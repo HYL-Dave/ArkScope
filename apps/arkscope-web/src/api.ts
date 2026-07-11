@@ -96,11 +96,45 @@ export interface EffectiveModelEntry {
   badge: "advanced" | "seed" | "custom" | "route" | null;
 }
 
+export type EffectiveModelStatus = "visible" | "seed" | "advanced" | "route";
+
+export interface EffectiveProviderModelEntry {
+  id: string;
+  label: string;
+  status: EffectiveModelStatus;
+  visible_to_credential: boolean | null;
+  eligible: boolean;
+  reason_code: string | null;
+  thinking_mode:
+    | "none"
+    | "manual_budget"
+    | "adaptive_opt_in"
+    | "adaptive_default_on"
+    | "adaptive_always_on"
+    | string;
+}
+
+export interface EffectiveProviderModels {
+  executable: boolean;
+  reason_code: string | null;
+  models: EffectiveProviderModelEntry[];
+  cache_state: "ok" | "seed_only" | "never_discovered" | string;
+  discovered_at: string | null;
+}
+
+export interface EffectiveProviderSummary {
+  credential_id: string;
+  auth_mode: CredentialAuthType;
+  label: string;
+}
+
 export interface EffectiveTaskModels {
   verified: EffectiveModelEntry[];
   advanced: EffectiveModelEntry[];
   cache_state: "ok" | "seed_only" | "never_discovered" | string;
   discovered_at: string | null;
+  current_provider?: ModelProvider;
+  providers?: Partial<Record<ModelProvider, EffectiveProviderModels>>;
 }
 
 export interface ModelCatalog {
@@ -113,7 +147,10 @@ export interface ModelCatalog {
   custom_allowed: boolean;
   // P2.7 additive: per-task verified/advanced partition (may be absent on old
   // sidecars — the picker falls back to the seed list).
-  effective?: { tasks: Partial<Record<ModelTask, EffectiveTaskModels>> };
+  effective?: {
+    providers?: Partial<Record<ModelProvider, EffectiveProviderSummary | null>>;
+    tasks: Partial<Record<ModelTask, EffectiveTaskModels>>;
+  };
 }
 
 // Explicit auth modes (backend normalizes legacy oauth/setup_token → these; it
@@ -170,6 +207,21 @@ export interface ModelTestResult {
   error: string | null;
   warning: string | null;
   fallback_effort: string | null;
+}
+
+export interface TaskModelTestResult {
+  task: ModelTask;
+  provider: ModelProvider;
+  model: string;
+  effort: string;
+  auth_mode: CredentialAuthType | null;
+  credential_id: string | null;
+  status: "ok" | "error" | "unsupported";
+  error_code: string | null;
+  latency_ms: number | null;
+  tested_at: string;
+  fallback_effort: string | null;
+  warning: string | null;
 }
 
 export interface WatchlistRow {
@@ -996,6 +1048,20 @@ export function testModelAccess(
     "POST",
     { provider, model, effort, credential_id: credentialId ?? null },
     45_000,
+  );
+}
+
+export function testTaskModelAccess(
+  task: ModelTask,
+  provider: ModelProvider,
+  model: string,
+  effort: string,
+): Promise<TaskModelTestResult> {
+  return sendJSON<TaskModelTestResult>(
+    "/config/model-task-test",
+    "POST",
+    { task, provider, model, effort },
+    60_000,
   );
 }
 

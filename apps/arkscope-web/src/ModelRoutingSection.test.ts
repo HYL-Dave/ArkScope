@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ModelRoutingSection } from "./Settings";
-import type { ModelCatalog, ModelOption, TaskRoute } from "./api";
+import type { ModelCatalog, ModelOption, ProviderCredential, TaskRoute, TaskModelTestResult } from "./api";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -58,7 +58,12 @@ function catalog(): ModelCatalog {
 
 type DraftDispatch = Parameters<typeof ModelRoutingSection>[0]["onDraft"];
 
-function render(onReset = vi.fn(), catOverride?: ModelCatalog, onDraftOverride?: DraftDispatch) {
+function render(
+  onReset = vi.fn(),
+  catOverride?: ModelCatalog,
+  onDraftOverride?: DraftDispatch,
+  extra: Record<string, unknown> = {},
+) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -77,6 +82,9 @@ function render(onReset = vi.fn(), catOverride?: ModelCatalog, onDraftOverride?:
       onDraft: onDraftOverride ?? vi.fn(),
       onTest: vi.fn(),
       onReset,
+      onDiscover: vi.fn(),
+      onInvalidateTest: vi.fn(),
+      ...extra,
     }));
   });
   return onReset;
@@ -103,81 +111,87 @@ describe("ModelRoutingSection reset affordance", () => {
   });
 });
 
-describe("ModelRoutingSection effective picker (P2.7)", () => {
-  function catalogWithEffective(): ModelCatalog {
+describe("ModelRoutingSection provider-first UX", () => {
+  const cred = (
+    provider: "openai" | "anthropic",
+    id: string,
+    authType: ProviderCredential["auth_type"],
+    label: string,
+  ): ProviderCredential => ({
+    id, provider, auth_type: authType, label, account_label: null, expires_at: null,
+    source: "profile_state.db", available: true, masked: null, active: true,
+    editable: true, can_discover_models: true, can_test_models: authType === "api_key", notes: "",
+  });
+
+  const entry = (
+    id: string,
+    status: "visible" | "advanced" | "route" | "seed",
+    eligible: boolean,
+    reason: string | null,
+    thinking = "none",
+    visible: boolean | null = true,
+  ) => ({
+    id, label: id, status, visible_to_credential: visible, eligible,
+    reason_code: reason, thinking_mode: thinking,
+  });
+
+  function catalogV2(): ModelCatalog {
     const cat = catalog();
-    // the shared fixture renders only two tasks; the picker tests need all three
     cat.tasks = [
       ...cat.tasks,
       { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-4-8" },
     ];
+    cat.credentials = {
+      openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT Plus")],
+      anthropic: [cred("anthropic", "local:4", "api_key", "Claude API")],
+    };
+    const openai = {
+      executable: true, reason_code: null, cache_state: "ok",
+      discovered_at: "2026-07-10T06:00:00Z",
+      models: [
+        entry("gpt-5.4-mini", "visible", true, null),
+        entry("gpt-5.6-luna", "visible", false, "task_capability_missing"),
+        entry("gpt-5.6-terra", "advanced", true, null),
+        entry("mystery-model", "route", true, "model_not_in_registry", "none", false),
+      ],
+    };
+    const anthropic = {
+      executable: true, reason_code: null, cache_state: "seed_only",
+      discovered_at: null,
+      models: [
+        entry("claude-sonnet-5", "seed", true, null, "adaptive_default_on", null),
+        entry("claude-opus-4-8", "advanced", true, null, "adaptive_opt_in", null),
+      ],
+    };
+    const taskBlock = (current: "openai" | "anthropic") => ({
+      verified: [], advanced: [], cache_state: "ok", discovered_at: null,
+      current_provider: current,
+      providers: { openai, anthropic },
+    });
     cat.effective = {
+      providers: {
+        openai: { credential_id: "local:7", auth_mode: "chatgpt_oauth", label: "ChatGPT Plus" },
+        anthropic: { credential_id: "local:4", auth_mode: "api_key", label: "Claude API" },
+      },
       tasks: {
-        ai_research: {
-          verified: [{ id: "gpt-5.4-mini", label: "GPT-5.4 mini", badge: null }],
-          advanced: [
-            { id: "claude-sonnet-4-6", label: "Sonnet 4.6", badge: "advanced" },
-            { id: "mystery-model", label: "mystery-model", badge: "route" },
-          ],
-          cache_state: "ok",
-          discovered_at: "2026-07-10T06:00:00Z",
-        },
-        card_synthesis: { verified: [], advanced: [], cache_state: "never_discovered", discovered_at: null },
-        card_translation: { verified: [], advanced: [], cache_state: "seed_only", discovered_at: null },
+        ai_research: taskBlock("openai"),
+        card_synthesis: taskBlock("openai"),
+        card_translation: taskBlock("anthropic"),
       },
     };
     return cat;
   }
 
-  it("defaults to verified models and reveals advanced with badges", () => {
-    render(vi.fn(), catalogWithEffective());
+  function researchCard() {
+    return host!.querySelector('[data-testid="route-ai_research"]')!;
+  }
 
-    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
-    const options = Array.from(research.querySelectorAll("option")).map((o) => (o as HTMLOptionElement).value);
-    expect(options.some((v) => v.includes("gpt-5.4-mini"))).toBe(true);
-    expect(options.some((v) => v.includes("claude-sonnet-4-6"))).toBe(false);  // advanced hidden by default
+  function buttonByText(parent: ParentNode, text: string): HTMLButtonElement {
+    return Array.from(parent.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === text) as HTMLButtonElement;
+  }
 
-    act(() => {
-      (research.querySelector('[aria-label="顯示進階模型"]') as HTMLInputElement).click();
-    });
-    const expanded = Array.from(research.querySelectorAll("option")).map((o) => (o as HTMLOptionElement).value);
-    expect(expanded.some((v) => v.includes("claude-sonnet-4-6"))).toBe(true);
-    expect(research.textContent).toContain("最後驗證可見");
-  });
-
-  it("shows discovery nudge only for never_discovered and badge for seed_only", () => {
-    render(vi.fn(), catalogWithEffective());
-
-    const synth = host!.querySelector('[data-testid="route-card_synthesis"]')!;
-    expect(synth.textContent).toContain("跑一次模型探索以驗證");
-    const trans = host!.querySelector('[data-testid="route-card_translation"]')!;
-    expect(trans.textContent).toContain("此通道無法線上列出模型");
-    expect(trans.textContent).not.toContain("跑一次模型探索以驗證");
-  });
-
-  it("collapses the full-seed selector into a manual override when effective is present", () => {
-    // Review MF1: the legacy full-seed selector must not remain a default path
-    // around verified-first — it lives inside a collapsed <details>.
-    render(vi.fn(), catalogWithEffective());
-    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
-    const override = research.querySelector('[data-testid="manual-override-ai_research"]') as HTMLDetailsElement;
-    expect(override).toBeTruthy();
-    expect(override.tagName.toLowerCase()).toBe("details");
-    expect(override.open).toBe(false);                       // collapsed by default
-    expect(override.textContent).toContain("手動覆寫");
-  });
-
-  it("renders the legacy selector directly when effective is absent", () => {
-    render(vi.fn());  // shared fixture has no effective block (old sidecar)
-    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
-    expect(research.querySelector('[data-testid="manual-override-ai_research"]')).toBeNull();
-    expect(research.querySelectorAll("select").length).toBeGreaterThan(0);
-  });
-
-  it("manual override still switches provider and updates the draft", () => {
-    // Review round-2 test gap: the collapsed override must keep full
-    // cross-provider selection working — selecting the other provider's model
-    // dispatches an onDraft update carrying the new provider.
+  it("shows provider controls directly and switching clears an incompatible model", () => {
     const drafts: unknown[] = [];
     const onDraft = vi.fn((updater: unknown) => {
       if (typeof updater === "function") {
@@ -186,33 +200,142 @@ describe("ModelRoutingSection effective picker (P2.7)", () => {
         }));
       }
     }) as unknown as DraftDispatch;
-    render(vi.fn(), catalogWithEffective(), onDraft);
+    const invalidate = vi.fn();
+    render(vi.fn(), catalogV2(), onDraft, { onInvalidateTest: invalidate });
 
-    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
-    const override = research.querySelector('[data-testid="manual-override-ai_research"]') as HTMLDetailsElement;
-    act(() => { override.open = true; });
-    const legacySelect = override.querySelector("select") as HTMLSelectElement;
-    // pick the anthropic seed from the legacy selector (cross-provider switch)
-    const anthropicOption = Array.from(legacySelect.options)
-      .find((o) => o.value.includes("anthropic") && o.value.includes("claude-opus-4-8"))!;
-    act(() => {
-      legacySelect.value = anthropicOption.value;
-      legacySelect.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    expect(onDraft).toHaveBeenCalled();
-    const updated = drafts.at(-1) as Record<string, { provider: string; model: string }>;
-    expect(updated.ai_research.provider).toBe("anthropic");
-    expect(updated.ai_research.model).toBe("claude-opus-4-8");
+    act(() => buttonByText(researchCard(), "Anthropic").click());
+    const updated = drafts.at(-1) as Record<string, { provider: string; model: string; effort: string }>;
+    expect(updated.ai_research).toMatchObject({ provider: "anthropic", model: "", effort: "default" });
+    expect(invalidate).toHaveBeenCalledWith("ai_research");
   });
 
-  it("keeps the saved route model selectable from advanced", () => {
-    render(vi.fn(), catalogWithEffective());
+  it("renders one selector with four groups and disables ineligible entries with text reasons", () => {
+    render(vi.fn(), catalogV2());
+    const card = researchCard();
+    const select = card.querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement;
+    expect(Array.from(select.querySelectorAll("optgroup")).map((g) => g.label)).toEqual([
+      "可供此任務使用", "此登入可見", "進階／未驗證", "目前路由",
+    ]);
+    const luna = Array.from(select.options).find((option) => option.value === "gpt-5.6-luna")!;
+    expect(luna.disabled).toBe(true);
+    expect(luna.textContent).toContain("缺少任務能力");
+    expect(luna.getAttribute("title")).toBeNull();
+    expect(card.textContent).toContain("缺少任務能力");
+  });
 
-    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
-    act(() => {
-      (research.querySelector('[aria-label="顯示進階模型"]') as HTMLInputElement).click();
+  it("has no advanced checkbox, manual override details, or duplicate seed selector", () => {
+    render(vi.fn(), catalogV2());
+    const card = researchCard();
+    expect(card.querySelector('[aria-label="顯示進階模型"]')).toBeNull();
+    expect(card.querySelector("details")).toBeNull();
+    expect(card.querySelectorAll('select[aria-label="模型 ai_research"]')).toHaveLength(1);
+  });
+
+  it("reveals a clearly marked custom id input", () => {
+    const drafts: unknown[] = [];
+    const onDraft = vi.fn((updater: unknown) => {
+      if (typeof updater === "function") {
+        drafts.push((updater as (p: Record<string, unknown>) => unknown)({
+          ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+        }));
+      }
+    }) as unknown as DraftDispatch;
+    render(vi.fn(), catalogV2(), onDraft);
+    const card = researchCard();
+    act(() => buttonByText(card, "輸入自訂 model id").click());
+    const updated = drafts.at(-1) as Record<string, { custom: boolean }>;
+    expect(updated.ai_research.custom).toBe(true);
+
+    act(() => root!.unmount());
+    root = null;
+    host!.remove();
+    host = null;
+    render(vi.fn(), catalogV2(), undefined, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: true },
+        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+      },
     });
-    const expanded = Array.from(research.querySelectorAll("option")).map((o) => (o as HTMLOptionElement).value);
-    expect(expanded.some((v) => v.includes("mystery-model"))).toBe(true);
+    expect(researchCard().querySelector('[aria-label="自訂 model id ai_research"]')).toBeTruthy();
+    expect(researchCard().textContent).toContain("未驗證");
+  });
+
+  it("shows credential identity/state/time and disables a missing provider", () => {
+    const cat = catalogV2();
+    render(vi.fn(), cat);
+    expect(researchCard().textContent).toContain("ChatGPT Plus");
+    expect(researchCard().textContent).toContain("最後驗證可見");
+
+    cat.effective!.providers!.openai = null;
+    render(vi.fn(), cat);
+    const card = researchCard();
+    expect(card.textContent).toContain("尚未設定此 provider 的登入");
+    expect((card.querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement).disabled).toBe(true);
+    expect(card.textContent).toContain("前往 Providers");
+  });
+
+  it("refreshes discovery for the selected provider credential", () => {
+    const discover = vi.fn();
+    render(vi.fn(), catalogV2(), undefined, { onDiscover: discover });
+    act(() => buttonByText(researchCard(), "重新驗證列表").click());
+    expect(discover).toHaveBeenCalledWith("openai", "local:7");
+  });
+
+  it("renders thinking behavior as read-only", () => {
+    render(vi.fn(), catalogV2());
+    const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
+    expect(translation.textContent).toContain("可選擇 adaptive thinking");
+    expect(translation.querySelector('[aria-label="Thinking card_translation"]')).toBeNull();
+  });
+
+  it("uses the task-scoped test and explains subscription billing", () => {
+    const onTest = vi.fn();
+    render(vi.fn(), catalogV2(), undefined, { onTest });
+    const card = researchCard();
+    expect(card.textContent).toContain("消耗訂閱額度，非 API 帳單");
+    act(() => buttonByText(card, "實際測試").click());
+    expect(onTest).toHaveBeenCalledWith("ai_research");
+  });
+
+  it("keeps route-pinned unknown models in the current route group", () => {
+    render(vi.fn(), catalogV2());
+    const select = researchCard().querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement;
+    const routeGroup = Array.from(select.querySelectorAll("optgroup"))
+      .find((group) => group.label === "目前路由")!;
+    expect(routeGroup.textContent).toContain("mystery-model");
+    expect((routeGroup.querySelector("option") as HTMLOptionElement).disabled).toBe(false);
+  });
+
+  it("marks a changed test snapshot stale and does not show the old result", () => {
+    const result: TaskModelTestResult = {
+      task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+      auth_mode: "chatgpt_oauth", credential_id: "local:7", status: "ok",
+      error_code: null, latency_ms: 12, tested_at: "2026-07-11T00:00:00Z",
+      fallback_effort: null, warning: null,
+    };
+    render(vi.fn(), catalogV2(), undefined, {
+      testState: {
+        ai_research: {
+          loading: false, result, stale: true,
+          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low", credential_id: "local:7" },
+        },
+      },
+    });
+    expect(researchCard().textContent).toContain("選擇已變更——重新測試");
+    expect(researchCard().textContent).not.toContain("12 ms");
+  });
+
+  it("degrades honestly against an old sidecar without reviving hidden controls", () => {
+    const cat = catalog();
+    cat.credentials.openai = [cred("openai", "local:7", "api_key", "OpenAI API")];
+    render(vi.fn(), cat);
+    const card = researchCard();
+    expect(buttonByText(card, "OpenAI")).toBeTruthy();
+    expect(card.textContent).toContain("未驗證（舊 sidecar 相容模式）");
+    expect(card.textContent).toContain("請重啟／更新 sidecar");
+    expect((buttonByText(card, "實際測試")).disabled).toBe(true);
+    expect(card.querySelector('[aria-label="顯示進階模型"]')).toBeNull();
+    expect(card.querySelector("details")).toBeNull();
   });
 });

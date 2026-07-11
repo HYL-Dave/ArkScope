@@ -37,7 +37,7 @@ import {
   applyAppRecordsMigration,
   type AppRecordsMigrationPreview,
   type AppRecordsMigrationResult,
-  testModelAccess,
+  testTaskModelAccess,
   updateCredential,
   type MarketDataStatus,
   type MacroSnapshot,
@@ -56,18 +56,25 @@ import {
   type ScheduleSourceState,
   type SyncMeta,
   type ModelCatalog,
-  type EffectiveTaskModels,
+  type EffectiveProviderModelEntry,
   type ModelDiscoveryResult,
   type ModelOption,
   type ModelProvider,
-  type ModelTestResult,
+  type TaskModelTestResult,
   type ModelTask,
   type ProviderCredential,
   type ResearchRuntimeSettings,
   type RuntimeConfig,
   type TaskRoute,
 } from "./api";
-import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider, runDiscoveryAndRefreshCatalog } from "./modelSelect";
+import { runDiscoveryAndRefreshCatalog } from "./modelSelect";
+import {
+  blockedRouteSaves,
+  isTaskTestSnapshotCurrent,
+  providerContexts,
+  type DraftRouteValue,
+  type TaskTestSnapshot,
+} from "./modelRoutingUx";
 import {
   activeFirst,
   addApiKeyButtonLabel,
@@ -181,12 +188,7 @@ const SETTINGS_SECTIONS: Array<{
   },
 ];
 
-interface DraftRoute {
-  provider: ModelProvider;
-  model: string;
-  effort: string;
-  custom: boolean;
-}
+interface DraftRoute extends DraftRouteValue {}
 
 type DiscoveryState = Partial<Record<ModelProvider, {
   loading: boolean;
@@ -196,7 +198,9 @@ type DiscoveryState = Partial<Record<ModelProvider, {
 
 type TestState = Partial<Record<ModelTask, {
   loading: boolean;
-  result: ModelTestResult | null;
+  result: TaskModelTestResult | null;
+  snapshot: TaskTestSnapshot | null;
+  stale: boolean;
 }>>;
 
 type CredentialMetadataDraft = {
@@ -249,8 +253,44 @@ export function SettingsView({
     return grouped;
   }, [catalog]);
 
+  const modelProviderContexts = useMemo(
+    () => catalog
+      ? providerContexts(catalog.effective?.providers, catalog.credentials)
+      : { anthropic: null, openai: null },
+    [catalog],
+  );
+  const routeSaveBlocks = useMemo(
+    () => catalog ? blockedRouteSaves(draft, catalog.routes, modelProviderContexts) : [],
+    [catalog, draft, modelProviderContexts],
+  );
+
+  function invalidateTaskTest(task: ModelTask) {
+    setTestState((prev) => {
+      const state = prev[task];
+      if (!state) return prev;
+      return { ...prev, [task]: { ...state, loading: false, stale: true } };
+    });
+  }
+
+  function invalidateAllTaskTests() {
+    setTestState((prev) => Object.fromEntries(
+      Object.entries(prev).map(([task, state]) => [
+        task,
+        state ? { ...state, loading: false, stale: true } : state,
+      ]),
+    ) as TestState);
+  }
+
   async function save() {
     if (!catalog) return;
+    if (routeSaveBlocks.length) {
+      setErr(
+        routeSaveBlocks
+          .map(({ task }) => `${TASK_LABELS[task]}：所選 provider 尚未設定登入`)
+          .join("；"),
+      );
+      return;
+    }
     setSaving(true);
     setErr(null);
     setMsg(null);
@@ -265,6 +305,7 @@ export function SettingsView({
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
+      setTestState({});
       await onRuntimeChanged();
       setMsg("模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。");
     } catch (e) {
@@ -283,6 +324,7 @@ export function SettingsView({
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
+      setTestState({});
       await onRuntimeChanged();
       const imp = res.imported.length ? `匯入 ${res.imported.length}` : "無可匯入";
       const skip = res.skipped.length ? `，略過 ${res.skipped.length}（不完整／不一致）` : "";
@@ -304,6 +346,7 @@ export function SettingsView({
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
+      setTestState({});
       await onRuntimeChanged();
       const cleared = res.cleared.length ? `，清除 ${res.cleared.length} 個無 DB 路由的舊鍵` : "";
       setMsg(`已將 DB 路由寫回設定檔（${res.exported.length} 筆${cleared}）。`);
@@ -346,6 +389,44 @@ export function SettingsView({
     }
   }
 
+  async function discoverAndRefresh(provider: ModelProvider, credentialId: string | null) {
+    setDiscovery((prev) => ({
+      ...prev,
+      [provider]: { loading: true, result: null, credentialId },
+    }));
+    try {
+      await runDiscoveryAndRefreshCatalog({
+        discover: () => discoverModels(provider, credentialId),
+        fetchCatalog: getModelCatalog,
+        onResult: (result) =>
+          setDiscovery((prev) => ({
+            ...prev,
+            [provider]: { loading: false, result, credentialId },
+          })),
+        onCatalog: (next) => {
+          setCatalog(next);
+          invalidateAllTaskTests();
+        },
+      });
+    } catch (e) {
+      setDiscovery((prev) => ({
+        ...prev,
+        [provider]: {
+          loading: false,
+          credentialId,
+          result: {
+            provider,
+            credential_id: credentialId,
+            status: "error",
+            models: [],
+            error: e instanceof Error ? e.message : String(e),
+            source_url: null,
+          },
+        },
+      }));
+    }
+  }
+
   return (
     <main className="main settings-page">
       <div className="page-head">
@@ -373,7 +454,12 @@ export function SettingsView({
           >
             匯出到設定檔
           </button>
-          <button className="btn-ghost" onClick={() => void save()} disabled={saving || loading || !catalog}>
+          <button
+            className="btn-ghost"
+            onClick={() => void save()}
+            disabled={saving || loading || !catalog || routeSaveBlocks.length > 0}
+            aria-describedby={routeSaveBlocks.length ? "route-save-blocked" : undefined}
+          >
             {saving ? "儲存中…" : "儲存路由"}
           </button>
         </div>
@@ -381,6 +467,11 @@ export function SettingsView({
 
       {err && <p className="error-text">{err}</p>}
       {msg && <p className="ok-text">{msg}</p>}
+      {routeSaveBlocks.length > 0 && (
+        <p id="route-save-blocked" className="warn-text">
+          本次變更尚未儲存：請先到 Providers 完成所選 provider 的登入。
+        </p>
+      )}
 
       {runtime && (
         <section className="settings-band">
@@ -437,30 +528,60 @@ export function SettingsView({
                   onTest={async (task) => {
                     const row = draft[task];
                     if (!row || !row.model.trim()) return;
-                    setTestState((prev) => ({ ...prev, [task]: { loading: true, result: null } }));
+                    const context = modelProviderContexts[row.provider];
+                    if (!context) return;
+                    const snapshot: TaskTestSnapshot = {
+                      task,
+                      provider: row.provider,
+                      model: row.model.trim(),
+                      effort: row.effort || "default",
+                      credential_id: context.credential_id,
+                    };
+                    setTestState((prev) => ({
+                      ...prev,
+                      [task]: { loading: true, result: null, snapshot, stale: false },
+                    }));
                     try {
-                      const result = await testModelAccess(row.provider, row.model.trim(), row.effort || "default");
-                      setTestState((prev) => ({ ...prev, [task]: { loading: false, result } }));
+                      const result = await testTaskModelAccess(
+                        task, row.provider, row.model.trim(), row.effort || "default",
+                      );
+                      setTestState((prev) => ({
+                        ...prev,
+                        [task]: {
+                          loading: false,
+                          result,
+                          snapshot,
+                          stale: prev[task]?.stale ?? false,
+                        },
+                      }));
                     } catch (e) {
                       setTestState((prev) => ({
                         ...prev,
                         [task]: {
                           loading: false,
+                          snapshot,
+                          stale: prev[task]?.stale ?? false,
                           result: {
+                            task,
                             provider: row.provider,
+                            auth_mode: context.auth_mode,
                             credential_id: null,
                             model: row.model,
                             effort: row.effort || "default",
                             status: "error",
+                            error_code: "provider_call_failed",
                             latency_ms: null,
-                            error: e instanceof Error ? e.message : String(e),
-                            warning: null,
+                            tested_at: new Date().toISOString(),
+                            warning: e instanceof Error ? e.message : String(e),
                             fallback_effort: null,
                           },
                         },
                       }));
                     }
                   }}
+                  onInvalidateTest={invalidateTaskTest}
+                  onDiscover={discoverAndRefresh}
+                  onOpenProviders={() => setSection("providers")}
                   onReset={async (task) => {
                     setErr(null);
                     setMsg(null);
@@ -469,6 +590,7 @@ export function SettingsView({
                       const refreshed = await getModelCatalog();
                       setCatalog(refreshed);
                       setDraft(fromRoutes(refreshed.routes));
+                      invalidateTaskTest(task);
                       await onRuntimeChanged();
                       setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
                     } catch (e) {
@@ -495,44 +617,11 @@ export function SettingsView({
                 onRefresh={async () => {
                   const refreshed = await getModelCatalog();
                   setCatalog(refreshed);
+                  invalidateAllTaskTests();
                   await onRuntimeChanged();
                 }}
                 onDiscover={async (provider, credentialId) => {
-                  setDiscovery((prev) => ({
-                    ...prev,
-                    [provider]: { loading: true, result: null, credentialId },
-                  }));
-                  try {
-                    // MF2: a successful discovery updates the entitlement cache —
-                    // the helper refetches the catalog so the effective picker
-                    // leaves never_discovered without an app reload.
-                    await runDiscoveryAndRefreshCatalog({
-                      discover: () => discoverModels(provider, credentialId),
-                      fetchCatalog: getModelCatalog,
-                      onResult: (result) =>
-                        setDiscovery((prev) => ({
-                          ...prev,
-                          [provider]: { loading: false, result, credentialId },
-                        })),
-                      onCatalog: setCatalog,
-                    });
-                  } catch (e) {
-                    setDiscovery((prev) => ({
-                      ...prev,
-                      [provider]: {
-                        loading: false,
-                        credentialId,
-                        result: {
-                          provider,
-                          credential_id: credentialId,
-                          status: "error",
-                          models: [],
-                          error: e instanceof Error ? e.message : String(e),
-                          source_url: null,
-                        },
-                      },
-                    }));
-                  }
+                  await discoverAndRefresh(provider, credentialId);
                 }}
                 onClearDiscovery={(provider) => {
                   setDiscovery((prev) => {
@@ -542,6 +631,7 @@ export function SettingsView({
                   });
                 }}
                 onUseModel={(provider, model, task) => {
+                  invalidateTaskTest(task);
                   onDraftForTask(setDraft, task, provider, model);
                   setSection("models");
                 }}
@@ -2017,81 +2107,105 @@ function DataSourcesSection() {
   );
 }
 
-const EFFECTIVE_BADGE_LABELS: Record<string, string> = {
-  advanced: "舊版",
-  seed: "未驗證 seed",
-  custom: "自訂",
-  route: "目前路由",
+const MODEL_REASON_LABELS: Record<string, string> = {
+  missing_active_credential: "尚未設定此 provider 的登入",
+  task_auth_mode_unsupported: "此登入方式不支援這個任務",
+  task_test_unsupported: "此登入方式尚不支援實際測試",
+  task_capability_missing: "缺少任務能力",
+  model_not_visible: "此登入的探索清單未顯示此模型",
+  model_not_in_registry: "自訂／未知模型，尚未驗證能力",
+  discovery_unavailable: "暫時無法讀取模型探索狀態",
+  provider_call_failed: "provider 實際呼叫失敗",
+  reauth_required: "登入已失效，請重新登入",
 };
 
-// P2.7 verified-first picker: default list = 已驗證可用 (registry ∩ discovery ∩
-// executability);其餘 (舊版/seed/自訂/目前路由) 收進「顯示進階模型」。
-function EffectiveModelPicker({
-  task,
-  effective,
-  row,
-  onDraft,
-}: {
-  task: ModelTask;
-  effective: EffectiveTaskModels;
-  row: DraftRoute;
-  onDraft: Dispatch<SetStateAction<Partial<Record<ModelTask, DraftRoute>>>>;
-}) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const entries = showAdvanced
-    ? [...effective.verified, ...effective.advanced]
-    : effective.verified;
-  return (
-    <div className="field">
-      <span>已驗證可用模型</span>
-      {effective.cache_state === "never_discovered" && (
-        <p className="muted tiny">尚未探索——跑一次模型探索以驗證此 credential 可見的模型。</p>
-      )}
-      {effective.cache_state === "seed_only" && (
-        <p className="muted tiny">此通道無法線上列出模型；以下為 seed 候選（未驗證）。</p>
-      )}
-      {effective.discovered_at && (
-        <p className="muted tiny">最後驗證可見 {effective.discovered_at}</p>
-      )}
-      <select
-        aria-label={`已驗證模型 ${task}`}
-        value={entries.some((m) => m.id === row.model) ? row.model : ""}
-        onChange={(e) => {
-          const id = e.target.value;
-          if (!id) return;
-          const inferred = inferProvider(id);
-          onDraft((prev) => ({
-            ...prev,
-            [task]: {
-              provider: inferred ?? row.provider,
-              model: id,
-              effort: (inferred ?? row.provider) === row.provider ? row.effort : "default",
-              custom: false,
-            },
-          }));
-        }}
-      >
-        <option value="">選擇模型…</option>
-        {entries.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-            {m.badge ? ` · ${EFFECTIVE_BADGE_LABELS[m.badge] ?? m.badge}` : ""}
-          </option>
-        ))}
-      </select>
-      <label className="muted tiny">
-        <input
-          type="checkbox"
-          aria-label="顯示進階模型"
-          checked={showAdvanced}
-          onChange={(e) => setShowAdvanced(e.currentTarget.checked)}
-        />
-        顯示進階模型（舊版 / 未驗證 / 自訂 / 目前路由）
-      </label>
-    </div>
-  );
+const THINKING_LABELS: Record<string, string> = {
+  none: "無特殊 thinking 行為",
+  manual_budget: "使用手動 thinking budget",
+  adaptive_opt_in: "可選擇 adaptive thinking",
+  adaptive_default_on: "預設開啟 adaptive thinking",
+  adaptive_always_on: "固定開啟 adaptive thinking",
+};
+
+const AUTH_MODE_LABELS: Record<string, string> = {
+  api_key: "API key",
+  api_key_pool: "API key pool",
+  chatgpt_oauth: "ChatGPT 訂閱登入",
+  claude_code_oauth: "Claude 訂閱登入",
+};
+
+type ModelEntryGroup = {
+  label: string;
+  entries: Array<EffectiveProviderModelEntry & { disabledReason: string | null }>;
+};
+
+function optionReason(
+  entry: EffectiveProviderModelEntry,
+  providerReason: string | null,
+): string | null {
+  if (providerReason) return providerReason;
+  if (!entry.eligible) return entry.reason_code ?? "task_capability_missing";
+  if (entry.visible_to_credential === false && entry.status !== "route") {
+    return "model_not_visible";
+  }
+  return null;
 }
 
+function groupedModelEntries(
+  entries: EffectiveProviderModelEntry[],
+  providerReason: string | null,
+): ModelEntryGroup[] {
+  const withReason = entries.map((entry) => ({
+    ...entry,
+    disabledReason: optionReason(entry, providerReason),
+  }));
+  return [
+    {
+      label: "可供此任務使用",
+      entries: withReason.filter((entry) => entry.status === "visible" && !entry.disabledReason),
+    },
+    {
+      label: "此登入可見",
+      entries: withReason.filter((entry) => entry.status === "visible" && !!entry.disabledReason),
+    },
+    {
+      label: "進階／未驗證",
+      entries: withReason.filter((entry) => entry.status === "advanced" || entry.status === "seed"),
+    },
+    {
+      label: "目前路由",
+      entries: withReason.filter((entry) => entry.status === "route"),
+    },
+  ];
+}
+
+function compatEntries(
+  provider: ModelProvider,
+  row: DraftRoute,
+  modelsByProvider: Record<ModelProvider, ModelOption[]>,
+): EffectiveProviderModelEntry[] {
+  const entries: EffectiveProviderModelEntry[] = (modelsByProvider[provider] ?? []).map((model) => ({
+    id: model.id,
+    label: `${model.label} · 未驗證（舊 sidecar 相容模式）`,
+    status: "advanced",
+    visible_to_credential: null,
+    eligible: true,
+    reason_code: null,
+    thinking_mode: "none",
+  }));
+  if (row.model && !entries.some((entry) => entry.id === row.model)) {
+    entries.push({
+      id: row.model,
+      label: `${row.model} · 未驗證（舊 sidecar 相容模式）`,
+      status: "route",
+      visible_to_credential: null,
+      eligible: true,
+      reason_code: "model_not_in_registry",
+      thinking_mode: "none",
+    });
+  }
+  return entries;
+}
 
 export function ModelRoutingSection({
   catalog,
@@ -2101,6 +2215,9 @@ export function ModelRoutingSection({
   onDraft,
   onTest,
   onReset,
+  onDiscover = async () => {},
+  onInvalidateTest = () => {},
+  onOpenProviders = () => {},
 }: {
   catalog: ModelCatalog;
   draft: Partial<Record<ModelTask, DraftRoute>>;
@@ -2109,14 +2226,25 @@ export function ModelRoutingSection({
   onDraft: Dispatch<SetStateAction<Partial<Record<ModelTask, DraftRoute>>>>;
   onTest: (task: ModelTask) => Promise<void>;
   onReset: (task: ModelTask) => Promise<void>;
+  onDiscover?: (provider: ModelProvider, credentialId: string) => Promise<void> | void;
+  onInvalidateTest?: (task: ModelTask) => void;
+  onOpenProviders?: () => void;
 }) {
+  const contexts = providerContexts(catalog.effective?.providers, catalog.credentials);
+  const compatMode = !catalog.effective?.providers;
+
+  const updateTask = (task: ModelTask, next: DraftRoute) => {
+    onInvalidateTest(task);
+    onDraft((prev) => ({ ...prev, [task]: next }));
+  };
+
   return (
     <>
       <div className="settings-section-head">
         <div>
           <h2>任務模型路由</h2>
           <p className="muted">
-            這裡控制實際會被 AI card / 翻譯呼叫的模型。可以從 seed/discovery 套用，也可以直接輸入 provider model id。
+            登入在 Providers 管理；這裡只決定每個任務使用哪個 provider、模型與 effort。
           </p>
         </div>
       </div>
@@ -2124,12 +2252,57 @@ export function ModelRoutingSection({
         {catalog.tasks.map((task) => {
           const row = draft[task.id];
           if (!row) return null;
-          const options = modelsByProvider[row.provider];
-          const effortOptions = catalog.effort_options[row.provider] ?? [];
-          const effective = catalog.routes[task.id];
-          const envLocked = effective?.source === "env";
-          const currentTest = testState[task.id];
+          const effectiveRoute = catalog.routes[task.id];
+          const envLocked = effectiveRoute?.source === "env";
+          const context = contexts[row.provider];
           const taskEffective = catalog.effective?.tasks?.[task.id];
+          const providerBlock = taskEffective?.providers?.[row.provider];
+          const rawEntries = providerBlock?.models
+            ?? compatEntries(row.provider, row, modelsByProvider);
+          const entries = rawEntries.some((entry) => entry.id === row.model) || !row.model
+            ? rawEntries
+            : [
+                ...rawEntries,
+                {
+                  id: row.model,
+                  label: row.model,
+                  status: "route" as const,
+                  visible_to_credential: null,
+                  eligible: true,
+                  reason_code: "model_not_in_registry",
+                  thinking_mode: "none",
+                },
+              ];
+          const providerReason = context
+            ? (providerBlock?.reason_code ?? null)
+            : "missing_active_credential";
+          const groups = groupedModelEntries(entries, providerReason);
+          const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
+          const selectedReason = selectedEntry ? optionReason(selectedEntry, providerReason) : null;
+          const disabledReasons = Array.from(new Set(
+            groups.flatMap((group) => group.entries)
+              .map((entry) => entry.disabledReason)
+              .filter((reason): reason is string => !!reason),
+          ));
+          const effortOptions = catalog.effort_options[row.provider] ?? [];
+          const currentTest = testState[task.id];
+          const testIsCurrent = !!(
+            currentTest?.snapshot
+            && isTaskTestSnapshotCurrent(currentTest.snapshot, {
+              task: task.id,
+              route: row,
+              credentialId: context?.credential_id ?? null,
+              stale: currentTest.stale,
+            })
+          );
+          const modelSelectDisabled = !context || (!!providerBlock && !providerBlock.executable);
+          const testDisabled = (
+            compatMode
+            || modelSelectDisabled
+            || !row.model.trim()
+            || !!selectedReason
+            || !!currentTest?.loading
+          );
           return (
             <div className="settings-panel" key={task.id} data-testid={`route-${task.id}`}>
               <div className="settings-panel-head">
@@ -2138,207 +2311,228 @@ export function ModelRoutingSection({
                   <p className="muted">{task.description}</p>
                 </div>
                 <span
-                  className={`route-source ${routeSourceBadge(effective?.source ?? "default").tone}`}
-                  title={`此路由目前的權威來源：${routeSourceBadge(effective?.source ?? "default").label}`}
+                  className={`route-source ${routeSourceBadge(effectiveRoute?.source ?? "default").tone}`}
+                  aria-label={`路由權威 ${routeSourceBadge(effectiveRoute?.source ?? "default").label}`}
                 >
-                  {routeSourceBadge(effective?.source ?? "default").label}
+                  {routeSourceBadge(effectiveRoute?.source ?? "default").label}
                 </span>
               </div>
 
               {envLocked && (
                 <p className="warn-text">
-                  目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準（不會被 DB 覆蓋）。
+                  目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。
                 </p>
               )}
-              {effective?.warning && <p className="warn-text">{effective.warning}</p>}
-              {taskEffective && (
-                <EffectiveModelPicker
-                  task={task.id}
-                  effective={taskEffective}
-                  row={row}
-                  onDraft={onDraft}
-                />
-              )}
+              {effectiveRoute?.warning && <p className="warn-text">{effectiveRoute.warning}</p>}
 
-              {/* MF1: with the effective picker present, the full-seed
-                  selector + custom-id input become a collapsed manual override —
-                  no default path around verified-first. Without `effective`
-                  (older sidecar) they render as before. */}
-              {taskEffective ? (
-                <details className="field" data-testid={`manual-override-${task.id}`}>
-                  <summary className="muted tiny">手動覆寫（全部 seed 模型 / 自訂 id）</summary>
-              <label className="field">
-                <span>Model</span>
-                <select
-                  value={row.custom ? MODEL_OPTION_CUSTOM : encodeModelOption(row.provider, row.model)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === MODEL_OPTION_CUSTOM) {
-                      // switch to custom-id mode; keep the current provider/model as the starting point
-                      onDraft((prev) => ({ ...prev, [task.id]: { ...row, custom: true } }));
-                      return;
-                    }
-                    const dec = decodeModelOption(v);
-                    if (!dec) return;
-                    onDraft((prev) => ({
-                      ...prev,
-                      [task.id]: {
-                        provider: dec.provider,
-                        model: dec.model,
-                        // reset effort only when the provider changed (effort sets differ)
-                        effort: dec.provider === row.provider ? row.effort : "default",
-                        custom: false,
-                      },
-                    }));
-                  }}
-                >
-                  {catalog.providers.map((p) => (
-                    <optgroup key={p} label={p}>
-                      {(modelsByProvider[p] ?? []).map((m) => (
-                        <option key={`${p}:${m.id}`} value={encodeModelOption(p, m.id)}>
-                          {p} · {m.label}
-                        </option>
-                      ))}
-                    </optgroup>
+              <div className="field">
+                <span>Provider</span>
+                <div className="model-provider-toggle" role="group" aria-label={`Provider ${task.id}`}>
+                  {(["openai", "anthropic"] as ModelProvider[]).map((provider) => (
+                    <button
+                      key={provider}
+                      type="button"
+                      className={row.provider === provider ? "active" : ""}
+                      aria-pressed={row.provider === provider}
+                      onClick={() => {
+                        if (provider === row.provider) return;
+                        const nextBlock = taskEffective?.providers?.[provider];
+                        const nextModels = nextBlock?.models
+                          ?? compatEntries(provider, row, modelsByProvider);
+                        const keepModel = nextModels.some((entry) => entry.id === row.model);
+                        updateTask(task.id, {
+                          provider,
+                          model: keepModel ? row.model : "",
+                          effort: "default",
+                          custom: false,
+                        });
+                      }}
+                    >
+                      {provider === "openai" ? "OpenAI" : "Anthropic"}
+                    </button>
                   ))}
-                  <option value={MODEL_OPTION_CUSTOM}>自訂 model id…</option>
-                </select>
-                <span className="field-help">直接選模型即可，provider 會自動設定；或選「自訂 model id」手動輸入。</span>
-              </label>
+                </div>
+              </div>
 
-              {row.custom && (
-                <label className="field">
-                  <span>自訂 model id</span>
-                  <input
-                    value={row.model}
-                    placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
-                    onChange={(e) => {
-                      const value = e.target.value.trim();
-                      const inferred = inferProvider(value);
-                      onDraft((prev) => ({
-                        ...prev,
-                        [task.id]: { ...row, provider: inferred ?? row.provider, model: value, custom: true },
-                      }));
-                    }}
-                  />
-                  <span className="field-help">
-                    由 prefix 自動判斷 provider（gpt-… → openai，claude-… → anthropic）；判斷不出時沿用目前 provider（{row.provider}）。
-                  </span>
-                </label>
+              <div className={`model-credential-summary ${context ? "ok" : "missing"}`}>
+                {context ? (
+                  <>
+                    <strong>{context.label}</strong>
+                    <span>{AUTH_MODE_LABELS[context.auth_mode] ?? context.auth_mode}</span>
+                    <span>
+                      {providerBlock?.cache_state === "ok"
+                        ? "已取得可見模型清單"
+                        : providerBlock?.cache_state === "seed_only"
+                          ? "此通道無法線上列出模型"
+                          : "尚未探索此登入的模型"}
+                    </span>
+                    {providerBlock?.discovered_at && (
+                      <span>最後驗證可見 {formatSystemTimestamp(providerBlock.discovered_at)}</span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      onClick={() => void onDiscover(row.provider, context.credential_id)}
+                    >
+                      重新驗證列表
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <strong>尚未設定此 provider 的登入</strong>
+                    <button type="button" className="btn-ghost small" onClick={onOpenProviders}>
+                      前往 Providers
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {compatMode && (
+                <p className="warn-text">
+                  未驗證（舊 sidecar 相容模式）。請重啟／更新 sidecar 後再執行模型測試。
+                </p>
               )}
 
-                </details>
+              {!row.custom ? (
+                <div className="field">
+                  <span>Model</span>
+                  <select
+                    aria-label={`模型 ${task.id}`}
+                    value={entries.some((entry) => entry.id === row.model) ? row.model : ""}
+                    disabled={modelSelectDisabled}
+                    onChange={(event) => {
+                      const model = event.currentTarget.value;
+                      if (!model) return;
+                      updateTask(task.id, { ...row, model, custom: false });
+                    }}
+                  >
+                    <option value="">選擇模型…</option>
+                    {groups.map((group) => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.entries.map((entry) => (
+                          <option
+                            key={`${group.label}:${entry.id}`}
+                            value={entry.id}
+                            disabled={!!entry.disabledReason}
+                          >
+                            {entry.label}
+                            {entry.disabledReason
+                              ? ` · ${MODEL_REASON_LABELS[entry.disabledReason] ?? entry.disabledReason}`
+                              : entry.status === "advanced"
+                                ? " · 進階"
+                                : entry.status === "seed"
+                                  ? " · 未驗證"
+                                  : entry.status === "route" && entry.reason_code
+                                    ? ` · ${MODEL_REASON_LABELS[entry.reason_code] ?? entry.reason_code}`
+                                    : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {disabledReasons.length > 0 && (
+                    <p className="field-help" aria-label={`模型限制 ${task.id}`}>
+                      不可選：{disabledReasons.map((reason) => MODEL_REASON_LABELS[reason] ?? reason).join("；")}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-ghost small model-custom-toggle"
+                    disabled={!context}
+                    onClick={() => updateTask(task.id, { ...row, custom: true })}
+                  >
+                    輸入自訂 model id
+                  </button>
+                </div>
               ) : (
-                <>
-              <label className="field">
-                <span>Model</span>
-                <select
-                  value={row.custom ? MODEL_OPTION_CUSTOM : encodeModelOption(row.provider, row.model)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === MODEL_OPTION_CUSTOM) {
-                      // switch to custom-id mode; keep the current provider/model as the starting point
-                      onDraft((prev) => ({ ...prev, [task.id]: { ...row, custom: true } }));
-                      return;
-                    }
-                    const dec = decodeModelOption(v);
-                    if (!dec) return;
-                    onDraft((prev) => ({
-                      ...prev,
-                      [task.id]: {
-                        provider: dec.provider,
-                        model: dec.model,
-                        // reset effort only when the provider changed (effort sets differ)
-                        effort: dec.provider === row.provider ? row.effort : "default",
-                        custom: false,
-                      },
-                    }));
-                  }}
-                >
-                  {catalog.providers.map((p) => (
-                    <optgroup key={p} label={p}>
-                      {(modelsByProvider[p] ?? []).map((m) => (
-                        <option key={`${p}:${m.id}`} value={encodeModelOption(p, m.id)}>
-                          {p} · {m.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                  <option value={MODEL_OPTION_CUSTOM}>自訂 model id…</option>
-                </select>
-                <span className="field-help">直接選模型即可，provider 會自動設定；或選「自訂 model id」手動輸入。</span>
-              </label>
-
-              {row.custom && (
-                <label className="field">
-                  <span>自訂 model id</span>
+                <div className="field">
+                  <span>自訂 model id · 未驗證</span>
                   <input
+                    aria-label={`自訂 model id ${task.id}`}
                     value={row.model}
                     placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
-                    onChange={(e) => {
-                      const value = e.target.value.trim();
-                      const inferred = inferProvider(value);
-                      onDraft((prev) => ({
-                        ...prev,
-                        [task.id]: { ...row, provider: inferred ?? row.provider, model: value, custom: true },
-                      }));
-                    }}
+                    onChange={(event) => updateTask(task.id, {
+                      ...row,
+                      model: event.currentTarget.value.trim(),
+                      custom: true,
+                    })}
                   />
-                  <span className="field-help">
-                    由 prefix 自動判斷 provider（gpt-… → openai，claude-… → anthropic）；判斷不出時沿用目前 provider（{row.provider}）。
-                  </span>
-                </label>
-              )}
-
-                </>
+                  <span className="field-help">自訂 id 仍會經過「實際測試」；不會被當成已驗證模型。</span>
+                  <button
+                    type="button"
+                    className="btn-ghost small model-custom-toggle"
+                    onClick={() => updateTask(task.id, { ...row, custom: false })}
+                  >
+                    返回模型列表
+                  </button>
+                </div>
               )}
 
               <label className="field">
-                <span>Effort / thinking</span>
+                <span>Effort</span>
                 <select
+                  aria-label={`Effort ${task.id}`}
                   value={row.effort || "default"}
-                  onChange={(e) => {
-                    onDraft((prev) => ({
-                      ...prev,
-                      [task.id]: { ...row, effort: e.target.value },
-                    }));
-                  }}
+                  onChange={(event) => updateTask(task.id, {
+                    ...row,
+                    effort: event.currentTarget.value,
+                  })}
                 >
                   {effortOptions.map((effort) => (
-                    <option key={effort.id} value={effort.id}>
-                      {effort.label}
-                    </option>
+                    <option key={effort.id} value={effort.id}>{effort.label}</option>
                   ))}
                 </select>
                 <span className="field-help">
-                  {effortOptions.find((x) => x.id === (row.effort || "default"))?.description ??
-                    "Provider default."}
+                  {effortOptions.find((item) => item.id === (row.effort || "default"))?.description
+                    ?? "Provider default."}
                 </span>
               </label>
 
-              <ModelNotes models={options} selected={row.model} custom={row.custom} />
+              <div className="model-thinking-line">
+                <span>Thinking</span>
+                <strong>
+                  {THINKING_LABELS[selectedEntry?.thinking_mode ?? "none"]
+                    ?? selectedEntry?.thinking_mode
+                    ?? THINKING_LABELS.none}
+                </strong>
+              </div>
+
+              <ModelNotes
+                models={modelsByProvider[row.provider] ?? []}
+                selected={row.model}
+                custom={row.custom}
+              />
 
               <div className="settings-actions">
                 <button
                   type="button"
                   className="btn-ghost small"
-                  disabled={!row.model.trim() || currentTest?.loading}
+                  disabled={testDisabled}
                   onClick={() => void onTest(task.id)}
                 >
-                  {currentTest?.loading ? "測試中…" : "測試此模型"}
+                  {currentTest?.loading && testIsCurrent ? "測試中…" : "實際測試"}
                 </button>
-                {routeIsOverridable(effective?.source ?? "default") && (
+                {context?.auth_mode.includes("oauth") && (
+                  <span className="muted tiny">消耗訂閱額度，非 API 帳單</span>
+                )}
+                {routeIsOverridable(effectiveRoute?.source ?? "default") && (
                   <button
                     type="button"
                     className="btn-ghost small"
-                    title="移除此任務的 DB 路由，改回設定檔／內建預設"
+                    aria-label={`重設 ${task.id}`}
                     onClick={() => void onReset(task.id)}
                   >
                     重設為 fallback
                   </button>
                 )}
-                {currentTest?.result && <ModelTestStatus result={currentTest.result} />}
               </div>
+
+              {currentTest && !testIsCurrent && (
+                <p className="muted tiny">選擇已變更——重新測試</p>
+              )}
+              {currentTest?.result && testIsCurrent && (
+                <TaskModelTestStatus result={currentTest.result} />
+              )}
             </div>
           );
         })}
@@ -2347,6 +2541,20 @@ export function ModelRoutingSection({
   );
 }
 
+function TaskModelTestStatus({ result }: { result: TaskModelTestResult }) {
+  const ok = result.status === "ok";
+  const action = result.error_code ? MODEL_REASON_LABELS[result.error_code] : null;
+  return (
+    <div className={`test-status ${ok ? "ok" : "bad"}`}>
+      <strong>{ok ? "可實際呼叫" : action ?? "測試失敗"}</strong>
+      {result.latency_ms != null && <span>{result.latency_ms} ms</span>}
+      {result.warning && <p className="warn-text">{result.warning}</p>}
+      {result.fallback_effort && (
+        <p className="muted tiny">fallback effort: {result.fallback_effort}</p>
+      )}
+    </div>
+  );
+}
 function runtimeSourceBadge(source: ResearchRuntimeSettings["source"]) {
   if (source === "db") return { label: "DB 已儲存", tone: "active" };
   if (source === "env") return { label: "env override", tone: "override" };
@@ -3456,19 +3664,6 @@ export function DiscoveryResultView({
       <p className="muted tiny">
         顯示 {models.length} / {result.models.length} 個 provider 回傳模型；任務頁仍可直接輸入任何 model id。
       </p>
-    </div>
-  );
-}
-
-function ModelTestStatus({ result }: { result: ModelTestResult }) {
-  const ok = result.status === "ok";
-  return (
-    <div className={`test-status ${ok ? "ok" : "bad"}`}>
-      <strong>{ok ? "可用" : result.status}</strong>
-      {result.latency_ms != null && <span>{result.latency_ms} ms</span>}
-      {result.warning && <p className="warn-text">{result.warning}</p>}
-      {result.fallback_effort && <p className="muted tiny">fallback effort: {result.fallback_effort}</p>}
-      {result.error && <p>{result.error}</p>}
     </div>
   );
 }
