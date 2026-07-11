@@ -1,6 +1,6 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: DRAFT FOR REVIEW ROUND 3 2026-07-11.** Roles: Claude authors + implements,
+> **Status: REVIEWED — CLEARED FOR IMPLEMENTATION 2026-07-11.** Roles: Claude authors + implements,
 > user reviews. Origin: P2.7 live verification hit local:7 (openai
 > chatgpt_oauth) failing discovery with a refresh-401; the user triaged it as a
 > product lifecycle gap (five code claims, all independently verified) and
@@ -466,3 +466,8 @@ Then review-ready hand-off; §7 live gate BEFORE merge.
   only the latter offers re-login. Rollback is explicitly best-effort under a
   double storage failure, and successful delete responses use
   `token_deleted: true|null` with false reserved for no successful response.
+- Round 3 (2026-07-11): independent re-check GREEN. The reviewer verified the
+  process boundary/live gate/inter-process follow-up, the three-way missing
+  credential split, best-effort compensation semantics, and the
+  `token_deleted: true|null` response/test shape against current code. No open
+  plan findings remain; Task 1 may start.

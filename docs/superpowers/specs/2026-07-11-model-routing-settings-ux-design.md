@@ -1,6 +1,6 @@
 # Model Routing Settings UX Design
 
-> **Status: DRAFT FOR USER REVIEW, 2026-07-11.** This is a focused P2.8 design
+> **Status: DRAFT FOR USER REVIEW ROUND 2, 2026-07-11.** This is a focused P2.8 design
 > slice prompted by the first live inspection of the P2.7 picker. It preserves
 > the existing Settings boundary: `Providers` owns credentials, login, and
 > credential-scoped discovery; `Models` owns per-task provider/model/effort
@@ -116,7 +116,7 @@ Each task card follows one fixed vertical order:
 2. Provider segmented control.
 3. Active credential summary and status.
 4. Model selector.
-5. Effort/thinking selector.
+5. Effort selector plus read-only thinking behavior.
 6. Availability refresh and actual-call test actions.
 7. Existing reset action and result/status text.
 
@@ -144,7 +144,10 @@ picker. A custom id is always marked unverified until an explicit call succeeds.
 
 If no active credential exists, the card shows `尚未設定此 provider 的登入` and a
 `前往 Providers` action. Model selection, actual testing, and saving that draft
-route are disabled.
+route are disabled **in the frontend**. The backend `PUT /config/model-routes`
+keeps its existing warning-only capability contract for compatibility with
+custom ids, import/export, and older clients; this slice does not turn a missing
+active credential into a new backend 400.
 
 If the active auth mode cannot execute the task, the card names the reason. For
 example, Claude OAuth may be valid for AI research while card synthesis remains
@@ -178,11 +181,39 @@ active credential authority used by runtime routing.
 - `api_key_pool` remains unsupported until direct runtime execution is wired; the
   UI states that reason instead of borrowing a single key.
 
+OAuth research tests are deliberately bounded. They use a minimal prompt,
+`max_turns=1`, no ArkScope registry/tool dispatch, and a short dedicated timeout.
+The Claude CLI path additionally passes `--tools ""` (supported by the installed
+CLI) so built-in tools are disabled; the ChatGPT driver receives `registry=None`.
+Any tool event is a failed canary, not permission to continue a research loop.
+The UI states that OAuth tests consume subscription allowance rather than API-key
+billing. If an auth driver cannot enforce these bounds, that path reports
+`task_test_unsupported` and does not run a normal research session.
+
 The check validates authentication, model id, effort, and the selected auth path.
 It does not claim report quality, market-data completeness, or successful future
 calls. Results are ephemeral in v1 and include `tested_at`, latency, auth mode,
 and a machine-readable failure code. Tests never persist a route or research
 artifact.
+
+### 4.5 Effort and thinking behavior
+
+V1 stores only `provider`, `model`, and `effort` in `TaskRoute`. It does **not**
+add a task-level thinking toggle or a new route-schema field.
+
+The card shows effort as the editable control. Beneath it, a read-only line
+describes the selected model's registry-derived `thinking_mode`:
+
+- `none`: no Anthropic thinking behavior;
+- `manual_budget` or `adaptive_opt_in`: follows the existing global Anthropic
+  thinking setting;
+- `adaptive_default_on`: provider default is on; the existing global off setting
+  sends the explicit disabled shape;
+- `adaptive_always_on`: always on and cannot be disabled by this route.
+
+This line explains runtime behavior but never pretends thinking is independently
+saved per task. A task-level thinking control requires a separate schema/API
+design and is outside this slice.
 
 ## 5. Backend Contract
 
@@ -213,14 +244,32 @@ the alternative provider. The additive target shape is:
           "openai": {
             "executable": true,
             "reason_code": null,
-            "models": [],
+            "models": [
+              {
+                "id": "gpt-5.6-luna",
+                "label": "GPT-5.6 Luna",
+                "status": "visible",
+                "eligible": true,
+                "reason_code": null,
+                "thinking_mode": "none"
+              }
+            ],
             "cache_state": "ok",
             "discovered_at": "..."
           },
           "anthropic": {
             "executable": true,
             "reason_code": null,
-            "models": [],
+            "models": [
+              {
+                "id": "claude-sonnet-5",
+                "label": "Claude Sonnet 5",
+                "status": "seed",
+                "eligible": true,
+                "reason_code": null,
+                "thinking_mode": "adaptive_default_on"
+              }
+            ],
             "cache_state": "seed_only",
             "discovered_at": "..."
           }
@@ -231,14 +280,42 @@ the alternative provider. The additive target shape is:
 }
 ```
 
-Each model entry carries one status classification (`visible`, `seed`,
-`advanced`, or `route`) plus task eligibility. Secrets and raw broker/provider
-responses never enter this view.
+The model-entry contract is:
+
+```text
+{
+  id: string,
+  label: string,
+  status: "visible" | "seed" | "advanced" | "route",
+  eligible: bool,
+  reason_code: string | null,
+  thinking_mode: "none" | "manual_budget" | "adaptive_opt_in" |
+                 "adaptive_default_on" | "adaptive_always_on"
+}
+```
+
+Eligibility is per model, not inferred only from the provider block. A model
+that is visible/seeded/pinned but fails task capability requirements remains in
+the list with `eligible=false`, is disabled in the selector, and carries a
+reason such as `task_capability_missing`. This lets the UI explain why it cannot
+be selected instead of silently dropping it. The provider-level `executable`
+field represents an auth-mode-wide veto such as OAuth card execution. Secrets
+and raw provider responses never enter this view.
 
 During migration, the old task-level `verified`/`advanced` fields may remain as
-an alias for the current provider so old frontends do not break. New UI reads
-only the provider-indexed shape; the implementation plan must define the removal
-gate for the alias rather than leaving it indefinitely.
+an alias for the current provider so old frontends do not break. The new UI's
+normal path reads only the provider-indexed shape; the implementation plan must
+define the removal gate for the alias rather than leaving it indefinitely.
+
+The reverse version-skew path is also explicit. If a new frontend receives an
+old catalog without `effective.tasks[task].providers`, it enters compatibility
+mode: the provider control remains visible; the current provider uses the legacy
+`verified`/`advanced` partition; the alternate provider uses registry candidates
+marked unverified; active-credential display is derived from the existing
+`catalog.credentials`; and the new task-scoped test is disabled with
+`請重啟／更新 sidecar` rather than silently calling the API-key-only endpoint.
+This fallback must not restore the old checkbox or hide Anthropic under manual
+override.
 
 ### 5.2 Task-scoped test endpoint
 
@@ -267,10 +344,18 @@ Machine-readable reasons include at least:
 - `missing_active_credential`;
 - `reauth_required`;
 - `task_auth_mode_unsupported`;
+- `task_capability_missing`;
+- `task_test_unsupported`;
 - `model_not_visible`;
 - `model_not_in_registry`;
 - `discovery_unavailable`;
 - `provider_call_failed`.
+
+`model_not_visible` is valid only when `cache_state="ok"` proves that a
+successful live discovery omitted the model. It must not block a seed candidate
+under `seed_only` or a candidate under `never_discovered`, because those states
+cannot establish non-visibility; the explicit test is allowed to provide the
+first live evidence.
 
 The UI maps these to specific next actions. It never collapses all failures to
 `模型不可用`, never offers re-login for wiring failures, and never suggests
@@ -313,12 +398,15 @@ Providers ownership remain authoritative.
 5. `此登入可見`, `可供此任務使用`, and `實際呼叫通過` are independently testable
    states and never used as synonyms.
 6. A provider switch cannot retain an incompatible model or effort silently.
-7. A task cannot save a newly selected provider with no active credential.
+7. The frontend cannot save a newly selected provider with no active credential;
+   the backend remains warning-only for compatibility and custom routes.
 8. OAuth card testing makes zero provider calls and returns an explicit
    unsupported reason; OAuth research testing uses its subscription driver.
 9. A route-pinned unknown/old model remains visible with a warning and is never
    auto-replaced.
 10. Providers remains the only surface with credential mutation controls.
+11. Thinking behavior is shown from the registry but no task-level thinking
+    field is written to the route store or API.
 
 ## 10. Verification Shape
 
@@ -332,9 +420,17 @@ The implementation plan must include:
 - frontend interaction tests for provider switching, model/effort reset,
   missing credential, seed-only Anthropic, refresh, task-scoped testing, custom
   id, and route-pinned models;
+- model-entry rendering tests proving ineligible entries remain visible,
+  disabled, and paired with their reason code;
 - an exact test proving the old checkbox and duplicate manual model selector are
   gone;
 - zero-call tests for unsupported auth/task combinations;
+- bounded OAuth canary tests proving `max_turns=1`, no tools, timeout handling,
+  subscription-billing copy, and zero normal research persistence;
+- a seed-only/never-discovered test proving `model_not_visible` cannot veto an
+  explicit canary;
+- new-frontend/old-sidecar compatibility tests proving provider visibility and
+  task-test disablement without reviving the old checkbox/manual selector;
 - full frontend typecheck/build, focused backend tests, no-PG smoke, and virgin
   full A/B before merge;
 - live verification with one OpenAI API-key route, one Anthropic API-key route,
@@ -347,3 +443,14 @@ The implementation plan must include:
 2. Implement this focused Models UX slice.
 3. Continue the broader P2.8 current-UI audit and canonical shell spec; do not
    use this focused slice as a substitute for that larger pass.
+
+## 12. Review Log
+
+- Round 1 (2026-07-11): 2 must-fix + 4 should-fix verified and absorbed.
+  V1 now has an effort control plus read-only registry-derived thinking behavior
+  rather than an undefined thinking route field; model entries have an explicit
+  status/eligibility/reason/thinking schema and ineligible entries remain visible
+  but disabled. Missing-active-credential save blocking is frontend-only;
+  OAuth research canaries are one-turn/no-tools/timed and identify subscription
+  consumption; `model_not_visible` applies only after successful live discovery;
+  and new-frontend/old-sidecar degradation is defined in both directions.
