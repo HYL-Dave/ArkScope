@@ -1,6 +1,6 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: DRAFT FOR REVIEW ROUND 2 2026-07-11.** Roles: Claude authors + implements,
+> **Status: DRAFT FOR REVIEW ROUND 3 2026-07-11.** Roles: Claude authors + implements,
 > user reviews. Origin: P2.7 live verification hit local:7 (openai
 > chatgpt_oauth) failing discovery with a refresh-401; the user triaged it as a
 > product lifecycle gap (five code claims, all independently verified) and
@@ -76,9 +76,12 @@ BOTH completion paths (loopback `_await_callback` and copy-code
 context manager backed by the existing `_lock_for()` map. `refresh_if_needed`,
 re-login completion, and ChatGPT-OAuth deletion all use this SAME lock. The
 lock covers only completion/storage work, never the user's browser interaction
-or authorization-code exchange. This prevents an in-flight refresh from
-overwriting a newly authorized token, or writing a refreshed old token back
-after deletion.
+or authorization-code exchange. **This is a process-local guarantee only.**
+Within one sidecar it prevents an in-flight refresh from overwriting a newly
+authorized token, or writing a refreshed old token back after deletion. Two
+sidecars that share the same profile DB/token store do not share this Python
+lock; the pre-merge live gate therefore runs with exactly one sidecar, and a
+credential-scoped inter-process lifecycle lock is filed in §6.
 
 `complete_login` gains
 `invalidate_relogin_cache: Callable[[str], int] | None = None` and branches on
@@ -98,11 +101,14 @@ after deletion.
   account_label=label)` (src/model_credentials.py update, verified: `""` forces
   NULL, `None` means don't-touch — a new token with no JWT exp must CLEAR the
   old expiry, hence `or ""`). **alias and active are NOT passed** — preserved
-  by design (item 2). If update raises, restore the old token (or delete the
-  new token when no old record existed) before raising. If `update()` returns
-  None because the row vanished, delete the newly written token before raising.
-  A failed re-login must never intentionally leave "token replaced, metadata
-  row gone" as a terminal state.
+  by design (item 2). If update raises, make a best-effort attempt to restore
+  the old token (or delete the new token when no old record existed) before
+  propagating the ORIGINAL metadata error. If compensation itself fails, log
+  that secondary failure without replacing the original exception. If
+  `update()` returns None because the row vanished, apply the same best-effort
+  cleanup. Normal rollback is tested; a double storage failure cannot honestly
+  promise a clean terminal state. A failed re-login must never intentionally
+  leave "token replaced, metadata row gone" as a terminal state.
 - `pending.make_active` is IGNORED on this branch (D8).
 - Return payload gains `"relogin": true` (same masked-metadata shape,
   credential_id == the target), `"discovery_cache_cleared": true`, and the
@@ -144,11 +150,17 @@ Consumers:
   duck-types via `model_dump()`, untouched).
 - `_stream` catch (:452): the error event payload gains
   `"code": "reauth_required"` when flagged (additive dict key).
-- The two pre-refresh early exits are part of this contract, not exceptions:
-  `discover_models`'s no-token branch (:321) returns `missing_credential` WITH
-  `error_code="reauth_required"`; `_stream`'s no-token branch (:446) yields an
-  error event with that code and returns instead of raising a bare
-  `MissingCredentialError` before the classified catch.
+- The pre-refresh early exits are split, not collapsed. When BOTH
+  `self._token_store` and `self._credential_id` exist but `_load_token()` finds
+  no stored token, the OAuth metadata row is repairable by re-login:
+  `discover_models` returns `missing_credential` with
+  `error_code="reauth_required"`; `_stream` yields one classified error event
+  with that code and returns. By contrast, a missing token-store dependency or
+  missing credential id is driver wiring/configuration failure, which re-login
+  cannot repair: discovery keeps `status="missing_credential"` with
+  `error_code="missing_credential"`, and `_stream` yields the same classified
+  code (never a bare `MissingCredentialError`), so the UI does NOT show a
+  re-login affordance for those two arms.
 
 **D5 — delete cascade (item 5 + review C; shared route, both providers).**
 `delete_credential` (config_routes.py:596) gains
@@ -165,14 +177,21 @@ delete the metadata row last.
   not proven, return 502 and keep the row; old record absent + `False` = nothing
   secret remained and deletion may continue.
 - If metadata deletion fails after a token was removed, best-effort restore the
-  previously loaded token before returning an error. Cache rows need not be
-  restored; an empty cache is safe and forces re-verification.
-- ChatGPT deletion shares D2's lock with refresh/re-login, so an in-flight old
-  refresh cannot resurrect the token. Claude uses the same lock harmlessly
-  even though its setup-token driver does not rotate.
+  previously loaded token before returning an error. A restore failure is
+  logged while the original metadata-deletion error remains authoritative.
+  Cache rows need not be restored; an empty cache is safe and forces
+  re-verification.
+- Within one process, ChatGPT deletion shares D2's lock with refresh/re-login,
+  so an in-flight old refresh cannot resurrect the token. Claude uses the same
+  lock harmlessly even though its setup-token driver does not rotate. The
+  cross-process residual risk and follow-up are explicit in D2/§6.
 
-Response: `{"deleted": true, "id": …, "token_deleted": bool|null,
+Response: `{"deleted": true, "id": …, "token_deleted": true|null,
 "discovery_cache_rows_deleted": int}` (additive).
+`token_deleted=true` means an existing OAuth token was confirmed removed;
+`null` means no token cleanup was required (non-OAuth row or OAuth metadata
+with no stored token). `false` is intentionally unreachable in a 200 response:
+failure to prove deletion when a token was preloaded returns 502.
 
 **D6 — frontend (items 1/4/6).**
 - `api.ts`: `startOpenAIOAuth(makeActive = false, reloginCredentialId?:
@@ -248,9 +267,13 @@ RED tests (tests/test_chatgpt_oauth_login.py):
    last. Final token is the newly authorized token, never the refreshed old
    account token.
 10. `test_relogin_metadata_failure_restores_or_deletes_token` — update raises
-    with an old token present → old token restored; vanished row/no old token →
-    new token removed. No orphan remains.
-11. `test_relogin_requires_cache_invalidator` — relogin with no invalidator
+    with an old token present → when compensation succeeds, old token is
+    restored; vanished row/no old token → new token removed.
+11. `test_relogin_compensation_failure_preserves_original_error` — metadata
+    update raises and rollback save/delete also raises → rollback failure is
+    logged, but the original metadata error is the propagated cause; the test
+    does NOT claim a clean token-store state after this double failure.
+12. `test_relogin_requires_cache_invalidator` — relogin with no invalidator
     fails before token/profile mutation; create-login remains valid with the
     default `None` callback.
 
@@ -291,7 +314,10 @@ rule):
    delete removes all three without real authentication.
 9. routes: `test_delete_serializes_with_inflight_refresh` — barrier-controlled
    refresh finishes before delete; final state has no metadata row and no token
-   (the old refresh cannot resurrect it).
+   (the process-local old refresh cannot resurrect it).
+10. routes: `test_credential_delete_oauth_without_stored_token_returns_null` —
+    OAuth metadata row exists but the preloaded token is absent; deletion may
+    continue and the 200 response reports `token_deleted: null`, never false.
 
 **Task 4 — driver error_code (chatgpt_oauth_driver.py + ModelDiscoveryResult).**
 RED tests (tests/test_chatgpt_oauth_driver.py, existing seam style):
@@ -303,9 +329,17 @@ RED tests (tests/test_chatgpt_oauth_driver.py, existing seam style):
 3. `test_stream_refresh_401_event_carries_code` — `_stream` error event
    payload has `code == "reauth_required"`.
 4. `test_discover_missing_token_requires_reauth` — an existing OAuth metadata
-   row with no token returns `missing_credential` + reauth error_code.
+   row, token-store dependency, and credential id are all present, but the
+   token record is absent → `missing_credential` + reauth error_code.
 5. `test_stream_missing_token_yields_reauth_event` — no bare exception; one
-   classified error event and no backend call.
+   classified reauth error event and no backend call, with store/id present.
+6. `test_discover_missing_driver_wiring_is_not_reauth` — missing token-store
+   dependency and missing credential id (parameterized) return
+   `missing_credential` with `error_code="missing_credential"`, not
+   `reauth_required`.
+7. `test_stream_missing_driver_wiring_yields_non_reauth_event` — the same two
+   wiring arms yield one classified `missing_credential` event and no backend
+   call; no bare exception and no re-login code.
 
 **Task 5 — frontend (`api.ts`, `Settings.tsx`, `credentialDisplay.ts`, and
 their existing focused tests; `chatgptOAuth.ts` remains unchanged).**
@@ -381,16 +415,28 @@ Then review-ready hand-off; §7 live gate BEFORE merge.
   transient affordance is not enough).
 - OAuth cache fingerprint = account-id (would let P2.7's fingerprint-mismatch
   machinery subsume D3's manual clear; touches read+write convention).
+- **Cross-process credential lifecycle lock.** The Python `_lock_for()` map is
+  process-local, while desktop and standalone sidecars can share the same
+  profile DB/token store. A follow-up must add a credential-scoped advisory
+  file lock (for example `flock`) held across the FULL
+  load/refresh/save/re-login/delete critical section. `PlaintextTokenStore`'s
+  read-modify-write operations also need this lock to prevent lost updates;
+  locking `_write_all()` alone is insufficient because a stale refresh can be
+  computed before the lock and written after a re-login.
 
 ## 7. Live verification gate (BEFORE merge; order matters)
 
-1. I restart the sidecar on the branch; regression-check discovery on
+1. I stop every standalone/old sidecar, restart exactly ONE sidecar on the
+   branch, regression-check discovery on
    local:3 (api_key, must stay `ok`/cached) and confirm local:7 discovery now
    returns `error_code: "reauth_required"`.
 2. **User performs the browser auth** (I never handle login credentials):
    Settings → local:7 列 → 重新登入 → complete. I verify from outside: same
    `credential_id` local:7, alias 「ChatGPT subscription Plus」 preserved,
    active flag unchanged, token replaced (probe P1/P2), old cache rows gone.
+   The one-sidecar precondition remains in force until this lifecycle window
+   completes; starting 8420 or another desktop sidecar during re-login is a
+   stop condition.
 3. I run discovery on local:7 → expect live ChatGPT-backend list (status `ok`,
    provider_api models, cache row lands with fresh discovered_at).
 4. Research live smoke (S3 live P1/P2, closes the copy claim): temporarily
@@ -412,3 +458,11 @@ Then review-ready hand-off; §7 live gate BEFORE merge.
   invalidation, collapsed/busy re-login UI, full stale-copy sweep, and a real
   temporary token-store cascade test. Broad Settings model IA redesign remains
   P2.8; this hotfix changes only the re-login path it owns.
+- Round 2 (2026-07-11): 2 must-fix + 2 should-fix accepted with one technical
+  strengthening. The lifecycle lock is now explicitly process-local; live
+  re-login requires one sidecar and the follow-up calls for a full
+  credential-scoped inter-process critical section (not merely a locked final
+  write). Missing driver wiring is separated from a genuinely absent token, so
+  only the latter offers re-login. Rollback is explicitly best-effort under a
+  double storage failure, and successful delete responses use
+  `token_deleted: true|null` with false reserved for no successful response.
