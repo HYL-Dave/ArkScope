@@ -531,3 +531,49 @@ def test_discovery_commit_skipped_after_concurrent_delete(tmp_path, monkeypatch)
     assert store.get(cid) is None                              # the delete stands
     # nothing was resurrected for the deleted credential (0 rows to clear)
     assert cache.delete_scope(provider="openai", credential_id=cid) == 0
+
+
+def test_credential_delete_row_failure_detail_reflects_restore_outcome(tmp_path, monkeypatch):
+    # F2 (round 4): the 502 detail must report the REAL compensation outcome.
+    from src.auth_drivers.token_store import StoredTokenRecord
+
+    # arm 1: row deletion fails, restore lands → detail says restored
+    store = CredentialStore(tmp_path / "creds.db")
+    cid = _oauth_row(store)
+    tok = _RecTok(record=StoredTokenRecord(access_token="T"))
+    monkeypatch.setattr(store, "delete", lambda _cid: (_ for _ in ()).throw(RuntimeError("db locked")))
+    with pytest.raises(HTTPException) as ei:
+        cr.delete_credential(cid, store=store, token_store=tok)
+    assert ei.value.status_code == 502
+    assert "restored" in ei.value.detail
+    assert tok.saved and tok.saved[-1][0] == cid              # the restore actually landed
+
+    # arm 2: restore ALSO fails → detail must NOT claim restoration
+    class _NoSaveTok(_RecTok):
+        def save(self, **kw):
+            raise RuntimeError("keyring down")
+
+    store2 = CredentialStore(tmp_path / "creds2.db")
+    cid2 = _oauth_row(store2)
+    tok2 = _NoSaveTok(record=StoredTokenRecord(access_token="T"))
+    monkeypatch.setattr(store2, "delete", lambda _cid: (_ for _ in ()).throw(RuntimeError("db locked")))
+    with pytest.raises(HTTPException) as ei2:
+        cr.delete_credential(cid2, store=store2, token_store=tok2)
+    assert ei2.value.status_code == 502
+    assert "was restored" not in ei2.value.detail
+    assert "unverified" in ei2.value.detail
+
+
+def test_credential_delete_row_vanished_after_token_delete_is_success(tmp_path, monkeypatch):
+    # F2 ruling (round 4): store.delete() returning False AFTER token cleanup =
+    # a concurrent (cross-process) removal — the terminal state is achieved, so
+    # the route reports success (never a misleading 404 after real cleanup).
+    from src.auth_drivers.token_store import StoredTokenRecord
+
+    store = CredentialStore(tmp_path / "creds.db")
+    cid = _oauth_row(store)
+    tok = _RecTok(record=StoredTokenRecord(access_token="T"))
+    monkeypatch.setattr(store, "delete", lambda _cid: False)
+    out = cr.delete_credential(cid, store=store, token_store=tok)
+    assert out["deleted"] is True and out["token_deleted"] is True
+    assert tok.deleted == [("openai", "chatgpt_oauth", cid)]
