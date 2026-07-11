@@ -1,6 +1,6 @@
 # Models Routing UX — Implementation Plan (focused P2.8 slice)
 
-> **Status: IMPLEMENTED FOR REVIEW 2026-07-11. NOT MERGED; §6 live gate pending.**
+> **Status: IMPLEMENTATION REVIEW GREEN 2026-07-12. NOT MERGED; §6 live gate pending.**
 > Roles: Claude authored the plan; **Codex implemented on `codex/models-ux`,
 > user/Claude reviews**. Implements the APPROVED spec
 > `docs/superpowers/specs/2026-07-11-model-routing-settings-ux-design.md`
@@ -24,15 +24,14 @@
 > `test_model`; RED pin + rename to `src/model_task_canary.py` removed that
 > phantom node without adding a test (`6a8568b`).
 >
-> **A/B environment limitation:** the required virgin single-process base
-> suite did not finish in this Codex environment because existing
-> TestClient/event-loop state hangs in unrelated base tests. It is therefore
-> NOT claimed as a full-protocol PASS. The broad symmetric fallback ran every
-> test file in its own virgin pytest process with a 60-second file timeout:
-> failure/error nodes `27 = 27`, timeout files `4 = 4` (both directional
-> diffs empty), non-timeout passed `3768 → 3815 = +47`, skipped `73 = 73`,
-> warnings `20 = 20`, errors `1 = 1`. Reviewer still owns the canonical
-> single-process full A/B before merge.
+> **Canonical A/B authority:** the reviewer completed the required virgin
+> single-process run: failure sets `30 = 30` (both directional diffs empty),
+> passed `3948 → 3995 = +47`, skips `74 = 74`, warnings `18 = 18`, errors
+> `7 = 7`. This exactly matches collect `+47 / -0`; canonical A/B is PASS.
+> Codex's earlier file-isolated fallback remains supporting evidence only:
+> failure/error nodes `27 = 27`, timeout files `4 = 4`, non-timeout passed
+> `3768 → 3815 = +47`, with flat skipped/warnings/errors. Its difference from
+> the canonical 30-failure family is explained by those four timeout files.
 
 ## 0. Grounding corrections to the spec (verified against code 2026-07-11; round-2 re-verified)
 
@@ -242,9 +241,12 @@ translated (`missing_credential` → `missing_active_credential`, error →
    dirty-vs-pre-existing split) + ONE Settings-level wiring test proving
    the button/`save()` actually consult the gate;
 4. ONE grouped `<select>`: optgroups 此登入可見 / 候選／未驗證 / 舊版／進階 /
-   目前路由; a discovered advanced-tier entry additionally reads
-   ·此登入可見 from `visible_to_credential` (round-2 MF2 orthogonality);
-   ineligible options rendered `disabled` **with the reason INSIDE the option
+   目前路由. **Implementation-review ruling:** under `cache_state=ok`, an
+   advanced entry with `visible_to_credential=false` stays listed but is
+   disabled with `model_not_visible`, matching the backend zero-call veto;
+   unknown visibility under seed channels is not vetoed, and route entries are
+   exempt so saved routes are never silently displaced. Other ineligible
+   options render `disabled` **with the reason INSIDE the option
    text** (e.g. 「GPT-5.5 — 缺結構化輸出」) plus an adjacent note listing the
    card's ineligible reasons and `aria-disabled` — `title` on `<option>` is
    unreliable/unfocusable (round-2 SF3); 自訂 model id = a button beside the
@@ -493,6 +495,16 @@ BEFORE merge.
 
 ## 7. Review log
 
+- Round 3 / implementation review (2026-07-12): GREEN, no must-fix. Canonical
+  virgin single-process A/B is authoritative and exact: failure sets `30=30`,
+  passed `3948→3995 = +47`, collect `+47/-0`, all other counters flat. Ruling
+  1 accepts the stronger advanced-entry visibility veto now recorded in D5 and
+  the spec §4.1; seed/never-discovered and route-pin exceptions remain explicit.
+  Ruling 2 accepts `尚未探索此登入的模型` plus the shared visible
+  `重新驗證列表` action as semantically equivalent never-discovered copy.
+  Legacy-alias seed ordering is cosmetic; the source-string zero-persistence
+  test remains an accepted implementation-level guard. Next gate is §6 live,
+  then merge review.
 - Round 2 (2026-07-11): 3 must-fix + 3 should-fix, all verified real. MF1 —
   `task_auth_executable` has no separable capability leg (cards×oauth returns
   False on the auth axis before capability is ever evaluated) → D4 now fixes

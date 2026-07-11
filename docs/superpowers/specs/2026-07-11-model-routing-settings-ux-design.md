@@ -1,11 +1,12 @@
 # Model Routing Settings UX Design
 
-> **Status: ADOPTED; IMPLEMENTED FOR REVIEW, 2026-07-11. Live gate pending.**
+> **Status: ADOPTED; IMPLEMENTATION REVIEW GREEN, 2026-07-12. Live gate pending.**
 > This is a focused P2.8 design slice prompted by the first live inspection of
 > the P2.7 picker. It preserves
 > the existing Settings boundary: `Providers` owns credentials, login, and
 > credential-scoped discovery; `Models` owns per-task provider/model/effort
-> routing. No implementation work starts until this document is approved.
+> routing. Implementation was approval-gated; review is now green and the live
+> gate remains required before merge.
 
 ## 1. Problem
 
@@ -105,9 +106,11 @@ The UI uses these distinct terms:
 | `實際呼叫通過` | The user explicitly ran a small call through the selected provider/auth path and it succeeded at that time. | Ephemeral test result |
 
 `seed_only` is rendered as `候選模型，無法由此登入線上列出`, never as verified.
-`never_discovered` is rendered as `尚未檢查此登入可見模型`, never as empty or
-unavailable. A timestamped discovery result is an observation, not a permanent
-entitlement promise.
+`never_discovered` is rendered as `尚未檢查此登入可見模型` or the equivalent
+`尚未探索此登入的模型`, never as empty or unavailable. The same visible
+verification action may serve first discovery and later re-verification. A
+timestamped discovery result is an observation, not a permanent entitlement
+promise.
 
 ## 4. Task Card Interaction
 
@@ -140,6 +143,16 @@ only when already routed. Unknown provider-discovered ids do not flood the list.
 Custom model ids remain supported through a clearly labeled `自訂 model id`
 command adjacent to the selector. They are not hidden inside a second model
 picker. A custom id is always marked unverified until an explicit call succeeds.
+
+When `cache_state="ok"`, an advanced entry with
+`visible_to_credential=false` remains listed but is disabled with
+`model_not_visible`; this matches the task-test endpoint's zero-call visibility
+veto and prevents selecting a model that this credential's successful listing
+omitted. This stronger selector veto does not apply when visibility is unknown
+under `seed_only` or `never_discovered`. A `route` entry is also exempt from the
+selector veto so an existing saved route remains visible and selectable rather
+than being silently displaced; an explicit task test may still report
+`model_not_visible`.
 
 ### 4.2 Missing or incompatible credentials
 
@@ -447,6 +460,15 @@ The implementation plan must include:
 
 ## 12. Review Log
 
+- Implementation review (2026-07-12): GREEN with canonical single-process
+  virgin A/B `30=30`, passed `3948→3995` (`+47`, exactly the collect delta),
+  and flat skips/warnings/errors. Accepted the implementation's stronger
+  advanced-entry visibility veto described in §4.1, including the seed/unknown
+  and route-pin exceptions. Also accepted the semantically equivalent
+  never-discovered copy and shared visible verification action. Legacy alias
+  seed ordering remains cosmetic compatibility behavior; the source-string
+  zero-persistence guard is accepted as an implementation note, not elevated
+  into a broader architecture guarantee.
 - Round 1 (2026-07-11): 2 must-fix + 4 should-fix verified and absorbed.
   V1 now has an effort control plus read-only registry-derived thinking behavior
   rather than an undefined thinking route field; model entries have an explicit
