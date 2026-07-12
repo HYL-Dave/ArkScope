@@ -72,6 +72,40 @@
 .ui-inline-alert-action { justify-self: end; }
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 
+.ui-bounded-progress {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel2);
+}
+.ui-bounded-progress-head,
+.ui-bounded-progress-stage,
+.ui-bounded-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ui-bounded-progress-overall,
+.ui-bounded-progress-stage,
+.ui-bounded-progress-meta { color: var(--muted); font-size: 11.5px; }
+.ui-bounded-progress-grace { color: var(--wait); font-weight: 600; }
+.ui-bounded-progress > .ui-button { justify-self: start; }
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .ui-overlay-backdrop {
   position: fixed;
   inset: 0;
