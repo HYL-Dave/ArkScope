@@ -45,7 +45,17 @@ type PortfolioApiResponse =
   | PortfolioSyncPreview
   | { ok: true };
 
-function stubFetch(handler: (url: string, init?: RequestInit) => PortfolioApiResponse) {
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function stubFetch(
+  handler: (url: string, init?: RequestInit) => PortfolioApiResponse | Promise<PortfolioApiResponse>,
+) {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
   vi.stubGlobal(
     "fetch",
@@ -56,7 +66,7 @@ function stubFetch(handler: (url: string, init?: RequestInit) => PortfolioApiRes
         method: init?.method ?? "GET",
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
-      return new Response(JSON.stringify(handler(u, init)), {
+      return new Response(JSON.stringify(await handler(u, init)), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -82,7 +92,7 @@ async function flush() {
 
 async function buttonByText(text: string): Promise<HTMLButtonElement> {
   for (let i = 0; i < 6; i += 1) {
-    const found = Array.from(host!.querySelectorAll("button")).find((b) =>
+    const found = Array.from(document.querySelectorAll("button")).find((b) =>
       b.textContent?.includes(text),
     );
     if (found) return found;
@@ -91,7 +101,30 @@ async function buttonByText(text: string): Promise<HTMLButtonElement> {
   throw new Error(`button not found: ${text}; text=${host?.textContent ?? ""}`);
 }
 
+async function openRowActions(label: string): Promise<HTMLButtonElement> {
+  const trigger = host!.querySelector<HTMLButtonElement>(`button[aria-label="${label} 操作"]`);
+  if (!trigger) throw new Error(`row action trigger not found: ${label}`);
+  await act(async () => {
+    trigger.click();
+  });
+  return trigger;
+}
+
 describe("HoldingsView", () => {
+  it("shows_loading_before_the_first_portfolio_response", async () => {
+    const firstPortfolio = deferred<PortfolioSnapshot>();
+    stubFetch(() => firstPortfolio.promise);
+
+    await mount();
+
+    expect(host!.querySelector('[data-state="loading"]')?.textContent).toContain("載入持倉");
+
+    await act(async () => {
+      firstPortfolio.resolve(snapshot());
+      await firstPortfolio.promise;
+    });
+  });
+
   it("renders accounts, positions, and currency basis", async () => {
     stubFetch(() => snapshot({
       positions: [
@@ -118,6 +151,8 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    expect(host!.querySelectorAll("h1")).toHaveLength(1);
+    expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("1 筆持倉");
     expect(host!.textContent).toContain("Manual");
     expect(host!.textContent).toContain("NVDA");
     expect(host!.textContent).toContain("per-currency");
@@ -148,9 +183,23 @@ describe("HoldingsView", () => {
   });
 
   it("shows ibkr preview as review before applying", async () => {
+    const previewResponse = deferred<PortfolioSyncPreview>();
     stubFetch((url) => {
       if (url.endsWith("/portfolio/ibkr/preview")) {
-        return {
+        return previewResponse.promise;
+      }
+      return snapshot();
+    });
+    await mount();
+    await flush();
+
+    await act(async () => {
+      (await buttonByText("預覽 IBKR 同步")).click();
+    });
+    expect(host!.querySelector('[data-state="running"]')?.textContent).toContain("更新中");
+
+    await act(async () => {
+      previewResponse.resolve({
           changes: [{
             kind: "update",
             symbol: "MSFT",
@@ -167,17 +216,12 @@ describe("HoldingsView", () => {
             },
           }],
           applies: false,
-        };
-      }
-      return snapshot();
-    });
-    await mount();
-
-    await act(async () => {
-      (await buttonByText("預覽 IBKR 同步")).click();
+      });
+      await previewResponse.promise;
     });
     await flush();
 
+    expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("待套用變更");
     expect(host!.textContent).toContain("MSFT");
     expect(host!.textContent).toContain("套用同步");
     expect(host!.textContent).toContain("尚未寫入本地持倉");
@@ -350,6 +394,7 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    await openRowActions("AAPL");
     await act(async () => {
       (await buttonByText("編輯")).click();
     });
@@ -377,9 +422,13 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    const trigger = await openRowActions("NVDA");
     await act(async () => {
       (await buttonByText("編輯")).click();
     });
+    const ownerRow = trigger.closest("tr");
+    expect(ownerRow?.nextElementSibling?.classList.contains("ui-data-table-expanded")).toBe(true);
+    expect(ownerRow?.nextElementSibling?.querySelector('input[aria-label="Edit Quantity"]')).not.toBeNull();
     await act(async () => {
       setInput("Edit Quantity", "5");
       setInput("Edit Avg Cost", "110.5");
@@ -409,6 +458,7 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    await openRowActions("NVDA");
     await act(async () => {
       (await buttonByText("編輯")).click();
     });
@@ -422,9 +472,9 @@ describe("HoldingsView", () => {
     expect((patch?.body as Record<string, unknown>).avg_cost).toBeNull();
   });
 
-  it("soft closes a manual row after confirmation", async () => {
-    const confirmFn = vi.fn(() => false);
-    vi.stubGlobal("confirm", confirmFn);
+  it("soft closes a manual row only after ConfirmDialog approval", async () => {
+    const legacyConfirm = vi.fn(() => { throw new Error("window.confirm must not run"); });
+    vi.stubGlobal("confirm", legacyConfirm);
     const calls = stubFetch((url, init) => {
       if (init?.method === "DELETE") {
         return manualPosition({ closed_at: "2026-07-10T00:00:00Z" });
@@ -434,19 +484,30 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    const trigger = host!.querySelector<HTMLButtonElement>('button[aria-label="NVDA 操作"]')!;
     await act(async () => {
-      (await buttonByText("關閉")).click();
+      trigger.click();
     });
-    expect(confirmFn).toHaveBeenCalled();
-    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-
-    confirmFn.mockReturnValue(true);
     await act(async () => {
       (await buttonByText("關閉")).click();
     });
 
-    const del = calls.find((c) => c.method === "DELETE");
-    expect(del?.url.endsWith("/portfolio/positions/40")).toBe(true);
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("顯示已關閉");
+    expect(calls.some((call) => call.method === "DELETE")).toBe(false);
+    expect(legacyConfirm).not.toHaveBeenCalled();
+
+    await act(async () => { (await buttonByText("取消")).click(); });
+    expect(calls.some((call) => call.method === "DELETE")).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+
+    await act(async () => {
+      trigger.click();
+    });
+    await act(async () => { (await buttonByText("關閉")).click(); });
+    await act(async () => { (await buttonByText("確認關閉")).click(); });
+
+    expect(calls.find((call) => call.method === "DELETE")?.url)
+      .toMatch(/\/portfolio\/positions\/40$/);
   });
 
   it("shows closed rows when include closed is enabled", async () => {
@@ -483,6 +544,7 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    await openRowActions("NVDA");
     await act(async () => {
       (await buttonByText("編輯")).click();
     });
@@ -510,9 +572,9 @@ describe("HoldingsView", () => {
     await flush();
 
     expect(host!.textContent).toContain("AAPL");
-    const closeButtons = Array.from(host!.querySelectorAll("button")).filter((b) =>
-      b.textContent?.includes("關閉"),
-    );
-    expect(closeButtons).toEqual([]);
+    await openRowActions("AAPL");
+    const menu = host!.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("編輯");
+    expect(menu?.textContent).not.toContain("關閉");
   });
 });

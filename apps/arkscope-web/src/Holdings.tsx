@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, Eye, Plus, RefreshCw, Save, X } from "lucide-react";
 import {
   applyIbkrPortfolioSync,
   closePortfolioPosition,
@@ -9,9 +10,20 @@ import {
   updatePortfolioPosition,
   type PortfolioPosition,
   type PortfolioSnapshot,
+  type PortfolioSyncChange,
   type PortfolioSyncPreview,
   type PositionUpdate,
 } from "./api";
+import {
+  Button,
+  ConfirmDialog,
+  DataTable,
+  IconButton,
+  InlineAlert,
+  PageHeader,
+  StatusBadge,
+  type DataTableColumn,
+} from "./ui";
 
 export function HoldingsView() {
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
@@ -21,6 +33,9 @@ export function HoldingsView() {
   const [err, setErr] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
   const [editing, setEditing] = useState<PortfolioPosition | null>(null);
+  const [pendingClose, setPendingClose] = useState<PortfolioPosition | null>(null);
+  const closeTriggerRef = useRef<HTMLElement | null>(null);
+  const closedFilterRef = useRef<HTMLInputElement | null>(null);
   const tickerRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
@@ -153,13 +168,6 @@ export function HoldingsView() {
   }
 
   async function onCloseRow(position: PortfolioPosition) {
-    if (
-      !window.confirm(
-        `確認關閉 ${position.symbol}?已關閉的持倉仍可在「顯示已關閉」檢視中查看。`,
-      )
-    ) {
-      return;
-    }
     setBusy(`close-${position.id}`);
     setErr(null);
     try {
@@ -170,6 +178,7 @@ export function HoldingsView() {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
+      setPendingClose(null);
     }
   }
 
@@ -191,9 +200,67 @@ export function HoldingsView() {
   const standardPositions = positions.filter((position) => position.asset_class !== "option");
   const accounts = snapshot?.accounts ?? [];
   const totals = snapshot?.totals;
+  const viewState = err
+    ? { state: "failed" as const, label: "載入失敗" }
+    : snapshot == null || loading
+      ? { state: "loading" as const, label: "載入持倉" }
+      : busy
+        ? { state: "running" as const, label: "更新中" }
+        : positions.length === 0
+          ? { state: "empty" as const, label: "尚無持倉" }
+          : { state: "ready" as const, label: `${positions.length} 筆持倉` };
+  const previewColumns: DataTableColumn<PortfolioSyncChange>[] = [
+    { id: "change", header: "Change", render: (change) => change.kind },
+    { id: "symbol", header: "Symbol", render: (change) => change.symbol },
+    {
+      id: "quantity",
+      header: "Qty",
+      align: "right",
+      render: (change) => formatChangeMetric(
+        change.kind,
+        change.before,
+        change.after,
+        "quantity",
+        change.quantity,
+      ),
+    },
+    {
+      id: "avg-cost",
+      header: "Avg Cost",
+      align: "right",
+      render: (change) => formatChangeMetric(
+        change.kind,
+        change.before,
+        change.after,
+        "avg_cost",
+      ),
+    },
+    {
+      id: "market-value",
+      header: "Market Value",
+      align: "right",
+      render: (change) => formatChangeMetric(
+        change.kind,
+        change.before,
+        change.after,
+        "market_value",
+      ),
+    },
+    {
+      id: "unrealized-pnl",
+      header: <>Unrealized P&amp;L</>,
+      align: "right",
+      render: (change) => formatChangeMetric(
+        change.kind,
+        change.before,
+        change.after,
+        "unrealized_pnl",
+      ),
+    },
+  ];
 
   const editorNode = editing ? (
-    <div className="inline-form" key={editing.id}>
+    <div className="ui-inline-form" key={editing.id}>
       {editing.broker === "manual" && (
         <>
           <label>
@@ -250,39 +317,45 @@ export function HoldingsView() {
           defaultValue={(editing.tags ?? []).join(", ")}
         />
       </label>
-      <button
-        type="button"
-        className="btn-primary"
+      <Button
+        tone="primary"
+        icon={<Save size={15} />}
         onClick={() => void onSaveEdit()}
-        disabled={busy === `edit-${editing.id}`}
+        busy={busy === `edit-${editing.id}`}
       >
         儲存
-      </button>
-      <button type="button" className="btn-secondary" onClick={() => setEditing(null)}>
+      </Button>
+      <Button icon={<X size={15} />} onClick={() => setEditing(null)}>
         取消
-      </button>
+      </Button>
     </div>
   ) : null;
 
   return (
     <main className="main">
-      <section className="section-band">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">Holdings</p>
-            <h1>持倉</h1>
-          </div>
-          <button type="button" className="btn-secondary" onClick={() => void load()} disabled={loading}>
-            重新整理
-          </button>
-        </div>
+      <PageHeader
+        eyebrow="Holdings"
+        title="持倉"
+        context={<StatusBadge state={viewState.state} label={viewState.label} />}
+        actions={(
+          <IconButton
+            label="重新整理"
+            icon={<RefreshCw size={16} />}
+            onClick={() => void load()}
+            disabled={loading}
+          />
+        )}
+      />
 
-        {err && <p className="error">{err}</p>}
+      {err ? (
+        <InlineAlert state="failed" title="持倉載入失敗">{err}</InlineAlert>
+      ) : null}
 
-        <div className="status-grid">
+      <section className="ui-section-band">
+        <div className="ui-status-grid">
           {accounts.map((account) => (
-            <div className="metric" key={account.id}>
-              <span className="metric-label">{account.label}</span>
+            <div className="ui-metric" key={account.id}>
+              <span className="ui-metric-label">{account.label}</span>
               <strong>{account.sync_mode}</strong>
               <span className="muted tiny">{account.broker}{account.base_currency ? ` · ${account.base_currency}` : ""}</span>
               <label className="muted tiny">
@@ -299,19 +372,19 @@ export function HoldingsView() {
               </label>
             </div>
           ))}
-          <div className="metric">
-            <span className="metric-label">Currency basis</span>
+          <div className="ui-metric">
+            <span className="ui-metric-label">Currency basis</span>
             <strong>{totals?.currency_basis === "broker_base" ? "broker-base" : "per-currency"}</strong>
             <span className="muted tiny">{currencySummary(totals)}</span>
           </div>
         </div>
       </section>
 
-      <section className="section-band">
-        <div className="section-head">
+      <section className="ui-section-band">
+        <div className="ui-section-head">
           <h2>新增手動持倉</h2>
         </div>
-        <div className="inline-form">
+        <div className="ui-inline-form">
           <label>
             <span>Ticker</span>
             <input ref={tickerRef} aria-label="Ticker" placeholder="NVDA" />
@@ -324,23 +397,37 @@ export function HoldingsView() {
             <span>Notes</span>
             <input ref={notesRef} aria-label="Notes" placeholder="optional" />
           </label>
-          <button type="button" className="btn-primary" onClick={() => void onAddManual()} disabled={busy === "manual"}>
+          <Button
+            tone="primary"
+            icon={<Plus size={15} />}
+            onClick={() => void onAddManual()}
+            busy={busy === "manual"}
+          >
             新增持倉
-          </button>
+          </Button>
         </div>
       </section>
 
-      <section className="section-band">
-        <div className="section-head">
+      <section className="ui-section-band">
+        <div className="ui-section-head">
           <h2>IBKR 同步</h2>
-          <div className="actions">
-            <button type="button" className="btn-secondary" onClick={() => void onPreviewIbkr()} disabled={busy != null}>
+          <div className="ui-action-row">
+            <Button
+              icon={<Eye size={15} />}
+              onClick={() => void onPreviewIbkr()}
+              disabled={busy != null}
+            >
               預覽 IBKR 同步
-            </button>
+            </Button>
             {preview && preview.changes.length > 0 && (
-              <button type="button" className="btn-primary" onClick={() => void onApplyIbkr()} disabled={busy != null}>
+              <Button
+                tone="primary"
+                icon={<Check size={15} />}
+                onClick={() => void onApplyIbkr()}
+                disabled={busy != null}
+              >
                 套用同步
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -349,61 +436,33 @@ export function HoldingsView() {
         </p>
         {preview && (
           <div>
-            <p className="muted tiny">
-              預覽結果，尚未寫入本地持倉；按「套用同步」後才會保存。
-            </p>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Change</th>
-                    <th>Symbol</th>
-                    <th>Qty</th>
-                    <th>Avg Cost</th>
-                    <th>Market Value</th>
-                    <th>Unrealized P&amp;L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.changes.length === 0 ? (
-                    <tr><td colSpan={6}>沒有差異</td></tr>
-                  ) : preview.changes.map((change, idx) => (
-                    <tr key={`${change.broker_con_id ?? change.symbol}-${idx}`}>
-                      <td>{change.kind}</td>
-                      <td>{change.symbol}</td>
-                      <td>
-                        {formatChangeMetric(
-                          change.kind,
-                          change.before,
-                          change.after,
-                          "quantity",
-                          change.quantity,
-                        )}
-                      </td>
-                      <td>
-                        {formatChangeMetric(change.kind, change.before, change.after, "avg_cost")}
-                      </td>
-                      <td>
-                        {formatChangeMetric(change.kind, change.before, change.after, "market_value")}
-                      </td>
-                      <td>
-                        {formatChangeMetric(change.kind, change.before, change.after, "unrealized_pnl")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="ui-action-row">
+              <p className="muted tiny">
+                預覽結果，尚未寫入本地持倉；按「套用同步」後才會保存。
+              </p>
+              {preview.changes.length > 0 ? (
+                <StatusBadge state="partial" label="待套用變更" />
+              ) : null}
             </div>
+            <DataTable<PortfolioSyncChange>
+              ariaLabel="IBKR 同步預覽"
+              rows={preview.changes}
+              columns={previewColumns}
+              rowKey={(change) => `${change.kind}-${change.broker_con_id ?? change.symbol}`}
+              rowLabel={(change) => change.symbol}
+              emptyText="沒有差異"
+            />
           </div>
         )}
       </section>
 
-      <section className="section-band">
-        <div className="section-head">
+      <section className="ui-section-band">
+        <div className="ui-section-head">
           <h2>Positions</h2>
-          <div className="actions">
+          <div className="ui-action-row">
             <label className="muted tiny">
               <input
+                ref={closedFilterRef}
                 type="checkbox"
                 aria-label="顯示已關閉持倉"
                 checked={includeClosed}
@@ -421,13 +480,16 @@ export function HoldingsView() {
           editor={editorNode}
           busy={busy}
           onEdit={(position) => setEditing(position)}
-          onClose={(position) => void onCloseRow(position)}
+          onClose={(position, trigger) => {
+            closeTriggerRef.current = trigger;
+            setPendingClose(position);
+          }}
         />
       </section>
 
       {optionPositions.length > 0 && (
-        <section className="section-band">
-          <div className="section-head">
+        <section className="ui-section-band">
+          <div className="ui-section-head">
             <h2>Options</h2>
             <span className="muted tiny">{optionPositions.length} rows</span>
           </div>
@@ -441,10 +503,25 @@ export function HoldingsView() {
             editor={editorNode}
             busy={busy}
             onEdit={(position) => setEditing(position)}
-            onClose={(position) => void onCloseRow(position)}
+            onClose={(position, trigger) => {
+              closeTriggerRef.current = trigger;
+              setPendingClose(position);
+            }}
           />
         </section>
       )}
+
+      <ConfirmDialog
+        open={pendingClose != null}
+        title={pendingClose ? `關閉 ${pendingClose.symbol}` : "關閉持倉"}
+        consequence="這是軟關閉；持倉與筆記會保留，之後可在「顯示已關閉」檢視中查看。"
+        confirmLabel="確認關閉"
+        busy={pendingClose != null && busy === `close-${pendingClose.id}`}
+        returnFocusRef={closeTriggerRef}
+        fallbackFocusRef={closedFilterRef}
+        onCancel={() => setPendingClose(null)}
+        onConfirm={() => { if (pendingClose) void onCloseRow(pendingClose); }}
+      />
     </main>
   );
 }
@@ -461,76 +538,76 @@ function PositionsTable({
   positions: PortfolioPosition[];
   emptyText: string;
   editingId: number | null;
-  editor: React.ReactNode;
+  editor: ReactNode;
   busy: string | null;
   onEdit: (position: PortfolioPosition) => void;
-  onClose: (position: PortfolioPosition) => void;
+  onClose: (position: PortfolioPosition, trigger: HTMLButtonElement) => void;
 }) {
+  const columns: DataTableColumn<PortfolioPosition>[] = [
+    { id: "symbol", header: "Symbol", render: (position) => position.symbol },
+    { id: "asset", header: "Asset", render: (position) => position.asset_class },
+    {
+      id: "quantity",
+      header: "Qty",
+      align: "right",
+      render: (position) => formatNum(position.quantity),
+    },
+    { id: "currency", header: "Currency", render: (position) => position.currency },
+    {
+      id: "avg-cost",
+      header: "Avg Cost",
+      align: "right",
+      render: (position) => formatMaybe(position.avg_cost),
+    },
+    {
+      id: "market-value",
+      header: "Market Value",
+      align: "right",
+      render: (position) => formatMaybe(position.market_value),
+    },
+    {
+      id: "unrealized-pnl",
+      header: <>Unrealized P&amp;L</>,
+      align: "right",
+      render: (position) => formatMaybe(position.unrealized_pnl),
+    },
+    { id: "notes", header: "Notes", render: (position) => position.notes ?? "" },
+    {
+      id: "status",
+      header: "Status",
+      render: (position) => position.closed_at
+        ? <span className="muted tiny">已關閉</span>
+        : position.broker === "manual"
+          ? null
+          : <span className="muted tiny">broker · synced</span>,
+    },
+  ];
+
   return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Asset</th>
-            <th>Qty</th>
-            <th>Currency</th>
-            <th>Avg Cost</th>
-            <th>Market Value</th>
-            <th>Unrealized P&amp;L</th>
-            <th>Notes</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {positions.length === 0 ? (
-            <tr><td colSpan={9}>{emptyText}</td></tr>
-          ) : positions.map((position) => (
-            <React.Fragment key={position.id}>
-              <tr>
-                <td>{position.symbol}</td>
-                <td>{position.asset_class}</td>
-                <td>{formatNum(position.quantity)}</td>
-                <td>{position.currency}</td>
-                <td>{formatMaybe(position.avg_cost)}</td>
-                <td>{formatMaybe(position.market_value)}</td>
-                <td>{formatMaybe(position.unrealized_pnl)}</td>
-                <td>{position.notes ?? ""}</td>
-                <td className="actions">
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => onEdit(position)}
-                    disabled={busy != null}
-                  >
-                    編輯
-                  </button>
-                  {position.closed_at ? (
-                    <span className="muted tiny">已關閉</span>
-                  ) : position.broker === "manual" ? (
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => onClose(position)}
-                      disabled={busy != null}
-                    >
-                      關閉
-                    </button>
-                  ) : (
-                    <span className="muted tiny">broker · synced</span>
-                  )}
-                </td>
-              </tr>
-              {editingId === position.id && (
-                <tr>
-                  <td colSpan={9}>{editor}</td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable<PortfolioPosition>
+      ariaLabel="持倉"
+      rows={positions}
+      columns={columns}
+      rowKey={(position) => position.id}
+      rowLabel={(position) => position.symbol}
+      emptyText={emptyText}
+      actions={(position) => [
+        {
+          id: "edit",
+          label: "編輯",
+          disabled: busy != null,
+          onSelect: onEdit,
+        },
+        ...(!position.closed_at && position.broker === "manual" ? [{
+          id: "close",
+          label: "關閉",
+          tone: "danger" as const,
+          disabled: busy != null,
+          onSelect: onClose,
+        }] : []),
+      ]}
+      renderExpandedRow={(position) => editingId === position.id ? editor : null}
+    />
   );
 }
 

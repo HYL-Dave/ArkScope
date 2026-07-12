@@ -1,6 +1,7 @@
 export * from "./Button";
 export * from "./BoundedProgress";
 export * from "./ConfirmDialog";
+export * from "./DataTable";
 export * from "./Drawer";
 export * from "./PageHeader";
 export * from "./Status";
