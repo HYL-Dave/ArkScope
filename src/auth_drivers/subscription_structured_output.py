@@ -13,6 +13,7 @@ import concurrent.futures
 from datetime import datetime, timezone
 import inspect
 import json
+import os
 import shutil
 import tempfile
 from typing import Any
@@ -25,6 +26,9 @@ from claude_agent_sdk import (
     SystemMessage,
     ToolUseBlock,
     query as _claude_query,
+)
+from claude_agent_sdk._internal.transport.subprocess_cli import (
+    SubprocessCLITransport,
 )
 
 from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
@@ -93,6 +97,28 @@ def _openai_client(token: str, base_url: str, timeout_s: float) -> Any:  # test 
 
 def _refresh_chatgpt_token(*, credential_id: str, token_store: Any):  # test seam
     return refresh_if_needed(credential_id=credential_id, token_store=token_store)
+
+
+def _claude_transport(*, prompt: str, options: ClaudeAgentOptions) -> Any:
+    """Build the pinned SDK transport while retaining ownership of its PID."""
+    return SubprocessCLITransport(prompt=prompt, options=options)
+
+
+def _transport_child_pid(transport: Any) -> int | None:
+    process = getattr(transport, "_process", None)
+    pid = getattr(process, "pid", None)
+    return pid if isinstance(pid, int) and pid > 0 else None
+
+
+def _reap_owned_child(pid: int | None) -> None:
+    """Reap only this adapter's child if the SDK left it as a zombie."""
+    if pid is None:
+        return
+    try:
+        os.waitpid(pid, os.WNOHANG)
+    except ChildProcessError:
+        # The SDK/asyncio child watcher already reaped it.
+        pass
 
 
 def _safe_message(exc: BaseException, token: str | None = None) -> str:
@@ -365,6 +391,8 @@ async def _claude_structured_output_async(
 
     config_dir = tempfile.mkdtemp(prefix="ark_claude_structured_")
     agen = None
+    transport = None
+    child_pid = None
     try:
         selected_effort = None if effort in ("", "default") else effort
         options = ClaudeAgentOptions(
@@ -387,7 +415,8 @@ async def _claude_structured_output_async(
                 "CLAUDE_CONFIG_DIR": config_dir,
             },
         )
-        agen = _claude_query(prompt=user, options=options)
+        transport = _claude_transport(prompt=user, options=options)
+        agen = _claude_query(prompt=user, options=options, transport=transport)
         iterator = agen.__aiter__()
         subscription_auth_verified = False
         while True:
@@ -460,7 +489,9 @@ async def _claude_structured_output_async(
     finally:
         # The pinned SDK can spend 5s on graceful exit and another 5s escalating
         # SIGTERM to SIGKILL. Do not abandon the child after the provider deadline.
+        child_pid = _transport_child_pid(transport)
         await _close_quietly(agen, timeout_s=_CLAUDE_SHUTDOWN_TIMEOUT_S)
+        _reap_owned_child(child_pid)
         shutil.rmtree(config_dir, ignore_errors=True)
 
 

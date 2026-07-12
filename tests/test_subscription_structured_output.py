@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from pathlib import Path
 
@@ -260,7 +261,7 @@ def test_claude_oauth_structured_output_uses_locked_agent_sdk_options(tmp_path, 
 
     captured = {"closed": False}
 
-    async def fake_query(*, prompt, options):
+    async def fake_query(*, prompt, options, transport=None):
         captured.update(prompt=prompt, options=options)
         try:
             yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
@@ -331,6 +332,59 @@ def test_claude_oauth_structured_output_uses_locked_agent_sdk_options(tmp_path, 
     assert options.env["CLAUDE_CONFIG_DIR"] == str(config_dir)
     assert captured["closed"] is True
     assert Path(config_dir).exists() is False
+
+
+def test_claude_reaps_exact_owned_subprocess_after_sdk_close(monkeypatch):
+    from types import SimpleNamespace
+
+    from src.auth_drivers import subscription_structured_output as mod
+
+    transport = SimpleNamespace(_process=SimpleNamespace(pid=4242))
+    monkeypatch.setattr(
+        mod,
+        "_claude_transport",
+        lambda *, prompt, options: transport,
+        raising=False,
+    )
+
+    async def fake_query(**kwargs):
+        assert kwargs.get("transport") is transport
+        yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=2,
+            session_id="owned-child",
+            structured_output={"ok": True},
+        )
+
+    waited = []
+
+    def fake_waitpid(pid, options):
+        waited.append((pid, options))
+        return pid, 0
+
+    monkeypatch.setattr(mod, "_claude_query", fake_query)
+    monkeypatch.setattr(os, "waitpid", fake_waitpid)
+    store = _FakeTokenStore(StoredTokenRecord(access_token="claude-setup-token"))
+
+    result = mod.run_subscription_structured_output(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        credential_id="local:2",
+        model="claude-sonnet-5",
+        system="sys",
+        user="user",
+        output_name="emit_check",
+        output_description="desc",
+        schema=_schema(),
+        token_store=store,
+    )
+
+    assert result == {"ok": True}
+    assert waited == [(4242, os.WNOHANG)]
 
 
 def test_chatgpt_oauth_requires_the_named_function_call_and_still_closes(monkeypatch):
@@ -524,7 +578,7 @@ def test_claude_oauth_expired_token_is_reauth_and_never_starts_sdk(monkeypatch):
 def test_claude_oauth_rejects_non_subscription_auth_source(tmp_path, monkeypatch):
     from src.auth_drivers import subscription_structured_output as mod
 
-    async def fake_query(*, prompt, options):
+    async def fake_query(*, prompt, options, transport=None):
         yield SystemMessage(
             subtype="init",
             data={"apiKeySource": "ANTHROPIC_API_KEY"},
@@ -563,7 +617,7 @@ def test_claude_oauth_rejects_non_subscription_auth_source(tmp_path, monkeypatch
 def test_claude_oauth_allows_only_internal_structured_output_tool(monkeypatch):
     from src.auth_drivers import subscription_structured_output as mod
 
-    async def fake_query(*, prompt, options):
+    async def fake_query(*, prompt, options, transport=None):
         yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
         yield AssistantMessage(
             content=[ToolUseBlock(id="bad-1", name="Bash", input={"command": "pwd"})],
@@ -594,7 +648,7 @@ def test_claude_oauth_allows_only_internal_structured_output_tool(monkeypatch):
 def test_claude_oauth_requires_init_auth_evidence_before_result(monkeypatch):
     from src.auth_drivers import subscription_structured_output as mod
 
-    async def fake_query(*, prompt, options):
+    async def fake_query(*, prompt, options, transport=None):
         yield ResultMessage(
             subtype="success",
             duration_ms=1,
@@ -651,7 +705,7 @@ def test_claude_async_adapter_runs_without_a_second_executor(
 ):
     from src.auth_drivers import subscription_structured_output as mod
 
-    async def fake_query(*, prompt, options):
+    async def fake_query(*, prompt, options, transport=None):
         yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
         yield ResultMessage(
             subtype="success",
