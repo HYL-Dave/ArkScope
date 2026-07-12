@@ -5,9 +5,12 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: REVIEW-CLEARED, 2026-07-12; IMPLEMENTATION AUTHORIZED.** Review MF1
-> and SF1-SF4 are absorbed in this document. Implementation stops review-ready
-> on an isolated branch and does not merge without a separate user decision.
+> **Status: IMPLEMENTED FOR REVIEW, 2026-07-12; CODE REVIEW GREEN; NOT
+> MERGED.** Review MF1 and SF1-SF4 are absorbed in this document. Final code tip
+> is `df9c39b` on `codex/p2-8-ui-primitives`. Canonical backend A/B remains
+> pending because base and head reproduced the same known single-process hang;
+> authenticated DesignSync read-back is also pending because this session has
+> no DesignSync server. Neither gap is reported as PASS or complete.
 
 **Goal:** Establish the minimum canonical UI primitive foundation and use it to repair the missing Holdings and Investor Profile presentation without changing their domain behavior.
 
@@ -16,6 +19,60 @@
 **Tech Stack:** React 18, TypeScript 5.5, Vite 5, Vitest/jsdom, CSS custom properties, `lucide-react` icons, existing npm workspace tooling.
 
 **Behavioral A/B base:** `4e229a8` (canonical written design approved and Claude Design companion synchronized). Create the implementation worktree from the current review-cleared `master` tip so this plan and its ledger are present; intervening commits after `4e229a8` are docs-only. Full behavioral comparison uses `4e229a8` versus the final implementation tip. Do not merge in this plan; stop review-ready.
+
+## Execution Ledger
+
+- **TDD delivery:** Tasks 1-6 landed as focused commits from `f2faebc` through
+  `9d7d169`. Every planned primitive began with the named missing-module or
+  missing-contract RED. Task reviews then repaired stacked-overlay ownership,
+  initially-busy focus, account-scoped row identity, body-portal menu
+  placement, and responsive metric/profile presentation before moving on.
+- **Final implementation review:** the whole-branch review found four gaps:
+  multiple row menus could remain open, Investor Profile mutations had no
+  visible `running` state, proposal guardrails could overflow at 390px, and
+  non-cancellable work was not stated. RED-first fixes landed in `9500d77`.
+  Chrome then exposed a jsdom false positive: menu focus happened while the
+  portal was still hidden. A timing RED observed `hidden, hidden`; `40a92e8`
+  split positioning from focus and real Chrome then reported one menu, a
+  visible focused menuitem, and correct Escape focus restoration. The final
+  terminal-cancellation wording finding landed RED-first in `df9c39b`. Final
+  re-review: **GREEN, no remaining findings**.
+- **Fresh automated evidence at `df9c39b`:** focused frontend `8 files / 70
+  tests`; full frontend `38 / 347`; typecheck and production build PASS (only
+  the existing >500k chunk warning); no-PG smoke `24/24`, `ok:true`,
+  `pg_attempts:[]`. Static gates retain exactly four legacy confirmation
+  owners (Research, Settings, Universe, Watchlist), find no UI media-query or
+  radius exception, keep literal `960` in `tokens.json`/token tests only, find
+  no hard-delete copy, and prove App/Research/Settings/API/styles/backend files
+  byte-unchanged from `4e229a8`.
+- **Frontend base/head accounting:** a fresh virgin base run is `32 files / 296
+  tests`; final head is `38 / 347`, exactly six files and **+51 tests**. The
+  original +46 plan gained five review regressions: BoundedProgress +2,
+  DataTable +1, and Investor Profile/class coverage +2.
+- **Backend A/B:** virgin collect is strict equality `4185 -> 4185` with empty
+  added/removed sets. Base attempt 1, base attempt 2, and head all stopped at
+  the identical 31-byte prefix `..............EEEEEEE..........` before
+  `tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`; all three
+  logs share SHA-256
+  `bad8cae6a1dd39f36318ca7a571577e7fa6bc1163722613b02294c49cd69893d`.
+  Full counters and failure sets were never
+  emitted, so canonical A/B is **PENDING / NOT PASS**. Preserved evidence lives
+  under `/tmp/arkscope-p2.8-s1-ab.nxivgf/logs/`. The final post-attempt commits
+  touch only `apps/arkscope-web`; `src` and `tests` remain unchanged.
+- **Visual evidence:** Holdings and Investor Profile were inspected at
+  1440x900, 1024x768, 961x768, 959x768, and 390x844. At 390px the page has no
+  body overflow; Holdings keeps its 705px financial table inside a 364px
+  horizontal-scroll owner; menus stay within the viewport; ConfirmDialog traps
+  focus, closes on Escape, and restores the row trigger. A long proposal
+  specimen remained `366/366px` with wrapping and no body overflow. Lighthouse
+  snapshot: Accessibility 98 / Best Practices 100; the sole accessibility
+  failure is the pre-existing Settings heading-order debt owned by a later
+  Settings/Profile slice.
+- **Design companion:** the pre-slice companion sync remains plan
+  `dfd45b4f7dbb`. This session exposes no DesignSync tool/resource, so the
+  required component specimens and `radius-lg` read-back were not fabricated.
+  External companion closeout remains pending and blocks marking the visual
+  line complete, but does not justify an app-code workaround.
 
 ---
 
@@ -150,7 +207,7 @@ surfaces and are tested at primitive level only.
 - Create: `apps/arkscope-web/src/ui/tokens.test.ts`
 - Modify: `apps/arkscope-web/src/main.tsx`
 
-- [ ] **Step 1: Write the token contract RED tests**
+- [x] **Step 1: Write the token contract RED tests**
 
 Create `tokens.test.ts` with these named tests:
 
@@ -202,7 +259,7 @@ describe("canonical UI tokens", () => {
 });
 ```
 
-- [ ] **Step 2: Run Task 1 tests and verify RED**
+- [x] **Step 2: Run Task 1 tests and verify RED**
 
 Run:
 
@@ -212,7 +269,7 @@ npm test --workspace apps/arkscope-web -- src/ui/tokens.test.ts
 
 Expected: FAIL because `src/ui/tokens` and `useShellOverlay` do not exist.
 
-- [ ] **Step 3: Add the reviewed token source**
+- [x] **Step 3: Add the reviewed token source**
 
 Create `tokens.json` exactly as the local app authority:
 
@@ -248,7 +305,7 @@ Create `tokens.json` exactly as the local app authority:
 
 There is deliberately no `radius-lg`. Overlay/modal uses `radius-md`.
 
-- [ ] **Step 4: Implement typed exports and CSS installation**
+- [x] **Step 4: Implement typed exports and CSS installation**
 
 Create `tokens.ts` with no duplicated numeric breakpoint:
 
@@ -318,7 +375,7 @@ export function useShellOverlay(): boolean {
 
 Do not add a fallback `@media (max-width: 960px)` elsewhere.
 
-- [ ] **Step 5: Install tokens before the application render**
+- [x] **Step 5: Install tokens before the application render**
 
 In `main.tsx`, import `installUiTokens` and `./ui/primitives.css`, then call the
 installer before `createRoot`:
@@ -334,7 +391,7 @@ installUiTokens(document.documentElement);
 `primitives.css` is created in Task 2; until then, create an empty file only if
 the RED-to-GREEN cycle requires the import to resolve.
 
-- [ ] **Step 6: Run Task 1 tests and typecheck**
+- [x] **Step 6: Run Task 1 tests and typecheck**
 
 Run:
 
@@ -345,7 +402,7 @@ npm run typecheck --workspace apps/arkscope-web
 
 Expected: 5 parameter-expanded token tests PASS; typecheck PASS.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 git add apps/arkscope-web/src/main.tsx apps/arkscope-web/src/ui/tokens.json apps/arkscope-web/src/ui/tokens.ts apps/arkscope-web/src/ui/useShellOverlay.ts apps/arkscope-web/src/ui/tokens.test.ts apps/arkscope-web/src/ui/primitives.css
@@ -367,7 +424,7 @@ git commit -m "feat: add canonical ui token authority"
 - Modify: `apps/arkscope-web/src/ui/primitives.css`
 - Create: `apps/arkscope-web/src/ui/index.ts`
 
-- [ ] **Step 1: Add the icon dependency through the workspace**
+- [x] **Step 1: Add the icon dependency through the workspace**
 
 Run:
 
@@ -378,7 +435,7 @@ npm install lucide-react --workspace apps/arkscope-web
 Expected: `apps/arkscope-web/package.json` and root `package-lock.json` change;
 no unrelated package is upgraded.
 
-- [ ] **Step 2: Write RED tests using the repository's jsdom harness**
+- [x] **Step 2: Write RED tests using the repository's jsdom harness**
 
 Create `primitives.test.tsx`. Use `createRoot` + `act`; do not add
 Testing Library. The helper is explicit:
@@ -468,7 +525,7 @@ it("uses status semantics for nonterminal information", async () => {
 The `it.each` expands to all nine machine values. `partial` and `stale` must
 remain distinct `data-state` values even though they share visual tokens.
 
-- [ ] **Step 3: Run tests and verify RED**
+- [x] **Step 3: Run tests and verify RED**
 
 Run:
 
@@ -478,7 +535,7 @@ npm test --workspace apps/arkscope-web -- src/ui/primitives.test.tsx
 
 Expected: FAIL because the primitive modules do not exist.
 
-- [ ] **Step 4: Implement compact command controls**
+- [x] **Step 4: Implement compact command controls**
 
 Create `Button.tsx`:
 
@@ -549,7 +606,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 
 The icon wrapper is `aria-hidden`; the button label is authoritative.
 
-- [ ] **Step 5: Implement PageHeader**
+- [x] **Step 5: Implement PageHeader**
 
 Create `PageHeader.tsx`:
 
@@ -580,7 +637,7 @@ export function PageHeader({
 }
 ```
 
-- [ ] **Step 6: Implement common state presentation without re-translating domains**
+- [x] **Step 6: Implement common state presentation without re-translating domains**
 
 Create `Status.tsx`:
 
@@ -648,7 +705,7 @@ export function InlineAlert({
 }
 ```
 
-- [ ] **Step 7: Add the compact shared CSS**
+- [x] **Step 7: Add the compact shared CSS**
 
 Populate the first part of `primitives.css`. Use only installed token variables;
 all framed radii are `var(--radius-md)` or smaller:
@@ -732,7 +789,7 @@ all framed radii are `var(--radius-md)` or smaller:
 Do not add viewport-width font scaling, negative letter spacing, decorative
 gradients, nested card rules, or 10px/14px general-frame radii.
 
-- [ ] **Step 8: Export only implemented primitives**
+- [x] **Step 8: Export only implemented primitives**
 
 Create `ui/index.ts`:
 
@@ -746,7 +803,7 @@ export * from "./useShellOverlay";
 
 Later tasks append exports only after their module is green.
 
-- [ ] **Step 9: Run focused tests and typecheck**
+- [x] **Step 9: Run focused tests and typecheck**
 
 Run:
 
@@ -758,7 +815,7 @@ npm run typecheck --workspace apps/arkscope-web
 Expected: token tests and 14 parameter-expanded primitive tests PASS;
 typecheck PASS.
 
-- [ ] **Step 10: Commit Task 2**
+- [x] **Step 10: Commit Task 2**
 
 ```bash
 git add package.json package-lock.json apps/arkscope-web/package.json apps/arkscope-web/src/ui
@@ -778,7 +835,7 @@ git commit -m "feat: add compact ui state primitives"
 - Modify: `apps/arkscope-web/src/ui/primitives.css`
 - Modify: `apps/arkscope-web/src/ui/index.ts`
 
-- [ ] **Step 1: Write overlay RED tests**
+- [x] **Step 1: Write overlay RED tests**
 
 Create `overlays.test.tsx` with the same `createRoot`/`act` cleanup pattern as
 Task 2. Stub `matchMedia` explicitly:
@@ -835,7 +892,7 @@ Test 10 proves idle Escape calls Cancel and never Confirm, then rerenders with
 The restore test must render a real trigger and toggle `open` from component
 state. It must not call the primitive function directly.
 
-- [ ] **Step 2: Run overlay tests and verify RED**
+- [x] **Step 2: Run overlay tests and verify RED**
 
 Run:
 
@@ -845,7 +902,7 @@ npm test --workspace apps/arkscope-web -- src/ui/overlays.test.tsx
 
 Expected: FAIL because Drawer/ConfirmDialog do not exist.
 
-- [ ] **Step 3: Implement one focus boundary for both overlays**
+- [x] **Step 3: Implement one focus boundary for both overlays**
 
 Create `useOverlayFocus.ts`:
 
@@ -927,7 +984,7 @@ export function useOverlayFocus({
 
 Do not fork a second focus implementation in ConfirmDialog.
 
-- [ ] **Step 4: Implement transient Drawer only**
+- [x] **Step 4: Implement transient Drawer only**
 
 Create `Drawer.tsx`:
 
@@ -1005,7 +1062,7 @@ export function Drawer({
 `IconButton` is already `forwardRef` compatible from Task 2; do not replace it
 with an untyped cast or a second trigger wrapper.
 
-- [ ] **Step 5: Implement consequence-aware ConfirmDialog**
+- [x] **Step 5: Implement consequence-aware ConfirmDialog**
 
 Create `ConfirmDialog.tsx`:
 
@@ -1083,7 +1140,7 @@ export function ConfirmDialog({
 The default focus is Cancel. No hidden hard-delete wording or generic “Are you
 sure?” copy is generated by the primitive; the consumer supplies consequences.
 
-- [ ] **Step 6: Add overlay CSS with an 8px maximum radius**
+- [x] **Step 6: Add overlay CSS with an 8px maximum radius**
 
 Append:
 
@@ -1138,7 +1195,7 @@ Append:
 The Drawer breakpoint is driven by `data-shell-overlay`; this file contains no
 `@media` shell breakpoint.
 
-- [ ] **Step 7: Export the green overlay modules**
+- [x] **Step 7: Export the green overlay modules**
 
 Append to `ui/index.ts`:
 
@@ -1147,7 +1204,7 @@ export * from "./ConfirmDialog";
 export * from "./Drawer";
 ```
 
-- [ ] **Step 8: Run focused tests, typecheck, and radius/breakpoint gates**
+- [x] **Step 8: Run focused tests, typecheck, and radius/breakpoint gates**
 
 Run:
 
@@ -1161,7 +1218,7 @@ Expected: 10 overlay tests and 5 token tests PASS; typecheck PASS. The `rg`
 command may show test prose asserting forbidden values, but must show no
 production CSS/TS declaration of a shell media query or 10px/14px frame radius.
 
-- [ ] **Step 9: Commit Task 3**
+- [x] **Step 9: Commit Task 3**
 
 ```bash
 git add apps/arkscope-web/src/ui
@@ -1179,7 +1236,7 @@ git commit -m "feat: add accessible ui overlays"
 - Modify: `apps/arkscope-web/src/ui/primitives.css`
 - Modify: `apps/arkscope-web/src/ui/index.ts`
 
-- [ ] **Step 1: Write BoundedProgress RED tests**
+- [x] **Step 1: Write BoundedProgress RED tests**
 
 Create `BoundedProgress.test.tsx` with the house jsdom harness and these named
 tests:
@@ -1222,7 +1279,7 @@ expect(host!.querySelector('[role="status"][aria-live="polite"]')?.textContent)
 The test must distinguish `overallElapsedMs=930_000` from
 `stageElapsedMs=900_000`; it may not render `930 / 900` as one ratio.
 
-- [ ] **Step 2: Run Task 4 tests and verify RED**
+- [x] **Step 2: Run Task 4 tests and verify RED**
 
 Run:
 
@@ -1232,7 +1289,7 @@ npm test --workspace apps/arkscope-web -- src/ui/BoundedProgress.test.tsx
 
 Expected: FAIL because `BoundedProgress` does not exist.
 
-- [ ] **Step 3: Implement the compact bounded-work contract**
+- [x] **Step 3: Implement the compact bounded-work contract**
 
 Create `BoundedProgress.tsx`:
 
@@ -1338,7 +1395,7 @@ job registry, or polling behavior. The elapsed-time container is not a live
 region; only grace and terminal state transitions are announced, so polling
 updates cannot be read aloud every second.
 
-- [ ] **Step 4: Add compact BoundedProgress styles**
+- [x] **Step 4: Add compact BoundedProgress styles**
 
 Append:
 
@@ -1378,7 +1435,7 @@ Append:
 }
 ```
 
-- [ ] **Step 5: Export and run the focused battery**
+- [x] **Step 5: Export and run the focused battery**
 
 Append:
 
@@ -1396,7 +1453,7 @@ npm run typecheck --workspace apps/arkscope-web
 Expected: 7 BoundedProgress tests and the Task 2 primitive tests PASS;
 typecheck PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add apps/arkscope-web/src/ui
@@ -1416,7 +1473,7 @@ git commit -m "feat: add bounded work progress primitive"
 - Modify: `apps/arkscope-web/src/Holdings.tsx`
 - Modify: `apps/arkscope-web/src/Holdings.test.tsx`
 
-- [ ] **Step 1: Write generic DataTable RED tests**
+- [x] **Step 1: Write generic DataTable RED tests**
 
 Create `DataTable.test.tsx` with the standard jsdom harness. Add these five
 tests:
@@ -1481,7 +1538,7 @@ vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function
 // Only now click the trigger; stubbing the menu element afterward is too late.
 ```
 
-- [ ] **Step 2: Write Holdings migration RED tests before changing production**
+- [x] **Step 2: Write Holdings migration RED tests before changing production**
 
 Update the current Holdings tests, preserving every existing payload assertion.
 Replace `soft closes a manual row after confirmation` with a stronger dialog
@@ -1545,7 +1602,7 @@ Make the Holdings test accounting exact:
 Do not delete or weaken the existing numeric validation, explicit-null,
 read-only sync, apply-refresh, aggregate toggle, or payload tests.
 
-- [ ] **Step 3: Run the two suites and verify RED for the intended reasons**
+- [x] **Step 3: Run the two suites and verify RED for the intended reasons**
 
 Run:
 
@@ -1557,7 +1614,7 @@ Expected: DataTable import fails; new Holdings selectors fail because the row
 menu, PageHeader state, and ConfirmDialog are not wired. Existing behavior tests
 remain green except the intentionally replaced confirmation test.
 
-- [ ] **Step 4: Implement the typed DataTable and row-action menu**
+- [x] **Step 4: Implement the typed DataTable and row-action menu**
 
 Create `DataTable.tsx`:
 
@@ -1732,7 +1789,7 @@ export function DataTable<Row>({
 
 Keep the generic type consistent; do not use `any` to silence row typing.
 
-- [ ] **Step 5: Style DataTable, menus, and the existing Holdings class family**
+- [x] **Step 5: Style DataTable, menus, and the existing Holdings class family**
 
 Append to `primitives.css`:
 
@@ -1769,7 +1826,7 @@ Append to `primitives.css`:
 These are full-width bands, not floating section cards. Account metrics are
 allowed repeated framed items and are never nested inside another card.
 
-- [ ] **Step 6: Migrate Holdings to PageHeader, state primitives, and DataTable**
+- [x] **Step 6: Migrate Holdings to PageHeader, state primitives, and DataTable**
 
 Apply these structural changes without changing API calls:
 
@@ -1836,7 +1893,7 @@ const viewState = err
 
 Do not create a hard-delete action or a manual close action for IBKR rows.
 
-- [ ] **Step 7: Export DataTable and run the full Holdings battery**
+- [x] **Step 7: Export DataTable and run the full Holdings battery**
 
 Append:
 
@@ -1854,7 +1911,7 @@ npm run typecheck --workspace apps/arkscope-web
 Expected: all existing Holdings contracts plus the new menu/dialog/state tests
 PASS. There must be no `act()` warning introduced by portal cleanup.
 
-- [ ] **Step 8: Run the Holdings-specific ratchets**
+- [x] **Step 8: Run the Holdings-specific ratchets**
 
 Run:
 
@@ -1866,7 +1923,7 @@ rg -n 'className="(btn-primary|btn-secondary|table-wrap|section-band|section-hea
 
 Expected: all three commands return no matches.
 
-- [ ] **Step 9: Commit Task 5**
+- [x] **Step 9: Commit Task 5**
 
 ```bash
 git add apps/arkscope-web/src/ui apps/arkscope-web/src/Holdings.tsx apps/arkscope-web/src/Holdings.test.tsx
@@ -1884,7 +1941,7 @@ git commit -m "feat: migrate holdings to shared ui primitives"
 - Modify: `apps/arkscope-web/src/ui/primitives.css`
 - Create: `apps/arkscope-web/src/ui/classCoverage.test.ts`
 
-- [ ] **Step 1: Write Investor Profile presentation RED tests**
+- [x] **Step 1: Write Investor Profile presentation RED tests**
 
 Keep all six current domain tests. Add exactly two tests:
 
@@ -1917,7 +1974,7 @@ expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("�
 Do not change the approved-profile payload, proposal endpoint, message journal,
 risk mismatch derivation, or effective-stance assertions.
 
-- [ ] **Step 2: Write the literal class-coverage RED test**
+- [x] **Step 2: Write the literal class-coverage RED test**
 
 Create `classCoverage.test.ts` in the default Node environment:
 
@@ -1959,7 +2016,7 @@ describe("migrated component class coverage", () => {
 This gate intentionally covers only the two migrated consumers. It does not
 declare the untouched monolithic app clean.
 
-- [ ] **Step 3: Run tests and verify RED**
+- [x] **Step 3: Run tests and verify RED**
 
 Run:
 
@@ -1971,7 +2028,7 @@ Expected: presentation-state tests fail; class coverage reports the current
 undefined families, including `investor-profile-panel`, `ip-grid`, `ip-chip`,
 `ip-calibration`, `ip-actions`, `ip-guardrail`, and `ip-calibration-log`.
 
-- [ ] **Step 4: Adopt shared state/command primitives without redesigning profile semantics**
+- [x] **Step 4: Adopt shared state/command primitives without redesigning profile semantics**
 
 In `InvestorProfilePanel.tsx`:
 
@@ -1991,7 +2048,7 @@ Keep the current DOM ordering: description, enable toggle, raw fields,
 preferences, freeform, calibration, mismatch, skill note, draft/save. Slice 5
 owns the future hierarchy.
 
-- [ ] **Step 5: Add the complete Investor Profile class family**
+- [x] **Step 5: Add the complete Investor Profile class family**
 
 Append styles that are scoped and unframed at the section level:
 
@@ -2034,7 +2091,7 @@ Append styles that are scoped and unframed at the section level:
 Do not turn `.investor-profile-panel`, `.ip-calibration`, or `.ip-guardrail`
 into nested cards.
 
-- [ ] **Step 6: Run focused profile/class tests and the two consumer suites**
+- [x] **Step 6: Run focused profile/class tests and the two consumer suites**
 
 Run:
 
@@ -2046,7 +2103,7 @@ npm run typecheck --workspace apps/arkscope-web
 Expected: all existing profile and Holdings tests plus new state/class tests
 PASS; `missing` is `[]`; typecheck PASS.
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 ```bash
 git add apps/arkscope-web/src/InvestorProfilePanel.tsx apps/arkscope-web/src/InvestorProfilePanel.test.tsx apps/arkscope-web/src/ui/primitives.css apps/arkscope-web/src/ui/classCoverage.test.ts
@@ -2064,7 +2121,7 @@ git commit -m "fix: repair investor profile presentation"
 - External authenticated review after code GREEN: Claude Design component
   specimens and radius reconciliation; no repo file is written by DesignSync.
 
-- [ ] **Step 1: Run the complete focused frontend battery**
+- [x] **Step 1: Run the complete focused frontend battery**
 
 Run:
 
@@ -2083,7 +2140,7 @@ npm test --workspace apps/arkscope-web -- \
 Expected: all focused tests PASS with no React `act`, portal cleanup, unhandled
 promise, or accessibility warnings.
 
-- [ ] **Step 2: Run the complete frontend suite and exact accounting**
+- [x] **Step 2: Run the complete frontend suite and exact accounting**
 
 The base is authoritative and was rechecked while writing this plan:
 
@@ -2092,17 +2149,17 @@ Test Files  32 passed (32)
 Tests       296 passed (296)
 ```
 
-This plan adds six test files and exactly 46 net tests:
+This plan adds six test files and exactly 51 net tests after review hardening:
 
 | Task | Net tests |
 | --- | ---: |
 | Tokens | 5 |
 | Controls/PageHeader/common state | 14 |
 | Drawer/ConfirmDialog | 10 |
-| BoundedProgress | 7 |
-| DataTable + one new Holdings state test | 6 |
-| Investor Profile + class coverage | 4 |
-| **Total** | **46** |
+| BoundedProgress | 9 |
+| DataTable + one new Holdings state test | 7 |
+| Investor Profile + class coverage | 6 |
+| **Total** | **51** |
 
 Run:
 
@@ -2112,11 +2169,11 @@ npm --workspace apps/arkscope-web run typecheck
 npm --workspace apps/arkscope-web run build
 ```
 
-Expected: `38 files / 342 tests`, typecheck PASS, production build PASS. Any
-count other than +46 is a finding: reconcile the named-test ledger rather than
+Expected: `38 files / 347 tests`, typecheck PASS, production build PASS. Any
+count other than +51 is a finding: reconcile the named-test ledger rather than
 rounding or weakening it.
 
-- [ ] **Step 3: Run static ratchets**
+- [x] **Step 3: Run static ratchets**
 
 Run each command and inspect the complete untruncated output:
 
@@ -2162,7 +2219,7 @@ Expected: class coverage PASS; diff command has no output. This proves Slice 1
 did not smuggle shell/Research/Settings/API/backend behavior into the primitive
 foundation.
 
-- [ ] **Step 4: Run no-PG/fresh-start smoke**
+- [x] **Step 4: Run no-PG/fresh-start smoke**
 
 Run:
 
@@ -2172,7 +2229,7 @@ python src/smoke/pg_unreachable_e2e.py
 
 Expected: `ok: true`, all checks pass, and `pg_attempts: []`.
 
-- [ ] **Step 5: Run visual and interaction checks at the required viewports**
+- [x] **Step 5: Run visual and interaction checks at the required viewports**
 
 Start the branch web server after the production build. Use 8430 if free;
 otherwise select the next free 84xx port and report the actual URL:
@@ -2227,17 +2284,18 @@ Backend acceptance, because no backend/test file is modified:
 Frontend acceptance:
 
 - base `32/296`;
-- head `38/342`;
+- head `38/347`;
 - all tests pass on both sides;
-- delta is exactly six files and 46 tests.
+- delta is exactly six files and 51 tests.
 
 If the known single-process TestClient/lifespan noise appears, preserve logs and
 use the established reviewer canonical protocol. Do not claim a partial A/B as
 PASS.
 
-- [ ] **Step 7: Mark implementation review-ready, not complete**
+- [x] **Step 7: Mark implementation review-ready, not complete**
 
-After Steps 1-6 pass:
+After Steps 1-5 pass, and after Step 6 either passes or records the known
+single-process hang without claiming a partial PASS:
 
 1. Change this plan header to `IMPLEMENTED FOR REVIEW`.
 2. Record each RED reason, focused/full counts, static gates, screenshots, smoke,
@@ -2271,7 +2329,7 @@ Read back all changed Design files and record the DesignSync plan ID in this
 plan/map. External sync failure blocks visual closeout but must not trigger an
 unreviewed app-code workaround.
 
-- [ ] **Step 9: Commit review-ready documentation and stop**
+- [x] **Step 9: Commit review-ready documentation and stop**
 
 ```bash
 git add docs/design/PROJECT_PRIORITY_MAP.md docs/superpowers/plans/2026-07-12-p2-8-slice-1-ui-primitives.md
@@ -2299,7 +2357,7 @@ Stop and report instead of widening scope if any of these occurs:
    or control order.
 6. A new visual frame requires radius over 8px.
 7. A second shell breakpoint literal appears outside `tokens.json`/token tests.
-8. Full frontend accounting is not exactly +46 or backend A/B changes.
+8. Full frontend accounting is not exactly +51 or backend A/B changes.
 9. Visual checks show overlap, clipped controls, unreadable financial columns,
    or a dialog/menu outside the viewport.
 
