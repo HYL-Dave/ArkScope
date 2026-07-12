@@ -700,3 +700,136 @@ def test_chatgpt_async_adapter_enforces_one_wall_clock_deadline(monkeypatch):
     assert elapsed < 0.05
     assert stream.close_started is True
     assert client.closed is True
+
+
+def test_chatgpt_credential_preflight_is_inside_the_deadline(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    client_built = False
+
+    def slow_refresh(**kwargs):
+        time.sleep(0.06)
+        return StoredTokenRecord(access_token="late-token")
+
+    def forbidden_client(*args, **kwargs):
+        nonlocal client_built
+        client_built = True
+        raise AssertionError("provider client must not start after preflight timeout")
+
+    monkeypatch.setattr(mod, "_refresh_chatgpt_token", slow_refresh)
+    monkeypatch.setattr(mod, "_openai_client", forbidden_client)
+
+    async def invoke():
+        with pytest.raises(mod.SubscriptionStructuredOutputError) as caught:
+            await mod.run_subscription_structured_output_async(
+                provider="openai",
+                auth_mode="chatgpt_oauth",
+                credential_id="local:7",
+                model="gpt-5.4-mini",
+                system="sys",
+                user="user",
+                output_name="emit_check",
+                output_description="desc",
+                schema=_schema(),
+                token_store=object(),
+                timeout_s=0.01,
+            )
+        return caught.value
+
+    started = time.perf_counter()
+    error = asyncio.run(invoke())
+    elapsed = time.perf_counter() - started
+
+    assert error.code == "provider_call_failed"
+    assert "preflight timed out" in str(error)
+    assert elapsed < 0.05
+    assert client_built is False
+
+
+def test_claude_token_store_preflight_is_inside_the_deadline(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    class SlowStore:
+        def load(self, **kwargs):
+            time.sleep(0.06)
+            return StoredTokenRecord(access_token="late-token")
+
+    async def forbidden_query(**kwargs):
+        raise AssertionError("Claude SDK must not start after preflight timeout")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(mod, "_claude_query", forbidden_query)
+
+    async def invoke():
+        with pytest.raises(mod.SubscriptionStructuredOutputError) as caught:
+            await mod.run_subscription_structured_output_async(
+                provider="anthropic",
+                auth_mode="claude_code_oauth",
+                credential_id="local:2",
+                model="claude-sonnet-5",
+                system="sys",
+                user="user",
+                output_name="emit_check",
+                output_description="desc",
+                schema=_schema(),
+                token_store=SlowStore(),
+                timeout_s=0.01,
+            )
+        return caught.value
+
+    started = time.perf_counter()
+    error = asyncio.run(invoke())
+    elapsed = time.perf_counter() - started
+
+    assert error.code == "provider_call_failed"
+    assert "preflight timed out" in str(error)
+    assert elapsed < 0.05
+
+
+def test_claude_timeout_waits_for_bounded_subprocess_cleanup(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    class SlowClaudeStream:
+        def __init__(self):
+            self.close_started = False
+            self.closed = False
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            await asyncio.sleep(0.06)
+            raise StopAsyncIteration
+
+        async def aclose(self):
+            self.close_started = True
+            await asyncio.sleep(0.02)
+            self.closed = True
+
+    stream = SlowClaudeStream()
+    monkeypatch.setattr(mod, "_claude_query", lambda **kwargs: stream)
+    store = _FakeTokenStore(StoredTokenRecord(access_token="claude-setup-token"))
+
+    async def invoke():
+        with pytest.raises(mod.SubscriptionStructuredOutputError) as caught:
+            await mod.run_subscription_structured_output_async(
+                provider="anthropic",
+                auth_mode="claude_code_oauth",
+                credential_id="local:2",
+                model="claude-sonnet-5",
+                system="sys",
+                user="user",
+                output_name="emit_check",
+                output_description="desc",
+                schema=_schema(),
+                token_store=store,
+                timeout_s=0.01,
+            )
+        return caught.value
+
+    error = asyncio.run(invoke())
+
+    assert error.code == "provider_call_failed"
+    assert "timed out" in str(error)
+    assert stream.close_started is True
+    assert stream.closed is True

@@ -9,6 +9,7 @@ environment API key, another provider, or another model.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 from datetime import datetime, timezone
 import inspect
 import json
@@ -72,6 +73,7 @@ _CLAUDE_INHERITED_BILLING_ENV = (
     "CLAUDE_CODE_USE_MANTLE",
     "CLAUDE_CODE_USE_GATEWAY",
 )
+_CLAUDE_SHUTDOWN_TIMEOUT_S = 11.0
 
 
 def _openai_client(token: str, base_url: str, timeout_s: float) -> Any:  # test seam
@@ -146,6 +148,29 @@ async def _next_with_deadline(iterator: Any, deadline: float) -> Any:
     return item
 
 
+async def _run_sync_preflight(call, *, deadline: float, label: str) -> Any:
+    """Bound keyring/refresh work without moving a provider call off-loop.
+
+    A timed-out worker may finish credential maintenance later, but it never owns
+    an LLM client and therefore cannot continue model usage after the route returns.
+    """
+    loop = asyncio.get_running_loop()
+    pool = concurrent.futures.ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix="ark-subscription-preflight",
+    )
+    future = loop.run_in_executor(pool, call)
+    try:
+        return await asyncio.wait_for(future, timeout=_remaining(deadline))
+    except asyncio.TimeoutError as exc:
+        raise SubscriptionStructuredOutputError(
+            "provider_call_failed",
+            f"{label} preflight timed out before any model call.",
+        ) from exc
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
 async def _openai_structured_output_async(
     *,
     credential_id: str,
@@ -162,9 +187,13 @@ async def _openai_structured_output_async(
     deadline = asyncio.get_running_loop().time() + max(float(timeout_s), 0.001)
     token: str | None = None
     try:
-        record = _refresh_chatgpt_token(
-            credential_id=credential_id,
-            token_store=token_store,
+        record = await _run_sync_preflight(
+            lambda: _refresh_chatgpt_token(
+                credential_id=credential_id,
+                token_store=token_store,
+            ),
+            deadline=deadline,
+            label="ChatGPT credential",
         )
         token = getattr(record, "access_token", None)
     except ChatGPTOAuthLoginError as exc:
@@ -289,10 +318,14 @@ async def _claude_structured_output_async(
 ) -> dict[str, Any]:
     deadline = asyncio.get_running_loop().time() + max(float(timeout_s), 0.001)
     try:
-        record = token_store.load(
-            provider="anthropic",
-            auth_mode="claude_code_oauth",
-            credential_id=credential_id,
+        record = await _run_sync_preflight(
+            lambda: token_store.load(
+                provider="anthropic",
+                auth_mode="claude_code_oauth",
+                credential_id=credential_id,
+            ),
+            deadline=deadline,
+            label="Claude credential",
         )
     except Exception as exc:  # noqa: BLE001
         raise SubscriptionStructuredOutputError(
@@ -414,7 +447,9 @@ async def _claude_structured_output_async(
             _safe_message(exc, token),
         ) from exc
     finally:
-        await _close_quietly(agen, timeout_s=_cleanup_budget(deadline))
+        # The pinned SDK can spend 5s on graceful exit and another 5s escalating
+        # SIGTERM to SIGKILL. Do not abandon the child after the provider deadline.
+        await _close_quietly(agen, timeout_s=_CLAUDE_SHUTDOWN_TIMEOUT_S)
         shutil.rmtree(config_dir, ignore_errors=True)
 
 
