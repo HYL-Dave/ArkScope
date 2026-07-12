@@ -1,6 +1,6 @@
 # P2.8 Settings Stabilization Design
 
-> **Status: WRITTEN DESIGN FOR REVIEW — NOT IMPLEMENTED, 2026-07-12.**
+> **Status: APPROVED DESIGN / REVIEW-CLEARED — NOT IMPLEMENTED, 2026-07-12.**
 > This is a bounded insertion after P2.8 Slice 1. It does not replace the
 > canonical shell authority or pre-implement the later Settings and Investor
 > Profile slices.
@@ -169,8 +169,25 @@ read-only status and coverage behavior remains unchanged.
 - most recent provider/general error.
 
 It stops rendering write-route, PostgreSQL, local/legacy projection, rollout
-toggle, and pre-exit language in the post-exit normal state. Whether this
-surface later merges into Data Sources remains a Slice 4 decision.
+and pre-exit language.
+
+Two mutation controls require an explicit disposition:
+
+- the direct-news routing checkbox calls `PUT /news/settings` and persists
+  `use_local_news`;
+- the normalized-writes checkbox calls
+  `PUT /news/settings/normalized-writes` and persists
+  `use_normalized_news_writes`.
+
+The normal UI stops rendering both checkbox branches. This is an intentional
+removal of migration-era user controls, not a copy-only edit. The underlying
+profile settings, environment overrides, compatibility mutation routes, status
+DTO fields, and route-resolution code remain unchanged. Programmatic callers
+can still reach the guarded routes; in the completed post-exit state those
+routes already reject selecting the retired OFF path, and the current UI
+already hides the checkboxes when `news_hard_local=true`.
+
+Whether this surface later merges into Data Sources remains a Slice 4 decision.
 
 ### 5.3 Macro / Calendar
 
@@ -276,8 +293,11 @@ states:
 | request, provider segment, or durable run failed | `failed` |
 | no current domain signal | `interrupted` is not synthesized |
 
-A user-disabled schedule is a stable neutral state, not a failure. Existing
-domain labels remain authoritative; shared primitives standardize presentation.
+A user-disabled schedule is a stable neutral state, not a failure. It receives
+no state badge and is shown as muted plain text (`排程關閉`) beside the existing
+control. This is an explicit presentation exception rather than a fabricated
+`ready` state. Existing domain labels remain authoritative; shared primitives
+standardize presentation.
 
 ## 9. Error and Accessibility Boundaries
 
@@ -304,17 +324,22 @@ The implementation plan must begin RED-first and include:
    content inside explicit scroll owners;
 6. enabled directory and panel text free of storage/migration narration while
    actionable credential-source labels remain;
-7. the four Investor Profile/mismatch wording replacements and all affected
+7. both News mutation checkboxes absent from the rendered normal UI, zero
+   `setUseLocalNews` / `setNormalizedNewsWrites` calls during render, and
+   unchanged effective fields from the status response; backend byte identity
+   keeps the status endpoint and compatibility mutation routes unchanged;
+8. a disabled schedule rendered as muted `排程關閉` text without a status badge;
+9. the four Investor Profile/mismatch wording replacements and all affected
    existing assertions;
-8. Market, News, Macro, and Data Sources loading/empty/ready/running/failed
+10. Market, News, Macro, and Data Sources loading/empty/ready/running/failed
    states where applicable, plus partial/stale and blocked states on Data
    Sources;
-9. full frontend Vitest, TypeScript, and production build;
-10. browser checks at 1440x900, 1024x768, 961x768, 959x768, and 390x844 with
+11. full frontend Vitest, TypeScript, and production build;
+12. browser checks at 1440x900, 1024x768, 961x768, 959x768, and 390x844 with
     long-content fixtures and a non-null running progress fixture;
-11. no overlap, clipping, page-level horizontal overflow, font shrinking, or
+13. no overlap, clipping, page-level horizontal overflow, font shrinking, or
     inaccessible progress state;
-12. backend and backend-test byte identity for this frontend-only slice.
+14. backend and backend-test byte identity for this frontend-only slice.
 
 Static gates are scoped to enabled normal Settings surfaces. They must not
 rewrite unreachable App Records history, comments, backend compatibility
