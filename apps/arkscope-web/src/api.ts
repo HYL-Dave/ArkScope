@@ -1529,12 +1529,13 @@ export function saveCard(
 }
 
 // On-demand translation (cached server-side per language). Smaller than a
-// generation but still an LLM call, so allow a generous timeout.
+// generation, but max-effort subscription models can still exceed two minutes.
+// Match generation so the provider's 210s deadline can surface cleanly.
 export function translateCard(
   runId: number,
   lang = "zh-Hant",
 ): Promise<{ run_id: number; lang: string; card: ResultCard; cached: boolean }> {
-  return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, 120_000);
+  return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, CARD_GEN_TIMEOUT_MS);
 }
 
 // --- market-data local-DB lifecycle (3a prices + 3b news + 3c-A iv/fundamentals) ---

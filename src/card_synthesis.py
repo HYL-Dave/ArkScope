@@ -39,6 +39,9 @@ logger = logging.getLogger(__name__)
 Provider = Literal["anthropic", "openai"]
 _TOOL_NAME = "emit_result_card"
 _MAX_TOKENS = 8192  # card JSON is small; well under the 21333 streaming threshold
+# Full cards at high/max effort need materially longer than the tiny task-test.
+# Keep this below the web client's 240s deadline, including bounded SDK cleanup.
+_SUBSCRIPTION_CARD_TIMEOUT_S = 210.0
 
 
 class _SynthClaim(BaseModel):
@@ -167,6 +170,7 @@ def _subscription_structured_output_if_active(
         output_description=output_description,
         schema=schema,
         effort=effort,
+        timeout_s=_SUBSCRIPTION_CARD_TIMEOUT_S,
     )
 
 

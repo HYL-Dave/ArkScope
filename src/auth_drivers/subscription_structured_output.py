@@ -74,7 +74,10 @@ _CLAUDE_INHERITED_BILLING_ENV = (
     "CLAUDE_CODE_USE_MANTLE",
     "CLAUDE_CODE_USE_GATEWAY",
 )
-_CLAUDE_SHUTDOWN_TIMEOUT_S = 11.0
+# The SDK's own close path budgets 5s graceful + 5s SIGTERM before SIGKILL.
+# Leave enough outer margin for the final waitpid/reap instead of cancelling
+# cleanup after the child exits but before it is collected.
+_CLAUDE_SHUTDOWN_TIMEOUT_S = 20.0
 
 
 def _openai_client(token: str, base_url: str, timeout_s: float) -> Any:  # test seam

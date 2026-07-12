@@ -843,6 +843,11 @@ def test_claude_token_store_preflight_is_inside_the_deadline(monkeypatch):
 def test_claude_timeout_waits_for_bounded_subprocess_cleanup(monkeypatch):
     from src.auth_drivers import subscription_structured_output as mod
 
+    # The pinned SDK itself may spend 5s on graceful shutdown and 5s on
+    # SIGTERM before SIGKILL + waitpid. The outer bound must leave margin for
+    # the final reap instead of cancelling close() while the child is a zombie.
+    assert mod._CLAUDE_SHUTDOWN_TIMEOUT_S >= 15.0
+
     class SlowClaudeStream:
         def __init__(self):
             self.close_started = False

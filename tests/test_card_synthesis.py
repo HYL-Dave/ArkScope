@@ -251,6 +251,7 @@ def test_openai_synthesis_uses_chatgpt_subscription_when_oauth_is_active(monkeyp
     assert calls[0]["model"] == "gpt-5.4-mini"
     assert calls[0]["output_name"] == "emit_result_card"
     assert calls[0]["effort"] == "high"
+    assert calls[0]["timeout_s"] == 210.0
 
 
 def test_openai_translation_uses_chatgpt_subscription_when_oauth_is_active(monkeypatch):
@@ -283,6 +284,7 @@ def test_openai_translation_uses_chatgpt_subscription_when_oauth_is_active(monke
     assert calls[0]["auth_mode"] == "chatgpt_oauth"
     assert calls[0]["output_name"] == "emit_translation"
     assert calls[0]["effort"] == "medium"
+    assert calls[0]["timeout_s"] == 210.0
 
 
 def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monkeypatch):
@@ -312,6 +314,7 @@ def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monke
     assert calls[0]["output_name"] == "emit_result_card"
     assert "emit_result_card tool" not in calls[0]["system"]
     assert "JSON" in calls[0]["system"]
+    assert calls[0]["timeout_s"] == 210.0
 
 
 def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(monkeypatch):
@@ -346,6 +349,7 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
     assert calls[0]["output_name"] == "emit_translation"
     assert "emit_translation tool" not in calls[0]["system"]
     assert "JSON" in calls[0]["system"]
+    assert calls[0]["timeout_s"] == 210.0
 
 
 @pytest.mark.parametrize(
