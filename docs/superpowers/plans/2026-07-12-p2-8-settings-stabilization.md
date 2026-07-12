@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED FOR REVIEW — NOT MERGED. Reviewer canonical A/B remains open because the Codex environment reproduces the known single-process TestClient/lifespan hang; the file-isolated fallback is strictly equal.**
+> **Status: LIVE COMPLETE / MERGED — fast-forwarded to `master` through `ca3db2f`, 2026-07-13.**
 
 **Goal:** Repair the bounded Settings overlap and stale-copy defects, add truthful scheduler progress, and rename the Investor Profile risk-appetite label without changing backend behavior or pre-implementing later P2.8 slices.
 
@@ -63,7 +63,7 @@ Implementation branch: `codex/p2-8-settings-stabilization`, based on
   `/tmp/arkscope-settings-stabilization-<viewport>*.png`. Temporary sidecar and
   Vite processes were stopped after capture.
 
-### Open reviewer gate
+### Codex-environment fallback evidence
 
 Canonical single-process pytest did not complete in this Codex environment:
 base hung for more than eight minutes in the existing FastAPI
@@ -74,10 +74,10 @@ collected `4185` nodes across `216` files; the same four files timed out
 (`test_agents.py`, `test_api.py`, `test_monitor.py`,
 `test_signal_factors_p1.py`), and the remaining `3995` tests were exactly equal:
 `3894 passed / 27 failed / 1 error / 73 skipped / 20 warnings`. Problem sets,
-timeout sets, totals, and normalized per-file results are all equal. Reviewer
-canonical A/B is still required before merge. The later review fix changed only
-TypeScript/TSX frontend files; the backend/API byte-identity gate remained
-empty, so it does not alter this backend fallback comparison.
+timeout sets, totals, and normalized per-file results are all equal. This was a
+provisional fallback; the reviewer canonical run below closed the merge gate.
+The later review fix changed only TypeScript/TSX frontend files; the backend/API
+byte-identity gate remained empty, so it did not alter the backend comparison.
 
 ### Reviewer gate CLOSED — canonical A/B ✅ PASS (Fable, 2026-07-13, no hang)
 
@@ -91,7 +91,14 @@ frontend suite in the branch worktree (`41 files / 366 tests` PASS + typecheck
 + production build) and every Task 7 Step 3 static gate (byte-identity empty;
 News handlers, rendered `source_badges`, polling `aria-live`, new `@media`,
 and production `風險胃納` all zero; both compatibility API exports present).
-All gates are now closed; merge remains the user's decision.
+All review gates closed. The user delegated the local merge decision and
+`master` was fast-forwarded through `ca3db2f` on 2026-07-13.
+
+### Post-merge verification
+
+Merged `master` re-ran `41 files / 366 tests`, TypeScript typecheck, and the
+production build successfully; the existing Vite chunk-size warning remains.
+The no-PG smoke passed all `24` checks with `pg_attempts: []`.
 
 ---
 
@@ -1775,12 +1782,13 @@ At every viewport verify:
 Stop both temporary processes after screenshots. Do not restart the user's
 desktop app from the implementation worktree.
 
-- [ ] **Step 6: Run canonical backend A/B**
+- [x] **Step 6: Run canonical backend A/B**
 
-Codex-environment attempt reproduced the known single-process
-`TestClient`/lifespan hang. The file-isolated virgin fallback is strictly equal
-as recorded in the implementation evidence above; reviewer canonical A/B is
-the remaining merge gate.
+The Codex environment reproduced the known single-process
+`TestClient`/lifespan hang, while its file-isolated fallback was strictly equal.
+Reviewer canonical virgin A/B subsequently passed with identical
+`30 failed / 4074 passed / 74 skipped / 18 warnings / 7 errors`, empty
+bidirectional failure diff, and backend collect `+0/-0`.
 
 Compare virgin archives of base `554e94b` and final tip under identical
 environment isolation. Acceptance:

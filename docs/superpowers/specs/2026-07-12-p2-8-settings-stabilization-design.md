@@ -1,6 +1,6 @@
 # P2.8 Settings Stabilization Design
 
-> **Status: APPROVED DESIGN / REVIEW-CLEARED — NOT IMPLEMENTED, 2026-07-12.**
+> **Status: LIVE / MERGED — fast-forwarded through `ca3db2f`, 2026-07-13.**
 > This is a bounded insertion after P2.8 Slice 1. It does not replace the
 > canonical shell authority or pre-implement the later Settings and Investor
 > Profile slices.
