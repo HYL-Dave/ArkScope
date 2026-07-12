@@ -177,9 +177,10 @@ describe("schedulerStateLabel", () => {
     const r = schedulerStateLabel({ last_status: "partial", continuation: { deferred: ["NVDA", "TSLA"] } });
     expect(r).toEqual({ label: "部分完成（待補抓 2）", tone: "warn", needsContinue: true });
   });
-  it("distinguishes succeeded / failed / running / none", () => {
+  it("distinguishes succeeded / failed / skipped / running / none", () => {
     expect(schedulerStateLabel({ last_status: "succeeded", continuation: null }).tone).toBe("ok");
     expect(schedulerStateLabel({ last_status: "failed", continuation: null }).tone).toBe("bad");
+    expect(schedulerStateLabel({ last_status: "skipped", continuation: null }).label).toBe("上次已跳過");
     expect(schedulerStateLabel({ last_status: "running", continuation: null }).label).toBe("執行中");
     expect(schedulerStateLabel(null).label).toBe("尚未執行");
   });

@@ -68,6 +68,9 @@ describe("Data Sources common-state mapping", () => {
     expect(durableScheduleCommonState(schedule({
       durable_state: { last_status: "failed", last_error: "boom", continuation: null, last_attempt: null, updated_at: null },
     }))).toBe("failed");
+    expect(durableScheduleCommonState(schedule({
+      durable_state: { last_status: "skipped", last_error: null, continuation: null, last_attempt: null, updated_at: null },
+    }))).toBeNull();
     expect(durableScheduleCommonState(schedule({ enabled: true }))).toBe("empty");
     expect(durableScheduleCommonState(schedule({ enabled: false }))).toBeNull();
   });

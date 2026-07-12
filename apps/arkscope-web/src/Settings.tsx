@@ -1614,6 +1614,7 @@ function DataSourcesSection() {
     const skippedSummary = alreadyRunningSkip ? "已有執行中" : compactMessage(skippedReason ?? "");
     const skipState = scheduleSkipCommonState(skippedReason);
     const historyState = durableScheduleCommonState(s);
+    const durableSkipped = s.durable_state?.last_status === "skipped";
     if (skippedReason) {
       details.push({
         label: alreadyRunningSkip ? "新觸發略過" : "跳過原因",
@@ -1638,12 +1639,14 @@ function DataSourcesSection() {
               <StatusBadge state={skipState} label="新觸發已略過" />
             )
           )}
-          {historyState !== null && (
+          {historyState !== null ? (
             <StatusBadge
               state={historyState}
               label={`${ss.label}${durableError ? `：${compactMessage(durableError)}` : ""}`}
             />
-          )}
+          ) : durableSkipped && !skippedReason ? (
+            <span className="muted tiny">{ss.label}</span>
+          ) : null}
           {ss.needsContinue && (
             <button
               className="btn-ghost"
@@ -2027,10 +2030,9 @@ function DataSourcesSection() {
           </table>
           </div>
         )}
-        <p className="muted tiny" style={{ marginTop: 8 }}>
-          保護機制：同來源不重疊、IBKR Gateway 序列化、啟動時讀 job_runs 接續（手動剛跑過
-          不會立即重抓）— 且鎖為<strong>跨進程</strong>（data/locks/）：app 與 CLI 重疊跑
-          同一來源會被跳過（顯示於「最近一次」），不會雙抓。
+        <p className="muted tiny ds-schedule-protection-note" style={{ marginTop: 8 }}>
+          執行保護：同一資料來源與 IBKR 工作同時間只執行一次；若已有工作進行中，
+          新觸發會顯示為已跳過，不會重複抓取。
         </p>
       </div>
     </div>

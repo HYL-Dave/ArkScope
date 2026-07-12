@@ -33,6 +33,7 @@ export function durableScheduleCommonState(
     case "partial": return "partial";
     case "failed": return "failed";
     case "running": return source.durable_state.running_stale ? "stale" : "running";
+    case "skipped": return null;
     default: return source.enabled ? "empty" : null;
   }
 }

@@ -204,6 +204,33 @@ vi.mock("./api", async (importOriginal) => {
           },
           job_name: "collect.polygon_news",
         },
+        writer_lock_deferred: {
+          label: "Writer lock deferred",
+          description: "writer lock fixture",
+          ibkr: false,
+          provider_fetch: true,
+          source_mode: "direct_local",
+          write_target: "market_data.db",
+          source_badges: [],
+          retired: false,
+          retired_reason: null,
+          enabled: true,
+          interval_minutes: 30,
+          default_interval_minutes: 30,
+          running: false,
+          progress: null,
+          last_attempt_at: "2026-07-04T00:00:00+00:00",
+          last_result: null,
+          gap_planned: false,
+          durable_state: {
+            last_status: "skipped",
+            last_error: null,
+            continuation: null,
+            last_attempt: "2026-07-04T00:00:00+00:00",
+            updated_at: "2026-07-04T00:01:00+00:00",
+          },
+          job_name: "collect.writer_lock_deferred",
+        },
         price_backfill: {
           label: "價格缺口補抓",
           description: "IBKR/Polygon → market_data.db DIRECT (no PG)",
@@ -482,6 +509,16 @@ describe("Settings provider config authority", () => {
       button.textContent?.includes("Run"))).toBe(true);
   });
 
+  it("renders_persisted_skipped_history_as_neutral_instead_of_never_run", async () => {
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("Writer lock deferred"));
+    if (!row) throw new Error("missing durable skipped row");
+    expect(row.textContent).toContain("上次已跳過");
+    expect(row.textContent).not.toContain("尚未執行");
+    expect(row.querySelector(".ui-status-badge")).toBeNull();
+  });
+
   it("does_not_render_storage_route_source_badges", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
@@ -495,6 +532,9 @@ describe("Settings provider config authority", () => {
     expect(host!.textContent).not.toMatch(
       /直寫本地 SQLite|direct-local|PG 同步|鏡像|FRED 本地快照|本地快照|存本地|strict DB-first|legacy config/,
     );
+    const protectionNote = host!.querySelector(".ds-schedule-protection-note");
+    expect(protectionNote?.textContent).toContain("同一資料來源與 IBKR 工作同時間只執行一次");
+    expect(protectionNote?.textContent).not.toMatch(/job_runs|data\/locks\/|app 與 CLI/);
     expect(host!.textContent).toContain("config/.env");
   });
 

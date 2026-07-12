@@ -96,8 +96,8 @@ export function coverageStatusLabel(
 }
 
 // Scheduler durable-state → UI label + tone (v1.4). Distinguishes the cases the reviewer
-// stressed: partial = a budget-bounded run left work → needs manual 補抓; skipped (transient,
-// from last_result, not durable) = temporarily not run; failed carries the error.
+// stressed: partial = a budget-bounded run left work → needs manual 補抓; skipped can be
+// transient or a durable writer-lock outcome and remains neutral; failed carries the error.
 export function schedulerStateLabel(
   durable: {
     last_status: string | null;
@@ -116,6 +116,8 @@ export function schedulerStateLabel(
     }
     case "failed":
       return { label: "上次失敗", tone: "bad", needsContinue: false };
+    case "skipped":
+      return { label: "上次已跳過", tone: "muted", needsContinue: false };
     case "running":
       if (durable?.running_stale) {
         return { label: "執行過久", tone: "warn", needsContinue: false };
