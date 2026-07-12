@@ -98,7 +98,7 @@
 - Card dispatch RED: all four OAuth paths attempted the API-key client; GREEN: all four use the subscription adapter.
 - Eligibility RED: OAuth cards returned `task_auth_mode_unsupported`; GREEN: provider-matching OAuth cards are executable and canary-tested.
 - One test-only `asyncio.to_thread()` experiment hung after the worker returned; faulthandler showed the short-lived loop blocked in `select()`. The final implementation calls the bounded sync adapter directly from the existing sync-route `asyncio.run()` shape, and the full canary suite completes normally.
-- Automated evidence: focused backend 116 passed; subscription-driver adjacency 166 passed; frontend 30 files/284 tests; TypeScript typecheck and production build passed; no-PG smoke 24/24 with `pg_attempts: []`.
+- Automated evidence: focused backend 119 passed; subscription-driver adjacency 166 passed; frontend 30 files/284 tests; TypeScript typecheck and production build passed; no-PG smoke 24/24 with `pg_attempts: []`.
 
 ## Stop Conditions
 
