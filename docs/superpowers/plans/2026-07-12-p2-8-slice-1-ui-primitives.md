@@ -5,12 +5,11 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: IMPLEMENTED FOR REVIEW, 2026-07-12; CODE REVIEW GREEN; NOT
-> MERGED.** Review MF1 and SF1-SF4 are absorbed in this document. Final code tip
-> is `df9c39b` on `codex/p2-8-ui-primitives`. Canonical backend A/B remains
-> pending because base and head reproduced the same known single-process hang;
-> authenticated DesignSync read-back is also pending because this session has
-> no DesignSync server. Neither gap is reported as PASS or complete.
+> **Status: MERGED / ALL GATES CLOSED, 2026-07-12.** Review MF1 and SF1-SF4
+> are absorbed in this document. Final code tip `df9c39b`, review-ready docs
+> `c7d9c41`, and reviewer gate evidence `3449e32` were fast-forwarded into
+> `master`. Reviewer canonical backend A/B passed and the authenticated Slice 1
+> DesignSync companion update completed before merge.
 
 **Goal:** Establish the minimum canonical UI primitive foundation and use it to repair the missing Holdings and Investor Profile presentation without changing their domain behavior.
 
@@ -18,7 +17,7 @@
 
 **Tech Stack:** React 18, TypeScript 5.5, Vite 5, Vitest/jsdom, CSS custom properties, `lucide-react` icons, existing npm workspace tooling.
 
-**Behavioral A/B base:** `4e229a8` (canonical written design approved and Claude Design companion synchronized). Create the implementation worktree from the current review-cleared `master` tip so this plan and its ledger are present; intervening commits after `4e229a8` are docs-only. Full behavioral comparison uses `4e229a8` versus the final implementation tip. Do not merge in this plan; stop review-ready.
+**Behavioral A/B base:** `4e229a8` (canonical written design approved and Claude Design companion synchronized). The implementation worktree was created from the then-current review-cleared `master` tip so this plan and its ledger travelled with the branch; intervening commits after `4e229a8` were docs-only. Implementation stopped review-ready, then reviewer canonical A/B and DesignSync closed the two remaining gates before the user-approved fast-forward merge through `3449e32`.
 
 ## Execution Ledger
 
@@ -105,7 +104,8 @@
 2. Modal and overlay frames are **not** a new radius exception. Every general
    framed component, including Drawer and ConfirmDialog, is capped at 8px.
    Pill/chip and circular indicators remain the only radius exceptions. The
-   app does not import or recreate the kit's pending `radius-lg: 10px` token.
+   app does not import the kit token; the companion's legacy `radius-lg` alias
+   was reconciled from 10px to the same 8px cap during the Slice 1 sync.
 3. `ui/tokens.json` is the single app token source for Slice 1. TypeScript reads
    it directly; `installUiTokens()` writes the corresponding CSS custom
    properties before React mounts. No generated CSS, copied breakpoint
@@ -2289,7 +2289,7 @@ Their visual specimens are checked during the Design Kit sync in Step 8; do not
 add a hidden product route or permanent component gallery to manufacture a
 consumer.
 
-- [ ] **Step 6: Run canonical backend A/B and frontend base/head accounting**
+- [x] **Step 6: Run canonical backend A/B and frontend base/head accounting**
 
 Compare virgin archives of base `4e229a8` and the final tip under identical
 environment isolation.
@@ -2323,7 +2323,7 @@ single-process hang without claiming a partial PASS:
 3. Add a newest-first map entry identifying the branch/tip and review focus.
 4. Do not mark Slice 1 shipped/live and do not merge.
 
-- [ ] **Step 8: Reviewer checkpoint and incremental Design Kit sync**
+- [x] **Step 8: Reviewer checkpoint and incremental Design Kit sync**
 
 Reviewer focus:
 
