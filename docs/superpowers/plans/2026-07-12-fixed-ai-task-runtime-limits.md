@@ -519,6 +519,13 @@ In `tests/test_card_synthesis.py`, replace the four old `210.0` assertions with 
 
 Use `httpx.MockTransport`. The handler increments a counter then raises `httpx.ReadTimeout`. Build a real sync SDK client with a dummy key and that transport, patch the corresponding `live_*_client`, and patch `resolve_live_auth` to `env_fallback`. Invoke the provider helper with `model_timeout_s=0.01` and assert the typed timeout plus exactly one transport call.
 
+Because `card_synthesis.py` imports these functions inside `run_once`, patch the
+source module targets
+`src.auth_drivers.live_resolver.live_openai_client`,
+`src.auth_drivers.live_resolver.live_anthropic_client`, and
+`src.auth_drivers.live_resolver.resolve_live_auth`. Do not patch nonexistent
+module attributes on `src.card_synthesis`.
+
 Required test names:
 
 - `test_openai_api_timeout_uses_one_attempt`
@@ -588,7 +595,14 @@ Every call in this module passes it explicitly.
 
 Define `ModelExecutionTimeout` in `src/card_synthesis.py` with `provider`, `model`, `effort`, and `effective_seconds`. It must not include raw provider response text. Add a `detail(task)` method returning the exact route dictionary from Step 3.
 
-Subscription conversion is cause-based, not message parsing: a `SubscriptionStructuredOutputError` whose `__cause__` is `asyncio.TimeoutError` becomes `ModelExecutionTimeout`; every other subscription error remains unchanged. API-key conversion catches the provider SDK's `APITimeoutError` and raises the same typed error.
+Subscription conversion is cause-based, not message parsing: a
+`SubscriptionStructuredOutputError` whose cause chain contains
+`asyncio.TimeoutError`, OpenAI `APITimeoutError`, or Anthropic
+`APITimeoutError` becomes `ModelExecutionTimeout`; every other subscription
+error remains unchanged. The SDK timeout cases cover the single-tick race where
+the subscription client's own deadline fires just before the outer async
+deadline. API-key conversion catches the same provider SDK timeout classes and
+raises the typed error.
 
 All four provider functions add an explicit `except ModelExecutionTimeout: raise` before the legacy effort-rejection branch, guaranteeing timeout never retries with provider default effort.
 
