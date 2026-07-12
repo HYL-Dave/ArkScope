@@ -79,6 +79,20 @@ canonical A/B is still required before merge. The later review fix changed only
 TypeScript/TSX frontend files; the backend/API byte-identity gate remained
 empty, so it does not alter this backend fallback comparison.
 
+### Reviewer gate CLOSED — canonical A/B ✅ PASS (Fable, 2026-07-13, no hang)
+
+Virgin `git archive` of base `554e94b` versus head `cef39e6`, sequential
+single-process full pytest, identical environment isolation. Both sides
+identical: `30 failed / 4074 passed / 74 skipped / 18 warnings / 7 errors`;
+failure sets empty in both directions; backend collect added/removed `0/0`.
+Work dir `/tmp/ab_stab_UCdI`. The frontend-only slice leaves the backend
+byte-identical, as required. The reviewer also independently re-ran the full
+frontend suite in the branch worktree (`41 files / 366 tests` PASS + typecheck
++ production build) and every Task 7 Step 3 static gate (byte-identity empty;
+News handlers, rendered `source_badges`, polling `aria-live`, new `@media`,
+and production `風險胃納` all zero; both compatibility API exports present).
+All gates are now closed; merge remains the user's decision.
+
 ---
 
 ## 0. Authority, Baseline, and Locked Decisions
