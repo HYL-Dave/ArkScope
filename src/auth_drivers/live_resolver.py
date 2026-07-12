@@ -7,11 +7,11 @@ manual key switch in Settings takes effect on the next query.
 
 Hard rule: when an OAuth credential is ACTIVE but the current call site is a
 direct SDK-client path that cannot use that OAuth mode, FAIL CLOSED — never
-silently bill the env API key. Research streaming has separate OAuth drivers in
-``query.py``; direct card-synthesis/code-gen client construction still cannot
-consume ChatGPT/Claude subscription tokens. A genuine env_fallback (NO active
-credential chosen) still uses the env key — that is the legitimate default, not a
-pretense.
+silently bill the env API key. Research streaming and structured card tasks
+intercept the resolution and use explicit subscription adapters; unrelated
+direct-client sites such as code generation remain fail-closed. A genuine
+env_fallback (NO active credential chosen) still uses the env key — that is the
+legitimate default, not a pretense.
 """
 
 from __future__ import annotations
@@ -40,15 +40,15 @@ class SubscriptionDriverNotWiredError(RuntimeError):
 # and must NOT inherit this Anthropic/Slice-7 wording.)
 _ANTHROPIC_OAUTH_FAILCLOSED_MSG = (
     "Claude OAuth (claude_code_oauth) is the active Anthropic credential. AI "
-    "Research uses the Claude subscription driver, but this direct Anthropic SDK "
+    "Research and structured card tasks have subscription adapters, but this direct Anthropic SDK "
     "client path cannot use that subscription token. The call is paused rather "
     "than silently billing the env API key — switch the active Anthropic credential "
     "to an API key in Settings for this feature."
 )
 
 _OPENAI_OAUTH_FAILCLOSED_MSG = (
-    "ChatGPT OAuth (chatgpt_oauth) is the active OpenAI credential. AI Research "
-    "uses the ChatGPT backend driver, but this direct OpenAI SDK client path cannot "
+    "ChatGPT OAuth (chatgpt_oauth) is the active OpenAI credential. AI Research and "
+    "structured card tasks have ChatGPT backend adapters, but this direct OpenAI SDK client path cannot "
     "use that subscription token. The call is paused rather than silently billing "
     "the env API key — switch the active OpenAI credential to an API key in Settings "
     "for this feature."
@@ -123,7 +123,7 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
 
 def live_openai_client(*, store: Optional[CredentialStore] = None) -> Any:
     """A SYNC ``OpenAI`` client for the direct (non-Agents-SDK) OpenAI call sites
-    (card synthesis, code-gen). db_api_key → built from the active row via the
+    (including code generation and API-key card calls). db_api_key → built from the active row via the
     driver; chatgpt_oauth-active → FAIL CLOSED (S3 step 0; don't silently bill the
     env key); no active credential → env fallback (bare ``OpenAI()``)."""
     from openai import OpenAI

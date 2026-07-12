@@ -22,11 +22,13 @@ def _fp(secret: str) -> str:
 def test_task_auth_executable_matrix():
     opus = capability_for("claude-opus-4-8")
     gpt = capability_for("gpt-5.5")
-    # card tasks: sync clients → api_key ONLY (pool unwired, oauth fail-closed)
+    # Card tasks use the selected provider's active direct or subscription path.
     assert task_auth_executable("card_synthesis", "anthropic", "api_key", opus) is True
     assert task_auth_executable("card_synthesis", "anthropic", "api_key_pool", opus) is False
-    assert task_auth_executable("card_synthesis", "anthropic", "claude_code_oauth", opus) is False
-    assert task_auth_executable("card_translation", "openai", "chatgpt_oauth", gpt) is False
+    assert task_auth_executable("card_synthesis", "anthropic", "claude_code_oauth", opus) is True
+    assert task_auth_executable("card_translation", "openai", "chatgpt_oauth", gpt) is True
+    assert task_auth_executable("card_synthesis", "openai", "claude_code_oauth", gpt) is False
+    assert task_auth_executable("card_translation", "anthropic", "chatgpt_oauth", opus) is False
     # ai_research: oauth on own provider OK; pool still False (unwired)
     assert task_auth_executable("ai_research", "anthropic", "claude_code_oauth", opus) is True
     assert task_auth_executable("ai_research", "openai", "chatgpt_oauth", gpt) is True
@@ -140,8 +142,10 @@ def test_effective_view_anthropic_oauth_research_is_executable_but_seed_only(tmp
     # round-5 SF: pinned_only Claude models must NOT resurface as seed candidates
     seed_ids = {m["id"] for m in research["advanced"]}
     assert not ({"claude-sonnet-4-5", "claude-opus-4-5"} & seed_ids)
-    # cards under oauth are not even executable:
+    # Cards are executable through the Claude subscription adapter, but a
+    # seed-only channel still cannot promote any candidate to verified.
     assert view["tasks"]["card_synthesis"]["verified"] == []
+    assert any(m["badge"] == "seed" for m in view["tasks"]["card_synthesis"]["advanced"])
 
 
 def test_effective_view_missing_credential_fails_closed(tmp_path):
@@ -364,10 +368,10 @@ def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
     assert missing_cap["reason_code"] == "task_capability_missing"
 
     anthropic_card = view["tasks"]["card_translation"]["providers"]["anthropic"]
-    assert anthropic_card["executable"] is False
-    assert anthropic_card["reason_code"] == "task_auth_mode_unsupported"
+    assert anthropic_card["executable"] is True
+    assert anthropic_card["reason_code"] is None
     assert anthropic_card["models"]
-    assert all(entry["eligible"] is False for entry in anthropic_card["models"])
+    assert all(entry["eligible"] is True for entry in anthropic_card["models"])
 
 
 def test_v2_route_pin_unknown_model_is_eligible_with_warning(tmp_path):

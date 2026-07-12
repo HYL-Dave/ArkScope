@@ -969,8 +969,8 @@ export interface OAuthStatusResult {
 }
 export function startOpenAIOAuth(makeActive = false, reloginCredentialId?: string): Promise<OAuthStartResult> {
   // make_active default false: logging in (or re-logging in) must never silently
-  // switch the active credential. AI 研究 CAN run through chatgpt_oauth (subscription
-  // backend, experimental); card tasks stay api_key-only (fail-closed).
+  // switch the active credential. Supported tasks use chatgpt_oauth through the
+  // subscription backend; model-specific execution still requires a task test.
   // `reloginCredentialId` (S3) replaces that credential's token IN PLACE — no new row.
   const body: Record<string, unknown> = { make_active: makeActive };
   if (reloginCredentialId) body.relogin_credential_id = reloginCredentialId;

@@ -113,11 +113,12 @@ describe("ProviderSection re-login integration (S3 credential lifecycle)", () =>
     expect(reloginButtons().every((b) => b.disabled)).toBe(true);
   });
 
-  it("openai setup copy is three-axis honest (research wired; cards api-key-only)", () => {
+  it("openai setup copy explains subscription task billing without changing active", () => {
     vi.stubGlobal("fetch", vi.fn());
     renderSection();
     expect(host!.textContent).not.toContain("尚未接上");
-    expect(host!.textContent).toContain("卡片合成／翻譯仍需 API key");
+    expect(host!.textContent).toContain("AI 研究、卡片合成與翻譯會依 active credential 使用 ChatGPT 訂閱後端");
+    expect(host!.textContent).toContain("預設不設為 active");
   });
 });
 

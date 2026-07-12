@@ -209,3 +209,235 @@ def test_refusal_never_triggers_effort_fallback(monkeypatch):
     with pytest.raises(AnthropicRefusalError):
         cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW", effort="xhigh")
     assert client.messages.create.call_count == 1
+
+
+# ── 2026-07-12: subscription-backed card tasks ────────────────────────────
+
+
+def _oauth_resolution(provider: str, credential_id: str):
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    return LiveAuthResolution(
+        provider=provider,
+        source="oauth_driver_unwired",
+        credential_id=credential_id,
+    )
+
+
+def test_openai_synthesis_uses_chatgpt_subscription_when_oauth_is_active(monkeypatch):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:7"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_openai_client",
+        lambda: (_ for _ in ()).throw(AssertionError("API-key client must not be built")),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or _synth().model_dump(),
+    )
+
+    result, meta = cs._synthesize_openai(_packet(), "gpt-5.4-mini", effort="high")
+
+    assert result == _synth()
+    assert meta == {"effort": "high"}
+    assert calls[0]["provider"] == "openai"
+    assert calls[0]["auth_mode"] == "chatgpt_oauth"
+    assert calls[0]["credential_id"] == "local:7"
+    assert calls[0]["model"] == "gpt-5.4-mini"
+    assert calls[0]["output_name"] == "emit_result_card"
+    assert calls[0]["effort"] == "high"
+
+
+def test_openai_translation_uses_chatgpt_subscription_when_oauth_is_active(monkeypatch):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:7"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_openai_client",
+        lambda: (_ for _ in ()).throw(AssertionError("API-key client must not be built")),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or {"conclusion": "結論"},
+    )
+
+    result = cs._translate_openai(
+        "gpt-5.4-mini",
+        "system",
+        '{"conclusion":"view"}',
+        {"type": "object"},
+        "Traditional Chinese",
+        effort="medium",
+    )
+
+    assert result == {"conclusion": "結論"}
+    assert calls[0]["auth_mode"] == "chatgpt_oauth"
+    assert calls[0]["output_name"] == "emit_translation"
+    assert calls[0]["effort"] == "medium"
+
+
+def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monkeypatch):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:2"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda: (_ for _ in ()).throw(AssertionError("API-key client must not be built")),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or _synth().model_dump(),
+    )
+
+    result, meta = cs._synthesize_anthropic(_packet(), "claude-sonnet-5", effort="low")
+
+    assert result == _synth()
+    assert meta == {"effort": "low"}
+    assert calls[0]["provider"] == "anthropic"
+    assert calls[0]["auth_mode"] == "claude_code_oauth"
+    assert calls[0]["credential_id"] == "local:2"
+    assert calls[0]["output_name"] == "emit_result_card"
+    assert "emit_result_card tool" not in calls[0]["system"]
+    assert "JSON" in calls[0]["system"]
+
+
+def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(monkeypatch):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:2"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda: (_ for _ in ()).throw(AssertionError("API-key client must not be built")),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or {"conclusion": "結論"},
+    )
+
+    result = cs._translate_anthropic(
+        "claude-sonnet-5",
+        "Respond ONLY via the emit_translation tool.",
+        '{"conclusion":"view"}',
+        {"type": "object"},
+        "Traditional Chinese",
+        effort="medium",
+        subscription_system="Return ONLY one JSON object matching the schema.",
+    )
+
+    assert result == {"conclusion": "結論"}
+    assert calls[0]["auth_mode"] == "claude_code_oauth"
+    assert calls[0]["output_name"] == "emit_translation"
+    assert "emit_translation tool" not in calls[0]["system"]
+    assert "JSON" in calls[0]["system"]
+
+
+def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypatch):
+    from types import SimpleNamespace
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    tool_calls=[
+                        SimpleNamespace(
+                            function=SimpleNamespace(
+                                name="emit_result_card",
+                                arguments=_synth().model_dump_json(),
+                            )
+                        )
+                    ]
+                )
+            )
+        ]
+    )
+    client = MagicMock()
+    client.chat.completions.create.return_value = response
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "db_api_key", "local:3"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_openai_client",
+        lambda: client,
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("API-key route must not call the subscription adapter")
+        ),
+    )
+
+    result, meta = cs._synthesize_openai(_packet(), "gpt-5.4-mini", effort="high")
+
+    assert result == _synth() and meta == {"effort": "high"}
+    kwargs = client.chat.completions.create.call_args.kwargs
+    assert kwargs["model"] == "gpt-5.4-mini"
+    assert kwargs["reasoning_effort"] == "high"
+    assert kwargs["max_completion_tokens"] == 8192
+    assert kwargs["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "emit_result_card"},
+    }
+
+
+def test_anthropic_api_key_synthesis_keeps_existing_messages_shape(monkeypatch):
+    from types import SimpleNamespace
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    response = SimpleNamespace(
+        stop_reason="tool_use",
+        content=[
+            SimpleNamespace(
+                type="tool_use",
+                name="emit_result_card",
+                input=_synth().model_dump(),
+            )
+        ],
+    )
+    client = MagicMock()
+    client.messages.create.return_value = response
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "db_api_key", "local:4"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda: client,
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("API-key route must not call the subscription adapter")
+        ),
+    )
+
+    result, meta = cs._synthesize_anthropic(_packet(), "claude-sonnet-5", effort="high")
+
+    assert result == _synth() and meta == {"effort": "high"}
+    kwargs = client.messages.create.call_args.kwargs
+    assert kwargs["model"] == "claude-sonnet-5"
+    assert kwargs["max_tokens"] == 8192
+    assert kwargs["output_config"] == {"effort": "high"}
+    assert kwargs["tool_choice"] == {"type": "tool", "name": "emit_result_card"}

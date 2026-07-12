@@ -103,7 +103,7 @@ _CARD_TOOL_SCHEMA: dict[str, Any] = {
     "required": ["conclusion", "counter_thesis", "confidence_level", "claims"],
 }
 
-_SYSTEM_PROMPT = """You are the synthesis layer for ArkScope's structured research card (ProductSpec §2).
+_SYSTEM_PROMPT_BASE = """You are the synthesis layer for ArkScope's structured research card (ProductSpec §2).
 
 You are given an EvidencePacket: a set of OBJECTIVE evidence items, each with an `evidence_id`. The packet INTENTIONALLY excludes ArkScope-generated LLM sentiment/risk scores — do not reconstruct or assert any such score.
 
@@ -113,8 +113,61 @@ Rules:
 3. For every material claim (each primary reason, counter-thesis point, key assumption, trigger, invalidation, and risk), add an entry to `claims[]` citing the supporting `evidence_id`(s). If a statement genuinely rests on no packet evidence, give it `evidence_ids: []` and phrase it as an explicit assumption, not a fact.
 4. `counter_thesis` is REQUIRED: state the strongest good-faith opposing view.
 5. Calibrate `confidence_level` to evidence completeness and consistency. Thin, missing, or conflicting evidence ⇒ "low". Read the packet's `coverage` item to see what was unavailable.
-6. Be concrete and decision-useful; avoid hedging filler.
-7. Respond ONLY by calling the emit_result_card tool exactly once. Do not write prose outside the tool call."""
+6. Be concrete and decision-useful; avoid hedging filler."""
+
+_SYSTEM_PROMPT = (
+    _SYSTEM_PROMPT_BASE
+    + "\n7. Respond ONLY by calling the emit_result_card tool exactly once. "
+      "Do not write prose outside the tool call."
+)
+_SYSTEM_SCHEMA_PROMPT = (
+    _SYSTEM_PROMPT_BASE
+    + "\n7. Return ONLY one JSON object matching the required output schema. "
+      "Do not call tools or write prose outside the JSON object."
+)
+
+
+def _subscription_structured_output_if_active(
+    *,
+    provider: Provider,
+    model: str,
+    system: str,
+    user: str,
+    output_name: str,
+    output_description: str,
+    schema: dict[str, Any],
+    effort: str,
+) -> Optional[dict[str, Any]]:
+    """Use the selected provider's subscription transport when OAuth is active.
+
+    Returning ``None`` means the provider is on its existing API-key/env path.
+    An OAuth-active call never reaches those clients, so it cannot silently bill
+    a key after the user selected subscription auth.
+    """
+    from src.auth_drivers.live_resolver import resolve_live_auth
+
+    resolution = resolve_live_auth(provider)
+    if resolution.source != "oauth_driver_unwired":
+        return None
+    if not resolution.credential_id:
+        raise RuntimeError(f"{provider} subscription credential has no id")
+    auth_mode = "chatgpt_oauth" if provider == "openai" else "claude_code_oauth"
+    from src.auth_drivers.subscription_structured_output import (
+        run_subscription_structured_output,
+    )
+
+    return run_subscription_structured_output(
+        provider=provider,
+        auth_mode=auth_mode,
+        credential_id=resolution.credential_id,
+        model=model,
+        system=system,
+        user=user,
+        output_name=output_name,
+        output_description=output_description,
+        schema=schema,
+        effort=effort,
+    )
 
 
 def _build_user_message(packet: EvidencePacket, personalization_context: str = "") -> str:
@@ -145,6 +198,19 @@ def _synthesize_anthropic(
 ) -> tuple[CardSynthesis, dict[str, Any]]:
 
     def run_once(selected_effort: str) -> CardSynthesis:
+        user_message = _build_user_message(packet, personalization_context)
+        subscription_payload = _subscription_structured_output_if_active(
+            provider="anthropic",
+            model=model,
+            system=_SYSTEM_SCHEMA_PROMPT,
+            user=user_message,
+            output_name=_TOOL_NAME,
+            output_description="Emit the structured §2 result card.",
+            schema=_CARD_TOOL_SCHEMA,
+            effort=selected_effort,
+        )
+        if subscription_payload is not None:
+            return CardSynthesis(**subscription_payload)
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
@@ -154,7 +220,7 @@ def _synthesize_anthropic(
             model=model,
             max_tokens=_MAX_TOKENS,
             system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": _build_user_message(packet, personalization_context)}],
+            messages=[{"role": "user", "content": user_message}],
             tools=[
                 {
                     "name": _TOOL_NAME,
@@ -200,6 +266,19 @@ def _synthesize_openai(
 ) -> tuple[CardSynthesis, dict[str, Any]]:
 
     def run_once(selected_effort: str) -> CardSynthesis:
+        user_message = _build_user_message(packet, personalization_context)
+        subscription_payload = _subscription_structured_output_if_active(
+            provider="openai",
+            model=model,
+            system=_SYSTEM_PROMPT,
+            user=user_message,
+            output_name=_TOOL_NAME,
+            output_description="Emit the structured §2 result card.",
+            schema=_CARD_TOOL_SCHEMA,
+            effort=selected_effort,
+        )
+        if subscription_payload is not None:
+            return CardSynthesis(**subscription_payload)
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["reasoning_effort"] = selected_effort
@@ -210,7 +289,7 @@ def _synthesize_openai(
             max_completion_tokens=_MAX_TOKENS,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": _build_user_message(packet, personalization_context)},
+                {"role": "user", "content": user_message},
             ],
             tools=[
                 {
@@ -440,17 +519,30 @@ def translate_card(
         )
     schema = {"type": "object", "additionalProperties": False, "properties": props, "required": list(props)}
 
-    system = (
+    system_base = (
         f"You are a precise financial translator. Translate every value into {target}. "
         "Keep tickers, numbers, %, currency, dates, and evidence ids (E1, E2, …) exactly as-is. "
         "Preserve list structure and item COUNT — translate each item in place, never add, drop, "
-        "merge, or reorder items. Respond ONLY via the emit_translation tool."
+        "merge, or reorder items."
+    )
+    system = system_base + " Respond ONLY via the emit_translation tool."
+    subscription_system = (
+        system_base
+        + " Return ONLY one JSON object matching the required output schema; do not call tools."
     )
     user = json.dumps(payload, ensure_ascii=False, indent=2)
 
     effort = route.effort if provider == route.provider else "default"
     if provider == "anthropic":
-        translated = _translate_anthropic(model, system, user, schema, target, effort)
+        translated = _translate_anthropic(
+            model,
+            system,
+            user,
+            schema,
+            target,
+            effort,
+            subscription_system=subscription_system,
+        )
     elif provider == "openai":
         translated = _translate_openai(model, system, user, schema, target, effort)
     else:
@@ -471,9 +563,22 @@ def _translate_anthropic(
     schema: dict,
     target: str,
     effort: str = "default",
+    subscription_system: Optional[str] = None,
 ) -> dict:
 
     def run_once(selected_effort: str) -> dict:
+        subscription_payload = _subscription_structured_output_if_active(
+            provider="anthropic",
+            model=model,
+            system=subscription_system or system,
+            user=user,
+            output_name="emit_translation",
+            output_description=f"Emit the {target} translation of the given fields.",
+            schema=schema,
+            effort=selected_effort,
+        )
+        if subscription_payload is not None:
+            return subscription_payload
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
@@ -525,6 +630,18 @@ def _translate_openai(
 ) -> dict:
 
     def run_once(selected_effort: str) -> dict:
+        subscription_payload = _subscription_structured_output_if_active(
+            provider="openai",
+            model=model,
+            system=system,
+            user=user,
+            output_name="emit_translation",
+            output_description=f"Emit the {target} translation of the given fields.",
+            schema=schema,
+            effort=selected_effort,
+        )
+        if subscription_payload is not None:
+            return subscription_payload
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["reasoning_effort"] = selected_effort

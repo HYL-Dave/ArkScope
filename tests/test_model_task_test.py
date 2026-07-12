@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from src.agents.shared.events import AgentEvent, EventType
 from src.auth_drivers.api_key_drivers import MissingCredentialError
+from src.auth_drivers.subscription_structured_output import SubscriptionStructuredOutputError
 from src.model_capabilities import all_models, capability_for
 from src.model_credentials import ModelTestResult
 from src.model_discovery_cache import CachedModel, DiscoveryScope
@@ -93,13 +94,14 @@ _DEFAULT_ACTIVE = object()
 
 
 def _run(monkeypatch, tmp_path, *, active=_DEFAULT_ACTIVE, cache=None, api_result=None,
-         stream=None, driver_error=None, task="ai_research", provider="openai",
+         stream=None, driver_error=None, structured_result=None, structured_error=None,
+         task="ai_research", provider="openai",
          model="gpt-5.4-mini", effort="low", timeout_s=0.05):
     import src.model_task_canary as mt
 
     active = _active() if active is _DEFAULT_ACTIVE else active
     cache = cache or _Cache()
-    calls = {"api": [], "driver": []}
+    calls = {"api": [], "driver": [], "subscription": []}
     monkeypatch.setattr(mt, "resolve_active_credential", lambda *_a, **_kw: active)
     monkeypatch.setattr(mt, "ModelDiscoveryCache", lambda _path: cache)
 
@@ -120,8 +122,20 @@ def _run(monkeypatch, tmp_path, *, active=_DEFAULT_ACTIVE, cache=None, api_resul
             raise driver_error
         return _Driver(stream or _Stream([AgentEvent(EventType.done, {"answer": "ok"})]))
 
+    def fake_subscription(**kwargs):
+        calls["subscription"].append(kwargs)
+        if structured_error is not None:
+            raise structured_error
+        return structured_result or {"ok": True}
+
     monkeypatch.setattr(mt, "test_model", fake_api_test)
     monkeypatch.setattr(mt, "build_driver", fake_driver)
+    monkeypatch.setattr(
+        mt,
+        "run_subscription_structured_output",
+        fake_subscription,
+        raising=False,
+    )
     result = asyncio.run(mt.dispatch_task_model_test(
         task=task,
         provider=provider,
@@ -138,8 +152,6 @@ def test_dispatch_matrix_zero_call_arms(monkeypatch, tmp_path):
     cases = [
         (None, "card_synthesis", "openai", "missing_active_credential"),
         (_active("api_key_pool"), "ai_research", "openai", "task_test_unsupported"),
-        (_active("chatgpt_oauth"), "card_synthesis", "openai", "task_auth_mode_unsupported"),
-        (_active("claude_code_oauth", "anthropic"), "card_synthesis", "anthropic", "task_auth_mode_unsupported"),
         (_active("claude_code_oauth", "anthropic"), "ai_research", "anthropic", "task_test_unsupported"),
     ]
     for active, task, provider, code in cases:
@@ -148,7 +160,7 @@ def test_dispatch_matrix_zero_call_arms(monkeypatch, tmp_path):
             model="claude-opus-4-8" if provider == "anthropic" else "gpt-5.4-mini",
         )
         assert result.error_code == code
-        assert calls == {"api": [], "driver": []}
+        assert calls == {"api": [], "driver": [], "subscription": []}
 
 
 @pytest.mark.parametrize(
@@ -160,11 +172,11 @@ def test_dispatch_matrix_zero_call_arms(monkeypatch, tmp_path):
         *[(provider, "api_key_pool", task, "task_test_unsupported", None)
           for provider in ("openai", "anthropic")
           for task in ("card_synthesis", "card_translation", "ai_research")],
-        ("openai", "chatgpt_oauth", "card_synthesis", "task_auth_mode_unsupported", None),
-        ("openai", "chatgpt_oauth", "card_translation", "task_auth_mode_unsupported", None),
+        ("openai", "chatgpt_oauth", "card_synthesis", None, "subscription"),
+        ("openai", "chatgpt_oauth", "card_translation", None, "subscription"),
         ("openai", "chatgpt_oauth", "ai_research", None, "driver"),
-        ("anthropic", "claude_code_oauth", "card_synthesis", "task_auth_mode_unsupported", None),
-        ("anthropic", "claude_code_oauth", "card_translation", "task_auth_mode_unsupported", None),
+        ("anthropic", "claude_code_oauth", "card_synthesis", None, "subscription"),
+        ("anthropic", "claude_code_oauth", "card_translation", None, "subscription"),
         ("anthropic", "claude_code_oauth", "ai_research", "task_test_unsupported", None),
     ],
 )
@@ -183,6 +195,7 @@ def test_dispatch_matrix_covers_every_task_provider_auth_combination(
     assert result.error_code == expected
     assert len(calls["api"]) == (1 if call_arm == "api" else 0)
     assert len(calls["driver"]) == (1 if call_arm == "driver" else 0)
+    assert len(calls["subscription"]) == (1 if call_arm == "subscription" else 0)
 
 
 def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
@@ -191,7 +204,7 @@ def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
         active=_active("api_key", "anthropic"),
     )
     assert result.error_code == "task_capability_missing"
-    assert calls == {"api": [], "driver": []}
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
     import src.model_task_canary as mt
 
@@ -202,7 +215,7 @@ def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
     )
     result, calls, _ = _run(monkeypatch, tmp_path, model=real.id)
     assert result.error_code == "task_capability_missing"
-    assert calls == {"api": [], "driver": []}
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
     monkeypatch.setattr(mt, "capability_for", capability_for)
     scope = DiscoveryScope(
@@ -211,20 +224,22 @@ def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
     )
     result, calls, _ = _run(monkeypatch, tmp_path, cache=_Cache(scope), model="gpt-5.4-mini")
     assert result.error_code == "model_not_visible"
-    assert calls == {"api": [], "driver": []}
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
     result, calls, _ = _run(monkeypatch, tmp_path, cache=_Cache(scope), model="gpt-5.6")
     assert result.status == "ok"
     assert len(calls["api"]) == 1
 
 
-def test_dispatch_precedence_auth_before_capability(monkeypatch, tmp_path):
+def test_dispatch_precedence_rejects_cross_provider_oauth_before_capability(monkeypatch, tmp_path):
     result, calls, _ = _run(
         monkeypatch, tmp_path,
-        active=_active("chatgpt_oauth"), task="card_synthesis", model="gpt-5.4-mini",
+        active=_active("claude_code_oauth", "openai"),
+        task="card_synthesis",
+        model="gpt-5.4-mini",
     )
     assert result.error_code == "task_auth_mode_unsupported"
-    assert calls == {"api": [], "driver": []}
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
     for capability in all_models():
         for task in ("card_synthesis", "card_translation", "ai_research"):
@@ -253,7 +268,7 @@ def test_cache_read_failure_is_discovery_unavailable_for_all_auth_modes(
         cache=_Cache(error=OSError("locked")),
     )
     assert result.error_code == "discovery_unavailable"
-    assert calls == {"api": [], "driver": []}
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
 
 def test_api_key_arm_reuses_test_model_and_translates(monkeypatch, tmp_path):
@@ -289,6 +304,62 @@ def test_oauth_research_canary_bounds(monkeypatch, tmp_path):
     assert built["max_turns"] == 1
     assert built["registry"] is None and built["dal"] is None
     assert built["timeout_s"] <= 45
+
+
+@pytest.mark.parametrize(
+    ("provider", "auth_mode", "task", "model"),
+    [
+        ("openai", "chatgpt_oauth", "card_synthesis", "gpt-5.4-mini"),
+        ("openai", "chatgpt_oauth", "card_translation", "gpt-5.4-mini"),
+        ("anthropic", "claude_code_oauth", "card_synthesis", "claude-opus-4-8"),
+        ("anthropic", "claude_code_oauth", "card_translation", "claude-sonnet-5"),
+    ],
+)
+def test_oauth_card_canary_uses_one_subscription_structured_call(
+    monkeypatch, tmp_path, provider, auth_mode, task, model
+):
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active(auth_mode, provider),
+        task=task,
+        provider=provider,
+        model=model,
+        effort="high",
+    )
+    assert result.status == "ok" and result.error_code is None
+    assert calls["api"] == [] and calls["driver"] == []
+    assert len(calls["subscription"]) == 1
+    call = calls["subscription"][0]
+    assert call["provider"] == provider
+    assert call["auth_mode"] == auth_mode
+    assert call["credential_id"] == "local:7"
+    assert call["model"] == model and call["effort"] == "high"
+    assert call["output_name"] == "emit_check"
+    assert call["schema"]["required"] == ["ok"]
+    assert call["token_store"] is not None
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (SubscriptionStructuredOutputError("reauth_required", "login again"), "reauth_required"),
+        (SubscriptionStructuredOutputError("provider_call_failed", "model rejected"), "provider_call_failed"),
+    ],
+)
+def test_oauth_card_canary_classifies_subscription_failures(
+    monkeypatch, tmp_path, error, expected
+):
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active("chatgpt_oauth"),
+        task="card_synthesis",
+        structured_error=error,
+    )
+    assert result.status == "error" and result.error_code == expected
+    assert len(calls["subscription"]) == 1
+    assert calls["api"] == [] and calls["driver"] == []
 
 
 def test_oauth_canary_reauth_and_model_not_found(monkeypatch, tmp_path):

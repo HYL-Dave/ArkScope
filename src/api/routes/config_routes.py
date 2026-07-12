@@ -480,9 +480,9 @@ class OAuthManualComplete(BaseModel):
 
 class OAuthStartRequest(BaseModel):
     # Default FALSE: login/setup must not silently switch the active OpenAI credential.
-    # AI 研究 can use chatgpt_oauth, but direct OpenAI SDK-client features still fail
-    # closed for it; the user can opt in explicitly. Carried into pending login state
-    # so the loopback callback honors it.
+    # Supported tasks use chatgpt_oauth through explicit subscription adapters;
+    # unrelated direct SDK-client sites still fail closed. Carried into pending
+    # login state so the loopback callback honors the user's explicit choice.
     make_active: bool = False
     # S3 re-login: when set, completion replaces THIS credential's token in place
     # (no new row; alias/active preserved). openai chatgpt_oauth targets only.

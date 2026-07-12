@@ -2684,8 +2684,7 @@ export function ProviderSection({
   const [newMakeActive, setNewMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   // OAuth/setup-token "set active on add?" choice (per provider). Undefined = the
   // unified default (Claude: active iff no local DB credential; ChatGPT: always off —
-  // logging in must never silently switch the active credential; research runs via
-  // the subscription backend, cards stay api_key-only).
+  // logging in must never silently switch the active credential).
   const [oauthMakeActive, setOauthMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   const [renames, setRenames] = useState<Record<string, string>>({});
   const [metadataDrafts, setMetadataDrafts] = useState<Record<string, CredentialMetadataDraft>>({});
@@ -3164,8 +3163,8 @@ export function ProviderSection({
                           <span>登入後設為 active</span>
                         </label>
                         <p className="muted tiny">
-                          可做 discovery / probe；AI 研究可走 ChatGPT 訂閱後端（experimental）。
-                          卡片合成／翻譯仍需 API key（fail-closed）。預設不設為 active——登入不應悄悄切換使用中的 credential。
+                          AI 研究、卡片合成與翻譯會依 active credential 使用 ChatGPT 訂閱後端；
+                          可見模型仍須用任務內的實際測試確認。預設不設為 active——登入不應悄悄切換使用中的 credential。
                         </p>
                         <button
                           type="button"

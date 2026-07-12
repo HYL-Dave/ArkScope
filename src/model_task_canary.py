@@ -19,6 +19,10 @@ from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.auth_drivers.factory import build_driver
 from src.auth_drivers.probe_harness import redact
 from src.auth_drivers.protocol import LLMRequest
+from src.auth_drivers.subscription_structured_output import (
+    SubscriptionStructuredOutputError,
+    run_subscription_structured_output,
+)
 from src.model_capabilities import capability_for
 from src.model_credentials import resolve_active_credential, test_model
 from src.model_discovery_cache import ModelDiscoveryCache
@@ -90,16 +94,118 @@ def _visibility_matches(requested_model: str, discovered_model: str) -> bool:
     return requested_model == discovered_model
 
 
-def _auth_veto(task: str, auth_mode: str) -> str | None:
+def _auth_veto(task: str, provider: str, auth_mode: str) -> str | None:
     if auth_mode == "api_key_pool":
         return "task_test_unsupported"
-    if task in _CARD_TASKS and auth_mode in {"chatgpt_oauth", "claude_code_oauth"}:
+    if task in _CARD_TASKS:
+        if auth_mode == "api_key":
+            return None
+        if provider == "openai" and auth_mode == "chatgpt_oauth":
+            return None
+        if provider == "anthropic" and auth_mode == "claude_code_oauth":
+            return None
         return "task_auth_mode_unsupported"
-    if task == "ai_research" and auth_mode == "claude_code_oauth":
+    if task == "ai_research":
+        if auth_mode == "api_key":
+            return None
+        if provider == "openai" and auth_mode == "chatgpt_oauth":
+            return None
+        if provider == "anthropic" and auth_mode == "claude_code_oauth":
+            return "task_test_unsupported"
         return "task_test_unsupported"
-    if auth_mode not in {"api_key", "chatgpt_oauth"}:
-        return "task_test_unsupported"
-    return None
+    return "task_test_unsupported"
+
+
+async def _run_subscription_card_canary(
+    *,
+    task: str,
+    provider: str,
+    model: str,
+    effort: str,
+    active: Any,
+    token_store: Any,
+    timeout_s: float,
+) -> TaskModelTestResult:
+    started = time.perf_counter()
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"ok": {"type": "boolean"}},
+        "required": ["ok"],
+    }
+    try:
+        # The route driving this coroutine is itself a sync FastAPI handler in an
+        # AnyIO worker thread. Both provider adapters carry their own timeout;
+        # calling directly avoids a second executor whose completion can outlive
+        # the short-lived asyncio.run() loop.
+        payload = run_subscription_structured_output(
+            provider=provider,
+            auth_mode=active.auth_mode,
+            credential_id=active.credential_id,
+            model=model,
+            system=(
+                "This is a bounded structured-output availability check. "
+                "Return the requested object and do not use any other tool."
+            ),
+            user="Return ok=true.",
+            output_name="emit_check",
+            output_description="Emit the bounded availability result.",
+            schema=schema,
+            effort=effort,
+            token_store=token_store,
+            timeout_s=timeout_s,
+        )
+        if payload.get("ok") is not True:
+            raise SubscriptionStructuredOutputError(
+                "provider_call_failed",
+                "Subscription card canary returned an unexpected payload.",
+            )
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="ok",
+            latency_ms=round((time.perf_counter() - started) * 1000),
+        )
+    except SubscriptionStructuredOutputError as exc:
+        code = "reauth_required" if exc.code == "reauth_required" else "provider_call_failed"
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="error",
+            error_code=code,
+            latency_ms=round((time.perf_counter() - started) * 1000),
+            warning=exc,
+        )
+    except asyncio.TimeoutError:
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="error",
+            error_code="provider_call_failed",
+            latency_ms=round((time.perf_counter() - started) * 1000),
+            warning=f"Model test timed out after {timeout_s:g} seconds.",
+        )
+    except Exception as exc:  # noqa: BLE001 - endpoint never returns a bare 500
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="error",
+            error_code="provider_call_failed",
+            latency_ms=round((time.perf_counter() - started) * 1000),
+            warning=exc,
+        )
 
 
 async def _run_oauth_canary(
@@ -212,7 +318,7 @@ async def dispatch_task_model_test(
             warning="No active credential is configured for this provider.",
         )
 
-    auth_error = _auth_veto(task, active.auth_mode)
+    auth_error = _auth_veto(task, provider, active.auth_mode)
     if auth_error is not None:
         return _result(
             task=task, provider=provider, model=model, effort=effort,
@@ -276,6 +382,17 @@ async def dispatch_task_model_test(
             active=active, status="error", error_code=code,
             latency_ms=raw.latency_ms, fallback_effort=raw.fallback_effort,
             warning=raw.error or raw.warning,
+        )
+
+    if task in _CARD_TASKS:
+        return await _run_subscription_card_canary(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            token_store=token_store,
+            timeout_s=timeout_s,
         )
 
     return await _run_oauth_canary(

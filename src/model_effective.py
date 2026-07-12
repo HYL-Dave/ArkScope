@@ -4,10 +4,10 @@ The picker's default list is the intersection of three independent facts:
 1. the model is default-visibility in the code registry (picker policy),
 2. the ACTIVE credential for that task's provider has actually SEEN it
    (discovery cache, fingerprint-scoped),
-3. the (task, auth_mode) pair can actually execute it (fail-closed contract
-   grounded in live_resolver behavior: cards use sync SDK clients that resolve
-   api_key only; api_key_pool is unwired for direct calls; AI research streams
-   through api_key or the provider's own OAuth driver).
+3. the (task, auth_mode) pair can actually execute it (fail-closed contract:
+   cards use the provider's direct API-key client or its structured subscription
+   adapter; api_key_pool is unwired; AI research streams through api_key or the
+   provider's own OAuth driver).
 
 Everything else the user might still legitimately choose (advanced-visibility
 previous generation, custom ids, the saved route's pin, seed candidates on
@@ -51,8 +51,11 @@ def _task_auth_mode_ok(task: str, provider: str, auth_mode: str | None) -> bool:
     if auth_mode is None:
         return False
     if task in _CARD_TASKS:
-        # Sync SDK clients resolve a single api_key only.
-        return auth_mode == "api_key"
+        return (
+            auth_mode == "api_key"
+            or (provider == "openai" and auth_mode == "chatgpt_oauth")
+            or (provider == "anthropic" and auth_mode == "claude_code_oauth")
+        )
     if task == "ai_research":
         return (
             auth_mode == "api_key"
