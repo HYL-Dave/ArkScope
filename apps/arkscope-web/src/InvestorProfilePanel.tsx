@@ -254,7 +254,7 @@ export function InvestorProfilePanel() {
         </label>
 
         <label>
-          風險胃納(1-10)
+          風險意願(1-10)
           <select
             value={form.risk_appetite ?? ""}
             onChange={(e) =>
@@ -463,7 +463,7 @@ export function InvestorProfilePanel() {
       </section>
 
       <div className="ip-guardrail">
-        風險胃納 vs 承受能力:
+        風險意願與風險承受能力:
         <StatusBadge
           state={mismatch === "none" ? "ready" : "partial"}
           label={mismatchLabel(mismatch)}

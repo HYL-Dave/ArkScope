@@ -152,7 +152,10 @@ describe("InvestorProfilePanel", () => {
     const draftCall = calls.find((c) => c.url.endsWith("/profile/investor/draft"));
     expect(draftCall?.method).toBe("POST");
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
-    expect(host!.textContent).toContain("風險胃納高於承受能力");
+    expect(host!.textContent).toContain("風險意願高於承受能力");
+    expect(host!.textContent).toContain("風險意願(1-10)");
+    expect(host!.textContent).toContain("風險意願與風險承受能力");
+    expect(host!.textContent).not.toContain("風險胃納");
   });
 
   it("save_button_puts_profile", async () => {

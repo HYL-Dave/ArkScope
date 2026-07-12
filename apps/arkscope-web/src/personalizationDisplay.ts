@@ -15,8 +15,8 @@ const STANCE_LABELS: Record<AssistantStance, string> = {
 
 const MISMATCH_LABELS: Record<InvestorProfile["risk_mismatch"], string> = {
   none: "一致",
-  appetite_above_capacity: "風險胃納高於承受能力",
-  capacity_above_appetite: "承受能力高於風險胃納",
+  appetite_above_capacity: "風險意願高於承受能力",
+  capacity_above_appetite: "承受能力高於風險意願",
   unclear: "未評估",
 };
 

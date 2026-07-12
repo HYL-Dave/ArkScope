@@ -11,7 +11,8 @@ describe("personalizationDisplay", () => {
   });
 
   it("labels mismatch as a guardrail", () => {
-    expect(mismatchLabel("appetite_above_capacity")).toBe("風險胃納高於承受能力");
+    expect(mismatchLabel("appetite_above_capacity")).toBe("風險意願高於承受能力");
+    expect(mismatchLabel("capacity_above_appetite")).toBe("承受能力高於風險意願");
     expect(mismatchLabel("none")).toBe("一致");
     expect(mismatchLabel("unclear")).toBe("未評估");
   });
