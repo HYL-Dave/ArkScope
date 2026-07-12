@@ -72,8 +72,8 @@ The effective value applies to both API-key and subscription execution:
 
 - subscription structured-output calls receive the effective deadline;
 - OpenAI and Anthropic API-key requests use a request-scoped client clone with
-  `timeout=model_timeout_s` and `max_retries=0` (for example,
-  `client.with_options(...)`), so the configured value is a true execution
+  `timeout=model_timeout_s` and `max_retries=0` through
+  `client.with_options(timeout=model_timeout_s, max_retries=0)`, so the configured value is a true execution
   bound rather than a per-attempt allowance multiplied by SDK retries;
 - unsupported auth modes remain fail-closed.
 
