@@ -211,8 +211,8 @@ therefore defaults to defer until the hypothesis gate exists.
   `3449e32`** (`docs/superpowers/plans/2026-07-12-p2-8-slice-1-ui-primitives.md`):
   the primitive foundation, Holdings migration, and Investor Profile
   presentation repair are on `master`. A bounded Settings stabilization
-  design is now review-cleared at
-  `docs/superpowers/specs/2026-07-12-p2-8-settings-stabilization-design.md`;
+  design is review-cleared and its implementation plan is drafted for review
+  at `docs/superpowers/plans/2026-07-12-p2-8-settings-stabilization.md`;
   Slice 2 shell work remains not started.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
@@ -399,6 +399,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-12 (P2.8 bounded Settings stabilization IMPLEMENTATION PLAN DRAFTED — review pending)**: The review-cleared design at `docs/superpowers/specs/2026-07-12-p2-8-settings-stabilization-design.md` is translated into a frontend-only, RED-first plan at `docs/superpowers/plans/2026-07-12-p2-8-settings-stabilization.md`. Planned units are: truthful known/indeterminate source progress; pure provider/SA/schedule common-state mapping; Data Sources wiring with neutral disabled schedules and no storage-route badges; explicit scroll ownership for provider/SA/FRED/config/schedule tables; normal Market/News/Macro/Data Sources copy with both migration-era News checkbox branches removed from rendering while API/profile/env/status compatibility stays byte-identical; and `風險胃納` -> `風險意願`. Baseline is `38` frontend files / `347` tests; plan contract is `+18/-0` and backend `+0/-0`. Sequence remains stabilization merge -> Portfolio 1.1 design -> P2.8 Slice 2/3/4/5.
 
 - **2026-07-12 (P2.8 bounded Settings stabilization DESIGN APPROVED / REVIEW-CLEARED — mixed sequence adopted)**: User inspection after Slice 1 found four distinct facts rather than one unfinished-layout problem: (1) Data Sources running progress puts current item/count/percentage into one no-wrap chip and covers adjacent information; (2) SA extension and FRED fixed-layout tables have no scroll owner and overlap at constrained widths; (3) enabled Market/News/Macro/Data Sources copy still narrates PG/SQLite/local/legacy migration history after PG-EXIT closed; (4) Investor Profile's `風險胃納` is not acceptable user language and becomes `風險意願` while `風險承受能力` remains. Adopted bounded design: user-selected two-line real progress with truthful indeterminate fallback; existing StatusBadge and surface-level common-state mapping; scroll-owner/min-width/wrapping repair without wholesale DataTable migration; normal copy preserves actionable source ownership but removes storage/migration narration; News Ingestion becomes a concise news-data status surface without deciding future consolidation; both migration-era News checkbox branches are deliberately removed from normal rendering while profile/env/API/status compatibility remains untouched; disabled schedules use muted text rather than a fabricated common-state badge; enabled directory descriptions are included, unreachable App Records is excluded. Startup was measured, not guessed: fresh scheduler-disabled sidecar probes show median ready time about 2.24s at `91ca631` versus 3.11s now (145→158 routes; eager card/Research/provider SDK imports dominate), but the user accepts the roughly one-second increase and defers optimization/loading-screen work. Sequence ruling: stabilize these UI debts first, then open Portfolio 1.1 (cash/net value/realized P&L/transaction effects), then return to P2.8 Slice 2/3/4/5. Authority: `docs/superpowers/specs/2026-07-12-p2-8-settings-stabilization-design.md`; implementation plan is authorized.
 
