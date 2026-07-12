@@ -7,6 +7,14 @@
 > credential-scoped discovery; `Models` owns per-task provider/model/effort
 > routing. Implementation and review are complete; the live gate proved both
 > the successful-call and honest-failure states before merge.
+>
+> **2026-07-12 subscription-task amendment:** task routing uses the active
+> credential for the selected provider as its transport and billing authority.
+> Card generation and translation therefore use API billing for an active API
+> key, ChatGPT subscription allowance for active `chatgpt_oauth`, and Claude
+> subscription allowance for active `claude_code_oauth`. Unsupported models
+> fail explicitly; ArkScope never borrows another credential, provider, model,
+> or billing path.
 
 ## 1. Problem
 
@@ -43,8 +51,10 @@ The design is based on these current code facts:
 4. `/config/model-test` calls `test_model()`, which resolves a direct API-key
    credential and does not dispatch through ChatGPT OAuth or Claude OAuth.
 5. The active Anthropic credential observed in the P2.7 live run was
-   `claude_code_oauth`. That channel is honestly `seed_only`: it can execute AI
-   research, but cannot live-list provider models and cannot execute card tasks.
+   `claude_code_oauth`. That channel is honestly `seed_only`: it cannot
+   live-list provider models. The original implementation also left card tasks
+   unwired; the 2026-07-12 amendment closes that execution gap through the
+   installed Claude Agent SDK's JSON-schema output mode.
 6. The active OpenAI API-key credential had live discovery data, so OpenAI's four
    default-value models appeared as verified options.
 
@@ -163,10 +173,12 @@ keeps its existing warning-only capability contract for compatibility with
 custom ids, import/export, and older clients; this slice does not turn a missing
 active credential into a new backend 400.
 
-If the active auth mode cannot execute the task, the card names the reason. For
-example, Claude OAuth may be valid for AI research while card synthesis remains
-API-key-only. The selector does not silently borrow another credential or switch
-providers.
+If the active auth mode cannot execute the task, the card names the reason. The
+task runtime must first attempt the selected provider's active credential path:
+API-key clients use API billing; OAuth clients use that provider's subscription
+backend. A model-specific or transport-specific incompatibility disables or
+fails that model honestly. The selector never silently borrows another
+credential or switches providers.
 
 If reauthentication is required, Models links to the affected row in Providers;
 the re-login control itself stays in Providers.
@@ -188,18 +200,23 @@ contextual shortcut, not a second credential manager.
 active credential authority used by runtime routing.
 
 - API-key routes use a minimal paid provider call.
-- ChatGPT OAuth and Claude OAuth are testable only for AI research, through their
-  respective subscription drivers.
-- Card tasks with an OAuth-active provider fail closed before a network call and
-  explain that an API-key credential is required.
+- ChatGPT OAuth card tasks use the ChatGPT/Codex Responses backend with one
+  inline function schema; Claude OAuth card tasks use Claude Agent SDK
+  `output_format={"type":"json_schema"}` with all tools disabled. Both consume
+  subscription allowance rather than API-key billing.
+- OAuth AI research continues through its provider-specific subscription
+  driver. Card and research tests remain separate because their runtime shapes
+  differ.
 - `api_key_pool` remains unsupported until direct runtime execution is wired; the
   UI states that reason instead of borrowing a single key.
 
-OAuth research tests are deliberately bounded. They use a minimal prompt,
+OAuth tests are deliberately bounded. Research uses a minimal prompt,
 `max_turns=1`, no ArkScope registry/tool dispatch, and a short dedicated timeout.
-The Claude CLI path additionally passes `--tools ""` (supported by the installed
-CLI) so built-in tools are disabled; the ChatGPT driver receives `registry=None`.
-Any tool event is a failed canary, not permission to continue a research loop.
+Card canaries request one tiny structured object and never invoke market tools,
+research stores, or report persistence. Claude subscription cards pass
+`tools=[]`, `allowed_tools=[]`, `setting_sources=[]`, and an isolated config
+directory; ChatGPT subscription cards expose only the one output function.
+Any unexpected tool event is a failed canary, not permission to continue a loop.
 The UI states that OAuth tests consume subscription allowance rather than API-key
 billing. If an auth driver cannot enforce these bounds, that path reports
 `task_test_unsupported` and does not run a normal research session.
@@ -326,8 +343,10 @@ that is visible/seeded/pinned but fails task capability requirements remains in
 the list with `eligible=false`, is disabled in the selector, and carries a
 reason such as `task_capability_missing`. This lets the UI explain why it cannot
 be selected instead of silently dropping it. The provider-level `executable`
-field represents an auth-mode-wide veto such as OAuth card execution. Secrets
-and raw provider responses never enter this view.
+field represents an auth-mode-wide veto such as an unwired key pool or a
+provider/auth mismatch. Provider-matching OAuth card execution is supported by
+the subscription structured-output adapters. Secrets and raw provider responses
+never enter this view.
 
 During migration, the old task-level `verified`/`advanced` fields may remain as
 an alias for the current provider so old frontends do not break. The new UI's
@@ -427,8 +446,9 @@ Providers ownership remain authoritative.
 6. A provider switch cannot retain an incompatible model or effort silently.
 7. The frontend cannot save a newly selected provider with no active credential;
    the backend remains warning-only for compatibility and custom routes.
-8. OAuth card testing makes zero provider calls and returns an explicit
-   unsupported reason; OAuth research testing uses its subscription driver.
+8. OAuth card generation, translation, and task testing use the selected
+   provider's subscription backend. A model-specific failure is reported
+   without falling back to an API key, another provider, or another model.
 9. A route-pinned unknown/old model remains visible with a warning and is never
    auto-replaced.
 10. Providers remains the only surface with credential mutation controls.
