@@ -364,7 +364,9 @@ def test_claude_reaps_exact_owned_subprocess_after_sdk_close(monkeypatch):
 
     def fake_waitpid(pid, options):
         waited.append((pid, options))
-        return pid, 0
+        # The SDK close may return just before the child exits. The adapter
+        # must keep the same event loop alive and poll this exact PID again.
+        return (0, 0) if len(waited) == 1 else (pid, 0)
 
     monkeypatch.setattr(mod, "_claude_query", fake_query)
     monkeypatch.setattr(os, "waitpid", fake_waitpid)
@@ -384,7 +386,7 @@ def test_claude_reaps_exact_owned_subprocess_after_sdk_close(monkeypatch):
     )
 
     assert result == {"ok": True}
-    assert waited == [(4242, os.WNOHANG)]
+    assert waited == [(4242, os.WNOHANG), (4242, os.WNOHANG)]
 
 
 def test_chatgpt_oauth_requires_the_named_function_call_and_still_closes(monkeypatch):

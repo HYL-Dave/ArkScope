@@ -1496,7 +1496,7 @@ export function getCards(
 
 // Generation runs the gather + LLM synthesis server-side (~1-2 min for one
 // card), so it needs a generous timeout — well past the 15s default.
-const CARD_GEN_TIMEOUT_MS = 240_000;
+const CARD_GEN_TIMEOUT_MS = 300_000;
 
 export function generateCard(
   ticker: string,

@@ -227,7 +227,7 @@ billing. If an auth driver cannot enforce these bounds, that path reports
 The tiny task-test deadline is not the production card deadline. Full card
 synthesis and translation may use high/max reasoning over a larger evidence or
 translation payload: subscription provider execution is bounded at 210 seconds,
-while the web request waits 240 seconds so the backend can return its classified
+while the web request waits 300 seconds so the backend can return its classified
 result and finish bounded SDK subprocess cleanup.
 
 The check validates authentication, model id, effort, and the selected auth path.

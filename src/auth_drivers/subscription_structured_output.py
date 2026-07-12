@@ -110,15 +110,27 @@ def _transport_child_pid(transport: Any) -> int | None:
     return pid if isinstance(pid, int) and pid > 0 else None
 
 
-def _reap_owned_child(pid: int | None) -> None:
-    """Reap only this adapter's child if the SDK left it as a zombie."""
+async def _reap_owned_child(pid: int | None, *, timeout_s: float = 5.0) -> None:
+    """Reap only this adapter's child if it exits just after SDK close."""
     if pid is None:
         return
-    try:
-        os.waitpid(pid, os.WNOHANG)
-    except ChildProcessError:
-        # The SDK/asyncio child watcher already reaped it.
-        pass
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(float(timeout_s), 0.0)
+    while True:
+        try:
+            waited_pid, _ = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            # The SDK/asyncio child watcher already reaped it.
+            return
+        except OSError:
+            # Cleanup must not replace the provider result.
+            return
+        if waited_pid == pid:
+            return
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            return
+        await asyncio.sleep(min(0.05, remaining))
 
 
 def _safe_message(exc: BaseException, token: str | None = None) -> str:
@@ -491,7 +503,7 @@ async def _claude_structured_output_async(
         # SIGTERM to SIGKILL. Do not abandon the child after the provider deadline.
         child_pid = _transport_child_pid(transport)
         await _close_quietly(agen, timeout_s=_CLAUDE_SHUTDOWN_TIMEOUT_S)
-        _reap_owned_child(child_pid)
+        await _reap_owned_child(child_pid)
         shutil.rmtree(config_dir, ignore_errors=True)
 
 

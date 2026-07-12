@@ -24,6 +24,6 @@ describe("card API timeouts", () => {
     await translateCard(1);
 
     const budgets = setTimeoutSpy.mock.calls.map((call) => call[1]);
-    expect(budgets).toEqual([240_000, 240_000]);
+    expect(budgets).toEqual([300_000, 300_000]);
   });
 });
