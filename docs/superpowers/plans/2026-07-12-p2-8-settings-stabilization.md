@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: DRAFT FOR REVIEW — DO NOT IMPLEMENT.**
+> **Status: REVIEW-CLEARED — READY TO IMPLEMENT, NOT STARTED.**
 
 **Goal:** Repair the bounded Settings overlap and stale-copy defects, add truthful scheduler progress, and rename the Investor Profile risk-appetite label without changing backend behavior or pre-implementing later P2.8 slices.
 
@@ -47,8 +47,9 @@
 3. Missing, invalid, or non-positive totals are indeterminate. No fabricated
    percentage or time estimate is shown.
 4. Polling remains five seconds and does not use `aria-live`.
-5. A disabled schedule is muted plain text `排程關閉`, not a common-state
-   badge. Manual Run remains available when the schedule is disabled.
+5. A disabled provider or schedule is muted domain text, not a common-state
+   badge. The schedule text is `排程關閉`; manual Run remains available when
+   the schedule is disabled. This surface never synthesizes `interrupted`.
 6. Raw `source_badges` and technical source descriptions stop rendering. The
    DTO remains unchanged.
 7. The direct-news and normalized-writes checkboxes, handlers, and imports are
@@ -433,9 +434,10 @@ Create `dataSourcesPresentation.test.ts`:
 import { describe, expect, it } from "vitest";
 
 import {
+  durableScheduleCommonState,
   providerCommonState,
   saSegmentCommonState,
-  scheduleHistoryCommonState,
+  scheduleSkipCommonState,
 } from "./dataSourcesPresentation";
 import type { ScheduleSourceState } from "./api";
 
@@ -463,7 +465,7 @@ const schedule = (over: Partial<ScheduleSourceState> = {}): ScheduleSourceState 
 });
 
 describe("Data Sources common-state mapping", () => {
-  it("maps_every_provider_status_without_losing_domain_labels", () => {
+  it("maps_badged_provider_statuses_and_leaves_disabled_neutral", () => {
     expect({
       connected: providerCommonState("connected"),
       stale: providerCommonState("stale"),
@@ -479,7 +481,7 @@ describe("Data Sources common-state mapping", () => {
       no_signal: "empty",
       not_configured: "blocked",
       missing_key: "blocked",
-      disabled: "interrupted",
+      disabled: null,
     });
   });
 
@@ -490,26 +492,23 @@ describe("Data Sources common-state mapping", () => {
   });
 
   it("maps_durable_schedule_history_without_confusing_disabled_schedule_state", () => {
-    expect(scheduleHistoryCommonState(schedule({
+    expect(durableScheduleCommonState(schedule({
       durable_state: { last_status: "succeeded", last_error: null, continuation: null, last_attempt: null, updated_at: null },
     }))).toBe("ready");
-    expect(scheduleHistoryCommonState(schedule({
+    expect(durableScheduleCommonState(schedule({
       durable_state: { last_status: "partial", last_error: null, continuation: { deferred: ["NVDA"] }, last_attempt: null, updated_at: null },
     }))).toBe("partial");
-    expect(scheduleHistoryCommonState(schedule({
+    expect(durableScheduleCommonState(schedule({
       durable_state: { last_status: "failed", last_error: "boom", continuation: null, last_attempt: null, updated_at: null },
     }))).toBe("failed");
-    expect(scheduleHistoryCommonState(schedule({ enabled: false }))).toBe("empty");
+    expect(durableScheduleCommonState(schedule({ enabled: true }))).toBe("empty");
+    expect(durableScheduleCommonState(schedule({ enabled: false }))).toBeNull();
   });
 
-  it("maps_an_already_running_skip_to_blocked", () => {
-    expect(scheduleHistoryCommonState(schedule({
-      last_result: {
-        source: "polygon_news",
-        status: "skipped",
-        reason: "already running in another process",
-      },
-    }))).toBe("blocked");
+  it("maps_duplicate_skips_to_blocked_and_other_skips_to_neutral", () => {
+    expect(scheduleSkipCommonState("already running in another process")).toBe("blocked");
+    expect(scheduleSkipCommonState("IBKR gateway busy (lock timeout)")).toBeNull();
+    expect(scheduleSkipCommonState(null)).toBeNull();
   });
 });
 ```
@@ -534,7 +533,7 @@ import type {
 } from "./api";
 import type { CommonUiState } from "./ui";
 
-export function providerCommonState(status: ProviderStatus): CommonUiState {
+export function providerCommonState(status: ProviderStatus): CommonUiState | null {
   switch (status) {
     case "connected": return "ready";
     case "stale": return "stale";
@@ -542,7 +541,7 @@ export function providerCommonState(status: ProviderStatus): CommonUiState {
     case "no_signal": return "empty";
     case "not_configured":
     case "missing_key": return "blocked";
-    case "disabled": return "interrupted";
+    case "disabled": return null;
   }
 }
 
@@ -554,26 +553,29 @@ export function saSegmentCommonState(
   return "failed";
 }
 
-export function scheduleHistoryCommonState(
+export function durableScheduleCommonState(
   source: ScheduleSourceState,
-): CommonUiState {
-  const skipped = source.last_result?.status === "skipped"
-    ? source.last_result.reason ?? ""
-    : "";
-  if (skipped.includes("already running")) return "blocked";
-  if (skipped) return "interrupted";
+): CommonUiState | null {
   switch (source.durable_state?.last_status) {
     case "succeeded": return "ready";
     case "partial": return "partial";
     case "failed": return "failed";
     case "running": return source.durable_state.running_stale ? "stale" : "running";
-    default: return "empty";
+    default: return source.enabled ? "empty" : null;
   }
+}
+
+export function scheduleSkipCommonState(
+  reason: string | null | undefined,
+): CommonUiState | null {
+  return reason?.includes("already running") ? "blocked" : null;
 }
 ```
 
 This module classifies presentation only. It must not derive provider health,
-schedule completeness, or retry policy.
+schedule completeness, or retry policy. It must not return `interrupted`:
+that common state is reserved for an actually cancelled/interrupted work item,
+which this surface does not currently expose.
 
 - [ ] **Step 4: Run focused tests and typecheck**
 
@@ -619,6 +621,29 @@ progress: mocked.scheduleProgress,
 
 Reset both fields in `afterEach`.
 
+Append one deterministic disabled provider to the existing `health.providers`
+fixture so the neutral provider path is tested through real Settings JSX:
+
+```ts
+{
+  id: "retired_provider",
+  label: "Retired provider",
+  kind: "macro",
+  status: "disabled",
+  enabled: false,
+  disabled_reason: "retired",
+  key_present: true,
+  key_source: "not_required",
+  key_vars: [],
+  last_success_at: null,
+  last_attempt_at: null,
+  last_error: null,
+  detail: "",
+  signals: {},
+  key_import_suggested: false,
+},
+```
+
 - [ ] **Step 2: Add two RED integration tests and rewrite one obsolete sibling**
 
 Add exactly two new tests:
@@ -641,8 +666,16 @@ it("renders_known_schedule_progress_without_covering_the_last_run_cell", async (
   expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("已跳過");
 });
 
-it("shows_a_disabled_schedule_as_neutral_text_while_preserving_manual_run", async () => {
+it("shows_disabled_provider_and_schedule_states_as_neutral_text", async () => {
   await renderDataSources();
+  const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
+    node.textContent?.includes("Retired provider"));
+  if (!providerRow) throw new Error("missing disabled provider row");
+  expect(providerRow.textContent).toContain("已停用");
+  expect(providerRow.querySelector(".ui-status-badge")).toBeNull();
+  expect(providerRow.querySelector(".ds-chip")).toBeNull();
+  expect(providerRow.querySelector(".muted")).not.toBeNull();
+
   const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
     node.textContent?.includes("價格缺口補抓"));
   if (!row) throw new Error("missing price_backfill row");
@@ -700,14 +733,17 @@ Expected RED reasons:
 
 In `Settings.tsx`:
 
-1. Import `SourceRunProgress`, `StatusBadge`, and the three mapping helpers.
-2. Replace provider status chips with:
+1. Import `SourceRunProgress`, `StatusBadge`, and the four mapping helpers.
+2. Add this local presentation helper beside `DataSourcesSection` and replace
+   provider status chips with `<ProviderHealthState provider={p} />`:
 
 ```tsx
-<StatusBadge
-  state={providerCommonState(p.status)}
-  label={providerHealthStatusLabel(p)}
-/>
+function ProviderHealthState({ provider }: { provider: ProviderHealth }) {
+  const state = providerCommonState(provider.status);
+  return state === null
+    ? <span className="muted tiny">{providerHealthStatusLabel(provider)}</span>
+    : <StatusBadge state={state} label={providerHealthStatusLabel(provider)} />;
+}
 ```
 
 3. Replace SA status chips with:
@@ -719,10 +755,41 @@ In `Settings.tsx`:
 />
 ```
 
-4. In `renderLastRun`, replace the colored durable-state span with a
-   `StatusBadge` whose state is `scheduleHistoryCommonState(s)` and whose label
-   remains `ss.label` plus the compact error text. Render an already-running
-   skip with `state="blocked"`; render other skips with `state="interrupted"`.
+4. In `renderLastRun`, compute the two independent axes before returning JSX:
+
+```ts
+const skipState = scheduleSkipCommonState(skippedReason);
+const historyState = durableScheduleCommonState(s);
+```
+
+   Render an already-running skip with a `blocked` `StatusBadge`. Render every
+   other skipped attempt as muted domain text with no common-state badge;
+   Gateway busy, writer-lock busy, and pending-manual-continue are not
+   cancelled work and must not borrow `interrupted`:
+
+```tsx
+{skippedReason && (
+  skipState === null ? (
+    <span className="muted tiny" title={skippedReason}>
+      已跳過：{skippedSummary}
+    </span>
+  ) : (
+    <StatusBadge state={skipState} label="新觸發已略過" />
+  )
+)}
+```
+
+   Render the durable/never-run axis separately so a transient skip never
+   rewrites the prior durable outcome:
+
+```tsx
+{historyState !== null && (
+  <StatusBadge
+    state={historyState}
+    label={`${ss.label}${durableError ? `：${compactMessage(durableError)}` : ""}`}
+  />
+)}
+```
 5. Delete only the `(s.source_badges ?? []).map(...)` JSX. Keep the DTO.
 6. In the schedule control cell, keep the checkbox and replace the current
    one-character `開` / `關` label with:
@@ -970,6 +1037,7 @@ git commit -m "fix: contain wide settings data tables"
 - Modify: `apps/arkscope-web/src/SettingsNewsStorage.test.ts`
 - Modify: `apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts`
 - Modify: `apps/arkscope-web/src/SettingsProviderConfig.test.ts`
+- Modify: `apps/arkscope-web/src/SettingsStabilizationCss.test.ts`
 - Modify: `apps/arkscope-web/src/Settings.tsx`
 
 - [ ] **Step 1: Rewrite existing copy tests before implementation**
@@ -989,7 +1057,9 @@ Evolve the two active Post-PG storage tests in place:
 expect(host!.textContent).toContain("市場資料 · Market Data");
 expect(host!.textContent).toContain("價格");
 expect(host!.textContent).toContain("財務快取");
-expect(host!.textContent).not.toMatch(/PG fallback|SQLite|local authority|本地市場資料庫|本地路由/);
+expect(host!.textContent).not.toMatch(
+  /PG fallback|SQLite|local authority|本地市場資料庫|本地市場庫|本地路由/,
+);
 ```
 
 ```ts
@@ -1000,6 +1070,70 @@ expect(host!.textContent).not.toMatch(/PostgreSQL|PG|SQLite|local-only|本地總
 ```
 
 Keep the existing App Records absence test unchanged.
+
+Extend the existing second test in `SettingsStabilizationCss.test.ts` without
+adding a collected test. Read `Settings.tsx`, extract only the four enabled
+normal sections, and pin every authored migration term that is present in the
+RED baseline:
+
+```ts
+const settingsSource = readFileSync(resolve(here, "./Settings.tsx"), "utf8");
+
+function sourceSection(start: string, end: string): string {
+  const from = settingsSource.indexOf(start);
+  const to = settingsSource.indexOf(end, from + start.length);
+  expect(from).toBeGreaterThanOrEqual(0);
+  expect(to).toBeGreaterThan(from);
+  return settingsSource.slice(from, to);
+}
+```
+
+Rename the existing wrapping test to
+`keeps_detail_cells_wrap_capable_and_normal_sections_free_of_migration_copy`
+and append:
+
+```ts
+const normalSections = [
+  sourceSection("function DataStorageSection()", "function NewsStorageSection()"),
+  sourceSection("function NewsStorageSection()", "function TradingDayCoveragePanel()"),
+  sourceSection("function MacroStorageSection()", "function FragmentKV("),
+  sourceSection("function DataSourcesSection()", "type ModelEntryGroup"),
+].join("\n");
+expect(normalSections).not.toMatch(
+  /PostgreSQL|PG exit|PG mirror|PG fallback|PG 同步|PG 鏡像|SQLite|local authority|local-primary|local-only|本地市場資料庫|本地市場庫|本地路由|本地新聞庫|本地總經庫|本地快照|本地 SA|存本地|market_data\.db|macro_calendar\.db|direct-local|legacy local|legacy config|strict DB-first/,
+);
+expect(normalSections).toContain("config/.env");
+```
+
+This is deliberately source-scoped: it excludes unreachable App Records,
+backend compatibility DTOs, comments outside the four owners, and archival
+documents.
+
+Evolve the existing Data Sources source-badge and FRED tests in
+`SettingsProviderConfig.test.ts` without adding tests. The rendered surface
+must prove every currently visible authored migration string is gone while the
+actionable credential source remains:
+
+```ts
+expect(host!.textContent).not.toMatch(
+  /直寫本地 SQLite|direct-local|PG 同步|鏡像|FRED 本地快照|本地快照|存本地|strict DB-first|legacy config/,
+);
+expect(host!.textContent).toContain("config/.env");
+```
+
+In the rewritten source-badge test, also assert the source cell has no
+technical description tooltip:
+
+```ts
+expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
+```
+
+In the evolved FRED provider test, assert the provider cell no longer exposes
+`p.detail` through `title`:
+
+```ts
+expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
+```
 
 - [ ] **Step 2: Add exactly four new tests**
 
@@ -1190,7 +1324,8 @@ it("renders_market_empty_and_macro_failed_states_as_user_outcomes", async () => 
 npm test --workspace apps/arkscope-web -- \
   src/SettingsNewsStorage.test.ts \
   src/SettingsPostPgExitStorage.test.ts \
-  src/SettingsProviderConfig.test.ts
+  src/SettingsProviderConfig.test.ts \
+  src/SettingsStabilizationCss.test.ts
 ```
 
 Expected: old titles/copy/checkbox branches/source narration make the tests
@@ -1316,6 +1451,7 @@ npm test --workspace apps/arkscope-web -- \
   src/SettingsNewsStorage.test.ts \
   src/SettingsPostPgExitStorage.test.ts \
   src/SettingsProviderConfig.test.ts \
+  src/SettingsStabilizationCss.test.ts \
   src/marketDataDisplay.test.ts
 ```
 
@@ -1337,7 +1473,8 @@ and archival docs are intentionally preserved.
 git add apps/arkscope-web/src/Settings.tsx \
   apps/arkscope-web/src/SettingsNewsStorage.test.ts \
   apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts \
-  apps/arkscope-web/src/SettingsProviderConfig.test.ts
+  apps/arkscope-web/src/SettingsProviderConfig.test.ts \
+  apps/arkscope-web/src/SettingsStabilizationCss.test.ts
 git commit -m "fix: replace migration-era settings copy"
 ```
 
@@ -1466,13 +1603,14 @@ rg -n "setUseLocalNews|setNormalizedNewsWrites|toggleLocalNews|toggleNormalizedW
   apps/arkscope-web/src/Settings.tsx
 rg -n "source_badges" apps/arkscope-web/src/Settings.tsx
 rg -n "aria-live" apps/arkscope-web/src/SourceRunProgress.tsx
+rg -n '"interrupted"' apps/arkscope-web/src/dataSourcesPresentation.ts
 git diff -U0 554e94b -- apps/arkscope-web/src/styles.css | rg "^\+@media"
 ```
 
 Expected:
 
 - byte-identity diff has no output;
-- the three source `rg` commands and the added-media diff gate exit `1` with
+- the four source `rg` commands and the added-media diff gate exit `1` with
   no output;
 - `api.ts` still exports both News compatibility helpers;
 - no new breakpoint or live region exists.
