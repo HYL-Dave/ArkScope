@@ -100,6 +100,21 @@ async function buttonByText(text: string): Promise<HTMLButtonElement> {
 }
 
 describe("InvestorProfilePanel", () => {
+  it("pending_profile_request_uses_loading_state_not_bare_text", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    await mount();
+    expect(host!.querySelector('[data-state="loading"]')?.textContent).toContain("載入投資人設定");
+  });
+
+  it("request_failure_uses_alert_semantics", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("profile request failed");
+    }));
+    await mount();
+    await flush();
+    expect(host!.querySelector('[role="alert"]')?.textContent).toContain("投資人設定失敗");
+  });
+
   it("loads_default_disabled_profile", async () => {
     const calls = stubFetch(() => disabledResponse());
     await mount();
@@ -161,6 +176,7 @@ describe("InvestorProfilePanel", () => {
     const putCall = calls.find((c) => c.method === "PUT");
     expect(putCall?.url).toContain("/profile/investor");
     expect(host!.textContent).toContain("互補投資人");
+    expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("已儲存");
   });
 
   it("starts_calibration_sends_message_and_shows_proposal_rationale", async () => {
@@ -234,6 +250,7 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("Draft ready.");
     expect(host!.textContent).toContain("User said 10% drawdown");
     expect(host!.textContent).toContain("風險承受能力");
+    expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("校準提案");
   });
 
   it("approves_calibration_proposal_through_dedicated_endpoint", async () => {

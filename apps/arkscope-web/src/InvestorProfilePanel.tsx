@@ -20,6 +20,7 @@ import {
   type InvestorPreset,
 } from "./api";
 import { mismatchLabel, stanceLabel } from "./personalizationDisplay";
+import { Button, InlineAlert, StatusBadge } from "./ui";
 
 const PRESETS: Array<{ value: InvestorPreset; label: string }> = [
   { value: "growth", label: "成長投資人（預設）" },
@@ -100,7 +101,11 @@ export function InvestorProfilePanel() {
     return (
       <div className="investor-profile-panel">
         <h3>投資人設定</h3>
-        <div className="muted">{err ?? "載入中…"}</div>
+        {err ? (
+          <InlineAlert state="failed" title="投資人設定失敗">{err}</InlineAlert>
+        ) : (
+          <StatusBadge state="loading" label="載入投資人設定" />
+        )}
       </div>
     );
   }
@@ -401,12 +406,12 @@ export function InvestorProfilePanel() {
           校準對話只用來整理投資人輪廓,不是投資建議或個股推薦。只有你核准的結構化設定會影響研究;原始對話不會進入研究 prompt。
         </p>
         <div className="ip-actions">
-          <button
+          <Button
             disabled={busy || Boolean(calibration?.active_session)}
             onClick={() => void runCalibration(() => startCalibrationSession(false), "校準對話已開始")}
           >
             開始校準對話
-          </button>
+          </Button>
         </div>
         {messages.length ? (
           <div className="ip-calibration-log">
@@ -426,13 +431,15 @@ export function InvestorProfilePanel() {
           />
         </label>
         <div className="ip-actions">
-          <button disabled={busy || !calibration?.active_session || !calibrationText.trim()} onClick={() => void sendCalibration()}>
+          <Button disabled={busy || !calibration?.active_session || !calibrationText.trim()} onClick={() => void sendCalibration()}>
             送出校準訊息
-          </button>
+          </Button>
         </div>
         {latestProposal ? (
           <div className="ip-guardrail">
-            <strong>校準提案</strong>
+            <strong>
+              校準提案 <StatusBadge state="partial" label="待核准校準提案" />
+            </strong>
             {rationaleEntries.length ? (
               <ul>
                 {rationaleEntries.map(([field, rationale]) => (
@@ -443,32 +450,36 @@ export function InvestorProfilePanel() {
               </ul>
             ) : null}
             <div className="ip-actions">
-              <button disabled={busy} onClick={() => void approveProposal()}>
+              <Button disabled={busy} onClick={() => void approveProposal()}>
                 套用校準提案
-              </button>
-              <button disabled={busy} onClick={() => void rejectProposal()}>
+              </Button>
+              <Button disabled={busy} onClick={() => void rejectProposal()}>
                 拒絕提案
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
       </section>
 
       <div className="ip-guardrail">
-        風險胃納 vs 承受能力:{mismatchLabel(mismatch)}
+        風險胃納 vs 承受能力:
+        <StatusBadge
+          state={mismatch === "none" ? "ready" : "partial"}
+          label={mismatchLabel(mismatch)}
+        />
       </div>
       <div className="muted">技能模式:off(技能建議屬後續階段,尚未啟用)</div>
 
       <div className="ip-actions">
-        <button disabled={busy} onClick={() => void run(() => draftInvestorProfile(payload()), "草稿已產生(未儲存)")}>
+        <Button disabled={busy} onClick={() => void run(() => draftInvestorProfile(payload()), "草稿已產生(未儲存)")}>
           產生設定草稿
-        </button>
-        <button disabled={busy} onClick={() => void run(() => saveInvestorProfile(payload()), "已儲存")}>
+        </Button>
+        <Button disabled={busy} onClick={() => void run(() => saveInvestorProfile(payload()), "已儲存")}>
           儲存設定
-        </button>
+        </Button>
       </div>
-      {notice ? <div className="muted">{notice}</div> : null}
-      {err ? <div className="error">{err}</div> : null}
+      {notice ? <InlineAlert state="ready" title={notice} /> : null}
+      {err ? <InlineAlert state="failed" title="投資人設定失敗">{err}</InlineAlert> : null}
     </div>
   );
 }
