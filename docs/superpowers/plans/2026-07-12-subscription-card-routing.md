@@ -9,7 +9,7 @@
 
 **Architecture:** Keep the existing API-key SDK paths byte-compatible. Add one focused subscription structured-output adapter: ChatGPT OAuth uses the already-proven Codex-backend Responses function-call shape; Claude OAuth uses Claude Agent SDK JSON-schema output with all tools disabled. Effective-model eligibility and task canaries derive from the same executable matrix, so the UI unlocks only after the runtime path exists.
 
-**Tech Stack:** Python 3.10, OpenAI sync Responses client, Claude Agent SDK 0.2.105, Pydantic, pytest, React/TypeScript derived Models UI.
+**Tech Stack:** Python 3.10, OpenAI async Responses client with a sync worker-route facade, Claude Agent SDK 0.2.105, Pydantic, pytest, React/TypeScript derived Models UI.
 
 ## Global Constraints
 
@@ -30,6 +30,7 @@
 
 **Interfaces:**
 - Produces: `run_subscription_structured_output(*, provider, auth_mode, credential_id, model, system, user, output_name, output_description, schema, effort="default", token_store=None, timeout_s=90.0) -> dict[str, Any]`.
+- Produces: `await run_subscription_structured_output_async(...)` for task canaries; the sync facade is restricted to worker-thread card routes and never creates a nested provider executor.
 - Produces: `SubscriptionStructuredOutputError(code: str, message: str)` with `code` equal to `reauth_required`, `provider_call_failed`, or `task_auth_mode_unsupported`.
 
 - [x] **Step 1: Write OpenAI RED tests** proving a `chatgpt_oauth` token is refreshed and sent only to `https://chatgpt.com/backend-api/codex`, the request uses one flat function tool with `stream=True`/`store=False`, explicit effort is preserved, the function arguments are returned, and both stream and client close.
@@ -98,8 +99,10 @@
 - Card dispatch RED: all four OAuth paths attempted the API-key client; GREEN: all four use the subscription adapter.
 - Eligibility RED: OAuth cards returned `task_auth_mode_unsupported`; GREEN: provider-matching OAuth cards are executable and canary-tested.
 - Review fix RED: an OAuth provider error containing `effort` was caught by the legacy API-key retry heuristic, causing all four card/translation paths to call the subscription backend again with `default`; GREEN: `SubscriptionStructuredOutputError` is never effort-retried, while the existing API-key fallback contract remains unchanged (four parametrized pins).
-- One test-only `asyncio.to_thread()` experiment hung after the worker returned; faulthandler showed the short-lived loop blocked in `select()`. The final implementation calls the bounded sync adapter directly from the existing sync-route `asyncio.run()` shape, and the full canary suite completes normally.
-- Automated evidence: focused backend 123 passed; subscription-driver adjacency 166 passed; frontend 30 files/284 tests; TypeScript typecheck and production build passed; no-PG smoke 24/24 with `pg_attempts: []`.
+- Independent review round 1 caught four runtime-only gaps: Claude's SDK-internal `StructuredOutput` tool was rejected, `apiKeySource` was not verified, provider streams lacked a real deadline, and expired Claude tokens were not classified as reauthentication. RED/GREEN fixes now allow only the internal structured-output tool, require subscription auth evidence and clear inherited billing variables, use an async OpenAI client with SDK retries disabled, directly await the async canary adapter, and reject expired Claude credentials before SDK startup.
+- Independent review round 2 caught two remaining timeout gaps: credential preflight was still synchronous, and Claude cleanup inherited only the expired provider deadline. RED/GREEN fixes place keyring/refresh work in a deadline-bounded preflight worker that never owns an LLM client, and reserve 11 seconds for the pinned SDK's documented graceful-exit/SIGTERM/SIGKILL teardown. Round 3 re-review: GREEN, no blocking findings.
+- One test-only `asyncio.to_thread()` experiment hung after the worker returned; faulthandler showed the short-lived loop blocked in `select()`. The final canary directly awaits the bounded async adapter in the sync route's single `asyncio.run()` loop; no second provider executor exists.
+- Automated evidence: focused backend 132 passed; subscription-driver adjacency 166 passed; frontend 30 files/284 tests; TypeScript typecheck and production build passed; no-PG smoke 24/24 with `pg_attempts: []`.
 - Full-suite limitation is recorded rather than overstated: the warmed branch run reached the repository's known long-hang family. Its first two data-dependent failures (`test_execute_get_ticker_news` and `test_execute_get_price_change`) were then run against a detached `c7256c8` base worktree with an empty `data/` directory and failed identically, proving those two failures predate this slice. A canonical full A/B remains a review gate.
 
 ## Stop Conditions
