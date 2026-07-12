@@ -110,6 +110,13 @@ describe("BoundedProgress", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
+  it("states_when_running_work_cannot_be_cancelled_here", async () => {
+    await mount(<BoundedProgress {...baseProps} status="running" />);
+
+    expect(host!.textContent).toContain("無法從此處取消");
+    expect(host!.querySelector("button")).toBeNull();
+  });
+
   it("renders_a_typed_terminal_failure_without_a_progress_bar", async () => {
     await mount(
       <BoundedProgress

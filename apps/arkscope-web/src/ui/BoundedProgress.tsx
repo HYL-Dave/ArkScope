@@ -82,6 +82,7 @@ export function BoundedProgress({
       ) : null}
       <div className="ui-bounded-progress-meta">
         <span>{continuesAfterNavigation ? "離開頁面後繼續" : "離開頁面後不保證追蹤"}</span>
+        <span>{canCancel && onCancel ? "可從此處取消" : "無法從此處取消"}</span>
         <span>結果：{resultLabel}</span>
       </div>
       {status === "running" && canCancel && onCancel ? (

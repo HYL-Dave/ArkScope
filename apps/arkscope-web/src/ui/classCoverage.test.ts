@@ -6,10 +6,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const css = [
-  resolve(here, "../styles.css"),
-  resolve(here, "./primitives.css"),
-].map((path) => readFileSync(path, "utf8")).join("\n");
+const primitiveCss = readFileSync(resolve(here, "./primitives.css"), "utf8");
+const css = [readFileSync(resolve(here, "../styles.css"), "utf8"), primitiveCss].join("\n");
 
 function literalClasses(source: string): string[] {
   return Array.from(source.matchAll(/className="([^"]+)"/g))
@@ -30,5 +28,10 @@ describe("migrated component class coverage", () => {
     const classes = [...new Set(literalClasses(readFileSync(path, "utf8")))];
     const missing = classes.filter((name) => !hasSelector(name));
     expect(missing).toEqual([]);
+  });
+
+  it("keeps investor proposal guardrails wrap-capable on narrow screens", () => {
+    const rule = primitiveCss.match(/\.ip-guardrail\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/flex-wrap:\s*wrap|display:\s*grid/);
   });
 });

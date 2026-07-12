@@ -33,12 +33,15 @@ function RowActionMenu<Row>({
   row,
   label,
   actions,
+  open,
+  onOpenChange,
 }: {
   row: Row;
   label: string;
   actions: DataTableAction<Row>[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<"up" | "down">("down");
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -67,6 +70,9 @@ function RowActionMenu<Row>({
   useLayoutEffect(() => {
     if (!open) return;
     positionMenu();
+    menuRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+      ?.focus();
   }, [open, positionMenu]);
 
   useEffect(() => {
@@ -84,13 +90,13 @@ function RowActionMenu<Row>({
     const onPointer = (event: MouseEvent) => {
       const target = event.target as Node;
       if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
-      setOpen(false);
+      onOpenChange(false);
       setMenuPosition(null);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.key !== "Escape") return;
       event.preventDefault();
-      setOpen(false);
+      onOpenChange(false);
       setMenuPosition(null);
       triggerRef.current?.focus();
     };
@@ -100,7 +106,7 @@ function RowActionMenu<Row>({
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [onOpenChange, open]);
 
   const menu = open ? createPortal(
     <div
@@ -123,7 +129,7 @@ function RowActionMenu<Row>({
           className={action.tone === "danger" ? "danger" : ""}
           disabled={action.disabled}
           onClick={() => {
-            setOpen(false);
+            onOpenChange(false);
             setMenuPosition(null);
             if (triggerRef.current) action.onSelect(row, triggerRef.current);
           }}
@@ -147,7 +153,7 @@ function RowActionMenu<Row>({
         aria-expanded={open}
         onClick={() => {
           setMenuPosition(null);
-          setOpen((value) => !value);
+          onOpenChange(!open);
         }}
       />
       {menu}
@@ -174,6 +180,7 @@ export function DataTable<Row>({
   actions?: (row: Row) => DataTableAction<Row>[];
   renderExpandedRow?: (row: Row) => ReactNode;
 }) {
+  const [activeActionKey, setActiveActionKey] = useState<Key | null>(null);
   const actionColumn = Boolean(actions);
   const columnCount = columns.length + (actionColumn ? 1 : 0);
 
@@ -200,10 +207,11 @@ export function DataTable<Row>({
               <td className="ui-data-table-empty" colSpan={columnCount}>{emptyText}</td>
             </tr>
           ) : rows.map((row) => {
+            const key = rowKey(row);
             const expanded = renderExpandedRow?.(row);
             const rowActions = actions?.(row) ?? [];
             return (
-              <Fragment key={rowKey(row)}>
+              <Fragment key={key}>
                 <tr>
                   {columns.map((column) => (
                     <td
@@ -217,7 +225,13 @@ export function DataTable<Row>({
                   {actionColumn ? (
                     <td className="ui-data-table-actions">
                       {rowActions.length > 0 ? (
-                        <RowActionMenu row={row} label={rowLabel(row)} actions={rowActions} />
+                        <RowActionMenu
+                          row={row}
+                          label={rowLabel(row)}
+                          actions={rowActions}
+                          open={activeActionKey === key}
+                          onOpenChange={(open) => setActiveActionKey(open ? key : null)}
+                        />
                       ) : null}
                     </td>
                   ) : null}

@@ -165,6 +165,28 @@ describe("DataTable", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("keeps_only_one_row_action_menu_open_and_focuses_the_new_menu", async () => {
+    await mount(table({
+      rows: [
+        { id: 1, symbol: "NVDA", closed: false },
+        { id: 2, symbol: "AMD", closed: false },
+      ],
+      actions: () => [{ id: "edit", label: "編輯", onSelect: vi.fn() }],
+    }));
+    const first = host!.querySelector<HTMLButtonElement>('button[aria-label="NVDA 操作"]')!;
+    const second = host!.querySelector<HTMLButtonElement>('button[aria-label="AMD 操作"]')!;
+
+    await act(async () => first.click());
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1);
+    expect(document.activeElement?.textContent).toContain("編輯");
+
+    await act(async () => second.click());
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1);
+    expect(first.getAttribute("aria-expanded")).toBe("false");
+    expect(second.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement?.textContent).toContain("編輯");
+  });
+
   it("renders_an_inline_expansion_directly_after_its_owner_row", async () => {
     await mount(table({ renderExpandedRow: (row) => <div>Edit {row.symbol}</div> }));
 

@@ -221,12 +221,13 @@ export function InvestorProfilePanel() {
   const rationaleEntries = Object.entries(latestProposal?.rationales ?? {});
 
   return (
-    <div className="investor-profile-panel">
+    <div className="investor-profile-panel" aria-busy={busy}>
       <h3>投資人設定</h3>
       <p className="muted">
         研究個人化輔助（非投資建議、非適足性評估）。啟用後,助手依你的風險輪廓與所選立場調整
         分析重點;證據蒐集與反方論點完全不受影響。
       </p>
+      {busy ? <StatusBadge state="running" label="正在更新投資人設定" /> : null}
 
       <label className="ip-toggle">
         <input

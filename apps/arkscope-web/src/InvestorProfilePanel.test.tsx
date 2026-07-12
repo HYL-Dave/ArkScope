@@ -179,6 +179,45 @@ describe("InvestorProfilePanel", () => {
     expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("已儲存");
   });
 
+  it("shows_a_running_state_while_a_profile_mutation_is_pending", async () => {
+    let finishSave: ((response: Response) => void) | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: unknown, init?: RequestInit) => {
+        const target = String(url);
+        if (target.endsWith("/profile/investor") && init?.method === "PUT") {
+          return new Promise<Response>((resolve) => {
+            finishSave = resolve;
+          });
+        }
+        const body = target.endsWith("/profile/investor/calibration")
+          ? { active_session: null, sessions: [], messages: [], latest_proposal: null }
+          : disabledResponse();
+        return Promise.resolve(new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }));
+      }),
+    );
+    await mount();
+    await flush();
+
+    const saveBtn = await buttonByText("儲存設定");
+    await act(async () => saveBtn.click());
+
+    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
+    expect(host!.querySelector('[data-state="running"]')?.textContent).toContain("正在更新投資人設定");
+
+    await act(async () => {
+      finishSave?.(new Response(JSON.stringify(disabledResponse()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      await Promise.resolve();
+    });
+    await flush();
+  });
+
   it("starts_calibration_sends_message_and_shows_proposal_rationale", async () => {
     stubFetch((url) => {
       if (url.endsWith("/profile/investor")) return disabledResponse();
