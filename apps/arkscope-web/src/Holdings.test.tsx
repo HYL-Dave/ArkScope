@@ -507,7 +507,7 @@ describe("HoldingsView", () => {
   });
 
   it("soft closes a manual row only after ConfirmDialog approval", async () => {
-    const legacyConfirm = vi.fn(() => { throw new Error("window.confirm must not run"); });
+    const legacyConfirm = vi.fn(() => { throw new Error("legacy confirmation must not run"); });
     vi.stubGlobal("confirm", legacyConfirm);
     const calls = stubFetch((url, init) => {
       if (init?.method === "DELETE") {
