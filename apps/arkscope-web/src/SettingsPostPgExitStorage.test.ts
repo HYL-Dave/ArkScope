@@ -6,6 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, TaskRoute, TradingDayCoverage } from "./api";
 
+const mocked = vi.hoisted(() => ({
+  marketStatus: null as MarketDataStatus | null,
+  macroStatus: null as MacroStatus | null,
+  marketError: null as Error | null,
+  macroError: null as Error | null,
+}));
+
 const emptyCatalog: ModelCatalog = {
   providers: ["anthropic", "openai"],
   tasks: [],
@@ -46,6 +53,9 @@ const macroStatus: MacroStatus = {
   local_first_active: true,
 };
 
+mocked.marketStatus = marketStatus;
+mocked.macroStatus = macroStatus;
+
 const coverage: TradingDayCoverage = {
   interval: "15min",
   lookback_days: 10,
@@ -60,8 +70,14 @@ vi.mock("./api", async (importOriginal) => {
   return {
     ...actual,
     getModelCatalog: vi.fn(async () => emptyCatalog),
-    getMarketDataStatus: vi.fn(async () => marketStatus),
-    getMacroStatus: vi.fn(async () => macroStatus),
+    getMarketDataStatus: vi.fn(async () => {
+      if (mocked.marketError) throw mocked.marketError;
+      return mocked.marketStatus!;
+    }),
+    getMacroStatus: vi.fn(async () => {
+      if (mocked.macroError) throw mocked.macroError;
+      return mocked.macroStatus!;
+    }),
     getTradingDayCoverage: vi.fn(async () => coverage),
   };
 });
@@ -71,13 +87,19 @@ import { SettingsView } from "./Settings";
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
-afterEach(() => {
-  if (root) {
-    act(() => root!.unmount());
-    root = null;
-  }
+function dispose() {
+  if (root) act(() => root!.unmount());
   host?.remove();
+  root = null;
   host = null;
+}
+
+afterEach(() => {
+  dispose();
+  mocked.marketStatus = marketStatus;
+  mocked.macroStatus = macroStatus;
+  mocked.marketError = null;
+  mocked.macroError = null;
 });
 
 async function renderSettings() {
@@ -101,27 +123,26 @@ async function openSection(label: string) {
 }
 
 describe("post-PG-exit storage panels", () => {
-  it("shows Data Storage as locked local authority without retired PG mirror actions", async () => {
+  it("shows Data Storage as normal market data status", async () => {
     await renderSettings();
     await openSection("Data Storage");
 
-    expect(host!.textContent).toContain("本地權威（PG fallback 已退役）");
-    expect(host!.textContent).toContain("local authority");
-    const buttons = Array.from(host!.querySelectorAll("button")).map((button) => button.textContent ?? "");
-    expect(buttons).not.toContain("建立本地市場庫");
-    expect(buttons).not.toContain("重建本地市場庫");
-    expect(buttons).not.toContain("增量更新");
-    expect(buttons).not.toContain("驗證本地資料");
-    expect(host!.textContent).not.toContain("使用本地 market data");
+    expect(host!.textContent).toContain("市場資料 · Market Data");
+    expect(host!.textContent).toContain("價格");
+    expect(host!.textContent).toContain("財務快取");
+    expect(host!.textContent).not.toMatch(
+      /PG fallback|SQLite|local authority|本地市場資料庫|本地市場庫|本地路由/,
+    );
   });
 
-  it("shows Macro / Calendar as local-only without a local-vs-PG toggle", async () => {
+  it("shows Macro / Calendar as normal macro and calendar status", async () => {
     await renderSettings();
     await openSection("Macro / Calendar");
 
-    expect(host!.textContent).toContain("Macro / Calendar is local-only");
-    expect(host!.textContent).not.toContain("使用本地 macro / calendar");
-    expect(host!.textContent).not.toContain("關閉（使用 PG）");
+    expect(host!.textContent).toContain("總經與行事曆 · Macro / Calendar");
+    expect(host!.textContent).toContain("FRED 序列");
+    expect(host!.textContent).toContain("Finnhub 付費方案");
+    expect(host!.textContent).not.toMatch(/PostgreSQL|PG|SQLite|local-only|本地總經庫|本地路由/);
   });
 
   it("does not show the completed App Records migration panel in normal settings navigation", async () => {
@@ -130,5 +151,33 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).not.toContain("App Records");
     expect(host!.textContent).not.toContain("App Records 遷移");
     expect(host!.textContent).not.toContain("一次性 PG→本地遷移工具");
+  });
+
+  it("uses_normal_user_outcomes_in_the_enabled_settings_directory", async () => {
+    await renderSettings();
+    expect(host!.textContent).toContain("價格、新聞、IV、基本面與財務快取狀態");
+    expect(host!.textContent).toContain("新聞資料量、最新文章、收集狀態與最近錯誤");
+    expect(host!.textContent).toContain("FRED 總經資料與經濟、財報、IPO 行事曆狀態");
+    expect(host!.textContent).not.toMatch(/PG mirror routes|PostgreSQL exit|本地總經/);
+  });
+
+  it("renders_market_empty_and_macro_failed_states_as_user_outcomes", async () => {
+    mocked.marketStatus = {
+      ...marketStatus,
+      exists: false,
+    };
+    await renderSettings();
+    await openSection("Data Storage");
+    expect(host!.textContent).toContain("尚無資料");
+    expect(host!.textContent).not.toContain("尚未建立");
+
+    dispose();
+    mocked.marketStatus = marketStatus;
+    mocked.macroError = new Error("macro status unavailable");
+    await renderSettings();
+    await openSection("Macro / Calendar");
+    expect(host!.textContent).toContain("macro status unavailable");
+    expect(host!.querySelector(".errorbox")).not.toBeNull();
+    expect(host!.textContent).not.toMatch(/SQLite|PG fallback|local-only/);
   });
 });

@@ -6,10 +6,19 @@ import { describe, expect, it } from "vitest";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const css = readFileSync(resolve(here, "./styles.css"), "utf8");
+const settingsSource = readFileSync(resolve(here, "./Settings.tsx"), "utf8");
 
 function rule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+}
+
+function sourceSection(start: string, end: string): string {
+  const from = settingsSource.indexOf(start);
+  const to = settingsSource.indexOf(end, from + start.length);
+  expect(from).toBeGreaterThanOrEqual(0);
+  expect(to).toBeGreaterThan(from);
+  return settingsSource.slice(from, to);
 }
 
 describe("Settings stabilization CSS contracts", () => {
@@ -27,9 +36,20 @@ describe("Settings stabilization CSS contracts", () => {
     }
   });
 
-  it("lets_designated_detail_cells_wrap_without_shrinking_type", () => {
+  it("keeps_detail_cells_wrap_capable_and_normal_sections_free_of_migration_copy", () => {
     expect(rule(".settings-wrap-text")).toMatch(/white-space:\s*normal/);
     expect(rule(".settings-wrap-text")).toMatch(/overflow-wrap:\s*anywhere/);
     expect(rule(".settings-wrap-text")).not.toMatch(/font-size:/);
+
+    const normalSections = [
+      sourceSection("function DataStorageSection()", "function NewsStorageSection()"),
+      sourceSection("function NewsStorageSection()", "function TradingDayCoveragePanel()"),
+      sourceSection("function MacroStorageSection()", "function FragmentKV("),
+      sourceSection("function DataSourcesSection()", "type ModelEntryGroup"),
+    ].join("\n");
+    expect(normalSections).not.toMatch(
+      /PostgreSQL|PG exit|PG mirror|PG fallback|PG 同步|PG 鏡像|SQLite|local authority|local-primary|local-only|本地市場資料庫|本地市場庫|本地路由|本地新聞庫|本地總經庫|本地快照|本地 SA|存本地|market_data\.db|macro_calendar\.db|direct-local|legacy local|legacy config|strict DB-first/,
+    );
+    expect(normalSections).toContain("config/.env");
   });
 });

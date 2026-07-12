@@ -331,7 +331,8 @@ function setInputValue(el: HTMLInputElement, value: string) {
 describe("Settings provider config authority", () => {
   it("renders config-file provenance with per-field import", async () => {
     await renderDataSources();
-    expect(host!.textContent).toContain("strict DB-first");
+    expect(host!.textContent).toContain("來源標示會說明每個值");
+    expect(host!.textContent).not.toContain("strict DB-first");
     expect(host!.textContent).toContain("config/.env");
     expect(host!.textContent).toContain("建議匯入");
     const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
@@ -488,8 +489,13 @@ describe("Settings provider config authority", () => {
     if (!row) throw new Error("missing price_backfill row");
     expect(row.querySelector("td")?.textContent?.replace(/\s+/g, "").trim())
       .toBe("價格缺口補抓");
+    expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
     expect(row.textContent).not.toContain("IBKR/Polygon");
     expect(row.textContent).not.toContain("直寫本地");
+    expect(host!.textContent).not.toMatch(
+      /直寫本地 SQLite|direct-local|PG 同步|鏡像|FRED 本地快照|本地快照|存本地|strict DB-first|legacy config/,
+    );
+    expect(host!.textContent).toContain("config/.env");
   });
 
   it("renders FRED as configured local snapshot with refresh off", async () => {
@@ -499,16 +505,17 @@ describe("Settings provider config authority", () => {
     if (!row) throw new Error("missing FRED provider row");
     expect(row.textContent).toContain("正常");
     expect(row.textContent).toContain("app");
-    expect(row.textContent).toContain("本地快照");
+    expect(row.textContent).toContain("資料快照");
     expect(row.textContent).toContain("自動刷新未啟用");
     expect(row.textContent).not.toContain("未啟用抓取");
     expect(row.textContent).not.toContain("已停用");
+    expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
     expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
   });
 
   it("renders the FRED local snapshot panel", async () => {
     await renderDataSources();
-    expect(host!.textContent).toContain("FRED 本地快照");
+    expect(host!.textContent).toContain("FRED 資料快照");
     expect(host!.textContent).toContain("11 序列");
     expect(host!.textContent).toContain("29,571 觀測值");
     expect(host!.textContent).toContain("最後抓取 2026-06-25");

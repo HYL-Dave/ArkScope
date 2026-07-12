@@ -31,8 +31,6 @@ import {
   testProvider,
   getMacroStatus,
   getMacroSnapshot,
-  setUseLocalNews,
-  setNormalizedNewsWrites,
   getNewsStatus,
   getTradingDayCoverage,
   previewAppRecordsMigration,
@@ -49,7 +47,6 @@ import {
   type TradingDayCoverage,
   type TradingDayRow,
   type ProviderConfigEntry,
-  type ProviderEnvFallbackState,
   type ProviderConfigField,
   type ProviderConfigSetupState,
   type ProviderHealth,
@@ -101,12 +98,6 @@ import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
 import {
   coverageStatusLabel,
-  macroRoutingLabel,
-  marketRoutingLabel,
-  newsPostgresRouteLabel,
-  newsReadSurfaceLabel,
-  newsRoutingLabel,
-  newsWriteRouteLabel,
   providerHealthStatusLabel,
   schedulerStateLabel,
 } from "./marketDataDisplay";
@@ -165,19 +156,19 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "data_storage",
     title: "Data Storage",
-    description: "本地市場庫（價格＋新聞＋IV＋基本面）狀態；PG mirror routes 已退役。",
+    description: "價格、新聞、IV、基本面與財務快取狀態。",
     enabled: true,
   },
   {
     id: "news_storage",
-    title: "News Ingestion",
-    description: "新聞寫入路由、PostgreSQL exit 狀態與 direct telemetry。",
+    title: "News Data",
+    description: "新聞資料量、最新文章、收集狀態與最近錯誤。",
     enabled: true,
   },
   {
     id: "macro_storage",
     title: "Macro / Calendar",
-    description: "本地總經＋行事曆庫（FRED 序列、經濟／財報／IPO 行事曆）；資料由 FRED/Finnhub 抓取。",
+    description: "FRED 總經資料與經濟、財報、IPO 行事曆狀態。",
     enabled: true,
   },
   {
@@ -750,12 +741,10 @@ function DataStorageSection() {
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>本地市場資料庫 · Market Data</h2>
+          <h2>市場資料 · Market Data</h2>
           <p className="muted tiny">
-            市場資料現在以本地 SQLite 為權威。價格與新聞由 Data Sources 的 per-source scheduler 直寫本地；
-            PG mirror bootstrap / update / validation route 已退役，缺資料時不會 fallback 回 PG。
-            財務快取為 local-primary；Seeking Alpha capture 已切到本地 SQLite。
-            最新資料時間沿用來源欄位；同步／抓取時間顯示本機時區 + 美股 ET 對照。
+            顯示價格、新聞、隱含波動率、基本面與財務快取的資料量、最新時間及最近更新。
+            資料抓取由 Data Sources 管理。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()}>↻ 重新整理</button>
@@ -768,8 +757,8 @@ function DataStorageSection() {
       ) : (
         <div className="settings-panel">
           <dl className="ds-kv">
-            <dt>本地市場庫</dt>
-            <dd>{exists ? "已建立" : "尚未建立"}</dd>
+            <dt>市場資料</dt>
+            <dd>{exists ? "可用" : "尚無資料"}</dd>
             <dt>價格</dt>
             <dd>{exists ? `${pr!.row_count.toLocaleString()} 列 · ${pr!.ticker_count} 檔 · 最新 ${pr!.latest_datetime ?? "—"}` : "—"}</dd>
             <dt>新聞</dt>
@@ -781,25 +770,12 @@ function DataStorageSection() {
             <dt>財務快取</dt>
             <dd>
               {exists
-                ? `${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${formatSystemTimestamp(fc!.latest_fetched_at)}（local-primary，不對 PG 驗證）`
+                ? `${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${formatSystemTimestamp(fc!.latest_fetched_at)}`
                 : "—"}
             </dd>
             <dt>最近增量更新</dt>
             <dd>{syncLine(status)}</dd>
-            <dt>本地路由</dt>
-            <dd>
-              {marketRoutingLabel(status)}
-              {status.env_override && "（env 強制開啟）"}
-              {status.strict_enabled && status.strict_env_override && "（strict env 強制開啟）"}
-            </dd>
           </dl>
-
-          <div className="settings-actions" style={{ marginTop: 12 }}>
-            <span className="ds-chip ds-connected">local authority</span>
-            <span className="muted tiny">
-              PG mirror bootstrap / update / validation routes are retired. Price and news ingestion now run from Data Sources.
-            </span>
-          </div>
         </div>
       )}
 
@@ -811,7 +787,6 @@ function DataStorageSection() {
 function NewsStorageSection() {
   const [status, setStatus] = useState<NewsStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -826,34 +801,6 @@ function NewsStorageSection() {
     void load();
   }, [load]);
 
-  async function toggleLocalNews(enabled: boolean) {
-    if (busy || status?.env_override || status?.news_hard_local) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      await setUseLocalNews(enabled);
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleNormalizedWrites(enabled: boolean) {
-    if (busy || status?.normalized_writes_env_override || status?.news_hard_local) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      await setNormalizedNewsWrites(enabled);
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const sync = status?.sync;
   const providerErrors = sync
     ? Object.entries(sync.providers)
@@ -866,13 +813,12 @@ function NewsStorageSection() {
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>新聞本地狀態 · News Ingestion</h2>
+          <h2>新聞資料狀態 · News Data</h2>
           <p className="muted tiny">
-            Polygon／Finnhub／IBKR 新聞由 Data Sources 排程直寫 normalized SQLite，並投影到 legacy local
-            讀取面直到 N8b 完成。不再經 news PG sync／mirror；此頁只顯示本地新聞庫與 PG exit 狀態。
+            顯示新聞資料量、最新文章、最近收集時間與錯誤。各來源排程與手動執行由 Data Sources 管理。
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
+        <button className="btn-ghost" onClick={() => void load()}>↻ 重新整理</button>
       </div>
 
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
@@ -882,88 +828,22 @@ function NewsStorageSection() {
       ) : (
         <div className="settings-panel">
           <dl className="ds-kv">
-            <dt>本地新聞庫</dt>
+            <dt>新聞資料</dt>
             <dd>
               {status.exists
                 ? `${status.news.row_count.toLocaleString()} 篇 · ${status.news.source_count} 來源 · 最新 ${status.news.latest_published ?? "—"}`
-                : "尚未建立"}
+                : "尚無資料"}
             </dd>
-            {status.news_hard_local ? (
-              <>
-                <dt>新聞寫入</dt>
-                <dd>{newsWriteRouteLabel(status)}</dd>
-                <dt>PostgreSQL</dt>
-                <dd>{newsPostgresRouteLabel(status)}</dd>
-                <dt>新聞讀取</dt>
-                <dd>{newsReadSurfaceLabel(status)}</dd>
-              </>
-            ) : (
-              <>
-                <dt>Legacy local 直寫</dt>
-                <dd>{newsRoutingLabel(status)}</dd>
-                <dt>Normalized 寫入測試</dt>
-                <dd>
-                  {status.normalized_writes_env_override
-                    ? status.normalized_writes_env_value
-                      ? "開啟（env 強制）"
-                      : "關閉（env 強制）"
-                    : status.normalized_writes_setting
-                      ? "開啟（pre-exit test）"
-                      : "關閉"}
-                </dd>
-                <dt>目前新聞寫入</dt>
-                <dd>{newsWriteRouteLabel(status)}</dd>
-                <dt>PostgreSQL</dt>
-                <dd>{newsPostgresRouteLabel(status)}</dd>
-              </>
-            )}
-            <dt>最近 direct 成功</dt>
+            <dt>最近收集成功</dt>
             <dd>{formatSystemTimestamp(sync?.last_success)}</dd>
-            <dt>最近 direct 嘗試</dt>
+            <dt>最近收集嘗試</dt>
             <dd>{formatSystemTimestamp(sync?.last_attempt)}</dd>
-            <dt>Direct 狀態</dt>
+            <dt>收集狀態</dt>
             <dd>{sync?.status ?? "尚未執行"}</dd>
             <dt>最近錯誤</dt>
             <dd className={providerErrors ? "refresh-err" : undefined}>{providerErrors || sync?.last_error || "—"}</dd>
           </dl>
 
-          {!status.news_hard_local && (
-            <div className="settings-actions" style={{ marginTop: 12 }}>
-              <label className="ds-toggle">
-                <input
-                  type="checkbox"
-                  checked={status.env_override ? status.direct_active : status.use_local_news_setting}
-                  disabled={busy || status.env_override}
-                  onChange={(e) => void toggleLocalNews(e.target.checked)}
-                />
-                Legacy local writer（pre-exit）
-              </label>
-              <label className="ds-toggle">
-                <input
-                  type="checkbox"
-                  checked={
-                    status.normalized_writes_env_override
-                      ? !!status.normalized_writes_env_value
-                      : status.normalized_writes_setting
-                  }
-                  disabled={busy || status.normalized_writes_env_override}
-                  onChange={(e) => void toggleNormalizedWrites(e.target.checked)}
-                />
-                Normalized news writes（測試）
-              </label>
-            </div>
-          )}
-
-          {status.env_override && !status.news_hard_local && (
-            <p className="muted tiny" style={{ marginTop: 8 }}>
-              目前由 ARKSCOPE_USE_LOCAL_NEWS 環境變數強制控制；移除 env override 後才能由此開關變更。
-            </p>
-          )}
-          {status.normalized_writes_env_override && !status.news_hard_local && (
-            <p className="muted tiny" style={{ marginTop: 8 }}>
-              目前由 ARKSCOPE_USE_NORMALIZED_NEWS_WRITES 環境變數強制控制；移除 env override 後才能由此開關變更。
-            </p>
-          )}
         </div>
       )}
     </div>
@@ -1005,7 +885,7 @@ function TradingDayCoveragePanel() {
         <div>
           <h2>交易日 / 價格覆蓋 · Trading-day coverage</h2>
           <p className="muted tiny">
-            最近 {lookback} 天本地 15min 價格覆蓋（讀 market_data.db）。每列以 coverage_status 為準：
+            最近 {lookback} 天的 15min 價格覆蓋。每列以 coverage_status 為準：
             覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日。點開可看缺漏與 partial 標的、以及 provider 錯誤。
             <strong>唯讀診斷，不會自動補抓</strong>；full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。
           </p>
@@ -1171,12 +1051,10 @@ function MacroStorageSection() {
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>本地總經／行事曆庫 · Macro / Calendar</h2>
+          <h2>總經與行事曆 · Macro / Calendar</h2>
           <p className="muted tiny">
-            把 FRED 總經序列（含 ALFRED vintage 還原時點）與經濟／財報／IPO 行事曆存到本地 SQLite（macro_calendar.db）。
-            Macro / Calendar is local-only in the app；資料由 FRED／Finnhub 抓取的 job 填入，非 PG 鏡像。
-            觀測值的 realtime_start 取 FRED 首次發布日（output_type=4），lookahead-safe。
-            注意：經濟行事曆需 Finnhub 付費方案（目前 403）；財報行事曆待節流批次抓取。
+            顯示 FRED 序列與觀測值，以及經濟、財報與 IPO 行事曆資料。
+            經濟行事曆需要 Finnhub 付費方案；未取得授權時會維持不可用。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()}>↻ 重新整理</button>
@@ -1189,8 +1067,8 @@ function MacroStorageSection() {
       ) : (
         <div className="settings-panel">
           <dl className="ds-kv">
-            <dt>本地總經庫</dt>
-            <dd>{exists ? `已建立 · ${seriesCount} 序列 · ${totalObs} 觀測值` : "尚未建立"}</dd>
+            <dt>總經資料</dt>
+            <dd>{exists ? `可用 · ${seriesCount} 序列 · ${totalObs} 觀測值` : "尚無資料"}</dd>
             {MACRO_TABLE_LABELS.map(([key, label]) => {
               const t = tables[key];
               return (
@@ -1205,23 +1083,7 @@ function MacroStorageSection() {
                 />
               );
             })}
-            <dt>本地路由</dt>
-            <dd>
-              {macroRoutingLabel(status)}
-            </dd>
           </dl>
-
-          <p className="muted tiny" style={{ marginTop: 12 }}>
-            Macro / Calendar is local-only in the app. FRED/Finnhub jobs populate macro_calendar.db;
-            when disabled or empty, reads return honest empty results rather than PG fallback.
-          </p>
-
-          {status.local_first_active && !exists && (
-            <p className="muted tiny" style={{ marginTop: 8 }}>
-              讀寫即走本地，macro_calendar.db 會在首次使用時自動建立；未經 FRED／Finnhub
-              ingestion 填入前本地查詢回空（不會 fallback 回 PG）。
-            </p>
-          )}
         </div>
       )}
     </div>
@@ -1457,10 +1319,10 @@ function fredProviderDetail(p: ProviderHealth): string | null {
   const parts: string[] = [];
   if (snap?.available) {
     parts.push(
-      `本地快照可用：${formatCount(snap.series_count)} 序列 · ${formatCount(snap.observation_count)} 觀測值`,
+      `資料快照可用：${formatCount(snap.series_count)} 序列 · ${formatCount(snap.observation_count)} 觀測值`,
     );
   } else {
-    parts.push("本地快照尚無資料");
+    parts.push("尚無資料");
   }
   if (snap?.latest_fetched_at) parts.push(`最後抓取 ${shortDate(snap.latest_fetched_at)}`);
   parts.push(auto ? "自動刷新已啟用" : "自動刷新未啟用");
@@ -1498,7 +1360,6 @@ function DataSourcesSection() {
   const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
-  const [cfgEnvFallback, setCfgEnvFallback] = useState<ProviderEnvFallbackState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -1513,7 +1374,6 @@ function DataSourcesSection() {
     if (rc.status === "fulfilled") {
       setCfg(rc.value.providers);
       setCfgSetup(rc.value.setup);
-      setCfgEnvFallback(rc.value.env_fallback);
     }
     if (rm.status === "fulfilled") setMacroSnapshot(rm.value);
     const bad = [rs, rh, rc, rm].filter((r): r is PromiseRejectedResult => r.status === "rejected");
@@ -1816,10 +1676,8 @@ function DataSourcesSection() {
         <div>
           <h2>資料來源 · Data Sources</h2>
           <p className="muted tiny">
-            App 直接發起資料抓取（免 cron）。每個來源獨立排程：自己的開關與間隔、平行執行
-            （IBKR 項目共用 Gateway 鎖序列化；同一輪最多啟動一個本地市場 DB 寫入者）。
-            一次執行＝抓取並直寫本地 SQLite（股價與新聞皆為 direct-local，已無 PG 同步／鏡像）。
-            預設全部停用。
+            集中檢視各資料來源的健康狀態、連線設定、排程與手動執行。
+            每個來源可獨立設定；IBKR 工作會共用 Gateway 鎖以避免重疊。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>
@@ -1842,7 +1700,7 @@ function DataSourcesSection() {
               <tbody>
                 {health.providers.map((p) => (
                   <tr key={p.id}>
-                    <td className="settings-wrap-text" title={p.detail}>
+                    <td className="settings-wrap-text">
                       {p.label}
                       {fredProviderDetail(p) && (
                         <div className="muted tiny">{fredProviderDetail(p)}</div>
@@ -1868,7 +1726,7 @@ function DataSourcesSection() {
           <div>
             <h4 className="detail-section">SA Extension 健康</h4>
             <p className="muted tiny">
-              Firefox/Chrome extension → native host → sidecar telemetry → 本地 SA DB 的分段檢查。
+              檢查瀏覽器 extension、native host、sidecar 回報與資料接收狀態。
             </p>
           </div>
           <button
@@ -1912,7 +1770,7 @@ function DataSourcesSection() {
       </div>
 
       <div className="settings-panel" style={{ marginTop: 16 }}>
-        <h4 className="detail-section">FRED 本地快照</h4>
+        <h4 className="detail-section">FRED 資料快照</h4>
         {!macroSnapshot ? (
           <p className="muted tiny">loading…</p>
         ) : (
@@ -1920,7 +1778,7 @@ function DataSourcesSection() {
             <p className="muted tiny">
               {macroSnapshot.available
                 ? `${formatCount(macroSnapshot.series_count)} 序列 · ${formatCount(macroSnapshot.observation_count)} 觀測值 · 最後抓取 ${shortDate(macroSnapshot.latest_fetched_at)} · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`
-                : `尚無本地快照 · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`}
+                : `尚無資料 · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`}
             </p>
             {macroSnapshot.items.length > 0 ? (
               <div className="settings-table-scroll" data-testid="fred-snapshot-scroll">
@@ -1944,7 +1802,7 @@ function DataSourcesSection() {
                 </table>
               </div>
             ) : (
-              <p className="muted tiny">本地 macro_calendar.db 尚無可顯示的 FRED 觀測值。</p>
+              <p className="muted tiny">尚無可顯示的 FRED 觀測值。</p>
             )}
           </>
         )}
@@ -1953,17 +1811,9 @@ function DataSourcesSection() {
       <div className="settings-panel" style={{ marginTop: 16 }}>
         <h4 className="detail-section">連線與金鑰</h4>
         <p className="muted tiny">
-          App 管理各 provider 的金鑰與連線設定（存本地、僅顯示遮罩值）。真實環境變數仍可作為 operator escape hatch；
-          config/.env 只作為逐欄匯入來源。儲存即生效（毋須重啟）。
+          來源標示會說明每個值由 App、環境變數或 config/.env 管理。
+          App 內儲存的設定會立即生效；敏感值只顯示遮罩內容。
         </p>
-        {cfgEnvFallback && (
-          <p className="muted tiny">
-            Provider runtime policy：
-            {cfgEnvFallback.enabled
-              ? ` legacy config/.env fallback enabled（${cfgEnvFallback.source}）`
-              : ` strict DB-first（${cfgEnvFallback.source}）`}
-          </p>
-        )}
         {cfgSetup?.required && (
           <div className="errorbox">
             <p className="muted">
@@ -2117,7 +1967,7 @@ function DataSourcesSection() {
             <tbody>
               {Object.entries(schedule).map(([id, s]) => (
                 <tr key={id}>
-                  <td title={s.description}>
+                  <td>
                     {s.label}
                     {s.retired && <span className="ds-chip ds-disabled">已退役</span>}
                   </td>

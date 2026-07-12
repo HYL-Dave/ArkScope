@@ -8,6 +8,7 @@ import type { ModelCatalog, ModelTask, NewsStatus, TaskRoute } from "./api";
 
 const mocked = vi.hoisted(() => ({
   newsStatus: null as NewsStatus | null,
+  newsError: null as Error | null,
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -25,7 +26,10 @@ vi.mock("./api", async (importOriginal) => {
   return {
     ...actual,
     getModelCatalog: vi.fn(async () => emptyCatalog),
-    getNewsStatus: vi.fn(async () => mocked.newsStatus),
+    getNewsStatus: vi.fn(async () => {
+      if (mocked.newsError) throw mocked.newsError;
+      return mocked.newsStatus;
+    }),
     setNormalizedNewsWrites: vi.fn(),
     setUseLocalNews: vi.fn(),
   };
@@ -36,14 +40,12 @@ import { SettingsView } from "./Settings";
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
-afterEach(() => {
-  if (root) {
-    act(() => root!.unmount());
-    root = null;
-  }
+function dispose() {
+  if (root) act(() => root!.unmount());
   host?.remove();
+  root = null;
   host = null;
-});
+}
 
 const newsStatus = (over: Partial<NewsStatus> = {}): NewsStatus => ({
   market_db: "/tmp/market.db",
@@ -73,35 +75,73 @@ async function flush() {
   });
 }
 
+async function renderNewsSection() {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root!.render(React.createElement(SettingsView, {
+      runtime: null,
+      onRuntimeChanged: vi.fn(),
+    }));
+  });
+  await flush();
+  const button = Array.from(host.querySelectorAll("button")).find((node) =>
+    node.textContent?.includes("News Data"));
+  if (!button) throw new Error("missing News Data section button");
+  await act(async () => {
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  });
+  await flush();
+}
+
+afterEach(() => {
+  dispose();
+  mocked.newsStatus = null;
+  mocked.newsError = null;
+  vi.clearAllMocks();
+});
+
 describe("SettingsView news storage copy", () => {
-  it("hides the legacy local-news env hint after news PG exit", async () => {
+  it("renders_normal_news_status_without_migration_narration", async () => {
     mocked.newsStatus = newsStatus();
-    host = document.createElement("div");
-    document.body.append(host);
-    root = createRoot(host);
+    await renderNewsSection();
 
-    await act(async () => {
-      root!.render(React.createElement(SettingsView, {
-        runtime: null,
-        onRuntimeChanged: vi.fn(),
-      }));
+    expect(host!.textContent).toContain("新聞資料狀態 · News Data");
+    expect(host!.textContent).toContain("10 篇 · 2 來源");
+    expect(host!.textContent).toContain("最近收集成功");
+    expect(host!.textContent).not.toMatch(/PostgreSQL|PG exit|SQLite|legacy|mirror|本地新聞庫/);
+  });
+
+  it("hides_both_migration_controls_even_for_a_pre_exit_compatibility_response", async () => {
+    mocked.newsStatus = newsStatus({
+      news_hard_local: false,
+      news_pg_exit_completed: false,
+      pg_news_route_available: true,
+      direct_active: false,
     });
-    await flush();
+    await renderNewsSection();
+    expect(host!.querySelectorAll("input[type='checkbox']")).toHaveLength(0);
+    expect(host!.textContent).not.toContain("Legacy local writer");
+    expect(host!.textContent).not.toContain("Normalized news writes");
+    const api = await import("./api");
+    expect(api.setUseLocalNews).not.toHaveBeenCalled();
+    expect(api.setNormalizedNewsWrites).not.toHaveBeenCalled();
+  });
 
-    const newsButton = Array.from(host.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("News Ingestion"));
-    if (!newsButton) throw new Error("missing News Ingestion section button");
-
-    await act(async () => {
-      newsButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  it("renders_empty_and_failed_news_statuses_as_user_outcomes", async () => {
+    mocked.newsStatus = newsStatus({
+      exists: false,
+      news: { row_count: 0, source_count: 0, latest_published: null },
     });
-    await flush();
+    await renderNewsSection();
+    expect(host!.textContent).toContain("尚無資料");
+    expect(host!.textContent).not.toContain("尚未建立");
 
-    expect(host.textContent).toContain("新聞本地狀態 · News Ingestion");
-    expect(host.textContent).toContain("已退出（不可回退到 PG）");
-    expect(host.textContent).not.toContain("ARKSCOPE_USE_LOCAL_NEWS");
-    expect(host.textContent).not.toContain("IBKR news 暫時仍使用 collector");
-    expect(host.textContent).not.toContain("Polygon／Finnhub 新聞直寫本地");
-    expect(host.textContent).not.toContain("Normalized news writes");
+    dispose();
+    mocked.newsError = new Error("news status unavailable");
+    await renderNewsSection();
+    expect(host!.textContent).toContain("news status unavailable");
+    expect(host!.querySelector(".errorbox")).not.toBeNull();
   });
 });
