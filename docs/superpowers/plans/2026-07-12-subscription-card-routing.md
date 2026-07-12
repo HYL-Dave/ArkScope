@@ -87,7 +87,7 @@
 - [x] **Step 2: Run frontend Models tests and typecheck:** `npm --workspace apps/arkscope-web test -- --run ModelRoutingSection.test.ts modelRoutingUx.test.ts` and `npm --workspace apps/arkscope-web run typecheck`.
 - [x] **Step 3: Run production build and no-PG smoke:** `npm --workspace apps/arkscope-web run build` and `python src/smoke/pg_unreachable_e2e.py`.
 - [x] **Step 4: Run regression tests for OAuth lifecycle and both subscription drivers.**
-- [ ] **Step 5: Live gate after merge/restart:** with ChatGPT OAuth active, generate one `gpt-5.4-mini` card and translate it; with Claude OAuth active, run one low-cost supported model card/translation. Confirm the task-test and real task both consume subscription allowance, no API key is touched, and an unsupported model fails without fallback.
+- [ ] **Step 5: Live gate on the branch sidecar before merge:** stop the desktop/master sidecar, start this branch against the real profile DB, then generate one ChatGPT OAuth `gpt-5.4-mini` card and translate it; with Claude OAuth active, run one low-cost supported model card/translation. Confirm the task-test and real task both consume subscription allowance, no API key is touched, and an unsupported model fails without fallback. Merge only after this gate and review pass; restart the desktop app once after merge.
 - [x] **Step 6: Mark this plan `IMPLEMENTED FOR REVIEW` and add a newest-first map entry with automated evidence.**
 - [ ] **Step 7: After the live gate, mark `LIVE COMPLETE` and append the live evidence.**
 
@@ -99,6 +99,7 @@
 - Eligibility RED: OAuth cards returned `task_auth_mode_unsupported`; GREEN: provider-matching OAuth cards are executable and canary-tested.
 - One test-only `asyncio.to_thread()` experiment hung after the worker returned; faulthandler showed the short-lived loop blocked in `select()`. The final implementation calls the bounded sync adapter directly from the existing sync-route `asyncio.run()` shape, and the full canary suite completes normally.
 - Automated evidence: focused backend 119 passed; subscription-driver adjacency 166 passed; frontend 30 files/284 tests; TypeScript typecheck and production build passed; no-PG smoke 24/24 with `pg_attempts: []`.
+- Full-suite limitation is recorded rather than overstated: the warmed branch run reached the repository's known long-hang family. Its first two data-dependent failures (`test_execute_get_ticker_news` and `test_execute_get_price_change`) were then run against a detached `c7256c8` base worktree with an empty `data/` directory and failed identically, proving those two failures predate this slice. A canonical full A/B remains a review gate.
 
 ## Stop Conditions
 
