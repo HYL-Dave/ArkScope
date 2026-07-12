@@ -56,11 +56,13 @@ def _synth() -> CardSynthesis:
 def test_synthesize_merges_metadata_and_citations(monkeypatch):
     monkeypatch.setattr(
         "src.card_synthesis._synthesize_anthropic",
-        lambda packet, model, effort="default": (_synth(), {"effort": effort}),
+        lambda packet, model, effort="default", model_timeout_s=None: (
+            _synth(), {"effort": effort}
+        ),
     )
     card, meta = synthesize_card(
         _packet(), now_iso="2026-06-05T00:00:00Z", provider="anthropic",
-        question="thesis into the print?", horizon="swing",
+        question="thesis into the print?", horizon="swing", model_timeout_s=900,
     )
     assert isinstance(card, ResultCard)
     assert card.ticker == "AAPL"
@@ -87,7 +89,9 @@ def test_synthesize_merges_metadata_and_citations(monkeypatch):
 
 def test_synthesize_rejects_unknown_provider():
     with pytest.raises(ValueError):
-        synthesize_card(_packet(), now_iso="t", provider="grok")  # type: ignore[arg-type]
+        synthesize_card(
+            _packet(), now_iso="t", provider="grok", model_timeout_s=900
+        )  # type: ignore[arg-type]
 
 
 def test_translation_validation_rejects_list_count_change():
@@ -134,9 +138,16 @@ def test_task_model_routing(tmp_path, monkeypatch):
 def test_render_card_markdown_has_core_sections(monkeypatch):
     monkeypatch.setattr(
         "src.card_synthesis._synthesize_anthropic",
-        lambda packet, model, effort="default": (_synth(), {"effort": effort}),
+        lambda packet, model, effort="default", model_timeout_s=None: (
+            _synth(), {"effort": effort}
+        ),
     )
-    card, _ = synthesize_card(_packet(), now_iso="2026-06-05T00:00:00Z", provider="anthropic")
+    card, _ = synthesize_card(
+        _packet(),
+        now_iso="2026-06-05T00:00:00Z",
+        provider="anthropic",
+        model_timeout_s=900,
+    )
     md = render_card_markdown(card)
     assert "## Conclusion" in md
     assert "Counter-thesis" in md
@@ -161,6 +172,7 @@ def test_card_synthesis_raises_structured_refusal(monkeypatch):
     from src.anthropic_refusal import AnthropicRefusalError
 
     client = MagicMock()
+    client.with_options.return_value = client
     client.messages.create.return_value = _refusal_response()
     # Function-local import → patch the SOURCE module.
     monkeypatch.setattr(
@@ -168,7 +180,9 @@ def test_card_synthesis_raises_structured_refusal(monkeypatch):
         lambda **kw: client,
     )
     with pytest.raises(AnthropicRefusalError):
-        cs._synthesize_anthropic(_packet(), "claude-fable-5")
+        cs._synthesize_anthropic(
+            _packet(), "claude-fable-5", model_timeout_s=900
+        )
 
 
 def test_card_translation_raises_structured_refusal(monkeypatch):
@@ -177,13 +191,21 @@ def test_card_translation_raises_structured_refusal(monkeypatch):
     from src.anthropic_refusal import AnthropicRefusalError
 
     client = MagicMock()
+    client.with_options.return_value = client
     client.messages.create.return_value = _refusal_response()
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.live_anthropic_client",
         lambda **kw: client,
     )
     with pytest.raises(AnthropicRefusalError):
-        cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW")
+        cs._translate_anthropic(
+            "claude-fable-5",
+            "sys",
+            "user",
+            {},
+            "zh-TW",
+            model_timeout_s=900,
+        )
 
 
 def test_refusal_never_triggers_effort_fallback(monkeypatch):
@@ -194,6 +216,7 @@ def test_refusal_never_triggers_effort_fallback(monkeypatch):
     from src.anthropic_refusal import AnthropicRefusalError
 
     client = MagicMock()
+    client.with_options.return_value = client
     refusal = _refusal_response()
     refusal.stop_details = {"category": "effort_extraction"}
     client.messages.create.return_value = refusal
@@ -202,12 +225,22 @@ def test_refusal_never_triggers_effort_fallback(monkeypatch):
         lambda **kw: client,
     )
     with pytest.raises(AnthropicRefusalError):
-        cs._synthesize_anthropic(_packet(), "claude-fable-5", effort="xhigh")
+        cs._synthesize_anthropic(
+            _packet(), "claude-fable-5", effort="xhigh", model_timeout_s=900
+        )
     assert client.messages.create.call_count == 1
 
     client.messages.create.reset_mock()
     with pytest.raises(AnthropicRefusalError):
-        cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW", effort="xhigh")
+        cs._translate_anthropic(
+            "claude-fable-5",
+            "sys",
+            "user",
+            {},
+            "zh-TW",
+            effort="xhigh",
+            model_timeout_s=900,
+        )
     assert client.messages.create.call_count == 1
 
 
@@ -241,7 +274,9 @@ def test_openai_synthesis_uses_chatgpt_subscription_when_oauth_is_active(monkeyp
         lambda **kwargs: calls.append(kwargs) or _synth().model_dump(),
     )
 
-    result, meta = cs._synthesize_openai(_packet(), "gpt-5.4-mini", effort="high")
+    result, meta = cs._synthesize_openai(
+        _packet(), "gpt-5.4-mini", effort="high", model_timeout_s=321
+    )
 
     assert result == _synth()
     assert meta == {"effort": "high"}
@@ -251,7 +286,7 @@ def test_openai_synthesis_uses_chatgpt_subscription_when_oauth_is_active(monkeyp
     assert calls[0]["model"] == "gpt-5.4-mini"
     assert calls[0]["output_name"] == "emit_result_card"
     assert calls[0]["effort"] == "high"
-    assert calls[0]["timeout_s"] == 210.0
+    assert calls[0]["timeout_s"] == 321.0
 
 
 def test_openai_translation_uses_chatgpt_subscription_when_oauth_is_active(monkeypatch):
@@ -278,13 +313,14 @@ def test_openai_translation_uses_chatgpt_subscription_when_oauth_is_active(monke
         {"type": "object"},
         "Traditional Chinese",
         effort="medium",
+        model_timeout_s=322,
     )
 
     assert result == {"conclusion": "結論"}
     assert calls[0]["auth_mode"] == "chatgpt_oauth"
     assert calls[0]["output_name"] == "emit_translation"
     assert calls[0]["effort"] == "medium"
-    assert calls[0]["timeout_s"] == 210.0
+    assert calls[0]["timeout_s"] == 322.0
 
 
 def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monkeypatch):
@@ -304,7 +340,9 @@ def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monke
         lambda **kwargs: calls.append(kwargs) or _synth().model_dump(),
     )
 
-    result, meta = cs._synthesize_anthropic(_packet(), "claude-sonnet-5", effort="low")
+    result, meta = cs._synthesize_anthropic(
+        _packet(), "claude-sonnet-5", effort="low", model_timeout_s=323
+    )
 
     assert result == _synth()
     assert meta == {"effort": "low"}
@@ -314,7 +352,7 @@ def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monke
     assert calls[0]["output_name"] == "emit_result_card"
     assert "emit_result_card tool" not in calls[0]["system"]
     assert "JSON" in calls[0]["system"]
-    assert calls[0]["timeout_s"] == 210.0
+    assert calls[0]["timeout_s"] == 323.0
 
 
 def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(monkeypatch):
@@ -341,6 +379,7 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
         {"type": "object"},
         "Traditional Chinese",
         effort="medium",
+        model_timeout_s=324,
         subscription_system="Return ONLY one JSON object matching the schema.",
     )
 
@@ -349,7 +388,7 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
     assert calls[0]["output_name"] == "emit_translation"
     assert "emit_translation tool" not in calls[0]["system"]
     assert "JSON" in calls[0]["system"]
-    assert calls[0]["timeout_s"] == 210.0
+    assert calls[0]["timeout_s"] == 324.0
 
 
 @pytest.mark.parametrize(
@@ -358,7 +397,7 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
         (
             "openai",
             lambda cs: cs._synthesize_openai(
-                _packet(), "gpt-5.4-mini", effort="high"
+                _packet(), "gpt-5.4-mini", effort="high", model_timeout_s=900
             ),
         ),
         (
@@ -370,12 +409,13 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
                 {"type": "object"},
                 "Traditional Chinese",
                 effort="high",
+                model_timeout_s=900,
             ),
         ),
         (
             "anthropic",
             lambda cs: cs._synthesize_anthropic(
-                _packet(), "claude-sonnet-5", effort="high"
+                _packet(), "claude-sonnet-5", effort="high", model_timeout_s=900
             ),
         ),
         (
@@ -387,6 +427,7 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
                 {"type": "object"},
                 "Traditional Chinese",
                 effort="high",
+                model_timeout_s=900,
             ),
         ),
     ],
@@ -452,7 +493,9 @@ def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypa
         ]
     )
     client = MagicMock()
-    client.chat.completions.create.return_value = response
+    bounded = MagicMock()
+    bounded.chat.completions.create.return_value = response
+    client.with_options.return_value = bounded
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.resolve_live_auth",
         lambda provider: LiveAuthResolution(provider, "db_api_key", "local:3"),
@@ -468,10 +511,13 @@ def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypa
         ),
     )
 
-    result, meta = cs._synthesize_openai(_packet(), "gpt-5.4-mini", effort="high")
+    result, meta = cs._synthesize_openai(
+        _packet(), "gpt-5.4-mini", effort="high", model_timeout_s=456
+    )
 
     assert result == _synth() and meta == {"effort": "high"}
-    kwargs = client.chat.completions.create.call_args.kwargs
+    client.with_options.assert_called_once_with(timeout=456, max_retries=0)
+    kwargs = bounded.chat.completions.create.call_args.kwargs
     assert kwargs["model"] == "gpt-5.4-mini"
     assert kwargs["reasoning_effort"] == "high"
     assert kwargs["max_completion_tokens"] == 8192
@@ -498,7 +544,9 @@ def test_anthropic_api_key_synthesis_keeps_existing_messages_shape(monkeypatch):
         ],
     )
     client = MagicMock()
-    client.messages.create.return_value = response
+    bounded = MagicMock()
+    bounded.messages.create.return_value = response
+    client.with_options.return_value = bounded
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.resolve_live_auth",
         lambda provider: LiveAuthResolution(provider, "db_api_key", "local:4"),
@@ -514,11 +562,135 @@ def test_anthropic_api_key_synthesis_keeps_existing_messages_shape(monkeypatch):
         ),
     )
 
-    result, meta = cs._synthesize_anthropic(_packet(), "claude-sonnet-5", effort="high")
+    result, meta = cs._synthesize_anthropic(
+        _packet(), "claude-sonnet-5", effort="high", model_timeout_s=457
+    )
 
     assert result == _synth() and meta == {"effort": "high"}
-    kwargs = client.messages.create.call_args.kwargs
+    client.with_options.assert_called_once_with(timeout=457, max_retries=0)
+    kwargs = bounded.messages.create.call_args.kwargs
     assert kwargs["model"] == "claude-sonnet-5"
     assert kwargs["max_tokens"] == 8192
     assert kwargs["output_config"] == {"effort": "high"}
     assert kwargs["tool_choice"] == {"type": "tool", "name": "emit_result_card"}
+
+
+def test_openai_api_timeout_uses_one_attempt(monkeypatch):
+    import httpx
+    from openai import OpenAI
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    attempts = []
+
+    def timeout(request):
+        attempts.append(request)
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = OpenAI(
+        api_key="sk-test",
+        base_url="https://openai.invalid/v1",
+        http_client=httpx.Client(transport=httpx.MockTransport(timeout)),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "env_fallback"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_openai_client", lambda: client
+    )
+
+    try:
+        with pytest.raises(cs.ModelExecutionTimeout):
+            cs._synthesize_openai(
+                _packet(), "gpt-5.4-mini", effort="high", model_timeout_s=0.01
+            )
+    finally:
+        client.close()
+
+    assert len(attempts) == 1
+
+
+def test_anthropic_api_timeout_uses_one_attempt(monkeypatch):
+    import httpx
+    from anthropic import Anthropic
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    attempts = []
+
+    def timeout(request):
+        attempts.append(request)
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = Anthropic(
+        api_key="test-key",
+        base_url="https://anthropic.invalid",
+        http_client=httpx.Client(transport=httpx.MockTransport(timeout)),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "env_fallback"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client", lambda: client
+    )
+
+    try:
+        with pytest.raises(cs.ModelExecutionTimeout):
+            cs._synthesize_anthropic(
+                _packet(), "claude-sonnet-5", effort="high", model_timeout_s=0.01
+            )
+    finally:
+        client.close()
+
+    assert len(attempts) == 1
+
+
+@pytest.mark.parametrize("provider", ["openai", "anthropic"])
+def test_subscription_sdk_timeout_cause_is_typed(monkeypatch, provider):
+    import httpx
+    import openai
+    import anthropic
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.subscription_structured_output import (
+        SubscriptionStructuredOutputError,
+    )
+
+    credential_id = "local:7" if provider == "openai" else "local:2"
+    timeout_type = openai.APITimeoutError if provider == "openai" else anthropic.APITimeoutError
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda selected: _oauth_resolution(selected, credential_id),
+    )
+
+    def fail(**kwargs):
+        try:
+            raise timeout_type(request=httpx.Request("POST", "https://provider.invalid"))
+        except timeout_type as exc:
+            raise SubscriptionStructuredOutputError(
+                "provider_call_failed", "provider timed out"
+            ) from exc
+
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        fail,
+    )
+
+    with pytest.raises(cs.ModelExecutionTimeout) as caught:
+        cs._subscription_structured_output_if_active(
+            provider=provider,
+            model="gpt-5.4-mini" if provider == "openai" else "claude-sonnet-5",
+            system="system",
+            user="user",
+            output_name="emit_result_card",
+            output_description="Emit a card",
+            schema={"type": "object"},
+            effort="high",
+            model_timeout_s=123,
+        )
+
+    assert caught.value.effective_seconds == 123.0

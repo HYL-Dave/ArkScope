@@ -520,7 +520,7 @@ async def run_subscription_structured_output_async(
     schema: dict[str, Any],
     effort: str = "default",
     token_store: Any = None,
-    timeout_s: float = 90.0,
+    timeout_s: float,
 ) -> dict[str, Any]:
     """Execute one deadline-bound subscription result without fallback."""
     openai_oauth = provider == "openai" and auth_mode == "chatgpt_oauth"
@@ -571,7 +571,7 @@ def run_subscription_structured_output(
     schema: dict[str, Any],
     effort: str = "default",
     token_store: Any = None,
-    timeout_s: float = 90.0,
+    timeout_s: float,
 ) -> dict[str, Any]:
     """Synchronous facade for FastAPI worker-thread card routes."""
     try:

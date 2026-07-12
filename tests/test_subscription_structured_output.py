@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
 import time
@@ -54,6 +55,17 @@ def _schema():
         "properties": {"ok": {"type": "boolean"}},
         "required": ["ok"],
     }
+
+
+def test_subscription_entry_points_require_timeout():
+    from src.auth_drivers import subscription_structured_output as mod
+
+    assert inspect.signature(
+        mod.run_subscription_structured_output
+    ).parameters["timeout_s"].default is inspect.Parameter.empty
+    assert inspect.signature(
+        mod.run_subscription_structured_output_async
+    ).parameters["timeout_s"].default is inspect.Parameter.empty
 
 
 def test_chatgpt_subscription_client_disables_sdk_retries(monkeypatch):
@@ -118,6 +130,7 @@ def test_chatgpt_oauth_structured_output_uses_subscription_backend_and_closes(mo
         schema=_schema(),
         effort="high",
         token_store=token_store,
+        timeout_s=45.0,
     )
 
     assert result == {"ok": True}
@@ -125,7 +138,7 @@ def test_chatgpt_oauth_structured_output_uses_subscription_backend_and_closes(mo
     assert built == {
         "token": "fresh-oauth-token",
         "base_url": "https://chatgpt.com/backend-api/codex",
-        "timeout_s": 90.0,
+        "timeout_s": 45.0,
     }
     assert client.responses.calls == [
         {
@@ -190,6 +203,7 @@ def test_chatgpt_oauth_default_effort_is_omitted(monkeypatch):
         schema=_schema(),
         effort="default",
         token_store=object(),
+        timeout_s=45.0,
     )
 
     assert result == {"ok": True}
@@ -241,6 +255,7 @@ def test_chatgpt_oauth_waits_for_completed_function_item_arguments(monkeypatch):
         output_description="desc",
         schema=_schema(),
         token_store=object(),
+        timeout_s=45.0,
     )
 
     assert result == {"ok": True}
@@ -383,6 +398,7 @@ def test_claude_reaps_exact_owned_subprocess_after_sdk_close(monkeypatch):
         output_description="desc",
         schema=_schema(),
         token_store=store,
+        timeout_s=45.0,
     )
 
     assert result == {"ok": True}
@@ -413,6 +429,7 @@ def test_chatgpt_oauth_requires_the_named_function_call_and_still_closes(monkeyp
             output_description="desc",
             schema=_schema(),
             token_store=object(),
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "provider_call_failed"
@@ -454,6 +471,7 @@ def test_subscription_provider_error_redacts_the_oauth_token(monkeypatch):
             output_description="desc",
             schema=_schema(),
             token_store=object(),
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "provider_call_failed"
@@ -508,6 +526,7 @@ def test_chatgpt_provider_error_only_classifies_auth_rejection_as_reauth(
             output_description="desc",
             schema=_schema(),
             token_store=object(),
+            timeout_s=45.0,
         )
 
     assert caught.value.code == expected_code
@@ -535,6 +554,7 @@ def test_claude_oauth_missing_token_is_reauth_and_never_starts_sdk(monkeypatch):
             output_description="desc",
             schema=_schema(),
             token_store=store,
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "reauth_required"
@@ -571,6 +591,7 @@ def test_claude_oauth_expired_token_is_reauth_and_never_starts_sdk(monkeypatch):
             output_description="desc",
             schema=_schema(),
             token_store=store,
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "reauth_required"
@@ -610,6 +631,7 @@ def test_claude_oauth_rejects_non_subscription_auth_source(tmp_path, monkeypatch
             output_description="desc",
             schema=_schema(),
             token_store=store,
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "provider_call_failed"
@@ -641,6 +663,7 @@ def test_claude_oauth_allows_only_internal_structured_output_tool(monkeypatch):
             output_description="desc",
             schema=_schema(),
             token_store=store,
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "provider_call_failed"
@@ -676,6 +699,7 @@ def test_claude_oauth_requires_init_auth_evidence_before_result(monkeypatch):
             output_description="desc",
             schema=_schema(),
             token_store=store,
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "provider_call_failed"
@@ -697,6 +721,7 @@ def test_cross_provider_subscription_auth_is_rejected_before_token_access():
             output_description="desc",
             schema=_schema(),
             token_store=object(),
+            timeout_s=45.0,
         )
 
     assert caught.value.code == "task_auth_mode_unsupported"

@@ -501,7 +501,7 @@ git commit -m "feat: expose fixed task runtime settings"
 - Modify: `tests/test_subscription_structured_output.py`
 - Modify: `tests/test_analysis_cards_api.py`
 
-- [ ] **Step 1: Write required-timeout and four-path propagation RED tests**
+- [x] **Step 1: Write required-timeout and four-path propagation RED tests**
 
 Update all existing direct calls in `tests/test_subscription_structured_output.py` to pass an explicit task-test value such as `timeout_s=45.0` or the pre-existing test-specific bound. Then add an introspection pin:
 
@@ -520,7 +520,7 @@ def test_subscription_entry_points_require_timeout():
 
 In `tests/test_card_synthesis.py`, replace the four old `210.0` assertions with caller-supplied distinct values and prove synthesis/translation send those exact values for OpenAI and Anthropic subscription auth.
 
-- [ ] **Step 2: Write API-key one-attempt RED tests with real SDK clients and fake transports**
+- [x] **Step 2: Write API-key one-attempt RED tests with real SDK clients and fake transports**
 
 Use `httpx.MockTransport`. The handler increments a counter then raises `httpx.ReadTimeout`. Build a real sync SDK client with a dummy key and that transport, patch the corresponding `live_*_client`, and patch `resolve_live_auth` to `env_fallback`. Invoke the provider helper with `model_timeout_s=0.01` and assert the typed timeout plus exactly one transport call.
 
@@ -540,7 +540,7 @@ These are integration-style unit tests for
 `with_options(timeout=model_timeout_s, max_retries=0)`, not MagicMock
 call-shape tests.
 
-- [ ] **Step 3: Write route RED tests for resolution, envelope, and no partial writes**
+- [x] **Step 3: Write route RED tests for resolution, envelope, and no partial writes**
 
 Add:
 
@@ -567,7 +567,7 @@ Both tests monkeypatch `routes.resolve_fixed_task_runtime` to a deterministic
 `FixedTaskRuntimeSettings`; they never touch the developer's real profile DB.
 The generation timeout test also asserts `require_db_write` was not called.
 
-- [ ] **Step 4: Run the new focused tests and verify RED**
+- [x] **Step 4: Run the new focused tests and verify RED**
 
 Run:
 
@@ -580,7 +580,7 @@ pytest -q \
 
 Expected failures: fixed 210-second forwarding, adapter defaults still present, SDK retries not disabled, route timeout not resolved, and timeout detail not structured.
 
-- [ ] **Step 5: Make subscription timeout mandatory and remove stale constants**
+- [x] **Step 5: Make subscription timeout mandatory and remove stale constants**
 
 In both adapter entry points, change `timeout_s: float = 90.0` to the required keyword-only `timeout_s: float`. `src/model_task_canary.py` already passes its bounded value and must not change.
 
@@ -596,7 +596,7 @@ Delete `_SUBSCRIPTION_CARD_TIMEOUT_S` and the stale 240-second browser comment f
 
 Every call in this module passes it explicitly.
 
-- [ ] **Step 6: Add a typed provider execution timeout**
+- [x] **Step 6: Add a typed provider execution timeout**
 
 Define `ModelExecutionTimeout` in `src/card_synthesis.py` with `provider`, `model`, `effort`, and `effective_seconds`. It must not include raw provider response text. Add a `detail(task)` method returning the exact route dictionary from Step 3.
 
@@ -611,7 +611,7 @@ raises the typed error.
 
 All four provider functions add an explicit `except ModelExecutionTimeout: raise` before the legacy effort-rejection branch, guaranteeing timeout never retries with provider default effort.
 
-- [ ] **Step 7: Apply request-scoped SDK limits**
+- [x] **Step 7: Apply request-scoped SDK limits**
 
 The API-key client shape is:
 
@@ -624,7 +624,7 @@ client = live_anthropic_client().with_options(
 
 and equivalently for OpenAI. Do not mutate a shared SDK client and do not change endpoint/tool payloads. Update the two existing API-key call-shape tests so `with_options.return_value` is a distinct bounded client; assert the parent received the timeout/retry options and the existing request assertions apply to the bounded client.
 
-- [ ] **Step 8: Resolve runtime in analysis-card routes and map timeout only**
+- [x] **Step 8: Resolve runtime in analysis-card routes and map timeout only**
 
 Generation order is:
 
@@ -654,7 +654,7 @@ model_timeout_s=setting.model_timeout_s)`.
 
 Catch `ModelExecutionTimeout` before the generic provider exception and return `HTTPException(status_code=502, detail=exc.detail(task))`. Preserve all existing generic 502 behavior.
 
-- [ ] **Step 9: Update strict fakes mechanically and run a residue gate**
+- [x] **Step 9: Update strict fakes mechanically and run a residue gate**
 
 Every direct provider-helper call in `tests/test_card_synthesis.py` receives `model_timeout_s`. Every strict `synthesize_card` or `translate_card` fake that receives the new keyword either accepts/asserts that exact key or remains `**kw` compatible.
 
@@ -667,7 +667,7 @@ rg -n "_SUBSCRIPTION_CARD_TIMEOUT_S|240s deadline|timeout_s: float = 90\.0" \
 
 Expected: zero matches.
 
-- [ ] **Step 10: Run execution tests and regressions**
+- [x] **Step 10: Run execution tests and regressions**
 
 Run:
 
@@ -684,7 +684,13 @@ pytest -q \
 
 Expected: all pass. Existing task-test assertions continue to prove a maximum 45-second driver bound; Research runtime values remain unchanged.
 
-- [ ] **Step 11: Commit Task 3**
+Execution evidence: the focused card/adapter/route set passed `62`; the wider
+fixed-runtime + canary + Research regression battery passed `165`. Both real SDK
+clients used counting `httpx.MockTransport` timeouts and made exactly one
+attempt. The adapter call-site AST scan and old-constant residue scan returned
+zero findings.
+
+- [x] **Step 11: Commit Task 3**
 
 ```bash
 git add \

@@ -25,6 +25,7 @@ from src.api.routes.analysis_cards import (
 )
 from src.card_runs import CardRunStore
 from src.evidence_packet import EvidenceItem, EvidencePacket
+from src.fixed_task_runtime_config import FixedTaskRuntimeSettings
 from src.result_card import ResultCard, Traceability
 
 
@@ -51,6 +52,20 @@ def _packet() -> EvidencePacket:
 @pytest.fixture()
 def store(tmp_path):
     return CardRunStore(tmp_path / "profile_state.db")
+
+
+@pytest.fixture(autouse=True)
+def fixed_task_runtime(monkeypatch):
+    monkeypatch.setattr(
+        routes,
+        "resolve_fixed_task_runtime",
+        lambda task: FixedTaskRuntimeSettings(
+            task=task,
+            model_timeout_s=900.0,
+            source="default",
+        ),
+        raising=False,
+    )
 
 
 @pytest.fixture()
@@ -83,8 +98,9 @@ def test_translate_caches_and_returns(store, stub_generation, monkeypatch):
     rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
     calls = {"n": 0}
 
-    def fake_translate(card, *, lang="zh-Hant", model=None):
+    def fake_translate(card, *, lang="zh-Hant", model=None, model_timeout_s):
         calls["n"] += 1
+        assert model_timeout_s == 900.0
         return {**card, "conclusion": "繁中結論"}
 
     monkeypatch.setattr(routes, "translate_card", fake_translate)
@@ -106,6 +122,138 @@ def test_generate_caches_run(store, stub_generation):
     det = get_card(res["run_id"], store=store)
     assert det["card"]["conclusion"] == "constructive"
     assert det["evidence_packet"]["ticker"] == "AAPL"
+
+
+def test_generate_resolves_synthesis_timeout_before_gather_and_forwards_it(
+    store, monkeypatch
+):
+    events = []
+    captured = {}
+
+    def resolve(task):
+        events.append(("resolve", task))
+        return FixedTaskRuntimeSettings(task=task, model_timeout_s=1234, source="db")
+
+    def gather(dal, ticker, **kwargs):
+        events.append(("gather", ticker))
+        return _packet()
+
+    def synthesize(packet, **kwargs):
+        captured.update(kwargs)
+        return _card(), {"provider": "anthropic", "model": "m"}
+
+    monkeypatch.setattr(routes, "resolve_fixed_task_runtime", resolve)
+    monkeypatch.setattr(routes, "gather_evidence", gather)
+    monkeypatch.setattr(routes, "synthesize_card", synthesize)
+
+    generate_card(
+        "AAPL", GenerateBody(include_sa=False), dal=object(), store=store
+    )
+
+    assert events[:2] == [("resolve", "card_synthesis"), ("gather", "AAPL")]
+    assert captured["model_timeout_s"] == 1234.0
+
+
+def test_translate_resolves_translation_timeout_and_forwards_it(
+    store, stub_generation, monkeypatch
+):
+    rid = generate_card(
+        "AAPL", GenerateBody(include_sa=False), dal=object(), store=store
+    )["run_id"]
+    captured = {}
+    monkeypatch.setattr(
+        routes,
+        "resolve_fixed_task_runtime",
+        lambda task: FixedTaskRuntimeSettings(
+            task=task, model_timeout_s=432, source="db"
+        ),
+    )
+
+    def translate(card, **kwargs):
+        captured.update(kwargs)
+        return {**card, "conclusion": "繁中結論"}
+
+    monkeypatch.setattr(routes, "translate_card", translate)
+
+    translate_card_route(rid, TranslateBody(lang="zh-Hant"), store=store)
+
+    assert captured["lang"] == "zh-Hant"
+    assert captured["model_timeout_s"] == 432.0
+
+
+def test_generate_timeout_returns_structured_502_and_stores_no_run(
+    store, monkeypatch
+):
+    from src import card_synthesis as cs
+
+    writes = []
+    monkeypatch.setattr(routes, "gather_evidence", lambda *args, **kwargs: _packet())
+    monkeypatch.setattr(
+        routes,
+        "require_db_write",
+        lambda *args, **kwargs: writes.append((args, kwargs)),
+    )
+
+    def timeout(packet, **kwargs):
+        raise cs.ModelExecutionTimeout(
+            provider="anthropic",
+            model="claude-sonnet-5",
+            effort="max",
+            effective_seconds=900,
+        )
+
+    monkeypatch.setattr(routes, "synthesize_card", timeout)
+
+    with pytest.raises(HTTPException) as exc:
+        generate_card(
+            "AAPL", GenerateBody(include_sa=False), dal=object(), store=store
+        )
+
+    assert exc.value.status_code == 502
+    assert exc.value.detail == {
+        "code": "model_timeout",
+        "task": "card_synthesis",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "effort": "max",
+        "effective_seconds": 900.0,
+    }
+    assert writes == []
+    assert store.recent() == []
+
+
+def test_translate_timeout_returns_structured_502_and_stores_no_translation(
+    store, stub_generation, monkeypatch
+):
+    from src import card_synthesis as cs
+
+    rid = generate_card(
+        "AAPL", GenerateBody(include_sa=False), dal=object(), store=store
+    )["run_id"]
+
+    def timeout(card, **kwargs):
+        raise cs.ModelExecutionTimeout(
+            provider="openai",
+            model="gpt-5.4-mini",
+            effort="high",
+            effective_seconds=600,
+        )
+
+    monkeypatch.setattr(routes, "translate_card", timeout)
+
+    with pytest.raises(HTTPException) as exc:
+        translate_card_route(rid, TranslateBody(lang="zh-Hant"), store=store)
+
+    assert exc.value.status_code == 502
+    assert exc.value.detail == {
+        "code": "model_timeout",
+        "task": "card_translation",
+        "provider": "openai",
+        "model": "gpt-5.4-mini",
+        "effort": "high",
+        "effective_seconds": 600.0,
+    }
+    assert store.get(rid).translations is None
 
 
 def test_list_hides_archived_by_default(store, stub_generation):

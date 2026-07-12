@@ -26,12 +26,14 @@ from src.api.dependencies import get_card_store, get_dal
 from src.api.permissions import require_db_write
 from src.card_runs import CardRun, CardRunStore
 from src.card_synthesis import (
+    ModelExecutionTimeout,
     confidence_to_score,
     render_card_markdown,
     synthesize_card,
     translate_card,
 )
 from src.evidence_packet import gather_evidence
+from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.api.personalization import resolve_personalization
 from src.result_card import ResultCard
 from src.tools.data_access import DataAccessLayer
@@ -107,6 +109,7 @@ def generate_card(
     # synthesis ONLY; evidence gathering never sees profile/stance values.
     personalization_context, personalization = resolve_personalization(body.assistant_stance)
     _pctx = {"personalization_context": personalization_context} if personalization_context else {}
+    runtime = resolve_fixed_task_runtime("card_synthesis")
 
     now = _utcnow()
     sa_enabled = body.include_sa if body.include_sa is not None else get_agent_config().sa_enabled
@@ -136,8 +139,12 @@ def generate_card(
             model=model,
             question=body.question,
             horizon=body.horizon,
+            model_timeout_s=runtime.model_timeout_s,
             **_pctx,
         )
+    except ModelExecutionTimeout as exc:
+        logger.warning("Card synthesis timed out for %s: %s", ticker, exc)
+        raise HTTPException(status_code=502, detail=exc.detail("card_synthesis"))
     except Exception as exc:
         logger.warning("Card synthesis failed for %s: %s", ticker, exc)
         raise HTTPException(status_code=502, detail=f"synthesis failed: {exc}")
@@ -276,10 +283,18 @@ def translate_card_route(
     cached = (run.translations or {}).get(lang)
     if cached:
         return {"run_id": run_id, "lang": lang, "card": cached, "cached": True}
+    runtime = resolve_fixed_task_runtime("card_translation")
     # Gate BEFORE spending tokens, so a future permission engine can deny pre-LLM.
     require_db_write("card_translate", {"run_id": run_id, "lang": lang})
     try:
-        translated = translate_card(run.result_card, lang=lang)
+        translated = translate_card(
+            run.result_card,
+            lang=lang,
+            model_timeout_s=runtime.model_timeout_s,
+        )
+    except ModelExecutionTimeout as exc:
+        logger.warning("Card translate timed out for run %s: %s", run_id, exc)
+        raise HTTPException(status_code=502, detail=exc.detail("card_translation"))
     except Exception as exc:
         logger.warning("Card translate failed for run %s: %s", run_id, exc)
         raise HTTPException(status_code=502, detail=f"translate failed: {exc}")

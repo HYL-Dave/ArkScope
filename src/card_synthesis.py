@@ -15,11 +15,14 @@ model only fills the judgment fields + per-claim citations.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
+from anthropic import APITimeoutError as AnthropicAPITimeoutError
+from openai import APITimeoutError as OpenAIAPITimeoutError
 
 from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
@@ -39,9 +42,53 @@ logger = logging.getLogger(__name__)
 Provider = Literal["anthropic", "openai"]
 _TOOL_NAME = "emit_result_card"
 _MAX_TOKENS = 8192  # card JSON is small; well under the 21333 streaming threshold
-# Full cards at high/max effort need materially longer than the tiny task-test.
-# Keep this below the web client's 240s deadline, including bounded SDK cleanup.
-_SUBSCRIPTION_CARD_TIMEOUT_S = 210.0
+
+
+class ModelExecutionTimeout(RuntimeError):
+    """Provider/model execution exceeded the selected fixed-task limit."""
+
+    def __init__(
+        self,
+        *,
+        provider: Provider,
+        model: str,
+        effort: str,
+        effective_seconds: float,
+    ):
+        self.provider = provider
+        self.model = model
+        self.effort = effort
+        self.effective_seconds = float(effective_seconds)
+        super().__init__(
+            f"{provider} model execution timed out after "
+            f"{self.effective_seconds:g} seconds"
+        )
+
+    def detail(self, task: str) -> dict[str, Any]:
+        return {
+            "code": "model_timeout",
+            "task": task,
+            "provider": self.provider,
+            "model": self.model,
+            "effort": self.effort,
+            "effective_seconds": self.effective_seconds,
+        }
+
+
+def _has_timeout_cause(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    timeout_types = (
+        asyncio.TimeoutError,
+        OpenAIAPITimeoutError,
+        AnthropicAPITimeoutError,
+    )
+    while current is not None and id(current) not in seen:
+        if isinstance(current, timeout_types):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
 
 
 class _SynthClaim(BaseModel):
@@ -140,6 +187,7 @@ def _subscription_structured_output_if_active(
     output_description: str,
     schema: dict[str, Any],
     effort: str,
+    model_timeout_s: float,
 ) -> Optional[dict[str, Any]]:
     """Use the selected provider's subscription transport when OAuth is active.
 
@@ -159,19 +207,29 @@ def _subscription_structured_output_if_active(
         run_subscription_structured_output,
     )
 
-    return run_subscription_structured_output(
-        provider=provider,
-        auth_mode=auth_mode,
-        credential_id=resolution.credential_id,
-        model=model,
-        system=system,
-        user=user,
-        output_name=output_name,
-        output_description=output_description,
-        schema=schema,
-        effort=effort,
-        timeout_s=_SUBSCRIPTION_CARD_TIMEOUT_S,
-    )
+    try:
+        return run_subscription_structured_output(
+            provider=provider,
+            auth_mode=auth_mode,
+            credential_id=resolution.credential_id,
+            model=model,
+            system=system,
+            user=user,
+            output_name=output_name,
+            output_description=output_description,
+            schema=schema,
+            effort=effort,
+            timeout_s=model_timeout_s,
+        )
+    except Exception as exc:
+        if _is_subscription_structured_output_error(exc) and _has_timeout_cause(exc):
+            raise ModelExecutionTimeout(
+                provider=provider,
+                model=model,
+                effort=effort,
+                effective_seconds=model_timeout_s,
+            ) from exc
+        raise
 
 
 def _is_subscription_structured_output_error(exc: BaseException) -> bool:
@@ -208,6 +266,8 @@ def _synthesize_anthropic(
     model: str,
     effort: str = "default",
     personalization_context: str = "",
+    *,
+    model_timeout_s: float,
 ) -> tuple[CardSynthesis, dict[str, Any]]:
 
     def run_once(selected_effort: str) -> CardSynthesis:
@@ -221,6 +281,7 @@ def _synthesize_anthropic(
             output_description="Emit the structured §2 result card.",
             schema=_CARD_TOOL_SCHEMA,
             effort=selected_effort,
+            model_timeout_s=model_timeout_s,
         )
         if subscription_payload is not None:
             return CardSynthesis(**subscription_payload)
@@ -228,22 +289,33 @@ def _synthesize_anthropic(
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
         from src.auth_drivers.live_resolver import live_anthropic_client
-        client = live_anthropic_client()
-        resp = client.messages.create(
-            model=model,
-            max_tokens=_MAX_TOKENS,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-            tools=[
-                {
-                    "name": _TOOL_NAME,
-                    "description": "Emit the structured §2 result card.",
-                    "input_schema": _CARD_TOOL_SCHEMA,
-                }
-            ],
-            tool_choice={"type": "tool", "name": _TOOL_NAME},
-            **kwargs,
+        client = live_anthropic_client().with_options(
+            timeout=model_timeout_s,
+            max_retries=0,
         )
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=_MAX_TOKENS,
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_message}],
+                tools=[
+                    {
+                        "name": _TOOL_NAME,
+                        "description": "Emit the structured §2 result card.",
+                        "input_schema": _CARD_TOOL_SCHEMA,
+                    }
+                ],
+                tool_choice={"type": "tool", "name": _TOOL_NAME},
+                **kwargs,
+            )
+        except AnthropicAPITimeoutError as exc:
+            raise ModelExecutionTimeout(
+                provider="anthropic",
+                model=model,
+                effort=selected_effort,
+                effective_seconds=model_timeout_s,
+            ) from exc
         if is_refusal(resp):
             # HTTP-200 classifier refusal (Fable-class): typed failure, no
             # fallback model, never an empty-success card.
@@ -255,6 +327,8 @@ def _synthesize_anthropic(
 
     try:
         return run_once(effort), {"effort": effort}
+    except ModelExecutionTimeout:
+        raise
     except AnthropicRefusalError:
         raise  # zero-fallback contract: a refusal is never retried (MF6)
     except Exception as exc:
@@ -278,6 +352,8 @@ def _synthesize_openai(
     model: str,
     effort: str = "default",
     personalization_context: str = "",
+    *,
+    model_timeout_s: float,
 ) -> tuple[CardSynthesis, dict[str, Any]]:
 
     def run_once(selected_effort: str) -> CardSynthesis:
@@ -291,6 +367,7 @@ def _synthesize_openai(
             output_description="Emit the structured §2 result card.",
             schema=_CARD_TOOL_SCHEMA,
             effort=selected_effort,
+            model_timeout_s=model_timeout_s,
         )
         if subscription_payload is not None:
             return CardSynthesis(**subscription_payload)
@@ -298,27 +375,38 @@ def _synthesize_openai(
         if selected_effort != "default":
             kwargs["reasoning_effort"] = selected_effort
         from src.auth_drivers.live_resolver import live_openai_client
-        client = live_openai_client()
-        resp = client.chat.completions.create(
-            model=model,
-            max_completion_tokens=_MAX_TOKENS,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": _TOOL_NAME,
-                        "description": "Emit the structured §2 result card.",
-                        "parameters": _CARD_TOOL_SCHEMA,
-                    },
-                }
-            ],
-            tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
-            **kwargs,
+        client = live_openai_client().with_options(
+            timeout=model_timeout_s,
+            max_retries=0,
         )
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                max_completion_tokens=_MAX_TOKENS,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": _TOOL_NAME,
+                            "description": "Emit the structured §2 result card.",
+                            "parameters": _CARD_TOOL_SCHEMA,
+                        },
+                    }
+                ],
+                tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
+                **kwargs,
+            )
+        except OpenAIAPITimeoutError as exc:
+            raise ModelExecutionTimeout(
+                provider="openai",
+                model=model,
+                effort=selected_effort,
+                effective_seconds=model_timeout_s,
+            ) from exc
         msg = resp.choices[0].message
         tool_calls = getattr(msg, "tool_calls", None) or []
         for tc in tool_calls:
@@ -328,6 +416,8 @@ def _synthesize_openai(
 
     try:
         return run_once(effort), {"effort": effort}
+    except ModelExecutionTimeout:
+        raise
     except Exception as exc:
         if _is_subscription_structured_output_error(exc):
             raise
@@ -408,6 +498,7 @@ def synthesize_card(
     packet: EvidencePacket,
     *,
     now_iso: str,
+    model_timeout_s: float,
     provider: Provider = "anthropic",
     model: Optional[str] = None,
     question: Optional[str] = None,
@@ -427,11 +518,23 @@ def synthesize_card(
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
         effort = route.effort if route.provider == "anthropic" else "default"
-        synth, effort_meta = _synthesize_anthropic(packet, model, effort, **_pctx)
+        synth, effort_meta = _synthesize_anthropic(
+            packet,
+            model,
+            effort,
+            model_timeout_s=model_timeout_s,
+            **_pctx,
+        )
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
         effort = route.effort if route.provider == "openai" else "default"
-        synth, effort_meta = _synthesize_openai(packet, model, effort, **_pctx)
+        synth, effort_meta = _synthesize_openai(
+            packet,
+            model,
+            effort,
+            model_timeout_s=model_timeout_s,
+            **_pctx,
+        )
     else:
         raise ValueError(f"unknown provider: {provider}")
     card = _merge_to_card(
@@ -507,6 +610,7 @@ _TRANSLATABLE_FIELDS = (
 def translate_card(
     card: dict,
     *,
+    model_timeout_s: float,
     lang: str = "zh-Hant",
     provider: Optional[Provider] = None,
     model: Optional[str] = None,
@@ -559,9 +663,18 @@ def translate_card(
             target,
             effort,
             subscription_system=subscription_system,
+            model_timeout_s=model_timeout_s,
         )
     elif provider == "openai":
-        translated = _translate_openai(model, system, user, schema, target, effort)
+        translated = _translate_openai(
+            model,
+            system,
+            user,
+            schema,
+            target,
+            effort,
+            model_timeout_s=model_timeout_s,
+        )
     else:
         raise ValueError(f"unknown provider: {provider}")
 
@@ -581,6 +694,8 @@ def _translate_anthropic(
     target: str,
     effort: str = "default",
     subscription_system: Optional[str] = None,
+    *,
+    model_timeout_s: float,
 ) -> dict:
 
     def run_once(selected_effort: str) -> dict:
@@ -593,6 +708,7 @@ def _translate_anthropic(
             output_description=f"Emit the {target} translation of the given fields.",
             schema=schema,
             effort=selected_effort,
+            model_timeout_s=model_timeout_s,
         )
         if subscription_payload is not None:
             return subscription_payload
@@ -600,22 +716,33 @@ def _translate_anthropic(
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
         from src.auth_drivers.live_resolver import live_anthropic_client
-        client = live_anthropic_client()
-        resp = client.messages.create(
-            model=model,
-            max_tokens=4096,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            tools=[
-                {
-                    "name": "emit_translation",
-                    "description": f"Emit the {target} translation of the given fields.",
-                    "input_schema": schema,
-                }
-            ],
-            tool_choice={"type": "tool", "name": "emit_translation"},
-            **kwargs,
+        client = live_anthropic_client().with_options(
+            timeout=model_timeout_s,
+            max_retries=0,
         )
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                tools=[
+                    {
+                        "name": "emit_translation",
+                        "description": f"Emit the {target} translation of the given fields.",
+                        "input_schema": schema,
+                    }
+                ],
+                tool_choice={"type": "tool", "name": "emit_translation"},
+                **kwargs,
+            )
+        except AnthropicAPITimeoutError as exc:
+            raise ModelExecutionTimeout(
+                provider="anthropic",
+                model=model,
+                effort=selected_effort,
+                effective_seconds=model_timeout_s,
+            ) from exc
         if is_refusal(resp):
             raise AnthropicRefusalError(model, getattr(resp, "stop_details", None))
         for block in resp.content:
@@ -625,6 +752,8 @@ def _translate_anthropic(
 
     try:
         return run_once(effort)
+    except ModelExecutionTimeout:
+        raise
     except AnthropicRefusalError:
         raise  # zero-fallback contract: a refusal is never retried (MF6)
     except Exception as exc:
@@ -646,6 +775,8 @@ def _translate_openai(
     schema: dict,
     target: str,
     effort: str = "default",
+    *,
+    model_timeout_s: float,
 ) -> dict:
 
     def run_once(selected_effort: str) -> dict:
@@ -658,6 +789,7 @@ def _translate_openai(
             output_description=f"Emit the {target} translation of the given fields.",
             schema=schema,
             effort=selected_effort,
+            model_timeout_s=model_timeout_s,
         )
         if subscription_payload is not None:
             return subscription_payload
@@ -665,27 +797,38 @@ def _translate_openai(
         if selected_effort != "default":
             kwargs["reasoning_effort"] = selected_effort
         from src.auth_drivers.live_resolver import live_openai_client
-        client = live_openai_client()
-        resp = client.chat.completions.create(
-            model=model,
-            max_completion_tokens=4096,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "emit_translation",
-                        "description": f"Emit the {target} translation of the given fields.",
-                        "parameters": schema,
-                    },
-                }
-            ],
-            tool_choice={"type": "function", "function": {"name": "emit_translation"}},
-            **kwargs,
+        client = live_openai_client().with_options(
+            timeout=model_timeout_s,
+            max_retries=0,
         )
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                max_completion_tokens=4096,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "emit_translation",
+                            "description": f"Emit the {target} translation of the given fields.",
+                            "parameters": schema,
+                        },
+                    }
+                ],
+                tool_choice={"type": "function", "function": {"name": "emit_translation"}},
+                **kwargs,
+            )
+        except OpenAIAPITimeoutError as exc:
+            raise ModelExecutionTimeout(
+                provider="openai",
+                model=model,
+                effort=selected_effort,
+                effective_seconds=model_timeout_s,
+            ) from exc
         msg = resp.choices[0].message
         tool_calls = getattr(msg, "tool_calls", None) or []
         for tc in tool_calls:
@@ -695,6 +838,8 @@ def _translate_openai(
 
     try:
         return run_once(effort)
+    except ModelExecutionTimeout:
+        raise
     except Exception as exc:
         if _is_subscription_structured_output_error(exc):
             raise
