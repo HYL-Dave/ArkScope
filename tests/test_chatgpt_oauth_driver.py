@@ -596,6 +596,32 @@ def test_stream_refresh_401_event_carries_code(monkeypatch):
     assert len(errs) == 1 and errs[0].data.get("code") == "reauth_required"
 
 
+@pytest.mark.parametrize(
+    ("status_code", "expected_code"),
+    [(401, "reauth_required"), (404, None)],
+)
+def test_stream_backend_error_only_classifies_auth_rejection_as_reauth(
+    monkeypatch, status_code, expected_code
+):
+    class FailingResponses:
+        def create(self, **kwargs):
+            raise _ApiErr(status_code, f"backend rejected request ({status_code})")
+
+    class FailingClient:
+        responses = FailingResponses()
+
+        async def close(self):
+            return None
+
+    monkeypatch.setattr(mod, "_execution_client", lambda token: FailingClient())
+
+    events = _run(_collect(_driver().stream_llm(_req())))
+
+    errors = [event for event in events if event.type == EventType.error]
+    assert len(errors) == 1
+    assert errors[0].data.get("code") == expected_code
+
+
 def test_discover_missing_token_requires_reauth():
     # token-store dependency + credential id PRESENT, stored token absent →
     # the OAuth row is repairable ONLY by re-login.

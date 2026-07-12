@@ -28,6 +28,7 @@ from claude_agent_sdk import (
 )
 
 from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
+from src.auth_drivers.chatgpt_oauth_login import provider_error_requires_reauth
 from src.auth_drivers.chatgpt_oauth_login import refresh_if_needed
 from src.auth_drivers.chatgpt_oauth_probe import (
     CHATGPT_BACKEND_BASE_URL,
@@ -296,8 +297,13 @@ async def _openai_structured_output_async(
             f"ChatGPT subscription structured call timed out after {timeout_s:g} seconds.",
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        code = (
+            "reauth_required"
+            if provider_error_requires_reauth(exc)
+            else "provider_call_failed"
+        )
         raise SubscriptionStructuredOutputError(
-            "provider_call_failed",
+            code,
             _safe_message(exc, token),
         ) from exc
     finally:
@@ -369,7 +375,9 @@ async def _claude_structured_output_async(
             setting_sources=[],
             strict_mcp_config=True,
             permission_mode="dontAsk",
-            max_turns=1,
+            # The internal StructuredOutput tool call consumes the first turn;
+            # the terminal ResultMessage with structured_output needs a second.
+            max_turns=2,
             env={
                 **{name: "" for name in _CLAUDE_INHERITED_BILLING_ENV},
                 "CLAUDE_CODE_OAUTH_TOKEN": token,

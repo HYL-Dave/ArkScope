@@ -215,7 +215,10 @@ OAuth tests are deliberately bounded. Research uses a minimal prompt,
 Card canaries request one tiny structured object and never invoke market tools,
 research stores, or report persistence. Claude subscription cards pass
 `tools=[]`, `allowed_tools=[]`, `setting_sources=[]`, and an isolated config
-directory; ChatGPT subscription cards expose only the one output function.
+directory. They allow two Agent-SDK turns only because the internal
+`StructuredOutput` call is turn one and its terminal result is turn two;
+external tools remain disabled. ChatGPT subscription cards expose only the one
+output function.
 Any unexpected tool event is a failed canary, not permission to continue a loop.
 The UI states that OAuth tests consume subscription allowance rather than API-key
 billing. If an auth driver cannot enforce these bounds, that path reports
@@ -475,8 +478,10 @@ The implementation plan must include:
 - an exact test proving the old checkbox and duplicate manual model selector are
   gone;
 - zero-call tests for unsupported auth/task combinations;
-- bounded OAuth canary tests proving `max_turns=1`, no tools, timeout handling,
-  subscription-billing copy, and zero normal research persistence;
+- bounded OAuth canary tests proving research uses `max_turns=1`, Claude
+  structured card checks use exactly two internal SDK turns with no external
+  tools, timeout handling, subscription-billing copy, and zero normal research
+  persistence;
 - a seed-only/never-discovered test proving `model_not_visible` cannot veto an
   explicit canary;
 - new-frontend/old-sidecar compatibility tests proving provider visibility and

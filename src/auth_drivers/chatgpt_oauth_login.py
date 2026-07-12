@@ -75,6 +75,20 @@ class ChatGPTOAuthLoginError(RuntimeError):
         self.reauth_required = reauth_required
 
 
+def provider_error_requires_reauth(exc: BaseException) -> bool:
+    """Return whether a backend failure proves the OAuth login is invalid.
+
+    Permission, model, rate-limit, and transport failures are not evidence that
+    signing in again will help. OpenAI SDK authentication failures normally
+    carry HTTP 401; the type-name fallback covers compatible SDK wrappers that
+    omit the status attribute.
+    """
+    status_code = getattr(exc, "status_code", None)
+    return status_code == 401 or (
+        status_code is None and type(exc).__name__ == "AuthenticationError"
+    )
+
+
 # --- PKCE + state -------------------------------------------------------------
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")

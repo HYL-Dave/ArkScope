@@ -33,6 +33,7 @@ from src.auth_drivers.protocol import LLMRequest, LLMResponse, TokenUsage
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
 
 from .chatgpt_oauth_login import ChatGPTOAuthLoginError
+from .chatgpt_oauth_login import provider_error_requires_reauth
 from .chatgpt_oauth_login import refresh_if_needed as _refresh_login
 from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PROBE_MODEL, _model_ids, _to_dict
 from .probe_harness import redact
@@ -613,7 +614,14 @@ class OpenAIChatGPTOAuthDriver:
                 })
                 return
             except BaseException as exc:  # noqa: BLE001
-                yield AgentEvent(EventType.error, {"error": _redact_token(str(exc), token)[:500], "provider": "openai", "model": request.model})
+                payload = {
+                    "error": _redact_token(str(exc), token)[:500],
+                    "provider": "openai",
+                    "model": request.model,
+                }
+                if provider_error_requires_reauth(exc):
+                    payload["code"] = "reauth_required"
+                yield AgentEvent(EventType.error, payload)
                 return
 
             output_items = _response_output_items(response_obj) or call_items

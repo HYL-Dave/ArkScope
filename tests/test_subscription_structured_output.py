@@ -322,7 +322,9 @@ def test_claude_oauth_structured_output_uses_locked_agent_sdk_options(tmp_path, 
     assert options.setting_sources == []
     assert options.strict_mcp_config is True
     assert options.permission_mode == "dontAsk"
-    assert options.max_turns == 1
+    # StructuredOutput is an internal SDK tool call. One turn emits that call;
+    # the second delivers the terminal ResultMessage with structured_output.
+    assert options.max_turns == 2
     assert options.env["CLAUDE_CODE_OAUTH_TOKEN"] == "claude-setup-token"
     assert options.env["ANTHROPIC_API_KEY"] == ""
     assert all(options.env[name] == "" for name in mod._CLAUDE_INHERITED_BILLING_ENV)
@@ -401,6 +403,58 @@ def test_subscription_provider_error_redacts_the_oauth_token(monkeypatch):
     assert caught.value.code == "provider_call_failed"
     assert secret not in str(caught.value)
     assert "REDACTED" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_code"),
+    [(401, "reauth_required"), (404, "provider_call_failed")],
+)
+def test_chatgpt_provider_error_only_classifies_auth_rejection_as_reauth(
+    monkeypatch, status_code, expected_code
+):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    class ProviderError(Exception):
+        def __init__(self):
+            super().__init__(f"backend rejected request ({status_code})")
+            self.status_code = status_code
+
+    class FailingResponses:
+        def create(self, **kwargs):
+            raise ProviderError()
+
+    class FailingClient:
+        responses = FailingResponses()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(
+        mod,
+        "_openai_client",
+        lambda token, base_url, timeout_s: FailingClient(),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_refresh_chatgpt_token",
+        lambda **kwargs: StoredTokenRecord(access_token="fresh-oauth-token"),
+    )
+
+    with pytest.raises(mod.SubscriptionStructuredOutputError) as caught:
+        mod.run_subscription_structured_output(
+            provider="openai",
+            auth_mode="chatgpt_oauth",
+            credential_id="local:7",
+            model="gpt-5.4-mini",
+            system="sys",
+            user="user",
+            output_name="emit_check",
+            output_description="desc",
+            schema=_schema(),
+            token_store=object(),
+        )
+
+    assert caught.value.code == expected_code
 
 
 def test_claude_oauth_missing_token_is_reauth_and_never_starts_sdk(monkeypatch):
