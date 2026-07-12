@@ -117,6 +117,21 @@ describe("BoundedProgress", () => {
     expect(host!.querySelector("button")).toBeNull();
   });
 
+  it("does_not_claim_terminal_work_can_still_be_cancelled", async () => {
+    await mount(
+      <BoundedProgress
+        {...baseProps}
+        status="succeeded"
+        canCancel
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(host!.textContent).toContain("無法從此處取消");
+    expect(host!.textContent).not.toContain("可從此處取消");
+    expect(host!.querySelector("button")).toBeNull();
+  });
+
   it("renders_a_typed_terminal_failure_without_a_progress_bar", async () => {
     await mount(
       <BoundedProgress

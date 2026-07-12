@@ -45,6 +45,7 @@ export function BoundedProgress({
     && stageBoundMs != null
     && stageElapsedMs >= stageBoundMs;
   const phase = awaitingConfirmation ? "awaiting-confirmation" : status;
+  const cancellationAvailable = status === "running" && canCancel && Boolean(onCancel);
   const announcement = awaitingConfirmation
     ? "已達上界，等待伺服器確認"
     : status === "succeeded"
@@ -82,10 +83,10 @@ export function BoundedProgress({
       ) : null}
       <div className="ui-bounded-progress-meta">
         <span>{continuesAfterNavigation ? "離開頁面後繼續" : "離開頁面後不保證追蹤"}</span>
-        <span>{canCancel && onCancel ? "可從此處取消" : "無法從此處取消"}</span>
+        <span>{cancellationAvailable ? "可從此處取消" : "無法從此處取消"}</span>
         <span>結果：{resultLabel}</span>
       </div>
-      {status === "running" && canCancel && onCancel ? (
+      {cancellationAvailable ? (
         <Button tone="danger" size="compact" icon={<Square size={13} />} onClick={onCancel}>
           停止
         </Button>
