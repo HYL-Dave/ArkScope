@@ -2,13 +2,74 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: REVIEW-CLEARED — READY TO IMPLEMENT, NOT STARTED.**
+> **Status: IMPLEMENTED FOR REVIEW — NOT MERGED. Reviewer canonical A/B remains open because the Codex environment reproduces the known single-process TestClient/lifespan hang; the file-isolated fallback is strictly equal.**
 
 **Goal:** Repair the bounded Settings overlap and stale-copy defects, add truthful scheduler progress, and rename the Investor Profile risk-appetite label without changing backend behavior or pre-implementing later P2.8 slices.
 
 **Architecture:** Keep all transport and persistence contracts intact. Add one Data Sources-only progress component and one pure domain-state mapper, wire them into the existing `Settings.tsx` surface, and stabilize the existing tables with explicit scroll owners and reviewed widths rather than migrating them to `DataTable`. Remove two migration-era News controls from rendering while leaving their API/profile/env compatibility paths untouched.
 
 **Tech Stack:** React 18, TypeScript 5.5, Vitest/jsdom, existing Slice 1 UI primitives, CSS, Vite.
+
+## Implementation Evidence (2026-07-13)
+
+Implementation branch: `codex/p2-8-settings-stabilization`, based on
+`332a92b`; behavioral comparison authority remains plan base `554e94b`.
+
+### Task commits and RED evidence
+
+- Task 1 — `c32524b feat: add truthful source run progress`: RED because
+  `SourceRunProgress` did not exist and the four known/indeterminate progress
+  contracts could not import or render.
+- Task 2 — `87e5490 feat: map data source states to shared status semantics`:
+  RED because the pure Data Sources state mapper did not exist, including the
+  required disabled/skip neutrality and no-`interrupted` contract.
+- Task 3 — `96e050d feat: stabilize data source run status`: RED because the
+  Settings schedule still rendered the old one-line progress/source-badge
+  shape and lacked the new status/progress selectors.
+- Task 4 — `0f940f3 fix: contain wide settings data tables`: RED because the
+  five owner classes/minimum table widths were absent and long content had no
+  explicit horizontal-scroll ownership.
+- Task 5 — `4a44ce7 fix: replace migration-era settings copy`: RED because the
+  two vestigial News controls and scoped migration/storage narration still
+  rendered. The JSX test fixture was corrected to the repository's existing
+  `React.createElement` harness before accepting RED.
+- Task 6 — `113e5fd fix: rename investor risk appetite label`: RED because the
+  production Investor Profile and mismatch labels still exposed
+  `風險胃納`.
+
+### Closed gates
+
+- Focused frontend: `9` owner files / `62` tests passed.
+- Full frontend: `41` files / `365` tests passed, exactly `+3` files / `+18`
+  tests over the `38 / 347` baseline. Typecheck and production build passed;
+  only the existing Vite chunk-size warning remains.
+- Backend/API byte boundary against `554e94b` is empty for
+  `apps/arkscope-web/src/api.ts`, `src`, `tests`, and `data_sources`.
+- Static semantic gates are clean: no removed News handlers in Settings, no
+  rendered `source_badges`, no polling `aria-live`, no synthesized
+  `interrupted`, and no added media query. Both compatibility API exports
+  remain.
+- No-PG smoke passed all `24` checks with `ok: true` and `pg_attempts: []`.
+- Browser gate passed at `1440x900`, `1024x768`, `961x768`, `959x768`, and
+  `390x844`: no page overflow or progress/detail overlap; five table scroll
+  owners remained usable; `17 / 149 · 11%`, indeterminate, disabled schedule,
+  provenance, and copy contracts rendered correctly. Evidence is under
+  `/tmp/arkscope-settings-stabilization-<viewport>*.png`. Temporary sidecar and
+  Vite processes were stopped after capture.
+
+### Open reviewer gate
+
+Canonical single-process pytest did not complete in this Codex environment:
+base hung for more than eight minutes in the existing FastAPI
+`TestClient`/lifespan family and was terminated; no canonical pass is claimed.
+As bounded fallback, virgin base/head archives were run file-isolated under
+identical bare-home, scheduler-disabled, credential-scrubbed conditions. Both
+collected `4185` nodes across `216` files; the same four files timed out
+(`test_agents.py`, `test_api.py`, `test_monitor.py`,
+`test_signal_factors_p1.py`), and the remaining `3995` tests were exactly equal:
+`3894 passed / 27 failed / 1 error / 73 skipped / 20 warnings`. Problem sets,
+timeout sets, totals, and normalized per-file results are all equal. Reviewer
+canonical A/B is still required before merge.
 
 ---
 
@@ -1559,7 +1620,7 @@ git commit -m "fix: rename investor risk appetite label"
 - Modify: `docs/superpowers/plans/2026-07-12-p2-8-settings-stabilization.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Run every focused owner suite**
+- [x] **Step 1: Run every focused owner suite**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
@@ -1576,7 +1637,7 @@ npm test --workspace apps/arkscope-web -- \
 
 Expected: all focused tests pass.
 
-- [ ] **Step 2: Run full frontend gates and reconcile exact accounting**
+- [x] **Step 2: Run full frontend gates and reconcile exact accounting**
 
 ```bash
 npm test --workspace apps/arkscope-web
@@ -1595,7 +1656,7 @@ Expected:
 If the count is not exactly `+18 / -0` from the `38 / 347` baseline, collect
 base/head test names and reconcile before continuing.
 
-- [ ] **Step 3: Run static scope and semantic ratchets**
+- [x] **Step 3: Run static scope and semantic ratchets**
 
 ```bash
 git diff --exit-code 554e94b -- apps/arkscope-web/src/api.ts src tests data_sources
@@ -1624,7 +1685,7 @@ rg -n "export function setUseLocalNews|export function setNormalizedNewsWrites" 
 
 Expected: two exports found.
 
-- [ ] **Step 4: Run no-PG/fresh-start smoke**
+- [x] **Step 4: Run no-PG/fresh-start smoke**
 
 ```bash
 python src/smoke/pg_unreachable_e2e.py
@@ -1632,7 +1693,7 @@ python src/smoke/pg_unreachable_e2e.py
 
 Expected: `ok: true`, all checks pass, and `pg_attempts: []`.
 
-- [ ] **Step 5: Run browser checks with long-content and real-progress fixtures**
+- [x] **Step 5: Run browser checks with long-content and real-progress fixtures**
 
 Start one scheduler-disabled sidecar against a disposable profile DB:
 
@@ -1692,6 +1753,11 @@ desktop app from the implementation worktree.
 
 - [ ] **Step 6: Run canonical backend A/B**
 
+Codex-environment attempt reproduced the known single-process
+`TestClient`/lifespan hang. The file-isolated virgin fallback is strictly equal
+as recorded in the implementation evidence above; reviewer canonical A/B is
+the remaining merge gate.
+
 Compare virgin archives of base `554e94b` and final tip under identical
 environment isolation. Acceptance:
 
@@ -1703,7 +1769,7 @@ environment isolation. Acceptance:
 Because this is frontend-only, any backend delta is a finding, not an accepted
 side effect.
 
-- [ ] **Step 7: Record evidence and mark implementation review-ready**
+- [x] **Step 7: Record evidence and mark implementation review-ready**
 
 In this plan header append:
 
@@ -1727,7 +1793,7 @@ Insert a newest-first Priority Map decision-log entry stating that the bounded
 stabilization is implementation-review-ready and Portfolio 1.1 remains next
 only after merge. Do not mark the design spec implemented or merged yet.
 
-- [ ] **Step 8: Commit the review-ready ledger**
+- [x] **Step 8: Commit the review-ready ledger**
 
 ```bash
 git add docs/superpowers/plans/2026-07-12-p2-8-settings-stabilization.md \

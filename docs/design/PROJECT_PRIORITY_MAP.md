@@ -210,10 +210,18 @@ therefore defaults to defer until the hypothesis gate exists.
   **Slice 1 UI primitives is MERGED / ALL GATES CLOSED 2026-07-12 through
   `3449e32`** (`docs/superpowers/plans/2026-07-12-p2-8-slice-1-ui-primitives.md`):
   the primitive foundation, Holdings migration, and Investor Profile
-  presentation repair are on `master`. A bounded Settings stabilization
-  design and implementation plan are review-cleared
-  at `docs/superpowers/plans/2026-07-12-p2-8-settings-stabilization.md`;
-  Slice 2 shell work remains not started.
+  presentation repair are on `master`. The bounded Settings stabilization is
+  **IMPLEMENTED FOR REVIEW / NOT MERGED** on
+  `codex/p2-8-settings-stabilization` at
+  `docs/superpowers/plans/2026-07-12-p2-8-settings-stabilization.md`: frontend
+  accounting is exactly `41 files / 365 tests` (`+3 / +18`), focused suites,
+  typecheck/build, static boundaries, no-PG smoke, and five-viewport browser
+  gates are closed. This Codex environment reproduced the known canonical
+  single-process `TestClient` hang; a file-isolated virgin fallback is strictly
+  equal (`4185` collected, identical `3894/27/1/73/20` completed counters and
+  `4=4` timeout files), but reviewer canonical A/B remains the merge gate.
+  Portfolio 1.1 is promoted only after that merge; Slice 2 shell work remains
+  not started.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -399,6 +407,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-13 (P2.8 bounded Settings stabilization IMPLEMENTED FOR REVIEW — canonical reviewer A/B pending)**: Branch `codex/p2-8-settings-stabilization` completes the authorized frontend-only repair in six RED-first commits: truthful real/indeterminate scheduler progress; pure Data Sources common-state mapping without synthesized `interrupted`; disabled provider/schedule neutral text and durable-history separation; five explicit wide-table scroll owners; removal of rendered source badges, two vestigial News toggles, and migration/storage narration while preserving API/profile/env compatibility; and `風險胃納` -> `風險意願` with schema/prompt behavior unchanged. Gates closed at `9 files / 62` focused tests, `41 files / 365` full frontend tests (exact `+18/-0`), typecheck/build, backend/API byte boundary, static semantic ratchets, no-PG `24/24` with `pg_attempts:[]`, and real-Chrome 1440/1024/961/959/390 checks with no overlap or page overflow. Canonical single-process base pytest reproduced the known FastAPI `TestClient`/lifespan hang in this Codex environment and no canonical pass is claimed. A credential-scrubbed virgin file-isolated fallback is strictly equal base/head: `4185=4185` collected, `3894 passed / 27 failed / 1 error / 73 skipped / 20 warnings` on both completed subsets, identical problem sets and normalized per-file results, and identical four timeout files (`test_agents.py`, `test_api.py`, `test_monitor.py`, `test_signal_factors_p1.py`). Stop for implementation review plus reviewer canonical A/B; do not merge yet. Sequence remains stabilization merge -> Portfolio 1.1 -> P2.8 Slice 2.
 
 - **2026-07-13 (P2.8 bounded Settings stabilization PLAN REVIEW-CLEARED — implementation authorized)**: Plan review found one real spec contradiction: the draft mapped provider-disabled and generic scheduler-skip states to `interrupted`, while the approved surface spec explicitly forbids synthesizing that state and the canonical meaning is cancelled/interrupted work. Corrected contract: disabled provider/schedule = muted domain text; duplicate already-running skip = `blocked`; other real skip families (Gateway busy, writer-lock busy, pending manual continue) remain muted domain text. Skip presentation and durable history now have separate pure mappings, so a transient skip cannot overwrite the prior durable outcome. The copy-test observation was partly inaccurate (`本地市場資料庫` really is the current heading), but coverage was incomplete because `本地市場庫` is a separate live label; scoped RED assertions now pin both plus all authored migration strings across the four enabled owner functions while preserving `config/.env` provenance and excluding App Records/compatibility code. Test accounting remains `+18/-0`; Task 0 is authorized.
 
