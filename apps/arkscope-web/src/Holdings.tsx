@@ -448,7 +448,11 @@ export function HoldingsView() {
               ariaLabel="IBKR 同步預覽"
               rows={preview.changes}
               columns={previewColumns}
-              rowKey={(change) => `${change.kind}-${change.broker_con_id ?? change.symbol}`}
+              rowKey={(change) => [
+                change.broker_account_id ?? change.account_id ?? "unscoped-account",
+                change.kind,
+                change.broker_con_id ?? change.symbol,
+              ].join("-")}
               rowLabel={(change) => change.symbol}
               emptyText="沒有差異"
             />

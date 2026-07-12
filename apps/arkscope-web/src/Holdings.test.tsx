@@ -21,6 +21,7 @@ afterEach(() => {
   host?.remove();
   host = null;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const snapshot = (over: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot => ({
@@ -184,6 +185,7 @@ describe("HoldingsView", () => {
 
   it("shows ibkr preview as review before applying", async () => {
     const previewResponse = deferred<PortfolioSyncPreview>();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     stubFetch((url) => {
       if (url.endsWith("/portfolio/ibkr/preview")) {
         return previewResponse.promise;
@@ -202,6 +204,9 @@ describe("HoldingsView", () => {
       previewResponse.resolve({
           changes: [{
             kind: "update",
+            account_id: 1,
+            broker_account_id: "DU111",
+            broker_con_id: "1001",
             symbol: "MSFT",
             quantity: 1,
             before: {
@@ -214,6 +219,23 @@ describe("HoldingsView", () => {
               market_value: 1250,
               unrealized_pnl: -25.5,
             },
+          }, {
+            kind: "update",
+            account_id: 2,
+            broker_account_id: "DU222",
+            broker_con_id: "1001",
+            symbol: "MSFT",
+            quantity: 2,
+            before: {
+              avg_cost: 200,
+              market_value: 2200,
+              unrealized_pnl: 50,
+            },
+            after: {
+              avg_cost: 210.5,
+              market_value: 2250,
+              unrealized_pnl: 75,
+            },
           }],
           applies: false,
       });
@@ -222,6 +244,16 @@ describe("HoldingsView", () => {
     await flush();
 
     expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("待套用變更");
+    const previewTable = host!.querySelector('table[aria-label="IBKR 同步預覽"]')!;
+    expect(previewTable.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(Array.from(previewTable.querySelectorAll("tbody tr")).map((row) => row.textContent))
+      .toEqual([
+        expect.stringContaining("90 → 100.25"),
+        expect.stringContaining("200 → 210.5"),
+      ]);
+    expect(consoleError.mock.calls.flat().join(" ")).not.toContain("same key");
+    expect(host!.textContent).not.toContain("DU111");
+    expect(host!.textContent).not.toContain("DU222");
     expect(host!.textContent).toContain("MSFT");
     expect(host!.textContent).toContain("套用同步");
     expect(host!.textContent).toContain("尚未寫入本地持倉");
@@ -229,6 +261,8 @@ describe("HoldingsView", () => {
     expect(host!.textContent).toContain("90 → 100.25");
     expect(host!.textContent).toContain("1,200 → 1,250");
     expect(host!.textContent).toContain("-50 → -25.5");
+    expect(host!.textContent).toContain("2,200 → 2,250");
+    expect(host!.textContent).toContain("50 → 75");
   });
 
   it("clears preview and shows persisted positions after applying", async () => {
@@ -573,7 +607,7 @@ describe("HoldingsView", () => {
 
     expect(host!.textContent).toContain("AAPL");
     await openRowActions("AAPL");
-    const menu = host!.querySelector('[role="menu"]');
+    const menu = document.querySelector('[role="menu"]');
     expect(menu?.textContent).toContain("編輯");
     expect(menu?.textContent).not.toContain("關閉");
   });

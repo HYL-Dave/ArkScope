@@ -117,16 +117,33 @@ describe("DataTable", () => {
     });
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(host!.querySelector('[role="menu"]')?.getAttribute("data-placement")).toBe("up");
-    const menuItems = host!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu.getAttribute("data-placement")).toBe("up");
+    expect(menu.style.position).toBe("fixed");
+    expect(menu.style.top).toBe("376px");
+    const menuItems = document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
     expect(Array.from(menuItems).map((item) => item.textContent)).toEqual(["編輯", "關閉"]);
+    await act(async () => {
+      menuItems[1].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+    expect(document.querySelector('[role="menu"]')).toBe(menu);
     await act(async () => {
       menuItems[1].click();
     });
     expect(onClose).toHaveBeenCalledWith(rows[0]);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onEdit).not.toHaveBeenCalled();
-    expect(host!.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+
+    await act(async () => {
+      trigger.click();
+    });
+    await act(async () => {
+      document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("escape_closes_the_row_menu_and_restores_its_trigger", async () => {
@@ -137,13 +154,13 @@ describe("DataTable", () => {
     await act(async () => {
       trigger.click();
     });
-    host!.querySelector<HTMLButtonElement>('[role="menuitem"]')!.focus();
+    document.querySelector<HTMLButtonElement>('[role="menuitem"]')!.focus();
 
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     });
 
-    expect(host!.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(trigger);
   });

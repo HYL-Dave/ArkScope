@@ -162,8 +162,7 @@
 .ui-data-table-action-head, .ui-data-table-actions { width: 1%; text-align: right; white-space: nowrap; }
 .ui-data-table-expanded > td { background: var(--panel2); }
 .ui-row-actions { position: relative; display: inline-flex; }
-.ui-row-action-menu { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 132px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); }
-.ui-row-action-menu[data-placement="up"] { top: auto; bottom: calc(100% + 4px); }
+.ui-row-action-menu { position: fixed; z-index: 20; min-width: 132px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); }
 .ui-row-action-menu button { width: 100%; display: block; padding: 6px 8px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--fg); text-align: left; font: inherit; cursor: pointer; }
 .ui-row-action-menu button:hover:not(:disabled), .ui-row-action-menu button:focus-visible { background: var(--panel2); outline: none; }
 .ui-row-action-menu button.danger { color: var(--bad); }

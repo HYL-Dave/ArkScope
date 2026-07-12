@@ -1,5 +1,6 @@
 import {
   Fragment,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -7,6 +8,7 @@ import {
   type Key,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 
 import { IconButton } from "./Button";
@@ -38,28 +40,58 @@ function RowActionMenu<Row>({
 }) {
   const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<"up" | "down">("down");
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useLayoutEffect(() => {
-    if (!open || !menuRef.current || !triggerRef.current) return;
+  const positionMenu = useCallback(() => {
+    if (!menuRef.current || !triggerRef.current) return;
     const menu = menuRef.current.getBoundingClientRect();
     const trigger = triggerRef.current.getBoundingClientRect();
-    setPlacement(
-      menu.bottom > window.innerHeight && trigger.top >= menu.height ? "up" : "down",
-    );
-  }, [open]);
+    const nextPlacement = trigger.bottom + 4 + menu.height > window.innerHeight
+      && trigger.top >= menu.height
+      ? "up"
+      : "down";
+    const unclampedTop = nextPlacement === "up"
+      ? trigger.top - menu.height - 4
+      : trigger.bottom + 4;
+    const maxLeft = Math.max(0, window.innerWidth - menu.width);
+    setPlacement(nextPlacement);
+    setMenuPosition({
+      top: Math.max(0, Math.min(unclampedTop, window.innerHeight - menu.height)),
+      left: Math.max(0, Math.min(trigger.right - menu.width, maxLeft)),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    positionMenu();
+  }, [open, positionMenu]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("resize", positionMenu);
+    window.addEventListener("scroll", positionMenu, true);
+    return () => {
+      window.removeEventListener("resize", positionMenu);
+      window.removeEventListener("scroll", positionMenu, true);
+    };
+  }, [open, positionMenu]);
 
   useEffect(() => {
     if (!open) return;
     const onPointer = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+      setMenuPosition(null);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.key !== "Escape") return;
       event.preventDefault();
       setOpen(false);
+      setMenuPosition(null);
       triggerRef.current?.focus();
     };
     document.addEventListener("mousedown", onPointer);
@@ -69,6 +101,39 @@ function RowActionMenu<Row>({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  const menu = open ? createPortal(
+    <div
+      ref={menuRef}
+      className="ui-row-action-menu"
+      role="menu"
+      data-placement={placement}
+      style={{
+        position: "fixed",
+        top: menuPosition?.top ?? 0,
+        left: menuPosition?.left ?? 0,
+        visibility: menuPosition ? "visible" : "hidden",
+      }}
+    >
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          role="menuitem"
+          className={action.tone === "danger" ? "danger" : ""}
+          disabled={action.disabled}
+          onClick={() => {
+            setOpen(false);
+            setMenuPosition(null);
+            if (triggerRef.current) action.onSelect(row, triggerRef.current);
+          }}
+        >
+          {action.label}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  ) : null;
 
   return (
     <div className="ui-row-actions" ref={rootRef}>
@@ -80,32 +145,12 @@ function RowActionMenu<Row>({
         icon={<MoreHorizontal size={17} />}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setMenuPosition(null);
+          setOpen((value) => !value);
+        }}
       />
-      {open ? (
-        <div
-          ref={menuRef}
-          className="ui-row-action-menu"
-          role="menu"
-          data-placement={placement}
-        >
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              role="menuitem"
-              className={action.tone === "danger" ? "danger" : ""}
-              disabled={action.disabled}
-              onClick={() => {
-                setOpen(false);
-                if (triggerRef.current) action.onSelect(row, triggerRef.current);
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {menu}
     </div>
   );
 }
