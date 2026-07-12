@@ -70,10 +70,16 @@ function RowActionMenu<Row>({
   useLayoutEffect(() => {
     if (!open) return;
     positionMenu();
+  }, [open, positionMenu]);
+
+  const menuVisible = menuPosition !== null;
+
+  useLayoutEffect(() => {
+    if (!open || !menuVisible) return;
     menuRef.current
       ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
       ?.focus();
-  }, [open, positionMenu]);
+  }, [menuVisible, open]);
 
   useEffect(() => {
     if (!open) return;

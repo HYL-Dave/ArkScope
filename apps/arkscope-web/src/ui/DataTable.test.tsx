@@ -166,6 +166,14 @@ describe("DataTable", () => {
   });
 
   it("keeps_only_one_row_action_menu_open_and_focuses_the_new_menu", async () => {
+    const visibilityAtFocus: string[] = [];
+    const recordMenuFocus = (event: FocusEvent) => {
+      const item = event.target as HTMLElement;
+      if (item.getAttribute("role") === "menuitem") {
+        visibilityAtFocus.push(item.closest<HTMLElement>('[role="menu"]')?.style.visibility ?? "");
+      }
+    };
+    document.addEventListener("focusin", recordMenuFocus);
     await mount(table({
       rows: [
         { id: 1, symbol: "NVDA", closed: false },
@@ -185,6 +193,8 @@ describe("DataTable", () => {
     expect(first.getAttribute("aria-expanded")).toBe("false");
     expect(second.getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement?.textContent).toContain("編輯");
+    expect(visibilityAtFocus).toEqual(["visible", "visible"]);
+    document.removeEventListener("focusin", recordMenuFocus);
   });
 
   it("renders_an_inline_expansion_directly_after_its_owner_row", async () => {
