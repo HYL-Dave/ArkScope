@@ -30,6 +30,14 @@ V1 manages model-execution limits for:
 The schema and API are task-keyed so later fixed tasks such as note assistance or
 summary generation can join without another storage redesign.
 
+Fixed-task membership has one code-reviewed authority,
+`FIXED_TASK_RUNTIME_TASKS`. Its members must be existing model-routing `TaskId`
+values; V1 contains `card_synthesis` and `card_translation`. Store validation,
+route validation, environment-key mapping, and Settings fields derive from this
+registry rather than maintaining independent task lists. `TaskId` remains the
+authority for the shared identifier vocabulary; the fixed-task registry owns
+which of those identifiers receive runtime settings.
+
 AI Research is explicitly out of scope. It continues to use
 `research_runtime_config.session_timeout_s`, max turns, and per-tool timeout.
 Task-test canaries and SDK subprocess cleanup are also out of scope for user
@@ -63,9 +71,16 @@ cleanup. The UI labels it **模型執行上限** rather than a generic request t
 The effective value applies to both API-key and subscription execution:
 
 - subscription structured-output calls receive the effective deadline;
-- OpenAI and Anthropic API-key requests receive the equivalent per-request SDK
-  timeout;
+- OpenAI and Anthropic API-key requests use a request-scoped client clone with
+  `timeout=model_timeout_s` and `max_retries=0` (for example,
+  `client.with_options(...)`), so the configured value is a true execution
+  bound rather than a per-attempt allowance multiplied by SDK retries;
 - unsupported auth modes remain fail-closed.
+
+An immediate provider rejection of an effort value may still use the existing
+compatibility retry with the same model and billing path. It is not a timeout
+retry and does not authorize SDK transport retries or a second full timeout
+window.
 
 ### 3.3 One server authority, derived client wait
 
@@ -106,6 +121,7 @@ default. Initial environment keys are:
 
 Environment values are operator overrides, not imported into the DB. Invalid env
 values are ignored with a surfaced warning; an invalid DB write is rejected.
+There is intentionally no YAML resolution layer for fixed-task limits.
 
 ## 5. API Contract
 
@@ -137,6 +153,12 @@ For card generation:
 
 Translation follows the same flow for `card_translation`. A failed translation
 does not populate the translation cache.
+
+The subscription structured-output adapter's synchronous and asynchronous
+entry points require `timeout_s` as a keyword-only argument with no default.
+Every production caller must therefore choose an explicit bound; the current
+90-second default is removed rather than retained as a silent fallback for new
+callers.
 
 Task-test continues to use its short dedicated bound and must not inherit the
 production task timeout. It tests connectivity and compatibility, not worst-case
@@ -181,11 +203,19 @@ The implementation plan must include:
   errors;
 - synthesis and translation tests proving the resolved timeout reaches all four
   API-key/subscription provider paths;
+- API-key timeout tests using counting fake transports to prove OpenAI and
+  Anthropic make exactly one attempt and receive `max_retries=0` together with
+  the resolved timeout;
+- adapter signature/call-site tests proving subscription `timeout_s` is
+  required and every production caller supplies it explicitly;
 - regressions proving task-test deadlines and AI Research runtime are unchanged;
 - timeout tests proving no partial card/translation persistence;
 - frontend tests for rendering, save/reset, source badges, validation, and the
   derived `model_timeout_s + 60s` request budget;
 - subprocess cleanup regression and host-level zero-zombie smoke;
+- a residual-source gate removing `_SUBSCRIPTION_CARD_TIMEOUT_S` and its stale
+  claim that the web client has a 240-second deadline; the browser wait becomes
+  derived exclusively from the effective backend timeout plus 60 seconds;
 - frontend full suite/typecheck/build, no-PG smoke, and canonical full A/B.
 
 ## 10. Non-Goals
