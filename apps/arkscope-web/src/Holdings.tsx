@@ -579,6 +579,7 @@ function PositionsTable({
     {
       id: "status",
       header: "Status",
+      className: "ui-data-table-status",
       render: (position) => position.closed_at
         ? <span className="muted tiny">已關閉</span>
         : position.broker === "manual"

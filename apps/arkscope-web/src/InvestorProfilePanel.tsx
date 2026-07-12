@@ -228,7 +228,7 @@ export function InvestorProfilePanel() {
         分析重點;證據蒐集與反方論點完全不受影響。
       </p>
 
-      <label>
+      <label className="ip-toggle">
         <input
           type="checkbox"
           checked={form.enabled}
