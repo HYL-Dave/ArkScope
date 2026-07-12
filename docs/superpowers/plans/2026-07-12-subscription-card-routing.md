@@ -2,8 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: IMPLEMENTED FOR REVIEW, 2026-07-12.** Automated gates are green;
-> the real ChatGPT/Claude subscription card + translation gate remains pending.
+> **Status: LIVE COMPLETE, 2026-07-12; FF MERGE APPROVED.** Automated,
+> reviewer, and real ChatGPT/Claude subscription card + translation gates are
+> green. The fixed-task runtime follow-up removed the temporary 210-second
+> production bound before merge.
 
 **Goal:** Make AI card generation and card translation consume the active selected provider credential, including ChatGPT and Claude subscription allowance, without silent billing fallback.
 
@@ -88,9 +90,9 @@
 - [x] **Step 2: Run frontend Models tests and typecheck:** `npm --workspace apps/arkscope-web test -- --run ModelRoutingSection.test.ts modelRoutingUx.test.ts` and `npm --workspace apps/arkscope-web run typecheck`.
 - [x] **Step 3: Run production build and no-PG smoke:** `npm --workspace apps/arkscope-web run build` and `python src/smoke/pg_unreachable_e2e.py`.
 - [x] **Step 4: Run regression tests for OAuth lifecycle and both subscription drivers.**
-- [ ] **Step 5: Live gate on the branch sidecar before merge:** stop the desktop/master sidecar, start this branch against the real profile DB, then generate one ChatGPT OAuth `gpt-5.4-mini` card and translate it; with Claude OAuth active, run one low-cost supported model card/translation. Confirm the task-test and real task both consume subscription allowance, no API key is touched, and an unsupported model fails without fallback. Merge only after this gate and review pass; restart the desktop app once after merge.
+- [x] **Step 5: Live gate on the branch sidecar before merge:** stop the desktop/master sidecar, start this branch against the real profile DB, then generate one ChatGPT OAuth `gpt-5.4-mini` card and translate it; with Claude OAuth active, run one low-cost supported model card/translation. Confirm the task-test and real task both consume subscription allowance, no API key is touched, and an unsupported model fails without fallback. Merge only after this gate and review pass; restart the desktop app once after merge.
 - [x] **Step 6: Mark this plan `IMPLEMENTED FOR REVIEW` and add a newest-first map entry with automated evidence.**
-- [ ] **Step 7: After the live gate, mark `LIVE COMPLETE` and append the live evidence.**
+- [x] **Step 7: After the live gate, mark `LIVE COMPLETE` and append the live evidence.**
 
 ### Execution ledger
 
@@ -107,6 +109,8 @@
 - One test-only `asyncio.to_thread()` experiment hung after the worker returned; faulthandler showed the short-lived loop blocked in `select()`. The final canary directly awaits the bounded async adapter in the sync route's single `asyncio.run()` loop; no second provider executor exists.
 - Automated evidence: focused backend 132 passed; subscription-driver adjacency 166 passed; frontend 30 files/284 tests; TypeScript typecheck and production build passed; no-PG smoke 24/24 with `pg_attempts: []`.
 - Full-suite limitation is recorded rather than overstated: the warmed branch run reached the repository's known long-hang family. Its first two data-dependent failures (`test_execute_get_ticker_news` and `test_execute_get_price_change`) were then run against a detached `c7256c8` base worktree with an empty `data/` directory and failed identically, proving those two failures predate this slice. A canonical full A/B remains a review gate.
+- Reviewer canonical A/B for the fixed-runtime final stack passed with identical failure sets `30=30`, passed `4042→4074` (`+32` exactly), and unchanged skip/warning/error counters. Fresh closeout gates repeated `232` focused backend tests, `296` frontend tests, typecheck/build, and no-PG `24/24` with `pg_attempts:[]`.
+- Final one-sidecar transport proof closed both providers. Claude Sonnet 5 `max` completed the real MU card and `zh-Hant` translation under independently saved 900-second DB bounds, with no managed child left behind. ChatGPT OAuth `gpt-5.4-mini/low` then generated AAPL `run_id=7` and wrote its first `zh-Hant` translation (`cached=false`) without API-key, provider, model, or effort fallback. The user's Sonnet 5 `max` routes were restored after the gate.
 
 ## Stop Conditions
 

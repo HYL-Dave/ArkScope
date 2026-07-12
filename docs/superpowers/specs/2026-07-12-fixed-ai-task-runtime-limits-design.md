@@ -1,6 +1,8 @@
 # Fixed AI Task Runtime Limits Design
 
-> **Status: ADOPTED DESIGN, 2026-07-12; implementation plan pending.**
+> **Status: LIVE COMPLETE, 2026-07-12.** Implemented on
+> `codex/card-oauth-routing`; reviewer canonical A/B and the real Sonnet 5
+> `max` generation/translation gate passed before merge approval.
 > This design covers fixed, single-result AI tasks. AI Research keeps its
 > existing independent runtime authority. The first implementation scope is
 > card synthesis and card translation.

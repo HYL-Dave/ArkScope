@@ -2,22 +2,31 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: IMPLEMENTED FOR REVIEW, 2026-07-12.** Branch
-> `codex/card-oauth-routing` at `c311b23`; not merged and not live-complete.
+> **Status: LIVE COMPLETE, 2026-07-12; FF MERGE APPROVED.** Branch
+> `codex/card-oauth-routing`; the user approved local fast-forward merge after
+> reviewer and live gates passed.
 > TDD commits: `d408b4a` (registry/store/resolver), `87bb452` (guarded
 > config API), `b55efc6` (four provider paths + typed timeout), and `c311b23`
 > (Settings UI + derived browser budgets). RED evidence included the missing
 > registry/module, absent routes, old adapter defaults/fixed constants, SDK
 > retry count, and 12 expected frontend failures before Task 4 wiring.
 >
-> **Automated evidence:** final backend focused battery `232 passed`; frontend
+> **Automated evidence:** reviewer canonical virgin A/B is green: failures
+> `30=30` with an empty bidirectional diff, passed `4042→4074` (`+32`, exactly
+> the added tests), and skips/warnings/errors unchanged at `74/18/7`. Final
+> fresh closeout rerun: backend focused battery `232 passed`; frontend
 > focused `33 passed`, full `32 files / 296 tests`, typecheck and production
 > build green; static stale-constant/call-site gates zero; no-PG smoke `24/24`
-> with `ok:true` and `pg_attempts:[]`. Virgin collect is base `4153` versus
-> head `4185` (`+32 / -0`). The canonical base single-process pytest attempt
-> reproduced this environment's known TestClient/lifespan hang (no output
-> progress for over four minutes after the existing error family), so no full
-> A/B verdict is claimed; reviewer canonical A/B remains the merge gate.
+> with `ok:true` and `pg_attempts:[]`.
+>
+> **Live evidence:** Settings persisted both fixed tasks at `900s`
+> (`source=db`, `db_saved=true`). Claude Sonnet 5 `max` generated the real MU
+> card and its Traditional-Chinese translation inside the new bound, with no
+> managed Claude child left behind. The remaining parent transport gate was
+> then run through ChatGPT OAuth: `gpt-5.4-mini/low` generated AAPL card
+> `run_id=7` and wrote a first `zh-Hant` translation (`cached=false`) with no
+> effort fallback. The original Sonnet 5 `max` routes were restored exactly;
+> AI Research retained its independent runtime authority.
 
 **Goal:** Replace guessed card/translation deadlines with independently configurable, DB-backed fixed-task model limits that apply equally to API-key and subscription execution.
 
@@ -1010,7 +1019,7 @@ python src/smoke/pg_unreachable_e2e.py
 
 Expected: frontend green; smoke reports `ok: true` and `pg_attempts: []`.
 
-- [ ] **Step 4: Run canonical virgin A/B**
+- [x] **Step 4: Run canonical virgin A/B**
 
 Implementation-side attempt: virgin collect completed at `4153 → 4185`
 (`+32 / -0`), but the base single-process run reproduced the known
@@ -1031,7 +1040,7 @@ If the known single-process TestClient hang appears, preserve the canonical revi
 
 Update this plan header to `IMPLEMENTED FOR REVIEW`, add RED/GREEN evidence and exact counts, and add a newest-first map entry. Do not mark live complete or merge.
 
-- [ ] **Step 6: Reviewer checkpoint**
+- [x] **Step 6: Reviewer checkpoint**
 
 Review focus:
 
@@ -1045,7 +1054,7 @@ Review focus:
 
 Stop until review is green.
 
-- [ ] **Step 7: Run the live branch gate with one sidecar**
+- [x] **Step 7: Run the live branch gate with one sidecar**
 
 1. Stop desktop/master sidecars; run only this branch sidecar against the real profile DB with scheduler disabled.
 2. Confirm GET returns both tasks at default 900 seconds, then save synthesis/translation values through Settings and read them back with `source=db`.
@@ -1055,11 +1064,11 @@ Stop until review is green.
 6. Confirm task-test still stops within its short bound and AI Research still reports its independent runtime settings.
 7. For an API-key credential, a low-cost card smoke may be run only with user approval; unit fake-transport evidence remains the required retry proof.
 
-- [ ] **Step 8: Close the parent only when live evidence supports it**
+- [x] **Step 8: Close the parent only when live evidence supports it**
 
 If the real max task succeeds within 900 seconds, mark this plan `LIVE COMPLETE`, update the map, and close the pending runtime follow-up in `2026-07-12-subscription-card-routing.md`. If it reaches 900 seconds, keep the transport plan open and record the honest timeout; do not increase the default or hide the failure without a new user decision.
 
-- [ ] **Step 9: Commit docs closeout and stop review-ready**
+- [x] **Step 9: Commit docs closeout and stop review-ready**
 
 ```bash
 git add \
