@@ -11,6 +11,7 @@ import {
   getProfileLists,
   getUniverse,
   type CardSummary,
+  type RuntimeConfig,
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
@@ -24,10 +25,12 @@ export function HomeView({
   status,
   onNavigate,
   onOpenTicker,
+  runtime,
 }: {
   status: StatusState;
   onNavigate: (view: NavTarget) => void;
   onOpenTicker: (ticker: string) => void;
+  runtime?: RuntimeConfig | null;
 }) {
   const [active, setActive] = useState<UniverseRow[] | null>(null);
   const [asOf, setAsOf] = useState<string | null>(null);
@@ -157,6 +160,7 @@ export function HomeView({
           runId={openCardId}
           onClose={() => setOpenCardId(null)}
           onChanged={() => void load()}
+          runtime={runtime}
         />
       )}
     </>

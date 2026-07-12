@@ -14,6 +14,21 @@ export interface ApiStatus {
   data_sources: Record<string, number>;
 }
 
+export type FixedTaskRuntimeTask = "card_synthesis" | "card_translation";
+
+export interface FixedTaskRuntimeSettings {
+  task: FixedTaskRuntimeTask;
+  model_timeout_s: number;
+  source: "env" | "db" | "default";
+  db_saved: boolean;
+  warning: string | null;
+}
+
+export type FixedTaskRuntimeMap = Record<
+  FixedTaskRuntimeTask,
+  FixedTaskRuntimeSettings
+>;
+
 export interface RuntimeConfig {
   anthropic: {
     model: string;
@@ -34,6 +49,8 @@ export interface RuntimeConfig {
   card_translation: TaskRoute;
   ai_research: TaskRoute;
   research_runtime: ResearchRuntimeSettings;
+  // Optional while the desktop UI and sidecar can be on adjacent versions.
+  fixed_task_runtime?: FixedTaskRuntimeMap;
   data_keys: Record<string, boolean>;
 }
 
@@ -910,6 +927,27 @@ export function deleteResearchRuntime(): Promise<{ deleted: boolean; research_ru
   );
 }
 
+export function saveFixedTaskRuntime(body: {
+  tasks: Record<FixedTaskRuntimeTask, { model_timeout_s: number }>;
+}): Promise<{ fixed_task_runtime: FixedTaskRuntimeMap }> {
+  return sendJSON<{ fixed_task_runtime: FixedTaskRuntimeMap }>(
+    "/config/fixed-task-runtime",
+    "PUT",
+    body,
+    8_000,
+  );
+}
+
+export function deleteFixedTaskRuntime(): Promise<{
+  deleted: boolean;
+  fixed_task_runtime: FixedTaskRuntimeMap;
+}> {
+  return sendJSON<{
+    deleted: boolean;
+    fixed_task_runtime: FixedTaskRuntimeMap;
+  }>("/config/fixed-task-runtime", "DELETE", undefined, 8_000);
+}
+
 export function listCredentials(): Promise<{ credentials: Record<ModelProvider, ProviderCredential[]> }> {
   return getJSON<{ credentials: Record<ModelProvider, ProviderCredential[]> }>("/config/credentials", 8_000);
 }
@@ -1494,9 +1532,17 @@ export function getCards(
   return getJSON<{ cards: CardSummary[] }>(`/analysis/cards?${params.toString()}`);
 }
 
-// Generation runs the gather + LLM synthesis server-side (~1-2 min for one
-// card), so it needs a generous timeout — well past the 15s default.
-const CARD_GEN_TIMEOUT_MS = 300_000;
+const FIXED_TASK_COMPAT_TIMEOUT_S = 900;
+const FIXED_TASK_BROWSER_MARGIN_S = 60;
+
+export function fixedTaskRequestTimeoutMs(
+  runtime: RuntimeConfig | null | undefined,
+  task: FixedTaskRuntimeTask,
+): number {
+  const seconds = runtime?.fixed_task_runtime?.[task]?.model_timeout_s
+    ?? FIXED_TASK_COMPAT_TIMEOUT_S;
+  return (seconds + FIXED_TASK_BROWSER_MARGIN_S) * 1_000;
+}
 
 export function generateCard(
   ticker: string,
@@ -1509,12 +1555,13 @@ export function generateCard(
     max_news?: number;
     assistant_stance?: AssistantStance;
   } = {},
+  runtime?: RuntimeConfig | null,
 ): Promise<GenerateResult> {
   return sendJSON<GenerateResult>(
     `/analysis/card/${encodeURIComponent(ticker)}`,
     "POST",
     body,
-    CARD_GEN_TIMEOUT_MS,
+    fixedTaskRequestTimeoutMs(runtime, "card_synthesis"),
   );
 }
 
@@ -1528,14 +1575,19 @@ export function saveCard(
   return sendJSON(`/analysis/cards/${runId}/save`, "POST");
 }
 
-// On-demand translation (cached server-side per language). Smaller than a
-// generation, but max-effort subscription models can still exceed two minutes.
-// Match generation so the provider's 210s deadline can surface cleanly.
+// On-demand translation is cached server-side per language and uses its own
+// effective fixed-task budget.
 export function translateCard(
   runId: number,
   lang = "zh-Hant",
+  runtime?: RuntimeConfig | null,
 ): Promise<{ run_id: number; lang: string; card: ResultCard; cached: boolean }> {
-  return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, CARD_GEN_TIMEOUT_MS);
+  return sendJSON(
+    `/analysis/cards/${runId}/translate`,
+    "POST",
+    { lang },
+    fixedTaskRequestTimeoutMs(runtime, "card_translation"),
+  );
 }
 
 // --- market-data local-DB lifecycle (3a prices + 3b news + 3c-A iv/fundamentals) ---

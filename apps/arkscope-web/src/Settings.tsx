@@ -20,10 +20,12 @@ import {
   getSchedule,
   importProviderConfigField,
   importModelRoutes,
+  deleteFixedTaskRuntime,
   deleteResearchRuntime,
   putProviderConfig,
   putSchedule,
   runScheduleNow,
+  saveFixedTaskRuntime,
   saveResearchRuntime,
   saveModelRoutes,
   testProvider,
@@ -63,6 +65,8 @@ import {
   type TaskModelTestResult,
   type ModelTask,
   type ProviderCredential,
+  type FixedTaskRuntimeMap,
+  type FixedTaskRuntimeSettings,
   type ResearchRuntimeSettings,
   type RuntimeConfig,
   type TaskRoute,
@@ -391,6 +395,41 @@ export function SettingsView({
     }
   }
 
+  async function saveFixedTaskLimits(body: {
+    tasks: {
+      card_synthesis: { model_timeout_s: number };
+      card_translation: { model_timeout_s: number };
+    };
+  }) {
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await saveFixedTaskRuntime(body);
+      await onRuntimeChanged();
+      setMsg("固定 AI 任務執行限制已儲存到 profile DB。");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetFixedTaskLimits() {
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await deleteFixedTaskRuntime();
+      await onRuntimeChanged();
+      setMsg("固定 AI 任務執行限制已重設為環境變數／內建預設。");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function discoverAndRefresh(provider: ModelProvider, credentialId: string | null) {
     setDiscovery((prev) => ({
       ...prev,
@@ -600,6 +639,14 @@ export function SettingsView({
                     }
                   }}
                 />
+                {runtime?.fixed_task_runtime && (
+                  <FixedTaskRuntimeSection
+                    settings={runtime.fixed_task_runtime}
+                    saving={saving}
+                    onSave={saveFixedTaskLimits}
+                    onReset={resetFixedTaskLimits}
+                  />
+                )}
                 {runtime?.research_runtime && (
                   <ResearchRuntimeSection
                     settings={runtime.research_runtime}
@@ -2547,11 +2594,143 @@ function TaskModelTestStatus({ result }: { result: TaskModelTestResult }) {
     </div>
   );
 }
-function runtimeSourceBadge(source: ResearchRuntimeSettings["source"]) {
+function runtimeSourceBadge(
+  source: ResearchRuntimeSettings["source"] | FixedTaskRuntimeSettings["source"],
+) {
   if (source === "db") return { label: "DB 已儲存", tone: "active" };
   if (source === "env") return { label: "env override", tone: "override" };
   if (source === "profile") return { label: "設定檔 fallback", tone: "fallback" };
   return { label: "內建預設", tone: "default" };
+}
+
+function parseFixedTaskTimeout(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value < 60 || value > 3600) return null;
+  return value;
+}
+
+export function FixedTaskRuntimeSection({
+  settings,
+  saving,
+  onSave,
+  onReset,
+}: {
+  settings: FixedTaskRuntimeMap;
+  saving: boolean;
+  onSave: (body: {
+    tasks: {
+      card_synthesis: { model_timeout_s: number };
+      card_translation: { model_timeout_s: number };
+    };
+  }) => void | Promise<void>;
+  onReset: () => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState({
+    card_synthesis: String(settings.card_synthesis.model_timeout_s),
+    card_translation: String(settings.card_translation.model_timeout_s),
+  });
+
+  useEffect(() => {
+    setDraft({
+      card_synthesis: String(settings.card_synthesis.model_timeout_s),
+      card_translation: String(settings.card_translation.model_timeout_s),
+    });
+  }, [
+    settings.card_synthesis.model_timeout_s,
+    settings.card_translation.model_timeout_s,
+  ]);
+
+  const synthesis = parseFixedTaskTimeout(draft.card_synthesis);
+  const translation = parseFixedTaskTimeout(draft.card_translation);
+  const disabled = saving || synthesis == null || translation == null;
+  const canReset = settings.card_synthesis.db_saved || settings.card_translation.db_saved;
+  const rows: Array<{
+    key: "card_synthesis" | "card_translation";
+    label: string;
+    settings: FixedTaskRuntimeSettings;
+  }> = [
+    {
+      key: "card_synthesis",
+      label: "AI 卡片生成 - 模型執行上限（秒）",
+      settings: settings.card_synthesis,
+    },
+    {
+      key: "card_translation",
+      label: "卡片翻譯 - 模型執行上限（秒）",
+      settings: settings.card_translation,
+    },
+  ];
+
+  return (
+    <section className="settings-panel research-runtime-panel">
+      <div className="settings-panel-head">
+        <div>
+          <h2>固定 AI 任務執行限制</h2>
+          <p className="muted">
+            較高 effort 的模型可能需要更久；這裡只控制最長等待時間，不會變更模型或 effort。
+          </p>
+        </div>
+      </div>
+
+      <div className="runtime-limit-grid">
+        {rows.map((row) => {
+          const badge = runtimeSourceBadge(row.settings.source);
+          return (
+            <label className="field" key={row.key}>
+              <span>{row.label}</span>
+              <input
+                name={`${row.key}_model_timeout_s`}
+                type="number"
+                min={60}
+                max={3600}
+                step={30}
+                value={draft[row.key]}
+                onChange={(e) => setDraft((prev) => ({
+                  ...prev,
+                  [row.key]: e.target.value,
+                }))}
+              />
+              <span className={`route-source ${badge.tone}`}>{badge.label}</span>
+              {row.settings.warning && (
+                <span className="warn-text">{row.settings.warning}</span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+
+      <div className="settings-actions">
+        <button
+          type="button"
+          className="btn-ghost small"
+          disabled={disabled}
+          onClick={() => {
+            if (synthesis == null || translation == null) return;
+            void onSave({
+              tasks: {
+                card_synthesis: { model_timeout_s: synthesis },
+                card_translation: { model_timeout_s: translation },
+              },
+            });
+          }}
+        >
+          {saving ? "儲存中…" : "儲存固定任務限制"}
+        </button>
+        {canReset && (
+          <button
+            type="button"
+            className="btn-ghost small"
+            disabled={saving}
+            onClick={() => void onReset()}
+          >
+            重設固定任務限制
+          </button>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export function ResearchRuntimeSection({

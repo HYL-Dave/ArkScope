@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace } from "./api";
+import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace, type RuntimeConfig } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import {
   generateCard,
@@ -24,7 +24,13 @@ import {
   type ResultCard,
 } from "./api";
 
-export function AICardTab({ ticker }: { ticker: string }) {
+export function AICardTab({
+  ticker,
+  runtime,
+}: {
+  ticker: string;
+  runtime?: RuntimeConfig | null;
+}) {
   const [recent, setRecent] = useState<CardSummary[] | null>(null);
   const [card, setCard] = useState<ResultCard | null>(null);
   const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
@@ -108,7 +114,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
         news_days: newsDays,
         max_news: maxNews,
         assistant_stance: investorProfile?.profile.enabled ? cardStance : undefined,
-      });
+      }, runtime);
       if (id !== reqRef.current) return; // superseded (ticker switch / new action)
       setLastTrace(r.personalization ?? null);
       setCard(r.card);
@@ -216,6 +222,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
           evidencePacket={evidencePacket}
           saved={saved}
           saving={saving}
+          runtime={runtime}
           onSave={() => void save()}
           onBack={backToList}
         />
@@ -255,6 +262,7 @@ export function CardView({
   evidencePacket,
   saved,
   saving,
+  runtime,
   onSave,
   onBack,
   backLabel = "← 卡片列表",
@@ -264,6 +272,7 @@ export function CardView({
   evidencePacket?: EvidencePacket | null;
   saved: boolean;
   saving?: boolean;
+  runtime?: RuntimeConfig | null;
   onSave: () => void;
   onBack?: () => void;
   backLabel?: string;
@@ -297,7 +306,7 @@ export function CardView({
     setTranslating(true);
     setTErr(null);
     try {
-      const r = await translateCard(runId, "zh-Hant");
+      const r = await translateCard(runId, "zh-Hant", runtime);
       setZh(r.card);
       setLang("zh");
     } catch (e) {
@@ -431,10 +440,12 @@ export function CardModal({
   runId,
   onClose,
   onChanged,
+  runtime,
 }: {
   runId: number;
   onClose: () => void;
   onChanged?: () => void;
+  runtime?: RuntimeConfig | null;
 }) {
   const [card, setCard] = useState<ResultCard | null>(null);
   const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
@@ -527,6 +538,7 @@ export function CardModal({
             evidencePacket={evidencePacket}
             saved={saved}
             saving={saving}
+            runtime={runtime}
             onSave={() => void save()}
           />
         )}

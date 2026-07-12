@@ -719,7 +719,7 @@ git commit -m "feat: enforce fixed task model timeouts"
 - Modify: `apps/arkscope-web/src/Home.tsx`
 - Modify: `apps/arkscope-web/src/App.tsx`
 
-- [ ] **Step 1: Write API timeout derivation RED tests**
+- [x] **Step 1: Write API timeout derivation RED tests**
 
 Replace the fixed `300_000` expectation with three cases:
 
@@ -750,7 +750,7 @@ expect(fixedTaskRequestTimeoutMs(runtimeWith(1200, 600), "card_translation")).to
 
 Then call `generateCard` and `translateCard` with that runtime fixture and assert `window.setTimeout` receives `1_260_000` and `660_000` respectively. This proves task independence and the old-sidecar fallback.
 
-- [ ] **Step 2: Write Settings panel RED tests using the existing DOM harness**
+- [x] **Step 2: Write Settings panel RED tests using the existing DOM harness**
 
 `FixedTaskRuntimeSection.test.tsx` uses `createRoot`, `act`, direct DOM queries, and prototype input setters, matching `ResearchRuntimeSection.test.ts`.
 
@@ -769,7 +769,7 @@ synthesis field, click the fixed-task Save button, and assert the mocked
 `saveFixedTaskRuntime` receives both tasks in one request. This test guards the
 page-level callback; the component-only test is not sufficient wiring proof.
 
-- [ ] **Step 3: Run frontend RED tests**
+- [x] **Step 3: Run frontend RED tests**
 
 Run:
 
@@ -781,7 +781,7 @@ npm --workspace apps/arkscope-web test -- --run \
 
 Expected: RED because the fixed-task DTO/helper/component do not exist.
 
-- [ ] **Step 4: Add additive frontend DTOs and API calls**
+- [x] **Step 4: Add additive frontend DTOs and API calls**
 
 ```typescript
 export type FixedTaskRuntimeTask = "card_synthesis" | "card_translation";
@@ -822,7 +822,7 @@ export function fixedTaskRequestTimeoutMs(
 
 Delete `CARD_GEN_TIMEOUT_MS` and both stale comments describing 210/300-second constants. `generateCard` and `translateCard` accept the current runtime snapshot and call this helper.
 
-- [ ] **Step 5: Implement `FixedTaskRuntimeSection` and Settings wiring**
+- [x] **Step 5: Implement `FixedTaskRuntimeSection` and Settings wiring**
 
 Export the component from `Settings.tsx`. Render two stable numeric controls:
 
@@ -859,7 +859,7 @@ The component contract is:
 
 In `SettingsView`, add dedicated fixed-task save/reset callbacks, refresh `runtime` through `onRuntimeChanged`, and render the panel next to `ModelRoutingSection` and before `ResearchRuntimeSection`. Research controls and copy remain independent.
 
-- [ ] **Step 6: Thread the existing App runtime snapshot to card actions**
+- [x] **Step 6: Thread the existing App runtime snapshot to card actions**
 
 Production wiring is explicit:
 
@@ -876,7 +876,7 @@ App
 
 Use nullable `RuntimeConfig | null` because App renders while runtime loads. Do not fetch `/config/runtime` again inside card actions.
 
-- [ ] **Step 7: Run focused frontend tests and typecheck**
+- [x] **Step 7: Run focused frontend tests and typecheck**
 
 Run:
 
@@ -892,7 +892,7 @@ npm --workspace apps/arkscope-web run typecheck
 
 Expected: all pass; Research panel tests are unchanged.
 
-- [ ] **Step 8: Run full frontend suite and build**
+- [x] **Step 8: Run full frontend suite and build**
 
 Run:
 
@@ -903,7 +903,7 @@ npm --workspace apps/arkscope-web run build
 
 Expected: all tests pass and Vite production build succeeds.
 
-- [ ] **Step 9: Commit Task 4**
+- [x] **Step 9: Commit Task 4**
 
 ```bash
 git add \

@@ -148,9 +148,10 @@ export function App() {
             key={detail.ticker}
             ticker={detail.ticker}
             onBack={() => setDetail(null)}
+            runtime={runtime}
           />
         ) : view === "Home" ? (
-          <HomeView status={status} onNavigate={goView} onOpenTicker={openTicker} />
+          <HomeView status={status} onNavigate={goView} onOpenTicker={openTicker} runtime={runtime} />
         ) : view === "Watchlist" ? (
           <WatchlistView onOpenTicker={openTicker} />
         ) : view === "Universe" ? (

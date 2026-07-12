@@ -4,7 +4,9 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelCatalog, ModelTask, TaskRoute } from "./api";
+import type { ModelCatalog, ModelTask, RuntimeConfig, TaskRoute } from "./api";
+
+const saveFixedTaskRuntime = vi.hoisted(() => vi.fn(async () => ({ fixed_task_runtime: {} })));
 
 const taskRoute = (
   task: ModelTask,
@@ -69,7 +71,11 @@ const catalog: ModelCatalog = {
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
-  return { ...actual, getModelCatalog: vi.fn(async () => catalog) };
+  return {
+    ...actual,
+    getModelCatalog: vi.fn(async () => catalog),
+    saveFixedTaskRuntime,
+  };
 });
 
 import { SettingsView } from "./Settings";
@@ -110,5 +116,84 @@ describe("Settings model route save gate", () => {
 
     expect(save.disabled).toBe(true);
     expect(host.textContent).toContain("本次變更尚未儲存");
+  });
+
+  it("wires the fixed-task panel to one atomic settings request", async () => {
+    saveFixedTaskRuntime.mockClear();
+    const runtime = {
+      anthropic: {
+        model: "claude-sonnet-5",
+        model_advanced: "claude-opus-4-8",
+        effort: null,
+        thinking: false,
+        key_set: true,
+        credentials: [],
+      },
+      openai: {
+        model: "gpt-5.4-mini",
+        model_advanced: "gpt-5.6-luna",
+        reasoning_effort: "default",
+        key_set: true,
+        credentials: [],
+      },
+      card_synthesis: routes.card_synthesis,
+      card_translation: routes.card_translation,
+      ai_research: routes.ai_research,
+      research_runtime: {
+        max_tool_calls: 60,
+        session_timeout_s: 900,
+        per_tool_timeout_s: 45,
+        source: "default",
+        db_saved: false,
+        warning: null,
+      },
+      fixed_task_runtime: {
+        card_synthesis: {
+          task: "card_synthesis",
+          model_timeout_s: 900,
+          source: "db",
+          db_saved: true,
+          warning: null,
+        },
+        card_translation: {
+          task: "card_translation",
+          model_timeout_s: 900,
+          source: "db",
+          db_saved: true,
+          warning: null,
+        },
+      },
+      data_keys: {},
+    } satisfies RuntimeConfig;
+    const onRuntimeChanged = vi.fn(async () => undefined);
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, { runtime, onRuntimeChanged }));
+    });
+    await flush();
+
+    const synthesis = host.querySelector(
+      'input[name="card_synthesis_model_timeout_s"]',
+    ) as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(synthesis, "1200");
+      synthesis.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const save = Array.from(host.querySelectorAll("button"))
+      .find((item) => item.textContent?.includes("儲存固定任務限制")) as HTMLButtonElement;
+    await act(async () => save.click());
+    await flush();
+
+    expect(saveFixedTaskRuntime).toHaveBeenCalledWith({
+      tasks: {
+        card_synthesis: { model_timeout_s: 1200 },
+        card_translation: { model_timeout_s: 900 },
+      },
+    });
+    expect(onRuntimeChanged).toHaveBeenCalledOnce();
   });
 });

@@ -1,0 +1,136 @@
+/** @vitest-environment jsdom */
+import React from "react";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { FixedTaskRuntimeSection } from "./Settings";
+import type {
+  FixedTaskRuntimeSettings,
+  FixedTaskRuntimeTask,
+} from "./api";
+
+let root: ReturnType<typeof createRoot> | null = null;
+let host: HTMLDivElement | null = null;
+
+afterEach(() => {
+  if (root) act(() => root!.unmount());
+  root = null;
+  host?.remove();
+  host = null;
+});
+
+function row(
+  task: FixedTaskRuntimeTask,
+  over: Partial<FixedTaskRuntimeSettings> = {},
+): FixedTaskRuntimeSettings {
+  return {
+    task,
+    model_timeout_s: 900,
+    source: "db",
+    db_saved: true,
+    warning: null,
+    ...over,
+  };
+}
+
+function settings(
+  synthesis: Partial<FixedTaskRuntimeSettings> = {},
+  translation: Partial<FixedTaskRuntimeSettings> = {},
+) {
+  return {
+    card_synthesis: row("card_synthesis", synthesis),
+    card_translation: row("card_translation", translation),
+  };
+}
+
+function render(
+  current = settings(),
+  onSave = vi.fn(),
+  onReset = vi.fn(),
+) {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  act(() => {
+    root!.render(React.createElement(FixedTaskRuntimeSection, {
+      settings: current,
+      saving: false,
+      onSave,
+      onReset,
+    }));
+  });
+  return { onSave, onReset };
+}
+
+function input(name: string): HTMLInputElement {
+  const element = host!.querySelector(`input[name="${name}"]`);
+  if (!(element instanceof HTMLInputElement)) throw new Error(`missing ${name}`);
+  return element;
+}
+
+function setInputValue(element: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(element, value);
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function button(text: string): HTMLButtonElement | undefined {
+  return Array.from(host!.querySelectorAll("button"))
+    .find((item) => item.textContent?.includes(text));
+}
+
+describe("FixedTaskRuntimeSection", () => {
+  it("renders independent values and source badges", () => {
+    render(settings(
+      { model_timeout_s: 1200, source: "env", db_saved: true },
+      { model_timeout_s: 600, source: "default", db_saved: false },
+    ));
+
+    expect(input("card_synthesis_model_timeout_s").value).toBe("1200");
+    expect(input("card_translation_model_timeout_s").value).toBe("600");
+    expect(host!.textContent).toContain("AI 卡片生成 - 模型執行上限（秒）");
+    expect(host!.textContent).toContain("卡片翻譯 - 模型執行上限（秒）");
+    expect(host!.textContent).toContain("env override");
+    expect(host!.textContent).toContain("內建預設");
+    expect(button("重設固定任務限制")).toBeTruthy();
+  });
+
+  it("saves both task values atomically", () => {
+    const { onSave } = render();
+    act(() => {
+      setInputValue(input("card_synthesis_model_timeout_s"), "1500");
+      setInputValue(input("card_translation_model_timeout_s"), "750");
+    });
+    act(() => button("儲存固定任務限制")!.click());
+
+    expect(onSave).toHaveBeenCalledWith({
+      tasks: {
+        card_synthesis: { model_timeout_s: 1500 },
+        card_translation: { model_timeout_s: 750 },
+      },
+    });
+  });
+
+  it.each(["59", "3601", "", "NaN", "Infinity"])(
+    "disables save for invalid value %s",
+    (value) => {
+      render();
+      act(() => {
+        setInputValue(input("card_synthesis_model_timeout_s"), value);
+      });
+      expect(button("儲存固定任務限制")!.disabled).toBe(true);
+    },
+  );
+
+  it("hides reset only when neither task has a saved DB row", () => {
+    render(settings({ source: "default", db_saved: false }, { source: "default", db_saved: false }));
+    expect(button("重設固定任務限制")).toBeUndefined();
+  });
+
+  it("explains effort sensitivity without changing route quality", () => {
+    render();
+    expect(host!.textContent).toContain("較高 effort");
+    expect(host!.textContent).toContain("不會變更模型或 effort");
+  });
+});

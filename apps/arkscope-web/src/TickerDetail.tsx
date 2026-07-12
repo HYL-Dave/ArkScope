@@ -28,6 +28,7 @@ import {
   type Note,
   type SourcePath,
   type PriceChange,
+  type RuntimeConfig,
   type TagRef,
   type TickerAggregate,
 } from "./api";
@@ -39,9 +40,11 @@ type Tab = "overview" | "data" | "notes" | "ai";
 export function TickerDetailView({
   ticker,
   onBack,
+  runtime,
 }: {
   ticker: string;
   onBack: () => void;
+  runtime?: RuntimeConfig | null;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [state, setState] = useState<TickerAggregate | null>(null);
@@ -107,7 +110,7 @@ export function TickerDetailView({
         <NotesTab ticker={ticker} onChanged={refreshState} />
       ) : (
         <div className="detail-ai-wrap">
-          <AICardTab ticker={ticker} />
+          <AICardTab ticker={ticker} runtime={runtime} />
         </div>
       )}
     </main>
