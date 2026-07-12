@@ -122,7 +122,7 @@ def _run(monkeypatch, tmp_path, *, active=_DEFAULT_ACTIVE, cache=None, api_resul
             raise driver_error
         return _Driver(stream or _Stream([AgentEvent(EventType.done, {"answer": "ok"})]))
 
-    def fake_subscription(**kwargs):
+    async def fake_subscription(**kwargs):
         calls["subscription"].append(kwargs)
         if structured_error is not None:
             raise structured_error
@@ -132,7 +132,7 @@ def _run(monkeypatch, tmp_path, *, active=_DEFAULT_ACTIVE, cache=None, api_resul
     monkeypatch.setattr(mt, "build_driver", fake_driver)
     monkeypatch.setattr(
         mt,
-        "run_subscription_structured_output",
+        "run_subscription_structured_output_async",
         fake_subscription,
         raising=False,
     )

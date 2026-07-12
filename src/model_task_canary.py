@@ -21,7 +21,7 @@ from src.auth_drivers.probe_harness import redact
 from src.auth_drivers.protocol import LLMRequest
 from src.auth_drivers.subscription_structured_output import (
     SubscriptionStructuredOutputError,
-    run_subscription_structured_output,
+    run_subscription_structured_output_async,
 )
 from src.model_capabilities import capability_for
 from src.model_credentials import resolve_active_credential, test_model
@@ -134,11 +134,9 @@ async def _run_subscription_card_canary(
         "required": ["ok"],
     }
     try:
-        # The route driving this coroutine is itself a sync FastAPI handler in an
-        # AnyIO worker thread. Both provider adapters carry their own timeout;
-        # calling directly avoids a second executor whose completion can outlive
-        # the short-lived asyncio.run() loop.
-        payload = run_subscription_structured_output(
+        # The sync FastAPI route owns one short-lived asyncio.run() loop. Await the
+        # provider adapter in that loop; never create a second executor/session.
+        payload = await run_subscription_structured_output_async(
             provider=provider,
             auth_mode=active.auth_mode,
             credential_id=active.credential_id,

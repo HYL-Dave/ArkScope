@@ -9,7 +9,8 @@ environment API key, another provider, or another model.
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
+from datetime import datetime, timezone
+import inspect
 import json
 import shutil
 import tempfile
@@ -20,6 +21,7 @@ from claude_agent_sdk import (
     ClaudeAgentOptions,
     ResultMessage,
     ServerToolUseBlock,
+    SystemMessage,
     ToolUseBlock,
     query as _claude_query,
 )
@@ -44,10 +46,43 @@ class SubscriptionStructuredOutputError(RuntimeError):
         super().__init__(message)
 
 
-def _openai_client(token: str, base_url: str, timeout_s: float) -> Any:  # test seam
-    from openai import OpenAI
+_CLAUDE_INHERITED_BILLING_ENV = (
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_FOUNDRY_API_KEY",
+    "ANTHROPIC_AWS_API_KEY",
+    "ANTHROPIC_BEDROCK_MANTLE_API_KEY",
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "ANTHROPIC_AWS_AUTH",
+    "ANTHROPIC_IDENTITY_TOKEN",
+    "ANTHROPIC_IDENTITY_TOKEN_FILE",
+    "ANTHROPIC_PROFILE",
+    "ANTHROPIC_CUSTOM_HEADERS",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_BEDROCK_BASE_URL",
+    "ANTHROPIC_VERTEX_BASE_URL",
+    "ANTHROPIC_FOUNDRY_BASE_URL",
+    "ANTHROPIC_AWS_BASE_URL",
+    "ANTHROPIC_BEDROCK_MANTLE_BASE_URL",
+    "ANTHROPIC_UNIX_SOCKET",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+    "CLAUDE_CODE_USE_MANTLE",
+    "CLAUDE_CODE_USE_GATEWAY",
+)
 
-    return OpenAI(api_key=token, base_url=base_url, timeout=timeout_s)
+
+def _openai_client(token: str, base_url: str, timeout_s: float) -> Any:  # test seam
+    from openai import AsyncOpenAI
+
+    return AsyncOpenAI(
+        api_key=token,
+        base_url=base_url,
+        timeout=timeout_s,
+        max_retries=0,
+    )
 
 
 def _refresh_chatgpt_token(*, credential_id: str, token_store: Any):  # test seam
@@ -64,19 +99,54 @@ def _safe_message(exc: BaseException, token: str | None = None) -> str:
     return redact(message)[:500]
 
 
-def _close_quietly(value: Any) -> None:
+async def _close_quietly(value: Any, *, timeout_s: float = 1.0) -> None:
     if value is None:
         return
-    close = getattr(value, "close", None)
+    close = getattr(value, "aclose", None) or getattr(value, "close", None)
     if close is None:
         return
     try:
-        close()
-    except Exception:  # noqa: BLE001 - cleanup must not replace provider result
+        result = close()
+        if inspect.isawaitable(result):
+            await asyncio.wait_for(result, timeout=max(float(timeout_s), 0.001))
+    except BaseException:  # noqa: BLE001 - cleanup must not replace provider result
         pass
 
 
-def _openai_structured_output(
+def _remaining(deadline: float) -> float:
+    remaining = deadline - asyncio.get_running_loop().time()
+    if remaining <= 0:
+        raise asyncio.TimeoutError
+    return remaining
+
+
+def _cleanup_budget(deadline: float) -> float:
+    """Use the call's remaining budget, with a tiny best-effort cancellation slot."""
+    remaining = deadline - asyncio.get_running_loop().time()
+    return min(1.0, max(remaining, 0.005))
+
+
+async def _await_with_deadline(value: Any, deadline: float) -> Any:
+    if not inspect.isawaitable(value):
+        _remaining(deadline)
+        return value
+    return await asyncio.wait_for(value, timeout=_remaining(deadline))
+
+
+_STREAM_END = object()
+
+
+async def _next_with_deadline(iterator: Any, deadline: float) -> Any:
+    if hasattr(iterator, "__anext__"):
+        return await asyncio.wait_for(iterator.__anext__(), timeout=_remaining(deadline))
+    _remaining(deadline)
+    item = next(iterator, _STREAM_END)
+    if item is _STREAM_END:
+        raise StopAsyncIteration
+    return item
+
+
+async def _openai_structured_output_async(
     *,
     credential_id: str,
     model: str,
@@ -89,6 +159,7 @@ def _openai_structured_output(
     token_store: Any,
     timeout_s: float,
 ) -> dict[str, Any]:
+    deadline = asyncio.get_running_loop().time() + max(float(timeout_s), 0.001)
     token: str | None = None
     try:
         record = _refresh_chatgpt_token(
@@ -128,12 +199,17 @@ def _openai_structured_output(
         }
         if effort not in ("", "default"):
             kwargs["reasoning"] = {"effort": effort}
-        stream = client.responses.create(**kwargs)
+        stream = await _await_with_deadline(client.responses.create(**kwargs), deadline)
 
         terminal = None
         call_items: list[dict[str, Any]] = []
         arg_fallback: dict[str, str] = {}
-        for event in stream:
+        iterator = stream.__aiter__() if hasattr(stream, "__aiter__") else iter(stream)
+        while True:
+            try:
+                event = await _next_with_deadline(iterator, deadline)
+            except StopAsyncIteration:
+                break
             raw = _to_dict(event)
             event_type = raw.get("type")
             if event_type == "response.function_call_arguments.done":
@@ -185,14 +261,19 @@ def _openai_structured_output(
         )
     except SubscriptionStructuredOutputError:
         raise
+    except asyncio.TimeoutError as exc:
+        raise SubscriptionStructuredOutputError(
+            "provider_call_failed",
+            f"ChatGPT subscription structured call timed out after {timeout_s:g} seconds.",
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         raise SubscriptionStructuredOutputError(
             "provider_call_failed",
             _safe_message(exc, token),
         ) from exc
     finally:
-        _close_quietly(stream)
-        _close_quietly(client)
+        await _close_quietly(stream, timeout_s=_cleanup_budget(deadline))
+        await _close_quietly(client, timeout_s=_cleanup_budget(deadline))
 
 
 async def _claude_structured_output_async(
@@ -206,6 +287,7 @@ async def _claude_structured_output_async(
     token_store: Any,
     timeout_s: float,
 ) -> dict[str, Any]:
+    deadline = asyncio.get_running_loop().time() + max(float(timeout_s), 0.001)
     try:
         record = token_store.load(
             provider="anthropic",
@@ -223,43 +305,85 @@ async def _claude_structured_output_async(
             "reauth_required",
             "No Claude subscription token is available; import it from Settings.",
         )
+    expires_at = getattr(record, "expires_at", None)
+    if isinstance(expires_at, str) and expires_at.strip():
+        try:
+            parsed_expiry = datetime.fromisoformat(
+                expires_at.strip().replace("Z", "+00:00")
+            )
+            if parsed_expiry.tzinfo is None:
+                parsed_expiry = parsed_expiry.replace(tzinfo=timezone.utc)
+        except ValueError:
+            parsed_expiry = None
+        if parsed_expiry is not None and datetime.now(timezone.utc) >= parsed_expiry:
+            raise SubscriptionStructuredOutputError(
+                "reauth_required",
+                "The Claude subscription token has expired; import it again from Settings.",
+            )
 
     config_dir = tempfile.mkdtemp(prefix="ark_claude_structured_")
-    selected_effort = None if effort in ("", "default") else effort
-    options = ClaudeAgentOptions(
-        model=model,
-        effort=selected_effort,
-        system_prompt=system,
-        output_format={"type": "json_schema", "schema": schema},
-        mcp_servers={},
-        allowed_tools=[],
-        tools=[],
-        setting_sources=[],
-        strict_mcp_config=True,
-        permission_mode="dontAsk",
-        max_turns=1,
-        env={
-            "CLAUDE_CODE_OAUTH_TOKEN": token,
-            "ANTHROPIC_API_KEY": "",
-            "CLAUDE_CONFIG_DIR": config_dir,
-        },
-    )
-    agen = _claude_query(prompt=user, options=options)
-
-    async def consume() -> dict[str, Any]:
-        async for message in agen:
+    agen = None
+    try:
+        selected_effort = None if effort in ("", "default") else effort
+        options = ClaudeAgentOptions(
+            model=model,
+            effort=selected_effort,
+            system_prompt=system,
+            output_format={"type": "json_schema", "schema": schema},
+            mcp_servers={},
+            allowed_tools=[],
+            tools=[],
+            setting_sources=[],
+            strict_mcp_config=True,
+            permission_mode="dontAsk",
+            max_turns=1,
+            env={
+                **{name: "" for name in _CLAUDE_INHERITED_BILLING_ENV},
+                "CLAUDE_CODE_OAUTH_TOKEN": token,
+                "CLAUDE_CONFIG_DIR": config_dir,
+            },
+        )
+        agen = _claude_query(prompt=user, options=options)
+        iterator = agen.__aiter__()
+        subscription_auth_verified = False
+        while True:
+            try:
+                message = await _next_with_deadline(iterator, deadline)
+            except StopAsyncIteration:
+                break
+            if isinstance(message, SystemMessage):
+                if message.subtype == "init":
+                    source = (message.data or {}).get("apiKeySource")
+                    if source not in (None, "none"):
+                        raise SubscriptionStructuredOutputError(
+                            "provider_call_failed",
+                            "Claude subscription auth is not active "
+                            f"(apiKeySource={source!r}); refusing to bill another source.",
+                        )
+                    subscription_auth_verified = True
+                continue
             if isinstance(message, AssistantMessage):
-                if any(
-                    isinstance(block, (ToolUseBlock, ServerToolUseBlock))
-                    for block in (message.content or [])
-                ):
+                if getattr(message, "error", None) == "authentication_failed":
                     raise SubscriptionStructuredOutputError(
-                        "provider_call_failed",
-                        "Claude subscription attempted an unexpected tool call.",
+                        "reauth_required",
+                        "Claude subscription authentication failed; import the token again.",
                     )
+                for block in message.content or []:
+                    if isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                        continue
+                    if isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                        raise SubscriptionStructuredOutputError(
+                            "provider_call_failed",
+                            "Claude subscription attempted an unexpected tool call.",
+                        )
                 continue
             if not isinstance(message, ResultMessage):
                 continue
+            if not subscription_auth_verified:
+                raise SubscriptionStructuredOutputError(
+                    "provider_call_failed",
+                    "Claude subscription result arrived without verified auth source evidence.",
+                )
             if message.is_error or message.subtype == "error":
                 detail = message.result or message.errors or "Claude subscription returned an error."
                 raise SubscriptionStructuredOutputError(
@@ -277,46 +401,72 @@ async def _claude_structured_output_async(
             "provider_call_failed",
             "Claude subscription stream ended without a structured result.",
         )
-
-    try:
-        try:
-            return await asyncio.wait_for(consume(), timeout=max(float(timeout_s), 0.001))
-        except asyncio.TimeoutError as exc:
-            raise SubscriptionStructuredOutputError(
-                "provider_call_failed",
-                f"Claude subscription structured call timed out after {timeout_s:g} seconds.",
-            ) from exc
     except SubscriptionStructuredOutputError:
         raise
+    except asyncio.TimeoutError as exc:
+        raise SubscriptionStructuredOutputError(
+            "provider_call_failed",
+            f"Claude subscription structured call timed out after {timeout_s:g} seconds.",
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         raise SubscriptionStructuredOutputError(
             "provider_call_failed",
             _safe_message(exc, token),
         ) from exc
     finally:
-        aclose = getattr(agen, "aclose", None)
-        if aclose is not None:
-            try:
-                await aclose()
-            except BaseException:  # noqa: BLE001 - cleanup must not replace result
-                pass
+        await _close_quietly(agen, timeout_s=_cleanup_budget(deadline))
         shutil.rmtree(config_dir, ignore_errors=True)
 
 
-def _run_async_blocking(factory):
-    """Run an async subscription call from sync card routes and CLI callers."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(factory())
-
-    # A sync caller invoked from an async host cannot nest asyncio.run(). Keep the
-    # card API synchronous and isolate the SDK session on its own event-loop thread.
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=1,
-        thread_name_prefix="ark-claude-structured",
-    ) as pool:
-        return pool.submit(lambda: asyncio.run(factory())).result()
+async def run_subscription_structured_output_async(
+    *,
+    provider: str,
+    auth_mode: str,
+    credential_id: str,
+    model: str,
+    system: str,
+    user: str,
+    output_name: str,
+    output_description: str,
+    schema: dict[str, Any],
+    effort: str = "default",
+    token_store: Any = None,
+    timeout_s: float = 90.0,
+) -> dict[str, Any]:
+    """Execute one deadline-bound subscription result without fallback."""
+    openai_oauth = provider == "openai" and auth_mode == "chatgpt_oauth"
+    claude_oauth = provider == "anthropic" and auth_mode == "claude_code_oauth"
+    if not (openai_oauth or claude_oauth):
+        raise SubscriptionStructuredOutputError(
+            "task_auth_mode_unsupported",
+            f"Subscription structured output is not wired for {provider}/{auth_mode}.",
+        )
+    token_store = token_store or get_token_store()
+    if openai_oauth:
+        return await _openai_structured_output_async(
+            credential_id=credential_id,
+            model=model,
+            system=system,
+            user=user,
+            output_name=output_name,
+            output_description=output_description,
+            schema=schema,
+            effort=effort,
+            token_store=token_store,
+            timeout_s=timeout_s,
+        )
+    if claude_oauth:
+        return await _claude_structured_output_async(
+            credential_id=credential_id,
+            model=model,
+            system=system,
+            user=user,
+            schema=schema,
+            effort=effort,
+            token_store=token_store,
+            timeout_s=timeout_s,
+        )
+    raise AssertionError("validated subscription auth mode was not dispatched")
 
 
 def run_subscription_structured_output(
@@ -334,39 +484,27 @@ def run_subscription_structured_output(
     token_store: Any = None,
     timeout_s: float = 90.0,
 ) -> dict[str, Any]:
-    """Execute one subscription-backed structured result without fallback."""
-    openai_oauth = provider == "openai" and auth_mode == "chatgpt_oauth"
-    claude_oauth = provider == "anthropic" and auth_mode == "claude_code_oauth"
-    if not (openai_oauth or claude_oauth):
-        raise SubscriptionStructuredOutputError(
-            "task_auth_mode_unsupported",
-            f"Subscription structured output is not wired for {provider}/{auth_mode}.",
-        )
-    token_store = token_store or get_token_store()
-    if openai_oauth:
-        return _openai_structured_output(
-            credential_id=credential_id,
-            model=model,
-            system=system,
-            user=user,
-            output_name=output_name,
-            output_description=output_description,
-            schema=schema,
-            effort=effort,
-            token_store=token_store,
-            timeout_s=timeout_s,
-        )
-    if claude_oauth:
-        return _run_async_blocking(
-            lambda: _claude_structured_output_async(
+    """Synchronous facade for FastAPI worker-thread card routes."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(
+            run_subscription_structured_output_async(
+                provider=provider,
+                auth_mode=auth_mode,
                 credential_id=credential_id,
                 model=model,
                 system=system,
                 user=user,
+                output_name=output_name,
+                output_description=output_description,
                 schema=schema,
                 effort=effort,
                 token_store=token_store,
                 timeout_s=timeout_s,
             )
         )
-    raise AssertionError("validated subscription auth mode was not dispatched")
+    raise RuntimeError(
+        "run_subscription_structured_output cannot run inside an active event loop; "
+        "await run_subscription_structured_output_async instead"
+    )
