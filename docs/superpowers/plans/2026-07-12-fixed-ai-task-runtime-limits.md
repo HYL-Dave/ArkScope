@@ -2,7 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: DRAFT FOR REVIEW, 2026-07-12.** Implementation has not started.
+> **Status: IMPLEMENTED FOR REVIEW, 2026-07-12.** Branch
+> `codex/card-oauth-routing` at `c311b23`; not merged and not live-complete.
+> TDD commits: `d408b4a` (registry/store/resolver), `87bb452` (guarded
+> config API), `b55efc6` (four provider paths + typed timeout), and `c311b23`
+> (Settings UI + derived browser budgets). RED evidence included the missing
+> registry/module, absent routes, old adapter defaults/fixed constants, SDK
+> retry count, and 12 expected frontend failures before Task 4 wiring.
+>
+> **Automated evidence:** final backend focused battery `232 passed`; frontend
+> focused `33 passed`, full `32 files / 296 tests`, typecheck and production
+> build green; static stale-constant/call-site gates zero; no-PG smoke `24/24`
+> with `ok:true` and `pg_attempts:[]`. Virgin collect is base `4153` versus
+> head `4185` (`+32 / -0`). The canonical base single-process pytest attempt
+> reproduced this environment's known TestClient/lifespan hang (no output
+> progress for over four minutes after the existing error family), so no full
+> A/B verdict is claimed; reviewer canonical A/B remains the merge gate.
 
 **Goal:** Replace guessed card/translation deadlines with independently configurable, DB-backed fixed-task model limits that apply equally to API-key and subscription execution.
 
@@ -929,7 +944,7 @@ git commit -m "feat: configure fixed AI task limits"
 - Modify: `docs/superpowers/plans/2026-07-12-fixed-ai-task-runtime-limits.md`
 - Modify after successful live max gate only: `docs/superpowers/plans/2026-07-12-subscription-card-routing.md`
 
-- [ ] **Step 1: Run the backend focused battery**
+- [x] **Step 1: Run the backend focused battery**
 
 ```bash
 pytest -q \
@@ -946,7 +961,7 @@ pytest -q \
 
 Record exact passed/skipped counts in the execution ledger.
 
-- [ ] **Step 2: Run static contract gates**
+- [x] **Step 2: Run static contract gates**
 
 ```bash
 rg -n "_SUBSCRIPTION_CARD_TIMEOUT_S|CARD_GEN_TIMEOUT_MS|240s deadline|timeout_s: float = 90\.0" \
@@ -984,7 +999,7 @@ test "$(rg -n 'min\(max\(float\(timeout_s\), 0\.001\), 45\.0\)' src/model_task_c
 test "$(rg -n 'fixed_task_runtime_config' src/model_task_canary.py | wc -l)" -eq 0
 ```
 
-- [ ] **Step 3: Run frontend and no-PG gates**
+- [x] **Step 3: Run frontend and no-PG gates**
 
 ```bash
 npm --workspace apps/arkscope-web test
@@ -997,6 +1012,12 @@ Expected: frontend green; smoke reports `ok: true` and `pg_attempts: []`.
 
 - [ ] **Step 4: Run canonical virgin A/B**
 
+Implementation-side attempt: virgin collect completed at `4153 → 4185`
+(`+32 / -0`), but the base single-process run reproduced the known
+TestClient/lifespan hang and made no output progress for over four minutes.
+The run was stopped with its log preserved under `/tmp`; this is not reported
+as a partial A/B pass. Reviewer canonical A/B remains required.
+
 Compare base `c136316` with the final implementation tip using virgin archives and identical environment isolation. Acceptance:
 
 - failure sets identical in both directions;
@@ -1006,7 +1027,7 @@ Compare base `c136316` with the final implementation tip using virgin archives a
 
 If the known single-process TestClient hang appears, preserve the canonical reviewer protocol; do not replace it with an unreported partial suite.
 
-- [ ] **Step 5: Mark automated implementation review-ready**
+- [x] **Step 5: Mark automated implementation review-ready**
 
 Update this plan header to `IMPLEMENTED FOR REVIEW`, add RED/GREEN evidence and exact counts, and add a newest-first map entry. Do not mark live complete or merge.
 
