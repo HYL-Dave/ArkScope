@@ -96,6 +96,8 @@ const mocked = vi.hoisted(() => ({
   longDurableError:
     "IBKR historical data request failed after bounded retries: HMDS query returned no data for HAPN on 2026-06-05 " +
     "during afternoon recovery window; clientId=11 requestId=980123 pacing bucket=hist_15m",
+  scheduleRunning: false,
+  scheduleProgress: null as { done: number; total: number; current: string } | null,
   importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
   putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
 }));
@@ -139,6 +141,23 @@ const health: ProvidersHealthResponse = {
       },
       key_import_suggested: false,
     },
+    {
+      id: "retired_provider",
+      label: "Retired provider",
+      kind: "macro",
+      status: "disabled",
+      enabled: false,
+      disabled_reason: "retired",
+      key_present: true,
+      key_source: "not_required",
+      key_vars: [],
+      last_success_at: null,
+      last_attempt_at: null,
+      last_error: null,
+      detail: "",
+      signals: {},
+      key_import_suggested: false,
+    },
   ],
   generated_at: "2026-07-02T00:00:00+00:00",
   jobs: {},
@@ -166,8 +185,8 @@ vi.mock("./api", async (importOriginal) => {
           enabled: true,
           interval_minutes: 30,
           default_interval_minutes: 30,
-          running: false,
-          progress: null,
+          running: mocked.scheduleRunning,
+          progress: mocked.scheduleProgress,
           last_attempt_at: "2026-07-04T00:00:00+00:00",
           last_result: {
             source: "polygon_news",
@@ -270,6 +289,8 @@ afterEach(() => {
   host = null;
   mocked.importCalls = [];
   mocked.putCalls = [];
+  mocked.scheduleRunning = false;
+  mocked.scheduleProgress = null;
   vi.restoreAllMocks();
 });
 
@@ -411,15 +432,53 @@ describe("Settings provider config authority", () => {
     expect(details?.textContent).toContain(mocked.longDurableError);
   });
 
-  it("renders scheduler source badges from backend metadata instead of provider_fetch heuristics", async () => {
+  it("renders_known_schedule_progress_without_covering_the_last_run_cell", async () => {
+    mocked.scheduleRunning = true;
+    mocked.scheduleProgress = {
+      done: 17,
+      total: 149,
+      current: "BRK.B — long current contract name that must wrap inside the progress cell",
+    };
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("Polygon news"));
+    if (!row) throw new Error("missing schedule row");
+    expect(row.querySelector(".source-run-current")?.textContent).toContain("BRK.B");
+    expect(row.querySelector(".source-run-counts")?.textContent).toBe("17 / 149 · 11%");
+    expect(row.querySelector("[role='progressbar']")).not.toBeNull();
+    expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("已跳過");
+  });
+
+  it("shows_disabled_provider_and_schedule_states_as_neutral_text", async () => {
+    await renderDataSources();
+    const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("Retired provider"));
+    if (!providerRow) throw new Error("missing disabled provider row");
+    expect(providerRow.textContent).toContain("已停用");
+    expect(providerRow.querySelector(".ui-status-badge")).toBeNull();
+    expect(providerRow.querySelector(".ds-chip")).toBeNull();
+    expect(providerRow.querySelector(".muted")).not.toBeNull();
+
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("價格缺口補抓"));
+    if (!row) throw new Error("missing price_backfill row");
+    expect(row.textContent).toContain("排程關閉");
+    const scheduleCell = row.querySelectorAll("td")[1];
+    expect(scheduleCell?.querySelector(".ui-status-badge")).toBeNull();
+    expect(scheduleCell?.querySelector(".ds-schedule-disabled")?.textContent).toBe("排程關閉");
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.includes("Run"))).toBe(true);
+  });
+
+  it("does_not_render_storage_route_source_badges", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("價格缺口補抓"));
     if (!row) throw new Error("missing price_backfill row");
-    expect(row.textContent).toContain("IBKR/Polygon");
-    expect(row.textContent).toContain("直寫本地");
-    expect(row.textContent).toContain("缺口補抓");
-    expect(row.textContent).not.toContain(" · 本地");
+    expect(row.querySelector("td")?.textContent?.replace(/\s+/g, "").trim())
+      .toBe("價格缺口補抓");
+    expect(row.textContent).not.toContain("IBKR/Polygon");
+    expect(row.textContent).not.toContain("直寫本地");
   });
 
   it("renders FRED as configured local snapshot with refresh off", async () => {
@@ -433,6 +492,7 @@ describe("Settings provider config authority", () => {
     expect(row.textContent).toContain("自動刷新未啟用");
     expect(row.textContent).not.toContain("未啟用抓取");
     expect(row.textContent).not.toContain("已停用");
+    expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
   });
 
   it("renders the FRED local snapshot panel", async () => {

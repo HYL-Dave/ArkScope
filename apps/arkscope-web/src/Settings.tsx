@@ -112,6 +112,14 @@ import {
 } from "./marketDataDisplay";
 import { displaySAExtensionSegments } from "./saExtensionHealthDisplay";
 import { InvestorProfilePanel } from "./InvestorProfilePanel";
+import { SourceRunProgress } from "./SourceRunProgress";
+import {
+  durableScheduleCommonState,
+  providerCommonState,
+  saSegmentCommonState,
+  scheduleSkipCommonState,
+} from "./dataSourcesPresentation";
+import { StatusBadge } from "./ui";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -1476,6 +1484,13 @@ function ibkrClientIdChips(
   return { preview: base !== null, text };
 }
 
+function ProviderHealthState({ provider }: { provider: ProviderHealth }) {
+  const state = providerCommonState(provider.status);
+  return state === null
+    ? <span className="muted tiny">{providerHealthStatusLabel(provider)}</span>
+    : <StatusBadge state={state} label={providerHealthStatusLabel(provider)} />;
+}
+
 function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
@@ -1737,6 +1752,8 @@ function DataSourcesSection() {
     const skippedReason = s.last_result?.status === "skipped" ? s.last_result.reason ?? "已在執行" : null;
     const alreadyRunningSkip = skippedReason?.includes("already running") ?? false;
     const skippedSummary = alreadyRunningSkip ? "已有執行中" : compactMessage(skippedReason ?? "");
+    const skipState = scheduleSkipCommonState(skippedReason);
+    const historyState = durableScheduleCommonState(s);
     if (skippedReason) {
       details.push({
         label: alreadyRunningSkip ? "新觸發略過" : "跳過原因",
@@ -1753,14 +1770,19 @@ function DataSourcesSection() {
         <div className="ds-last-run-summary">
           <span>{jobOutcome(s.job_name)}</span>
           {skippedReason && (
-            <span className="refresh-err" title={skippedReason}>
-              {alreadyRunningSkip ? "新觸發已略過" : "已跳過"}：{skippedSummary}
-            </span>
+            skipState === null ? (
+              <span className="muted tiny" title={skippedReason}>
+                已跳過：{skippedSummary}
+              </span>
+            ) : (
+              <StatusBadge state={skipState} label="新觸發已略過" />
+            )
           )}
-          {s.durable_state?.last_status && (
-            <span style={{ color: coverageToneColor(ss.tone) }} title={durableError ?? ss.label}>
-              {ss.label}{durableError ? `：${compactMessage(durableError)}` : ""}
-            </span>
+          {historyState !== null && (
+            <StatusBadge
+              state={historyState}
+              label={`${ss.label}${durableError ? `：${compactMessage(durableError)}` : ""}`}
+            />
           )}
           {ss.needsContinue && (
             <button
@@ -1825,7 +1847,7 @@ function DataSourcesSection() {
                       <div className="muted tiny">{fredProviderDetail(p)}</div>
                     )}
                   </td>
-                  <td><span className={`ds-chip ds-${p.status}`}>{providerHealthStatusLabel(p)}</span></td>
+                  <td><ProviderHealthState provider={p} /></td>
                   <td>
                     {p.key_source === "not_required" ? "免金鑰" : p.key_source}
                     {p.key_import_suggested && <span className="muted tiny"> · 建議匯入</span>}
@@ -1871,9 +1893,10 @@ function DataSourcesSection() {
                   <tr key={row.key}>
                     <td>{row.label}</td>
                     <td>
-                      <span className={`ds-chip ds-${row.tone === "ok" ? "connected" : row.tone === "warn" ? "stale" : "disabled"}`}>
-                        {row.mark}
-                      </span>
+                      <StatusBadge
+                        state={saSegmentCommonState(row.tone)}
+                        label={row.tone === "ok" ? "正常" : row.tone === "warn" ? "注意" : "失敗"}
+                      />
                     </td>
                     <td className="muted" style={{ overflowWrap: "anywhere" }}>{row.detail}</td>
                   </tr>
@@ -2087,9 +2110,6 @@ function DataSourcesSection() {
                 <tr key={id}>
                   <td title={s.description}>
                     {s.label}
-                    {(s.source_badges ?? []).map((badge) => (
-                      <span className="muted tiny" key={badge}> · {badge}</span>
-                    ))}
                     {s.retired && <span className="ds-chip ds-disabled">已退役</span>}
                   </td>
                   <td>
@@ -2100,7 +2120,9 @@ function DataSourcesSection() {
                         disabled={busy === id}
                         onChange={(e) => void setEnabled(id, e.target.checked)}
                       />
-                      {s.enabled ? "開" : "關"}
+                      <span className={s.enabled ? "tiny" : "muted tiny ds-schedule-disabled"}>
+                        {s.enabled ? "排程開啟" : "排程關閉"}
+                      </span>
                     </label>
                   </td>
                   <td>
@@ -2122,12 +2144,11 @@ function DataSourcesSection() {
                   </td>
                   <td>
                     {s.running ? (
-                      <span className="ds-chip ds-running">
-                        執行中…
-                        {s.progress
-                          ? ` ${s.progress.done}/${s.progress.total}（${s.progress.current}，${Math.round((s.progress.done / Math.max(1, s.progress.total)) * 100)}%）`
-                          : ""}
-                      </span>
+                      <SourceRunProgress
+                        sourceLabel={s.label}
+                        running={s.running}
+                        progress={s.progress}
+                      />
                     ) : (
                       <button
                         className="btn-ghost"
