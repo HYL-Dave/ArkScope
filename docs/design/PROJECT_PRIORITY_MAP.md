@@ -207,9 +207,9 @@ therefore defaults to defer until the hypothesis gate exists.
 ### P2.8 UI improvement pass (audit-first + user irritation list)
 - **Status**: **PHASE-1 AUDIT + CANONICAL DESIGN ADOPTED; written review and
   Claude Design conformance sync COMPLETE** (`docs/superpowers/specs/2026-07-12-p2-8-canonical-shell-interaction-design.md`).
-  Slice 1 plan is open for review at
+  Slice 1 plan is review-cleared and implementation-authorized at
   `docs/superpowers/plans/2026-07-12-p2-8-slice-1-ui-primitives.md`;
-  implementation still waits for plan review.
+  isolated TDD implementation is next and must stop review-ready before merge.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -395,6 +395,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-12 (P2.8 Slice 1 plan REVIEW-CLEARED — isolated TDD implementation authorized)**: Review found and the plan now closes one paired implementation/test defect plus four interaction edge cases before code work starts: Drawer close visibly invokes `onClose` and restores trigger focus; polling elapsed time is no longer an `aria-live` region; stacked overlays respect `defaultPrevented`; busy confirmation cannot be escaped around its disabled Cancel action; and DataTable placement tests install their geometry stub before the layout effect runs. Shared Holdings layout classes are explicitly promoted into the `ui-*` namespace, while every native command button and the dead `btn-primary`/`btn-secondary`/`table-wrap` tokens must disappear during migration. The exact frontend ledger remains six new test files and +46 tests (`32/296` to `38/342`). Behavioral A/B stays anchored at approved-design base `4e229a8`; the implementation worktree starts from the review-cleared master tip so its plan and ledger travel with the branch. Stop review-ready; merge still requires implementation review and canonical A/B.
 
 - **2026-07-12 (P2.8 Slice 1 UI primitive plan OPENED — implementation waits for review)**: Plan `docs/superpowers/plans/2026-07-12-p2-8-slice-1-ui-primitives.md` targets only the minimum foundation plus the two audited first repairs. One JSON token authority supplies TypeScript behavior and pre-mount CSS variables; shell overlay classification is exactly 960px with 961/959 gates; modal/overlay radius is not granted an exception and stays at or below 8px. Focused primitives are compact controls/PageHeader, nine machine-state presentations over the common eight-state vocabulary, transient Drawer, consequence-aware ConfirmDialog, compact stage-owned BoundedProgress, and typed DataTable row actions/inline expansion. Holdings is the first full consumer and repays its `window.confirm`; Investor Profile receives presentation/state/class repair only, with Slice 5 semantics explicitly excluded. Frontend baseline was re-run at `32 files / 296 tests`; the plan's exact ledger is six files and +46 tests (`38/342`). Static gates freeze App/Research/Settings/api/styles/backend, retain four known legacy confirm owners, prohibit copied shell breakpoints/radius exceptions/hard delete, and require class coverage. Next: plan review; no implementation or branch merge is authorized yet.
 

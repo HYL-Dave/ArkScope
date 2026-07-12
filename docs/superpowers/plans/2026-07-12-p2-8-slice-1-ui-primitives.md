@@ -5,8 +5,9 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: DRAFT FOR REVIEW, 2026-07-12.** Do not implement or merge before
-> plan review clears. Implementation stops review-ready on an isolated branch.
+> **Status: REVIEW-CLEARED, 2026-07-12; IMPLEMENTATION AUTHORIZED.** Review MF1
+> and SF1-SF4 are absorbed in this document. Implementation stops review-ready
+> on an isolated branch and does not merge without a separate user decision.
 
 **Goal:** Establish the minimum canonical UI primitive foundation and use it to repair the missing Holdings and Investor Profile presentation without changing their domain behavior.
 
@@ -14,7 +15,7 @@
 
 **Tech Stack:** React 18, TypeScript 5.5, Vite 5, Vitest/jsdom, CSS custom properties, `lucide-react` icons, existing npm workspace tooling.
 
-**Implementation base:** `4e229a8` on `master` (canonical written design approved and Claude Design companion synchronized). Create an isolated worktree/branch from this exact base. Full comparison uses this commit versus the final implementation tip. Do not merge in this plan; stop review-ready.
+**Behavioral A/B base:** `4e229a8` (canonical written design approved and Claude Design companion synchronized). Create the implementation worktree from the current review-cleared `master` tip so this plan and its ledger are present; intervening commits after `4e229a8` are docs-only. Full behavioral comparison uses `4e229a8` versus the final implementation tip. Do not merge in this plan; stop review-ready.
 
 ---
 
@@ -61,6 +62,10 @@
 10. No backend, API DTO, database, route, model, navigation, topbar, Research,
     Settings IA, or Reference-store change belongs here. If a green test seems
     to require one, stop and report instead of widening the slice.
+11. Shared layout classes use the `ui-` namespace. The legacy Holdings-only
+    tokens `section-band`, `section-head`, `actions`, `status-grid`, `metric`,
+    `metric-label`, and `inline-form` are migrated, not promoted into ambiguous
+    global vocabulary.
 
 ## Domain State Mapping
 
@@ -796,7 +801,7 @@ function stubMatchMedia(matches: boolean) {
 Add these named contracts:
 
 1. `closed_drawer_renders_nothing_and_reserves_no_width`
-2. `open_drawer_is_a_labelled_modal_and_focuses_close`
+2. `open_drawer_close_button_closes_and_restores_its_trigger`
 3. `drawer_escape_closes_and_restores_the_trigger`
 4. `drawer_tabs_between_its_own_focusable_controls`
 5. `drawer_marks_961px_as_wide`
@@ -804,7 +809,7 @@ Add these named contracts:
 7. `confirm_dialog_focuses_cancel_for_a_destructive_action`
 8. `confirm_dialog_cancel_does_not_confirm_and_restores_focus`
 9. `confirm_dialog_confirms_once_then_uses_fallback_if_the_trigger_disappears`
-10. `confirm_dialog_escape_uses_cancel_not_confirm`
+10. `confirm_dialog_escape_cancels_only_when_not_busy`
 
 The critical assertions are:
 
@@ -818,8 +823,14 @@ expect(onConfirm).toHaveBeenCalledTimes(1);
 expect(onCancel).not.toHaveBeenCalled();
 ```
 
+Test 2 must focus the visible close button, click it, assert `onClose` exactly
+once, and assert focus returns to the supplied trigger. Escape/backdrop coverage
+does not substitute for the visible close affordance.
+
 Test 9 removes the original trigger in its confirm handler, closes the dialog,
 and proves focus lands on the supplied `fallbackFocusRef`.
+Test 10 proves idle Escape calls Cancel and never Confirm, then rerenders with
+`busy=true` and proves Escape calls neither callback.
 
 The restore test must render a real trigger and toggle `open` from component
 state. It must not call the primitive function directly.
@@ -881,6 +892,7 @@ export function useOverlayFocus({
     initial.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onEscapeRef.current();
@@ -973,7 +985,13 @@ export function Drawer({
       >
         <header className="ui-overlay-head">
           <h2 id={titleId}>{title}</h2>
-          <IconButton ref={closeRef} label="關閉" tone="ghost" icon={<X size={18} />} />
+          <IconButton
+            ref={closeRef}
+            label="關閉"
+            tone="ghost"
+            icon={<X size={18} />}
+            onClick={onClose}
+          />
         </header>
         <div className="ui-drawer-body">{children}</div>
         {footer ? <footer className="ui-drawer-footer">{footer}</footer> : null}
@@ -1032,7 +1050,9 @@ export function ConfirmDialog({
     initialFocusRef: cancelRef,
     returnFocusRef,
     fallbackFocusRef,
-    onEscape: onCancel,
+    onEscape: () => {
+      if (!busy) onCancel();
+    },
   });
   if (!open) return null;
 
@@ -1194,6 +1214,9 @@ expect(host!.textContent).toContain("已達上界，等待伺服器確認");
 expect(host!.textContent).toContain("結果：AI 卡片列表");
 expect(host!.querySelector('[role="progressbar"]')).toBeNull();
 expect(host!.querySelector('[data-progress-phase="awaiting-confirmation"]')).not.toBeNull();
+expect(host!.querySelector(".ui-bounded-progress")?.hasAttribute("aria-live")).toBe(false);
+expect(host!.querySelector('[role="status"][aria-live="polite"]')?.textContent)
+  .toContain("已達上界");
 ```
 
 The test must distinguish `overallElapsedMs=930_000` from
@@ -1261,6 +1284,13 @@ export function BoundedProgress({
     && stageBoundMs != null
     && stageElapsedMs >= stageBoundMs;
   const phase = awaitingConfirmation ? "awaiting-confirmation" : status;
+  const announcement = awaitingConfirmation
+    ? "已達上界，等待伺服器確認"
+    : status === "succeeded"
+      ? "工作完成"
+      : status === "interrupted"
+        ? "工作已中止"
+        : null;
 
   if (status === "failed") {
     return (
@@ -1272,7 +1302,7 @@ export function BoundedProgress({
   }
 
   return (
-    <section className="ui-bounded-progress" data-progress-phase={phase} aria-live="polite">
+    <section className="ui-bounded-progress" data-progress-phase={phase}>
       <div className="ui-bounded-progress-head">
         <StatusBadge state={stateFor(status)} label={stageLabel} />
         <span className="ui-bounded-progress-overall">總耗時 {formatElapsed(overallElapsedMs)}</span>
@@ -1283,6 +1313,11 @@ export function BoundedProgress({
       </div>
       {awaitingConfirmation ? (
         <div className="ui-bounded-progress-grace">已達上界，等待伺服器確認</div>
+      ) : null}
+      {announcement ? (
+        <span className="ui-visually-hidden" role="status" aria-live="polite">
+          {announcement}
+        </span>
       ) : null}
       <div className="ui-bounded-progress-meta">
         <span>{continuesAfterNavigation ? "離開頁面後繼續" : "離開頁面後不保證追蹤"}</span>
@@ -1299,7 +1334,9 @@ export function BoundedProgress({
 ```
 
 There is intentionally no `progress` element, percentage, ETA, persistence,
-job registry, or polling behavior.
+job registry, or polling behavior. The elapsed-time container is not a live
+region; only grace and terminal state transitions are announced, so polling
+updates cannot be read aloud every second.
 
 - [ ] **Step 4: Add compact BoundedProgress styles**
 
@@ -1328,6 +1365,17 @@ Append:
 .ui-bounded-progress-meta { color: var(--muted); font-size: 11.5px; }
 .ui-bounded-progress-grace { color: var(--wait); font-weight: 600; }
 .ui-bounded-progress > .ui-button { justify-self: start; }
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 ```
 
 - [ ] **Step 5: Export and run the focused battery**
@@ -1408,6 +1456,30 @@ The menu trigger must be discoverable as `button[aria-label="NVDA 操作"]`, use
 `aria-haspopup="menu"`, and expose `aria-expanded`. Menu item labels remain
 text, not icon-only commands. Test 3 stubs the menu bounding rectangle below
 `window.innerHeight`, asserts `data-placement="up"`, then selects one action.
+Because placement runs in `useLayoutEffect`, install the single prototype stub
+**before** clicking the trigger:
+
+```ts
+const rect = (top: number, height: number): DOMRect => ({
+  x: 0,
+  y: top,
+  top,
+  left: 0,
+  width: 132,
+  height,
+  right: 132,
+  bottom: top + height,
+  toJSON: () => ({}),
+});
+Object.defineProperty(window, "innerHeight", { value: 600, configurable: true });
+vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () {
+  if ((this as Element).classList.contains("ui-row-action-menu")) return rect(580, 120);
+  if ((this as Element).matches('button[aria-haspopup="menu"]')) return rect(500, 28);
+  return rect(0, 0);
+});
+
+// Only now click the trigger; stubbing the menu element afterward is too late.
+```
 
 - [ ] **Step 2: Write Holdings migration RED tests before changing production**
 
@@ -1540,6 +1612,7 @@ function RowActionMenu<Row>({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       if (event.key !== "Escape") return;
       event.preventDefault();
       setOpen(false);
@@ -1680,17 +1753,17 @@ Append to `primitives.css`:
 .ui-row-action-menu button:hover:not(:disabled), .ui-row-action-menu button:focus-visible { background: var(--panel2); outline: none; }
 .ui-row-action-menu button.danger { color: var(--bad); }
 
-.section-band { width: 100%; padding: var(--space-4) 0; border-top: 1px solid var(--border); }
-.section-band:first-of-type { border-top: 0; padding-top: 0; }
-.section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
-.section-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
-.actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2); }
-.metric { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--panel); }
-.metric-label { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: var(--space-1); }
-.inline-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); align-items: end; }
-.inline-form label { display: grid; gap: var(--space-1); color: var(--muted); font-size: 11.5px; }
-.inline-form input, .inline-form select, .inline-form textarea { min-height: var(--control-height-default); min-width: 0; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel2); color: var(--fg); font: inherit; }
+.ui-section-band { width: 100%; padding: var(--space-4) 0; border-top: 1px solid var(--border); }
+.ui-section-band:first-of-type { border-top: 0; padding-top: 0; }
+.ui-section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.ui-section-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
+.ui-action-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ui-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2); }
+.ui-metric { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--panel); }
+.ui-metric-label { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: var(--space-1); }
+.ui-inline-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); align-items: end; }
+.ui-inline-form label { display: grid; gap: var(--space-1); color: var(--muted); font-size: 11.5px; }
+.ui-inline-form input, .ui-inline-form select, .ui-inline-form textarea { min-height: var(--control-height-default); min-width: 0; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel2); color: var(--fg); font: inherit; }
 ```
 
 These are full-width bands, not floating section cards. Account metrics are
@@ -1702,6 +1775,11 @@ Apply these structural changes without changing API calls:
 
 1. Import `PortfolioSyncChange` from `api.ts` and the green UI exports from
    `./ui`.
+   Replace every Holdings command `<button>` with shared `Button`/`IconButton`;
+   `btn-primary` and `btn-secondary` must disappear. Replace
+   `section-band`, `section-head`, `actions`, `status-grid`, `metric`,
+   `metric-label`, and `inline-form` with their `ui-*` names from Step 5.
+   `table-wrap` disappears because DataTable owns its responsive wrapper.
 2. Add `pendingClose: PortfolioPosition | null` state,
    `closeTriggerRef = useRef<HTMLElement | null>(null)`, and
    `closedFilterRef = useRef<HTMLInputElement | null>(null)`, then remove every
@@ -1783,9 +1861,10 @@ Run:
 ```bash
 rg -n "window\.confirm|confirm\(" apps/arkscope-web/src/Holdings.tsx
 rg -n "hard.?delete|permanent.?delete" apps/arkscope-web/src/Holdings.tsx
+rg -n 'className="(btn-primary|btn-secondary|table-wrap|section-band|section-head|actions|status-grid|metric|metric-label|inline-form)(\s|\")' apps/arkscope-web/src/Holdings.tsx
 ```
 
-Expected: both commands return no matches.
+Expected: all three commands return no matches.
 
 - [ ] **Step 9: Commit Task 5**
 
