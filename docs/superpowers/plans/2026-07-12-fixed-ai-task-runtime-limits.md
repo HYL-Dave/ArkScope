@@ -70,7 +70,7 @@ merge in this plan; stop review-ready.
 - Create: `src/fixed_task_runtime_config.py`
 - Create: `tests/test_fixed_task_runtime_config.py`
 
-- [ ] **Step 1: Write registry/default RED tests**
+- [x] **Step 1: Write registry/default RED tests**
 
 ```python
 from src.fixed_task_runtime_config import (
@@ -107,7 +107,7 @@ def test_defaults_are_900_seconds(tmp_path, monkeypatch):
         assert value.warning is None
 ```
 
-- [ ] **Step 2: Write persistence, precedence, and degradation RED tests**
+- [x] **Step 2: Write persistence, precedence, and degradation RED tests**
 
 Add named tests covering all of these exact cases:
 
@@ -134,7 +134,7 @@ def test_env_overrides_db_without_rewriting_saved_value(tmp_path, monkeypatch):
     assert store.get_all()["card_synthesis"].model_timeout_s == 600.0
 ```
 
-- [ ] **Step 3: Write validation and atomicity RED tests**
+- [x] **Step 3: Write validation and atomicity RED tests**
 
 Use parametrization for `59`, `3601`, `float("nan")`, `float("inf")`, non-numeric input, and unknown task `ai_research`. The atomic test starts with synthesis `700`, attempts `{synthesis: 800, translation: 59}`, expects `ValueError`, then proves synthesis is still `700` and translation is absent.
 
@@ -151,7 +151,7 @@ def test_set_many_validates_every_value_before_writing(tmp_path):
     assert "card_translation" not in rows
 ```
 
-- [ ] **Step 4: Run Task 1 tests and verify RED**
+- [x] **Step 4: Run Task 1 tests and verify RED**
 
 Run:
 
@@ -161,7 +161,7 @@ pytest -q tests/test_fixed_task_runtime_config.py
 
 Expected: collection fails because `src.fixed_task_runtime_config` does not exist.
 
-- [ ] **Step 5: Implement the registry and DTOs**
+- [x] **Step 5: Implement the registry and DTOs**
 
 The public shape is fixed:
 
@@ -215,7 +215,7 @@ class FixedTaskRuntimeSettings:
 
 At import time, assert every registry key equals `definition.task` and belongs to `{task.id for task in model_routing.TASKS}`. This is a development invariant, not runtime discovery.
 
-- [ ] **Step 6: Implement validation and the SQLite store**
+- [x] **Step 6: Implement validation and the SQLite store**
 
 Use the existing profile DB path rule,
 `sqlite3.connect(self._db_path, timeout=10.0)`, and
@@ -333,7 +333,7 @@ class FixedTaskRuntimeStore:
 Define `_SCHEMA` as the SQL block above and `_now()` with UTC ISO seconds, matching
 `research_runtime_config.py`.
 
-- [ ] **Step 7: Implement one-pass resolution**
+- [x] **Step 7: Implement one-pass resolution**
 
 `resolve_all_fixed_task_runtime(store=None)` reads DB rows once, then resolves each registry member independently. A malformed env value affects only its own task. DB-read exceptions are logged and become per-task warnings; they do not prevent startup.
 
@@ -348,7 +348,7 @@ def resolve_fixed_task_runtime(
     return resolve_all_fixed_task_runtime(store=store)[task]
 ```
 
-- [ ] **Step 8: Run Task 1 tests and verify GREEN**
+- [x] **Step 8: Run Task 1 tests and verify GREEN**
 
 Run:
 
@@ -358,7 +358,7 @@ pytest -q tests/test_fixed_task_runtime_config.py
 
 Expected: all Task 1 tests pass with no warnings.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```bash
 git add src/fixed_task_runtime_config.py tests/test_fixed_task_runtime_config.py
