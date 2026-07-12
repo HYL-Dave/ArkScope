@@ -285,29 +285,52 @@ describe("overlay focus contracts", () => {
   });
 
   it("confirm_dialog_escape_cancels_only_when_not_busy", async () => {
+    stubMatchMedia(false);
+    const onDrawerClose = vi.fn();
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
-    const dialog = (busy: boolean) => (
-      <ConfirmDialog
-        open
-        busy={busy}
-        title="刪除觀察清單"
-        consequence="刪除後無法復原。"
-        confirmLabel="刪除"
-        onConfirm={onConfirm}
-        onCancel={onCancel}
-      />
+    const overlays = (busy: boolean) => (
+      <>
+        <Drawer open title="篩選條件" onClose={onDrawerClose}>
+          <button>套用</button>
+        </Drawer>
+        <ConfirmDialog
+          open
+          busy={busy}
+          title="刪除觀察清單"
+          consequence="刪除後無法復原。"
+          confirmLabel="刪除"
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      </>
     );
 
-    await render(dialog(false));
+    await render(overlays(true));
+    const drawer = document.querySelector<HTMLElement>(".ui-drawer")!;
+    const confirmDialog = document.querySelector<HTMLElement>(".ui-confirm-dialog")!;
+    expect.soft(document.activeElement).toBe(confirmDialog);
     await act(async () => pressKey("Escape"));
-    expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect.soft(onDrawerClose).not.toHaveBeenCalled();
+    expect.soft(onCancel).not.toHaveBeenCalled();
+    expect.soft(onConfirm).not.toHaveBeenCalled();
+    expect.soft(drawer.isConnected).toBe(true);
 
+    onDrawerClose.mockClear();
     onCancel.mockClear();
-    await rerender(dialog(true));
+    await rerender(overlays(false));
     await act(async () => pressKey("Escape"));
-    expect(onCancel).not.toHaveBeenCalled();
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect.soft(onDrawerClose).not.toHaveBeenCalled();
+    expect.soft(onCancel).toHaveBeenCalledTimes(1);
+    expect.soft(onConfirm).not.toHaveBeenCalled();
+    expect.soft(drawer.isConnected).toBe(true);
+
+    onDrawerClose.mockClear();
+    onCancel.mockClear();
+    await rerender(overlays(true));
+    await act(async () => pressKey("Escape"));
+    expect.soft(onDrawerClose).not.toHaveBeenCalled();
+    expect.soft(onCancel).not.toHaveBeenCalled();
+    expect.soft(onConfirm).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,8 @@ function focusables(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
 }
 
+const activeOverlays: symbol[] = [];
+
 export function useOverlayFocus({
   open,
   containerRef,
@@ -34,12 +36,19 @@ export function useOverlayFocus({
   useEffect(() => {
     if (!open || !containerRef.current) return;
     const container = containerRef.current;
+    const overlay = Symbol("overlay");
     const previous = returnFocusRef?.current
       ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-    const initial = initialFocusRef?.current ?? focusables(container)[0] ?? container;
+    const items = focusables(container);
+    const requestedInitial = initialFocusRef?.current;
+    const initial = requestedInitial && items.includes(requestedInitial)
+      ? requestedInitial
+      : items[0] ?? container;
+    activeOverlays.push(overlay);
     initial.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (activeOverlays[activeOverlays.length - 1] !== overlay) return;
       if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         event.preventDefault();
@@ -66,6 +75,10 @@ export function useOverlayFocus({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      const overlayIndex = activeOverlays.lastIndexOf(overlay);
+      const wasTopmost = overlayIndex === activeOverlays.length - 1;
+      if (overlayIndex >= 0) activeOverlays.splice(overlayIndex, 1);
+      if (!wasTopmost) return;
       if (previous?.isConnected) previous.focus();
       else fallbackFocusRef?.current?.focus();
     };
