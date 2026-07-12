@@ -36,11 +36,17 @@ Implementation branch: `codex/p2-8-settings-stabilization`, based on
 - Task 6 — `113e5fd fix: rename investor risk appetite label`: RED because the
   production Investor Profile and mismatch labels still exposed
   `風險胃納`.
+- Review fix — `fe83011 fix: keep skipped scheduler history truthful`: an
+  independent review found that three real writer-lock paths can persist
+  durable `skipped`, while the UI mapped it to `empty`/`尚未執行`; it also found
+  authored scheduler copy exposing `job_runs`, `data/locks/`, and app/CLI
+  internals. RED pinned neutral `上次已跳過` rendering, no status badge, the
+  helper mapping, and user-language-only protection copy before the fix.
 
 ### Closed gates
 
-- Focused frontend: `9` owner files / `62` tests passed.
-- Full frontend: `41` files / `365` tests passed, exactly `+3` files / `+18`
+- Focused frontend: `9` owner files / `63` tests passed.
+- Full frontend: `41` files / `366` tests passed, exactly `+3` files / `+19`
   tests over the `38 / 347` baseline. Typecheck and production build passed;
   only the existing Vite chunk-size warning remains.
 - Backend/API byte boundary against `554e94b` is empty for
@@ -69,7 +75,9 @@ collected `4185` nodes across `216` files; the same four files timed out
 `test_signal_factors_p1.py`), and the remaining `3995` tests were exactly equal:
 `3894 passed / 27 failed / 1 error / 73 skipped / 20 warnings`. Problem sets,
 timeout sets, totals, and normalized per-file results are all equal. Reviewer
-canonical A/B is still required before merge.
+canonical A/B is still required before merge. The later review fix changed only
+TypeScript/TSX frontend files; the backend/API byte-identity gate remained
+empty, so it does not alter this backend fallback comparison.
 
 ---
 
@@ -133,9 +141,11 @@ canonical A/B is still required before merge.
 ### Planned test accounting
 
 - New test files: `3`.
-- New collected tests: `18`.
+- Original planned collected tests: `18`; final collected tests: `19` after one
+  RED-first implementation-review regression test for persisted skipped
+  scheduler history.
 - Existing tests rewritten in place: no net count change.
-- Expected final frontend accounting: `41` files / `365` tests.
+- Final frontend accounting: `41` files / `366` tests.
 - Expected backend collection delta: `+0 / -0`.
 
 If implementation changes these numbers, stop and reconcile every added or
@@ -1648,12 +1658,12 @@ npm run build --workspace apps/arkscope-web
 Expected:
 
 - `41` test files pass;
-- `365` tests pass;
+- `366` tests pass;
 - typecheck passes;
 - production build passes;
 - only the known Vite chunk-size warning may remain.
 
-If the count is not exactly `+18 / -0` from the `38 / 347` baseline, collect
+If the count is not exactly `+19 / -0` from the `38 / 347` baseline, collect
 base/head test names and reconcile before continuing.
 
 - [x] **Step 3: Run static scope and semantic ratchets**
@@ -1808,7 +1818,7 @@ Stop here. Do not merge. Request implementation review with emphasis on:
 3. disabled schedule neutrality;
 4. scroll ownership at 961/959/390;
 5. rendered copy rather than repository-wide string deletion;
-6. exact `+18 / -0` frontend accounting and backend `+0 / -0`.
+6. exact `+19 / -0` frontend accounting and backend `+0 / -0`.
 
 ---
 
