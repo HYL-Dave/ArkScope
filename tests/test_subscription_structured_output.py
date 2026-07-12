@@ -174,6 +174,55 @@ def test_chatgpt_oauth_default_effort_is_omitted(monkeypatch):
     assert "max_output_tokens" not in client.responses.calls[0]
 
 
+def test_chatgpt_oauth_waits_for_completed_function_item_arguments(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    stream = _FakeStream(
+        [
+            {
+                "type": "response.output_item.added",
+                "item": {
+                    "type": "function_call",
+                    "name": "emit_check",
+                    "call_id": "call-1",
+                },
+            },
+            {
+                "type": "response.output_item.done",
+                "item": {
+                    "type": "function_call",
+                    "name": "emit_check",
+                    "call_id": "call-1",
+                    "arguments": json.dumps({"ok": True}),
+                },
+            },
+            {"type": "response.completed", "response": {"output": []}},
+        ]
+    )
+    client = _FakeOpenAIClient(stream)
+    monkeypatch.setattr(mod, "_openai_client", lambda token, base_url, timeout_s: client)
+    monkeypatch.setattr(
+        mod,
+        "_refresh_chatgpt_token",
+        lambda **kwargs: StoredTokenRecord(access_token="fresh-oauth-token"),
+    )
+
+    result = mod.run_subscription_structured_output(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id="local:7",
+        model="gpt-5.4-mini",
+        system="sys",
+        user="user",
+        output_name="emit_check",
+        output_description="desc",
+        schema=_schema(),
+        token_store=object(),
+    )
+
+    assert result == {"ok": True}
+
+
 class _FakeTokenStore:
     def __init__(self, record):
         self.record = record

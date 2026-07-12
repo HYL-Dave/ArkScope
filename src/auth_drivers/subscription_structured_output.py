@@ -153,7 +153,10 @@ def _openai_structured_output(
                     _safe_message(RuntimeError(str(detail)), token),
                 )
 
-        items = _iter_output_items(terminal) or call_items
+        # Streaming emits ``output_item.added`` before the completed item. Prefer
+        # terminal output; otherwise inspect streamed items newest-first so a
+        # placeholder without arguments cannot mask the completed call.
+        items = _iter_output_items(terminal) or list(reversed(call_items))
         for item in items:
             if not isinstance(item, dict) or item.get("type") != "function_call":
                 continue
