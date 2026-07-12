@@ -115,7 +115,7 @@ const emptyCatalog: ModelCatalog = {
 const health: ProvidersHealthResponse = {
   providers: [
     { id: "polygon", label: "Polygon", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
-    { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
+    { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: "request_id=provider-health-check-000000000000000000000000000000000000000000000000000000000000000001", detail: "", signals: {}, key_import_suggested: false },
     {
       id: "fred",
       label: "FRED",
@@ -228,6 +228,17 @@ vi.mock("./api", async (importOriginal) => {
       },
     })),
     getProvidersHealth: vi.fn(async () => health),
+    getSAExtensionHealth: vi.fn(async () => ({
+      ok: false,
+      generated_at: "2026-07-12T00:00:00+00:00",
+      segments: [{
+        key: "capture_readback",
+        state: "warn" as const,
+        detail:
+          "No capture has arrived from the browser extension for the selected account; " +
+          "check the native-host binding and retry the extension health check.",
+      }],
+    })),
     getMacroSnapshot: vi.fn(async () => ({
       available: true,
       macro_db: "/tmp/macro_calendar.db",
@@ -515,5 +526,28 @@ describe("Settings provider config authority", () => {
     expect(group?.textContent).toContain("Client ID");
     expect(group?.textContent).toContain("各域用戶端 ID：");
     expect(group?.textContent).toContain("股價=21");
+  });
+
+  it("wraps_each_wide_data_source_table_in_an_explicit_scroll_owner", async () => {
+    await renderDataSources();
+    for (const id of [
+      "provider-health-scroll",
+      "sa-health-scroll",
+      "fred-snapshot-scroll",
+      "provider-config-scroll",
+      "schedule-scroll",
+    ]) {
+      const owner = host!.querySelector(`[data-testid='${id}']`);
+      expect(owner?.classList.contains("settings-table-scroll")).toBe(true);
+      expect(owner?.querySelector("table")).not.toBeNull();
+    }
+  });
+
+  it("marks_long_runtime_content_as_wrap_capable", async () => {
+    await renderDataSources();
+    const wrapCells = Array.from(host!.querySelectorAll(".settings-wrap-text"));
+    expect(wrapCells.some((cell) => cell.textContent?.includes("native-host binding"))).toBe(true);
+    expect(wrapCells.some((cell) => cell.textContent?.includes("Treasury Securities"))).toBe(true);
+    expect(host!.querySelector(".ds-last-run-cell.settings-wrap-text")).not.toBeNull();
   });
 });

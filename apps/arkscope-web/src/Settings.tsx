@@ -1834,30 +1834,32 @@ function DataSourcesSection() {
         {!health ? (
           <p className="muted tiny">loading…</p>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr><th>Provider</th><th>狀態</th><th>金鑰</th><th>最近成功</th><th>最近錯誤</th></tr>
-            </thead>
-            <tbody>
-              {health.providers.map((p) => (
-                <tr key={p.id}>
-                  <td title={p.detail}>
-                    {p.label}
-                    {fredProviderDetail(p) && (
-                      <div className="muted tiny">{fredProviderDetail(p)}</div>
-                    )}
-                  </td>
-                  <td><ProviderHealthState provider={p} /></td>
-                  <td>
-                    {p.key_source === "not_required" ? "免金鑰" : p.key_source}
-                    {p.key_import_suggested && <span className="muted tiny"> · 建議匯入</span>}
-                  </td>
-                  <td>{shortTs(p.last_success_at)}</td>
-                  <td className="muted">{p.last_error ? p.last_error.slice(0, 60) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="settings-table-scroll" data-testid="provider-health-scroll">
+            <table className="data-table settings-provider-health-table">
+              <thead>
+                <tr><th>Provider</th><th>狀態</th><th>金鑰</th><th>最近成功</th><th>最近錯誤</th></tr>
+              </thead>
+              <tbody>
+                {health.providers.map((p) => (
+                  <tr key={p.id}>
+                    <td className="settings-wrap-text" title={p.detail}>
+                      {p.label}
+                      {fredProviderDetail(p) && (
+                        <div className="muted tiny">{fredProviderDetail(p)}</div>
+                      )}
+                    </td>
+                    <td><ProviderHealthState provider={p} /></td>
+                    <td>
+                      {p.key_source === "not_required" ? "免金鑰" : p.key_source}
+                      {p.key_import_suggested && <span className="muted tiny"> · 建議匯入</span>}
+                    </td>
+                    <td>{shortTs(p.last_success_at)}</td>
+                    <td className="muted settings-wrap-text">{p.last_error ? p.last_error.slice(0, 60) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -1884,25 +1886,27 @@ function DataSourcesSection() {
             <p className="muted tiny">
               {saExtensionHealth.ok ? "鏈路可用" : "鏈路有中斷"} · {shortTs(saExtensionHealth.generated_at)}
             </p>
-            <table className="data-table" style={{ tableLayout: "fixed", width: "100%" }}>
-              <thead>
-                <tr><th>段落</th><th>狀態</th><th>細節</th></tr>
-              </thead>
-              <tbody>
-                {displaySAExtensionSegments(saExtensionHealth.segments).map((row) => (
-                  <tr key={row.key}>
-                    <td>{row.label}</td>
-                    <td>
-                      <StatusBadge
-                        state={saSegmentCommonState(row.tone)}
-                        label={row.tone === "ok" ? "正常" : row.tone === "warn" ? "注意" : "失敗"}
-                      />
-                    </td>
-                    <td className="muted" style={{ overflowWrap: "anywhere" }}>{row.detail}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="settings-table-scroll" data-testid="sa-health-scroll">
+              <table className="data-table settings-sa-health-table">
+                <thead>
+                  <tr><th>段落</th><th>狀態</th><th>細節</th></tr>
+                </thead>
+                <tbody>
+                  {displaySAExtensionSegments(saExtensionHealth.segments).map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.label}</td>
+                      <td>
+                        <StatusBadge
+                          state={saSegmentCommonState(row.tone)}
+                          label={row.tone === "ok" ? "正常" : row.tone === "warn" ? "注意" : "失敗"}
+                        />
+                      </td>
+                      <td className="muted settings-wrap-text">{row.detail}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
@@ -1919,24 +1923,26 @@ function DataSourcesSection() {
                 : `尚無本地快照 · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`}
             </p>
             {macroSnapshot.items.length > 0 ? (
-              <table className="data-table" style={{ tableLayout: "fixed", width: "100%" }}>
-                <thead>
-                  <tr><th>指標</th><th>值</th><th>觀測日</th><th>抓取時間</th></tr>
-                </thead>
-                <tbody>
-                  {macroSnapshot.items.slice(0, 11).map((item) => (
-                    <tr key={item.series_id}>
-                      <td style={{ overflowWrap: "anywhere" }}>
-                        {item.label}
-                        <div className="muted tiny">{item.series_id}{item.title ? ` · ${item.title}` : ""}</div>
-                      </td>
-                      <td>{formatMacroValue(item)}</td>
-                      <td>{shortDate(item.observation_date)}</td>
-                      <td>{shortDate(item.fetched_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="settings-table-scroll" data-testid="fred-snapshot-scroll">
+                <table className="data-table settings-fred-table">
+                  <thead>
+                    <tr><th>指標</th><th>值</th><th>觀測日</th><th>抓取時間</th></tr>
+                  </thead>
+                  <tbody>
+                    {macroSnapshot.items.slice(0, 11).map((item) => (
+                      <tr key={item.series_id}>
+                        <td className="settings-wrap-text">
+                          {item.label}
+                          <div className="muted tiny">{item.series_id}{item.title ? ` · ${item.title}` : ""}</div>
+                        </td>
+                        <td>{formatMacroValue(item)}</td>
+                        <td>{shortDate(item.observation_date)}</td>
+                        <td>{shortDate(item.fetched_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <p className="muted tiny">本地 macro_calendar.db 尚無可顯示的 FRED 觀測值。</p>
             )}
@@ -1968,7 +1974,8 @@ function DataSourcesSection() {
         {!cfg ? (
           <p className="muted tiny">loading…</p>
         ) : (
-          <table className="data-table ds-config">
+          <div className="settings-table-scroll" data-testid="provider-config-scroll">
+          <table className="data-table ds-config settings-provider-config-table">
             <thead>
               <tr><th>Provider</th><th>欄位</th><th>目前值（來源）</th><th>設定</th><th>連線測試</th></tr>
             </thead>
@@ -2091,6 +2098,7 @@ function DataSourcesSection() {
                 })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -2099,7 +2107,8 @@ function DataSourcesSection() {
         {!schedule ? (
           <p className="muted tiny">loading…</p>
         ) : (
-          <table className="data-table ds-schedule">
+          <div className="settings-table-scroll" data-testid="schedule-scroll">
+          <table className="data-table settings-schedule-table">
             <thead>
               <tr>
                 <th>來源</th><th>排程</th><th>間隔（分）</th><th>立即執行</th><th>最近一次</th>
@@ -2159,13 +2168,14 @@ function DataSourcesSection() {
                       </button>
                     )}
                   </td>
-                  <td className="muted tiny ds-last-run-cell">
+                  <td className="muted tiny ds-last-run-cell settings-wrap-text">
                     {renderLastRun(id, s)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
         <p className="muted tiny" style={{ marginTop: 8 }}>
           保護機制：同來源不重疊、IBKR Gateway 序列化、啟動時讀 job_runs 接續（手動剛跑過

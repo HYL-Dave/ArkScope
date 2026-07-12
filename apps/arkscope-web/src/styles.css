@@ -1836,6 +1836,21 @@ table.wl tbody tr.archived td {
 .source-run-counts {
   white-space: nowrap;
 }
+.settings-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.settings-provider-health-table { min-width: 760px; }
+.settings-sa-health-table { min-width: 720px; table-layout: auto; }
+.settings-fred-table { min-width: 760px; table-layout: auto; }
+.settings-provider-config-table { min-width: 940px; }
+.settings-schedule-table { min-width: 980px; table-layout: fixed; }
+.settings-wrap-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .ds-chip {
   display: inline-block;
   padding: 1px 8px;
@@ -1851,15 +1866,12 @@ table.wl tbody tr.archived td {
 .ds-missing_key { color: #f85149; border-color: #f8514966; background: #f8514914; }
 .ds-disabled { color: var(--muted); text-decoration: line-through; }
 .ds-running { color: #58a6ff; border-color: #58a6ff66; background: #58a6ff14; }
-.ds-schedule td { vertical-align: middle; }
-.ds-schedule {
-  table-layout: fixed;
-}
-.ds-schedule th:nth-child(1) { width: 22%; }
-.ds-schedule th:nth-child(2) { width: 10%; }
-.ds-schedule th:nth-child(3) { width: 16%; }
-.ds-schedule th:nth-child(4) { width: 16%; }
-.ds-schedule th:nth-child(5) { width: 36%; }
+.settings-schedule-table td { vertical-align: middle; }
+.settings-schedule-table th:nth-child(1) { width: 22%; }
+.settings-schedule-table th:nth-child(2) { width: 10%; }
+.settings-schedule-table th:nth-child(3) { width: 16%; }
+.settings-schedule-table th:nth-child(4) { width: 16%; }
+.settings-schedule-table th:nth-child(5) { width: 36%; }
 .ds-interval {
   width: 72px;
   background: var(--bg);
