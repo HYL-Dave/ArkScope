@@ -55,10 +55,19 @@
   `tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`; all three
   logs share SHA-256
   `bad8cae6a1dd39f36318ca7a571577e7fa6bc1163722613b02294c49cd69893d`.
-  Full counters and failure sets were never
-  emitted, so canonical A/B is **PENDING / NOT PASS**. Preserved evidence lives
-  under `/tmp/arkscope-p2.8-s1-ab.nxivgf/logs/`. The final post-attempt commits
-  touch only `apps/arkscope-web`; `src` and `tests` remain unchanged.
+  Full counters and failure sets were never emitted in the implementation
+  environment, so its attempt stayed **PENDING**; preserved evidence lives
+  under `/tmp/arkscope-p2.8-s1-ab.nxivgf/logs/`.
+  **Reviewer canonical A/B ✅ PASS (Fable, 2026-07-12, no hang):** virgin
+  `git archive` of base `820d1b3` (merge-base) versus head `c7d9c41`,
+  sequential single-process full pytest. Both sides identical:
+  `30 failed / 4074 passed / 74 skipped / 18 warnings / 7 errors`; failure
+  sets empty in both directions; collect added/removed `0/0`. Work dir
+  `/tmp/ab_slice1_AoqO`. The frontend-only slice leaves the backend
+  byte-identical, as required. Reviewer also re-ran the frontend suite in the
+  branch worktree (`38 files / 347 tests` PASS + typecheck + build), the
+  no-PG smoke, and every Task 7 Step 3 static ratchet independently — all
+  green, exactly four legacy confirmation owners remain.
 - **Visual evidence:** Holdings and Investor Profile were inspected at
   1440x900, 1024x768, 961x768, 959x768, and 390x844. At 390px the page has no
   body overflow; Holdings keeps its 705px financial table inside a 364px
@@ -69,10 +78,21 @@
   failure is the pre-existing Settings heading-order debt owned by a later
   Settings/Profile slice.
 - **Design companion:** the pre-slice companion sync remains plan
-  `dfd45b4f7dbb`. This session exposes no DesignSync tool/resource, so the
-  required component specimens and `radius-lg` read-back were not fabricated.
-  External companion closeout remains pending and blocks marking the visual
-  line complete, but does not justify an app-code workaround.
+  `dfd45b4f7dbb`. The implementation session exposed no DesignSync tool, so it
+  correctly reported this gate pending rather than fabricating it.
+  **Slice 1 companion sync ✅ COMPLETE (Fable, authenticated session,
+  2026-07-12, DesignSync plan `plan_f9c9ea59626141ed_14c603dcda45`, 9 files):**
+  `--radius-lg` reconciled `10px -> 8px` as a legacy alias (no modal
+  exception, per locked decision 2; app token source has no `lg`), the
+  `spacing-radii` specimen relabeled to the 8px cap, and seven primitive
+  specimens added under the new **Primitives** group
+  (`guidelines/p28-controls / p28-page-header / p28-status / p28-overlays /
+  p28-bounded-progress / p28-data-table` + the existing `shell-contract`
+  card), plus a readme snapshot update (slice-1 primitives implemented,
+  radius reconciliation resolved, lucide-react noted). Read-back verified:
+  `list_files` shows all six new paths; `tokens/spacing.css` re-fetched and
+  confirms `--radius-lg: 8px`. No Slice 2 shell or Slice 3 Research screens
+  were prebuilt.
 
 ---
 
