@@ -348,6 +348,83 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
     assert "JSON" in calls[0]["system"]
 
 
+@pytest.mark.parametrize(
+    ("provider", "invoke"),
+    [
+        (
+            "openai",
+            lambda cs: cs._synthesize_openai(
+                _packet(), "gpt-5.4-mini", effort="high"
+            ),
+        ),
+        (
+            "openai",
+            lambda cs: cs._translate_openai(
+                "gpt-5.4-mini",
+                "system",
+                '{"conclusion":"view"}',
+                {"type": "object"},
+                "Traditional Chinese",
+                effort="high",
+            ),
+        ),
+        (
+            "anthropic",
+            lambda cs: cs._synthesize_anthropic(
+                _packet(), "claude-sonnet-5", effort="high"
+            ),
+        ),
+        (
+            "anthropic",
+            lambda cs: cs._translate_anthropic(
+                "claude-sonnet-5",
+                "system",
+                '{"conclusion":"view"}',
+                {"type": "object"},
+                "Traditional Chinese",
+                effort="high",
+            ),
+        ),
+    ],
+)
+def test_subscription_effort_errors_never_retry_with_default(
+    monkeypatch,
+    provider,
+    invoke,
+):
+    from src import card_synthesis as cs
+    from src.auth_drivers.subscription_structured_output import (
+        SubscriptionStructuredOutputError,
+    )
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda selected_provider: _oauth_resolution(
+            selected_provider,
+            "local:7" if selected_provider == "openai" else "local:2",
+        ),
+    )
+
+    def fail(**kwargs):
+        calls.append(kwargs)
+        raise SubscriptionStructuredOutputError(
+            "provider_call_failed",
+            "Provider rejected the selected effort parameter.",
+        )
+
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        fail,
+    )
+
+    with pytest.raises(SubscriptionStructuredOutputError):
+        invoke(cs)
+
+    assert [call["provider"] for call in calls] == [provider]
+    assert calls[0]["effort"] == "high"
+
+
 def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypatch):
     from types import SimpleNamespace
 

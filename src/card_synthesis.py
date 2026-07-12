@@ -170,6 +170,15 @@ def _subscription_structured_output_if_active(
     )
 
 
+def _is_subscription_structured_output_error(exc: BaseException) -> bool:
+    """Keep subscription calls on the exact user-selected effort."""
+    from src.auth_drivers.subscription_structured_output import (
+        SubscriptionStructuredOutputError,
+    )
+
+    return isinstance(exc, SubscriptionStructuredOutputError)
+
+
 def _build_user_message(packet: EvidencePacket, personalization_context: str = "") -> str:
     parts: list[str] = []
     if packet.question:
@@ -245,6 +254,8 @@ def _synthesize_anthropic(
     except AnthropicRefusalError:
         raise  # zero-fallback contract: a refusal is never retried (MF6)
     except Exception as exc:
+        if _is_subscription_structured_output_error(exc):
+            raise
         if effort != "default" and looks_like_effort_error(exc):
             synth = run_once("default")
             return synth, {
@@ -314,6 +325,8 @@ def _synthesize_openai(
     try:
         return run_once(effort), {"effort": effort}
     except Exception as exc:
+        if _is_subscription_structured_output_error(exc):
+            raise
         if effort != "default" and looks_like_effort_error(exc):
             synth = run_once("default")
             return synth, {
@@ -611,6 +624,8 @@ def _translate_anthropic(
     except AnthropicRefusalError:
         raise  # zero-fallback contract: a refusal is never retried (MF6)
     except Exception as exc:
+        if _is_subscription_structured_output_error(exc):
+            raise
         if effort != "default" and looks_like_effort_error(exc):
             logger.warning(
                 "Anthropic translation effort %s was rejected; retrying with provider default",
@@ -677,6 +692,8 @@ def _translate_openai(
     try:
         return run_once(effort)
     except Exception as exc:
+        if _is_subscription_structured_output_error(exc):
+            raise
         if effort != "default" and looks_like_effort_error(exc):
             logger.warning(
                 "OpenAI translation effort %s was rejected; retrying with provider default",
