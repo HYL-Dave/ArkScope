@@ -1810,6 +1810,32 @@ table.wl tbody tr.archived td {
 }
 
 /* ---- Data Sources (provider health chips + per-source schedule) ---- */
+.source-run-progress {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.source-run-current {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.source-run-track {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--panel2);
+}
+.source-run-track-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.source-run-counts {
+  white-space: nowrap;
+}
 .ds-chip {
   display: inline-block;
   padding: 1px 8px;
