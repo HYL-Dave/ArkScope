@@ -10,18 +10,22 @@ from fastapi import HTTPException
 from src.api.routes.config_routes import (
     CredentialCreate,
     CredentialUpdate,
+    FixedTaskRuntimeUpdate,
+    FixedTaskRuntimeValue,
     ModelRoutesUpdate,
     ModelTestRequest,
     ResearchRuntimeUpdate,
     RouteUpdate,
     add_credential,
     delete_credential,
+    delete_fixed_task_runtime,
     delete_research_runtime,
     model_catalog,
     run_provider_model_test,
     runtime_config,
     update_research_runtime,
     update_credential,
+    update_fixed_task_runtime,
     update_model_routes,
 )
 from src.model_credentials import CredentialStore, provider_credentials
@@ -133,6 +137,175 @@ def test_delete_research_runtime_reverts_to_profile_fallback(tmp_path, monkeypat
     assert res["research_runtime"]["session_timeout_s"] == 900.0
 
     cfg_mod.get_agent_config.cache_clear()
+
+
+def test_runtime_config_exposes_fixed_task_runtime(tmp_path, monkeypatch):
+    db = tmp_path / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
+    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_TIMEOUT_S", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_TIMEOUT_S", raising=False)
+
+    result = runtime_config(store=CredentialStore(db))
+
+    assert set(result["fixed_task_runtime"]) == {
+        "card_synthesis",
+        "card_translation",
+    }
+    assert result["fixed_task_runtime"]["card_synthesis"] == {
+        "task": "card_synthesis",
+        "model_timeout_s": 900.0,
+        "source": "default",
+        "db_saved": False,
+        "warning": None,
+    }
+
+
+def test_update_fixed_task_runtime_validates_then_gates_then_writes(
+    tmp_path, monkeypatch
+):
+    import src.api.routes.config_routes as cr
+    from src.fixed_task_runtime_config import FixedTaskRuntimeStore
+
+    db = tmp_path / "profile_state.db"
+    events = []
+    original_set_many = FixedTaskRuntimeStore.set_many
+
+    monkeypatch.setattr(
+        cr,
+        "require_profile_state_write",
+        lambda action, detail=None: events.append(("gate", action, detail)),
+    )
+
+    def record_set(self, values):
+        events.append(("set_many", dict(values)))
+        return original_set_many(self, values)
+
+    monkeypatch.setattr(FixedTaskRuntimeStore, "set_many", record_set)
+    result = update_fixed_task_runtime(
+        FixedTaskRuntimeUpdate(
+            tasks={
+                "card_synthesis": FixedTaskRuntimeValue(model_timeout_s=1200),
+                "card_translation": FixedTaskRuntimeValue(model_timeout_s=600),
+            }
+        ),
+        store=CredentialStore(db),
+    )
+
+    assert [event[0] for event in events] == ["gate", "set_many"]
+    assert events[0][1] == "fixed_task_runtime_update"
+    assert events[0][2] == {
+        "tasks": ["card_synthesis", "card_translation"]
+    }
+    assert result["fixed_task_runtime"]["card_synthesis"]["model_timeout_s"] == 1200.0
+    assert result["fixed_task_runtime"]["card_translation"]["model_timeout_s"] == 600.0
+
+
+def test_update_fixed_task_runtime_rejects_unknown_task_without_gate_or_write(
+    tmp_path, monkeypatch
+):
+    import src.api.routes.config_routes as cr
+    from src.fixed_task_runtime_config import FixedTaskRuntimeStore
+
+    db = tmp_path / "profile_state.db"
+    gates = []
+    monkeypatch.setattr(
+        cr,
+        "require_profile_state_write",
+        lambda *args, **kwargs: gates.append((args, kwargs)),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        update_fixed_task_runtime(
+            FixedTaskRuntimeUpdate(
+                tasks={"ai_research": FixedTaskRuntimeValue(model_timeout_s=900)}
+            ),
+            store=CredentialStore(db),
+        )
+
+    assert exc.value.status_code == 400
+    assert gates == []
+    assert FixedTaskRuntimeStore(db).get_all() == {}
+
+
+def test_update_fixed_task_runtime_rejects_empty_payload_without_gate(
+    tmp_path, monkeypatch
+):
+    import src.api.routes.config_routes as cr
+
+    gates = []
+    monkeypatch.setattr(
+        cr,
+        "require_profile_state_write",
+        lambda *args, **kwargs: gates.append((args, kwargs)),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        update_fixed_task_runtime(
+            FixedTaskRuntimeUpdate(tasks={}),
+            store=CredentialStore(tmp_path / "profile_state.db"),
+        )
+
+    assert exc.value.status_code == 400
+    assert gates == []
+
+
+def test_update_fixed_task_runtime_rejects_mixed_payload_atomically(
+    tmp_path, monkeypatch
+):
+    import src.api.routes.config_routes as cr
+    from src.fixed_task_runtime_config import FixedTaskRuntimeStore
+
+    db = tmp_path / "profile_state.db"
+    runtime_store = FixedTaskRuntimeStore(db)
+    runtime_store.set_many({"card_synthesis": 700})
+    gates = []
+    monkeypatch.setattr(
+        cr,
+        "require_profile_state_write",
+        lambda *args, **kwargs: gates.append((args, kwargs)),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        update_fixed_task_runtime(
+            FixedTaskRuntimeUpdate(
+                tasks={
+                    "card_synthesis": FixedTaskRuntimeValue(model_timeout_s=800),
+                    "card_translation": FixedTaskRuntimeValue(model_timeout_s=59),
+                }
+            ),
+            store=CredentialStore(db),
+        )
+
+    assert exc.value.status_code == 400
+    assert gates == []
+    rows = runtime_store.get_all()
+    assert rows["card_synthesis"].model_timeout_s == 700.0
+    assert "card_translation" not in rows
+
+
+def test_delete_fixed_task_runtime_gates_and_restores_defaults(
+    tmp_path, monkeypatch
+):
+    import src.api.routes.config_routes as cr
+    from src.fixed_task_runtime_config import FixedTaskRuntimeStore
+
+    db = tmp_path / "profile_state.db"
+    runtime_store = FixedTaskRuntimeStore(db)
+    runtime_store.set_many({"card_synthesis": 1200, "card_translation": 600})
+    calls = []
+    monkeypatch.setattr(
+        cr,
+        "require_profile_state_write",
+        lambda action, detail=None: calls.append((action, detail)),
+    )
+
+    result = delete_fixed_task_runtime(store=CredentialStore(db))
+
+    assert calls == [("fixed_task_runtime_delete", {})]
+    assert result["deleted"] is True
+    assert result["fixed_task_runtime"]["card_synthesis"]["model_timeout_s"] == 900.0
+    assert result["fixed_task_runtime"]["card_synthesis"]["source"] == "default"
+    assert result["fixed_task_runtime"]["card_translation"]["db_saved"] is False
 
 
 def test_update_model_routes_rejects_provider_model_mismatch():

@@ -5,6 +5,7 @@ Uses FastAPI TestClient to test all endpoints against real data.
 """
 
 import sys
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,20 @@ from src.analysis.service import SavedAnalysisReport
 from src.api.app import create_app
 from src.agents.config import get_agent_config
 from src.api.routes.analysis import AnalysisRunRequest, run_analysis
+
+
+def test_fixed_task_runtime_routes_mount_on_real_app():
+    try:
+        asyncio.get_event_loop_policy().get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+    routes = {
+        (getattr(route, "path", None), method)
+        for route in create_app().routes
+        for method in (getattr(route, "methods", None) or set())
+    }
+    assert ("/config/fixed-task-runtime", "PUT") in routes
+    assert ("/config/fixed-task-runtime", "DELETE") in routes
 
 
 @pytest.fixture(scope="module")

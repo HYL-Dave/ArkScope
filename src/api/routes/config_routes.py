@@ -20,6 +20,11 @@ from src.agents.config import (
     task_route,
 )
 from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
+from src.fixed_task_runtime_config import (
+    FixedTaskRuntimeStore,
+    resolve_all_fixed_task_runtime,
+    validate_fixed_task_runtime_updates,
+)
 from src.model_route_store import ModelRouteStore
 from src.model_task_canary import dispatch_task_model_test
 from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
@@ -101,6 +106,14 @@ class ResearchRuntimeUpdate(BaseModel):
     max_tool_calls: int
     session_timeout_s: float
     per_tool_timeout_s: float
+
+
+class FixedTaskRuntimeValue(BaseModel):
+    model_timeout_s: float
+
+
+class FixedTaskRuntimeUpdate(BaseModel):
+    tasks: dict[str, FixedTaskRuntimeValue]
 
 
 class ModelDiscoveryRequest(BaseModel):
@@ -195,6 +208,7 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
     store = _credential_store(store)
     route_store = ModelRouteStore(store.db_path)
     runtime_store = ResearchRuntimeStore(store.db_path)
+    fixed_runtime_store = FixedTaskRuntimeStore(store.db_path)
     cfg = get_agent_config()
 
     def key_set(name: str) -> bool:
@@ -224,6 +238,12 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
         "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
         "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
         "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
+        "fixed_task_runtime": {
+            task: settings.model_dump()
+            for task, settings in resolve_all_fixed_task_runtime(
+                store=fixed_runtime_store
+            ).items()
+        },
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
             "polygon": key_set("POLYGON_API_KEY"),
@@ -988,6 +1008,60 @@ def delete_research_runtime(store: CredentialStore = Depends(get_credential_stor
     return {
         "deleted": deleted,
         "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
+    }
+
+
+@router.put("/config/fixed-task-runtime")
+def update_fixed_task_runtime(
+    body: FixedTaskRuntimeUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Atomically persist model-execution limits for recognized fixed tasks."""
+    if not body.tasks:
+        raise HTTPException(status_code=400, detail="no fixed tasks supplied")
+    raw = {
+        task: value.model_timeout_s
+        for task, value in body.tasks.items()
+    }
+    try:
+        validated = validate_fixed_task_runtime_updates(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    store = _credential_store(store)
+    runtime_store = FixedTaskRuntimeStore(store.db_path)
+    require_profile_state_write(
+        "fixed_task_runtime_update",
+        {"tasks": sorted(validated)},
+    )
+    runtime_store.set_many(validated)
+    return {
+        "fixed_task_runtime": {
+            task: settings.model_dump()
+            for task, settings in resolve_all_fixed_task_runtime(
+                store=runtime_store
+            ).items()
+        }
+    }
+
+
+@router.delete("/config/fixed-task-runtime")
+def delete_fixed_task_runtime(
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Delete all DB overrides and return the effective defaults/env values."""
+    store = _credential_store(store)
+    runtime_store = FixedTaskRuntimeStore(store.db_path)
+    require_profile_state_write("fixed_task_runtime_delete", {})
+    deleted = runtime_store.delete_all()
+    return {
+        "deleted": deleted,
+        "fixed_task_runtime": {
+            task: settings.model_dump()
+            for task, settings in resolve_all_fixed_task_runtime(
+                store=runtime_store
+            ).items()
+        },
     }
 
 

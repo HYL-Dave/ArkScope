@@ -375,7 +375,7 @@ git commit -m "feat: add fixed task runtime store"
 - Modify: `tests/test_model_routing.py`
 - Modify: `tests/test_api.py`
 
-- [ ] **Step 1: Write additive GET and route-mount RED tests**
+- [x] **Step 1: Write additive GET and route-mount RED tests**
 
 ```python
 def test_runtime_config_exposes_fixed_task_runtime(tmp_path, monkeypatch):
@@ -407,7 +407,7 @@ def test_fixed_task_runtime_routes_mount_on_real_app():
     assert ("/config/fixed-task-runtime", "DELETE") in routes
 ```
 
-- [ ] **Step 2: Write PUT/DELETE RED tests with gate ordering**
+- [x] **Step 2: Write PUT/DELETE RED tests with gate ordering**
 
 Add these exact tests in `tests/test_model_routing.py`:
 
@@ -425,7 +425,7 @@ body = FixedTaskRuntimeUpdate(tasks={
 })
 ```
 
-- [ ] **Step 3: Run the route tests and verify RED**
+- [x] **Step 3: Run the route tests and verify RED**
 
 Run:
 
@@ -441,7 +441,7 @@ pytest -q \
 
 Expected: RED because the DTOs, response key, and routes do not exist.
 
-- [ ] **Step 4: Add DTOs and additive runtime response**
+- [x] **Step 4: Add DTOs and additive runtime response**
 
 ```python
 class FixedTaskRuntimeValue(BaseModel):
@@ -454,7 +454,7 @@ class FixedTaskRuntimeUpdate(BaseModel):
 
 Inside `runtime_config`, construct `FixedTaskRuntimeStore(store.db_path)`, call `resolve_all_fixed_task_runtime`, and serialize every registered task under `fixed_task_runtime`. Do not modify existing keys or route shapes.
 
-- [ ] **Step 5: Implement guarded PUT/DELETE**
+- [x] **Step 5: Implement guarded PUT/DELETE**
 
 PUT rules:
 
@@ -466,7 +466,7 @@ PUT rules:
 
 DELETE calls `require_profile_state_write("fixed_task_runtime_delete", {})`, deletes all rows, and returns `{deleted, fixed_task_runtime}`. Map `ValueError` to HTTP 400 without leaking a traceback.
 
-- [ ] **Step 6: Run config tests and verify GREEN**
+- [x] **Step 6: Run config tests and verify GREEN**
 
 Run:
 
@@ -476,7 +476,12 @@ pytest -q tests/test_fixed_task_runtime_config.py tests/test_model_routing.py te
 
 Expected: no new failures; existing model/research runtime behavior is unchanged.
 
-- [ ] **Step 7: Commit Task 2**
+Execution evidence: fixed-task + model-routing + isolated real-app mount tests
+passed `66`; the whole `test_api.py` command entered the repository's known
+TestClient lifespan hang after its non-lifespan tests, so the authoritative
+full-file comparison remains the Task 5 canonical A/B gate.
+
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add src/api/routes/config_routes.py tests/test_model_routing.py tests/test_api.py
