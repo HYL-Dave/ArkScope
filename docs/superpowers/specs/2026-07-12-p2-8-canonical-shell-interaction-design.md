@@ -1,10 +1,10 @@
 # P2.8 Canonical Shell and Interaction Design
 
-> **Status: DESIGN APPROVED IN DISCUSSION; WRITTEN SPEC REVIEW PENDING, 2026-07-12.**
+> **Status: ADOPTED DESIGN; WRITTEN SPEC REVIEW APPROVED, 2026-07-12.**
 > This document is the implementation authority for ArkScope shell structure,
 > interaction primitives, cross-surface navigation, and the bounded UI repair
-> sequence. It does not authorize implementation before written review and a
-> separately reviewed implementation plan.
+> sequence. The Claude Design companion was synchronized after approval; each
+> implementation slice still requires its own separately reviewed plan.
 
 ## 1. Purpose and Authority
 
