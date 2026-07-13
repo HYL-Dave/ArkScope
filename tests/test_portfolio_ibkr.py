@@ -174,3 +174,32 @@ def test_snapshot_removal_is_previewed_then_closes_position_on_apply(tmp_path):
 
     assert store.get_position(position.id).closed_at is not None
     assert store.get_position(position.id).notes == "preserve me"
+
+
+def test_legacy_apply_preserves_archived_account_and_user_owned_fields(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account(
+        "ibkr",
+        "DU123",
+        "IBKR DU123",
+        sync_mode="ibkr_auto",
+    )
+    archived = store.update_account(
+        account.id,
+        label="Retirement",
+        include_in_total=False,
+        archived=True,
+    )
+
+    preview_or_apply_ibkr_snapshot(
+        store,
+        snapshot_with_pos(account="DU123", con_id=1, quantity=2),
+        apply=True,
+    )
+
+    current = store.get_account(account.id)
+    assert current.id == account.id
+    assert current.archived_at == archived.archived_at
+    assert current.label == "Retirement"
+    assert current.sync_mode == "ibkr_auto"
+    assert current.include_in_total is False

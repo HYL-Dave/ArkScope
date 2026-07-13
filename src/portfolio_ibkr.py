@@ -141,7 +141,7 @@ def preview_or_apply_ibkr_snapshot(
 ) -> PortfolioSyncPreview:
     account_by_broker_id = {
         account.broker_account_id: account
-        for account in store.list_accounts()
+        for account in store.list_accounts(include_archived=True)
         if account.broker == "ibkr" and account.broker_account_id
     }
     snapshot_accounts = {
