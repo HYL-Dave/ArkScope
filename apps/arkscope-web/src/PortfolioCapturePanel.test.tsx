@@ -220,6 +220,183 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("成功");
   });
 
+  it("keeps_only_one_status_poll_in_flight", async () => {
+    vi.useFakeTimers();
+    const changed = vi.fn();
+    const running = run({ id: 101, state: "running", finished_at: null });
+    const terminal = run({ id: 101, state: "succeeded" });
+    let reads = 0;
+    let resolvePoll: ((value: PortfolioCaptureStatus) => void) | null = null;
+    stubFetch(() => {
+      reads += 1;
+      if (reads === 1) {
+        return status({ running: true, latest_run: running, recent_runs: [running] });
+      }
+      if (reads === 2) {
+        return new Promise<PortfolioCaptureStatus>((resolve) => {
+          resolvePoll = resolve;
+        });
+      }
+      return status({ running: false, latest_run: terminal, recent_runs: [terminal] });
+    });
+    await mount(changed);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(reads).toBe(2);
+
+    await act(async () => {
+      resolvePoll!(status({ running: false, latest_run: terminal, recent_runs: [terminal] }));
+      await Promise.resolve();
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores_an_older_poll_response_after_settings_save", async () => {
+    vi.useFakeTimers();
+    let resolvePoll: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let idleReads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/settings") && init?.method === "PUT") {
+        return status({
+          settings: {
+            enabled: true,
+            interval_minutes: 30,
+            source: "database",
+            provider_configured: true,
+          },
+        });
+      }
+      idleReads += 1;
+      if (idleReads === 1) return status();
+      return new Promise<PortfolioCaptureStatus>((resolve) => {
+        resolvePoll = resolve;
+      });
+    });
+    await mount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    const interval = host!.querySelector<HTMLInputElement>('input[aria-label="持倉同步間隔（分鐘）"]')!;
+    await act(async () => setInput(interval, "30"));
+    await clickButton("儲存排程");
+
+    await act(async () => {
+      resolvePoll!(status());
+      await Promise.resolve();
+    });
+    expect(interval.value).toBe("30");
+  });
+
+  it("lets_a_completed_settings_mutation_win_over_a_poll_started_while_it_was_pending", async () => {
+    vi.useFakeTimers();
+    let resolveSave: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/settings") && init?.method === "PUT") {
+        return new Promise<PortfolioCaptureStatus>((resolve) => {
+          resolveSave = resolve;
+        });
+      }
+      reads += 1;
+      return status();
+    });
+    await mount();
+
+    const enabled = host!.querySelector<HTMLInputElement>('input[aria-label="啟用持倉同步排程"]')!;
+    const saveButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("儲存排程"))!;
+    await act(async () => {
+      enabled.click();
+      saveButton.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(reads).toBe(2);
+
+    await act(async () => {
+      resolveSave!(status({
+        settings: {
+          enabled: false,
+          interval_minutes: 15,
+          source: "database",
+          provider_configured: true,
+        },
+        next_due_at: null,
+      }));
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("排程已停用");
+  });
+
+  it("retries_initial_status_failure_on_the_idle_cadence", async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      reads += 1;
+      if (reads === 1) throw new Error("sidecar warming up");
+      return new Response(JSON.stringify(status()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+    await mount();
+
+    expect(host!.textContent).toContain("sidecar warming up");
+    expect(host!.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(reads).toBe(2);
+    expect(host!.textContent).toContain("最近一次");
+  });
+
+  it("uses_the_manual_start_run_when_the_follow_up_status_read_fails", async () => {
+    const running = run({ id: 102, trigger: "manual", state: "running", finished_at: null });
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs") && init?.method === "POST") {
+        return { accepted: true, state: "running", run: running };
+      }
+      reads += 1;
+      if (reads === 1) return status({ latest_run: null, recent_runs: [] });
+      throw new Error("status refresh failed");
+    });
+    await mount();
+
+    await clickButton("立即同步");
+
+    expect(host!.querySelector('[data-state="running"]')?.textContent).toContain("執行中");
+    const captureButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("立即同步"));
+    expect(captureButton?.disabled).toBe(true);
+  });
+
+  it("renders_a_rejected_manual_start_as_blocked", async () => {
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs") && init?.method === "POST") {
+        return {
+          accepted: false,
+          state: "blocked",
+          run: null,
+          error_code: "already_running",
+          error_detail: "另一個同步仍在執行",
+        };
+      }
+      return status();
+    });
+    await mount();
+
+    await clickButton("立即同步");
+
+    expect(host!.querySelector('[data-state="blocked"]')?.textContent).toContain("另一個同步仍在執行");
+  });
+
   it("renders_partial_blocked_failed_and_interrupted_with_existing_status_badges", async () => {
     const runs = [
       run({ id: 11, state: "partial" }),
@@ -280,7 +457,9 @@ describe("PortfolioCapturePanel", () => {
         applied = true;
         return { run_id: 55, changes: [], applies: true };
       }
-      return status({ review: applied ? null : review });
+      return status({
+        review: applied ? { run_id: 55, changes: [], applies: false } : review,
+      });
     });
     await mount(changed);
 
@@ -291,6 +470,63 @@ describe("PortfolioCapturePanel", () => {
     expect(calls.some((call) => call.url.endsWith("/runs/55/apply") && call.method === "POST")).toBe(true);
     expect(changed).toHaveBeenCalledTimes(1);
     expect(host!.textContent).not.toContain("待套用差異");
+  });
+
+  it("clears_a_stale_review_when_post_apply_refresh_fails", async () => {
+    const review = {
+      run_id: 56,
+      changes: [{
+        kind: "update",
+        account_id: 3,
+        account_label: "IBKR 主帳戶",
+        broker_account_id_hash: "5bc54f22a3",
+        broker_con_id: "265598",
+        symbol: "AAPL",
+        quantity: 3,
+        before: { quantity: 2 },
+        after: { quantity: 3 },
+      }],
+      applies: false,
+    };
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs/56/apply") && init?.method === "POST") {
+        return { run_id: 56, changes: [], applies: true };
+      }
+      reads += 1;
+      if (reads === 1) return status({ review });
+      throw new Error("status refresh failed");
+    });
+    await mount();
+
+    await clickButton("套用同步");
+
+    expect(host!.textContent).not.toContain("待套用差異");
+    expect(host!.textContent).toContain("status refresh failed");
+  });
+
+  it("shows_nullable_review_values_being_cleared", async () => {
+    stubFetch(() => status({
+      review: {
+        run_id: 57,
+        changes: [{
+          kind: "update",
+          account_id: 3,
+          account_label: "IBKR 主帳戶",
+          broker_account_id_hash: "5bc54f22a3",
+          broker_con_id: "265598",
+          symbol: "AAPL",
+          quantity: 3,
+          before: { quantity: 3, avg_cost: 100 },
+          after: { quantity: 3, avg_cost: null },
+        }],
+        applies: false,
+      },
+    }));
+    await mount();
+
+    const reviewTable = host!.querySelector('table[aria-label="持倉同步待檢視差異"]')!;
+    expect(reviewTable.textContent).toContain("100 → -");
   });
 
   it("returns_to_idle_polling_without_repeated_live_announcements_after_terminal", async () => {

@@ -78,15 +78,36 @@ function formatReviewMetric(
   field: string,
   fallback?: number,
 ): string {
-  const before = typeof change.before?.[field] === "number" ? change.before[field] : null;
-  const afterValue = change.after?.[field] ?? fallback;
+  const beforeValue = change.before?.[field];
+  const before = typeof beforeValue === "number" ? beforeValue : null;
+  const hasAfterValue = change.after != null && Object.prototype.hasOwnProperty.call(change.after, field);
+  const afterValue = hasAfterValue ? change.after?.[field] : fallback;
   const after = typeof afterValue === "number" ? afterValue : null;
   const format = (value: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 }).format(value);
-  if (change.kind === "update" && before != null && after != null && before !== after) {
-    return `${format(before)} → ${format(after)}`;
+  const display = (value: number | null) => value == null ? "-" : format(value);
+  if (change.kind === "update" && before !== after) {
+    return `${display(before)} → ${display(after)}`;
   }
   const value = change.kind === "remove" ? before : (after ?? before);
   return value == null ? "-" : format(value);
+}
+
+interface CaptureIssue {
+  state: CommonUiState;
+  title: string;
+  message: string;
+}
+
+function statusWithRun(
+  current: PortfolioCaptureStatus,
+  run: PortfolioCaptureRun,
+): PortfolioCaptureStatus {
+  return {
+    ...current,
+    running: run.state === "running",
+    latest_run: run,
+    recent_runs: [run, ...current.recent_runs.filter((item) => item.id !== run.id)].slice(0, 20),
+  };
 }
 
 export function PortfolioCapturePanel({
@@ -98,14 +119,21 @@ export function PortfolioCapturePanel({
   const [enabled, setEnabled] = useState(false);
   const [interval, setIntervalValue] = useState("15");
   const [busy, setBusy] = useState<"save" | "capture" | "apply" | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [issue, setIssue] = useState<CaptureIssue | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const dirtyRef = useRef(false);
   const initializedRef = useRef(false);
   const lastTerminalRunIdRef = useRef<number | null>(null);
+  const requestSequenceRef = useRef(0);
+  const acceptedSequenceRef = useRef(0);
   const safeCapture = isCaptureStatus(capture) ? capture : null;
 
-  const acceptStatus = useCallback(async (next: PortfolioCaptureStatus) => {
+  const acceptStatus = useCallback(async (
+    next: PortfolioCaptureStatus,
+    sequence: number,
+  ) => {
+    if (sequence < acceptedSequenceRef.current) return false;
+    acceptedSequenceRef.current = sequence;
     setCapture(next);
     if (!dirtyRef.current) {
       setEnabled(next.settings.enabled);
@@ -117,25 +145,33 @@ export function PortfolioCapturePanel({
     if (!initializedRef.current) {
       initializedRef.current = true;
       lastTerminalRunIdRef.current = terminal?.id ?? null;
-      return;
+      return true;
     }
     if (terminal && terminal.id !== lastTerminalRunIdRef.current) {
       lastTerminalRunIdRef.current = terminal.id;
       await onPortfolioChanged();
     }
+    return true;
   }, [onPortfolioChanged]);
 
   const refresh = useCallback(async () => {
+    const sequence = ++requestSequenceRef.current;
     try {
       const next: unknown = await getPortfolioCaptureStatus();
       if (!isCaptureStatus(next)) {
         throw new Error("持倉同步狀態格式不相容，請重啟應用程式後再試");
       }
-      await acceptStatus(next);
-      setError(null);
-      return next;
+      const accepted = await acceptStatus(next, sequence);
+      if (accepted) setIssue(null);
+      return accepted ? next : null;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      if (sequence >= acceptedSequenceRef.current) {
+        setIssue({
+          state: "failed",
+          title: "持倉同步失敗",
+          message: reason instanceof Error ? reason.message : String(reason),
+        });
+      }
       return null;
     }
   }, [acceptStatus]);
@@ -145,22 +181,39 @@ export function PortfolioCapturePanel({
   }, [refresh]);
 
   useEffect(() => {
-    if (!safeCapture) return;
-    const timer = window.setInterval(
-      () => void refresh(),
-      safeCapture.running ? RUNNING_POLL_MS : IDLE_POLL_MS,
+    let cancelled = false;
+    let timer = 0;
+    const poll = async () => {
+      await refresh();
+      if (!cancelled) {
+        timer = window.setTimeout(
+          () => void poll(),
+          safeCapture?.running ? RUNNING_POLL_MS : IDLE_POLL_MS,
+        );
+      }
+    };
+    timer = window.setTimeout(
+      () => void poll(),
+      safeCapture?.running ? RUNNING_POLL_MS : IDLE_POLL_MS,
     );
-    return () => window.clearInterval(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [safeCapture?.running, refresh]);
 
   async function saveSettings() {
     const parsed = parseCaptureInterval(interval);
     if (parsed === null) {
-      setError("間隔必須是 5-1440 分鐘的整數");
+      setIssue({
+        state: "failed",
+        title: "排程設定無效",
+        message: "間隔必須是 5-1440 分鐘的整數",
+      });
       return;
     }
     setBusy("save");
-    setError(null);
+    setIssue(null);
     setNotice(null);
     try {
       const next: unknown = await updatePortfolioCaptureSettings({
@@ -170,11 +223,16 @@ export function PortfolioCapturePanel({
       if (!isCaptureStatus(next)) {
         throw new Error("持倉同步設定回應格式不相容，請重啟應用程式後再試");
       }
+      const sequence = ++requestSequenceRef.current;
       dirtyRef.current = false;
-      await acceptStatus(next);
+      await acceptStatus(next, sequence);
       setNotice("排程已儲存");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setIssue({
+        state: "failed",
+        title: "排程儲存失敗",
+        message: reason instanceof Error ? reason.message : String(reason),
+      });
     } finally {
       setBusy(null);
     }
@@ -182,14 +240,28 @@ export function PortfolioCapturePanel({
 
   async function startCapture() {
     setBusy("capture");
-    setError(null);
+    setIssue(null);
     setNotice(null);
     try {
       const started = await triggerPortfolioCapture();
+      const sequence = ++requestSequenceRef.current;
+      if (started.run && safeCapture) {
+        await acceptStatus(statusWithRun(safeCapture, started.run), sequence);
+      }
       await refresh();
-      if (started.error_detail) setError(started.error_detail);
+      if (started.error_detail) {
+        setIssue({
+          state: runUiState(started.state),
+          title: RUN_LABELS[started.state],
+          message: started.error_detail,
+        });
+      }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setIssue({
+        state: "failed",
+        title: "持倉同步失敗",
+        message: reason instanceof Error ? reason.message : String(reason),
+      });
     } finally {
       setBusy(null);
     }
@@ -197,15 +269,22 @@ export function PortfolioCapturePanel({
 
   async function applyReview(runId: number) {
     setBusy("apply");
-    setError(null);
+    setIssue(null);
     setNotice(null);
     try {
       await applyPortfolioCaptureRun(runId);
+      const sequence = ++requestSequenceRef.current;
+      acceptedSequenceRef.current = sequence;
+      setCapture((current) => current ? { ...current, review: null } : current);
       await onPortfolioChanged();
       await refresh();
       setNotice("同步變更已套用");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setIssue({
+        state: "failed",
+        title: "套用同步失敗",
+        message: reason instanceof Error ? reason.message : String(reason),
+      });
     } finally {
       setBusy(null);
     }
@@ -296,7 +375,7 @@ export function PortfolioCapturePanel({
           前往設定 &gt; Data Sources &gt; IBKR
         </InlineAlert>
       ) : null}
-      {error ? <InlineAlert state="failed" title="持倉同步失敗">{error}</InlineAlert> : null}
+      {issue ? <InlineAlert state={issue.state} title={issue.title}>{issue.message}</InlineAlert> : null}
       {notice ? <InlineAlert state="ready" title={notice} /> : null}
 
       <div className="portfolio-capture-settings">
@@ -385,7 +464,7 @@ export function PortfolioCapturePanel({
         emptyText="尚無同步紀錄"
       />
 
-      {safeCapture?.review ? (
+      {safeCapture?.review && safeCapture.review.changes.length > 0 ? (
         <div className="portfolio-capture-review">
           <div className="ui-section-head">
             <div className="ui-action-row">
