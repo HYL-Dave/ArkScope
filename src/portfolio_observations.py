@@ -347,6 +347,11 @@ class PortfolioObservationStore:
     ) -> CaptureRun:
         if trigger not in _TRIGGERS:
             raise ValueError(f"unsupported capture trigger: {trigger}")
+        effective_client_id = _integer_or_none(
+            effective_client_id, "effective_client_id"
+        )
+        if effective_client_id is None:
+            raise ValueError("effective_client_id must be an integer")
         started_at = _now()
         with self._connect() as conn:
             cursor = conn.execute(
@@ -1093,16 +1098,17 @@ class PortfolioObservationStore:
         for row in conn.execute(
             """
             SELECT * FROM portfolio_broker_executions
-            WHERE portfolio_account_id=? AND broker_con_id=?
-              AND first_observed_run_id <= ?
+            WHERE portfolio_account_id=? AND first_observed_run_id <= ?
             ORDER BY first_observed_run_id, id
             """,
-            (account_id, con_id, run_id),
+            (account_id, run_id),
         ):
             effective[row["correction_family"]] = row
         signed = 0.0
         unknown: set[str] = set()
         for family, row in effective.items():
+            if row["broker_con_id"] != con_id:
+                continue
             if row["side"] in {"BUY", "BOT"}:
                 signed += row["quantity"]
             elif row["side"] in {"SELL", "SLD"}:

@@ -313,14 +313,31 @@ def test_correction_family_links_previous_and_reconciliation_uses_latest_revisio
         ),
     )
     original = execution(exec_id="fill.1", quantity=5.0)
-    correction = execution(exec_id="fill.2", quantity=2.0)
+    correction = replace(
+        execution(exec_id="fill.2", quantity=2.0),
+        broker_con_id="999999",
+        symbol="MSFT",
+    )
+    corrected_result = complete_result(
+        finished_at="2026-01-05T16:00:00+00:00",
+        quantity=10.0,
+        executions=(original, correction),
+    )
+    corrected_result = replace(
+        corrected_result,
+        positions=(
+            corrected_result.positions[0],
+            replace(
+                corrected_result.positions[0],
+                broker_con_id="999999",
+                symbol="MSFT",
+                quantity=2.0,
+            ),
+        ),
+    )
     _, committed = commit(
         observations,
-        complete_result(
-            finished_at="2026-01-05T16:00:00+00:00",
-            quantity=12.0,
-            executions=(original, correction),
-        ),
+        corrected_result,
     )
 
     executions = rows(
@@ -432,6 +449,28 @@ def test_complete_zero_position_set_differs_from_failed_position_leg(stores):
 def test_non_finite_numeric_input_never_persists_as_zero(stores):
     _, observations = stores
     run = observations.create_run(trigger="manual", effective_client_id=61)
+    for invalid_client_id in (
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        61.5,
+    ):
+        with pytest.raises(ValueError, match="effective_client_id must be an integer"):
+            observations.create_run(
+                trigger="manual", effective_client_id=invalid_client_id
+            )
+        with pytest.raises(ValueError, match="effective_client_id must be an integer"):
+            observations.record_blocked(
+                trigger="scheduled",
+                effective_client_id=invalid_client_id,
+                error_code="provider_unavailable",
+            )
+
+    stored_runs = rows(
+        observations,
+        "SELECT id, effective_client_id FROM portfolio_capture_runs ORDER BY id",
+    )
+    assert [tuple(row) for row in stored_runs] == [(run.id, 61)]
     invalid_results = (
         (
             complete_result(
