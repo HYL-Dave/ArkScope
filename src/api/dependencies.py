@@ -87,6 +87,57 @@ def get_portfolio_store():
 
 
 @lru_cache(maxsize=1)
+def get_portfolio_observation_store():
+    """Singleton append-only Portfolio capture observation store."""
+    from src.portfolio_observations import PortfolioObservationStore
+
+    return PortfolioObservationStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
+def get_portfolio_capture_service():
+    """Singleton Portfolio capture coordinator shared by routes and scheduler."""
+    from src.portfolio_capture import PortfolioCaptureService
+    from src.portfolio_capture_ibkr import read_ibkr_capture
+
+    return PortfolioCaptureService(
+        observations=get_portfolio_observation_store(),
+        portfolio=get_portfolio_store(),
+        reader=read_ibkr_capture,
+        provider_readiness=_ibkr_capture_readiness,
+        write_allowed=_portfolio_capture_write_allowed,
+    )
+
+
+def _ibkr_capture_readiness():
+    from src.data_provider_config import (
+        ProviderConfigMissing,
+        require_provider_configured,
+    )
+    from src.portfolio_capture_types import ProviderReadiness
+
+    try:
+        require_provider_configured("ibkr", get_data_provider_store())
+    except ProviderConfigMissing as exc:
+        detail = exc.as_dict()
+        return ProviderReadiness(
+            configured=False,
+            code=detail["code"],
+            status=detail["status"],
+            provider=detail["provider"],
+            field=detail["field"],
+        )
+    return ProviderReadiness(configured=True)
+
+
+def _portfolio_capture_write_allowed(action: str, detail: dict) -> bool:
+    from src.api.permissions import require_profile_state_write
+
+    require_profile_state_write(action, detail)
+    return True
+
+
+@lru_cache(maxsize=1)
 def get_thread_store():
     """Singleton local store for AI 研究 conversation threads/messages (same local
     SQLite). Threads live alongside profile state in the local DB, never PG."""

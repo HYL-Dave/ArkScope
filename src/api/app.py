@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
         reconcile_interrupted_runtime_state,
         scheduler_loop,
     )
+    from src.portfolio_capture_scheduler import portfolio_capture_scheduler_loop
 
     # Apply app-managed provider keys / IBKR host+port into os.environ BEFORE the
     # scheduler exists: the sidecar is the parent of every collector subprocess, so
@@ -62,13 +63,25 @@ async def lifespan(app: FastAPI):
     # seed/tick threads reach the real PG/network — tests/conftest.py disables it so
     # unit tests stay hermetic (a stalled seed thread otherwise hangs pytest at the
     # executor's atexit join in PG-less environments).
-    sched_task = None
-    if (
-        provider_config_ready
-        and os.environ.get("ARKSCOPE_DISABLE_SCHEDULER", "").strip().lower()
+    scheduler_enabled = (
+        os.environ.get("ARKSCOPE_DISABLE_SCHEDULER", "").strip().lower()
         not in ("1", "true", "yes", "on")
-    ):
+    )
+    capture_service = None
+    portfolio_sched_task = None
+    if provider_config_ready:
+        from .dependencies import get_portfolio_capture_service
+
+        capture_service = get_portfolio_capture_service()
+        capture_service.reconcile_startup()
+
+    sched_task = None
+    if provider_config_ready and scheduler_enabled:
         sched_task = asyncio.create_task(scheduler_loop(), name="data-scheduler")
+        portfolio_sched_task = asyncio.create_task(
+            portfolio_capture_scheduler_loop(capture_service),
+            name="portfolio-capture-scheduler",
+        )
     elif not provider_config_ready:
         logger.warning("data scheduler disabled: provider config setup required")
     else:
@@ -76,10 +89,14 @@ async def lifespan(app: FastAPI):
     logger.info("ArkScope API ready — DAL and registry initialize lazily")
     yield
     # Shutdown
-    if sched_task is not None:
-        sched_task.cancel()
+    scheduler_tasks = tuple(
+        task for task in (sched_task, portfolio_sched_task) if task is not None
+    )
+    for task in scheduler_tasks:
+        task.cancel()
+    for task in scheduler_tasks:
         try:
-            await sched_task
+            await task
         except (asyncio.CancelledError, Exception):  # noqa: BLE001 — shutdown best-effort
             pass
     if get_dal.cache_info().currsize:
@@ -123,6 +140,7 @@ def create_app() -> FastAPI:
     from .routes.research import router as research_router
     from .routes.app_records import router as app_records_router
     from .routes.portfolio import router as portfolio_router
+    from .routes.portfolio_capture import router as portfolio_capture_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -150,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(research_router)
     app.include_router(app_records_router)
     app.include_router(portfolio_router)
+    app.include_router(portfolio_capture_router)
 
     # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
     # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the

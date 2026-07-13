@@ -48,6 +48,13 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
     monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
     monkeypatch.setattr("src.data_provider_config.apply_env", _fail_apply_env)
     monkeypatch.setattr("src.api.dependencies.get_data_provider_store", lambda: object())
+    monkeypatch.setattr(
+        "src.api.dependencies.get_portfolio_capture_service",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("capture service constructed during setup-only boot")
+        ),
+        raising=False,
+    )
     monkeypatch.setattr("src.service.data_scheduler.scheduler_loop", _scheduler_loop)
 
     async def _run_lifespan():
@@ -66,6 +73,107 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
     assert cfg["setup"]["code"] == "provider_config_setup_required"
     assert "profile_state.db readonly" in cfg["setup"]["reason"]
     assert started["scheduler"] is False
+
+
+def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_path):
+    from src.api.app import create_app, lifespan
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
+    monkeypatch.setattr("src.data_provider_config.apply_env", lambda store: None)
+    monkeypatch.setattr("src.api.dependencies.get_data_provider_store", lambda: object())
+    monkeypatch.setattr(
+        "src.service.data_scheduler.reconcile_interrupted_runtime_state",
+        lambda: None,
+    )
+    started = []
+
+    class CaptureService:
+        def __init__(self):
+            self.reconcile_calls = 0
+
+        def reconcile_startup(self):
+            self.reconcile_calls += 1
+            return []
+
+    capture_service = CaptureService()
+    monkeypatch.setattr(
+        "src.api.dependencies.get_portfolio_capture_service",
+        lambda: capture_service,
+        raising=False,
+    )
+
+    async def data_loop():
+        started.append("data")
+        await asyncio.Event().wait()
+
+    async def portfolio_loop(service):
+        assert service is capture_service
+        started.append("portfolio")
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("src.service.data_scheduler.scheduler_loop", data_loop)
+    monkeypatch.setattr(
+        "src.portfolio_capture_scheduler.portfolio_capture_scheduler_loop",
+        portfolio_loop,
+    )
+
+    async def _run_lifespan():
+        async with lifespan(create_app()):
+            await asyncio.sleep(0)
+            assert set(started) == {"data", "portfolio"}
+            assert capture_service.reconcile_calls == 1
+
+    asyncio.run(_run_lifespan())
+
+
+def test_disable_scheduler_env_prevents_both_scheduler_tasks(monkeypatch, tmp_path):
+    from src.api.app import create_app, lifespan
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setenv("ARKSCOPE_DISABLE_SCHEDULER", "yes")
+    monkeypatch.setattr("src.data_provider_config.apply_env", lambda store: None)
+    monkeypatch.setattr("src.api.dependencies.get_data_provider_store", lambda: object())
+    monkeypatch.setattr(
+        "src.service.data_scheduler.reconcile_interrupted_runtime_state",
+        lambda: None,
+    )
+
+    class CaptureService:
+        def __init__(self):
+            self.reconcile_calls = 0
+
+        def reconcile_startup(self):
+            self.reconcile_calls += 1
+            return []
+
+    capture_service = CaptureService()
+    monkeypatch.setattr(
+        "src.api.dependencies.get_portfolio_capture_service",
+        lambda: capture_service,
+        raising=False,
+    )
+
+    async def forbidden_data_loop():
+        raise AssertionError("data scheduler started while disabled")
+
+    async def forbidden_portfolio_loop(service):
+        raise AssertionError("portfolio scheduler started while disabled")
+
+    monkeypatch.setattr(
+        "src.service.data_scheduler.scheduler_loop", forbidden_data_loop
+    )
+    monkeypatch.setattr(
+        "src.portfolio_capture_scheduler.portfolio_capture_scheduler_loop",
+        forbidden_portfolio_loop,
+    )
+
+    async def _run_lifespan():
+        async with lifespan(create_app()):
+            await asyncio.sleep(0)
+            assert capture_service.reconcile_calls == 1
+
+    asyncio.run(_run_lifespan())
 
 
 def test_provider_work_routes_refuse_in_setup_only(monkeypatch):
