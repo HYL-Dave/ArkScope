@@ -34,6 +34,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
     from src.api.app import create_app, lifespan
     from src.api.routes.health import healthz
     from src.api.routes import providers_config
+    import src.api.routes.portfolio_capture  # noqa: F401
     import src.provider_config_runtime as runtime
 
     runtime.clear_provider_config_setup_required()
@@ -77,6 +78,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
 
 def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_path):
     from src.api.app import create_app, lifespan
+    import src.api.routes.portfolio_capture  # noqa: F401
 
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
@@ -87,6 +89,7 @@ def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_pat
         lambda: None,
     )
     started = []
+    cancelled = []
 
     class CaptureService:
         def __init__(self):
@@ -105,12 +108,20 @@ def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_pat
 
     async def data_loop():
         started.append("data")
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.append("data")
+            raise
 
     async def portfolio_loop(service):
         assert service is capture_service
         started.append("portfolio")
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.append("portfolio")
+            raise
 
     monkeypatch.setattr("src.service.data_scheduler.scheduler_loop", data_loop)
     monkeypatch.setattr(
@@ -125,10 +136,12 @@ def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_pat
             assert capture_service.reconcile_calls == 1
 
     asyncio.run(_run_lifespan())
+    assert set(cancelled) == {"data", "portfolio"}
 
 
 def test_disable_scheduler_env_prevents_both_scheduler_tasks(monkeypatch, tmp_path):
     from src.api.app import create_app, lifespan
+    import src.api.routes.portfolio_capture  # noqa: F401
 
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     monkeypatch.setenv("ARKSCOPE_DISABLE_SCHEDULER", "yes")
