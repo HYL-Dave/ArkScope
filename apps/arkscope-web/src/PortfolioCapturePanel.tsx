@@ -49,6 +49,16 @@ function runUiState(state: PortfolioCaptureRunState): CommonUiState {
   return state === "succeeded" ? "ready" : state;
 }
 
+function runDetailTitle(state: PortfolioCaptureRunState): string {
+  switch (state) {
+    case "partial": return "同步資料不完整";
+    case "blocked": return "同步已阻擋";
+    case "failed": return "同步失敗";
+    case "interrupted": return "同步已中止";
+    default: return "同步資訊";
+  }
+}
+
 function formatLocalTime(value?: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -448,7 +458,7 @@ export function PortfolioCapturePanel({
             </InlineAlert>
           ) : null}
           {latest.error_detail ? (
-            <InlineAlert state={runUiState(latest.state)} title={latest.error_code ?? "同步資訊"}>
+            <InlineAlert state={runUiState(latest.state)} title={runDetailTitle(latest.state)}>
               {latest.error_detail}
             </InlineAlert>
           ) : null}

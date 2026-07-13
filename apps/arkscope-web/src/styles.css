@@ -2438,9 +2438,14 @@ button.wl-railitem.active,
   color: var(--muted);
   font-size: 11.5px;
 }
-.portfolio-capture .ui-inline-alert-detail,
-.portfolio-capture .ui-data-table td {
+.portfolio-capture .ui-inline-alert-detail {
   overflow-wrap: anywhere;
+}
+.portfolio-capture .ui-data-table { min-width: 620px; }
+.portfolio-capture-review .ui-data-table { min-width: 760px; }
+.portfolio-capture .ui-data-table [data-align="right"] {
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 /* ---- 新聞·事件 surface ---- */

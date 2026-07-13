@@ -415,6 +415,7 @@ describe("PortfolioCapturePanel", () => {
   it("shows_next_due_and_recent_runs_without_raw_account_id", async () => {
     const latest = run({
       id: 12,
+      state: "partial",
       error_code: "capture_partial",
       error_detail: "Account hash 8da21f requires review; no raw identifier returned",
       new_account_count: 1,
@@ -432,6 +433,8 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.textContent).toContain("封存帳戶有新活動");
     expect(host!.querySelector('table[aria-label="持倉同步紀錄"] tbody tr')).not.toBeNull();
     expect(host!.textContent).not.toContain("DU7654321");
+    expect(host!.textContent).not.toContain("capture_partial");
+    expect(host!.textContent).toContain("同步資料不完整");
   });
 
   it("renders_latest_review_and_applies_that_capture_run", async () => {
