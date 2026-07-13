@@ -31,8 +31,8 @@ DOMAIN_OFFSETS = {
     "news": 30,     # normalized IBKR news worker
     "iv": 40,       # reserved for the IV reboot line
     # Next 10-wide band. With the seeded base 1 the effective id is 51 —
-    # deliberately DISTINCT from legacy collect_ibkr_news.py's absolute
-    # default 50 (adjacent but never equal for any base, since base >= 1).
+    # adjacent to but distinct from legacy collect_ibkr_news.py's absolute
+    # default 50. Base 0 is valid, so choosing it can collide with that legacy id.
     "quotes": 50,   # ad hoc read-through quote snapshots
     "holdings": 60,  # read-only portfolio/position snapshots
     "portfolio_capture": 70,  # read-only portfolio capture

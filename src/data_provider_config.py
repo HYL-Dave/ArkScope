@@ -219,8 +219,8 @@ def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
     if fdef.env_var == "IBKR_CLIENT_ID":
         # Every domain id derives from this base (data_sources/ibkr_client_id.py); a
         # bad base would crash every IBKR connect long after the save. isdecimal (not
-        # isdigit: '²'.isdigit() is True but int() rejects it) + int32 headroom for
-        # the largest offset, canonicalized to ASCII (int('７')==7, '007'→'7').
+        # isdigit: '²'.isdigit() is True but int() rejects it), canonicalized to
+        # ASCII (int('７')==7, '007'→'7'), and bounded at 0..29 so +70 stays <=99.
         if not value.isdecimal():
             raise ValueError("IBKR client_id must be a non-negative integer")
         base = int(value)
