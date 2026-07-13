@@ -615,7 +615,7 @@ def test_normalize_rejects_non_numeric_ibkr_client_id():
         # '²'.isdigit() is True but int() rejects it — the validator must too
         dpc.normalize_provider_config_value(cid, "²")
     with pytest.raises(ValueError):
-        # Gateway client ids are int32; leave headroom for the +40 offset
+        # The app-managed base is fixed to 0..29 so every derived id stays below 100
         dpc.normalize_provider_config_value(cid, str(2**31))
     assert dpc.normalize_provider_config_value(cid, " 7 ") == "7"
     assert dpc.normalize_provider_config_value(cid, "００７") == "7"  # canonicalized ASCII
