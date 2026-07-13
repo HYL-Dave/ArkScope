@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import warnings
+
+import anyio
 
 from data_sources import ibkr_source
+from src import portfolio_capture_ibkr
 
 
 class _FakeEvent:
@@ -56,3 +60,58 @@ def test_disconnect_tolerates_instance_created_without_init():
     source._ib = None
 
     source.disconnect()
+
+
+def test_capture_reader_runs_in_an_anyio_worker_thread_without_event_loop_warning(
+    monkeypatch,
+):
+    class FakeCaptureSession:
+        def managedAccounts(self):
+            return []
+
+        def accountSummary(self):
+            return []
+
+        def accountValues(self):
+            return []
+
+        def fills(self):
+            return []
+
+        def positions(self):
+            return []
+
+        def portfolio(self):
+            return []
+
+    class FakeCaptureSource:
+        disconnect_calls = 0
+
+        def __init__(self, *, client_id, readonly):
+            self._ib = FakeCaptureSession()
+
+        def connect(self):
+            return True
+
+        def disconnect(self):
+            type(self).disconnect_calls += 1
+
+    monkeypatch.setattr(
+        portfolio_capture_ibkr,
+        "_source_factory",
+        FakeCaptureSource,
+    )
+
+    async def run_capture():
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = await anyio.to_thread.run_sync(
+                portfolio_capture_ibkr.read_ibkr_capture
+            )
+        return result, caught
+
+    result, caught = anyio.run(run_capture)
+
+    assert result.position_leg.state == "complete"
+    assert not [warning for warning in caught if warning.category is RuntimeWarning]
+    assert FakeCaptureSource.disconnect_calls == 1
