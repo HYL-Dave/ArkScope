@@ -120,6 +120,15 @@ function statusWithRun(
   };
 }
 
+function shouldProjectRun(
+  current: PortfolioCaptureRun | null | undefined,
+  candidate: PortfolioCaptureRun,
+) {
+  if (!current) return true;
+  if (candidate.id !== current.id) return candidate.id > current.id;
+  return current.state === "running" && candidate.state !== "running";
+}
+
 export function PortfolioCapturePanel({
   onPortfolioChanged,
 }: {
@@ -175,6 +184,28 @@ export function PortfolioCapturePanel({
     }
     return sequence === acceptedSequenceRef.current;
   }, [onPortfolioChanged]);
+
+  const acceptSettingsStatus = useCallback(async (
+    next: PortfolioCaptureStatus,
+    sequence: number,
+  ) => {
+    if (sequence >= acceptedSequenceRef.current) {
+      return acceptStatus(next, sequence);
+    }
+    const current = captureRef.current;
+    if (!current) return false;
+    const merged = {
+      ...current,
+      settings: next.settings,
+      provider_issue: next.provider_issue,
+      next_due_at: next.next_due_at,
+    };
+    captureRef.current = merged;
+    setCapture(merged);
+    setEnabled(next.settings.enabled);
+    setIntervalValue(String(next.settings.interval_minutes));
+    return false;
+  }, [acceptStatus]);
 
   const refresh = useCallback(async () => {
     const sequence = ++requestSequenceRef.current;
@@ -235,6 +266,7 @@ export function PortfolioCapturePanel({
     setBusy("save");
     setIssue(null);
     setNotice(null);
+    const sequence = ++requestSequenceRef.current;
     try {
       const next: unknown = await updatePortfolioCaptureSettings({
         enabled,
@@ -243,9 +275,9 @@ export function PortfolioCapturePanel({
       if (!isCaptureStatus(next)) {
         throw new Error("持倉同步設定回應格式不相容，請重啟應用程式後再試");
       }
-      const sequence = ++requestSequenceRef.current;
       dirtyRef.current = false;
-      await acceptStatus(next, sequence);
+      await acceptSettingsStatus(next, sequence);
+      setIssue(null);
       setNotice("排程已儲存");
     } catch (reason) {
       publishIssue({
@@ -265,8 +297,7 @@ export function PortfolioCapturePanel({
     try {
       const started = await triggerPortfolioCapture();
       const current = captureRef.current;
-      const currentRunId = current?.latest_run?.id ?? -1;
-      if (started.run && current && started.run.id > currentRunId) {
+      if (started.run && current && shouldProjectRun(current.latest_run, started.run)) {
         const sequence = ++requestSequenceRef.current;
         await acceptStatus(statusWithRun(current, started.run), sequence);
       }
@@ -293,12 +324,14 @@ export function PortfolioCapturePanel({
     setBusy("apply");
     setIssue(null);
     setNotice(null);
+    const sequence = ++requestSequenceRef.current;
     try {
-      await applyPortfolioCaptureRun(runId);
-      const sequence = ++requestSequenceRef.current;
-      acceptedSequenceRef.current = sequence;
+      const applied = await applyPortfolioCaptureRun(runId);
+      if (sequence >= acceptedSequenceRef.current) {
+        acceptedSequenceRef.current = sequence;
+      }
       const current = captureRef.current;
-      if (current) {
+      if (current?.review?.run_id === applied.run_id) {
         const next = { ...current, review: null };
         captureRef.current = next;
         setCapture(next);

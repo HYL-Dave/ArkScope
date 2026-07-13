@@ -333,6 +333,93 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.textContent).toContain("排程已停用");
   });
 
+  it("does_not_let_a_delayed_settings_snapshot_regress_a_newer_terminal_run", async () => {
+    vi.useFakeTimers();
+    const changed = vi.fn();
+    const prior = run({ id: 106, state: "succeeded" });
+    const running = run({ id: 107, state: "running", finished_at: null });
+    const terminal = run({ id: 107, state: "succeeded" });
+    let resolveSave: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/settings") && init?.method === "PUT") {
+        return new Promise<PortfolioCaptureStatus>((resolve) => {
+          resolveSave = resolve;
+        });
+      }
+      reads += 1;
+      return reads === 1
+        ? status({ latest_run: prior, recent_runs: [prior] })
+        : status({ running: false, latest_run: terminal, recent_runs: [terminal, prior] });
+    });
+    await mount(changed);
+
+    const enabled = host!.querySelector<HTMLInputElement>('input[aria-label="啟用持倉同步排程"]')!;
+    const saveButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("儲存排程"))!;
+    await act(async () => {
+      enabled.click();
+      saveButton.click();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSave!(status({
+        settings: {
+          enabled: false,
+          interval_minutes: 15,
+          source: "database",
+          provider_configured: true,
+        },
+        running: true,
+        latest_run: running,
+        recent_runs: [running, prior],
+      }));
+      await Promise.resolve();
+    });
+
+    expect(host!.querySelector('[data-state="running"]')).toBeNull();
+    expect(Array.from(host!.querySelectorAll('[data-state="ready"]'))
+      .some((badge) => badge.textContent?.includes("成功"))).toBe(true);
+    expect(host!.textContent).toContain("排程已停用");
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears_a_transient_poll_issue_when_a_pending_settings_save_succeeds", async () => {
+    vi.useFakeTimers();
+    let resolveSave: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/settings") && init?.method === "PUT") {
+        return new Promise<PortfolioCaptureStatus>((resolve) => {
+          resolveSave = resolve;
+        });
+      }
+      reads += 1;
+      if (reads === 1) return status();
+      throw new Error("transient poll failure");
+    });
+    await mount();
+
+    const saveButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("儲存排程"))!;
+    await act(async () => {
+      saveButton.click();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(host!.textContent).toContain("transient poll failure");
+
+    await act(async () => {
+      resolveSave!(status());
+      await Promise.resolve();
+    });
+    expect(host!.textContent).not.toContain("transient poll failure");
+    expect(host!.textContent).toContain("排程已儲存");
+  });
+
   it("retries_initial_status_failure_on_the_idle_cadence", async () => {
     vi.useFakeTimers();
     let reads = 0;
@@ -439,6 +526,52 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("成功");
     expect(host!.querySelector('[data-state="running"]')).toBeNull();
     expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts_a_terminal_start_response_after_a_poll_saw_the_same_run_running", async () => {
+    vi.useFakeTimers();
+    const prior = run({ id: 107, state: "succeeded" });
+    const running = run({ id: 108, trigger: "manual", state: "running", finished_at: null });
+    const failed = run({
+      id: 108,
+      trigger: "manual",
+      state: "failed",
+      error_code: "capture_thread_start_failed",
+      error_detail: "Capture worker startup failed",
+    });
+    let resolveStart: ((value: PortfolioCaptureStart) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs") && init?.method === "POST") {
+        return new Promise<PortfolioCaptureStart>((resolve) => {
+          resolveStart = resolve;
+        });
+      }
+      reads += 1;
+      if (reads === 1) return status({ latest_run: prior, recent_runs: [prior] });
+      if (reads === 2) {
+        return status({ running: true, latest_run: running, recent_runs: [running, prior] });
+      }
+      throw new Error("follow-up status failed");
+    });
+    await mount();
+
+    const captureButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("立即同步"))!;
+    await act(async () => {
+      captureButton.click();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(host!.querySelector('[data-state="running"]')).not.toBeNull();
+
+    await act(async () => {
+      resolveStart!({ accepted: true, state: "failed", run: failed });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(host!.querySelector('[data-state="running"]')).toBeNull();
+    expect(host!.textContent).toContain("Capture worker startup failed");
   });
 
   it("does_not_let_an_older_poll_clear_a_newer_action_failure", async () => {
@@ -643,6 +776,65 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.textContent).not.toContain("待套用差異");
     expect(host!.textContent).toContain("status refresh failed");
     expect(host!.textContent).toContain("同步狀態載入失敗");
+  });
+
+  it("does_not_clear_a_newer_review_when_an_older_apply_response_arrives_late", async () => {
+    vi.useFakeTimers();
+    const oldReview = {
+      run_id: 58,
+      changes: [{
+        kind: "update",
+        account_id: 3,
+        account_label: "IBKR 主帳戶",
+        broker_account_id_hash: "5bc54f22a3",
+        broker_con_id: "265598",
+        symbol: "AAPL",
+        quantity: 3,
+        before: { quantity: 2 },
+        after: { quantity: 3 },
+      }],
+      applies: false,
+    };
+    const newReview = {
+      ...oldReview,
+      run_id: 59,
+      changes: [{
+        ...oldReview.changes[0],
+        broker_con_id: "272093",
+        symbol: "MSFT",
+      }],
+    };
+    let resolveApply: ((value: CaptureResponse) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs/58/apply") && init?.method === "POST") {
+        return new Promise<CaptureResponse>((resolve) => {
+          resolveApply = resolve;
+        });
+      }
+      reads += 1;
+      if (reads === 1) return status({ review: oldReview });
+      if (reads === 2) return status({ review: newReview });
+      throw new Error("post-apply refresh failed");
+    });
+    await mount();
+
+    const applyButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("套用同步"))!;
+    await act(async () => {
+      applyButton.click();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(host!.textContent).toContain("MSFT");
+
+    await act(async () => {
+      resolveApply!({ run_id: 58, changes: [], applies: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("MSFT");
+    expect(host!.textContent).toContain("post-apply refresh failed");
   });
 
   it("shows_nullable_review_values_being_cleared", async () => {
