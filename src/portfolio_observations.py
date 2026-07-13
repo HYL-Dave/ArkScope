@@ -478,6 +478,7 @@ class PortfolioObservationStore:
             conn.execute(
                 """
                 UPDATE portfolio_capture_runs SET
+                    finished_at=COALESCE(finished_at, ?),
                     account_leg_state=?, execution_leg_state=?, position_leg_state=?,
                     discovered_account_count=?,
                     new_account_count=new_account_count+?,
@@ -488,6 +489,7 @@ class PortfolioObservationStore:
                 WHERE id=?
                 """,
                 (
+                    normalized["finished_at_utc"],
                     normalized["account_leg_state"],
                     normalized["execution_leg_state"],
                     normalized["position_leg_state"],
@@ -534,7 +536,6 @@ class PortfolioObservationStore:
     ) -> CaptureRun:
         if state not in _TERMINAL_STATES:
             raise ValueError(f"unsupported terminal capture state: {state}")
-        finished_at = _now()
         with self._connect() as conn:
             current = conn.execute(
                 "SELECT * FROM portfolio_capture_runs WHERE id=?", (run_id,)
@@ -543,6 +544,7 @@ class PortfolioObservationStore:
                 raise KeyError(f"capture run not found: {run_id}")
             if current["state"] != "running":
                 raise ValueError(f"capture run is already terminal: {run_id}")
+            finished_at = current["finished_at"] or _now()
             redacted_detail = self._redact_account_ids(conn, error_detail)
             conn.execute(
                 """
@@ -607,7 +609,7 @@ class PortfolioObservationStore:
                 conn.execute(
                     f"""
                     UPDATE portfolio_capture_runs
-                    SET state='interrupted', finished_at=?,
+                    SET state='interrupted', finished_at=COALESCE(finished_at, ?),
                         error_code='capture_interrupted',
                         error_detail='Capture process ended before completion.'
                     WHERE id IN ({placeholders})

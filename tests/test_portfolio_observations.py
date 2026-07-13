@@ -177,14 +177,29 @@ def test_run_lifecycle_and_recent_order_are_durable(stores):
         reopened.finish_run(first.id, state="failed")
 
 
-def test_startup_reconciles_stale_running_rows_to_interrupted(stores):
+def test_startup_reconciles_stale_running_rows_to_interrupted(stores, monkeypatch):
     _, observations = stores
     first = observations.create_run(trigger="startup", effective_client_id=61)
     second = observations.create_run(trigger="manual", effective_client_id=61)
+    endpoint = "2026-01-06T04:59:00+00:00"
+    observations.commit_capture(
+        second.id,
+        replace(
+            complete_result(finished_at=endpoint),
+            account_snapshots=(),
+            positions=(),
+        ),
+    )
+    monkeypatch.setattr(
+        "src.portfolio_observations._now",
+        lambda: "2026-01-06T05:01:00+00:00",
+    )
 
     assert observations.reconcile_interrupted() == [first.id, second.id]
     assert observations.get_run(first.id).state == "interrupted"
     assert observations.get_run(second.id).state == "interrupted"
+    assert observations.get_run(first.id).finished_at == "2026-01-06T05:01:00+00:00"
+    assert observations.get_run(second.id).finished_at == endpoint
     assert observations.reconcile_interrupted() == []
 
 
@@ -421,29 +436,76 @@ def test_cross_broker_day_window_is_marked_incomplete(stores):
     assert row["reason_code"] == "execution_coverage_gap"
 
 
-def test_complete_zero_position_set_differs_from_failed_position_leg(stores):
+def test_complete_zero_position_set_differs_from_failed_position_leg(
+    stores, monkeypatch
+):
     _, observations = stores
+    clock = {"now": "2026-01-06T04:58:00+00:00"}
+    monkeypatch.setattr(
+        "src.portfolio_observations._now", lambda: clock["now"]
+    )
     zero = replace(
-        complete_result(finished_at="2026-01-05T15:00:00+00:00"),
+        complete_result(finished_at="2026-01-06T04:59:00+00:00"),
+        account_snapshots=(),
         positions=(),
     )
-    complete_run_id, _ = commit(observations, zero)
+    complete_run = observations.create_run(trigger="manual", effective_client_id=61)
+    observations.commit_capture(complete_run.id, zero)
+    assert observations.get_run(complete_run.id).finished_at == zero.finished_at_utc
+    assert rows(
+        observations,
+        "SELECT * FROM portfolio_account_snapshots WHERE capture_run_id=?",
+        (complete_run.id,),
+    ) == []
+    assert rows(
+        observations,
+        "SELECT * FROM portfolio_broker_position_observations WHERE capture_run_id=?",
+        (complete_run.id,),
+    ) == []
+
+    clock["now"] = "2026-01-06T05:01:00+00:00"
+    terminal = observations.finish_run(complete_run.id, state="succeeded")
+    assert terminal.finished_at == zero.finished_at_utc
+    assert observations.last_successful_finished_at() == datetime.fromisoformat(
+        zero.finished_at_utc
+    )
+
+    complete_run_id = complete_run.id
     snapshot = observations.position_snapshot_for_run(complete_run_id)
     assert [account.account_id for account in snapshot.accounts] == ["DU123"]
     assert snapshot.positions == []
     assert observations.latest_reviewable_run_id() == complete_run_id
 
+    clock["now"] = "2026-01-06T05:03:00+00:00"
+    next_run_id, next_commit = commit(
+        observations,
+        complete_result(
+            finished_at="2026-01-06T05:02:00+00:00",
+            quantity=1.0,
+        ),
+    )
+    assert next_commit.unmatched_count == 1
+    unmatched = rows(
+        observations,
+        "SELECT execution_coverage FROM portfolio_unmatched_position_changes "
+        "WHERE from_run_id=? AND to_run_id=?",
+        (complete_run_id, next_run_id),
+    )
+    assert [row["execution_coverage"] for row in unmatched] == ["gap"]
+    assert observations.last_successful_finished_at() == datetime.fromisoformat(
+        "2026-01-06T05:02:00+00:00"
+    )
+
     failed = replace(
         zero,
-        finished_at_utc="2026-01-05T16:00:00+00:00",
+        finished_at_utc="2026-01-06T05:04:00+00:00",
         account_leg=CaptureLegResult("failed", "account_failed"),
         position_leg=CaptureLegResult("failed", "position_failed"),
-        account_snapshots=(),
     )
     failed_run_id, _ = commit(observations, failed)
     with pytest.raises(ValueError, match="complete broker-position set"):
         observations.position_snapshot_for_run(failed_run_id)
-    assert observations.latest_reviewable_run_id() == complete_run_id
+    assert observations.latest_reviewable_run_id() == next_run_id
 
 
 def test_non_finite_numeric_input_never_persists_as_zero(stores):
