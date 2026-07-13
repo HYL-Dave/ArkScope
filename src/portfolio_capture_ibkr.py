@@ -368,6 +368,8 @@ def _select_summary_value(
         return base_rows[0]
     if len(base_rows) > 1:
         return _AMBIGUOUS
+    if base_currency is not None:
+        return _AMBIGUOUS
     if len(candidates) == 1:
         return candidates[0][1]
     return _AMBIGUOUS
@@ -389,7 +391,7 @@ def _read_daily_pnl(
         deadline = time.monotonic() + _PNL_WAIT_SECONDS
         while subscriptions:
             values = {
-                account: _pnl_values(subscription)
+                account: _pnl_values(subscription, status)
                 for account, subscription in subscriptions.items()
             }
             if all(
@@ -415,19 +417,27 @@ def _read_daily_pnl(
                 status.partial("ibkr_pnl_cancel_failed", exc)
 
 
-def _pnl_values(subscription: Any) -> tuple[float | None, float | None]:
+def _pnl_values(
+    subscription: Any, status: _LegStatus
+) -> tuple[float | None, float | None]:
     return (
-        _optional_pnl(getattr(subscription, "realizedPnL", None)),
-        _optional_pnl(getattr(subscription, "unrealizedPnL", None)),
+        _optional_pnl(getattr(subscription, "realizedPnL", None), status),
+        _optional_pnl(getattr(subscription, "unrealizedPnL", None), status),
     )
 
 
-def _optional_pnl(value: Any) -> float | None:
+def _optional_pnl(value: Any, status: _LegStatus) -> float | None:
+    if value is None:
+        return None
     try:
         normalized = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        status.partial("ibkr_pnl_values_invalid")
         return None
-    if not math.isfinite(normalized) or abs(normalized) >= _IB_UNSET_DOUBLE:
+    if math.isnan(normalized) or abs(normalized) >= _IB_UNSET_DOUBLE:
+        return None
+    if not math.isfinite(normalized):
+        status.partial("ibkr_pnl_values_invalid")
         return None
     return normalized
 
@@ -470,7 +480,7 @@ def _parse_fills(
                 cumulative_quantity=_finite(getattr(execution, "cumQty", None)),
                 average_price=_finite(getattr(execution, "avgPrice", None)),
             )
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError, OverflowError):
             status.partial("ibkr_execution_rows_invalid")
             continue
         executions.append(observed)
@@ -500,7 +510,7 @@ def _parse_fills(
                     ),
                 )
             )
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             status.partial("ibkr_commission_rows_invalid")
     return tuple(executions), tuple(commissions)
 
@@ -522,7 +532,7 @@ def _parse_positions(
                 "unrealized_pnl": _finite(getattr(row, "unrealizedPNL", None)),
                 "realized_pnl": _finite(getattr(row, "realizedPNL", None)),
             }
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError, OverflowError):
             status.partial("ibkr_portfolio_rows_invalid")
             continue
         account_ids.add(account)
@@ -532,6 +542,7 @@ def _parse_positions(
         status.partial("ibkr_position_sets_contradictory")
 
     positions = []
+    position_keys: set[tuple[str, str]] = set()
     for row in raw_positions or []:
         try:
             account = _required_text(getattr(row, "account", None))
@@ -542,19 +553,29 @@ def _parse_positions(
             symbol = _required_text(getattr(contract, "symbol", None)).upper()
             currency = _required_text(getattr(contract, "currency", None)).upper()
             asset_class = _asset_class(getattr(contract, "secType", None))
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError, OverflowError):
             status.partial("ibkr_position_rows_invalid")
             continue
         account_ids.add(account)
-        matches = portfolio_by_key.get((account, con_id), [])
+        key = (account, con_id)
+        if key in position_keys:
+            status.partial("ibkr_position_rows_duplicate")
+            continue
+        position_keys.add(key)
+        matches = portfolio_by_key.get(key, [])
         enrichment: dict[str, float | None] = {}
         if quantity != 0:
             if len(matches) != 1:
                 status.partial("ibkr_position_enrichment_incomplete")
+            elif not any(value is not None for value in matches[0].values()):
+                status.partial("ibkr_position_enrichment_incomplete")
             else:
                 enrichment = matches[0]
         elif len(matches) == 1:
-            enrichment = matches[0]
+            if not any(value is not None for value in matches[0].values()):
+                status.partial("ibkr_position_enrichment_incomplete")
+            else:
+                enrichment = matches[0]
         elif len(matches) > 1:
             status.partial("ibkr_position_enrichment_ambiguous")
         positions.append(
@@ -578,6 +599,8 @@ def _parse_positions(
             )
         )
 
+    if any(key not in position_keys for key in portfolio_by_key):
+        status.partial("ibkr_position_sets_contradictory")
     if raw_positions is not None and raw_portfolio is None and positions:
         status.partial("ibkr_portfolio_failed")
     return tuple(positions)
@@ -590,7 +613,7 @@ def _finite(value: Any, *, required: bool = False) -> float | None:
         return None
     try:
         normalized = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ValueError("numeric value is malformed") from None
     if not math.isfinite(normalized):
         raise ValueError("numeric value is non-finite")
@@ -602,14 +625,21 @@ def _optional_int(value: Any) -> int | None:
         return None
     if isinstance(value, bool):
         raise ValueError("boolean is not an integer identity")
-    return int(value)
+    if isinstance(value, float) and (
+        not math.isfinite(value) or not value.is_integer()
+    ):
+        raise ValueError("integer value is malformed")
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("integer value is malformed") from None
 
 
 def _required_id(value: Any) -> str:
-    text = _required_text(value)
-    if text == "0":
+    normalized = _optional_int(value)
+    if normalized is None or normalized <= 0:
         raise ValueError("provider identity is unset")
-    return text
+    return str(normalized)
 
 
 def _required_text(value: Any) -> str:

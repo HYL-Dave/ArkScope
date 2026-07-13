@@ -282,6 +282,22 @@ def test_account_leg_keeps_selected_fields_and_uses_unique_cached_base_currency_
     assert ambiguous_snapshot.net_liquidation is None
     assert ambiguous_snapshot.available_funds == 18000.0
 
+    mismatched = FakeIB()
+    mismatched.summary_rows = [
+        summary("DU123", "NetLiquidation", "120000", "EUR")
+    ]
+    mismatched.value_rows = [
+        obj(account="DU123", tag="Currency", value="USD", currency="")
+    ]
+    install_source(monkeypatch, mismatched)
+
+    mismatched_result = read_ibkr_capture()
+
+    mismatched_snapshot = mismatched_result.account_snapshots[0]
+    assert mismatched_snapshot.base_currency == "USD"
+    assert mismatched_snapshot.net_liquidation is None
+    assert mismatched_result.account_leg.state == "partial"
+
 
 def test_daily_pnl_subscription_is_bounded_and_missing_values_stay_null(
     monkeypatch,
@@ -360,10 +376,9 @@ def test_position_leg_joins_positions_and_portfolio_by_account_and_conid(
     monkeypatch,
 ):
     ib = FakeIB()
-    ib.managed_accounts = ["DU123", "DU999"]
+    ib.managed_accounts = ["DU123"]
     ib.position_rows = [position(account="DU123", con_id=42)]
     ib.portfolio_rows = [
-        portfolio_item(account="DU999", con_id=42, market_value=999.0),
         portfolio_item(account="DU123", con_id=42, market_value=205.0),
     ]
     install_source(monkeypatch, ib)
@@ -377,6 +392,63 @@ def test_position_leg_joins_positions_and_portfolio_by_account_and_conid(
     assert observed.market_value == 205.0
     assert observed.unrealized_pnl == 5.0
     assert observed.realized_pnl == 7.0
+
+    missing_enrichment = FakeIB()
+    missing_enrichment.position_rows = [
+        position(account="DU123", con_id=42),
+        position(account="DU123", con_id=43),
+    ]
+    missing_enrichment.portfolio_rows = [
+        portfolio_item(account="DU123", con_id=42, market_value=205.0),
+        obj(
+            account="DU123",
+            contract=contract(43),
+            position=2.0,
+            marketValue=None,
+            unrealizedPNL=None,
+            realizedPNL=None,
+        ),
+    ]
+    install_source(monkeypatch, missing_enrichment)
+
+    missing_result = read_ibkr_capture()
+
+    assert missing_result.position_leg.state == "partial"
+    assert [row.broker_con_id for row in missing_result.positions] == ["42", "43"]
+    assert missing_result.positions[0].market_value == 205.0
+    assert missing_result.positions[1].market_value is None
+
+    duplicate_positions = FakeIB()
+    duplicate_positions.position_rows = [
+        position(account="DU123", con_id=42),
+        position(account="DU123", con_id=42),
+        position(account="DU123", con_id=43),
+    ]
+    duplicate_positions.portfolio_rows = [
+        portfolio_item(account="DU123", con_id=42, market_value=205.0),
+        portfolio_item(account="DU123", con_id=43, market_value=310.0),
+    ]
+    install_source(monkeypatch, duplicate_positions)
+
+    duplicate_result = read_ibkr_capture()
+
+    assert duplicate_result.position_leg.state == "partial"
+    assert [row.broker_con_id for row in duplicate_result.positions].count("42") <= 1
+    assert [row.broker_con_id for row in duplicate_result.positions].count("43") == 1
+
+    extra_portfolio = FakeIB()
+    extra_portfolio.position_rows = [position(account="DU123", con_id=42)]
+    extra_portfolio.portfolio_rows = [
+        portfolio_item(account="DU123", con_id=42, market_value=205.0),
+        portfolio_item(account="DU123", con_id=99, market_value=999.0),
+    ]
+    install_source(monkeypatch, extra_portfolio)
+
+    extra_result = read_ibkr_capture()
+
+    assert extra_result.position_leg.state == "partial"
+    assert [row.broker_con_id for row in extra_result.positions] == ["42"]
+    assert extra_result.positions[0].market_value == 205.0
 
 
 def test_successful_empty_position_calls_are_complete(monkeypatch):
@@ -417,6 +489,10 @@ def test_one_failed_leg_does_not_discard_other_valid_legs(monkeypatch):
 def test_non_finite_provider_value_marks_the_leg_partial_and_never_zero(
     monkeypatch,
 ):
+    class OverflowingNumber:
+        def __float__(self):
+            raise OverflowError("provider numeric overflow")
+
     ib = FakeIB()
     ib.summary_rows = [
         obj(
@@ -432,15 +508,30 @@ def test_non_finite_provider_value_marks_the_leg_partial_and_never_zero(
             currency="BASE",
         ),
     ]
-    ib.fill_rows = [fill("good"), fill("bad", account="DU456", price=float("inf"))]
+    overflowing_execution = fill("overflow", account="DU789")
+    overflowing_execution.execution.permId = float("inf")
+    ib.fill_rows = [
+        fill("good"),
+        fill("bad", account="DU456", price=float("inf")),
+        overflowing_execution,
+    ]
     ib.position_rows = [
         position(account="DU123", con_id=1),
         position(account="DU456", con_id=2, quantity=float("nan")),
     ]
+    overflowing_position = position(account="DU789", con_id=3)
+    overflowing_position.contract.conId = float("inf")
+    ib.position_rows.append(overflowing_position)
     ib.portfolio_rows = [
         portfolio_item(account="DU123", con_id=1),
         portfolio_item(account="DU456", con_id=2),
     ]
+    ib.pnl_by_account = {
+        "DU123": obj(
+            realizedPnL=OverflowingNumber(),
+            unrealizedPnL=float("nan"),
+        )
+    }
     install_source(monkeypatch, ib)
 
     result = read_ibkr_capture()
@@ -454,3 +545,35 @@ def test_non_finite_provider_value_marks_the_leg_partial_and_never_zero(
         ("DU123", "1")
     ]
     assert all(row.price != 0 for row in result.executions)
+
+    overflowing_commission = fill("bad-commission", account="DU456")
+    overflowing_commission.commissionReport.yieldRedemptionDate = float("inf")
+    commission_ib = FakeIB()
+    commission_ib.fill_rows = [fill("good-commission"), overflowing_commission]
+    install_source(monkeypatch, commission_ib)
+
+    commission_result = read_ibkr_capture()
+
+    assert commission_result.execution_leg.state == "partial"
+    assert [row.exec_id for row in commission_result.executions] == [
+        "good-commission",
+        "bad-commission",
+    ]
+    assert [row.exec_id for row in commission_result.commissions] == [
+        "good-commission"
+    ]
+
+    pnl_ib = FakeIB()
+    pnl_ib.pnl_by_account = {
+        "DU123": obj(
+            realizedPnL=OverflowingNumber(),
+            unrealizedPnL=4.5,
+        )
+    }
+    install_source(monkeypatch, pnl_ib)
+
+    pnl_result = read_ibkr_capture()
+
+    assert pnl_result.account_leg.state == "partial"
+    assert pnl_result.account_snapshots[0].daily_realized_pnl is None
+    assert pnl_result.account_snapshots[0].daily_unrealized_pnl == 4.5
