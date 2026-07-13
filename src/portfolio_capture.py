@@ -430,7 +430,10 @@ class PortfolioCaptureService:
     def _snapshot_for_mode(self, snapshot: BrokerSnapshot, mode: str) -> BrokerSnapshot:
         allowed = {
             account.broker_account_id
-            for account in self.portfolio.list_accounts(include_archived=True)
+            for account in self.portfolio.list_accounts(
+                include_archived=True,
+                ensure_manual=False,
+            )
             if account.broker == "ibkr"
             and account.broker_account_id
             and account.sync_mode == mode
@@ -451,7 +454,10 @@ class PortfolioCaptureService:
     ) -> CaptureReviewPreview:
         accounts_by_raw = {
             account.broker_account_id: account
-            for account in self.portfolio.list_accounts(include_archived=True)
+            for account in self.portfolio.list_accounts(
+                include_archived=True,
+                ensure_manual=False,
+            )
             if account.broker == "ibkr" and account.broker_account_id
         }
         changes: list[CaptureReviewChange] = []

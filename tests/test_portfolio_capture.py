@@ -552,6 +552,13 @@ def test_review_preview_is_derived_from_run_and_is_zero_write(tmp_path):
     assert status.review == preview
     assert portfolio.get_account(account.id).label == "Legacy IBKR DU123"
     assert portfolio.list_positions(account_id=account.id) == []
+    assert [
+        row.broker
+        for row in portfolio.list_accounts(
+            include_archived=True,
+            ensure_manual=False,
+        )
+    ] == ["ibkr"]
     assert reader_calls == 1
 
 

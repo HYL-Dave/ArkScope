@@ -33,6 +33,9 @@ def broker_pos(
 
 def test_fresh_store_creates_manual_account(tmp_path):
     store = PortfolioStore(tmp_path / "profile_state.db")
+
+    assert store.list_accounts(ensure_manual=False) == []
+
     accounts = store.list_accounts()
     assert [a.label for a in accounts] == ["Manual"]
     assert accounts[0].broker == "manual"

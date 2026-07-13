@@ -379,13 +379,41 @@ class PortfolioObservationStore:
         error_code: str,
         error_detail: str | None = None,
     ) -> CaptureRun:
-        run = self.create_run(trigger=trigger, effective_client_id=effective_client_id)
-        return self.finish_run(
-            run.id,
-            state="blocked",
-            error_code=error_code,
-            error_detail=error_detail,
+        if trigger not in _TRIGGERS:
+            raise ValueError(f"unsupported capture trigger: {trigger}")
+        effective_client_id = _integer_or_none(
+            effective_client_id, "effective_client_id"
         )
+        if effective_client_id is None:
+            raise ValueError("effective_client_id must be an integer")
+        blocked_at = _now()
+        normalized_code = _optional_text(error_code)
+        with self._connect() as conn:
+            redacted_detail = self._redact_account_ids(conn, error_detail)
+            cursor = conn.execute(
+                """
+                INSERT INTO portfolio_capture_runs(
+                    trigger, state, started_at, finished_at,
+                    account_leg_state, execution_leg_state, position_leg_state,
+                    error_code, error_detail,
+                    client_id_domain, effective_client_id
+                ) VALUES (?, 'blocked', ?, ?, 'not_attempted', 'not_attempted',
+                          'not_attempted', ?, ?, 'portfolio_capture', ?)
+                """,
+                (
+                    trigger,
+                    blocked_at,
+                    blocked_at,
+                    normalized_code,
+                    redacted_detail,
+                    effective_client_id,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM portfolio_capture_runs WHERE id=?",
+                (cursor.lastrowid,),
+            ).fetchone()
+        return self._run_from_row(row)
 
     def commit_capture(
         self, run_id: int, result: BrokerCaptureResult

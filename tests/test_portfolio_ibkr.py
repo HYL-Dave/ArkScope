@@ -113,7 +113,7 @@ def test_review_mode_does_not_create_discovered_broker_account(tmp_path):
 
     assert diff.changes[0].account_id is None
     assert diff.changes[0].broker_account_id == "DU999"
-    assert [a for a in store.list_accounts() if a.broker == "ibkr"] == []
+    assert store.list_accounts(include_archived=True, ensure_manual=False) == []
 
 
 def test_auto_mode_applies_broker_owned_fields_only(tmp_path):

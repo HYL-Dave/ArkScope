@@ -155,10 +155,19 @@ def test_settings_write_is_atomic_and_rejects_interval_outside_5_to_1440(stores)
     assert observations.get_stored_settings() == saved
 
 
-def test_run_lifecycle_and_recent_order_are_durable(stores):
+def test_run_lifecycle_and_recent_order_are_durable(stores, monkeypatch):
     _, observations = stores
     first = observations.create_run(trigger="startup", effective_client_id=61)
     first = observations.finish_run(first.id, state="succeeded")
+    blocked_at = "2026-01-06T05:02:00+00:00"
+    monkeypatch.setattr("src.portfolio_observations._now", lambda: blocked_at)
+    monkeypatch.setattr(
+        observations,
+        "finish_run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("record_blocked must not call finish_run")
+        ),
+    )
     second = observations.record_blocked(
         trigger="scheduled",
         effective_client_id=61,
@@ -170,6 +179,10 @@ def test_run_lifecycle_and_recent_order_are_durable(stores):
     assert [run.id for run in reopened.list_runs(limit=2)] == [second.id, first.id]
     assert reopened.get_run(first.id).state == "succeeded"
     assert reopened.get_run(second.id).state == "blocked"
+    assert second.started_at == blocked_at
+    assert second.finished_at == blocked_at
+    assert second.error_code == "provider_unavailable"
+    assert second.error_detail == "Gateway is offline"
     assert reopened.last_successful_finished_at() == datetime.fromisoformat(
         first.finished_at
     ).astimezone(timezone.utc)

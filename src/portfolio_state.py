@@ -298,8 +298,14 @@ class PortfolioStore:
                 ).fetchone()
             return self._account_from_row(row)
 
-    def list_accounts(self, *, include_archived: bool = False) -> list[PortfolioAccount]:
-        self.ensure_manual_account()
+    def list_accounts(
+        self,
+        *,
+        include_archived: bool = False,
+        ensure_manual: bool = True,
+    ) -> list[PortfolioAccount]:
+        if ensure_manual:
+            self.ensure_manual_account()
         sql = "SELECT * FROM portfolio_accounts"
         if not include_archived:
             sql += " WHERE archived_at IS NULL"
