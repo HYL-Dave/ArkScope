@@ -567,15 +567,14 @@ def _parse_positions(
         if quantity != 0:
             if len(matches) != 1:
                 status.partial("ibkr_position_enrichment_incomplete")
-            elif not any(value is not None for value in matches[0].values()):
-                status.partial("ibkr_position_enrichment_incomplete")
             else:
                 enrichment = matches[0]
+                if any(value is None for value in enrichment.values()):
+                    status.partial("ibkr_position_enrichment_incomplete")
         elif len(matches) == 1:
-            if not any(value is not None for value in matches[0].values()):
+            enrichment = matches[0]
+            if any(value is None for value in enrichment.values()):
                 status.partial("ibkr_position_enrichment_incomplete")
-            else:
-                enrichment = matches[0]
         elif len(matches) > 1:
             status.partial("ibkr_position_enrichment_ambiguous")
         positions.append(

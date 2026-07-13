@@ -418,6 +418,36 @@ def test_position_leg_joins_positions_and_portfolio_by_account_and_conid(
     assert missing_result.positions[0].market_value == 205.0
     assert missing_result.positions[1].market_value is None
 
+    partially_missing = FakeIB()
+    partially_missing.position_rows = [
+        position(account="DU123", con_id=42),
+        position(account="DU123", con_id=44),
+    ]
+    partially_missing.portfolio_rows = [
+        portfolio_item(account="DU123", con_id=42, market_value=205.0),
+        obj(
+            account="DU123",
+            contract=contract(44),
+            position=2.0,
+            marketValue=None,
+            unrealizedPNL=6.0,
+            realizedPNL=8.0,
+        ),
+    ]
+    install_source(monkeypatch, partially_missing)
+
+    partially_missing_result = read_ibkr_capture()
+
+    assert partially_missing_result.position_leg.state == "partial"
+    assert [row.broker_con_id for row in partially_missing_result.positions] == [
+        "42",
+        "44",
+    ]
+    assert partially_missing_result.positions[0].market_value == 205.0
+    assert partially_missing_result.positions[1].market_value is None
+    assert partially_missing_result.positions[1].unrealized_pnl == 6.0
+    assert partially_missing_result.positions[1].realized_pnl == 8.0
+
     duplicate_positions = FakeIB()
     duplicate_positions.position_rows = [
         position(account="DU123", con_id=42),
