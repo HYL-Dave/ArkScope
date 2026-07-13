@@ -13,7 +13,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 
 def _now() -> str:
@@ -120,6 +120,25 @@ class PortfolioPosition:
 
 
 @dataclass(frozen=True)
+class ManualAdjustmentChange:
+    field: str
+    before: Any
+    after: Any
+
+
+@dataclass(frozen=True)
+class ManualAdjustment:
+    id: int
+    account_id: int
+    position_id: int
+    action: Literal["create", "update", "close"]
+    note: str | None
+    source: Literal["manual"]
+    occurred_at_utc: str
+    changes: tuple[ManualAdjustmentChange, ...]
+
+
+@dataclass(frozen=True)
 class CurrencyTotal:
     position_count: int
     market_value: float | None = None
@@ -197,6 +216,25 @@ CREATE TABLE IF NOT EXISTS portfolio_position_notes (
     alert_preferences_json TEXT NOT NULL DEFAULT '{}',
     research_links_json TEXT NOT NULL DEFAULT '[]',
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_manual_adjustments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES portfolio_accounts(id) ON DELETE RESTRICT,
+    position_id INTEGER NOT NULL REFERENCES portfolio_positions(id) ON DELETE RESTRICT,
+    action TEXT NOT NULL CHECK(action IN ('create','update','close')),
+    note TEXT,
+    source TEXT NOT NULL CHECK(source='manual'),
+    occurred_at_utc TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_manual_adjustment_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    adjustment_id INTEGER NOT NULL REFERENCES portfolio_manual_adjustments(id) ON DELETE RESTRICT,
+    field TEXT NOT NULL,
+    before_json TEXT,
+    after_json TEXT,
+    UNIQUE(adjustment_id, field)
 );
 
 """
@@ -384,9 +422,15 @@ class PortfolioStore:
         currency: str = "USD",
         notes: str = "",
     ) -> PortfolioPosition:
-        symbol = _norm_symbol(symbol)
-        if not symbol:
-            raise ValueError("symbol is required")
+        financial_sets = self._validated_manual_sets(
+            {
+                "symbol": symbol,
+                "asset_class": asset_class,
+                "quantity": quantity,
+                "avg_cost": avg_cost,
+                "currency": currency,
+            }
+        )
         now = _now()
         with self._connect() as conn:
             cur = conn.execute(
@@ -395,10 +439,27 @@ class PortfolioStore:
                 (account_id,broker,symbol,asset_class,quantity,avg_cost,currency,source,sync_status,created_at,updated_at)
                 VALUES (?,'manual',?,?,?,?,?,'manual','local',?,?)
                 """,
-                (account_id, symbol, asset_class, float(quantity), avg_cost, currency.upper(), now, now),
+                (
+                    account_id,
+                    financial_sets["symbol"],
+                    financial_sets["asset_class"],
+                    financial_sets["quantity"],
+                    financial_sets["avg_cost"],
+                    financial_sets["currency"],
+                    now,
+                    now,
+                ),
             )
             position_id = int(cur.lastrowid)
             self._upsert_notes(conn, position_id=position_id, notes=notes, tags=None, now=now)
+            self._record_manual_adjustment(
+                conn,
+                account_id=account_id,
+                position_id=position_id,
+                action="create",
+                changes={field: (None, value) for field, value in financial_sets.items()},
+                now=now,
+            )
             return self._position_from_id(conn, position_id)
 
     def apply_broker_positions(
@@ -564,6 +625,11 @@ class PortfolioStore:
                 )
 
             sets = self._validated_manual_sets(fields)
+            changes = {
+                field: (getattr(current, field), value)
+                for field, value in sets.items()
+                if getattr(current, field) != value
+            }
             if sets:
                 sets["updated_at"] = now
                 assignments = ", ".join(f"{key}=?" for key in sets)
@@ -599,6 +665,15 @@ class PortfolioStore:
                     tags=tags,
                     strategy_bucket=strategy_bucket,
                     target_allocation=target_allocation,
+                    now=now,
+                )
+            if changes:
+                self._record_manual_adjustment(
+                    conn,
+                    account_id=current.account_id,
+                    position_id=position_id,
+                    action="update",
+                    changes=changes,
                     now=now,
                 )
             return self._position_from_id(conn, position_id)
@@ -656,6 +731,14 @@ class PortfolioStore:
                 """,
                 (now, now, position_id),
             )
+            self._record_manual_adjustment(
+                conn,
+                account_id=current.account_id,
+                position_id=position_id,
+                action="close",
+                changes={"closed_at": (None, now)},
+                now=now,
+            )
             return self._position_from_id(conn, position_id)
 
     def list_positions(
@@ -681,6 +764,56 @@ class PortfolioStore:
         """
         with self._connect() as conn:
             return [self._position_from_row(row) for row in conn.execute(sql, params)]
+
+    def list_manual_adjustments(
+        self, position_id: int | None = None
+    ) -> list[ManualAdjustment]:
+        where = "WHERE a.position_id=?" if position_id is not None else ""
+        params: tuple[Any, ...] = (position_id,) if position_id is not None else ()
+        sql = f"""
+            SELECT a.id, a.account_id, a.position_id, a.action, a.note, a.source,
+                   a.occurred_at_utc, c.field, c.before_json, c.after_json
+            FROM portfolio_manual_adjustments a
+            LEFT JOIN portfolio_manual_adjustment_changes c ON c.adjustment_id=a.id
+            {where}
+            ORDER BY a.id, c.field
+        """
+        with self._connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        adjustments: list[ManualAdjustment] = []
+        current_id: int | None = None
+        current: dict[str, Any] | None = None
+        changes: list[ManualAdjustmentChange] = []
+        for row in rows:
+            adjustment_id = int(row["id"])
+            if adjustment_id != current_id:
+                if current is not None:
+                    adjustments.append(
+                        ManualAdjustment(changes=tuple(changes), **current)
+                    )
+                current_id = adjustment_id
+                current = {
+                    "id": adjustment_id,
+                    "account_id": int(row["account_id"]),
+                    "position_id": int(row["position_id"]),
+                    "action": row["action"],
+                    "note": row["note"],
+                    "source": row["source"],
+                    "occurred_at_utc": row["occurred_at_utc"],
+                }
+                changes = []
+            if row["field"] is not None:
+                changes.append(
+                    ManualAdjustmentChange(
+                        field=row["field"],
+                        before=_json_loads(row["before_json"], None),
+                        after=_json_loads(row["after_json"], None),
+                    )
+                )
+        if current is not None:
+            adjustments.append(ManualAdjustment(changes=tuple(changes), **current))
+        return adjustments
 
     def snapshot(
         self,
@@ -761,6 +894,37 @@ class PortfolioStore:
                 target_allocation,
                 now,
             ),
+        )
+
+    @staticmethod
+    def _record_manual_adjustment(
+        conn: sqlite3.Connection,
+        *,
+        account_id: int,
+        position_id: int,
+        action: Literal["create", "update", "close"],
+        changes: dict[str, tuple[Any, Any]],
+        now: str,
+    ) -> None:
+        cur = conn.execute(
+            """
+            INSERT INTO portfolio_manual_adjustments
+            (account_id,position_id,action,note,source,occurred_at_utc)
+            VALUES (?,?,?,NULL,'manual',?)
+            """,
+            (account_id, position_id, action, now),
+        )
+        adjustment_id = int(cur.lastrowid)
+        conn.executemany(
+            """
+            INSERT INTO portfolio_manual_adjustment_changes
+            (adjustment_id,field,before_json,after_json)
+            VALUES (?,?,?,?)
+            """,
+            [
+                (adjustment_id, field, _json_dumps(before), _json_dumps(after))
+                for field, (before, after) in sorted(changes.items())
+            ],
         )
 
     def _position_from_id(self, conn: sqlite3.Connection, position_id: int) -> PortfolioPosition:

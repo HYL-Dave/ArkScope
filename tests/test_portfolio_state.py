@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.portfolio_state import BrokerPosition, PortfolioStore
 
 
@@ -405,3 +407,181 @@ def test_totals_always_exclude_closed_rows_even_when_visible(tmp_path):
     assert [p.id for p in closed_view.positions] == [row.id]
     assert closed_view.totals == default_view.totals
     assert "USD" not in closed_view.totals.per_currency
+
+
+def _adjustment_change_count(store: PortfolioStore) -> int:
+    with store._connect() as conn:
+        return int(
+            conn.execute("SELECT COUNT(*) FROM portfolio_manual_adjustment_changes").fetchone()[0]
+        )
+
+
+def test_manual_create_records_field_level_adjustment(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+
+    row = store.upsert_manual_position(
+        account_id=account.id,
+        symbol=" nvda ",
+        asset_class="ETF",
+        quantity=3,
+        avg_cost=100,
+        currency="twd",
+        notes="not journaled",
+    )
+
+    adjustments = store.list_manual_adjustments(position_id=row.id)
+    assert len(adjustments) == 1
+    adjustment = adjustments[0]
+    assert adjustment.account_id == account.id
+    assert adjustment.position_id == row.id
+    assert adjustment.action == "create"
+    assert adjustment.note is None
+    assert adjustment.source == "manual"
+    assert adjustment.occurred_at_utc
+    assert [(change.field, change.before, change.after) for change in adjustment.changes] == [
+        ("asset_class", None, "etf"),
+        ("avg_cost", None, 100.0),
+        ("currency", None, "TWD"),
+        ("quantity", None, 3.0),
+        ("symbol", None, "NVDA"),
+    ]
+
+    for value in (float("nan"), float("inf"), -float("inf"), 0):
+        with pytest.raises(ValueError):
+            store.upsert_manual_position(
+                account_id=account.id, symbol="BAD", quantity=value
+            )
+    with pytest.raises(ValueError):
+        store.upsert_manual_position(
+            account_id=account.id, symbol="BAD", quantity=1, avg_cost=-1
+        )
+    with pytest.raises(ValueError):
+        store.upsert_manual_position(
+            account_id=account.id, symbol="BAD", quantity=1, currency=" "
+        )
+    assert [position.id for position in store.list_positions(include_closed=True)] == [row.id]
+    assert _adjustment_change_count(store) == 5
+
+
+def test_manual_update_journals_only_changed_financial_fields(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id, symbol="NVDA", quantity=3, avg_cost=100
+    )
+
+    store.update_position(
+        row.id,
+        fields={"symbol": "amd ", "quantity": -2, "notes": "not journaled"},
+    )
+
+    adjustments = store.list_manual_adjustments(position_id=row.id)
+    assert len(adjustments) == 2
+    assert adjustments[-1].action == "update"
+    assert [(change.field, change.before, change.after) for change in adjustments[-1].changes] == [
+        ("quantity", 3.0, -2.0),
+        ("symbol", "NVDA", "AMD"),
+    ]
+
+
+def test_manual_avg_cost_clear_records_explicit_null(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id, symbol="NVDA", quantity=3, avg_cost=100
+    )
+
+    store.update_position(row.id, fields={"avg_cost": None})
+
+    adjustment = store.list_manual_adjustments(position_id=row.id)[-1]
+    assert adjustment.action == "update"
+    assert [(change.field, change.before, change.after) for change in adjustment.changes] == [
+        ("avg_cost", 100.0, None),
+    ]
+
+
+def test_manual_close_records_one_idempotent_adjustment(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(account_id=account.id, symbol="NVDA", quantity=3)
+    before_count = _adjustment_change_count(store)
+
+    closed = store.close_position(row.id)
+    again = store.close_position(row.id)
+
+    adjustments = store.list_manual_adjustments(position_id=row.id)
+    close_adjustments = [adjustment for adjustment in adjustments if adjustment.action == "close"]
+    assert again.closed_at == closed.closed_at
+    assert len(close_adjustments) == 1
+    assert [(change.field, change.before, change.after) for change in close_adjustments[0].changes] == [
+        ("closed_at", None, closed.closed_at),
+    ]
+    assert _adjustment_change_count(store) == before_count + 1
+
+
+def test_note_only_update_does_not_create_manual_adjustment(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(account_id=account.id, symbol="NVDA", quantity=3)
+    before_count = _adjustment_change_count(store)
+
+    updated = store.update_position(row.id, fields={"notes": "not journaled"})
+
+    assert updated.notes == "not journaled"
+    assert _adjustment_change_count(store) == before_count
+
+
+def test_manual_create_rolls_back_when_journal_insert_fails(tmp_path, monkeypatch):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    before_positions = store.list_positions(include_closed=True)
+    before_changes = _adjustment_change_count(store)
+
+    def fail_journal(*args, **kwargs):
+        raise RuntimeError("journal insert failed")
+
+    monkeypatch.setattr(store, "_record_manual_adjustment", fail_journal)
+    with pytest.raises(RuntimeError, match="journal insert failed"):
+        store.upsert_manual_position(account_id=account.id, symbol="NVDA", quantity=3)
+
+    assert store.list_positions(include_closed=True) == before_positions
+    assert _adjustment_change_count(store) == before_changes
+
+
+def test_manual_update_and_note_change_roll_back_when_journal_insert_fails(tmp_path, monkeypatch):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id, symbol="NVDA", quantity=3, notes="original"
+    )
+    before = store.get_position(row.id)
+    before_changes = _adjustment_change_count(store)
+
+    def fail_journal(*args, **kwargs):
+        raise RuntimeError("journal insert failed")
+
+    monkeypatch.setattr(store, "_record_manual_adjustment", fail_journal)
+    with pytest.raises(RuntimeError, match="journal insert failed"):
+        store.update_position(row.id, fields={"quantity": 4, "notes": "changed"})
+
+    assert store.get_position(row.id) == before
+    assert _adjustment_change_count(store) == before_changes
+
+
+def test_manual_close_rolls_back_when_journal_insert_fails(tmp_path, monkeypatch):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(account_id=account.id, symbol="NVDA", quantity=3)
+    before = store.get_position(row.id)
+    before_changes = _adjustment_change_count(store)
+
+    def fail_journal(*args, **kwargs):
+        raise RuntimeError("journal insert failed")
+
+    monkeypatch.setattr(store, "_record_manual_adjustment", fail_journal)
+    with pytest.raises(RuntimeError, match="journal insert failed"):
+        store.close_position(row.id)
+
+    assert store.get_position(row.id) == before
+    assert _adjustment_change_count(store) == before_changes
