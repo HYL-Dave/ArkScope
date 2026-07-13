@@ -16,6 +16,20 @@ def test_domain_ids_pinned_with_default_base(monkeypatch):
     assert ibkr_client_id_for("prices") == 21
     assert ibkr_client_id_for("news") == 31
     assert ibkr_client_id_for("iv") == 41        # reserved for the IV reboot line
+    assert ibkr_client_id_for("quotes") == 51
+    assert ibkr_client_id_for("holdings") == 61
+    assert ibkr_client_id_for("portfolio_capture") == 71
+
+
+def test_portfolio_capture_band_caps_base_before_legacy_100(monkeypatch):
+    monkeypatch.setenv("IBKR_CLIENT_ID", "29")
+    assert ibkr_client_id_for("portfolio_capture") == 99
+    monkeypatch.setenv("IBKR_CLIENT_ID", "30")
+    with pytest.raises(ValueError, match="0 through 29"):
+        ibkr_client_id_for("portfolio_capture")
+    monkeypatch.setenv("IBKR_CLIENT_ID", "-1")
+    with pytest.raises(ValueError, match="0 through 29"):
+        ibkr_client_id_for("portfolio_capture")
 
 
 def test_base_env_respected(monkeypatch):

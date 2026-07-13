@@ -20,8 +20,10 @@ import os
 # option_chain_tools' original base+10 convention. Legacy occupants to stay clear
 # of: collect_ibkr_news.py defaults to 50, collect_ibkr_fundamentals.py hardcodes
 # 103, and archived scan/iv scripts stomp the env with random 100–999. quotes=+50
-# and holdings=+60 are the current high bands; if future trading/execution reserves
-# +70, the app-managed base must stay <= 29 so derived ids never enter that legacy band.
+# and holdings=+60 are the current high bands; portfolio capture reserves +70 as a
+# read-only domain. Future trading/execution must use another independently
+# authorized id, and the app-managed base must stay <= 29 so derived ids never
+# enter the legacy 100+ band.
 DOMAIN_OFFSETS = {
     "manual": 0,    # the base itself: manual smokes / legacy single-client paths
     "options": 10,  # option chain tools (readonly)
@@ -33,6 +35,7 @@ DOMAIN_OFFSETS = {
     # default 50 (adjacent but never equal for any base, since base >= 1).
     "quotes": 50,   # ad hoc read-through quote snapshots
     "holdings": 60,  # read-only portfolio/position snapshots
+    "portfolio_capture": 70,  # read-only portfolio capture
 }
 
 # Display labels for the Settings hint — kept HERE so adding a domain is a
@@ -45,6 +48,7 @@ DOMAIN_LABELS_ZH = {
     "iv": "IV",
     "quotes": "即時股價",
     "holdings": "持倉",
+    "portfolio_capture": "持倉擷取",
 }
 
 
@@ -70,4 +74,6 @@ def ibkr_client_id_for(domain: str) -> int:
         # Name the env var: the prices worker keeps a 240-char error message (the
         # news worker keeps only the class), and sidecar logs get the full text.
         raise ValueError(f"IBKR_CLIENT_ID must be an integer, got {raw!r}") from None
+    if not 0 <= base <= 29:
+        raise ValueError("IBKR_CLIENT_ID base must be in range 0 through 29")
     return base + offset

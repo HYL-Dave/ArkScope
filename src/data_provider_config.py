@@ -98,7 +98,9 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             guard_reason=(
                 "Changing IBKR client_id can disturb active Gateway sessions; this is the "
                 "base id — all domains derive from it (options=+10, prices=+20, news=+30, "
-                "iv=+40, quotes=+50, holdings=+60; see data_sources/ibkr_client_id.py)."
+                "iv=+40, quotes=+50, holdings=+60, portfolio_capture=+70; the app-managed "
+                "base must stay at 0 through 29 (base <= 29); order placement needs another "
+                "independently authorized id (see data_sources/ibkr_client_id.py)."
             ),
         ),
     ],
@@ -222,8 +224,8 @@ def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
         if not value.isdecimal():
             raise ValueError("IBKR client_id must be a non-negative integer")
         base = int(value)
-        if base > 2**31 - 1 - 40:
-            raise ValueError("IBKR client_id too large for a Gateway client id")
+        if not 0 <= base <= 29:
+            raise ValueError("IBKR client_id base must be in range 0 through 29")
         return str(base)
     return value
 

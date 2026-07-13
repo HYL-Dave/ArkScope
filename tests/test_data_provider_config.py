@@ -607,6 +607,10 @@ def test_normalize_rejects_non_numeric_ibkr_client_id():
         dpc.normalize_provider_config_value(cid, "abc")
     with pytest.raises(ValueError):
         dpc.normalize_import_value(cid, "IBKR_CLIENT", "-5")
+    with pytest.raises(ValueError, match="0 through 29"):
+        dpc.normalize_provider_config_value(cid, "30")
+    with pytest.raises(ValueError):
+        dpc.normalize_provider_config_value(cid, "-1")
     with pytest.raises(ValueError):
         # '²'.isdigit() is True but int() rejects it — the validator must too
         dpc.normalize_provider_config_value(cid, "²")
@@ -666,13 +670,16 @@ def test_view_exposes_client_id_domains(store, monkeypatch):
     doms = row["client_id_domains"]
     assert [d["domain"] for d in doms] == [
         "manual", "options", "prices", "news", "iv", "quotes", "holdings",
+        "portfolio_capture",
     ]
-    assert [d["offset"] for d in doms] == [0, 10, 20, 30, 40, 50, 60]
-    assert [d["effective_id"] for d in doms] == [1, 11, 21, 31, 41, 51, 61]
+    assert [d["offset"] for d in doms] == [0, 10, 20, 30, 40, 50, 60, 70]
+    assert [d["effective_id"] for d in doms] == [1, 11, 21, 31, 41, 51, 61, 71]
     assert doms[2]["label"] == "股價"
-    assert doms[-1]["label"] == "持倉"
+    assert doms[-1]["label"] == "持倉擷取"
     assert "quotes=+50" in row["guard_reason"]
     assert "holdings=+60" in row["guard_reason"]
+    assert "portfolio_capture=+70" in row["guard_reason"]
+    assert "base <= 29" in row["guard_reason"]
 
     # a real-env override wins precedence — effective ids must reflect it
     monkeypatch.setenv("IBKR_CLIENT_ID", "7")
@@ -680,7 +687,7 @@ def test_view_exposes_client_id_domains(store, monkeypatch):
         f for f in pc._view(store)["providers"]["ibkr"]["fields"]
         if f["field"] == "client_id"
     )["client_id_domains"]
-    assert [d["effective_id"] for d in doms] == [7, 17, 27, 37, 47, 57, 67]
+    assert [d["effective_id"] for d in doms] == [7, 17, 27, 37, 47, 57, 67, 77]
 
     # unparsable env base → ids unknown, list still present (UI shows placeholders)
     monkeypatch.setenv("IBKR_CLIENT_ID", "abc")
