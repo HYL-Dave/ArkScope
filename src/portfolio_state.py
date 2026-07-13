@@ -38,11 +38,14 @@ def _float_or_error(value: Any, field_name: str, *, allow_none: bool) -> float |
     return out
 
 
-def _account_hash(value: str | None) -> str | None:
+def portfolio_account_hash(value: str | None) -> str | None:
     raw = (value or "").strip()
     if not raw:
         return None
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+_account_hash = portfolio_account_hash
 
 
 def _json_loads(value: str | None, default: Any) -> Any:
