@@ -134,9 +134,9 @@ def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_pat
             await asyncio.sleep(0)
             assert set(started) == {"data", "portfolio"}
             assert capture_service.reconcile_calls == 1
+        assert set(cancelled) == {"data", "portfolio"}
 
     asyncio.run(_run_lifespan())
-    assert set(cancelled) == {"data", "portfolio"}
 
 
 def test_disable_scheduler_env_prevents_both_scheduler_tasks(monkeypatch, tmp_path):
