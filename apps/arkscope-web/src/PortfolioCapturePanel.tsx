@@ -134,9 +134,20 @@ export function PortfolioCapturePanel({
   const dirtyRef = useRef(false);
   const initializedRef = useRef(false);
   const lastTerminalRunIdRef = useRef<number | null>(null);
+  const captureRef = useRef<PortfolioCaptureStatus | null>(null);
   const requestSequenceRef = useRef(0);
   const acceptedSequenceRef = useRef(0);
   const safeCapture = isCaptureStatus(capture) ? capture : null;
+
+  const publishIssue = useCallback((
+    next: CaptureIssue,
+    sequence = ++requestSequenceRef.current,
+  ) => {
+    if (sequence < acceptedSequenceRef.current) return false;
+    acceptedSequenceRef.current = sequence;
+    setIssue(next);
+    return true;
+  }, []);
 
   const acceptStatus = useCallback(async (
     next: PortfolioCaptureStatus,
@@ -144,6 +155,7 @@ export function PortfolioCapturePanel({
   ) => {
     if (sequence < acceptedSequenceRef.current) return false;
     acceptedSequenceRef.current = sequence;
+    captureRef.current = next;
     setCapture(next);
     if (!dirtyRef.current) {
       setEnabled(next.settings.enabled);
@@ -155,13 +167,13 @@ export function PortfolioCapturePanel({
     if (!initializedRef.current) {
       initializedRef.current = true;
       lastTerminalRunIdRef.current = terminal?.id ?? null;
-      return true;
+      return sequence === acceptedSequenceRef.current;
     }
     if (terminal && terminal.id !== lastTerminalRunIdRef.current) {
       lastTerminalRunIdRef.current = terminal.id;
       await onPortfolioChanged();
     }
-    return true;
+    return sequence === acceptedSequenceRef.current;
   }, [onPortfolioChanged]);
 
   const refresh = useCallback(async () => {
@@ -175,16 +187,14 @@ export function PortfolioCapturePanel({
       if (accepted) setIssue(null);
       return accepted ? next : null;
     } catch (reason) {
-      if (sequence >= acceptedSequenceRef.current) {
-        setIssue({
-          state: "failed",
-          title: "持倉同步失敗",
-          message: reason instanceof Error ? reason.message : String(reason),
-        });
-      }
+      publishIssue({
+        state: "failed",
+        title: "同步狀態載入失敗",
+        message: reason instanceof Error ? reason.message : String(reason),
+      }, sequence);
       return null;
     }
-  }, [acceptStatus]);
+  }, [acceptStatus, publishIssue]);
 
   useEffect(() => {
     void refresh();
@@ -215,7 +225,7 @@ export function PortfolioCapturePanel({
   async function saveSettings() {
     const parsed = parseCaptureInterval(interval);
     if (parsed === null) {
-      setIssue({
+      publishIssue({
         state: "failed",
         title: "排程設定無效",
         message: "間隔必須是 5-1440 分鐘的整數",
@@ -238,7 +248,7 @@ export function PortfolioCapturePanel({
       await acceptStatus(next, sequence);
       setNotice("排程已儲存");
     } catch (reason) {
-      setIssue({
+      publishIssue({
         state: "failed",
         title: "排程儲存失敗",
         message: reason instanceof Error ? reason.message : String(reason),
@@ -254,20 +264,22 @@ export function PortfolioCapturePanel({
     setNotice(null);
     try {
       const started = await triggerPortfolioCapture();
-      const sequence = ++requestSequenceRef.current;
-      if (started.run && safeCapture) {
-        await acceptStatus(statusWithRun(safeCapture, started.run), sequence);
+      const current = captureRef.current;
+      const currentRunId = current?.latest_run?.id ?? -1;
+      if (started.run && current && started.run.id > currentRunId) {
+        const sequence = ++requestSequenceRef.current;
+        await acceptStatus(statusWithRun(current, started.run), sequence);
       }
       await refresh();
-      if (started.error_detail) {
-        setIssue({
+      if (started.error_detail && !started.run) {
+        publishIssue({
           state: runUiState(started.state),
           title: RUN_LABELS[started.state],
           message: started.error_detail,
         });
       }
     } catch (reason) {
-      setIssue({
+      publishIssue({
         state: "failed",
         title: "持倉同步失敗",
         message: reason instanceof Error ? reason.message : String(reason),
@@ -285,12 +297,17 @@ export function PortfolioCapturePanel({
       await applyPortfolioCaptureRun(runId);
       const sequence = ++requestSequenceRef.current;
       acceptedSequenceRef.current = sequence;
-      setCapture((current) => current ? { ...current, review: null } : current);
+      const current = captureRef.current;
+      if (current) {
+        const next = { ...current, review: null };
+        captureRef.current = next;
+        setCapture(next);
+      }
       await onPortfolioChanged();
       await refresh();
       setNotice("同步變更已套用");
     } catch (reason) {
-      setIssue({
+      publishIssue({
         state: "failed",
         title: "套用同步失敗",
         message: reason instanceof Error ? reason.message : String(reason),

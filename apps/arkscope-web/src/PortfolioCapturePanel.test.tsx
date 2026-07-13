@@ -397,6 +397,142 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.querySelector('[data-state="blocked"]')?.textContent).toContain("另一個同步仍在執行");
   });
 
+  it("does_not_regress_a_terminal_poll_when_the_start_response_arrives_late", async () => {
+    vi.useFakeTimers();
+    const changed = vi.fn();
+    const prior = run({ id: 102, state: "succeeded" });
+    const running = run({ id: 103, trigger: "manual", state: "running", finished_at: null });
+    const terminal = run({ id: 103, trigger: "manual", state: "succeeded" });
+    let resolveStart: ((value: PortfolioCaptureStart) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs") && init?.method === "POST") {
+        return new Promise<PortfolioCaptureStart>((resolve) => {
+          resolveStart = resolve;
+        });
+      }
+      reads += 1;
+      if (reads === 1) return status({ latest_run: prior, recent_runs: [prior] });
+      if (reads === 2) {
+        return status({ running: false, latest_run: terminal, recent_runs: [terminal, prior] });
+      }
+      throw new Error("follow-up status failed");
+    });
+    await mount(changed);
+
+    const captureButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("立即同步"))!;
+    await act(async () => {
+      captureButton.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveStart!({ accepted: true, state: "running", run: running });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("成功");
+    expect(host!.querySelector('[data-state="running"]')).toBeNull();
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it("does_not_let_an_older_poll_clear_a_newer_action_failure", async () => {
+    vi.useFakeTimers();
+    let resolvePoll: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/settings") && init?.method === "PUT") {
+        throw new Error("settings write failed");
+      }
+      reads += 1;
+      if (reads === 1) return status();
+      return new Promise<PortfolioCaptureStatus>((resolve) => {
+        resolvePoll = resolve;
+      });
+    });
+    await mount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    await clickButton("儲存排程");
+    expect(host!.textContent).toContain("settings write failed");
+
+    await act(async () => {
+      resolvePoll!(status());
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("settings write failed");
+  });
+
+  it("does_not_clear_a_newer_action_failure_after_an_older_terminal_callback_finishes", async () => {
+    vi.useFakeTimers();
+    let resolveChanged: (() => void) | null = null;
+    const changed = vi.fn(() => new Promise<void>((resolve) => {
+      resolveChanged = resolve;
+    }));
+    const running = run({ id: 105, state: "running", finished_at: null });
+    const terminal = run({ id: 105, state: "succeeded" });
+    let reads = 0;
+    stubFetch((url, init) => {
+      if (url.endsWith("/settings") && init?.method === "PUT") {
+        throw new Error("settings write failed during refresh callback");
+      }
+      reads += 1;
+      return reads === 1
+        ? status({ running: true, latest_run: running, recent_runs: [running] })
+        : status({ running: false, latest_run: terminal, recent_runs: [terminal] });
+    });
+    await mount(changed);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+    await clickButton("儲存排程");
+    expect(host!.textContent).toContain("settings write failed during refresh callback");
+
+    await act(async () => {
+      resolveChanged!();
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("settings write failed during refresh callback");
+  });
+
+  it("announces_a_terminal_start_detail_only_once", async () => {
+    const blocked = run({
+      id: 104,
+      trigger: "manual",
+      state: "blocked",
+      error_code: "provider_config_missing",
+      error_detail: "IBKR provider configuration is incomplete",
+    });
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs") && init?.method === "POST") {
+        return {
+          accepted: true,
+          state: "blocked",
+          run: blocked,
+          error_code: blocked.error_code,
+          error_detail: blocked.error_detail,
+        };
+      }
+      return status({ latest_run: blocked, recent_runs: [blocked] });
+    });
+    await mount();
+
+    await clickButton("立即同步");
+
+    const matchingAlerts = Array.from(host!.querySelectorAll(".ui-inline-alert"))
+      .filter((alert) => alert.textContent?.includes("IBKR provider configuration is incomplete"));
+    expect(matchingAlerts).toHaveLength(1);
+  });
+
   it("renders_partial_blocked_failed_and_interrupted_with_existing_status_badges", async () => {
     const runs = [
       run({ id: 11, state: "partial" }),
@@ -506,6 +642,7 @@ describe("PortfolioCapturePanel", () => {
 
     expect(host!.textContent).not.toContain("待套用差異");
     expect(host!.textContent).toContain("status refresh failed");
+    expect(host!.textContent).toContain("同步狀態載入失敗");
   });
 
   it("shows_nullable_review_values_being_cleared", async () => {
