@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: DRAFT FOR REVIEW — IMPLEMENTATION NOT STARTED, 2026-07-13.**
+> **Status: REVIEW-CLEARED — IMPLEMENTATION NOT STARTED, 2026-07-13.**
 
 **Goal:** Start preserving truthful, non-retroactive IBKR account, position, execution, commission, correction, and manual-adjustment facts while retaining the shipped Holdings tables as current-state authority.
 
@@ -38,6 +38,12 @@
 - Account overview and rich activity UI remain Slice 2/3. Slice 1 renders only configuration, current/recent run truth, leg outcomes, and the latest derived review diff.
 - Spec Section 14.3 is split by its owning consumer: Slice 1 proves the single Holdings schedule owner plus responsive run/review controls; Slice 2 owns every-account visibility, currency-safe/manual subtotals, dual timestamps, and labeled daily P&L; Slice 3 owns fill grouping, unknown-outcome labels, gap markers, and the collapsible activity context panel. Deferred UI clauses are not silently claimed by this plan.
 - The existing immediate `/portfolio/ibkr/preview` and `/portfolio/ibkr/apply` API routes remain mounted for compatibility. The new Holdings path uses capture-run observations and must not silently call Gateway again during review/apply.
+- One deliberate compatibility-route repair is in scope: a reappearing archived
+  IBKR account remains archived and retains user-owned account fields. Legacy
+  apply must no longer mistake that account for a new one and silently
+  unarchive/reset it; a direct `tests/test_portfolio_ibkr.py` regression pins
+  this exception while every other legacy preview/apply contract remains
+  unchanged.
 - No PostgreSQL import, connection, mirror, or fallback is permitted.
 - Implementation stops review-ready. Merge, docs LIVE status, worktree cleanup, and Slice 2 are separate user decisions.
 
@@ -779,11 +785,15 @@ git commit -m "feat: read portfolio capture from ibkr"
 - Create: `tests/test_portfolio_capture.py`
 - Create: `tests/test_portfolio_capture_scheduler.py`
 - Modify: `src/portfolio_ibkr.py`
+- Modify: `tests/test_portfolio_ibkr.py`
 
 **Interfaces:**
 - Consumes: observation store, reader, existing `preview_or_apply_ibkr_snapshot`, `PortfolioStore`, shared `ibkr_gateway_lock`.
 - Produces: `PortfolioCaptureService`, status/start/review DTOs, and scheduler loop.
-- Preserves: legacy immediate preview is zero-write and legacy apply still requires its existing route gate.
+- Preserves: legacy immediate preview is zero-write and legacy apply still
+  requires its existing route gate. Deliberate exception: legacy apply now
+  recognizes archived broker accounts without unarchiving them or resetting
+  their user-owned account fields.
 
 - [ ] **Step 1: Write 14 RED orchestration tests**
 
@@ -815,6 +825,20 @@ same complete capture. It proves only the auto account's broker-owned fields
 change. Its auto account is archived, and the test also asserts `archived_at`
 remains unchanged.
 
+Add one direct legacy-helper RED regression in `tests/test_portfolio_ibkr.py`:
+
+```text
+test_legacy_apply_preserves_archived_account_and_user_owned_fields
+```
+
+Seed an `ibkr_auto` account, give it a user label and
+`include_in_total=false`, archive it, then apply a snapshot for the same raw
+broker account id. The test must assert that the existing local account id,
+archive timestamp, label, sync mode, and inclusion setting are unchanged. On
+the current code this fails because `list_accounts()` hides the archived row
+and `upsert_broker_account()` then clears `archived_at` while resetting
+label/sync mode.
+
 - [ ] **Step 2: Write eight RED cadence/scheduler tests**
 
 `tests/test_portfolio_capture_scheduler.py` must separately collect:
@@ -837,10 +861,12 @@ Use an injected UTC clock and fake sleep; do not use wall-clock sleeps.
 Run:
 
 ```bash
+pytest tests/test_portfolio_ibkr.py -q
 pytest tests/test_portfolio_capture.py tests/test_portfolio_capture_scheduler.py -q
 ```
 
-Expected: service/scheduler modules are absent.
+Expected: the new direct legacy regression fails on silent unarchive/reset;
+service/scheduler modules are absent.
 
 - [ ] **Step 4: Implement service ordering and redacted projections**
 
@@ -975,8 +1001,10 @@ pass a response boundary.
 In `preview_or_apply_ibkr_snapshot`, build broker-account identity from
 `store.list_accounts(include_archived=True)`. This closes the existing path
 where a reappearing archived account was mistaken for missing and
-`upsert_broker_account` silently cleared `archived_at`. Do not otherwise change
-legacy preview/apply behavior.
+`upsert_broker_account` silently cleared `archived_at` and reset user-owned
+account fields. This is a deliberate behavior repair on the mounted legacy
+compatibility route, not an incidental service-only change. Do not otherwise
+change legacy preview/apply behavior.
 
 - [ ] **Step 5: Implement due calculation and scheduler loop**
 
@@ -1025,12 +1053,14 @@ Run:
 pytest tests/test_portfolio_capture.py tests/test_portfolio_capture_scheduler.py tests/test_portfolio_ibkr.py tests/test_portfolio_routes.py -q
 ```
 
-Expected: all pass; legacy preview still creates zero accounts/positions and legacy apply still works.
+Expected: all pass; legacy preview still creates zero accounts/positions,
+legacy apply still works, and a reappearing archived account remains archived
+with its user-owned fields intact.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/portfolio_capture.py src/portfolio_capture_scheduler.py src/portfolio_ibkr.py tests/test_portfolio_capture.py tests/test_portfolio_capture_scheduler.py
+git add src/portfolio_capture.py src/portfolio_capture_scheduler.py src/portfolio_ibkr.py tests/test_portfolio_capture.py tests/test_portfolio_capture_scheduler.py tests/test_portfolio_ibkr.py
 git commit -m "feat: orchestrate portfolio capture"
 ```
 
@@ -1431,9 +1461,10 @@ pytest \
 ```
 
 Expected: all Slice 1 tests pass. The planned backend collect delta is exactly
-`+70/-0`: 1 client-id-band, 18 observation-store, 8 manual-journal, 11 reader,
-14 service, 8 scheduler, and 10 route/lifespan tests. Any different delta must
-be reconciled by named test before review.
+`+71/-0`: 1 client-id-band, 18 observation-store, 8 manual-journal, 11 reader,
+14 service, 8 scheduler, 1 direct legacy archived-account regression, and 10
+route/lifespan tests. Any different delta must be reconciled by named test
+before review.
 
 - [ ] **Step 2: Run static safety and ownership gates**
 
@@ -1500,7 +1531,7 @@ Compare virgin archives of that exact base and final tip under the same environm
 
 - failure sets identical in both directions;
 - pre-existing passed/skipped/warning/error behavior is identical;
-- passed/collected delta equals exactly the new test ledger (`+70/-0` backend);
+- passed/collected delta equals exactly the new test ledger (`+71/-0` backend);
 - frontend delta equals `+10/-0`;
 - no generated DB/cache/build artifact enters either archive.
 
@@ -1571,6 +1602,8 @@ Reviewer focus should be:
 7. derived review with no second Gateway call;
 8. startup/manual cadence semantics and no tight retry;
 9. redacted additive API and no Data Sources duplicate;
-10. exact test accounting plus real Gateway evidence.
+10. deliberate legacy compatibility repair: archived accounts stay archived
+    and retain user-owned fields;
+11. exact test accounting plus real Gateway evidence.
 
 Implementation may begin only after this plan is reviewed. The recommended execution mode is subagent-driven development with a fresh implementation worktree and one review checkpoint per task; inline execution remains acceptable if the same RED/commit/review boundaries are preserved.
