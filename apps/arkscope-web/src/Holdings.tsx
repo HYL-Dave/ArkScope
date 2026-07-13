@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, Eye, Plus, RefreshCw, Save, X } from "lucide-react";
+import { Plus, RefreshCw, Save, X } from "lucide-react";
 import {
-  applyIbkrPortfolioSync,
   closePortfolioPosition,
   createManualPosition,
   getPortfolio,
-  previewIbkrPortfolioSync,
   updatePortfolioAccount,
   updatePortfolioPosition,
   type PortfolioPosition,
   type PortfolioSnapshot,
-  type PortfolioSyncChange,
-  type PortfolioSyncPreview,
   type PositionUpdate,
 } from "./api";
+import { PortfolioCapturePanel } from "./PortfolioCapturePanel";
 import {
   Button,
   ConfirmDialog,
@@ -27,7 +24,6 @@ import {
 
 export function HoldingsView() {
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
-  const [preview, setPreview] = useState<PortfolioSyncPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -90,32 +86,6 @@ export function HoldingsView() {
       if (tickerRef.current) tickerRef.current.value = "";
       if (quantityRef.current) quantityRef.current.value = "";
       if (notesRef.current) notesRef.current.value = "";
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onPreviewIbkr() {
-    setBusy("preview");
-    setErr(null);
-    try {
-      setPreview(await previewIbkrPortfolioSync());
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onApplyIbkr() {
-    setBusy("apply");
-    setErr(null);
-    try {
-      await applyIbkrPortfolioSync();
-      setPreview(null);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -209,56 +179,6 @@ export function HoldingsView() {
         : positions.length === 0
           ? { state: "empty" as const, label: "尚無持倉" }
           : { state: "ready" as const, label: `${positions.length} 筆持倉` };
-  const previewColumns: DataTableColumn<PortfolioSyncChange>[] = [
-    { id: "change", header: "Change", render: (change) => change.kind },
-    { id: "symbol", header: "Symbol", render: (change) => change.symbol },
-    {
-      id: "quantity",
-      header: "Qty",
-      align: "right",
-      render: (change) => formatChangeMetric(
-        change.kind,
-        change.before,
-        change.after,
-        "quantity",
-        change.quantity,
-      ),
-    },
-    {
-      id: "avg-cost",
-      header: "Avg Cost",
-      align: "right",
-      render: (change) => formatChangeMetric(
-        change.kind,
-        change.before,
-        change.after,
-        "avg_cost",
-      ),
-    },
-    {
-      id: "market-value",
-      header: "Market Value",
-      align: "right",
-      render: (change) => formatChangeMetric(
-        change.kind,
-        change.before,
-        change.after,
-        "market_value",
-      ),
-    },
-    {
-      id: "unrealized-pnl",
-      header: <>Unrealized P&amp;L</>,
-      align: "right",
-      render: (change) => formatChangeMetric(
-        change.kind,
-        change.before,
-        change.after,
-        "unrealized_pnl",
-      ),
-    },
-  ];
-
   const editorNode = editing ? (
     <div className="ui-inline-form" key={editing.id}>
       {editing.broker === "manual" && (
@@ -408,57 +328,7 @@ export function HoldingsView() {
         </div>
       </section>
 
-      <section className="ui-section-band">
-        <div className="ui-section-head">
-          <h2>IBKR 同步</h2>
-          <div className="ui-action-row">
-            <Button
-              icon={<Eye size={15} />}
-              onClick={() => void onPreviewIbkr()}
-              disabled={busy != null}
-            >
-              預覽 IBKR 同步
-            </Button>
-            {preview && preview.changes.length > 0 && (
-              <Button
-                tone="primary"
-                icon={<Check size={15} />}
-                onClick={() => void onApplyIbkr()}
-                disabled={busy != null}
-              >
-                套用同步
-              </Button>
-            )}
-          </div>
-        </div>
-        <p className="muted">
-          唯讀同步，只讀取 Gateway 可見帳戶與持倉；ArkScope 不會下單。
-        </p>
-        {preview && (
-          <div>
-            <div className="ui-action-row">
-              <p className="muted tiny">
-                預覽結果，尚未寫入本地持倉；按「套用同步」後才會保存。
-              </p>
-              {preview.changes.length > 0 ? (
-                <StatusBadge state="partial" label="待套用變更" />
-              ) : null}
-            </div>
-            <DataTable<PortfolioSyncChange>
-              ariaLabel="IBKR 同步預覽"
-              rows={preview.changes}
-              columns={previewColumns}
-              rowKey={(change) => [
-                change.broker_account_id ?? change.account_id ?? "unscoped-account",
-                change.kind,
-                change.broker_con_id ?? change.symbol,
-              ].join("-")}
-              rowLabel={(change) => change.symbol}
-              emptyText="沒有差異"
-            />
-          </div>
-        )}
-      </section>
+      <PortfolioCapturePanel onPortfolioChanged={load} />
 
       <section className="ui-section-band">
         <div className="ui-section-head">
@@ -614,32 +484,6 @@ function PositionsTable({
       renderExpandedRow={(position) => editingId === position.id ? editor : null}
     />
   );
-}
-
-function formatChangeMetric(
-  kind: string,
-  before: Record<string, unknown> | null | undefined,
-  after: Record<string, unknown> | null | undefined,
-  field: string,
-  fallback?: number,
-): string {
-  const beforeValue = finiteNumber(before?.[field]);
-  const afterValue = finiteNumber(after?.[field]) ?? finiteNumber(fallback);
-  if (
-    kind === "update" &&
-    beforeValue != null &&
-    afterValue != null &&
-    beforeValue !== afterValue
-  ) {
-    return `${formatNum(beforeValue)} → ${formatNum(afterValue)}`;
-  }
-  if (kind === "remove") return formatMaybe(beforeValue);
-  return formatMaybe(afterValue ?? beforeValue);
-}
-
-function finiteNumber(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-  return value;
 }
 
 function splitTags(raw: string): string[] {

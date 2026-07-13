@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HoldingsView } from "./Holdings";
 import type {
   PortfolioAccount,
+  PortfolioCaptureReview,
+  PortfolioCaptureStart,
+  PortfolioCaptureStatus,
   PortfolioPosition,
   PortfolioSnapshot,
   PortfolioSyncPreview,
@@ -41,10 +44,50 @@ const snapshot = (over: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot => (
 
 type PortfolioApiResponse =
   | PortfolioAccount
+  | PortfolioCaptureReview
+  | PortfolioCaptureStart
+  | PortfolioCaptureStatus
   | PortfolioPosition
   | PortfolioSnapshot
   | PortfolioSyncPreview
   | { ok: true };
+
+const captureStatus = (over: Partial<PortfolioCaptureStatus> = {}): PortfolioCaptureStatus => ({
+  settings: {
+    enabled: true,
+    interval_minutes: 15,
+    source: "default",
+    provider_configured: true,
+  },
+  provider_issue: null,
+  running: false,
+  next_due_at: "2026-07-14T05:15:00+00:00",
+  latest_run: null,
+  recent_runs: [],
+  review: null,
+  ...over,
+});
+
+const captureRun = (over: Partial<NonNullable<PortfolioCaptureStatus["latest_run"]>> = {}) => ({
+  id: 51,
+  trigger: "manual" as const,
+  state: "succeeded" as const,
+  started_at: "2026-07-14T05:00:00+00:00",
+  finished_at: "2026-07-14T05:00:02+00:00",
+  account_leg_state: "complete",
+  execution_leg_state: "complete",
+  position_leg_state: "complete",
+  discovered_account_count: 2,
+  new_account_count: 0,
+  archived_activity_count: 0,
+  inserted_execution_count: 0,
+  inserted_commission_count: 0,
+  unmatched_count: 0,
+  data_conflict_count: 0,
+  error_code: null,
+  error_detail: null,
+  ...over,
+});
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -56,6 +99,7 @@ function deferred<T>() {
 
 function stubFetch(
   handler: (url: string, init?: RequestInit) => PortfolioApiResponse | Promise<PortfolioApiResponse>,
+  captureHandler?: () => PortfolioCaptureStatus | Promise<PortfolioCaptureStatus>,
 ) {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
   vi.stubGlobal(
@@ -67,7 +111,10 @@ function stubFetch(
         method: init?.method ?? "GET",
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
-      return new Response(JSON.stringify(await handler(u, init)), {
+      const payload = u.endsWith("/portfolio/capture") && (init?.method ?? "GET") === "GET"
+        ? await (captureHandler?.() ?? captureStatus())
+        : await handler(u, init);
+      return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -93,9 +140,9 @@ async function flush() {
 
 async function buttonByText(text: string): Promise<HTMLButtonElement> {
   for (let i = 0; i < 6; i += 1) {
-    const found = Array.from(document.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes(text),
-    );
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const found = buttons.find((button) => button.textContent?.trim() === text)
+      ?? buttons.find((button) => button.textContent?.includes(text));
     if (found) return found;
     await flush();
   }
@@ -183,70 +230,44 @@ describe("HoldingsView", () => {
     expect(calls.some((c) => c.method === "POST" && (c.body as any)?.symbol === "AAPL")).toBe(true);
   });
 
-  it("shows ibkr preview as review before applying", async () => {
-    const previewResponse = deferred<PortfolioSyncPreview>();
+  it("shows captured review as review before applying", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    stubFetch((url) => {
-      if (url.endsWith("/portfolio/ibkr/preview")) {
-        return previewResponse.promise;
-      }
-      return snapshot();
-    });
+    const review: PortfolioCaptureReview = {
+      run_id: 51,
+      changes: [{
+        kind: "update",
+        account_id: 1,
+        account_label: "IBKR 主帳戶",
+        broker_account_id_hash: "hash-one",
+        broker_con_id: "1001",
+        symbol: "MSFT",
+        quantity: 1,
+        before: { avg_cost: 90, market_value: 1200, unrealized_pnl: -50 },
+        after: { avg_cost: 100.25, market_value: 1250, unrealized_pnl: -25.5 },
+      }, {
+        kind: "update",
+        account_id: 2,
+        account_label: "IBKR 子帳戶",
+        broker_account_id_hash: "hash-two",
+        broker_con_id: "1001",
+        symbol: "MSFT",
+        quantity: 2,
+        before: { avg_cost: 200, market_value: 2200, unrealized_pnl: 50 },
+        after: { avg_cost: 210.5, market_value: 2250, unrealized_pnl: 75 },
+      }],
+      applies: false,
+    };
+    stubFetch(
+      () => snapshot(),
+      () => captureStatus({ latest_run: captureRun(), recent_runs: [captureRun()], review }),
+    );
     await mount();
     await flush();
 
-    await act(async () => {
-      (await buttonByText("預覽 IBKR 同步")).click();
-    });
-    expect(host!.querySelector('[data-state="running"]')?.textContent).toContain("更新中");
-
-    await act(async () => {
-      previewResponse.resolve({
-          changes: [{
-            kind: "update",
-            account_id: 1,
-            broker_account_id: "DU111",
-            broker_con_id: "1001",
-            symbol: "MSFT",
-            quantity: 1,
-            before: {
-              avg_cost: 90,
-              market_value: 1200,
-              unrealized_pnl: -50,
-            },
-            after: {
-              avg_cost: 100.25,
-              market_value: 1250,
-              unrealized_pnl: -25.5,
-            },
-          }, {
-            kind: "update",
-            account_id: 2,
-            broker_account_id: "DU222",
-            broker_con_id: "1001",
-            symbol: "MSFT",
-            quantity: 2,
-            before: {
-              avg_cost: 200,
-              market_value: 2200,
-              unrealized_pnl: 50,
-            },
-            after: {
-              avg_cost: 210.5,
-              market_value: 2250,
-              unrealized_pnl: 75,
-            },
-          }],
-          applies: false,
-      });
-      await previewResponse.promise;
-    });
-    await flush();
-
-    expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("待套用變更");
-    const previewTable = host!.querySelector('table[aria-label="IBKR 同步預覽"]')!;
-    expect(previewTable.querySelectorAll("tbody tr")).toHaveLength(2);
-    expect(Array.from(previewTable.querySelectorAll("tbody tr")).map((row) => row.textContent))
+    expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("2 項變更");
+    const reviewTable = host!.querySelector('table[aria-label="持倉同步待檢視差異"]')!;
+    expect(reviewTable.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(Array.from(reviewTable.querySelectorAll("tbody tr")).map((row) => row.textContent))
       .toEqual([
         expect.stringContaining("90 → 100.25"),
         expect.stringContaining("200 → 210.5"),
@@ -256,32 +277,34 @@ describe("HoldingsView", () => {
     expect(host!.textContent).not.toContain("DU222");
     expect(host!.textContent).toContain("MSFT");
     expect(host!.textContent).toContain("套用同步");
-    expect(host!.textContent).toContain("尚未寫入本地持倉");
     expect(host!.textContent).toContain("Avg Cost");
-    expect(host!.textContent).toContain("90 → 100.25");
     expect(host!.textContent).toContain("1,200 → 1,250");
     expect(host!.textContent).toContain("-50 → -25.5");
     expect(host!.textContent).toContain("2,200 → 2,250");
     expect(host!.textContent).toContain("50 → 75");
   });
 
-  it("clears preview and shows persisted positions after applying", async () => {
+  it("clears captured review and shows persisted positions after applying", async () => {
     let applied = false;
+    const review: PortfolioCaptureReview = {
+      run_id: 52,
+      changes: [{
+        kind: "add",
+        account_id: 1,
+        account_label: "IBKR 主帳戶",
+        broker_account_id_hash: "hash-one",
+        broker_con_id: "2002",
+        symbol: "AMD",
+        quantity: 400,
+        before: null,
+        after: { avg_cost: 92.26, market_value: 206704, unrealized_pnl: 169800 },
+      }],
+      applies: false,
+    };
     const calls = stubFetch((url, init) => {
-      if (url.endsWith("/portfolio/ibkr/preview")) {
-        return {
-          changes: [{
-            kind: "add",
-            symbol: "AMD",
-            quantity: 400,
-            after: { avg_cost: 92.26, market_value: 206704, unrealized_pnl: 169800 },
-          }],
-          applies: false,
-        };
-      }
-      if (url.endsWith("/portfolio/ibkr/apply") && init?.method === "POST") {
+      if (url.endsWith("/portfolio/capture/runs/52/apply") && init?.method === "POST") {
         applied = true;
-        return { changes: [], applies: true };
+        return { run_id: 52, changes: [], applies: true };
       }
       if (applied && url.endsWith("/portfolio")) {
         return snapshot({
@@ -299,25 +322,33 @@ describe("HoldingsView", () => {
         });
       }
       return snapshot();
-    });
+    }, () => captureStatus({
+      latest_run: captureRun({ id: 52 }),
+      recent_runs: [captureRun({ id: 52 })],
+      review: applied ? null : review,
+    }));
     await mount();
-
-    await act(async () => {
-      (await buttonByText("預覽 IBKR 同步")).click();
-    });
-    await flush();
     await act(async () => {
       (await buttonByText("套用同步")).click();
     });
     await flush();
 
-    expect(calls.some((call) => call.url.endsWith("/portfolio/ibkr/apply"))).toBe(true);
-    expect(
-      calls.filter((call) => call.url.endsWith("/portfolio")).length,
-    ).toBeGreaterThanOrEqual(2);
+    expect(calls.some((call) => call.url.endsWith("/portfolio/capture/runs/52/apply"))).toBe(true);
+    expect(calls.filter((call) => call.url.endsWith("/portfolio")).length).toBeGreaterThanOrEqual(2);
     expect(host!.textContent).toContain("AMD");
     expect(host!.textContent).toContain("92.26");
-    expect(host!.textContent).not.toContain("尚未寫入本地持倉");
+    expect(host!.textContent).not.toContain("待套用差異");
+  });
+
+  it("holdings_renders_one_capture_control_surface_and_no_legacy_live_sync_buttons", async () => {
+    stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    expect(host!.querySelectorAll("[data-portfolio-capture-controls]")).toHaveLength(1);
+    expect(host!.textContent).toContain("同步紀錄");
+    expect(host!.textContent).not.toContain("預覽 IBKR 同步");
+    expect(host!.textContent).not.toContain("IBKR 同步預覽");
   });
 
   it("updates whether an account participates in aggregate totals", async () => {

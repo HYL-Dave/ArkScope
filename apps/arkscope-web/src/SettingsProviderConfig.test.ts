@@ -597,4 +597,10 @@ describe("Settings provider config authority", () => {
     expect(wrapCells.some((cell) => cell.textContent?.includes("Treasury Securities"))).toBe(true);
     expect(host!.querySelector(".ds-last-run-cell.settings-wrap-text")).not.toBeNull();
   });
+
+  it("settings_data_sources_does_not_own_portfolio_capture_controls", async () => {
+    await renderDataSources();
+    expect(host!.textContent).not.toContain("持倉擷取排程");
+    expect(host!.querySelector("[data-portfolio-capture-controls]")).toBeNull();
+  });
 });

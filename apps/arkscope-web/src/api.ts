@@ -1261,6 +1261,106 @@ export function applyIbkrPortfolioSync(): Promise<PortfolioSyncPreview> {
   return sendJSON<PortfolioSyncPreview>("/portfolio/ibkr/apply", "POST", undefined, 30_000);
 }
 
+export type PortfolioCaptureRunState =
+  | "running"
+  | "succeeded"
+  | "partial"
+  | "failed"
+  | "blocked"
+  | "interrupted";
+
+export interface PortfolioCaptureRun {
+  id: number;
+  trigger: "startup" | "scheduled" | "manual";
+  state: PortfolioCaptureRunState;
+  started_at: string;
+  finished_at?: string | null;
+  account_leg_state: string;
+  execution_leg_state: string;
+  position_leg_state: string;
+  discovered_account_count: number;
+  new_account_count: number;
+  archived_activity_count: number;
+  inserted_execution_count: number;
+  inserted_commission_count: number;
+  unmatched_count: number;
+  data_conflict_count: number;
+  error_code?: string | null;
+  error_detail?: string | null;
+}
+
+export interface PortfolioCaptureReviewChange {
+  kind: string;
+  account_id?: number | null;
+  account_label?: string | null;
+  broker_account_id_hash?: string | null;
+  broker_con_id: string;
+  symbol: string;
+  quantity: number;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+
+export interface PortfolioCaptureReview {
+  run_id: number;
+  changes: PortfolioCaptureReviewChange[];
+  applies: boolean;
+}
+
+export interface PortfolioCaptureStatus {
+  settings: {
+    enabled: boolean;
+    interval_minutes: number;
+    source: "default" | "database";
+    provider_configured: boolean;
+  };
+  provider_issue?: {
+    code: "provider_config_missing" | string;
+    status: "not_configured" | string;
+    provider: "ibkr" | string;
+    field: "host" | "port" | string;
+  } | null;
+  running: boolean;
+  next_due_at?: string | null;
+  latest_run?: PortfolioCaptureRun | null;
+  recent_runs: PortfolioCaptureRun[];
+  review?: PortfolioCaptureReview | null;
+}
+
+export interface PortfolioCaptureStart {
+  accepted: boolean;
+  state: PortfolioCaptureRunState;
+  run?: PortfolioCaptureRun | null;
+  error_code?: string | null;
+  error_detail?: string | null;
+}
+
+export function getPortfolioCaptureStatus(): Promise<PortfolioCaptureStatus> {
+  return getJSON<PortfolioCaptureStatus>("/portfolio/capture");
+}
+
+export function updatePortfolioCaptureSettings(body: {
+  enabled: boolean;
+  interval_minutes: number;
+}): Promise<PortfolioCaptureStatus> {
+  return sendJSON<PortfolioCaptureStatus>("/portfolio/capture/settings", "PUT", body);
+}
+
+export function triggerPortfolioCapture(): Promise<PortfolioCaptureStart> {
+  return sendJSON<PortfolioCaptureStart>(
+    "/portfolio/capture/runs",
+    "POST",
+    { trigger: "manual" },
+  );
+}
+
+export function applyPortfolioCaptureRun(runId: number): Promise<PortfolioCaptureReview> {
+  return sendJSON<PortfolioCaptureReview>(
+    `/portfolio/capture/runs/${encodeURIComponent(runId)}/apply`,
+    "POST",
+  );
+}
+
 export function getProfileLists(includeArchived = false): Promise<{ lists: WatchlistSummary[] }> {
   return getJSON<{ lists: WatchlistSummary[] }>(`/profile/lists?include_archived=${includeArchived}`);
 }
