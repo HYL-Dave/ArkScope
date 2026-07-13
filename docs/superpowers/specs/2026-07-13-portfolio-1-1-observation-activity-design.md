@@ -1,6 +1,6 @@
 # Portfolio 1.1 Account Observation and Activity Design
 
-> **Status: DESIGN APPROVED; WRITTEN SPEC REVIEW PENDING, 2026-07-13.**
+> **Status: APPROVED DESIGN; SLICE 1 IMPLEMENTATION PLAN OPEN, 2026-07-13.**
 > This document extends, but does not replace,
 > `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md` and its
 > shipped implementation. Holdings V1 remains the authority for local
