@@ -340,6 +340,7 @@ describe("PortfolioCapturePanel", () => {
     const running = run({ id: 107, state: "running", finished_at: null });
     const terminal = run({ id: 107, state: "succeeded" });
     let resolveSave: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let resolvePoll: ((value: PortfolioCaptureStatus) => void) | null = null;
     let reads = 0;
     stubFetch((url, init) => {
       if (url.endsWith("/settings") && init?.method === "PUT") {
@@ -348,17 +349,16 @@ describe("PortfolioCapturePanel", () => {
         });
       }
       reads += 1;
-      return reads === 1
-        ? status({ latest_run: prior, recent_runs: [prior] })
-        : status({
-          running: false,
-          next_due_at: "2026-07-14T05:45:00+00:00",
-          latest_run: terminal,
-          recent_runs: [terminal, prior],
-        });
+      if (reads === 1) return status({ latest_run: prior, recent_runs: [prior] });
+      return new Promise<PortfolioCaptureStatus>((resolve) => {
+        resolvePoll = resolve;
+      });
     });
     await mount(changed);
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
     const interval = host!.querySelector<HTMLInputElement>('input[aria-label="持倉同步間隔（分鐘）"]')!;
     const saveButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.includes("儲存排程"))!;
@@ -366,7 +366,16 @@ describe("PortfolioCapturePanel", () => {
       setInput(interval, "30");
       saveButton.click();
       await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    await act(async () => {
+      resolvePoll!(status({
+        running: false,
+        next_due_at: "2026-07-14T05:45:00+00:00",
+        latest_run: terminal,
+        recent_runs: [terminal, prior],
+      }));
+      await Promise.resolve();
     });
     expect(changed).toHaveBeenCalledTimes(1);
     const newerDue = host!.querySelector(".portfolio-capture-next")?.textContent;
@@ -377,7 +386,7 @@ describe("PortfolioCapturePanel", () => {
           enabled: true,
           interval_minutes: 30,
           source: "database",
-          provider_configured: true,
+          provider_configured: false,
         },
         next_due_at: "2026-07-14T05:20:00+00:00",
         running: true,
@@ -387,6 +396,10 @@ describe("PortfolioCapturePanel", () => {
       await Promise.resolve();
     });
 
+    const captureButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("立即同步"));
+    expect(captureButton?.disabled).toBe(false);
+    expect(host!.textContent).not.toContain("IBKR 尚未設定");
     expect(host!.querySelector('[data-state="running"]')).toBeNull();
     expect(Array.from(host!.querySelectorAll('[data-state="ready"]'))
       .some((badge) => badge.textContent?.includes("成功"))).toBe(true);
@@ -395,7 +408,7 @@ describe("PortfolioCapturePanel", () => {
     expect(changed).toHaveBeenCalledTimes(1);
   });
 
-  it("clears_a_transient_poll_issue_when_a_pending_settings_save_succeeds", async () => {
+  it("preserves_a_poll_issue_published_while_settings_save_is_pending", async () => {
     vi.useFakeTimers();
     let resolveSave: ((value: PortfolioCaptureStatus) => void) | null = null;
     let reads = 0;
@@ -424,7 +437,7 @@ describe("PortfolioCapturePanel", () => {
       resolveSave!(status());
       await Promise.resolve();
     });
-    expect(host!.textContent).not.toContain("transient poll failure");
+    expect(host!.textContent).toContain("transient poll failure");
     expect(host!.textContent).toContain("排程已儲存");
   });
 
@@ -843,6 +856,72 @@ describe("PortfolioCapturePanel", () => {
     });
     expect(host!.textContent).toContain("MSFT");
     expect(host!.textContent).toContain("post-apply refresh failed");
+  });
+
+  it("does_not_restore_an_applied_review_from_a_poll_started_during_apply", async () => {
+    vi.useFakeTimers();
+    const review = {
+      run_id: 60,
+      changes: [{
+        kind: "update",
+        account_id: 3,
+        account_label: "IBKR 主帳戶",
+        broker_account_id_hash: "5bc54f22a3",
+        broker_con_id: "265598",
+        symbol: "AAPL",
+        quantity: 3,
+        before: { quantity: 2 },
+        after: { quantity: 3 },
+      }],
+      applies: false,
+    };
+    let resolveApply: ((value: CaptureResponse) => void) | null = null;
+    let resolvePoll: ((value: PortfolioCaptureStatus) => void) | null = null;
+    let resolveChanged: (() => void) | null = null;
+    let reads = 0;
+    const changed = vi.fn(() => new Promise<void>((resolve) => {
+      resolveChanged = resolve;
+    }));
+    stubFetch((url, init) => {
+      if (url.endsWith("/runs/60/apply") && init?.method === "POST") {
+        return new Promise<CaptureResponse>((resolve) => {
+          resolveApply = resolve;
+        });
+      }
+      reads += 1;
+      if (reads === 1) return status({ review });
+      if (reads === 2) {
+        return new Promise<PortfolioCaptureStatus>((resolve) => {
+          resolvePoll = resolve;
+        });
+      }
+      throw new Error("post-apply status failed");
+    });
+    await mount(changed);
+
+    const applyButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("套用同步"))!;
+    await act(async () => {
+      applyButton.click();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+      resolveApply!({ run_id: 60, changes: [], applies: true });
+      await Promise.resolve();
+    });
+    expect(host!.textContent).not.toContain("待套用差異");
+
+    await act(async () => {
+      resolvePoll!(status({ review }));
+      await Promise.resolve();
+    });
+    expect(host!.textContent).not.toContain("待套用差異");
+
+    await act(async () => {
+      resolveChanged!();
+      await Promise.resolve();
+    });
+    expect(host!.textContent).not.toContain("待套用差異");
+    expect(host!.textContent).toContain("post-apply status failed");
   });
 
   it("shows_nullable_review_values_being_cleared", async () => {

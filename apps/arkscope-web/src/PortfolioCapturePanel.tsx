@@ -146,6 +146,9 @@ export function PortfolioCapturePanel({
   const captureRef = useRef<PortfolioCaptureStatus | null>(null);
   const requestSequenceRef = useRef(0);
   const acceptedSequenceRef = useRef(0);
+  const settingsRevisionRef = useRef(0);
+  const issueVersionRef = useRef(0);
+  const appliedReviewRunIdsRef = useRef(new Set<number>());
   const safeCapture = isCaptureStatus(capture) ? capture : null;
 
   const publishIssue = useCallback((
@@ -154,6 +157,7 @@ export function PortfolioCapturePanel({
   ) => {
     if (sequence < acceptedSequenceRef.current) return false;
     acceptedSequenceRef.current = sequence;
+    issueVersionRef.current += 1;
     setIssue(next);
     return true;
   }, []);
@@ -161,17 +165,28 @@ export function PortfolioCapturePanel({
   const acceptStatus = useCallback(async (
     next: PortfolioCaptureStatus,
     sequence: number,
+    settingsRevision = settingsRevisionRef.current,
   ) => {
     if (sequence < acceptedSequenceRef.current) return false;
     acceptedSequenceRef.current = sequence;
-    captureRef.current = next;
-    setCapture(next);
+    const current = captureRef.current;
+    const projected = {
+      ...next,
+      settings: current && settingsRevision !== settingsRevisionRef.current
+        ? current.settings
+        : next.settings,
+      review: next.review && appliedReviewRunIdsRef.current.has(next.review.run_id)
+        ? null
+        : next.review,
+    };
+    captureRef.current = projected;
+    setCapture(projected);
     if (!dirtyRef.current) {
-      setEnabled(next.settings.enabled);
-      setIntervalValue(String(next.settings.interval_minutes));
+      setEnabled(projected.settings.enabled);
+      setIntervalValue(String(projected.settings.interval_minutes));
     }
 
-    const latest = next.latest_run ?? null;
+    const latest = projected.latest_run ?? null;
     const terminal = latest && latest.state !== "running" ? latest : null;
     if (!initializedRef.current) {
       initializedRef.current = true;
@@ -185,35 +200,17 @@ export function PortfolioCapturePanel({
     return sequence === acceptedSequenceRef.current;
   }, [onPortfolioChanged]);
 
-  const acceptSettingsStatus = useCallback(async (
-    next: PortfolioCaptureStatus,
-    sequence: number,
-  ) => {
-    if (sequence >= acceptedSequenceRef.current) {
-      return acceptStatus(next, sequence);
-    }
-    const current = captureRef.current;
-    if (!current) return false;
-    const merged = {
-      ...current,
-      settings: next.settings,
-    };
-    captureRef.current = merged;
-    setCapture(merged);
-    setEnabled(next.settings.enabled);
-    setIntervalValue(String(next.settings.interval_minutes));
-    return false;
-  }, [acceptStatus]);
-
   const refresh = useCallback(async () => {
     const sequence = ++requestSequenceRef.current;
+    const settingsRevision = settingsRevisionRef.current;
+    const issueVersion = issueVersionRef.current;
     try {
       const next: unknown = await getPortfolioCaptureStatus();
       if (!isCaptureStatus(next)) {
         throw new Error("持倉同步狀態格式不相容，請重啟應用程式後再試");
       }
-      const accepted = await acceptStatus(next, sequence);
-      if (accepted) setIssue(null);
+      const accepted = await acceptStatus(next, sequence, settingsRevision);
+      if (accepted && issueVersion === issueVersionRef.current) setIssue(null);
       return accepted ? next : null;
     } catch (reason) {
       publishIssue({
@@ -264,7 +261,6 @@ export function PortfolioCapturePanel({
     setBusy("save");
     setIssue(null);
     setNotice(null);
-    const sequence = ++requestSequenceRef.current;
     try {
       const next: unknown = await updatePortfolioCaptureSettings({
         enabled,
@@ -273,9 +269,24 @@ export function PortfolioCapturePanel({
       if (!isCaptureStatus(next)) {
         throw new Error("持倉同步設定回應格式不相容，請重啟應用程式後再試");
       }
+      settingsRevisionRef.current += 1;
       dirtyRef.current = false;
-      await acceptSettingsStatus(next, sequence);
-      setIssue(null);
+      const current = captureRef.current;
+      if (current) {
+        const merged = {
+          ...current,
+          settings: {
+            ...current.settings,
+            enabled: next.settings.enabled,
+            interval_minutes: next.settings.interval_minutes,
+            source: next.settings.source,
+          },
+        };
+        captureRef.current = merged;
+        setCapture(merged);
+      }
+      setEnabled(next.settings.enabled);
+      setIntervalValue(String(next.settings.interval_minutes));
       setNotice("排程已儲存");
     } catch (reason) {
       publishIssue({
@@ -325,6 +336,7 @@ export function PortfolioCapturePanel({
     const sequence = ++requestSequenceRef.current;
     try {
       const applied = await applyPortfolioCaptureRun(runId);
+      appliedReviewRunIdsRef.current.add(applied.run_id);
       if (sequence >= acceptedSequenceRef.current) {
         acceptedSequenceRef.current = sequence;
       }
