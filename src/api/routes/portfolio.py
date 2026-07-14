@@ -8,7 +8,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import get_data_provider_store, get_portfolio_store
+from src.api.dependencies import (
+    get_data_provider_store,
+    get_portfolio_observation_store,
+    get_portfolio_store,
+)
 from src.api.permissions import require_profile_state_write
 from src.data_provider_config import (
     DataProviderConfigStore,
@@ -20,6 +24,8 @@ from src.portfolio_ibkr import (
     preview_or_apply_ibkr_snapshot,
     read_ibkr_portfolio_snapshot,
 )
+from src.portfolio_observations import PortfolioObservationStore
+from src.portfolio_overview import build_portfolio_overview
 from src.portfolio_state import BrokerPositionManagedBySync, PortfolioStore
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -81,6 +87,16 @@ def get_portfolio(
     store: PortfolioStore = Depends(get_portfolio_store),
 ) -> dict[str, Any]:
     return _to_json(store.snapshot(include_closed=include_closed))
+
+
+@router.get("/overview")
+def get_portfolio_overview(
+    store: PortfolioStore = Depends(get_portfolio_store),
+    observations: PortfolioObservationStore = Depends(
+        get_portfolio_observation_store
+    ),
+) -> dict[str, Any]:
+    return _to_json(build_portfolio_overview(store, observations))
 
 
 @router.get("/accounts")

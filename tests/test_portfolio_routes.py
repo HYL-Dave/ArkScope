@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi import HTTPException
 
@@ -10,6 +12,7 @@ from src.portfolio_ibkr import (
     BrokerSnapshot,
     IBKRHoldingsUnavailable,
 )
+from src.portfolio_observations import PortfolioObservationStore
 from src.portfolio_state import PortfolioStore
 from src.api.routes import portfolio as routes
 
@@ -50,6 +53,79 @@ def test_portfolio_router_mounts_on_real_app():
     assert "/portfolio" in paths
     assert "/portfolio/positions" in paths
     assert "/portfolio/ibkr/preview" in paths
+
+
+def test_portfolio_overview_router_mounts_on_real_app():
+    from src.api.app import create_app
+
+    paths = {getattr(route, "path", None) for route in create_app().routes}
+
+    assert "/portfolio/overview" in paths
+
+
+def test_get_portfolio_overview_fresh_profile_is_truthful(tmp_path):
+    path = tmp_path / "profile_state.db"
+
+    out = routes.get_portfolio_overview(
+        store=PortfolioStore(path),
+        observations=PortfolioObservationStore(path),
+    )
+
+    assert out["accounts"] == [
+        {
+            "id": 1,
+            "label": "Manual",
+            "broker": "manual",
+            "broker_account_id_hash": None,
+            "sync_mode": "manual",
+            "base_currency": "USD",
+            "include_in_total": True,
+            "canonical_last_sync_at": None,
+            "latest_snapshot": None,
+        }
+    ]
+    assert out["manual_subtotal"]["totals"]["per_currency"] == {}
+
+
+def test_get_portfolio_overview_never_serializes_raw_broker_id(tmp_path):
+    path = tmp_path / "profile_state.db"
+    store = PortfolioStore(path)
+    store.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+
+    out = routes.get_portfolio_overview(
+        store=store,
+        observations=PortfolioObservationStore(path),
+    )
+
+    encoded = json.dumps(out, sort_keys=True)
+    assert all("broker_account_id" not in account for account in out["accounts"])
+    assert "DU123" not in encoded
+    assert "broker_account_id_hash" in out["accounts"][1]
+
+
+def test_get_portfolio_overview_never_calls_gateway_or_checks_write_permission(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        routes,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("write gate called")
+        ),
+    )
+    monkeypatch.setattr(
+        routes,
+        "_read_ibkr_snapshot_or_503",
+        lambda: (_ for _ in ()).throw(AssertionError("IBKR read called")),
+    )
+    path = tmp_path / "profile_state.db"
+
+    out = routes.get_portfolio_overview(
+        store=PortfolioStore(path),
+        observations=PortfolioObservationStore(path),
+    )
+
+    assert out["accounts"][0]["broker"] == "manual"
 
 
 def test_get_portfolio_returns_manual_account_for_fresh_profile(tmp_path):
