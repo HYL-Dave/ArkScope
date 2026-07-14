@@ -1184,6 +1184,45 @@ export interface PortfolioSnapshot {
   included_account_ids: number[];
 }
 
+export interface PortfolioAccountValueSnapshot {
+  capture_run_id: number;
+  as_of_utc: string;
+  as_of_kind: "capture_completed" | string;
+  source: "ibkr_gateway" | string;
+  base_currency: string | null;
+  net_liquidation: number | null;
+  total_cash_value: number | null;
+  settled_cash: number | null;
+  gross_position_value: number | null;
+  buying_power: number | null;
+  available_funds: number | null;
+  initial_margin_requirement: number | null;
+  maintenance_margin_requirement: number | null;
+  daily_realized_pnl: number | null;
+  daily_unrealized_pnl: number | null;
+  daily_total_pnl: number | null;
+}
+
+export interface PortfolioOverviewAccount {
+  id: number;
+  label: string;
+  broker: string;
+  broker_account_id_hash: string | null;
+  sync_mode: "manual" | "ibkr_review" | "ibkr_auto" | string;
+  base_currency: string | null;
+  include_in_total: boolean;
+  canonical_last_sync_at: string | null;
+  latest_snapshot: PortfolioAccountValueSnapshot | null;
+}
+
+export interface PortfolioOverview {
+  accounts: PortfolioOverviewAccount[];
+  manual_subtotal: {
+    included_account_ids: number[];
+    totals: PortfolioTotals;
+  };
+}
+
 export interface PortfolioSyncChange {
   kind: string;
   account_id?: number | null;
@@ -1204,6 +1243,10 @@ export function getPortfolio(includeClosed = false): Promise<PortfolioSnapshot> 
   return getJSON<PortfolioSnapshot>(
     includeClosed ? "/portfolio?include_closed=true" : "/portfolio",
   );
+}
+
+export function getPortfolioOverview(): Promise<PortfolioOverview> {
+  return getJSON<PortfolioOverview>("/portfolio/overview");
 }
 
 export function updatePortfolioPosition(
