@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** APPROVED DESIGN, WRITTEN REVIEW GREEN — 2026-07-15. Hotfix A planning is authorized; implementation has not started. The durable-retry follow-up still requires its own reviewed plan.
+> **Status:** APPROVED DESIGN, WRITTEN REVIEW GREEN — 2026-07-15. Hotfix A plan is OPEN / REVIEW PENDING; implementation has not started. The durable-retry follow-up still requires its own reviewed plan.
 
 ## 1. Purpose
 
