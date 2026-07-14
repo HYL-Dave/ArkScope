@@ -2378,6 +2378,75 @@ button.wl-railitem.active,
   }
 }
 
+/* ---- Portfolio account overview ---- */
+.portfolio-view-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+.portfolio-view-tab {
+  min-height: var(--control-height-default);
+  padding: 5px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.portfolio-view-tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--fg);
+}
+.portfolio-view-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.portfolio-account-summary {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.portfolio-account-row {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+.portfolio-account-row h3,
+.portfolio-manual-subtotal h3 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.portfolio-account-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: var(--space-2);
+}
+.portfolio-account-times {
+  display: flex;
+  gap: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.portfolio-manual-subtotal {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.portfolio-account-details .ui-data-table { min-width: 1800px; }
+.portfolio-account-details .ui-data-table [data-align="right"] {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 /* ---- Portfolio capture records ---- */
 .portfolio-capture {
   display: grid;

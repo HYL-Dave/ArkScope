@@ -10,6 +10,7 @@ import type {
   PortfolioCaptureReview,
   PortfolioCaptureStart,
   PortfolioCaptureStatus,
+  PortfolioOverview,
   PortfolioPosition,
   PortfolioSnapshot,
   PortfolioSyncPreview,
@@ -42,11 +43,31 @@ const snapshot = (over: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot => (
   ...over,
 });
 
+const overview = (over: Partial<PortfolioOverview> = {}): PortfolioOverview => ({
+  accounts: [{
+    id: 1,
+    label: "Manual",
+    broker: "manual",
+    broker_account_id_hash: null,
+    sync_mode: "manual",
+    base_currency: "USD",
+    include_in_total: true,
+    canonical_last_sync_at: null,
+    latest_snapshot: null,
+  }],
+  manual_subtotal: {
+    included_account_ids: [1],
+    totals: { currency_basis: "per_currency", per_currency: {}, broker_base: null },
+  },
+  ...over,
+});
+
 type PortfolioApiResponse =
   | PortfolioAccount
   | PortfolioCaptureReview
   | PortfolioCaptureStart
   | PortfolioCaptureStatus
+  | PortfolioOverview
   | PortfolioPosition
   | PortfolioSnapshot
   | PortfolioSyncPreview
@@ -100,6 +121,7 @@ function deferred<T>() {
 function stubFetch(
   handler: (url: string, init?: RequestInit) => PortfolioApiResponse | Promise<PortfolioApiResponse>,
   captureHandler?: () => PortfolioCaptureStatus | Promise<PortfolioCaptureStatus>,
+  overviewHandler?: () => PortfolioOverview | Promise<PortfolioOverview>,
 ) {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
   vi.stubGlobal(
@@ -111,9 +133,12 @@ function stubFetch(
         method: init?.method ?? "GET",
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
-      const payload = u.endsWith("/portfolio/capture") && (init?.method ?? "GET") === "GET"
+      const method = init?.method ?? "GET";
+      const payload = u.endsWith("/portfolio/capture") && method === "GET"
         ? await (captureHandler?.() ?? captureStatus())
-        : await handler(u, init);
+        : u.endsWith("/portfolio/overview") && method === "GET"
+          ? await (overviewHandler?.() ?? overview())
+          : await handler(u, init);
       return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -173,8 +198,24 @@ describe("HoldingsView", () => {
     });
   });
 
-  it("renders accounts, positions, and currency basis", async () => {
+  it("renders account-labelled positions and filters by account", async () => {
+    const accounts: PortfolioAccount[] = [{
+      id: 1,
+      label: "Manual",
+      broker: "manual",
+      sync_mode: "manual",
+      base_currency: "USD",
+      include_in_total: true,
+    }, {
+      id: 2,
+      label: "IBKR DU123",
+      broker: "ibkr",
+      sync_mode: "ibkr_review",
+      base_currency: "USD",
+      include_in_total: true,
+    }];
     stubFetch(() => snapshot({
+      accounts,
       positions: [
         {
           id: 10,
@@ -188,26 +229,190 @@ describe("HoldingsView", () => {
           unrealized_pnl: -2765,
           notes: "core",
         },
+        {
+          id: 11,
+          account_id: 2,
+          broker: "ibkr",
+          symbol: "AAPL",
+          asset_class: "stock",
+          quantity: 1,
+          avg_cost: 190,
+          currency: "USD",
+          market_value: 200,
+          unrealized_pnl: 10,
+        },
       ],
-      totals: {
-        currency_basis: "per_currency",
-        per_currency: { USD: { market_value: null, position_count: 1 } },
-        broker_base: null,
-      },
+    }), undefined, () => overview({
+      accounts: [{
+        ...overview().accounts[0],
+      }, {
+        id: 2,
+        label: "IBKR · safe-hash",
+        broker: "ibkr",
+        broker_account_id_hash: "safe-hash",
+        sync_mode: "ibkr_review",
+        base_currency: "USD",
+        include_in_total: true,
+        canonical_last_sync_at: null,
+        latest_snapshot: null,
+      }],
     }));
 
     await mount();
     await flush();
 
     expect(host!.querySelectorAll("h1")).toHaveLength(1);
-    expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("1 筆持倉");
+    expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("2 筆持倉");
     expect(host!.textContent).toContain("Manual");
+    expect(host!.textContent).toContain("IBKR · safe-hash");
     expect(host!.textContent).toContain("NVDA");
-    expect(host!.textContent).toContain("per-currency");
+    expect(host!.textContent).toContain("AAPL");
+    expect(host!.textContent).not.toContain("IBKR DU123");
+    expect(host!.textContent).not.toContain("Currency basis");
     expect(host!.textContent).toContain("Avg Cost");
     expect(host!.textContent).toContain("212.84");
     expect(host!.textContent).toContain("61,086");
     expect(host!.textContent).toContain("-2,765");
+
+    const filter = host!.querySelector<HTMLSelectElement>(
+      'select[aria-label="持倉帳戶篩選"]',
+    )!;
+    await act(async () => {
+      filter.value = "2";
+      filter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(host!.textContent).not.toContain("NVDA");
+    expect(host!.textContent).toContain("AAPL");
+  });
+
+  it("keeps_canonical_positions_usable_when_the_additive_overview_fails", async () => {
+    const calls = stubFetch(
+      () => snapshot({
+        positions: [{
+          id: 10,
+          account_id: 1,
+          broker: "manual",
+          symbol: "NVDA",
+          asset_class: "stock",
+          quantity: 3,
+          currency: "USD",
+        }],
+      }),
+      undefined,
+      () => Promise.reject(new Error("stale sidecar")),
+    );
+
+    await mount();
+    await flush();
+
+    expect(calls[0].url.endsWith("/portfolio")).toBe(true);
+    expect(calls[1].url.endsWith("/portfolio/overview")).toBe(true);
+    expect(host!.textContent).toContain("帳戶總覽無法載入；持倉仍可使用");
+    expect(host!.textContent).not.toContain("stale sidecar");
+    expect(host!.textContent).toContain("NVDA");
+    expect(host!.querySelector('button[aria-label="NVDA 操作"]')).not.toBeNull();
+  });
+
+  it("keeps_account_summary_visible_above_every_completed_tab", async () => {
+    stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    for (const label of ["持倉", "帳戶明細", "同步紀錄"]) {
+      await act(async () => {
+        (await buttonByText(label)).click();
+      });
+      const summary = host!.querySelector('[aria-label="帳戶總覽"]')!;
+      const tablist = host!.querySelector('[role="tablist"]')!;
+      expect(summary).not.toBeNull();
+      expect(summary.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+    }
+  });
+
+  it("switches_between_holdings_account_details_and_sync_records", async () => {
+    stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    expect(host!.querySelector('[role="tabpanel"]')?.id)
+      .toBe("portfolio-panel-holdings");
+    expect(host!.querySelector('[data-portfolio-capture-controls]')).toBeNull();
+
+    await act(async () => {
+      (await buttonByText("帳戶明細")).click();
+    });
+    expect(host!.querySelector('table[aria-label="帳戶最新快照明細"]')).not.toBeNull();
+    expect(host!.querySelector('table[aria-label="持倉"]')).toBeNull();
+
+    await act(async () => {
+      (await buttonByText("同步紀錄")).click();
+    });
+    await flush();
+    expect(host!.querySelector('[data-portfolio-capture-controls]')).not.toBeNull();
+    expect(host!.querySelector('table[aria-label="帳戶最新快照明細"]')).toBeNull();
+  });
+
+  it("does_not_render_an_unfinished_activity_tab_or_placeholder", async () => {
+    stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    const labels = Array.from(
+      host!.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+      (tab) => tab.textContent,
+    );
+    expect(labels).toEqual(["持倉", "帳戶明細", "同步紀錄"]);
+    expect(host!.textContent).not.toContain("活動");
+  });
+
+  it("mounts_capture_polling_only_while_sync_records_is_active", async () => {
+    const calls = stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    expect(calls.filter((call) => call.url.endsWith("/portfolio/capture")))
+      .toHaveLength(0);
+
+    await act(async () => {
+      (await buttonByText("同步紀錄")).click();
+    });
+    await flush();
+    expect(calls.filter((call) => call.url.endsWith("/portfolio/capture")))
+      .toHaveLength(1);
+
+    await act(async () => {
+      (await buttonByText("持倉")).click();
+    });
+    expect(host!.querySelector('[data-portfolio-capture-controls]')).toBeNull();
+  });
+
+  it("supports_arrow_home_and_end_keyboard_navigation_between_tabs", async () => {
+    stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    const selected = () => host!.querySelector<HTMLButtonElement>(
+      '[role="tab"][aria-selected="true"]',
+    )!;
+    const key = (target: HTMLButtonElement, value: string) => {
+      act(() => {
+        target.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true }));
+      });
+    };
+
+    selected().focus();
+    key(selected(), "ArrowRight");
+    expect(selected().textContent).toBe("帳戶明細");
+    expect(document.activeElement).toBe(selected());
+
+    key(selected(), "End");
+    expect(selected().textContent).toBe("同步紀錄");
+    key(selected(), "Home");
+    expect(selected().textContent).toBe("持倉");
+    key(selected(), "ArrowLeft");
+    expect(selected().textContent).toBe("同步紀錄");
   });
 
   it("can add a manual holding", async () => {
@@ -262,6 +467,10 @@ describe("HoldingsView", () => {
       () => captureStatus({ latest_run: captureRun(), recent_runs: [captureRun()], review }),
     );
     await mount();
+    await flush();
+    await act(async () => {
+      (await buttonByText("同步紀錄")).click();
+    });
     await flush();
 
     expect(host!.querySelector('[data-state="partial"]')?.textContent).toContain("2 項變更");
@@ -329,12 +538,21 @@ describe("HoldingsView", () => {
     }));
     await mount();
     await act(async () => {
+      (await buttonByText("同步紀錄")).click();
+    });
+    await flush();
+    await act(async () => {
       (await buttonByText("套用同步")).click();
     });
     await flush();
 
     expect(calls.some((call) => call.url.endsWith("/portfolio/capture/runs/52/apply"))).toBe(true);
     expect(calls.filter((call) => call.url.endsWith("/portfolio")).length).toBeGreaterThanOrEqual(2);
+    expect(calls.filter((call) => call.url.endsWith("/portfolio/overview")).length)
+      .toBeGreaterThanOrEqual(2);
+    await act(async () => {
+      (await buttonByText("持倉")).click();
+    });
     expect(host!.textContent).toContain("AMD");
     expect(host!.textContent).toContain("92.26");
     expect(host!.textContent).not.toContain("待套用差異");
@@ -343,6 +561,10 @@ describe("HoldingsView", () => {
   it("holdings_renders_one_capture_control_surface_and_no_legacy_live_sync_buttons", async () => {
     stubFetch(() => snapshot());
     await mount();
+    await flush();
+    await act(async () => {
+      (await buttonByText("同步紀錄")).click();
+    });
     await flush();
 
     expect(host!.querySelectorAll("[data-portfolio-capture-controls]")).toHaveLength(1);
@@ -365,9 +587,14 @@ describe("HoldingsView", () => {
       return snapshot();
     });
     await mount();
+    await flush();
     const toggle = host!.querySelector<HTMLInputElement>(
       'input[aria-label="Manual 納入總計"]',
     )!;
+
+    expect(host!.textContent).not.toContain("Currency basis");
+    expect(host!.querySelectorAll('input[aria-label="Manual 納入總計"]'))
+      .toHaveLength(1);
 
     await act(async () => {
       toggle.click();
@@ -408,8 +635,16 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
+    await act(async () => {
+      (await buttonByText("同步紀錄")).click();
+    });
+    await flush();
+
     expect(host!.textContent).toContain("唯讀同步");
     expect(host!.textContent).toContain("不會下單");
+    await act(async () => {
+      (await buttonByText("持倉")).click();
+    });
     expect(host!.textContent).toContain("Options");
     expect(host!.textContent).toContain("進階選擇權風險尚未建模");
   });

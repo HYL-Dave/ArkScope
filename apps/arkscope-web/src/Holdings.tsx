@@ -1,15 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Plus, RefreshCw, Save, X } from "lucide-react";
 import {
   closePortfolioPosition,
   createManualPosition,
   getPortfolio,
+  getPortfolioOverview,
   updatePortfolioAccount,
   updatePortfolioPosition,
+  type PortfolioOverview,
   type PortfolioPosition,
   type PortfolioSnapshot,
   type PositionUpdate,
 } from "./api";
+import {
+  PortfolioAccountDetails,
+  PortfolioAccountSummary,
+} from "./PortfolioAccountOverview";
 import { PortfolioCapturePanel } from "./PortfolioCapturePanel";
 import {
   Button,
@@ -22,12 +36,25 @@ import {
   type DataTableColumn,
 } from "./ui";
 
+type PortfolioView = "holdings" | "account_details" | "sync_records";
+
+const PORTFOLIO_VIEWS: Array<{ id: PortfolioView; label: string }> = [
+  { id: "holdings", label: "持倉" },
+  // Slice 3 inserts the activity view here.
+  { id: "account_details", label: "帳戶明細" },
+  { id: "sync_records", label: "同步紀錄" },
+];
+
 export function HoldingsView() {
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
+  const [overview, setOverview] = useState<PortfolioOverview | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [overviewErr, setOverviewErr] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
+  const [activeView, setActiveView] = useState<PortfolioView>("holdings");
+  const [positionAccountId, setPositionAccountId] = useState<number | "all">("all");
   const [editing, setEditing] = useState<PortfolioPosition | null>(null);
   const [pendingClose, setPendingClose] = useState<PortfolioPosition | null>(null);
   const closeTriggerRef = useRef<HTMLElement | null>(null);
@@ -43,6 +70,11 @@ export function HoldingsView() {
   const editNotesRef = useRef<HTMLInputElement>(null);
   const editThesisRef = useRef<HTMLInputElement>(null);
   const editTagsRef = useRef<HTMLInputElement>(null);
+  const tabRefs = useRef<Record<PortfolioView, HTMLButtonElement | null>>({
+    holdings: null,
+    account_details: null,
+    sync_records: null,
+  });
 
   const manualAccount = useMemo(
     () => snapshot?.accounts.find((a) => a.broker === "manual") ?? snapshot?.accounts[0] ?? null,
@@ -52,10 +84,25 @@ export function HoldingsView() {
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
+    setOverviewErr(null);
+    setOverview(null);
     try {
       setSnapshot(await getPortfolio(includeClosed));
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      try {
+        setOverview(await getPortfolioOverview());
+      } catch (overviewError) {
+        setOverviewErr(
+          overviewError instanceof Error
+            ? overviewError.message
+            : String(overviewError),
+        );
+      }
+    } catch (portfolioError) {
+      setErr(
+        portfolioError instanceof Error
+          ? portfolioError.message
+          : String(portfolioError),
+      );
     } finally {
       setLoading(false);
     }
@@ -166,10 +213,59 @@ export function HoldingsView() {
   }
 
   const positions = snapshot?.positions ?? [];
-  const optionPositions = positions.filter((position) => position.asset_class === "option");
-  const standardPositions = positions.filter((position) => position.asset_class !== "option");
   const accounts = snapshot?.accounts ?? [];
-  const totals = snapshot?.totals;
+  const accountLabels = useMemo(() => {
+    const safe = new Map(
+      (overview?.accounts ?? []).map((account) => [account.id, account.label]),
+    );
+    return new Map(
+      (snapshot?.accounts ?? []).map((account) => [
+        account.id,
+        safe.get(account.id) ?? account.label,
+      ]),
+    );
+  }, [overview, snapshot]);
+  const filteredPositions = positionAccountId === "all"
+    ? positions
+    : positions.filter((position) => position.account_id === positionAccountId);
+  const optionPositions = filteredPositions.filter(
+    (position) => position.asset_class === "option",
+  );
+  const standardPositions = filteredPositions.filter(
+    (position) => position.asset_class !== "option",
+  );
+
+  useEffect(() => {
+    if (
+      positionAccountId !== "all"
+      && !accounts.some((account) => account.id === positionAccountId)
+    ) {
+      setPositionAccountId("all");
+    }
+  }, [accounts, positionAccountId]);
+
+  function onTabKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    current: PortfolioView,
+  ) {
+    const currentIndex = PORTFOLIO_VIEWS.findIndex((view) => view.id === current);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % PORTFOLIO_VIEWS.length;
+    }
+    if (event.key === "ArrowLeft") {
+      nextIndex = (
+        currentIndex - 1 + PORTFOLIO_VIEWS.length
+      ) % PORTFOLIO_VIEWS.length;
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = PORTFOLIO_VIEWS.length - 1;
+    if (nextIndex == null) return;
+    event.preventDefault();
+    const next = PORTFOLIO_VIEWS[nextIndex].id;
+    setActiveView(next);
+    tabRefs.current[next]?.focus();
+  }
   const viewState = err
     ? { state: "failed" as const, label: "載入失敗" }
     : snapshot == null || loading
@@ -271,137 +367,210 @@ export function HoldingsView() {
         <InlineAlert state="failed" title="持倉載入失敗">{err}</InlineAlert>
       ) : null}
 
-      <section className="ui-section-band">
-        <div className="ui-status-grid">
-          {accounts.map((account) => (
-            <div className="ui-metric" key={account.id}>
-              <span className="ui-metric-label">{account.label}</span>
-              <strong>{account.sync_mode}</strong>
-              <span className="muted tiny">{account.broker}{account.base_currency ? ` · ${account.base_currency}` : ""}</span>
-              <label className="muted tiny">
-                <input
-                  type="checkbox"
-                  aria-label={`${account.label} 納入總計`}
-                  checked={account.include_in_total !== false}
-                  disabled={busy === `account-${account.id}`}
-                  onChange={(event) => {
-                    void onToggleAggregate(account.id, event.currentTarget.checked);
-                  }}
-                />
-                納入總計
-              </label>
-            </div>
-          ))}
-          <div className="ui-metric">
-            <span className="ui-metric-label">Currency basis</span>
-            <strong>{totals?.currency_basis === "broker_base" ? "broker-base" : "per-currency"}</strong>
-            <span className="muted tiny">{currencySummary(totals)}</span>
-          </div>
-        </div>
-      </section>
+      {overviewErr ? (
+        <InlineAlert state="partial" title="帳戶總覽無法載入；持倉仍可使用">
+          請重新整理；若剛更新版本，請重啟應用程式後再試。
+        </InlineAlert>
+      ) : null}
 
-      <section className="ui-section-band">
-        <div className="ui-section-head">
-          <h2>新增手動持倉</h2>
-        </div>
-        <div className="ui-inline-form">
-          <label>
-            <span>Ticker</span>
-            <input ref={tickerRef} aria-label="Ticker" placeholder="NVDA" />
-          </label>
-          <label>
-            <span>Quantity</span>
-            <input ref={quantityRef} aria-label="Quantity" inputMode="decimal" placeholder="1" />
-          </label>
-          <label>
-            <span>Notes</span>
-            <input ref={notesRef} aria-label="Notes" placeholder="optional" />
-          </label>
-          <Button
-            tone="primary"
-            icon={<Plus size={15} />}
-            onClick={() => void onAddManual()}
-            busy={busy === "manual"}
-          >
-            新增持倉
-          </Button>
-        </div>
-      </section>
-
-      <PortfolioCapturePanel onPortfolioChanged={load} />
-
-      <section className="ui-section-band">
-        <div className="ui-section-head">
-          <h2>Positions</h2>
-          <div className="ui-action-row">
-            <label className="muted tiny">
-              <input
-                ref={closedFilterRef}
-                type="checkbox"
-                aria-label="顯示已關閉持倉"
-                checked={includeClosed}
-                onChange={(event) => setIncludeClosed(event.currentTarget.checked)}
-              />
-              顯示已關閉
-            </label>
-            <span className="muted tiny">{standardPositions.length} rows</span>
-          </div>
-        </div>
-        <PositionsTable
-          positions={standardPositions}
-          emptyText="尚無一般持倉"
-          editingId={editing?.id ?? null}
-          editor={editorNode}
-          busy={busy}
-          onEdit={(position) => setEditing(position)}
-          onClose={(position, trigger) => {
-            closeTriggerRef.current = trigger;
-            setPendingClose(position);
+      {overview ? (
+        <PortfolioAccountSummary
+          overview={overview}
+          busyAccountId={
+            busy?.startsWith("account-") ? Number(busy.slice(8)) : null
+          }
+          onToggleAggregate={(accountId, include) => {
+            void onToggleAggregate(accountId, include);
           }}
         />
-      </section>
+      ) : null}
 
-      {optionPositions.length > 0 && (
-        <section className="ui-section-band">
-          <div className="ui-section-head">
-            <h2>Options</h2>
-            <span className="muted tiny">{optionPositions.length} rows</span>
-          </div>
-          <p className="muted">
-            進階選擇權風險尚未建模；此區只呈現 broker 回傳的持倉快照。
-          </p>
-          <PositionsTable
-            positions={optionPositions}
-            emptyText="尚無選擇權持倉"
-            editingId={editing?.id ?? null}
-            editor={editorNode}
-            busy={busy}
-            onEdit={(position) => setEditing(position)}
-            onClose={(position, trigger) => {
-              closeTriggerRef.current = trigger;
-              setPendingClose(position);
+      <div className="portfolio-view-tabs" role="tablist" aria-label="持倉檢視">
+        {PORTFOLIO_VIEWS.map((view) => (
+          <button
+            key={view.id}
+            ref={(node) => { tabRefs.current[view.id] = node; }}
+            id={`portfolio-tab-${view.id}`}
+            className="portfolio-view-tab"
+            type="button"
+            role="tab"
+            tabIndex={activeView === view.id ? 0 : -1}
+            aria-selected={activeView === view.id}
+            aria-controls={`portfolio-panel-${view.id}`}
+            onClick={() => setActiveView(view.id)}
+            onKeyDown={(event) => onTabKeyDown(event, view.id)}
+          >
+            {view.label}
+          </button>
+        ))}
+      </div>
+
+      {activeView === "holdings" ? (
+        <div
+          id="portfolio-panel-holdings"
+          role="tabpanel"
+          aria-labelledby="portfolio-tab-holdings"
+        >
+          <section className="ui-section-band">
+            <div className="ui-section-head">
+              <h2>新增手動持倉</h2>
+            </div>
+            <div className="ui-inline-form">
+              <label>
+                <span>Ticker</span>
+                <input ref={tickerRef} aria-label="Ticker" placeholder="NVDA" />
+              </label>
+              <label>
+                <span>Quantity</span>
+                <input
+                  ref={quantityRef}
+                  aria-label="Quantity"
+                  inputMode="decimal"
+                  placeholder="1"
+                />
+              </label>
+              <label>
+                <span>Notes</span>
+                <input ref={notesRef} aria-label="Notes" placeholder="optional" />
+              </label>
+              <Button
+                tone="primary"
+                icon={<Plus size={15} />}
+                onClick={() => void onAddManual()}
+                busy={busy === "manual"}
+              >
+                新增持倉
+              </Button>
+            </div>
+          </section>
+
+          <section className="ui-section-band">
+            <div className="ui-section-head">
+              <h2>Positions</h2>
+              <div className="ui-action-row">
+                <label className="muted tiny">
+                  <span>帳戶</span>
+                  <select
+                    aria-label="持倉帳戶篩選"
+                    value={positionAccountId}
+                    onChange={(event) => {
+                      setPositionAccountId(
+                        event.currentTarget.value === "all"
+                          ? "all"
+                          : Number(event.currentTarget.value),
+                      );
+                    }}
+                  >
+                    <option value="all">全部帳戶</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {accountLabels.get(account.id) ?? account.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="muted tiny">
+                  <input
+                    ref={closedFilterRef}
+                    type="checkbox"
+                    aria-label="顯示已關閉持倉"
+                    checked={includeClosed}
+                    onChange={(event) => setIncludeClosed(event.currentTarget.checked)}
+                  />
+                  顯示已關閉
+                </label>
+                <span className="muted tiny">{standardPositions.length} rows</span>
+              </div>
+            </div>
+            <PositionsTable
+              positions={standardPositions}
+              accountLabels={accountLabels}
+              emptyText="尚無一般持倉"
+              editingId={editing?.id ?? null}
+              editor={editorNode}
+              busy={busy}
+              onEdit={(position) => setEditing(position)}
+              onClose={(position, trigger) => {
+                closeTriggerRef.current = trigger;
+                setPendingClose(position);
+              }}
+            />
+          </section>
+
+          {optionPositions.length > 0 && (
+            <section className="ui-section-band">
+              <div className="ui-section-head">
+                <h2>Options</h2>
+                <span className="muted tiny">{optionPositions.length} rows</span>
+              </div>
+              <p className="muted">
+                進階選擇權風險尚未建模；此區只呈現 broker 回傳的持倉快照。
+              </p>
+              <PositionsTable
+                positions={optionPositions}
+                accountLabels={accountLabels}
+                emptyText="尚無選擇權持倉"
+                editingId={editing?.id ?? null}
+                editor={editorNode}
+                busy={busy}
+                onEdit={(position) => setEditing(position)}
+                onClose={(position, trigger) => {
+                  closeTriggerRef.current = trigger;
+                  setPendingClose(position);
+                }}
+              />
+            </section>
+          )}
+
+          <ConfirmDialog
+            open={pendingClose != null}
+            title={pendingClose ? `關閉 ${pendingClose.symbol}` : "關閉持倉"}
+            consequence="這是軟關閉；持倉與筆記會保留，之後可在「顯示已關閉」檢視中查看。"
+            confirmLabel="確認關閉"
+            busy={pendingClose != null && busy === `close-${pendingClose.id}`}
+            returnFocusRef={closeTriggerRef}
+            fallbackFocusRef={closedFilterRef}
+            onCancel={() => setPendingClose(null)}
+            onConfirm={() => {
+              if (pendingClose) void onCloseRow(pendingClose);
             }}
           />
-        </section>
-      )}
+        </div>
+      ) : null}
 
-      <ConfirmDialog
-        open={pendingClose != null}
-        title={pendingClose ? `關閉 ${pendingClose.symbol}` : "關閉持倉"}
-        consequence="這是軟關閉；持倉與筆記會保留，之後可在「顯示已關閉」檢視中查看。"
-        confirmLabel="確認關閉"
-        busy={pendingClose != null && busy === `close-${pendingClose.id}`}
-        returnFocusRef={closeTriggerRef}
-        fallbackFocusRef={closedFilterRef}
-        onCancel={() => setPendingClose(null)}
-        onConfirm={() => { if (pendingClose) void onCloseRow(pendingClose); }}
-      />
+      {activeView === "account_details" ? (
+        <div
+          id="portfolio-panel-account_details"
+          role="tabpanel"
+          aria-labelledby="portfolio-tab-account_details"
+        >
+          {overview ? (
+            <PortfolioAccountDetails overview={overview} />
+          ) : (
+            <InlineAlert
+              state={loading ? "loading" : "empty"}
+              title={loading ? "載入帳戶明細" : "帳戶明細目前不可用"}
+            />
+          )}
+        </div>
+      ) : null}
+
+      {activeView === "sync_records" ? (
+        <div
+          id="portfolio-panel-sync_records"
+          role="tabpanel"
+          aria-labelledby="portfolio-tab-sync_records"
+        >
+          <PortfolioCapturePanel onPortfolioChanged={load} />
+        </div>
+      ) : null}
     </main>
   );
 }
 
 function PositionsTable({
   positions,
+  accountLabels,
   emptyText,
   editingId,
   editor,
@@ -410,6 +579,7 @@ function PositionsTable({
   onClose,
 }: {
   positions: PortfolioPosition[];
+  accountLabels: ReadonlyMap<number, string>;
   emptyText: string;
   editingId: number | null;
   editor: ReactNode;
@@ -418,6 +588,13 @@ function PositionsTable({
   onClose: (position: PortfolioPosition, trigger: HTMLButtonElement) => void;
 }) {
   const columns: DataTableColumn<PortfolioPosition>[] = [
+    {
+      id: "account",
+      header: "Account",
+      render: (position) => (
+        accountLabels.get(position.account_id) ?? `#${position.account_id}`
+      ),
+    },
     { id: "symbol", header: "Symbol", render: (position) => position.symbol },
     { id: "asset", header: "Asset", render: (position) => position.asset_class },
     {
@@ -491,13 +668,6 @@ function splitTags(raw: string): string[] {
     .split(",")
     .map((tag) => tag.trim())
     .filter((tag) => tag.length > 0);
-}
-
-function currencySummary(totals: PortfolioSnapshot["totals"] | undefined): string {
-  if (!totals) return "";
-  return Object.entries(totals.per_currency)
-    .map(([currency, row]) => `${currency}: ${row.position_count}`)
-    .join(" · ");
 }
 
 function formatMaybe(value: number | null | undefined): string {

@@ -19,4 +19,19 @@ describe("portfolio capture responsive table contract", () => {
       /white-space:\s*nowrap/,
     );
   });
+
+  it("keeps_account_detail_financial_columns_inside_one_scroll_owner", () => {
+    expect(rule(".portfolio-account-details .ui-data-table")).toMatch(
+      /min-width:\s*1800px/,
+    );
+    expect(rule('.portfolio-account-details .ui-data-table [data-align="right"]'))
+      .toMatch(/white-space:\s*nowrap/);
+  });
+
+  it("lets_the_completed_portfolio_tabs_wrap_without_a_new_breakpoint", () => {
+    expect(rule(".portfolio-view-tabs")).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule(".portfolio-view-tab")).toMatch(
+      /min-height:\s*var\(--control-height-default\)/,
+    );
+  });
 });
