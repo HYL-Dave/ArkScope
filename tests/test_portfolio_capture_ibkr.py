@@ -299,6 +299,56 @@ def test_account_leg_keeps_selected_fields_and_uses_unique_cached_base_currency_
     assert mismatched_result.account_leg.state == "partial"
 
 
+def test_account_summary_all_pseudo_account_is_not_discovered(monkeypatch):
+    ib = FakeIB()
+    ib.summary_rows = [
+        obj(
+            account="All",
+            tag="NetLiquidation",
+            value="350000",
+            currency="USD",
+        ),
+        obj(
+            account="DU123",
+            tag="NetLiquidation",
+            value="150000",
+            currency="USD",
+        ),
+    ]
+    ib.value_rows = [
+        obj(account="DU123", tag="Currency", value="USD", currency="USD")
+    ]
+    install_source(monkeypatch, ib)
+
+    result = read_ibkr_capture()
+
+    assert [account.broker_account_id for account in result.discovered_accounts] == [
+        "DU123"
+    ]
+    assert [snapshot.broker_account_id for snapshot in result.account_snapshots] == [
+        "DU123"
+    ]
+    assert ib.pnl_requests == ["DU123"]
+
+
+def test_account_values_base_sentinel_does_not_make_account_leg_partial(
+    monkeypatch,
+):
+    ib = FakeIB()
+    ib.value_rows = [
+        obj(account="DU123", tag="Currency", value="BASE", currency="BASE"),
+        obj(account="DU123", tag="Currency", value="USD", currency="USD"),
+        obj(account="DU123", tag="RealCurrency", value="USD", currency="BASE"),
+        obj(account="DU123", tag="RealCurrency", value="USD", currency="USD"),
+    ]
+    install_source(monkeypatch, ib)
+
+    result = read_ibkr_capture()
+
+    assert result.account_snapshots[0].base_currency == "USD"
+    assert result.account_leg.state == "complete"
+
+
 def test_daily_pnl_subscription_is_bounded_and_missing_values_stay_null(
     monkeypatch,
 ):

@@ -244,6 +244,8 @@ def _parse_account_summary(
         if not account or not tag:
             status.partial("ibkr_account_rows_invalid")
             continue
+        if account == "All":
+            continue
         account_ids.add(account)
         if tag == "BaseCurrency":
             candidate = _iso_currency(getattr(row, "value", None))
@@ -285,6 +287,11 @@ def _parse_base_hints(
             if candidate is not None
         }
         if not candidates:
+            if {
+                _text(getattr(row, "value", None)).upper(),
+                _text(getattr(row, "currency", None)).upper(),
+            } == {"BASE"}:
+                continue
             status.partial("ibkr_account_value_rows_invalid")
             continue
         hints.setdefault(account, set()).update(candidates)
