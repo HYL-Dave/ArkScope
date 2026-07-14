@@ -264,12 +264,27 @@ describe("PortfolioCapturePanel", () => {
             enabled: true,
             interval_minutes: 30,
             source: "database",
-            provider_configured: true,
+            provider_configured: false,
           },
         });
       }
       idleReads += 1;
-      if (idleReads === 1) return status();
+      if (idleReads === 1) {
+        return status({
+          settings: {
+            enabled: true,
+            interval_minutes: 15,
+            source: "default",
+            provider_configured: false,
+          },
+          provider_issue: {
+            code: "provider_config_missing",
+            status: "missing",
+            provider: "ibkr",
+            field: "host",
+          },
+        });
+      }
       return new Promise<PortfolioCaptureStatus>((resolve) => {
         resolvePoll = resolve;
       });
@@ -284,10 +299,22 @@ describe("PortfolioCapturePanel", () => {
     await clickButton("儲存排程");
 
     await act(async () => {
-      resolvePoll!(status());
+      resolvePoll!(status({
+        settings: {
+          enabled: true,
+          interval_minutes: 15,
+          source: "default",
+          provider_configured: true,
+        },
+        provider_issue: null,
+      }));
       await Promise.resolve();
     });
     expect(interval.value).toBe("30");
+    const captureButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("立即同步"));
+    expect(captureButton?.disabled).toBe(false);
+    expect(host!.textContent).not.toContain("IBKR 尚未設定");
   });
 
   it("lets_a_completed_settings_mutation_win_over_a_poll_started_while_it_was_pending", async () => {
@@ -597,6 +624,9 @@ describe("PortfolioCapturePanel", () => {
 
   it("does_not_let_an_older_poll_clear_a_newer_action_failure", async () => {
     vi.useFakeTimers();
+    const changed = vi.fn();
+    const running = run({ id: 109, state: "running", finished_at: null });
+    const terminal = run({ id: 109, state: "succeeded" });
     let resolvePoll: ((value: PortfolioCaptureStatus) => void) | null = null;
     let reads = 0;
     stubFetch((url, init) => {
@@ -604,24 +634,30 @@ describe("PortfolioCapturePanel", () => {
         throw new Error("settings write failed");
       }
       reads += 1;
-      if (reads === 1) return status();
+      if (reads === 1) {
+        return status({ running: true, latest_run: running, recent_runs: [running] });
+      }
       return new Promise<PortfolioCaptureStatus>((resolve) => {
         resolvePoll = resolve;
       });
     });
-    await mount();
+    await mount(changed);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(2_000);
     });
     await clickButton("儲存排程");
     expect(host!.textContent).toContain("settings write failed");
 
     await act(async () => {
-      resolvePoll!(status());
+      resolvePoll!(status({ running: false, latest_run: terminal, recent_runs: [terminal] }));
       await Promise.resolve();
     });
     expect(host!.textContent).toContain("settings write failed");
+    expect(host!.querySelector('[data-state="running"]')).toBeNull();
+    expect(Array.from(host!.querySelectorAll('[data-state="ready"]'))
+      .some((badge) => badge.textContent?.includes("成功"))).toBe(true);
+    expect(changed).toHaveBeenCalledTimes(1);
   });
 
   it("does_not_clear_a_newer_action_failure_after_an_older_terminal_callback_finishes", async () => {

@@ -148,6 +148,7 @@ export function PortfolioCapturePanel({
   const acceptedSequenceRef = useRef(0);
   const settingsRevisionRef = useRef(0);
   const issueVersionRef = useRef(0);
+  const issueSequenceRef = useRef(0);
   const appliedReviewRunIdsRef = useRef(new Set<number>());
   const safeCapture = isCaptureStatus(capture) ? capture : null;
 
@@ -155,8 +156,8 @@ export function PortfolioCapturePanel({
     next: CaptureIssue,
     sequence = ++requestSequenceRef.current,
   ) => {
-    if (sequence < acceptedSequenceRef.current) return false;
-    acceptedSequenceRef.current = sequence;
+    if (sequence < issueSequenceRef.current) return false;
+    issueSequenceRef.current = sequence;
     issueVersionRef.current += 1;
     setIssue(next);
     return true;
@@ -169,11 +170,17 @@ export function PortfolioCapturePanel({
   ) => {
     if (sequence < acceptedSequenceRef.current) return false;
     acceptedSequenceRef.current = sequence;
+    issueSequenceRef.current = Math.max(issueSequenceRef.current, sequence);
     const current = captureRef.current;
     const projected = {
       ...next,
       settings: current && settingsRevision !== settingsRevisionRef.current
-        ? current.settings
+        ? {
+          ...next.settings,
+          enabled: current.settings.enabled,
+          interval_minutes: current.settings.interval_minutes,
+          source: current.settings.source,
+        }
         : next.settings,
       review: next.review && appliedReviewRunIdsRef.current.has(next.review.run_id)
         ? null
@@ -333,13 +340,9 @@ export function PortfolioCapturePanel({
     setBusy("apply");
     setIssue(null);
     setNotice(null);
-    const sequence = ++requestSequenceRef.current;
     try {
       const applied = await applyPortfolioCaptureRun(runId);
       appliedReviewRunIdsRef.current.add(applied.run_id);
-      if (sequence >= acceptedSequenceRef.current) {
-        acceptedSequenceRef.current = sequence;
-      }
       const current = captureRef.current;
       if (current?.review?.run_id === applied.run_id) {
         const next = { ...current, review: null };
