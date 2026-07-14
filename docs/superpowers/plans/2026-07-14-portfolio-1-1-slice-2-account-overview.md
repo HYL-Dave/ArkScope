@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: DRAFT FOR REVIEW, 2026-07-14. IMPLEMENTATION NOT STARTED.**
+> **Status: REVIEW-CLEARED, 2026-07-14. IMPLEMENTATION AUTHORIZED BUT NOT STARTED.**
 
 **Goal:** Add a truthful Holdings account overview that shows every visible IBKR account's latest captured values, keeps manual-account holdings separate, exposes broker and canonical timestamps, and moves the shipped capture controls into the final Holdings tab hierarchy without implementing Slice 3 activity.
 
@@ -26,6 +26,7 @@
 - The new overview response never exposes `broker_account_id`. If a legacy label embeds the raw id, the projection replaces it with `IBKR · <hash-prefix>` before serialization. The local id, user-safe label, and hash remain available.
 - The final tab order remains `持倉 / 活動 / 帳戶明細 / 同步紀錄`, but unfinished controls are not rendered. Slice 2 renders `持倉 / 帳戶明細 / 同步紀錄`; Slice 3 inserts `活動` between the first and second rendered tabs. No disabled or empty activity placeholder is allowed.
 - Account summary remains above the tablist and visible for every completed tab. The existing manual-position editor and canonical positions stay under `持倉`; canonical position rows gain an account column and an all/account filter using the overview's safe label; `PortfolioCapturePanel` moves under `同步紀錄`; complete latest snapshot fields live under `帳戶明細`.
+- `PortfolioAccountSummary` replaces the existing Accounts card/status-grid block completely. The old per-account cards, duplicate `納入總計` controls, mixed-account `Currency basis` metric, and `currencySummary()` helper must be removed rather than left beside or outside the new tab hierarchy.
 - A new frontend plus an old/stale sidecar must not make canonical positions unusable. Overview failure renders a scoped alert while `/portfolio` data remains interactive. The frontend loads `/portfolio` before `/portfolio/overview`; do not issue the two first-read requests concurrently because both retain V1 Manual-shell initialization.
 - Financial tables own horizontal scrolling and do not shrink numeric text. Visual verification is mandatory at `1440x900`, `1024x768`, `961x768`, `959x768`, and `390x844`.
 - No new `@media` query, shell breakpoint, ad hoc badge/chip, raw exception surface, `window.confirm`, PostgreSQL path, order API, agent tool, prompt input, or Data Sources scheduler control is allowed.
@@ -1440,6 +1441,7 @@ Evolve, without deleting, the existing capture/apply tests:
 - `holdings_renders_one_capture_control_surface_and_no_legacy_live_sync_buttons` first clicks `同步紀錄`, then asserts one capture surface.
 - `clears captured review_and_shows_persisted_positions_after_applying` first enters `同步紀錄`, applies, and asserts both `/portfolio` and `/portfolio/overview` were fetched again before returning to `持倉`.
 - The account aggregate-toggle test continues to assert the exact PATCH body, now through `PortfolioAccountSummary`.
+- In that same aggregate-toggle test, assert `Currency basis` is absent and the fixture's Manual account has exactly one `Manual 納入總計` checkbox. This is a 1:1 strengthening of the existing test, not a new collected test.
 - `renders accounts, positions, and currency basis` becomes `renders account-labelled positions and filters by account`: seed two accounts with one position each, assert the Account column uses overview-safe labels, select one account, and assert only that account's row remains. This is a 1:1 intent-strengthening rename, not a new collected test.
 
 For degraded loading, return a rejected overview promise and a successful snapshot. Assert `NVDA` and row actions still render, while a scoped alert says `帳戶總覽無法載入；持倉仍可使用`.
@@ -1596,6 +1598,12 @@ Render `PortfolioAccountSummary` immediately below errors and before the tablist
   ))}
 </div>
 ```
+
+Before wrapping the three completed panels, delete the existing Accounts `ui-section-band` in its
+entirety: the per-account `ui-status-grid` cards, their old aggregate toggles, and the mixed-account
+`Currency basis` metric. Remove the now-unused `currencySummary()` helper as part of the same
+replacement. No legacy Accounts summary may remain above, below, or outside the tab hierarchy;
+`PortfolioAccountSummary` is the sole account-summary and aggregate-toggle surface.
 
 Each panel uses `role="tabpanel"`, `aria-labelledby`, and is mounted only when active. Wrap the existing contiguous manual-add, Positions, Options, editor, and ConfirmDialog JSX in `portfolio-panel-holdings` without changing those nodes. The two new panel wrappers are exact:
 
@@ -1965,7 +1973,7 @@ Stop and report rather than widening scope if any of these occurs:
 4. Daily total never treats a missing provider leg as zero.
 5. Legacy raw-id labels are redacted before the additive API/DOM while user-owned safe labels survive unchanged.
 6. Overview failure does not take canonical positions or row actions down.
-7. Account summary is persistent above tabs; canonical positions identify/filter accounts with safe labels; capture polling is mounted only in `同步紀錄`; no unfinished activity control is rendered.
+7. Account summary is persistent above tabs and fully replaces the old Accounts/Currency-basis block; every account has exactly one aggregate toggle; canonical positions identify/filter accounts with safe labels; capture polling is mounted only in `同步紀錄`; no unfinished activity control is rendered.
 8. Account details expose every normalized latest-snapshot field and both timestamps without page overflow.
 9. Optional IBKR aggregation, performance claims, and Slice 3 activity have not leaked into the implementation.
 10. Backend `+17/-0`, frontend `+18/-0`, no-PG, privacy/order/static boundaries, responsive matrix, and one-sidecar live evidence all reconcile exactly before merge consideration.
