@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED FOR REVIEW, 2026-07-14. CODE + AUTOMATED/CANONICAL A/B + RESPONSIVE GATES PASS; SINGLE-SIDECAR LIVE GATE PENDING.**
+> **Status: LIVE GATE PASS / MERGE-READY, 2026-07-15. CODE + AUTOMATED/CANONICAL A/B + RESPONSIVE + SINGLE-SIDECAR REAL-GATEWAY GATES PASS; NOT MERGED.**
 
 ## Implementation Ledger
 
@@ -81,6 +81,37 @@ redaction, finite-only `daily_total_pnl`, capture panel mounted only under
 `同步紀錄`, sequential `/portfolio` -> `/portfolio/overview` load. The single
 remaining gate is the user-run single-sidecar live Gateway gate (Task 7
 Step 6), deliberately deferred so the running desktop app was not interrupted.
+
+### Single-sidecar live Gateway verification ✅ (2026-07-15)
+
+The user closed the normal desktop app and master sidecar before the branch
+started one scheduler-disabled sidecar against the real `profile_state.db`.
+Manual capture run `61` completed in about 0.55 seconds with all three provider
+legs `complete`, one visible IBKR account, zero new accounts/executions/
+commissions/unmatched/conflicts, and no error. Its naturally occurring review
+contained only eight broker-owned market-value/unrealized-P&L refreshes; apply
+succeeded, cleared the review, kept `61` as the latest capture, and created no
+second run or Gateway read.
+
+The additive overview then proved on real data:
+
+- Manual plus one IBKR account, with raw broker account ID absent from JSON and
+  DOM by comparison against a read-only DB lookup;
+- broker observation `2026-07-14T16:14:50.777441+00:00` and canonical approval
+  `2026-07-14T16:16:36.711622+00:00` remained independently sourced;
+- provider-present NLV, total cash, gross position value, buying power,
+  available funds, initial/maintenance margin, and realized/unrealized/total
+  daily P&L all rendered, while absent Settled Cash remained null/`—`;
+- Manual subtotal remained separate and no overall-net-worth field or label
+  existed; and
+- real-data browser automation switched exactly `持倉 / 帳戶明細 / 同步紀錄`,
+  kept account summary visible on all three, mounted capture controls only in
+  `同步紀錄`, and rendered no `活動` placeholder.
+
+The user's Gateway exposes one account, so multi-account/mixed-currency remains
+the reviewed fake-backed responsive contract; no second broker account or
+transaction was manufactured. Temporary sidecar, Vite, Chrome, and copied
+`.env` were removed after the gate.
 
 **Goal:** Add a truthful Holdings account overview that shows every visible IBKR account's latest captured values, keeps manual-account holdings separate, exposes broker and canonical timestamps, and moves the shipped capture controls into the final Holdings tab hierarchy without implementing Slice 3 activity.
 
