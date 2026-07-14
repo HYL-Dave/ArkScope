@@ -41,6 +41,28 @@
   remains mandatory and must reconcile backend `+73/-0` and frontend
   `+28/-0` before merge.
 
+### Reviewer gate CLOSED — canonical A/B ✅ PASS (Fable, 2026-07-14, no hang)
+
+Virgin `git archive` of base `281382d` (plan-review clearance, the true branch
+point) versus head `0aa161e`, sequential single-process full pytest under
+identical environment isolation. Both sides identical on the pre-existing
+family: `30 failed / 74 skipped / 18 warnings / 7 errors`; failure sets empty
+in both directions; passed `4074 -> 4147` = exactly **`+73`**, matching collect
+`+73/-0` and the reconciled ledger (`+71` reviewed plan incl. the legacy-route
+pin, plus the two live IBKR parser regressions). Work dir `/tmp/ab_p11s1_1ZlN`.
+The reviewer also independently re-ran: frontend `43 files / 394 tests` PASS +
+typecheck + production build in the branch worktree; no-PG smoke `ok:true`,
+`pg_attempts:[]`; the order-API/PG/raw-id-panel/Settings-duplicate static
+gates (all zero matches); the observation-FK probe (zero CASCADE on
+observation tables — the two CASCADE hits are the pre-existing Holdings V1
+authority tables, out of rule scope, and account hard-delete remains blocked
+by observation RESTRICT FKs); and the reader-factory gate (exactly one
+`_source_factory` site with `readonly=True` +
+`ibkr_client_id_for("portfolio_capture")`). The tool-boundary diff contains
+exactly the one deliberate serializer exception (`34c50e4`), verified narrow:
+agent payload label redaction only, authority surface and tool registration
+unchanged. All gates are now closed; merge remains the user's decision.
+
 ### Live Gateway ledger
 
 - One branch sidecar only, `reload=0`, real provider config/profile DB, and a
