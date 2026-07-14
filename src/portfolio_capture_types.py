@@ -53,6 +53,26 @@ class AccountSnapshotObservation:
 
 
 @dataclass(frozen=True)
+class AccountSnapshotRecord:
+    capture_run_id: int
+    portfolio_account_id: int
+    as_of_utc: str
+    base_currency: str | None = None
+    net_liquidation: float | None = None
+    total_cash_value: float | None = None
+    settled_cash: float | None = None
+    gross_position_value: float | None = None
+    buying_power: float | None = None
+    available_funds: float | None = None
+    initial_margin_requirement: float | None = None
+    maintenance_margin_requirement: float | None = None
+    daily_realized_pnl: float | None = None
+    daily_unrealized_pnl: float | None = None
+    source: Literal["ibkr_gateway"] = "ibkr_gateway"
+    as_of_kind: Literal["capture_completed"] = "capture_completed"
+
+
+@dataclass(frozen=True)
 class PositionObservation:
     broker_account_id: str
     broker_con_id: str

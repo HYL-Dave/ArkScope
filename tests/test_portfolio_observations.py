@@ -8,6 +8,7 @@ import pytest
 
 from src.portfolio_capture_types import (
     AccountSnapshotObservation,
+    AccountSnapshotRecord,
     BrokerAccountRef,
     BrokerCaptureResult,
     CaptureLegResult,
@@ -233,6 +234,82 @@ def test_identical_account_values_still_create_one_snapshot_per_run(stores):
         (first_id, 100_000.0),
         (second_id, 100_000.0),
     ]
+
+
+def test_latest_account_snapshots_returns_one_newest_full_record_per_account(stores):
+    portfolio, observations = stores
+    first = complete_result(finished_at="2026-07-14T05:00:00+00:00")
+    commit(observations, first)
+    latest_result = replace(
+        first,
+        finished_at_utc="2026-07-14T05:15:00+00:00",
+        account_snapshots=(
+            AccountSnapshotObservation(
+                broker_account_id="DU123",
+                as_of_utc="2026-07-14T05:15:00+00:00",
+                base_currency="USD",
+                net_liquidation=101_000,
+                total_cash_value=11_000,
+                settled_cash=9_000,
+                gross_position_value=90_000,
+                buying_power=25_000,
+                available_funds=20_000,
+                initial_margin_requirement=15_000,
+                maintenance_margin_requirement=12_000,
+                daily_realized_pnl=125,
+                daily_unrealized_pnl=-25,
+            ),
+        ),
+    )
+    latest_run_id, _ = commit(observations, latest_result)
+    account = next(a for a in portfolio.list_accounts() if a.broker == "ibkr")
+
+    records = observations.latest_account_snapshots()
+
+    assert records[account.id] == AccountSnapshotRecord(
+        capture_run_id=latest_run_id,
+        portfolio_account_id=account.id,
+        as_of_utc="2026-07-14T05:15:00+00:00",
+        base_currency="USD",
+        net_liquidation=101_000,
+        total_cash_value=11_000,
+        settled_cash=9_000,
+        gross_position_value=90_000,
+        buying_power=25_000,
+        available_funds=20_000,
+        initial_margin_requirement=15_000,
+        maintenance_margin_requirement=12_000,
+        daily_realized_pnl=125,
+        daily_unrealized_pnl=-25,
+        source="ibkr_gateway",
+        as_of_kind="capture_completed",
+    )
+
+
+def test_latest_account_snapshots_filters_local_ids_and_breaks_time_ties_by_run(stores):
+    portfolio, observations = stores
+    same_time = "2026-07-14T06:00:00+00:00"
+    first_id, _ = commit(observations, complete_result(finished_at=same_time))
+    second = complete_result(finished_at=same_time)
+    second = replace(
+        second,
+        account_snapshots=(
+            replace(second.account_snapshots[0], net_liquidation=222_000),
+        ),
+    )
+    second_id, _ = commit(observations, second)
+    account = next(a for a in portfolio.list_accounts() if a.broker == "ibkr")
+
+    records = observations.latest_account_snapshots({account.id})
+
+    assert first_id < second_id
+    assert records[account.id].capture_run_id == second_id
+    assert records[account.id].net_liquidation == 222_000
+
+
+def test_latest_account_snapshots_empty_filter_returns_empty(stores):
+    _, observations = stores
+    assert observations.latest_account_snapshots(set()) == {}
 
 
 def test_duplicate_execution_is_a_noop(stores):

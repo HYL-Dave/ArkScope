@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
+from collections.abc import Collection
 from dataclasses import fields
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 from src.portfolio_capture_types import (
     AccountSnapshotObservation,
+    AccountSnapshotRecord,
     BrokerCaptureResult,
     CaptureCommitResult,
     CaptureRun,
@@ -605,6 +607,66 @@ class PortfolioObservationStore:
                 (limit,),
             ).fetchall()
         return [self._run_from_row(row) for row in result]
+
+    def latest_account_snapshots(
+        self,
+        account_ids: Collection[int] | None = None,
+    ) -> dict[int, AccountSnapshotRecord]:
+        ids = (
+            None
+            if account_ids is None
+            else sorted({int(value) for value in account_ids})
+        )
+        if ids == []:
+            return {}
+        where = ""
+        params: tuple[int, ...] = ()
+        if ids is not None:
+            placeholders = ",".join("?" for _ in ids)
+            where = f"WHERE portfolio_account_id IN ({placeholders})"
+            params = tuple(ids)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM (
+                    SELECT s.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY s.portfolio_account_id
+                               ORDER BY s.as_of_utc DESC, s.capture_run_id DESC, s.id DESC
+                           ) AS latest_rank
+                    FROM portfolio_account_snapshots s
+                    {where}
+                )
+                WHERE latest_rank=1
+                ORDER BY portfolio_account_id
+                """,
+                params,
+            ).fetchall()
+        return {
+            int(row["portfolio_account_id"]): self._account_snapshot_record(row)
+            for row in rows
+        }
+
+    @staticmethod
+    def _account_snapshot_record(row: sqlite3.Row) -> AccountSnapshotRecord:
+        return AccountSnapshotRecord(
+            capture_run_id=int(row["capture_run_id"]),
+            portfolio_account_id=int(row["portfolio_account_id"]),
+            as_of_utc=row["as_of_utc"],
+            base_currency=row["base_currency"],
+            net_liquidation=row["net_liquidation"],
+            total_cash_value=row["total_cash_value"],
+            settled_cash=row["settled_cash"],
+            gross_position_value=row["gross_position_value"],
+            buying_power=row["buying_power"],
+            available_funds=row["available_funds"],
+            initial_margin_requirement=row["initial_margin_requirement"],
+            maintenance_margin_requirement=row["maintenance_margin_requirement"],
+            daily_realized_pnl=row["daily_realized_pnl"],
+            daily_unrealized_pnl=row["daily_unrealized_pnl"],
+            source=row["source"],
+            as_of_kind=row["as_of_kind"],
+        )
 
     def last_successful_finished_at(self) -> datetime | None:
         with self._connect() as conn:
