@@ -1,6 +1,6 @@
 # Portfolio 1.1 Account Observation and Activity Design
 
-> **Status: APPROVED DESIGN; SLICE 1 MERGED / LIVE 2026-07-14 (`fa052dc`); SLICES 2-3 PENDING.**
+> **Status: APPROVED DESIGN; SLICE 1 MERGED / LIVE 2026-07-14 (`fa052dc`); SLICE 2 IMPLEMENTATION PLAN OPEN / REVIEW PENDING 2026-07-14; SLICE 3 PENDING.**
 > This document extends, but does not replace,
 > `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md` and its
 > shipped implementation. Holdings V1 remains the authority for local
