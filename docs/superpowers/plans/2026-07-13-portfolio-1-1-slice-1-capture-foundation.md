@@ -2,13 +2,96 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: REVIEW-CLEARED — IMPLEMENTATION NOT STARTED, 2026-07-13.**
+> **Status: IMPLEMENTED FOR REVIEW, 2026-07-14. Canonical reviewer A/B pending; do not merge.**
 
 **Goal:** Start preserving truthful, non-retroactive IBKR account, position, execution, commission, correction, and manual-adjustment facts while retaining the shipped Holdings tables as current-state authority.
 
 **Architecture:** A new append-only `PortfolioObservationStore` shares `profile_state.db` with `PortfolioStore` but owns broker observations and capture-run state. One read-only `PortfolioCaptureService` serializes startup, scheduled, and manual Gateway reads, commits valid observation legs before any separately authorized canonical position update, and exposes a Holdings-owned status/control API; the existing immediate `/portfolio/ibkr/*` routes remain compatible but are no longer the primary UI workflow. The scheduler is a separate lifespan task rather than a Data Sources source, so there is one Portfolio control surface and no duplicate schedule row.
 
 **Tech Stack:** Python 3.11+, SQLite/WAL, FastAPI/Pydantic, `ib_insync` through the existing worker-loop-safe `IBKRDataSource`, React 18, TypeScript 5.5, Vite/Vitest, existing P2.8 UI primitives.
+
+## Implementation Ledger — 2026-07-14
+
+- Branch: `codex/portfolio-1-1-capture`; implementation base `281382d`;
+  code tip `34c50e4` before this review-handoff docs commit.
+- Tasks 0-6 landed as isolated RED-first commits. The final implementation
+  includes the `portfolio_capture=+70` band, append-only observation store,
+  atomic manual-adjustment journal, one-connection read-only IBKR reader,
+  capture service/scheduler/API, and the Holdings-owned control/review panel.
+- Independent task review closed status-ordering, issue-ordering, due-time,
+  scheduler-shutdown, polling, and responsive-review races through code tip
+  `a9ccecd`. The final frontend result is `43 files / 394 tests`, exactly
+  `+2 files / +28 tests` over base (`+10` planned plus `+18` named reviewer
+  hardening tests); typecheck and production build pass with only the existing
+  chunk-size warning.
+- Final focused backend verification excluding the environment-hanging
+  `tests/test_api.py` is `173 passed`. Full collection is `4185 -> 4258`,
+  exactly `+73/-0`: the reviewed `+71` plan ledger plus two live-only IBKR
+  parser regressions. The legacy-label agent-redaction test was strengthened
+  in place and adds no collected test. No-PG smoke reports `ok: true` and
+  `pg_attempts: []`; order-API, PG, raw-id capture-DOM, duplicate-Settings,
+  AST ownership, SQLite FK/no-delete, and tool/agent/catalog ledger gates pass
+  except for the deliberate tool serializer correction described below.
+- Browser verification at `1440x900`, `1024x768`, `961x768`, `959x768`, and
+  `390x844` found no overlap, page overflow, raw account identity, or new shell
+  breakpoint. Screenshots remain under `/tmp` as disposable evidence.
+- Canonical single-process full A/B was attempted in this implementation
+  environment and reproduced the known FastAPI `TestClient`/lifespan hang in
+  `tests/test_api.py`; no A/B PASS is claimed. Reviewer canonical virgin A/B
+  remains mandatory and must reconcile backend `+73/-0` and frontend
+  `+28/-0` before merge.
+
+### Live Gateway ledger
+
+- One branch sidecar only, `reload=0`, real provider config/profile DB, and a
+  read-only effective client id of `71` (`base 1 + portfolio_capture 70`).
+  Pre-state was 9 canonical IBKR positions and 9 position-note rows with note
+  digest `9ee30a48...dde9f`.
+- The first live startup capture exposed two provider-shape defects that mocks
+  had missed: `accountSummary()` includes an `account="All"` aggregate row,
+  and `accountValues()` includes a valid `Currency=BASE` sentinel. The old
+  parser created a pseudo-account, issued invalid `reqPnL("All")`, and marked
+  the account leg partial. Tests first reproduced both failures; `f64cd4a`
+  now ignores the aggregate row and accepts only the explicit BASE sentinel
+  without weakening other invalid-currency checks.
+- The two pre-fix live runs and their pseudo-account observations were removed
+  in one assertion-guarded cleanup. The cleanup touched only branch-created
+  runs 1/2 and the `All` shell; canonical positions remained 9, notes remained
+  9, and the note digest stayed byte-identical. The first retained fixed run
+  succeeded with one real account, eight open-position observations, complete
+  account/execution/position legs, no error, and no pseudo-account.
+- The 15-minute scheduler then ran continuously during the live window. Final
+  evidence has 47 retained runs: 46 successful account snapshots and one
+  truthful `gateway_busy` blocked run. Adjacent manual runs 47/48 each
+  succeeded; the second added exactly one account snapshot and zero duplicate
+  executions/commissions. No trade occurred that day, so executions,
+  commissions, corrections, commission revisions, and unmatched changes remain
+  naturally absent and fake-backed rather than manufactured.
+- Latest account snapshot (run 49) persisted provider-reported USD NLV, total
+  cash, gross position value, buying power, available funds, initial/maintenance
+  margin, and daily realized/unrealized P&L. Provider-absent SettledCash remains
+  `null`, never invented as zero.
+- Review run 48 derived eight broker-field updates with zero canonical writes
+  before approval; apply succeeded and preserved the note digest exactly.
+  Manual capture run 49 also succeeded while periodic capture was disabled;
+  settings were restored to `enabled=true`, `interval_minutes=15`.
+- Immediate sidecar restart kept run count/latest run unchanged and restored
+  `next_due_at` exactly to latest successful completion + 15 minutes. Stale
+  capture-run interruption remains test-backed; no synthetic running row was
+  inserted into the user's production history. `ibkr_auto` likewise remains
+  test-backed because the real account is review-mode.
+- Capture API, capture DOM/fixtures, logs, non-authority DB text/trace columns,
+  and agent payload contain no raw broker account id. Live scanning found that
+  the older agent serializer removed `broker_account_id` but leaked a legacy
+  label containing the same raw id; the sharpened existing test failed first,
+  and `34c50e4` now derives a hash label for agent output. This is the sole
+  deliberate exception to the original tool byte-identity constraint; tool
+  registration/schema and research hydration remain unchanged. The user-owned
+  `/portfolio` authority surface continues its previously adopted ability to
+  display the user's own broker account identity.
+- Final shutdown was clean: zero branch sidecars/worktree processes and no
+  owned event-loop/session warning. Capture ownership contains zero order API
+  references or invocations.
 
 ## Global Constraints
 
@@ -30,8 +113,16 @@
 - Stored numeric values must be finite. Blank, parse failure, `NaN`, and positive/negative infinity never become zero.
 - All persisted times are UTC. Broker-day gap classification uses `America/New_York`.
 - Observation foreign keys are `RESTRICT`/`NO ACTION`, never `CASCADE`; account hard delete is blocked while observations exist.
-- Raw broker account ids remain inside the local broker/store boundary. New API DTOs, normal UI, logs, tests, traces, and agent payloads expose local account id, label, and hash only.
-- Existing `get_portfolio_holdings` behavior and tool/agent registries remain byte-identical. Slice 1 adds no tool, prompt input, report evidence, or research hydration path.
+- Raw broker account ids remain inside the local broker/store boundary. New
+  capture API DTOs/UI, logs, tests, traces, and agent payloads expose local
+  account id, label, and hash only. The pre-existing user-owned `/portfolio`
+  authority response may still show the user's own account identity under the
+  Holdings V1 ruling; generic agent/trace/capture surfaces may not.
+- Existing tool/agent registries remain byte-identical and Slice 1 adds no tool,
+  prompt input, report evidence, or research hydration path. One live-gate
+  privacy correction is deliberate: `get_portfolio_holdings` now rewrites a
+  legacy display label only when it contains the raw broker account id; all
+  other payload behavior is preserved.
 - Capture ownership must contain zero references to `placeOrder`, `cancelOrder`, `reqGlobalCancel`, order modification methods, `exerciseOption`, or `exerciseOptions`.
 - Settings -> Data Sources receives no Portfolio capture row or mutation control. Holdings is the only schedule owner.
 - `portfolio_activity_annotations` is deliberately deferred to Slice 3, its first consumer. Do not create an unused table or write API in Slice 1.
@@ -1417,7 +1508,9 @@ npm --workspace apps/arkscope-web run typecheck
 npm --workspace apps/arkscope-web run build
 ```
 
-Expected: all pass; base `41 files / 366 tests` becomes `42 files / 376 tests` (`+10/-0`), typecheck/build pass, and only the existing chunk warning is permitted.
+Reconciled result: base `41 files / 366 tests` becomes `43 files / 394 tests`
+(`+28/-0`: `+10` planned plus `+18` review hardening), typecheck/build pass,
+and only the existing chunk warning is permitted.
 
 - [ ] **Step 7: Commit**
 
@@ -1439,7 +1532,7 @@ git commit -m "feat: add holdings capture controls"
 - Consumes: all prior tasks.
 - Produces: a review-ready branch with exact automated/live evidence.
 
-- [ ] **Step 1: Run the complete focused backend suite**
+- [x] **Step 1: Run the complete focused backend suite**
 
 Run:
 
@@ -1461,12 +1554,12 @@ pytest \
 ```
 
 Expected: all Slice 1 tests pass. The planned backend collect delta is exactly
-`+71/-0`: 1 client-id-band, 18 observation-store, 8 manual-journal, 11 reader,
+`+73/-0`: 1 client-id-band, 18 observation-store, 8 manual-journal, 13 reader,
 14 service, 8 scheduler, 1 direct legacy archived-account regression, and 10
 route/lifespan tests. Any different delta must be reconciled by named test
 before review.
 
-- [ ] **Step 2: Run static safety and ownership gates**
+- [x] **Step 2: Run static safety and ownership gates**
 
 Run:
 
@@ -1480,18 +1573,22 @@ rg -n "postgres|psycopg|supabase|db_dsn" \
   src/api/routes/portfolio_capture.py
 rg -n '\bbroker_account_id\b' apps/arkscope-web/src/PortfolioCapturePanel.tsx
 rg -n "portfolio_capture|持倉擷取" apps/arkscope-web/src/Settings.tsx
-git diff --exit-code "$(cat /tmp/arkscope-portfolio-1-1-slice-1-base.txt)" -- \
-  src/tools src/agents docs/design/ARKSCOPE_TOOL_CATALOG.md
+git diff --exit-code 281382d -- \
+  src/agents docs/design/ARKSCOPE_TOOL_CATALOG.md
+git diff --name-only 281382d -- src/tools
 ```
 
-Expected: the four `rg` commands produce zero matches and the tool/agent/catalog
-boundary diff is empty. The exact-word raw-id gate deliberately permits the
-redacted `broker_account_id_hash` identifier. Tests may name banned strings
-only to enforce their absence.
+Expected: the four `rg` commands produce zero matches; agent/catalog boundaries
+are empty; the tool diff contains only
+`src/tools/portfolio_holdings_tools.py`, whose live-gate redaction exception is
+pinned by `test_get_portfolio_holdings_redacts_raw_broker_account_id`. The
+exact-word raw-id gate deliberately permits the redacted
+`broker_account_id_hash` identifier. Tests may name banned strings only to
+enforce their absence.
 
 Run an AST call-site gate proving `IBKRDataSource` in capture ownership is constructed exactly once, with `readonly=True` and `ibkr_client_id_for('portfolio_capture')`. Run a SQLite schema probe proving every observation FK delete action is `RESTRICT`/`NO ACTION` and no observation table has a DELETE method/route.
 
-- [ ] **Step 3: Run the full frontend and no-PG gates**
+- [x] **Step 3: Run the full frontend and no-PG gates**
 
 Run:
 
@@ -1502,9 +1599,10 @@ npm --workspace apps/arkscope-web run build
 python src/smoke/pg_unreachable_e2e.py
 ```
 
-Expected: `42 files / 376 tests`, typecheck/build pass, smoke `ok: true`, all checks pass, and `pg_attempts: []`.
+Result: `43 files / 394 tests`, typecheck/build pass, smoke `ok: true`, all
+checks pass, and `pg_attempts: []`.
 
-- [ ] **Step 4: Run visual/interaction checks**
+- [x] **Step 4: Run visual/interaction checks**
 
 Start a scheduler-disabled sidecar against a disposable profile DB and Vite on an unused 84xx port. Inspect Holdings at `1440x900`, `1024x768`, `961x768`, `959x768`, and `390x844` using fake/captured run data. Store screenshots under `/tmp`.
 
@@ -1531,13 +1629,14 @@ Compare virgin archives of that exact base and final tip under the same environm
 
 - failure sets identical in both directions;
 - pre-existing passed/skipped/warning/error behavior is identical;
-- passed/collected delta equals exactly the new test ledger (`+71/-0` backend);
-- frontend delta equals `+10/-0`;
+- passed/collected delta equals exactly the reconciled test ledger
+  (`+73/-0` backend);
+- frontend delta equals `+28/-0`;
 - no generated DB/cache/build artifact enters either archive.
 
 If the known TestClient/lifespan hang occurs in the implementation environment, preserve logs and stop short of claiming A/B PASS; reviewer canonical A/B remains mandatory.
 
-- [ ] **Step 6: Run the single-sidecar live Gateway gate**
+- [x] **Step 6: Run the single-sidecar live Gateway gate**
 
 Shut down every other ArkScope sidecar first. Use the real provider config and profile DB, with one branch sidecar only:
 
@@ -1555,7 +1654,7 @@ Shut down every other ArkScope sidecar first. Use the real provider config and p
 
 Do not manufacture a trade, correction, commission revision, or unmatched position change on the user's account. Those remain fake-backed tests unless a naturally occurring event appears.
 
-- [ ] **Step 7: Mark review-ready and stop**
+- [x] **Step 7: Mark review-ready and stop**
 
 After automated and live gates:
 
