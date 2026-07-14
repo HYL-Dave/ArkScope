@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: LIVE GATE PASS / MERGE-READY, 2026-07-15. CODE + AUTOMATED/CANONICAL A/B + RESPONSIVE + SINGLE-SIDECAR REAL-GATEWAY GATES PASS; NOT MERGED.**
+> **Status: MERGED / LIVE, 2026-07-15. `master` FAST-FORWARDED THROUGH `35b3115`; CODE + AUTOMATED/CANONICAL A/B + RESPONSIVE + SINGLE-SIDECAR REAL-GATEWAY GATES PASS.**
 
 ## Implementation Ledger
 
-- **Branch / commits:** `codex/portfolio-1-1-overview`; behavioral base
-  `a0daf69`; review-cleared branch base `bdf8946`; code head `3cbe753` before
-  this docs-only closeout.
+- **Branch / commits:** merged branch `codex/portfolio-1-1-overview`;
+  behavioral base `a0daf69`; review-cleared branch base `bdf8946`; code head
+  `3cbe753`; live-evidence and merge tip `35b3115`.
 - **Task 1, observation read:** RED because no persisted latest-snapshot DTO
   or bounded latest-per-account query existed; GREEN at `5a28515` with
   `pytest tests/test_portfolio_observations.py -q` (`21 passed`).
@@ -51,12 +51,12 @@
   `4147 -> 4164` passed, exactly `+17`; both sides have `30 failed / 74 skipped /
   18 warnings / 7 errors`; parsed JUnit failure/error test-ID differences are
   empty in both directions. Temporary A/B worktrees were removed.
-- **Naturally unverified:** the normal desktop app and its master-code sidecar
+- **Pre-live deferral (historical; closed below):** the normal desktop app and its master-code sidecar
   were already running against the real profile DB/Gateway. The branch did not
   start a competing real-data sidecar or interrupt the user's app, so Task 7
-  Step 6 remains the post-review single-sidecar live gate. The provider-free
+  Step 6 was therefore deferred to the post-review single-sidecar live gate. The provider-free
   route, fake mixed-currency/multi-account behavior, privacy, and full UI
-  interaction matrix are verified; no LIVE claim is made.
+  interaction matrix were verified before the live gate.
 - **Plan deviations:** none in product scope. The review-cleared MF requiring
   complete replacement of the legacy Accounts/Currency-basis block was applied
   before implementation and is covered by explicit absence/cardinality tests.
@@ -78,9 +78,10 @@ PASS + typecheck + production build in the branch worktree; focused backend
 exactly-one-toggle assertions at `Holdings.test.tsx:271/:595-596`). Projection
 spot-checks: deterministic `ROW_NUMBER` latest-rank SQL, `_safe_label`
 redaction, finite-only `daily_total_pnl`, capture panel mounted only under
-`同步紀錄`, sequential `/portfolio` -> `/portfolio/overview` load. The single
-remaining gate is the user-run single-sidecar live Gateway gate (Task 7
-Step 6), deliberately deferred so the running desktop app was not interrupted.
+`同步紀錄`, sequential `/portfolio` -> `/portfolio/overview` load. At review
+time, the single remaining gate was the user-run single-sidecar live Gateway
+gate (Task 7 Step 6), deliberately deferred so the running desktop app was not
+interrupted; the following section records its successful closure.
 
 ### Single-sidecar live Gateway verification ✅ (2026-07-15)
 
@@ -112,6 +113,14 @@ The user's Gateway exposes one account, so multi-account/mixed-currency remains
 the reviewed fake-backed responsive contract; no second broker account or
 transaction was manufactured. Temporary sidecar, Vite, Chrome, and copied
 `.env` were removed after the gate.
+
+### Post-merge verification ✅ (2026-07-15)
+
+`master` fast-forwarded through `35b3115`. The merged tree passed the exact
+focused backend ledger (`81 passed`), full frontend (`44 files / 412 tests`),
+TypeScript typecheck, and production build with only the pre-existing Vite
+chunk-size warning. Portfolio 1.1 Slice 2 is therefore LIVE; Slice 3 activity
+and manual-journal UI remains a separate pending unit.
 
 **Goal:** Add a truthful Holdings account overview that shows every visible IBKR account's latest captured values, keeps manual-account holdings separate, exposes broker and canonical timestamps, and moves the shipped capture controls into the final Holdings tab hierarchy without implementing Slice 3 activity.
 
