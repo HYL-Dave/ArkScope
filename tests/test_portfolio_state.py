@@ -412,6 +412,81 @@ def test_totals_always_exclude_closed_rows_even_when_visible(tmp_path):
     assert "USD" not in closed_view.totals.per_currency
 
 
+def test_last_position_sync_time_survives_complete_liquidation(monkeypatch, tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account(
+        "ibkr", "DU123", "IBKR", base_currency="USD"
+    )
+    monkeypatch.setattr(
+        "src.portfolio_state._now", lambda: "2026-07-14T05:00:00+00:00"
+    )
+    store.apply_broker_positions(
+        account_id=account.id,
+        positions=[BrokerPosition("ibkr", "DU123", "1", "AAPL", "stock", 1)],
+        source="capture",
+    )
+    monkeypatch.setattr(
+        "src.portfolio_state._now", lambda: "2026-07-14T06:00:00+00:00"
+    )
+    store.apply_broker_positions(
+        account_id=account.id, positions=[], source="capture"
+    )
+
+    assert store.list_positions(account_id=account.id) == []
+    assert store.last_position_sync_at_by_account({account.id}) == {
+        account.id: "2026-07-14T06:00:00+00:00"
+    }
+
+
+def test_totals_for_accounts_reuses_open_position_currency_rules_and_exact_ids(
+    tmp_path,
+):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    manual = store.ensure_manual_account()
+    included = store.upsert_manual_position(
+        account_id=manual.id, symbol="AAPL", quantity=2, currency="USD"
+    )
+    excluded_account = store.upsert_broker_account("ibkr", "DU123", "IBKR")
+    store.apply_broker_positions(
+        account_id=excluded_account.id,
+        positions=[
+            BrokerPosition(
+                "ibkr",
+                "DU123",
+                "1",
+                "MSFT",
+                "stock",
+                1,
+                currency="USD",
+                market_value=999,
+            )
+        ],
+        source="capture",
+    )
+    with store._connect() as conn:
+        conn.execute(
+            "UPDATE portfolio_positions SET market_value=250 WHERE id=?",
+            (included.id,),
+        )
+
+    totals = store.totals_for_accounts({manual.id})
+
+    assert totals.currency_basis == "per_currency"
+    assert totals.per_currency["USD"].position_count == 1
+    assert totals.per_currency["USD"].market_value == 250
+
+
+def test_totals_for_accounts_empty_set_never_falls_back_to_all_positions(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    manual = store.ensure_manual_account()
+    store.upsert_manual_position(account_id=manual.id, symbol="AAPL", quantity=1)
+
+    totals = store.totals_for_accounts(set())
+
+    assert totals.per_currency == {}
+    assert totals.broker_base is None
+
+
 def _adjustment_change_count(store: PortfolioStore) -> int:
     with store._connect() as conn:
         return int(

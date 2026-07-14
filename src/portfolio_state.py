@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import sqlite3
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -770,6 +771,46 @@ class PortfolioStore:
         """
         with self._connect() as conn:
             return [self._position_from_row(row) for row in conn.execute(sql, params)]
+
+    def last_position_sync_at_by_account(
+        self,
+        account_ids: Collection[int] | None = None,
+    ) -> dict[int, str]:
+        ids = (
+            None
+            if account_ids is None
+            else sorted({int(value) for value in account_ids})
+        )
+        if ids == []:
+            return {}
+        where = "WHERE last_sync_at IS NOT NULL"
+        params: tuple[int, ...] = ()
+        if ids is not None:
+            placeholders = ",".join("?" for _ in ids)
+            where += f" AND account_id IN ({placeholders})"
+            params = tuple(ids)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT account_id, MAX(last_sync_at) AS last_sync_at
+                FROM portfolio_positions
+                {where}
+                GROUP BY account_id
+                """,
+                params,
+            ).fetchall()
+        return {int(row["account_id"]): row["last_sync_at"] for row in rows}
+
+    def totals_for_accounts(self, account_ids: Collection[int]) -> PortfolioTotals:
+        ids = {int(value) for value in account_ids}
+        if not ids:
+            return _totals([])
+        positions = [
+            position
+            for position in self.list_positions(include_closed=False)
+            if position.account_id in ids
+        ]
+        return _totals(positions)
 
     def list_manual_adjustments(
         self, position_id: int | None = None
