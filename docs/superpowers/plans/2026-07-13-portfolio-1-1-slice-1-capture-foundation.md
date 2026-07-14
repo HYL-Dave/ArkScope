@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED FOR REVIEW, 2026-07-14. Canonical reviewer A/B pending; do not merge.**
+> **Status: MERGED / SLICE 1 LIVE COMPLETE, 2026-07-14 (`fa052dc`). Portfolio 1.1 Slices 2-3 remain pending.**
 
 **Goal:** Start preserving truthful, non-retroactive IBKR account, position, execution, commission, correction, and manual-adjustment facts while retaining the shipped Holdings tables as current-state authority.
 
@@ -62,6 +62,16 @@ by observation RESTRICT FKs); and the reader-factory gate (exactly one
 exactly the one deliberate serializer exception (`34c50e4`), verified narrow:
 agent payload label redaction only, authority surface and tool registration
 unchanged. All gates are now closed; merge remains the user's decision.
+
+### Merge closeout — 2026-07-14
+
+The user delegated the local integration decision after the reviewer gate
+closed. `master` fast-forwarded from the plan-review base `281382d` through
+`fa052dc`; no merge-only code change was introduced. Slice 1 is therefore
+live and begins accumulating non-retroactive broker observations whenever the
+normal desktop sidecar is running. This status closes only the capture
+foundation: Slice 2 account overview and Slice 3 activity/journal UI retain
+their separate plan, review, A/B, and live gates.
 
 ### Live Gateway ledger
 
