@@ -217,11 +217,13 @@ therefore defaults to defer until the hypothesis gate exists.
   typecheck/build, static boundaries, no-PG smoke, and five-viewport browser
   gates are closed. Reviewer canonical A/B is identical
   (`30 failed / 4074 passed / 74 skipped / 18 warnings / 7 errors`, empty
-  bidirectional failure diff, backend collect `+0/-0`). Portfolio 1.1 design is
-  Slice 1 is now merged and live through `fa052dc` under
+  bidirectional failure diff, backend collect `+0/-0`). Portfolio 1.1 Slice 1
+  is now merged and live through `fa052dc` under
   `docs/superpowers/specs/2026-07-13-portfolio-1-1-observation-activity-design.md`;
-  its account-overview Slice 2 is the next Portfolio unit, while P2.8 Slice 2
-  shell work remains not started.
+  its account-overview Slice 2 is implemented for review through code
+  `3cbe753` with canonical A/B and responsive gates closed but the real-Gateway
+  single-sidecar gate still pending, while P2.8 Slice 2 shell work remains not
+  started.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -262,7 +264,7 @@ therefore defaults to defer until the hypothesis gate exists.
 - **Future decomposition**: (1) all-seam capture foundation and coverage/health contract, (2) aggregation API and contextual summaries, (3) System dashboard. Do not open an implementation plan until this map explicitly promotes slice 1.
 
 ### P2.10 Portfolio 1.1 account observation and activity
-- **Status**: **SLICE 1 MERGED / LIVE 2026-07-14 through `fa052dc`; all Slice 1 review, canonical A/B, and live Gateway gates closed. Slice 2 account-overview implementation plan is OPEN / REVIEW PENDING; implementation has not started. Slice 3 remains pending.** Authorities: `docs/superpowers/specs/2026-07-13-portfolio-1-1-observation-activity-design.md`, `docs/superpowers/plans/2026-07-13-portfolio-1-1-slice-1-capture-foundation.md`, and `docs/superpowers/plans/2026-07-14-portfolio-1-1-slice-2-account-overview.md`.
+- **Status**: **SLICE 1 MERGED / LIVE 2026-07-14 through `fa052dc`; all Slice 1 review, canonical A/B, and live Gateway gates closed. Slice 2 account overview is IMPLEMENTED FOR REVIEW at code `3cbe753`: backend canonical A/B is exact `+17/-0`, frontend is exact `+18/-0`, responsive/privacy/no-PG gates pass, and the single-sidecar real-Gateway gate remains pending. Slice 3 remains pending.** Authorities: `docs/superpowers/specs/2026-07-13-portfolio-1-1-observation-activity-design.md`, `docs/superpowers/plans/2026-07-13-portfolio-1-1-slice-1-capture-foundation.md`, and `docs/superpowers/plans/2026-07-14-portfolio-1-1-slice-2-account-overview.md`.
 - **Why now**: Holdings V1 persists canonical positions, but the existing IBKR call already discards account-value tags and broker realized P&L, while no execution/commission ledger exists. IB Gateway execution history is current-day bounded, so every uncaptured day creates a permanent activity gap.
 - **Adopted architecture**: retain `portfolio_accounts` / `portfolio_positions` / `portfolio_position_notes` as current-state authority; add a non-cascading append-only observation layer in `profile_state.db` for capture runs, account snapshots, complete broker-position observations, immutable executions, commission revisions, corrections, unmatched changes, and atomic manual-adjustment journals. Observations never rebuild canonical holdings. `ibkr_review` derives preview at read time; `ibkr_auto` may apply only a complete position leg after observation commit.
 - **Capture**: one read-only Gateway capture service (`portfolio_capture=+70`, distinct from `holdings=+60`), startup catch-up, configurable 5-1440 minute cadence with 15-minute default, and manual trigger. Account/execution/position legs report truthful five-state terminal outcomes; coverage gaps are explicit and never mean zero activity.
@@ -415,6 +417,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-14 (Portfolio 1.1 SLICE 2 ACCOUNT OVERVIEW IMPLEMENTED FOR REVIEW — canonical A/B and responsive gates pass)**: Branch `codex/portfolio-1-1-overview` implements the additive provider-free account overview through code `3cbe753`: latest captured values per visible IBKR account, broker/canonical dual timestamps, provider-reported ET daily P&L, a strictly separate manual-account subtotal, safe account labels, complete account details, account-aware canonical positions, and the three completed Holdings tabs (`持倉 / 帳戶明細 / 同步紀錄`). The shipped Accounts/Currency-basis block was removed rather than duplicated; no overall net worth, unfinished activity placeholder, Gateway read, write route, scheduler, tool/prompt input, or order API was added. Automated evidence closes at backend focused `81`, frontend `44 files / 412 tests`, typecheck/build, no-PG `pg_attempts:[]`, static/privacy boundaries, and five browser widths. Clean sequential backend A/B at base `a0daf69` versus head `3cbe753` is exact: cases `4258 -> 4275`, passed `4147 -> 4164`, while both sides retain identical `30 failed / 74 skipped / 18 warnings / 7 errors` and empty bidirectional failure/error test-ID differences. The normal desktop sidecar was left running and was not displaced by a competing branch process, so one post-review real-Gateway single-sidecar gate remains; this is not merged or LIVE. Slice 3 activity/journal remains pending.
 
 - **2026-07-14 (Portfolio 1.1 SLICE 2 PLAN REVIEW-CLEARED — implementation-ready, not started)**: Independent plan review verified the grounded backend/frontend seams and exact `+17/-0` backend, `+18/-0` frontend ledgers, then found one paired plan/test omission: the shipped Accounts status-grid would otherwise survive outside the new tabs with duplicate aggregate toggles and a mixed-account `Currency basis` summary that contradicts the approved manual-only aggregate. Task 6 now explicitly replaces that whole block with `PortfolioAccountSummary`, removes `currencySummary()`, and strengthens the existing toggle test to prove the old metric is absent and each fixture account has exactly one toggle; collection accounting is unchanged. The plan is implementation-ready. The currently approved sequencing interruption remains IBKR News Hotfix A followed by its bounded durable-body-retry plan; Portfolio Slice 2 product code has not started.
 

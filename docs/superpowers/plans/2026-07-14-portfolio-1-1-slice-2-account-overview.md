@@ -2,7 +2,64 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: REVIEW-CLEARED, 2026-07-14. IMPLEMENTATION AUTHORIZED BUT NOT STARTED.**
+> **Status: IMPLEMENTED FOR REVIEW, 2026-07-14. CODE + AUTOMATED/CANONICAL A/B + RESPONSIVE GATES PASS; SINGLE-SIDECAR LIVE GATE PENDING.**
+
+## Implementation Ledger
+
+- **Branch / commits:** `codex/portfolio-1-1-overview`; behavioral base
+  `a0daf69`; review-cleared branch base `bdf8946`; code head `3cbe753` before
+  this docs-only closeout.
+- **Task 1, observation read:** RED because no persisted latest-snapshot DTO
+  or bounded latest-per-account query existed; GREEN at `5a28515` with
+  `pytest tests/test_portfolio_observations.py -q` (`21 passed`).
+- **Task 2, authority reads:** RED because canonical per-account sync time and
+  exact-account totals helpers did not exist; GREEN at `c1bcd7a` with
+  `pytest tests/test_portfolio_state.py -q` (`29 passed`).
+- **Task 3, pure projection:** RED because `src.portfolio_overview` did not
+  exist; GREEN at `a727c2d` with seven projection tests covering safe labels,
+  manual-only totals, null/finite P&L, no-snapshot accounts, and timestamps.
+- **Task 4, additive route:** RED because `/portfolio/overview` did not exist;
+  GREEN at `0da2d5a` with route, real-app mount, fresh-profile, privacy, and
+  zero-Gateway-call coverage. The exact backend focused ledger became
+  `81 passed` (`64 + 17`).
+- **Task 5, account summary/details:** RED because the API DTO, client helper,
+  and component did not exist; GREEN at `08f4c8b` with ten component tests and
+  TypeScript passing.
+- **Task 6, Holdings integration:** RED because Holdings still rendered the
+  old Accounts/Currency-basis block, had no completed-tab hierarchy, and did
+  not isolate overview failure; GREEN at `3cbe753`. The old block and
+  `currencySummary()` are removed, every account has one aggregate toggle,
+  positions identify/filter safe account labels, and capture polling mounts
+  only under `同步紀錄`. Focused frontend: `4 files / 59 tests`; full frontend:
+  `44 files / 412 tests`; typecheck and production build pass (existing chunk
+  warning only).
+- **Fresh/static/smoke gates:** fresh schema + real-app mount + fresh overview
+  `3 passed`; order API, PostgreSQL, tool/research/prompt, target-file
+  `window.confirm`/`@media`, and rendered `活動` gates have zero matches;
+  capture/scheduler/tools/Settings owners are byte-identical to `a0daf69`;
+  no-PG smoke reports `ok: true` and `pg_attempts: []`.
+- **Responsive gate:** disposable scheduler-disabled sidecar and seeded local
+  profile passed DOM and screenshot inspection at `1440x900`, `1024x768`,
+  `961x768`, `959x768`, and `390x844`. All four accounts remained visible;
+  no overall-net-worth/raw-id/activity placeholder appeared; timestamps and
+  tabs were readable; summary preceded tabs; the details table owned overflow;
+  and page-level horizontal overflow was zero. Screenshots are disposable at
+  `/tmp/arkscope-p11-s2-*.png`; all temporary Vite/sidecar/Chrome processes
+  were stopped afterward.
+- **Canonical backend A/B:** clean detached worktrees, sequential single-process
+  pytest, base `a0daf69` versus code head `3cbe753`: `4258 -> 4275` cases and
+  `4147 -> 4164` passed, exactly `+17`; both sides have `30 failed / 74 skipped /
+  18 warnings / 7 errors`; parsed JUnit failure/error test-ID differences are
+  empty in both directions. Temporary A/B worktrees were removed.
+- **Naturally unverified:** the normal desktop app and its master-code sidecar
+  were already running against the real profile DB/Gateway. The branch did not
+  start a competing real-data sidecar or interrupt the user's app, so Task 7
+  Step 6 remains the post-review single-sidecar live gate. The provider-free
+  route, fake mixed-currency/multi-account behavior, privacy, and full UI
+  interaction matrix are verified; no LIVE claim is made.
+- **Plan deviations:** none in product scope. The review-cleared MF requiring
+  complete replacement of the legacy Accounts/Currency-basis block was applied
+  before implementation and is covered by explicit absence/cardinality tests.
 
 **Goal:** Add a truthful Holdings account overview that shows every visible IBKR account's latest captured values, keeps manual-account holdings separate, exposes broker and canonical timestamps, and moves the shipped capture controls into the final Holdings tab hierarchy without implementing Slice 3 activity.
 
