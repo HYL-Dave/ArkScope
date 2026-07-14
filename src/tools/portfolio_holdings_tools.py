@@ -26,16 +26,23 @@ def get_portfolio_holdings(
         included_only=account_id is None,
     )
     payload = asdict(snapshot)
-    payload["accounts"] = [
-        {
-            key: value
-            for key, value in asdict(account).items()
-            if key != "broker_account_id"
-        }
-        for account in snapshot.accounts
-    ]
+    payload["accounts"] = [_agent_account(account) for account in snapshot.accounts]
     payload["source"] = "local_profile"
     return payload
+
+
+def _agent_account(account: Any) -> dict[str, Any]:
+    row = asdict(account)
+    raw_id = row.pop("broker_account_id", None)
+    label = row.get("label")
+    account_hash = row.get("broker_account_id_hash")
+    if raw_id and label and raw_id in label:
+        row["label"] = (
+            f"{str(row.get('broker') or 'broker').upper()} · {str(account_hash)[:8]}"
+            if account_hash
+            else str(row.get("broker") or "Broker").upper()
+        )
+    return row
 
 
 def _profile_db_path() -> str:

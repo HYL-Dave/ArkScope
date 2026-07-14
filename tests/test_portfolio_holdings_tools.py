@@ -33,7 +33,9 @@ def test_get_portfolio_holdings_never_touches_ibkr(tmp_path, monkeypatch):
 def test_get_portfolio_holdings_redacts_raw_broker_account_id(tmp_path, monkeypatch):
     db = tmp_path / "profile_state.db"
     store = PortfolioStore(db)
-    account = store.upsert_broker_account("ibkr", "U7654321", "Primary IBKR")
+    account = store.upsert_broker_account(
+        "ibkr", "U7654321", "Legacy IBKR U7654321"
+    )
     store.apply_broker_positions(
         account_id=account.id,
         positions=[],
@@ -43,7 +45,8 @@ def test_get_portfolio_holdings_redacts_raw_broker_account_id(tmp_path, monkeypa
 
     out = get_portfolio_holdings()
 
-    assert out["accounts"][0]["label"] in {"Manual", "Primary IBKR"}
+    labels = {row["label"] for row in out["accounts"]}
+    assert labels == {"Manual", f"IBKR · {account.broker_account_id_hash[:8]}"}
     assert all("broker_account_id" not in row for row in out["accounts"])
     assert "U7654321" not in str(out)
 
