@@ -61,6 +61,27 @@
   complete replacement of the legacy Accounts/Currency-basis block was applied
   before implementation and is covered by explicit absence/cardinality tests.
 
+### Reviewer verification ✅ (Fable, 2026-07-14) — all reviewer gates closed
+
+Independent reviewer canonical A/B (virgin `git archive` of base `a0daf69`
+versus review head `73fc492`, sequential single-process full pytest, reviewer
+environment, no hang): both sides identical on the pre-existing family
+(`30 failed / 74 skipped / 18 warnings / 7 errors`); failure sets empty in both
+directions; passed `4147 -> 4164` = exactly **`+17`**, collect `+17/-0`. Work
+dir `/tmp/ab_p11s2_vzjl`. This independently confirms the implementation-side
+A/B numbers above. The reviewer also re-ran: frontend `44 files / 412 tests`
+PASS + typecheck + production build in the branch worktree; focused backend
+`81 passed`; all five Task 7 Step 3 static gates (zero matches, including the
+`活動` string gate) and the capture/tools/Settings byte-identity boundary
+(empty diff); and verified the plan-review must-fix landed (zero
+`currencySummary` / `Currency basis` remnants in `Holdings.tsx`, absence +
+exactly-one-toggle assertions at `Holdings.test.tsx:271/:595-596`). Projection
+spot-checks: deterministic `ROW_NUMBER` latest-rank SQL, `_safe_label`
+redaction, finite-only `daily_total_pnl`, capture panel mounted only under
+`同步紀錄`, sequential `/portfolio` -> `/portfolio/overview` load. The single
+remaining gate is the user-run single-sidecar live Gateway gate (Task 7
+Step 6), deliberately deferred so the running desktop app was not interrupted.
+
 **Goal:** Add a truthful Holdings account overview that shows every visible IBKR account's latest captured values, keeps manual-account holdings separate, exposes broker and canonical timestamps, and moves the shipped capture controls into the final Holdings tab hierarchy without implementing Slice 3 activity.
 
 **Architecture:** Add one provider-free read projection over the shipped `PortfolioStore` authority and `PortfolioObservationStore` observations, exposed through an additive `GET /portfolio/overview` route. The projection joins each non-archived account to its latest captured account snapshot and canonical position-sync time, reuses the existing Portfolio totals algorithm for included manual accounts, derives daily total P&L only when both provider legs exist, and never calls IBKR; it retains the pre-existing fresh-profile `ensure_manual_account` initialization already used by `GET /portfolio` rather than inventing a second initialization policy. The React Holdings surface loads `/portfolio` first and then the failure-isolated overview, avoiding a new concurrent fresh-profile Manual-shell race while keeping canonical positions usable when the additive overview is unavailable; it renders summary/details from one DTO and exposes only the three completed tabs, with Slice 3 inserting `活動` later at its locked position.
