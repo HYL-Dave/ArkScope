@@ -350,29 +350,36 @@ describe("PortfolioCapturePanel", () => {
       reads += 1;
       return reads === 1
         ? status({ latest_run: prior, recent_runs: [prior] })
-        : status({ running: false, latest_run: terminal, recent_runs: [terminal, prior] });
+        : status({
+          running: false,
+          next_due_at: "2026-07-14T05:45:00+00:00",
+          latest_run: terminal,
+          recent_runs: [terminal, prior],
+        });
     });
     await mount(changed);
 
-    const enabled = host!.querySelector<HTMLInputElement>('input[aria-label="啟用持倉同步排程"]')!;
+    const interval = host!.querySelector<HTMLInputElement>('input[aria-label="持倉同步間隔（分鐘）"]')!;
     const saveButton = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.includes("儲存排程"))!;
     await act(async () => {
-      enabled.click();
+      setInput(interval, "30");
       saveButton.click();
       await Promise.resolve();
       await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(changed).toHaveBeenCalledTimes(1);
+    const newerDue = host!.querySelector(".portfolio-capture-next")?.textContent;
 
     await act(async () => {
       resolveSave!(status({
         settings: {
-          enabled: false,
-          interval_minutes: 15,
+          enabled: true,
+          interval_minutes: 30,
           source: "database",
           provider_configured: true,
         },
+        next_due_at: "2026-07-14T05:20:00+00:00",
         running: true,
         latest_run: running,
         recent_runs: [running, prior],
@@ -383,7 +390,8 @@ describe("PortfolioCapturePanel", () => {
     expect(host!.querySelector('[data-state="running"]')).toBeNull();
     expect(Array.from(host!.querySelectorAll('[data-state="ready"]'))
       .some((badge) => badge.textContent?.includes("成功"))).toBe(true);
-    expect(host!.textContent).toContain("排程已停用");
+    expect(interval.value).toBe("30");
+    expect(host!.querySelector(".portfolio-capture-next")?.textContent).toBe(newerDue);
     expect(changed).toHaveBeenCalledTimes(1);
   });
 

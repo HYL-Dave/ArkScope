@@ -197,8 +197,6 @@ export function PortfolioCapturePanel({
     const merged = {
       ...current,
       settings: next.settings,
-      provider_issue: next.provider_issue,
-      next_due_at: next.next_due_at,
     };
     captureRef.current = merged;
     setCapture(merged);
