@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** ADOPTED DESIGN, WRITTEN REVIEW PENDING — 2026-07-14. Implementation has not started.
+> **Status:** APPROVED DESIGN, WRITTEN REVIEW GREEN — 2026-07-15. Hotfix A planning is authorized; implementation has not started. The durable-retry follow-up still requires its own reviewed plan.
 
 ## 1. Purpose
 
@@ -187,9 +187,10 @@ The follow-up must stop overloading one `partial` bit with two meanings:
 - **body backlog:** counts of due-now, scheduled-later, never-attempted, and the earliest next retry.
 
 A run that completed every currently eligible operation may be `succeeded` while reporting a
-nonzero scheduled-later backlog. A body request that failed during this run may make the run
-`partial`, with the backlog explaining the next retry. The UI presents both facts; it does not
-claim the scheduler is blocked.
+nonzero scheduled-later backlog. A body request that fails during this run makes the run
+`partial`, including a retryable 10172 that is durably scheduled for a later attempt; the backlog
+explains the next retry. A future-due backlog with no eligible body failure in this run does not
+downgrade a succeeded run. The UI presents both facts; it does not claim the scheduler is blocked.
 
 Manual `Run` respects `next_retry_at`. A force-retry command is out of scope because bypassing the
 six-hour policy can waste Gateway calls and undermine the bounded 10172 contract.
@@ -213,24 +214,26 @@ The reviewed implementation plan must include tests proving:
 
 1. a due body is attempted even when `fetch_headlines()` returns no article;
 2. a due body older than a synthetic 300-headline tail is still attempted;
-3. future-due rows are not attempted and do not by themselves mark the run partial;
-4. retry and fresh-headline budgets cannot starve each other;
-5. crash/restart reconstructs the same due queue from SQLite;
-6. third-10172 terminal behavior is unchanged;
-7. raw provider article IDs never cross sanitized stdout/API/log boundaries;
-8. existing market-writer and Gateway locks retain their order and timeout behavior;
-9. focused normalized-news/scheduler suites, no-PG smoke, and canonical backend A/B pass;
-10. a single-sidecar live gate observes a due retry or a controlled synthetic local row without
+3. an eligible body that receives retryable 10172 during this run deterministically marks the run
+   partial even though the next retry is durably scheduled;
+4. future-due rows are not attempted and do not by themselves mark the run partial;
+5. retry and fresh-headline budgets cannot starve each other;
+6. crash/restart reconstructs the same due queue from SQLite;
+7. third-10172 terminal behavior is unchanged;
+8. raw provider article IDs never cross sanitized stdout/API/log boundaries;
+9. existing market-writer and Gateway locks retain their order and timeout behavior;
+10. focused normalized-news/scheduler suites, no-PG smoke, and canonical backend A/B pass;
+11. a single-sidecar live gate observes a due retry or a controlled synthetic local row without
     exposing licensed content.
 
 ## 5. Sequencing
 
-1. Review this written design.
+1. Written review is complete.
 2. Open and execute the small Hotfix A implementation plan; stop review-ready and merge it
    independently.
 3. Open a separate durable-retry implementation plan immediately afterward.
-4. Resume Portfolio 1.1 Slice 2 implementation after this bounded news reliability interruption,
-   unless review finds that the durable-retry slice must be split further.
+4. Resume Portfolio 1.1 Slice 3 after this bounded news reliability interruption; Slice 2 is
+   already merged/live. Split the durable-retry work further first if its plan review requires it.
 
 Hotfix A is not evidence that body retry is reliable. Durable retry is not evidence that headlines
 missed before ArkScope observed them can be recovered.
