@@ -7,7 +7,7 @@ from src.portfolio_capture_types import (
     CaptureLegResult,
 )
 from src.portfolio_observations import PortfolioObservationStore
-from src.portfolio_overview import build_portfolio_overview
+from src.portfolio_overview import build_portfolio_overview, safe_portfolio_account_label
 from src.portfolio_state import BrokerPosition, PortfolioStore
 
 
@@ -230,4 +230,5 @@ def test_overview_redacts_legacy_label_that_contains_raw_broker_id(tmp_path):
     )
 
     assert row.label == f"IBKR · {account.broker_account_id_hash[:8]}"
+    assert safe_portfolio_account_label(account) == row.label
     assert "DU123" not in repr(row)

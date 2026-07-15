@@ -71,7 +71,7 @@ def build_portfolio_overview(
     rows = [
         PortfolioAccountOverviewRow(
             id=account.id,
-            label=_safe_label(account),
+            label=safe_portfolio_account_label(account),
             broker=account.broker,
             broker_account_id_hash=account.broker_account_id_hash,
             sync_mode=account.sync_mode,
@@ -91,7 +91,7 @@ def build_portfolio_overview(
     )
 
 
-def _safe_label(account: PortfolioAccount) -> str:
+def safe_portfolio_account_label(account: PortfolioAccount) -> str:
     raw_id = account.broker_account_id
     if raw_id and raw_id in account.label:
         if account.broker_account_id_hash:
