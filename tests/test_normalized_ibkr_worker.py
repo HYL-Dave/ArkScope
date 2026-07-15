@@ -1,16 +1,26 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import json
 import os
 from datetime import datetime
 import logging
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 from types import SimpleNamespace
 
 import pytest
+
+from src.news_normalized.models import (
+    ArticleCandidate,
+    BodyCandidate,
+    BodyRetryBacklog,
+    BodyRetrySelection,
+    BodyStatus,
+)
+from src.news_normalized.store import NormalizedNewsStore
 
 
 def test_ibkr_runtime_disconnects_after_worker_failure():
@@ -115,6 +125,9 @@ def test_ibkr_worker_prints_sanitized_json_without_provider_payload(
         "legacy_rows_inserted",
         "legacy_rows_updated",
         "projection_skipped_no_ticker",
+        "retry_bodies_attempted",
+        "retry_bodies_fetched",
+        "tickers_scanned",
         "error_count",
         "error_classes",
         "continuation",
@@ -214,6 +227,12 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
             events.append("store")
             self.conn = conn
 
+        def select_ibkr_body_retries(self, *, now, limit):
+            return BodyRetrySelection((), BodyRetryBacklog(0, 0, 0, None))
+
+        def summarize_ibkr_body_backlog(self, *, now):
+            return BodyRetryBacklog(0, 0, 0, None)
+
     @contextmanager
     def ibkr_lock():
         events.append("ibkr_enter")
@@ -252,6 +271,7 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
         ["AAPL"],
         max_articles=1,
         max_body_fetches=1,
+        max_retry_body_fetches=25,
         gateway_lock_held=False,
     )
 
@@ -321,6 +341,12 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
         def __init__(self, conn):
             self.conn = conn
 
+        def select_ibkr_body_retries(self, *, now, limit):
+            return BodyRetrySelection((), BodyRetryBacklog(0, 0, 0, None))
+
+        def summarize_ibkr_body_backlog(self, *, now):
+            return BodyRetryBacklog(0, 0, 0, None)
+
     def fake_write_news_batch(store, provider, tickers, budget, **kwargs):
         calls["kwargs"] = kwargs
         return {
@@ -347,6 +373,7 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
         ["AAPL"],
         max_articles=10,
         max_body_fetches=2,
+        max_retry_body_fetches=25,
         gateway_lock_held=True,
     )
 
@@ -378,3 +405,383 @@ def test_sanitize_worker_error_does_not_mark_generic_timeout_retryable():
     assert payload["error_classes"] == ["TimeoutError"]
     assert payload["retryable"] is False
     assert payload["error"] == ""
+
+
+class _WorkerSource:
+    def __init__(self, client_id=None):
+        self.client_id = client_id
+
+    def disconnect(self):
+        pass
+
+
+class _WorkerGateway:
+    def __init__(self, source):
+        self.source = source
+
+    def close(self):
+        self.source.disconnect()
+
+
+class _WorkerProvider:
+    source = "ibkr"
+
+    def __init__(self, rows_by_ticker=None, body_results=None):
+        self.rows_by_ticker = rows_by_ticker or {}
+        self.body_results = body_results or {}
+        self.events = []
+        self.body_calls = []
+
+    def operation(self):
+        return nullcontext()
+
+    def fetch_articles(self, ticker, since_iso):
+        self.events.append(("metadata", ticker))
+        return list(self.rows_by_ticker.get(ticker, ()))
+
+    def fetch_body(self, candidate):
+        local_key = candidate.provider_article_id
+        self.events.append(("body", local_key))
+        self.body_calls.append(local_key)
+        return self.body_results.get(
+            local_key,
+            BodyCandidate(
+                status=BodyStatus.FETCHED,
+                raw_body=f"body for {local_key}",
+                raw_format="text",
+            ),
+        )
+
+
+def _headline(label: str, *, body: BodyCandidate | None = None) -> ArticleCandidate:
+    return ArticleCandidate(
+        source="ibkr",
+        provider_article_id=f"DJ-N${label}",
+        title=f"Synthetic {label}",
+        publisher="DJ-N",
+        published_at="2026-07-15T10:00:00Z",
+        related_tickers=("AAPL",),
+        body=body or BodyCandidate(status=BodyStatus.PENDING),
+    )
+
+
+def _seed_body_row(
+    db_path,
+    label: str,
+    *,
+    status: str = "pending",
+    attempts: int = 0,
+    next_retry_at: str | None = None,
+) -> int:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    store = NormalizedNewsStore(conn)
+    article_id = store.upsert(_headline(label)).article_id
+    conn.execute(
+        "UPDATE news_article_bodies "
+        "SET body_status=?,fetch_attempts=?,next_retry_at=? WHERE article_id=?",
+        (status, attempts, next_retry_at, article_id),
+    )
+    conn.commit()
+    conn.close()
+    return article_id
+
+
+def _run_real_worker(
+    monkeypatch,
+    db_path,
+    provider,
+    *,
+    store_cls=NormalizedNewsStore,
+    max_articles=10,
+    max_body_fetches=10,
+    max_retry_body_fetches=25,
+):
+    from src.news_normalized import ibkr_cli as worker
+    from src.news_normalized import writer as writer_module
+
+    real_write = writer_module.write_news_batch
+
+    def write_without_legacy_projection(store, provider, tickers, budget, **kwargs):
+        kwargs["project_legacy"] = False
+        return real_write(store, provider, tickers, budget, **kwargs)
+
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _WorkerSource)
+    monkeypatch.setattr(
+        "src.news_normalized.ibkr_runtime.IBKRRuntimeGateway", _WorkerGateway
+    )
+    monkeypatch.setattr(
+        "src.news_normalized.ibkr_adapter.IBKRNormalizedProvider",
+        lambda gateway, acquire_gateway_lock: provider,
+    )
+    monkeypatch.setattr("src.news_normalized.store.NormalizedNewsStore", store_cls)
+    monkeypatch.setattr(
+        "src.news_normalized.writer.write_news_batch", write_without_legacy_projection
+    )
+    monkeypatch.setattr(
+        "src.market_data_admin.resolve_market_db_path", lambda: str(db_path)
+    )
+    monkeypatch.setattr(
+        "src.market_data_direct.market_write_lock", lambda: nullcontext()
+    )
+    return worker._run_worker(
+        ["AAPL"],
+        max_articles=max_articles,
+        max_body_fetches=max_body_fetches,
+        max_retry_body_fetches=max_retry_body_fetches,
+        gateway_lock_held=True,
+    )
+
+
+def test_ibkr_worker_accepts_separate_nonnegative_retry_budget():
+    from src.news_normalized import ibkr_cli as worker
+
+    args = worker.parse_args(
+        ["--tickers", "AAPL", "--max-retry-body-fetches", "0"]
+    )
+
+    assert args.max_retry_body_fetches == 0
+
+
+def test_ibkr_worker_rejects_negative_retry_budget(capsys):
+    from src.news_normalized import ibkr_cli as worker
+
+    with pytest.raises(SystemExit) as caught:
+        worker.parse_args(
+            ["--tickers", "AAPL", "--max-retry-body-fetches", "-1"]
+        )
+
+    assert caught.value.code == 2
+    assert "budgets must be non-negative" in capsys.readouterr().err
+
+
+def test_worker_selects_due_bodies_and_passes_local_ids_separately(
+    monkeypatch,
+):
+    from src.news_normalized import ibkr_cli as worker
+    from src.news_normalized.models import WriterResult
+
+    calls = {}
+
+    class Store:
+        def __init__(self, conn):
+            self.conn = conn
+
+        def select_ibkr_body_retries(self, *, now, limit):
+            calls["selection_limit"] = limit
+            return BodyRetrySelection(
+                article_ids=(41, 42),
+                backlog=BodyRetryBacklog(2, 0, 2, None),
+            )
+
+        def summarize_ibkr_body_backlog(self, *, now):
+            return BodyRetryBacklog(0, 0, 0, None)
+
+    def fake_write(store, provider, tickers, budget, **kwargs):
+        calls["retry_body_ids"] = kwargs["retry_body_ids"]
+        calls["tickers"] = tuple(tickers)
+        return WriterResult("succeeded", 0, 0, 0, {}, None)
+
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _WorkerSource)
+    monkeypatch.setattr(
+        "src.news_normalized.ibkr_runtime.IBKRRuntimeGateway", _WorkerGateway
+    )
+    monkeypatch.setattr(
+        "src.news_normalized.ibkr_adapter.IBKRNormalizedProvider",
+        lambda gateway, acquire_gateway_lock: _WorkerProvider(),
+    )
+    monkeypatch.setattr("src.news_normalized.store.NormalizedNewsStore", Store)
+    monkeypatch.setattr("src.news_normalized.writer.write_news_batch", fake_write)
+    monkeypatch.setattr("src.market_data_admin.resolve_market_db_path", lambda: ":memory:")
+    monkeypatch.setattr(
+        "src.market_data_direct.market_write_lock", lambda: nullcontext()
+    )
+
+    result = worker._run_worker(
+        ["AAPL"],
+        max_articles=10,
+        max_body_fetches=10,
+        max_retry_body_fetches=2,
+        gateway_lock_held=True,
+    )
+
+    assert calls == {
+        "selection_limit": 2,
+        "retry_body_ids": (41, 42),
+        "tickers": ("AAPL",),
+    }
+    assert result["body_backlog"]["status"] == "ok"
+
+
+def test_due_body_older_than_three_hundred_headlines_is_still_attempted(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "market_data.db"
+    _seed_body_row(db_path, "old-due")
+    provider = _WorkerProvider(
+        {"AAPL": [_headline(f"new-{index:03d}") for index in range(300)]}
+    )
+
+    result = _run_real_worker(
+        monkeypatch,
+        db_path,
+        provider,
+        max_articles=300,
+        max_body_fetches=0,
+        max_retry_body_fetches=1,
+    )
+
+    assert provider.events[0] == ("body", "DJ-N$old-due")
+    assert provider.events[1] == ("metadata", "AAPL")
+    assert result["retry_bodies_attempted"] == 1
+    assert result["articles_seen"] == 300
+
+
+def test_retry_queue_query_failure_keeps_fresh_scan_and_marks_partial(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "market_data.db"
+
+    class SelectionFailureStore(NormalizedNewsStore):
+        def select_ibkr_body_retries(self, *, now, limit):
+            raise sqlite3.OperationalError("queue read failed")
+
+    provider = _WorkerProvider({"AAPL": [_headline("fresh")]})
+
+    result = _run_real_worker(
+        monkeypatch,
+        db_path,
+        provider,
+        store_cls=SelectionFailureStore,
+        max_body_fetches=1,
+    )
+
+    assert ("metadata", "AAPL") in provider.events
+    assert result["retry_status"] == "failed"
+    assert result["fresh_status"] == "succeeded"
+    assert result["status"] == "partial"
+
+
+def test_post_run_backlog_failure_is_unavailable_not_zero(tmp_path, monkeypatch):
+    db_path = tmp_path / "market_data.db"
+
+    class SummaryFailureStore(NormalizedNewsStore):
+        def summarize_ibkr_body_backlog(self, *, now):
+            raise sqlite3.OperationalError("summary read failed")
+
+    result = _run_real_worker(
+        monkeypatch,
+        db_path,
+        _WorkerProvider({"AAPL": []}),
+        store_cls=SummaryFailureStore,
+    )
+
+    assert result["status"] == "partial"
+    assert result["retry_status"] == "failed"
+    assert result["fresh_status"] == "succeeded"
+    assert result["body_backlog"] == {"status": "unavailable"}
+
+
+def test_future_due_backlog_keeps_worker_succeeded(tmp_path, monkeypatch):
+    db_path = tmp_path / "market_data.db"
+    _seed_body_row(
+        db_path,
+        "future",
+        status="failed",
+        attempts=1,
+        next_retry_at="2099-01-01T00:00:00Z",
+    )
+    provider = _WorkerProvider({"AAPL": []})
+
+    result = _run_real_worker(monkeypatch, db_path, provider)
+
+    assert provider.body_calls == []
+    assert result["status"] == "succeeded"
+    assert result["body_backlog"]["scheduled_later"] == 1
+
+
+def test_retryable_10172_reports_partial_and_scheduled_backlog(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "market_data.db"
+    _seed_body_row(db_path, "retry-10172")
+    provider = _WorkerProvider(
+        {"AAPL": []},
+        {
+            "DJ-N$retry-10172": BodyCandidate(
+                status=BodyStatus.FAILED,
+                error="IBKR news article unavailable (10172)",
+                error_code=10172,
+            )
+        },
+    )
+    monkeypatch.setattr(
+        "src.news_normalized.store._now", lambda: "2099-01-01T00:00:00Z"
+    )
+
+    result = _run_real_worker(monkeypatch, db_path, provider)
+
+    assert result["status"] == "partial"
+    assert result["retry_status"] == "partial"
+    assert result["fresh_status"] == "succeeded"
+    assert result["body_backlog"]["scheduled_later"] == 1
+
+
+def test_retry_and_fresh_limits_are_independent(tmp_path, monkeypatch):
+    db_path = tmp_path / "market_data.db"
+    _seed_body_row(db_path, "old")
+    provider = _WorkerProvider(
+        {"AAPL": [_headline("fresh-1"), _headline("fresh-2")]}
+    )
+
+    result = _run_real_worker(
+        monkeypatch,
+        db_path,
+        provider,
+        max_articles=2,
+        max_body_fetches=1,
+        max_retry_body_fetches=1,
+    )
+
+    assert provider.body_calls == ["DJ-N$old", "DJ-N$fresh-1"]
+    assert result["retry_bodies_attempted"] == 1
+    assert result["retry_bodies_fetched"] == 1
+    assert result["bodies_fetched"] == 2
+    assert result["fresh_status"] == "partial"
+
+
+def test_sanitized_retry_result_contains_no_provider_ids_or_body_content():
+    from src.news_normalized.ibkr_cli import sanitize_worker_result
+
+    provider_id = "DJ-N$private"
+    licensed_body = "licensed body text"
+    payload = sanitize_worker_result(
+        {
+            "status": "partial",
+            "articles_seen": 1,
+            "articles_inserted": 0,
+            "bodies_fetched": 0,
+            "retry_bodies_attempted": 1,
+            "retry_bodies_fetched": 0,
+            "tickers_scanned": 1,
+            "retry_status": "partial",
+            "fresh_status": "succeeded",
+            "errors": {f"retry:{provider_id}": licensed_body},
+            "body_backlog": {
+                "status": "ok",
+                "due_now": 0,
+                "scheduled_later": 1,
+                "never_attempted": 0,
+                "earliest_next_retry_at": "2026-07-15T12:00:00Z",
+            },
+        }
+    )
+
+    rendered = json.dumps(payload, sort_keys=True)
+    assert payload["legs"] == {"retry": "partial", "fresh": "succeeded"}
+    assert payload["body_backlog"]["scheduled_later"] == 1
+    assert provider_id not in rendered
+    assert licensed_body not in rendered
