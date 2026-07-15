@@ -2,7 +2,103 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN REVIEW PENDING; IMPLEMENTATION NOT STARTED.**
+> **Status: IMPLEMENTED FOR REVIEW. CODE, AUTOMATED, RESPONSIVE, PRIVACY,
+> FRESH-PROFILE, NO-PG, AND CANONICAL A/B GATES PASS. COPIED-PROFILE
+> PROVIDER-FREE LIVE GATES PASS; THE FRESH SUCCESSFUL CAPTURE/RERUN SUBGATE IS
+> DEFERRED BECAUSE THE EXTERNAL IBKR API HANDSHAKE REMAINED UNAVAILABLE DURING
+> AND AFTER THE 2026-07-16 APAC RESET WINDOW.**
+
+## Implementation Ledger
+
+- **Branch / commits:** `codex/portfolio-1-1-activity`; behavioral A/B base
+  `c5cd91f`; branch base and plan commit `b657349`; code head `0709bed` before
+  this evidence-only closeout. Tasks landed as `8830b9a` (annotation
+  foundation), `cce9482` (broker projection), `42706a7` + `3d05600` (complete
+  projection and identity/cursor hardening), `54bb484` + `e9b8d65` (API plus
+  case-insensitive account-label privacy), `fc7e3a0` + `595c417` (activity UI
+  plus truth/focus hardening), and `94c72fa` + `0709bed` (navigation/recent
+  integration plus refresh semantics). Merge, spec/map LIVE status, and
+  worktree cleanup remain unperformed.
+- **Tasks 1-4, backend RED -> GREEN:** Task 1 began with no activity module,
+  annotation table, or safe public label helper. Task 2 began with no
+  correction-aware broker projection. Task 3 began with no manual/unmatched/
+  coverage projection, filters, or cursor. Task 4 began with no mounted
+  provider-free activity API. The final focused backend command over activity,
+  routes, Portfolio authority, observations, and capture routes reports
+  **`115 passed`**. Review fixes additionally pin local/account-scoped marker
+  identities, deterministic cursors, case-insensitive legacy raw-label
+  redaction, and typed storage failures.
+- **Tasks 5-6, frontend RED -> GREEN:** the activity DTO, ET-first formatter,
+  activity/recent components, four-tab hierarchy, and contextual layout did
+  not exist at RED. The final focused frontend ledger is **`6 files / 83
+  tests`**; the full frontend is **`46 files / 450 tests`**. TypeScript
+  typecheck and the production build pass, with only the pre-existing Vite
+  chunk-size warning. Review fixes pin failed-page cursor truth, commission
+  currency display, nested Drawer/ConfirmDialog focus, correction lineage,
+  unmatched timestamp domain, synchronous refresh invalidation, and
+  note-only refresh exclusion.
+- **Static/privacy/fresh gates:** order APIs, PostgreSQL terms, target-file
+  `window.confirm`/`@media`, agent/tool registration, and duplicate Settings
+  ownership all return zero matches. A fresh temporary profile adds exactly
+  `portfolio_activity_annotations`, keeps accounts `0 -> 0`, returns zero
+  items, mounts the route, and gives the annotation FK `RESTRICT` rather than
+  `CASCADE`. The no-PG smoke reports `ok: true` and `pg_attempts: []`. Focused
+  serialization/error/tool/capture probes all keep the real raw broker account
+  id absent.
+- **Responsive/interaction gate:** a disposable scheduler-disabled sidecar,
+  Vite process, and seeded profile passed DOM plus screenshot checks at
+  `1440x900`, `1024x768`, `961x768`, `959x768`, and `390x844`. The tab order is
+  exactly `持倉 / 活動 / 帳戶明細 / 同步紀錄`, including ArrowRight/ArrowLeft
+  keyboard navigation. The activity DataTable owns horizontal overflow while
+  the page does not; broker executions show ET first; expanded correction,
+  commission, manual, unmatched, and gap rows do not overlap; nested
+  ConfirmDialog Escape closes only the top overlay and restores focus before
+  the Drawer closes; and the recent panel renders only with real content at
+  `961+`, reserving no width at `959` or mobile. Fixture screenshots remain
+  disposable under `/tmp/arkscope-p11-s3-*.png`.
+- **Canonical backend A/B:** clean detached worktrees, sequential
+  single-process pytest, base `c5cd91f` versus code head `0709bed`: collected
+  **`4302 -> 4335`**, exactly **`+33/-0`**; passed **`4191 -> 4224`**; both
+  sides have **`30 failed / 74 skipped / 18 warnings / 7 errors`**. Parsed
+  pytest node IDs show exactly the 33 planned activity tests and no removal;
+  parsed JUnit failure and error sets have empty differences in both
+  directions. Both temporary A/B worktrees were removed; their only generated
+  untracked file was pytest's 73-byte risk-free-rate cache.
+- **Copied-profile provider-free live gate:** the normal app/sidecar was
+  closed before a scheduler-disabled branch sidecar used an SQLite backup of
+  the real profile. Existing captured facts rendered two natural current-day
+  broker order groups, unmatched observations, history-start, and explicit
+  coverage gaps without a raw account id. A disposable Manual position was
+  created, updated, and soft-closed through the real API; the activity feed
+  returned exactly `close / update / create`, historical field changes, and
+  no execution price, commission, or realized-P&L claim. Saving and clearing
+  one intent annotation restored the annotation row count and left SHA-256
+  digests of all nine broker/manual fact tables byte-identical.
+- **Copied-profile real-data browser gate:** at `1440x900`, the wide recent
+  panel showed only real rows and navigated to the full activity surface. The
+  activity page rendered 16 real/copied rows, the exact four tabs, ET-first
+  broker timestamps, local-first manual/system timestamps, history-start and
+  coverage-gap language, no page overflow, and no raw-account-id pattern. The
+  only fabricated live-gate entity was the disposable `ZZLIVE` Manual
+  position; no broker trade, commission, correction, or second account was
+  manufactured.
+- **External live subgate deferral:** copied-profile manual capture runs `123`
+  and `124` were accepted but failed all three legs with the typed
+  `ibkr_connection_failed` result and zero provider rows written. DB and the
+  main `config/.env` matched exactly for IBKR host, port, and client-id base;
+  TCP connected, but the official `API\0` version handshake returned zero
+  bytes until timeout. The first failures occurred during IBKR's published
+  APAC reset window (`04:45-06:05 HKT`); isolated handshakes at 06:16 and again
+  at 07:24 remained unavailable. No product fix was attempted because failure
+  precedes ArkScope client-id, account-summary, execution, or projection logic. The
+  still-pending subgate is: after IBKR API service recovers, run two successful
+  captures against a fresh copy and prove run history advances while execution
+  and logical order cardinality remain unchanged.
+- **Cleanup / scope:** disposable Vite and sidecar processes were stopped.
+  Product scope did not add Gateway reads, schedulers, Settings controls,
+  agents/tools/prompts, PostgreSQL paths, or order APIs. The authority spec and
+  priority map deliberately remain pre-LIVE pending independent review and the
+  deferred successful-capture subgate.
 
 **Goal:** Complete Portfolio 1.1 with a truthful Holdings activity view over captured broker facts and manual-adjustment journals, user-owned intent annotations, explicit coverage gaps, and a responsive recent-activity summary without changing capture or canonical-position authority.
 
