@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import math
 import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from typing import Collection, Literal, get_args
+from typing import Any, Collection, Literal, TypeAlias, get_args
 from zoneinfo import ZoneInfo
 
 from src.portfolio_observations import PortfolioObservationStore
@@ -188,6 +191,87 @@ class BrokerActivityItem:
 
 
 @dataclass(frozen=True)
+class UnmatchedActivityItem:
+    id: str
+    kind: Literal["unmatched"]
+    occurred_at_utc: str
+    account: ActivityAccount
+    symbol: str | None
+    asset_class: str | None
+    currency: str | None
+    source: Literal["broker"]
+    state: Literal["unmatched"]
+    annotation: ActivityAnnotation | None
+    from_run_id: int
+    to_run_id: int
+    from_as_of_utc: str
+    to_as_of_utc: str
+    before_quantity: float
+    after_quantity: float
+    expected_quantity: float
+    residual_quantity: float
+    execution_coverage: Literal["complete", "incomplete", "gap"]
+    reason_code: str
+
+
+@dataclass(frozen=True)
+class ActivityFieldChange:
+    field: str
+    before: Any
+    after: Any
+
+
+@dataclass(frozen=True)
+class ManualActivityItem:
+    id: str
+    kind: Literal["manual_adjustment"]
+    occurred_at_utc: str
+    account: ActivityAccount
+    symbol: str
+    source: Literal["manual"]
+    state: Literal["manual_adjustment"]
+    annotation: ActivityAnnotation | None
+    position_id: int
+    action: Literal["create", "update", "close"]
+    changes: list[ActivityFieldChange]
+
+
+@dataclass(frozen=True)
+class CoverageGapItem:
+    id: str
+    kind: Literal["coverage_gap"]
+    occurred_at_utc: str
+    account: ActivityAccount | None
+    source: Literal["system"]
+    state: Literal["coverage_gap"]
+    from_run_id: int | None
+    to_run_id: int
+    from_as_of_utc: str | None
+    to_as_of_utc: str
+    reason_code: Literal["execution_leg_incomplete", "broker_day_gap"]
+
+
+@dataclass(frozen=True)
+class HistoryStartItem:
+    id: str
+    kind: Literal["history_start"]
+    occurred_at_utc: str
+    account: ActivityAccount
+    source: Literal["system"]
+    state: Literal["history_start"]
+    capture_run_id: int
+
+
+PortfolioActivityItem: TypeAlias = (
+    BrokerActivityItem
+    | UnmatchedActivityItem
+    | ManualActivityItem
+    | CoverageGapItem
+    | HistoryStartItem
+)
+
+
+@dataclass(frozen=True)
 class ActivitySummary:
     item_count: int
     unmatched_count: int
@@ -198,7 +282,7 @@ class ActivitySummary:
 class PortfolioActivityPage:
     accounts: list[ActivityAccount]
     history_started_at_utc: str | None
-    items: list[BrokerActivityItem]
+    items: list[PortfolioActivityItem]
     summary: ActivitySummary
     next_cursor: str | None
 
@@ -484,6 +568,85 @@ def _normalized_note(note: str) -> str:
     return note.strip()
 
 
+@dataclass(frozen=True)
+class _ActivityCursor:
+    occurred_at_utc: str
+    activity_id: str
+
+
+@dataclass(frozen=True)
+class _NormalizedActivityFilters:
+    date_from_utc: str | None
+    date_to_utc: str | None
+    account_id: int | None
+    symbol: str | None
+    source: ActivitySource | None
+    state: ActivityState | None
+    recent: bool
+    limit: int
+    cursor: _ActivityCursor | None
+
+
+def _parse_utc_datetime(value: str, field: str) -> datetime:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field} must be an ISO timestamp")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError(f"{field} must be an ISO timestamp") from None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field} must include a UTC offset")
+    return parsed
+
+
+def _decode_cursor(value: str) -> _ActivityCursor:
+    if not isinstance(value, str) or not value or "=" in value:
+        raise ValueError("invalid activity cursor")
+    try:
+        encoded = value.encode("ascii")
+        padding = b"=" * ((4 - len(encoded) % 4) % 4)
+        raw = base64.b64decode(encoded + padding, altchars=b"-_", validate=True)
+
+        def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ValueError("duplicate cursor key")
+                result[key] = item
+            return result
+
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
+    except (binascii.Error, UnicodeError, json.JSONDecodeError, ValueError):
+        raise ValueError("invalid activity cursor") from None
+    if not isinstance(payload, dict) or set(payload) != {
+        "occurred_at_utc",
+        "activity_id",
+    }:
+        raise ValueError("invalid activity cursor")
+    occurred_at = payload["occurred_at_utc"]
+    activity_id = payload["activity_id"]
+    if not isinstance(activity_id, str) or not activity_id:
+        raise ValueError("invalid activity cursor")
+    _parse_utc_datetime(occurred_at, "cursor occurred_at_utc")
+    return _ActivityCursor(occurred_at, activity_id)
+
+
+def _encode_cursor(item: PortfolioActivityItem) -> str:
+    payload = {"occurred_at_utc": item.occurred_at_utc, "activity_id": item.id}
+    return base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+
+
+def _et_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).astimezone(_EASTERN).date().isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
 class PortfolioActivityStore:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -501,6 +664,7 @@ class PortfolioActivityStore:
             pass
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA foreign_keys=ON")
+        conn.create_function("portfolio_et_date", 1, _et_date, deterministic=True)
         return conn
 
     def _ensure_schema(self) -> None:
@@ -510,72 +674,129 @@ class PortfolioActivityStore:
     def list_activity(
         self, filters: ActivityFilters, *, now_utc: datetime | None = None
     ) -> PortfolioActivityPage:
-        if not isinstance(filters.limit, int) or not 1 <= filters.limit <= 200:
-            raise ValueError("activity limit must be between 1 and 200")
-        if filters.cursor is not None:
-            raise ValueError("activity cursors are implemented in Task 3")
-        if filters.recent and (filters.date_from_et or filters.date_to_et):
-            raise ValueError("recent cannot be combined with explicit dates")
-
-        date_from_utc, date_to_utc = self._time_bounds(filters, now_utc)
-        conditions = ["(? IS NULL OR ?='broker')"]
-        params: list[object] = [
-            filters.symbol or "",
-            filters.account_id,
-            filters.account_id,
-            filters.source,
-            filters.source,
-        ]
-        if filters.symbol:
-            conditions.append("symbol_matches=1")
-        if date_from_utc:
-            conditions.append("occurred_at_utc >= ?")
-            params.append(date_from_utc)
-        if date_to_utc:
-            conditions.append("occurred_at_utc < ?")
-            params.append(date_to_utc)
-        if filters.state:
-            conditions.append("state=?")
-            params.append(filters.state)
-        query = (
-            _BROKER_HEADER_CTE
-            + " SELECT * FROM classified_header WHERE "
-            + " AND ".join(conditions)
-            + " ORDER BY occurred_at_utc DESC, activity_id DESC LIMIT ?"
-        )
-        params.append(filters.limit + 1)
-
+        normalized = self._normalize_filters(filters, now_utc)
         with self._connect() as conn:
-            header_rows = list(conn.execute(query, params))
-            selected_headers = header_rows[: filters.limit]
             account_map = self._activity_accounts()
-            if not selected_headers:
-                items: list[BrokerActivityItem] = []
-            else:
-                fills_by_activity = self._load_selected_fills(
-                    conn, [row["activity_id"] for row in selected_headers]
+            headers = [
+                *self._broker_headers(conn, normalized),
+                *self._manual_headers(conn, normalized),
+                *self._unmatched_headers(conn, normalized),
+                *self._coverage_gap_headers(conn, normalized),
+                *self._history_headers(conn, normalized),
+            ]
+            headers.sort(
+                key=lambda row: (row["occurred_at_utc"], row["activity_id"]),
+                reverse=True,
+            )
+            if normalized.cursor is not None:
+                cursor_key = (
+                    normalized.cursor.occurred_at_utc,
+                    normalized.cursor.activity_id,
                 )
-                items = [
-                    self._broker_item(
-                        conn,
-                        header,
-                        account_map[int(header["portfolio_account_id"])],
-                        fills_by_activity[header["activity_id"]],
-                    )
-                    for header in selected_headers
+                headers = [
+                    row
+                    for row in headers
+                    if (row["occurred_at_utc"], row["activity_id"]) < cursor_key
                 ]
+            selected_headers = headers[: normalized.limit]
+            broker_headers = [
+                row for row in selected_headers if row["projection"] == "broker"
+            ]
+            manual_headers = [
+                row for row in selected_headers if row["projection"] == "manual"
+            ]
+            unmatched_headers = [
+                row for row in selected_headers if row["projection"] == "unmatched"
+            ]
+            if broker_headers:
+                fills_by_activity = self._load_selected_fills(
+                    conn, [row["activity_id"] for row in broker_headers]
+                )
+            else:
+                fills_by_activity = {}
+            manual_changes = self._load_manual_changes(
+                conn, [int(row["local_id"]) for row in manual_headers]
+            )
+            annotations = self._load_selected_annotations(
+                conn, manual_headers + unmatched_headers
+            )
+            items = [
+                self._item_from_header(
+                    conn,
+                    header,
+                    account_map,
+                    fills_by_activity,
+                    manual_changes,
+                    annotations,
+                )
+                for header in selected_headers
+            ]
 
         accounts = list(account_map.values())
         return PortfolioActivityPage(
             accounts=accounts,
-            history_started_at_utc=None,
+            history_started_at_utc=self._history_started_at(normalized),
             items=items,
             summary=ActivitySummary(
                 item_count=len(items),
-                unmatched_count=0,
-                recent_window_days=7 if filters.recent else None,
+                unmatched_count=self._unmatched_count(normalized),
+                recent_window_days=7 if normalized.recent else None,
             ),
-            next_cursor=None,
+            next_cursor=(
+                _encode_cursor(items[-1])
+                if items and len(headers) > normalized.limit
+                else None
+            ),
+        )
+
+    @classmethod
+    def _normalize_filters(
+        cls, filters: ActivityFilters, now_utc: datetime | None
+    ) -> _NormalizedActivityFilters:
+        if not isinstance(filters, ActivityFilters):
+            raise ValueError("activity filters are required")
+        if isinstance(filters.limit, bool) or not isinstance(filters.limit, int):
+            raise ValueError("activity limit must be between 1 and 200")
+        if not 1 <= filters.limit <= 200:
+            raise ValueError("activity limit must be between 1 and 200")
+        if filters.source is not None and filters.source not in get_args(ActivitySource):
+            raise ValueError("unsupported activity source")
+        if filters.state is not None and filters.state not in get_args(ActivityState):
+            raise ValueError("unsupported activity state")
+        if filters.account_id is not None and (
+            isinstance(filters.account_id, bool)
+            or not isinstance(filters.account_id, int)
+            or filters.account_id <= 0
+        ):
+            raise ValueError("account_id must be a positive integer")
+        if not isinstance(filters.recent, bool):
+            raise ValueError("recent must be boolean")
+        if filters.recent and (
+            filters.date_from_et is not None or filters.date_to_et is not None
+        ):
+            raise ValueError("recent cannot be combined with explicit dates")
+        if now_utc is not None:
+            if not isinstance(now_utc, datetime):
+                raise ValueError("now_utc must be a datetime or None")
+            if now_utc.tzinfo is None or now_utc.utcoffset() is None:
+                raise ValueError("now_utc must include a UTC offset")
+        symbol = None
+        if filters.symbol is not None:
+            if not isinstance(filters.symbol, str) or not filters.symbol.strip():
+                raise ValueError("symbol must be non-empty text")
+            symbol = filters.symbol.strip().upper()
+
+        date_from_utc, date_to_utc = cls._time_bounds(filters, now_utc)
+        return _NormalizedActivityFilters(
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
+            account_id=filters.account_id,
+            symbol=symbol,
+            source=filters.source,
+            state=filters.state,
+            recent=filters.recent,
+            limit=filters.limit,
+            cursor=_decode_cursor(filters.cursor) if filters.cursor is not None else None,
         )
 
     @staticmethod
@@ -583,25 +804,28 @@ class PortfolioActivityStore:
         filters: ActivityFilters, now_utc: datetime | None
     ) -> tuple[str | None, str | None]:
         def parse(value: str, field: str) -> date:
+            if not isinstance(value, str) or len(value) != 10:
+                raise ValueError(f"{field} must use YYYY-MM-DD")
             try:
-                return date.fromisoformat(value)
-            except (TypeError, ValueError):
+                parsed = date.fromisoformat(value)
+            except ValueError:
                 raise ValueError(f"{field} must use YYYY-MM-DD") from None
+            if parsed.isoformat() != value:
+                raise ValueError(f"{field} must use YYYY-MM-DD")
+            return parsed
 
         start_date = (
             parse(filters.date_from_et, "date_from_et")
-            if filters.date_from_et
+            if filters.date_from_et is not None
             else None
         )
         end_date = (
             parse(filters.date_to_et, "date_to_et")
-            if filters.date_to_et
+            if filters.date_to_et is not None
             else None
         )
         if filters.recent:
             current = now_utc or datetime.now(timezone.utc)
-            if current.tzinfo is None:
-                current = current.replace(tzinfo=timezone.utc)
             end_date = current.astimezone(_EASTERN).date()
             start_date = end_date - timedelta(days=6)
         if start_date and end_date and start_date > end_date:
@@ -623,6 +847,380 @@ class PortfolioActivityStore:
         )
         return start, end
 
+    @staticmethod
+    def _bounded_headers(
+        conn: sqlite3.Connection,
+        select_sql: str,
+        conditions: list[str],
+        params: list[object],
+        filters: _NormalizedActivityFilters,
+    ) -> list[dict[str, Any]]:
+        if filters.date_from_utc is not None:
+            conditions.append("occurred_at_utc >= ?")
+            params.append(filters.date_from_utc)
+        if filters.date_to_utc is not None:
+            conditions.append("occurred_at_utc < ?")
+            params.append(filters.date_to_utc)
+        if filters.cursor is not None:
+            conditions.append(
+                "(occurred_at_utc < ? OR "
+                "(occurred_at_utc = ? AND activity_id < ?))"
+            )
+            params.extend(
+                [
+                    filters.cursor.occurred_at_utc,
+                    filters.cursor.occurred_at_utc,
+                    filters.cursor.activity_id,
+                ]
+            )
+        params.append(filters.limit + 1)
+        rows = conn.execute(
+            select_sql
+            + " WHERE "
+            + " AND ".join(conditions or ["1=1"])
+            + " ORDER BY occurred_at_utc DESC, activity_id DESC LIMIT ?",
+            params,
+        )
+        return [dict(row) for row in rows]
+
+    def _broker_headers(
+        self, conn: sqlite3.Connection, filters: _NormalizedActivityFilters
+    ) -> list[dict[str, Any]]:
+        broker_states = {
+            "realized_gain",
+            "realized_loss",
+            "realized_flat",
+            "outcome_unknown",
+        }
+        if filters.source not in {None, "broker"}:
+            return []
+        if filters.state is not None and filters.state not in broker_states:
+            return []
+        conditions: list[str] = []
+        params: list[object] = [
+            filters.symbol or "",
+            filters.account_id,
+            filters.account_id,
+        ]
+        if filters.symbol is not None:
+            conditions.append("symbol_matches=1")
+        if filters.state is not None:
+            conditions.append("state=?")
+            params.append(filters.state)
+        return self._bounded_headers(
+            conn,
+            _BROKER_HEADER_CTE
+            + " SELECT classified_header.*, 'broker' AS projection, "
+            + "NULL AS local_id FROM classified_header",
+            conditions,
+            params,
+            filters,
+        )
+
+    def _manual_headers(
+        self, conn: sqlite3.Connection, filters: _NormalizedActivityFilters
+    ) -> list[dict[str, Any]]:
+        if filters.source not in {None, "manual"}:
+            return []
+        if filters.state not in {None, "manual_adjustment"}:
+            return []
+        conditions: list[str] = []
+        params: list[object] = []
+        if filters.account_id is not None:
+            conditions.append("portfolio_account_id=?")
+            params.append(filters.account_id)
+        if filters.symbol is not None:
+            conditions.append("UPPER(symbol)=?")
+            params.append(filters.symbol)
+        sql = """
+        WITH manual_header AS (
+            SELECT a.id AS local_id,
+                   'manual:' || a.id AS activity_id,
+                   a.occurred_at_utc,
+                   a.account_id AS portfolio_account_id,
+                   a.position_id,
+                   a.action,
+                   COALESCE(
+                     (
+                       SELECT json_extract(c2.after_json, '$')
+                       FROM portfolio_manual_adjustments a2
+                       JOIN portfolio_manual_adjustment_changes c2
+                         ON c2.adjustment_id=a2.id AND c2.field='symbol'
+                       WHERE a2.position_id=a.position_id AND a2.id<=a.id
+                       ORDER BY a2.id DESC LIMIT 1
+                     ),
+                     p.symbol
+                   ) AS symbol,
+                   'manual' AS projection
+            FROM portfolio_manual_adjustments a
+            JOIN portfolio_positions p ON p.id=a.position_id
+        )
+        SELECT * FROM manual_header
+        """
+        return self._bounded_headers(conn, sql, conditions, params, filters)
+
+    def _unmatched_headers(
+        self, conn: sqlite3.Connection, filters: _NormalizedActivityFilters
+    ) -> list[dict[str, Any]]:
+        if filters.source not in {None, "broker"}:
+            return []
+        if filters.state not in {None, "unmatched"}:
+            return []
+        conditions: list[str] = []
+        params: list[object] = []
+        if filters.account_id is not None:
+            conditions.append("portfolio_account_id=?")
+            params.append(filters.account_id)
+        if filters.symbol is not None:
+            conditions.append("UPPER(symbol)=?")
+            params.append(filters.symbol)
+        sql = """
+        SELECT id AS local_id,
+               'unmatched:' || id AS activity_id,
+               to_as_of_utc AS occurred_at_utc,
+               portfolio_account_id,
+               symbol,
+               asset_class,
+               currency,
+               from_run_id,
+               to_run_id,
+               from_as_of_utc,
+               to_as_of_utc,
+               before_quantity,
+               after_quantity,
+               expected_quantity,
+               residual_quantity,
+               execution_coverage,
+               reason_code,
+               'unmatched' AS projection
+        FROM portfolio_unmatched_position_changes
+        """
+        return self._bounded_headers(conn, sql, conditions, params, filters)
+
+    def _history_headers(
+        self, conn: sqlite3.Connection, filters: _NormalizedActivityFilters
+    ) -> list[dict[str, Any]]:
+        if filters.source not in {None, "system"}:
+            return []
+        if filters.state not in {None, "history_start"}:
+            return []
+        if filters.symbol is not None:
+            return []
+        conditions: list[str] = ["history_rank=1"]
+        params: list[object] = []
+        if filters.account_id is not None:
+            conditions.append("portfolio_account_id=?")
+            params.append(filters.account_id)
+        sql = """
+        WITH complete_run AS (
+            SELECT r.id AS capture_run_id,
+                   ra.portfolio_account_id,
+                   COALESCE(MAX(s.as_of_utc), r.finished_at) AS occurred_at_utc
+            FROM portfolio_capture_runs r
+            JOIN portfolio_capture_run_accounts ra ON ra.capture_run_id=r.id
+            LEFT JOIN portfolio_account_snapshots s
+              ON s.capture_run_id=r.id
+             AND s.portfolio_account_id=ra.portfolio_account_id
+            WHERE r.state IN ('succeeded','partial')
+              AND r.account_leg_state='complete'
+              AND r.execution_leg_state='complete'
+              AND r.position_leg_state='complete'
+            GROUP BY r.id, ra.portfolio_account_id
+        ), ranked_history AS (
+            SELECT *,
+                   'history:' || portfolio_account_id || ':' || capture_run_id
+                     AS activity_id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY portfolio_account_id ORDER BY capture_run_id
+                   ) AS history_rank,
+                   'history' AS projection,
+                   capture_run_id AS local_id
+            FROM complete_run
+        )
+        SELECT * FROM ranked_history
+        """
+        return self._bounded_headers(conn, sql, conditions, params, filters)
+
+    def _coverage_gap_headers(
+        self, conn: sqlite3.Connection, filters: _NormalizedActivityFilters
+    ) -> list[dict[str, Any]]:
+        if filters.source not in {None, "system"}:
+            return []
+        if filters.state not in {None, "coverage_gap"}:
+            return []
+        if filters.symbol is not None:
+            return []
+        account_condition = []
+        account_params: list[object] = []
+        if filters.account_id is not None:
+            account_condition.append(
+                "(portfolio_account_id IS NULL OR portfolio_account_id=?)"
+            )
+            account_params.append(filters.account_id)
+        incomplete_sql = """
+        WITH account_gap AS (
+            SELECT r.id AS to_run_id,
+                   ra.portfolio_account_id,
+                   COALESCE(MAX(s.as_of_utc), r.finished_at) AS occurred_at_utc
+            FROM portfolio_capture_runs r
+            JOIN portfolio_capture_run_accounts ra ON ra.capture_run_id=r.id
+            LEFT JOIN portfolio_account_snapshots s
+              ON s.capture_run_id=r.id
+             AND s.portfolio_account_id=ra.portfolio_account_id
+            WHERE r.state IN ('succeeded','partial','failed','blocked','interrupted')
+              AND r.execution_leg_state IN ('partial','failed','not_attempted')
+            GROUP BY r.id, ra.portfolio_account_id
+        ), global_gap AS (
+            SELECT r.id AS to_run_id,
+                   NULL AS portfolio_account_id,
+                   r.finished_at AS occurred_at_utc
+            FROM portfolio_capture_runs r
+            WHERE r.state IN ('succeeded','partial','failed','blocked','interrupted')
+              AND r.execution_leg_state IN ('partial','failed','not_attempted')
+              AND NOT EXISTS (
+                SELECT 1 FROM portfolio_capture_run_accounts ra
+                WHERE ra.capture_run_id=r.id
+              )
+        ), execution_gap AS (
+            SELECT * FROM account_gap
+            UNION ALL
+            SELECT * FROM global_gap
+        ), projected_gap AS (
+            SELECT *,
+                   'gap:execution:' || to_run_id || ':' ||
+                     COALESCE(CAST(portfolio_account_id AS TEXT), 'global')
+                     AS activity_id,
+                   'gap_execution' AS projection,
+                   to_run_id AS local_id,
+                   'execution_leg_incomplete' AS reason_code
+            FROM execution_gap
+        )
+        SELECT * FROM projected_gap
+        """
+        incomplete = self._bounded_headers(
+            conn,
+            incomplete_sql,
+            list(account_condition),
+            list(account_params),
+            filters,
+        )
+
+        cross_conditions: list[str] = [
+            "from_run_id IS NOT NULL",
+            "portfolio_et_date(from_as_of_utc) "
+            "!= portfolio_et_date(occurred_at_utc)",
+        ]
+        cross_params: list[object] = []
+        if filters.account_id is not None:
+            cross_conditions.append("portfolio_account_id=?")
+            cross_params.append(filters.account_id)
+        cross_sql = """
+        WITH complete_run AS (
+            SELECT r.id AS capture_run_id,
+                   ra.portfolio_account_id,
+                   COALESCE(MAX(s.as_of_utc), r.finished_at) AS occurred_at_utc
+            FROM portfolio_capture_runs r
+            JOIN portfolio_capture_run_accounts ra ON ra.capture_run_id=r.id
+            LEFT JOIN portfolio_account_snapshots s
+              ON s.capture_run_id=r.id
+             AND s.portfolio_account_id=ra.portfolio_account_id
+            WHERE r.state IN ('succeeded','partial')
+              AND r.account_leg_state='complete'
+              AND r.execution_leg_state='complete'
+              AND r.position_leg_state='complete'
+            GROUP BY r.id, ra.portfolio_account_id
+        ), sequenced_run AS (
+            SELECT *,
+                   LAG(capture_run_id) OVER (
+                     PARTITION BY portfolio_account_id ORDER BY capture_run_id
+                   ) AS from_run_id,
+                   LAG(occurred_at_utc) OVER (
+                     PARTITION BY portfolio_account_id ORDER BY capture_run_id
+                   ) AS from_as_of_utc
+            FROM complete_run
+        ), projected_gap AS (
+            SELECT *, capture_run_id AS to_run_id,
+                   'gap:day:' || portfolio_account_id || ':' || capture_run_id
+                     AS activity_id,
+                   'gap_day' AS projection,
+                   capture_run_id AS local_id,
+                   'broker_day_gap' AS reason_code
+            FROM sequenced_run
+        )
+        SELECT * FROM projected_gap
+        """
+        cross_day = self._bounded_headers(
+            conn, cross_sql, cross_conditions, cross_params, filters
+        )
+        return incomplete + cross_day
+
+    def _history_started_at(
+        self, filters: _NormalizedActivityFilters
+    ) -> str | None:
+        account_clause = ""
+        params: tuple[object, ...] = ()
+        if filters.account_id is not None:
+            account_clause = " AND ra.portfolio_account_id=?"
+            params = (filters.account_id,)
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                WITH complete_run AS (
+                    SELECT r.id,
+                           ra.portfolio_account_id,
+                           COALESCE(MAX(s.as_of_utc), r.finished_at) AS observed_at
+                    FROM portfolio_capture_runs r
+                    JOIN portfolio_capture_run_accounts ra ON ra.capture_run_id=r.id
+                    LEFT JOIN portfolio_account_snapshots s
+                      ON s.capture_run_id=r.id
+                     AND s.portfolio_account_id=ra.portfolio_account_id
+                    WHERE r.state IN ('succeeded','partial')
+                      AND r.account_leg_state='complete'
+                      AND r.execution_leg_state='complete'
+                      AND r.position_leg_state='complete'
+                """
+                + account_clause
+                + """
+                    GROUP BY r.id, ra.portfolio_account_id
+                ), first_run AS (
+                    SELECT *, ROW_NUMBER() OVER (
+                      PARTITION BY portfolio_account_id ORDER BY id
+                    ) AS history_rank
+                    FROM complete_run
+                )
+                SELECT MIN(observed_at) AS history_started_at_utc
+                FROM first_run WHERE history_rank=1
+                """,
+                params,
+            ).fetchone()
+        return None if row is None else row["history_started_at_utc"]
+
+    def _unmatched_count(self, filters: _NormalizedActivityFilters) -> int:
+        if filters.source not in {None, "broker"}:
+            return 0
+        if filters.state not in {None, "unmatched"}:
+            return 0
+        conditions: list[str] = []
+        params: list[object] = []
+        if filters.account_id is not None:
+            conditions.append("portfolio_account_id=?")
+            params.append(filters.account_id)
+        if filters.symbol is not None:
+            conditions.append("UPPER(symbol)=?")
+            params.append(filters.symbol)
+        if filters.date_from_utc is not None:
+            conditions.append("to_as_of_utc >= ?")
+            params.append(filters.date_from_utc)
+        if filters.date_to_utc is not None:
+            conditions.append("to_as_of_utc < ?")
+            params.append(filters.date_to_utc)
+        sql = "SELECT COUNT(*) AS unmatched_count FROM portfolio_unmatched_position_changes"
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        with self._connect() as conn:
+            row = conn.execute(sql, params).fetchone()
+        return int(row["unmatched_count"])
+
     def _activity_accounts(self) -> dict[int, ActivityAccount]:
         return {
             account.id: ActivityAccount(
@@ -636,6 +1234,199 @@ class PortfolioActivityStore:
                 include_archived=True, ensure_manual=False
             )
         }
+
+    @staticmethod
+    def _load_manual_changes(
+        conn: sqlite3.Connection, adjustment_ids: list[int]
+    ) -> dict[int, list[ActivityFieldChange]]:
+        if not adjustment_ids:
+            return {}
+        placeholders = ",".join("?" for _ in adjustment_ids)
+        result = {adjustment_id: [] for adjustment_id in adjustment_ids}
+        for row in conn.execute(
+            f"""
+            SELECT adjustment_id, field, before_json, after_json
+            FROM portfolio_manual_adjustment_changes
+            WHERE adjustment_id IN ({placeholders})
+            ORDER BY adjustment_id, field
+            """,
+            adjustment_ids,
+        ):
+            result[int(row["adjustment_id"])].append(
+                ActivityFieldChange(
+                    field=row["field"],
+                    before=(
+                        None
+                        if row["before_json"] is None
+                        else json.loads(row["before_json"])
+                    ),
+                    after=(
+                        None
+                        if row["after_json"] is None
+                        else json.loads(row["after_json"])
+                    ),
+                )
+            )
+        return result
+
+    @staticmethod
+    def _load_selected_annotations(
+        conn: sqlite3.Connection, headers: list[dict[str, Any]]
+    ) -> dict[str, ActivityAnnotation]:
+        result: dict[str, ActivityAnnotation] = {}
+        for header in headers:
+            target_kind = (
+                "manual_adjustment"
+                if header["projection"] == "manual"
+                else "unmatched"
+            )
+            row = conn.execute(
+                """
+                SELECT intent_label, note, updated_at_utc
+                FROM portfolio_activity_annotations
+                WHERE target_kind=? AND portfolio_account_id=? AND target_ref=?
+                """,
+                (
+                    target_kind,
+                    int(header["portfolio_account_id"]),
+                    str(header["local_id"]),
+                ),
+            ).fetchone()
+            if row is not None:
+                result[header["activity_id"]] = ActivityAnnotation(
+                    intent_label=row["intent_label"],
+                    note=row["note"],
+                    updated_at_utc=row["updated_at_utc"],
+                )
+        return result
+
+    def _item_from_header(
+        self,
+        conn: sqlite3.Connection,
+        header: dict[str, Any],
+        account_map: dict[int, ActivityAccount],
+        fills_by_activity: dict[str, list[ActivityFill]],
+        manual_changes: dict[int, list[ActivityFieldChange]],
+        annotations: dict[str, ActivityAnnotation],
+    ) -> PortfolioActivityItem:
+        projection = header["projection"]
+        activity_id = header["activity_id"]
+        if projection == "broker":
+            account_id = int(header["portfolio_account_id"])
+            return self._broker_item(
+                conn,
+                header,  # type: ignore[arg-type]
+                account_map[account_id],
+                fills_by_activity[activity_id],
+            )
+        if projection == "manual":
+            adjustment_id = int(header["local_id"])
+            return ManualActivityItem(
+                id=activity_id,
+                kind="manual_adjustment",
+                occurred_at_utc=header["occurred_at_utc"],
+                account=account_map[int(header["portfolio_account_id"])],
+                symbol=header["symbol"],
+                source="manual",
+                state="manual_adjustment",
+                annotation=annotations.get(activity_id),
+                position_id=int(header["position_id"]),
+                action=header["action"],
+                changes=manual_changes[adjustment_id],
+            )
+        if projection == "unmatched":
+            return UnmatchedActivityItem(
+                id=activity_id,
+                kind="unmatched",
+                occurred_at_utc=header["occurred_at_utc"],
+                account=account_map[int(header["portfolio_account_id"])],
+                symbol=header["symbol"],
+                asset_class=header["asset_class"],
+                currency=header["currency"],
+                source="broker",
+                state="unmatched",
+                annotation=annotations.get(activity_id),
+                from_run_id=int(header["from_run_id"]),
+                to_run_id=int(header["to_run_id"]),
+                from_as_of_utc=header["from_as_of_utc"],
+                to_as_of_utc=header["to_as_of_utc"],
+                before_quantity=float(header["before_quantity"]),
+                after_quantity=float(header["after_quantity"]),
+                expected_quantity=float(header["expected_quantity"]),
+                residual_quantity=float(header["residual_quantity"]),
+                execution_coverage=header["execution_coverage"],
+                reason_code=header["reason_code"],
+            )
+        if projection == "history":
+            return HistoryStartItem(
+                id=activity_id,
+                kind="history_start",
+                occurred_at_utc=header["occurred_at_utc"],
+                account=account_map[int(header["portfolio_account_id"])],
+                source="system",
+                state="history_start",
+                capture_run_id=int(header["capture_run_id"]),
+            )
+        if projection == "gap_execution":
+            raw_account_id = header["portfolio_account_id"]
+            account_id = None if raw_account_id is None else int(raw_account_id)
+            previous = (
+                None
+                if account_id is None
+                else self._previous_complete_run(
+                    conn, account_id=account_id, before_run_id=int(header["to_run_id"])
+                )
+            )
+            return CoverageGapItem(
+                id=activity_id,
+                kind="coverage_gap",
+                occurred_at_utc=header["occurred_at_utc"],
+                account=None if account_id is None else account_map[account_id],
+                source="system",
+                state="coverage_gap",
+                from_run_id=None if previous is None else int(previous["capture_run_id"]),
+                to_run_id=int(header["to_run_id"]),
+                from_as_of_utc=None if previous is None else previous["observed_at"],
+                to_as_of_utc=header["occurred_at_utc"],
+                reason_code="execution_leg_incomplete",
+            )
+        return CoverageGapItem(
+            id=activity_id,
+            kind="coverage_gap",
+            occurred_at_utc=header["occurred_at_utc"],
+            account=account_map[int(header["portfolio_account_id"])],
+            source="system",
+            state="coverage_gap",
+            from_run_id=int(header["from_run_id"]),
+            to_run_id=int(header["to_run_id"]),
+            from_as_of_utc=header["from_as_of_utc"],
+            to_as_of_utc=header["occurred_at_utc"],
+            reason_code="broker_day_gap",
+        )
+
+    @staticmethod
+    def _previous_complete_run(
+        conn: sqlite3.Connection, *, account_id: int, before_run_id: int
+    ) -> sqlite3.Row | None:
+        return conn.execute(
+            """
+            SELECT r.id AS capture_run_id,
+                   COALESCE(MAX(s.as_of_utc), r.finished_at) AS observed_at
+            FROM portfolio_capture_runs r
+            JOIN portfolio_capture_run_accounts ra ON ra.capture_run_id=r.id
+            LEFT JOIN portfolio_account_snapshots s
+              ON s.capture_run_id=r.id
+             AND s.portfolio_account_id=ra.portfolio_account_id
+            WHERE ra.portfolio_account_id=? AND r.id < ?
+              AND r.state IN ('succeeded','partial')
+              AND r.account_leg_state='complete'
+              AND r.execution_leg_state='complete'
+              AND r.position_leg_state='complete'
+            GROUP BY r.id
+            ORDER BY r.id DESC LIMIT 1
+            """,
+            (account_id, before_run_id),
+        ).fetchone()
 
     @staticmethod
     def _load_selected_fills(
