@@ -95,6 +95,14 @@ def get_portfolio_observation_store():
 
 
 @lru_cache(maxsize=1)
+def get_portfolio_activity_store():
+    """Singleton provider-free portfolio activity projection store."""
+    from src.portfolio_activity import PortfolioActivityStore
+
+    return PortfolioActivityStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_portfolio_capture_service():
     """Singleton Portfolio capture coordinator shared by routes and scheduler."""
     from src.portfolio_capture import PortfolioCaptureService

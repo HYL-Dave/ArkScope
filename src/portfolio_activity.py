@@ -51,6 +51,10 @@ ANNOTATABLE_KINDS = frozenset(
 )
 
 
+class ActivityTargetNotFound(ValueError):
+    """A structurally valid local activity ID whose immutable target is absent."""
+
+
 @dataclass(frozen=True)
 class ActivityFilters:
     date_from_et: str | None = None
@@ -1916,7 +1920,7 @@ class PortfolioActivityStore:
                 (int(parsed.target_ref), parsed.account_id),
             ).fetchone()
             if candidate is None:
-                raise ValueError("activity target does not exist")
+                raise ActivityTargetNotFound("activity target does not exist")
             root = conn.execute(
                 """
                 SELECT MIN(id) AS id
@@ -1956,5 +1960,5 @@ class PortfolioActivityStore:
                 (int(parsed.target_ref),),
             ).fetchone()
         if row is None:
-            raise ValueError("activity target does not exist")
+            raise ActivityTargetNotFound("activity target does not exist")
         return int(row["portfolio_account_id"])
