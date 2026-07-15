@@ -98,3 +98,17 @@ class WriterResult:
     legacy_rows_inserted: int = 0
     legacy_rows_updated: int = 0
     projection_skipped_no_ticker: int = 0
+
+
+@dataclass(frozen=True)
+class BodyRetryBacklog:
+    due_now: int
+    scheduled_later: int
+    never_attempted: int
+    earliest_next_retry_at: Optional[str]
+
+
+@dataclass(frozen=True)
+class BodyRetrySelection:
+    article_ids: Tuple[int, ...]
+    backlog: BodyRetryBacklog

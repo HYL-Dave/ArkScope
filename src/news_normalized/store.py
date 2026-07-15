@@ -12,7 +12,15 @@ from typing import Iterable, Optional
 
 from .body_policy import PreparedBody, choose_active_body, prepare_body
 from .identity import build_identity_keys, normalize_identity_text, normalize_timestamp
-from .models import ArticleCandidate, ArticleKey, BodyCandidate, BodyStatus, KeyKind
+from .models import (
+    ArticleCandidate,
+    ArticleKey,
+    BodyCandidate,
+    BodyRetryBacklog,
+    BodyRetrySelection,
+    BodyStatus,
+    KeyKind,
+)
 from .schema import ensure_news_normalized_schema
 from .tickers import canonical_ticker, load_ticker_aliases
 
@@ -208,12 +216,15 @@ class NormalizedNewsStore:
         self, source: str, provider_article_id: str
     ) -> Optional[ArticleCandidate]:
         article_id = self._article_id_for_provider(source, provider_article_id)
-        if article_id is None:
-            return None
+        return self.candidate_by_article_id(article_id) if article_id is not None else None
+
+    def candidate_by_article_id(self, article_id: int) -> Optional[ArticleCandidate]:
         row = self.conn.execute(
             "SELECT * FROM news_articles WHERE id=?",
-            (article_id,),
+            (int(article_id),),
         ).fetchone()
+        if row is None:
+            return None
         ticker_rows = self.conn.execute(
             "SELECT ticker,relation_kind FROM news_article_tickers WHERE article_id=? "
             "ORDER BY ticker",
@@ -253,6 +264,111 @@ class NormalizedNewsStore:
             related_tickers=related,
             content_kind=row["content_kind"],
             body=body,
+        )
+
+    @staticmethod
+    def _retry_now_iso(now: datetime) -> str:
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        else:
+            now = now.astimezone(timezone.utc)
+        return now.isoformat().replace("+00:00", "Z")
+
+    def _summarize_ibkr_body_backlog_at(
+        self, now_iso: str
+    ) -> BodyRetryBacklog:
+        row = self.conn.execute(
+            "WITH candidates AS ("
+            " SELECT a.id,a.published_at,b.body_status,b.fetch_attempts,b.next_retry_at"
+            " FROM news_articles AS a"
+            " JOIN news_article_bodies AS b ON b.article_id=a.id"
+            " WHERE a.source='ibkr'"
+            " AND NULLIF(TRIM(a.provider_article_id),'') IS NOT NULL"
+            " AND NULLIF(TRIM(a.publisher),'') IS NOT NULL"
+            ")"
+            " SELECT"
+            " COALESCE(SUM(CASE WHEN body_status='pending' OR ("
+            "   body_status='failed' AND ("
+            "     NULLIF(TRIM(next_retry_at),'') IS NULL"
+            "     OR julianday(next_retry_at) IS NULL"
+            "     OR julianday(next_retry_at)<=julianday(?)"
+            "   )"
+            " ) THEN 1 ELSE 0 END),0) AS due_now,"
+            " COALESCE(SUM(CASE WHEN body_status='failed'"
+            "   AND julianday(next_retry_at)>julianday(?)"
+            "   THEN 1 ELSE 0 END),0) AS scheduled_later,"
+            " COALESCE(SUM(CASE WHEN body_status='pending'"
+            "   AND fetch_attempts=0 THEN 1 ELSE 0 END),0) AS never_attempted,"
+            " (SELECT next_retry_at FROM candidates"
+            "   WHERE body_status='failed'"
+            "   AND julianday(next_retry_at)>julianday(?)"
+            "   ORDER BY julianday(next_retry_at),id LIMIT 1"
+            " ) AS earliest_next_retry_at"
+            " FROM candidates",
+            (now_iso, now_iso, now_iso),
+        ).fetchone()
+        return BodyRetryBacklog(
+            due_now=int(row["due_now"]),
+            scheduled_later=int(row["scheduled_later"]),
+            never_attempted=int(row["never_attempted"]),
+            earliest_next_retry_at=row["earliest_next_retry_at"],
+        )
+
+    def summarize_ibkr_body_backlog(
+        self, *, now: datetime
+    ) -> BodyRetryBacklog:
+        return self._summarize_ibkr_body_backlog_at(self._retry_now_iso(now))
+
+    def select_ibkr_body_retries(
+        self, *, now: datetime, limit: int
+    ) -> BodyRetrySelection:
+        if limit < 0:
+            raise ValueError("retry body limit must be non-negative")
+        if self.conn.in_transaction:
+            raise RuntimeError("retry selection requires no active transaction")
+
+        now_iso = self._retry_now_iso(now)
+        try:
+            self.conn.execute("BEGIN")
+            rows = self.conn.execute(
+                "SELECT a.id"
+                " FROM news_articles AS a"
+                " JOIN news_article_bodies AS b ON b.article_id=a.id"
+                " WHERE a.source='ibkr'"
+                " AND NULLIF(TRIM(a.provider_article_id),'') IS NOT NULL"
+                " AND NULLIF(TRIM(a.publisher),'') IS NOT NULL"
+                " AND ("
+                "   b.body_status='pending'"
+                "   OR (b.body_status='failed' AND ("
+                "     NULLIF(TRIM(b.next_retry_at),'') IS NULL"
+                "     OR julianday(b.next_retry_at) IS NULL"
+                "     OR julianday(b.next_retry_at)<=julianday(?)"
+                "   ))"
+                " )"
+                " ORDER BY"
+                " CASE"
+                "   WHEN b.body_status='failed'"
+                "     AND julianday(b.next_retry_at) IS NOT NULL"
+                "     AND julianday(b.next_retry_at)<=julianday(?) THEN 0"
+                "   WHEN b.body_status='pending' THEN 1"
+                "   ELSE 2"
+                " END,"
+                " CASE WHEN b.body_status='failed'"
+                "   THEN julianday(b.next_retry_at) END,"
+                " julianday(a.published_at),a.id"
+                " LIMIT ?",
+                (now_iso, now_iso, int(limit)),
+            ).fetchall()
+            backlog = self._summarize_ibkr_body_backlog_at(now_iso)
+            self.conn.commit()
+        except Exception:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
+        assert self.conn.in_transaction is False
+        return BodyRetrySelection(
+            article_ids=tuple(int(row["id"]) for row in rows),
+            backlog=backlog,
         )
 
     def _resolve(
