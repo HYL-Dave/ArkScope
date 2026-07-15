@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED FOR REVIEW — 2026-07-15. NOT MERGED; REVIEWER CANONICAL A/B PENDING.**
+> **Status: MERGED / LIVE — 2026-07-15. `master` FAST-FORWARDED THROUGH `c5cd91f`; REVIEWER CANONICAL A/B, MERGED-TREE, COPIED-DB GATEWAY, RESPONSIVE, AND USER VISUAL GATES PASS.**
 
 ## Implementation Ledger
 
@@ -93,6 +93,16 @@ no PG, budget default exactly once) — all clean. The CSS-specificity
 deviation (`3f9ea7e`, geometry-RED-first, selector scope only) is verified
 narrow and properly ledgered. All gates are now closed; merge remains the
 user's decision.
+
+### Post-merge verification ✅ (2026-07-15)
+
+`master` fast-forwarded `39097d4..c5cd91f`. The merged tree passed the exact
+focused backend ledger (`183 passed`), full frontend (`44 files / 426 tests`),
+typecheck, and production build with only the existing chunk-size warning.
+The user then opened the merged desktop surface and reported no issue in the
+affected schedule presentation. Together with the pre-merge one-Gateway
+copied-DB retry gate and six responsive states, this closes the durable retry
+line as LIVE. No push was performed; publication remains user-owned.
 
 **Goal:** Make every locally known, retryable IBKR article body eligible for a bounded automatic retry even after the article falls outside IBKR's rolling headline tail, while keeping fresh headline ingestion independent and provider identifiers inside the isolated worker.
 

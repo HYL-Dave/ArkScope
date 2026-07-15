@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** APPROVED DESIGN; HOTFIX A LIVE — 2026-07-15; DURABLE RETRY IMPLEMENTED FOR REVIEW. The durable retry product code, focused/full-head gates, responsive gate, and copied-DB live gate are complete; reviewer canonical A/B remains required before merge or LIVE status.
+> **Status:** LIVE COMPLETE — 2026-07-15. Hotfix A and durable SQLite-derived body retry are merged; reviewer canonical A/B, copied-DB Gateway, responsive, merged-tree, and user visual gates pass.
 
 ## 1. Purpose
 
