@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog, ModelTask, ProvidersHealthResponse, TaskRoute } from "./api";
+import { formatSystemTimestamp } from "./timeDisplay";
 
 const mocked = vi.hoisted(() => ({
   providersConfig: {
@@ -98,6 +99,7 @@ const mocked = vi.hoisted(() => ({
     "during afternoon recovery window; clientId=11 requestId=980123 pacing bucket=hist_15m",
   scheduleRunning: false,
   scheduleProgress: null as { done: number; total: number; current: string } | null,
+  ibkrBodyBacklogMode: "legacy" as "legacy" | "succeeded" | "partial",
   importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
   putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
 }));
@@ -220,7 +222,7 @@ vi.mock("./api", async (importOriginal) => {
           running: false,
           progress: null,
           last_attempt_at: "2026-07-14T10:00:00Z",
-          last_result: {
+          last_result: mocked.ibkrBodyBacklogMode === "legacy" ? {
             source: "ibkr_news",
             status: "partial",
             at: "2026-07-14T10:01:00Z",
@@ -232,9 +234,50 @@ vi.mock("./api", async (importOriginal) => {
                 has_cursor: false,
               },
             },
-          },
+          } : null,
           gap_planned: false,
-          durable_state: {
+          durable_state: mocked.ibkrBodyBacklogMode === "succeeded" ? {
+            last_status: "succeeded",
+            last_error: null,
+            continuation: null,
+            last_result: {
+              source: "ibkr_news",
+              status: "succeeded",
+              collect: {
+                status: "succeeded",
+                body_backlog: {
+                  status: "ok",
+                  due_now: 0,
+                  scheduled_later: 2,
+                  never_attempted: 0,
+                  earliest_next_retry_at: "2026-07-15T06:00:00Z",
+                },
+              },
+            },
+            last_attempt: "2026-07-15T05:00:00Z",
+            updated_at: "2026-07-15T05:01:00Z",
+          } : mocked.ibkrBodyBacklogMode === "partial" ? {
+            last_status: "partial",
+            last_error: null,
+            continuation: null,
+            last_result: {
+              source: "ibkr_news",
+              status: "partial",
+              collect: {
+                status: "partial",
+                legs: { retry: "partial", fresh: "succeeded" },
+                body_backlog: {
+                  status: "ok",
+                  due_now: 0,
+                  scheduled_later: 1,
+                  never_attempted: 0,
+                  earliest_next_retry_at: "2026-07-15T07:00:00Z",
+                },
+              },
+            },
+            last_attempt: "2026-07-15T06:00:00Z",
+            updated_at: "2026-07-15T06:01:00Z",
+          } : {
             last_status: "partial",
             last_error: null,
             continuation: null,
@@ -380,6 +423,7 @@ afterEach(() => {
   mocked.putCalls = [];
   mocked.scheduleRunning = false;
   mocked.scheduleProgress = null;
+  mocked.ibkrBodyBacklogMode = "legacy";
   vi.restoreAllMocks();
 });
 
@@ -534,6 +578,35 @@ describe("Settings provider config authority", () => {
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.includes("Run"))).toBe(true);
+  });
+
+  it("renders succeeded IBKR run and scheduled body backlog as separate facts", async () => {
+    mocked.ibkrBodyBacklogMode = "succeeded";
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("IBKR 新聞"));
+    if (!row) throw new Error("missing IBKR news schedule row");
+
+    expect(row.textContent).toContain("上次成功");
+    expect(row.textContent).toContain("內文佇列：2 篇已排程稍後重試");
+    expect(row.textContent).toContain(`最早 ${formatSystemTimestamp("2026-07-15T06:00:00Z")}`);
+  });
+
+  it("renders partial retry outcome with backlog and no continuation button", async () => {
+    mocked.ibkrBodyBacklogMode = "partial";
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("IBKR 新聞"));
+    if (!row) throw new Error("missing IBKR news schedule row");
+
+    expect(row.textContent).toContain("部分完成");
+    expect(row.textContent).toContain("內文佇列：1 篇已排程稍後重試");
+    expect(row.textContent).not.toContain("待補抓 0");
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.trim() === "補抓")).toBe(false);
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.includes("Run"))).toBe(true);
+    expect(row.textContent).not.toContain("provider_article_id");
   });
 
   it("renders_known_schedule_progress_without_covering_the_last_run_cell", async () => {

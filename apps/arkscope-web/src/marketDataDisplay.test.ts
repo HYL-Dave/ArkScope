@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import * as marketDataDisplay from "./marketDataDisplay";
 import {
   coverageStatusLabel,
   macroRoutingLabel,
@@ -295,6 +296,150 @@ describe("schedulerStateLabel", () => {
     });
     expect(result).toEqual({ label: "部分完成", tone: "warn", needsContinue: false });
     expect(result.label).not.toContain("0");
+  });
+});
+
+describe("schedulerBodyBacklogPresentation", () => {
+  type DurablePresentation = NonNullable<
+    Parameters<typeof marketDataDisplay.schedulerBodyBacklogPresentation>[0]
+  >;
+  const present = (durable: DurablePresentation) =>
+    marketDataDisplay.schedulerBodyBacklogPresentation(durable);
+
+  it("keeps a succeeded run successful when bodies are scheduled later", () => {
+    const durable: DurablePresentation = {
+      last_status: "succeeded",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "succeeded",
+        collect: {
+          status: "succeeded",
+          body_backlog: {
+            status: "ok",
+            due_now: 0,
+            scheduled_later: 2,
+            never_attempted: 0,
+            earliest_next_retry_at: "2026-07-15T06:00:00Z",
+          },
+        },
+      },
+    };
+
+    expect(schedulerStateLabel(durable)).toEqual({
+      label: "上次成功",
+      tone: "ok",
+      needsContinue: false,
+    });
+    expect(present(durable)).toEqual({
+      label: "內文佇列：2 篇已排程稍後重試",
+      tone: "muted",
+      earliestNextRetryAt: "2026-07-15T06:00:00Z",
+    });
+  });
+
+  it("describes due and never-attempted bodies without a manual action", () => {
+    expect(present({
+      last_status: "partial",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: {
+          status: "partial",
+          body_backlog: {
+            status: "ok",
+            due_now: 4,
+            scheduled_later: 2,
+            never_attempted: 3,
+            earliest_next_retry_at: "2026-07-15T08:00:00Z",
+          },
+        },
+      },
+    })).toEqual({
+      label: "內文佇列：4 篇目前可處理（其中 3 篇尚未嘗試） · 2 篇已排程稍後重試",
+      tone: "muted",
+      earliestNextRetryAt: "2026-07-15T08:00:00Z",
+    });
+  });
+
+  it("renders backlog-query failure as unavailable rather than zero", () => {
+    expect(present({
+      last_status: "partial",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: {
+          status: "partial",
+          body_backlog: { status: "unavailable" },
+        },
+      },
+    })).toEqual({
+      label: "內文待處理狀態暫時無法讀取",
+      tone: "warn",
+      earliestNextRetryAt: null,
+    });
+  });
+
+  it("separates new body backlog from the partial run label", () => {
+    const durable: DurablePresentation = {
+      last_status: "partial",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: {
+          status: "partial",
+          continuation: {
+            deferred_ticker_count: 0,
+            deferred_body_count: 9,
+            has_cursor: false,
+          },
+          body_backlog: {
+            status: "ok",
+            due_now: 1,
+            scheduled_later: 1,
+            never_attempted: 0,
+            earliest_next_retry_at: "2026-07-15T08:00:00Z",
+          },
+        },
+      },
+    };
+
+    expect(schedulerStateLabel(durable)).toEqual({
+      label: "部分完成",
+      tone: "warn",
+      needsContinue: false,
+    });
+    expect(present(durable)?.label).toBe("內文佇列：1 篇目前可處理 · 1 篇已排程稍後重試");
+  });
+
+  it("fails closed on malformed backlog counts", () => {
+    for (const malformed of [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, "2", null]) {
+      expect(present({
+        last_status: "partial",
+        continuation: null,
+        last_result: {
+          source: "ibkr_news",
+          status: "partial",
+          collect: {
+            status: "partial",
+            body_backlog: {
+              status: "ok",
+              due_now: malformed as unknown as number,
+              scheduled_later: 0,
+              never_attempted: 0,
+              earliest_next_retry_at: null,
+            },
+          },
+        },
+      })).toEqual({
+        label: "內文待處理狀態暫時無法讀取",
+        tone: "warn",
+        earliestNextRetryAt: null,
+      });
+    }
   });
 });
 

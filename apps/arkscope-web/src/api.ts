@@ -2154,6 +2154,19 @@ export interface ScheduleContinuationCounts {
   has_cursor?: boolean;
 }
 
+export interface ScheduleBodyBacklog {
+  status: "ok" | "unavailable";
+  due_now?: number;
+  scheduled_later?: number;
+  never_attempted?: number;
+  earliest_next_retry_at?: string | null;
+}
+
+export interface ScheduleWorkerLegs {
+  retry: "succeeded" | "partial" | "failed";
+  fresh: "succeeded" | "partial" | "failed";
+}
+
 export interface ScheduleRunResult {
   source: string;
   status: string;
@@ -2162,6 +2175,11 @@ export interface ScheduleRunResult {
   collect?: {
     status?: string;
     continuation?: ScheduleContinuationCounts | null;
+    legs?: ScheduleWorkerLegs;
+    body_backlog?: ScheduleBodyBacklog;
+    retry_bodies_attempted?: number;
+    retry_bodies_fetched?: number;
+    tickers_scanned?: number;
   } | null;
 }
 

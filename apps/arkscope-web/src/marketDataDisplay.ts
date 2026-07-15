@@ -116,6 +116,58 @@ function positiveCount(value: unknown): number {
   return value;
 }
 
+function backlogCount(value: unknown): number | null {
+  if (value === undefined) return 0;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return null;
+  return value;
+}
+
+export interface SchedulerBodyBacklogPresentation {
+  label: string;
+  tone: "muted" | "warn";
+  earliestNextRetryAt: string | null;
+}
+
+const unavailableBodyBacklog = (): SchedulerBodyBacklogPresentation => ({
+  label: "內文待處理狀態暫時無法讀取",
+  tone: "warn",
+  earliestNextRetryAt: null,
+});
+
+export function schedulerBodyBacklogPresentation(
+  durable: SchedulerDurablePresentation | null,
+): SchedulerBodyBacklogPresentation | null {
+  const backlog = durable?.last_result?.collect?.body_backlog;
+  if (!backlog) return null;
+  if (backlog.status !== "ok") return unavailableBodyBacklog();
+
+  const due = backlogCount(backlog.due_now);
+  const scheduled = backlogCount(backlog.scheduled_later);
+  const neverAttempted = backlogCount(backlog.never_attempted);
+  if (due === null || scheduled === null || neverAttempted === null || neverAttempted > due) {
+    return unavailableBodyBacklog();
+  }
+  if (due === 0 && scheduled === 0) return null;
+
+  const parts: string[] = [];
+  if (due > 0) {
+    parts.push(
+      neverAttempted > 0
+        ? `${due} 篇目前可處理（其中 ${neverAttempted} 篇尚未嘗試）`
+        : `${due} 篇目前可處理`,
+    );
+  }
+  if (scheduled > 0) parts.push(`${scheduled} 篇已排程稍後重試`);
+
+  return {
+    label: `內文佇列：${parts.join(" · ")}`,
+    tone: "muted",
+    earliestNextRetryAt: typeof backlog.earliest_next_retry_at === "string"
+      ? backlog.earliest_next_retry_at
+      : null,
+  };
+}
+
 export function schedulerStateLabel(
   durable: SchedulerDurablePresentation | null,
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad"; needsContinue: boolean } {
@@ -132,9 +184,12 @@ export function schedulerStateLabel(
           needsContinue: true,
         };
       }
-      const observed = durable?.last_result?.collect?.continuation;
+      const collect = durable?.last_result?.collect;
+      const observed = collect?.continuation;
       const tickers = positiveCount(observed?.deferred_ticker_count);
-      const bodies = positiveCount(observed?.deferred_body_count);
+      const bodies = collect?.body_backlog === undefined
+        ? positiveCount(observed?.deferred_body_count)
+        : 0;
       if (tickers > 0 && bodies > 0) {
         return {
           label: `部分完成（${tickers} 個標的、${bodies} 篇內文待後續處理）`,

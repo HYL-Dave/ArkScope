@@ -99,6 +99,7 @@ import { formatSystemTimestamp } from "./timeDisplay";
 import {
   coverageStatusLabel,
   providerHealthStatusLabel,
+  schedulerBodyBacklogPresentation,
   schedulerStateLabel,
 } from "./marketDataDisplay";
 import { displaySAExtensionSegments } from "./saExtensionHealthDisplay";
@@ -1623,6 +1624,7 @@ function DataSourcesSection() {
       });
     }
     const ss = schedulerStateLabel(s.durable_state ?? null);
+    const bodyBacklog = schedulerBodyBacklogPresentation(s.durable_state ?? null);
     const durableError = s.durable_state?.last_status === "failed" ? s.durable_state.last_error : null;
     if (durableError) details.push({ label: "失敗訊息", value: durableError, tone: "bad" });
 
@@ -1658,6 +1660,14 @@ function DataSourcesSection() {
             </button>
           )}
         </div>
+        {bodyBacklog && (
+          <div className={`tiny ${bodyBacklog.tone === "warn" ? "refresh-err" : "muted"}`}>
+            {bodyBacklog.label}
+            {bodyBacklog.earliestNextRetryAt
+              ? ` · 最早 ${formatSystemTimestamp(bodyBacklog.earliestNextRetryAt)}`
+              : ""}
+          </div>
+        )}
         {details.length > 0 && (
           <details className="ds-last-run-details">
             <summary>完整訊息</summary>
