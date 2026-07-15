@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatSystemTimestamp } from "./timeDisplay";
+import { formatMarketTimestamp, formatSystemTimestamp } from "./timeDisplay";
 
 describe("formatSystemTimestamp", () => {
   it("shows local time plus US market time for UTC ISO timestamps", () => {
@@ -19,5 +19,12 @@ describe("formatSystemTimestamp", () => {
     expect(formatSystemTimestamp(null, { localTimeZone: "Asia/Taipei" })).toBe("—");
     expect(formatSystemTimestamp(undefined, { localTimeZone: "Asia/Taipei" })).toBe("—");
     expect(formatSystemTimestamp("not-a-date", { localTimeZone: "Asia/Taipei" })).toBe("not-a-date");
+  });
+
+  it("formats market activity in ET before local time", () => {
+    expect(formatMarketTimestamp(
+      "2026-07-15T14:31:00+00:00",
+      { localTimeZone: "Asia/Taipei" },
+    )).toBe("07-15 10:31 ET · 07-15 22:31 Asia/Taipei");
   });
 });

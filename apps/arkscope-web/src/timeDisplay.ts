@@ -30,3 +30,16 @@ export function formatSystemTimestamp(
   const marketTimeZone = opts.marketTimeZone ?? MARKET_TIME_ZONE;
   return `${dateParts(date, localTimeZone)} ${localTimeZone} · ${dateParts(date, marketTimeZone)} ET`;
 }
+
+export function formatMarketTimestamp(
+  iso: string | null | undefined,
+  opts: { localTimeZone?: string; marketTimeZone?: string } = {},
+): string {
+  if (!iso) return "—";
+  const date = new Date(normalizeIsoOffset(iso));
+  if (Number.isNaN(date.getTime())) return iso;
+
+  const localTimeZone = opts.localTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "local";
+  const marketTimeZone = opts.marketTimeZone ?? MARKET_TIME_ZONE;
+  return `${dateParts(date, marketTimeZone)} ET · ${dateParts(date, localTimeZone)} ${localTimeZone}`;
+}

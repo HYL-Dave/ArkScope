@@ -1249,6 +1249,270 @@ export function getPortfolioOverview(): Promise<PortfolioOverview> {
   return getJSON<PortfolioOverview>("/portfolio/overview");
 }
 
+export type PortfolioIntentLabel =
+  | "profit_take"
+  | "stop_loss"
+  | "rebalance"
+  | "thesis_broken"
+  | "cash_need"
+  | "other";
+
+export type PortfolioActivitySource = "broker" | "manual" | "system";
+
+export type PortfolioActivityState =
+  | "realized_gain"
+  | "realized_loss"
+  | "realized_flat"
+  | "outcome_unknown"
+  | "unmatched"
+  | "manual_adjustment"
+  | "coverage_gap"
+  | "history_start";
+
+export interface PortfolioActivityAccount {
+  id: number;
+  label: string;
+  broker: string;
+  broker_account_id_hash: string | null;
+  archived: boolean;
+}
+
+export interface PortfolioActivityAnnotation {
+  intent_label: PortfolioIntentLabel | null;
+  note: string;
+  updated_at_utc: string;
+}
+
+export interface PortfolioCommissionRevision {
+  id: number;
+  first_observed_run_id: number;
+  first_observed_at_utc: string;
+  commission: number | null;
+  currency: string | null;
+  realized_pnl: number | null;
+  yield_value: number | null;
+  yield_redemption_date: number | null;
+  is_latest: boolean;
+}
+
+export interface PortfolioExecutionRevision {
+  id: number;
+  exec_id: string;
+  origin: "gateway" | "flex";
+  first_observed_run_id: number;
+  first_observed_at_utc: string;
+  execution_time_utc: string;
+  broker_con_id: string;
+  symbol: string;
+  asset_class: string;
+  currency: string;
+  exchange: string;
+  side: string;
+  quantity: number;
+  price: number;
+  order_id: number | null;
+  perm_id: number | null;
+  client_id: number | null;
+  order_ref: string | null;
+  liquidation: number | null;
+  cumulative_quantity: number | null;
+  average_price: number | null;
+  corrects_exec_id: string | null;
+  is_effective: boolean;
+  commission_revisions: PortfolioCommissionRevision[];
+}
+
+export interface PortfolioActivityFill {
+  family_root_id: number;
+  effective_revision_id: number;
+  revisions: PortfolioExecutionRevision[];
+}
+
+export interface PortfolioActivityObjective {
+  side: "buy" | "sell" | "mixed" | "unknown";
+  quantity: number;
+  average_price: number | null;
+  gross_notional: number | null;
+  gross_notional_kind: "deterministic_arithmetic";
+  commission: number | null;
+  commission_currency: string | null;
+  realized_pnl: number | null;
+  realized_outcome: "gain" | "loss" | "flat" | "unknown";
+  position_direction: "increase" | "reduce" | "unknown";
+  close_scope: "none" | "partial" | "complete" | "unknown";
+  position_context: "complete" | "unknown";
+}
+
+export interface PortfolioBrokerActivityItem {
+  id: string;
+  kind: "order" | "execution";
+  occurred_at_utc: string;
+  account: PortfolioActivityAccount;
+  symbol: string | null;
+  asset_class: string | null;
+  currency: string | null;
+  source: "broker";
+  state: "realized_gain" | "realized_loss" | "realized_flat" | "outcome_unknown";
+  objective: PortfolioActivityObjective;
+  annotation: PortfolioActivityAnnotation | null;
+  fills: PortfolioActivityFill[];
+}
+
+export interface PortfolioUnmatchedActivityItem {
+  id: string;
+  kind: "unmatched";
+  occurred_at_utc: string;
+  account: PortfolioActivityAccount;
+  symbol: string | null;
+  asset_class: string | null;
+  currency: string | null;
+  source: "broker";
+  state: "unmatched";
+  annotation: PortfolioActivityAnnotation | null;
+  from_run_id: number;
+  to_run_id: number;
+  from_as_of_utc: string;
+  to_as_of_utc: string;
+  before_quantity: number;
+  after_quantity: number;
+  expected_quantity: number;
+  residual_quantity: number;
+  execution_coverage: "complete" | "incomplete" | "gap";
+  reason_code: string;
+}
+
+export interface PortfolioActivityFieldChange {
+  field: string;
+  before: unknown;
+  after: unknown;
+}
+
+export interface PortfolioManualActivityItem {
+  id: string;
+  kind: "manual_adjustment";
+  occurred_at_utc: string;
+  account: PortfolioActivityAccount;
+  symbol: string;
+  source: "manual";
+  state: "manual_adjustment";
+  annotation: PortfolioActivityAnnotation | null;
+  position_id: number;
+  action: "create" | "update" | "close";
+  changes: PortfolioActivityFieldChange[];
+}
+
+export interface PortfolioCoverageGapActivityItem {
+  id: string;
+  kind: "coverage_gap";
+  occurred_at_utc: string;
+  account: PortfolioActivityAccount | null;
+  source: "system";
+  state: "coverage_gap";
+  from_run_id: number | null;
+  to_run_id: number;
+  from_as_of_utc: string | null;
+  to_as_of_utc: string;
+  reason_code: "execution_leg_incomplete" | "broker_day_gap";
+}
+
+export interface PortfolioHistoryStartActivityItem {
+  id: string;
+  kind: "history_start";
+  occurred_at_utc: string;
+  account: PortfolioActivityAccount;
+  source: "system";
+  state: "history_start";
+  capture_run_id: number;
+}
+
+export type PortfolioActivityItem =
+  | PortfolioBrokerActivityItem
+  | PortfolioUnmatchedActivityItem
+  | PortfolioManualActivityItem
+  | PortfolioCoverageGapActivityItem
+  | PortfolioHistoryStartActivityItem;
+
+export type PortfolioAnnotatableActivityItem = Extract<
+  PortfolioActivityItem,
+  { annotation: PortfolioActivityAnnotation | null }
+>;
+
+export function isPortfolioBrokerActivity(
+  item: PortfolioActivityItem,
+): item is Extract<PortfolioActivityItem, { kind: "order" | "execution" }> {
+  return item.kind === "order" || item.kind === "execution";
+}
+
+export function isPortfolioAnnotatableActivity(
+  item: PortfolioActivityItem,
+): item is PortfolioAnnotatableActivityItem {
+  return item.kind === "order"
+    || item.kind === "execution"
+    || item.kind === "unmatched"
+    || item.kind === "manual_adjustment";
+}
+
+export interface PortfolioActivityFilters {
+  date_from_et?: string;
+  date_to_et?: string;
+  account_id?: number;
+  symbol?: string;
+  source?: PortfolioActivitySource;
+  state?: PortfolioActivityState;
+  recent?: boolean;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface PortfolioActivityPage {
+  accounts: PortfolioActivityAccount[];
+  history_started_at_utc: string | null;
+  items: PortfolioActivityItem[];
+  summary: {
+    item_count: number;
+    unmatched_count: number;
+    recent_window_days: number | null;
+  };
+  next_cursor: string | null;
+}
+
+export function getPortfolioActivity(
+  filters: PortfolioActivityFilters = {},
+): Promise<PortfolioActivityPage> {
+  const query = new URLSearchParams();
+  if (filters.date_from_et) query.set("date_from_et", filters.date_from_et);
+  if (filters.date_to_et) query.set("date_to_et", filters.date_to_et);
+  if (filters.account_id !== undefined) query.set("account_id", String(filters.account_id));
+  if (filters.symbol) query.set("symbol", filters.symbol);
+  if (filters.source) query.set("source", filters.source);
+  if (filters.state) query.set("state", filters.state);
+  if (filters.recent) query.set("recent", "true");
+  if (filters.limit !== undefined && filters.limit !== 100) query.set("limit", String(filters.limit));
+  if (filters.cursor) query.set("cursor", filters.cursor);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return getJSON<PortfolioActivityPage>(`/portfolio/activity${suffix}`);
+}
+
+export function putPortfolioActivityAnnotation(
+  activityId: string,
+  body: { intent_label: PortfolioIntentLabel | null; note: string },
+): Promise<PortfolioActivityAnnotation> {
+  return sendJSON<PortfolioActivityAnnotation>(
+    `/portfolio/activity/annotations/${encodeURIComponent(activityId)}`,
+    "PUT",
+    body,
+  );
+}
+
+export function deletePortfolioActivityAnnotation(
+  activityId: string,
+): Promise<{ deleted: boolean; activity_id: string }> {
+  return sendJSON<{ deleted: boolean; activity_id: string }>(
+    `/portfolio/activity/annotations/${encodeURIComponent(activityId)}`,
+    "DELETE",
+  );
+}
+
 export function updatePortfolioPosition(
   positionId: number,
   body: PositionUpdate,
