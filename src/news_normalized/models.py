@@ -98,6 +98,11 @@ class WriterResult:
     legacy_rows_inserted: int = 0
     legacy_rows_updated: int = 0
     projection_skipped_no_ticker: int = 0
+    retry_status: str = "succeeded"
+    fresh_status: str = "succeeded"
+    retry_bodies_attempted: int = 0
+    retry_bodies_fetched: int = 0
+    tickers_scanned: int = 0
 
 
 @dataclass(frozen=True)

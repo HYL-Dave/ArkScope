@@ -3,6 +3,7 @@ import sqlite3
 
 import pytest
 
+from src.news_normalized import writer as writer_module
 from src.market_data_admin import (
     _NEWS_SCHEMA,
     _ensure_news_fts_triggers,
@@ -309,6 +310,119 @@ def test_writer_resumed_body_failure_updates_original_ticker_telemetry(store):
         "WHERE provider='fakewire' AND ticker='AAPL' AND interval='news'"
     ).fetchone()
     assert meta[0] == "body unavailable"
+
+
+def test_writer_retry_leg_runs_without_matching_headline(store):
+    old = store.upsert(candidate("p1"))
+    provider = FakeProvider({"AAPL": []})
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+        retry_body_ids=(old.article_id,),
+    )
+
+    assert provider.body_calls == ["p1"]
+    assert result.bodies_fetched == 1
+    assert result.retry_bodies_attempted == 1
+    assert result.retry_bodies_fetched == 1
+    assert result.retry_status == "succeeded"
+    assert result.fresh_status == "succeeded"
+    assert result.status == "succeeded"
+
+
+def test_writer_retry_leg_precedes_but_does_not_replace_fresh_scan(store):
+    old = store.upsert(candidate("p1"))
+    provider = FakeProvider({"AAPL": [candidate("p2")]})
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=1),
+        retry_body_ids=(old.article_id,),
+    )
+
+    work_events = [
+        event
+        for event in provider.events
+        if event.startswith("body:") or event.startswith("metadata:")
+    ]
+    assert work_events == [
+        "body:p1",
+        "metadata:AAPL:2026-06-27T10:00:01Z",
+        "body:p2",
+    ]
+    assert result.status == "succeeded"
+    assert result.tickers_scanned == 1
+
+
+def test_writer_retry_budget_is_independent_from_fresh_body_budget(store):
+    old = store.upsert(candidate("p1"))
+    provider = FakeProvider({"AAPL": [candidate("p2"), candidate("p3")]})
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=2, max_body_fetches=1),
+        retry_body_ids=(old.article_id,),
+    )
+
+    assert provider.body_calls == ["p1", "p2"]
+    assert result.retry_bodies_attempted == 1
+    assert result.retry_bodies_fetched == 1
+    assert result.bodies_fetched == 2
+    assert result.continuation is not None
+    assert result.continuation.deferred_body_ids == ("p3",)
+
+
+def test_retryable_10172_marks_retry_leg_and_run_partial_without_retry_continuation(
+    store,
+):
+    old = store.upsert(candidate("p1"))
+
+    class RetryableProvider(FakeProvider):
+        def fetch_body(self, article):
+            self.events.append(f"body:{article.provider_article_id}")
+            self.body_calls.append(article.provider_article_id)
+            return BodyCandidate(
+                status=BodyStatus.FAILED,
+                error="IBKR news article unavailable (10172)",
+                error_code=10172,
+            )
+
+    provider = RetryableProvider({"AAPL": []})
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+        retry_body_ids=(old.article_id,),
+    )
+
+    persisted = store.candidate_by_article_id(old.article_id)
+    assert persisted is not None
+    assert persisted.body.status is BodyStatus.FAILED
+    assert persisted.body.fetch_attempts == 1
+    assert persisted.body.next_retry_at is not None
+    assert result.retry_status == "partial"
+    assert result.fresh_status == "succeeded"
+    assert result.status == "partial"
+    assert result.continuation is None
+
+
+def test_writer_leg_status_matrix():
+    combine = writer_module.combine_writer_leg_statuses
+
+    assert combine("succeeded", "succeeded") == "succeeded"
+    assert combine("failed", "succeeded") == "partial"
+    assert combine("succeeded", "partial") == "partial"
+    assert combine("partial", "partial") == "partial"
+    assert combine("failed", "failed") == "failed"
 
 
 def test_projection_enabled_writes_two_legacy_rows_and_counts_inserted(store):

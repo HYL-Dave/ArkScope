@@ -178,3 +178,65 @@ def test_lock_busy_during_deferred_body_resume_aborts_batch(tmp_path):
             write_lock_factory=_flaky_lock_factory({2}),
         )
     conn.close()
+
+
+def test_retry_body_lock_busy_occurs_after_fetch_and_does_not_increment_attempt(
+    tmp_path,
+):
+    db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    store = NormalizedNewsStore(conn)
+    article = ArticleCandidate(
+        source="polygon",
+        provider_article_id="AAPL-retry",
+        title="Old retryable headline",
+        url="https://example.test/AAPL/retry",
+        published_at="2026-07-01T12:00:00Z",
+        primary_ticker="AAPL",
+        related_tickers=("AAPL",),
+        body=BodyCandidate(status=BodyStatus.PENDING),
+    )
+    article_id = store.upsert(article).article_id
+    lock_state = {"held": False, "calls": 0}
+    events = []
+
+    @contextmanager
+    def lock_factory():
+        lock_state["calls"] += 1
+        if lock_state["calls"] == 2:
+            events.append(("lock_busy", None, lock_state["held"]))
+            raise TimeoutError("market_data.db write lock busy (timeout)")
+        assert lock_state["held"] is False
+        lock_state["held"] = True
+        try:
+            yield
+        finally:
+            lock_state["held"] = False
+
+    provider = _FakeProvider(lock_state, events)
+    with pytest.raises(TimeoutError, match="market_data.db write lock busy"):
+        write_news_batch(
+            store,
+            provider,
+            [],
+            WriterBudget(max_articles=0, max_body_fetches=0),
+            retry_body_ids=(article_id,),
+            project_legacy=False,
+            write_lock_factory=lock_factory,
+        )
+
+    assert events.index(("fetch_body", "AAPL-retry", False)) < events.index(
+        ("lock_busy", None, False)
+    )
+    conn.close()
+    reopened = sqlite3.connect(db)
+    try:
+        row = reopened.execute(
+            "SELECT body_status,fetch_attempts,last_attempt_at,next_retry_at "
+            "FROM news_article_bodies WHERE article_id=?",
+            (article_id,),
+        ).fetchone()
+        assert row == ("pending", 0, None, None)
+    finally:
+        reopened.close()

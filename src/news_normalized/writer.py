@@ -50,6 +50,18 @@ def _unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(value for value in values if value))
 
 
+def _unique_ints(values: Iterable[int]) -> tuple[int, ...]:
+    return tuple(dict.fromkeys(int(value) for value in values))
+
+
+def combine_writer_leg_statuses(retry_status: str, fresh_status: str) -> str:
+    if retry_status == "failed" and fresh_status == "failed":
+        return "failed"
+    if retry_status != "succeeded" or fresh_status != "succeeded":
+        return "partial"
+    return "succeeded"
+
+
 def _body_fetch_due(body: BodyCandidate) -> bool:
     if not body.next_retry_at:
         return True
@@ -86,6 +98,7 @@ def write_news_batch(
     budget: WriterBudget,
     *,
     continuation: Optional[WriterContinuation] = None,
+    retry_body_ids: Iterable[int] = (),
     progress_cb: Optional[Callable[[int, int, str], None]] = None,
     project_legacy: bool = False,
     write_lock_factory: Optional[Callable[[], Any]] = None,
@@ -99,9 +112,11 @@ def write_news_batch(
     deferred_body_ids = list(
         continuation.deferred_body_ids if continuation is not None else ()
     )
+    retry_article_ids = _unique_ints(retry_body_ids)
     still_deferred_bodies: list[str] = []
     deferred_tickers: list[str] = []
     errors: dict[str, str] = {}
+    retry_errors: dict[str, str] = {}
     articles_seen = 0
     articles_inserted = 0
     bodies_fetched = 0
@@ -110,6 +125,8 @@ def write_news_batch(
     projection_skipped_no_ticker = 0
     projection_skip_article_ids: set[int] = set()
     body_fetch_attempts = 0
+    retry_bodies_attempted = 0
+    retry_bodies_fetched = 0
     tickers_scanned = 0
 
     def write_lock():
@@ -191,6 +208,37 @@ def write_news_batch(
     operation = getattr(provider, "operation", nullcontext)
     try:
         with operation():
+            for article_id in retry_article_ids:
+                restored = store.candidate_by_article_id(article_id)
+                if restored is None or restored.source.strip().casefold() != source:
+                    retry_errors[f"retry:{article_id}"] = (
+                        "retry article is missing from normalized store"
+                    )
+                    continue
+                if restored.body.status in _TERMINAL_BODY_STATUSES:
+                    continue
+                if not _body_fetch_due(restored.body):
+                    continue
+                retry_bodies_attempted += 1
+                try:
+                    body = provider.fetch_body(restored)
+                    update_body(restored, body)
+                    if body.status is BodyStatus.FETCHED:
+                        bodies_fetched += 1
+                        retry_bodies_fetched += 1
+                    elif body.status is BodyStatus.FAILED:
+                        retry_errors[f"retry:{article_id}"] = (
+                            body.error or "body fetch failed"
+                        )
+                except Exception as exc:  # provider failure remains retryable
+                    if _is_market_lock_busy(exc):
+                        raise
+                    update_body(
+                        restored,
+                        BodyCandidate(status=BodyStatus.FAILED, error=str(exc)),
+                    )
+                    retry_errors[f"retry:{article_id}"] = str(exc)
+
             for provider_id in deferred_body_ids:
                 restored = store.candidate_by_provider_id(source, provider_id)
                 if restored is None:
@@ -382,15 +430,22 @@ def write_news_batch(
             deferred_tickers=_unique(deferred_tickers),
             deferred_body_ids=_unique(still_deferred_bodies),
         )
-    status = "partial" if continuation_out is not None or errors else "succeeded"
+    retry_status = "partial" if retry_errors else "succeeded"
+    fresh_status = "partial" if continuation_out is not None or errors else "succeeded"
+    status = combine_writer_leg_statuses(retry_status, fresh_status)
     return WriterResult(
         status=status,
         articles_seen=articles_seen,
         articles_inserted=articles_inserted,
         bodies_fetched=bodies_fetched,
-        errors=errors,
+        errors={**retry_errors, **errors},
         continuation=continuation_out,
         legacy_rows_inserted=legacy_rows_inserted,
         legacy_rows_updated=legacy_rows_updated,
         projection_skipped_no_ticker=projection_skipped_no_ticker,
+        retry_status=retry_status,
+        fresh_status=fresh_status,
+        retry_bodies_attempted=retry_bodies_attempted,
+        retry_bodies_fetched=retry_bodies_fetched,
+        tickers_scanned=tickers_scanned,
     )
