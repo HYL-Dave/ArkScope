@@ -1882,7 +1882,7 @@ table.wl tbody tr.archived td {
   font-size: 12px;
 }
 .btn-ghost.tiny { font-size: 11px; padding: 2px 8px; margin-left: 6px; }
-.ds-last-run-cell {
+.data-table td.ds-last-run-cell {
   min-width: 220px;
   text-align: left;
   white-space: normal;
