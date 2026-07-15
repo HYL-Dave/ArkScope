@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** APPROVED DESIGN; HOTFIX A LIVE — 2026-07-15; DURABLE RETRY PENDING. Hotfix A is merged and verified. The durable-retry follow-up remains a separate unit that requires its own reviewed implementation plan.
+> **Status:** APPROVED DESIGN; HOTFIX A LIVE — 2026-07-15; DURABLE RETRY PLAN OPEN FOR REVIEW. Hotfix A is merged and verified. Durable retry has a separate RED-first implementation plan and no product code has started.
 
 ## 1. Purpose
 
