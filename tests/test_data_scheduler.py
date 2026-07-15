@@ -1079,6 +1079,7 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     assert "--tickers" in argv
     assert argv[argv.index("--tickers") + 1] == "AAPL,NVDA"
     assert "--gateway-lock-held" in argv
+    assert "--retry-body-ids" not in argv
     assert "sync" not in res
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
 
@@ -2678,3 +2679,195 @@ def test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure(monkeypatch):
     row = ds._state_store().get("ibkr_news")
     assert row["last_status"] == "skipped"
     assert row["last_error"] is None
+
+
+def test_worker_stdout_parse_preserves_retry_legs_and_body_backlog():
+    payload = ds._parse_sanitized_worker_stdout(
+        json.dumps(
+            {
+                "status": "succeeded",
+                "retry_bodies_attempted": 2,
+                "retry_bodies_fetched": 1,
+                "tickers_scanned": 3,
+                "error_count": 0,
+                "error_classes": [],
+                "legs": {"retry": "succeeded", "fresh": "succeeded"},
+                "body_backlog": {
+                    "status": "ok",
+                    "due_now": 0,
+                    "scheduled_later": 2,
+                    "never_attempted": 0,
+                    "earliest_next_retry_at": "2026-07-15T12:00:00Z",
+                },
+            }
+        )
+    )
+
+    assert payload is not None
+    assert payload["retry_bodies_attempted"] == 2
+    assert payload["retry_bodies_fetched"] == 1
+    assert payload["tickers_scanned"] == 3
+    assert payload["legs"] == {"retry": "succeeded", "fresh": "succeeded"}
+    assert payload["body_backlog"] == {
+        "status": "ok",
+        "due_now": 0,
+        "scheduled_later": 2,
+        "never_attempted": 0,
+        "earliest_next_retry_at": "2026-07-15T12:00:00Z",
+    }
+
+
+def test_worker_stdout_parser_rejects_malformed_body_backlog_values():
+    for invalid in (-1, 1.5, "1", float("inf")):
+        payload = ds._parse_sanitized_worker_stdout(
+            json.dumps(
+                {
+                    "status": "partial",
+                    "body_backlog": {
+                        "status": "ok",
+                        "due_now": invalid,
+                        "scheduled_later": 0,
+                        "never_attempted": 0,
+                    },
+                }
+            )
+        )
+        assert payload is not None
+        assert payload["body_backlog"] == {"status": "unavailable"}
+
+    invalid_timestamp = ds._parse_sanitized_worker_stdout(
+        json.dumps(
+            {
+                "status": "partial",
+                "body_backlog": {
+                    "status": "ok",
+                    "due_now": 0,
+                    "scheduled_later": 1,
+                    "never_attempted": 0,
+                    "earliest_next_retry_at": "not-a-time",
+                },
+            }
+        )
+    )
+    assert invalid_timestamp is not None
+    assert invalid_timestamp["body_backlog"] == {"status": "unavailable"}
+
+    forged_unavailable = ds._parse_sanitized_worker_stdout(
+        json.dumps(
+            {
+                "status": "partial",
+                "body_backlog": {"status": "unavailable", "due_now": 99},
+            }
+        )
+    )
+    assert forged_unavailable is not None
+    assert forged_unavailable["body_backlog"] == {"status": "unavailable"}
+
+    unknown_leg = ds._parse_sanitized_worker_stdout(
+        json.dumps(
+            {
+                "status": "partial",
+                "legs": {"retry": "waiting", "fresh": "succeeded"},
+            }
+        )
+    )
+    assert unknown_leg is not None
+    assert "legs" not in unknown_leg
+
+
+def _run_ibkr_worker_payload(monkeypatch, payload):
+    import src.news_normalized.routing as routing
+
+    _patch_news_write_route(
+        monkeypatch, routing.NewsWriteMode.NORMALIZED, "normalized ibkr test route"
+    )
+    seen = {}
+
+    def fake_worker(argv):
+        seen["argv"] = argv
+        parsed = ds._parse_sanitized_worker_stdout(json.dumps(payload))
+        assert parsed is not None
+        return {"returncode": 0, "payload": parsed}
+
+    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", fake_worker)
+    result = ds.run_source("ibkr_news", trigger_source="api")
+    return result, seen["argv"]
+
+
+def test_ibkr_success_persists_scheduled_backlog_without_partial(monkeypatch):
+    payload = {
+        "status": "succeeded",
+        "retry_bodies_attempted": 0,
+        "retry_bodies_fetched": 0,
+        "tickers_scanned": 2,
+        "error_count": 0,
+        "error_classes": [],
+        "legs": {"retry": "succeeded", "fresh": "succeeded"},
+        "body_backlog": {
+            "status": "ok",
+            "due_now": 0,
+            "scheduled_later": 2,
+            "never_attempted": 0,
+            "earliest_next_retry_at": "2026-07-15T18:00:00Z",
+        },
+    }
+
+    result, argv = _run_ibkr_worker_payload(monkeypatch, payload)
+
+    assert result["status"] == "succeeded"
+    assert result["collect"]["body_backlog"]["scheduled_later"] == 2
+    assert "--retry-body-ids" not in argv
+    row = ds._state_store().get("ibkr_news")
+    assert row["last_status"] == "succeeded"
+    assert row["continuation"] is None
+    assert row["last_result"]["collect"]["body_backlog"] == payload["body_backlog"]
+    assert ds.status_snapshot()["ibkr_news"]["durable_state"]["last_status"] == (
+        "succeeded"
+    )
+
+
+def test_ibkr_retry_failure_persists_partial_without_manual_continuation(
+    monkeypatch,
+):
+    payload = {
+        "status": "partial",
+        "error_count": 1,
+        "error_classes": ["ProviderError"],
+        "legs": {"retry": "partial", "fresh": "succeeded"},
+        "body_backlog": {
+            "status": "ok",
+            "due_now": 0,
+            "scheduled_later": 1,
+            "never_attempted": 0,
+            "earliest_next_retry_at": "2026-07-15T18:00:00Z",
+        },
+    }
+
+    result, _ = _run_ibkr_worker_payload(monkeypatch, payload)
+
+    assert result["status"] == "partial"
+    assert result["collect"]["legs"] == payload["legs"]
+    assert "continuation" not in result
+    row = ds._state_store().get("ibkr_news")
+    assert row["last_status"] == "partial"
+    assert row["continuation"] is None
+    assert ds._pending_continuation("ibkr_news") is None
+
+
+def test_ibkr_backlog_unavailable_is_partial_without_fake_zero(monkeypatch):
+    payload = {
+        "status": "partial",
+        "error_count": 1,
+        "error_classes": ["RetryBacklogError"],
+        "legs": {"retry": "failed", "fresh": "succeeded"},
+        "body_backlog": {"status": "unavailable"},
+    }
+
+    result, _ = _run_ibkr_worker_payload(monkeypatch, payload)
+
+    assert result["status"] == "partial"
+    assert result["collect"]["body_backlog"] == {"status": "unavailable"}
+    assert "due_now" not in result["collect"]["body_backlog"]
+    row = ds._state_store().get("ibkr_news")
+    assert row["last_status"] == "partial"
+    assert row["continuation"] is None

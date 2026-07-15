@@ -316,7 +316,11 @@ _SANITIZED_WORKER_COUNT_KEYS = (
     "legacy_rows_inserted",
     "legacy_rows_updated",
     "projection_skipped_no_ticker",
+    "retry_bodies_attempted",
+    "retry_bodies_fetched",
+    "tickers_scanned",
 )
+_SANITIZED_WORKER_LEG_STATUSES = frozenset({"succeeded", "partial", "failed"})
 
 
 def _make_normalized_news_provider(source: str):
@@ -519,6 +523,64 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
+def _safe_nonnegative_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _safe_iso_timestamp(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or len(text) > 64:
+        return None
+    parseable = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        datetime.fromisoformat(parseable)
+    except ValueError:
+        return None
+    return text
+
+
+def _parse_body_backlog(value: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(value, dict):
+        return None
+    if value.get("status") == "unavailable":
+        return {"status": "unavailable"}
+    if value.get("status") != "ok":
+        return None
+    counts = {
+        key: _safe_nonnegative_int(value.get(key))
+        for key in ("due_now", "scheduled_later", "never_attempted")
+    }
+    if any(item is None for item in counts.values()):
+        return {"status": "unavailable"}
+    earliest = _safe_iso_timestamp(value.get("earliest_next_retry_at"))
+    if value.get("earliest_next_retry_at") is not None and earliest is None:
+        return {"status": "unavailable"}
+    return {
+        "status": "ok",
+        **counts,
+        "earliest_next_retry_at": earliest,
+    }
+
+
+def _parse_worker_legs(value: Any) -> Optional[Dict[str, str]]:
+    if not isinstance(value, dict):
+        return None
+    retry = value.get("retry")
+    fresh = value.get("fresh")
+    if (
+        retry not in _SANITIZED_WORKER_LEG_STATUSES
+        or fresh not in _SANITIZED_WORKER_LEG_STATUSES
+    ):
+        return None
+    return {"retry": retry, "fresh": fresh}
+
+
 def _parse_sanitized_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
     try:
         raw = json.loads(stdout or "")
@@ -554,6 +616,12 @@ def _parse_sanitized_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
             ),
             "has_cursor": bool(continuation.get("has_cursor")),
         }
+    legs = _parse_worker_legs(raw.get("legs"))
+    if legs is not None:
+        payload["legs"] = legs
+    body_backlog = _parse_body_backlog(raw.get("body_backlog"))
+    if body_backlog is not None:
+        payload["body_backlog"] = body_backlog
     return payload
 
 
