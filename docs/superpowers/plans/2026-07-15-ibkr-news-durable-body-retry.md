@@ -2,7 +2,81 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN OPEN FOR REVIEW — 2026-07-15. IMPLEMENTATION NOT STARTED.**
+> **Status: IMPLEMENTED FOR REVIEW — 2026-07-15. NOT MERGED; REVIEWER CANONICAL A/B PENDING.**
+
+## Implementation Ledger
+
+- **Branch / commits:** branch `codex/ibkr-news-durable-body-retry`; plan base
+  `39097d4`; behavioral base `a113512`; code head `3f9ea7e`; review head is the
+  docs commit containing this ledger.
+- **Task 1, durable projection:** RED because the SQLite-derived retry selection,
+  backlog summary, and local-ID candidate lookup did not exist (six intended
+  failures). GREEN at `4b974a5`; queue/store coverage passed `31` tests. The
+  projection excludes future and terminal rows, orders explicit due promises
+  before never-attempted and legacy debt, survives reopen, and uses no second
+  queue table.
+- **Task 2, independent writer leg:** RED because `write_news_batch()` had no
+  independent retry input, budget, or leg outcome (six intended failures).
+  GREEN at `03b1995`; writer, lock, and adapter coverage passed `36` tests.
+  Retry runs before but never replaces the fresh scan, uses a separate budget,
+  and lock-busy commits no attempt.
+- **Task 3, isolated worker:** RED because the CLI lacked the retry budget,
+  SQLite selection, sanitized leg/backlog fields, and 300-tail-independent path
+  (ten intended failures; one initially false-green negative-budget case was
+  strengthened before implementation). GREEN at `a221bb3`; worker and adapter
+  coverage passed `40` tests. The default retry budget is exactly `25` and
+  child stdout contains no provider identity or licensed content.
+- **Task 4, scheduler persistence:** RED because the parent allowlist rejected
+  the new leg/backlog shape and could not distinguish unavailable from zero
+  (five intended failures after correcting one helper-bypass test). GREEN at
+  `0ef6d33`; the full scheduler file passed `101` tests. Retryable 10172 is
+  durably partial without creating an attended continuation; a future backlog
+  may coexist with a successful run.
+- **Task 5, Settings presentation:** RED was exactly `7 failed / 40 passed`
+  because no body-backlog DTO, pure projection, or mounted run/backlog split
+  existed. GREEN at `0f6727c`: focused `47`, full frontend `44 files / 426
+  tests`, typecheck, and production build passed. Old-sidecar Hotfix A behavior
+  remains compatible and the new backlog has no retry action.
+- **Task 6 automated gates:** exact focused backend `183 passed`; eight explicit
+  reliability cases passed; current full head result is `4191 passed / 30
+  failed / 74 skipped / 18 warnings / 7 errors` across `4302` cases, with the
+  failures/errors belonging to the known bare-profile family. Frontend remained
+  `44 files / 426 tests`; typecheck/build passed with only the existing chunk
+  warning. No-PG smoke returned `ok: true`, `pg_attempts: []` across 24 checks.
+- **Collection accounting:** clean virgin archives collect `4275 -> 4302`,
+  exactly `+27/-0`. Every added ID belongs to retry queue, writer/locking,
+  isolated-worker, or scheduler coverage; frontend is exactly `+7/-0`.
+- **Static boundaries:** privacy, second-authority, force-retry/order API,
+  PostgreSQL, and trading scans are empty. `DEFAULT_MAX_RETRY_BODY_FETCHES = 25`
+  appears exactly once. Queue restart, no-headline retry, older-than-300-tail,
+  independent budgets, third-10172 terminal behavior, lock-busy, and
+  succeeded-with-future-backlog contracts all pass.
+- **Responsive visual gate:** fixture sidecar plus Vite passed both scheduled
+  and unavailable backlog states at `1440x900`, `1024x768`, and `390x844`.
+  Status/backlog/progress/adjacent rows do not overlap; page overflow is zero;
+  the schedule table remains the bounded scroll owner; no false action or
+  licensed/provider data appears. Evidence paths are
+  `/tmp/arkscope-ibkr-retry-{scheduled,unavailable}-{1440x900,1024x768,390x844}.png`.
+- **Live copied-DB gate:** with exactly one Gateway consumer, a SQLite backup of
+  the real market DB supplied one due local article ID to the branch worker.
+  The naturally observed provider result was retryable `10172`: retry attempted
+  exactly once, fresh ticker scan still ran once, the copied row advanced to
+  attempt one with a six-hour retry, and sanitized backlog remained honest
+  (`due_now=237`, `scheduled_later=1`, `never_attempted=178`). Stdout was one
+  sanitized JSON object, stderr was empty, and no provider ID/title/body/error
+  payload crossed the boundary. Real DB digest and row counts were unchanged;
+  copied/probe artifacts were removed and the normal master desktop restarted.
+- **Plan deviations:** the visual gate exposed an existing CSS-specificity
+  collision: `.data-table td { white-space: nowrap }` overrode the intended
+  last-run wrapping. A geometry RED proved overflow, then `3f9ea7e` scoped the
+  stronger selector to `td.ds-last-run-cell`; all six viewports passed. No
+  product scope or test ledger changed.
+- **Canonical A/B limitation:** sequential base full pytest in this environment
+  hung after 31 cases in the known `TestClient`/lifespan family. It was stopped
+  as required; head full A/B was not substituted with partial/file-isolated
+  evidence and this ledger makes **no canonical PASS claim**. The exact clean
+  collection delta above is evidence only. Reviewer canonical A/B remains the
+  final merge gate.
 
 **Goal:** Make every locally known, retryable IBKR article body eligible for a bounded automatic retry even after the article falls outside IBKR's rolling headline tail, while keeping fresh headline ingestion independent and provider identifiers inside the isolated worker.
 
@@ -124,7 +198,7 @@ Sanitized child output gains only:
 - Consumes: existing `news_articles.id/source/provider_article_id/publisher/published_at` and `news_article_bodies.body_status/fetch_attempts/next_retry_at`.
 - Produces: `BodyRetryBacklog`, `BodyRetrySelection`, `candidate_by_article_id()`, `select_ibkr_body_retries()`, and `summarize_ibkr_body_backlog()`.
 
-- [ ] **Step 1: Write six failing queue tests**
+- [x] **Step 1: Write six failing queue tests**
 
 Create `tests/test_news_normalized_retry_queue.py` with a file-backed SQLite fixture and a helper that inserts synthetic IBKR candidates, then updates only body-state columns. Add exactly these tests:
 
@@ -157,7 +231,7 @@ assert summary == BodyRetryBacklog(
 
 The reopen test must close and reopen the same SQLite file and prove `selection.article_ids` and `selection.backlog` are identical. The validation test rejects both a negative limit and invocation while the caller already owns a transaction; it rolls back the test transaction before teardown.
 
-- [ ] **Step 2: Run RED and verify the failure reason**
+- [x] **Step 2: Run RED and verify the failure reason**
 
 Run:
 
@@ -167,7 +241,7 @@ pytest tests/test_news_normalized_retry_queue.py tests/test_news_normalized_stor
 
 Expected: the six new tests fail because the dataclasses/store methods do not exist; the existing 25 store tests pass, including both 10172 policy pins.
 
-- [ ] **Step 3: Add the retry data types and local-ID rehydration**
+- [x] **Step 3: Add the retry data types and local-ID rehydration**
 
 Add the two frozen dataclasses from **Locked Interfaces** to `models.py`. Refactor `candidate_by_provider_id()` so it resolves the provider key and delegates to a new `candidate_by_article_id()`; keep the returned `ArticleCandidate` shape byte-for-byte compatible.
 
@@ -227,7 +301,7 @@ def candidate_by_article_id(self, article_id: int) -> Optional[ArticleCandidate]
     )
 ```
 
-- [ ] **Step 4: Implement the deterministic read projection**
+- [x] **Step 4: Implement the deterministic read projection**
 
 Validate `limit >= 0`. Normalize `now` to aware UTC and use SQLite `julianday()` so `Z` and `+00:00` values compare correctly. Treat null, blank, or unparsable retry timestamps as legacy due work, matching `_body_fetch_due()`'s existing fail-open parse behavior.
 
@@ -274,7 +348,7 @@ The summary query uses the same source/identity filter and returns:
 
 `select_ibkr_body_retries()` must execute its selection and summary inside one short explicit read transaction so the chosen IDs and counts describe one SQLite snapshot. Reject an already-active caller transaction, commit/rollback the read transaction before returning, and assert `conn.in_transaction is False`; no transaction or cursor may survive into Gateway I/O. `summarize_ibkr_body_backlog()` is one aggregate SELECT and leaves no transaction open. `limit=0` returns no selected IDs but still returns complete backlog counts.
 
-- [ ] **Step 5: Run GREEN and unchanged-policy tests**
+- [x] **Step 5: Run GREEN and unchanged-policy tests**
 
 Run:
 
@@ -284,7 +358,7 @@ pytest tests/test_news_normalized_retry_queue.py tests/test_news_normalized_stor
 
 Expected: `31 passed` (`25 + 6`).
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```bash
 git add src/news_normalized/models.py src/news_normalized/store.py tests/test_news_normalized_retry_queue.py
@@ -305,7 +379,7 @@ git commit -m "feat: derive durable IBKR body retry queue"
 - Consumes: local integer IDs from `BodyRetrySelection.article_ids` and `NormalizedNewsStore.candidate_by_article_id()`.
 - Produces: the new `write_news_batch()` keyword `retry_body_ids=()`, additive leg/counter fields, and `combine_writer_leg_statuses(retry_status, fresh_status)`.
 
-- [ ] **Step 1: Write six failing writer tests**
+- [x] **Step 1: Write six failing writer tests**
 
 Add exactly five tests to `tests/test_news_normalized_writer.py`:
 
@@ -328,7 +402,7 @@ Required assertions:
 - the status matrix pins both succeeded -> succeeded, exactly one non-succeeded -> partial, both partial -> partial, and both failed -> failed;
 - the retry provider call observes the injected market write lock as not held; the following update-lock acquisition raises the exact lock-busy error; after reopening SQLite, `fetch_attempts`, `last_attempt_at`, and `next_retry_at` are unchanged.
 
-- [ ] **Step 2: Run RED and verify the failure reason**
+- [x] **Step 2: Run RED and verify the failure reason**
 
 ```bash
 pytest tests/test_news_normalized_writer.py tests/test_news_normalized_writer_locking.py -q
@@ -336,7 +410,7 @@ pytest tests/test_news_normalized_writer.py tests/test_news_normalized_writer_lo
 
 Expected: six new tests fail because `retry_body_ids` and leg telemetry do not exist; the existing `23` tests pass.
 
-- [ ] **Step 3: Extend `WriterResult` additively**
+- [x] **Step 3: Extend `WriterResult` additively**
 
 Add defaults so existing providers and constructor call sites remain valid:
 
@@ -370,7 +444,7 @@ def combine_writer_leg_statuses(retry_status: str, fresh_status: str) -> str:
     return "succeeded"
 ```
 
-- [ ] **Step 4: Split retry and fresh execution state**
+- [x] **Step 4: Split retry and fresh execution state**
 
 Add keyword-only `retry_body_ids: Iterable[int] = ()`. Deduplicate local IDs with stable order. Process those IDs before the existing ticker loop with a separate `retry_bodies_attempted` counter; do not increment fresh `body_fetch_attempts`.
 
@@ -396,7 +470,7 @@ errors = {**retry_errors, **fresh_errors}
 
 Market-lock exceptions still raise immediately and therefore cannot increment durable attempts.
 
-- [ ] **Step 5: Run GREEN and generic-provider regressions**
+- [x] **Step 5: Run GREEN and generic-provider regressions**
 
 ```bash
 pytest tests/test_news_normalized_writer.py tests/test_news_normalized_writer_locking.py tests/test_news_normalized_provider_adapters.py -q
@@ -404,7 +478,7 @@ pytest tests/test_news_normalized_writer.py tests/test_news_normalized_writer_lo
 
 Expected: writer files collect `29` tests (`19 + 5`, `4 + 1`); all selected suites pass and old continuation tests remain unchanged.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 ```bash
 git add src/news_normalized/models.py src/news_normalized/writer.py tests/test_news_normalized_writer.py tests/test_news_normalized_writer_locking.py
@@ -425,7 +499,7 @@ git commit -m "feat: separate normalized news body retry leg"
 - Consumes: Task 1 queue methods, Task 2 `retry_body_ids`, and the existing child-owned SQLite connection/Gateway lifetime.
 - Produces: `--max-retry-body-fetches`, `DEFAULT_MAX_RETRY_BODY_FETCHES=25`, sanitized `legs`, retry counters, and `body_backlog`.
 
-- [ ] **Step 1: Write ten failing worker tests**
+- [x] **Step 1: Write ten failing worker tests**
 
 Add exactly these tests to `tests/test_normalized_ibkr_worker.py`:
 
@@ -446,7 +520,7 @@ The queue-query-failure fake must raise from `select_ibkr_body_retries()` but re
 
 The post-summary-failure fake must let selection and both legs succeed, then raise from `summarize_ibkr_body_backlog()`. Assert aggregate partial plus exactly `{"status": "unavailable"}`; do not accept zero counts.
 
-- [ ] **Step 2: Run RED and verify the failure reason**
+- [x] **Step 2: Run RED and verify the failure reason**
 
 ```bash
 pytest tests/test_normalized_ibkr_worker.py -q
@@ -454,7 +528,7 @@ pytest tests/test_normalized_ibkr_worker.py -q
 
 Expected: ten new tests fail because the retry CLI argument, queue calls, and output fields do not exist; the existing 12 tests pass.
 
-- [ ] **Step 3: Add the independent child budget**
+- [x] **Step 3: Add the independent child budget**
 
 ```python
 DEFAULT_MAX_RETRY_BODY_FETCHES = 25
@@ -469,7 +543,7 @@ parser.add_argument(
 
 Reject any negative article, fresh-body, or retry-body budget. Thread the new value through `main()` to `_run_worker()`; keep all existing callers explicit in tests.
 
-- [ ] **Step 4: Orchestrate queue -> writer -> post-run backlog**
+- [x] **Step 4: Orchestrate queue -> writer -> post-run backlog**
 
 Inside the existing child-owned connection and before `write_news_batch()`:
 
@@ -513,7 +587,7 @@ data["body_backlog"] = {
 
 On failure attach only `{"status": "unavailable"}`, mark the retry leg failed, and recompute aggregate status. Do not abort or roll back fresh work that already committed.
 
-- [ ] **Step 5: Extend the stdout allowlist**
+- [x] **Step 5: Extend the stdout allowlist**
 
 Add `retry_bodies_attempted`, `retry_bodies_fetched`, and `tickers_scanned` to `_COUNT_KEYS`. Add strict helpers that accept only leg values `succeeded|partial|failed`, non-negative integer backlog counts, and parseable ISO timestamps no longer than 64 characters.
 
@@ -531,7 +605,7 @@ If an internal `retry_queue` error exists, include `RetryBacklogError` in `error
 
 Update `sanitize_worker_error()` with zero values for the three new counters. Keep raw stderr suppression and generic failure behavior unchanged.
 
-- [ ] **Step 6: Run GREEN, module-startup, and privacy tests**
+- [x] **Step 6: Run GREEN, module-startup, and privacy tests**
 
 ```bash
 pytest tests/test_normalized_ibkr_worker.py tests/test_news_normalized_ibkr_adapter.py -q
@@ -539,7 +613,7 @@ pytest tests/test_normalized_ibkr_worker.py tests/test_news_normalized_ibkr_adap
 
 Expected: worker file `22 passed`; adapter privacy/error tests remain green. The module-startup test still proves stdout is exactly one sorted JSON object.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 git add src/news_normalized/ibkr_cli.py tests/test_normalized_ibkr_worker.py
@@ -558,7 +632,7 @@ git commit -m "feat: run durable retries in isolated IBKR news worker"
 - Consumes: Task 3 sanitized stdout only.
 - Produces: additive `collect.legs` and `collect.body_backlog` in process-local and durable scheduler results; no article IDs or manual continuation.
 
-- [ ] **Step 1: Write five failing scheduler tests**
+- [x] **Step 1: Write five failing scheduler tests**
 
 Add exactly:
 
@@ -574,7 +648,7 @@ The retry-failure fixture must return aggregate partial, retry partial, fresh su
 
 The malformed parser cases include negative, float, string, infinity-equivalent JSON rejection, invalid timestamp, unknown leg status, and `status="unavailable"` with forged counts. They must fail closed to unavailable or omit invalid optional data, never coerce to a numeric zero promise.
 
-- [ ] **Step 2: Run RED and verify the failure reason**
+- [x] **Step 2: Run RED and verify the failure reason**
 
 ```bash
 pytest tests/test_data_scheduler.py -q
@@ -582,7 +656,7 @@ pytest tests/test_data_scheduler.py -q
 
 Expected: five new tests fail because the parent parser drops `legs/body_backlog`; the existing 96 tests pass.
 
-- [ ] **Step 3: Add strict parent-side parsers**
+- [x] **Step 3: Add strict parent-side parsers**
 
 Add the three retry counters to `_SANITIZED_WORKER_COUNT_KEYS`. Add helpers with these exact signatures:
 
@@ -601,13 +675,13 @@ Rules:
 
 Attach only parsed results in `_parse_sanitized_worker_stdout()`.
 
-- [ ] **Step 4: Preserve existing scheduler status mechanics**
+- [x] **Step 4: Preserve existing scheduler status mechanics**
 
 Do not add a continuation path. `writer_partial = collect.status == "partial"` remains the aggregate authority. A succeeded worker with scheduled backlog therefore persists succeeded; a partial worker persists partial with `continuation=None`; a nonzero future backlog never enters `_pending_continuation()`.
 
 Strengthen the existing worker argv test to assert it contains no `--retry-body-ids`, provider article ID, or body payload. The only new CLI behavior is the child's default 25-item retry budget.
 
-- [ ] **Step 5: Run GREEN and lock/timeout regressions**
+- [x] **Step 5: Run GREEN and lock/timeout regressions**
 
 ```bash
 pytest tests/test_data_scheduler.py -q
@@ -615,7 +689,7 @@ pytest tests/test_data_scheduler.py -q
 
 Expected: `101 passed`; existing Gateway-lock, market-lock-busy, timeout, and invalid-stdout tests remain green.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add src/service/data_scheduler.py tests/test_data_scheduler.py
@@ -637,7 +711,7 @@ git commit -m "feat: persist sanitized IBKR body retry telemetry"
 - Consumes: durable `ScheduleRunResult.collect.body_backlog` and optional leg statuses from Task 4.
 - Produces: `schedulerBodyBacklogPresentation(durable)` and one non-actionable mounted backlog line.
 
-- [ ] **Step 1: Write seven failing frontend tests**
+- [x] **Step 1: Write seven failing frontend tests**
 
 Add exactly five tests in `marketDataDisplay.test.ts`:
 
@@ -658,7 +732,7 @@ it("renders partial retry outcome with backlog and no continuation button", asyn
 
 The succeeded fixture shows `上次成功` plus `內文佇列：2 篇已排程稍後重試` and the formatted earliest timestamp. The partial fixture shows a generic partial run state plus `1 篇已排程稍後重試`; it must contain ordinary `Run`, no `補抓`, no provider ID, and no `待補抓 0`.
 
-- [ ] **Step 2: Run RED and verify the failure reason**
+- [x] **Step 2: Run RED and verify the failure reason**
 
 ```bash
 cd apps/arkscope-web
@@ -667,7 +741,7 @@ npm test -- --run src/marketDataDisplay.test.ts src/SettingsProviderConfig.test.
 
 Expected: seven new cases fail because backlog types/presentation/rendering do not exist; the current 40 Hotfix A tests pass.
 
-- [ ] **Step 3: Describe the additive sanitized DTO**
+- [x] **Step 3: Describe the additive sanitized DTO**
 
 Add:
 
@@ -688,7 +762,7 @@ export interface ScheduleWorkerLegs {
 
 Extend only `ScheduleRunResult.collect` with optional `legs`, `body_backlog`, and the three retry/ticker counters. Do not add a request, endpoint, provider ID, or body field.
 
-- [ ] **Step 4: Add a pure backlog presentation helper**
+- [x] **Step 4: Add a pure backlog presentation helper**
 
 Return `null` when the new field is absent or all valid counts are zero. Return a warning presentation for unavailable state. For valid backlog:
 
@@ -712,7 +786,7 @@ Counts must be finite non-negative integers. `never_attempted` is displayed only
 
 When `body_backlog` exists, `schedulerStateLabel()` must stop folding `deferred_body_count` into the run label. It may still show deferred ticker/cursor information. When `body_backlog` is absent, retain every Hotfix A count-only behavior for old-sidecar compatibility.
 
-- [ ] **Step 5: Render one compact non-actionable line**
+- [x] **Step 5: Render one compact non-actionable line**
 
 Import the helper into Settings. In `renderLastRun()` compute the backlog from `s.durable_state`. Render it beneath the existing status/action row:
 
@@ -729,7 +803,7 @@ Import the helper into Settings. In `renderLastRun()` compute the backlog from `
 
 Do not add `aria-live`, a progress bar, a badge that implies blocked state, a button, polling, CSS, or an IBKR-specific branch outside the data-driven presence of `body_backlog`.
 
-- [ ] **Step 6: Run GREEN and full frontend gates**
+- [x] **Step 6: Run GREEN and full frontend gates**
 
 ```bash
 cd apps/arkscope-web
@@ -741,7 +815,7 @@ npm run build
 
 Expected: focused `47 passed`; full frontend `44 files / 426 tests`, exactly `+7/-0`; typecheck/build pass with only the existing chunk-size warning.
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 ```bash
 git add apps/arkscope-web/src/api.ts apps/arkscope-web/src/marketDataDisplay.ts apps/arkscope-web/src/marketDataDisplay.test.ts apps/arkscope-web/src/Settings.tsx apps/arkscope-web/src/SettingsProviderConfig.test.ts
@@ -762,7 +836,7 @@ git commit -m "feat: show durable IBKR body retry backlog"
 - Consumes: final Tasks 1-5 implementation.
 - Produces: review-ready evidence only. No merge, LIVE claim, or Portfolio Slice 3 work.
 
-- [ ] **Step 1: Run the exact focused backend ledger**
+- [x] **Step 1: Run the exact focused backend ledger**
 
 ```bash
 pytest tests/test_news_normalized_store.py tests/test_news_normalized_retry_queue.py tests/test_news_normalized_writer.py tests/test_news_normalized_writer_locking.py tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py -q
@@ -770,7 +844,7 @@ pytest tests/test_news_normalized_store.py tests/test_news_normalized_retry_queu
 
 Expected: `183 passed`, exactly baseline `156 + 27`.
 
-- [ ] **Step 2: Run the explicit reliability gates**
+- [x] **Step 2: Run the explicit reliability gates**
 
 ```bash
 pytest \
@@ -787,7 +861,7 @@ pytest \
 
 Expected: `8 passed`.
 
-- [ ] **Step 3: Run privacy, authority, and scope ratchets**
+- [x] **Step 3: Run privacy, authority, and scope ratchets**
 
 The following commands must return zero matches:
 
@@ -816,7 +890,7 @@ rg -n "DEFAULT_MAX_RETRY_BODY_FETCHES = 25" src/news_normalized/ibkr_cli.py
 
 Expected: exactly one match.
 
-- [ ] **Step 4: Run full automated verification**
+- [x] **Step 4: Run full automated verification**
 
 ```bash
 pytest -q
@@ -840,7 +914,7 @@ Run a responsive visual gate for the affected Data Sources schedule row after th
 
 Record screenshot paths and DOM overflow measurements in the implementation ledger, then remove temporary fixture/profile artifacts.
 
-- [ ] **Step 5: Run one-Gateway live gate without mutating the real market DB**
+- [x] **Step 5: Run one-Gateway live gate without mutating the real market DB**
 
 Close the normal desktop/sidecar so exactly one Gateway consumer remains. Use SQLite backup to copy the real `market_data.db` to `/tmp/arkscope-ibkr-retry-live.db`. An internal probe may choose one locally known IBKR pending/failed row and make only the copied row due; it must print local integer IDs/counts only, never provider ID, title, body, or licensed error text.
 
@@ -880,7 +954,7 @@ Use clean virgin archives of behavioral base `a113512` and final code head under
 
 If this environment reproduces the known `TestClient`/lifespan hang, record it and stop for reviewer canonical A/B. Do not replace the authority with file-isolated or partial results while claiming canonical PASS.
 
-- [ ] **Step 7: Reconcile the ledger and stop review-ready**
+- [x] **Step 7: Reconcile the ledger and stop review-ready**
 
 Add an `Implementation Ledger` beneath the plan status containing:
 

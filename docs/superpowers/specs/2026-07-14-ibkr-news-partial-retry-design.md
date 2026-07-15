@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** APPROVED DESIGN; HOTFIX A LIVE — 2026-07-15; DURABLE RETRY PLAN OPEN FOR REVIEW. Hotfix A is merged and verified. Durable retry has a separate RED-first implementation plan and no product code has started.
+> **Status:** APPROVED DESIGN; HOTFIX A LIVE — 2026-07-15; DURABLE RETRY IMPLEMENTED FOR REVIEW. The durable retry product code, focused/full-head gates, responsive gate, and copied-DB live gate are complete; reviewer canonical A/B remains required before merge or LIVE status.
 
 ## 1. Purpose
 
@@ -231,7 +231,8 @@ The reviewed implementation plan must include tests proving:
 1. Written review is complete.
 2. Open and execute the small Hotfix A implementation plan; stop review-ready and merge it
    independently.
-3. Open a separate durable-retry implementation plan immediately afterward.
+3. The separate durable-retry implementation plan is implemented for review; do not merge or
+   mark it LIVE until reviewer canonical A/B closes.
 4. Resume Portfolio 1.1 Slice 3 after this bounded news reliability interruption; Slice 2 is
    already merged/live. Split the durable-retry work further first if its plan review requires it.
 
