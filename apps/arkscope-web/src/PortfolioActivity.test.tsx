@@ -83,7 +83,7 @@ const correctedRevision = {
       first_observed_run_id: 51,
       first_observed_at_utc: "2026-07-15T14:36:00+00:00",
       commission: 1.25,
-      currency: "USD",
+      currency: "CAD",
       realized_pnl: 124.5,
       yield_value: null,
       yield_redemption_date: null,
@@ -96,8 +96,8 @@ const correctedRevision = {
       commission: 1,
       currency: "USD",
       realized_pnl: 125,
-      yield_value: null,
-      yield_redemption_date: null,
+      yield_value: 2.5,
+      yield_redemption_date: 20270115,
       is_latest: true,
     },
   ],
@@ -328,6 +328,28 @@ describe("PortfolioActivity", () => {
     expect(detail.textContent).toContain("Commission #89");
     expect(detail.textContent).toContain("Commission #90");
     expect(detail.textContent).toContain("最新");
+    const execution31 = Array.from(detail.querySelectorAll(".portfolio-activity-revision"))
+      .find((row) => row.textContent?.includes("Exec 0001 ·"))!;
+    const execution32 = Array.from(detail.querySelectorAll(".portfolio-activity-revision"))
+      .find((row) => row.textContent?.includes("Exec 0001.01"))!;
+    expect(execution31.textContent).toContain("首次觀察 Run #50");
+    expect(execution31.textContent).toContain("07-15 22:32 Asia/Taipei");
+    expect(execution32.textContent).toContain("首次觀察 Run #51");
+    expect(execution32.textContent).toContain("07-15 22:35 Asia/Taipei");
+    const commission89 = Array.from(detail.querySelectorAll("li"))
+      .find((row) => row.textContent?.includes("Commission #89"))!;
+    const commission90 = Array.from(detail.querySelectorAll("li"))
+      .find((row) => row.textContent?.includes("Commission #90"))!;
+    expect(commission89.textContent).toContain("已實現損益 124.5 CAD");
+    expect(commission89.textContent).not.toContain("已實現損益 124.5 USD");
+    expect(commission89.textContent).toContain("首次觀察 Run #51");
+    expect(commission89.textContent).toContain("07-15 22:36 Asia/Taipei");
+    expect(commission89.textContent).toContain("Yield 未知");
+    expect(commission89.textContent).toContain("贖回日 未知");
+    expect(commission90.textContent).toContain("首次觀察 Run #52");
+    expect(commission90.textContent).toContain("07-15 22:40 Asia/Taipei");
+    expect(commission90.textContent).toContain("Yield 2.5");
+    expect(commission90.textContent).toContain("贖回日 20270115");
   });
 
   it("keeps missing-perm execution rows independent", async () => {
@@ -514,13 +536,21 @@ describe("PortfolioActivity", () => {
     await openRowAction("編輯註記");
     const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="註記"]')!;
     setInput(textarea, "keep this authored copy");
+    const clearButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("清除註記"))!;
     await clickButton("清除註記", document);
-    expect(document.querySelector('.ui-confirm-dialog[role="dialog"]')).not.toBeNull();
+    const cancelDialog = document.querySelector<HTMLElement>('.ui-confirm-dialog[role="dialog"]')!;
+    expect(cancelDialog).not.toBeNull();
     expect(confirm).not.toHaveBeenCalled();
+    await clickButton("取消", cancelDialog);
+    expect(document.activeElement).toBe(clearButton);
+
+    await clickButton("清除註記", document);
     await clickButton("確認清除", document);
     expect(document.body.textContent).toContain("註記未清除；請重試");
     expect(document.body.textContent).not.toContain("RAW DELETE SECRET");
     expect(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="註記"]')?.value).toBe("keep this authored copy");
+    expect(document.activeElement).toBe(clearButton);
 
     await clickButton("清除註記", document);
     await clickButton("確認清除", document);
@@ -539,12 +569,23 @@ describe("PortfolioActivity", () => {
   });
 
   it("shows authored read cause and next action without raw exception detail", async () => {
-    stubFetch(() => ({ status: 503, body: { detail: { message: "sqlite SECRET account DU123 stack" } } }));
+    let reads = 0;
+    stubFetch(() => {
+      reads += 1;
+      if (reads === 1) return page({ next_cursor: "stale-cursor" });
+      return { status: 503, body: { detail: { message: "sqlite SECRET account DU123 stack" } } };
+    });
     await mount();
     await flush();
+    expect(host!.textContent).toContain("AAPL");
+    expect(host!.textContent).toContain("載入更多");
+    setInput(host!.querySelector<HTMLInputElement>('input[aria-label="Symbol 篩選"]')!, "FAIL");
+    await clickButton("套用篩選");
 
     expect(host!.textContent).toContain("活動載入失敗；請重新整理");
     expect(host!.textContent).toContain("重新整理");
+    expect(host!.textContent).not.toContain("AAPL");
+    expect(host!.textContent).not.toContain("載入更多");
     expect(host!.textContent).not.toContain("sqlite SECRET");
     expect(host!.textContent).not.toContain("DU123");
   });

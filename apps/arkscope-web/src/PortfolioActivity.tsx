@@ -79,6 +79,7 @@ export function PortfolioActivity({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const requestGeneration = useRef(0);
   const editorReturnFocusRef = useRef<HTMLElement | null>(null);
+  const deleteReturnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const load = useCallback(async (
     filters: PortfolioActivityFilters,
@@ -87,6 +88,7 @@ export function PortfolioActivity({
     const generation = ++requestGeneration.current;
     if (append) setAppending(true);
     else {
+      setPage(null);
       setLoading(true);
       setReadFailed(false);
     }
@@ -359,7 +361,7 @@ export function PortfolioActivity({
         footer={(
           <div className="portfolio-activity-editor-actions">
             {annotatableEditorItem?.annotation ? (
-              <Button tone="danger" disabled={mutationBusy} onClick={() => setConfirmDelete(true)}>清除註記</Button>
+              <Button ref={deleteReturnFocusRef} tone="danger" disabled={mutationBusy} onClick={() => setConfirmDelete(true)}>清除註記</Button>
             ) : null}
             <span className="portfolio-activity-editor-spacer" />
             <Button disabled={mutationBusy} onClick={closeEditor}>取消</Button>
@@ -400,7 +402,8 @@ export function PortfolioActivity({
         busy={mutationBusy}
         onConfirm={() => void deleteAnnotation()}
         onCancel={() => setConfirmDelete(false)}
-        returnFocusRef={editorReturnFocusRef}
+        returnFocusRef={deleteReturnFocusRef}
+        fallbackFocusRef={editorReturnFocusRef}
       />
     </section>
   );
@@ -539,11 +542,14 @@ function ActivityDetail({
                   <span className="muted tiny">
                     {execution.side} {formatNumber(execution.quantity)} @ {formatNumber(execution.price)} · {formatMarketTimestamp(execution.execution_time_utc, { localTimeZone })}
                   </span>
+                  <span className="muted tiny">
+                    首次觀察 Run #{execution.first_observed_run_id} · {formatSystemTimestamp(execution.first_observed_at_utc, { localTimeZone })}
+                  </span>
                   {execution.commission_revisions.length ? (
                     <ul>
                       {execution.commission_revisions.map((commission) => (
                         <li key={commission.id}>
-                          Commission #{commission.id} · {formatAmount(commission.commission, commission.currency)} · 已實現損益 {formatAmount(commission.realized_pnl, execution.currency)}{commission.is_latest ? " · 最新" : ""}
+                          Commission #{commission.id} · {formatAmount(commission.commission, commission.currency)} · 已實現損益 {formatAmount(commission.realized_pnl, commission.currency)} · 首次觀察 Run #{commission.first_observed_run_id} · {formatSystemTimestamp(commission.first_observed_at_utc, { localTimeZone })} · Yield {formatNumber(commission.yield_value)} · 贖回日 {commission.yield_redemption_date ?? "未知"}{commission.is_latest ? " · 最新" : ""}
                         </li>
                       ))}
                     </ul>
