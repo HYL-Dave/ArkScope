@@ -613,32 +613,100 @@ describe("HoldingsView", () => {
     expect(activityCalls(calls, false)).toHaveLength(1);
   });
 
-  it("invalidates the wide recent summary once after a successful manual mutation", async () => {
+  it("invalidates recent synchronously and only for persisted manual financial changes", async () => {
     stubShellOverlay(false);
-    const recentHandler = vi.fn(recentActivityPage);
+    let persisted = manualPosition();
+    let patchCount = 0;
+    let publishPreFinancialRecent: (() => void) | null = null;
+    const financialPatch = deferred<PortfolioPosition>();
+    const recentRequests: Array<ReturnType<typeof deferred<PortfolioActivityPage>>> = [];
+    const recentHandler = vi.fn(() => {
+      const request = deferred<PortfolioActivityPage>();
+      recentRequests.push(request);
+      return request.promise;
+    });
     const calls = stubFetch((url, init) => {
-      if (init?.method === "POST") return { ok: true };
-      return snapshot();
+      if (init?.method === "PATCH") {
+        patchCount += 1;
+        if (patchCount === 1) {
+          persisted = manualPosition({ notes: "note only" });
+          return persisted;
+        }
+        return financialPatch.promise.then((position) => {
+          persisted = position;
+          return position;
+        });
+      }
+      if (
+        init?.method === undefined
+        && new URL(url).pathname === "/portfolio"
+        && patchCount === 2
+      ) {
+        const publish = publishPreFinancialRecent;
+        publishPreFinancialRecent = null;
+        publish?.();
+      }
+      return snapshot({ positions: [persisted] });
     }, undefined, undefined, recentHandler);
     await mount();
     await flush();
     expect(recentHandler).toHaveBeenCalledTimes(1);
 
-    const ticker = host!.querySelector<HTMLInputElement>('input[aria-label="Ticker"]')!;
-    const quantity = host!.querySelector<HTMLInputElement>('input[aria-label="Quantity"]')!;
+    await openRowActions("NVDA");
     await act(async () => {
-      ticker.value = "AAPL";
-      ticker.dispatchEvent(new Event("input", { bubbles: true }));
-      quantity.value = "2";
-      quantity.dispatchEvent(new Event("input", { bubbles: true }));
-      (await buttonByText("新增持倉")).click();
+      (await buttonByText("編輯")).click();
+    });
+    await act(async () => {
+      setInput("Edit Notes", "note only");
+      (await buttonByText("儲存")).click();
     });
     await flush();
     await flush();
+    const recentRequestCountAfterNote = activityCalls(calls, true).length;
 
-    expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
+    await openRowActions("NVDA");
+    await act(async () => {
+      (await buttonByText("編輯")).click();
+    });
+    await act(async () => {
+      setInput("Edit Quantity", "5");
+      (await buttonByText("儲存")).click();
+    });
+
+    let stalePanelPublished = false;
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (
+            node instanceof Element
+            && (node.matches(".portfolio-recent-activity")
+              || node.querySelector(".portfolio-recent-activity"))
+          ) {
+            stalePanelPublished = true;
+          }
+        }
+      }
+    });
+    observer.observe(host!, { childList: true, subtree: true });
+
+    const preFinancialRecent = recentRequests[recentRequests.length - 1];
+    publishPreFinancialRecent = () => preFinancialRecent.resolve(recentActivityPage());
+    await act(async () => {
+      financialPatch.resolve(manualPosition({ quantity: 5, notes: "note only" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await flush();
+    observer.disconnect();
+
+    expect(stalePanelPublished).toBe(false);
+    expect(recentRequestCountAfterNote).toBe(1);
     expect(activityCalls(calls, true)).toHaveLength(2);
-    expect(recentHandler).toHaveBeenCalledTimes(2);
+    expect(activityCalls(calls, true).length - recentRequestCountAfterNote).toBe(1);
+
+    await act(async () => {
+      for (const request of recentRequests) request.resolve(emptyActivityPage());
+    });
   });
 
   it("can add a manual holding", async () => {

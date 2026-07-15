@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PortfolioRecentActivity } from "./PortfolioRecentActivity";
+import { formatSystemTimestamp } from "./timeDisplay";
 import type {
   PortfolioActivityPage,
   PortfolioBrokerActivityItem,
@@ -169,6 +170,12 @@ async function mount(activityPage: PortfolioActivityPage, onOpenActivity = vi.fn
 
 describe("PortfolioRecentActivity", () => {
   it("renders real compact rows plus recent unmatched count and calls onOpenActivity", async () => {
+    vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({
+      locale: "en-US",
+      calendar: "gregory",
+      numberingSystem: "latn",
+      timeZone: "Asia/Taipei",
+    });
     const onOpenActivity = await mount(page());
 
     expect(host!.textContent).toContain("近期活動");
@@ -176,6 +183,11 @@ describe("PortfolioRecentActivity", () => {
     expect(host!.textContent).toContain("更新 · 1 項欄位");
     expect(host!.textContent).toContain("MSFT 未匹配變動");
     expect(host!.textContent).toContain("殘差 -3");
+    const unmatchedRow = Array.from(host!.querySelectorAll("li"))
+      .find((row) => row.textContent?.includes("MSFT 未匹配變動"));
+    expect(unmatchedRow?.textContent).toContain(
+      formatSystemTimestamp(unmatchedItem.occurred_at_utc).split(" · ")[0],
+    );
     expect(host!.textContent).toContain("近 7 日有 3 筆未匹配變動");
 
     await act(async () => {

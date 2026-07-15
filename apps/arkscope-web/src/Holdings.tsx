@@ -141,6 +141,8 @@ export function HoldingsView() {
   }, [activeView, recentRevision, shellOverlay]);
 
   const invalidateRecentActivity = useCallback(() => {
+    recentGeneration.current += 1;
+    setRecentActivity(null);
     setRecentRevision((current) => current + 1);
   }, []);
 
@@ -176,7 +178,7 @@ export function HoldingsView() {
 
   async function onSaveEdit() {
     if (!editing) return;
-    const updatesManualPosition = editing.broker === "manual";
+    const originalPosition = editing;
     const body: PositionUpdate = {
       notes: editNotesRef.current?.value ?? "",
       thesis: editThesisRef.current?.value ?? "",
@@ -208,8 +210,13 @@ export function HoldingsView() {
     setBusy(`edit-${editing.id}`);
     setErr(null);
     try {
-      await updatePortfolioPosition(editing.id, body);
-      if (updatesManualPosition) invalidateRecentActivity();
+      const persistedPosition = await updatePortfolioPosition(editing.id, body);
+      if (
+        originalPosition.broker === "manual"
+        && hasManualFinancialChange(originalPosition, persistedPosition)
+      ) {
+        invalidateRecentActivity();
+      }
       setEditing(null);
       await load();
     } catch (e) {
@@ -724,6 +731,17 @@ function PositionsTable({
       renderExpandedRow={(position) => editingId === position.id ? editor : null}
     />
   );
+}
+
+function hasManualFinancialChange(
+  before: PortfolioPosition,
+  after: PortfolioPosition,
+): boolean {
+  return before.symbol !== after.symbol
+    || before.asset_class !== after.asset_class
+    || before.quantity !== after.quantity
+    || before.avg_cost !== after.avg_cost
+    || before.currency !== after.currency;
 }
 
 function splitTags(raw: string): string[] {

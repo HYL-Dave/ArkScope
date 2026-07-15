@@ -103,7 +103,7 @@ function accountLabel(item: PortfolioActivityItem): string {
 }
 
 function compactTime(item: PortfolioActivityItem): string {
-  const formatted = item.source === "broker"
+  const formatted = item.kind === "order" || item.kind === "execution"
     ? formatMarketTimestamp(item.occurred_at_utc)
     : formatSystemTimestamp(item.occurred_at_utc);
   return formatted.split(" · ")[0];
