@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED FOR REVIEW — 2026-07-15. NOT MERGED. DURABLE RETRY REMAINS PENDING.**
+> **Status: MERGED / LIVE — 2026-07-15. DURABLE RETRY REMAINS PENDING.**
 
 ## Implementation Ledger
 
@@ -14,6 +14,7 @@
 - Live display gate used one scheduler-disabled branch sidecar and the real profile DB without triggering News or Gateway work. The natural durable row was still partial with `deferred_body_count=2`; all `1440x900`, `1024x768`, and `390x844` views rendered `2 篇內文待後續處理`, retained ordinary `Run`, exposed no `補抓`, had no cell overlap or page-level horizontal overflow, and used the existing table scroll owner at narrow widths.
 - Restart gate: after the sidecar restarted, process-local `last_result` was `null`, while SQLite preserved the same `last_attempt`, `updated_at`, and body count `2`; reloading all three viewports rendered the same durable explanation. No profile row was manufactured or modified for this gate.
 - Plan deviations: none. Canonical backend A/B was intentionally replaced by the stronger byte-identity proof approved in plan review.
+- Review and merge: independent review repeated every gate and returned GREEN. `master` fast-forwarded through `c035ff2`; merged-tree verification passed focused `40`, full frontend `44 files / 419 tests`, typecheck, and production build with only the existing chunk-size warning.
 
 **Goal:** Make the Data Sources schedule row describe IBKR News count-only partial work truthfully, without inventing `待補抓 0` or exposing a manual continuation action that the sanitized worker cannot honor.
 
