@@ -93,7 +93,7 @@ def build_portfolio_overview(
 
 def safe_portfolio_account_label(account: PortfolioAccount) -> str:
     raw_id = account.broker_account_id
-    if raw_id and raw_id in account.label:
+    if raw_id and raw_id.casefold() in account.label.casefold():
         if account.broker_account_id_hash:
             return f"{account.broker.upper()} · {account.broker_account_id_hash[:8]}"
         return account.broker.upper()

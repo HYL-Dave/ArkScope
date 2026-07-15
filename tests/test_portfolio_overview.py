@@ -221,7 +221,8 @@ def test_overview_mixed_manual_currencies_remain_per_currency_without_grand_tota
 
 def test_overview_redacts_legacy_label_that_contains_raw_broker_id(tmp_path):
     portfolio, observations = stores(tmp_path)
-    account = portfolio.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+    account = portfolio.upsert_broker_account("ibkr", "DU123", "IBKR du123")
+    clean = portfolio.upsert_broker_account("ibkr", "DU456", "Primary account")
 
     row = next(
         item
@@ -231,4 +232,5 @@ def test_overview_redacts_legacy_label_that_contains_raw_broker_id(tmp_path):
 
     assert row.label == f"IBKR · {account.broker_account_id_hash[:8]}"
     assert safe_portfolio_account_label(account) == row.label
-    assert "DU123" not in repr(row)
+    assert "du123" not in repr(row).casefold()
+    assert safe_portfolio_account_label(clean) == "Primary account"

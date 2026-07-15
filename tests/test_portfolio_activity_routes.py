@@ -82,7 +82,7 @@ def test_get_activity_serializes_exact_shape_without_raw_broker_account_id(tmp_p
     path = tmp_path / "profile_state.db"
     portfolio = PortfolioStore(path)
     portfolio.upsert_broker_account(
-        "ibkr", RAW_ACCOUNT_ID, f"Legacy IBKR {RAW_ACCOUNT_ID}"
+        "ibkr", RAW_ACCOUNT_ID, f"Legacy IBKR {RAW_ACCOUNT_ID.lower()}"
     )
 
     out = routes.get_activity(store=PortfolioActivityStore(path))
@@ -95,7 +95,7 @@ def test_get_activity_serializes_exact_shape_without_raw_broker_account_id(tmp_p
         "summary",
         "next_cursor",
     }
-    assert RAW_ACCOUNT_ID not in encoded
+    assert RAW_ACCOUNT_ID.casefold() not in encoded.casefold()
     assert '"broker_account_id"' not in encoded
     assert "broker_account_id_hash" in encoded
     assert out["accounts"][0]["label"].startswith("IBKR · ")
