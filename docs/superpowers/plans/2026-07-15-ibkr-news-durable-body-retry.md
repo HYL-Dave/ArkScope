@@ -78,6 +78,22 @@
   collection delta above is evidence only. Reviewer canonical A/B remains the
   final merge gate.
 
+### Reviewer gate CLOSED — canonical A/B ✅ PASS (Fable, 2026-07-15, no hang)
+
+Virgin `git archive` of behavioral base `a113512` versus head `4b7fb71`,
+sequential single-process full pytest, reviewer environment: both sides
+identical on the pre-existing family (`30 failed / 74 skipped / 18 warnings /
+7 errors`); failure sets empty in both directions; passed `4164 -> 4191` =
+exactly **`+27`**, collect `+27/-0`, matching the plan ledger to the test.
+Work dir `/tmp/ab_retry_qb5i`. The reviewer also independently re-ran:
+frontend `44 files / 426 tests` PASS + typecheck + production build in the
+branch worktree; focused backend `183 passed`; and all five Task 6 Step 3
+static gates (privacy boundary, no queue table, no force-retry/order APIs,
+no PG, budget default exactly once) — all clean. The CSS-specificity
+deviation (`3f9ea7e`, geometry-RED-first, selector scope only) is verified
+narrow and properly ledgered. All gates are now closed; merge remains the
+user's decision.
+
 **Goal:** Make every locally known, retryable IBKR article body eligible for a bounded automatic retry even after the article falls outside IBKR's rolling headline tail, while keeping fresh headline ingestion independent and provider identifiers inside the isolated worker.
 
 **Architecture:** `NormalizedNewsStore` derives a deterministic retry batch and backlog summary directly from `news_articles` plus `news_article_bodies`; no queue table is added. The isolated IBKR worker passes local normalized article IDs to a new writer retry leg with its own 25-request budget, then performs the existing fresh ticker scan with the existing body budget. The child emits only sanitized leg statuses, counts, and the earliest retry timestamp; the scheduler persists that additive result and Settings renders run outcome separately from durable backlog.
