@@ -12,9 +12,11 @@ import {
   closePortfolioPosition,
   createManualPosition,
   getPortfolio,
+  getPortfolioActivity,
   getPortfolioOverview,
   updatePortfolioAccount,
   updatePortfolioPosition,
+  type PortfolioActivityPage,
   type PortfolioOverview,
   type PortfolioPosition,
   type PortfolioSnapshot,
@@ -24,7 +26,9 @@ import {
   PortfolioAccountDetails,
   PortfolioAccountSummary,
 } from "./PortfolioAccountOverview";
+import { PortfolioActivity } from "./PortfolioActivity";
 import { PortfolioCapturePanel } from "./PortfolioCapturePanel";
+import { PortfolioRecentActivity } from "./PortfolioRecentActivity";
 import {
   Button,
   ConfirmDialog,
@@ -33,21 +37,25 @@ import {
   InlineAlert,
   PageHeader,
   StatusBadge,
+  useShellOverlay,
   type DataTableColumn,
 } from "./ui";
 
-type PortfolioView = "holdings" | "account_details" | "sync_records";
+type PortfolioView = "holdings" | "activity" | "account_details" | "sync_records";
 
 const PORTFOLIO_VIEWS: Array<{ id: PortfolioView; label: string }> = [
   { id: "holdings", label: "持倉" },
-  // Slice 3 inserts the activity view here.
+  { id: "activity", label: "活動" },
   { id: "account_details", label: "帳戶明細" },
   { id: "sync_records", label: "同步紀錄" },
 ];
 
 export function HoldingsView() {
+  const shellOverlay = useShellOverlay();
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [overview, setOverview] = useState<PortfolioOverview | null>(null);
+  const [recentActivity, setRecentActivity] = useState<PortfolioActivityPage | null>(null);
+  const [recentRevision, setRecentRevision] = useState(0);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -57,6 +65,7 @@ export function HoldingsView() {
   const [positionAccountId, setPositionAccountId] = useState<number | "all">("all");
   const [editing, setEditing] = useState<PortfolioPosition | null>(null);
   const [pendingClose, setPendingClose] = useState<PortfolioPosition | null>(null);
+  const recentGeneration = useRef(0);
   const closeTriggerRef = useRef<HTMLElement | null>(null);
   const closedFilterRef = useRef<HTMLInputElement | null>(null);
   const tickerRef = useRef<HTMLInputElement>(null);
@@ -72,6 +81,7 @@ export function HoldingsView() {
   const editTagsRef = useRef<HTMLInputElement>(null);
   const tabRefs = useRef<Record<PortfolioView, HTMLButtonElement | null>>({
     holdings: null,
+    activity: null,
     account_details: null,
     sync_records: null,
   });
@@ -112,6 +122,28 @@ export function HoldingsView() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const generation = ++recentGeneration.current;
+    setRecentActivity(null);
+    if (activeView !== "holdings" || shellOverlay) return;
+
+    void getPortfolioActivity({ recent: true, limit: 5 })
+      .then((page) => {
+        if (recentGeneration.current === generation) setRecentActivity(page);
+      })
+      .catch(() => {
+        if (recentGeneration.current === generation) setRecentActivity(null);
+      });
+
+    return () => {
+      if (recentGeneration.current === generation) recentGeneration.current += 1;
+    };
+  }, [activeView, recentRevision, shellOverlay]);
+
+  const invalidateRecentActivity = useCallback(() => {
+    setRecentRevision((current) => current + 1);
+  }, []);
+
   async function onAddManual() {
     const symbol = tickerRef.current?.value.trim().toUpperCase() ?? "";
     const quantity = Number(quantityRef.current?.value || "0");
@@ -130,6 +162,7 @@ export function HoldingsView() {
         currency: "USD",
         notes: notesRef.current?.value ?? "",
       });
+      invalidateRecentActivity();
       if (tickerRef.current) tickerRef.current.value = "";
       if (quantityRef.current) quantityRef.current.value = "";
       if (notesRef.current) notesRef.current.value = "";
@@ -143,6 +176,7 @@ export function HoldingsView() {
 
   async function onSaveEdit() {
     if (!editing) return;
+    const updatesManualPosition = editing.broker === "manual";
     const body: PositionUpdate = {
       notes: editNotesRef.current?.value ?? "",
       thesis: editThesisRef.current?.value ?? "",
@@ -175,6 +209,7 @@ export function HoldingsView() {
     setErr(null);
     try {
       await updatePortfolioPosition(editing.id, body);
+      if (updatesManualPosition) invalidateRecentActivity();
       setEditing(null);
       await load();
     } catch (e) {
@@ -189,6 +224,7 @@ export function HoldingsView() {
     setErr(null);
     try {
       await closePortfolioPosition(position.id);
+      invalidateRecentActivity();
       if (editing?.id === position.id) setEditing(null);
       await load();
     } catch (e) {
@@ -234,6 +270,10 @@ export function HoldingsView() {
   const standardPositions = filteredPositions.filter(
     (position) => position.asset_class !== "option",
   );
+  const showRecent = activeView === "holdings"
+    && !shellOverlay
+    && recentActivity != null
+    && (recentActivity.items.length > 0 || recentActivity.summary.unmatched_count > 0);
 
   useEffect(() => {
     if (
@@ -411,6 +451,11 @@ export function HoldingsView() {
           role="tabpanel"
           aria-labelledby="portfolio-tab-holdings"
         >
+          <div
+            className="portfolio-holdings-layout"
+            data-has-recent={String(showRecent)}
+          >
+            <div className="portfolio-holdings-primary">
           <section className="ui-section-band">
             <div className="ui-section-head">
               <h2>新增手動持倉</h2>
@@ -535,6 +580,24 @@ export function HoldingsView() {
               if (pendingClose) void onCloseRow(pendingClose);
             }}
           />
+            </div>
+            {showRecent && recentActivity ? (
+              <PortfolioRecentActivity
+                page={recentActivity}
+                onOpenActivity={() => setActiveView("activity")}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {activeView === "activity" ? (
+        <div
+          id="portfolio-panel-activity"
+          role="tabpanel"
+          aria-labelledby="portfolio-tab-activity"
+        >
+          <PortfolioActivity />
         </div>
       ) : null}
 

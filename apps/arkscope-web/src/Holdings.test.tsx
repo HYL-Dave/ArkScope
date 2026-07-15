@@ -10,6 +10,7 @@ import type {
   PortfolioCaptureReview,
   PortfolioCaptureStart,
   PortfolioCaptureStatus,
+  PortfolioActivityPage,
   PortfolioOverview,
   PortfolioPosition,
   PortfolioSnapshot,
@@ -67,6 +68,7 @@ type PortfolioApiResponse =
   | PortfolioCaptureReview
   | PortfolioCaptureStart
   | PortfolioCaptureStatus
+  | PortfolioActivityPage
   | PortfolioOverview
   | PortfolioPosition
   | PortfolioSnapshot
@@ -110,6 +112,40 @@ const captureRun = (over: Partial<NonNullable<PortfolioCaptureStatus["latest_run
   ...over,
 });
 
+const emptyActivityPage = (): PortfolioActivityPage => ({
+  accounts: [],
+  history_started_at_utc: null,
+  items: [],
+  summary: { item_count: 0, unmatched_count: 0, recent_window_days: null },
+  next_cursor: null,
+});
+
+const recentActivityPage = (): PortfolioActivityPage => ({
+  accounts: [],
+  history_started_at_utc: "2026-07-14T05:00:00+00:00",
+  items: [{
+    id: "manual:recent:40",
+    kind: "manual_adjustment",
+    occurred_at_utc: "2026-07-15T13:00:00+00:00",
+    account: {
+      id: 1,
+      label: "Manual",
+      broker: "manual",
+      broker_account_id_hash: null,
+      archived: false,
+    },
+    symbol: "NVDA",
+    source: "manual",
+    state: "manual_adjustment",
+    annotation: null,
+    position_id: 40,
+    action: "create",
+    changes: [{ field: "quantity", before: null, after: 3 }],
+  }],
+  summary: { item_count: 1, unmatched_count: 0, recent_window_days: 7 },
+  next_cursor: null,
+});
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -122,6 +158,7 @@ function stubFetch(
   handler: (url: string, init?: RequestInit) => PortfolioApiResponse | Promise<PortfolioApiResponse>,
   captureHandler?: () => PortfolioCaptureStatus | Promise<PortfolioCaptureStatus>,
   overviewHandler?: () => PortfolioOverview | Promise<PortfolioOverview>,
+  recentHandler?: () => PortfolioActivityPage | Promise<PortfolioActivityPage>,
 ) {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
   vi.stubGlobal(
@@ -134,7 +171,13 @@ function stubFetch(
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
       const method = init?.method ?? "GET";
-      const payload = u.endsWith("/portfolio/capture") && method === "GET"
+      const parsed = new URL(u);
+      const isActivity = parsed.pathname === "/portfolio/activity" && method === "GET";
+      const payload = isActivity
+        ? parsed.searchParams.get("recent") === "true"
+          ? await (recentHandler?.() ?? emptyActivityPage())
+          : emptyActivityPage()
+        : u.endsWith("/portfolio/capture") && method === "GET"
         ? await (captureHandler?.() ?? captureStatus())
         : u.endsWith("/portfolio/overview") && method === "GET"
           ? await (overviewHandler?.() ?? overview())
@@ -146,6 +189,51 @@ function stubFetch(
     }),
   );
   return calls;
+}
+
+function stubShellOverlay(initialMatches: boolean) {
+  let matches = initialMatches;
+  let media = "";
+  const listeners = new Set<EventListener>();
+  const mediaQueryList = {
+    get matches() { return matches; },
+    get media() { return media; },
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn((_type: string, listener: EventListener) => {
+      listeners.add(listener);
+    }),
+    removeEventListener: vi.fn((_type: string, listener: EventListener) => {
+      listeners.delete(listener);
+    }),
+    dispatchEvent: vi.fn(() => true),
+  } as unknown as MediaQueryList;
+  const matchMedia = vi.fn((query: string) => {
+    media = query;
+    return mediaQueryList;
+  });
+  vi.stubGlobal("matchMedia", matchMedia);
+  return {
+    matchMedia,
+    setMatches(next: boolean) {
+      matches = next;
+      const event = new Event("change");
+      listeners.forEach((listener) => listener.call(mediaQueryList, event));
+    },
+  };
+}
+
+function activityCalls(
+  calls: Array<{ url: string; method: string; body: unknown }>,
+  recent: boolean,
+) {
+  return calls.filter((call) => {
+    const parsed = new URL(call.url);
+    return call.method === "GET"
+      && parsed.pathname === "/portfolio/activity"
+      && (parsed.searchParams.get("recent") === "true") === recent;
+  });
 }
 
 async function mount() {
@@ -306,8 +394,8 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
-    expect(calls[0].url.endsWith("/portfolio")).toBe(true);
-    expect(calls[1].url.endsWith("/portfolio/overview")).toBe(true);
+    expect(calls.some((call) => call.url.endsWith("/portfolio"))).toBe(true);
+    expect(calls.some((call) => call.url.endsWith("/portfolio/overview"))).toBe(true);
     expect(host!.textContent).toContain("帳戶總覽無法載入；持倉仍可使用");
     expect(host!.textContent).not.toContain("stale sidecar");
     expect(host!.textContent).toContain("NVDA");
@@ -319,7 +407,7 @@ describe("HoldingsView", () => {
     await mount();
     await flush();
 
-    for (const label of ["持倉", "帳戶明細", "同步紀錄"]) {
+    for (const label of ["持倉", "活動", "帳戶明細", "同步紀錄"]) {
       await act(async () => {
         (await buttonByText(label)).click();
       });
@@ -331,7 +419,7 @@ describe("HoldingsView", () => {
     }
   });
 
-  it("switches_between_holdings_account_details_and_sync_records", async () => {
+  it("switches_between_holdings_activity_account_details_and_sync_records", async () => {
     stubFetch(() => snapshot());
     await mount();
     await flush();
@@ -339,6 +427,14 @@ describe("HoldingsView", () => {
     expect(host!.querySelector('[role="tabpanel"]')?.id)
       .toBe("portfolio-panel-holdings");
     expect(host!.querySelector('[data-portfolio-capture-controls]')).toBeNull();
+
+    await act(async () => {
+      (await buttonByText("活動")).click();
+    });
+    await flush();
+    expect(host!.querySelector('[role="tabpanel"]')?.id)
+      .toBe("portfolio-panel-activity");
+    expect(host!.querySelector('table[aria-label="持倉"]')).toBeNull();
 
     await act(async () => {
       (await buttonByText("帳戶明細")).click();
@@ -354,7 +450,7 @@ describe("HoldingsView", () => {
     expect(host!.querySelector('table[aria-label="帳戶最新快照明細"]')).toBeNull();
   });
 
-  it("does_not_render_an_unfinished_activity_tab_or_placeholder", async () => {
+  it("renders_the_exact_completed_portfolio_tabs_without_a_placeholder", async () => {
     stubFetch(() => snapshot());
     await mount();
     await flush();
@@ -363,8 +459,7 @@ describe("HoldingsView", () => {
       host!.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
       (tab) => tab.textContent,
     );
-    expect(labels).toEqual(["持倉", "帳戶明細", "同步紀錄"]);
-    expect(host!.textContent).not.toContain("活動");
+    expect(labels).toEqual(["持倉", "活動", "帳戶明細", "同步紀錄"]);
   });
 
   it("mounts_capture_polling_only_while_sync_records_is_active", async () => {
@@ -404,6 +499,10 @@ describe("HoldingsView", () => {
 
     selected().focus();
     key(selected(), "ArrowRight");
+    expect(selected().textContent).toBe("活動");
+    expect(document.activeElement).toBe(selected());
+
+    key(selected(), "ArrowRight");
     expect(selected().textContent).toBe("帳戶明細");
     expect(document.activeElement).toBe(selected());
 
@@ -413,6 +512,133 @@ describe("HoldingsView", () => {
     expect(selected().textContent).toBe("持倉");
     key(selected(), "ArrowLeft");
     expect(selected().textContent).toBe("同步紀錄");
+  });
+
+  it("mounts and fetches PortfolioActivity only while the activity tab is selected", async () => {
+    const { matchMedia } = stubShellOverlay(false);
+    const calls = stubFetch(() => snapshot());
+    await mount();
+    await flush();
+
+    expect(activityCalls(calls, false)).toHaveLength(0);
+    expect(host!.querySelector(".portfolio-activity")).toBeNull();
+
+    await act(async () => {
+      (await buttonByText("活動")).click();
+    });
+    await flush();
+
+    expect(activityCalls(calls, false)).toHaveLength(1);
+    expect(host!.querySelector(".portfolio-activity")).not.toBeNull();
+
+    await act(async () => {
+      (await buttonByText("帳戶明細")).click();
+    });
+    expect(host!.querySelector(".portfolio-activity")).toBeNull();
+    expect(activityCalls(calls, false)).toHaveLength(1);
+    expect(matchMedia).toHaveBeenCalledWith("(max-width: 960px)");
+  });
+
+  it("at 959px skips the recent request and renders no panel or reserved width", async () => {
+    const { matchMedia, setMatches } = stubShellOverlay(true);
+    const delayedRecent = deferred<PortfolioActivityPage>();
+    const recentHandler = vi.fn(() => delayedRecent.promise);
+    const calls = stubFetch(() => snapshot(), undefined, undefined, recentHandler);
+    await mount();
+    await flush();
+
+    expect(recentHandler).not.toHaveBeenCalled();
+    expect(activityCalls(calls, true)).toHaveLength(0);
+    expect(host!.querySelector(".portfolio-recent-activity")).toBeNull();
+    expect(host!.querySelector('[data-has-recent="true"]')).toBeNull();
+    expect(matchMedia).toHaveBeenCalledWith("(max-width: 960px)");
+
+    await act(async () => setMatches(false));
+    await flush();
+    expect(recentHandler).toHaveBeenCalledTimes(1);
+
+    await act(async () => setMatches(true));
+    await act(async () => delayedRecent.resolve(recentActivityPage()));
+    await flush();
+
+    expect(host!.querySelector(".portfolio-recent-activity")).toBeNull();
+    expect(host!.querySelector('[data-has-recent="true"]')).toBeNull();
+  });
+
+  it("at 961px renders a non-empty recent response beside positions", async () => {
+    const { matchMedia } = stubShellOverlay(false);
+    const calls = stubFetch(
+      () => snapshot(),
+      undefined,
+      undefined,
+      recentActivityPage,
+    );
+    await mount();
+    await flush();
+
+    const recentCalls = activityCalls(calls, true);
+    expect(recentCalls).toHaveLength(1);
+    const recentUrl = new URL(recentCalls[0].url);
+    expect(recentUrl.searchParams.get("recent")).toBe("true");
+    expect(recentUrl.searchParams.get("limit")).toBe("5");
+    const layout = host!.querySelector('[data-has-recent="true"]')!;
+    expect(layout.classList.contains("portfolio-holdings-layout")).toBe(true);
+    expect(layout.children).toHaveLength(2);
+    expect(layout.querySelector(".portfolio-holdings-primary table[aria-label=\"持倉\"]"))
+      .not.toBeNull();
+    expect(layout.querySelector(".portfolio-recent-activity")).not.toBeNull();
+    expect(matchMedia).toHaveBeenCalledWith("(max-width: 960px)");
+  });
+
+  it("opens the activity tab from recent activity and removes the side panel", async () => {
+    stubShellOverlay(false);
+    const calls = stubFetch(
+      () => snapshot(),
+      undefined,
+      undefined,
+      recentActivityPage,
+    );
+    await mount();
+    await flush();
+
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('button[aria-label="開啟完整活動"]')!.click();
+    });
+    await flush();
+
+    expect(host!.querySelector('[role="tab"][aria-selected="true"]')?.textContent)
+      .toBe("活動");
+    expect(host!.querySelector(".portfolio-recent-activity")).toBeNull();
+    expect(host!.querySelector('[data-has-recent="true"]')).toBeNull();
+    expect(activityCalls(calls, false)).toHaveLength(1);
+  });
+
+  it("invalidates the wide recent summary once after a successful manual mutation", async () => {
+    stubShellOverlay(false);
+    const recentHandler = vi.fn(recentActivityPage);
+    const calls = stubFetch((url, init) => {
+      if (init?.method === "POST") return { ok: true };
+      return snapshot();
+    }, undefined, undefined, recentHandler);
+    await mount();
+    await flush();
+    expect(recentHandler).toHaveBeenCalledTimes(1);
+
+    const ticker = host!.querySelector<HTMLInputElement>('input[aria-label="Ticker"]')!;
+    const quantity = host!.querySelector<HTMLInputElement>('input[aria-label="Quantity"]')!;
+    await act(async () => {
+      ticker.value = "AAPL";
+      ticker.dispatchEvent(new Event("input", { bubbles: true }));
+      quantity.value = "2";
+      quantity.dispatchEvent(new Event("input", { bubbles: true }));
+      (await buttonByText("新增持倉")).click();
+    });
+    await flush();
+    await flush();
+
+    expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(activityCalls(calls, true)).toHaveLength(2);
+    expect(recentHandler).toHaveBeenCalledTimes(2);
   });
 
   it("can add a manual holding", async () => {
