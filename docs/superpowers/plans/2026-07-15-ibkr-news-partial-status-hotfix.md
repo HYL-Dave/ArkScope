@@ -2,7 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN OPEN / REVIEW PENDING — 2026-07-15. IMPLEMENTATION HAS NOT STARTED.**
+> **Status: IMPLEMENTED FOR REVIEW — 2026-07-15. NOT MERGED. DURABLE RETRY REMAINS PENDING.**
+
+## Implementation Ledger
+
+- Branch: `codex/ibkr-news-partial-hotfix`; plan base `3d3c835`; behavioral base `e5ccd12`; code head `de23f61`; review head is the docs commit containing this ledger.
+- TDD RED: focused collection was `40`; all seven new cases failed for the intended existing output `部分完成（待補抓 0）`, while all 33 baseline cases passed. The mounted row received process-local count `99` and durable count `10` but rendered the old zero label.
+- TDD GREEN: focused `2 files / 40 tests`; full frontend `44 files / 419 tests`, exactly `+7/-0` over `44/412`; typecheck passed; production build passed with only the existing `>500 kB` chunk warning.
+- Boundaries: `src/`, `data_sources/`, and backend `tests/` are byte-identical to `e5ccd12`; the only frontend product/test paths are `api.ts`, `marketDataDisplay.ts`, `marketDataDisplay.test.ts`, and `SettingsProviderConfig.test.ts`; `Settings.tsx` is byte-identical. `api.ts` has interface/type-only hunks.
+- Privacy/static gates: frontend has zero `deferred_body_ids` / provider-article-id matches and zero `待補抓 0` matches. The single production `schedulerStateLabel` consumer remains the generic existing Settings call.
+- Live display gate used one scheduler-disabled branch sidecar and the real profile DB without triggering News or Gateway work. The natural durable row was still partial with `deferred_body_count=2`; all `1440x900`, `1024x768`, and `390x844` views rendered `2 篇內文待後續處理`, retained ordinary `Run`, exposed no `補抓`, had no cell overlap or page-level horizontal overflow, and used the existing table scroll owner at narrow widths.
+- Restart gate: after the sidecar restarted, process-local `last_result` was `null`, while SQLite preserved the same `last_attempt`, `updated_at`, and body count `2`; reloading all three viewports rendered the same durable explanation. No profile row was manufactured or modified for this gate.
+- Plan deviations: none. Canonical backend A/B was intentionally replaced by the stronger byte-identity proof approved in plan review.
 
 **Goal:** Make the Data Sources schedule row describe IBKR News count-only partial work truthfully, without inventing `待補抓 0` or exposing a manual continuation action that the sanitized worker cannot honor.
 
@@ -59,7 +70,7 @@
 - Consumes: existing `ScheduleSourceState.durable_state` and the sanitized three-field continuation already returned by `/schedule`.
 - Produces: `ScheduleContinuationCounts`, `ScheduleRunResult`, and the unchanged `schedulerStateLabel(durable)` result shape `{ label, tone, needsContinue }`.
 
-- [ ] **Step 1: Write the failing pure projection tests**
+- [x] **Step 1: Write the failing pure projection tests**
 
 Keep the existing actionable ticker test. Replace the existing no-deferred test with the exact generic fallback, then add these six collected cases:
 
@@ -173,7 +184,7 @@ it("partial without actionable or observed continuation is generic", () => {
 
 The test delta is exactly `+6`: body `+1`, the three `it.each` rows `+3`, precedence `+1`, and invalid values `+1`. The generic test replaces one existing test and contributes `+0`.
 
-- [ ] **Step 2: Add the failing mounted Settings fixture and test**
+- [x] **Step 2: Add the failing mounted Settings fixture and test**
 
 Add this `ibkr_news` source beside the existing schedule fixtures returned by mocked `getSchedule()`:
 
@@ -251,7 +262,7 @@ it("renders durable IBKR partial counts without a manual continuation action", a
 
 The conflicting process-local count `99` and durable count `10` prove that the mounted surface uses restart-safe durable state. The `Run` assertion distinguishes the ordinary schedule command from the forbidden count-only continuation command.
 
-- [ ] **Step 3: Run both suites and verify RED for the intended reason**
+- [x] **Step 3: Run both suites and verify RED for the intended reason**
 
 Run:
 
@@ -262,7 +273,7 @@ npm test -- --run src/marketDataDisplay.test.ts src/SettingsProviderConfig.test.
 
 Expected: the existing helper returns `部分完成（待補抓 0）`, ignores durable `last_result`, and therefore fails the new pure and mounted assertions. Existing non-scheduler tests remain green.
 
-- [ ] **Step 4: Add the existing response shape to `api.ts`**
+- [x] **Step 4: Add the existing response shape to `api.ts`**
 
 Define these interfaces immediately before `ScheduleSourceState`:
 
@@ -299,7 +310,7 @@ last_result?: ScheduleRunResult | null;
 
 The durable member stays optional so existing fixtures and an older sidecar remain compatible.
 
-- [ ] **Step 5: Implement the pure durable projection**
+- [x] **Step 5: Implement the pure durable projection**
 
 Extend the type import and replace only `schedulerStateLabel` plus its local count helper:
 
@@ -393,7 +404,7 @@ export function schedulerStateLabel(
 
 Do not infer counts from errors, article totals, or process-local `last_result`. Actionable `deferred[]` must remain the first branch.
 
-- [ ] **Step 6: Run focused tests and typecheck**
+- [x] **Step 6: Run focused tests and typecheck**
 
 Run:
 
@@ -405,7 +416,7 @@ npm run typecheck
 
 Expected: `2 files / 40 tests` pass (`marketDataDisplay=24`, `SettingsProviderConfig=16`); typecheck passes.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 git add apps/arkscope-web/src/api.ts apps/arkscope-web/src/marketDataDisplay.ts apps/arkscope-web/src/marketDataDisplay.test.ts apps/arkscope-web/src/SettingsProviderConfig.test.ts
@@ -426,7 +437,7 @@ git commit -m "fix: render truthful IBKR partial status"
 - Consumes: final Task 1 implementation.
 - Produces: review-ready evidence only. No merge, durable-retry claim, or retry implementation.
 
-- [ ] **Step 1: Run focused and full frontend verification**
+- [x] **Step 1: Run focused and full frontend verification**
 
 ```bash
 cd apps/arkscope-web
@@ -438,7 +449,7 @@ npm run build
 
 Expected focused result: `2 files / 40 tests`. Expected full result: `44 files / 419 tests`, exactly `+7/-0` over `44/412`; typecheck and build pass with only the existing chunk-size warning.
 
-- [ ] **Step 2: Prove the frontend-only boundary and privacy ratchets**
+- [x] **Step 2: Prove the frontend-only boundary and privacy ratchets**
 
 Run from the repository root:
 
@@ -470,7 +481,7 @@ Expected:
 - zero production code renders `待補抓 0`; and
 - `Settings.tsx` is byte-identical, proving there is no source-specific branch or new runtime wiring.
 
-- [ ] **Step 3: Run one display-only real-state visual gate**
+- [x] **Step 3: Run one display-only real-state visual gate**
 
 With exactly one sidecar, use the real profile DB but do not trigger a News or Gateway run. Open Settings -> Data Sources and inspect the persisted IBKR News row at `1440x900`, `1024x768`, and `390x844`:
 
@@ -483,7 +494,7 @@ With exactly one sidecar, use the real profile DB but do not trigger a News or G
 
 If the live durable row has naturally changed before this gate, use the exact mounted Settings fixture for screenshot evidence and record the real row's current truthful state separately. Do not mutate `profile_state.db` to manufacture a partial run.
 
-- [ ] **Step 4: Reconcile the exact implementation ledger and stop review-ready**
+- [x] **Step 4: Reconcile the exact implementation ledger and stop review-ready**
 
 Under this plan header record:
 
