@@ -2148,6 +2148,23 @@ export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
 // poll getSchedule() for the per-source running flag and the job_runs row
 // (collect.<source>, visible in getProvidersHealth().jobs) for the outcome.
 
+export interface ScheduleContinuationCounts {
+  deferred_ticker_count?: number;
+  deferred_body_count?: number;
+  has_cursor?: boolean;
+}
+
+export interface ScheduleRunResult {
+  source: string;
+  status: string;
+  reason?: string;
+  at?: string;
+  collect?: {
+    status?: string;
+    continuation?: ScheduleContinuationCounts | null;
+  } | null;
+}
+
 export interface ScheduleSourceState {
   label: string;
   description: string;
@@ -2169,7 +2186,7 @@ export interface ScheduleSourceState {
   // last run_source outcome INCLUDING skips — a skip (e.g. "the CLI is already
   // running this source", cross-process) writes no job_runs row, so this field is
   // the only way the UI can see it after a fire-and-return Run now.
-  last_result: { source: string; status: string; reason?: string; at?: string } | null;
+  last_result: ScheduleRunResult | null;
   // v1.4: this source plans scope from coverage + can finish `partial` (→ manual 補抓)
   gap_planned: boolean;
   // v1.4: durable per-source state (survives restart). last_status 'partial' → a budget-bounded
@@ -2178,6 +2195,7 @@ export interface ScheduleSourceState {
     last_status: string | null; // running | succeeded | failed | partial
     last_error: string | null;
     continuation: { deferred?: string[]; lookback_days?: number; candidate_count?: number } | null;
+    last_result?: ScheduleRunResult | null;
     last_attempt: string | null;
     updated_at: string | null;
     running_for_seconds?: number | null;

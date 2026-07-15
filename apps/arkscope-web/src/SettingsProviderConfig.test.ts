@@ -204,6 +204,57 @@ vi.mock("./api", async (importOriginal) => {
           },
           job_name: "collect.polygon_news",
         },
+        ibkr_news: {
+          label: "IBKR 新聞",
+          description: "IBKR market-news collector",
+          ibkr: true,
+          provider_fetch: true,
+          source_mode: "direct_local",
+          write_target: "market_data.db",
+          source_badges: [],
+          retired: false,
+          retired_reason: null,
+          enabled: true,
+          interval_minutes: 120,
+          default_interval_minutes: 120,
+          running: false,
+          progress: null,
+          last_attempt_at: "2026-07-14T10:00:00Z",
+          last_result: {
+            source: "ibkr_news",
+            status: "partial",
+            at: "2026-07-14T10:01:00Z",
+            collect: {
+              status: "partial",
+              continuation: {
+                deferred_ticker_count: 0,
+                deferred_body_count: 99,
+                has_cursor: false,
+              },
+            },
+          },
+          gap_planned: false,
+          durable_state: {
+            last_status: "partial",
+            last_error: null,
+            continuation: null,
+            last_result: {
+              source: "ibkr_news",
+              status: "partial",
+              collect: {
+                status: "partial",
+                continuation: {
+                  deferred_ticker_count: 0,
+                  deferred_body_count: 10,
+                  has_cursor: false,
+                },
+              },
+            },
+            last_attempt: "2026-07-14T10:00:00Z",
+            updated_at: "2026-07-14T10:01:00Z",
+          },
+          job_name: "collect.ibkr_news",
+        },
         writer_lock_deferred: {
           label: "Writer lock deferred",
           description: "writer lock fixture",
@@ -469,6 +520,20 @@ describe("Settings provider config authority", () => {
     const details = row.querySelector("details.ds-last-run-details");
     expect(details?.textContent).toContain(mocked.longSkipReason);
     expect(details?.textContent).toContain(mocked.longDurableError);
+  });
+
+  it("renders durable IBKR partial counts without a manual continuation action", async () => {
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("IBKR 新聞"));
+    if (!row) throw new Error("missing IBKR news schedule row");
+
+    expect(row.textContent).toContain("部分完成（10 篇內文待後續處理）");
+    expect(row.textContent).not.toContain("待補抓");
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.trim() === "補抓")).toBe(false);
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.includes("Run"))).toBe(true);
   });
 
   it("renders_known_schedule_progress_without_covering_the_last_run_cell", async () => {

@@ -1,4 +1,11 @@
-import type { CoverageStatus, MacroStatus, MarketDataStatus, NewsStatus, TradingDayRow } from "./api";
+import type {
+  CoverageStatus,
+  MacroStatus,
+  MarketDataStatus,
+  NewsStatus,
+  ScheduleSourceState,
+  TradingDayRow,
+} from "./api";
 
 export function providerHealthStatusLabel<T extends { status: string; disabled_reason?: string | null }>(p: T): string {
   const labels: Record<string, string> = {
@@ -95,24 +102,68 @@ export function coverageStatusLabel(
   }
 }
 
-// Scheduler durable-state → UI label + tone (v1.4). Distinguishes the cases the reviewer
-// stressed: partial = a budget-bounded run left work → needs manual 補抓; skipped can be
-// transient or a durable writer-lock outcome and remains neutral; failed carries the error.
+type SchedulerDurablePresentation = Pick<
+  NonNullable<ScheduleSourceState["durable_state"]>,
+  | "last_status"
+  | "continuation"
+  | "last_result"
+  | "running_stale"
+  | "running_stale_reason"
+>;
+
+function positiveCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) return 0;
+  return value;
+}
+
 export function schedulerStateLabel(
-  durable: {
-    last_status: string | null;
-    continuation: { deferred?: string[] } | null;
-    running_stale?: boolean;
-    running_stale_reason?: string | null;
-  } | null,
+  durable: SchedulerDurablePresentation | null,
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad"; needsContinue: boolean } {
   const st = durable?.last_status ?? null;
   switch (st) {
     case "succeeded":
       return { label: "上次成功", tone: "ok", needsContinue: false };
     case "partial": {
-      const n = durable?.continuation?.deferred?.length ?? 0;
-      return { label: `部分完成（待補抓 ${n}）`, tone: "warn", needsContinue: n > 0 };
+      const actionable = durable?.continuation?.deferred?.length ?? 0;
+      if (actionable > 0) {
+        return {
+          label: `部分完成（待補抓 ${actionable}）`,
+          tone: "warn",
+          needsContinue: true,
+        };
+      }
+      const observed = durable?.last_result?.collect?.continuation;
+      const tickers = positiveCount(observed?.deferred_ticker_count);
+      const bodies = positiveCount(observed?.deferred_body_count);
+      if (tickers > 0 && bodies > 0) {
+        return {
+          label: `部分完成（${tickers} 個標的、${bodies} 篇內文待後續處理）`,
+          tone: "warn",
+          needsContinue: false,
+        };
+      }
+      if (bodies > 0) {
+        return {
+          label: `部分完成（${bodies} 篇內文待後續處理）`,
+          tone: "warn",
+          needsContinue: false,
+        };
+      }
+      if (tickers > 0) {
+        return {
+          label: `部分完成（${tickers} 個標的待後續處理）`,
+          tone: "warn",
+          needsContinue: false,
+        };
+      }
+      if (observed?.has_cursor === true) {
+        return {
+          label: "部分完成（尚有資料待後續處理）",
+          tone: "warn",
+          needsContinue: false,
+        };
+      }
+      return { label: "部分完成", tone: "warn", needsContinue: false };
     }
     case "failed":
       return { label: "上次失敗", tone: "bad", needsContinue: false };

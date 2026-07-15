@@ -177,6 +177,100 @@ describe("schedulerStateLabel", () => {
     const r = schedulerStateLabel({ last_status: "partial", continuation: { deferred: ["NVDA", "TSLA"] } });
     expect(r).toEqual({ label: "部分完成（待補抓 2）", tone: "warn", needsContinue: true });
   });
+
+  it("renders durable IBKR body counts without promising a manual retry", () => {
+    const result = schedulerStateLabel({
+      last_status: "partial",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: {
+          status: "partial",
+          continuation: {
+            deferred_ticker_count: 0,
+            deferred_body_count: 10,
+            has_cursor: false,
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      label: "部分完成（10 篇內文待後續處理）",
+      tone: "warn",
+      needsContinue: false,
+    });
+  });
+
+  it.each([
+    [
+      { deferred_ticker_count: 3, deferred_body_count: 0, has_cursor: false },
+      "部分完成（3 個標的待後續處理）",
+    ],
+    [
+      { deferred_ticker_count: 3, deferred_body_count: 10, has_cursor: false },
+      "部分完成（3 個標的、10 篇內文待後續處理）",
+    ],
+    [
+      { deferred_ticker_count: 0, deferred_body_count: 0, has_cursor: true },
+      "部分完成（尚有資料待後續處理）",
+    ],
+  ])("renders sanitized count/cursor state %j", (continuation, label) => {
+    expect(schedulerStateLabel({
+      last_status: "partial",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: { status: "partial", continuation },
+      },
+    })).toEqual({ label, tone: "warn", needsContinue: false });
+  });
+
+  it("keeps actionable ticker continuation ahead of informational counts", () => {
+    const result = schedulerStateLabel({
+      last_status: "partial",
+      continuation: { deferred: ["NVDA", "TSLA"] },
+      last_result: {
+        source: "price_backfill",
+        status: "partial",
+        collect: {
+          continuation: {
+            deferred_ticker_count: 0,
+            deferred_body_count: 10,
+            has_cursor: false,
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      label: "部分完成（待補抓 2）",
+      tone: "warn",
+      needsContinue: true,
+    });
+  });
+
+  it("does not turn invalid observed counts into numeric promises", () => {
+    for (const value of [0, -1, 1.5, Number.POSITIVE_INFINITY, Number.NaN]) {
+      const result = schedulerStateLabel({
+        last_status: "partial",
+        continuation: null,
+        last_result: {
+          source: "ibkr_news",
+          status: "partial",
+          collect: {
+            continuation: {
+              deferred_ticker_count: value,
+              deferred_body_count: value,
+              has_cursor: false,
+            },
+          },
+        },
+      });
+      expect(result).toEqual({ label: "部分完成", tone: "warn", needsContinue: false });
+    }
+  });
+
   it("distinguishes succeeded / failed / skipped / running / none", () => {
     expect(schedulerStateLabel({ last_status: "succeeded", continuation: null }).tone).toBe("ok");
     expect(schedulerStateLabel({ last_status: "failed", continuation: null }).tone).toBe("bad");
@@ -194,8 +288,13 @@ describe("schedulerStateLabel", () => {
     expect(r.label).toBe("執行過久");
     expect(r.tone).toBe("warn");
   });
-  it("partial with no deferred is not actionable", () => {
-    expect(schedulerStateLabel({ last_status: "partial", continuation: { deferred: [] } }).needsContinue).toBe(false);
+  it("partial without actionable or observed continuation is generic", () => {
+    const result = schedulerStateLabel({
+      last_status: "partial",
+      continuation: { deferred: [] },
+    });
+    expect(result).toEqual({ label: "部分完成", tone: "warn", needsContinue: false });
+    expect(result.label).not.toContain("0");
   });
 });
 
