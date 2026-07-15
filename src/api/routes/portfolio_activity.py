@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import sqlite3
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.api.dependencies import get_portfolio_activity_store
@@ -65,7 +65,7 @@ def get_activity(
     source: ActivitySource | None = None,
     state: ActivityState | None = None,
     recent: bool = False,
-    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    limit: int = 100,
     cursor: str | None = None,
     store: PortfolioActivityStore = Depends(get_portfolio_activity_store),
 ) -> dict:

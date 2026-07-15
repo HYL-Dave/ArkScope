@@ -88,6 +88,7 @@ export function PortfolioActivity({
     const generation = ++requestGeneration.current;
     if (append) setAppending(true);
     else {
+      setAppending(false);
       setPage(null);
       setLoading(true);
       setReadFailed(false);

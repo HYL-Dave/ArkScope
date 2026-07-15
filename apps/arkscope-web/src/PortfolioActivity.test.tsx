@@ -489,6 +489,39 @@ describe("PortfolioActivity", () => {
     expect(host!.textContent).not.toContain("OLD");
   });
 
+  it("clears stale append busy state when a full reload supersedes it", async () => {
+    const staleAppend = deferred<PortfolioActivityPage>();
+    stubFetch((url) => {
+      if (url.includes("cursor=old-cursor")) return staleAppend.promise;
+      if (url.includes("symbol=NEW")) {
+        return page({
+          items: [{ ...brokerItem, symbol: "NEW" }],
+          next_cursor: "new-cursor",
+        });
+      }
+      return page({ next_cursor: "old-cursor" });
+    });
+    await mount();
+    await flush();
+    await clickButton("載入更多");
+
+    const symbol = host!.querySelector<HTMLInputElement>(
+      'input[aria-label="Symbol 篩選"]',
+    )!;
+    setInput(symbol, "NEW");
+    await clickButton("套用篩選");
+
+    const loadMore = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("載入更多"))!;
+    expect(loadMore.disabled).toBe(false);
+
+    staleAppend.resolve(page({ items: [unmatchedItem], next_cursor: null }));
+    await flush();
+    expect(loadMore.disabled).toBe(false);
+    expect(host!.textContent).toContain("NEW");
+    expect(host!.textContent).not.toContain("MSFT");
+  });
+
   it("keeps failed annotation save authored then updates locally from exact replacement PUT", async () => {
     let puts = 0;
     const calls = stubFetch((url, init) => {

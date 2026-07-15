@@ -6,8 +6,10 @@ import json
 import sqlite3
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
+from src.api.dependencies import get_portfolio_activity_store
 from src.portfolio_activity import ActivityAnnotation, ActivityFilters, PortfolioActivityStore
 from src.portfolio_state import PortfolioStore
 
@@ -153,6 +155,20 @@ def test_get_activity_maps_invalid_date_cursor_and_limit_to_typed_400(tmp_path):
             routes.get_activity(store=_store(tmp_path), **kwargs)
         assert exc.value.status_code == 400
         assert exc.value.detail["code"] == "invalid_portfolio_activity"
+
+
+@pytest.mark.parametrize("limit", (0, 201))
+def test_get_activity_http_limit_uses_typed_400(limit, tmp_path):
+    routes = _routes()
+    app = FastAPI()
+    app.include_router(routes.router)
+    app.dependency_overrides[get_portfolio_activity_store] = lambda: _store(tmp_path)
+
+    with TestClient(app) as client:
+        response = client.get("/portfolio/activity", params={"limit": limit})
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "invalid_portfolio_activity"
 
 
 def test_put_annotation_requires_write_gate_and_uses_full_replacement(monkeypatch, tmp_path):

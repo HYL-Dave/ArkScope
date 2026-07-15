@@ -312,6 +312,18 @@ def _finite_sum(values: Collection[float]) -> float | None:
     return result if math.isfinite(result) else None
 
 
+class _SQLiteFiniteSum:
+    def __init__(self) -> None:
+        self.values: list[float] = []
+
+    def step(self, value: float | None) -> None:
+        if value is not None:
+            self.values.append(float(value))
+
+    def finalize(self) -> float | None:
+        return _finite_sum(self.values) if self.values else None
+
+
 def _weighted_average(fills: Collection[EffectiveFill]) -> float | None:
     denominator = _finite_sum([abs(fill.quantity) for fill in fills])
     numerator = _finite_sum(
@@ -471,7 +483,7 @@ WITH ranked_execution AS (
            COUNT(DISTINCT commission_currency) AS distinct_commission_currencies,
            MIN(commission_currency) AS provider_currency,
            COUNT(realized_pnl) AS realized_count,
-           SUM(realized_pnl) AS realized_sum,
+           portfolio_fsum(realized_pnl) AS realized_sum,
            MAX(CASE WHEN UPPER(symbol)=UPPER(?) THEN 1 ELSE 0 END)
                 AS symbol_matches
     FROM effective_with_commission
@@ -671,6 +683,7 @@ class PortfolioActivityStore:
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.create_function("portfolio_et_date", 1, _et_date, deterministic=True)
+        conn.create_aggregate("portfolio_fsum", 1, _SQLiteFiniteSum)
         return conn
 
     def _ensure_schema(self) -> None:
@@ -1146,9 +1159,7 @@ class PortfolioActivityStore:
               ON s.capture_run_id=r.id
              AND s.portfolio_account_id=ra.portfolio_account_id
             WHERE r.state IN ('succeeded','partial')
-              AND r.account_leg_state='complete'
               AND r.execution_leg_state='complete'
-              AND r.position_leg_state='complete'
             GROUP BY r.id, ra.portfolio_account_id
         ), sequenced_run AS (
             SELECT *,

@@ -91,6 +91,7 @@ def capture_result(
     commissions: tuple[CommissionObservation, ...] = (),
     positions: tuple[PositionObservation, ...] | None = None,
     execution_leg: str = "complete",
+    position_leg: str = "complete",
 ) -> BrokerCaptureResult:
     if positions is None:
         positions = (
@@ -106,7 +107,7 @@ def capture_result(
         discovered_accounts=(BrokerAccountRef(account, "USD"),),
         account_leg=CaptureLegResult("complete"),
         execution_leg=CaptureLegResult(execution_leg),
-        position_leg=CaptureLegResult("complete"),
+        position_leg=CaptureLegResult(position_leg),
         account_snapshots=(
             AccountSnapshotObservation(
                 broker_account_id=account,
@@ -632,6 +633,52 @@ def test_group_arithmetic_returns_null_on_float_overflow_instead_of_zero(stores)
     assert activity.list_activity(ActivityFilters(state="realized_gain")).items == []
 
 
+def test_state_filter_matches_precise_serialized_realized_outcome(stores):
+    _, observations, activity = stores
+    realized_values = (0.1, 0.2, -0.1, -0.2)
+    fills = tuple(
+        execution(
+            exec_id=f"precision-{index}",
+            perm_id=70005,
+            order_id=5,
+            con_id="5",
+            symbol="AAPL",
+            side="SELL",
+            quantity=1.0,
+            price=40.0,
+            execution_time=f"2026-07-15T14:3{index}:00+00:00",
+        )
+        for index in range(4)
+    )
+    commissions = tuple(
+        CommissionObservation("DU123", fill.exec_id, 0.0, "USD", realized)
+        for fill, realized in zip(fills, realized_values, strict=True)
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:40:00+00:00",
+            executions=fills,
+            commissions=commissions,
+        ),
+    )
+
+    item = activity.list_activity(ActivityFilters(source="broker")).items[0]
+
+    assert item.objective.realized_pnl == 0.0
+    assert item.objective.realized_outcome == "flat"
+    assert item.state == "realized_flat"
+    assert [
+        filtered.id
+        for filtered in activity.list_activity(
+            ActivityFilters(source="broker", state="realized_flat")
+        ).items
+    ] == [item.id]
+    assert activity.list_activity(
+        ActivityFilters(source="broker", state="realized_gain")
+    ).items == []
+
+
 def test_complete_unambiguous_position_windows_classify_direction_and_close_scope(stores):
     _, observations, activity = stores
     commit_capture(
@@ -924,6 +971,32 @@ def test_cross_et_day_complete_runs_create_gap_without_rewriting_empty_activity(
         activity,
         "SELECT name FROM sqlite_master WHERE name='portfolio_activity_events'",
     ) == []
+
+
+def test_cross_et_day_gap_uses_complete_execution_legs_even_if_position_leg_failed(
+    stores,
+):
+    _, observations, activity = stores
+    first_run_id = commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-14T20:00:00+00:00",
+            positions=(),
+            position_leg="failed",
+        ),
+    )
+    second_run_id = commit_capture(
+        observations,
+        capture_result(finished_at="2026-07-15T14:00:00+00:00"),
+    )
+
+    markers = activity.list_activity(
+        ActivityFilters(state="coverage_gap")
+    ).items
+
+    marker = next(item for item in markers if item.reason_code == "broker_day_gap")
+    assert marker.id == f"gap:{marker.account.id}:{first_run_id}:{second_run_id}"
+    assert (marker.from_run_id, marker.to_run_id) == (first_run_id, second_run_id)
 
 
 def test_activity_filters_date_account_symbol_source_and_state_independently(
