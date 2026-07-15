@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import sqlite3
 from dataclasses import asdict, dataclass
@@ -854,7 +855,7 @@ def test_first_successful_complete_capture_creates_history_start_not_a_fake_trad
 
 def test_failed_or_incomplete_execution_leg_creates_explicit_gap_marker(stores):
     _, observations, activity = stores
-    commit_capture(
+    from_run_id = commit_capture(
         observations,
         capture_result(finished_at="2026-07-15T14:00:00+00:00"),
     )
@@ -883,6 +884,10 @@ def test_failed_or_incomplete_execution_leg_creates_explicit_gap_marker(stores):
     markers = [item for item in page.items if item.kind == "coverage_gap"]
 
     assert {marker.to_run_id for marker in markers} == {terminal.id, global_failed.id}
+    assert {marker.id for marker in markers} == {
+        f"gap:{account_id}:{from_run_id}:{terminal.id}",
+        f"gap:global:0:{global_failed.id}",
+    }
     assert running.id not in {marker.to_run_id for marker in markers}
     assert all(marker.reason_code == "execution_leg_incomplete" for marker in markers)
     assert any(marker.account is None for marker in markers)
@@ -907,6 +912,7 @@ def test_cross_et_day_complete_runs_create_gap_without_rewriting_empty_activity(
     marker = page.items[0]
 
     assert marker.kind == "coverage_gap"
+    assert marker.id == f"gap:{marker.account.id}:{first_run_id}:{second_run_id}"
     assert marker.reason_code == "broker_day_gap"
     assert (marker.from_run_id, marker.to_run_id) == (first_run_id, second_run_id)
     assert (marker.from_as_of_utc, marker.to_as_of_utc) == (
@@ -1075,6 +1081,17 @@ def test_activity_cursor_is_deterministic_and_recent_scope_uses_seven_et_dates(s
     assert not any(item.symbol == "OLD" for item in recent_all.items)
     assert any(item.symbol == "BOUNDARY" for item in recent_all.items)
 
+    noncanonical_cursor = base64.urlsafe_b64encode(
+        json.dumps(
+            {
+                "activity_id": first.items[-1].id,
+                "occurred_at_utc": "2026-07-15T10:30:00-04:00",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+
     for invalid in (
         ActivityFilters(source="BROKER"),
         ActivityFilters(state="gain"),
@@ -1085,6 +1102,7 @@ def test_activity_cursor_is_deterministic_and_recent_scope_uses_seven_et_dates(s
         ActivityFilters(limit=0),
         ActivityFilters(limit=201),
         ActivityFilters(cursor="not-a-cursor"),
+        ActivityFilters(cursor=noncanonical_cursor),
     ):
         with pytest.raises(ValueError):
             activity.list_activity(invalid, now_utc=now)

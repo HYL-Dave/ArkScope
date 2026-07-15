@@ -627,7 +627,9 @@ def _decode_cursor(value: str) -> _ActivityCursor:
     activity_id = payload["activity_id"]
     if not isinstance(activity_id, str) or not activity_id:
         raise ValueError("invalid activity cursor")
-    _parse_utc_datetime(occurred_at, "cursor occurred_at_utc")
+    parsed_occurred_at = _parse_utc_datetime(occurred_at, "cursor occurred_at_utc")
+    if occurred_at != parsed_occurred_at.astimezone(timezone.utc).isoformat():
+        raise ValueError("invalid activity cursor")
     return _ActivityCursor(occurred_at, activity_id)
 
 
@@ -1061,6 +1063,19 @@ class PortfolioActivityStore:
         WITH account_gap AS (
             SELECT r.id AS to_run_id,
                    ra.portfolio_account_id,
+                   COALESCE((
+                       SELECT MAX(previous.id)
+                       FROM portfolio_capture_runs previous
+                       JOIN portfolio_capture_run_accounts previous_ra
+                         ON previous_ra.capture_run_id=previous.id
+                       WHERE previous_ra.portfolio_account_id=
+                               ra.portfolio_account_id
+                         AND previous.id < r.id
+                         AND previous.state IN ('succeeded','partial')
+                         AND previous.account_leg_state='complete'
+                         AND previous.execution_leg_state='complete'
+                         AND previous.position_leg_state='complete'
+                   ), 0) AS from_run_id,
                    COALESCE(MAX(s.as_of_utc), r.finished_at) AS occurred_at_utc
             FROM portfolio_capture_runs r
             JOIN portfolio_capture_run_accounts ra ON ra.capture_run_id=r.id
@@ -1073,6 +1088,7 @@ class PortfolioActivityStore:
         ), global_gap AS (
             SELECT r.id AS to_run_id,
                    NULL AS portfolio_account_id,
+                   0 AS from_run_id,
                    r.finished_at AS occurred_at_utc
             FROM portfolio_capture_runs r
             WHERE r.state IN ('succeeded','partial','failed','blocked','interrupted')
@@ -1087,8 +1103,9 @@ class PortfolioActivityStore:
             SELECT * FROM global_gap
         ), projected_gap AS (
             SELECT *,
-                   'gap:execution:' || to_run_id || ':' ||
-                     COALESCE(CAST(portfolio_account_id AS TEXT), 'global')
+                   'gap:' ||
+                     COALESCE(CAST(portfolio_account_id AS TEXT), 'global') ||
+                     ':' || from_run_id || ':' || to_run_id
                      AS activity_id,
                    'gap_execution' AS projection,
                    to_run_id AS local_id,
@@ -1140,7 +1157,8 @@ class PortfolioActivityStore:
             FROM complete_run
         ), projected_gap AS (
             SELECT *, capture_run_id AS to_run_id,
-                   'gap:day:' || portfolio_account_id || ':' || capture_run_id
+                   'gap:' || portfolio_account_id || ':' || from_run_id || ':' ||
+                     capture_run_id
                      AS activity_id,
                    'gap_day' AS projection,
                    capture_run_id AS local_id,
