@@ -6,12 +6,13 @@ from dataclasses import asdict, dataclass
 
 import pytest
 
-from src.portfolio_activity import PortfolioActivityStore
+from src.portfolio_activity import ActivityFilters, PortfolioActivityStore
 from src.portfolio_capture_types import (
     AccountSnapshotObservation,
     BrokerAccountRef,
     BrokerCaptureResult,
     CaptureLegResult,
+    CommissionObservation,
     ExecutionObservation,
     PositionObservation,
 )
@@ -29,27 +30,53 @@ def execution(
     exec_id: str,
     account: str = "DU123",
     perm_id: int | None,
-    quantity: float = 1.0,
+    order_id: int,
+    con_id: str,
+    symbol: str,
+    side: str,
+    quantity: float,
+    price: float,
+    execution_time: str,
+    currency: str = "USD",
 ) -> ExecutionObservation:
     return ExecutionObservation(
         broker_account_id=account,
         exec_id=exec_id,
-        execution_time_utc="2026-07-15T14:30:00+00:00",
-        broker_con_id="265598",
-        symbol="AAPL",
+        execution_time_utc=execution_time,
+        broker_con_id=con_id,
+        symbol=symbol,
         asset_class="stock",
-        currency="USD",
+        currency=currency,
         exchange="NASDAQ",
-        side="BUY",
+        side=side,
         quantity=quantity,
-        price=200.0,
-        order_id=10,
+        price=price,
+        order_id=order_id,
         perm_id=perm_id,
         client_id=30,
         order_ref="activity-test",
         liquidation=0,
         cumulative_quantity=quantity,
-        average_price=200.0,
+        average_price=price,
+    )
+
+
+def position(
+    *,
+    account: str = "DU123",
+    con_id: str,
+    symbol: str,
+    quantity: float,
+    currency: str = "USD",
+) -> PositionObservation:
+    return PositionObservation(
+        broker_account_id=account,
+        broker_con_id=con_id,
+        symbol=symbol,
+        asset_class="stock",
+        quantity=quantity,
+        avg_cost=200.0,
+        currency=currency,
     )
 
 
@@ -59,12 +86,24 @@ def capture_result(
     account: str = "DU123",
     quantity: float = 1.0,
     executions: tuple[ExecutionObservation, ...] = (),
+    commissions: tuple[CommissionObservation, ...] = (),
+    positions: tuple[PositionObservation, ...] | None = None,
+    execution_leg: str = "complete",
 ) -> BrokerCaptureResult:
+    if positions is None:
+        positions = (
+            position(
+                account=account,
+                con_id="265598",
+                symbol="AAPL",
+                quantity=quantity,
+            ),
+        )
     return BrokerCaptureResult(
         finished_at_utc=finished_at,
         discovered_accounts=(BrokerAccountRef(account, "USD"),),
         account_leg=CaptureLegResult("complete"),
-        execution_leg=CaptureLegResult("complete"),
+        execution_leg=CaptureLegResult(execution_leg),
         position_leg=CaptureLegResult("complete"),
         account_snapshots=(
             AccountSnapshotObservation(
@@ -74,19 +113,9 @@ def capture_result(
                 net_liquidation=100_000.0,
             ),
         ),
-        positions=(
-            PositionObservation(
-                broker_account_id=account,
-                broker_con_id="265598",
-                symbol="AAPL",
-                asset_class="stock",
-                quantity=quantity,
-                avg_cost=200.0,
-                currency="USD",
-            ),
-        ),
+        positions=positions,
         executions=executions,
-        commissions=(),
+        commissions=commissions,
     )
 
 
@@ -102,12 +131,24 @@ def commit_capture(
 @pytest.fixture
 def stores(tmp_path):
     path = tmp_path / "profile_state.db"
-    return PortfolioStore(path), PortfolioObservationStore(path), PortfolioActivityStore(path)
+    portfolio = PortfolioStore(path)
+    portfolio.ensure_manual_account()
+    return portfolio, PortfolioObservationStore(path), PortfolioActivityStore(path)
 
 
 def rows(store: PortfolioActivityStore, sql: str, params=()):
     with store._connect() as conn:
         return conn.execute(sql, params).fetchall()
+
+
+def broker_account_id(activity: PortfolioActivityStore, raw_id: str = "DU123") -> int:
+    return int(
+        rows(
+            activity,
+            "SELECT id FROM portfolio_accounts WHERE broker_account_id=?",
+            (raw_id,),
+        )[0]["id"]
+    )
 
 
 @pytest.fixture
@@ -118,8 +159,16 @@ def targets(stores) -> dict[str, ActivityTarget]:
         capture_result(
             finished_at="2026-07-15T14:35:00+00:00",
             executions=(
-                execution(exec_id="order-fill", perm_id=70001),
-                execution(exec_id="ungrouped", perm_id=None),
+                execution(
+                    exec_id="order-fill", perm_id=70001, order_id=10,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=1.0,
+                    price=200.0, execution_time="2026-07-15T14:30:00+00:00",
+                ),
+                execution(
+                    exec_id="ungrouped", perm_id=None, order_id=11,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=1.0,
+                    price=200.0, execution_time="2026-07-15T14:31:00+00:00",
+                ),
             ),
         ),
     )
@@ -127,7 +176,13 @@ def targets(stores) -> dict[str, ActivityTarget]:
         observations,
         capture_result(
             finished_at="2026-07-15T14:40:00+00:00",
-            executions=(execution(exec_id="ungrouped.01", perm_id=None),),
+            executions=(
+                execution(
+                    exec_id="ungrouped.01", perm_id=None, order_id=11,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=1.0,
+                    price=200.0, execution_time="2026-07-15T14:31:00+00:00",
+                ),
+            ),
         ),
     )
     commit_capture(
@@ -308,3 +363,355 @@ def test_annotation_delete_is_idempotent_and_leaves_target_history(targets, stor
         "SELECT id, account_id, position_id, action FROM portfolio_manual_adjustments",
     ) == before_history
     assert rows(activity, "SELECT * FROM portfolio_activity_annotations") == []
+
+
+def test_same_account_perm_id_groups_effective_fills_but_never_crosses_accounts(stores):
+    _, observations, activity = stores
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:35:00+00:00",
+            executions=(
+                execution(
+                    exec_id="same-order-a", perm_id=70001, order_id=10,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=1.0,
+                    price=200.0, execution_time="2026-07-15T14:30:00+00:00",
+                ),
+                execution(
+                    exec_id="same-order-b", perm_id=70001, order_id=10,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=2.0,
+                    price=201.0, execution_time="2026-07-15T14:31:00+00:00",
+                ),
+            ),
+        ),
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:36:00+00:00",
+            account="DU456",
+            executions=(
+                execution(
+                    exec_id="other-account", account="DU456", perm_id=70001,
+                    order_id=10, con_id="265598", symbol="AAPL", side="BUY",
+                    quantity=4.0, price=202.0,
+                    execution_time="2026-07-15T14:32:00+00:00",
+                ),
+            ),
+        ),
+    )
+
+    account_id = broker_account_id(activity)
+    page = activity.list_activity(ActivityFilters(account_id=account_id))
+
+    assert account_id == 2
+    assert [item.id for item in page.items if item.kind == "order"] == [
+        "order:2:70001"
+    ]
+    assert len(page.items[0].fills) == 2
+    other_page = activity.list_activity(
+        ActivityFilters(account_id=broker_account_id(activity, "DU456"))
+    )
+    assert len(other_page.items[0].fills) == 1
+
+
+def test_missing_perm_id_keeps_same_order_id_as_independent_execution_rows(stores):
+    _, observations, activity = stores
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:35:00+00:00",
+            executions=(
+                execution(
+                    exec_id="no-perm", perm_id=None, order_id=77,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=1.0,
+                    price=200.0, execution_time="2026-07-15T14:30:00+00:00",
+                ),
+                execution(
+                    exec_id="zero-perm", perm_id=0, order_id=77,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=2.0,
+                    price=201.0, execution_time="2026-07-15T14:31:00+00:00",
+                ),
+            ),
+        ),
+    )
+    account_id = broker_account_id(activity)
+    execution_rows = rows(
+        activity,
+        "SELECT id, exec_id FROM portfolio_broker_executions ORDER BY id",
+    )
+    roots = {row["exec_id"]: int(row["id"]) for row in execution_rows}
+
+    page = activity.list_activity(ActivityFilters(account_id=account_id))
+
+    assert {item.id for item in page.items if item.kind == "execution"} == {
+        f"execution:{account_id}:{roots['no-perm']}",
+        f"execution:{account_id}:{roots['zero-perm']}",
+    }
+    assert all(len(item.fills) == 1 for item in page.items)
+
+
+def test_correction_selects_latest_effective_revision_and_preserves_lineage(stores):
+    _, observations, activity = stores
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:35:00+00:00",
+            executions=(
+                execution(
+                    exec_id="0001", perm_id=70001, order_id=10,
+                    con_id="265598", symbol="AAPL", side="BUY", quantity=5.0,
+                    price=200.0, execution_time="2026-07-15T14:30:00+00:00",
+                ),
+            ),
+        ),
+    )
+    corrected_quantity = 2.0
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:40:00+00:00",
+            executions=(
+                execution(
+                    exec_id="0001.01", perm_id=70001, order_id=10,
+                    con_id="265598", symbol="AAPL", side="BUY",
+                    quantity=corrected_quantity, price=201.0,
+                    execution_time="2026-07-15T14:30:00+00:00",
+                ),
+            ),
+        ),
+    )
+
+    page = activity.list_activity(
+        ActivityFilters(account_id=broker_account_id(activity))
+    )
+    order = page.items[0]
+    fill = order.fills[0]
+
+    assert [revision.exec_id for revision in fill.revisions] == ["0001", "0001.01"]
+    assert [revision.is_effective for revision in fill.revisions] == [False, True]
+    assert order.objective.quantity == corrected_quantity
+    assert order.objective.gross_notional == corrected_quantity * 201.0
+
+
+def test_late_commission_revisions_join_exact_execution_without_mutating_it(stores):
+    _, observations, activity = stores
+    fill = execution(
+        exec_id="commission-fill", perm_id=70001, order_id=10,
+        con_id="265598", symbol="AAPL", side="SELL", quantity=2.0,
+        price=210.0, execution_time="2026-07-15T14:30:00+00:00",
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:35:00+00:00",
+            executions=(fill,),
+            commissions=(
+                CommissionObservation("DU123", "commission-fill", 1.0, "USD", 8.0),
+            ),
+        ),
+    )
+    before = rows(activity, "SELECT * FROM portfolio_broker_executions")
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:45:00+00:00",
+            commissions=(
+                CommissionObservation("DU123", "commission-fill", 1.5, "USD", 9.0),
+            ),
+        ),
+    )
+
+    order = activity.list_activity(ActivityFilters()).items[0]
+    revisions = order.fills[0].revisions[0].commission_revisions
+
+    assert rows(activity, "SELECT * FROM portfolio_broker_executions") == before
+    assert [revision.commission for revision in revisions] == [1.0, 1.5]
+    assert [revision.is_latest for revision in revisions] == [False, True]
+    assert order.objective.commission == 1.5
+    assert order.objective.realized_pnl == 9.0
+
+
+def test_group_totals_require_every_effective_provider_leg_and_one_currency(stores):
+    _, observations, activity = stores
+    fills = (
+        execution(exec_id="flat-a", perm_id=70001, order_id=1, con_id="1", symbol="AAPL", side="SELL", quantity=1.0, price=10.0, execution_time="2026-07-15T14:30:00+00:00"),
+        execution(exec_id="flat-b", perm_id=70001, order_id=1, con_id="1", symbol="AAPL", side="SELL", quantity=1.0, price=10.0, execution_time="2026-07-15T14:31:00+00:00"),
+        execution(exec_id="missing-a", perm_id=70002, order_id=2, con_id="2", symbol="MSFT", side="SELL", quantity=1.0, price=20.0, execution_time="2026-07-15T14:32:00+00:00"),
+        execution(exec_id="missing-b", perm_id=70002, order_id=2, con_id="2", symbol="MSFT", side="SELL", quantity=1.0, price=20.0, execution_time="2026-07-15T14:33:00+00:00"),
+        execution(exec_id="mixed-a", perm_id=70003, order_id=3, con_id="3", symbol="NVDA", side="SELL", quantity=1.0, price=30.0, execution_time="2026-07-15T14:34:00+00:00"),
+        execution(exec_id="mixed-b", perm_id=70003, order_id=3, con_id="3", symbol="NVDA", side="SELL", quantity=1.0, price=30.0, execution_time="2026-07-15T14:35:00+00:00"),
+        execution(exec_id="conflict-a", perm_id=70004, order_id=4, con_id="4", symbol="AAPL", side="SELL", quantity=1.0, price=40.0, execution_time="2026-07-15T14:36:00+00:00", currency="USD"),
+        execution(exec_id="conflict-b", perm_id=70004, order_id=4, con_id="5", symbol="TSLA", side="SELL", quantity=1.0, price=40.0, execution_time="2026-07-15T14:37:00+00:00", currency="CAD"),
+    )
+    commissions = (
+        CommissionObservation("DU123", "flat-a", 0.0, "USD", 0.0),
+        CommissionObservation("DU123", "flat-b", 0.0, "USD", 0.0),
+        CommissionObservation("DU123", "missing-a", 1.0, "USD", 2.0),
+        CommissionObservation("DU123", "missing-b", None, "USD", None),
+        CommissionObservation("DU123", "mixed-a", 1.0, "USD", 2.0),
+        CommissionObservation("DU123", "mixed-b", 1.0, "CAD", 2.0),
+        CommissionObservation("DU123", "conflict-a", 1.0, "USD", 2.0),
+        CommissionObservation("DU123", "conflict-b", 1.0, "CAD", 2.0),
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:40:00+00:00",
+            executions=fills,
+            commissions=commissions,
+        ),
+    )
+
+    page = activity.list_activity(ActivityFilters())
+    orders = {item.id.rsplit(":", 1)[1]: item for item in page.items}
+    flat = orders["70001"]
+    missing = orders["70002"]
+    mixed = orders["70003"]
+    conflict = orders["70004"]
+
+    assert (flat.objective.commission, flat.objective.realized_pnl) == (0.0, 0.0)
+    assert flat.state == "realized_flat"
+    assert missing.objective.commission is None
+    assert missing.objective.realized_pnl is None
+    assert missing.state == "outcome_unknown"
+    assert mixed.objective.commission is None
+    assert mixed.objective.commission_currency is None
+    assert conflict.symbol is None
+    assert conflict.currency is None
+    assert conflict.objective.commission is None
+    assert conflict.objective.realized_pnl is None
+    assert len(conflict.fills) == 2
+    assert [item.id for item in activity.list_activity(ActivityFilters(state="realized_flat")).items] == [flat.id]
+    unknown_ids = {
+        item.id for item in activity.list_activity(ActivityFilters(state="outcome_unknown")).items
+    }
+    assert {missing.id, mixed.id, conflict.id} <= unknown_ids
+
+
+def test_group_arithmetic_returns_null_on_float_overflow_instead_of_zero(stores):
+    _, observations, activity = stores
+    maximum = 1.7976931348623157e308
+    fills = tuple(
+        execution(
+            exec_id=f"overflow-{suffix}", perm_id=70001, order_id=1,
+            con_id="1", symbol="AAPL", side="SELL", quantity=1.0,
+            price=maximum, execution_time=f"2026-07-15T14:3{suffix}:00+00:00",
+        )
+        for suffix in (0, 1)
+    )
+    commissions = tuple(
+        CommissionObservation("DU123", fill.exec_id, maximum, "USD", maximum)
+        for fill in fills
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:40:00+00:00",
+            executions=fills,
+            commissions=commissions,
+        ),
+    )
+
+    order = activity.list_activity(ActivityFilters(state="outcome_unknown")).items[0]
+
+    assert order.objective.average_price is None
+    assert order.objective.gross_notional is None
+    assert order.objective.commission is None
+    assert order.objective.realized_pnl is None
+    assert order.state == "outcome_unknown"
+    assert activity.list_activity(ActivityFilters(state="realized_gain")).items == []
+
+
+def test_complete_unambiguous_position_windows_classify_direction_and_close_scope(stores):
+    _, observations, activity = stores
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:00:00+00:00",
+            positions=(
+                position(con_id="1", symbol="AAPL", quantity=10.0),
+                position(con_id="2", symbol="MSFT", quantity=5.0),
+            ),
+        ),
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T15:00:00+00:00",
+            positions=(
+                position(con_id="1", symbol="AAPL", quantity=5.0),
+                position(con_id="3", symbol="NVDA", quantity=3.0),
+            ),
+            executions=(
+                execution(exec_id="partial-close", perm_id=70001, order_id=1, con_id="1", symbol="AAPL", side="SELL", quantity=5.0, price=210.0, execution_time="2026-07-15T14:30:00+00:00"),
+                execution(exec_id="complete-close", perm_id=70002, order_id=2, con_id="2", symbol="MSFT", side="SELL", quantity=5.0, price=310.0, execution_time="2026-07-15T14:31:00+00:00"),
+                execution(exec_id="increase", perm_id=70003, order_id=3, con_id="3", symbol="NVDA", side="BUY", quantity=3.0, price=410.0, execution_time="2026-07-15T14:32:00+00:00"),
+            ),
+        ),
+    )
+
+    orders = {
+        item.id.rsplit(":", 1)[1]: item.objective
+        for item in activity.list_activity(ActivityFilters()).items
+    }
+
+    assert (orders["70001"].position_direction, orders["70001"].close_scope, orders["70001"].position_context) == ("reduce", "partial", "complete")
+    assert (orders["70002"].position_direction, orders["70002"].close_scope, orders["70002"].position_context) == ("reduce", "complete", "complete")
+    assert (orders["70003"].position_direction, orders["70003"].close_scope, orders["70003"].position_context) == ("increase", "none", "complete")
+
+
+def test_incomplete_ambiguous_or_sign_flip_context_keeps_position_effect_unknown(stores):
+    _, observations, activity = stores
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T14:00:00+00:00",
+            positions=(position(con_id="1", symbol="AAPL", quantity=5.0),),
+        ),
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T15:00:00+00:00",
+            positions=(),
+            execution_leg="partial",
+            executions=(execution(exec_id="incomplete", perm_id=70001, order_id=1, con_id="1", symbol="AAPL", side="SELL", quantity=5.0, price=10.0, execution_time="2026-07-15T14:30:00+00:00"),),
+        ),
+    )
+    commit_capture(
+        observations,
+        capture_result(finished_at="2026-07-15T14:00:00+00:00", account="DU456", positions=(position(account="DU456", con_id="2", symbol="MSFT", quantity=10.0),)),
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T15:00:00+00:00", account="DU456",
+            positions=(position(account="DU456", con_id="2", symbol="MSFT", quantity=8.0),),
+            executions=(
+                execution(exec_id="ambiguous-a", account="DU456", perm_id=70002, order_id=2, con_id="2", symbol="MSFT", side="SELL", quantity=1.0, price=20.0, execution_time="2026-07-15T14:31:00+00:00"),
+                execution(exec_id="ambiguous-b", account="DU456", perm_id=70003, order_id=3, con_id="2", symbol="MSFT", side="SELL", quantity=1.0, price=20.0, execution_time="2026-07-15T14:32:00+00:00"),
+            ),
+        ),
+    )
+    commit_capture(
+        observations,
+        capture_result(finished_at="2026-07-15T14:00:00+00:00", account="DU789", positions=(position(account="DU789", con_id="3", symbol="NVDA", quantity=2.0),)),
+    )
+    commit_capture(
+        observations,
+        capture_result(
+            finished_at="2026-07-15T15:00:00+00:00", account="DU789",
+            positions=(position(account="DU789", con_id="3", symbol="NVDA", quantity=-1.0),),
+            executions=(execution(exec_id="sign-flip", account="DU789", perm_id=70004, order_id=4, con_id="3", symbol="NVDA", side="SELL", quantity=3.0, price=30.0, execution_time="2026-07-15T14:33:00+00:00"),),
+        ),
+    )
+
+    objectives = [
+        item.objective for item in activity.list_activity(ActivityFilters()).items
+    ]
+
+    assert len(objectives) == 4
+    assert all(objective.position_direction == "unknown" for objective in objectives)
+    assert all(objective.close_scope == "unknown" for objective in objectives)
+    assert all(objective.position_context == "unknown" for objective in objectives)
