@@ -123,11 +123,14 @@ def capture_result(
 
 
 def commit_capture(
-    observations: PortfolioObservationStore, result: BrokerCaptureResult
+    observations: PortfolioObservationStore,
+    result: BrokerCaptureResult,
+    *,
+    state: str = "succeeded",
 ) -> int:
     run = observations.create_run(trigger="manual", effective_client_id=61)
     observations.commit_capture(run.id, result)
-    observations.finish_run(run.id, state="succeeded")
+    observations.finish_run(run.id, state=state)
     return run.id
 
 
@@ -984,19 +987,20 @@ def test_cross_et_day_gap_uses_complete_execution_legs_even_if_position_leg_fail
             positions=(),
             position_leg="failed",
         ),
+        state="partial",
     )
     second_run_id = commit_capture(
         observations,
         capture_result(finished_at="2026-07-15T14:00:00+00:00"),
     )
 
-    markers = activity.list_activity(
-        ActivityFilters(state="coverage_gap")
-    ).items
+    page = activity.list_activity(ActivityFilters(state="coverage_gap"))
+    markers = page.items
 
     marker = next(item for item in markers if item.reason_code == "broker_day_gap")
     assert marker.id == f"gap:{marker.account.id}:{first_run_id}:{second_run_id}"
     assert (marker.from_run_id, marker.to_run_id) == (first_run_id, second_run_id)
+    assert page.history_started_at_utc == "2026-07-15T14:00:00+00:00"
 
 
 def test_activity_filters_date_account_symbol_source_and_state_independently(

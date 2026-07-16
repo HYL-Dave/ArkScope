@@ -69,7 +69,8 @@
   single-process pytest, base `c5cd91f` versus code head `a8e51ab`: collected
   **`4302 -> 4339`**, exactly **`+37/-0`**; passed **`4191 -> 4228`**; both
   sides have **`30 failed / 74 skipped / 18 warnings / 7 errors`**. Parsed
-  pytest node IDs show exactly the 33 planned activity tests and no removal;
+  pytest node IDs show the 33 original activity tests plus four review-repair
+  tests and no removal;
   parsed JUnit failure and error sets have empty differences in both
   directions. Both temporary A/B worktrees were removed; their only generated
   untracked file was pytest's 73-byte risk-free-rate cache.
