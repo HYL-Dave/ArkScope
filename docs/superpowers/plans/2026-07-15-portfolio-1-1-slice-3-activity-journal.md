@@ -110,6 +110,29 @@
   priority map deliberately remain pre-LIVE pending independent review and the
   deferred successful-capture subgate.
 
+### Reviewer verification ✅ (Fable, 2026-07-16) — reviewer gates closed
+
+Independent reviewer canonical A/B (virgin `git archive` of base `c5cd91f`
+versus branch tip `8076542` — deliberately the tip, one test-pin commit past
+the implementation-side A/B head `a8e51ab` — sequential single-process full
+pytest, reviewer environment, no hang): both sides identical on the
+pre-existing family (`30 failed / 74 skipped / 18 warnings / 7 errors`);
+failure sets empty in both directions; passed `4191 -> 4228` = exactly
+**`+37`**, collect `+37/-0`, and all 37 added node IDs live in the two new
+activity test files. Work dir `/tmp/ab_p11s3_8YI9`. This independently
+confirms the implementation-side A/B and extends it to the tip. The reviewer
+also re-ran: frontend `46 files / 451 tests` PASS + typecheck + production
+build in the branch worktree; focused backend `119 passed`; all five static
+gates (order APIs, PG, `window.confirm`/`@media`, agent/tool registry,
+Settings duplicate — zero matches) and the untouched-owner boundary
+(capture/scheduler/tools/agents — empty diff). Reviewer spot-check: the
+SQL-vs-Python summation divergence flagged at plan review was independently
+caught and fixed correctly — the custom `portfolio_fsum` SQLite aggregate
+delegates to the same `_finite_sum` authority, so state classification and
+serialization cannot disagree. Remaining before LIVE COMPLETE: the deferred
+IBKR-recovery capture subgate (external service availability, not a code
+gap) and the user's merge decision.
+
 **Goal:** Complete Portfolio 1.1 with a truthful Holdings activity view over captured broker facts and manual-adjustment journals, user-owned intent annotations, explicit coverage gaps, and a responsive recent-activity summary without changing capture or canonical-position authority.
 
 **Architecture:** Add one focused `PortfolioActivityStore` over the existing `profile_state.db` tables. It derives a bounded correction-aware read model from immutable executions, commission revisions, unmatched changes, capture coverage, and manual journals; only the new annotation table is mutable. Expose the projection through an additive provider-free `/portfolio/activity` API, then render it in the locked second Holdings tab with existing P2.8 primitives and a wide-only contextual summary. No activity read performs Gateway I/O or mutates canonical holdings.
