@@ -48,15 +48,15 @@ export function ShellTopBar({
       : <span>正在連線</span>;
 
   return (
-    <header className={`topbar shell-topbar ${developerMode ? "developer" : "normal"}`}>
+    <header className="shell-topbar" data-developer-mode={String(developerMode)}>
       <div className="shell-topbar-primary">
         {menuControl}
-        <span className="brand shell-topbar-identity" data-testid="shell-identity">ArkScope</span>
+        <span className="shell-topbar-identity" data-testid="shell-identity">ArkScope</span>
         <span className="shell-topbar-context" data-testid="shell-context">{contextLabel}</span>
         <span className={`shell-topbar-health ${status.kind}`} data-testid="shell-health">
           {health}
         </span>
-        <span className="spacer" />
+        <span className="shell-topbar-spacer" />
         {workControl ? <span data-testid="shell-work-slot">{workControl}</span> : null}
       </div>
       {developerMode ? (

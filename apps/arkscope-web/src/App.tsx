@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Menu } from "lucide-react";
 import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HoldingsView } from "./Holdings";
@@ -14,6 +15,9 @@ import { ShellTopBar } from "./shell/ShellTopBar";
 import { BackgroundWorkIndicator } from "./shell/BackgroundWorkIndicator";
 import { useResearchWorkRegistry } from "./shell/researchWork";
 import { readDeveloperMode, writeDeveloperMode } from "./shell/shellPreferences";
+import { Drawer } from "./ui/Drawer";
+import { IconButton } from "./ui/Button";
+import { useShellOverlay } from "./ui/useShellOverlay";
 import {
   nextNavigationRequest,
   resolveNavigationTarget,
@@ -36,6 +40,8 @@ export function App() {
   const [researchNavigation, setResearchNavigation] = useState<ResearchNavigationRequest | null>(null);
   const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationRequest | null>(null);
   const researchWork = useResearchWorkRegistry();
+  const shellOverlay = useShellOverlay();
+  const [navigationOpen, setNavigationOpen] = useState(false);
 
   const navigate = useCallback((target: NavigationTarget) => {
     const request = nextNavigationRequest(navigationSequenceRef.current, target);
@@ -81,6 +87,10 @@ export function App() {
     void refreshRuntime();
   }, [refreshRuntime]);
 
+  useEffect(() => {
+    if (!shellOverlay) setNavigationOpen(false);
+  }, [shellOverlay]);
+
   const researchSessionSeconds = runtime?.research_runtime.session_timeout_s;
   const researchSessionBoundMs = typeof researchSessionSeconds === "number"
     && Number.isFinite(researchSessionSeconds)
@@ -88,8 +98,53 @@ export function App() {
     ? researchSessionSeconds * 1_000
     : null;
 
+  const selectedSurface = detail ? (
+    <TickerDetailView
+      key={detail.ticker}
+      ticker={detail.ticker}
+      onBack={() => setDetail(null)}
+      runtime={runtime}
+    />
+  ) : view === "Home" ? (
+    <HomeView
+      status={status}
+      onNavigate={(next) => navigate({ kind: "view", view: next })}
+      onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+      runtime={runtime}
+    />
+  ) : view === "Watchlist" ? (
+    <WatchlistView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
+  ) : view === "Universe" ? (
+    <UniverseView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
+  ) : view === "News" ? (
+    <NewsView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
+  ) : view === "Research" ? (
+    <ResearchView
+      onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+      navigationRequest={researchNavigation}
+      onObserveRun={researchWork.observeRun}
+    />
+  ) : view === "Holdings" ? (
+    <HoldingsView />
+  ) : view === "System" ? (
+    <DashboardView
+      status={status}
+      runtime={runtime}
+      onRetry={refresh}
+      developerMode={developerMode}
+      onDeveloperModeChange={updateDeveloperMode}
+      onNavigate={navigate}
+    />
+  ) : (
+    <SettingsView
+      runtime={runtime}
+      onRuntimeChanged={refreshRuntime}
+      navigationRequest={settingsNavigation}
+    />
+  );
+
   return (
-    <div className="shell">
+    <div className="app-shell" data-shell-overlay={String(shellOverlay)}>
       <ShellTopBar
         contextLabel={detail?.ticker ?? shellViewLabel(view)}
         status={status}
@@ -110,58 +165,38 @@ export function App() {
           />
         ) : undefined}
         onNavigate={navigate}
+        menuControl={shellOverlay ? (
+          <IconButton
+            icon={<Menu size={18} />}
+            label="開啟導覽"
+            tone="ghost"
+            onClick={() => setNavigationOpen(true)}
+          />
+        ) : null}
       />
 
-      <div className="body rail-closed">
-        <nav className="leftnav">
-          <ShellNavigation currentView={view} onNavigate={navigate} />
-        </nav>
-
-        {detail ? (
-          <TickerDetailView
-            key={detail.ticker}
-            ticker={detail.ticker}
-            onBack={() => setDetail(null)}
-            runtime={runtime}
-          />
-        ) : view === "Home" ? (
-          <HomeView
-            status={status}
-            onNavigate={(next) => navigate({ kind: "view", view: next })}
-            onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
-            runtime={runtime}
-          />
-        ) : view === "Watchlist" ? (
-          <WatchlistView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
-        ) : view === "Universe" ? (
-          <UniverseView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
-        ) : view === "News" ? (
-          <NewsView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
-        ) : view === "Research" ? (
-          <ResearchView
-            onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
-            navigationRequest={researchNavigation}
-            onObserveRun={researchWork.observeRun}
-          />
-        ) : view === "Holdings" ? (
-          <HoldingsView />
-        ) : view === "System" ? (
-          <DashboardView
-            status={status}
-            runtime={runtime}
-            onRetry={refresh}
-            developerMode={developerMode}
-            onDeveloperModeChange={updateDeveloperMode}
-            onNavigate={navigate}
-          />
-        ) : (
-          <SettingsView
-            runtime={runtime}
-            onRuntimeChanged={refreshRuntime}
-            navigationRequest={settingsNavigation}
-          />
-        )}
+      <div className="app-shell-layout">
+        {!shellOverlay ? (
+          <aside className="app-shell-navigation" aria-label="主要導覽">
+            <ShellNavigation currentView={view} onNavigate={navigate} />
+          </aside>
+        ) : null}
+        <div className="app-shell-content">{selectedSurface}</div>
       </div>
+
+      <Drawer
+        open={shellOverlay && navigationOpen}
+        title="導覽"
+        onClose={() => setNavigationOpen(false)}
+      >
+        <nav className="app-shell-navigation-drawer" aria-label="主要導覽">
+          <ShellNavigation
+            currentView={view}
+            onNavigate={navigate}
+            onAfterNavigate={() => setNavigationOpen(false)}
+          />
+        </nav>
+      </Drawer>
     </div>
   );
 }
