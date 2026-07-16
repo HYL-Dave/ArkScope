@@ -67,12 +67,48 @@ class BodyClient:
         pass
 
 
+class NewsProviderClient(BodyClient):
+    def __init__(self, *, providers=None, error=None):
+        super().__init__()
+        self.providers = list(providers or ())
+        self.provider_error = error
+        self.provider_calls = 0
+
+    def reqNewsProviders(self):
+        self.provider_calls += 1
+        if self.provider_error is not None:
+            raise self.provider_error
+        return self.providers
+
+
 def body_source(client):
     source = IBKRDataSource.__new__(IBKRDataSource)
     source._ib = client
     source._ensure_connected = lambda: None
     source._rate_limit_wait = lambda: None
     return source
+
+
+def test_ibkr_strict_news_provider_discovery_distinguishes_empty_from_failure():
+    empty = NewsProviderClient(providers=[])
+
+    assert body_source(empty).get_news_providers_strict() == []
+    assert empty.provider_calls == 1
+
+    error = RuntimeError("provider list unavailable")
+    failed = NewsProviderClient(error=error)
+    with pytest.raises(RuntimeError) as caught:
+        body_source(failed).get_news_providers_strict()
+
+    assert caught.value is error
+    assert failed.provider_calls == 1
+
+
+def test_ibkr_compat_news_provider_discovery_still_returns_empty_on_failure():
+    client = NewsProviderClient(error=RuntimeError("provider list unavailable"))
+
+    assert body_source(client).get_news_providers() == []
+    assert client.provider_calls == 1
 
 
 @pytest.mark.parametrize(

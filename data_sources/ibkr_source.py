@@ -512,18 +512,16 @@ class IBKRDataSource(BaseDataSource):
             logger.error(f"Credential validation failed: {e}")
             return False
 
-    def get_news_providers(self) -> List[Dict[str, str]]:
-        """
-        Get list of available news providers for the account.
-
-        Returns:
-            List of dicts with 'code' and 'name' keys.
-        """
+    def get_news_providers_strict(self) -> List[Dict[str, str]]:
+        """Return the account's API news providers without hiding failures."""
         self._ensure_connected()
+        providers = self._ib.reqNewsProviders()
+        return [{'code': p.code, 'name': p.name} for p in providers]
 
+    def get_news_providers(self) -> List[Dict[str, str]]:
+        """Compatibility wrapper that returns an empty list on discovery failure."""
         try:
-            providers = self._ib.reqNewsProviders()
-            return [{'code': p.code, 'name': p.name} for p in providers]
+            return self.get_news_providers_strict()
         except Exception as e:
             logger.error(f"Error fetching news providers: {e}")
             return []

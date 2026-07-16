@@ -66,6 +66,66 @@ def test_ibkr_runtime_rejects_malformed_provider_article_id():
         list(gateway.fetch_headlines("AAPL", None))
 
 
+def test_runtime_gateway_discovers_once_and_reuses_provider_filter_for_headlines():
+    from src.news_normalized.ibkr_runtime import IBKRRuntimeGateway
+
+    class Source:
+        def __init__(self):
+            self.provider_calls = 0
+            self.fetch_news_calls = []
+
+        def get_news_providers_strict(self):
+            self.provider_calls += 1
+            return [
+                {"code": "DJ-N", "name": "Dow Jones"},
+                {"code": " dj-rta ", "name": "Dow Jones RTA"},
+                {"code": "DJ-N", "name": "duplicate"},
+            ]
+
+        def fetch_news(self, *args, **kwargs):
+            self.fetch_news_calls.append((args, kwargs))
+            return []
+
+        def disconnect(self):
+            pass
+
+    source = Source()
+    gateway = IBKRRuntimeGateway(source)
+
+    assert gateway.discover_news_provider_codes() == frozenset(
+        {"DJ-N", "DJ-RTA"}
+    )
+    assert list(gateway.fetch_headlines("AAPL", None)) == []
+
+    assert source.provider_calls == 1
+    assert source.fetch_news_calls[0][1]["providers"] == "DJ-N+DJ-RTA"
+
+
+def test_runtime_gateway_with_successful_empty_provider_set_makes_no_headline_call():
+    from src.news_normalized.ibkr_runtime import IBKRRuntimeGateway
+
+    class Source:
+        def __init__(self):
+            self.fetch_news_calls = []
+
+        def get_news_providers_strict(self):
+            return []
+
+        def fetch_news(self, *args, **kwargs):
+            self.fetch_news_calls.append((args, kwargs))
+            return []
+
+        def disconnect(self):
+            pass
+
+    source = Source()
+    gateway = IBKRRuntimeGateway(source)
+
+    assert gateway.discover_news_provider_codes() == frozenset()
+    assert list(gateway.fetch_headlines("AAPL", None)) == []
+    assert source.fetch_news_calls == []
+
+
 def test_ibkr_worker_requires_explicit_tickers():
     from src.news_normalized import ibkr_cli as worker
 

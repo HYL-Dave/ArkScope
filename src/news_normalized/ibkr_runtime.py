@@ -52,6 +52,7 @@ class IBKRRuntimeGateway:
 
     def __init__(self, source):
         self.source = source
+        self._provider_codes: frozenset[str] | None = None
 
     def __enter__(self):
         return self
@@ -65,13 +66,27 @@ class IBKRRuntimeGateway:
         if callable(disconnect):
             disconnect()
 
+    def discover_news_provider_codes(self) -> frozenset[str]:
+        rows = self.source.get_news_providers_strict()
+        self._provider_codes = frozenset(
+            code
+            for row in rows
+            if (code := str(row.get("code", "")).strip().upper())
+        )
+        return self._provider_codes
+
     def fetch_headlines(self, ticker: str, since_iso: Optional[str]):
         start_date = _date_from_cursor(since_iso)
-        articles = self.source.fetch_news(
-            [ticker],
-            start_date=start_date,
-            end_date=date.today(),
-        )
+        if self._provider_codes == frozenset():
+            articles = []
+        else:
+            kwargs = {
+                "start_date": start_date,
+                "end_date": date.today(),
+            }
+            if self._provider_codes is not None:
+                kwargs["providers"] = "+".join(sorted(self._provider_codes))
+            articles = self.source.fetch_news([ticker], **kwargs)
         for article in articles or ():
             provider_code = str(getattr(article, "source", "") or "").strip()
             provider_id = extract_provider_article_id(
