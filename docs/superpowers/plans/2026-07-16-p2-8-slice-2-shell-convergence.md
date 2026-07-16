@@ -45,6 +45,32 @@ DOM and pixel inspection prove 961px = one persistent grouped nav/two columns; 9
 
 **Bounded observation, not fixed here:** real `Research` initialization contains a pre-existing effect-order race where configured-route reset can overwrite the one-provider auto-selection in the same React batch. The new observer integration uses two available providers and an explicit OpenAI choice, matching existing supported UX; this slice does not change provider/model/effort selection behavior. Slice 3 or a dedicated Research behavior correction may own that separately if reproduced in product use.
 
+### Reviewer verification ✅ (Fable, 2026-07-17) — all reviewer gates closed
+
+Independent reviewer verification on tip `9e0af10`: frontend `54 files /
+516 tests` PASS + typecheck + production build re-run in the branch worktree
+(exact `+63/-0` over `46/453`); backend byte-identity confirmed empty
+(`git diff --exit-code` on `src`, `data_sources`, `tests` — the constructive
+A/B replacement approved at plan review); changed-file list matches the plan
+file map exactly; and all five Task 7 static ratchets re-run clean (legacy
+rail selectors, planned Notes/Alerts/`規劃中` labels, raw
+error/question/credential/token references in shell code, breakpoint literals
+in `shell.css`, newly added `window.confirm` — zero matches each). Both
+plan-review observations landed: `normalizedTitle()` falls back
+`title || previous || FALLBACK_THREAD_TITLE` so reloaded identities never
+render an undefined title, and the registry's default storage is explicitly
+`window.sessionStorage`. Because no internal review round preceded this one,
+the reviewer additionally close-read the two highest-risk implementations:
+the discovery/reconcile legs catch thread-poll failure while preserving prior
+items (`Promise.allSettled` per leg, in-flight refs against overlap, terminal
+projections never refetched), and the App dispatcher matches the reviewed
+contract (ticker targets preserve the owning view; view targets clear detail;
+sequence ref avoids stale closures). The three Research observer seams
+(hydration with title, post-create before polling, every replay response) are
+wired through a ref exactly as planned. All reviewer gates are closed; merge
+remains the user's decision, and the Slice 2 Design Kit sync remains a
+separate post-merge gate.
+
 ## Global Constraints
 
 - Canonical authority: `docs/superpowers/specs/2026-07-12-p2-8-canonical-shell-interaction-design.md`. The bounded sequencing authority is `docs/superpowers/specs/2026-07-12-p2-8-settings-stabilization-design.md`.
