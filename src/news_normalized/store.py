@@ -274,12 +274,44 @@ class NormalizedNewsStore:
             now = now.astimezone(timezone.utc)
         return now.isoformat().replace("+00:00", "Z")
 
+    @staticmethod
+    def _provider_entitlement_predicate(
+        available_provider_codes: Iterable[str] | None,
+        *,
+        publisher_sql: str,
+    ) -> tuple[str, tuple[str, ...]]:
+        if available_provider_codes is None:
+            return "1", ()
+        codes = tuple(
+            sorted(
+                {
+                    normalized
+                    for code in available_provider_codes
+                    if (normalized := str(code).strip().upper())
+                }
+            )
+        )
+        if not codes:
+            return "0", ()
+        placeholders = ",".join("?" for _ in codes)
+        return (
+            f"UPPER(TRIM({publisher_sql})) IN ({placeholders})",
+            codes,
+        )
+
     def _summarize_ibkr_body_backlog_at(
-        self, now_iso: str
+        self,
+        now_iso: str,
+        available_provider_codes: Iterable[str] | None = None,
     ) -> BodyRetryBacklog:
+        entitlement_sql, entitlement_params = self._provider_entitlement_predicate(
+            available_provider_codes,
+            publisher_sql="a.publisher",
+        )
         row = self.conn.execute(
             "WITH candidates AS ("
-            " SELECT a.id,a.published_at,b.body_status,b.fetch_attempts,b.next_retry_at"
+            " SELECT a.id,a.published_at,b.body_status,b.fetch_attempts,b.next_retry_at,"
+            f" CASE WHEN {entitlement_sql} THEN 1 ELSE 0 END AS is_entitled"
             " FROM news_articles AS a"
             " JOIN news_article_bodies AS b ON b.article_id=a.id"
             " WHERE a.source='ibkr'"
@@ -287,40 +319,54 @@ class NormalizedNewsStore:
             " AND NULLIF(TRIM(a.publisher),'') IS NOT NULL"
             ")"
             " SELECT"
-            " COALESCE(SUM(CASE WHEN body_status='pending' OR ("
+            " COALESCE(SUM(CASE WHEN is_entitled=1 AND (body_status='pending' OR ("
             "   body_status='failed' AND ("
             "     NULLIF(TRIM(next_retry_at),'') IS NULL"
             "     OR julianday(next_retry_at) IS NULL"
             "     OR julianday(next_retry_at)<=julianday(?)"
             "   )"
-            " ) THEN 1 ELSE 0 END),0) AS due_now,"
-            " COALESCE(SUM(CASE WHEN body_status='failed'"
+            " )) THEN 1 ELSE 0 END),0) AS due_now,"
+            " COALESCE(SUM(CASE WHEN is_entitled=1 AND body_status='failed'"
             "   AND julianday(next_retry_at)>julianday(?)"
             "   THEN 1 ELSE 0 END),0) AS scheduled_later,"
-            " COALESCE(SUM(CASE WHEN body_status='pending'"
+            " COALESCE(SUM(CASE WHEN is_entitled=1 AND body_status='pending'"
             "   AND fetch_attempts=0 THEN 1 ELSE 0 END),0) AS never_attempted,"
+            " COALESCE(SUM(CASE WHEN is_entitled=0"
+            "   AND body_status IN ('pending','failed')"
+            "   THEN 1 ELSE 0 END),0) AS provider_not_entitled,"
             " (SELECT next_retry_at FROM candidates"
-            "   WHERE body_status='failed'"
+            "   WHERE is_entitled=1 AND body_status='failed'"
             "   AND julianday(next_retry_at)>julianday(?)"
             "   ORDER BY julianday(next_retry_at),id LIMIT 1"
             " ) AS earliest_next_retry_at"
             " FROM candidates",
-            (now_iso, now_iso, now_iso),
+            (*entitlement_params, now_iso, now_iso, now_iso),
         ).fetchone()
         return BodyRetryBacklog(
             due_now=int(row["due_now"]),
             scheduled_later=int(row["scheduled_later"]),
             never_attempted=int(row["never_attempted"]),
             earliest_next_retry_at=row["earliest_next_retry_at"],
+            provider_not_entitled=int(row["provider_not_entitled"]),
         )
 
     def summarize_ibkr_body_backlog(
-        self, *, now: datetime
+        self,
+        *,
+        now: datetime,
+        available_provider_codes: Iterable[str] | None = None,
     ) -> BodyRetryBacklog:
-        return self._summarize_ibkr_body_backlog_at(self._retry_now_iso(now))
+        return self._summarize_ibkr_body_backlog_at(
+            self._retry_now_iso(now),
+            available_provider_codes,
+        )
 
     def select_ibkr_body_retries(
-        self, *, now: datetime, limit: int
+        self,
+        *,
+        now: datetime,
+        limit: int,
+        available_provider_codes: Iterable[str] | None = None,
     ) -> BodyRetrySelection:
         if limit < 0:
             raise ValueError("retry body limit must be non-negative")
@@ -328,6 +374,10 @@ class NormalizedNewsStore:
             raise RuntimeError("retry selection requires no active transaction")
 
         now_iso = self._retry_now_iso(now)
+        entitlement_sql, entitlement_params = self._provider_entitlement_predicate(
+            available_provider_codes,
+            publisher_sql="a.publisher",
+        )
         try:
             self.conn.execute("BEGIN")
             rows = self.conn.execute(
@@ -345,6 +395,7 @@ class NormalizedNewsStore:
                 "     OR julianday(b.next_retry_at)<=julianday(?)"
                 "   ))"
                 " )"
+                f" AND ({entitlement_sql})"
                 " ORDER BY"
                 " CASE"
                 "   WHEN b.body_status='failed'"
@@ -357,9 +408,12 @@ class NormalizedNewsStore:
                 "   THEN julianday(b.next_retry_at) END,"
                 " julianday(a.published_at),a.id"
                 " LIMIT ?",
-                (now_iso, now_iso, int(limit)),
+                (now_iso, *entitlement_params, now_iso, int(limit)),
             ).fetchall()
-            backlog = self._summarize_ibkr_body_backlog_at(now_iso)
+            backlog = self._summarize_ibkr_body_backlog_at(
+                now_iso,
+                available_provider_codes,
+            )
             self.conn.commit()
         except Exception:
             if self.conn.in_transaction:

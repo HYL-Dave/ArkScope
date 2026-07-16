@@ -111,6 +111,7 @@ class BodyRetryBacklog:
     scheduled_later: int
     never_attempted: int
     earliest_next_retry_at: Optional[str]
+    provider_not_entitled: int = 0
 
 
 @dataclass(frozen=True)

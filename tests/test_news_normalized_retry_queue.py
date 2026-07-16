@@ -232,3 +232,89 @@ def test_ibkr_retry_selection_rejects_negative_limit_and_active_transaction(tmp_
         conn.rollback()
     finally:
         conn.close()
+
+
+def test_entitlement_filter_excludes_unavailable_provider_and_counts_it(tmp_path):
+    conn, store = _open_store(tmp_path / "news.db")
+    try:
+        entitled = _seed(store, "entitled", publisher="DJ-N")
+        _seed(
+            store,
+            "blocked",
+            provider_id="FLY$blocked",
+            publisher="FLY",
+        )
+
+        selection = store.select_ibkr_body_retries(
+            now=NOW,
+            limit=10,
+            available_provider_codes=frozenset({"DJ-N"}),
+        )
+
+        assert selection.article_ids == (entitled,)
+        assert selection.backlog.due_now == 1
+        assert selection.backlog.never_attempted == 1
+        assert selection.backlog.provider_not_entitled == 1
+    finally:
+        conn.close()
+
+
+def test_provider_access_return_reenters_same_rows_under_existing_limit(tmp_path):
+    conn, store = _open_store(tmp_path / "news.db")
+    try:
+        first = _seed(
+            store,
+            "first",
+            provider_id="FLY$first",
+            publisher="FLY",
+        )
+        second = _seed(
+            store,
+            "second",
+            provider_id="FLY$second",
+            publisher="FLY",
+        )
+
+        blocked = store.select_ibkr_body_retries(
+            now=NOW,
+            limit=1,
+            available_provider_codes=frozenset({"DJ-N"}),
+        )
+        restored = store.select_ibkr_body_retries(
+            now=NOW,
+            limit=1,
+            available_provider_codes=frozenset({"DJ-N", "FLY"}),
+        )
+
+        assert blocked.article_ids == ()
+        assert blocked.backlog.provider_not_entitled == 2
+        assert restored.article_ids == (first,)
+        assert restored.backlog.due_now == 2
+        assert restored.backlog.provider_not_entitled == 0
+        assert second not in restored.article_ids
+    finally:
+        conn.close()
+
+
+def test_entitlement_filter_does_not_reclassify_terminal_10172(tmp_path):
+    conn, store = _open_store(tmp_path / "news.db")
+    try:
+        terminal = _seed(
+            store,
+            "terminal",
+            provider_id="FLY$terminal",
+            publisher="FLY",
+        )
+        _set_body(conn, terminal, status="unavailable", attempts=3)
+
+        summary = store.summarize_ibkr_body_backlog(
+            now=NOW,
+            available_provider_codes=frozenset({"DJ-N"}),
+        )
+
+        assert summary.provider_not_entitled == 0
+        assert summary.due_now == 0
+        assert summary.scheduled_later == 0
+        assert summary.never_attempted == 0
+    finally:
+        conn.close()
