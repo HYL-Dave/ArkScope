@@ -9,43 +9,12 @@ import { ResearchView } from "./Research";
 import { TickerDetailView } from "./TickerDetail";
 import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
-
-// Nav aligned to the desktop-app design doc (PDF p6) — MVP subset. Keys are
-// stable English ids; labels follow the mockups (Chinese-primary). Most are
-// stubs for now; the old dev health view is demoted from product-home to
-// "System / Health".
-const NAV = [
-  "Home",
-  "Watchlist",
-  "Universe",
-  "Research",
-  "Holdings",
-  "Alerts",
-  "News",
-  "Notes",
-  "System",
-  "Settings",
-] as const;
-type Nav = (typeof NAV)[number];
-
-const ENABLED: Nav[] = ["Home", "Watchlist", "Universe", "Research", "Holdings", "News", "System", "Settings"];
-
-const LABELS: Record<Nav, string> = {
-  Home: "工作台",
-  Watchlist: "自選股",
-  Universe: "全部標的",
-  Research: "AI 研究",
-  Holdings: "持倉",
-  Alerts: "告警",
-  News: "新聞·事件",
-  Notes: "研究筆記",
-  System: "System / Health",
-  Settings: "設定",
-};
+import { ShellNavigation } from "./shell/ShellNavigation";
+import type { ShellView } from "./shell/navigation";
 
 export function App() {
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
-  const [view, setView] = useState<Nav>("Home");
+  const [view, setView] = useState<ShellView>("Home");
   const [lastOk, setLastOk] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
   // Full-page ticker detail overlay (null = show the selected nav view).
@@ -57,7 +26,7 @@ export function App() {
     setDetail({ ticker });
   }, []);
 
-  const goView = useCallback((next: Nav) => {
+  const goView = useCallback((next: ShellView) => {
     setDetail(null);
     setView(next);
   }, []);
@@ -127,20 +96,9 @@ export function App() {
 
       <div className={`body ${railOpen ? "rail-open" : "rail-closed"}`}>
         <nav className="leftnav">
-          {NAV.map((key) => {
-            const enabled = ENABLED.includes(key);
-            return (
-              <button
-                key={key}
-                className={`navitem ${view === key && !detail ? "active" : ""}`}
-                disabled={!enabled}
-                onClick={() => enabled && goView(key)}
-                title={enabled ? LABELS[key] : `${LABELS[key]} — 規劃中`}
-              >
-                {LABELS[key]}
-              </button>
-            );
-          })}
+          <ShellNavigation currentView={view} onNavigate={(target) => {
+            if (target.kind === "view") goView(target.view);
+          }} />
         </nav>
 
         {detail ? (
@@ -164,12 +122,8 @@ export function App() {
           <HoldingsView />
         ) : view === "System" ? (
           <DashboardView status={status} runtime={runtime} onRetry={refresh} />
-        ) : view === "Settings" ? (
-          <SettingsView runtime={runtime} onRuntimeChanged={refreshRuntime} />
         ) : (
-          <main className="main">
-            <p className="muted">{LABELS[view]} — 規劃中。</p>
-          </main>
+          <SettingsView runtime={runtime} onRuntimeChanged={refreshRuntime} />
         )}
 
         {railOpen ? (
