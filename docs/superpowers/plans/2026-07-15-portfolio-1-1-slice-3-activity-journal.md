@@ -11,13 +11,14 @@
 ## Implementation Ledger
 
 - **Branch / commits:** `codex/portfolio-1-1-activity`; behavioral A/B base
-  `c5cd91f`; branch base and plan commit `b657349`; code head `0709bed` before
+  `c5cd91f`; branch base and plan commit `b657349`; code head `a8e51ab` before
   this evidence-only closeout. Tasks landed as `8830b9a` (annotation
   foundation), `cce9482` (broker projection), `42706a7` + `3d05600` (complete
   projection and identity/cursor hardening), `54bb484` + `e9b8d65` (API plus
   case-insensitive account-label privacy), `fc7e3a0` + `595c417` (activity UI
   plus truth/focus hardening), and `94c72fa` + `0709bed` (navigation/recent
-  integration plus refresh semantics). Merge, spec/map LIVE status, and
+  integration plus refresh semantics), `854ac89` (initial review ledger), and
+  `a8e51ab` (independent-review closure). Merge, spec/map LIVE status, and
   worktree cleanup remain unperformed.
 - **Tasks 1-4, backend RED -> GREEN:** Task 1 began with no activity module,
   annotation table, or safe public label helper. Task 2 began with no
@@ -25,18 +26,20 @@
   coverage projection, filters, or cursor. Task 4 began with no mounted
   provider-free activity API. The final focused backend command over activity,
   routes, Portfolio authority, observations, and capture routes reports
-  **`115 passed`**. Review fixes additionally pin local/account-scoped marker
+  **`119 passed`**. Review fixes additionally pin local/account-scoped marker
   identities, deterministic cursors, case-insensitive legacy raw-label
-  redaction, and typed storage failures.
+  redaction, typed storage failures, exact SQL/DTO realized-P&L summation,
+  execution-leg-only broker-day coverage, and mounted typed limit failures.
 - **Tasks 5-6, frontend RED -> GREEN:** the activity DTO, ET-first formatter,
   activity/recent components, four-tab hierarchy, and contextual layout did
-  not exist at RED. The final focused frontend ledger is **`6 files / 83
-  tests`**; the full frontend is **`46 files / 450 tests`**. TypeScript
+  not exist at RED. The final focused frontend ledger is **`6 files / 84
+  tests`**; the full frontend is **`46 files / 451 tests`**. TypeScript
   typecheck and the production build pass, with only the pre-existing Vite
   chunk-size warning. Review fixes pin failed-page cursor truth, commission
   currency display, nested Drawer/ConfirmDialog focus, correction lineage,
   unmatched timestamp domain, synchronous refresh invalidation, and
-  note-only refresh exclusion.
+  note-only refresh exclusion, and full-reload invalidation of stale append
+  busy state.
 - **Static/privacy/fresh gates:** order APIs, PostgreSQL terms, target-file
   `window.confirm`/`@media`, agent/tool registration, and duplicate Settings
   ownership all return zero matches. A fresh temporary profile adds exactly
@@ -56,9 +59,15 @@
   the Drawer closes; and the recent panel renders only with real content at
   `961+`, reserving no width at `959` or mobile. Fixture screenshots remain
   disposable under `/tmp/arkscope-p11-s3-*.png`.
+- **Independent implementation review:** four concrete gaps were reproduced
+  RED-first and closed in `a8e51ab`: SQLite `SUM` could disagree with the
+  serialized `math.fsum` outcome; cross-broker-day gaps incorrectly required
+  account and position legs; a superseded load-more request could leave the
+  UI busy; and FastAPI validation returned 422 rather than the activity
+  endpoint's typed 400 for numeric limits outside `1..200`.
 - **Canonical backend A/B:** clean detached worktrees, sequential
-  single-process pytest, base `c5cd91f` versus code head `0709bed`: collected
-  **`4302 -> 4335`**, exactly **`+33/-0`**; passed **`4191 -> 4224`**; both
+  single-process pytest, base `c5cd91f` versus code head `a8e51ab`: collected
+  **`4302 -> 4339`**, exactly **`+37/-0`**; passed **`4191 -> 4228`**; both
   sides have **`30 failed / 74 skipped / 18 warnings / 7 errors`**. Parsed
   pytest node IDs show exactly the 33 planned activity tests and no removal;
   parsed JUnit failure and error sets have empty differences in both
@@ -565,18 +574,18 @@ than making every field optional on one loose interface.
 - Grounded backend baseline at `c5cd91f`: **4302 collected**, with the known
   canonical family `4191 passed / 30 failed / 74 skipped / 18 warnings /
   7 errors`.
-- Planned backend delta: **+33 / -0** collected:
+- Final backend delta: **+37 / -0** collected:
   - Task 1 annotations/schema: +8;
-  - Task 2 broker projection: +8;
-  - Task 3 manual/unmatched/coverage/filtering: +8;
-  - Task 4 API/mount/privacy: +9.
-- Expected backend head collection: **4335**, expected passed **4224** when the
+  - Task 2 broker projection: +9;
+  - Task 3 manual/unmatched/coverage/filtering: +9;
+  - Task 4 API/mount/privacy: +11.
+- Expected backend head collection: **4339**, expected passed **4228** when the
   pre-existing canonical family remains identical.
 - Grounded frontend baseline: **44 files / 426 tests**.
-- Planned frontend delta: **+24 / -0** tests and two new test files:
-  - Task 5 activity/time surface: +16;
+- Final frontend delta: **+25 / -0** tests and two new test files:
+  - Task 5 activity/time surface: +17;
   - Task 6 recent panel/Holdings integration: +8.
-- Expected frontend head: **46 files / 450 tests**.
+- Expected frontend head: **46 files / 451 tests**.
 - Replacing the existing `does_not_render_an_unfinished_activity_tab_or_placeholder`
   assertion with the final four-tab contract is a 1:1 evolution and contributes
   zero net tests.
@@ -1156,7 +1165,7 @@ after the existing portfolio/capture routers.
 pytest tests/test_portfolio_activity.py tests/test_portfolio_activity_routes.py tests/test_portfolio_routes.py tests/test_portfolio_observations.py tests/test_portfolio_state.py -q
 ```
 
-Expected: all focused tests pass; new backend collection is exactly `+33/-0`
+Expected: all focused tests pass; new backend collection is exactly `+37/-0`
 relative to `c5cd91f`.
 
 - [ ] **Step 5: Commit**
@@ -1426,7 +1435,7 @@ npm run typecheck
 npm run build
 ```
 
-Expected: focused tests pass; full frontend is exactly **46 files / 450 tests**;
+Expected: focused tests pass; full frontend is exactly **46 files / 451 tests**;
 typecheck passes; production build passes with only the existing chunk-size
 warning.
 
@@ -1458,8 +1467,8 @@ npm run typecheck
 npm run build
 ```
 
-Record exact counts. Stop if backend new collection differs from `+33/-0` or
-frontend differs from `+24/-0`; reconcile the ledger before review.
+Record exact counts. Stop if backend new collection differs from `+37/-0` or
+frontend differs from `+25/-0`; reconcile the ledger before review.
 
 - [ ] **Step 2: Run static authority/privacy ratchets**
 
@@ -1549,10 +1558,10 @@ IDs, not just counts. Required verdict:
 
 ```text
 base collected 4302
-head collected 4335
-collect diff +33 / -0
+head collected 4339
+collect diff +37 / -0
 base passed 4191
-head passed 4224
+head passed 4228
 failed sets identical 30 = 30, bidirectional diff empty
 skipped 74 = 74
 warnings 18 = 18
@@ -1560,7 +1569,7 @@ errors 7 = 7
 ```
 
 If ambient counts differ, authority is same-run base/head set equality plus
-exact `+33/-0`; record the observed family honestly. No A/B PASS may be claimed
+exact `+37/-0`; record the observed family honestly. No A/B PASS may be claimed
 from a hanging or incomplete side.
 
 - [ ] **Step 6: Run the single-sidecar copied-profile live Gateway gate**
