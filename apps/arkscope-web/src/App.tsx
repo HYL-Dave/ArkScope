@@ -10,13 +10,16 @@ import { TickerDetailView } from "./TickerDetail";
 import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
 import { ShellNavigation } from "./shell/ShellNavigation";
-import type { ShellView } from "./shell/navigation";
+import { ShellTopBar } from "./shell/ShellTopBar";
+import { readDeveloperMode, writeDeveloperMode } from "./shell/shellPreferences";
+import { shellViewLabel, type ShellView } from "./shell/navigation";
 
 export function App() {
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
   const [view, setView] = useState<ShellView>("Home");
   const [lastOk, setLastOk] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
+  const [developerMode, setDeveloperMode] = useState(() => readDeveloperMode());
   // Full-page ticker detail overlay (null = show the selected nav view).
   const [detail, setDetail] = useState<{ ticker: string } | null>(null);
   // Right rail is collapsed by default — it only reserves width when opened.
@@ -49,6 +52,11 @@ export function App() {
     }
   }, []);
 
+  const updateDeveloperMode = useCallback((enabled: boolean) => {
+    setDeveloperMode(enabled);
+    writeDeveloperMode(enabled);
+  }, []);
+
   useEffect(() => {
     void refresh();
     const id = window.setInterval(() => void refresh(), 15_000);
@@ -60,39 +68,24 @@ export function App() {
     void refreshRuntime();
   }, [refreshRuntime]);
 
-  const dot = status.kind === "ready" ? "ok" : status.kind === "error" ? "bad" : "wait";
-
   return (
     <div className="shell">
-      <header className="topbar">
-        <span className="brand">ArkScope</span>
-        <span className={`dot ${dot}`} />
-        <span className="topbar-status">
-          {status.kind === "ready"
-            ? `sidecar ok · ${status.status.tools_registered} tools`
-            : status.kind === "error"
-              ? "sidecar unreachable"
-              : "connecting…"}
-        </span>
-        <span className="spacer" />
-        {runtime && (
-          <button
-            type="button"
-            className="topbar-model"
-            onClick={() => goView("Settings")}
-            title={
-              `卡片合成 ${runtime.card_synthesis.provider}/${runtime.card_synthesis.model}\n` +
-              `卡片翻譯 ${runtime.card_translation.provider}/${runtime.card_translation.model}\n` +
-              `Anthropic key ${runtime.anthropic.key_set ? "✓" : "✗"} · OpenAI key ${runtime.openai.key_set ? "✓" : "✗"}\n` +
-              "點擊進入模型設定"
-            }
-          >
-            ✦ {runtime.card_synthesis.provider}/{runtime.card_synthesis.model}
-          </button>
-        )}
-        <span className="topbar-meta">{apiBase}</span>
-        {lastOk && <span className="topbar-meta">updated {lastOk}</span>}
-      </header>
+      <ShellTopBar
+        contextLabel={detail?.ticker ?? shellViewLabel(view)}
+        status={status}
+        developerMode={developerMode}
+        diagnostics={{
+          apiBase,
+          toolsRegistered: status.kind === "ready" ? status.status.tools_registered : null,
+          lastStatusAt: lastOk,
+          cardModel: runtime
+            ? `${runtime.card_synthesis.provider}/${runtime.card_synthesis.model}`
+            : null,
+        }}
+        onNavigate={(target) => {
+          if (target.kind === "view") goView(target.view);
+        }}
+      />
 
       <div className={`body ${railOpen ? "rail-open" : "rail-closed"}`}>
         <nav className="leftnav">
@@ -121,7 +114,13 @@ export function App() {
         ) : view === "Holdings" ? (
           <HoldingsView />
         ) : view === "System" ? (
-          <DashboardView status={status} runtime={runtime} onRetry={refresh} />
+          <DashboardView
+            status={status}
+            runtime={runtime}
+            onRetry={refresh}
+            developerMode={developerMode}
+            onDeveloperModeChange={updateDeveloperMode}
+          />
         ) : (
           <SettingsView runtime={runtime} onRuntimeChanged={refreshRuntime} />
         )}

@@ -9,23 +9,41 @@ export function DashboardView({
   status,
   runtime,
   onRetry,
+  developerMode,
+  onDeveloperModeChange,
 }: {
   status: StatusState;
   runtime?: RuntimeConfig | null;
   onRetry: () => void;
+  developerMode: boolean;
+  onDeveloperModeChange: (enabled: boolean) => void;
 }) {
   return (
     <main className="main">
-      {status.kind === "loading" && <p className="muted">Connecting to the local sidecar…</p>}
+      {status.kind === "loading" && <p className="muted">正在連線至本機 Sidecar…</p>}
       {status.kind === "error" && (
         <div className="errorbox">
-          <p>Could not reach the sidecar.</p>
-          <p className="muted">{status.message}</p>
-          <button onClick={onRetry}>Retry</button>
+          <p>無法連線至本機 Sidecar</p>
+          {developerMode ? <p className="muted">{status.message}</p> : null}
+          <button onClick={onRetry}>重試</button>
         </div>
       )}
-      {runtime && <RuntimePanel rt={runtime} />}
-      {status.kind === "ready" && <StatusTiles status={status.status} />}
+      {status.kind === "ready" && !developerMode ? <p>本機 Sidecar 已連線。</p> : null}
+
+      <section aria-labelledby="developer-mode-heading">
+        <h2 id="developer-mode-heading" className="section">Developer Mode</h2>
+        <label>
+          <input
+            type="checkbox"
+            checked={developerMode}
+            onChange={(event) => onDeveloperModeChange(event.target.checked)}
+          />{" "}
+          顯示本機診斷資訊
+        </label>
+      </section>
+
+      {developerMode && runtime ? <RuntimePanel rt={runtime} /> : null}
+      {developerMode && status.kind === "ready" ? <StatusTiles status={status.status} /> : null}
     </main>
   );
 }
