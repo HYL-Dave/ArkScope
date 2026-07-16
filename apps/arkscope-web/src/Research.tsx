@@ -48,6 +48,7 @@ import {
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import { shouldEndResearchReplay } from "./researchRunReplay";
+import type { NavigationRequest, NavigationTarget } from "./shell/navigation";
 import {
   initialState,
   lastRetryCandidate,
@@ -129,7 +130,13 @@ const sleep = (ms: number, signal: AbortSignal): Promise<void> => new Promise((r
   }, { once: true });
 });
 
-export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
+export interface ResearchViewProps {
+  onOpenTicker: (ticker: string) => void;
+  navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "research_thread" }>> | null;
+  onObserveRun?: (run: ResearchRunDTO, threadTitle?: string) => void;
+}
+
+export function ResearchView({ onOpenTicker, onObserveRun }: ResearchViewProps) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [question, setQuestion] = useState("");
   const [tickerInput, setTickerInput] = useState("");
@@ -152,6 +159,8 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
 
   const abortRef = useRef<AbortController | null>(null);
   const pollingRunIdRef = useRef<string | null>(null);
+  const onObserveRunRef = useRef(onObserveRun);
+  onObserveRunRef.current = onObserveRun;
 
   // --- provider availability = SDK present (/query/providers) AND key set ----
   const availability = useMemo(() => {
@@ -229,6 +238,9 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           threads.map(async (t) => [t.id, (await getResearchMessages(t.id)).messages.map(toClientMessage)] as const),
         );
         if (!alive || threads.length === 0) return;
+        for (const thread of threads) {
+          if (thread.active_run) onObserveRunRef.current?.(thread.active_run, thread.title);
+        }
         const savedActive = readActiveThreadId();
         setActiveRunsByThread(Object.fromEntries(
           threads
@@ -264,6 +276,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     try {
       for (;;) {
         const res = await getResearchRunEvents(run.id, after);
+        onObserveRunRef.current?.(res.run);
         if (abortRef.current !== controller) return; // detached/superseded
         setActiveRunsByThread((prev) => {
           const next = { ...prev };
@@ -301,6 +314,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const runManaged = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean; assistant_stance?: AssistantStance }) => {
     try {
       const { run } = await createResearchRun(body);
+      onObserveRunRef.current?.(run);
       setActiveRunsByThread((prev) => ({ ...prev, [run.thread_id]: run }));
       await pollRun(run);
     } catch (e) {
