@@ -136,7 +136,7 @@ export interface ResearchViewProps {
   onObserveRun?: (run: ResearchRunDTO, threadTitle?: string) => void;
 }
 
-export function ResearchView({ onOpenTicker, onObserveRun }: ResearchViewProps) {
+export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: ResearchViewProps) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [question, setQuestion] = useState("");
   const [tickerInput, setTickerInput] = useState("");
@@ -159,6 +159,7 @@ export function ResearchView({ onOpenTicker, onObserveRun }: ResearchViewProps) 
 
   const abortRef = useRef<AbortController | null>(null);
   const pollingRunIdRef = useRef<string | null>(null);
+  const consumedNavigationSequenceRef = useRef(0);
   const onObserveRunRef = useRef(onObserveRun);
   onObserveRunRef.current = onObserveRun;
 
@@ -413,6 +414,12 @@ export function ResearchView({ onOpenTicker, onObserveRun }: ResearchViewProps) 
     writeActiveThreadId(id);
     dispatch({ kind: "selectThread", threadId: id });
   }, []);
+  useEffect(() => {
+    if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
+    if (!state.threads.some((thread) => thread.id === navigationRequest.target.threadId)) return;
+    consumedNavigationSequenceRef.current = navigationRequest.sequence;
+    selectThread(navigationRequest.target.threadId);
+  }, [navigationRequest, selectThread, state.threads]);
   const deleteThread = useCallback(async (thread: Thread) => {
     if (activeRunsByThread[thread.id]) {
       setThreadError("這個對話仍有研究執行中，請先停止或等待完成。");

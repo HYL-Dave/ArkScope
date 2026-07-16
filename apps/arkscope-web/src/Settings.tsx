@@ -112,6 +112,10 @@ import {
   scheduleSkipCommonState,
 } from "./dataSourcesPresentation";
 import { StatusBadge } from "./ui";
+import type {
+  NavigationRequest,
+  NavigationTarget,
+} from "./shell/navigation";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -214,13 +218,17 @@ type CredentialMetadataDraft = {
   expires_at?: string;
 };
 
+export interface SettingsViewProps {
+  runtime: RuntimeConfig | null;
+  onRuntimeChanged: () => Promise<void>;
+  navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "settings_section" }>> | null;
+}
+
 export function SettingsView({
   runtime,
   onRuntimeChanged,
-}: {
-  runtime: RuntimeConfig | null;
-  onRuntimeChanged: () => Promise<void>;
-}) {
+  navigationRequest,
+}: SettingsViewProps) {
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [draft, setDraft] = useState<Partial<Record<ModelTask, DraftRoute>>>({});
   const [loading, setLoading] = useState(true);
@@ -228,8 +236,15 @@ export function SettingsView({
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [section, setSection] = useState<SettingsSection>("models");
+  const consumedNavigationSequenceRef = useRef(0);
   const [discovery, setDiscovery] = useState<DiscoveryState>({});
   const [testState, setTestState] = useState<TestState>({});
+
+  useEffect(() => {
+    if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
+    consumedNavigationSequenceRef.current = navigationRequest.sequence;
+    setSection(navigationRequest.target.section);
+  }, [navigationRequest]);
 
   useEffect(() => {
     let cancelled = false;

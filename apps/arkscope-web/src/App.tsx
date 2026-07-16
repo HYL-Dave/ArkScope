@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HoldingsView } from "./Holdings";
@@ -11,8 +11,18 @@ import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
 import { ShellNavigation } from "./shell/ShellNavigation";
 import { ShellTopBar } from "./shell/ShellTopBar";
+import { BackgroundWorkIndicator } from "./shell/BackgroundWorkIndicator";
+import { useResearchWorkRegistry } from "./shell/researchWork";
 import { readDeveloperMode, writeDeveloperMode } from "./shell/shellPreferences";
-import { shellViewLabel, type ShellView } from "./shell/navigation";
+import {
+  nextNavigationRequest,
+  resolveNavigationTarget,
+  shellViewLabel,
+  type NavigationTarget,
+  type ResearchNavigationRequest,
+  type SettingsNavigationRequest,
+  type ShellView,
+} from "./shell/navigation";
 
 export function App() {
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
@@ -22,16 +32,19 @@ export function App() {
   const [developerMode, setDeveloperMode] = useState(() => readDeveloperMode());
   // Full-page ticker detail overlay (null = show the selected nav view).
   const [detail, setDetail] = useState<{ ticker: string } | null>(null);
-  // Right rail is collapsed by default — it only reserves width when opened.
-  const [railOpen, setRailOpen] = useState(false);
+  const navigationSequenceRef = useRef(0);
+  const [researchNavigation, setResearchNavigation] = useState<ResearchNavigationRequest | null>(null);
+  const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationRequest | null>(null);
+  const researchWork = useResearchWorkRegistry();
 
-  const openTicker = useCallback((ticker: string) => {
-    setDetail({ ticker });
-  }, []);
-
-  const goView = useCallback((next: ShellView) => {
-    setDetail(null);
-    setView(next);
+  const navigate = useCallback((target: NavigationTarget) => {
+    const request = nextNavigationRequest(navigationSequenceRef.current, target);
+    navigationSequenceRef.current = request.sequence;
+    const resolved = resolveNavigationTarget(request);
+    setDetail(resolved.ticker ? { ticker: resolved.ticker } : null);
+    if (resolved.view) setView(resolved.view);
+    if (resolved.research) setResearchNavigation(resolved.research);
+    if (resolved.settings) setSettingsNavigation(resolved.settings);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -68,6 +81,13 @@ export function App() {
     void refreshRuntime();
   }, [refreshRuntime]);
 
+  const researchSessionSeconds = runtime?.research_runtime.session_timeout_s;
+  const researchSessionBoundMs = typeof researchSessionSeconds === "number"
+    && Number.isFinite(researchSessionSeconds)
+    && researchSessionSeconds >= 0
+    ? researchSessionSeconds * 1_000
+    : null;
+
   return (
     <div className="shell">
       <ShellTopBar
@@ -82,16 +102,19 @@ export function App() {
             ? `${runtime.card_synthesis.provider}/${runtime.card_synthesis.model}`
             : null,
         }}
-        onNavigate={(target) => {
-          if (target.kind === "view") goView(target.view);
-        }}
+        workControl={researchWork.activeCount > 0 || researchWork.attentionCount > 0 ? (
+          <BackgroundWorkIndicator
+            work={researchWork}
+            researchSessionBoundMs={researchSessionBoundMs}
+            onNavigate={navigate}
+          />
+        ) : undefined}
+        onNavigate={navigate}
       />
 
-      <div className={`body ${railOpen ? "rail-open" : "rail-closed"}`}>
+      <div className="body rail-closed">
         <nav className="leftnav">
-          <ShellNavigation currentView={view} onNavigate={(target) => {
-            if (target.kind === "view") goView(target.view);
-          }} />
+          <ShellNavigation currentView={view} onNavigate={navigate} />
         </nav>
 
         {detail ? (
@@ -102,15 +125,24 @@ export function App() {
             runtime={runtime}
           />
         ) : view === "Home" ? (
-          <HomeView status={status} onNavigate={goView} onOpenTicker={openTicker} runtime={runtime} />
+          <HomeView
+            status={status}
+            onNavigate={(next) => navigate({ kind: "view", view: next })}
+            onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+            runtime={runtime}
+          />
         ) : view === "Watchlist" ? (
-          <WatchlistView onOpenTicker={openTicker} />
+          <WatchlistView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
         ) : view === "Universe" ? (
-          <UniverseView onOpenTicker={openTicker} />
+          <UniverseView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
         ) : view === "News" ? (
-          <NewsView onOpenTicker={openTicker} />
+          <NewsView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
         ) : view === "Research" ? (
-          <ResearchView onOpenTicker={openTicker} />
+          <ResearchView
+            onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+            navigationRequest={researchNavigation}
+            onObserveRun={researchWork.observeRun}
+          />
         ) : view === "Holdings" ? (
           <HoldingsView />
         ) : view === "System" ? (
@@ -120,31 +152,14 @@ export function App() {
             onRetry={refresh}
             developerMode={developerMode}
             onDeveloperModeChange={updateDeveloperMode}
+            onNavigate={navigate}
           />
         ) : (
-          <SettingsView runtime={runtime} onRuntimeChanged={refreshRuntime} />
-        )}
-
-        {railOpen ? (
-          <aside className="rightrail">
-            <div className="rightrail-head">
-              <h3>面板</h3>
-              <span className="spacer" />
-              <button className="btn-ghost" onClick={() => setRailOpen(false)} title="收合">✕</button>
-            </div>
-            <p className="muted tiny">
-              嵌入式 AI 助手與「今日重點」（事件 / 告警 / 摘要）將放這裡。AI 嵌入各頁，
-              AI 研究頁集中管理對話 threads（vision §1/§3）。規劃中。
-            </p>
-          </aside>
-        ) : (
-          <button
-            className="rail-tab"
-            onClick={() => setRailOpen(true)}
-            title="展開側面板"
-          >
-            面板 ‹
-          </button>
+          <SettingsView
+            runtime={runtime}
+            onRuntimeChanged={refreshRuntime}
+            navigationRequest={settingsNavigation}
+          />
         )}
       </div>
     </div>

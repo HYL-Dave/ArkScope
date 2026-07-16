@@ -5,6 +5,10 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog, ModelTask, RuntimeConfig, TaskRoute } from "./api";
+import type {
+  EnabledSettingsSection,
+  SettingsNavigationRequest,
+} from "./shell/navigation";
 
 const saveFixedTaskRuntime = vi.hoisted(() => vi.fn(async () => ({ fixed_task_runtime: {} })));
 
@@ -195,5 +199,58 @@ describe("Settings model route save gate", () => {
       },
     });
     expect(onRuntimeChanged).toHaveBeenCalledOnce();
+  });
+
+  it("opens an enabled section from a sequenced shell request", async () => {
+    const providers = "providers" satisfies EnabledSettingsSection;
+    const navigationRequest: SettingsNavigationRequest = {
+      sequence: 1,
+      target: { kind: "settings_section", section: providers },
+    };
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        onRuntimeChanged: vi.fn(),
+        navigationRequest,
+      }));
+    });
+    await flush();
+
+    expect(host.querySelector("button[title='Providers']")?.classList.contains("active")).toBe(true);
+  });
+
+  it("reapplies the same section only when its request sequence advances", async () => {
+    const models = "models" satisfies EnabledSettingsSection;
+    const request = (sequence: number): SettingsNavigationRequest => ({
+      sequence,
+      target: { kind: "settings_section", section: models },
+    });
+    const render = async (navigationRequest: SettingsNavigationRequest) => {
+      await act(async () => {
+        root!.render(React.createElement(SettingsView, {
+          runtime: null,
+          onRuntimeChanged: vi.fn(),
+          navigationRequest,
+        }));
+      });
+      await flush();
+    };
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await render(request(1));
+    const providers = host.querySelector("button[title='Providers']") as HTMLButtonElement;
+    await act(async () => providers.click());
+    expect(providers.classList.contains("active")).toBe(true);
+
+    await render(request(1));
+    expect(host.querySelector("button[title='Providers']")?.classList.contains("active")).toBe(true);
+
+    await render(request(2));
+    expect(host.querySelector("button[title='Models']")?.classList.contains("active")).toBe(true);
   });
 });

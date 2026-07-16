@@ -1,4 +1,8 @@
+import { Database } from "lucide-react";
+
 import type { ApiStatus, RuntimeConfig } from "./api";
+import type { NavigationTarget } from "./shell/navigation";
+import { Button } from "./ui";
 
 export type StatusState =
   | { kind: "loading" }
@@ -11,12 +15,14 @@ export function DashboardView({
   onRetry,
   developerMode,
   onDeveloperModeChange,
+  onNavigate,
 }: {
   status: StatusState;
   runtime?: RuntimeConfig | null;
   onRetry: () => void;
   developerMode: boolean;
   onDeveloperModeChange: (enabled: boolean) => void;
+  onNavigate: (target: NavigationTarget) => void;
 }) {
   return (
     <main className="main">
@@ -29,6 +35,13 @@ export function DashboardView({
         </div>
       )}
       {status.kind === "ready" && !developerMode ? <p>本機 Sidecar 已連線。</p> : null}
+      <Button
+        size="compact"
+        icon={<Database size={14} />}
+        onClick={() => onNavigate({ kind: "settings_section", section: "data_sources" })}
+      >
+        資料來源設定
+      </Button>
 
       <section aria-labelledby="developer-mode-heading">
         <h2 id="developer-mode-heading" className="section">Developer Mode</h2>
