@@ -225,7 +225,7 @@ therefore defaults to defer until the hypothesis gate exists.
   real-Gateway gates are closed. Portfolio 1.1 Slice 3 is **MERGED / LIVE
   2026-07-16 through `e5045dc`**, making the full three-slice Portfolio 1.1
   line LIVE COMPLETE. **P2.8 Slice 2 shell convergence is MERGED to `master`
-  2026-07-17 through reviewed tip `8016aaf`; code, independent review, exact
+  2026-07-17 through post-merge scroll hotfix `95662b1`; code, independent review, exact
   frontend accounting, responsive/live, static, backend-byte-identity, and
   merged-tree verification gates are closed.** The external Claude Design
   companion sync remains the one separate post-merge gate; Slice 3 has not
@@ -423,6 +423,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-17 (P2.8 SLICE 2 POST-MERGE SCROLL REGRESSION CLOSED)**: The user's first desktop restart caught a real test-shaped hole: every ordinary `.main` page had stopped scrolling because the new viewport-bounded `.app-shell-content { overflow: hidden }` wrapper clipped an unconstrained full-height child; the old shell had made `.main` the constrained grid item directly. RED-first hotfix `95662b1` makes the wrapper a column flex container and restores its direct page root as the bounded scroll owner (`flex: 1 1 auto; min-height: 0`). Real Chromium proved Settings PageDown movement at 840px (`0 -> 682`), 1440px (`0 -> 815`), and 390px (`0 -> 686`) with no horizontal overflow, while Research retained its viewport-bound outer workspace and independently scrollable message region. `master` fast-forwarded through the hotfix; fresh merged-tree frontend is exactly `54 files / 517 tests`, with typecheck and production build green. The external Design Kit companion sync remains pending and Slice 3 has not started.
 
 - **2026-07-17 (P2.8 SLICE 2 SHELL CONVERGENCE MERGED — external Design Kit companion sync pending)**: Independent review closed every reviewer gate at docs tip `8016aaf`, and the user selected local integration. `master` fast-forwarded from `29f37f8` through that reviewed tip while preserving the unrelated `config/tickers_core.json` worktree edit. Fresh merged-tree verification passed frontend `54 files / 516 tests`, typecheck, and production build with only the existing `559.14 kB` chunk warning; backend-owned paths remain byte-identical to base. The shipped shell now has one four-group IA, no planned Notes/Alerts controls or placeholder rail, normal/developer diagnostic separation, exact current-surface navigation, and a Research-only background-work notification Drawer. The external Claude Design companion sync remains a separately recorded post-merge gate because this execution session has no authenticated DesignSync capability; no Slice 3 implementation has started.
 

@@ -85,6 +85,27 @@ This execution session has no authenticated DesignSync capability, so it does
 not claim that gate or mark the full multi-slice P2.8 line complete. No Slice 3
 implementation has started.
 
+### Post-merge scrolling hotfix (2026-07-17)
+
+The first desktop restart exposed a vertical-scroll regression that the
+responsive gate had not asserted. Before Slice 2, each `.main` surface was a
+direct constrained grid item and therefore owned its `overflow: auto`. The new
+`.app-shell-content` wrapper was constrained to the viewport and used
+`overflow: hidden`, but its unconstrained `.main` child expanded to full
+content height and was clipped instead of becoming scrollable.
+
+RED-first commit `95662b1` makes the wrapper a column flex container and bounds
+its direct `.main` child with `flex: 1 1 auto; min-height: 0`; one CSS contract
+prevents the ownership regression. Real Chromium evidence at the 840px-high
+test viewport changed Settings from parent `795 / 3570` with child
+`3555 / 3555` and immovable `scrollTop=0` to a bounded child `780 / 3575`;
+one real `PageDown` moved it to `scrollTop=682`. Wide 1440px and narrow 390px
+checks moved to `815` and `686` respectively with no horizontal overflow.
+Research remained viewport-bounded (`795 / 795`) while its message region kept
+independent scrolling (`364 / 735`). The hotfix fast-forwarded to `master` and
+fresh merged-tree verification passed frontend `54 files / 517 tests`,
+typecheck, and production build with only the existing chunk warning.
+
 ## Global Constraints
 
 - Canonical authority: `docs/superpowers/specs/2026-07-12-p2-8-canonical-shell-interaction-design.md`. The bounded sequencing authority is `docs/superpowers/specs/2026-07-12-p2-8-settings-stabilization-design.md`.
