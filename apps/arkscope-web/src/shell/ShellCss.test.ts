@@ -36,6 +36,22 @@ describe("responsive application shell CSS", () => {
     expect(shellCss).not.toMatch(/rightrail|rail-tab|320px/);
   });
 
+  it("bounds each page root so the page owns vertical scrolling", () => {
+    const contentRules = Array.from(
+      shellCss.matchAll(/\.app-shell-content\s*\{([^}]*)\}/g),
+      (match) => match[1] ?? "",
+    );
+    const pageRoot = shellCss.match(/\.app-shell-content\s*>\s*\.main\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(contentRules.some((rule) => (
+      /display:\s*flex/.test(rule)
+      && /flex-direction:\s*column/.test(rule)
+      && /overflow:\s*hidden/.test(rule)
+    ))).toBe(true);
+    expect(pageRoot).toMatch(/flex:\s*1\s+1\s+auto/);
+    expect(pageRoot).toMatch(/min-height:\s*0/);
+  });
+
   it("switches overlay layout through data-shell-overlay without an at-media rule", () => {
     expect(shellCss).toMatch(/\.app-shell\[data-shell-overlay="true"\]\s+\.app-shell-layout/);
     expect(shellCss).not.toMatch(/@media/i);
