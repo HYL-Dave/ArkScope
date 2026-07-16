@@ -2775,6 +2775,47 @@ def test_worker_stdout_parser_rejects_malformed_body_backlog_values():
     assert "legs" not in unknown_leg
 
 
+def test_worker_stdout_parse_preserves_entitlement_block_count():
+    payload = ds._parse_sanitized_worker_stdout(
+        json.dumps(
+            {
+                "status": "succeeded",
+                "body_backlog": {
+                    "status": "ok",
+                    "due_now": 0,
+                    "scheduled_later": 0,
+                    "never_attempted": 0,
+                    "earliest_next_retry_at": None,
+                    "provider_not_entitled": 78,
+                },
+            }
+        )
+    )
+
+    assert payload is not None
+    assert payload["body_backlog"]["provider_not_entitled"] == 78
+
+
+def test_worker_stdout_parser_rejects_malformed_entitlement_block_count():
+    for value in (-1, 1.5, True, "78"):
+        payload = ds._parse_sanitized_worker_stdout(
+            json.dumps(
+                {
+                    "status": "partial",
+                    "body_backlog": {
+                        "status": "ok",
+                        "due_now": 0,
+                        "scheduled_later": 0,
+                        "never_attempted": 0,
+                        "provider_not_entitled": value,
+                    },
+                }
+            )
+        )
+        assert payload is not None
+        assert payload["body_backlog"] == {"status": "unavailable"}
+
+
 def _run_ibkr_worker_payload(monkeypatch, payload):
     import src.news_normalized.routing as routing
 

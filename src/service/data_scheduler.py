@@ -558,14 +558,24 @@ def _parse_body_backlog(value: Any) -> Optional[Dict[str, Any]]:
     }
     if any(item is None for item in counts.values()):
         return {"status": "unavailable"}
+    provider_not_entitled = None
+    if "provider_not_entitled" in value:
+        provider_not_entitled = _safe_nonnegative_int(
+            value.get("provider_not_entitled")
+        )
+        if provider_not_entitled is None:
+            return {"status": "unavailable"}
     earliest = _safe_iso_timestamp(value.get("earliest_next_retry_at"))
     if value.get("earliest_next_retry_at") is not None and earliest is None:
         return {"status": "unavailable"}
-    return {
+    result = {
         "status": "ok",
         **counts,
         "earliest_next_retry_at": earliest,
     }
+    if provider_not_entitled is not None:
+        result["provider_not_entitled"] = provider_not_entitled
+    return result
 
 
 def _parse_worker_legs(value: Any) -> Optional[Dict[str, str]]:

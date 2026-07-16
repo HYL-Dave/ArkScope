@@ -130,14 +130,24 @@ def _sanitize_body_backlog(value: Any) -> dict[str, Any] | None:
     }
     if any(value is None for value in counts.values()):
         return {"status": "unavailable"}
+    provider_not_entitled = None
+    if "provider_not_entitled" in data:
+        provider_not_entitled = _nonnegative_int(
+            data.get("provider_not_entitled")
+        )
+        if provider_not_entitled is None:
+            return {"status": "unavailable"}
     earliest = _iso_timestamp(data.get("earliest_next_retry_at"))
     if data.get("earliest_next_retry_at") is not None and earliest is None:
         return {"status": "unavailable"}
-    return {
+    result = {
         "status": "ok",
         **counts,
         "earliest_next_retry_at": earliest,
     }
+    if provider_not_entitled is not None:
+        result["provider_not_entitled"] = provider_not_entitled
+    return result
 
 
 def _sanitize_legs(data: dict[str, Any]) -> dict[str, str] | None:
@@ -245,6 +255,18 @@ def _run_worker(
     gateway_lock = nullcontext() if gateway_lock_held else ibkr_gateway_lock()
     try:
         with gateway_lock:
+            has_provider_work = any(
+                (
+                    max_articles,
+                    max_body_fetches,
+                    max_retry_body_fetches,
+                )
+            )
+            available_provider_codes = (
+                gateway.discover_news_provider_codes()
+                if has_provider_work
+                else None
+            )
             provider = IBKRNormalizedProvider(
                 gateway,
                 acquire_gateway_lock=False,
@@ -256,6 +278,7 @@ def _run_worker(
                 selection = store.select_ibkr_body_retries(
                     now=datetime.now(timezone.utc),
                     limit=max_retry_body_fetches,
+                    available_provider_codes=available_provider_codes,
                 )
                 retry_body_ids = selection.article_ids
             except Exception:
@@ -279,7 +302,8 @@ def _run_worker(
 
             try:
                 backlog = store.summarize_ibkr_body_backlog(
-                    now=datetime.now(timezone.utc)
+                    now=datetime.now(timezone.utc),
+                    available_provider_codes=available_provider_codes,
                 )
                 data["body_backlog"] = {
                     "status": "ok",
@@ -287,6 +311,7 @@ def _run_worker(
                     "scheduled_later": backlog.scheduled_later,
                     "never_attempted": backlog.never_attempted,
                     "earliest_next_retry_at": backlog.earliest_next_retry_at,
+                    "provider_not_entitled": backlog.provider_not_entitled,
                 }
             except Exception:
                 data["body_backlog"] = {"status": "unavailable"}
