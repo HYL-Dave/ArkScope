@@ -1,6 +1,10 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** DURABLE RETRY LIVE; ENTITLEMENT-AWARE FOLLOW-UP IMPLEMENTED FOR REVIEW — 2026-07-16. Hotfix A and durable SQLite-derived body retry are merged/live. The bounded §5 correction is implemented on `codex/ibkr-news-entitlement-hotfix`; independent review and merge remain pending.
+> **Status:** LIVE COMPLETE — 2026-07-16. Hotfix A, durable SQLite-derived
+> body retry, and the entitlement-aware §5 correction are merged/live; the
+> final correction merged through `a73939f` with all canonical A/B,
+> copied-DB Gateway, responsive, privacy/static, merged-tree, and no-PG gates
+> closed.
 
 ## 1. Purpose
 
@@ -320,15 +324,12 @@ RED-first verification must prove:
 
 ## 6. Sequencing
 
-1. Written review is complete.
-2. Open and execute the small Hotfix A implementation plan; stop review-ready and merge it
-   independently.
-3. The separate durable-retry implementation plan is implemented for review; do not merge or
-   mark it LIVE until reviewer canonical A/B closes.
-4. The 2026-07-16 entitlement-aware follow-up may interrupt Portfolio Slice 3 only as this bounded
-   correctness hotfix; it requires its own RED-first plan and copied-DB Gateway gate.
-5. Resume Portfolio 1.1 Slice 3 after the entitlement-aware hotfix is reviewed and merged; Slice 2
-   is already merged/live. Split the hotfix further first if plan review requires it.
+1. Hotfix A is merged/live.
+2. Durable SQLite-derived body retry is merged/live.
+3. The entitlement-aware correction is independently reviewed and merged/live through
+   `a73939f`; its RED-first, canonical A/B, and copied-DB Gateway gates are closed.
+4. Portfolio Slice 3 completed concurrently and is also merged/live; no resume or additional
+   implementation step remains between these lines.
 
 Hotfix A is not evidence that body retry is reliable. Durable retry is not evidence that headlines
 missed before ArkScope observed them can be recovered.

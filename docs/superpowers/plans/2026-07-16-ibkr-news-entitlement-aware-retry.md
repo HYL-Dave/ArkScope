@@ -2,7 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTED FOR REVIEW — 2026-07-16. Code head `442911e` on `codex/ibkr-news-entitlement-hotfix`; do not merge before independent review. Grounded baseline: expanded focused backend `201`, full backend collection `4302`, focused frontend `47`, full frontend `44 files / 426 tests`. Final accounting: backend `+13/-0`, frontend `+2/-0`.
+> **Status:** MERGED / LIVE COMPLETE — 2026-07-16 (`a73939f`). Independent
+> review, exact canonical A/B, copied-DB Gateway, responsive, merged-tree,
+> privacy/static, and no-PG gates are closed. Grounded baseline: expanded
+> focused backend `201`, full backend collection `4302`, focused frontend `47`,
+> full frontend `44 files / 426 tests`. Final isolated accounting: backend
+> `+13/-0`, frontend `+2/-0`.
 
 **Goal:** Stop unavailable IBKR news-provider entitlements from consuming the durable body-retry budget while retaining headlines and automatically resuming bounded retries when access later appears.
 
@@ -20,6 +25,13 @@
 - **Copied-DB one-Gateway proof:** a successful capability observation returned a non-empty aggregate provider set; `78` unresolved rows were classified as entitlement-blocked, generated zero body calls, and did not consume the `25` available-provider retry calls. An available-provider control returned normally or typed `10172`. A provider-set-only replay made one copied blocked row eligible under limit `1` without changing body status or attempts. Real market and profile DB digests were byte-identical before/after.
 - **Responsive proof:** fixture-backed Settings checks at `1440x900`, `1024x768`, and `390x844` show the explanation inside its own cell, clear of the previous action cell, with no document overflow and no false retry action.
 - **Deviation ledger:** no architecture or behavior deviation. Task 1's planned RED count said four, but the deliberately preserved compatibility-wrapper test was already green; the ledger records the actual three failing new interfaces rather than manufacturing a fourth failure.
+- **Integration closeout:** because Portfolio Slice 3 merged first, reviewed tip
+  `b7d590a` was rebased onto Portfolio closeout `4dab7d1`; `git range-diff`
+  reports all four product commits byte-equivalent, with only the priority-map
+  chronology retained during documentation conflict resolution. `master`
+  fast-forwarded through `a73939f`. The combined merged tree passes focused
+  backend `214`, full frontend `46 files / 453 tests`, typecheck, production
+  build, all static gates, and no-PG `ok:true / pg_attempts:[]`.
 
 ### Reviewer verification ✅ (Fable, 2026-07-16) — all reviewer gates closed
 
@@ -44,7 +56,8 @@ provider list via the compat wrapper, so the explicit strict-discovery filter
 is semantically equivalent for fresh scans while additionally fixing the
 pre-existing failure-as-empty defect (discovery failure now fails closed with
 a sanitized error instead of silently scanning nothing). All reviewer gates
-are closed; merge remains the user's decision.
+closed, the user returned GREEN, and the rebased branch fast-forwarded into
+`master` through `a73939f`.
 
 ## Global Constraints
 
