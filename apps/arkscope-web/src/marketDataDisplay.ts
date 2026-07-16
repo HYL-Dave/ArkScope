@@ -144,10 +144,17 @@ export function schedulerBodyBacklogPresentation(
   const due = backlogCount(backlog.due_now);
   const scheduled = backlogCount(backlog.scheduled_later);
   const neverAttempted = backlogCount(backlog.never_attempted);
-  if (due === null || scheduled === null || neverAttempted === null || neverAttempted > due) {
+  const providerNotEntitled = backlogCount(backlog.provider_not_entitled);
+  if (
+    due === null
+    || scheduled === null
+    || neverAttempted === null
+    || providerNotEntitled === null
+    || neverAttempted > due
+  ) {
     return unavailableBodyBacklog();
   }
-  if (due === 0 && scheduled === 0) return null;
+  if (due === 0 && scheduled === 0 && providerNotEntitled === 0) return null;
 
   const parts: string[] = [];
   if (due > 0) {
@@ -158,6 +165,11 @@ export function schedulerBodyBacklogPresentation(
     );
   }
   if (scheduled > 0) parts.push(`${scheduled} 篇已排程稍後重試`);
+  if (providerNotEntitled > 0) {
+    parts.push(
+      `${providerNotEntitled} 篇來源目前未訂閱（標題已保留，開通後自動重試）`,
+    );
+  }
 
   return {
     label: `內文佇列：${parts.join(" · ")}`,

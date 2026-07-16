@@ -99,7 +99,7 @@ const mocked = vi.hoisted(() => ({
     "during afternoon recovery window; clientId=11 requestId=980123 pacing bucket=hist_15m",
   scheduleRunning: false,
   scheduleProgress: null as { done: number; total: number; current: string } | null,
-  ibkrBodyBacklogMode: "legacy" as "legacy" | "succeeded" | "partial",
+  ibkrBodyBacklogMode: "legacy" as "legacy" | "succeeded" | "partial" | "entitlement",
   importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
   putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
 }));
@@ -236,7 +236,7 @@ vi.mock("./api", async (importOriginal) => {
             },
           } : null,
           gap_planned: false,
-          durable_state: mocked.ibkrBodyBacklogMode === "succeeded" ? {
+          durable_state: mocked.ibkrBodyBacklogMode === "succeeded" || mocked.ibkrBodyBacklogMode === "entitlement" ? {
             last_status: "succeeded",
             last_error: null,
             continuation: null,
@@ -251,6 +251,9 @@ vi.mock("./api", async (importOriginal) => {
                   scheduled_later: 2,
                   never_attempted: 0,
                   earliest_next_retry_at: "2026-07-15T06:00:00Z",
+                  ...(mocked.ibkrBodyBacklogMode === "entitlement"
+                    ? { provider_not_entitled: 78 }
+                    : {}),
                 },
               },
             },
@@ -607,6 +610,24 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.includes("Run"))).toBe(true);
     expect(row.textContent).not.toContain("provider_article_id");
+  });
+
+  it("renders entitlement-blocked bodies as retained headlines without a retry action", async () => {
+    mocked.ibkrBodyBacklogMode = "entitlement";
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("IBKR 新聞"));
+    if (!row) throw new Error("missing IBKR news schedule row");
+
+    expect(row.textContent).toContain("78 篇來源目前未訂閱");
+    expect(row.textContent).toContain("標題已保留");
+    expect(row.textContent).toContain("開通後自動重試");
+    expect(row.textContent).not.toContain("FLY");
+    expect(row.textContent).not.toContain("provider_article_id");
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.trim() === "補抓")).toBe(false);
+    expect(Array.from(row.querySelectorAll("button")).some((button) =>
+      button.textContent?.includes("Run"))).toBe(true);
   });
 
   it("renders_known_schedule_progress_without_covering_the_last_run_cell", async () => {

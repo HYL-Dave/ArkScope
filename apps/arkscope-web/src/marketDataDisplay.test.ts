@@ -441,6 +441,33 @@ describe("schedulerBodyBacklogPresentation", () => {
       });
     }
   });
+
+  it("explains entitlement-blocked bodies without calling them permanently missing", () => {
+    const view = present({
+      last_status: "succeeded",
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "succeeded",
+        collect: {
+          status: "succeeded",
+          body_backlog: {
+            status: "ok",
+            due_now: 0,
+            scheduled_later: 0,
+            never_attempted: 0,
+            earliest_next_retry_at: null,
+            provider_not_entitled: 78,
+          },
+        },
+      },
+    });
+
+    expect(view?.label).toContain("78 篇來源目前未訂閱");
+    expect(view?.label).toContain("標題已保留");
+    expect(view?.label).toContain("開通後自動重試");
+    expect(view?.label).not.toContain("永久");
+  });
 });
 
 describe("providerHealthStatusLabel", () => {

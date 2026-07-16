@@ -2423,6 +2423,7 @@ export interface ScheduleBodyBacklog {
   due_now?: number;
   scheduled_later?: number;
   never_attempted?: number;
+  provider_not_entitled?: number;
   earliest_next_retry_at?: string | null;
 }
 
