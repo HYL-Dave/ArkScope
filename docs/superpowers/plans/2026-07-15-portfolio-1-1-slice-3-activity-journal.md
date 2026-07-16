@@ -2,22 +2,26 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED FOR REVIEW. CODE, AUTOMATED, RESPONSIVE, PRIVACY,
-> FRESH-PROFILE, NO-PG, CANONICAL A/B, COPIED-PROFILE, AND FRESH SUCCESSFUL
-> IBKR CAPTURE/RERUN GATES PASS.**
+> **Status: MERGED / PORTFOLIO 1.1 SLICE 3 LIVE COMPLETE, 2026-07-16
+> (`e5045dc`). CODE, AUTOMATED, RESPONSIVE, PRIVACY, FRESH-PROFILE, NO-PG,
+> CANONICAL A/B, COPIED-PROFILE, AND FRESH SUCCESSFUL IBKR CAPTURE/RERUN GATES
+> PASS.**
 
 ## Implementation Ledger
 
-- **Branch / commits:** `codex/portfolio-1-1-activity`; behavioral A/B base
-  `c5cd91f`; branch base and plan commit `b657349`; code head `a8e51ab` before
-  this evidence-only closeout. Tasks landed as `8830b9a` (annotation
+- **Branch / commits:** `codex/portfolio-1-1-activity` fast-forwarded into
+  `master` through `e5045dc`; behavioral A/B base `c5cd91f`; branch base and
+  plan commit `b657349`; code head `a8e51ab` before evidence-only closeout.
+  Tasks landed as `8830b9a` (annotation
   foundation), `cce9482` (broker projection), `42706a7` + `3d05600` (complete
   projection and identity/cursor hardening), `54bb484` + `e9b8d65` (API plus
   case-insensitive account-label privacy), `fc7e3a0` + `595c417` (activity UI
   plus truth/focus hardening), and `94c72fa` + `0709bed` (navigation/recent
   integration plus refresh semantics), `854ac89` (initial review ledger), and
-  `a8e51ab` (independent-review closure). Merge, spec/map LIVE status, and
-  worktree cleanup remain unperformed.
+  `a8e51ab` (independent-review closure), `8076542` (review pins), `036f971`
+  (review evidence), and `e5045dc` (recovered-Gateway evidence). Fast-forward
+  merge and merged-tree verification are complete; this closeout synchronizes
+  the spec/map status before worktree cleanup.
 - **Tasks 1-4, backend RED -> GREEN:** Task 1 began with no activity module,
   annotation table, or safe public label helper. Task 2 began with no
   correction-aware broker projection. Task 3 began with no manual/unmatched/
@@ -108,7 +112,8 @@
   The recovered-gate sidecar and copied profile were also stopped/removed.
   Product scope did not add Gateway reads, schedulers, Settings controls,
   agents/tools/prompts, PostgreSQL paths, or order APIs. The authority spec and
-  priority map deliberately remain pre-LIVE pending the user's merge decision.
+  priority map are promoted to Portfolio 1.1 LIVE COMPLETE by the merge
+  closeout.
 
 ### Reviewer verification ✅ (Fable, 2026-07-16) — reviewer gates closed
 
@@ -130,7 +135,8 @@ SQL-vs-Python summation divergence flagged at plan review was independently
 caught and fixed correctly — the custom `portfolio_fsum` SQLite aggregate
 delegates to the same `_finite_sum` authority, so state classification and
 serialization cannot disagree. The recovered IBKR capture/rerun evidence is
-recorded above; only the user's merge decision remains before LIVE COMPLETE.
+recorded above, the user returned GREEN without reservation, and `master`
+fast-forwarded through `e5045dc`.
 
 **Goal:** Complete Portfolio 1.1 with a truthful Holdings activity view over captured broker facts and manual-adjustment journals, user-owned intent annotations, explicit coverage gaps, and a responsive recent-activity summary without changing capture or canonical-position authority.
 

@@ -1,6 +1,9 @@
 # Portfolio 1.1 Account Observation and Activity Design
 
-> **Status: APPROVED DESIGN; SLICE 1 MERGED / LIVE 2026-07-14 (`fa052dc`); SLICE 2 MERGED / LIVE 2026-07-15 (code `3cbe753`, live-evidence/merge tip `35b3115`; canonical A/B, responsive, privacy, and single-sidecar real-Gateway gates pass); SLICE 3 IMPLEMENTATION PLAN OPENED 2026-07-15, REVIEW PENDING, IMPLEMENTATION NOT STARTED.**
+> **Status: PORTFOLIO 1.1 LIVE COMPLETE 2026-07-16. SLICE 1 MERGED / LIVE
+> (`fa052dc`); SLICE 2 MERGED / LIVE (`35b3115`); SLICE 3 MERGED / LIVE
+> (`e5045dc`). ALL THREE SLICES' CANONICAL A/B, AUTOMATED, RESPONSIVE, PRIVACY,
+> NO-PG, COPIED-PROFILE, AND REQUIRED REAL-GATEWAY GATES ARE CLOSED.**
 > This document extends, but does not replace,
 > `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md` and its
 > shipped implementation. Holdings V1 remains the authority for local
