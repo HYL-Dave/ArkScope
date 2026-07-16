@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** DURABLE RETRY LIVE; ENTITLEMENT-AWARE FOLLOW-UP APPROVED — 2026-07-16. Hotfix A and durable SQLite-derived body retry are merged/live. The bounded entitlement-aware correction in §5 is approved but not yet implemented.
+> **Status:** DURABLE RETRY LIVE; ENTITLEMENT-AWARE FOLLOW-UP IMPLEMENTED FOR REVIEW — 2026-07-16. Hotfix A and durable SQLite-derived body retry are merged/live. The bounded §5 correction is implemented on `codex/ibkr-news-entitlement-hotfix`; independent review and merge remain pending.
 
 ## 1. Purpose
 

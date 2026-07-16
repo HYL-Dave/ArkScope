@@ -2,13 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** APPROVED DESIGN / IMPLEMENTATION NOT STARTED. Grounded baseline: expanded focused backend `201`, full backend collection `4302`, focused frontend `47`, full frontend `44 files / 426 tests`. Planned accounting: backend `+13/-0`, frontend `+2/-0`.
+> **Status:** IMPLEMENTED FOR REVIEW — 2026-07-16. Code head `442911e` on `codex/ibkr-news-entitlement-hotfix`; do not merge before independent review. Grounded baseline: expanded focused backend `201`, full backend collection `4302`, focused frontend `47`, full frontend `44 files / 426 tests`. Final accounting: backend `+13/-0`, frontend `+2/-0`.
 
 **Goal:** Stop unavailable IBKR news-provider entitlements from consuming the durable body-retry budget while retaining headlines and automatically resuming bounded retries when access later appears.
 
 **Architecture:** One strict `reqNewsProviders` observation becomes the per-worker capability snapshot and is reused by both retry and fresh-headline legs. The normalized SQLite queue remains the only body authority: entitlement is a derived, reversible filter over unresolved rows, not a second queue or a terminal article-state rewrite. Sanitized telemetry carries only an aggregate `provider_not_entitled` count so Settings can explain retained headlines and automatic recovery without exposing provider identity.
 
 **Tech Stack:** Python 3, ib_insync, SQLite, pytest, React 18, TypeScript, Vitest.
+
+## Implementation Ledger
+
+- **RED-first evidence:** Task 1 produced three intended missing-interface failures while the compatibility-wrapper pin remained green; Task 2 produced three missing-keyword failures; Task 3 produced five relevant worker/parser failures before wiring (the sixth new case exercised an already-safe branch); Task 4 produced two presentation failures with `47` existing focused tests still green.
+- **Focused GREEN:** expanded news backend `214 passed` (`201 + 13`); explicit entitlement/10172/restart/budget/lock reliability selection `14 passed`; focused frontend `49 passed` (`47 + 2`).
+- **Full frontend:** `44 files / 428 tests`, typecheck and production build pass; only the existing chunk-size warning remains.
+- **Canonical backend A/B:** base `b657349` = `30 failed / 4191 passed / 74 skipped / 18 warnings / 7 errors`; code head = `30 failed / 4204 passed / 74 skipped / 18 warnings / 7 errors`. Failure/error sets are identical and collection is exactly `4302 -> 4315` (`+13/-0`).
+- **Boundaries:** provider/article/body identity, second-queue, force-retry, order-API, and budget gates pass; `DEFAULT_MAX_RETRY_BODY_FETCHES = 25` has exactly one authority. No-PG smoke passes with `pg_attempts: []`.
+- **Copied-DB one-Gateway proof:** a successful capability observation returned a non-empty aggregate provider set; `78` unresolved rows were classified as entitlement-blocked, generated zero body calls, and did not consume the `25` available-provider retry calls. An available-provider control returned normally or typed `10172`. A provider-set-only replay made one copied blocked row eligible under limit `1` without changing body status or attempts. Real market and profile DB digests were byte-identical before/after.
+- **Responsive proof:** fixture-backed Settings checks at `1440x900`, `1024x768`, and `390x844` show the explanation inside its own cell, clear of the previous action cell, with no document overflow and no false retry action.
+- **Deviation ledger:** no architecture or behavior deviation. Task 1's planned RED count said four, but the deliberately preserved compatibility-wrapper test was already green; the ledger records the actual three failing new interfaces rather than manufacturing a fourth failure.
 
 ## Global Constraints
 
@@ -35,7 +46,7 @@
 - Produces: `IBKRRuntimeGateway.discover_news_provider_codes() -> frozenset[str]`.
 - Changes: `IBKRRuntimeGateway.fetch_headlines()` reuses the discovered set and passes a deterministic `+`-joined provider filter to `fetch_news()`.
 
-- [ ] **Step 1: Write failing strict-discovery tests**
+- [x] **Step 1: Write failing strict-discovery tests**
 
 Add tests that use a fake `reqNewsProviders()` client and prove all three states:
 
@@ -78,21 +89,21 @@ def test_runtime_gateway_with_successful_empty_provider_set_makes_no_headline_ca
     assert source.fetch_news_calls == []
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pytest tests/test_news_normalized_ibkr_adapter.py tests/test_normalized_ibkr_worker.py -k "provider_discovery or provider_filter" -q
 ```
 
-Expected: four failures because strict discovery and runtime caching do not exist.
+Expected/observed: three RED failures because strict discovery and runtime caching do not exist; the compatibility-wrapper pin remains green by design.
 
-- [ ] **Step 3: Implement the strict compatibility split**
+- [x] **Step 3: Implement the strict compatibility split**
 
 Implement `get_news_providers_strict()` as the only direct `reqNewsProviders()` caller. Keep `get_news_providers()` as the compatibility wrapper that catches, logs, and returns `[]`.
 
 In `IBKRRuntimeGateway`, keep `_provider_codes: frozenset[str] | None`; normalize codes using `str(...).strip().upper()`, remove empty/duplicate values, and require discovery before `fetch_headlines()`. A successful empty set returns no headlines without calling `fetch_news`; a non-empty set passes `providers="+".join(sorted(codes))`.
 
-- [ ] **Step 4: Run GREEN and regression tests**
+- [x] **Step 4: Run GREEN and regression tests**
 
 ```bash
 pytest tests/test_news_normalized_ibkr_adapter.py tests/test_normalized_ibkr_worker.py -q
@@ -100,7 +111,7 @@ pytest tests/test_news_normalized_ibkr_adapter.py tests/test_normalized_ibkr_wor
 
 Expected: all tests pass; existing strict body and runtime cleanup contracts remain green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add data_sources/ibkr_source.py src/news_normalized/ibkr_runtime.py tests/test_news_normalized_ibkr_adapter.py tests/test_normalized_ibkr_worker.py
@@ -122,7 +133,7 @@ git commit -m "fix: discover IBKR news entitlements strictly"
 - Changes: `summarize_ibkr_body_backlog(*, now, available_provider_codes=None)`.
 - `None` preserves compatibility for non-worker callers/tests; the production worker always passes a successfully observed set.
 
-- [ ] **Step 1: Write failing queue tests**
+- [x] **Step 1: Write failing queue tests**
 
 ```python
 def test_entitlement_filter_excludes_unavailable_provider_and_counts_it(tmp_path):
@@ -182,7 +193,7 @@ def test_entitlement_filter_does_not_reclassify_terminal_10172(tmp_path):
         conn.close()
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pytest tests/test_news_normalized_retry_queue.py -k "entitlement or provider_access" -q
@@ -190,7 +201,7 @@ pytest tests/test_news_normalized_retry_queue.py -k "entitlement or provider_acc
 
 Expected: three failures due to missing parameters/count.
 
-- [ ] **Step 3: Implement one SQL capability predicate**
+- [x] **Step 3: Implement one SQL capability predicate**
 
 Normalize the optional set once. Build SQL placeholders only from normalized codes; never interpolate code values. Apply the same predicate to selection and summary:
 
@@ -200,7 +211,7 @@ Normalize the optional set once. Build SQL placeholders only from normalized cod
 
 Keep terminal rows outside all four counts. Do not update `news_article_bodies`, `fetch_attempts`, errors, or timestamps.
 
-- [ ] **Step 4: Run GREEN and all queue/store policy tests**
+- [x] **Step 4: Run GREEN and all queue/store policy tests**
 
 ```bash
 pytest tests/test_news_normalized_retry_queue.py tests/test_news_normalized_store.py -q
@@ -208,7 +219,7 @@ pytest tests/test_news_normalized_retry_queue.py tests/test_news_normalized_stor
 
 Expected: all tests pass, including existing deterministic order, restart, and third-`10172` pins.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/news_normalized/models.py src/news_normalized/store.py tests/test_news_normalized_retry_queue.py
@@ -230,7 +241,7 @@ git commit -m "fix: filter news retries by active entitlement"
 - Both queue methods receive that exact immutable set.
 - Sanitized `body_backlog.status="ok"` gains only `provider_not_entitled`.
 
-- [ ] **Step 1: Write failing worker and boundary tests**
+- [x] **Step 1: Write failing worker and boundary tests**
 
 Add real-store worker coverage:
 
@@ -368,7 +379,7 @@ def test_worker_stdout_parser_rejects_malformed_entitlement_block_count():
         assert payload["body_backlog"] == {"status": "unavailable"}
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pytest tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py -k "entitlement or provider_discovery or body_backlog" -q
@@ -376,13 +387,13 @@ pytest tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py -k "ent
 
 Expected: new tests fail because the worker does not discover/filter providers and sanitizers do not recognize the new count.
 
-- [ ] **Step 3: Wire discovery before retry selection**
+- [x] **Step 3: Wire discovery before retry selection**
 
 Call `discover_news_provider_codes()` once inside the existing Gateway lock before opening SQLite selection. Pass the returned `frozenset` to both queue calls. Let discovery exceptions escape `_run_worker`; `main()` already owns the sanitized failure boundary and `finally` disconnects.
 
 Extend `_sanitize_body_backlog()` and scheduler `_parse_body_backlog()` with the same strict non-negative-integer validation used by existing counts. A malformed count makes the whole body backlog `unavailable`, never zero.
 
-- [ ] **Step 4: Run GREEN and focused worker/scheduler suites**
+- [x] **Step 4: Run GREEN and focused worker/scheduler suites**
 
 ```bash
 pytest tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py -q
@@ -390,7 +401,7 @@ pytest tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py -q
 
 Expected: all pass; existing fresh/retry independence, queue-failure, lock, and privacy tests remain green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/news_normalized/ibkr_cli.py src/service/data_scheduler.py tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py
@@ -411,7 +422,7 @@ git commit -m "fix: report entitlement-blocked news bodies"
 - `ScheduleBodyBacklog.provider_not_entitled?: number` is additive.
 - `schedulerBodyBacklogPresentation()` renders blocked rows as a separate fact and never offers a retry command.
 
-- [ ] **Step 1: Write failing frontend tests**
+- [x] **Step 1: Write failing frontend tests**
 
 ```typescript
 it("explains entitlement-blocked bodies without calling them missing", () => {
@@ -444,7 +455,7 @@ it("explains entitlement-blocked bodies without calling them missing", () => {
 
 Mounted Settings coverage must assert the IBKR row shows the same explanation, still has only the ordinary `Run` command, has no `補抓`/provider code/article ID, and may show due/scheduled counts alongside the blocked count.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 cd apps/arkscope-web
@@ -453,7 +464,7 @@ npm test -- --run src/marketDataDisplay.test.ts src/SettingsProviderConfig.test.
 
 Expected: two new tests fail because the new field is ignored.
 
-- [ ] **Step 3: Implement additive typing and copy**
+- [x] **Step 3: Implement additive typing and copy**
 
 Validate `provider_not_entitled` with `backlogCount()`. If invalid, return the existing unavailable presentation. If positive, append:
 
@@ -461,7 +472,7 @@ Validate `provider_not_entitled` with `backlogCount()`. If invalid, return the e
 
 Return a presentation even when due-now and scheduled-later are both zero but the blocked count is positive. Keep tone `muted`; entitlement block is not a failed operation and never creates a button.
 
-- [ ] **Step 4: Run GREEN and frontend gates**
+- [x] **Step 4: Run GREEN and frontend gates**
 
 ```bash
 cd apps/arkscope-web
@@ -473,7 +484,7 @@ npm run build
 
 Expected: focused tests pass; full frontend increases by exactly two tests; typecheck/build pass with only the existing chunk-size warning.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/arkscope-web/src/api.ts apps/arkscope-web/src/marketDataDisplay.ts apps/arkscope-web/src/marketDataDisplay.test.ts apps/arkscope-web/src/SettingsProviderConfig.test.ts
@@ -493,7 +504,7 @@ git commit -m "fix: explain unavailable news entitlements"
 **Interfaces:**
 - Produces review-ready evidence only. Do not merge or mark the follow-up LIVE before independent review.
 
-- [ ] **Step 1: Run the focused backend ledger**
+- [x] **Step 1: Run the focused backend ledger**
 
 ```bash
 pytest tests/test_news_normalized_ibkr_adapter.py tests/test_news_normalized_store.py tests/test_news_normalized_retry_queue.py tests/test_news_normalized_writer.py tests/test_news_normalized_writer_locking.py tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py -q
@@ -501,7 +512,7 @@ pytest tests/test_news_normalized_ibkr_adapter.py tests/test_news_normalized_sto
 
 Expected: `214 passed`, exactly baseline `201 + 13`; no removals or warning delta.
 
-- [ ] **Step 2: Run explicit behavior and privacy gates**
+- [x] **Step 2: Run explicit behavior and privacy gates**
 
 Run the new entitlement tests plus existing `10172`, restart, independent-budget, lock-busy, and scheduler-persistence pins. Then require zero provider identity in parent/frontend surfaces:
 
@@ -523,7 +534,7 @@ rg -n "DEFAULT_MAX_RETRY_BODY_FETCHES = 25" src/news_normalized/ibkr_cli.py
 
 Expected: first three gates return zero matches; the final gate returns exactly one match.
 
-- [ ] **Step 3: Run full automated verification**
+- [x] **Step 3: Run full automated verification**
 
 ```bash
 pytest -q
@@ -537,7 +548,7 @@ python src/smoke/pg_unreachable_e2e.py
 
 Record raw known baseline failures rather than claiming a clean full pass. Run canonical virgin A/B against `b657349`; require identical pre-existing failure/error/skip/warning sets and backend collection `4302 -> 4315`, exactly `+13/-0`.
 
-- [ ] **Step 4: Run one-Gateway copied-DB proof**
+- [x] **Step 4: Run one-Gateway copied-DB proof**
 
 With the desktop sidecar closed and one Gateway consumer only:
 
@@ -551,11 +562,11 @@ With the desktop sidecar closed and one Gateway consumer only:
 
 No provider code, provider article ID, title, body, or licensed error text may enter the terminal transcript or ledger.
 
-- [ ] **Step 5: Run responsive Settings gate**
+- [x] **Step 5: Run responsive Settings gate**
 
 At `1440x900`, `1024x768`, and `390x844`, verify the blocked-entitlement explanation wraps without covering progress/last-run cells, causes no document overflow, and shows no false action. Use fixture data if the live backlog naturally changes; do not edit the real profile/market DB to manufacture UI state.
 
-- [ ] **Step 6: Reconcile docs and commit review handoff**
+- [x] **Step 6: Reconcile docs and commit review handoff**
 
 Update the plan header with RED/GREEN counts, canonical A/B, copied-DB evidence, and any deliberate deviations. Mark the spec `ENTITLEMENT FOLLOW-UP IMPLEMENTED FOR REVIEW`, insert the newest-first map entry, and commit only those docs. Stop review-ready; do not merge.
 
