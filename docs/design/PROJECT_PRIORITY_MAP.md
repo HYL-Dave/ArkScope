@@ -224,10 +224,12 @@ therefore defaults to defer until the hypothesis gate exists.
   `35b3115`**: canonical A/B, responsive/privacy, and single-sidecar
   real-Gateway gates are closed. Portfolio 1.1 Slice 3 is **MERGED / LIVE
   2026-07-16 through `e5045dc`**, making the full three-slice Portfolio 1.1
-  line LIVE COMPLETE. **P2.8 Slice 2 shell convergence is IMPLEMENTED FOR
-  REVIEW 2026-07-17 on `codex/p2-8-slice-2-shell-convergence` through code
-  `90e953e`; all implementer gates are closed, but it is not merged or LIVE**
-  (`docs/superpowers/plans/2026-07-16-p2-8-slice-2-shell-convergence.md`).
+  line LIVE COMPLETE. **P2.8 Slice 2 shell convergence is MERGED to `master`
+  2026-07-17 through reviewed tip `8016aaf`; code, independent review, exact
+  frontend accounting, responsive/live, static, backend-byte-identity, and
+  merged-tree verification gates are closed.** The external Claude Design
+  companion sync remains the one separate post-merge gate; Slice 3 has not
+  started (`docs/superpowers/plans/2026-07-16-p2-8-slice-2-shell-convergence.md`).
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -421,6 +423,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-17 (P2.8 SLICE 2 SHELL CONVERGENCE MERGED — external Design Kit companion sync pending)**: Independent review closed every reviewer gate at docs tip `8016aaf`, and the user selected local integration. `master` fast-forwarded from `29f37f8` through that reviewed tip while preserving the unrelated `config/tickers_core.json` worktree edit. Fresh merged-tree verification passed frontend `54 files / 516 tests`, typecheck, and production build with only the existing `559.14 kB` chunk warning; backend-owned paths remain byte-identical to base. The shipped shell now has one four-group IA, no planned Notes/Alerts controls or placeholder rail, normal/developer diagnostic separation, exact current-surface navigation, and a Research-only background-work notification Drawer. The external Claude Design companion sync remains a separately recorded post-merge gate because this execution session has no authenticated DesignSync capability; no Slice 3 implementation has started.
 
 - **2026-07-17 (P2.8 SLICE 2 SHELL CONVERGENCE IMPLEMENTED FOR REVIEW — all implementer gates closed)**: Branch `codex/p2-8-slice-2-shell-convergence` completes the approved frontend-only shell through code tip `90e953e`: one four-group shipped IA; no disabled Notes/Alerts placeholders; no global placeholder rail; normal top bar separated from persisted display-only Developer Mode diagnostics; one sequenced `NavigationTarget` dispatcher for views/tickers/Research threads/enabled Settings sections; and a Research-only background-work Drawer backed by minimal session identities and 5-second direct reconciliation. RED-first commits account exactly for frontend `46 / 453 -> 54 / 516` (`+63/-0`); full frontend, typecheck, and build pass with only the existing chunk warning. Backend owners are byte-identical to `29f37f8` (`+0/-0`, constructive equivalence rather than a claimed canonical A/B), and static IA/privacy/confirm/breakpoint ratchets are clean. Disposable sidecar/Vite/Chrome gates at 1440/1024/961/960/959/390 prove the single 960px authority, no overflow/duplicate nav/blank third column, Drawer focus restoration, Developer Mode reload persistence, repeated exact Research/Settings targets, and no work-payload leakage; measured terminal observation was 1.283s after DB completion. Evidence screenshots are `/tmp/arkscope-p2-8-shell-{1440x900,1024x768,961x768,960x768,959x768,390x844}.png`; all three isolated test services were stopped and the normal desktop/profile remained untouched. Independent implementation review is the remaining gate; do not merge, mark LIVE, sync the Design Kit, or start Slice 3 yet.
 

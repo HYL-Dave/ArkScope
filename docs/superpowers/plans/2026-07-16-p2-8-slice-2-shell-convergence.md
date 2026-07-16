@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** IMPLEMENTED FOR REVIEW — ALL IMPLEMENTER GATES CLOSED; NOT MERGED / NOT LIVE
+**Status:** MERGED TO `master` 2026-07-17 — CODE, REVIEW, AND MERGED-TREE GATES CLOSED; EXTERNAL DESIGN KIT COMPANION SYNC PENDING
 
 **Goal:** Converge ArkScope on the approved workflow-grouped shell with an honest normal/Developer top bar, no planned placeholders or empty right rail, exact current-surface navigation, and a Research-only background-work notification drawer.
 
@@ -70,6 +70,20 @@ sequence ref avoids stale closures). The three Research observer seams
 wired through a ref exactly as planned. All reviewer gates are closed; merge
 remains the user's decision, and the Slice 2 Design Kit sync remains a
 separate post-merge gate.
+
+### Merge closeout (2026-07-17)
+
+The user selected local integration. `master` fast-forwarded from `29f37f8`
+through reviewed tip `8016aaf` without touching the user's unrelated
+`config/tickers_core.json` worktree edit. Fresh verification on the merged tree
+passed frontend `54 files / 516 tests`, typecheck, and production build; the
+build retains only the existing `559.14 kB` chunk-size warning. Backend-owned
+paths remain byte-identical to the implementation base.
+
+The external Claude Design companion sync remains a separate post-merge gate.
+This execution session has no authenticated DesignSync capability, so it does
+not claim that gate or mark the full multi-slice P2.8 line complete. No Slice 3
+implementation has started.
 
 ## Global Constraints
 
