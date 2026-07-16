@@ -1,6 +1,6 @@
 # IBKR News Partial Status and Durable Body Retry Design
 
-> **Status:** LIVE COMPLETE — 2026-07-15. Hotfix A and durable SQLite-derived body retry are merged; reviewer canonical A/B, copied-DB Gateway, responsive, merged-tree, and user visual gates pass.
+> **Status:** DURABLE RETRY LIVE; ENTITLEMENT-AWARE FOLLOW-UP APPROVED — 2026-07-16. Hotfix A and durable SQLite-derived body retry are merged/live. The bounded entitlement-aware correction in §5 is approved but not yet implemented.
 
 ## 1. Purpose
 
@@ -226,15 +226,109 @@ The reviewed implementation plan must include tests proving:
 11. a single-sidecar live gate observes a due retry or a controlled synthetic local row without
     exposing licensed content.
 
-## 5. Sequencing
+## 5. Entitlement-Aware Retry Follow-up
+
+### 5.1 Live evidence and problem statement
+
+Read-only inspection on 2026-07-16 found that one manual run behaved as implemented but could not
+drain the body queue:
+
+- the retry leg attempted its full independent budget of `25` bodies and fetched `0`;
+- `17` attempts returned typed `10172` and remained under the existing bounded policy;
+- `8` attempts were FLY articles whose provider request returned IBKR error `321` with a
+  not-subscribed condition;
+- the same run independently fetched `40` fresh bodies, proving that Gateway connectivity and the
+  fresh leg were working;
+- a successful `reqNewsProviders` observation listed the account's available API providers but did
+  not include `FLY`; and
+- a recent DJ-N control body remained fetchable while sampled DJ-N/DJ-RTA `10172` rows remained
+  unavailable.
+
+The current generic exception path discards non-`10172` numeric classification. Those FLY rows
+therefore remain immediately retryable and can consume budget forever even though retrying cannot
+succeed under the current account entitlement.
+
+### 5.2 State semantics
+
+`provider_not_entitled` is a reversible capability block, not a claim that an article or body is
+permanently unavailable:
+
+- ArkScope retains the headline, timestamps, ticker relations, and normalized metadata;
+- the unresolved body is excluded from the automatic retry queue while its provider is absent from
+  the latest successfully observed API-provider set;
+- these rows are reported separately from due-now, scheduled-later, and terminal `10172` rows;
+- the UI says the current login does not subscribe to the source, that the headline is retained,
+  and that retry resumes after access appears; and
+- the existing `BodyStatus.UNAVAILABLE` continues to mean article-level terminal evidence such as
+  the third `10172`. Entitlement blocking must not reuse or overwrite that status.
+
+The capability block is derived from a successful provider observation. It does not create a
+second queue table or rewrite article truth. When a later successful observation includes the
+provider, affected unresolved rows automatically re-enter the ordinary deterministic queue and are
+attempted only within the existing `25`-body per-run retry budget.
+
+### 5.3 Provider discovery and failure boundary
+
+Each isolated IBKR news worker performs one strict `reqNewsProviders` observation before selecting
+body retries or scanning fresh headlines. The resulting normalized provider-code set is reused by
+both legs for that run; provider names and codes remain inside the child process and
+`market_data.db` boundary.
+
+A successful empty set means the current login exposes no API news provider and therefore blocks
+all unresolved IBKR bodies without deleting metadata. A provider-discovery exception is not an
+empty set: the worker fails closed, performs no body retry or headline query, changes no body
+state, and emits only the existing sanitized failure envelope. It must never mass-classify rows as
+unentitled from a failed observation.
+
+### 5.4 Queue and telemetry contract
+
+The normalized store's queue projection accepts the successfully observed provider-code set:
+
+- due-now, scheduled-later, and never-attempted counts include only unresolved rows whose provider
+  is currently available;
+- `provider_not_entitled` counts unresolved `pending`/`failed` rows whose provider is absent;
+- terminal rows remain excluded from all retry counts;
+- queue ordering and the `25`-request budget remain unchanged; and
+- changing only the provider set from absent to present makes the same unresolved rows eligible
+  again without a force-retry command or status rewrite.
+
+Sanitized child/parent/API telemetry may expose only the non-negative
+`provider_not_entitled` count. It must not expose provider codes, provider article IDs, titles,
+bodies, or licensed error text. Entitlement-blocked rows do not make an otherwise successful run
+`partial`, because no eligible operation failed during that run; they remain a separately rendered
+fact.
+
+### 5.5 Scope boundaries and verification
+
+This follow-up does not change cadence, body budgets, the three-attempt/six-hour `10172` policy,
+generic transport-error policy, normalized-news authority, PG-exit boundaries, or manual retry
+controls. Historical generic DJ-N/DJ-RTA rows remain eligible and can resolve into fetched or typed
+`10172` evidence on later attempts; this change does not infer their cause.
+
+RED-first verification must prove:
+
+1. strict provider discovery distinguishes a successful empty set from an exception;
+2. the worker observes providers once and reuses the set for retry and fresh legs;
+3. an unavailable-provider row is not requested and appears only in the entitlement-blocked count;
+4. the same row becomes eligible, under the existing limit, when a later provider set includes it;
+5. provider-discovery failure performs zero body/headline calls and never fabricates zero backlog;
+6. `10172` ordering, timing, terminal behavior, and fresh/retry budget independence remain intact;
+7. child stdout, scheduler state, API types, and DOM carry only the aggregate blocked count;
+8. Settings explains retained-headline and automatic-resume semantics without a retry button; and
+9. a copied-DB one-Gateway live gate observes FLY excluded under the current entitlement while a
+   currently available provider remains fetchable, without mutating the real market DB.
+
+## 6. Sequencing
 
 1. Written review is complete.
 2. Open and execute the small Hotfix A implementation plan; stop review-ready and merge it
    independently.
 3. The separate durable-retry implementation plan is implemented for review; do not merge or
    mark it LIVE until reviewer canonical A/B closes.
-4. Resume Portfolio 1.1 Slice 3 after this bounded news reliability interruption; Slice 2 is
-   already merged/live. Split the durable-retry work further first if its plan review requires it.
+4. The 2026-07-16 entitlement-aware follow-up may interrupt Portfolio Slice 3 only as this bounded
+   correctness hotfix; it requires its own RED-first plan and copied-DB Gateway gate.
+5. Resume Portfolio 1.1 Slice 3 after the entitlement-aware hotfix is reviewed and merged; Slice 2
+   is already merged/live. Split the hotfix further first if plan review requires it.
 
 Hotfix A is not evidence that body retry is reliable. Durable retry is not evidence that headlines
 missed before ArkScope observed them can be recovered.
