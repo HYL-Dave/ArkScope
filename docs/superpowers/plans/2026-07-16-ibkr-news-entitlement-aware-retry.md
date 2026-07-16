@@ -21,6 +21,31 @@
 - **Responsive proof:** fixture-backed Settings checks at `1440x900`, `1024x768`, and `390x844` show the explanation inside its own cell, clear of the previous action cell, with no document overflow and no false retry action.
 - **Deviation ledger:** no architecture or behavior deviation. Task 1's planned RED count said four, but the deliberately preserved compatibility-wrapper test was already green; the ledger records the actual three failing new interfaces rather than manufacturing a fourth failure.
 
+### Reviewer verification ✅ (Fable, 2026-07-16) — all reviewer gates closed
+
+Independent reviewer canonical A/B (virgin `git archive` of base `b657349`
+versus tip `19144b0`, sequential single-process full pytest, reviewer
+environment, no hang): both sides identical on the pre-existing family
+(`30 failed / 74 skipped / 18 warnings / 7 errors`); failure sets empty in
+both directions; passed `4191 -> 4204` = exactly **`+13`**, collect `+13/-0`,
+and all 13 added node IDs are the named entitlement tests across the four
+expected files. Work dir `/tmp/ab_entl_6njw`. Reviewer also re-ran: frontend
+`44 files / 428 tests` PASS + typecheck + production build; focused backend
+`214 passed`; and the static gates (provider identity absent from
+scheduler/API/display/Settings boundaries; no new queue table, force-retry,
+or order API; `DEFAULT_MAX_RETRY_BODY_FETCHES = 25` single authority;
+`provider_not_entitled` implemented as a derived SQL count that never touches
+`BodyStatus.UNAVAILABLE`). Reviewer grounding of the two load-bearing design
+facts: (1) IBKR articles store `provider_code` as `publisher`
+(`ibkr_adapter.py:67/:85`), so the publisher-based SQL predicate is a true
+entitlement filter, not a string coincidence; (2) the old
+`fetch_news(providers=None)` already defaulted to the account's available
+provider list via the compat wrapper, so the explicit strict-discovery filter
+is semantically equivalent for fresh scans while additionally fixing the
+pre-existing failure-as-empty defect (discovery failure now fails closed with
+a sanitized error instead of silently scanning nothing). All reviewer gates
+are closed; merge remains the user's decision.
+
 ## Global Constraints
 
 - Preserve the existing independent retry budget exactly: `DEFAULT_MAX_RETRY_BODY_FETCHES = 25`.
