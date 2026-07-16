@@ -3,10 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **Status: IMPLEMENTED FOR REVIEW. CODE, AUTOMATED, RESPONSIVE, PRIVACY,
-> FRESH-PROFILE, NO-PG, AND CANONICAL A/B GATES PASS. COPIED-PROFILE
-> PROVIDER-FREE LIVE GATES PASS; THE FRESH SUCCESSFUL CAPTURE/RERUN SUBGATE IS
-> DEFERRED BECAUSE THE EXTERNAL IBKR API HANDSHAKE REMAINED UNAVAILABLE DURING
-> AND AFTER THE 2026-07-16 APAC RESET WINDOW.**
+> FRESH-PROFILE, NO-PG, CANONICAL A/B, COPIED-PROFILE, AND FRESH SUCCESSFUL
+> IBKR CAPTURE/RERUN GATES PASS.**
 
 ## Implementation Ledger
 
@@ -92,23 +90,25 @@
   only fabricated live-gate entity was the disposable `ZZLIVE` Manual
   position; no broker trade, commission, correction, or second account was
   manufactured.
-- **External live subgate deferral:** copied-profile manual capture runs `123`
-  and `124` were accepted but failed all three legs with the typed
-  `ibkr_connection_failed` result and zero provider rows written. DB and the
-  main `config/.env` matched exactly for IBKR host, port, and client-id base;
-  TCP connected, but the official `API\0` version handshake returned zero
-  bytes until timeout. The first failures occurred during IBKR's published
-  APAC reset window (`04:45-06:05 HKT`); isolated handshakes at 06:16 and again
-  at 07:24 remained unavailable. No product fix was attempted because failure
-  precedes ArkScope client-id, account-summary, execution, or projection logic. The
-  still-pending subgate is: after IBKR API service recovers, run two successful
-  captures against a fresh copy and prove run history advances while execution
-  and logical order cardinality remain unchanged.
+- **Recovered external live subgate:** after the APAC reset-window failures,
+  the official bounded `API\0` handshake returned 39 bytes. One
+  scheduler-disabled branch sidecar then used a fresh SQLite backup of the
+  real profile and completed two immediate manual captures (`123`, `124`).
+  Both runs were `succeeded`; account, execution, and position legs were all
+  `complete`; inserted execution/commission counts and data conflicts were
+  zero. Run history advanced `120 -> 121 -> 122`, while executions remained
+  `2`, commission revisions remained `2`, and the activity projection remained
+  exactly 12 rows: two order groups, two unmatched observations, seven honest
+  coverage gaps, and one history-start marker. The serialized API remained
+  free of the raw broker account id, and the real profile SHA-256 digest was
+  unchanged. No late commission/correction naturally appeared, so those
+  shapes retain their reviewed fake-backed status rather than manufacturing a
+  trade.
 - **Cleanup / scope:** disposable Vite and sidecar processes were stopped.
+  The recovered-gate sidecar and copied profile were also stopped/removed.
   Product scope did not add Gateway reads, schedulers, Settings controls,
   agents/tools/prompts, PostgreSQL paths, or order APIs. The authority spec and
-  priority map deliberately remain pre-LIVE pending independent review and the
-  deferred successful-capture subgate.
+  priority map deliberately remain pre-LIVE pending the user's merge decision.
 
 ### Reviewer verification ✅ (Fable, 2026-07-16) — reviewer gates closed
 
@@ -129,9 +129,8 @@ Settings duplicate — zero matches) and the untouched-owner boundary
 SQL-vs-Python summation divergence flagged at plan review was independently
 caught and fixed correctly — the custom `portfolio_fsum` SQLite aggregate
 delegates to the same `_finite_sum` authority, so state classification and
-serialization cannot disagree. Remaining before LIVE COMPLETE: the deferred
-IBKR-recovery capture subgate (external service availability, not a code
-gap) and the user's merge decision.
+serialization cannot disagree. The recovered IBKR capture/rerun evidence is
+recorded above; only the user's merge decision remains before LIVE COMPLETE.
 
 **Goal:** Complete Portfolio 1.1 with a truthful Holdings activity view over captured broker facts and manual-adjustment journals, user-owned intent annotations, explicit coverage gaps, and a responsive recent-activity summary without changing capture or canonical-position authority.
 
