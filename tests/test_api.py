@@ -125,16 +125,35 @@ class TestNewsFeed:
         r = client.get("/news/feed?days=7&limit=3")
         assert r.status_code == 200
         data = r.json()
-        assert set(data.keys()) == {"available", "items", "total", "sources", "days"}
+        assert set(data.keys()) == {
+            "available",
+            "items",
+            "total",
+            "sources",
+            "days",
+            "content_counts",
+        }
         if data["available"] and data["items"]:
             it = data["items"][0]
-            assert {"published_at", "ticker", "title", "source"} <= set(it.keys())
+            assert {
+                "published_at",
+                "ticker",
+                "title",
+                "source",
+                "content_availability",
+                "content_recovery",
+            } <= set(it.keys())
 
     def test_feed_search_and_filters(self, client):
         r = client.get("/news/feed?q=earnings&ticker=NVDA&days=90&limit=5")
         assert r.status_code == 200
         data = r.json()
         assert all(i["ticker"] == "NVDA" for i in data["items"])
+
+    def test_feed_rejects_invalid_content(self, client):
+        r = client.get("/news/feed?content=body_or_guess")
+
+        assert r.status_code == 422
 
 
 class TestOptionsEndpoints:

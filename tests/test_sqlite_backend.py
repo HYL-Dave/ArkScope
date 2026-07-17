@@ -1161,7 +1161,14 @@ def test_news_strict_feed_local_exception_does_not_hit_pg(market_db, monkeypatch
 
     feed = b.query_news_feed(q="Apple")
 
-    assert feed == {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+    assert feed == {
+        "available": False,
+        "items": [],
+        "total": 0,
+        "sources": {},
+        "days": {},
+        "content_counts": {"full": 0, "headline_only": 0, "unknown": 0},
+    }
 
 
 def test_sa_capture_backend_threads_strict(market_db, tmp_path, monkeypatch):
@@ -1196,7 +1203,14 @@ def test_strict_news_feed_exception_returns_full_shape_not_thin(market_db, monke
     monkeypatch.setattr(b._market, "query_news_feed", _boom)
 
     feed = b.query_news_feed(q="x")
-    assert set(feed) >= {"available", "items", "total", "sources", "days"}  # full shape, not thin
+    assert set(feed) >= {
+        "available",
+        "items",
+        "total",
+        "sources",
+        "days",
+        "content_counts",
+    }  # full shape, not thin
     assert feed["available"] is False and feed["total"] == 0 and feed["sources"] == {}
 
 

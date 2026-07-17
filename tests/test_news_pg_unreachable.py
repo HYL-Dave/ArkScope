@@ -135,6 +135,11 @@ def test_news_hard_local_no_dsn_never_calls_pg_for_empty_reads(tmp_path, monkeyp
     feed = dal.get_news_feed(q="Apple", ticker="AAPL")
     assert feed["available"] is True
     assert feed["total"] == 0
+    assert feed["content_counts"] == {
+        "full": 0,
+        "headline_only": 0,
+        "unknown": 0,
+    }
 
 
 def test_completed_audit_marker_forces_news_hard_local_without_profile_exit_setting(

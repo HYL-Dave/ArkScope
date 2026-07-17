@@ -43,6 +43,8 @@ import logging
 
 import pandas as pd
 
+from src.news_content_availability import ContentFilter, empty_content_counts
+
 from . import provenance
 from .db_backend import DatabaseBackend
 from .sqlite_backend import SqliteBackend, _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
@@ -130,26 +132,55 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
                 return pd.DataFrame(columns=_NEWS_STATS_COLS)  # local-only: honest empty, no PG
             return super().query_news_stats(ticker=ticker, days=days)
 
-    def query_news_feed(self, q=None, ticker=None, source=None, days=30,
-                        limit=50, offset=0):
+    def query_news_feed(
+        self,
+        q=None,
+        ticker=None,
+        source=None,
+        days=30,
+        limit=50,
+        offset=0,
+        content: ContentFilter = "all",
+    ):
         # Local-first feed (新聞·事件): the local DB is authoritative when it has a
         # news table — an empty result there is an honest zero, NOT a fallback
         # trigger. PG only serves pre-3b DBs (available=False).
         try:
             local = self._market.query_news_feed(
-                q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
+                q=q,
+                ticker=ticker,
+                source=source,
+                content=content,
+                days=days,
+                limit=limit,
+                offset=offset,
+            )
         except Exception as e:
             logger.warning(f"local query_news_feed failed ({e})")
             # CANONICAL full shape (mirror SqliteBackend.query_news_feed's empty) — never a
             # thin {available:False}: in strict mode this returns directly to the frontend,
             # which reads total/sources before the available guard.
-            local = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+            local = {
+                "available": False,
+                "items": [],
+                "total": 0,
+                "sources": {},
+                "days": {},
+                "content_counts": empty_content_counts(),
+            }
         if local.get("available"):
             return local
         if self._strict or self._news_strict:
             return local  # local-only: honest local feed state (no PG), even if empty
         return super().query_news_feed(
-            q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
+            q=q,
+            ticker=ticker,
+            source=source,
+            content=content,
+            days=days,
+            limit=limit,
+            offset=offset,
+        )
 
     def query_iv_history(self, ticker: str) -> pd.DataFrame:
         try:

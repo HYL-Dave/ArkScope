@@ -88,6 +88,11 @@ NEWS feed.
   missing `content_counts`/item fields or the unsupported `content` keyword.
   Dynamic dual/single/no-map SQL classification then passed the new file at
   `16/16`; the combined owner plus existing SQLite backend is `84 passed`.
+- Task 3 RED produced exactly three failures: the route and local compatibility
+  backend rejected the new `content` keyword, while the HTTP route accepted an
+  invalid value with `200`. The additive route/DAL/backend/smoke propagation,
+  typed validation, and full empty-response shape then passed the exact focused
+  gate at `94 passed`.
 
 ## Locked Decisions
 
@@ -532,7 +537,7 @@ feat: derive news content facets in SQL
 - Modify: `tests/test_db_backend.py`
 - Modify: `tests/test_api.py`
 
-- [ ] **Step 1: Write the three failing propagation/API nodes**
+- [x] **Step 1: Write the three failing propagation/API nodes**
 
 Create two tests in `tests/test_news_feed_content_route.py`:
 
@@ -560,7 +565,7 @@ test_feed_rejects_invalid_content
 Request `/news/feed?content=body_or_guess` and assert typed `422`; do not test a
 custom error string.
 
-- [ ] **Step 2: Prove RED for missing route propagation/validation**
+- [x] **Step 2: Prove RED for missing route propagation/validation**
 
 ```bash
 pytest -q \
@@ -568,7 +573,7 @@ pytest -q \
   tests/test_api.py::TestNewsFeed::test_feed_rejects_invalid_content
 ```
 
-- [ ] **Step 3: Propagate the selector through every compatibility layer**
+- [x] **Step 3: Propagate the selector through every compatibility layer**
 
 - Import `ContentFilter` in the route and declare
   `content: ContentFilter = Query("all")`.
@@ -582,7 +587,7 @@ pytest -q \
 - Keep the retired PG method non-querying and local hard-exit behavior
   unchanged.
 
-- [ ] **Step 4: Evolve exact-shape tests and smoke contracts**
+- [x] **Step 4: Evolve exact-shape tests and smoke contracts**
 
 - `TestNewsFeed.test_feed_route_not_captured_by_ticker_route` now expects the
   six top-level keys including `content_counts`, and item additive fields when
@@ -593,7 +598,7 @@ pytest -q \
 - The no-PG smoke still requests ordinary `content=all` behavior and asserts
   `pg_attempts: []` later; it does not seed normalized state.
 
-- [ ] **Step 5: Run the exact backend accounting gate and commit**
+- [x] **Step 5: Run the exact backend accounting gate and commit**
 
 ```bash
 pytest -q \

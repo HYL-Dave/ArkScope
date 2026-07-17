@@ -26,6 +26,8 @@ import pandas as pd
 import psycopg2
 import psycopg2.extras
 
+from src.news_content_availability import ContentFilter, empty_content_counts
+
 from .sqlite_backend import _IV_COLS, _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
 
 logger = logging.getLogger(__name__)
@@ -351,9 +353,17 @@ class DatabaseBackend:
 
     def query_news_feed(self, q: Optional[str] = None, ticker: Optional[str] = None,
                         source: Optional[str] = None, days: int = 30,
-                        limit: int = 50, offset: int = 0) -> dict:
+                        limit: int = 50, offset: int = 0,
+                        content: ContentFilter = "all") -> dict:
         """Retired PG news feed surface."""
-        return {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+        return {
+            "available": False,
+            "items": [],
+            "total": 0,
+            "sources": {},
+            "days": {},
+            "content_counts": empty_content_counts(),
+        }
 
     def query_news_search(
         self,

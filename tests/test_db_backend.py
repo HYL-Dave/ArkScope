@@ -61,7 +61,14 @@ def test_retired_pg_domain_methods_do_not_query_dropped_tables(monkeypatch):
     assert backend.get_available_tickers("fundamentals") == []
 
     feed = backend.query_news_feed(q="nvda", ticker="NVDA")
-    assert feed == {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+    assert feed == {
+        "available": False,
+        "items": [],
+        "total": 0,
+        "sources": {},
+        "days": {},
+        "content_counts": {"full": 0, "headline_only": 0, "unknown": 0},
+    }
 
 
 def test_query_prices_is_retired_after_batch3(monkeypatch):

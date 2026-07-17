@@ -415,6 +415,7 @@ class _HandlerDirectClient:
                     q=qstr("q"),
                     ticker=qstr("ticker"),
                     source=qstr("source"),
+                    content=qstr("content", "all") or "all",
                     days=qint("days", 30),
                     limit=qint("limit", 50),
                     offset=qint("offset", 0),

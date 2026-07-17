@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import yaml
 
+from src.news_content_availability import ContentFilter, empty_content_counts
+
 from .backends import DataBackend
 from .backends.file_backend import FileBackend
 from .backends.db_backend import DatabaseBackend
@@ -708,14 +710,36 @@ class DataAccessLayer:
             date_range=date_range,
         )
 
-    def get_news_feed(self, q=None, ticker=None, source=None, days=30,
-                      limit=50, offset=0) -> dict:
+    def get_news_feed(
+        self,
+        q=None,
+        ticker=None,
+        source=None,
+        days=30,
+        limit=50,
+        offset=0,
+        content: ContentFilter = "all",
+    ) -> dict:
         """Score-free news feed (新聞·事件 surface) — local-first via the backend.
         FileBackend has no feed → empty shape."""
         if hasattr(self._backend, "query_news_feed"):
             return self._backend.query_news_feed(
-                q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
-        return {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+                q=q,
+                ticker=ticker,
+                source=source,
+                content=content,
+                days=days,
+                limit=limit,
+                offset=offset,
+            )
+        return {
+            "available": False,
+            "items": [],
+            "total": 0,
+            "sources": {},
+            "days": {},
+            "content_counts": empty_content_counts(),
+        }
 
     def get_iv_history(self, ticker: str) -> List[IVHistoryPoint]:
         """Query IV history and return structured result."""
