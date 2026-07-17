@@ -1,7 +1,7 @@
 # IBKR News 10172 Retry Recalibration Design
 
-> **Status:** WRITTEN SPEC REVIEW PENDING — conversational policy approved
-> 2026-07-17; implementation has not started.
+> **Status:** APPROVED — implementation plan opened 2026-07-17; production
+> remains on the live three-attempt contract until reviewed code is merged.
 
 ## 1. Purpose
 
@@ -52,6 +52,13 @@ retry cohort remained unavailable.
 
 These counts are an observation snapshot, not migration acceptance constants;
 normal ingestion may change them before implementation.
+
+A later read-only review observed the exact next budget transition: the
+`failed / attempts=2 / 10172` cohort moved from `96` to `71`, terminal
+`unavailable` moved from `136` to `161`, and fetched bodies at attempts two or
+more remained zero. The `-25 / +25` movement is one complete retry budget with
+no recovery. It strengthens the policy evidence without turning either count
+into a migration constant.
 
 ### 2.3 Provider boundary
 
