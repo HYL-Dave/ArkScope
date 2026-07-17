@@ -300,6 +300,50 @@ class NormalizedNewsStore:
             codes,
         )
 
+    def reconcile_ibkr_10172_retry_policy(
+        self,
+        *,
+        now: datetime,
+        available_provider_codes: Iterable[str] | None,
+    ) -> int:
+        """Terminalize repeated typed IBKR-unavailable evidence."""
+        if self.conn.in_transaction:
+            raise RuntimeError("10172 reconciliation requires no active transaction")
+
+        now_iso = self._retry_now_iso(now)
+        entitlement_sql, entitlement_params = self._provider_entitlement_predicate(
+            available_provider_codes,
+            publisher_sql="a.publisher",
+        )
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            cursor = self.conn.execute(
+                "UPDATE news_article_bodies AS b SET "
+                "body_status='unavailable',next_retry_at=NULL,"
+                "unavailable_at=COALESCE(NULLIF(TRIM(last_attempt_at),''),?) "
+                "WHERE b.body_status='failed' "
+                "AND b.last_error_code=10172 "
+                "AND b.fetch_attempts>=? "
+                "AND EXISTS ("
+                " SELECT 1 FROM news_articles AS a"
+                " WHERE a.id=b.article_id AND a.source='ibkr'"
+                f" AND ({entitlement_sql})"
+                ")",
+                (
+                    now_iso,
+                    _IBKR_10172_MAX_ATTEMPTS,
+                    *entitlement_params,
+                ),
+            )
+            changed = max(int(cursor.rowcount), 0)
+            self.conn.commit()
+        except Exception:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
+        assert self.conn.in_transaction is False
+        return changed
+
     def _summarize_ibkr_body_backlog_at(
         self,
         now_iso: str,
