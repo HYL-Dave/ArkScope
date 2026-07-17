@@ -111,6 +111,11 @@ import {
   saSegmentCommonState,
   scheduleSkipCommonState,
 } from "./dataSourcesPresentation";
+import {
+  dataSourceScheduleLifecycleChanged,
+  dataSourceSchedulePollMs,
+  type DataSourceScheduleMap,
+} from "./dataSourceSchedulePolling";
 import { StatusBadge } from "./ui";
 import type {
   NavigationRequest,
@@ -1381,11 +1386,42 @@ function DataSourcesSection() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
   const [testResults, setTestResults] = useState<Record<string, string>>({});
+  const scheduleRef = useRef<DataSourceScheduleMap | null>(null);
+  const scheduleRequestSequenceRef = useRef(0);
+  const acceptedScheduleSequenceRef = useRef(0);
+  const schedulePollInFlightRef = useRef<Promise<void> | null>(null);
+  const dataSourcesMountedRef = useRef(true);
+
+  useEffect(() => {
+    dataSourcesMountedRef.current = true;
+    return () => {
+      dataSourcesMountedRef.current = false;
+    };
+  }, []);
+
+  const acceptSchedule = useCallback((
+    next: DataSourceScheduleMap,
+    sequence: number,
+  ): { accepted: boolean; lifecycleChanged: boolean } => {
+    if (sequence < acceptedScheduleSequenceRef.current) {
+      return { accepted: false, lifecycleChanged: false };
+    }
+    acceptedScheduleSequenceRef.current = sequence;
+    const previous = scheduleRef.current;
+    scheduleRef.current = next;
+    setSchedule(next);
+    return {
+      accepted: true,
+      lifecycleChanged: dataSourceScheduleLifecycleChanged(previous, next),
+    };
+  }, []);
 
   const load = useCallback(async () => {
+    const scheduleSequence = ++scheduleRequestSequenceRef.current;
     const [rs, rh, rc, rm] = await Promise.allSettled([
       getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot()]);
-    if (rs.status === "fulfilled") setSchedule(rs.value.sources);
+    if (!dataSourcesMountedRef.current) return;
+    if (rs.status === "fulfilled") acceptSchedule(rs.value.sources, scheduleSequence);
     if (rh.status === "fulfilled") setHealth(rh.value);
     if (rc.status === "fulfilled") {
       setCfg(rc.value.providers);
@@ -1396,7 +1432,30 @@ function DataSourcesSection() {
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
       : null);
-  }, []);
+  }, [acceptSchedule]);
+
+  const pollSchedule = useCallback((): Promise<void> => {
+    if (schedulePollInFlightRef.current) return schedulePollInFlightRef.current;
+    const sequence = ++scheduleRequestSequenceRef.current;
+    const request = (async () => {
+      try {
+        const next = await getSchedule();
+        if (!dataSourcesMountedRef.current) return;
+        const accepted = acceptSchedule(next.sources, sequence);
+        if (accepted.accepted && accepted.lifecycleChanged) {
+          await load();
+        }
+      } catch {
+        // Passive polling preserves the last accepted schedule truth.
+      }
+    })().finally(() => {
+      if (schedulePollInFlightRef.current === request) {
+        schedulePollInFlightRef.current = null;
+      }
+    });
+    schedulePollInFlightRef.current = request;
+    return request;
+  }, [acceptSchedule, load]);
 
   useEffect(() => {
     void load();
@@ -1419,13 +1478,21 @@ function DataSourcesSection() {
     };
   }, []);
 
-  // Run-now / scheduled runs flip `running` server-side — poll while any is active.
+  // Discover background starts while idle, then observe active runs more closely.
   const anyRunning = !!schedule && Object.values(schedule).some((s) => s.running);
+  const schedulePollIntervalMs = dataSourceSchedulePollMs(schedule);
   useEffect(() => {
-    if (!anyRunning) return;
-    const t = window.setInterval(() => void load(), 5_000);
-    return () => window.clearInterval(t);
-  }, [anyRunning, load]);
+    const timer = window.setInterval(
+      () => { void pollSchedule(); },
+      schedulePollIntervalMs,
+    );
+    const onFocus = () => { void pollSchedule(); };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [pollSchedule, schedulePollIntervalMs]);
 
   async function setEnabled(source: string, enabled: boolean) {
     if (busy) return;

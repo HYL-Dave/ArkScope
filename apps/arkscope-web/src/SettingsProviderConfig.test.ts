@@ -4,8 +4,20 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelCatalog, ModelTask, ProvidersHealthResponse, TaskRoute } from "./api";
+import {
+  getMacroSnapshot,
+  getProvidersConfig,
+  getProvidersHealth,
+  getSchedule,
+  type ModelCatalog,
+  type ModelTask,
+  type ProvidersHealthResponse,
+  type TaskRoute,
+} from "./api";
 import { formatSystemTimestamp } from "./timeDisplay";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocked = vi.hoisted(() => ({
   providersConfig: {
@@ -99,6 +111,8 @@ const mocked = vi.hoisted(() => ({
     "during afternoon recovery window; clientId=11 requestId=980123 pacing bucket=hist_15m",
   scheduleRunning: false,
   scheduleProgress: null as { done: number; total: number; current: string } | null,
+  scheduleLastAttemptAt: "2026-07-14T10:00:00Z",
+  scheduleUpdatedAt: "2026-07-14T10:01:00Z",
   ibkrBodyBacklogMode: "legacy" as "legacy" | "succeeded" | "partial" | "entitlement",
   importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
   putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
@@ -221,7 +235,7 @@ vi.mock("./api", async (importOriginal) => {
           default_interval_minutes: 120,
           running: false,
           progress: null,
-          last_attempt_at: "2026-07-14T10:00:00Z",
+          last_attempt_at: mocked.scheduleLastAttemptAt,
           last_result: mocked.ibkrBodyBacklogMode === "legacy" ? {
             source: "ibkr_news",
             status: "partial",
@@ -257,8 +271,8 @@ vi.mock("./api", async (importOriginal) => {
                 },
               },
             },
-            last_attempt: "2026-07-15T05:00:00Z",
-            updated_at: "2026-07-15T05:01:00Z",
+            last_attempt: mocked.scheduleLastAttemptAt,
+            updated_at: mocked.scheduleUpdatedAt,
           } : mocked.ibkrBodyBacklogMode === "partial" ? {
             last_status: "partial",
             last_error: null,
@@ -278,8 +292,8 @@ vi.mock("./api", async (importOriginal) => {
                 },
               },
             },
-            last_attempt: "2026-07-15T06:00:00Z",
-            updated_at: "2026-07-15T06:01:00Z",
+            last_attempt: mocked.scheduleLastAttemptAt,
+            updated_at: mocked.scheduleUpdatedAt,
           } : {
             last_status: "partial",
             last_error: null,
@@ -296,8 +310,8 @@ vi.mock("./api", async (importOriginal) => {
                 },
               },
             },
-            last_attempt: "2026-07-14T10:00:00Z",
-            updated_at: "2026-07-14T10:01:00Z",
+            last_attempt: mocked.scheduleLastAttemptAt,
+            updated_at: mocked.scheduleUpdatedAt,
           },
           job_name: "collect.ibkr_news",
         },
@@ -426,7 +440,10 @@ afterEach(() => {
   mocked.putCalls = [];
   mocked.scheduleRunning = false;
   mocked.scheduleProgress = null;
+  mocked.scheduleLastAttemptAt = "2026-07-14T10:00:00Z";
+  mocked.scheduleUpdatedAt = "2026-07-14T10:01:00Z";
   mocked.ibkrBodyBacklogMode = "legacy";
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -445,6 +462,13 @@ async function renderDataSources() {
     dataButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   });
   await act(async () => { await Promise.resolve(); });
+}
+
+function clearDataSourceReadMocks() {
+  vi.mocked(getSchedule).mockClear();
+  vi.mocked(getProvidersHealth).mockClear();
+  vi.mocked(getProvidersConfig).mockClear();
+  vi.mocked(getMacroSnapshot).mockClear();
 }
 
 function setInputValue(el: HTMLInputElement, value: string) {
@@ -761,5 +785,168 @@ describe("Settings provider config authority", () => {
     await renderDataSources();
     expect(host!.textContent).not.toContain("持倉擷取排程");
     expect(host!.querySelector("[data-portfolio-capture-controls]")).toBeNull();
+  });
+
+  it("polls only schedule after thirty idle seconds without a live region", async () => {
+    vi.useFakeTimers();
+    await renderDataSources();
+    clearDataSourceReadMocks();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(29_999); });
+    expect(getSchedule).not.toHaveBeenCalled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(getMacroSnapshot).not.toHaveBeenCalled();
+    expect(host!.querySelector("[aria-live]")).toBeNull();
+  });
+
+  it("detects a fast idle-to-idle completion and refreshes related state once", async () => {
+    vi.useFakeTimers();
+    await renderDataSources();
+    clearDataSourceReadMocks();
+    mocked.ibkrBodyBacklogMode = "succeeded";
+    mocked.scheduleLastAttemptAt = "2026-07-17T10:30:00Z";
+    mocked.scheduleUpdatedAt = "2026-07-17T10:31:00Z";
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+
+    expect(getSchedule).toHaveBeenCalledTimes(2);
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).toHaveBeenCalledTimes(1);
+    expect(getMacroSnapshot).toHaveBeenCalledTimes(1);
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("IBKR 新聞"));
+    expect(row?.textContent).toContain("上次成功");
+  });
+
+  it("switches to five second polling while running and back to idle after completion", async () => {
+    vi.useFakeTimers();
+    await renderDataSources();
+    clearDataSourceReadMocks();
+
+    mocked.scheduleRunning = true;
+    mocked.scheduleLastAttemptAt = "2026-07-17T10:30:00Z";
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(host!.textContent).toContain("執行中，自動更新");
+
+    clearDataSourceReadMocks();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+
+    mocked.scheduleRunning = false;
+    mocked.scheduleUpdatedAt = "2026-07-17T10:31:00Z";
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(host!.textContent).not.toContain("執行中，自動更新");
+
+    clearDataSourceReadMocks();
+    await act(async () => { await vi.advanceTimersByTimeAsync(29_999); });
+    expect(getSchedule).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes schedule on focus and full-loads only when lifecycle truth changes", async () => {
+    await renderDataSources();
+    clearDataSourceReadMocks();
+
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+
+    clearDataSourceReadMocks();
+    mocked.scheduleLastAttemptAt = "2026-07-17T10:30:00Z";
+    mocked.scheduleUpdatedAt = "2026-07-17T10:31:00Z";
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(getSchedule).toHaveBeenCalledTimes(2);
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).toHaveBeenCalledTimes(1);
+    expect(getMacroSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces timer and focus reads and preserves prior truth on poll failure", async () => {
+    vi.useFakeTimers();
+    await renderDataSources();
+    const before = host!.textContent;
+    clearDataSourceReadMocks();
+    let rejectPoll: ((reason?: unknown) => void) | null = null;
+    vi.mocked(getSchedule).mockImplementationOnce(() => new Promise((_, reject) => {
+      rejectPoll = reject;
+    }));
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rejectPoll!(new Error("temporary schedule read failure"));
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toBe(before);
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+  });
+
+  it("does not let an older full refresh replace newer schedule truth", async () => {
+    await renderDataSources();
+    const staleSchedule = await getSchedule();
+    clearDataSourceReadMocks();
+    let resolveOldFull!: (value: Awaited<ReturnType<typeof getSchedule>>) => void;
+    vi.mocked(getSchedule).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveOldFull = resolve;
+    }));
+
+    const refresh = Array.from(host!.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("重新整理"));
+    if (!refresh) throw new Error("missing Data Sources refresh button");
+    await act(async () => {
+      refresh.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+
+    mocked.scheduleRunning = true;
+    mocked.scheduleLastAttemptAt = "2026-07-17T10:30:00Z";
+    mocked.scheduleUpdatedAt = "2026-07-17T10:31:00Z";
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(getSchedule).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      resolveOldFull(staleSchedule);
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("執行中，自動更新");
+  });
+
+  it("removes idle timers and focus listeners and ignores a finishing poll after unmount", async () => {
+    vi.useFakeTimers();
+    await renderDataSources();
+    let resolvePoll: ((value: Awaited<ReturnType<typeof getSchedule>>) => void) | null = null;
+    clearDataSourceReadMocks();
+    vi.mocked(getSchedule).mockImplementationOnce(() => new Promise((resolve) => {
+      resolvePoll = resolve;
+    }));
+
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+
+    act(() => root!.unmount());
+    root = null;
+    await act(async () => {
+      resolvePoll!({ sources: {} });
+      await Promise.resolve();
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).not.toHaveBeenCalled();
   });
 });
