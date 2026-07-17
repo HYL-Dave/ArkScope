@@ -1,6 +1,7 @@
 # NEWS Content Availability Mini-Design
 
-> **Status:** DRAFT FOR WRITTEN REVIEW. No implementation plan is open.
+> **Status:** APPROVED FOR IMPLEMENTATION. Written review closed after the
+> provider-recovery capability correction; implementation plan is opening.
 
 ## 1. Purpose
 
@@ -51,6 +52,20 @@ Consequently:
 Changing the search authority to `news_articles_fts` is a separate cutover and
 must not be smuggled into this visibility slice.
 
+### 2.3 Body status alone does not promise recovery
+
+The durable retry queue is currently IBKR-only:
+`select_ibkr_body_retries()` filters `news_articles.source='ibkr'`, and only the
+IBKR worker supplies explicit retry article IDs. Finnhub and Polygon consume
+body/summary text delivered in their ordinary provider payload; there is no
+scheduled per-article body recovery path for their migrated `pending` rows.
+
+A read-only 2026-07-17 snapshot made this distinction material: pending bodies
+were `3,058 finnhub`, `1,862 polygon`, and `70 ibkr`; the `8 failed` rows were
+IBKR. Treating every pending/failed row as retryable would therefore give 4,920
+rows a recovery promise the runtime cannot fulfill. These counts are diagnostic
+snapshots, not acceptance constants.
+
 ## 3. Locked Read Model
 
 ### 3.1 Derived at read time
@@ -59,13 +74,16 @@ Content availability is derived from the normalized `body_status` on every
 feed read. No new column, table, trigger, cache, or background reconciliation is
 introduced.
 
-The mapping is exhaustive:
+The mapping is exhaustive across body state and the independent provider
+recovery-capability axis:
 
 | Normalized evidence | `content_availability` | `content_recovery` | Product meaning |
 |---|---|---|---|
 | `fetched` | `full` | `null` | Provider body is stored locally |
-| `pending` | `headline_only` | `retryable` | Body has not yet completed its bounded retrieval path |
-| `failed` | `headline_only` | `retryable` | A retryable provider/transport failure is recorded |
+| `pending` + source has a scheduled body-recovery path | `headline_only` | `retryable` | Body has not yet completed its bounded retrieval path |
+| `pending` + source has no scheduled body-recovery path | `headline_only` | `terminal` | Provider payload supplied no body and ArkScope has no queued recovery action |
+| `failed` + source has a scheduled body-recovery path | `headline_only` | `retryable` | A retryable provider/transport failure is recorded |
+| `failed` + source has no scheduled body-recovery path | `headline_only` | `terminal` | Failure is recorded but no runtime worker can retry this article |
 | `empty` | `headline_only` | `terminal` | Provider returned no body |
 | `unavailable` | `headline_only` | `terminal` | Scheduled retrieval ended unavailable; explicit recovery may still replace it later |
 | `expired` | `headline_only` | `terminal` | Provider/policy evidence says retrieval history is no longer available |
@@ -74,11 +92,18 @@ The mapping is exhaustive:
 `unknown` must never be folded into `headline_only`. Age, an empty legacy
 description, or a missing URL is not substitute body-state evidence.
 
+Recovery capability is a code-reviewed backend fact, not a DB flag inferred
+from age, status, URL, or provider article ID. V1's capable set is exactly
+`ibkr`. Adding another source requires wiring a real bounded recovery caller and
+updating the capability contract and tests together. A derived `terminal` result
+does not prevent a later normal provider ingestion or explicit future recovery
+from replacing the underlying body state; it means there is no scheduled
+recovery path now.
+
 ### 3.2 Legacy-to-normalized join
 
 The feed query resolves normalized identity only through the two explicit map
-tables. It may use the same deterministic expression already used by score
-lookups:
+tables, using one deterministic dual-map expression:
 
 ```text
 COALESCE(migration_map.article_id, projection_map.article_id)
@@ -178,7 +203,9 @@ provider feed.
 
 The implementation plan must include RED-first coverage proving:
 
-1. all six body statuses and the unmapped case produce the locked mapping;
+1. all six body statuses, both provider-capability polarities for
+   `pending`/`failed`, and the unmapped case produce the locked mapping,
+   including `finnhub + pending -> terminal`;
 2. migration-map and projection-map rows both resolve, without duplicate feed
    rows;
 3. `content` filtering occurs before total/facets/pagination and preserves
@@ -193,7 +220,10 @@ The implementation plan must include RED-first coverage proving:
 8. market-feed focused tests, full frontend, typecheck/build, no-PG smoke, and
    canonical backend A/B pass with exact test accounting; and
 9. a read-only live check compares API facets with direct normalized-state
-   aggregates without treating dynamic row totals as fixed constants.
+   aggregates without treating dynamic row totals as fixed constants; and
+10. the implementation plan times the derived query against the real roughly
+    400k-row legacy feed as a read-only sanity gate, recording rather than
+    inventing a performance threshold before a baseline exists.
 
 ## 8. Sequence
 
