@@ -778,7 +778,16 @@ def test_news_feed_browse_and_facets(market_db):
     assert f["available"] is True and f["total"] == 3
     assert f["sources"] == {"polygon": 2, "finnhub": 1}
     assert f["days"] == {day.isoformat(): 3}
+    assert f["content_counts"] == {
+        "full": 0,
+        "headline_only": 0,
+        "unknown": 3,
+    }
     assert len(f["items"]) == 3
+    assert {
+        (item["content_availability"], item["content_recovery"])
+        for item in f["items"]
+    } == {("unknown", None)}
     # newest first, FULL timestamps
     assert f["items"][0]["published_at"].endswith("+0000")
     assert "T" in f["items"][0]["published_at"]
@@ -807,6 +816,11 @@ def test_news_feed_missing_table_not_available(tmp_path):
     sqlite3.connect(str(db)).close()
     f = SqliteBackend(str(db)).query_news_feed()
     assert f["available"] is False and f["items"] == []
+    assert f["content_counts"] == {
+        "full": 0,
+        "headline_only": 0,
+        "unknown": 0,
+    }
 
 
 def test_news_feed_local_authoritative_vs_pre3b_fallback(market_db, monkeypatch):

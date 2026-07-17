@@ -35,6 +35,11 @@ from typing import List, Optional
 
 import pandas as pd
 
+from src.news_content_availability import (
+    ContentFilter,
+    empty_content_counts,
+    news_content_sql,
+)
 from src.news_normalized.scores import normalize_score_model
 
 logger = logging.getLogger(__name__)
@@ -295,6 +300,59 @@ class SqliteBackend:
         )
 
     @staticmethod
+    def _news_content_projection(conn: sqlite3.Connection) -> tuple[str, str, str]:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        map_tables = [
+            table
+            for table in (
+                "news_legacy_migration_map",
+                "news_legacy_projection_map",
+            )
+            if table in tables
+        ]
+        if not {
+            "news_articles",
+            "news_article_bodies",
+        }.issubset(tables) or not map_tables:
+            return "", "'unknown'", "NULL"
+
+        joins: list[str] = []
+        article_ids: list[str] = []
+        if "news_legacy_migration_map" in map_tables:
+            joins.append(
+                "LEFT JOIN news_legacy_migration_map m "
+                "ON m.legacy_news_id = n.id"
+            )
+            article_ids.append("m.article_id")
+        if "news_legacy_projection_map" in map_tables:
+            joins.append(
+                "LEFT JOIN news_legacy_projection_map p "
+                "ON p.legacy_news_id = n.id"
+            )
+            article_ids.append("p.article_id")
+
+        article_expr = (
+            f"COALESCE({', '.join(article_ids)})"
+            if len(article_ids) > 1
+            else article_ids[0]
+        )
+        joins.extend(
+            (
+                f"LEFT JOIN news_articles a ON a.id = {article_expr}",
+                "LEFT JOIN news_article_bodies b ON b.article_id = a.id",
+            )
+        )
+        availability_sql, recovery_sql = news_content_sql(
+            "b.body_status", "a.source"
+        )
+        return " ".join(joins), availability_sql, recovery_sql
+
+    @staticmethod
     def _sql_literal(value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
 
@@ -521,7 +579,8 @@ class SqliteBackend:
 
     def query_news_feed(self, q: Optional[str] = None, ticker: Optional[str] = None,
                         source: Optional[str] = None, days: int = 30,
-                        limit: int = 50, offset: int = 0) -> dict:
+                        limit: int = 50, offset: int = 0,
+                        content: ContentFilter = "all") -> dict:
         """Score-free local news feed for the 新聞·事件 surface: FULL
         ``published_at`` timestamps, newest first, paginated, with window facets
         (total / per-source / per-day counts over the SAME filters). Search uses
@@ -530,7 +589,14 @@ class SqliteBackend:
         ``available`` is False when the local DB/table is missing (pre-3b DB) so
         the router can fall back to PG; an available-but-empty result is an
         honest zero, NOT a fallback trigger."""
-        empty = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+        empty = {
+            "available": False,
+            "items": [],
+            "total": 0,
+            "sources": {},
+            "days": {},
+            "content_counts": empty_content_counts(),
+        }
         try:
             conn = self._connect()
         except sqlite3.OperationalError:
@@ -539,6 +605,9 @@ class SqliteBackend:
             cutoff = (date.today() - timedelta(days=days)).isoformat()
             conds, params = ["n.published_at >= ?"], [cutoff]
             base_from = "news n"
+            content_joins, availability_sql, recovery_sql = (
+                self._news_content_projection(conn)
+            )
             if ticker:
                 conds.append("n.ticker = ?")
                 params.append(self._canon(ticker))
@@ -553,31 +622,63 @@ class SqliteBackend:
             elif ql:
                 conds.append("(n.title LIKE ? OR n.description LIKE ?)")
                 params += [f"%{ql}%", f"%{ql}%"]
-            where = " AND ".join(conds)
+            if content_joins:
+                base_from = f"{base_from} {content_joins}"
+            common_where = " AND ".join(conds)
+
+            content_counts = empty_content_counts()
+            for row in conn.execute(
+                f"SELECT {availability_sql}, COUNT(*) FROM {base_from} "
+                f"WHERE {common_where} GROUP BY 1",
+                params,
+            ).fetchall():
+                key = row[0]
+                if key in content_counts:
+                    content_counts[key] = int(row[1])
+
+            selected_params = list(params)
+            selected_where = common_where
+            if content != "all":
+                selected_where += f" AND ({availability_sql}) = ?"
+                selected_params.append(content)
 
             total = conn.execute(
-                f"SELECT COUNT(*) FROM {base_from} WHERE {where}", params).fetchone()[0]
+                f"SELECT COUNT(*) FROM {base_from} WHERE {selected_where}",
+                selected_params,
+            ).fetchone()[0]
             sources = dict(conn.execute(
-                f"SELECT n.source, COUNT(*) FROM {base_from} WHERE {where} "
-                "GROUP BY n.source", params).fetchall())
+                f"SELECT n.source, COUNT(*) FROM {base_from} "
+                f"WHERE {selected_where} GROUP BY n.source",
+                selected_params,
+            ).fetchall())
             day_counts = dict(conn.execute(
                 f"SELECT substr(n.published_at, 1, 10), COUNT(*) FROM {base_from} "
-                f"WHERE {where} GROUP BY 1 ORDER BY 1", params).fetchall())
+                f"WHERE {selected_where} GROUP BY 1 ORDER BY 1",
+                selected_params,
+            ).fetchall())
             # Searching → RELEVANCE order (bm25, title weighted 10x over
             # description so passing mentions in summaries rank below real title
             # hits); browsing → chronological. bm25 is ascending-better in FTS5.
-            order = ("bm25(news_fts, 10.0, 1.0), n.published_at DESC"
-                     if base_from.startswith("news_fts") else "n.published_at DESC")
+            order = (
+                "bm25(news_fts, 10.0, 1.0), n.published_at DESC, n.id DESC"
+                if base_from.startswith("news_fts")
+                else "n.published_at DESC, n.id DESC"
+            )
             rows = conn.execute(
                 f"SELECT n.published_at, n.ticker, n.title, n.url, n.publisher, "
-                f"n.source, n.description FROM {base_from} WHERE {where} "
+                f"n.source, n.description, {availability_sql}, {recovery_sql} "
+                f"FROM {base_from} WHERE {selected_where} "
                 f"ORDER BY {order} LIMIT ? OFFSET ?",
-                [*params, max(1, min(200, limit)), max(0, offset)]).fetchall()
+                [*selected_params, max(1, min(200, limit)), max(0, offset)]
+            ).fetchall()
             items = [{"published_at": r[0], "ticker": r[1], "title": r[2],
                       "url": r[3], "publisher": r[4], "source": r[5],
-                      "description": clean_snippet(r[6])} for r in rows]
+                      "description": clean_snippet(r[6]),
+                      "content_availability": r[7],
+                      "content_recovery": r[8]} for r in rows]
             return {"available": True, "items": items, "total": total,
-                    "sources": sources, "days": day_counts}
+                    "sources": sources, "days": day_counts,
+                    "content_counts": content_counts}
         except sqlite3.OperationalError as e:
             logger.warning(f"SqliteBackend.query_news_feed: {e}")
             return empty

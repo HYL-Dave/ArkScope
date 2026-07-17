@@ -84,6 +84,10 @@ NEWS feed.
 - Task 1 RED was the required collection error
   `ModuleNotFoundError: src.news_content_availability`. The minimal shared
   classifier/SQL authority then passed exactly `10` tests.
+- Task 2 RED retained the ten pure passes and produced exactly six failures:
+  missing `content_counts`/item fields or the unsupported `content` keyword.
+  Dynamic dual/single/no-map SQL classification then passed the new file at
+  `16/16`; the combined owner plus existing SQLite backend is `84 passed`.
 
 ## Locked Decisions
 
@@ -387,7 +391,7 @@ feat: define news content availability contract
 - Extend: `tests/test_news_content_availability.py`
 - Modify: `tests/test_sqlite_backend.py`
 
-- [ ] **Step 1: Add the six failing backend integration nodes**
+- [x] **Step 1: Add the six failing backend integration nodes**
 
 Extend the new test file with exactly these six tests:
 
@@ -430,7 +434,7 @@ The tests must prove:
 - a missing legacy `news` table returns the full additive unavailable shape
   with a fresh zero `content_counts`.
 
-- [ ] **Step 2: Prove RED for missing SQL classification**
+- [x] **Step 2: Prove RED for missing SQL classification**
 
 ```bash
 pytest -q tests/test_news_content_availability.py
@@ -440,7 +444,7 @@ Expected: the first ten pure tests remain green; all six new backend tests
 fail because `query_news_feed()` lacks `content`, classification fields, and
 the additive facet.
 
-- [ ] **Step 3: Add a dynamic read-only projection builder**
+- [x] **Step 3: Add a dynamic read-only projection builder**
 
 Inside `SqliteBackend`, inspect `sqlite_master` using the already-open
 read-only connection. Build:
@@ -468,7 +472,7 @@ Do not call `_news_score_tables_available()` or `_score_map_joins()` as an
 availability proxy: score-table requirements and the unconditional dual-map
 join have different compatibility semantics.
 
-- [ ] **Step 4: Refactor `query_news_feed()` around one common non-content filter**
+- [x] **Step 4: Refactor `query_news_feed()` around one common non-content filter**
 
 Add `content: ContentFilter = "all"` to the method. Keep the existing FTS/LIKE
 decision and parameterization. Build one common FROM/JOIN and one common WHERE
@@ -487,7 +491,7 @@ overlaying grouped rows. Never infer a missing key from the selected page.
 Preserve current BM25 weighting. Add only the deterministic ID tie-breaker to
 the current orders.
 
-- [ ] **Step 5: Evolve existing feed assertions without changing node IDs**
+- [x] **Step 5: Evolve existing feed assertions without changing node IDs**
 
 In `tests/test_sqlite_backend.py`:
 
@@ -498,7 +502,7 @@ In `tests/test_sqlite_backend.py`:
 - do not rewrite the old fixture to create normalized tables merely to make
   the new feature look populated.
 
-- [ ] **Step 6: Prove the 16-node backend owner green and commit**
+- [x] **Step 6: Prove the 16-node backend owner green and commit**
 
 ```bash
 pytest -q tests/test_news_content_availability.py tests/test_sqlite_backend.py
