@@ -58,6 +58,7 @@ _TERMINAL = {
     BodyStatus.UNAVAILABLE,
     BodyStatus.EXPIRED,
 }
+_IBKR_10172_MAX_ATTEMPTS = 2
 
 
 def _now() -> str:
@@ -730,7 +731,7 @@ class NormalizedNewsStore:
             if existing not in {BodyStatus.PENDING, BodyStatus.FAILED}:
                 raise BodyConflictError(f"cannot fail terminal body {existing.value}")
             if body.error_code == 10172:
-                unavailable = attempts >= 3
+                unavailable = attempts >= _IBKR_10172_MAX_ATTEMPTS
                 self.conn.execute(
                     "UPDATE news_article_bodies SET body_status=?,fetch_attempts=?,"
                     "last_attempt_at=?,next_retry_at=?,last_error=?,last_error_code=?,"

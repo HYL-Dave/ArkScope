@@ -263,11 +263,11 @@ def test_cross_ticker_fetch_stores_one_body_and_relations(store, conn):
     assert body["body_text"] == "body"
 
 
-def test_third_10172_becomes_terminal_unavailable(store, conn, monkeypatch):
+def test_second_10172_becomes_terminal_unavailable(store, conn, monkeypatch):
     article = candidate("DJ-N$retry")
     result = store.upsert(article)
     conn.execute(
-        "UPDATE news_article_bodies SET body_status='failed',fetch_attempts=2 "
+        "UPDATE news_article_bodies SET body_status='failed',fetch_attempts=1 "
         "WHERE article_id=?",
         (result.article_id,),
     )
@@ -291,14 +291,14 @@ def test_third_10172_becomes_terminal_unavailable(store, conn, monkeypatch):
     ).fetchone()
     assert tuple(row) == (
         "unavailable",
-        3,
+        2,
         10172,
         None,
         "2026-06-29T00:00:00Z",
     )
 
 
-def test_10172_before_third_attempt_sets_six_hour_retry(store, conn, monkeypatch):
+def test_first_10172_sets_six_hour_retry(store, conn, monkeypatch):
     article = candidate("DJ-N$retry")
     result = store.upsert(article)
     monkeypatch.setattr(
@@ -368,7 +368,7 @@ def test_unavailable_recovers_only_through_explicit_reprobe(store, conn):
     article = candidate("DJ-N$recover")
     result = store.upsert(article)
     conn.execute(
-        "UPDATE news_article_bodies SET body_status='unavailable',fetch_attempts=3,"
+        "UPDATE news_article_bodies SET body_status='unavailable',fetch_attempts=2,"
         "last_error_code=10172 WHERE article_id=?",
         (result.article_id,),
     )

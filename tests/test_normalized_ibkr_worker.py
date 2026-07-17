@@ -960,6 +960,52 @@ def test_retryable_10172_reports_partial_and_scheduled_backlog(
     assert result["body_backlog"]["scheduled_later"] == 1
 
 
+def test_second_10172_run_is_partial_then_terminal_history_does_not_degrade_next_run(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "market_data.db"
+    article_id = _seed_body_row(
+        db_path,
+        "second-10172",
+        status="failed",
+        attempts=1,
+        next_retry_at="2000-01-01T00:00:00Z",
+    )
+    provider = _WorkerProvider(
+        {"AAPL": []},
+        {
+            "DJ-N$second-10172": BodyCandidate(
+                status=BodyStatus.FAILED,
+                error="IBKR news article unavailable (10172)",
+                error_code=10172,
+            )
+        },
+    )
+    monkeypatch.setattr(
+        "src.news_normalized.store._now",
+        lambda: "2026-07-17T00:00:00Z",
+    )
+
+    first = _run_real_worker(monkeypatch, db_path, provider)
+    conn = sqlite3.connect(db_path)
+    row = conn.execute(
+        "SELECT body_status,fetch_attempts,next_retry_at "
+        "FROM news_article_bodies WHERE article_id=?",
+        (article_id,),
+    ).fetchone()
+    conn.close()
+    second = _run_real_worker(monkeypatch, db_path, provider)
+
+    assert first["status"] == "partial"
+    assert first["retry_status"] == "partial"
+    assert first["body_backlog"]["due_now"] == 0
+    assert first["body_backlog"]["scheduled_later"] == 0
+    assert tuple(row) == ("unavailable", 2, None)
+    assert provider.body_calls == ["DJ-N$second-10172"]
+    assert second["status"] == "succeeded"
+
+
 def test_retry_and_fresh_limits_are_independent(tmp_path, monkeypatch):
     db_path = tmp_path / "market_data.db"
     _seed_body_row(db_path, "old")
