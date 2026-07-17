@@ -127,6 +127,39 @@ no-PostgreSQL smoke harness.
 - No live Gateway retry was forced. Production `market_data.db` was not
   mutated by any implementation gate.
 
+### Reviewer verification ✅ (Fable, 2026-07-17) — all reviewer gates closed
+
+Independent reviewer canonical A/B (virgin `git archive` of behavioral base
+`4e7bb24` versus docs tip `1c28dd1`, sequential single-process full pytest,
+reviewer environment, no hang): both sides identical on the pre-existing
+family (`30 failed / 74 skipped / 18 warnings / 7 errors`); failure sets
+empty in both directions; passed `4241 -> 4248` = exactly **`+7`**. Raw
+collect diff is `+9/-2`; the two removed node IDs are exactly the planned 1:1
+renames (`test_third_10172_becomes_terminal_unavailable ->
+test_second_10172_becomes_terminal_unavailable`,
+`test_10172_before_third_attempt_sets_six_hour_retry ->
+test_first_10172_sets_six_hour_retry`, both new names present in the added
+set), so the semantic ledger is `+7/-0`: the four reconciliation queue
+contracts plus the three worker tests named in the plan. Work dir
+`/tmp/ab_10172_2SVz`. The reviewer also independently re-ran: focused
+`192 passed`; the must-not-modify byte-identity boundary (empty diff on
+schema/writer/models/adapter/scheduler/frontend); the threshold gates
+(`_IBKR_10172_MAX_ATTEMPTS = 2` present, zero `attempts >= 3` remnants); and
+the plan-exact telemetry gate (zero `reconcile_ibkr_10172`/count references
+in scheduler or frontend owners — the broad-pattern `reconcil` hits in
+`data_scheduler.py` are pre-existing interrupted-run reconciliation,
+byte-identical to base). Reviewer close-read of
+`reconcile_ibkr_10172_retry_policy` confirms it matches the reviewed
+interface exactly (active-transaction rejection, BEGIN IMMEDIATE, single
+correlated-EXISTS UPDATE, three-field assignment with `last_attempt_at`
+fallback, rollback-and-reraise, post-condition assert), and the worker call
+site sits precisely between store construction and retry selection under one
+short `market_write_lock`, guarded by `available_provider_codes is not None`.
+The copied-DB probe's drift from the spec snapshot (`76` matching rows versus
+`96` at spec time and `71` at spec review) is natural-ingestion drift, exactly
+as the spec's snapshot-not-constant clause anticipated. All reviewer gates
+are closed; merge remains the user's decision.
+
 ## Locked Decisions
 
 1. **Two total typed attempts.** First typed `10172` is `failed` with a six-hour
