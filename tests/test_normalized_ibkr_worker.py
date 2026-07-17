@@ -291,6 +291,13 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
             events.append("store")
             self.conn = conn
 
+        def reconcile_ibkr_10172_retry_policy(
+            self, *, now, available_provider_codes
+        ):
+            assert available_provider_codes == frozenset({"DJ-N"})
+            events.append("reconcile")
+            return 0
+
         def select_ibkr_body_retries(
             self, *, now, limit, available_provider_codes=None
         ):
@@ -347,6 +354,11 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
 
     assert events.count("ibkr_enter") == 1
     assert "provider_operation" in events
+    assert events.index("providers") < events.index("store")
+    assert events.index("store") < events.index("market_enter")
+    assert events.index("market_enter") < events.index("reconcile")
+    assert events.index("reconcile") < events.index("market_exit")
+    assert events.index("market_exit") < events.index("write")
     # news domain rides its own partitioned client id (base 1 + 30), never the raw base
     assert seen_source_kwargs.get("client_id") == 31
 
@@ -415,10 +427,19 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
         def __init__(self, conn):
             self.conn = conn
 
+        def reconcile_ibkr_10172_retry_policy(
+            self, *, now, available_provider_codes
+        ):
+            assert available_provider_codes == frozenset({"DJ-N"})
+            assert calls["market_lock_depth"] == 1
+            calls["reconciled"] = True
+            return 0
+
         def select_ibkr_body_retries(
             self, *, now, limit, available_provider_codes=None
         ):
             assert available_provider_codes == frozenset({"DJ-N"})
+            assert calls["market_lock_depth"] == 0
             return BodyRetrySelection((), BodyRetryBacklog(0, 0, 0, None))
 
         def summarize_ibkr_body_backlog(
@@ -428,6 +449,7 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
             return BodyRetryBacklog(0, 0, 0, None)
 
     def fake_write_news_batch(store, provider, tickers, budget, **kwargs):
+        assert calls["market_lock_depth"] == 0
         calls["kwargs"] = kwargs
         return {
             "status": "succeeded",
@@ -438,15 +460,25 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
             "continuation": None,
         }
 
-    def forbidden_outer_lock(*args, **kwargs):
-        raise AssertionError("outer market_write_lock must not wrap the whole worker")
+    @contextmanager
+    def recording_market_lock(*args, **kwargs):
+        calls["market_lock_entries"] = calls.get("market_lock_entries", 0) + 1
+        calls["market_lock_depth"] += 1
+        try:
+            yield
+        finally:
+            calls["market_lock_depth"] -= 1
 
+    calls["market_lock_depth"] = 0
     monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _Source)
     monkeypatch.setattr("src.news_normalized.ibkr_runtime.IBKRRuntimeGateway", _Gateway)
     monkeypatch.setattr("src.news_normalized.ibkr_adapter.IBKRNormalizedProvider", _Provider)
     monkeypatch.setattr("src.news_normalized.store.NormalizedNewsStore", _Store)
     monkeypatch.setattr("src.news_normalized.writer.write_news_batch", fake_write_news_batch)
-    monkeypatch.setattr("src.market_data_direct.market_write_lock", forbidden_outer_lock)
+    monkeypatch.setattr(
+        "src.market_data_direct.market_write_lock",
+        recording_market_lock,
+    )
     monkeypatch.setattr("src.market_data_admin.resolve_market_db_path", lambda: ":memory:")
 
     out = ibkr_cli._run_worker(
@@ -458,7 +490,11 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
     )
 
     assert out["status"] == "succeeded"
+    assert calls["reconciled"] is True
+    assert calls["market_lock_entries"] == 1
+    assert calls["market_lock_depth"] == 0
     assert "write_lock_factory" in calls["kwargs"]
+    assert calls["kwargs"]["write_lock_factory"] is recording_market_lock
     assert calls["kwargs"]["project_legacy"] is True
     assert calls["closed"] is True
 
@@ -667,6 +703,12 @@ def test_worker_selects_due_bodies_and_passes_local_ids_separately(
         def __init__(self, conn):
             self.conn = conn
 
+        def reconcile_ibkr_10172_retry_policy(
+            self, *, now, available_provider_codes
+        ):
+            calls["reconciliation_provider_codes"] = available_provider_codes
+            return 0
+
         def select_ibkr_body_retries(
             self, *, now, limit, available_provider_codes=None
         ):
@@ -712,6 +754,7 @@ def test_worker_selects_due_bodies_and_passes_local_ids_separately(
     )
 
     assert calls == {
+        "reconciliation_provider_codes": frozenset({"DJ-N"}),
         "selection_limit": 2,
         "selection_provider_codes": frozenset({"DJ-N"}),
         "summary_provider_codes": frozenset({"DJ-N"}),
@@ -796,6 +839,86 @@ def test_worker_provider_discovery_failure_performs_no_retry_or_fresh_calls(
     assert payload["error"] == ""
     assert secret not in repr(payload)
     assert events == ["discover", "disconnect"]
+
+
+def test_worker_reconciliation_failure_stops_before_retry_or_fresh_calls(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "market_data.db"
+    article_id = _seed_body_row(
+        db_path,
+        "reconcile-failure",
+        status="failed",
+        attempts=2,
+        next_retry_at="2000-01-01T00:00:00Z",
+    )
+
+    class ReconciliationFailureStore(NormalizedNewsStore):
+        def reconcile_ibkr_10172_retry_policy(
+            self, *, now, available_provider_codes
+        ):
+            raise sqlite3.OperationalError("injected reconciliation failure")
+
+    provider = _WorkerProvider(
+        {"AAPL": [_headline("fresh-after-reconcile")]},
+        {"DJ-N$reconcile-failure": BodyCandidate(status=BodyStatus.FETCHED)},
+    )
+    conn = sqlite3.connect(db_path)
+    before = conn.execute(
+        "SELECT * FROM news_article_bodies WHERE article_id=?",
+        (article_id,),
+    ).fetchone()
+    conn.close()
+
+    with pytest.raises(sqlite3.OperationalError, match="injected"):
+        _run_real_worker(
+            monkeypatch,
+            db_path,
+            provider,
+            store_cls=ReconciliationFailureStore,
+        )
+
+    conn = sqlite3.connect(db_path)
+    after = conn.execute(
+        "SELECT * FROM news_article_bodies WHERE article_id=?",
+        (article_id,),
+    ).fetchone()
+    conn.close()
+    assert provider.events == []
+    assert provider.body_calls == []
+    assert tuple(after) == tuple(before)
+
+
+def test_worker_reconciliation_count_stays_inside_child(tmp_path, monkeypatch):
+    from src.news_normalized.ibkr_cli import sanitize_worker_result
+
+    db_path = tmp_path / "market_data.db"
+    calls = []
+    sentinel = 987654321
+
+    class CountingStore(NormalizedNewsStore):
+        def reconcile_ibkr_10172_retry_policy(
+            self, *, now, available_provider_codes
+        ):
+            calls.append(available_provider_codes)
+            return sentinel
+
+    provider = _WorkerProvider({"AAPL": []})
+    result = _run_real_worker(
+        monkeypatch,
+        db_path,
+        provider,
+        store_cls=CountingStore,
+    )
+    sanitized = sanitize_worker_result(result)
+
+    assert calls == [frozenset({"DJ-N"})]
+    assert provider.events == [("metadata", "AAPL")]
+    assert str(sentinel) not in repr(result)
+    assert str(sentinel) not in repr(sanitized)
+    assert not any("reconcil" in key for key in result)
+    assert not any("reconcil" in key for key in sanitized)
 
 
 def test_worker_stdout_preserves_only_aggregate_entitlement_block_count():

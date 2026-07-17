@@ -273,6 +273,12 @@ def _run_worker(
             )
             conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
             store = NormalizedNewsStore(conn)
+            if available_provider_codes is not None:
+                with market_write_lock():
+                    store.reconcile_ibkr_10172_retry_policy(
+                        now=datetime.now(timezone.utc),
+                        available_provider_codes=available_provider_codes,
+                    )
             retry_query_failed = False
             try:
                 selection = store.select_ibkr_body_retries(
