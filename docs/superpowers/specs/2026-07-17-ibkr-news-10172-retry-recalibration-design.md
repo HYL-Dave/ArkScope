@@ -1,7 +1,8 @@
 # IBKR News 10172 Retry Recalibration Design
 
-> **Status:** IMPLEMENTED FOR REVIEW — code tip `dda3c00`; production remains
-> on the live three-attempt contract until independent review and merge.
+> **Status:** MERGED — `master` through `80dd6e8`; automated merged-tree gates
+> pass. Desktop restart and one natural due-cycle read-only verification remain
+> before LIVE COMPLETE.
 
 ## 1. Purpose
 

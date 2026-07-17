@@ -4,6 +4,12 @@
 
 > **Status: MERGED / LIVE — 2026-07-15. `master` FAST-FORWARDED THROUGH `c5cd91f`; REVIEWER CANONICAL A/B, MERGED-TREE, COPIED-DB GATEWAY, RESPONSIVE, AND USER VISUAL GATES PASS.**
 
+> **Policy supersession (2026-07-17):** This historical implementation ledger
+> remains unchanged evidence for the durable queue. Its global/baseline
+> terminal-at-third `10172` statements are superseded by
+> `2026-07-17-ibkr-news-10172-retry-recalibration.md`: first typed failure keeps
+> the six-hour retry and the second is terminal.
+
 ## Implementation Ledger
 
 - **Branch / commits:** branch `codex/ibkr-news-durable-body-retry`; plan base
@@ -119,7 +125,7 @@ line as LIVE. No push was performed; publication remains user-owned.
 - The retry interface uses normalized local integer `article_id` values. `retry_body_ids` never means an IBKR provider ID.
 - Retry and fresh work are orthogonal. A retry batch must not replace `tickers`, create a `WriterContinuation`, consume `WriterBudget.max_body_fetches`, or suppress `fetch_articles()`.
 - Set `DEFAULT_MAX_RETRY_BODY_FETCHES = 25` in `src/news_normalized/ibkr_cli.py`. Keep existing fresh defaults `DEFAULT_MAX_ARTICLES = 50_000` and `DEFAULT_MAX_BODY_FETCHES = 50_000` unchanged.
-- Preserve the approved 10172 policy exactly: first and second failures schedule six hours later; the third becomes terminal `unavailable`; manual Run respects `next_retry_at`; no force-retry command is added.
+- Historical implementation constraint: first and second failures scheduled six hours later and the third became terminal. The 2026-07-17 superseding policy keeps the first delay but makes the second terminal; manual Run still respects `next_retry_at` and no force-retry command exists.
 - Queue reads and provider calls must not hold `market_write_lock`. Each body/metadata/projection update keeps the existing short transaction and write-lock boundary.
 - Existing same-source and shared IBKR Gateway lock order remains: source thread lock -> source file lock -> IBKR thread lock -> IBKR file lock -> child worker -> short market write lock.
 - Lock-busy remains a retryable skip and must not commit a body attempt. Already committed metadata or body updates remain durable if a later operation fails.
@@ -133,7 +139,7 @@ line as LIVE. No push was performed; publication remains user-owned.
 
 ## Grounded Baseline
 
-- `NormalizedNewsStore._upsert_body()` already owns retry policy. It writes `next_retry_at = attempted_at + 6h` for 10172 attempts one and two and changes attempt three to `unavailable`.
+- Historical grounded baseline: `_upsert_body()` wrote `+6h` for attempts one and two and made attempt three unavailable. The superseding 2026-07-17 authority changes only that threshold to terminal-at-two.
 - `write_news_batch()` currently reads `continuation.deferred_body_ids` before metadata, but any non-null continuation also replaces `work_tickers` with `continuation.deferred_tickers`. Reusing that interface for the durable queue would suppress fresh headline scans.
 - The current writer uses one `body_fetch_attempts` counter for resumed and fresh body work. A separate durable retry limit therefore requires a separate input and counter, not a larger shared budget.
 - `IBKRNormalizedProvider.fetch_body()` can rehydrate the provider code from the stored candidate and returns a sanitized `BodyCandidate(error_code=10172)` without raw provider text.

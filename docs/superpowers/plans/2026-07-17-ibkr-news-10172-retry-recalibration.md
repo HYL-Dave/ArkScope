@@ -7,9 +7,9 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox syntax for tracking; completed steps are marked `- [x]`.
 
-> **Status:** IMPLEMENTED FOR REVIEW — code tip `dda3c00`; canonical virgin
-> A/B, focused, copied-DB, static, and no-PG gates pass. Production still uses
-> the live three-attempt policy until independent review and merge.
+> **Status:** MERGED — `master` through `80dd6e8`; merged-tree automated gates
+> pass. Desktop restart and one natural due-cycle read-only verification remain
+> before the final LIVE COMPLETE closeout.
 
 **Goal:** Stop spending a third IBKR Gateway body request after two persisted
 typed `10172` outcomes, reconcile already-known repeated failures without a
@@ -159,6 +159,27 @@ The copied-DB probe's drift from the spec snapshot (`76` matching rows versus
 `96` at spec time and `71` at spec review) is natural-ingestion drift, exactly
 as the spec's snapshot-not-constant clause anticipated. All reviewer gates
 are closed; merge remains the user's decision.
+
+### Post-review merge checkpoint (2026-07-17)
+
+- `master` fast-forwarded `77ea897..2a84248`; no branch sidecar was running and
+  the user's unrelated `config/tickers_core.json` modification was preserved.
+- The first merged-tree focused run exposed pre-existing test pollution only
+  present when the real checkout has `config/.env`: fake diagnostic probe tests
+  loaded file keys into process-global `src.env_keys._loaded_keys`, causing the
+  later scheduler fixture's dummy keys to be misclassified as forbidden file
+  authority. The failing order was adapter -> scheduler (`59 failed`), while
+  either file alone passed. A one-off hook clearing only that provenance set
+  made the exact pair `123 passed`, proving the cause.
+- Test-only commit `80dd6e8` makes both fake-source probe cases bypass the real
+  environment/profile application seam. It changes no production path and no
+  test count. The exact merged-tree focused command then passed `192/192`.
+- Merged-tree full collection remains `4359`; no-PG smoke returned `ok:true`
+  and `pg_attempts:[]` across all 24 checks.
+- No Gateway call or production database mutation was used for the merge gate.
+  The desktop process still needs one restart before the new worker policy is
+  active; natural due-cycle telemetry, rather than a forced retry, remains the
+  final live check.
 
 ## Locked Decisions
 

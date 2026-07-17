@@ -6,6 +6,12 @@
 > copied-DB Gateway, responsive, privacy/static, merged-tree, and no-PG gates
 > closed.
 
+> **Policy supersession (2026-07-17):** This document remains the authority for
+> durable queue, entitlement, and UI semantics, but every three-attempt `10172`
+> statement below is historical. The current authority is
+> `2026-07-17-ibkr-news-10172-retry-recalibration-design.md`: first typed
+> `10172` waits six hours; the second is terminal `unavailable`.
+
 ## 1. Purpose
 
 Fix one misleading Settings state immediately, then remove the reliability dependency that caused
@@ -49,8 +55,9 @@ is absent and the helper invents zero.
 
 - Article metadata is committed before body retrieval.
 - Successfully fetched bodies and legacy projections are durable.
-- Error `10172` is persisted without provider text and follows the approved policy: at most three
-  attempts, at least six hours apart, then terminal `unavailable`.
+- Error `10172` is persisted without provider text. At this design's launch it followed an
+  at-most-three-attempt policy; that historical threshold is superseded by the 2026-07-17
+  terminal-at-two authority noted above.
 - The latest observed six-hour IBKR volume was at most `63` articles for one ticker, below the
   provider's 300-headline response cap. The current ten retries are therefore likely to reappear
   at their next due run under the present cadence.
@@ -202,7 +209,8 @@ six-hour policy can waste Gateway calls and undermine the bounded 10172 contract
 ### 4.5 Failure and lifecycle rules
 
 - Each body update is idempotent under the existing provider article identity.
-- The third 10172 still becomes terminal `unavailable`.
+- Historical acceptance: the third 10172 became terminal `unavailable`; current policy makes the
+  second terminal under the superseding 2026-07-17 authority.
 - A worker crash leaves durable rows eligible for the next run; no in-memory queue is authoritative.
 - Lock-busy remains a retryable skip and must not consume an attempt.
 - Provider/body failures cannot roll back already committed article metadata.
@@ -223,7 +231,8 @@ The reviewed implementation plan must include tests proving:
 4. future-due rows are not attempted and do not by themselves mark the run partial;
 5. retry and fresh-headline budgets cannot starve each other;
 6. crash/restart reconstructs the same due queue from SQLite;
-7. third-10172 terminal behavior is unchanged;
+7. historical third-10172 terminal behavior is unchanged for this slice (superseded by the
+   terminal-at-two policy on 2026-07-17);
 8. raw provider article IDs never cross sanitized stdout/API/log boundaries;
 9. existing market-writer and Gateway locks retain their order and timeout behavior;
 10. focused normalized-news/scheduler suites, no-PG smoke, and canonical backend A/B pass;
@@ -264,7 +273,8 @@ permanently unavailable:
 - the UI says the current login does not subscribe to the source, that the headline is retained,
   and that retry resumes after access appears; and
 - the existing `BodyStatus.UNAVAILABLE` continues to mean article-level terminal evidence such as
-  the third `10172`. Entitlement blocking must not reuse or overwrite that status.
+  terminal typed `10172` evidence. At this design's launch that meant the third attempt; since
+  2026-07-17 it means the second. Entitlement blocking must not reuse or overwrite that status.
 
 The capability block is derived from a successful provider observation. It does not create a
 second queue table or rewrite article truth. When a later successful observation includes the
@@ -304,7 +314,8 @@ fact.
 
 ### 5.5 Scope boundaries and verification
 
-This follow-up does not change cadence, body budgets, the three-attempt/six-hour `10172` policy,
+This follow-up did not change cadence, body budgets, or the then-live three-attempt/six-hour
+`10172` policy (that threshold was independently superseded on 2026-07-17),
 generic transport-error policy, normalized-news authority, PG-exit boundaries, or manual retry
 controls. Historical generic DJ-N/DJ-RTA rows remain eligible and can resolve into fetched or typed
 `10172` evidence on later attempts; this change does not infer their cause.
@@ -316,7 +327,8 @@ RED-first verification must prove:
 3. an unavailable-provider row is not requested and appears only in the entitlement-blocked count;
 4. the same row becomes eligible, under the existing limit, when a later provider set includes it;
 5. provider-discovery failure performs zero body/headline calls and never fabricates zero backlog;
-6. `10172` ordering, timing, terminal behavior, and fresh/retry budget independence remain intact;
+6. the then-live `10172` ordering, timing, terminal behavior, and fresh/retry budget independence
+   remain intact (terminal threshold independently superseded on 2026-07-17);
 7. child stdout, scheduler state, API types, and DOM carry only the aggregate blocked count;
 8. Settings explains retained-headline and automatic-resume semantics without a retry button; and
 9. a copied-DB one-Gateway live gate observes FLY excluded under the current entitlement while a
