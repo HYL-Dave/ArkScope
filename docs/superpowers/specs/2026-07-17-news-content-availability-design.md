@@ -1,7 +1,8 @@
 # NEWS Content Availability Mini-Design
 
 > **Status:** IMPLEMENTED FOR REVIEW. The approved design remains the
-> authority; independent implementation review is the remaining merge gate.
+> authority; independent implementation review is GREEN and integration
+> remains a user decision.
 
 ## 1. Purpose
 

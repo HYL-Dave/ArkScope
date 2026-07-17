@@ -7,9 +7,10 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox syntax for tracking; completed steps become `- [x]`.
 
-> **Status:** IMPLEMENTED FOR REVIEW. Product code tip is `270a150`;
-> independent implementation review is the remaining gate. Do not merge, mark
-> Unit 2 LIVE, or start the next implementation unit before review closes.
+> **Status:** IMPLEMENTED FOR REVIEW. Final implementation/test tip is
+> `eb011d7`; independent implementation review is GREEN. Do not merge, mark
+> Unit 2 LIVE, or start the next implementation unit before the user makes the
+> integration decision.
 
 **Goal:** Let the market NEWS feed filter and label `full`, `headline_only`,
 and `unknown` content honestly, while distinguishing a real scheduled recovery
@@ -72,9 +73,11 @@ NEWS feed.
 - Review-cleared branch base: `ef733c3`.
 - Branch/worktree: `codex/news-content-availability-unit-2` at
   `/tmp/arkscope-news-content-availability`.
-- Product code tip: `270a150` (`perf: collapse news content facet joins`),
-  following four RED-first feature commits. The final status/map/spec update is
-  a separate docs-only commit after this code tip.
+- Final implementation/test tip: `eb011d7` (`test: pin SQL news content
+  pagination`). The last production-behavior tip is `8e4d926` (`fix: harden
+  news content version skew`), following the original RED-first feature stack
+  through performance tip `270a150`. The final status/map/spec update is a
+  separate docs-only commit after these tips.
 - Worktree setup required the repository's existing `git-crypt` key in the
   linked worktree git-dir before checkout; tracked files remained clean and
   the main worktree's BTSG edit was never copied.
@@ -142,8 +145,28 @@ NEWS feed.
   `9223`). All three ports subsequently refused connections; the disposable
   profile DB and Chrome profile were removed. The user's desktop and Gateway
   processes were not touched.
+- Independent implementation review found four testable gaps in the original
+  review-ready tip: selected `unknown` could remain selected after another
+  facet made that cohort empty; item badges could render when an old sidecar
+  omitted `content_counts`; the SQL-before-pagination test did not fully
+  exclude an unbounded SQL read followed by Python filtering/slicing; and map
+  precedence plus legacy-FTS authority needed explicit counterexamples.
+  Frontend RED was exactly `2 failed / 4 passed`; `8e4d926` resets an empty
+  selected unknown cohort to `all` and suppresses all content badges unless the
+  response carries the availability facet contract. Existing backend nodes
+  now interleave a newest full row before headline-only pagination, overlap
+  both maps to pin migration-first authority, and prove normalized body text
+  is not legacy feed FTS input.
+- The remaining SQL-bound proof was closed in existing node
+  `test_content_filter_precedes_total_facets_and_pagination_with_stable_order`.
+  A deliberate mutation to one unbounded item query followed by Python
+  filter/slice preserved the returned rows but failed the new shared-predicate
+  plus `LIMIT/OFFSET` assertions; restoring the production SQL made the node
+  green. Independent narrow re-review then reported all four findings closed
+  with no new finding. Backend/frontend node accounting did not change.
 - Canonical backend A/B used symmetric virgin archives at behavioral base
-  `012dc69` and product tip `270a150`, run sequentially in the same environment.
+  `012dc69` and final implementation/test tip `eb011d7`, run sequentially in
+  the same environment.
   Base finished at `30 failed / 4248 passed / 74 skipped / 18 warnings / 7
   errors`; head finished at `30 failed / 4267 passed / 74 skipped / 18 warnings
   / 7 errors`. All `37` failure/error node identities had an empty
