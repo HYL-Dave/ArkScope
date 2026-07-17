@@ -627,14 +627,35 @@ class SqliteBackend:
             common_where = " AND ".join(conds)
 
             content_counts = empty_content_counts()
-            for row in conn.execute(
-                f"SELECT {availability_sql}, COUNT(*) FROM {base_from} "
-                f"WHERE {common_where} GROUP BY 1",
-                params,
-            ).fetchall():
-                key = row[0]
-                if key in content_counts:
-                    content_counts[key] = int(row[1])
+            total = 0
+            sources: dict[str, int] = {}
+            day_counts: dict[str, int] = {}
+            facet_rows = conn.execute(
+                f"SELECT {availability_sql} AS availability, n.source, "
+                "substr(n.published_at, 1, 10) AS published_day, "
+                "COUNT(*) AS all_count, "
+                f"SUM(CASE WHEN ? = 'all' OR ({availability_sql}) = ? "
+                "THEN 1 ELSE 0 END) AS selected_count "
+                f"FROM {base_from} WHERE {common_where} "
+                "GROUP BY availability, n.source, published_day",
+                [content, content, *params],
+            ).fetchall()
+            for (
+                availability,
+                source_key,
+                day_key,
+                all_count,
+                selected_count,
+            ) in facet_rows:
+                if availability in content_counts:
+                    content_counts[availability] += int(all_count)
+                selected = int(selected_count)
+                total += selected
+                if selected:
+                    sources[source_key] = sources.get(source_key, 0) + selected
+                    day_counts[day_key] = day_counts.get(day_key, 0) + selected
+            sources = dict(sorted(sources.items()))
+            day_counts = dict(sorted(day_counts.items()))
 
             selected_params = list(params)
             selected_where = common_where
@@ -642,20 +663,6 @@ class SqliteBackend:
                 selected_where += f" AND ({availability_sql}) = ?"
                 selected_params.append(content)
 
-            total = conn.execute(
-                f"SELECT COUNT(*) FROM {base_from} WHERE {selected_where}",
-                selected_params,
-            ).fetchone()[0]
-            sources = dict(conn.execute(
-                f"SELECT n.source, COUNT(*) FROM {base_from} "
-                f"WHERE {selected_where} GROUP BY n.source",
-                selected_params,
-            ).fetchall())
-            day_counts = dict(conn.execute(
-                f"SELECT substr(n.published_at, 1, 10), COUNT(*) FROM {base_from} "
-                f"WHERE {selected_where} GROUP BY 1 ORDER BY 1",
-                selected_params,
-            ).fetchall())
             # Searching → RELEVANCE order (bm25, title weighted 10x over
             # description so passing mentions in summaries rank below real title
             # hits); browsing → chronological. bm25 is ascending-better in FTS5.

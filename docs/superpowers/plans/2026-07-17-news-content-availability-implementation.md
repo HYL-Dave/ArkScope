@@ -97,6 +97,29 @@ NEWS feed.
   surface had no content selector or labels. Optional version-skew-safe DTO
   fields, a market-only facet selector, honest explicit labels, and old-sidecar
   degradation then passed exactly `1 file / 6 tests`.
+- The first Task 6 performance gate triggered the reviewed stop condition:
+  five repeated normalized join chains measured `80.1 / 542.8 / 7719.5ms`
+  for `7 / 30 / 3650` day all-content reads, versus the Task 0 baselines of
+  `17.3 / 84.2 / 765.6ms`. Query plans showed indexed lookups rather than a
+  missing-index scan. Review approved a Task 2 implementation-shape deviation:
+  one grouped conditional facet query plus one item query, with no schema,
+  cache, column, index, or Python item post-filter.
+- The performance RED strengthened the existing
+  `test_content_counts_ignore_only_content_axis_and_respect_other_filters`
+  node: the normalized join chain appeared in five statements and violated
+  the reviewed `<=2` semantic bound. After the aggregation refactor that same
+  node and all `16` owner tests passed without changing node accounting.
+- The approved no-schema exploratory shape first measured `38.4 / 228.4 /
+  1411.2 / 2479.3ms` for `7 / 30 / 365 / 3650` day all-content reads.
+  Post-implementation real-DB medians under later system load were `36.3ms`
+  (7d/all), `372.7ms` (30d/all), `1533.9ms` (365d/all), `2734.3ms`
+  (3650d/all), `2688.4ms`
+  (3650d/headline-only), and `525.3ms` (30d/headline-only FTS). Dynamic totals
+  changed during live ingestion and are not acceptance constants. The same
+  FTS term on behavioral base measured `886.9ms`, so the search branch did not
+  regress. EXPLAIN used `idx_news_pub`, both map PK/UNIQUE indexes, article/body
+  integer primary keys, and the FTS virtual-table index; no normalized map/body
+  full scan appeared.
 
 ## Locked Decisions
 
@@ -487,12 +510,20 @@ Add `content: ContentFilter = "all"` to the method. Keep the existing FTS/LIKE
 decision and parameterization. Build one common FROM/JOIN and one common WHERE
 for q/ticker/source/days.
 
-Execute:
+Execute the review-approved performance shape:
 
-1. one grouped `content_counts` query over the common WHERE without content;
-2. total, sources, days, and item queries over common WHERE plus the selected
-   availability predicate when `content != "all"`;
-3. item SELECT with both derived expressions.
+1. one grouped query by availability/source/day over the common WHERE;
+2. emit both all-content `COUNT(*)` and SQL-selected
+   `SUM(CASE WHEN content matches THEN 1 ELSE 0 END)` counts from that query;
+3. fold those already-aggregated counts into `content_counts`, total, sources,
+   and days without filtering returned feed items in Python; and
+4. run one item SELECT with the selected availability predicate before
+   `LIMIT/OFFSET` and both derived expressions.
+
+The normalized join chain may therefore appear in at most one aggregate
+statement plus one item statement per request. This reviewed deviation replaces
+the original five-query shape after the real-data performance gate measured a
+tenfold 3650-day regression.
 
 Initialize the three facet keys through `empty_content_counts()` before
 overlaying grouped rows. Never infer a missing key from the selected page.
@@ -730,7 +761,7 @@ feat: surface news content availability
 - Verify all implementation files.
 - Do not edit excluded owners to make gates pass.
 
-- [ ] **Step 1: Run focused and full frontend gates**
+- [x] **Step 1: Run focused and full frontend gates**
 
 ```bash
 cd apps/arkscope-web
@@ -742,7 +773,7 @@ npm run build
 
 Expected full result: `56 files / 533 tests`, exact `+6/-0`.
 
-- [ ] **Step 2: Run focused backend and no-PG gates**
+- [x] **Step 2: Run focused backend and no-PG gates**
 
 ```bash
 pytest -q \
@@ -758,7 +789,7 @@ python src/smoke/pg_unreachable_e2e.py
 
 Expected: `94 passed`; smoke `ok:true` and `pg_attempts:[]`.
 
-- [ ] **Step 3: Run static boundary ratchets**
+- [x] **Step 3: Run static boundary ratchets**
 
 Against behavioral base `012dc69`, require byte identity for:
 
@@ -785,7 +816,7 @@ Also require:
 implementation branch must be byte-identical to base; never use a command that
 reverts the user's main-worktree edit.
 
-- [ ] **Step 4: Verify exact test accounting**
+- [x] **Step 4: Verify exact test accounting**
 
 Collect base and head node IDs from symmetric trees and assert:
 
@@ -805,7 +836,7 @@ with renamed or removed tests.
 - No production DB writes.
 - Temporary scripts/screenshots live only under `/tmp`.
 
-- [ ] **Step 1: Inspect the real query plan without mutation**
+- [x] **Step 1: Inspect the real query plan without mutation**
 
 On real `data/market_data.db`, run `EXPLAIN QUERY PLAN` for representative
 all/full/headline-only queries. Record only table/index/operator summaries.
@@ -815,7 +846,7 @@ map, projection map, article, and body. A `SCAN` of an entire normalized map or
 body table per feed query is a stop condition; do not add an unreviewed schema
 index inside this unit.
 
-- [ ] **Step 2: Repeat the read-only timing sanity**
+- [x] **Step 2: Repeat the read-only timing sanity**
 
 Warm once and record at least five runs/median for `days=7`, `30`, and `3650`
 under `content=all`, plus one representative `headline_only` query. Compare

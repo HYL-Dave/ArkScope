@@ -238,6 +238,15 @@ def test_content_counts_ignore_only_content_axis_and_respect_other_filters(
     tmp_path: Path,
 ) -> None:
     backend = SqliteBackend(_seed_content_feed(tmp_path))
+    statements: list[str] = []
+    original_connect = backend._connect
+
+    def traced_connect() -> sqlite3.Connection:
+        conn = original_connect()
+        conn.set_trace_callback(statements.append)
+        return conn
+
+    backend._connect = traced_connect  # type: ignore[method-assign]
 
     apple = backend.query_news_feed(
         q="apple", ticker="AAPL", content="headline_only", days=30)
@@ -247,6 +256,15 @@ def test_content_counts_ignore_only_content_axis_and_respect_other_filters(
         "headline_only": 2,
         "unknown": 1,
     }
+    normalized_join_statements = [
+        statement
+        for statement in statements
+        if "JOIN news_legacy_migration_map" in statement
+        or "JOIN news_legacy_projection_map" in statement
+    ]
+    assert len(normalized_join_statements) <= 2
+
+    backend._connect = original_connect  # type: ignore[method-assign]
 
     finnhub = backend.query_news_feed(
         source="finnhub", content="headline_only", days=30)
