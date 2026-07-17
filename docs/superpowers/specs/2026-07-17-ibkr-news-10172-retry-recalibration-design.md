@@ -1,7 +1,7 @@
 # IBKR News 10172 Retry Recalibration Design
 
-> **Status:** APPROVED — implementation plan opened 2026-07-17; production
-> remains on the live three-attempt contract until reviewed code is merged.
+> **Status:** IMPLEMENTED FOR REVIEW — code tip `dda3c00`; production remains
+> on the live three-attempt contract until independent review and merge.
 
 ## 1. Purpose
 

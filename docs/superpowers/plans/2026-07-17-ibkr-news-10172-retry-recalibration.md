@@ -5,10 +5,11 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Use
 > `superpowers:test-driven-development` for every behavior change and
 > `superpowers:verification-before-completion` before review-ready claims.
-> Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox syntax for tracking; completed steps are marked `- [x]`.
 
-> **Status:** PLAN REVIEW PENDING — authority spec approved; implementation has
-> not started and production still uses the live three-attempt policy.
+> **Status:** IMPLEMENTED FOR REVIEW — code tip `dda3c00`; canonical virgin
+> A/B, focused, copied-DB, static, and no-PG gates pass. Production still uses
+> the live three-attempt policy until independent review and merge.
 
 **Goal:** Stop spending a third IBKR Gateway body request after two persisted
 typed `10172` outcomes, reconcile already-known repeated failures without a
@@ -44,9 +45,87 @@ no-PostgreSQL smoke harness.
   - `tests/test_normalized_ibkr_worker.py`: `28`;
   - `tests/test_news_normalized_ibkr_adapter.py`: `20`; and
   - `tests/test_data_scheduler.py`: `103`.
-- Reviewed accounting target is exactly `+7/-0`: retry queue `+4`, isolated
-  worker `+3`, and no net change for 1:1 policy-test renames. Expected focused
-  collection is `192`; expected full backend collection is `4359`.
+- Reviewed semantic accounting target is exactly `+7/-0`: retry queue `+4`,
+  isolated worker `+3`, and no net change for two 1:1 policy-test renames.
+  Because pytest node IDs include function names, the expected raw node diff
+  for those prescribed renames is `+9/-2`. Expected focused collection is
+  `192`; expected full backend collection is `4359`.
+
+## Implementation Ledger (2026-07-17)
+
+### Branch and commits
+
+- Behavioral A/B base: `4e7bb24`.
+- Review-cleared branch base: `77ea897`.
+- Implementation worktree: `/tmp/arkscope-ibkr-news-10172-recalibration` on
+  `codex/ibkr-news-10172-recalibration`. The reviewed `.worktrees/...` path was
+  not used because the repo-local parent is not ignored; the linked worktree
+  instead received the existing git-crypt key and no user-owned dirty file.
+- Code tip: `dda3c00`.
+- Task commits:
+  - `db9aeae` — terminal-at-two state machine;
+  - `0a49945` — idempotent existing-row reconciliation;
+  - `dda3c00` — worker choke-point integration.
+- The review-ready documentation head is the branch-tip commit carrying this
+  ledger; the code tip above remains the canonical A/B head.
+
+### RED -> GREEN record
+
+- Task 1 RED: the second typed `10172` remained `failed` with a future retry,
+  and the real worker reported one scheduled-later row. After the named
+  threshold change, the targeted pair and the complete store/worker pair were
+  green.
+- Task 2 RED: all four reconciliation contracts failed with the expected
+  missing-method `AttributeError`. The one-statement transaction then passed
+  preservation, entitlement, idempotence, active-transaction, and rollback
+  contracts.
+- Task 3 RED: the four orchestration contracts proved the worker never called
+  reconciliation. After wiring, one test-only assertion initially raised a
+  `TypeError` by applying string containment to an integer sentinel; the
+  assertion was corrected to compare `str(sentinel)`. Production code did not
+  change for that harness correction.
+- The copied-DB probe's first harness invocation could not import `src` because
+  the temporary script directory led `sys.path`; adding the worktree root to
+  the probe fixed the harness. No database mutation had begun.
+
+### Verification evidence
+
+- Baseline: focused collect `185`, full collect `4352`, and narrow baseline
+  `62 passed`.
+- Final focused collection and execution: `192` collected and `192 passed in
+  6.74s`. The explicit state/regression selection passed `21` tests.
+- Final full collection: `4359`.
+- Raw node-ID diff is `+9/-2`, not literally `+7/-0`: the two removals are
+  exactly the reviewed one-to-one renames
+  `test_10172_before_third_attempt_sets_six_hour_retry` ->
+  `test_first_10172_sets_six_hour_retry` and
+  `test_third_10172_becomes_terminal_unavailable` ->
+  `test_second_10172_becomes_terminal_unavailable`. After mapping those
+  intent-preserving renames, semantic accounting is exactly `+7/-0` (four
+  queue contracts and three worker contracts). No old behavior test vanished.
+- Canonical sequential A/B used symmetric virgin archives. Base:
+  `30 failed / 4241 passed / 74 skipped / 18 warnings / 7 errors` in 253.13s.
+  Head: `30 failed / 4248 passed / 74 skipped / 18 warnings / 7 errors` in
+  263.20s. Failure and error node identities have an empty bidirectional diff;
+  passed delta is exactly `+7`.
+- One earlier asymmetric harness run (virgin base versus a configured
+  development worktree) was discarded: its fixture errors differed because
+  the trees did not have equivalent local files. It is not A/B evidence.
+- Static scope/privacy gates pass: protected schema/writer/models/adapter/
+  scheduler/frontend owners are byte-identical; the threshold constant occurs
+  once; the old threshold, telemetry leakage, queue-table, force-retry/order,
+  provider-identity, and PostgreSQL searches are empty.
+- Copied-DB aggregate probe (real DB opened only for SQLite backup):
+  `matching_before=76`, `changed_first=76`, `changed_second=0`,
+  `matching_after=0`; fetched count/digest, article digest, protected body
+  fields, and `quick_check` all remained true/`ok`. The copy and probe were
+  removed; no identifiers or provider values were printed.
+- No-PG smoke passed all 24 checks with `ok:true` and `pg_attempts:[]`.
+- Reconciliation return count remains internal: raw and sanitized worker
+  results exclude the sentinel and reconciliation keys, and parent/API/UI
+  static gates are empty.
+- No live Gateway retry was forced. Production `market_data.db` was not
+  mutated by any implementation gate.
 
 ## Locked Decisions
 
@@ -187,7 +266,7 @@ If implementation needs any listed owner, stop and return to design review.
 
 **Files:** none
 
-- [ ] **Step 1: Confirm the parent worktree is safe**
+- [x] **Step 1: Confirm the parent worktree is safe**
 
 ```bash
 git status --short --branch
@@ -198,7 +277,7 @@ git worktree list
 Expected: the user's existing `config/tickers_core.json` modification may be
 present in the main worktree. Do not stage, copy, reset, or otherwise modify it.
 
-- [ ] **Step 2: Create the implementation worktree from the review-cleared tip**
+- [x] **Step 2: Create the implementation worktree from the review-cleared tip**
 
 ```bash
 git worktree add .worktrees/ibkr-news-10172-recalibration \
@@ -211,7 +290,7 @@ git rev-parse HEAD
 Record this hash as the plan/branch base. Record `4e7bb24` separately as the
 behavioral A/B base.
 
-- [ ] **Step 3: Reproduce the collection baseline before edits**
+- [x] **Step 3: Reproduce the collection baseline before edits**
 
 ```bash
 pytest --collect-only -q \
@@ -226,7 +305,7 @@ pytest --collect-only -q
 Expected summaries: `185` focused and `4352` full. If collection differs before
 code changes, stop and reconcile the ledger rather than carrying a false base.
 
-- [ ] **Step 4: Run the narrow GREEN baseline**
+- [x] **Step 4: Run the narrow GREEN baseline**
 
 ```bash
 pytest -q \
@@ -246,7 +325,7 @@ Expected: `62 passed` (`25 + 9 + 28`). Record elapsed time and warnings.
 - Modify `tests/test_normalized_ibkr_worker.py`
 - Modify `src/news_normalized/store.py`
 
-- [ ] **Step 1: Evolve the two store policy tests without changing collection**
+- [x] **Step 1: Evolve the two store policy tests without changing collection**
 
 Rename and strengthen the existing cases:
 
@@ -293,7 +372,7 @@ Rename `test_10172_before_third_attempt_sets_six_hour_retry` to
 attempts `2`, not `3`, while preserving the denied-normal-update and
 allowed-explicit-reprobe assertions.
 
-- [ ] **Step 2: Add the end-to-end worker outcome test**
+- [x] **Step 2: Add the end-to-end worker outcome test**
 
 Add exactly one new test:
 
@@ -345,7 +424,7 @@ def test_second_10172_run_is_partial_then_terminal_history_does_not_degrade_next
 The same provider object is intentional: the final call-list assertion proves
 the terminal row was not requested a third time.
 
-- [ ] **Step 3: Run RED and inspect the reason**
+- [x] **Step 3: Run RED and inspect the reason**
 
 ```bash
 pytest -q \
@@ -356,7 +435,7 @@ pytest -q \
 Expected RED: current code leaves attempt two as `failed` with a future retry;
 the failure must not be fixture setup, connection, or timestamp parsing.
 
-- [ ] **Step 4: Implement one named policy constant and use it once**
+- [x] **Step 4: Implement one named policy constant and use it once**
 
 Near `_TERMINAL` in `src/news_normalized/store.py`, add:
 
@@ -374,7 +453,7 @@ if body.error_code == 10172:
 Do not alter generic failures, first backoff, terminal conflict handling, or
 explicit recovery.
 
-- [ ] **Step 5: Run GREEN and the entire store/worker pair**
+- [x] **Step 5: Run GREEN and the entire store/worker pair**
 
 ```bash
 pytest -q \
@@ -384,7 +463,7 @@ pytest -q \
 
 Expected: `54 passed` (`25 + 29`).
 
-- [ ] **Step 6: Commit the state-machine change**
+- [x] **Step 6: Commit the state-machine change**
 
 ```bash
 git add src/news_normalized/store.py \
@@ -401,7 +480,7 @@ git commit -m "fix: bound IBKR 10172 retries to two attempts"
 - Modify `tests/test_news_normalized_retry_queue.py`
 - Modify `src/news_normalized/store.py`
 
-- [ ] **Step 1: Extend the local test helper without weakening existing cases**
+- [x] **Step 1: Extend the local test helper without weakening existing cases**
 
 Allow `_set_body()` to set optional typed evidence fields while retaining its
 existing defaults:
@@ -440,7 +519,7 @@ def _set_body(
 Update the existing entitlement terminal fixture from attempts `3` to `2`.
 Its behavior and test ID remain unchanged.
 
-- [ ] **Step 2: Add four RED reconciliation contracts**
+- [x] **Step 2: Add four RED reconciliation contracts**
 
 Add exactly these tests:
 
@@ -476,7 +555,7 @@ Add exactly these tests:
 The tests may use provider-code fixture strings internally, but assertion
 messages and any copied-DB/report output must not print real provider values.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 pytest -q tests/test_news_normalized_retry_queue.py -k reconcile
@@ -485,7 +564,7 @@ pytest -q tests/test_news_normalized_retry_queue.py -k reconcile
 Expected: four failures because the explicit method does not exist. No test may
 fail because schema construction or a status read unexpectedly mutates rows.
 
-- [ ] **Step 4: Implement the explicit transaction**
+- [x] **Step 4: Implement the explicit transaction**
 
 Use the existing entitlement helper and an `EXISTS` subquery so the update is
 one statement:
@@ -539,7 +618,7 @@ The installed SQLite `3.37.2` was directly probed with this target-alias plus
 correlated-`EXISTS` shape and updated exactly one row. Keep this one-statement
 form; do not split the mutation into a read loop or multiple updates.
 
-- [ ] **Step 5: Run GREEN and queue regressions**
+- [x] **Step 5: Run GREEN and queue regressions**
 
 ```bash
 pytest -q \
@@ -550,7 +629,7 @@ pytest -q \
 Expected: `38 passed` (`25 + 13`). Verify the idempotence test's second return
 is exactly zero.
 
-- [ ] **Step 6: Commit reconciliation**
+- [x] **Step 6: Commit reconciliation**
 
 ```bash
 git add src/news_normalized/store.py tests/test_news_normalized_retry_queue.py
@@ -565,7 +644,7 @@ git commit -m "fix: reconcile repeated IBKR body unavailability"
 - Modify `tests/test_normalized_ibkr_worker.py`
 - Modify `src/news_normalized/ibkr_cli.py`
 
-- [ ] **Step 1: Sweep every fake store for the new required interface**
+- [x] **Step 1: Sweep every fake store for the new required interface**
 
 There are three standalone fake `Store` classes in
 `tests/test_normalized_ibkr_worker.py` (current neighborhoods near lines 289,
@@ -585,7 +664,7 @@ def reconcile_ibkr_10172_retry_policy(
 Subclasses of the real `NormalizedNewsStore` inherit the method and need no
 compatibility shim.
 
-- [ ] **Step 2: Evolve the existing lock/order tests to the new contract**
+- [x] **Step 2: Evolve the existing lock/order tests to the new contract**
 
 In `test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock`:
 
@@ -613,7 +692,7 @@ replace the obsolete never-enter lock with a recording context manager. Assert:
 This explicitly rejects wrapping provider discovery, queue reads, or the whole
 writer in the new outer lock.
 
-- [ ] **Step 3: Add two new RED worker tests**
+- [x] **Step 3: Add two new RED worker tests**
 
 Add exactly:
 
@@ -636,7 +715,7 @@ Add exactly:
 Together with Task 1's new runtime test, worker collection grows from `28` to
 `31`.
 
-- [ ] **Step 4: Run RED**
+- [x] **Step 4: Run RED**
 
 ```bash
 pytest -q \
@@ -649,7 +728,7 @@ pytest -q \
 Expected: failures because `_run_worker()` never invokes reconciliation. The
 failure test must demonstrate that current code proceeds into provider work.
 
-- [ ] **Step 5: Add the bounded worker call**
+- [x] **Step 5: Add the bounded worker call**
 
 Immediately after `store = NormalizedNewsStore(conn)` and before
 `retry_query_failed = False`, add:
@@ -668,7 +747,7 @@ existing `main()` sanitizer is the correct failure boundary. Keep the existing
 queue-read exception policy unchanged: only queue selection/summary failures
 may degrade to partial and continue fresh work.
 
-- [ ] **Step 6: Run GREEN and all worker/adapter contracts**
+- [x] **Step 6: Run GREEN and all worker/adapter contracts**
 
 ```bash
 pytest -q \
@@ -679,7 +758,7 @@ pytest -q \
 Expected: `51 passed` (`31 + 20`). Confirm the existing zero-budget module
 startup test does not enter provider discovery or reconciliation.
 
-- [ ] **Step 7: Commit worker orchestration**
+- [x] **Step 7: Commit worker orchestration**
 
 ```bash
 git add src/news_normalized/ibkr_cli.py tests/test_normalized_ibkr_worker.py
@@ -694,7 +773,7 @@ git commit -m "fix: reconcile IBKR body retries before selection"
 - Do not modify production code unless a RED-first defect is found.
 - Update this plan's ledger after evidence is complete.
 
-- [ ] **Step 1: Run exact focused verification and accounting**
+- [x] **Step 1: Run exact focused verification and accounting**
 
 ```bash
 pytest --collect-only -q \
@@ -711,12 +790,13 @@ pytest -q \
   tests/test_data_scheduler.py
 ```
 
-Expected: collection `192`; all `192 passed`. Verify collection diff against a
-clean archive of `4e7bb24` is exactly the seven named additions and zero
-removals. Test renames must be 1:1 intent-preserving replacements, not hidden
-losses.
+Expected: collection `192`; all `192 passed`. Verify raw collection diff
+against a clean archive of `4e7bb24` is exactly `+9/-2`: seven genuinely new
+contracts plus the two new names, with the two old names as the only removals.
+After mapping those 1:1 intent-preserving renames, semantic accounting must be
+exactly `+7/-0`; no hidden loss is allowed.
 
-- [ ] **Step 2: Run state-machine and regression focus explicitly**
+- [x] **Step 2: Run state-machine and regression focus explicitly**
 
 ```bash
 pytest -q \
@@ -731,7 +811,7 @@ pytest -q \
   tests/test_normalized_ibkr_worker.py::test_worker_provider_discovery_failure_performs_no_retry_or_fresh_calls
 ```
 
-- [ ] **Step 3: Run static scope and privacy ratchets**
+- [x] **Step 3: Run static scope and privacy ratchets**
 
 The following must be true:
 
@@ -767,7 +847,7 @@ Expected:
 The reconciliation method name is expected inside store/worker/tests; the
 telemetry gate is intentionally scoped to parent/API/frontend owners.
 
-- [ ] **Step 4: Run a copied-DB mutation probe, never the real DB**
+- [x] **Step 4: Run a copied-DB mutation probe, never the real DB**
 
 Use `sqlite3.Connection.backup()` to copy the resolved real market DB to a
 unique `/tmp/arkscope-10172-reconcile-*.db`. The probe must:
@@ -804,7 +884,7 @@ zero, after is zero, and every preservation boolean is true. The output must
 contain no IDs, provider codes, titles, bodies, hashes, paths, or errors. Delete
 the copied DB and temporary probe after recording the aggregate result.
 
-- [ ] **Step 5: Run full backend and no-PG smoke**
+- [x] **Step 5: Run full backend and no-PG smoke**
 
 ```bash
 pytest -q
@@ -815,7 +895,7 @@ In an environment with the known bare-profile family, record raw counts and
 failure identities without claiming clean full-suite PASS. The no-PG smoke
 must return `ok: true` and `pg_attempts: []`.
 
-- [ ] **Step 6: Run canonical A/B in clean virgin archives**
+- [x] **Step 6: Run canonical A/B in clean virgin archives**
 
 Compare behavioral base `4e7bb24` to the final code head, sequentially in one
 process per side and the same environment. Required verdict:
@@ -823,7 +903,8 @@ process per side and the same environment. Required verdict:
 - pre-existing failure sets are identical in both directions;
 - skips, warnings, and errors are identical;
 - passed delta equals exactly `+7`;
-- collect diff is exactly `+7/-0`; and
+- raw collect diff is exactly `+9/-2`, reducing to semantic `+7/-0` after the
+  two reviewed one-to-one renames; and
 - the seven additions are the four queue and three worker tests named in this
   plan.
 
@@ -840,21 +921,22 @@ gate. Do not substitute a partial/file-isolated result and call it canonical.
 - Modify `docs/superpowers/specs/2026-07-17-ibkr-news-10172-retry-recalibration-design.md`
 - Modify `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Reconcile the implementation ledger exactly**
+- [x] **Step 1: Reconcile the implementation ledger exactly**
 
 Record:
 
 - branch base, behavioral base, code head, and docs head;
 - every RED failure and why it was the intended old behavior;
 - commits by task;
-- focused/full collection and exact `+7/-0` node-ID diff;
+- focused/full collection, raw `+9/-2` node-ID diff, and rename-normalized
+  `+7/-0` semantic diff;
 - full-suite, no-PG, static, copied-DB, and A/B evidence;
 - copied-DB aggregate counts without identifiers;
 - confirmation that reconciliation count remained internal;
 - any deviation, false-green, or test-ledger correction; and
 - explicit statement that no live Gateway retry was forced for this gate.
 
-- [ ] **Step 2: Change statuses without claiming LIVE**
+- [x] **Step 2: Change statuses without claiming LIVE**
 
 Set:
 
@@ -865,7 +947,7 @@ Set:
 Do not update the older live three-attempt authorities yet; production still
 uses them until merge.
 
-- [ ] **Step 3: Commit docs and stop for independent review**
+- [x] **Step 3: Commit docs and stop for independent review**
 
 ```bash
 git add \
@@ -895,8 +977,8 @@ live Gateway calls before independent review.
 9. First-attempt six-hour backoff, budget `25`, entitlement reversibility,
    generic errors, explicit recovery, lock-busy, and fresh ingestion are
    unchanged.
-10. Collection accounting is exactly `+7/-0`; no old contract silently
-    disappeared under a rename.
+10. Raw collection accounting is exactly `+9/-2`; after the two reviewed
+    one-to-one renames it is semantic `+7/-0`, with no silent contract loss.
 
 ## Stop Conditions
 
@@ -911,8 +993,8 @@ Stop and return to review if any of these occur:
 - an entitlement-blocked row must be reclassified to make tests pass;
 - generic errors or first-attempt backoff must change;
 - copied-DB preservation cannot be proved without exposing row identity;
-- canonical A/B has a new failure identity or collection delta other than
-  `+7/-0`; or
+- canonical A/B has a new failure identity, a passed delta other than `+7`, or
+  a raw/semantic collection delta other than `+9/-2` / `+7/-0`; or
 - a live gate would require repeatedly forcing real due rows.
 
 ## Post-Review Merge and Live Closeout
