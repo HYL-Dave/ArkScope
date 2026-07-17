@@ -2267,6 +2267,10 @@ export function applyAppRecordsMigration(): Promise<AppRecordsMigrationResult> {
 
 // --- 新聞·事件 feed (score-free, local-first over news + FTS5) ---
 
+export type NewsContentAvailability = "full" | "headline_only" | "unknown";
+export type NewsContentRecovery = "retryable" | "terminal";
+export type NewsContentFilter = "all" | NewsContentAvailability;
+
 export interface NewsFeedItem {
   published_at: string; // full UTC timestamp
   ticker: string;
@@ -2275,6 +2279,8 @@ export interface NewsFeedItem {
   publisher: string | null;
   source: string; // polygon | finnhub | ibkr
   description: string | null;
+  content_availability?: NewsContentAvailability;
+  content_recovery?: NewsContentRecovery | null;
 }
 
 export interface NewsFeedResponse {
@@ -2283,6 +2289,7 @@ export interface NewsFeedResponse {
   total: number;
   sources: Record<string, number>;
   days: Record<string, number>; // YYYY-MM-DD → count (same filters)
+  content_counts?: Record<NewsContentAvailability, number>;
 }
 
 export function getNewsFeed(params: {
@@ -2292,6 +2299,7 @@ export function getNewsFeed(params: {
   days?: number;
   limit?: number;
   offset?: number;
+  content?: NewsContentFilter;
 }): Promise<NewsFeedResponse> {
   const sp = new URLSearchParams();
   if (params.q) sp.set("q", params.q);
@@ -2300,6 +2308,7 @@ export function getNewsFeed(params: {
   if (params.days) sp.set("days", String(params.days));
   if (params.limit) sp.set("limit", String(params.limit));
   if (params.offset) sp.set("offset", String(params.offset));
+  if (params.content && params.content !== "all") sp.set("content", params.content);
   return getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000);
 }
 

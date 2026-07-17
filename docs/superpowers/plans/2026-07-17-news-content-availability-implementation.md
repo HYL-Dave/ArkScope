@@ -93,6 +93,10 @@ NEWS feed.
   invalid value with `200`. The additive route/DAL/backend/smoke propagation,
   typed validation, and full empty-response shape then passed the exact focused
   gate at `94 passed`.
+- Task 4 RED produced exactly six mounted failures because the market NEWS
+  surface had no content selector or labels. Optional version-skew-safe DTO
+  fields, a market-only facet selector, honest explicit labels, and old-sidecar
+  degradation then passed exactly `1 file / 6 tests`.
 
 ## Locked Decisions
 
@@ -627,7 +631,7 @@ feat: expose additive news content filters
 - Modify: `apps/arkscope-web/src/News.tsx`
 - Create: `apps/arkscope-web/src/News.test.tsx`
 
-- [ ] **Step 1: Write exactly six failing mounted tests**
+- [x] **Step 1: Write exactly six failing mounted tests**
 
 Use the existing Vitest/jsdom React harness patterns and mock only `./api`.
 Create exactly:
@@ -653,7 +657,7 @@ Fixture requirements:
 Use visible labels and request arguments as assertions. Do not assert private
 React state or implementation class names.
 
-- [ ] **Step 2: Prove RED on the current NEWS UI**
+- [x] **Step 2: Prove RED on the current NEWS UI**
 
 ```bash
 cd apps/arkscope-web
@@ -663,7 +667,7 @@ npm test -- --run src/News.test.tsx
 Expected: six tests fail because the API type, selector, compatibility gate,
 and labels do not exist.
 
-- [ ] **Step 3: Add additive version-skew-safe API types**
+- [x] **Step 3: Add additive version-skew-safe API types**
 
 Add:
 
@@ -684,7 +688,7 @@ content_counts?: Record<NewsContentAvailability, number>;
 Add optional `content` to `getNewsFeed()`. Omit it from the URL for `all`; send
 it for the other three values. Do not alter timeout, auth, or SA client code.
 
-- [ ] **Step 4: Implement the market-only filter and labels**
+- [x] **Step 4: Implement the market-only filter and labels**
 
 - Add `content` state initialized to `all` and include it in the market request
   plus the existing request-sequence dependency set.
@@ -703,7 +707,7 @@ it for the other three values. Do not alter timeout, auth, or SA client code.
 - `full` and absent fields render no label. Never interpret absent as unknown.
 - SA mode does not render/send/read market content state.
 
-- [ ] **Step 5: Prove focused GREEN and commit**
+- [x] **Step 5: Prove focused GREEN and commit**
 
 ```bash
 cd apps/arkscope-web

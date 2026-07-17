@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  getNewsFeed, type NewsFeedItem, type NewsFeedResponse,
+  getNewsFeed, type NewsContentFilter, type NewsFeedItem, type NewsFeedResponse,
   getSAFeed, type SAFeedItem, type SAFeedResponse,
 } from "./api";
 
@@ -29,6 +29,7 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
   const [tickerInput, setTickerInput] = useState(""); // typed value
   const [ticker, setTicker] = useState("");           // applied filter (on Enter)
   const [source, setSource] = useState<string>("auto"); // market providers
+  const [content, setContent] = useState<NewsContentFilter>("all");
   const [saType, setSaType] = useState<string>("");      // SA item_type
   const [days, setDays] = useState<number>(7);
   const [offset, setOffset] = useState(0);
@@ -61,9 +62,16 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
           setSaItems((prev) => (append ? [...prev, ...f.items] : f.items));
         } else {
           const f = await getNewsFeed({
-            q: q || undefined, ticker: tk, source, days, limit: PAGE, offset: nextOffset,
+            q: q || undefined,
+            ticker: tk,
+            source,
+            content,
+            days,
+            limit: PAGE,
+            offset: nextOffset,
           });
           if (myReq !== reqRef.current) return; // stale → drop
+          if (!f.content_counts) setContent("all");
           setFeed(f);
           setItems((prev) => (append ? [...prev, ...f.items] : f.items));
         }
@@ -75,7 +83,7 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
         if (myReq === reqRef.current) setLoading(false);
       }
     },
-    [mode, q, ticker, source, saType, days],
+    [mode, q, ticker, source, content, saType, days],
   );
 
   useEffect(() => {
@@ -123,6 +131,24 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
             {SOURCE_OPTIONS.map((s) => (
               <option key={s} value={s}>{s === "auto" ? "全部來源" : s}</option>
             ))}
+          </select>
+        )}
+        {mode === "market" && feed?.content_counts && (
+          <select
+            value={content}
+            onChange={(e) => setContent(e.target.value as NewsContentFilter)}
+            title="內文狀態"
+          >
+            <option value="all">
+              全部 ({Object.values(feed.content_counts).reduce((sum, count) => sum + count, 0)})
+            </option>
+            <option value="full">有內文 ({feed.content_counts.full})</option>
+            <option value="headline_only">
+              僅標題 ({feed.content_counts.headline_only})
+            </option>
+            {feed.content_counts.unknown > 0 && (
+              <option value="unknown">狀態不明 ({feed.content_counts.unknown})</option>
+            )}
           </select>
         )}
         <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -208,6 +234,7 @@ function MarketFeedBody({
                   <button className="news-ticker-chip" onClick={() => onOpenTicker(it.ticker)} title={`開啟 ${it.ticker}`}>
                     {it.ticker}
                   </button>
+                  {contentLabel(it) && <span className="list-chip">{contentLabel(it)}</span>}
                   {it.url ? (
                     <a className="news-title" href={it.url} target="_blank" rel="noreferrer">{it.title}</a>
                   ) : (
@@ -235,6 +262,14 @@ function MarketFeedBody({
       )}
     </>
   );
+}
+
+function contentLabel(item: NewsFeedItem): string | null {
+  if (item.content_availability === "unknown") return "內文狀態不明";
+  if (item.content_availability !== "headline_only") return null;
+  if (item.content_recovery === "retryable") return "僅標題 · 內文待處理";
+  if (item.content_recovery === "terminal") return "僅標題 · 來源未提供內文";
+  return null;
 }
 
 // --- Seeking Alpha evidence feed (Layer C-1) -------------------------------
