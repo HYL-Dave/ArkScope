@@ -71,7 +71,9 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
             offset: nextOffset,
           });
           if (myReq !== reqRef.current) return; // stale → drop
-          if (!f.content_counts) setContent("all");
+          if (!f.content_counts || (content === "unknown" && f.content_counts.unknown <= 0)) {
+            setContent("all");
+          }
           setFeed(f);
           setItems((prev) => (append ? [...prev, ...f.items] : f.items));
         }
@@ -205,6 +207,7 @@ function MarketFeedBody({
       else groups.push({ date: d, rows: [it] });
     }
   }
+  const showContentLabels = Boolean(feed?.content_counts);
 
   return (
     <>
@@ -234,7 +237,9 @@ function MarketFeedBody({
                   <button className="news-ticker-chip" onClick={() => onOpenTicker(it.ticker)} title={`開啟 ${it.ticker}`}>
                     {it.ticker}
                   </button>
-                  {contentLabel(it) && <span className="list-chip">{contentLabel(it)}</span>}
+                  {showContentLabels && contentLabel(it) && (
+                    <span className="list-chip">{contentLabel(it)}</span>
+                  )}
                   {it.url ? (
                     <a className="news-title" href={it.url} target="_blank" rel="noreferrer">{it.title}</a>
                   ) : (

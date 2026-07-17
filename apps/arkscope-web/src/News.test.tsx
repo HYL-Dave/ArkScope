@@ -95,6 +95,8 @@ function oldSidecarFeed(): NewsFeedResponse {
         publisher: null,
         source: "finnhub",
         description: null,
+        content_availability: "headline_only",
+        content_recovery: "terminal",
       },
     ],
     total: 1,
@@ -225,17 +227,35 @@ describe("News content availability", () => {
     expect(host!.textContent).not.toContain("Full article");
   });
 
-  it("hides status-unknown option when its facet count is zero", async () => {
-    apiMocks.getNewsFeed.mockResolvedValue(marketFeed({
-      items: marketRows.slice(0, 3),
-      total: 3,
-      content_counts: { full: 1, headline_only: 2, unknown: 0 },
-    }));
+  it("resets a selected unknown filter when another facet has no unknown rows", async () => {
+    apiMocks.getNewsFeed.mockImplementation(async (params: Record<string, unknown>) => {
+      if (params.source === "finnhub") {
+        const contentCounts = { full: 1, headline_only: 0, unknown: 0 };
+        return params.content === "all"
+          ? marketFeed({ items: [marketRows[0]], total: 1, content_counts: contentCounts })
+          : marketFeed({ items: [], total: 0, content_counts: contentCounts });
+      }
+      if (params.content === "unknown") {
+        return marketFeed({ items: [marketRows[3]], total: 1 });
+      }
+      return marketFeed();
+    });
     await mount();
 
+    await change(contentSelect(), "unknown");
+    await waitForText("Unknown body state");
+    await change(sourceSelect(), "finnhub");
+    await waitForText("Full article");
+
     const options = Array.from(contentSelect().options).map((option) => option.textContent);
-    expect(options).toEqual(["全部 (3)", "有內文 (1)", "僅標題 (2)"]);
+    expect(options).toEqual(["全部 (1)", "有內文 (1)", "僅標題 (0)"]);
     expect(options).not.toContain("狀態不明 (0)");
+    expect(contentSelect().value).toBe("all");
+    expect(apiMocks.getNewsFeed).toHaveBeenLastCalledWith(expect.objectContaining({
+      source: "finnhub",
+      content: "all",
+      offset: 0,
+    }));
   });
 
   it("old-sidecar responses hide the filter and never guess row labels", async () => {

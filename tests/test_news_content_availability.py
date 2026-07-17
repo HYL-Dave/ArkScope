@@ -96,11 +96,12 @@ def _seed_legacy_feed(path: Path, rows: list[tuple]) -> None:
 
 
 def _seed_content_feed(tmp_path: Path, name: str = "content.db") -> Path:
+    newest = f"{date.today().isoformat()}T12:00:00+0000"
     recent = f"{(date.today() - timedelta(days=1)).isoformat()}T12:00:00+0000"
     older = f"{(date.today() - timedelta(days=20)).isoformat()}T12:00:00+0000"
     db = tmp_path / name
     rows = [
-        (1, "AAPL", "Apple full report", "legacy full summary", "u1", "P1", "finnhub", recent, "h1"),
+        (1, "AAPL", "Apple full report", "legacy full summary", "u1", "P1", "finnhub", newest, "h1"),
         (2, "AAPL", "Apple retry pending", "", "u2", "P2", "ibkr", recent, "h2"),
         (3, "AAPL", "Apple retry failed", "", "u3", "P3", "ibkr", recent, "h3"),
         (4, "NVDA", "Nvidia beacon headline", "", "u4", "P4", "finnhub", recent, "h4"),
@@ -123,7 +124,7 @@ def _seed_content_feed(tmp_path: Path, name: str = "content.db") -> Path:
             (1, "test", "input", "resolved", "reject", "{}", "backup.db", "now"),
         )
         normalized = [
-            (101, "finnhub", "Apple full report", recent, "fetched", "Stored full body"),
+            (101, "finnhub", "Apple full report", newest, "fetched", "normalizedonlyburiedterm"),
             (102, "ibkr", "Apple retry pending", recent, "pending", None),
             (103, "ibkr", "Apple retry failed", recent, "failed", None),
             (104, "finnhub", "Nvidia beacon headline", recent, "pending", None),
@@ -158,6 +159,12 @@ def _seed_content_feed(tmp_path: Path, name: str = "content.db") -> Path:
                 "(article_id,ticker,legacy_news_id,projected_at) VALUES (?,?,?,?)",
                 (100 + legacy_id, rows[legacy_id - 1][1], legacy_id, "now"),
             )
+        # Both maps may contain a legacy row; migration authority wins.
+        conn.execute(
+            "INSERT INTO news_legacy_projection_map "
+            "(article_id,ticker,legacy_news_id,projected_at) VALUES (?,?,?,?)",
+            (106, "AAPL", 1, "now"),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -326,12 +333,12 @@ def test_headline_only_search_uses_existing_legacy_title_and_description_only(
 
     title_hit = backend.query_news_feed(
         q="beacon", content="headline_only", days=30)
-    absent_body_term = backend.query_news_feed(
-        q="nonexistentburiedterm", content="headline_only", days=30)
+    normalized_body_only_term = backend.query_news_feed(
+        q="normalizedonlyburiedterm", content="all", days=30)
 
     assert title_hit["total"] == 1
     assert title_hit["items"][0]["title"] == "Nvidia beacon headline"
-    assert absent_body_term["total"] == 0
+    assert normalized_body_only_term["total"] == 0
 
 
 def test_unavailable_feed_returns_additive_zero_shape(tmp_path: Path) -> None:
