@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** PLAN REVIEW PENDING — implementation has not started.
+> **Status:** IMPLEMENTED FOR REVIEW — automated gates complete; not merged or LIVE.
 
 **Goal:** Keep the mounted Settings > Data Sources schedule status current across background scheduler starts and completions without requiring a manual refresh or repeatedly fetching unrelated Settings data.
 
@@ -19,6 +19,42 @@
 - **Reviewed target accounting:** add `3` pure policy tests and `7` mounted integration tests, for exactly `+10/-0`; expected focused total `29`, expected full total `55 files / 527 tests`.
 - **Backend equivalence:** this is frontend-only. `src/`, `data_sources/`, and backend `tests/` remain byte-identical to `8ee85f7`; canonical backend A/B is replaced by that constructive byte-identity proof.
 - **Runtime safety:** no Gateway call, scheduler mutation, profile/market database mutation, provider probe, SA native-host health poll, or new endpoint is part of this hotfix.
+
+### Implementation Evidence (2026-07-17)
+
+- **Commits:** `e555284` opened the reviewed plan; `178730b` added the pure
+  policy after the required module-resolution RED; `8862485` added the mounted
+  polling path after all seven integration tests failed on the old behavior.
+- **RED evidence:** the pure suite failed only because
+  `./dataSourceSchedulePolling` did not exist. Before the Settings edit, the
+  seven mounted tests failed in order because idle polling made `0` schedule
+  calls instead of `1`, fast completion made `0` instead of `2`, the running
+  copy never appeared, focus made `0` instead of `1`, timer/focus coalescing
+  made `0` instead of `1`, the overlapping old full refresh remained the only
+  schedule call instead of the required three-call sequence, and the unmount
+  test could not start a focus poll.
+- **GREEN evidence:** focused policy/presentation/Settings is `3 files / 33
+  tests`; full frontend is exactly `55 files / 527 tests`; typecheck passes;
+  production build passes with only the pre-existing chunk-size warning.
+- **Exact accounting:** the test diff contains exactly ten added `it(...)`
+  nodes and zero removed/renamed nodes: three pure policy tests plus seven
+  mounted integration tests (`+10/-0` over `54 / 517`).
+- **Boundaries:** `src/`, `data_sources/`, backend `tests/`, and frontend
+  `api.ts` are byte-identical to `8ee85f7`; the changed frontend path set is
+  exactly the reviewed four files; production `Settings.tsx` and the policy
+  module contain zero `aria-live` matches. No Gateway request, scheduler run,
+  provider probe, database mutation, or live-state fixture was used.
+- **Test-shape corrections:** the stale-response test initially asserted an
+  IBKR timestamp that the compact partial row does not render; it now uses the
+  visible `running` polarity to prove the old response cannot replace newer
+  truth. The unmount test now clears all four initial full-load counters before
+  asserting no post-unmount related read. The file also explicitly enables the
+  React act environment so asynchronous timer tests finish without warnings.
+- **Reviewer observations retained:** sequence protection intentionally applies
+  only to schedule truth; overlapping health/config/macro full-load legs keep
+  their existing last-writer-wins behavior. `enabled` remains outside the
+  lifecycle fingerprint because in-UI mutations already await a full load;
+  an external change is still reflected by the lightweight schedule poll.
 
 ## Root Cause and Locked Decisions
 
@@ -76,7 +112,7 @@
 - Produces: `DATA_SOURCE_SCHEDULE_IDLE_POLL_MS`, `DATA_SOURCE_SCHEDULE_ACTIVE_POLL_MS`, `dataSourceSchedulePollMs()`, and `dataSourceScheduleLifecycleChanged()`.
 - Does not consume React, fetch, wall-clock time, DOM state, Provider health, or source-specific labels.
 
-- [ ] **Step 1: Write the three failing policy tests**
+- [x] **Step 1: Write the three failing policy tests**
 
 Create `apps/arkscope-web/src/dataSourceSchedulePolling.test.ts` exactly with a complete source factory:
 
@@ -188,7 +224,7 @@ describe("Data Sources schedule polling policy", () => {
 });
 ```
 
-- [ ] **Step 2: Run the policy test and verify RED**
+- [x] **Step 2: Run the policy test and verify RED**
 
 Run from `apps/arkscope-web`:
 
@@ -198,7 +234,7 @@ npm test -- src/dataSourceSchedulePolling.test.ts
 
 Expected: FAIL because `./dataSourceSchedulePolling` does not exist. The failure must be module resolution, not a malformed fixture or unrelated test error.
 
-- [ ] **Step 3: Implement the minimal pure policy**
+- [x] **Step 3: Implement the minimal pure policy**
 
 Create `apps/arkscope-web/src/dataSourceSchedulePolling.ts`:
 
@@ -243,7 +279,7 @@ export function dataSourceScheduleLifecycleChanged(
 
 The fingerprint deliberately excludes progress, backlog counts, labels, descriptions, and UI presentation fields. Source IDs are sorted so response object insertion order cannot manufacture a transition.
 
-- [ ] **Step 4: Run the policy and existing presentation suites**
+- [x] **Step 4: Run the policy and existing presentation suites**
 
 ```bash
 npm test -- src/dataSourceSchedulePolling.test.ts src/dataSourcesPresentation.test.ts
@@ -251,7 +287,7 @@ npm test -- src/dataSourceSchedulePolling.test.ts src/dataSourcesPresentation.te
 
 Expected: `2 files / 7 tests` pass (`3` new polling tests plus the existing `4` presentation tests).
 
-- [ ] **Step 5: Commit the pure policy**
+- [x] **Step 5: Commit the pure policy**
 
 ```bash
 git add apps/arkscope-web/src/dataSourceSchedulePolling.ts \
@@ -273,7 +309,7 @@ git commit -m "test: define data source schedule polling policy"
 - `pollSchedule()` calls only `getSchedule()`, coalesces concurrent timer/focus requests, accepts sequenced schedule truth, and calls `load()` after a detected boundary.
 - The existing DOM, labels, row controls, API DTO, and schedule mutation paths remain unchanged.
 
-- [ ] **Step 1: Extend the mounted harness and add seven failing integration tests**
+- [x] **Step 1: Extend the mounted harness and add seven failing integration tests**
 
 In `SettingsProviderConfig.test.ts`, import the mocked API functions as values:
 
@@ -504,7 +540,7 @@ it("removes idle timers and focus listeners and ignores a finishing poll after u
 
 The integration delta is exactly `+7`. Do not rename, delete, or weaken any of the existing 19 tests.
 
-- [ ] **Step 2: Run the focused tests and verify RED for behavior**
+- [x] **Step 2: Run the focused tests and verify RED for behavior**
 
 ```bash
 npm test -- src/dataSourceSchedulePolling.test.ts src/SettingsProviderConfig.test.ts
@@ -512,7 +548,7 @@ npm test -- src/dataSourceSchedulePolling.test.ts src/SettingsProviderConfig.tes
 
 Expected collection: `29` tests. The `3` policy tests and existing `19` Settings tests pass; the `7` new mounted tests fail because idle/focus polling, coalescing, transition refresh, stale-response rejection, and cleanup do not yet exist. Failures must not come from timer leakage or malformed fixtures.
 
-- [ ] **Step 3: Wire sequenced schedule acceptance and the dual-cadence poll**
+- [x] **Step 3: Wire sequenced schedule acceptance and the dual-cadence poll**
 
 Import the policy in `Settings.tsx`:
 
@@ -651,7 +687,7 @@ section has unmounted.
 
 Keep the initial `void load()` effect, extension-health effect, all mutation `await load()` calls, and the existing refresh button unchanged. Do not add `aria-live` anywhere.
 
-- [ ] **Step 4: Run the focused tests and verify GREEN**
+- [x] **Step 4: Run the focused tests and verify GREEN**
 
 ```bash
 npm test -- src/dataSourceSchedulePolling.test.ts \
@@ -661,7 +697,7 @@ npm test -- src/dataSourceSchedulePolling.test.ts \
 
 Expected: `3 files / 33 tests` pass (`3` polling + `4` presentation + `26` Settings). There must be no fake-timer leak warning, state-update-after-unmount warning, or unhandled rejected Promise.
 
-- [ ] **Step 5: Commit mounted polling**
+- [x] **Step 5: Commit mounted polling**
 
 ```bash
 git add apps/arkscope-web/src/Settings.tsx \
@@ -676,7 +712,7 @@ git commit -m "fix: refresh background schedule status"
 **Files:**
 - Verify only; no product-file edits.
 
-- [ ] **Step 1: Prove the backend and API contract are byte-identical**
+- [x] **Step 1: Prove the backend and API contract are byte-identical**
 
 ```bash
 git diff --exit-code 8ee85f7 -- src data_sources tests
@@ -685,7 +721,7 @@ git diff --exit-code 8ee85f7 -- apps/arkscope-web/src/api.ts
 
 Expected: both commands produce no output and exit zero. This is the constructive backend-equivalence gate; do not run or claim canonical backend A/B for identical trees.
 
-- [ ] **Step 2: Run static scope and accessibility ratchets**
+- [x] **Step 2: Run static scope and accessibility ratchets**
 
 ```bash
 git diff --name-only 8ee85f7 -- apps/arkscope-web/src
@@ -707,7 +743,7 @@ apps/arkscope-web/src/dataSourceSchedulePolling.ts
 
 The `aria-live` gate must produce no matches. No CSS, API DTO, backend, NEWS, scheduler, or Design Kit path may appear.
 
-- [ ] **Step 3: Run focused and full frontend verification**
+- [x] **Step 3: Run focused and full frontend verification**
 
 From `apps/arkscope-web`:
 
@@ -727,7 +763,7 @@ Expected:
 - typecheck passes;
 - build passes with no new warning family (the existing chunk-size warning is acceptable).
 
-- [ ] **Step 4: Reconcile exact test-node accounting**
+- [x] **Step 4: Reconcile exact test-node accounting**
 
 ```bash
 npm test -- --reporter=verbose \
@@ -737,7 +773,7 @@ npm test -- --reporter=verbose \
 
 Expected: all `29` named nodes pass. Compare the node list against base: `3` pure policy additions and `7` Settings additions, with zero removed/renamed nodes. Stop if the delta is not exactly `+10/-0`.
 
-- [ ] **Step 5: Commit no product changes**
+- [x] **Step 5: Commit no product changes**
 
 No commit is created in this step. If any verification required a product edit, return to the owning RED test and produce a separate reviewed fix commit; do not hide it in closeout docs.
 
@@ -749,7 +785,7 @@ No commit is created in this step. If any verification required a product edit, 
 - Modify: `docs/superpowers/plans/2026-07-17-data-sources-schedule-polling-hotfix.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Record implementation evidence without claiming merge or LIVE**
+- [x] **Step 1: Record implementation evidence without claiming merge or LIVE**
 
 Change the plan status to `IMPLEMENTED FOR REVIEW` and record:
 
@@ -760,11 +796,11 @@ Change the plan status to `IMPLEMENTED FOR REVIEW` and record:
 - any deviation from the reviewed plan;
 - confirmation that no Gateway request, profile DB mutation, or live scheduler trigger was used.
 
-- [ ] **Step 2: Insert the review-ready map entry at the top of the Decision Log**
+- [x] **Step 2: Insert the review-ready map entry at the top of the Decision Log**
 
 The entry must say this bounded frontend hotfix is implemented for review, Unit 2 remains queued, and P2.8 Slice 3 remains paused until both units complete. It must not mark the hotfix merged/live.
 
-- [ ] **Step 3: Commit review-ready docs**
+- [x] **Step 3: Commit review-ready docs**
 
 ```bash
 git add docs/superpowers/plans/2026-07-17-data-sources-schedule-polling-hotfix.md \
@@ -772,7 +808,7 @@ git add docs/superpowers/plans/2026-07-17-data-sources-schedule-polling-hotfix.m
 git commit -m "docs: mark schedule polling hotfix review-ready"
 ```
 
-- [ ] **Step 4: Stop for independent review**
+- [x] **Step 4: Stop for independent review**
 
 Report branch tip, commit list, exact test accounting, and the four product/test paths. Do not merge, mark LIVE, remove the worktree, begin Unit 2, or resume P2.8 Slice 3 before independent review and user approval.
 
