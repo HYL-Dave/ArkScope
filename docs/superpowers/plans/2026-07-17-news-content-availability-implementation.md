@@ -66,6 +66,25 @@ NEWS feed.
 - The user's unrelated modification in `config/tickers_core.json` is outside
   this unit. Never copy, stage, revert, rewrite, or include it in a commit.
 
+## Implementation Ledger (2026-07-17)
+
+- Behavioral A/B base: `012dc69`.
+- Review-cleared branch base: `ef733c3`.
+- Branch/worktree: `codex/news-content-availability-unit-2` at
+  `/tmp/arkscope-news-content-availability`.
+- Worktree setup required the repository's existing `git-crypt` key in the
+  linked worktree git-dir before checkout; tracked files remained clean and
+  the main worktree's BTSG edit was never copied.
+- Baselines re-run before RED: focused backend `75 passed`; full backend
+  `4359 collected`; frontend `55 files / 527 tests`; TypeScript typecheck PASS.
+- Read-only real-DB baseline medians over five warm runs were `17.3ms` (7
+  days), `84.2ms` (30 days), and `765.6ms` (3650 days), with dynamic totals
+  `14,046 / 53,685 / 408,327`. These are diagnostics, not acceptance
+  constants.
+- Task 1 RED was the required collection error
+  `ModuleNotFoundError: src.news_content_availability`. The minimal shared
+  classifier/SQL authority then passed exactly `10` tests.
+
 ## Locked Decisions
 
 1. **Derived at read time only.** Add no availability column, cache, table,
@@ -242,7 +261,7 @@ queries. Do not calculate any of these values from the returned page.
 - Modify: this plan's implementation ledger only after the worktree exists.
 - Do not copy: `config/tickers_core.json`.
 
-- [ ] **Step 1: Create an isolated implementation branch only after plan review**
+- [x] **Step 1: Create an isolated implementation branch only after plan review**
 
 Use `superpowers:using-git-worktrees`. Start from the review-cleared docs tip,
 not from a dirty file copy. Suggested branch:
@@ -259,7 +278,7 @@ worktree path: <path>
 Verify `git status --short` inside the new worktree is empty. The main
 worktree's BTSG change remains only in the main worktree.
 
-- [ ] **Step 2: Re-run and record grounded baselines before RED**
+- [x] **Step 2: Re-run and record grounded baselines before RED**
 
 ```bash
 pytest -q \
@@ -279,7 +298,7 @@ Expected focused backend: `75 passed`. Expected frontend: `55 files / 527
 tests`. If collection differs from the approved base before product edits,
 stop and reconcile the branch base rather than adjusting the ledger.
 
-- [ ] **Step 3: Capture the read-only performance baseline**
+- [x] **Step 3: Capture the read-only performance baseline**
 
 Against the real `data/market_data.db`, use `SqliteBackend.query_news_feed()`
 without writing or starting a provider. Warm once, then record at least five
@@ -297,7 +316,7 @@ titles, URLs, provider IDs, or body text in the ledger.
 - Create: `src/news_content_availability.py`
 - Create: `tests/test_news_content_availability.py`
 
-- [ ] **Step 1: Write the ten failing pure-contract nodes**
+- [x] **Step 1: Write the ten failing pure-contract nodes**
 
 Create `tests/test_news_content_availability.py` with one nine-case
 `pytest.mark.parametrize` and one exact-capability test. The nine cases are:
@@ -327,7 +346,7 @@ Also assert two calls to `empty_content_counts()` return equal but distinct
 dictionaries so callers cannot share mutable response state. Keep that
 assertion inside the exact-capability test; it does not add an eleventh node.
 
-- [ ] **Step 2: Prove RED for the missing authority**
+- [x] **Step 2: Prove RED for the missing authority**
 
 ```bash
 pytest -q tests/test_news_content_availability.py
@@ -336,7 +355,7 @@ pytest -q tests/test_news_content_availability.py
 Expected RED: collection/import fails only because
 `src.news_content_availability` does not exist. Do not pre-create a stub.
 
-- [ ] **Step 3: Implement the pure mapping and generated SQL**
+- [x] **Step 3: Implement the pure mapping and generated SQL**
 
 Implement the required shared interface. Generate both CASE expressions from
 the same reviewed status/source constants. The SQL expressions must return
@@ -345,7 +364,7 @@ only the three availability literals, the two recovery literals, or SQL
 
 Do not import SQLite, schema code, provider workers, or FastAPI in this module.
 
-- [ ] **Step 4: Prove GREEN and commit**
+- [x] **Step 4: Prove GREEN and commit**
 
 ```bash
 pytest -q tests/test_news_content_availability.py
