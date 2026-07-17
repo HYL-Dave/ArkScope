@@ -353,7 +353,11 @@ def test_ibkr_strict_body_method_propagates_but_compatibility_method_catches():
     assert source.fetch_news_article_body("DJ-N", "DJ-N$2") is None
 
 
-def test_probe_output_never_contains_body_or_exception_payload(capsys):
+def test_probe_output_never_contains_body_or_exception_payload(capsys, monkeypatch):
+    monkeypatch.setattr(
+        "scripts.diagnostics.probe_ibkr_news_bodies._apply_effective_ibkr_env",
+        lambda _profile_db: None,
+    )
     secret = "LICENSED-ARTICLE-SECRET-7f3c"
 
     class Source:
@@ -394,7 +398,12 @@ def test_probe_output_never_contains_body_or_exception_payload(capsys):
     assert payload[1]["error_type"] == "RuntimeError"
 
 
-def test_probe_classifies_ibkr_unavailable_without_payload(capsys):
+def test_probe_classifies_ibkr_unavailable_without_payload(capsys, monkeypatch):
+    monkeypatch.setattr(
+        "scripts.diagnostics.probe_ibkr_news_bodies._apply_effective_ibkr_env",
+        lambda _profile_db: None,
+    )
+
     class Source:
         def fetch_news_article_body_strict(self, provider, article_id):
             raise IBKRNewsArticleUnavailable(10172)
