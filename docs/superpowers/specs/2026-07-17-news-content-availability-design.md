@@ -1,7 +1,7 @@
 # NEWS Content Availability Mini-Design
 
-> **Status:** APPROVED FOR IMPLEMENTATION. Written review closed after the
-> provider-recovery capability correction; implementation plan is opening.
+> **Status:** IMPLEMENTED FOR REVIEW. The approved design remains the
+> authority; independent implementation review is the remaining merge gate.
 
 ## 1. Purpose
 

@@ -7,9 +7,9 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox syntax for tracking; completed steps become `- [x]`.
 
-> **Status:** DRAFT FOR INDEPENDENT PLAN REVIEW. Implementation has not
-> started. Do not create the implementation worktree or edit product code until
-> this plan is review-cleared.
+> **Status:** IMPLEMENTED FOR REVIEW. Product code tip is `270a150`;
+> independent implementation review is the remaining gate. Do not merge, mark
+> Unit 2 LIVE, or start the next implementation unit before review closes.
 
 **Goal:** Let the market NEWS feed filter and label `full`, `headline_only`,
 and `unknown` content honestly, while distinguishing a real scheduled recovery
@@ -72,6 +72,9 @@ NEWS feed.
 - Review-cleared branch base: `ef733c3`.
 - Branch/worktree: `codex/news-content-availability-unit-2` at
   `/tmp/arkscope-news-content-availability`.
+- Product code tip: `270a150` (`perf: collapse news content facet joins`),
+  following four RED-first feature commits. The final status/map/spec update is
+  a separate docs-only commit after this code tip.
 - Worktree setup required the repository's existing `git-crypt` key in the
   linked worktree git-dir before checkout; tracked files remained clean and
   the main worktree's BTSG edit was never copied.
@@ -120,6 +123,40 @@ NEWS feed.
   regress. EXPLAIN used `idx_news_pub`, both map PK/UNIQUE indexes, article/body
   integer primary keys, and the FTS virtual-table index; no normalized map/body
   full scan appeared.
+- The scheduler-disabled live API gate compared all four selectors to an
+  independent read-only SQL probe over the same 30-day window. API and SQL
+  matched exactly at `51,593` all, `51,045` full, `510` headline-only, and
+  `38` unknown rows; source/day facets also matched. API calls completed in
+  roughly `217-290ms`. These values are a dynamic 2026-07-18 observation, not
+  acceptance constants.
+- Real-browser checks passed at `1440x900`, `1024x768`, and `390x844`: one
+  market selector, no horizontal overflow or toolbar overlap, honest terminal
+  and unknown labels, no badge on full rows, pagination retained the selected
+  cohort (`50 -> 100`), and SA rendered neither the selector nor market
+  content labels. The live 30-day headline-only cohort contained `510`
+  terminal and zero retryable rows, so retryable wording was verified with an
+  explicitly fixture-backed response interception rather than by modifying
+  production data. Screenshots are temporary evidence under `/tmp`.
+- Live-gate cleanup stopped only the branch sidecar (PID `1168765`, port
+  `8421`), Vite (port `8432`), and headless Chrome (PID `1170405`, debug port
+  `9223`). All three ports subsequently refused connections; the disposable
+  profile DB and Chrome profile were removed. The user's desktop and Gateway
+  processes were not touched.
+- Canonical backend A/B used symmetric virgin archives at behavioral base
+  `012dc69` and product tip `270a150`, run sequentially in the same environment.
+  Base finished at `30 failed / 4248 passed / 74 skipped / 18 warnings / 7
+  errors`; head finished at `30 failed / 4267 passed / 74 skipped / 18 warnings
+  / 7 errors`. All `37` failure/error node identities had an empty
+  bidirectional diff. Collection was exactly `4359 -> 4378`, with the reviewed
+  `+19/-0` nodes and no rename/removal. An initial head attempt accidentally
+  used the non-virgin worktree, exposed an early asymmetric error shape, and
+  was aborted; no result from that invalid run is used in the verdict.
+- Fresh review-ready verification passed focused backend `94`, full frontend
+  `56 files / 533 tests`, TypeScript typecheck, production build (only the
+  existing chunk-size warning), and no-PG smoke `ok:true` with
+  `pg_attempts:[]`. Protected owners remain byte-identical to `012dc69`,
+  `git diff --check` is clean, and the main worktree's unrelated
+  `config/tickers_core.json` edit was never copied, staged, or modified.
 
 ## Locked Decisions
 
@@ -857,7 +894,7 @@ delta and query plan. If the joined query is plainly unusable or shows an
 unexpected full normalized-table scan, stop for review instead of hiding the
 cost or adding a cache/column.
 
-- [ ] **Step 3: Compare live API facets to direct read-only aggregates**
+- [x] **Step 3: Compare live API facets to direct read-only aggregates**
 
 Start a scheduler-disabled branch sidecar with a disposable profile DB and the
 real market DB as read-only authority. Query `/news/feed` for all four content
@@ -867,7 +904,7 @@ the same date/source filters.
 Record only aggregate counts and timings. Dynamic totals are evidence, not
 fixed test constants. Do not print titles, URLs, provider IDs, or body text.
 
-- [ ] **Step 4: Run real-browser visual checks**
+- [x] **Step 4: Run real-browser visual checks**
 
 At `1440x900`, `1024x768`, and `390x844`, verify:
 
@@ -883,7 +920,7 @@ Use screenshots and DOM assertions. Do not fabricate normalized rows in the
 production database; fixture-backed visual evidence may cover any cohort not
 naturally present and must be labeled as such.
 
-- [ ] **Step 5: Stop all temporary services**
+- [x] **Step 5: Stop all temporary services**
 
 Record exact PIDs/ports and confirm branch sidecar, Vite, Chrome, and temporary
 profile artifacts are stopped/removed. Do not stop the user's normal desktop
@@ -898,7 +935,7 @@ or Gateway process unless the user explicitly asked.
 - Modify: `docs/superpowers/specs/2026-07-17-news-content-availability-design.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Run canonical backend A/B from symmetric virgin archives**
+- [x] **Step 1: Run canonical backend A/B from symmetric virgin archives**
 
 Compare behavioral base `012dc69` with the code tip sequentially in the same
 review environment. Expected:
@@ -915,14 +952,14 @@ record it and stop short of claiming canonical A/B; independent review must
 run the authority comparison. Focused/file-isolated evidence is not mislabeled
 as canonical.
 
-- [ ] **Step 2: Reconcile the implementation ledger**
+- [x] **Step 2: Reconcile the implementation ledger**
 
 Record branch/base/code tip, each RED cause, each GREEN command/result, exact
 node accounting, performance/query-plan evidence, live aggregate evidence,
 visual screenshots, static gates, and process cleanup. No placeholders or
 unverified claims remain.
 
-- [ ] **Step 3: Mark review-ready, not LIVE**
+- [x] **Step 3: Mark review-ready, not LIVE**
 
 - Change the spec header to `IMPLEMENTED FOR REVIEW` while retaining Unit 2's
   design authority.
