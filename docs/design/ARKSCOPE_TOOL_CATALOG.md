@@ -109,7 +109,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 | `tavily_fetch` | web | url*, extract_depth?, offset?, max_chars? | `external_web_access` (+ `metered_spend` by usage) | keep-current — web-search/fetch (§1.5) |
 | `web_browse` | web | url*, wait_for?, extract_links?, offset?, max_chars? | `external_browser_automation` | **keep/adapt** — browser-automation; backend pluggable (§1.5) |
 | `scan_alerts` | monitor | tickers? | none (read) | keep-current |
-| `refresh_sa_alpha_picks` | portfolio | — | none (read) | **adapt done ✓ (842b5bf)** — implicit `tickers_core.json` sync stripped; now pure read-only status. Explicit gated 'follow' action deferred to desktop (§1.5) |
+| `refresh_sa_alpha_picks` | portfolio | — | none (read) | **adapt done ✓ (842b5bf)** — the agent tool is pure read-only status. Universe membership is now separately ruled as an automatic DB-derived `sa_alpha_picks_current` source; JSON retirement is governed by the 2026-07-17 mini-design (§1.5). |
 
 *(`codex_web_research` was here — **removed** 2a168e9, see §1.4; the deep-research capability re-homes provider-neutral in §1.5.)*
 
@@ -123,7 +123,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 |------|-------|------|-----|
 | `scan_mispricing` | options/CA | **adapt** | Naive Black-Scholes "market > theoretical = overpriced" is **known-flawed** — `docs/data/OPTIONS_PRICING_THEORY.md` shows VRP makes it always wrong; correct method = IV-percentile-rank vs own 252-day history. Re-base the methodology. |
 | `save_report` | reports/AC | **adapt** | Must **accept/store** the ProductSpec §2 card fields (conclusion / counter-thesis / triggers / invalidation / confidence / traceability) + metadata. The card is produced by agent/report composition — `save_report` stores it, it does **not** generate it. |
-| `refresh_sa_alpha_picks` | portfolio/AC | **adapt done ✓ (842b5bf)** | Implicit `tickers_core.json` sync stripped — now pure read-only status. Universe sync stays owned by the PROTECTED SA native host (unchanged). Explicit gated 'follow Alpha Picks' (`profile_state_write`) deferred to desktop (§1.5). |
+| `refresh_sa_alpha_picks` | portfolio/AC | **adapt done ✓ (842b5bf)** | The agent-facing tool is pure read-only status. The protected native host still writes the legacy JSON only during the reviewed readers-first transition; terminal authority is the automatic DB-derived source in the 2026-07-17 retirement design. |
 | `codex_web_research` | web/AC | **retired ✓ (2a168e9)** | Removed: hard-binds external Codex CLI + OpenAI OAuth + `--full-auto --search`; bypassed BYOK and the §2 output contract. Capability re-homed as provider-neutral `deep_research` (§1.5). |
 | `web_browse` | web/AC | **keep/adapt** | Gate locked to `external_browser_automation` (drives a browser). Framed as browser-automation with a pluggable backend (§1.5); seed of the CloakBrowser spike. |
 | `get_morning_brief`, `get_watchlist_overview` | analysis/CA | **definition-only / adapt-to-card** | Thin orchestration digests → composable recipe that emits the §2 card; no heavy impl to preserve. |
@@ -142,13 +142,16 @@ The old "web" category conflated three distinct capabilities with different gate
 - **`web_browse` backend is pluggable** behind one `external_browser_automation` gate: `playwright_builtin` (today) / `user_chrome` / `cloakbrowser_spike`. CloakBrowser (source-patched Chromium, Playwright/CDP drop-in, persistent profiles) is a **backend spike** (ProductSpec §7) — *not* a v1 replacement for the SA Chrome/Firefox extension pipeline (binary supply-chain, profile/session mgmt, packaging, ToS, CDP security all open).
 - **`deep_research` must be provider-neutral.** `codex_web_research` was removed (2a168e9) because it hard-binds the external Codex CLI + OpenAI OAuth / `--full-auto --search`, bypassing BYOK and the §2 output contract — *not* because the capability is unwanted. Rebuild on OpenAI SDK **and** Anthropic SDK paths, same §2 card out.
 
-**Planned tools (NOT in the live 56)** — recorded so the permission model stays ahead of them:
+**Superseded planned tool:** the earlier
+`sync_sa_alpha_picks_watchlist` / `follow_sa_alpha_picks` proposal is retired by
+the adopted 2026-07-17 data-authority decision. V1 does not add an opt-in
+mutation: every successful capture is retained, and current non-stale Alpha
+Picks automatically contribute source `sa_alpha_picks_current` to the derived
+universe. If the feed is later retired, a visible source-policy action may
+withdraw that source's eligibility without deleting capture history; that
+additive action will require `profile_state_write` when designed.
 
-| Planned tool | Purpose | Gate |
-|-------------|---------|------|
-| `sync_sa_alpha_picks_watchlist` / `follow_sa_alpha_picks` | show an add/remove **diff** vs SA current portfolio; let the user explicitly fold picks into the research universe | `profile_state_write` |
-
-> Long-term direction (out of this catalog's permission scope, into the **SA pipeline**): make Alpha Picks a **DB-derived universe source** (`watchlist_source = sa_alpha_picks_current`) that the UI opts into, instead of writing `config/tickers_core.json` directly; generate a config view/export only for legacy-pipeline compat. Separately, locate the source Alpha Picks article by closest-time + content match to attach a confidence/evidence link (SA-capture improvement, not a permission concern).
+> Current authority: `docs/superpowers/specs/2026-07-17-db-derived-universe-tickers-core-retirement-design.md`. Runtime readers migrate to one DB-derived accessor before the protected native host stops writing `config/tickers_core.json`; the app then provides only an on-demand generated compatibility export. Alpha Picks event/article reconciliation is a separate reviewed design, not a permission concern.
 
 ---
 
@@ -187,10 +190,10 @@ The old "web" category conflated three distinct capabilities with different gate
 1. **CA definition-only narrowed** to the two thin digests (`get_morning_brief`, `get_watchlist_overview`). `get_peer_comparison` / `get_earnings_impact` / `get_portfolio_analysis` keep their real impl (adapt output to §2). `synthesize_signal` = **preserve-adapt**, paired with `get_signal_factors`.
 2. **`codex_web_research` → retire**; the *capability* re-homes as provider-neutral `deep_research` (§1.5).
 3. **`web_browse` → `external_browser_automation`**, pluggable backend (§1.5).
-4. **`refresh_sa_alpha_picks` → adapt + `profile_state_write`**; strip the implicit `tickers_core.json` sync, universe-following becomes an explicit gated action. New gate `profile_state_write` added to ProductSpec §4.3 (now **6** gated classes).
+4. **`refresh_sa_alpha_picks` → read-only status**; implicit agent-side mutation remains removed. The later 2026-07-17 ruling supersedes the proposed explicit follow action: current Alpha Picks become an automatic DB-derived universe source after readers-first JSON retirement. A future source-retirement mutation, if needed, uses `profile_state_write` and preserves captured history.
 
 **Still open (build sequencing, not blocking adoption):**
 1. **`scan_mispricing` adapt timing** — re-base on IV-percentile-rank now, or defer until an options-analysis surface exists?
 2. **`deep_research` build path** — OpenAI SDK, Anthropic SDK, or ArkScope-orchestrated first? (spike, ProductSpec §7)
 3. **CloakBrowser backend** — when/whether to wire `cloakbrowser_spike` behind `web_browse` vs stay on `playwright_builtin`. (spike, ProductSpec §7)
-4. **Desktop-phase follow-up**: add the explicit gated `sync_sa_alpha_picks_watchlist` / `follow_sa_alpha_picks` action once `profile_state_write` enforcement + diff UI exist.
+4. **DB-universe follow-up**: execute the reviewed readers-first `tickers_core.json` retirement after P2.8 Slice 3. Do not add the superseded follow/opt-in control; retain only the named future source-retirement action if the Alpha Picks feed is actually discontinued.

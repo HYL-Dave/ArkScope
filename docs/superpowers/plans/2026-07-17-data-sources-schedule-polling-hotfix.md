@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTED FOR REVIEW — automated gates complete; not merged or LIVE.
+> **Status:** MERGED TO `master` THROUGH `a4aadc6`; merged-tree and natural
+> backend-boundary gates pass. User confirmation of the mounted row's automatic
+> visual transition remains before LIVE.
 
 **Goal:** Keep the mounted Settings > Data Sources schedule status current across background scheduler starts and completions without requiring a manual refresh or repeatedly fetching unrelated Settings data.
 
@@ -74,9 +76,24 @@ test-shape corrections (stale test asserting visible running polarity instead
 of a timestamp the compact partial row never renders; unmount counter clears
 plus explicit act environment) are mechanical test-fidelity fixes, not
 behavior deviations, and both reviewer observations from plan review are
-faithfully retained. All reviewer gates are closed; merge remains the user's
-decision, followed by the plan's natural-boundary live check and Unit 2's
-`content_availability` mini-design.
+faithfully retained. At that review checkpoint, merge and the natural-boundary
+live check remained; both subsequent outcomes are recorded below.
+
+### Merge and natural-boundary evidence (2026-07-17)
+
+- `master` fast-forwarded through reviewed docs tip `a4aadc6`; the unrelated
+  working-tree edit in `config/tickers_core.json` remained untouched.
+- Fresh merged-tree focused `3 files / 33`, full frontend `55 files / 527`,
+  typecheck, build, exact `+10/-0`, backend/API byte identity, and zero
+  production `aria-live` all passed.
+- After the desktop restart, a read-only `/schedule` monitor observed a natural
+  IBKR News run enter `running` at `2026-07-17T14:22:02Z` and complete at
+  `14:25:25Z`, without pressing Run, forcing Gateway work, or mutating either
+  database. The monitor observed both transitions within the designed cadence
+  and has been stopped.
+- This proves scheduler/API discovery across a natural boundary. It does not
+  replace the final user visual assertion that the already-mounted Data Sources
+  row changed automatically; the plan therefore remains not-LIVE.
 
 ## Root Cause and Locked Decisions
 
