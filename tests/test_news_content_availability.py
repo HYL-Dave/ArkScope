@@ -10,6 +10,7 @@ from src.news_content_availability import (
     RECOVERY_CAPABLE_BODY_SOURCES,
     classify_news_content,
     empty_content_counts,
+    news_content_sql,
 )
 from src.news_normalized.schema import ensure_news_normalized_schema
 from src.tools.backends.sqlite_backend import SqliteBackend
@@ -218,10 +219,30 @@ def test_content_filter_precedes_total_facets_and_pagination_with_stable_order(
     tmp_path: Path,
 ) -> None:
     backend = SqliteBackend(_seed_content_feed(tmp_path))
+    statements: list[str] = []
+    original_connect = backend._connect
+
+    def traced_connect() -> sqlite3.Connection:
+        conn = original_connect()
+        conn.set_trace_callback(statements.append)
+        return conn
+
+    backend._connect = traced_connect  # type: ignore[method-assign]
 
     first = backend.query_news_feed(content="headline_only", days=30, limit=2)
     second = backend.query_news_feed(
         content="headline_only", days=30, limit=2, offset=2)
+
+    item_statements = [
+        statement
+        for statement in statements
+        if statement.lstrip().startswith("SELECT n.published_at,")
+    ]
+    availability_sql, _ = news_content_sql("b.body_status", "a.source")
+    assert len(item_statements) == 2
+    for statement, expected_offset in zip(item_statements, (0, 2), strict=True):
+        assert f"AND ({availability_sql}) = 'headline_only'" in statement
+        assert f"LIMIT 2 OFFSET {expected_offset}" in statement
 
     assert first["total"] == second["total"] == 7
     assert first["sources"] == {"finnhub": 1, "ibkr": 4, "polygon": 2}
