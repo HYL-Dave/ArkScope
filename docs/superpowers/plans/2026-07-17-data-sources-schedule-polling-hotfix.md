@@ -56,6 +56,28 @@
   lifecycle fingerprint because in-UI mutations already await a full load;
   an external change is still reflected by the lightweight schedule poll.
 
+### Reviewer verification ✅ (Fable, 2026-07-17) — all reviewer gates closed
+
+Independent reviewer verification on tip `de1e27f`: frontend
+`55 files / 527 tests` PASS + typecheck + production build re-run in the
+branch worktree (exact `+10/-0` over `54/517`; focused node list is exactly
+`29`); byte-identity boundary empty (`src`, `data_sources`, backend `tests`,
+and `apps/arkscope-web/src/api.ts` — the constructive A/B replacement);
+changed-file set is exactly the four reviewed paths; the `aria-live` gate is
+zero in production `Settings.tsx` and the policy module. Implementation
+spot-read confirms the reviewed shape: `acceptSchedule` sequence guard
+(strict `<` on a monotonically increasing ref), one coalescing
+`schedulePollInFlightRef` held through any lifecycle-triggered full load, and
+the dual-cadence effect keyed only on `[pollSchedule, schedulePollIntervalMs]`
+so progress/backlog updates never restart the timer. The two ledgered
+test-shape corrections (stale test asserting visible running polarity instead
+of a timestamp the compact partial row never renders; unmount counter clears
+plus explicit act environment) are mechanical test-fidelity fixes, not
+behavior deviations, and both reviewer observations from plan review are
+faithfully retained. All reviewer gates are closed; merge remains the user's
+decision, followed by the plan's natural-boundary live check and Unit 2's
+`content_availability` mini-design.
+
 ## Root Cause and Locked Decisions
 
 1. `DataSourcesSection` currently fetches all state once on mount and installs its five-second timer only when the already-rendered schedule contains `running=true`. An app-owned background run that starts while the mounted view believes all sources are idle has no polling path that can discover it. The scheduler and durable SQLite state update correctly; the DOM remains stale until the existing manual `重新整理` action or remount.
