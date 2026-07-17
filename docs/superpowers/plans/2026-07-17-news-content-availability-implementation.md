@@ -7,10 +7,9 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox syntax for tracking; completed steps become `- [x]`.
 
-> **Status:** IMPLEMENTED FOR REVIEW. Final implementation/test tip is
-> `eb011d7`; independent implementation review is GREEN. Do not merge, mark
-> Unit 2 LIVE, or start the next implementation unit before the user makes the
-> integration decision.
+> **Status:** LIVE COMPLETE. The reviewed stack was fast-forwarded to `master`
+> through `b3d9728`; merged-tree automation, the independent SA runtime gate,
+> and the merged NEWS visual gate are closed.
 
 **Goal:** Let the market NEWS feed filter and label `full`, `headline_only`,
 and `unknown` content honestly, while distinguishing a real scheduled recovery
@@ -180,6 +179,26 @@ NEWS feed.
   `pg_attempts:[]`. Protected owners remain byte-identical to `012dc69`,
   `git diff --check` is clean, and the main worktree's unrelated
   `config/tickers_core.json` edit was never copied, staged, or modified.
+- The user's independent pre-merge C-1 runtime gate exercised the complete
+  Seeking Alpha API/UI surface from a virgin `b3d9728` archive: search,
+  ticker/day/type filters, pagination, empty/degraded behavior, validation,
+  and two-way mode switching all passed. The market-only content selector and
+  availability labels were absent throughout SA mode. Its isolated
+  sidecar/Vite/Chromium services were stopped without touching the real DB or
+  the user's dirty ticker configuration.
+- `master` fast-forwarded from `ef733c3` through reviewed docs tip `b3d9728`.
+  Fresh merged-tree verification passed focused backend `94`, frontend `56
+  files / 533 tests`, typecheck, and production build with only the existing
+  chunk-size warning; no-PG smoke returned `ok:true` with `pg_attempts:[]`.
+  A scheduler-disabled merged sidecar plus Vite/Chromium
+  then repeated the market visual contract at `1440x900`, `1024x768`, and
+  `390x844`: exactly one content selector, no horizontal overflow or toolbar
+  overlap, `50 -> 100` filtered pagination, and zero selector/content-label
+  leakage in SA mode. Ports `8421`, `8432`, and `9223` were closed afterward.
+- A pre-existing SA semantic debt remains deliberately separate: a missing SA
+  DB currently returns an available empty feed rather than an unavailable
+  source. It is recorded in the project map as a non-blocking follow-up; no SA
+  path changed in this unit.
 
 ## Locked Decisions
 
