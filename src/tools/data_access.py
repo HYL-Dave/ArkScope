@@ -42,6 +42,14 @@ _SA_MARKET_NEWS_DETAIL_CACHE_HOURS = 24
 _SA_MARKET_NEWS_BACKFILL_PUBLISHED_WINDOW_HOURS = 24
 
 
+def _failed_sa_reconciliation() -> Dict[str, Any]:
+    return {
+        "status": "failed",
+        "error_code": "reconciliation_failed",
+        "enrichment": [],
+    }
+
+
 def _extract_sa_published_year(published_date: Any) -> Optional[int]:
     """Extract a four-digit year from SA article metadata."""
     if hasattr(published_date, "year"):
@@ -1126,12 +1134,19 @@ class DataAccessLayer:
         except Exception as e:
             logger.warning("Failed to sanitize corrupted SA comments_count rows: %s", e)
 
-        # Determine need_content (body IS NULL)
+        # Normal capture work is bounded to the rows in this list scan. Historic
+        # body-less rows are review/enrichment work, not an implicit backfill.
         all_articles = self._backend.query_sa_articles(limit=9999)
+        scanned_article_ids = list(dict.fromkeys(
+            a["article_id"]
+            for a in normalized_articles
+            if a.get("article_id")
+        ))
+        scanned_ids = set(scanned_article_ids)
         need_content = [
             {"article_id": a["article_id"], "url": a.get("url", "")}
             for a in all_articles
-            if not a.get("has_content")
+            if a.get("article_id") in scanned_ids and not a.get("has_content")
         ]
 
         # Determine need_comments
@@ -1207,11 +1222,6 @@ class DataAccessLayer:
                     )
                     need_comment_ids.add(a["article_id"])
         elif mode == "quick":
-            scanned_ids = {
-                a.get("article_id")
-                for a in normalized_articles
-                if a.get("article_id")
-            }
             for a in all_articles:
                 if a["article_id"] not in scanned_ids:
                     continue
@@ -1231,6 +1241,20 @@ class DataAccessLayer:
         # Unresolved symbols (current picks only, metadata-only matching)
         unresolved = self._compute_unresolved_symbols()
 
+        try:
+            reconciliation = self._backend.reconcile_sa_articles(
+                article_ids=scanned_article_ids,
+                max_events=100,
+                enrichment_limit={"quick": 4, "full": 12, "backfill": 20}.get(
+                    mode, 4
+                ),
+            )
+        except Exception as exc:
+            logger.warning(
+                "SA article reconciliation failed after metadata capture: %s", exc
+            )
+            reconciliation = _failed_sa_reconciliation()
+
         return {
             "status": "ok",
             "saved": saved,
@@ -1238,17 +1262,38 @@ class DataAccessLayer:
             "need_comments": need_comments,
             "unresolved_symbols": unresolved,
             "auto_upgrade": False,
+            "reconciliation": reconciliation,
         }
 
     def save_sa_article_with_comments(
-        self, article_id: str, body_markdown: str, comments: List[Dict]
+        self,
+        article_id: str,
+        body_markdown: str,
+        comments: List[Dict],
+        *,
+        detail_ticker: str | None = None,
+        detail_ticker_observed_at=None,
     ) -> Dict:
-        """Compound atomic write: article body + comments + pick sync."""
+        """Capture body/comments first, then reconcile in a separate transaction."""
         if not isinstance(self._backend, DatabaseBackend):
             return {"error": "DB required"}
-        return self._backend.save_article_with_comments(
-            article_id, body_markdown, comments
+        captured = self._backend.save_article_with_comments(
+            article_id,
+            body_markdown,
+            comments,
+            detail_ticker=detail_ticker,
+            detail_ticker_observed_at=detail_ticker_observed_at,
         )
+        try:
+            reconciliation = self._backend.reconcile_sa_articles(
+                article_ids=[article_id],
+                max_events=100,
+                enrichment_limit=4,
+            )
+        except Exception as exc:
+            logger.warning("SA article reconciliation failed after body capture: %s", exc)
+            reconciliation = _failed_sa_reconciliation()
+        return {**captured, "reconciliation": reconciliation}
 
     def save_sa_comments_only(
         self, article_id: str, comments: List[Dict]
@@ -1259,10 +1304,35 @@ class DataAccessLayer:
         return self._backend.update_article_comments(article_id, comments)
 
     def audit_sa_unresolved_symbols(self) -> Dict:
-        """Full-text fallback matching for current picks without canonical article."""
+        """Compatibility projection of the read-only reconciliation queue."""
         if not isinstance(self._backend, DatabaseBackend):
             return {"unresolved_symbols": [], "resolved_by_fulltext": 0}
         return self._backend.audit_unresolved_symbols()
+
+    def reconcile_sa_articles(self, **kwargs) -> Dict[str, Any]:
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"status": "unavailable", "reason": "DB required", "enrichment": []}
+        return self._backend.reconcile_sa_articles(**kwargs)
+
+    def query_sa_article_review_queue(self, limit: int = 50) -> Dict[str, Any]:
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"events": [], "total": 0}
+        return self._backend.query_sa_article_review_queue(limit=limit)
+
+    def resolve_sa_reconciliation_event(self, **kwargs) -> Dict[str, Any]:
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"status": "unavailable", "reason": "DB required"}
+        return self._backend.resolve_sa_reconciliation_event(**kwargs)
+
+    def accept_sa_article_link(self, **kwargs) -> Dict[str, Any]:
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"status": "unavailable", "reason": "DB required"}
+        return self._backend.accept_sa_article_link(**kwargs)
+
+    def reject_sa_article_candidate(self, **kwargs) -> Dict[str, Any]:
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"status": "unavailable", "reason": "DB required"}
+        return self._backend.reject_sa_article_candidate(**kwargs)
 
     def get_sa_articles(
         self,

@@ -36,7 +36,6 @@ def test_retired_pg_sa_methods_do_not_connect():
     }
     assert b.save_article_with_comments("a1", "body", []) == {
         "ok": False,
-        "synced_picks": 0,
         "prepared_comments": 0,
         "stored_comments_total": 0,
         "net_new_comments": 0,
@@ -48,5 +47,20 @@ def test_retired_pg_sa_methods_do_not_connect():
         "net_new_comments": 0,
     }
     assert b.audit_unresolved_symbols() == {"unresolved_symbols": [], "resolved_by_fulltext": 0}
+    assert b.reconcile_sa_articles(article_ids=["a1"]) == {
+        "status": "unavailable",
+        "reason": "pg_sa_retired",
+        "enrichment": [],
+    }
+    assert b.query_sa_article_review_queue() == {"events": [], "total": 0}
+    assert b.resolve_sa_reconciliation_event(
+        symbol="NVDA", role="entry", event_anchor_date="2026-01-01"
+    ) == {"status": "unavailable", "reason": "pg_sa_retired"}
+    assert b.accept_sa_article_link() == {
+        "status": "unavailable", "reason": "pg_sa_retired"
+    }
+    assert b.reject_sa_article_candidate() == {
+        "status": "unavailable", "reason": "pg_sa_retired"
+    }
     assert b.query_sa_articles() == []
     assert b.get_sa_article_with_comments("a1") is None

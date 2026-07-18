@@ -129,6 +129,18 @@ def handle_message(msg):
     elif action == "audit_unresolved":
         return _handle_audit_unresolved(dal)
 
+    elif action == "get_reconciliation_queue":
+        return _handle_get_reconciliation_queue(dal, msg)
+
+    elif action == "resolve_reconciliation_event":
+        return _handle_resolve_reconciliation_event(dal, msg)
+
+    elif action == "accept_reconciliation_link":
+        return _handle_accept_reconciliation_link(dal, msg)
+
+    elif action == "reject_reconciliation_candidate":
+        return _handle_reject_reconciliation_candidate(dal, msg)
+
     elif action == "record_extension_job":
         return _handle_record_extension_job(dal, msg)
 
@@ -234,8 +246,6 @@ def _handle_refresh(dal, scope, picks, attempt_ts):
         if scope == "current" and picks:
             _try_ticker_sync(dal, picks)
 
-        return {"status": "ok", "scope": scope, "count": count}
-
     except Exception as e:
         logger.error("Refresh %s failed: %s", scope, e)
         try:
@@ -243,6 +253,34 @@ def _handle_refresh(dal, scope, picks, attempt_ts):
         except Exception:
             pass
         return {"status": "error", "scope": scope, "error": str(e)}
+
+    seen_keys = set()
+    pick_keys = []
+    for pick in picks:
+        key = (
+            str(pick.get("symbol") or ""),
+            str(pick.get("picked_date") or ""),
+        )
+        if key not in seen_keys:
+            seen_keys.add(key)
+            pick_keys.append(key)
+    try:
+        reconciliation = dal.reconcile_sa_articles(
+            pick_keys=pick_keys,
+            article_ids=None,
+            max_events=100,
+            enrichment_limit=4,
+        )
+    except Exception as e:
+        logger.error("Refresh %s reconciliation failed: %s", scope, e)
+        reconciliation = _reconciliation_failed_result()
+
+    return {
+        "status": "ok",
+        "scope": scope,
+        "count": count,
+        "reconciliation": reconciliation,
+    }
 
 
 def _handle_failure(dal, scope, attempt_ts, error):
@@ -614,19 +652,25 @@ def _normalize_comment_ids(article_id, comments):
 
 
 def _handle_save_article_content(dal, msg):
-    """Compound atomic write: article body + comments + pick sync."""
+    """Capture article body/comments and independently reconcile the article."""
     article_id = msg.get("article_id", "")
     body_markdown = msg.get("body_markdown", "")
     comments = _normalize_comment_ids(article_id, msg.get("comments", []))
     try:
-        result = dal.save_sa_article_with_comments(article_id, body_markdown, comments)
+        result = dal.save_sa_article_with_comments(
+            article_id,
+            body_markdown,
+            comments,
+            detail_ticker=msg.get("detail_ticker"),
+            detail_ticker_observed_at=msg.get("detail_ticker_observed_at"),
+        )
         logger.info(
-            "save_article_content: %s (%d chars, prepared=%d net_new=%d stored_total=%d synced=%s)",
+            "save_article_content: %s (%d chars, prepared=%d net_new=%d stored_total=%d reconciliation=%s)",
             article_id, len(body_markdown),
             result.get("prepared_comments", 0),
             result.get("net_new_comments", 0),
             result.get("stored_comments_total", 0),
-            result.get("synced_picks", 0),
+            (result.get("reconciliation") or {}).get("status"),
         )
         return {"status": "ok", "article_id": article_id, **result}
     except Exception as e:
@@ -659,18 +703,170 @@ def _handle_save_comments_only(dal, msg):
 
 
 def _handle_audit_unresolved(dal):
-    """Final audit: full-text fallback for unresolved current picks."""
+    """Compatibility action: project the read-only reconciliation queue."""
     try:
-        result = dal.audit_sa_unresolved_symbols()
+        queue = dal.query_sa_article_review_queue(limit=200)
+        symbols = sorted({
+            str(event.get("symbol") or "")
+            for event in queue.get("events", [])
+            if event.get("symbol")
+        })
+        result = {
+            "unresolved_symbols": symbols,
+            "resolved_by_fulltext": 0,
+            "review_queue": queue,
+        }
         logger.info(
-            "audit_unresolved: %d unresolved, %d resolved by fulltext",
+            "audit_unresolved: %d unresolved, %d review_required",
             len(result.get("unresolved_symbols", [])),
-            result.get("resolved_by_fulltext", 0),
+            queue.get("total", 0),
         )
         return {"status": "ok", **result}
     except Exception as e:
         logger.error("audit_unresolved failed: %s", e)
         return {"status": "error", "error": str(e)}
+
+
+def _reconciliation_failed_result():
+    return {
+        "status": "failed",
+        "error_code": "reconciliation_failed",
+        "enrichment": [],
+    }
+
+
+def _native_reconciliation_error(error_code="reconciliation_failed"):
+    return {"status": "error", "error_code": error_code}
+
+
+def _positive_int(value):
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _canonical_event_date(value):
+    text = str(value or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        return None
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return text
+
+
+def _handle_get_reconciliation_queue(dal, msg):
+    try:
+        limit = max(1, min(int(msg.get("limit", 50)), 200))
+        queue = dal.query_sa_article_review_queue(limit=limit)
+        return {"status": "ok", **queue}
+    except Exception as e:
+        logger.error("get_reconciliation_queue failed: %s", e)
+        return _native_reconciliation_error()
+
+
+def _handle_resolve_reconciliation_event(dal, msg):
+    symbol = str(msg.get("symbol") or "").strip().upper()
+    role = msg.get("role")
+    event_anchor_date = _canonical_event_date(msg.get("event_anchor_date"))
+    if not symbol or role not in ("entry", "exit") or not event_anchor_date:
+        return _native_reconciliation_error("invalid_event")
+    try:
+        return dal.resolve_sa_reconciliation_event(
+            symbol=symbol,
+            role=role,
+            event_anchor_date=event_anchor_date,
+        )
+    except Exception as e:
+        logger.error("resolve_reconciliation_event failed: %s", e)
+        return _native_reconciliation_error()
+
+
+def _handle_accept_reconciliation_link(dal, msg):
+    from src.sa_article_reconciliation import parse_alpha_picks_article_id
+
+    lineage_id = _positive_int(msg.get("lineage_id"))
+    role = msg.get("role")
+    event_anchor_date = _canonical_event_date(msg.get("event_anchor_date"))
+    article_id = str(msg.get("article_id") or "").strip()
+    article_url = str(msg.get("article_url") or "").strip()
+    replace_raw = msg.get("replace_link_id")
+    replace_link_id = None if replace_raw is None else _positive_int(replace_raw)
+    if (
+        lineage_id is None
+        or role not in ("entry", "exit")
+        or not event_anchor_date
+        or not article_id
+        or (replace_raw is not None and replace_link_id is None)
+    ):
+        return _native_reconciliation_error("invalid_link")
+    if parse_alpha_picks_article_id(article_url) != article_id:
+        return _native_reconciliation_error("invalid_article_url")
+
+    try:
+        article = dal.get_sa_article_detail(article_id)
+        if not article:
+            return _native_reconciliation_error("article_not_found")
+        published_date = _canonical_event_date(article.get("published_date"))
+        warnings = []
+        if published_date and published_date != event_anchor_date:
+            warnings.append("date_mismatch")
+        if replace_link_id is not None:
+            warnings.append("replacement")
+        candidate = {
+            "article_id": article_id,
+            "published_date": article.get("published_date"),
+        }
+        if warnings and msg.get("confirm_warnings") is not True:
+            return {
+                "status": "confirmation_required",
+                "warnings": warnings,
+                "candidate": candidate,
+            }
+        evidence_codes = ["user_confirmed", *warnings] if warnings else ["user_selected"]
+        return dal.accept_sa_article_link(
+            lineage_id=lineage_id,
+            role=role,
+            event_anchor_date=event_anchor_date,
+            article_id=article_id,
+            link_source="user",
+            evidence_codes=evidence_codes,
+            replace_link_id=replace_link_id,
+        )
+    except Exception as e:
+        logger.error("accept_reconciliation_link failed: %s", e)
+        return _native_reconciliation_error()
+
+
+def _handle_reject_reconciliation_candidate(dal, msg):
+    lineage_id = _positive_int(msg.get("lineage_id"))
+    role = msg.get("role")
+    event_anchor_date = _canonical_event_date(msg.get("event_anchor_date"))
+    article_id = str(msg.get("article_id") or "").strip()
+    if (
+        lineage_id is None
+        or role not in ("entry", "exit")
+        or not event_anchor_date
+        or not article_id
+        or msg.get("reason_code") != "user_rejected"
+    ):
+        return _native_reconciliation_error("invalid_rejection")
+    try:
+        return dal.reject_sa_article_candidate(
+            lineage_id=lineage_id,
+            role=role,
+            event_anchor_date=event_anchor_date,
+            article_id=article_id,
+            reason_code="user_rejected",
+        )
+    except Exception as e:
+        logger.error("reject_reconciliation_candidate failed: %s", e)
+        return _native_reconciliation_error()
 
 
 def _handle_record_extension_job(dal, msg):

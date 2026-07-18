@@ -1370,7 +1370,10 @@ class TestDataAccessArticleMeta:
             ),
         ):
             result = dal.save_sa_articles_meta([
-                {"article_id": "123", "url": "https://example.com/123"},
+                {
+                    "article_id": "need-content",
+                    "url": "https://example.com/need-content",
+                },
             ], mode="full")
 
         assert result["need_content"] == [
@@ -1584,29 +1587,42 @@ class TestNativeHostArticles:
         assert result["saved"] == 5
 
     def test_save_article_content(self):
-        """save_article_content calls compound DAL method."""
+        """save_article_content forwards provider-owned detail evidence."""
         from src.sa_native_host import _handle_save_article_content
         dal = MagicMock()
-        dal.save_sa_article_with_comments.return_value = {"ok": True, "synced_picks": 1}
+        dal.save_sa_article_with_comments.return_value = {
+            "ok": True,
+            "reconciliation": {"status": "ok", "enrichment": []},
+        }
         result = _handle_save_article_content(dal, {
             "article_id": "123",
             "body_markdown": "# Content",
+            "detail_ticker": "NVDA",
+            "detail_ticker_observed_at": "2026-07-18T12:00:00Z",
             "comments": [],
         })
         assert result["status"] == "ok"
-        dal.save_sa_article_with_comments.assert_called_once()
+        dal.save_sa_article_with_comments.assert_called_once_with(
+            "123",
+            "# Content",
+            [],
+            detail_ticker="NVDA",
+            detail_ticker_observed_at="2026-07-18T12:00:00Z",
+        )
 
     def test_audit_unresolved(self):
         """audit_unresolved calls DAL and returns result."""
         from src.sa_native_host import _handle_audit_unresolved
         dal = MagicMock()
-        dal.audit_sa_unresolved_symbols.return_value = {
-            "unresolved_symbols": ["CVSA"],
-            "resolved_by_fulltext": 2,
+        dal.query_sa_article_review_queue.return_value = {
+            "events": [{"symbol": "CVSA"}],
+            "total": 1,
         }
         result = _handle_audit_unresolved(dal)
         assert result["status"] == "ok"
         assert "CVSA" in result["unresolved_symbols"]
+        assert result["resolved_by_fulltext"] == 0
+        dal.query_sa_article_review_queue.assert_called_once_with(limit=200)
 
 
 class TestCommentNormalization:

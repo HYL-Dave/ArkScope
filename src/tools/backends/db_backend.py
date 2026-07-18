@@ -861,11 +861,12 @@ class DatabaseBackend:
         article_id: str,
         body_markdown: str,
         comments: list,
-        sync_picks: bool = True,
+        *,
+        detail_ticker: str | None = None,
+        detail_ticker_observed_at=None,
     ) -> dict:
         return {
             "ok": False,
-            "synced_picks": 0,
             "prepared_comments": 0,
             "stored_comments_total": 0,
             "net_new_comments": 0,
@@ -881,6 +882,25 @@ class DatabaseBackend:
 
     def audit_unresolved_symbols(self) -> dict:
         return {"unresolved_symbols": [], "resolved_by_fulltext": 0}
+
+    def reconcile_sa_articles(self, **kwargs) -> dict:
+        return {
+            "status": "unavailable",
+            "reason": "pg_sa_retired",
+            "enrichment": [],
+        }
+
+    def query_sa_article_review_queue(self, limit: int = 50) -> dict:
+        return {"events": [], "total": 0}
+
+    def resolve_sa_reconciliation_event(self, **kwargs) -> dict:
+        return {"status": "unavailable", "reason": "pg_sa_retired"}
+
+    def accept_sa_article_link(self, **kwargs) -> dict:
+        return {"status": "unavailable", "reason": "pg_sa_retired"}
+
+    def reject_sa_article_candidate(self, **kwargs) -> dict:
+        return {"status": "unavailable", "reason": "pg_sa_retired"}
 
     def query_sa_articles(
         self,
