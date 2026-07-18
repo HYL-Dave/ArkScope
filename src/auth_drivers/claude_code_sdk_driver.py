@@ -469,13 +469,10 @@ class AnthropicClaudeCodeSdkDriver:
         # options.env (NEVER os.environ). dontAsk + tools=[] + allowed_tools +
         # setting_sources=[] is the validated locked posture.
         allowed = [_MCP_PREFIX + n for n in sorted(_RESEARCH_READONLY_TOOLS)]
-        effort = request.reasoning_effort
-        if effort in ("", "default"):
-            effort = None
         max_turns = self._max_turns if self._max_turns > 0 else None
         return ClaudeAgentOptions(
             model=request.model,
-            effort=effort,
+            effort=request.reasoning_effort,
             system_prompt=request.instructions,
             mcp_servers={_MCP_SERVER_NAME: server},
             allowed_tools=allowed,

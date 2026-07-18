@@ -724,7 +724,7 @@ def test_build_options_omits_default_reasoning_effort(monkeypatch):
         model="claude-opus-4-8",
         instructions="You are a terse research assistant.",
         input_messages=[{"role": "user", "content": "normal question"}],
-        reasoning_effort="default",
+        reasoning_effort=None,
     )
 
     events = asyncio.run(_collect(_make_driver(), req))

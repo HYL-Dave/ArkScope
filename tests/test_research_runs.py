@@ -412,6 +412,32 @@ def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeyp
     assert result is sentinel
     assert captured["reasoning_effort"] is None
 
+    subscription_captured = {}
+    subscription_sentinel = object()
+
+    def fake_openai_subscription_stream(**kwargs):
+        subscription_captured.update(kwargs)
+        return subscription_sentinel
+
+    monkeypatch.setattr(q, "_openai_subscription_stream", fake_openai_subscription_stream)
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(
+            provider, "oauth_driver_unwired", "local:subscription"
+        ),
+    )
+    subscription_result = q._research_provider_stream(
+        provider="openai",
+        question="q",
+        model=run.model,
+        effort=run.effort,
+        dal=object(),
+        history=[],
+    )
+
+    assert subscription_result is subscription_sentinel
+    assert subscription_captured["effort"] is None
+
 
 def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monkeypatch):
     run_store, thread_store = stores
@@ -459,6 +485,36 @@ def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monk
 
     assert result is sentinel
     assert captured["effort"] is None
+
+    subscription_captured = {}
+    subscription_sentinel = object()
+
+    def fake_anthropic_subscription_stream(**kwargs):
+        subscription_captured.update(kwargs)
+        return subscription_sentinel
+
+    monkeypatch.setattr(
+        q,
+        "_anthropic_subscription_stream",
+        fake_anthropic_subscription_stream,
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(
+            provider, "oauth_driver_unwired", "local:subscription"
+        ),
+    )
+    subscription_result = q._research_provider_stream(
+        provider="anthropic",
+        question="q",
+        model=run.model,
+        effort=run.effort,
+        dal=object(),
+        history=[],
+    )
+
+    assert subscription_result is subscription_sentinel
+    assert subscription_captured["effort"] is None
 
 
 def test_explicit_error_code_survives_event_run_and_linked_message(stores):
@@ -534,13 +590,38 @@ def test_timeout_causes_and_owned_event_shapes_are_model_timeout(stores):
 
     run_store, thread_store = stores
     cases = [
-        ("api-openai", "APITimeoutError: request deadline exceeded"),
-        ("api-anthropic", "TimeoutError: request deadline exceeded"),
-        ("chatgpt", "ChatGPT OAuth driver timed out after 45s"),
-        ("claude-sdk", "claude agent-sdk timed out after 45s"),
-        ("claude-cli", "claude -p timed out after 45s"),
+        ("api-openai", "APITimeoutError: request deadline exceeded", "model_timeout"),
+        ("api-anthropic", "TimeoutError: request deadline exceeded", "model_timeout"),
+        ("chatgpt", "ChatGPT OAuth driver timed out after 45s", "model_timeout"),
+        ("claude-sdk", "claude agent-sdk timed out after 45s", "model_timeout"),
+        ("claude-cli", "claude -p timed out after 45s", "model_timeout"),
+        (
+            "api-openai-near-miss",
+            "wrapped APITimeoutError: request deadline exceeded",
+            "provider_call_failed",
+        ),
+        (
+            "api-anthropic-near-miss",
+            "wrapped TimeoutError: request deadline exceeded",
+            "provider_call_failed",
+        ),
+        (
+            "chatgpt-near-miss",
+            "ChatGPT OAuth driver timed out after 45s trailing",
+            "provider_call_failed",
+        ),
+        (
+            "claude-sdk-near-miss",
+            "claude agent-sdk timed out after 45s trailing",
+            "provider_call_failed",
+        ),
+        (
+            "claude-cli-near-miss",
+            "claude -p timed out after 45s trailing",
+            "provider_call_failed",
+        ),
     ]
-    for suffix, detail in cases:
+    for suffix, detail, expected_code in cases:
         thread_id = f"timeout-{suffix}"
         run_id = f"run-{suffix}"
         _seed_run(run_store, thread_store, thread_id=thread_id, run_id=run_id)
@@ -558,7 +639,7 @@ def test_timeout_causes_and_owned_event_shapes_are_model_timeout(stores):
                 stream_factory=event_stream,
             )
         )
-        assert run_store.get_run(run_id).error_code == "model_timeout"
+        assert run_store.get_run(run_id).error_code == expected_code
 
     _seed_run(run_store, thread_store, thread_id="timeout-cause", run_id="run-cause")
 
@@ -607,15 +688,33 @@ def test_max_turn_shapes_are_typed_without_fuzzy_near_misses(stores):
             "tool_limit_reached",
         ),
         (
+            "anthropic-near-miss",
+            EventType.error,
+            {
+                "error": f"{MAX_TOOL_CALLS_SENTINEL} trailing",
+                "token_usage": {"total_tokens": 20},
+            },
+            "provider_call_failed",
+        ),
+        (
+            "openai-near-miss",
+            EventType.error,
+            {
+                "error": "wrapped MaxTurnsExceeded: maximum turns (8) exceeded",
+                "token_usage": {"total_tokens": 21},
+            },
+            "provider_call_failed",
+        ),
+        (
             "tool-timeout-near-miss",
             EventType.error,
-            {"error": "tool 'x' timed out after 8s", "token_usage": {"total_tokens": 20}},
+            {"error": "tool 'x' timed out after 8s", "token_usage": {"total_tokens": 22}},
             "provider_call_failed",
         ),
         (
             "chatgpt-near-miss",
             EventType.error,
-            {"error": "Reached maximum number of turns (8) trailing", "token_usage": {"total_tokens": 21}},
+            {"error": "Reached maximum number of turns (8) trailing", "token_usage": {"total_tokens": 23}},
             "provider_call_failed",
         ),
     ]
