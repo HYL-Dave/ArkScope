@@ -1,8 +1,8 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
-> **Status:** DRAFT FOR WRITTEN REVIEW, revised 2026-07-18 with live BTSG
-> capture evidence. The universe/JSON decision does not pre-approve this
-> design, and no implementation plan is open.
+> **Status:** APPROVED FOR IMPLEMENTATION PLANNING after 2026-07-18 written
+> review. The universe/JSON decision does not pre-approve this design; this is
+> an independent implementation slice.
 
 ## 1. Purpose
 
@@ -107,21 +107,71 @@ Overwriting one `canonical_article_id` loses this distinction. Matching must
 therefore be modelled as a relationship, not as another nearest-article update
 to the existing column.
 
+### 2.5 Captured row IDs are not lifecycle identity
+
+The current upsert keys differ by tab: current rows use
+`(symbol, picked_date, portfolio_status)`, while closed rows additionally use
+`closed_date`. Migration 014 explicitly permits current/closed dual membership,
+and migration 015 explicitly permits multiple closed events for one
+`(symbol, picked_date)` when close dates differ.
+
+A read-only 2026-07-18 example makes the consequence concrete: RCL with picked
+date `2024-03-15` has stale current row `807` and live closed rows `116511` and
+`122696` with different close dates. Attaching links or rejection history to any
+one of those row IDs would strand the entry relationship across lifecycle
+changes. These IDs and counts are diagnostic evidence, not acceptance
+constants.
+
 ## 3. Locked Relationship Model
 
-### 3.1 Event roles
+### 3.1 Stable lineages and event roles
+
+`sa_alpha_picks.id` identifies one captured current/closed membership row, not a
+stable recommendation lifecycle. Current-to-closed movement creates a new row,
+and the reviewed source model permits the same `(symbol, picked_date)` in both
+tabs and multiple times in the closed tab when `closed_date` differs. Links,
+rejections, and review work therefore must not use that row ID as identity.
+
+V1 introduces a persistent `sa_pick_lineages` authority keyed by the source
+symbol normalized with trim+uppercase only (provider punctuation is retained)
+and canonical `picked_date`:
+
+```text
+sa_pick_lineages
+  lineage_id
+  symbol_key
+  picked_date
+  created_at
+  UNIQUE(symbol_key, picked_date)
+```
+
+`sa_alpha_picks` gains a non-cascading `lineage_id` reference. Migration first
+creates one lineage per distinct normalized source symbol/picked date, then
+attaches every existing observation row before new links are allowed. Refreshes
+resolve or create the lineage before inserting membership rows; stale marking
+never deletes it. A current row and all closed rows sharing the same source
+symbol and picked date therefore retain the same entry identity across
+lifecycle changes. Distinct `closed_date` values remain distinct exit events
+inside that lineage; they are not silently collapsed as date corrections.
 
 The V1 matching targets are:
 
-| Role | Pick anchor | Cardinality |
-|---|---|---|
-| `entry` | `picked_date` | at most one accepted article per pick |
-| `exit` | `closed_date` | at most one accepted article per closed pick |
-| `update` | no automatic anchor in V1 | zero or more explicit future links |
+| Role | Stable target | Anchor | Cardinality |
+|---|---|---|---|
+| `entry` | lineage | `picked_date` | at most one accepted article per lineage |
+| `exit` | lineage + exit event | `closed_date` | at most one accepted article per distinct exit date |
+| `update` | lineage | no automatic anchor in V1 | zero or more explicit future links |
 
 An exit candidate is never compared to `picked_date`. A current pick has no
 exit target. Missing/unparseable anchor dates make the event unmatchable rather
 than authorizing a ticker-only guess.
+
+A changed `picked_date` is ambiguous without a provider event ID: it may be a
+correction or a genuine re-entry. V1 creates a new lineage, preserves the old
+lineage and all audit history, and surfaces the possible correction for review;
+it never migrates links by symbol alone. Lineage merge/alias is deferred until
+there is real correction evidence and is not required for current-to-closed
+continuity.
 
 ### 3.2 Persistent accepted links, derived candidates
 
@@ -130,9 +180,10 @@ A dedicated relationship table is the eventual authority:
 ```text
 sa_pick_article_links
   link_id
-  pick_id
+  lineage_id
   article_id
   role                 entry | exit | update
+  event_anchor_date    entry picked_date | exit closed_date | null for update
   link_source          auto | user
   evidence_codes       deterministic JSON array
   supersedes_link_id   nullable
@@ -140,14 +191,15 @@ sa_pick_article_links
   revoked_at           nullable
 ```
 
-Foreign keys reference `sa_alpha_picks.id` and `sa_articles.article_id`.
-`entry` and `exit` each permit at most one non-revoked accepted link per pick;
-`update` may repeat. A replacement revokes the prior row and inserts a new row
-with `supersedes_link_id` in one transaction. The prior row is retained. A
-separate candidate-decision log records explicit rejections keyed by
-`(pick_id, role, article_id)` so a rejected candidate is not silently proposed
-again. Link history and rejection history are never encoded by mutating article
-metadata.
+Foreign keys reference `sa_pick_lineages.lineage_id` and
+`sa_articles.article_id`. Active `entry` uniqueness is `(lineage_id, role)`;
+active `exit` uniqueness is `(lineage_id, role, event_anchor_date)`; `update`
+may repeat. A replacement revokes the prior row and inserts a new row with
+`supersedes_link_id` in one transaction. The prior row is retained. A separate
+candidate-decision log records explicit rejections keyed by
+`(lineage_id, role, event_anchor_date, article_id)` so a rejected candidate is
+not silently proposed again. Link history and rejection history are never
+encoded by mutating article metadata.
 
 Candidate sets and scores are derived from current local evidence at read time.
 They do not become accepted links merely because they sort first. The future
@@ -157,9 +209,10 @@ rejection semantics above.
 
 The existing `canonical_article_id` and copied `detail_report` remain a
 compatibility projection while readers migrate. They are not the new authority.
-For compatibility, an accepted `entry` may project to the legacy field; an
-`exit` must not overwrite it. Existing links require a preview/reclassification
-pass and are not grandfathered merely because they are populated.
+For compatibility, an accepted `entry` may project to the legacy fields on all
+observation rows in its lineage; an `exit` must not overwrite it. Existing
+legacy values require a preview/reclassification pass and are not grandfathered
+merely because they are populated.
 
 ### 3.3 Provider ticker sources remain separable
 
@@ -177,6 +230,28 @@ evidence. Existing legacy values are not backfilled into either new source and
 must be recaptured or remain fallback/review-only. A manually supplied symbol
 is user evidence on an explicit link; it never populates or impersonates the
 list/detail provider observations.
+
+### 3.4 Single-writer cutover
+
+The accepted-link authority is the only automatic association writer in this
+slice. The two existing nearest/same-ticker mutation paths must be retired in
+the same implementation release:
+
+- `save_article_with_comments()` must stop calling
+  `_sync_canonical_to_picks()`; article/body/comment capture commits first, then
+  the new matcher runs in a separate bounded reconciliation step so matcher
+  failure cannot roll back captured provider facts.
+- `audit_unresolved_symbols()` may remain as a read projection over unresolved
+  lineage events, but its branch that chooses an article and updates
+  `canonical_article_id`/`detail_report` must be removed or redirected through
+  the reviewed matcher and acceptance policy.
+
+There is no dual-writer compatibility window. Legacy
+`canonical_article_id`/`detail_report` writes occur only as a projection of an
+accepted `entry` link, transactionally with that link decision. No title,
+ticker-prefix, or unbounded nearest-date helper may write those fields directly.
+Static and behavioral tests must prove the old writer is unreachable before the
+new writer is enabled.
 
 ## 4. Deterministic Matching Policy
 
@@ -252,8 +327,9 @@ remain explicit in the implementation plan.
 
 ## 5. Review Queue and Manual Escape Hatch
 
-Unresolved work is keyed by `(pick_id, role)`, not only by symbol. Each row
-shows:
+Unresolved work is keyed by
+`(lineage_id, role, event_anchor_date)`, not only by symbol or a transient
+`sa_alpha_picks.id`. Each row shows:
 
 - ticker/company;
 - event role and anchor date;
@@ -268,7 +344,7 @@ escape hatch during transition, then may retire after live coverage evidence.
 
 Manual input must:
 
-- bind to one explicit pick event, not every same-symbol pick;
+- bind to one explicit lineage event, not every same-symbol observation row;
 - accept only a canonical Alpha Picks article URL/ID;
 - fetch and store metadata/body/comments through the existing native-host
   boundary;
@@ -282,11 +358,13 @@ already accepted entry/exit link without explicit confirmation.
 
 - Pick and article capture commit independently of matching success. An
   ambiguous link cannot roll back provider facts.
-- Repeated refreshes are idempotent under pick/article identity and do not
+- Repeated refreshes are idempotent under lineage-event/article identity and do not
   duplicate accepted links.
-- Current and closed rows for the same symbol are separate events.
-- A pick date correction invalidates the derived candidate set but does not
-  erase the prior decision audit.
+- Current and closed observation rows with the same `(symbol_key, picked_date)`
+  share one lineage; each distinct `closed_date` is a separate exit event.
+- A changed `picked_date` creates a new lineage because V1 cannot distinguish a
+  correction from a re-entry. The old lineage and decision audit remain intact,
+  and no symbol-only migration occurs.
 - Missing article list/body access remains visible; it does not manufacture a
   `no article exists` conclusion.
 - Historical pick/article/body rows are never deleted when a link changes.
@@ -316,6 +394,7 @@ be the acceptance authority.
 - matching general SA articles to every ArkScope holding;
 - arbitrary web search or server-side SA scraping;
 - semantic clustering of update/recap/webinar articles;
+- automatic merge/alias of possible picked-date corrections;
 - deleting the manual escape hatch before live coverage is measured;
 - changing Alpha Picks capture cadence; or
 - implementing DB-universe/JSON retirement in the same slice.
@@ -330,26 +409,36 @@ The future implementation plan must prove, RED first:
    generic article title and body;
 3. list/detail ticker observations persist independently, while a mismatch
    remains unresolved as `ticker_metadata_conflict`;
-4. entry uses `picked_date`; exit uses `closed_date`;
-5. exact-date exact-ticker unique candidates auto-link;
-6. ticker-less exact-date candidates require strong body/title evidence;
-7. candidates outside three days never auto-link;
-8. ties remain unresolved and stable ordering does not decide identity;
-9. repeated-symbol picks link independently;
-10. exit links do not overwrite the compatibility entry projection;
-11. refresh/detail-enrichment reruns are idempotent and bounded;
-12. manual selection binds one `(pick_id, role)`, rejects malformed/non-SA
-    URLs, and never populates list/detail provider observations;
-13. existing suspicious canonical links are reported by preview rather than
+4. current and closed rows with the same normalized source symbol and
+   `picked_date` resolve to one lineage, preserving the entry link across the
+   lifecycle transition;
+5. multiple closed rows in one lineage remain distinct exit events by
+   `closed_date`, while a changed `picked_date` creates a separate lineage;
+6. entry uses `picked_date`; exit uses its exact `closed_date`;
+7. exact-date exact-ticker unique candidates auto-link;
+8. ticker-less exact-date candidates require strong body/title evidence;
+9. candidates outside three days never auto-link;
+10. ties remain unresolved and stable ordering does not decide identity;
+11. repeated-symbol lineages link independently;
+12. exit links do not overwrite the compatibility entry projection;
+13. refresh/detail-enrichment reruns are idempotent and bounded;
+14. manual selection binds one
+    `(lineage_id, role, event_anchor_date)`, rejects malformed/non-SA URLs, and
+    never populates list/detail provider observations;
+15. existing suspicious canonical links are reported by preview rather than
     silently preserved;
-14. capture facts survive matcher/review failures byte-for-byte; and
-15. automated browser/fixture gates cover ticker-less body assistance and
+16. `_sync_canonical_to_picks()` and the mutating branch of
+    `audit_unresolved_symbols()` cannot write outside the new accepted-link
+    authority, with no dual-writer test configuration;
+17. article/pick capture facts survive matcher/review failures byte-for-byte;
+    and
+18. automated browser/fixture gates cover ticker-less body assistance and
     list/detail conflict, while a live extension gate proves BTSG automatic
     metadata capture without manual symbol injection and retains unrelated
     ambiguity for review.
 
 ## 10. Sequence
 
-P2.8 Slice 3 is complete. This revised document receives fresh written review;
-after approval it may open its own implementation plan, independently from the
+P2.8 Slice 3 is complete and the 2026-07-18 written review is closed. The
+implementation plan opens next, independently from the
 DB-universe/JSON-retirement slice.
