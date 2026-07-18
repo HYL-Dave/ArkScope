@@ -1,11 +1,4 @@
-"""
-Read routes for the AI 研究 surface (Layer C-2b): list persisted threads and a
-thread's messages, so the web app can hydrate on reload.
-
-Local-first: served from the local ResearchThreadStore (profile_state.db family),
-never the remote PG. Writes happen as a best-effort side effect of POST
-/query/stream (see query.py), not here — these are read-only.
-"""
+"""Local-first AI Research thread lifecycle and durable run routes."""
 
 from __future__ import annotations
 
@@ -21,7 +14,12 @@ from src.research_run_manager import cancel_research_run, schedule_research_run
 from src.research_runs import ACTIVE_STATUSES, ResearchRun, ResearchRunEvent
 from src.research_threads import ResearchMessage, ResearchThread, valid_thread_id
 
-from ..dependencies import get_dal, get_run_store, get_thread_store
+from ..dependencies import (
+    get_dal,
+    get_research_history_store,
+    get_run_store,
+    get_thread_store,
+)
 
 router = APIRouter(tags=["research"])
 _RUN_EVENT_PAGE_SIZE = 500
@@ -37,6 +35,11 @@ class ResearchRunCreate(BaseModel):
     retry_last_failed: bool = False
     # Track A: per-run Assistant Stance override (invalid → 400 at create).
     assistant_stance: str | None = None
+
+
+class ResearchThreadPatch(BaseModel):
+    title: str | None = None
+    archived: bool | None = None
 
 
 def _run_dict(run: ResearchRun | None) -> dict | None:
@@ -73,14 +76,20 @@ def _event_dict(event: ResearchRunEvent) -> dict:
     }
 
 
-def _thread_dict(t: ResearchThread, *, run_store=None) -> dict:
+_MISSING = object()
+
+
+def _thread_dict(t: ResearchThread, *, active_run=_MISSING) -> dict:
     out = {
         "id": t.id, "title": t.title, "ticker": t.ticker,
         "provider": t.provider, "model": t.model,
         "created_at": t.created_at, "updated_at": t.updated_at,
+        "archived_at": t.archived_at,
     }
-    if run_store is not None:
-        out["active_run"] = _run_dict(run_store.latest_active_for_thread(t.id))
+    if hasattr(t, "latest_run_status"):
+        out["latest_run_status"] = t.latest_run_status
+    if active_run is not _MISSING:
+        out["active_run"] = _run_dict(active_run)
     return out
 
 
@@ -97,14 +106,123 @@ def _message_dict(m: ResearchMessage) -> dict:
 
 @router.get("/research/threads")
 def list_research_threads(
-    limit: int = Query(50, ge=1, le=200),
+    q: str | None = None,
+    ticker: str | None = None,
+    updated_from: str | None = None,
+    updated_before: str | None = None,
+    run_state: str = "all",
+    archived: str = "current",
+    limit: int = 50,
+    offset: int = 0,
+    store=Depends(get_thread_store),
+    history_store=Depends(get_research_history_store),
+    run_store=Depends(get_run_store),
+) -> dict:
+    """Bounded history page with filters applied before count and pagination."""
+    if not hasattr(history_store, "query_threads"):
+        from src.research_history import ResearchHistoryStore
+
+        history_store = ResearchHistoryStore(store.db_path)
+    if not hasattr(run_store, "latest_active_for_threads"):
+        from src.research_runs import ResearchRunStore
+
+        run_store = ResearchRunStore(store.db_path)
+
+    try:
+        page = history_store.query_threads(
+            q=q,
+            ticker=ticker,
+            updated_from=updated_from,
+            updated_before=updated_before,
+            run_state=run_state,
+            archive_mode=archived,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    thread_ids = [thread.id for thread in page.threads]
+    active_runs = run_store.latest_active_for_threads(thread_ids)
+    return {
+        "threads": [
+            _thread_dict(thread, active_run=active_runs.get(thread.id))
+            for thread in page.threads
+        ],
+        "total": page.total,
+        "limit": page.limit,
+        "offset": page.offset,
+    }
+
+
+def _resolve_run_store(run_store, thread_store):
+    if hasattr(run_store, "latest_active_for_thread") and hasattr(
+        run_store, "latest_active_for_threads"
+    ):
+        return run_store
+    from src.research_runs import ResearchRunStore
+
+    return ResearchRunStore(thread_store.db_path)
+
+
+def _thread_with_active_run(thread: ResearchThread, run_store) -> dict:
+    active_runs = run_store.latest_active_for_threads([thread.id])
+    return _thread_dict(thread, active_run=active_runs.get(thread.id))
+
+
+@router.get("/research/threads/{thread_id}")
+def get_research_thread(
+    thread_id: str,
     store=Depends(get_thread_store),
     run_store=Depends(get_run_store),
 ) -> dict:
-    """Persisted threads, newest-activity first (for the left-pane list)."""
-    if not hasattr(run_store, "latest_active_for_thread"):
-        run_store = None  # handler-direct tests may omit this dependency
-    return {"threads": [_thread_dict(t, run_store=run_store) for t in store.list_threads(limit=limit)]}
+    if not valid_thread_id(thread_id):
+        raise HTTPException(status_code=422, detail="invalid thread_id")
+    thread = store.get_thread(thread_id)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    run_store = _resolve_run_store(run_store, store)
+    return {"thread": _thread_with_active_run(thread, run_store)}
+
+
+@router.patch("/research/threads/{thread_id}")
+def patch_research_thread(
+    thread_id: str,
+    request: ResearchThreadPatch,
+    store=Depends(get_thread_store),
+    run_store=Depends(get_run_store),
+) -> dict:
+    if not valid_thread_id(thread_id):
+        raise HTTPException(status_code=422, detail="invalid thread_id")
+    thread = store.get_thread(thread_id)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    if request.title is None and request.archived is None:
+        raise HTTPException(status_code=422, detail="at least one field is required")
+
+    title = None
+    if request.title is not None:
+        title = request.title.strip()
+        if not title or len(title) > TITLE_MAX:
+            raise HTTPException(
+                status_code=422,
+                detail=f"title must contain 1 to {TITLE_MAX} characters",
+            )
+
+    run_store = _resolve_run_store(run_store, store)
+    if request.archived is True and run_store.latest_active_for_thread(thread_id):
+        raise HTTPException(
+            status_code=409,
+            detail="active research run prevents archiving this thread",
+        )
+
+    updated = thread
+    if title is not None:
+        updated = store.rename_thread(thread_id, title)
+    if request.archived is not None:
+        updated = store.set_thread_archived(thread_id, request.archived)
+    assert updated is not None
+    return {"thread": _thread_with_active_run(updated, run_store)}
 
 
 @router.get("/research/threads/{thread_id}/messages")
@@ -124,6 +242,7 @@ def list_research_messages(
 def delete_research_thread(
     thread_id: str,
     store=Depends(get_thread_store),
+    run_store=Depends(get_run_store),
 ) -> dict:
     """Delete one persisted thread and its messages from the local store.
 
@@ -132,6 +251,12 @@ def delete_research_thread(
     """
     if not valid_thread_id(thread_id):
         raise HTTPException(status_code=422, detail="invalid thread_id")
+    run_store = _resolve_run_store(run_store, store)
+    if run_store.latest_active_for_thread(thread_id) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="active research run prevents deleting this thread",
+        )
     return {"thread_id": thread_id, "deleted": store.delete_thread(thread_id)}
 
 

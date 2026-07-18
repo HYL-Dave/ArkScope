@@ -10,6 +10,8 @@ persistence is a pure write-through. Tested directly, no FastAPI/TestClient.
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from src.research_threads import ResearchThreadStore
@@ -132,6 +134,195 @@ def test_delete_thread_missing_is_false(store):
 def test_local_only_no_pg(store):
     assert store.db_path.endswith(".db")
     assert not hasattr(store, "_pg_conn") and not hasattr(store, "_get_conn")
+
+
+def test_rename_thread_updates_title_and_timestamp_without_changing_transcript(store):
+    store.ensure_thread(
+        id="t1", title="Original", now="2026-07-18T01:00:00+00:00"
+    )
+    store.append_message(
+        thread_id="t1",
+        role="user",
+        content="keep me",
+        now="2026-07-18T01:01:00+00:00",
+    )
+
+    renamed = store.rename_thread(
+        "t1", "Renamed", now="2026-07-18T02:00:00+00:00"
+    )
+
+    assert renamed is not None
+    assert renamed.title == "Renamed"
+    assert renamed.created_at == "2026-07-18T01:00:00+00:00"
+    assert renamed.updated_at == "2026-07-18T02:00:00+00:00"
+    assert [m.content for m in store.list_messages("t1")] == ["keep me"]
+    assert store.ensure_thread(id="t1", title="Legacy overwrite").title == "Renamed"
+
+
+def test_archive_hides_default_list_but_exact_lookup_survives(store):
+    store.ensure_thread(id="t1", title="Keep", now="2026-07-18T01:00:00+00:00")
+
+    archived = store.set_thread_archived(
+        "t1", True, now="2026-07-18T02:00:00+00:00"
+    )
+
+    assert archived is not None
+    assert archived.archived_at == "2026-07-18T02:00:00+00:00"
+    assert store.list_threads() == []
+    assert store.get_thread("t1") == archived
+    assert [t.id for t in store.list_threads(include_archived=True)] == ["t1"]
+
+
+def test_unarchive_restores_same_thread_and_transcript(store):
+    store.ensure_thread(id="t1", title="Keep", now="2026-07-18T01:00:00+00:00")
+    store.append_message(thread_id="t1", role="user", content="question")
+    store.set_thread_archived("t1", True, now="2026-07-18T02:00:00+00:00")
+
+    restored = store.set_thread_archived(
+        "t1", False, now="2026-07-18T03:00:00+00:00"
+    )
+
+    assert restored is not None
+    assert restored.id == "t1"
+    assert restored.created_at == "2026-07-18T01:00:00+00:00"
+    assert restored.archived_at is None
+    assert [t.id for t in store.list_threads()] == ["t1"]
+    assert [m.content for m in store.list_messages("t1")] == ["question"]
+
+
+def test_archive_never_deletes_runs_or_messages(store):
+    from src.research_runs import ResearchRunStore
+
+    run_store = ResearchRunStore(store.db_path)
+    store.ensure_thread(id="t1", title="Keep")
+    store.append_message(thread_id="t1", role="user", content="question")
+    run_store.create_run(
+        id="r1",
+        thread_id="t1",
+        question="question",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+        auth_mode="api_key",
+        credential_id=None,
+    )
+
+    store.set_thread_archived("t1", True)
+
+    assert run_store.get_run("r1") is not None
+    assert [m.content for m in store.list_messages("t1")] == ["question"]
+
+
+def test_missing_thread_lifecycle_updates_return_none_and_create_nothing(store):
+    assert store.rename_thread("missing", "No row") is None
+    assert store.set_thread_archived("missing", True) is None
+    assert store.set_thread_archived("missing", False) is None
+    assert store.get_thread("missing") is None
+    assert store.list_threads(include_archived=True) == []
+
+
+def test_message_run_linkage_is_fresh_and_tolerantly_migrated(tmp_path):
+    legacy_db = tmp_path / "legacy.db"
+    with sqlite3.connect(legacy_db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE research_threads (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                ticker TEXT,
+                provider TEXT,
+                model TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                archived_at TEXT
+            );
+            CREATE TABLE research_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                thread_id TEXT NOT NULL REFERENCES research_threads(id) ON DELETE CASCADE,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT '',
+                provider TEXT,
+                model TEXT,
+                effort TEXT,
+                tools_used_json TEXT,
+                tool_calls_json TEXT,
+                token_usage_json TEXT,
+                tickers_json TEXT,
+                elapsed_seconds REAL,
+                is_error INTEGER NOT NULL DEFAULT 0,
+                personalization_json TEXT,
+                created_at TEXT NOT NULL
+            );
+            INSERT INTO research_threads
+                (id, title, created_at, updated_at)
+            VALUES
+                ('legacy', 'Legacy', '2026-07-18T01:00:00+00:00', '2026-07-18T01:00:00+00:00');
+            INSERT INTO research_messages
+                (id, thread_id, role, content, created_at)
+            VALUES
+                (7, 'legacy', 'assistant', 'old answer', '2026-07-18T01:01:00+00:00');
+            """
+        )
+        before = conn.execute(
+            "SELECT id, thread_id, role, content, created_at FROM research_messages"
+        ).fetchall()
+
+    migrated = ResearchThreadStore(legacy_db)
+
+    with sqlite3.connect(legacy_db) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(research_messages)")}
+        foreign_keys = conn.execute("PRAGMA foreign_key_list(research_messages)").fetchall()
+        after = conn.execute(
+            "SELECT id, thread_id, role, content, created_at FROM research_messages"
+        ).fetchall()
+    assert before == after
+    assert {"run_id", "error_code"} <= columns
+    assert any(
+        row[2] == "research_runs"
+        and row[3] == "run_id"
+        and row[6].upper() == "SET NULL"
+        for row in foreign_keys
+    )
+    legacy_message = migrated.list_messages("legacy")[0]
+    assert legacy_message.run_id is None
+    assert legacy_message.error_code is None
+
+    from src.research_runs import ResearchRunStore
+
+    fresh_db = tmp_path / "fresh.db"
+    fresh = ResearchThreadStore(fresh_db)
+    runs = ResearchRunStore(fresh_db)
+    fresh.ensure_thread(id="fresh", title="Fresh")
+    runs.create_run(
+        id="run-fresh",
+        thread_id="fresh",
+        question="question",
+        ticker=None,
+        provider="anthropic",
+        model="claude-sonnet-4-6",
+        effort="high",
+        auth_mode="api_key",
+        credential_id=None,
+    )
+    linked = fresh.append_message(
+        thread_id="fresh",
+        role="assistant",
+        content="timed out",
+        run_id="run-fresh",
+        error_code="model_timeout",
+        is_error=True,
+    )
+    assert linked.run_id == "run-fresh"
+    assert linked.error_code == "model_timeout"
+
+    with sqlite3.connect(fresh_db) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("DELETE FROM research_runs WHERE id = 'run-fresh'")
+    surviving = fresh.list_messages("fresh")
+    assert len(surviving) == 1
+    assert surviving[0].run_id is None
+    assert surviving[0].error_code == "model_timeout"
 
 
 # --- C-2c: build_thread_history — provider-neutral prompt-context builder ----

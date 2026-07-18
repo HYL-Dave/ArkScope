@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS research_run_events (
 
 ACTIVE_STATUSES = ("queued", "running")
 TERMINAL_STATUSES = ("succeeded", "failed", "cancelled", "interrupted")
+MAX_ACTIVE_THREAD_BATCH = 200
 
 
 def _now() -> str:
@@ -107,6 +109,9 @@ class ResearchRunStore:
         return conn
 
     def _ensure_schema(self) -> None:
+        from src.research_threads import _ensure_thread_schema
+
+        _ensure_thread_schema(self.db_path)
         with self._write_lock, self._connect() as conn:
             try:
                 conn.execute("PRAGMA journal_mode = WAL")
@@ -187,6 +192,36 @@ class ResearchRunStore:
                 (thread_id,),
             ).fetchone()
         return self._run(r) if r else None
+
+    def latest_active_for_threads(
+        self, thread_ids: Sequence[str]
+    ) -> dict[str, ResearchRun]:
+        """Resolve one latest active run per thread with one bounded query."""
+        if isinstance(thread_ids, (str, bytes)) or not isinstance(thread_ids, Sequence):
+            raise TypeError("thread_ids must be a bounded sequence")
+        if len(thread_ids) > MAX_ACTIVE_THREAD_BATCH:
+            raise ValueError(
+                f"thread_ids cannot exceed {MAX_ACTIVE_THREAD_BATCH} entries"
+            )
+        if not thread_ids:
+            return {}
+        if any(not isinstance(thread_id, str) for thread_id in thread_ids):
+            raise TypeError("thread_ids must contain strings")
+
+        unique_ids = tuple(dict.fromkeys(thread_ids))
+        placeholders = ",".join("?" for _ in unique_ids)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM research_runs WHERE thread_id IN ({placeholders}) "
+                "AND status IN ('queued','running') "
+                "ORDER BY thread_id ASC, created_at DESC, id DESC",
+                unique_ids,
+            ).fetchall()
+
+        latest: dict[str, ResearchRun] = {}
+        for row in rows:
+            latest.setdefault(row["thread_id"], self._run(row))
+        return latest
 
     def mark_running(self, run_id: str) -> None:
         ts = _now()

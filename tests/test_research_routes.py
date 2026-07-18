@@ -9,16 +9,58 @@ persistence (#4 — store errors never propagate), thread_id validation (#5).
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from src.api.routes import query as q
 from src.api.routes import research as r
+from src.research_history import ResearchHistoryStore
+from src.research_runs import ResearchRunStore
 from src.research_threads import ResearchThreadStore, valid_thread_id
 
 
 @pytest.fixture()
 def store(tmp_path):
     return ResearchThreadStore(tmp_path / "profile_state.db")
+
+
+@pytest.fixture()
+def research_stores(tmp_path):
+    db = tmp_path / "profile_state.db"
+    thread_store = ResearchThreadStore(db)
+    run_store = ResearchRunStore(db)
+    return thread_store, run_store, ResearchHistoryStore(db)
+
+
+def _archive_thread(thread_store, thread_id, archived_at):
+    with sqlite3.connect(thread_store.db_path) as conn:
+        conn.execute(
+            "UPDATE research_threads SET archived_at = ? WHERE id = ?",
+            (archived_at, thread_id),
+        )
+
+
+def _add_run(run_store, thread_id, run_id, *, status="queued", created_at=None):
+    run_store.create_run(
+        id=run_id,
+        thread_id=thread_id,
+        question=f"question for {thread_id}",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+        auth_mode="api_key",
+        credential_id=None,
+    )
+    if status != "queued" or created_at is not None:
+        timestamp = created_at or "2026-07-18T02:00:00+00:00"
+        with sqlite3.connect(run_store.db_path) as conn:
+            conn.execute(
+                "UPDATE research_runs SET status = ?, created_at = ?, updated_at = ? WHERE id = ?",
+                (status, timestamp, timestamp, run_id),
+            )
+    return run_store.get_run(run_id)
 
 
 # --- #2: server composes the agent prompt; the RAW question is what's stored ---
@@ -124,12 +166,265 @@ def test_persist_is_best_effort_swallows_store_errors():
 
 
 # --- GET routes (handler-direct) ---
-def test_list_threads_route_orders_desc(store):
+def test_list_threads_route_orders_desc(research_stores):
+    store, run_store, history_store = research_stores
     store.ensure_thread(id="t1", title="alpha", now="2026-06-14T00:00:00+00:00")
     store.ensure_thread(id="t2", title="beta", now="2026-06-14T00:01:00+00:00")
-    res = r.list_research_threads(limit=50, store=store)
+    res = r.list_research_threads(
+        q=None,
+        ticker=None,
+        updated_from=None,
+        updated_before=None,
+        run_state="all",
+        archived="current",
+        limit=50,
+        offset=0,
+        store=store,
+        history_store=history_store,
+        run_store=run_store,
+    )
     assert [t["id"] for t in res["threads"]] == ["t2", "t1"]  # updated_at desc
     assert res["threads"][0]["title"] == "beta"
+    assert res["total"] == 2
+    assert res["limit"] == 50 and res["offset"] == 0
+    assert res["threads"][0]["archived_at"] is None
+    assert res["threads"][0]["latest_run_status"] is None
+    assert res["threads"][0]["active_run"] is None
+
+
+def test_history_route_filters_before_pagination_and_batches_active_runs(
+    research_stores, monkeypatch
+):
+    thread_store, run_store, history_store = research_stores
+    for thread_id, title, ticker, updated_at, archived in [
+        ("match-new", "Needle newest", "NVDA", "2026-07-18T03:00:00+00:00", True),
+        ("match-old", "Needle older", "nvda", "2026-07-18T02:00:00+00:00", True),
+        ("wrong-q", "Unrelated", "NVDA", "2026-07-18T02:30:00+00:00", True),
+        ("wrong-ticker", "Needle ticker", "AAPL", "2026-07-18T02:30:00+00:00", True),
+        ("outside-window", "Needle old", "NVDA", "2026-07-18T00:30:00+00:00", True),
+        ("terminal", "Needle failed", "NVDA", "2026-07-18T02:30:00+00:00", True),
+        ("current", "Needle current", "NVDA", "2026-07-18T02:30:00+00:00", False),
+    ]:
+        thread_store.ensure_thread(
+            id=thread_id,
+            title=title,
+            ticker=ticker,
+            provider="openai",
+            model="gpt-5.4-mini",
+            now=updated_at,
+        )
+        if archived:
+            _archive_thread(thread_store, thread_id, updated_at)
+
+    for thread_id in [
+        "match-new",
+        "match-old",
+        "wrong-q",
+        "wrong-ticker",
+        "outside-window",
+        "current",
+    ]:
+        _add_run(run_store, thread_id, f"r-{thread_id}")
+    _add_run(run_store, "terminal", "r-terminal", status="failed")
+
+    history_calls = []
+    real_query = history_store.query_threads
+
+    def recording_query(**kwargs):
+        history_calls.append(kwargs)
+        return real_query(**kwargs)
+
+    batch_calls = []
+    real_batch = run_store.latest_active_for_threads
+
+    def recording_batch(thread_ids):
+        batch_calls.append(list(thread_ids))
+        return real_batch(thread_ids)
+
+    def forbid_single_lookup(*args, **kwargs):
+        raise AssertionError("list route must not call latest_active_for_thread")
+
+    monkeypatch.setattr(history_store, "query_threads", recording_query)
+    monkeypatch.setattr(run_store, "latest_active_for_threads", recording_batch)
+    monkeypatch.setattr(run_store, "latest_active_for_thread", forbid_single_lookup)
+
+    response = r.list_research_threads(
+        q="Needle",
+        ticker="nvda",
+        updated_from="2026-07-18T01:00:00+00:00",
+        updated_before="2026-07-18T04:00:00+00:00",
+        run_state="active",
+        archived="archived",
+        limit=1,
+        offset=1,
+        store=thread_store,
+        history_store=history_store,
+        run_store=run_store,
+    )
+
+    assert history_calls == [
+        {
+            "q": "Needle",
+            "ticker": "nvda",
+            "updated_from": "2026-07-18T01:00:00+00:00",
+            "updated_before": "2026-07-18T04:00:00+00:00",
+            "run_state": "active",
+            "archive_mode": "archived",
+            "limit": 1,
+            "offset": 1,
+        }
+    ]
+    assert response["total"] == 2
+    assert response["limit"] == 1 and response["offset"] == 1
+    assert [thread["id"] for thread in response["threads"]] == ["match-old"]
+    thread = response["threads"][0]
+    assert thread["latest_run_status"] == "queued"
+    assert thread["archived_at"] == "2026-07-18T02:00:00+00:00"
+    assert thread["active_run"] == r._run_dict(run_store.get_run("r-match-old"))
+    assert batch_calls == [["match-old"]]
+    assert run_store.latest_active_for_threads([]) == {}
+    with pytest.raises(ValueError):
+        run_store.latest_active_for_threads([f"thread-{i}" for i in range(201)])
+    with pytest.raises(TypeError):
+        run_store.latest_active_for_threads(iter(["match-old"]))
+
+
+def test_exact_thread_route_returns_archived_target_outside_history_page(research_stores):
+    thread_store, run_store, history_store = research_stores
+    thread_store.ensure_thread(
+        id="target", title="Archived target", now="2026-07-18T01:00:00+00:00"
+    )
+    thread_store.ensure_thread(
+        id="newer", title="Newer archived", now="2026-07-18T02:00:00+00:00"
+    )
+    _archive_thread(thread_store, "target", "2026-07-18T01:30:00+00:00")
+    _archive_thread(thread_store, "newer", "2026-07-18T02:30:00+00:00")
+    page = history_store.query_threads(archive_mode="archived", limit=1)
+    assert [thread.id for thread in page.threads] == ["newer"]
+
+    response = r.get_research_thread(
+        thread_id="target", store=thread_store, run_store=run_store
+    )
+
+    assert response["thread"]["id"] == "target"
+    assert response["thread"]["archived_at"] == "2026-07-18T01:30:00+00:00"
+    assert response["thread"]["active_run"] is None
+
+
+def test_patch_thread_renames_and_rejects_invalid_titles_without_mutation(research_stores):
+    from fastapi import HTTPException
+
+    thread_store, run_store, _ = research_stores
+    original = thread_store.ensure_thread(
+        id="t1", title="Original", now="2026-07-18T01:00:00+00:00"
+    )
+    thread_store.append_message(thread_id="t1", role="user", content="keep me")
+
+    response = r.patch_research_thread(
+        thread_id="t1",
+        request=r.ResearchThreadPatch(title="  Renamed  "),
+        store=thread_store,
+        run_store=run_store,
+    )
+
+    assert response["thread"]["title"] == "Renamed"
+    assert response["thread"]["created_at"] == original.created_at
+    assert response["thread"]["updated_at"] != original.updated_at
+    assert [m.content for m in thread_store.list_messages("t1")] == ["keep me"]
+
+    for invalid_title in ("   ", "x" * 61):
+        with pytest.raises(HTTPException) as exc_info:
+            r.patch_research_thread(
+                thread_id="t1",
+                request=r.ResearchThreadPatch(title=invalid_title),
+                store=thread_store,
+                run_store=run_store,
+            )
+        assert exc_info.value.status_code == 422
+        assert thread_store.get_thread("t1").title == "Renamed"
+    with pytest.raises(HTTPException) as exc_info:
+        r.patch_research_thread(
+            thread_id="t1",
+            request=r.ResearchThreadPatch(),
+            store=thread_store,
+            run_store=run_store,
+        )
+    assert exc_info.value.status_code == 422
+    assert thread_store.get_thread("t1").title == "Renamed"
+
+
+def test_patch_archive_active_thread_returns_409_without_mutation(research_stores):
+    from fastapi import HTTPException
+
+    thread_store, run_store, _ = research_stores
+    thread_store.ensure_thread(id="t1", title="Active")
+    thread_store.append_message(thread_id="t1", role="user", content="question")
+    _add_run(run_store, "t1", "r1")
+
+    with pytest.raises(HTTPException) as exc_info:
+        r.patch_research_thread(
+            thread_id="t1",
+            request=r.ResearchThreadPatch(archived=True),
+            store=thread_store,
+            run_store=run_store,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert thread_store.get_thread("t1").archived_at is None
+    assert [m.content for m in thread_store.list_messages("t1")] == ["question"]
+    assert run_store.get_run("r1").status == "queued"
+
+
+def test_patch_archive_and_unarchive_preserve_transcript_and_runs(research_stores):
+    thread_store, run_store, history_store = research_stores
+    thread_store.ensure_thread(id="t1", title="Lifecycle")
+    thread_store.append_message(thread_id="t1", role="user", content="question")
+    _add_run(run_store, "t1", "r1", status="succeeded")
+    run_store.append_event("r1", "done", {"answer": "answer"})
+
+    archived = r.patch_research_thread(
+        thread_id="t1",
+        request=r.ResearchThreadPatch(archived=True),
+        store=thread_store,
+        run_store=run_store,
+    )
+
+    assert archived["thread"]["archived_at"] is not None
+    assert history_store.query_threads().total == 0
+    assert [t.id for t in history_store.query_threads(archive_mode="archived").threads] == ["t1"]
+
+    restored = r.patch_research_thread(
+        thread_id="t1",
+        request=r.ResearchThreadPatch(archived=False),
+        store=thread_store,
+        run_store=run_store,
+    )
+
+    assert restored["thread"]["archived_at"] is None
+    assert [m.content for m in thread_store.list_messages("t1")] == ["question"]
+    assert run_store.get_run("r1").status == "succeeded"
+    assert [event.type for event in run_store.list_events("r1")] == ["done"]
+
+
+def test_delete_active_thread_returns_409_without_cascade(research_stores):
+    from fastapi import HTTPException
+
+    thread_store, run_store, _ = research_stores
+    thread_store.ensure_thread(id="t1", title="Active")
+    thread_store.append_message(thread_id="t1", role="user", content="question")
+    _add_run(run_store, "t1", "r1")
+    run_store.append_event("r1", "thinking", {"turn": 1})
+
+    with pytest.raises(HTTPException) as exc_info:
+        r.delete_research_thread(
+            thread_id="t1", store=thread_store, run_store=run_store
+        )
+
+    assert exc_info.value.status_code == 409
+    assert thread_store.get_thread("t1") is not None
+    assert [m.content for m in thread_store.list_messages("t1")] == ["question"]
+    assert run_store.get_run("r1").status == "queued"
+    assert [event.type for event in run_store.list_events("r1")] == ["thinking"]
 
 
 def test_list_messages_route_roundtrip(store):

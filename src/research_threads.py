@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-_SCHEMA = """
+_THREAD_SCHEMA = """
 CREATE TABLE IF NOT EXISTS research_threads (
     id          TEXT PRIMARY KEY,
     title       TEXT NOT NULL,
@@ -33,10 +33,13 @@ CREATE TABLE IF NOT EXISTS research_threads (
     archived_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_research_threads_updated ON research_threads(updated_at DESC);
+"""
 
+_MESSAGE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS research_messages (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     thread_id       TEXT NOT NULL REFERENCES research_threads(id) ON DELETE CASCADE,
+    run_id           TEXT REFERENCES research_runs(id) ON DELETE SET NULL,
     role            TEXT NOT NULL,
     content         TEXT NOT NULL DEFAULT '',
     provider        TEXT,
@@ -48,6 +51,7 @@ CREATE TABLE IF NOT EXISTS research_messages (
     tickers_json    TEXT,
     elapsed_seconds REAL,
     is_error        INTEGER NOT NULL DEFAULT 0,
+    error_code      TEXT,
     created_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_research_messages_thread ON research_messages(thread_id, id);
@@ -121,6 +125,18 @@ def _loads(v: Optional[str]):
     return json.loads(v) if v else None
 
 
+def _ensure_thread_schema(db_path: str | Path) -> None:
+    """Create only the thread-owned table before run/message dependents."""
+    with sqlite3.connect(str(db_path), timeout=5.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 5000")
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
+        conn.executescript(_THREAD_SCHEMA)
+        conn.commit()
+
+
 @dataclass
 class ResearchThread:
     id: str  # client-owned stable id (e.g. crypto.randomUUID), agreed reducer↔store
@@ -137,6 +153,7 @@ class ResearchThread:
 class ResearchMessage:
     id: int
     thread_id: str
+    run_id: Optional[str]
     role: str
     content: str
     provider: Optional[str]
@@ -148,6 +165,7 @@ class ResearchMessage:
     tickers: Optional[list]
     elapsed_seconds: Optional[float]
     is_error: bool
+    error_code: Optional[str]
     personalization: Optional[dict]
     created_at: str
 
@@ -169,32 +187,45 @@ class ResearchThreadStore:
         return conn
 
     def _ensure_schema(self) -> None:
-        with self._write_lock, self._connect() as conn:
-            try:
-                conn.execute("PRAGMA journal_mode = WAL")
-            except sqlite3.OperationalError:
-                pass
-            conn.executescript(_SCHEMA)
-            # Migration: add is_error to a pre-existing research_messages table.
-            # Tolerant of the concurrent-first-construct race (duplicate column =
-            # another constructor added it), per CardRunStore's pattern.
-            cols = {r[1] for r in conn.execute("PRAGMA table_info(research_messages)").fetchall()}
-            if "is_error" not in cols:
-                try:
-                    conn.execute("ALTER TABLE research_messages ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0")
-                except sqlite3.OperationalError:
-                    pass
-            if "effort" not in cols:
-                try:
-                    conn.execute("ALTER TABLE research_messages ADD COLUMN effort TEXT")
-                except sqlite3.OperationalError:
-                    pass
-            if "personalization_json" not in cols:
-                try:
-                    conn.execute("ALTER TABLE research_messages ADD COLUMN personalization_json TEXT")
-                except sqlite3.OperationalError:
-                    pass
-            conn.commit()
+        with self._write_lock:
+            _ensure_thread_schema(self.db_path)
+
+            # Messages may link to runs, so the run store must create its
+            # authoritative tables before fresh message creation or migration.
+            from src.research_runs import ResearchRunStore
+
+            ResearchRunStore(self.db_path)
+
+            with self._connect() as conn:
+                conn.executescript(_MESSAGE_SCHEMA)
+                # Tolerate pre-existing message tables and concurrent first
+                # constructors using the established additive-column pattern.
+                cols = {
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(research_messages)"
+                    ).fetchall()
+                }
+                migrations = (
+                    ("is_error", "is_error INTEGER NOT NULL DEFAULT 0"),
+                    ("effort", "effort TEXT"),
+                    ("personalization_json", "personalization_json TEXT"),
+                    (
+                        "run_id",
+                        "run_id TEXT REFERENCES research_runs(id) ON DELETE SET NULL",
+                    ),
+                    ("error_code", "error_code TEXT"),
+                )
+                for column, definition in migrations:
+                    if column in cols:
+                        continue
+                    try:
+                        conn.execute(
+                            f"ALTER TABLE research_messages ADD COLUMN {definition}"
+                        )
+                    except sqlite3.OperationalError:
+                        pass
+                conn.commit()
 
     # --- row mappers -----------------------------------------------------
 
@@ -209,7 +240,8 @@ class ResearchThreadStore:
     @staticmethod
     def _message(r: sqlite3.Row) -> ResearchMessage:
         return ResearchMessage(
-            id=r["id"], thread_id=r["thread_id"], role=r["role"], content=r["content"],
+            id=r["id"], thread_id=r["thread_id"], run_id=r["run_id"],
+            role=r["role"], content=r["content"],
             provider=r["provider"], model=r["model"], effort=r["effort"],
             tools_used=_loads(r["tools_used_json"]) or [],
             tool_calls=_loads(r["tool_calls_json"]) or [],
@@ -217,6 +249,7 @@ class ResearchThreadStore:
             tickers=_loads(r["tickers_json"]),
             elapsed_seconds=r["elapsed_seconds"],
             is_error=bool(r["is_error"]),
+            error_code=r["error_code"],
             personalization=_loads(r["personalization_json"]),
             created_at=r["created_at"],
         )
@@ -253,6 +286,7 @@ class ResearchThreadStore:
         thread_id: str,
         role: str,
         content: str = "",
+        run_id: Optional[str] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         effort: Optional[str] = None,
@@ -262,6 +296,7 @@ class ResearchThreadStore:
         tickers: Optional[list] = None,
         elapsed_seconds: Optional[float] = None,
         is_error: bool = False,
+        error_code: Optional[str] = None,
         personalization: Optional[dict] = None,
         now: Optional[str] = None,
     ) -> ResearchMessage:
@@ -270,18 +305,18 @@ class ResearchThreadStore:
             cur = conn.execute(
                 """
                 INSERT INTO research_messages
-                    (thread_id, role, content, provider, model, effort, tools_used_json,
+                    (thread_id, run_id, role, content, provider, model, effort, tools_used_json,
                      tool_calls_json, token_usage_json, tickers_json, elapsed_seconds,
-                     is_error, personalization_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     is_error, error_code, personalization_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    thread_id, role, content, provider, model, effort,
+                    thread_id, run_id, role, content, provider, model, effort,
                     json.dumps(tools_used) if tools_used is not None else None,
                     json.dumps(tool_calls) if tool_calls is not None else None,
                     json.dumps(token_usage) if token_usage is not None else None,
                     json.dumps(tickers) if tickers is not None else None,
-                    elapsed_seconds, 1 if is_error else 0,
+                    elapsed_seconds, 1 if is_error else 0, error_code,
                     json.dumps(personalization) if personalization is not None else None,
                     ts,
                 ),
@@ -292,6 +327,49 @@ class ResearchThreadStore:
             mid = cur.lastrowid
             r = conn.execute("SELECT * FROM research_messages WHERE id = ?", (mid,)).fetchone()
         return self._message(r)
+
+    def rename_thread(
+        self,
+        thread_id: str,
+        title: str,
+        *,
+        now: Optional[str] = None,
+    ) -> Optional[ResearchThread]:
+        ts = now or _now()
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute(
+                "UPDATE research_threads SET title = ?, updated_at = ? WHERE id = ?",
+                (title, ts, thread_id),
+            )
+            if cur.rowcount == 0:
+                return None
+            row = conn.execute(
+                "SELECT * FROM research_threads WHERE id = ?", (thread_id,)
+            ).fetchone()
+            conn.commit()
+        return self._thread(row)
+
+    def set_thread_archived(
+        self,
+        thread_id: str,
+        archived: bool,
+        *,
+        now: Optional[str] = None,
+    ) -> Optional[ResearchThread]:
+        ts = now or _now()
+        archived_at = ts if archived else None
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute(
+                "UPDATE research_threads SET archived_at = ?, updated_at = ? WHERE id = ?",
+                (archived_at, ts, thread_id),
+            )
+            if cur.rowcount == 0:
+                return None
+            row = conn.execute(
+                "SELECT * FROM research_threads WHERE id = ?", (thread_id,)
+            ).fetchone()
+            conn.commit()
+        return self._thread(row)
 
     def delete_thread(self, thread_id: str) -> bool:
         """Delete one persisted research conversation and all of its messages."""
