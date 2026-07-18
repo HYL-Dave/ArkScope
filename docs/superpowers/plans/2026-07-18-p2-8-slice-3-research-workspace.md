@@ -8,8 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** REVIEWED — CLEARED FOR IMPLEMENTATION 2026-07-18 — PRODUCT CODE
-> NOT STARTED
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 1 COMPLETE 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -52,6 +51,24 @@ backend `+34/-0` and frontend `+52/-15`.
 - Structural RED inventory confirmed the permanent `research-grid`, history and
   trace asides, `window.confirm`, the second model-discovery/fallback policy,
   and current generic thread-error rendering.
+
+### Task 1 — COMPLETE (2026-07-18)
+
+- RED first: the absent `src.research_history` module failed collection; the
+  quality hardening then reproduced three contract failures (snapshot, bounds,
+  timezone offsets) plus one fractional-endpoint failure before each fix.
+- Product commits: `b87d9d4` (bounded projection), `fff7d7e` (snapshot, UTC,
+  and page bounds), and `bd2e306` (fractional timestamp precision).
+- Exact accounting remains ten collected nodes; final focused result is
+  `10 passed`. Adjacent thread/run stores remain `34 passed`.
+- The projection filters before count/pagination, uses one explicit read
+  transaction for count plus page consistency, creates no schema, and opens
+  SQLite in read-only/query-only mode. Dependency bootstrap remains the
+  reviewed owner of authoritative thread/run schema initialization.
+- Independent spec review and final code-quality review both returned PASS.
+  The reviewed suggestion to add an index or redesign the latest-run CTE was
+  not adopted because no measured regression justified speculative storage
+  or query-plan changes.
 
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
@@ -378,7 +395,7 @@ These are diagnostic baselines, not commands to mass-rewrite files.
 **Files:** create `src/research_history.py`, create
 `tests/test_research_history.py`, modify `src/api/dependencies.py`.
 
-- [ ] **Step 1: Write exactly ten RED history-query nodes**
+- [x] **Step 1: Write exactly ten RED history-query nodes**
 
 Use the real `ResearchThreadStore` and `ResearchRunStore` schemas in one temp
 SQLite file. Do not hand-create reduced tables.
@@ -398,7 +415,7 @@ Every fixture includes a counterexample newer than the matching row so a
 post-limit Python filter fails for the right reason. Assert deterministic
 `updated_at DESC, id DESC`, exact total, and the bounded page.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pytest -q tests/test_research_history.py
@@ -406,7 +423,7 @@ pytest -q tests/test_research_history.py
 
 Expected RED: import failure for `src.research_history`.
 
-- [ ] **Step 3: Implement one read-only projection**
+- [x] **Step 3: Implement one read-only projection**
 
 Create immutable query/result dataclasses and `ResearchHistoryStore`. Its query
 accepts:
@@ -438,7 +455,7 @@ stores so both authoritative tables exist, then opens the read projection; the
 projection itself creates no schema and must not become a second DB path
 authority.
 
-- [ ] **Step 4: Run GREEN and query-plan sanity**
+- [x] **Step 4: Run GREEN and query-plan sanity**
 
 ```bash
 pytest -q tests/test_research_history.py
@@ -448,7 +465,7 @@ Use `EXPLAIN QUERY PLAN` on a seeded temp DB to confirm indexed primary-key/run
 lookups and bounded final reads. Do not invent a millisecond threshold or add
 an index without evidence.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/research_history.py src/api/dependencies.py tests/test_research_history.py
