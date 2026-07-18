@@ -679,6 +679,74 @@ def test_patch_archive_active_thread_returns_409_without_mutation(
     assert other_thread_store.get_thread("wrong-database") is None
     assert scheduled == [response["run"]["id"]]
 
+    thread_store.ensure_thread(id="history-race", title="History race")
+    thread_store.append_message(
+        thread_id="history-race", role="user", content="prior question"
+    )
+    _add_run(run_store, "history-race", "r-history-race")
+    scheduled_history = {}
+    monkeypatch.setattr(
+        r,
+        "schedule_research_run",
+        lambda **kwargs: scheduled_history.update(kwargs),
+    )
+    blocked = _install_write_signal(
+        monkeypatch, thread_store, run_store, thread_connect, run_connect
+    )
+    writer = _begin_writer(thread_store.db_path)
+    try:
+        writer.execute(
+            """
+            INSERT INTO research_messages (thread_id, role, content, created_at)
+            VALUES (?, 'assistant', 'just completed', ?)
+            """,
+            ("history-race", "2026-07-18T04:00:00+00:00"),
+        )
+        writer.execute(
+            "UPDATE research_threads SET updated_at = ? WHERE id = ?",
+            ("2026-07-18T04:00:00+00:00", "history-race"),
+        )
+        writer.execute(
+            """
+            UPDATE research_runs
+            SET status = 'succeeded', completed_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                "2026-07-18T04:00:01+00:00",
+                "2026-07-18T04:00:01+00:00",
+                "r-history-race",
+            ),
+        )
+        history_request = r.ResearchRunCreate(
+            thread_id="history-race",
+            question="follow up",
+            provider="openai",
+            model="gpt-5.4-mini",
+            effort="low",
+        )
+        error, response = _finish_after_writer_commit(
+            writer,
+            lambda: asyncio.run(
+                r.create_research_run(
+                    history_request,
+                    dal=object(),
+                    thread_store=thread_store,
+                    run_store=run_store,
+                )
+            ),
+            blocked,
+        )
+    finally:
+        writer.close()
+    assert error is None
+    assert response["run"]["status"] == "queued"
+    assert scheduled_history["history"] == [
+        {"role": "user", "content": "prior question"},
+        {"role": "assistant", "content": "just completed"},
+    ]
+    assert run_store.get_run("r-history-race").status == "succeeded"
+
 
 def test_patch_archive_and_unarchive_preserve_transcript_and_runs(research_stores):
     thread_store, run_store, history_store = research_stores
@@ -794,6 +862,83 @@ def test_delete_active_thread_returns_409_without_cascade(
     assert thread_store.get_thread("delete-first") is None
     assert thread_store.list_messages("delete-first") == []
     assert run_store.latest_active_for_thread("delete-first") is None
+
+    monkeypatch.setattr(thread_store, "_connect", thread_connect)
+    monkeypatch.setattr(run_store, "_connect", run_connect)
+
+    def fail_schedule(**kwargs):
+        raise RuntimeError("secret scheduler internals")
+
+    monkeypatch.setattr(r, "schedule_research_run", fail_schedule)
+    schedule_request = r.ResearchRunCreate(
+        thread_id="schedule-failure",
+        question="schedule me",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            r.create_research_run(
+                schedule_request,
+                dal=object(),
+                thread_store=thread_store,
+                run_store=run_store,
+            )
+        )
+    assert exc_info.value.status_code == 503
+    assert "secret scheduler internals" not in str(exc_info.value.detail)
+
+    messages = thread_store.list_messages("schedule-failure")
+    assert [(message.role, message.content) for message in messages] == [
+        ("user", "schedule me"),
+        ("assistant", "research run could not be scheduled"),
+    ]
+    assert messages[-1].is_error is True
+    assert messages[-1].run_id is not None
+    failed_run = run_store.get_run(messages[-1].run_id)
+    assert failed_run.status == "failed"
+    assert failed_run.error == "research run could not be scheduled"
+    assert run_store.latest_active_for_thread("schedule-failure") is None
+    assert [
+        (event.type, event.data)
+        for event in run_store.list_events(failed_run.id)
+    ] == [
+        ("error", {"error": "research run could not be scheduled"})
+    ]
+
+    retry_schedule = {}
+    monkeypatch.setattr(
+        r,
+        "schedule_research_run",
+        lambda **kwargs: retry_schedule.update(kwargs),
+    )
+    retry_request = r.ResearchRunCreate(
+        thread_id="schedule-failure",
+        question="retry now",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+        retry_last_failed=True,
+    )
+    retry_response = asyncio.run(
+        r.create_research_run(
+            retry_request,
+            dal=object(),
+            thread_store=thread_store,
+            run_store=run_store,
+        )
+    )
+    assert retry_response["run"]["status"] == "queued"
+    assert retry_schedule["history"] == []
+    assert [
+        (message.role, message.content)
+        for message in thread_store.list_messages("schedule-failure")
+    ] == [
+        ("user", "schedule me"),
+        ("assistant", "research run could not be scheduled"),
+        ("user", "retry now"),
+    ]
 
 
 def test_list_messages_route_roundtrip(store):

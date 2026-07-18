@@ -247,6 +247,18 @@ class ResearchRunStore:
         assert row is not None
         return self._run(row)
 
+    def _require_shared_database(self, thread_store: ResearchThreadStore) -> None:
+        try:
+            same_database = Path(self.db_path).samefile(thread_store.db_path)
+        except OSError:
+            same_database = (
+                Path(self.db_path).resolve() == Path(thread_store.db_path).resolve()
+            )
+        if self.db_path == ":memory:" or not same_database:
+            raise ValueError(
+                "thread_store and run_store must use the same SQLite database"
+            )
+
     def create_run_with_user_message(
         self,
         *,
@@ -264,18 +276,10 @@ class ResearchRunStore:
         auth_mode: Optional[str],
         credential_id: Optional[str],
         assistant_stance: Optional[str] = None,
-    ) -> ResearchRun:
-        """Atomically queue a run and persist its raw user turn."""
-        try:
-            same_database = Path(self.db_path).samefile(thread_store.db_path)
-        except OSError:
-            same_database = (
-                Path(self.db_path).resolve() == Path(thread_store.db_path).resolve()
-            )
-        if self.db_path == ":memory:" or not same_database:
-            raise ValueError(
-                "thread_store and run_store must use the same SQLite database"
-            )
+        retry_last_failed: bool = False,
+    ) -> tuple[ResearchRun, list[dict]]:
+        """Atomically queue a run, snapshot history, and persist its user turn."""
+        self._require_shared_database(thread_store)
 
         ts = _now()
         with self._write_lock, thread_store._write_lock, self._connect() as conn:
@@ -305,6 +309,11 @@ class ResearchRunStore:
                     assistant_stance=assistant_stance,
                     now=ts,
                 )
+                history = thread_store._build_thread_history_on_connection(
+                    conn,
+                    thread_id,
+                    exclude_last_failed_pair=retry_last_failed,
+                )
                 thread_store._append_message_on_connection(
                     conn,
                     thread_id=thread_id,
@@ -317,7 +326,55 @@ class ResearchRunStore:
             except BaseException:
                 conn.rollback()
                 raise
-        return run
+        return run, history
+
+    def fail_queued_run_handoff(
+        self,
+        *,
+        run_id: str,
+        thread_store: ResearchThreadStore,
+        message: str,
+    ) -> ResearchRun:
+        """Atomically record a scheduler handoff failure for a queued run."""
+        self._require_shared_database(thread_store)
+        ts = _now()
+        with self._write_lock, thread_store._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                failed_run = self._mark_terminal_on_connection(
+                    conn,
+                    run_id,
+                    "failed",
+                    error=message,
+                    expected_status="queued",
+                    now=ts,
+                )
+                if failed_run is None:
+                    raise RuntimeError("queued research run is unavailable")
+                self._append_event_on_connection(
+                    conn,
+                    run_id,
+                    "error",
+                    {"error": message},
+                    now=ts,
+                )
+                thread_store._append_message_on_connection(
+                    conn,
+                    thread_id=failed_run.thread_id,
+                    run_id=run_id,
+                    role="assistant",
+                    content=message,
+                    provider=failed_run.provider,
+                    model=failed_run.model,
+                    effort=failed_run.effort,
+                    is_error=True,
+                    now=ts,
+                )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        return failed_run
 
     def get_run(self, run_id: str) -> Optional[ResearchRun]:
         with self._connect() as conn:
@@ -382,6 +439,44 @@ class ResearchRunStore:
             )
             conn.commit()
 
+    def _mark_terminal_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        status: str,
+        *,
+        error: Optional[str] = None,
+        token_usage: Optional[dict] = None,
+        expected_status: Optional[str] = None,
+        now: Optional[str] = None,
+    ) -> Optional[ResearchRun]:
+        if status not in TERMINAL_STATUSES:
+            raise ValueError(f"invalid terminal status: {status}")
+        ts = now or _now()
+        expected_clause = " AND status = ?" if expected_status is not None else ""
+        params = [
+            status,
+            ts,
+            ts,
+            error,
+            json.dumps(token_usage) if token_usage is not None else None,
+            run_id,
+        ]
+        if expected_status is not None:
+            params.append(expected_status)
+        cur = conn.execute(
+            "UPDATE research_runs SET status = ?, completed_at = ?, updated_at = ?, "
+            f"error = ?, token_usage_json = ? WHERE id = ?{expected_clause}",
+            params,
+        )
+        if cur.rowcount == 0:
+            return None
+        row = conn.execute(
+            "SELECT * FROM research_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+        assert row is not None
+        return self._run(row)
+
     def mark_terminal(
         self,
         run_id: str,
@@ -390,33 +485,53 @@ class ResearchRunStore:
         error: Optional[str] = None,
         token_usage: Optional[dict] = None,
     ) -> None:
-        if status not in TERMINAL_STATUSES:
-            raise ValueError(f"invalid terminal status: {status}")
-        ts = _now()
         with self._write_lock, self._connect() as conn:
-            conn.execute(
-                "UPDATE research_runs SET status = ?, completed_at = ?, updated_at = ?, "
-                "error = ?, token_usage_json = ? WHERE id = ?",
-                (status, ts, ts, error, json.dumps(token_usage) if token_usage is not None else None, run_id),
+            self._mark_terminal_on_connection(
+                conn,
+                run_id,
+                status,
+                error=error,
+                token_usage=token_usage,
             )
             conn.commit()
 
+    def _append_event_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        type: str,
+        data: dict,
+        *,
+        now: Optional[str] = None,
+    ) -> ResearchRunEvent:
+        ts = now or _now()
+        row = conn.execute(
+            "SELECT COALESCE(MAX(seq), 0) + 1 AS next_seq "
+            "FROM research_run_events WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        seq = int(row["next_seq"])
+        conn.execute(
+            "INSERT INTO research_run_events (run_id, seq, type, data_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (run_id, seq, type, json.dumps(data), ts),
+        )
+        conn.execute(
+            "UPDATE research_runs SET updated_at = ? WHERE id = ?", (ts, run_id)
+        )
+        return ResearchRunEvent(
+            run_id=run_id,
+            seq=seq,
+            type=type,
+            data=data,
+            created_at=ts,
+        )
+
     def append_event(self, run_id: str, type: str, data: dict) -> ResearchRunEvent:
-        ts = _now()
         with self._write_lock, self._connect() as conn:
-            row = conn.execute(
-                "SELECT COALESCE(MAX(seq), 0) + 1 AS next_seq FROM research_run_events WHERE run_id = ?",
-                (run_id,),
-            ).fetchone()
-            seq = int(row["next_seq"])
-            conn.execute(
-                "INSERT INTO research_run_events (run_id, seq, type, data_json, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (run_id, seq, type, json.dumps(data), ts),
-            )
-            conn.execute("UPDATE research_runs SET updated_at = ? WHERE id = ?", (ts, run_id))
+            event = self._append_event_on_connection(conn, run_id, type, data)
             conn.commit()
-        return ResearchRunEvent(run_id=run_id, seq=seq, type=type, data=data, created_at=ts)
+        return event
 
     def list_events(self, run_id: str, *, after: int = 0, limit: int = 500) -> list[ResearchRunEvent]:
         with self._connect() as conn:

@@ -81,6 +81,33 @@ def _is_retryable_failed_tail(m: ResearchMessage) -> bool:
     return content == MAX_TOOL_CALLS_SENTINEL or "Reached maximum number of turns" in content
 
 
+def _history_policy_reads_messages(policy: str) -> bool:
+    if policy == "full_thread":
+        return True
+    if policy == "no_history":
+        return False
+    raise ValueError(f"unsupported history policy (reserved, not yet built): {policy}")
+
+
+def _build_thread_history_from_messages(
+    messages: list[ResearchMessage],
+    *,
+    exclude_last_failed_pair: bool = False,
+) -> list[dict]:
+    if (
+        exclude_last_failed_pair
+        and len(messages) >= 2
+        and messages[-2].role == "user"
+        and _is_retryable_failed_tail(messages[-1])
+    ):
+        messages = messages[:-2]
+    return [
+        {"role": message.role, "content": message.content}
+        for message in messages
+        if not getattr(message, "is_error", False) and message.content
+    ]
+
+
 def build_thread_history(
     store,
     thread_id: str,
@@ -101,24 +128,12 @@ def build_thread_history(
     - ``recent_messages`` / ``summary_plus_recent``: reserved (plan §5) — raise,
       so a cap/summary can't ship implicitly before it's designed.
     """
-    if policy == "no_history":
+    if not _history_policy_reads_messages(policy):
         return []
-    if policy != "full_thread":
-        raise ValueError(f"unsupported history policy (reserved, not yet built): {policy}")
-    messages = store.list_messages(thread_id)
-    if (
-        exclude_last_failed_pair
-        and len(messages) >= 2
-        and messages[-2].role == "user"
-        and _is_retryable_failed_tail(messages[-1])
-    ):
-        messages = messages[:-2]
-    out: list[dict] = []
-    for m in messages:
-        if getattr(m, "is_error", False) or not m.content:
-            continue
-        out.append({"role": m.role, "content": m.content})
-    return out
+    return _build_thread_history_from_messages(
+        store.list_messages(thread_id),
+        exclude_last_failed_pair=exclude_last_failed_pair,
+    )
 
 
 def _now() -> str:
@@ -513,9 +528,32 @@ class ResearchThreadStore:
             ).fetchall()
         return [self._thread(r) for r in rows]
 
+    def _list_messages_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        thread_id: str,
+    ) -> list[ResearchMessage]:
+        rows = conn.execute(
+            "SELECT * FROM research_messages WHERE thread_id = ? ORDER BY id ASC",
+            (thread_id,),
+        ).fetchall()
+        return [self._message(r) for r in rows]
+
+    def _build_thread_history_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        thread_id: str,
+        policy: str = "full_thread",
+        *,
+        exclude_last_failed_pair: bool = False,
+    ) -> list[dict]:
+        if not _history_policy_reads_messages(policy):
+            return []
+        return _build_thread_history_from_messages(
+            self._list_messages_on_connection(conn, thread_id),
+            exclude_last_failed_pair=exclude_last_failed_pair,
+        )
+
     def list_messages(self, thread_id: str) -> list[ResearchMessage]:
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM research_messages WHERE thread_id = ? ORDER BY id ASC", (thread_id,)
-            ).fetchall()
-        return [self._message(r) for r in rows]
+            return self._list_messages_on_connection(conn, thread_id)

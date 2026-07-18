@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -33,6 +34,8 @@ from ..dependencies import (
 
 router = APIRouter(tags=["research"])
 _RUN_EVENT_PAGE_SIZE = 500
+_SCHEDULE_FAILURE_MESSAGE = "research run could not be scheduled"
+logger = logging.getLogger(__name__)
 
 
 class ResearchRunCreate(BaseModel):
@@ -304,18 +307,7 @@ async def create_research_run(
     if not valid_thread_id(thread_id):
         raise HTTPException(status_code=422, detail="invalid thread_id")
 
-    from src.research_threads import build_thread_history
-
     existing_thread = thread_store.get_thread(thread_id)
-    history = (
-        build_thread_history(
-            thread_store,
-            thread_id,
-            exclude_last_failed_pair=request.retry_last_failed,
-        )
-        if existing_thread is not None
-        else []
-    )
     model, effort = request.model, request.effort
     if model is None:
         model, effort = resolve_research_route(provider)
@@ -323,7 +315,7 @@ async def create_research_run(
     agent_question = _compose_agent_question(question, request.ticker)
 
     try:
-        run = run_store.create_run_with_user_message(
+        run, history = run_store.create_run_with_user_message(
             thread_store=thread_store,
             new_thread_title=(
                 question[:TITLE_MAX] if existing_thread is None else None
@@ -340,16 +332,32 @@ async def create_research_run(
             auth_mode=auth_mode,
             credential_id=credential_id,
             assistant_stance=request.assistant_stance,
+            retry_last_failed=request.retry_last_failed,
         )
     except ResearchRunUnavailableError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    schedule_research_run(
-        run_id=run.id,
-        run_store=run_store,
-        thread_store=thread_store,
-        dal=dal,
-        history=history,
-    )
+    try:
+        schedule_research_run(
+            run_id=run.id,
+            run_store=run_store,
+            thread_store=thread_store,
+            dal=dal,
+            history=history,
+        )
+    except Exception:
+        logger.exception("failed to schedule research run %s", run.id)
+        try:
+            run_store.fail_queued_run_handoff(
+                run_id=run.id,
+                thread_store=thread_store,
+                message=_SCHEDULE_FAILURE_MESSAGE,
+            )
+        except Exception:
+            logger.exception("failed to persist research scheduling failure %s", run.id)
+        raise HTTPException(
+            status_code=503,
+            detail=_SCHEDULE_FAILURE_MESSAGE,
+        ) from None
     return {"run": _run_dict(run)}
 
 
