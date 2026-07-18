@@ -13,9 +13,13 @@ var marketNewsAutoSyncToggle = document.getElementById("marketNewsAutoSyncToggle
 var marketNewsAutoSyncInterval = document.getElementById("marketNewsAutoSyncInterval");
 var marketNewsAutoSyncResolvedEl = document.getElementById("marketNewsAutoSyncResolved");
 var progressEl = document.getElementById("progress");
-var manualSection = document.getElementById("manualSection");
+var reconciliationQueueEl = document.getElementById("reconciliationQueue");
+var reconciliationErrorEl = document.getElementById("reconciliationError");
+var manualConfirmationEl = document.getElementById("manualConfirmation");
 var manualInput = document.getElementById("manualInput");
 var manualBtn = document.getElementById("manualBtn");
+var RECONCILIATION_NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
+var lastReconciliationQueue = null;
 var ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL = "30";
 var MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL = "60";
 var MARKET_NEWS_AUTO_SYNC_AUTO_VALUE = "auto";
@@ -64,6 +68,7 @@ chrome.storage.local.get([
   renderMarketNewsAutoSyncResolved();
   renderStatus(data.lastRefresh);
   renderMarketNewsStatus(data.lastMarketNewsRefresh);
+  loadReconciliationQueue();
   chrome.runtime.sendMessage({ action: "ensure_auto_sync_alarms" }, function () {
     if (chrome.runtime.lastError) {
       return;
@@ -176,6 +181,7 @@ function startRefresh(mode) {
 
     chrome.storage.local.get("lastRefresh", function (data) {
       renderStatus(data.lastRefresh);
+      loadReconciliationQueue();
     });
   });
 }
@@ -366,39 +372,146 @@ setInterval(function () {
   renderMarketNewsAutoSyncResolved();
 }, 60000);
 
+function sendReconciliationNative(payload) {
+  return new Promise(function (resolve) {
+    chrome.runtime.sendNativeMessage(RECONCILIATION_NATIVE_HOST, payload, function (result) {
+      if (chrome.runtime.lastError) {
+        resolve({ status: "error", error_code: "native_host_unavailable" });
+        return;
+      }
+      resolve(result || { status: "error", error_code: "empty_native_response" });
+    });
+  });
+}
+
+function renderReconciliationQueue(queue) {
+  ArkScopeReconciliationUI.renderQueue(reconciliationQueueEl, queue, {
+    onUseCandidate: function (payload) {
+      return sendReconciliationNative(Object.assign(
+        { action: "accept_reconciliation_link" }, payload
+      ));
+    },
+    onRejectCandidate: function (payload) {
+      return sendReconciliationNative(Object.assign(
+        { action: "reject_reconciliation_candidate" }, payload
+      ));
+    },
+    onChanged: function () {
+      loadReconciliationQueue();
+    },
+  });
+}
+
+function loadReconciliationQueue() {
+  return sendReconciliationNative({ action: "get_reconciliation_queue", limit: 50 })
+    .then(function (result) {
+      if (result && result.status === "ok" && Array.isArray(result.events)) {
+        lastReconciliationQueue = {
+          events: result.events,
+          total: Number.isInteger(result.total) ? result.total : result.events.length,
+        };
+        reconciliationErrorEl.hidden = true;
+        reconciliationErrorEl.textContent = "";
+        renderReconciliationQueue(lastReconciliationQueue);
+        return lastReconciliationQueue;
+      }
+      reconciliationErrorEl.hidden = false;
+      reconciliationErrorEl.textContent = "無法更新文章關聯佇列，請稍後重試";
+      if (lastReconciliationQueue) renderReconciliationQueue(lastReconciliationQueue);
+      return null;
+    });
+}
+
+function renderManualConfirmations(confirmations) {
+  manualConfirmationEl.replaceChildren();
+  (confirmations || []).forEach(function (item) {
+    var row = document.createElement("div");
+    row.className = "reconciliation-confirmation";
+    var warning = document.createElement("div");
+    warning.className = "reconciliation-warning";
+    warning.textContent = item.symbol + " 的文章日期或既有連結需要再次確認";
+    var actions = document.createElement("div");
+    actions.className = "reconciliation-confirm-actions";
+    var confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = "reconciliation-confirm";
+    confirmButton.textContent = "仍要使用";
+    var cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "reconciliation-cancel";
+    cancelButton.textContent = "取消";
+    actions.append(confirmButton, cancelButton);
+    row.append(warning, actions);
+    manualConfirmationEl.appendChild(row);
+
+    cancelButton.addEventListener("click", function () {
+      row.remove();
+    });
+    confirmButton.addEventListener("click", function () {
+      confirmButton.disabled = true;
+      sendReconciliationNative({
+        action: "accept_reconciliation_link",
+        lineage_id: item.lineage_id,
+        role: item.role,
+        event_anchor_date: item.event_anchor_date,
+        article_id: item.article_id,
+        article_url: item.url,
+        replace_link_id: item.replace_link_id,
+        confirm_warnings: true,
+      }).then(function (result) {
+        if (result && result.status === "ok") {
+          row.remove();
+          loadReconciliationQueue();
+          return;
+        }
+        confirmButton.disabled = false;
+        progressEl.style.display = "block";
+        progressEl.style.color = "#c62828";
+        progressEl.textContent = "確認未完成，請稍後重試";
+      });
+    });
+  });
+}
+
 manualBtn.addEventListener("click", function () {
-  var lines = manualInput.value.trim().split("\n");
-  var items = [];
-  for (var i = 0; i < lines.length; i++) {
-    var parts = lines[i].trim().split(/\s+/);
-    if (parts.length >= 2) {
-      items.push({ symbol: parts[0].toUpperCase(), url: parts.slice(1).join(" ") });
-    }
+  var parsed = ArkScopeReconciliationUI.parseAdvancedLines(manualInput.value);
+  if (parsed.errors.length > 0 || parsed.items.length === 0) {
+    progressEl.style.display = "block";
+    progressEl.style.color = "#c62828";
+    progressEl.textContent = parsed.errors.length > 0
+      ? "第 " + parsed.errors[0].line + " 行格式不正確"
+      : "請輸入至少一筆完整事件";
+    return;
   }
-  if (items.length === 0) return;
 
   manualBtn.disabled = true;
-  manualBtn.textContent = "Fetching...";
+  manualBtn.textContent = "擷取中…";
   progressEl.style.display = "block";
-
-  chrome.runtime.sendMessage({ action: "manual_fetch", items: items }, function (result) {
+  chrome.runtime.sendMessage({ action: "manual_fetch", items: parsed.items }, function (result) {
     manualBtn.disabled = false;
-    manualBtn.textContent = "Fetch Manual";
+    manualBtn.textContent = "擷取並檢查";
     progressEl.style.display = "block";
-    // Show result
-    if (result && result.fetched > 0) {
-      progressEl.textContent = "Done: " + result.fetched + " saved" +
-        (result.failed > 0 ? ", " + result.failed + " failed" : "");
+    var confirmations = result && Array.isArray(result.confirmation_required)
+      ? result.confirmation_required
+      : [];
+    renderManualConfirmations(confirmations);
+    if (confirmations.length > 0) {
+      progressEl.textContent = "文章已擷取，請確認關聯";
+      progressEl.style.color = "#e65100";
+    } else if (result && result.fetched > 0) {
+      progressEl.textContent = "已擷取 " + result.fetched + " 篇文章" +
+        (result.failed > 0 ? "，" + result.failed + " 篇失敗" : "");
       progressEl.style.color = "#2e7d32";
       manualInput.value = "";
       chrome.storage.local.remove("manualDraft");
     } else if (result && result.failed > 0) {
-      progressEl.textContent = "Failed: " + result.failed + " articles could not be fetched";
+      progressEl.textContent = "有 " + result.failed + " 篇文章無法擷取或關聯";
       progressEl.style.color = "#c62828";
     } else {
-      progressEl.textContent = "No result — check if URLs are correct";
+      progressEl.textContent = "沒有可處理的文章，請檢查輸入";
       progressEl.style.color = "#e65100";
     }
+    loadReconciliationQueue();
     chrome.storage.local.get("lastRefresh", function (data) {
       renderStatus(data.lastRefresh);
     });
@@ -416,6 +529,7 @@ chrome.storage.onChanged.addListener(function (changes, areaName) {
   if (areaName !== "local") return;
   if (changes.lastRefresh) {
     renderStatus(changes.lastRefresh.newValue);
+    loadReconciliationQueue();
   }
   if (changes.lastMarketNewsRefresh) {
     renderMarketNewsStatus(changes.lastMarketNewsRefresh.newValue);
@@ -533,19 +647,11 @@ function renderStatus(lastRefresh) {
       statusEl.append(document.createElement("br"), document.createTextNode(detailLine));
     }
 
-    // Show unresolved tickers + manual fetch section
-    var unresolved = details.unresolved_symbols || details.no_article || [];
-    if (unresolved.length > 0) {
+    if (Number.isInteger(details.review_required) && details.review_required > 0) {
       statusEl.append(
         document.createElement("br"),
-        document.createTextNode("Missing: " + unresolved.join(", "))
+        document.createTextNode("文章關聯：待檢視 " + details.review_required + " 個事件")
       );
-      manualSection.style.display = "block";
-      if (!manualInput.value || !manualInput.value.includes("http")) {
-        manualInput.value = unresolved.map(function (t) { return t + " "; }).join("\n");
-      }
-    } else {
-      manualSection.style.display = "none";
     }
   }
 }

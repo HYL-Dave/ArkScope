@@ -6,6 +6,7 @@
     body {
       width: 320px;
       padding: 12px;
+      box-sizing: border-box;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 13px;
       color: #333;
@@ -116,6 +117,123 @@
       font-size: 12px;
       padding: 4px 6px;
     }
+    #reconciliationSection {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+    }
+    .reconciliation-heading {
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #222;
+    }
+    #reconciliationError,
+    .reconciliation-action-error {
+      margin: 6px 0;
+      color: #c62828;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .reconciliation-summary,
+    .reconciliation-event-meta,
+    .reconciliation-event-reason,
+    .reconciliation-candidate-details,
+    .reconciliation-evidence,
+    .reconciliation-candidate-reason,
+    .reconciliation-no-candidate {
+      color: #666;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .reconciliation-event {
+      padding: 8px 0;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .reconciliation-event-title {
+      font-weight: 600;
+      color: #333;
+    }
+    .reconciliation-candidate {
+      margin-top: 7px;
+      padding-left: 8px;
+      border-left: 2px solid #d7d7d7;
+      min-width: 0;
+    }
+    .reconciliation-candidate-title {
+      display: block;
+      color: #1565c0;
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .reconciliation-candidate-details,
+    .reconciliation-candidate-actions,
+    .reconciliation-confirm-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 5px;
+    }
+    .reconciliation-content-state {
+      font-weight: 600;
+      color: #444;
+    }
+    .reconciliation-candidate-actions button,
+    .reconciliation-confirm-actions button,
+    #manualBtn {
+      flex: 0 1 auto;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .reconciliation-use,
+    .reconciliation-confirm {
+      background: #1976d2;
+    }
+    .reconciliation-reject,
+    .reconciliation-cancel {
+      background: #666;
+    }
+    .reconciliation-confirmation {
+      margin-top: 7px;
+      padding-top: 7px;
+      border-top: 1px solid #f0b36a;
+    }
+    .reconciliation-warning {
+      color: #b45309;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    #manualAdvanced {
+      margin-top: 10px;
+      color: #555;
+      font-size: 11px;
+    }
+    #manualAdvanced summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: #444;
+    }
+    #manualAdvanced label {
+      display: block;
+      margin: 7px 0 4px;
+      line-height: 1.4;
+    }
+    #manualInput {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: vertical;
+      font-family: monospace;
+      font-size: 11px;
+    }
+    #manualBtn {
+      margin-top: 6px;
+      background: #ef6c00;
+    }
   </style>
 </head>
 <body>
@@ -165,11 +283,19 @@
   <div id="marketNewsAutoSyncResolved" class="btn-hint" style="margin-top: -4px; margin-bottom: 8px;"></div>
   <div class="btn-hint">Quick: recent updates &nbsp;|&nbsp; Full: balanced scan &nbsp;|&nbsp; Backfill: overnight comments &nbsp;|&nbsp; News Catchup: latest + backlog</div>
   <div id="progress"></div>
-  <div id="manualSection" style="display:none; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
-    <div style="font-size: 12px; color: #666; margin-bottom: 6px;">Paste missing article URLs (TICKER URL per line):</div>
-    <textarea id="manualInput" rows="3" style="width: 100%; font-size: 11px; font-family: monospace; padding: 4px; border: 1px solid #ccc; border-radius: 4px; resize: vertical;"></textarea>
-    <button id="manualBtn" style="margin-top: 6px; background: #ef6c00; font-size: 12px; padding: 7px;">Fetch Manual</button>
-  </div>
+  <section id="reconciliationSection">
+    <div class="reconciliation-heading">文章關聯檢視</div>
+    <div id="reconciliationError" hidden></div>
+    <div id="reconciliationQueue">正在載入待檢視事件…</div>
+    <div id="manualConfirmation"></div>
+    <details id="manualAdvanced">
+      <summary>進階：指定文章網址</summary>
+      <label for="manualInput">每行：標的 事件 日期 文章網址</label>
+      <textarea id="manualInput" rows="3"></textarea>
+      <button id="manualBtn">擷取並檢查</button>
+    </details>
+  </section>
+  <script src="reconciliation_ui.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
