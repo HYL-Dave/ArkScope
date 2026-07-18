@@ -34,6 +34,25 @@ classifier test remains one node and loops over the three central shapes plus
 near misses, including per-tool timeout text. Reviewed accounting remains
 backend `+34/-0` and frontend `+52/-15`.
 
+## Implementation Ledger
+
+### Task 0 — COMPLETE (2026-07-18)
+
+- Isolated worktree: `/tmp/arkscope-p2-8-slice-3`, branch
+  `codex/p2-8-slice-3-research-workspace`, branch point and merge-base
+  `5be79a658be91168dc7d10b5108344fadf4c9a7a`.
+- Canonical behavior base remains `c78203a`; the later docs-only review tip is
+  recorded separately and does not move A/B authority.
+- Linked-worktree git-crypt key installed through the repository's established
+  metadata-key pattern; checkout is clean.
+- Protected-file proof: worktree `config/tickers_core.json` has no diff; the
+  main worktree's user-owned `BTSG` addition remains present and untouched.
+- Fresh baselines: backend `4378` collected; Research-focused `93`; frontend
+  `56 files / 533 tests`; TypeScript typecheck passed.
+- Structural RED inventory confirmed the permanent `research-grid`, history and
+  trace asides, `window.confirm`, the second model-discovery/fallback policy,
+  and current generic thread-error rendering.
+
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
 pinnable Evidence/Run-details surface, complete per-run model selection from
@@ -299,7 +318,7 @@ facts. The low-level agent event enum is unchanged.
 
 **Files:** no product edits.
 
-- [ ] **Step 1: Create a clean linked worktree after plan review**
+- [x] **Step 1: Create a clean linked worktree after plan review**
 
 Use `superpowers:using-git-worktrees`. Suggested branch and path:
 
@@ -312,7 +331,7 @@ Do not copy the dirty `config/tickers_core.json`. If encrypted tracked files
 need the repository's existing linked-worktree key setup, use that established
 mechanism and prove the worktree is clean before editing.
 
-- [ ] **Step 2: Record base, branch, environment, and protected-file proof**
+- [x] **Step 2: Record base, branch, environment, and protected-file proof**
 
 ```bash
 git status --short --branch
@@ -324,7 +343,7 @@ git diff -- config/tickers_core.json
 The implementation worktree must have no `tickers_core.json` change. The main
 worktree user's diff remains untouched.
 
-- [ ] **Step 3: Re-run exact baseline collection**
+- [x] **Step 3: Re-run exact baseline collection**
 
 ```bash
 pytest --collect-only -q
@@ -340,7 +359,7 @@ npm run typecheck --workspace apps/arkscope-web
 
 Stop if the counts differ from `4378`, `93`, and `56/533` before any RED test.
 
-- [ ] **Step 4: Record current structural RED facts**
+- [x] **Step 4: Record current structural RED facts**
 
 The ledger records, without editing code:
 
