@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -52,6 +53,8 @@ _RUN_STATES = frozenset(
     {"all", "active", "succeeded", "failed", "interrupted", "no_run"}
 )
 _ARCHIVE_MODES = frozenset({"current", "archived"})
+_MAX_PAGE_LIMIT = 200
+_MAX_SQLITE_OFFSET = 2**63 - 1
 
 _LATEST_RUNS_CTE = """
 WITH latest_runs AS (
@@ -96,6 +99,28 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _utc_bound(value: str | None, field: str) -> tuple[str | None, datetime | None]:
+    if value is None:
+        return None, None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"research history {field} must be a timezone-aware timestamp")
+
+    candidate = value.strip()
+    if candidate.endswith("Z"):
+        candidate = f"{candidate[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError as exc:
+        raise ValueError(
+            f"research history {field} must be a timezone-aware timestamp"
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"research history {field} must be a timezone-aware timestamp")
+
+    normalized = parsed.astimezone(timezone.utc)
+    return normalized.isoformat(timespec="seconds"), normalized
+
+
 def _normalized_query(
     *,
     q: str | None,
@@ -111,17 +136,36 @@ def _normalized_query(
         raise ValueError(f"invalid research run state: {run_state}")
     if archive_mode not in _ARCHIVE_MODES:
         raise ValueError(f"invalid research archive mode: {archive_mode}")
-    if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
-        raise ValueError("research history limit must be a positive integer")
-    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
-        raise ValueError("research history offset must be a non-negative integer")
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= _MAX_PAGE_LIMIT
+    ):
+        raise ValueError(f"research history limit must be between 1 and {_MAX_PAGE_LIMIT}")
+    if (
+        isinstance(offset, bool)
+        or not isinstance(offset, int)
+        or not 0 <= offset <= _MAX_SQLITE_OFFSET
+    ):
+        raise ValueError(
+            f"research history offset must be between 0 and {_MAX_SQLITE_OFFSET}"
+        )
 
     normalized_ticker = _optional_text(ticker)
+    normalized_from, from_datetime = _utc_bound(updated_from, "updated_from")
+    normalized_before, before_datetime = _utc_bound(updated_before, "updated_before")
+    if (
+        from_datetime is not None
+        and before_datetime is not None
+        and from_datetime >= before_datetime
+    ):
+        raise ValueError("research history updated window must be positive")
+
     return ResearchHistoryQuery(
         q=_optional_text(q),
         ticker=normalized_ticker.upper() if normalized_ticker else None,
-        updated_from=_optional_text(updated_from),
-        updated_before=_optional_text(updated_before),
+        updated_from=normalized_from,
+        updated_before=normalized_before,
         run_state=run_state,
         archive_mode=archive_mode,
         limit=limit,
@@ -230,11 +274,15 @@ class ResearchHistoryStore:
         )
 
         with closing(self._connect()) as conn:
-            total = int(conn.execute(count_sql, params).fetchone()["total"])
-            rows = conn.execute(
-                items_sql,
-                (*params, query.limit, query.offset),
-            ).fetchall()
+            conn.execute("BEGIN")
+            try:
+                total = int(conn.execute(count_sql, params).fetchone()["total"])
+                rows = conn.execute(
+                    items_sql,
+                    (*params, query.limit, query.offset),
+                ).fetchall()
+            finally:
+                conn.rollback()
 
         return ResearchHistoryPage(
             items=tuple(self._thread(row) for row in rows),

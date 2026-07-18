@@ -87,7 +87,34 @@ def _assert_bounded_page(page: ResearchHistoryPage, ids: list[str], *, total: in
     assert len(page.threads) <= page.limit
 
 
-def test_query_searches_stored_title_and_ticker_before_limit(stores):
+class _AfterFetchCursor:
+    def __init__(self, cursor, after_fetch):
+        self._cursor = cursor
+        self._after_fetch = after_fetch
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        self._after_fetch()
+        return row
+
+
+class _InterleavingConnection:
+    def __init__(self, conn, after_count):
+        self._conn = conn
+        self._after_count = after_count
+
+    def execute(self, sql, params=()):
+        cursor = self._conn.execute(sql, params)
+        if "COUNT(*) AS total" not in sql:
+            return cursor
+        assert self._conn.in_transaction, "count and page require an explicit snapshot"
+        return _AfterFetchCursor(cursor, self._after_count)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def test_query_searches_stored_title_and_ticker_before_limit(stores, monkeypatch):
     thread_store, run_store, history = stores
     _add_thread(thread_store, "match-a", ticker="100%_")
     _add_thread(thread_store, "match-z", title="Stored literal 100%_ marker")
@@ -105,10 +132,26 @@ def test_query_searches_stored_title_and_ticker_before_limit(stores):
         status="succeeded",
         question="100%_ appears only in the run question",
     )
+    original_connect = history._connect
+
+    def add_interleaved_match():
+        _add_thread(
+            thread_store,
+            "interleaved-match",
+            title="Stored literal 100%_ added between reads",
+            updated_at="2026-07-18T04:00:00+00:00",
+        )
+
+    monkeypatch.setattr(
+        history,
+        "_connect",
+        lambda: _InterleavingConnection(original_connect(), add_interleaved_match),
+    )
 
     page = history.query_threads(q="%_", limit=1)
 
     _assert_bounded_page(page, ["match-z"], total=2)
+    assert thread_store.get_thread("interleaved-match") is not None
     assert isinstance(page.threads[0], ResearchHistoryThread)
     assert isinstance(page.threads, tuple)
     with pytest.raises(FrozenInstanceError):
@@ -137,6 +180,25 @@ def test_query_filters_exact_ticker_before_limit(stores):
     _assert_bounded_page(page, ["match-z"], total=2)
     assert page.threads[0].ticker == "NVDA"
 
+    largest_offset = history.query_threads(
+        ticker="nvda",
+        limit=200,
+        offset=2**63 - 1,
+    )
+    assert largest_offset.threads == ()
+    assert largest_offset.total == 2
+    assert largest_offset.limit == 200
+    assert largest_offset.offset == 2**63 - 1
+
+    for invalid in (
+        {"limit": 0},
+        {"limit": 201},
+        {"offset": -1},
+        {"offset": 2**63},
+    ):
+        with pytest.raises(ValueError):
+            history.query_threads(**invalid)
+
 
 def test_query_filters_updated_window_before_limit(stores):
     thread_store, _, history = stores
@@ -154,13 +216,34 @@ def test_query_filters_updated_window_before_limit(stores):
     )
 
     page = history.query_threads(
-        updated_from="2026-07-18T01:00:00+00:00",
-        updated_before="2026-07-18T03:00:00+00:00",
+        updated_from="2026-07-18T09:00:00+08:00",
+        updated_before="2026-07-17T23:00:00-04:00",
         limit=1,
     )
 
     _assert_bounded_page(page, ["match-z"], total=2)
     assert page.threads[0].updated_at == MATCHED_AT
+
+    z_page = history.query_threads(
+        updated_from="2026-07-18T01:00:00Z",
+        updated_before="2026-07-18T03:00:00Z",
+        limit=1,
+    )
+    _assert_bounded_page(z_page, ["match-z"], total=2)
+
+    with pytest.raises(ValueError, match="updated_from"):
+        history.query_threads(updated_from="not-a-timestamp")
+    with pytest.raises(ValueError, match="updated_before"):
+        history.query_threads(updated_before="2026-07-18T03:00:00")
+    for updated_from, updated_before in (
+        ("2026-07-18T03:00:00Z", "2026-07-18T03:00:00Z"),
+        ("2026-07-18T04:00:00Z", "2026-07-18T03:00:00Z"),
+    ):
+        with pytest.raises(ValueError, match="positive"):
+            history.query_threads(
+                updated_from=updated_from,
+                updated_before=updated_before,
+            )
 
 
 @pytest.mark.parametrize(
