@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 2 COMPLETE / TASK 3 IN PROGRESS 2026-07-18
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 3 AND TASK 5 COMPLETE / TASK 4 IN PROGRESS 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -92,6 +92,29 @@ backend `+34/-0` and frontend `+52/-15`.
   error turn. This is not waived. Task 3's already-accounted tests 9 and 10
   must be true SQLite interleaving tests, and Task 3 must commit status, event,
   and linked typed message atomically before its review can pass.
+
+### Task 3 — COMPLETE (2026-07-18)
+
+- Product commit `0b11074` added the strict Research error-code authority,
+  nullable run/message linkage, deterministic latest-successful selection,
+  semantic `default` persistence with one provider-wire normalization seam,
+  typed DTOs, and the reviewed Claude SDK `error_max_turns` mapping.
+- The two carried cancellation/restart nodes use independent stores and pause
+  inside the uncommitted terminal transaction. They prove status, replay event,
+  and linked error turn commit before a new run can append its user message;
+  the established `run -> thread` lock order remains unchanged.
+- Review commits `08ed4e2` and `9fcc7d5` removed a duplicate SDK effort owner
+  and pinned every reviewed timeout/max-turn positive and near-miss boundary,
+  including provider `APITimeoutError` module gating and an Anthropic `done`
+  near miss that must remain successful.
+- Exact accounting is `23` run-store nodes (`+10`), `46` route nodes (`+2`),
+  and the Claude driver node strengthened in place. Independent focused replay
+  is `70 passed`; the isolated event file is `20 passed` with its one known
+  bare-environment `eventkit` setup node excluded rather than modified.
+- Independent spec and quality reviewers returned final PASS. `EventType`
+  remains byte-identical, public error detail is redacted/bounded, new
+  selection/message contracts expose no credential identity, and all four
+  API-key/OAuth branches receive `None` rather than literal `default`.
 
 ### Task 5 — COMPLETE IN PARALLEL (2026-07-18)
 
