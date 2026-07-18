@@ -73,6 +73,7 @@ export interface Thread {
   model: string | null;
   created_at: string;
   updated_at: string; // advances on done (and other terminals)
+  archived_at?: string | null;
 }
 
 // ---- In-flight working state (held OUT of messages so abort drops it clean) -
@@ -120,6 +121,7 @@ export type Action =
   | { kind: "streamError"; error: string; ts?: number }
   | { kind: "newThread" } // + 新對話: next submit starts a fresh thread (UI blocks while pending)
   | { kind: "selectThread"; threadId: string } // left-pane switch (UI blocks while pending)
+  | { kind: "updateThread"; thread: Thread } // server-confirmed rename/archive metadata
   | { kind: "deleteThread"; threadId: string } // persisted delete succeeded; remove local copy
   | { kind: "hydrate"; threads: Thread[]; messagesByThread: Record<string, Message[]>; activeThreadId?: string | null }; // reload restore (C-2b)
 
@@ -370,11 +372,18 @@ export function reduce(state: State, action: Action): State {
       return { ...state, activeThreadId: null, pending: null, footer: null, terminal: null };
     case "selectThread":
       return { ...state, activeThreadId: action.threadId, pending: null, footer: null, terminal: null };
+    case "updateThread":
+      return {
+        ...state,
+        threads: state.threads.map((thread) => (
+          thread.id === action.thread.id ? action.thread : thread
+        )),
+      };
     case "deleteThread": {
       const threads = state.threads.filter((t) => t.id !== action.threadId);
       const { [action.threadId]: _deleted, ...messagesByThread } = state.messagesByThread;
       const activeThreadId = state.activeThreadId === action.threadId
-        ? (threads[0]?.id ?? null)
+        ? null
         : state.activeThreadId;
       return { ...state, threads, activeThreadId, messagesByThread, footer: null, terminal: null };
     }

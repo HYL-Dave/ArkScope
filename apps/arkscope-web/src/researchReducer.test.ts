@@ -629,7 +629,7 @@ describe("reducer · thread navigation", () => {
     expect(s.messagesByThread["t2"]).toHaveLength(2);
   });
 
-  it("deleteThread removes the active thread and selects the next remaining thread", () => {
+  it("deleteThread removes the active thread and returns to a blank new-thread workspace", () => {
     const s0 = run(
       submit({ question: "first", threadId: "t1" }),
       done1,
@@ -638,10 +638,10 @@ describe("reducer · thread navigation", () => {
       f("done", { answer: "a2", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } }),
     );
     const s = reduce(s0, { kind: "deleteThread", threadId: "t2" });
-    expect(s.activeThreadId).toBe("t1");
+    expect(s.activeThreadId).toBeNull();
     expect(s.threads.map((t) => t.id)).toEqual(["t1"]);
     expect(s.messagesByThread["t2"]).toBeUndefined();
-    expect(msgs(s)).toHaveLength(2);
+    expect(s.messagesByThread["t1"]).toHaveLength(2);
   });
 
   it("deleteThread on the last thread clears active selection and footer", () => {
@@ -712,7 +712,15 @@ describe("reducer · hydrate", () => {
     });
     const sel = reduce(h, { kind: "selectThread", threadId: "ta" });
     expect(msgs(sel)).toHaveLength(2);
-    const cont = reduce(sel, submit({ question: "follow-up in restored thread", threadId: "ta" }));
+    const updated = reduce(sel, {
+      kind: "updateThread",
+      thread: { ...mkThread("ta", "renamed"), archived_at: "2026-07-18T00:00:00Z" },
+    });
+    expect(updated.threads[0]).toMatchObject({
+      title: "renamed",
+      archived_at: "2026-07-18T00:00:00Z",
+    });
+    const cont = reduce(updated, submit({ question: "follow-up in restored thread", threadId: "ta" }));
     expect(cont.threads).toHaveLength(1); // appended, not a new thread
     expect(cont.messagesByThread["ta"]).toHaveLength(3);
   });
