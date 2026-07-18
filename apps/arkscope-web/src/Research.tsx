@@ -9,42 +9,45 @@
 //   • Stop is the explicit cancellation path;
 //   • a superseded poller (a newer run took over abortRef) never commits.
 // Persistence (C-2b): the run API persists user/assistant turns to the local
-// ResearchThreadStore; on mount this fetches + `hydrate`s the threads/messages
-// (merge, so a late hydrate can't clobber a live turn). Threads survive reload;
-// follow-ups default to the active thread's persisted provider, while new
-// conversations default to the Settings AI 研究 route.
-//
-// Provider selection is USER-CHOSEN — no global default: 1 provider available →
-// auto-select; configured AI 研究 route → auto-select that route; 0 → disable
-// input. The model/effort per query is the ai_research route (Settings → Models,
-// Slice B2), resolved for the chosen provider — see researchModelFor.
+// ResearchThreadStore; on mount this fetches + `hydrate`s the threads/messages.
+// Complete provider/model/effort selection is resolved from the latest successful
+// thread tuple, the last explicit user tuple, or the Settings route, in that order.
+// Every candidate is validated against the shared Models-UX effective catalog;
+// invalid saved choices block instead of silently falling through.
 // Per-provider trace behaviour comes from a descriptor map, not an
 // OpenAI/Anthropic binary, so compatible providers can slot in later.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import {
-  cancelResearchRun, createResearchRun, deleteResearchThread, discoverModels,
+  cancelResearchRun, createResearchRun, deleteResearchThread,
   getModelCatalog, getQueryProviders, getResearchRunEvents,
-  getResearchThreads, getResearchMessages, getRuntimeConfig,
-  type CredentialAuthType, type ModelCatalog,
-  type ResearchMessageDTO, type ResearchRunDTO, type ResearchThreadDTO, type RuntimeConfig,
+  getResearchThreads, getResearchMessages,
+  type ModelCatalog,
+  type ResearchMessageDTO, type ResearchRunDTO, type ResearchThreadDTO,
 } from "./api";
 import { MarkdownView } from "./MarkdownView";
 import {
   asResearchProviderId,
-  chooseResearchProvider,
   RESEARCH_PROVIDER_IDS,
   type ResearchProviderId,
 } from "./researchProvider";
 import {
-  activeCredential,
-  defaultModel,
   effortNote,
   effortOptionsForModel,
-  lastAssistantSelection,
-  modelOptions,
 } from "./researchModels";
+import {
+  groupedModelEntries,
+  modelProviderReason,
+  optionReason,
+} from "./modelPicker";
+import { MODEL_UX_LABELS } from "./modelRoutingUx";
+import {
+  loadResearchThreadSelection,
+  resolveResearchSelection,
+  writeExplicitResearchSelection,
+  type ResearchTuple,
+} from "./researchSelection";
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import { shouldEndResearchReplay } from "./researchRunReplay";
@@ -85,12 +88,13 @@ type ProviderId = ResearchProviderId;
 
 // trace_mode drives the live-trace vs silent-until-done affordance; copy stays
 // neutral. A new OpenAI-compatible provider is a row here, not a render rewrite.
-const PRESENTATION: Record<ProviderId, { label: string; trace_mode: "live" | "post_run"; trace_note: string; auth_mode_label: string }> = {
-  // auth_mode_label reflects what's WIRED today (API key). setup-token / OAuth
-  // are planned auth modes (auth-driver slices S3/S4), not yet usable here.
-  anthropic: { label: "Anthropic", trace_mode: "live", trace_note: "即時工具追蹤", auth_mode_label: "API key（setup-token 計畫中）" },
-  openai: { label: "OpenAI", trace_mode: "post_run", trace_note: "完成後一次顯示工具追蹤", auth_mode_label: "API key（OAuth 計畫中）" },
+const PRESENTATION: Record<ProviderId, { label: string; trace_mode: "live" | "post_run"; trace_note: string }> = {
+  anthropic: { label: "Anthropic", trace_mode: "live", trace_note: "即時工具追蹤" },
+  openai: { label: "OpenAI", trace_mode: "post_run", trace_note: "完成後一次顯示工具追蹤" },
 };
+
+const modelReasonLabel = (reason: string): string =>
+  MODEL_UX_LABELS.reasons[reason] ?? reason;
 
 // Suggested prompts scoped to the C-1 SA primitives (get_sa_feed / get_sa_comment_focus).
 const SUGGESTED = [
@@ -140,18 +144,17 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
   const [state, dispatch] = useReducer(reduce, initialState);
   const [question, setQuestion] = useState("");
   const [tickerInput, setTickerInput] = useState("");
-  const [provider, setProvider] = useState<ProviderId | null>(null); // user-chosen, session-scoped
-  const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
   const [sdk, setSdk] = useState<Record<string, boolean> | null>(null);
   const [booting, setBooting] = useState(true);
-  const [autoRouteSelection, setAutoRouteSelection] = useState(true);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
-  // Model/effort picker (Step 3): a per-(provider, active-auth-mode) selection.
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
-  const [discovered, setDiscovered] = useState<Record<string, string[]>>({}); // credentialId → discovered model ids
-  const [selModel, setSelModel] = useState("");
-  const [selEffort, setSelEffort] = useState("default");
+  const [userSelection, setUserSelection] = useState<ResearchTuple | null>(null);
+  const [threadSelection, setThreadSelection] = useState<{
+    threadId: string;
+    tuple: ResearchTuple | null;
+    loaded: boolean;
+  } | null>(null);
   // Track A: opt-in investor profile → per-run assistant stance override.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [runStance, setRunStance] = useState<AssistantStance>("off");
@@ -163,38 +166,42 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
   const onObserveRunRef = useRef(onObserveRun);
   onObserveRunRef.current = onObserveRun;
 
-  // --- provider availability = SDK present (/query/providers) AND key set ----
-  const availability = useMemo(() => {
-    return PROVIDER_IDS.map((id) => {
-      const hasKey = runtime ? runtime[id].key_set : false;
-      const hasSdk = sdk ? sdk[id] !== false : false; // missing entry → treat as unavailable
-      return { id, available: hasKey && hasSdk, model: runtime ? runtime[id].model : "" };
-    });
-  }, [runtime, sdk]);
-  const availableIds = useMemo(() => availability.filter((a) => a.available).map((a) => a.id), [availability]);
-  const configuredProvider = runtime?.ai_research?.source !== "default"
-    ? (asResearchProviderId(runtime?.ai_research?.provider) ?? undefined)
-    : undefined;
-  const configuredRouteKey = runtime?.ai_research
-    ? `${runtime.ai_research.source}:${runtime.ai_research.provider}:${runtime.ai_research.model}:${runtime.ai_research.effort}`
-    : "";
-  const activeThread = useMemo(
-    () => (state.activeThreadId ? state.threads.find((t) => t.id === state.activeThreadId) ?? null : null),
-    [state.activeThreadId, state.threads],
+  const currentThreadSelection = state.activeThreadId
+    ? (threadSelection?.threadId === state.activeThreadId && threadSelection.loaded
+        ? threadSelection.tuple
+        : undefined)
+    : null;
+  const selection = useMemo(
+    () => catalog
+      ? resolveResearchSelection({
+          catalog,
+          hasActiveThread: !!state.activeThreadId,
+          threadSelection: currentThreadSelection,
+          userSelection,
+          sdkAvailability: sdk ?? undefined,
+        })
+      : null,
+    [catalog, currentThreadSelection, sdk, state.activeThreadId, userSelection],
   );
-  const activeThreadProvider = asResearchProviderId(activeThread?.provider);
+  const provider = selection?.tuple?.provider ?? null;
+  const selModel = selection?.tuple?.model ?? "";
+  const selEffort = selection?.tuple?.effort ?? "default";
+
+  const rememberUserSelection = useCallback((tuple: ResearchTuple) => {
+    setUserSelection(tuple);
+    writeExplicitResearchSelection(tuple);
+  }, []);
 
   useEffect(() => {
     let alive = true;
     void (async () => {
       try {
-        const [rc, qp, cat] = await Promise.all([getRuntimeConfig(), getQueryProviders(), getModelCatalog()]);
+        const [qp, cat] = await Promise.all([getQueryProviders(), getModelCatalog()]);
         if (!alive) return;
-        setRuntime(rc);
         setSdk(Object.fromEntries(Object.entries(qp.providers).map(([k, v]) => [k, !!v.available])));
         setCatalog(cat);
       } catch {
-        if (alive) { setRuntime(null); setSdk(null); }
+        if (alive) { setCatalog(null); setSdk(null); }
       } finally {
         if (alive) setBooting(false);
       }
@@ -202,25 +209,35 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     return () => { alive = false; };
   }, []);
 
-  // Follow-up turns default to the active thread's provider. If no thread is
-  // active, prefer the configured AI 研究 route when available. If the user
-  // explicitly clicks "切換", hold at the chooser until they pick another route.
   useEffect(() => {
-    const next = chooseResearchProvider({
-      currentProvider: provider,
-      activeThreadProvider,
-      availableIds,
-      autoRouteSelection,
-      configuredProvider,
-    });
-    if (next !== provider) setProvider(next);
-  }, [provider, activeThreadProvider, availableIds, autoRouteSelection, configuredProvider]);
-
-  // If Settings changes the AI 研究 route, let the page follow the new route.
-  useEffect(() => {
-    setAutoRouteSelection(true);
-    setProvider(null);
-  }, [configuredRouteKey]);
+    const threadId = state.activeThreadId;
+    if (!threadId) {
+      setThreadSelection(null);
+      return;
+    }
+    let alive = true;
+    setThreadSelection({ threadId, tuple: null, loaded: false });
+    void loadResearchThreadSelection(threadId)
+      .then((tuple) => {
+        if (alive) {
+          setThreadSelection((current) => (
+            current?.threadId === threadId && current.loaded
+              ? current
+              : { threadId, tuple, loaded: true }
+          ));
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setThreadSelection((current) => (
+            current?.threadId === threadId && current.loaded
+              ? current
+              : { threadId, tuple: null, loaded: false }
+          ));
+        }
+      });
+    return () => { alive = false; };
+  }, [state.activeThreadId]);
 
   useEffect(() => {
     if (state.pending) setThreadMenuId(null);
@@ -279,6 +296,20 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
         const res = await getResearchRunEvents(run.id, after);
         onObserveRunRef.current?.(res.run);
         if (abortRef.current !== controller) return; // detached/superseded
+        if (res.run.status === "succeeded") {
+          const successfulProvider = asResearchProviderId(res.run.provider);
+          if (successfulProvider && res.run.model.trim()) {
+            setThreadSelection({
+              threadId: res.run.thread_id,
+              tuple: {
+                provider: successfulProvider,
+                model: res.run.model.trim(),
+                effort: res.run.effort?.trim() || "default",
+              },
+              loaded: true,
+            });
+          }
+        }
         setActiveRunsByThread((prev) => {
           const next = { ...prev };
           if (isTerminalRun(res.run)) delete next[res.run.thread_id];
@@ -360,21 +391,26 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
 
   const submit = useCallback(() => {
     const q = question.trim();
-    if (!q || !provider || state.pending) return; // disabled while pending (defensive)
+    if (!q || selection?.state !== "ready" || state.pending) return;
     const ticker = tickerInput.trim().toUpperCase() || null;
     // Client-owned thread id: reuse the active thread to continue, else a fresh
     // uuid for a new conversation (agreed reducer↔store id model).
     const threadId = state.activeThreadId ?? crypto.randomUUID();
-    const model = selModel.trim() || null;
-    const effort = selEffort && selEffort !== "default" ? selEffort : undefined;
-    dispatch({ kind: "submit", question: q, provider, model, effort, ticker, ts: Date.now(), threadId });
+    const { provider: runProvider, model, effort } = selection.tuple;
+    dispatch({ kind: "submit", question: q, provider: runProvider, model, effort, ticker, ts: Date.now(), threadId });
     writeActiveThreadId(threadId);
     setQuestion("");
     setThreadError(null);
-    // raw question; server frames + persists. model/effort = the picker selection
-    // (server falls back to the ai_research route only when model is omitted).
-    void runManaged({ question: q, provider, model: model ?? undefined, effort, thread_id: threadId, ticker, assistant_stance: stanceForRun });
-  }, [question, tickerInput, provider, selModel, selEffort, state.pending, state.activeThreadId, runManaged, stanceForRun]);
+    void runManaged({
+      question: q,
+      provider: runProvider,
+      model,
+      effort,
+      thread_id: threadId,
+      ticker,
+      assistant_stance: stanceForRun,
+    });
+  }, [question, tickerInput, selection, state.pending, state.activeThreadId, runManaged, stanceForRun]);
 
   // Abort the live stream + drop the pending turn (explicit Stop only).
   const stopStream = useCallback(() => {
@@ -398,8 +434,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     pollingRunIdRef.current = null;
     setThreadError(null);
     setThreadMenuId(null);
-    setAutoRouteSelection(true);
-    setProvider(null);
+    setUserSelection(null);
     writeActiveThreadId(null);
     dispatch({ kind: "newThread" });
   }, []);
@@ -409,8 +444,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     pollingRunIdRef.current = null;
     setThreadError(null);
     setThreadMenuId(null);
-    setAutoRouteSelection(true);
-    setProvider(null);
+    setUserSelection(null);
     writeActiveThreadId(id);
     dispatch({ kind: "selectThread", threadId: id });
   }, []);
@@ -433,6 +467,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
       await deleteResearchThread(thread.id);
       const remaining = state.threads.filter((t) => t.id !== thread.id);
       const nextActive = state.activeThreadId === thread.id ? (remaining[0]?.id ?? null) : state.activeThreadId;
+      if (state.activeThreadId === thread.id) setUserSelection(null);
       writeActiveThreadId(nextActive);
       dispatch({ kind: "deleteThread", threadId: thread.id });
       setThreadMenuId(null);
@@ -445,110 +480,89 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
   const retryCandidate = useMemo(() => lastRetryCandidate(msgs), [msgs]);
   const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
-  const lastSelection = useMemo(() => lastAssistantSelection(msgs), [msgs]);
   const traceRows: TraceRow[] = state.pending
     ? state.pending.trace
     : (lastAssistant?.tool_calls ?? []).map((c) => ({ kind: "tool", name: c.name, input: c.input, result_preview: c.result_preview, chars: undefined, done: true } as ToolTraceRow));
   const pendingPresentation = state.pending ? PRESENTATION[state.pending.provider as ProviderId] : null;
   const footer = selectFooter(state); // derived from the active thread, survives thread-switch
-  const noProvider = !booting && availableIds.length === 0;
-  const needChooser = !provider && availableIds.length > 1;
-  // The model/effort a query will ACTUALLY use for a provider: the configured
-  // ai_research route when its provider matches, else the provider's default-tier
-  // model (= resolve_research_route's fallback). Keeps the send-area chip honest
-  // vs the header (don't show the default tier when a cheaper route is set).
-  const researchModelFor = (pid: string): string => {
-    const r = runtime?.ai_research;
-    if (r && r.provider === pid && r.source !== "default") return r.model;
-    return availability.find((a) => a.id === pid)?.model || "?";
-  };
-  const researchEffortFor = (pid: string): string | null => {
-    const r = runtime?.ai_research;
-    if (r && r.provider === pid && r.source !== "default" && r.effort && r.effort !== "default") return r.effort;
-    return null;
-  };
-
-  // --- model/effort picker (Step 3): per (provider, ACTIVE auth mode) -----------
-  // The active credential decides the model set: api_key → its provider /models;
-  // chatgpt_oauth → the ChatGPT backend list; claude_code_oauth → the seed. We
-  // discover it via /config/model-discovery (cached per credential id) and fall
-  // back to the configured route model until/if discovery returns.
-  const activeCred = useMemo(
-    () => (provider && runtime ? activeCredential(runtime[provider].credentials) : null),
-    [provider, runtime],
+  const taskProviders = catalog?.effective?.tasks.ai_research?.providers;
+  const noProvider = !booting && !PROVIDER_IDS.some((id) => !!catalog?.effective?.providers?.[id]);
+  const providerChoices = PROVIDER_IDS.map((id) => {
+    const context = catalog?.effective?.providers?.[id] ?? null;
+    const block = taskProviders?.[id];
+    const providerReason = modelProviderReason(context, block);
+    const preferred = block?.models.find((entry) => (
+      entry.id === catalog?.routes.ai_research.model && !optionReason(entry, providerReason)
+    ));
+    const firstReady = block?.models.find((entry) => !optionReason(entry, providerReason));
+    return {
+      id,
+      context,
+      block,
+      providerReason,
+      suggestedModel: preferred?.id ?? firstReady?.id ?? "",
+      disabled: !context || !block || !firstReady,
+    };
+  });
+  const selectedProviderChoice = providerChoices.find((choice) => choice.id === provider) ?? null;
+  const selectedProviderReason = selectedProviderChoice?.providerReason ?? null;
+  const modelGroups = groupedModelEntries(
+    selectedProviderChoice?.block?.models ?? [],
+    selectedProviderReason,
   );
-  const activeAuthMode: CredentialAuthType | null = activeCred?.auth_type ?? null;
-  const routeModel = provider ? researchModelFor(provider) : "";
-  const routeEffort = provider ? (researchEffortFor(provider) ?? "default") : "default";
-
-  // discover models for the active credential (once per credential id; silent on
-  // failure — the route/seed model stays usable).
-  useEffect(() => {
-    if (!provider || !activeCred || !activeCred.can_discover_models) return;
-    const credId = activeCred.id;
-    if (discovered[credId] !== undefined) return; // already attempted/cached
-    let alive = true;
-    void (async () => {
-      try {
-        const res = await discoverModels(provider, credId);
-        if (alive) setDiscovered((p) => ({ ...p, [credId]: (res.models ?? []).map((m) => m.id) }));
-      } catch {
-        if (alive) setDiscovered((p) => ({ ...p, [credId]: [] })); // mark attempted → fall back to seed/route
-      }
-    })();
-    return () => { alive = false; };
-  }, [provider, activeCred, discovered]);
-
-  const modelOpts = useMemo(() => {
-    const disc = activeCred ? (discovered[activeCred.id] ?? []) : [];
-    return modelOptions(disc, routeModel, lastSelection.model);
-  }, [activeCred, discovered, routeModel, lastSelection.model]);
-
-  // keep the selected model valid as the option set / provider changes
-  useEffect(() => { setSelModel((cur) => defaultModel(modelOpts, routeModel, cur)); }, [modelOpts, routeModel]);
-  // reset effort to the route's effort when the provider changes
-  useEffect(() => { setSelEffort(routeEffort); }, [routeEffort, provider]);
-  // When switching to a persisted thread, reflect that thread's latest completed
-  // assistant turn rather than the current Settings default. This is display and
-  // next-send ergonomics only; each answer bubble remains the historical record.
-  useEffect(() => {
-    if (!state.activeThreadId) return;
-    setSelModel(lastSelection.model && modelOpts.includes(lastSelection.model)
-      ? lastSelection.model
-      : defaultModel(modelOpts, routeModel, null));
-    setSelEffort(lastSelection.effort ?? routeEffort);
-  }, [state.activeThreadId, lastSelection.model, lastSelection.effort, modelOpts, routeModel, routeEffort]);
-
-  const selectedEffectiveModel = provider
-    ? catalog?.effective?.tasks?.ai_research?.providers?.[provider]?.models
-      .find((item) => item.id === selModel)
-    : undefined;
+  const selectedEffectiveModel = selectedProviderChoice?.block?.models
+    .find((item) => item.id === selModel);
+  const selectedModelMissing = !!provider && !!selModel && !selectedEffectiveModel;
   const effortOpts = useMemo(
     () => provider && catalog
       ? effortOptionsForModel(catalog, provider, selModel ?? "", selectedEffectiveModel?.effort_options)
       : [],
     [catalog, provider, selModel, selectedEffectiveModel?.effort_options],
   );
-  useEffect(() => {
-    if (effortOpts.length && !effortOpts.some((item) => item.id === selEffort)) {
-      setSelEffort("default");
-    }
-  }, [effortOpts, selEffort]);
-  const pickerEffortNote = provider ? effortNote(provider, activeAuthMode, selEffort) : null;
+  const supportedEffortChoices = effortOpts.some((option) => option.id === "default")
+    ? effortOpts
+    : [{
+        id: "default",
+        provider: provider ?? "openai",
+        label: "default",
+        description: "使用 provider 預設 effort",
+        applies_to_card_tasks: false,
+      }, ...effortOpts];
+  const effortChoices = supportedEffortChoices.some((option) => option.id === selEffort)
+    ? supportedEffortChoices
+    : [...supportedEffortChoices, {
+        id: selEffort,
+        provider: provider ?? "openai",
+        label: `${selEffort} · 此模型不支援`,
+        description: "此儲存值不再受目前模型支援",
+        applies_to_card_tasks: false,
+        disabled: true,
+      }];
+  const pickerEffortNote = provider ? effortNote(provider, selection?.authMode ?? null, selEffort) : null;
+
+  const chooseProvider = useCallback((nextProvider: ProviderId) => {
+    if (!catalog) return;
+    const context = catalog.effective?.providers?.[nextProvider] ?? null;
+    const block = catalog.effective?.tasks.ai_research?.providers?.[nextProvider];
+    const providerReason = modelProviderReason(context, block);
+    const route = catalog.routes.ai_research;
+    const selected = block?.models.find((entry) => (
+      entry.id === route.model && !optionReason(entry, providerReason)
+    )) ?? block?.models.find((entry) => !optionReason(entry, providerReason));
+    if (!selected) return;
+    rememberUserSelection({ provider: nextProvider, model: selected.id, effort: "default" });
+  }, [catalog, rememberUserSelection]);
 
   const retryLastFailed = useCallback(() => {
-    if (!retryCandidate || !state.activeThreadId || state.pending) return;
-    const retryProvider = retryCandidate.provider as ProviderId;
-    const effort = retryProvider === provider && selEffort && selEffort !== "default" ? selEffort : undefined;
-    setAutoRouteSelection(false);
-    setProvider(retryProvider);
+    if (!retryCandidate || !state.activeThreadId || state.pending || selection?.state !== "ready") return;
+    const retryTuple = selection.tuple;
     setThreadError(null);
     dispatch({
       kind: "submit",
       question: retryCandidate.question,
-      provider: retryProvider,
-      model: retryCandidate.model,
-      effort,
+      provider: retryTuple.provider,
+      model: retryTuple.model,
+      effort: retryTuple.effort,
       ticker: retryCandidate.ticker,
       ts: Date.now(),
       threadId: state.activeThreadId,
@@ -556,31 +570,26 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     writeActiveThreadId(state.activeThreadId);
     void runManaged({
       question: retryCandidate.question,
-      provider: retryProvider,
-      model: retryCandidate.model ?? undefined,
-      effort,
+      provider: retryTuple.provider,
+      model: retryTuple.model,
+      effort: retryTuple.effort,
       thread_id: state.activeThreadId,
       ticker: retryCandidate.ticker,
       retry_last_failed: true,
       assistant_stance: stanceForRun,
     });
-  }, [provider, retryCandidate, runManaged, selEffort, state.activeThreadId, state.pending, stanceForRun]);
+  }, [retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
 
   return (
     <main className="main research">
       <div className="surface-head">
         <h1 className="surface-title">AI 研究</h1>
         <span className="muted tiny">工具追蹤與證據整理，支援即時或完成後顯示，依 provider 而定；對話保存於本地（reload 後保留），即時工具追蹤為 ephemeral</span>
-        {runtime?.ai_research && (
-          runtime.ai_research.source !== "default" ? (
-            <span className="muted tiny">
-              研究模型：{runtime.ai_research.provider} · {runtime.ai_research.model}
-              {runtime.ai_research.effort && runtime.ai_research.effort !== "default" ? ` · ${runtime.ai_research.effort}` : ""}
-              {`（套用於 ${runtime.ai_research.provider} 查詢；其他 provider 用預設層）`}
-            </span>
-          ) : (
-            <span className="muted tiny">研究模型：未設定 — 各 provider 用預設層（設定 → 模型可指定，例如 OpenAI · gpt-5.4-mini · low）</span>
-          )
+        {selection?.tuple && (
+          <span className="muted tiny">
+            研究模型：{selection.tuple.provider} · {selection.tuple.model} · {selection.tuple.effort}
+            {selection.provenance ? `（${selection.provenance}）` : ""}
+          </span>
         )}
       </div>
 
@@ -676,61 +685,88 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
             {booting ? (
               <p className="muted tiny">載入 provider…</p>
             ) : noProvider ? (
-              <p className="muted">尚未設定可用的 AI provider（API key）。請到「設定」頁設定後再使用。</p>
+              <p className="muted">尚未設定可執行 AI 研究的登入。請到「設定」→ Providers 完成登入。</p>
             ) : (
               <>
                 <div className="research-providerbar">
-                  {needChooser ? (
-                    <>
-                      <span className="muted tiny">選擇研究路線：</span>
-                      {availability.filter((a) => a.available).map((a) => (
-                        <button
-                          key={a.id}
-                          className="btn-ghost small"
-                          onClick={() => { setAutoRouteSelection(false); setProvider(a.id as ProviderId); }}
-                          title={`${PRESENTATION[a.id as ProviderId].auth_mode_label}；${PRESENTATION[a.id as ProviderId].trace_note}`}
-                        >
-                          {PRESENTATION[a.id as ProviderId].label} / {researchModelFor(a.id)}
-                          {researchEffortFor(a.id) ? ` · ${researchEffortFor(a.id)}` : ""}
-                        </button>
-                      ))}
-                    </>
-                  ) : provider ? (
-                    <>
-                      <span className="list-chip prov">{PRESENTATION[provider].label} / {researchModelFor(provider)}{researchEffortFor(provider) ? ` · ${researchEffortFor(provider)}` : ""}</span>
-                      <span className="muted tiny">{PRESENTATION[provider].trace_note}</span>
-                      {availableIds.length > 1 && (
-                        <button
-                          className="btn-ghost tiny"
-                          onClick={() => { setAutoRouteSelection(false); setProvider(null); }}
-                          title="切換研究路線"
-                        >
-                          切換
-                        </button>
-                      )}
-                    </>
-                  ) : null}
+                  <span className="muted tiny">研究路線：</span>
+                  {providerChoices.map((choice) => (
+                    <button
+                      key={choice.id}
+                      className={`btn-ghost small ${provider === choice.id ? "active" : ""}`}
+                      onClick={() => chooseProvider(choice.id)}
+                      disabled={choice.disabled || !!state.pending}
+                      title={choice.providerReason
+                        ? modelReasonLabel(choice.providerReason)
+                        : `${choice.context?.label ?? choice.id}；${PRESENTATION[choice.id].trace_note}`}
+                    >
+                      {PRESENTATION[choice.id].label} / {choice.suggestedModel || "無可用模型"}
+                    </button>
+                  ))}
                 </div>
-                {provider && !needChooser && (
+                {provider && (
                   <div className="research-pickerbar">
                     <label className="research-pick">
                       <span className="muted tiny">模型</span>
-                      <select value={selModel} onChange={(e) => setSelModel(e.target.value)} disabled={!!state.pending}>
-                        {modelOpts.length === 0 && <option value="">（無可用模型）</option>}
-                        {modelOpts.map((m) => (
-                          <option key={m} value={m}>{m}</option>
+                      <select
+                        value={selModel}
+                        onChange={(event) => rememberUserSelection({
+                          provider,
+                          model: event.target.value,
+                          effort: selEffort,
+                        })}
+                        disabled={!!state.pending}
+                      >
+                        {selectedModelMissing && (
+                          <option value={selModel} disabled>
+                            {selModel} · 此登入未顯示
+                          </option>
+                        )}
+                        {modelGroups.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.entries.map((entry) => (
+                              <option
+                                key={entry.id}
+                                value={entry.id}
+                                disabled={!!entry.disabledReason}
+                              >
+                                {entry.label}
+                                {entry.disabledReason || entry.reason_code
+                                  ? ` · ${modelReasonLabel(entry.disabledReason ?? entry.reason_code ?? "")}`
+                                  : ""}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </label>
                     <label className="research-pick">
                       <span className="muted tiny">effort</span>
-                      <select value={selEffort} onChange={(e) => setSelEffort(e.target.value)} disabled={!!state.pending}>
-                        {(effortOpts.length ? effortOpts : [{ id: "default", label: "default" }]).map((o) => (
-                          <option key={o.id} value={o.id}>{o.label ?? o.id}</option>
+                      <select
+                        value={selEffort}
+                        onChange={(event) => rememberUserSelection({
+                          provider,
+                          model: selModel,
+                          effort: event.target.value,
+                        })}
+                        disabled={!!state.pending}
+                      >
+                        {effortChoices.map((o) => (
+                          <option key={o.id} value={o.id} disabled={"disabled" in o && o.disabled}>
+                            {o.label ?? o.id}
+                          </option>
                         ))}
                       </select>
                     </label>
                     {pickerEffortNote && <span className="warn-text tiny">{pickerEffortNote}</span>}
+                    {selection?.authLabel && <span className="muted tiny">{selection.authLabel}</span>}
+                    {selection?.billingCopy && <span className="muted tiny">{selection.billingCopy}</span>}
+                    {selection?.state === "blocked" && (
+                      <span className="warn-text tiny">{selection.reasonLabel}</span>
+                    )}
+                    {selection?.state === "needs_selection" && state.activeThreadId && (
+                      <span className="muted tiny">正在確認此對話上次成功使用的模型…</span>
+                    )}
                     {stanceEnabled && (
                       <label className="tiny">
                         立場
@@ -761,7 +797,13 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                   {state.pending ? (
                     <button className="btn-ghost danger" onClick={stopStream}>停止</button>
                   ) : (
-                    <button className="btn-ghost" onClick={submit} disabled={!provider || !question.trim()}>送出</button>
+                    <button
+                      className="btn-ghost"
+                      onClick={submit}
+                      disabled={selection?.state !== "ready" || !question.trim()}
+                    >
+                      送出
+                    </button>
                   )}
                 </div>
               </>

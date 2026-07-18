@@ -55,7 +55,6 @@ import {
   type ScheduleSourceState,
   type SyncMeta,
   type ModelCatalog,
-  type EffectiveProviderModelEntry,
   type ModelDiscoveryResult,
   type ModelOption,
   type ModelProvider,
@@ -69,6 +68,12 @@ import {
   type TaskRoute,
 } from "./api";
 import { runDiscoveryAndRefreshCatalog } from "./modelSelect";
+import {
+  compatEntries,
+  groupedModelEntries,
+  modelProviderReason,
+  optionReason,
+} from "./modelPicker";
 import { effortOptionsForModel } from "./researchModels";
 import {
   blockedRouteSaves,
@@ -2131,81 +2136,6 @@ function DataSourcesSection() {
   );
 }
 
-type ModelEntryGroup = {
-  label: string;
-  entries: Array<EffectiveProviderModelEntry & { disabledReason: string | null }>;
-};
-
-function optionReason(
-  entry: EffectiveProviderModelEntry,
-  providerReason: string | null,
-): string | null {
-  if (providerReason) return providerReason;
-  if (!entry.eligible) return entry.reason_code ?? "task_capability_missing";
-  if (entry.visible_to_credential === false && entry.status !== "route") {
-    return "model_not_visible";
-  }
-  return null;
-}
-
-function groupedModelEntries(
-  entries: EffectiveProviderModelEntry[],
-  providerReason: string | null,
-): ModelEntryGroup[] {
-  const withReason = entries.map((entry) => ({
-    ...entry,
-    disabledReason: optionReason(entry, providerReason),
-  }));
-  return [
-    {
-      label: MODEL_UX_LABELS.groups[0],
-      entries: withReason.filter((entry) => entry.status === "visible" && !entry.disabledReason),
-    },
-    {
-      label: MODEL_UX_LABELS.groups[1],
-      entries: withReason.filter((entry) => entry.status === "visible" && !!entry.disabledReason),
-    },
-    {
-      label: MODEL_UX_LABELS.groups[2],
-      entries: withReason.filter((entry) => entry.status === "advanced" || entry.status === "seed"),
-    },
-    {
-      label: MODEL_UX_LABELS.groups[3],
-      entries: withReason.filter((entry) => entry.status === "route"),
-    },
-  ];
-}
-
-function compatEntries(
-  provider: ModelProvider,
-  row: DraftRoute,
-  modelsByProvider: Record<ModelProvider, ModelOption[]>,
-): EffectiveProviderModelEntry[] {
-  const entries: EffectiveProviderModelEntry[] = (modelsByProvider[provider] ?? []).map((model) => ({
-    id: model.id,
-    label: `${model.label} · 未驗證（舊 sidecar 相容模式）`,
-    status: "advanced",
-    visible_to_credential: null,
-    eligible: true,
-    reason_code: null,
-    thinking_mode: "none",
-    effort_options: model.effort_options,
-  }));
-  if (row.model && !entries.some((entry) => entry.id === row.model)) {
-    entries.push({
-      id: row.model,
-      label: `${row.model} · 未驗證（舊 sidecar 相容模式）`,
-      status: "route",
-      visible_to_credential: null,
-      eligible: true,
-      reason_code: "model_not_in_registry",
-      thinking_mode: "none",
-      effort_options: undefined,
-    });
-  }
-  return entries;
-}
-
 export function ModelRoutingSection({
   catalog,
   draft,
@@ -2273,9 +2203,7 @@ export function ModelRoutingSection({
                   effort_options: [],
                 },
               ];
-          const providerReason = context
-            ? (providerBlock?.reason_code ?? null)
-            : "missing_active_credential";
+          const providerReason = modelProviderReason(context, providerBlock);
           const groups = groupedModelEntries(entries, providerReason);
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
           const selectedReason = selectedEntry ? optionReason(selectedEntry, providerReason) : null;

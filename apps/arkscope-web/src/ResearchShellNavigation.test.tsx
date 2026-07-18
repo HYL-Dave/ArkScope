@@ -86,6 +86,55 @@ const CATALOG: ModelCatalog = {
   },
   credentials: { openai: [], anthropic: [] },
   custom_allowed: true,
+  effective: {
+    providers: {
+      openai: { credential_id: "local:7", auth_mode: "api_key", label: "OpenAI API" },
+      anthropic: { credential_id: "local:4", auth_mode: "api_key", label: "Anthropic API" },
+    },
+    tasks: {
+      ai_research: {
+        verified: [],
+        advanced: [],
+        cache_state: "ok",
+        discovered_at: "2026-07-17T00:00:00Z",
+        current_provider: "openai",
+        providers: {
+          openai: {
+            executable: true,
+            reason_code: null,
+            cache_state: "ok",
+            discovered_at: "2026-07-17T00:00:00Z",
+            models: [{
+              id: "gpt-5.6-luna",
+              label: "gpt-5.6-luna",
+              status: "visible",
+              visible_to_credential: true,
+              eligible: true,
+              reason_code: null,
+              thinking_mode: "none",
+              effort_options: ["high"],
+            }],
+          },
+          anthropic: {
+            executable: true,
+            reason_code: null,
+            cache_state: "seed_only",
+            discovered_at: null,
+            models: [{
+              id: "claude-sonnet-5",
+              label: "claude-sonnet-5",
+              status: "seed",
+              visible_to_credential: null,
+              eligible: true,
+              reason_code: null,
+              thinking_mode: "adaptive_default_on",
+              effort_options: ["high"],
+            }],
+          },
+        },
+      },
+    },
+  },
 };
 
 const PROFILE: InvestorProfileResponse = {
@@ -188,6 +237,9 @@ function stubResearchFetch({
     if (path === "/config/model-catalog") return json(CATALOG);
     if (path === "/profile/investor") return json(PROFILE);
     if (path === "/research/threads?limit=50") return json({ threads });
+    if (/^\/research\/threads\/[^/]+\/selection$/.test(url.pathname)) {
+      return json({ provider: "openai", model: "gpt-5.6-luna", effort: "high" });
+    }
     if (/^\/research\/threads\/[^/]+\/messages$/.test(url.pathname)) {
       const threadId = decodeURIComponent(url.pathname.split("/")[3] ?? "");
       return json({ thread_id: threadId, messages: [] });
@@ -301,18 +353,22 @@ describe("Research shell navigation", () => {
     const created = run("new-run", "thread-a", "running");
     const terminal = run("new-run", "thread-a", "succeeded");
     const order: string[] = [];
-    vi.stubGlobal("fetch", stubResearchFetch({
+    const fetchMock = stubResearchFetch({
       threads: [thread("thread-a", "Thread A")],
       createdRun: created,
       replayRun: terminal,
       order,
-    }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
     window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "thread-a");
     const onObserveRun = vi.fn((observed: ResearchRunDTO) => {
       order.push(`observe-${observed.status}`);
     });
     const mounted = await mountResearch({ onObserveRun });
     await mounted.render();
+    expect(fetchMock.mock.calls.some(([input]) => (
+      new URL(String(input)).pathname === "/research/threads/thread-a/selection"
+    ))).toBe(true);
     let openAiRoute: HTMLButtonElement | undefined;
     await vi.waitFor(() => {
       openAiRoute = Array.from(host!.querySelectorAll("button"))
