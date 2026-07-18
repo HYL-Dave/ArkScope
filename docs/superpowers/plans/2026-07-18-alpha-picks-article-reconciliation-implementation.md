@@ -8,8 +8,10 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** PLAN REVIEW PENDING. Do not implement until the independent plan
-> review is GREEN.
+> **Status:** PLAN REVIEW ROUND 2 READY. Round 1 was conditionally GREEN; its
+> single must-fix (MF-A: native-host/live-migration process discipline and
+> schema-marker downgrade protection) is verified and absorbed below. Do not
+> implement until the reviewer confirms this bounded revision.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
@@ -88,6 +90,15 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
     cadence, and general holdings are out of scope.
 14. The user's unrelated `config/tickers_core.json` modification is protected.
     Never copy, stage, revert, rewrite, export over, or include it in a commit.
+15. The pre-merge provider gate never migrates or opens the production
+    `sa_capture.db` with branch v2 code. It runs the final product tip from a
+    second disposable detached worktree against a SQLite online-backup copy,
+    with a `0600` temporary native-host config selected through
+    `ARKSCOPE_SA_NATIVE_HOST_CONFIG`. This also contains the still-live legacy
+    ticker export inside the disposable checkout instead of touching either
+    the implementation worktree or the user's dirty main checkout. Production
+    migration occurs only after independent GREEN and merge, with every v1
+    sidecar/native-host/browser process stopped first.
 
 ---
 
@@ -407,8 +418,12 @@ Create the following exact nodes in
   and lineage deletes fail while history references them.
 - `test_future_pick_rows_require_lineage` attempts a raw null-lineage insert and
   requires `sqlite3.IntegrityError`.
-- `test_v1_to_v2_migration_is_idempotent` snapshots all new authority rows,
-  reconnects twice, and requires byte-identical results.
+- `test_v1_to_v2_migration_is_idempotent` is one node with two arms. The first
+  snapshots all new authority rows, reconnects twice, and requires
+  byte-identical results. The second creates a valid v2 DB, deliberately resets
+  only `PRAGMA user_version` to `1`, then requires reconnect to fail closed on
+  the v1-marker/v2-artifact mismatch without rebuilding or changing any row,
+  table, index, trigger, or marker.
 - `test_v1_to_v2_migration_is_serialized_across_two_real_processes` races two
   real Python processes and checks one coherent v2 result.
 - `test_v1_to_v2_migration_failure_rolls_back_v1_byte_state` injects invalid
@@ -536,6 +551,13 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
             return
         if version != 1:
             raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+        if conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='sa_pick_lineages'"
+        ).fetchone() is not None:
+            raise RuntimeError(
+                "sa_capture schema marker mismatch: v1 marker with v2 artifacts"
+            )
         for statement in _V1_TO_V2_STATEMENTS:
             conn.execute(statement)
         conn.execute(
@@ -558,6 +580,14 @@ The ordered statements must:
 4. add the four source-specific columns to `sa_articles`;
 5. create link/decision tables and indexes; and
 6. assert zero null lineage rows before commit.
+
+The marker/artifact check is inside the same `BEGIN IMMEDIATE` transaction and
+precedes every migration statement. It is load-bearing: current v1
+`ensure_schema()` can open a v2 database, run its old idempotent DDL, and write
+`PRAGMA user_version=1` while leaving `sa_pick_lineages` present. Branch code
+must reject that mixed state instead of treating it as a clean v1 database and
+attempting a second rebuild. The strengthened idempotence node proves both the
+normal v2 reconnect and this fail-closed arm without adding a test node.
 
 `ensure_schema()` uses the existing idempotent fresh path for version `0`, the
 new transactional path for version `1`, and a cheap fast return for version
@@ -1919,16 +1949,48 @@ Run the repository's existing no-PG smoke gate and extension native-host ping
 against a disposable profile. Require `ok:true`, `pg_attempts:[]`, and no
 credential/session values in queue/native responses or logs.
 
-- [ ] **Step 7: Run the real extension gate without manual symbol injection**
+- [ ] **Step 7: Run the real-provider extension gate on an isolated DB copy**
 
-Coordinate a single active ArkScope sidecar and ask the user only to keep the
-authenticated SA browser/extension available. Before any branch process opens
-the real v1 `sa_capture.db`, make a timestamped SQLite online backup and record
-its path, backup-file digest, and source logical row aggregates. Keep that
-backup until the live gate and post-gate integrity/FK checks pass; do not use a
-filesystem copy of a live WAL database.
-Reload the unpacked extension from the branch, then run one normal Alpha Picks
-refresh. Do not paste a `TICKER URL` line and do not alter real DB rows manually.
+This is a live Seeking Alpha/browser/provider gate, but deliberately not a
+pre-merge production-schema migration. Use this exact process boundary:
+
+1. close the desktop app, every master/branch sidecar, every supported browser
+   process using the extension profile, and every extant SA native-host child;
+   record the PID/port proof before proceeding;
+2. make a timestamped SQLite online backup of the configured production v1
+   `sa_capture.db` into `/tmp`, then record the source/copy logical aggregates,
+   source `user_version`, and backup digest. A filesystem copy of a live WAL DB
+   is forbidden;
+3. create a second disposable detached worktree at the exact final product tip.
+   Do not use the implementation worktree: `_try_ticker_sync()` still writes
+   `config/tickers_core.json` relative to the native host's project root, and
+   that legacy write must be contained in the disposable checkout;
+4. create a `0600` temporary native-host config. Read only the configured
+   `python_path` from the normal config; set `project_root` and `host_script` to
+   the disposable worktree and set `api_base`/`api_token` to a separately
+   launched branch sidecar with a fresh ephemeral token. Never copy, print, or
+   log the production token. Launch both the sidecar and a fresh browser
+   process with `ARKSCOPE_SA_DB` pointing to the backup copy and the browser
+   additionally carrying
+   `ARKSCOPE_SA_NATIVE_HOST_CONFIG=<temporary-config>` so its native-host child
+   inherits the override;
+5. load the unpacked extension from the disposable product-tip worktree.
+   Require native-host ping to identify that exact root and branch-sidecar
+   target, and separately query the copied DB to require schema `2` before the
+   first refresh. Any fallback to the normal config, port, main checkout,
+   implementation worktree, or production DB is a stop condition;
+6. run one normal Alpha Picks refresh. Do not paste a `TICKER URL` line and do
+   not alter DB rows manually; and
+7. after evidence is recorded, stop the gate browser/sidecar/native host,
+   inspect the disposable checkout diff (a generated ticker snapshot is
+   allowed only there), remove the temporary config/copy/worktree, and verify
+   the normal config digest, production DB `user_version`, production logical
+   aggregates, main checkout, and implementation worktree are unchanged.
+
+No v1 process may open the copied v2 database during this window. Because the
+production DB remains v1 throughout pre-merge review, a failed gate or failed
+implementation review requires cleanup of only the disposable artifacts, not
+a risky production restore.
 
 Primary evidence target is BTSG. If BTSG has naturally rolled off the captured
 list, use the latest current pick that visibly exposes ticker metadata on both
@@ -2001,15 +2063,25 @@ After independent GREEN and user merge approval only:
 
 1. fast-forward merge the reviewed branch;
 2. re-run focused `239`, merged extension fixture gates, no-PG smoke, and one
-   merged-tree popup smoke;
-3. change spec to `IMPLEMENTED / LIVE` and plan to `LIVE COMPLETE` with merge
-   commit and live evidence;
-4. update the priority map/memory, including the separately deferred
+   merged-tree popup smoke before touching production state;
+3. close the desktop app, all browsers using the extension, all sidecars, and
+   every native-host child. Make and retain a timestamped SQLite online backup
+   of the real v1 `sa_capture.db`, verify that all launcher/config paths now
+   resolve to merged master, and use only merged v2 code to perform the real
+   migration. Require `user_version=2`, `integrity_check='ok'`, an empty
+   `foreign_key_check`, reviewed logical aggregates, and a successful merged
+   native-host ping before restarting normal services. If any check fails,
+   stop all merged processes before restoring the recorded backup; never let
+   v1 code reopen a production v2 DB;
+4. change spec to `IMPLEMENTED / LIVE` and plan to `LIVE COMPLETE` with merge,
+   production-migration, and live evidence;
+5. update the priority map/memory, including the separately deferred
    per-(ticker,time) evidence-strength/stance Signals design discussion without
    reviving per-article scoring;
-5. reload the installed extension and restart the desktop app only when needed;
-6. remove the implementation worktree after verifying it contains no untracked
+6. reload the installed extension and restart the desktop app only after the
+   migration checks pass;
+7. remove the implementation worktree after verifying it contains no untracked
    evidence; and
-7. return to the reviewed sequence. DB-universe/`tickers_core.json` retirement
+8. return to the reviewed sequence. DB-universe/`tickers_core.json` retirement
    remains a separate slice, and the Advanced URL escape hatch remains until
    observed automatic coverage justifies a later removal decision.
