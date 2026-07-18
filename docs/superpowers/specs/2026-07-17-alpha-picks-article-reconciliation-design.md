@@ -1,8 +1,10 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
 > **Status:** APPROVED FOR IMPLEMENTATION PLANNING after 2026-07-18 written
-> review. The universe/JSON decision does not pre-approve this design; this is
-> an independent implementation slice.
+> review. The 2026-07-19 live gate added the bounded recent-comment checkpoint
+> contract in section 3.5; that addendum is pending written review and blocks
+> merge. The universe/JSON decision does not pre-approve this design; this is an
+> independent implementation slice.
 
 ## 1. Purpose
 
@@ -253,6 +255,76 @@ ticker-prefix, or unbounded nearest-date helper may write those fields directly.
 Static and behavioral tests must prove the old writer is unreachable before the
 new writer is enabled.
 
+### 3.5 Bounded recent-comment observation checkpoint
+
+The provider's article-level comment count, the comments currently exposed in
+one browser DOM, and ArkScope's cumulative deduplicated comment inventory are
+three different facts. The live gate made the distinction concrete: one article
+reported `983` provider comments, a bounded full-profile browser pass exposed
+about `207`, and the local store had accumulated `592` across prior sessions.
+None of those values proves that the other two are wrong.
+
+The existing scheduler incorrectly treats
+`provider comments_count > stored_comments_count` as permanent unfinished work.
+That comparison can never converge when Seeking Alpha exposes only a recent
+window, and it repeatedly spends Quick refresh time on inaccessible historical
+comments. V1 replaces the inventory-gap trigger with an observation checkpoint:
+
+```text
+sa_articles
+  comments_count                         existing provider list observation
+  comments_count_observed_at             nullable; parser proved the count was visible
+  provider_comments_count_at_last_scan   nullable; last provider count acknowledged
+                                         by a usable comment-page scan
+```
+
+`provider_comments_count_at_last_scan` is an observation checkpoint, not a
+coverage or completeness claim. `stored_comments_count` remains a local
+inventory fact and may be shown or audited, but it never schedules comment work.
+
+The list parser must distinguish an explicit `0 Comments` from an unparseable or
+absent count. An explicit count records `comments_count_observed_at`; an unknown
+count leaves the observation null and must not overwrite the last known provider
+count or trigger/reset the checkpoint. No arbitrary page-wide number scan may
+manufacture a count.
+
+Quick comment work is limited to articles in the current list scrape that
+already have usable body content. It is scheduled only when a current explicit
+provider count differs from `provider_comments_count_at_last_scan`. A null
+checkpoint plus a positive explicit count is first evidence and schedules one
+scan; null plus explicit zero does not require work. Count decreases also
+schedule one scan so moderation/deletion can reset the checkpoint instead of
+masking future additions.
+
+The checkpoint detects count changes, not identity changes at an unchanged
+total. A deletion and addition that cancel numerically cannot be inferred from
+the list card; an explicit Full/Backfill TTL scan may discover it, but Quick does
+not claim that coverage.
+
+Full and Backfill remain explicit, bounded best-effort operations. They use the
+same checkpoint-delta rule for currently scanned articles and may additionally
+rescan TTL-stale historical rows under the existing per-mode limits, newest
+article first. They do not rank or enqueue work by the provider-versus-inventory
+gap and never promise lifetime reconstruction. There is deliberately no fixed
+30/90-day definition of "old": recency is the provider's currently exposed
+window plus newest-first bounded work, not an invented calendar cutoff.
+
+A comment-page scan is usable when at least one valid comment was parsed, or
+when an explicit provider count of zero was observed and zero comments were
+parsed. A positive provider count with zero valid comments is a parser/readiness
+failure: body capture may still commit, but `comments_fetched_at` and the
+checkpoint do not advance, and a comments-only refresh is not counted as
+refreshed. Navigation, native-host, persistence, or parser failures likewise
+leave the prior checkpoint intact. Comment upserts, `comments_fetched_at`, and a
+checkpoint advance occur in one SQLite transaction.
+
+Because production remains schema v1 until merge, this addendum extends the
+not-yet-shipped v1-to-v2 migration instead of introducing a production v3. The
+migration seeds `provider_comments_count_at_last_scan = comments_count` only for
+rows with an existing `comments_fetched_at`; this intentionally waives the
+pre-migration historical gap. Rows never successfully scanned remain null.
+Pre-addendum disposable v2 gate copies are recreated, never upgraded in place.
+
 ## 4. Deterministic Matching Policy
 
 ### 4.1 Candidate evidence and provenance
@@ -397,6 +469,8 @@ be the acceptance authority.
 - automatic merge/alias of possible picked-date corrections;
 - deleting the manual escape hatch before live coverage is measured;
 - changing Alpha Picks capture cadence; or
+- promising or reconstructing lifetime-complete article comments;
+- defining comment recency with a fixed age cutoff; or
 - implementing DB-universe/JSON retirement in the same slice.
 
 ## 9. Verification Contract
@@ -435,10 +509,29 @@ The future implementation plan must prove, RED first:
 18. automated browser/fixture gates cover ticker-less body assistance and
     list/detail conflict, while a live extension gate proves BTSG automatic
     metadata capture without manual symbol injection and retains unrelated
-    ambiguity for review.
+    ambiguity for review;
+19. list parsing distinguishes explicit zero comments from an unknown count and
+    never overwrites a prior observation with unknown;
+20. v1-to-v2 migration seeds the checkpoint only for previously scanned rows
+    and preserves every article/comment row;
+21. Quick schedules on explicit provider-count change, including a decrease,
+    but does not schedule a stable historical inventory gap;
+22. Full/Backfill retain bounded newest-first TTL work without using inventory
+    gap size as priority or backlog;
+23. positive provider count plus zero parsed comments leaves the checkpoint and
+    `comments_fetched_at` unchanged;
+24. explicit provider zero plus zero parsed comments, and positive provider
+    count plus at least one parsed comment, advance atomically;
+25. body capture survives an unusable comment scan without falsely reporting a
+    comment refresh; and
+26. a live rerun proves a stable provider count no longer rescans the same
+    historical gap, while one newly added comment changes the count and becomes
+    eligible once.
 
 ## 10. Sequence
 
-P2.8 Slice 3 is complete and the 2026-07-18 written review is closed. The
-implementation plan opens next, independently from the
-DB-universe/JSON-retirement slice.
+P2.8 Slice 3 is complete and the 2026-07-18 written review is closed. Core
+implementation reached its live gate, where the invalid lifetime-gap retry
+assumption was discovered. The section 3.5 addendum and its implementation-plan
+task require written review before implementation resumes. This remains
+independent from the DB-universe/JSON-retirement slice.

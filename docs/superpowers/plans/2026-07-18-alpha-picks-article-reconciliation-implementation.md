@@ -8,15 +8,18 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** REVIEWED / CLEARED FOR IMPLEMENTATION. Round 2 confirmed the
-> bounded MF-A revision, exact `+78/-0` accounting, and disposable live-gate
-> boundary. Task 0 must branch from the dedicated clearance commit containing
-> this status, not from behavior base `848ffd4`.
+> **Status:** CORE IMPLEMENTED; LIVE-GATE ADDENDUM REVIEW PENDING. Round 2
+> cleared the original `+78/-0` plan. Implementation plus live parser,
+> body-settle, and English-copy corrections reached `18fcfb4` at exact focused
+> `246` / canonical collect `4497`. The live gate then disproved the historical
+> comment-gap retry assumption. Task 8 is a bounded `+8/-0` RED-first addendum;
+> it blocks merge until written review and implementation review are GREEN.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
 keeping ambiguous cases reviewable and demoting raw URL paste to an
-event-scoped Advanced escape hatch.
+event-scoped Advanced escape hatch; comment refreshes track new provider
+observations without retrying inaccessible lifetime-history gaps forever.
 
 **Architecture:** Schema v2 separates lifecycle-stable pick lineages from
 captured current/closed rows, and stores accepted article relationships plus
@@ -27,7 +30,10 @@ lineage/event queries, atomic link replacement, projection, and the derived
 review queue. The browser extension captures explicit list/detail ticker facts,
 commits article data before a separate bounded reconciliation pass, and renders
 the review queue in its popup. The two legacy nearest/same-ticker writers retire
-in the same product change, so no dual-writer window exists.
+in the same product change, so no dual-writer window exists. A nullable provider
+comment-count checkpoint records the last usable bounded scan; Quick compares
+fresh explicit counts to that checkpoint, while Full/Backfill retain bounded
+newest-first TTL work.
 
 **Tech Stack:** Python 3.11, SQLite/WAL, pytest, JavaScript MV3/WebExtension,
 Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
@@ -99,6 +105,12 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
     the implementation worktree or the user's dirty main checkout. Production
     migration occurs only after independent GREEN and merge, with every v1
     sidecar/native-host/browser process stopped first.
+16. Provider lifetime comment count, one browser DOM's exposed recent comments,
+    and ArkScope's cumulative deduplicated inventory are separate facts. Comment
+    work is scheduled from an explicit provider-count observation versus the
+    last usable-scan checkpoint, never from provider count minus inventory.
+    Quick has no fixed age cutoff; Full/Backfill retain bounded newest-first TTL
+    work without promising lifetime completeness.
 
 ---
 
@@ -168,6 +180,14 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
   a node-ID ledger before proceeding.
 - No web-app test node is added or removed; its target remains exact
   `60 files / 572 tests` plus typecheck/build.
+- Live-gate corrections after the original `+78/-0` target added exactly seven
+  focused nodes without removing one: current-portfolio parser `+3`, article
+  body/settle behavior `+3`, and English production-copy ratchet `+1`. At
+  `18fcfb4`, focused is `246` and full collection is `4497`.
+- Task 8 adds exactly `+8/-0` named nodes. Final reviewed targets become focused
+  `254`, canonical collection `4505`, and behavior-base delta `+93/-0` from
+  `848ffd4`. Any different node delta is a stop condition requiring an exact
+  node-ID ledger.
 
 ## File Map
 
@@ -195,23 +215,27 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
 **Modify**
 
 - `src/sa_capture_store.py` - schema v2, transactional v1 migration, lineage
-  backfill, provider evidence columns, link/decision constraints.
+  backfill, provider evidence columns, comment observation/checkpoint columns,
+  and link/decision constraints.
 - `src/tools/backends/sa_capture_backend.py` - resolve lineage during pick
-  refresh, persist source-specific article metadata, delegate reconciliation,
-  and remove both legacy mutation paths.
+  refresh, persist source-specific article metadata and comment checkpoints,
+  delegate reconciliation, and remove both legacy mutation paths.
 - `src/tools/backends/db_backend.py` - retired-PG compatibility stubs for the
   new DAL method surface; no PG access.
 - `src/tools/data_access.py` - capture-first pick/article/body orchestration,
-  scan-scoped normal cache work, and additive reconciliation/review DTOs.
+  scan-scoped normal cache work, checkpoint-based comment scheduling, and
+  additive reconciliation/review DTOs.
 - `src/sa_native_host.py` - additive queue/event-resolve/accept/reject actions,
-  post-pick-capture reconciliation, detail ticker propagation, and read-only
-  compatibility audit action.
+  post-pick-capture reconciliation, detail ticker and provider-comment-count
+  propagation, and read-only compatibility audit action.
 - `extensions/sa_alpha_picks/scrape_articles_list.js` - explicit list ticker
-  capture with the confirmed optional-time grammar.
+  capture with the confirmed optional-time grammar and an observed-versus-
+  unknown comment-count distinction.
 - `extensions/sa_alpha_picks/scrape_detail.js` - independent security-header
   ticker capture.
 - `extensions/sa_alpha_picks/background.js` - ordered helper injection,
-  bounded enrichment, event-scoped manual flow, and review actions.
+  bounded enrichment, checkpoint-aware comment refresh accounting,
+  event-scoped manual flow, and review actions.
 - `extensions/sa_alpha_picks/popup.html` / `popup.js` - default review queue and
   collapsed Advanced URL escape hatch.
 - `tests/test_sa_capture_store.py`, `tests/test_sa_capture_backend.py`,
@@ -1859,19 +1883,572 @@ git commit -m "feat: add Alpha Picks article review queue"
 
 ---
 
-### Task 8: Migration Preview, Full Verification, Live Gate, and Review Handoff
+### Task 8: Live-Gate Recent-Comment Checkpoint Correction
+
+**Files:**
+- Modify: `src/sa_capture_store.py`
+- Modify: `src/tools/backends/sa_capture_backend.py`
+- Modify: `src/tools/backends/db_backend.py`
+- Modify: `src/tools/data_access.py`
+- Modify: `src/sa_native_host.py`
+- Modify: `extensions/sa_alpha_picks/scrape_articles_list.js`
+- Modify: `extensions/sa_alpha_picks/background.js`
+- Modify: `tests/test_sa_article_reconciliation_schema.py`
+- Modify: `tests/test_sa_capture_backend.py`
+- Modify: `tests/test_sa_tools.py`
+- Modify: `tests/test_sa_reconciliation_native_host.py`
+- Modify: `tests/test_sa_extension_article_identity.py`
+- Modify: `tests/test_sa_extension_reconciliation_flow.py`
+
+**Interfaces:**
+- Consumes: section 3.5 of the design, the existing `comments_count`,
+  `comments_fetched_at`, deduplicated comment store, Quick/Full/Backfill mode
+  bounds, and the list/detail native-host path.
+- Produces: explicit count-observation provenance, a nullable provider-count
+  checkpoint, atomic usable-scan updates, and bounded scheduling that never
+  treats an inaccessible historical inventory difference as pending work.
+- Does not add a fixed age cutoff, delete old comments, change capture cadence,
+  promise lifetime completeness, or alter the web app.
+
+- [ ] **Step 1: Write three failing schema/backend checkpoint tests**
+
+Add exactly these nodes.
+
+In `tests/test_sa_article_reconciliation_schema.py`:
+
+```python
+def test_v1_migration_seeds_comment_scan_checkpoint_without_claiming_completeness(
+    tmp_path,
+):
+    path = tmp_path / "comments-v1.db"
+    _create_v1(path)
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "UPDATE sa_articles SET comments_count=41, comments_fetched_at=? "
+        "WHERE article_id='legacy-entry'",
+        ("2026-07-18T00:00:00+00:00",),
+    )
+    raw.execute(
+        "INSERT INTO sa_articles(article_id,url,title,comments_count) "
+        "VALUES ('never-scanned','https://sa/never','Never scanned article',18)"
+    )
+    raw.commit()
+    raw.close()
+
+    conn = scs.connect(str(path))
+    rows = {
+        row["article_id"]: dict(row)
+        for row in conn.execute(
+            "SELECT article_id, comments_count_observed_at, "
+            "provider_comments_count_at_last_scan FROM sa_articles"
+        )
+    }
+    assert rows["legacy-entry"] == {
+        "article_id": "legacy-entry",
+        "comments_count_observed_at": None,
+        "provider_comments_count_at_last_scan": 41,
+    }
+    assert rows["never-scanned"] == {
+        "article_id": "never-scanned",
+        "comments_count_observed_at": None,
+        "provider_comments_count_at_last_scan": None,
+    }
+    assert conn.execute("SELECT COUNT(*) FROM sa_articles").fetchone()[0] == 2
+    conn.close()
+```
+
+In `tests/test_sa_capture_backend.py`:
+
+```python
+def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
+    backend.upsert_sa_articles_meta([
+        _article("positive"), _article("zero"), _article("empty"),
+    ])
+
+    positive = backend.update_article_comments(
+        "positive", _comments(), provider_comments_count=12
+    )
+    zero = backend.update_article_comments(
+        "zero", [], provider_comments_count=0
+    )
+    empty = backend.update_article_comments(
+        "empty", [], provider_comments_count=7
+    )
+
+    rows = {row["article_id"]: row for row in backend.query_sa_articles()}
+    assert positive["comment_scan_usable"] is True
+    assert rows["positive"]["provider_comments_count_at_last_scan"] == 12
+    assert positive["prepared_comments"] == 2
+    assert zero["comment_scan_usable"] is True
+    assert rows["zero"]["provider_comments_count_at_last_scan"] == 0
+    assert empty["comment_scan_usable"] is False
+    assert rows["empty"]["provider_comments_count_at_last_scan"] is None
+    assert rows["empty"]["comments_fetched_at"] is None
+
+
+def test_body_capture_commits_when_comment_scan_is_unusable(backend):
+    backend.upsert_sa_articles_meta([_article("body-only")])
+    result = backend.save_article_with_comments(
+        "body-only", "Provider body", [], provider_comments_count=9
+    )
+    article = backend.get_sa_article_with_comments("body-only")
+    assert result["ok"] is True
+    assert result["comment_scan_usable"] is False
+    assert article["body_markdown"] == "Provider body"
+    assert article["detail_fetched_at"] is not None
+    assert article["comments_fetched_at"] is None
+    assert article["provider_comments_count_at_last_scan"] is None
+```
+
+- [ ] **Step 2: Run the schema/backend tests and prove RED**
+
+```bash
+pytest -q \
+  tests/test_sa_article_reconciliation_schema.py::test_v1_migration_seeds_comment_scan_checkpoint_without_claiming_completeness \
+  tests/test_sa_capture_backend.py::test_comment_scan_checkpoint_advances_only_on_usable_observation \
+  tests/test_sa_capture_backend.py::test_body_capture_commits_when_comment_scan_is_unusable
+```
+
+Expected: all three fail because the two columns and keyword argument do not
+exist; no failure may come from malformed fixture SQL.
+
+- [ ] **Step 3: Extend not-yet-shipped schema v2 and implement atomic checkpoints**
+
+Keep `SCHEMA_VERSION = 2`: production is still v1, and every pre-addendum v2
+file is a disposable live-gate artifact that must be recreated. Add to fresh
+`sa_articles` and `_V1_TO_V2_STATEMENTS`:
+
+```sql
+comments_count_observed_at           TEXT,
+provider_comments_count_at_last_scan INTEGER
+    CHECK(provider_comments_count_at_last_scan IS NULL
+          OR provider_comments_count_at_last_scan >= 0)
+```
+
+```sql
+ALTER TABLE sa_articles ADD COLUMN comments_count_observed_at TEXT;
+ALTER TABLE sa_articles ADD COLUMN provider_comments_count_at_last_scan INTEGER
+  CHECK(provider_comments_count_at_last_scan IS NULL
+        OR provider_comments_count_at_last_scan >= 0);
+UPDATE sa_articles
+SET provider_comments_count_at_last_scan = COALESCE(comments_count, 0)
+WHERE comments_fetched_at IS NOT NULL;
+```
+
+The list-metadata upsert writes `comments_count` only when
+`comments_count_observed_at` is non-null; unknown input preserves the prior
+count and observation timestamp:
+
+```sql
+comments_count = CASE
+  WHEN excluded.comments_count_observed_at IS NOT NULL
+    THEN excluded.comments_count
+  ELSE sa_articles.comments_count
+END,
+comments_count_observed_at = COALESCE(
+  excluded.comments_count_observed_at,
+  sa_articles.comments_count_observed_at
+)
+```
+
+Add one backend normalization seam and use it in both save methods:
+
+```python
+def _provider_comment_count(value) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _comment_scan_usable(prepared_count: int, provider_count: int | None) -> bool:
+    return prepared_count > 0 or provider_count == 0
+```
+
+Evolve signatures in `sa_capture_backend.py`, `db_backend.py`, and DAL:
+
+```python
+def save_article_with_comments(
+    self, article_id, body_markdown, comments, *,
+    detail_ticker=None, detail_ticker_observed_at=None,
+    provider_comments_count=None,
+) -> dict: ...
+
+def update_article_comments(
+    self, article_id, comments, *, provider_comments_count=None
+) -> dict: ...
+```
+
+Inside the existing `BEGIN IMMEDIATE`, upsert comments first. Only a usable scan
+updates `comments_fetched_at`; only a usable scan with a non-null normalized
+provider count updates the checkpoint. Return `comment_scan_usable` with the
+existing counts. `save_article_with_comments()` always commits a valid body and
+detail ticker even when its comment leg is unusable.
+
+- [ ] **Step 4: Run GREEN, compatibility shapes, and commit the storage half**
+
+```bash
+pytest -q \
+  tests/test_sa_article_reconciliation_schema.py \
+  tests/test_sa_capture_backend.py \
+  tests/test_db_backend_retired_pg_sa.py
+git add src/sa_capture_store.py src/tools/backends/sa_capture_backend.py \
+  src/tools/backends/db_backend.py tests/test_sa_article_reconciliation_schema.py \
+  tests/test_sa_capture_backend.py tests/test_db_backend_retired_pg_sa.py
+git commit -m "fix: checkpoint usable Alpha Picks comment scans"
+```
+
+Expected: all selected tests PASS; read-shape key sets include both additive
+fields; schema remains version `2`; no article/comment row is removed.
+
+- [ ] **Step 5: Write five failing parser/scheduler/transport tests**
+
+Add exactly these nodes:
+
+1. `tests/test_sa_extension_article_identity.py::test_comment_count_observation_distinguishes_zero_from_unknown`
+2. `tests/test_sa_tools.py::TestDataAccessArticleMeta::test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap`
+3. `tests/test_sa_tools.py::TestDataAccessArticleMeta::test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap`
+4. `tests/test_sa_reconciliation_native_host.py::test_save_comments_only_forwards_provider_checkpoint_and_usable_state`
+5. `tests/test_sa_extension_reconciliation_flow.py::test_comment_refresh_counts_only_usable_checkpointed_scan`
+
+The parser node is:
+
+```python
+def test_comment_count_observation_distinguishes_zero_from_unknown(tmp_path):
+    fixture = tmp_path / "comment-counts.html"
+    fixture.write_text(
+        """<article><h3><a href='/alpha-picks/articles/10-zero'>
+        A sufficiently long zero comments article title</a></h3>
+        <span>Jul 19, 2026, 12:00 PM</span><a>0 Comments</a></article>
+        <article><h3><a href='/alpha-picks/articles/11-unknown'>
+        A sufficiently long unknown comments article title</a></h3>
+        <span>Jul 18, 2026, 12:00 PM</span></article>""",
+        encoding="utf-8",
+    )
+    payload = _run_fixture(fixture, IDENTITY, LIST_SCRAPER)
+    by_id = {item["article_id"]: item for item in payload}
+    explicit_zero = by_id["10"]
+    unknown = by_id["11"]
+
+assert explicit_zero["comments_count"] == 0
+assert explicit_zero["comments_count_observed_at"].endswith("Z")
+assert unknown["comments_count"] == 0
+assert unknown["comments_count_observed_at"] is None
+```
+
+Strengthen the existing BTSG fixture node to require its explicit `265` count
+has an observation timestamp. Strengthen
+`test_articles_meta_upsert_and_query` in place: an upsert with no observation
+timestamp may update unrelated metadata but must preserve the prior provider
+count and count-observation timestamp.
+
+The Quick node table-drives four rows in one pytest node:
+
+```python
+def test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap(self):
+    cases = [
+        # provider, checkpoint, inventory, observed, scheduled
+        (983, 983, 592, True, False),
+        (984, 983, 592, True, True),
+        (982, 983, 592, True, True),
+        (983, 982, 592, False, False),
+    ]
+    for provider, checkpoint, inventory, observed, scheduled in cases:
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.reconcile_sa_articles = MagicMock(
+            return_value={"status": "ok", "enrichment": []}
+        )
+        dal._backend.query_sa_articles = MagicMock(return_value=[{
+            "article_id": "a1", "url": "https://example.com/a1",
+            "has_content": True, "comments_count": provider,
+            "comments_count_observed_at": (
+                "2026-07-19T00:00:00+00:00" if observed else None
+            ),
+            "provider_comments_count_at_last_scan": checkpoint,
+            "stored_comments_count": inventory,
+            "comments_fetched_at": "2026-07-18T00:00:00+00:00",
+        }])
+        incoming = {
+            "article_id": "a1", "url": "https://example.com/a1",
+            "comments_count": provider,
+            "comments_count_observed_at": (
+                "2026-07-19T00:00:00+00:00" if observed else None
+            ),
+        }
+        result = dal.save_sa_articles_meta([incoming], mode="quick")
+        expected = ([{
+            "article_id": "a1", "url": "https://example.com/a1",
+            "provider_comments_count": provider,
+        }] if scheduled else [])
+        assert result["need_comments"] == expected
+```
+
+For each case, the article is in the current scan and has content. The final
+case has `comments_count_observed_at=None`; the others use an ISO timestamp.
+Assert the scheduled item, when present, includes
+`provider_comments_count=<provider>` and never derives work from `inventory`.
+
+The Full/Backfill node supplies a fresh `983/983/592` historical-gap row plus
+TTL-stale rows and proves newest-first bounded selection:
+
+```python
+def test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap(self):
+    old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+    recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    rows = [
+        {
+            "article_id": "fresh-gap", "url": "https://example.com/fresh",
+            "has_content": True, "comments_count": 983,
+            "comments_count_observed_at": recent,
+            "provider_comments_count_at_last_scan": 983,
+            "stored_comments_count": 592, "published_date": "2026-07-19",
+            "comments_fetched_at": recent,
+        },
+        {
+            "article_id": "stale-new", "url": "https://example.com/new",
+            "has_content": True, "comments_count": 40,
+            "comments_count_observed_at": old,
+            "provider_comments_count_at_last_scan": 40,
+            "stored_comments_count": 20, "published_date": "2026-07-18",
+            "comments_fetched_at": old,
+        },
+        {
+            "article_id": "stale-old", "url": "https://example.com/old",
+            "has_content": True, "comments_count": 80,
+            "comments_count_observed_at": old,
+            "provider_comments_count_at_last_scan": 80,
+            "stored_comments_count": 5, "published_date": "2024-01-01",
+            "comments_fetched_at": old,
+        },
+    ]
+    for mode in ("full", "backfill"):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.query_sa_articles = MagicMock(return_value=rows)
+        dal._backend.reconcile_sa_articles = MagicMock(
+            return_value={"status": "ok", "enrichment": []}
+        )
+        with patch(
+            "src.agents.config.get_agent_config",
+            return_value=SimpleNamespace(
+                sa_comments_cache_days=7,
+                sa_comments_backfill_per_full_scan=1,
+                sa_comments_backfill_per_backfill_scan=1,
+            ),
+        ):
+            result = dal.save_sa_articles_meta([{
+                "article_id": "fresh-gap", "url": "https://example.com/fresh",
+                "comments_count": 983,
+                "comments_count_observed_at": recent,
+            }], mode=mode)
+        assert result["need_comments"] == [
+            {"article_id": "stale-new", "url": "https://example.com/new"}
+        ]
+```
+
+Keep the existing TTL and mutual-exclusion tests and evolve the old top-gap
+tests in place without renaming their node IDs.
+
+The native-host node is:
+
+```python
+def test_save_comments_only_forwards_provider_checkpoint_and_usable_state():
+    dal = MagicMock()
+    dal.save_sa_comments_only.return_value = {
+        "prepared_comments": 0, "stored_comments_total": 592,
+        "net_new_comments": 0, "comment_scan_usable": False,
+    }
+    result = host._handle_save_comments_only(dal, {
+        "article_id": "a1", "comments": [], "provider_comments_count": 12,
+    })
+    dal.save_sa_comments_only.assert_called_once_with(
+        "a1", [], provider_comments_count=12
+    )
+    assert result["status"] == "ok"
+    assert result["comment_scan_usable"] is False
+```
+
+The extension-flow node supplies one scheduled comment item with an empty
+scraper result:
+
+```python
+def test_comment_refresh_counts_only_usable_checkpointed_scan():
+    result = _run_background(
+        _DETAIL_FLOW_SETUP
+        + r"""
+        sendNativeMessage2 = async function (message) {
+          calls.push(message);
+          if (message.action === "save_articles_meta") return {
+            status: "ok", saved: 1, need_content: [],
+            need_comments: [{
+              article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a",
+              provider_comments_count: 12,
+            }],
+            unresolved_symbols: [], reconciliation: {status: "ok", enrichment: []},
+          };
+          if (message.action === "save_comments_only") return {
+            status: "ok", comment_scan_usable: false, net_new_comments: 0,
+          };
+          return {status: "ok", unresolved_symbols: [], review_queue: {total: 0, events: []}};
+        };
+        var summary = await doDetailFetch(1, [], "quick");
+        return {calls: calls, summary: summary};
+        """
+    )
+    save = next(
+        item for item in result["calls"] if item["action"] == "save_comments_only"
+    )
+    assert save["provider_comments_count"] == 12
+    assert result["summary"]["comments_refreshed"] == 0
+    assert result["summary"]["failed"] == 1
+```
+
+Strengthen the existing successful refresh node to return
+`comment_scan_usable: true` and retain its existing ordering assertion.
+Also strengthen the existing body-content native-host and background-flow nodes
+to pass one provider count from a `need_content` work item through
+`save_article_content` into `save_sa_article_with_comments`; these are in-place
+contract upgrades and add no node.
+
+- [ ] **Step 6: Run the five tests and prove RED for the reviewed reasons**
+
+```bash
+pytest -q \
+  tests/test_sa_extension_article_identity.py::test_comment_count_observation_distinguishes_zero_from_unknown \
+  tests/test_sa_tools.py::TestDataAccessArticleMeta::test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap \
+  tests/test_sa_tools.py::TestDataAccessArticleMeta::test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap \
+  tests/test_sa_reconciliation_native_host.py::test_save_comments_only_forwards_provider_checkpoint_and_usable_state \
+  tests/test_sa_extension_reconciliation_flow.py::test_comment_refresh_counts_only_usable_checkpointed_scan
+```
+
+Expected: parser observation is absent, Quick still schedules from `983 > 592`,
+Full/Backfill still rank inventory gaps, provider count is not forwarded, and an
+empty positive-count scan is falsely counted refreshed. Any unrelated fixture
+or harness failure must be fixed before implementation.
+
+- [ ] **Step 7: Implement observed counts and checkpoint scheduling**
+
+In `scrape_articles_list.js`, make count extraction return both value and
+certainty. Preserve the compatibility numeric `comments_count` while adding a
+timestamp only for an explicit match:
+
+```javascript
+var comments = extractCommentsCount(card, cardText, date);
+var commentsObservedAt = comments.observed ? new Date().toISOString() : null;
+// payload
+comments_count: comments.value,
+comments_count_observed_at: commentsObservedAt,
+```
+
+The helper returns `{value: 0, observed: false}` for absent/unparseable text and
+`{value: n, observed: true}` for an exact provider label, including explicit
+zero. `_sanitize_sa_article_meta()` retains the timestamp and never treats a
+missing timestamp as a new zero observation.
+
+In `save_sa_articles_meta()` build current-scan count observations from
+`normalized_articles`, not from the persisted row's possibly older timestamp.
+Quick schedules only current scanned/content-ready rows where an explicit count
+is positive with null checkpoint, or differs from a non-null checkpoint. A
+count decrease is work. Unknown count is not work.
+
+For Full/Backfill, add the same current-scan delta work first, then select at
+most the configured mode limit of TTL-stale, content-ready, non-duplicate rows,
+ordered by `(published_date, article_id)` descending. Remove all use of
+`remote_count - stored_count`, gap magnitude sorting, and inventory-gap backlog.
+Keep `need_content` precedence. Add `provider_comments_count` to work items only
+when an explicit observation is available.
+
+Forward that optional field through both background save actions, native host,
+DAL, and backend. In the comment-only loop:
+
+```javascript
+if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
+  if (saveCommentsOnlyResult.comment_scan_usable === true) {
+    commentsRefreshed++;
+    netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
+  } else {
+    failed++;
+  }
+}
+```
+
+Add an `else { failed++; }` for a missing/non-ok native response. The body loop
+forwards the same field but retains body success when
+`comment_scan_usable === false`; the checkpoint simply remains eligible for a
+later comments-only scan.
+
+Exceptions in the comment-only loop also increment `failed`. Body capture keeps
+its independent success semantics; an unusable comment leg cannot roll back or
+mislabel a valid body save.
+
+- [ ] **Step 8: Run GREEN, exact accounting, and semantic ratchets**
+
+```bash
+pytest -q \
+  tests/test_sa_capture_store.py \
+  tests/test_sa_capture_backend.py \
+  tests/test_sa_tools.py \
+  tests/test_sa_article_reconciliation_schema.py \
+  tests/test_sa_reconciliation_native_host.py \
+  tests/test_sa_extension_article_identity.py \
+  tests/test_sa_extension_reconciliation_flow.py \
+  tests/test_db_backend_retired_pg_sa.py
+pytest --collect-only -q
+rg -n 'remote_count\s*-\s*stored_count|remote_count\s*>\s*stored_count|backfill_candidates.*gap' \
+  src/tools/data_access.py
+git diff --exit-code 848ffd4 -- apps/arkscope-web config/tickers_core.json
+```
+
+Expected: focused exact `254`, full collection exact `4505`, semantic delta
+`+93/-0` from `848ffd4`; gap-trigger scan has zero production hit; web app and
+the protected ticker file remain byte-identical. Run `git diff --check`.
+
+- [ ] **Step 9: Commit the scheduling/transport half and stop for review**
+
+```bash
+git add src/tools/data_access.py src/sa_native_host.py \
+  extensions/sa_alpha_picks/scrape_articles_list.js \
+  extensions/sa_alpha_picks/background.js tests/test_sa_tools.py \
+  tests/test_sa_reconciliation_native_host.py \
+  tests/test_sa_extension_article_identity.py \
+  tests/test_sa_extension_reconciliation_flow.py \
+  docs/superpowers/specs/2026-07-17-alpha-picks-article-reconciliation-design.md \
+  docs/superpowers/plans/2026-07-18-alpha-picks-article-reconciliation-implementation.md
+git commit -m "fix: bound Alpha Picks comment refresh work"
+```
+
+Do not rerun the paid/provider live gate or merge yet. Request independent code
+review of the addendum first. After GREEN, recreate the disposable v2 DB copy
+from production v1 and perform one normal Quick run plus a second unchanged
+Quick run: the first may acknowledge current counts; the second must not rescan
+stable historical gaps. A naturally changed provider count is eligible exactly
+once. Dynamic counts are evidence, never acceptance constants.
+
+---
+
+### Task 9: Migration Preview, Full Verification, Live Gate, and Review Handoff
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-18-alpha-picks-article-reconciliation-implementation.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
-- Do not modify the approved spec until implementation review; then change only
-  its status/implementation ledger.
+- Section 3.5 is the sole pre-review live-gate addendum. After Task 8 written
+  review, do not modify design semantics during implementation; after code
+  review, change only status/implementation ledger unless a new stop condition
+  returns to design.
 
 **Interfaces:**
-- Consumes: Tasks 1-7 complete product stack.
+- Consumes: Tasks 1-8 complete product stack.
 - Produces: copied-DB migration evidence, exact automated accounting,
   no-dual-writer proof, real extension BTSG/current-pick proof, and a
   review-ready branch. No merge occurs in this task.
+- Separate live finding retained: pre-fix nonempty disclosure-only body caches
+  are still considered populated. Task 8 neither invalidates those rows nor
+  claims that issue resolved; Task 9 may not declare final merge-ready until it
+  receives an explicit bounded disposition and test/live evidence.
 
 - [ ] **Step 1: Run the exact focused suite and accounting**
 
@@ -1894,8 +2471,8 @@ pytest -q \
 pytest --collect-only -q
 ```
 
-Expected: focused `239 passed`; full collection exact `4490`, raw node diff
-`+78/-0` from `848ffd4`.
+Expected: focused `254 passed`; full collection exact `4505`, raw node diff
+`+93/-0` from `848ffd4`.
 
 - [ ] **Step 2: Run web-app and protected-boundary gates**
 
@@ -1959,10 +2536,10 @@ Run full `pytest -q` sequentially in the same environment. Require:
 
 ```text
 base collect 4412
-head collect 4490
-raw node diff +78/-0
+head collect 4505
+raw node diff +93/-0
 failure/error identity diff empty in both directions
-base 4301 passed -> head 4379 passed, if the known families remain unchanged
+base 4301 passed -> head 4394 passed, if the known families remain unchanged
 74 skipped / 18 warnings / 30 failed / 7 errors unchanged
 ```
 
@@ -2080,15 +2657,17 @@ reviewer focus is:
 6. single canonical writer and no legacy mutation path;
 7. event-scoped replacement/manual confirmation;
 8. bounded enrichment versus normal cache work;
-9. popup privacy/accessibility and no raw-ID exposure; and
-10. canonical A/B plus real extension evidence.
+9. popup privacy/accessibility and no raw-ID exposure;
+10. explicit comment-count provenance, usable-scan atomicity, and absence of
+    provider-versus-inventory retry logic; and
+11. canonical A/B plus real extension evidence.
 
 ## Post-Review Merge Closeout
 
 After independent GREEN and user merge approval only:
 
 1. fast-forward merge the reviewed branch;
-2. re-run focused `239`, merged extension fixture gates, no-PG smoke, and one
+2. re-run focused `254`, merged extension fixture gates, no-PG smoke, and one
    merged-tree popup smoke before touching production state;
 3. close the desktop app, all browsers using the extension, all sidecars, and
    every native-host child. Make and retain a timestamped SQLite online backup
