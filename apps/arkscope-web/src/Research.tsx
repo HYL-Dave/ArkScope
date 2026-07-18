@@ -18,15 +18,17 @@
 // OpenAI/Anthropic binary, so compatible providers can slot in later.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { History, Plus } from "lucide-react";
 
 import {
-  cancelResearchRun, createResearchRun, deleteResearchThread,
+  cancelResearchRun, createResearchRun,
   getModelCatalog, getQueryProviders, getResearchRunEvents,
-  getResearchThreads, getResearchMessages, getResearchSelection,
+  getResearchThread, getResearchMessages, getResearchSelection,
   type ModelCatalog,
   type ResearchMessageDTO, type ResearchRunDTO, type ResearchThreadDTO,
 } from "./api";
 import { MarkdownView } from "./MarkdownView";
+import { ResearchHistoryDrawer } from "./ResearchHistoryDrawer";
 import {
   asResearchProviderId,
   RESEARCH_PROVIDER_IDS,
@@ -52,6 +54,7 @@ import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse 
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import { shouldEndResearchReplay } from "./researchRunReplay";
 import type { NavigationRequest, NavigationTarget } from "./shell/navigation";
+import { Button, PageHeader } from "./ui";
 import {
   initialState,
   lastRetryCandidate,
@@ -70,7 +73,7 @@ import {
 // persist on `done`), so isError/maxTurns default false.
 const toClientThread = (t: ResearchThreadDTO): Thread => ({
   id: t.id, title: t.title, ticker: t.ticker, provider: t.provider, model: t.model,
-  created_at: t.created_at, updated_at: t.updated_at,
+  created_at: t.created_at, updated_at: t.updated_at, archived_at: t.archived_at ?? null,
 });
 const toClientMessage = (m: ResearchMessageDTO): Message => ({
   role: m.role, content: m.content, provider: m.provider, model: m.model, effort: m.effort,
@@ -120,6 +123,11 @@ const writeActiveThreadId = (id: string | null) => {
 const isTerminalRun = (run: ResearchRunDTO): boolean =>
   ["succeeded", "failed", "cancelled", "interrupted"].includes(run.status);
 
+const isMissingResearchThreadError = (error: unknown): boolean => (
+  error instanceof Error
+  && /^\/research\/threads\/\S+ returned 404$/.test(error.message)
+);
+
 const runStartedMs = (run: ResearchRunDTO): number => {
   const raw = run.started_at ?? run.created_at;
   const parsed = Date.parse(raw);
@@ -137,17 +145,24 @@ const sleep = (ms: number, signal: AbortSignal): Promise<void> => new Promise((r
 export interface ResearchViewProps {
   onOpenTicker: (ticker: string) => void;
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "research_thread" }>> | null;
+  onNavigationConsumed?: (sequence: number) => void;
   onObserveRun?: (run: ResearchRunDTO, threadTitle?: string) => void;
 }
 
-export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: ResearchViewProps) {
+export function ResearchView({
+  onOpenTicker,
+  navigationRequest,
+  onNavigationConsumed,
+  onObserveRun,
+}: ResearchViewProps) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [question, setQuestion] = useState("");
   const [tickerInput, setTickerInput] = useState("");
   const [sdk, setSdk] = useState<Record<string, boolean> | null>(null);
   const [booting, setBooting] = useState(true);
   const [threadError, setThreadError] = useState<string | null>(null);
-  const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [transcriptPendingThreadId, setTranscriptPendingThreadId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [userSelection, setUserSelection] = useState<ResearchTuple | null>(null);
   const [threadSelection, setThreadSelection] = useState<{
@@ -164,9 +179,14 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
 
   const abortRef = useRef<AbortController | null>(null);
   const pollingRunIdRef = useRef<string | null>(null);
+  const hydrationSequenceRef = useRef(0);
+  const initialAutoSelectAllowedRef = useRef(true);
   const consumedNavigationSequenceRef = useRef(0);
+  const historyTriggerRef = useRef<HTMLButtonElement>(null);
   const onObserveRunRef = useRef(onObserveRun);
   onObserveRunRef.current = onObserveRun;
+  const onNavigationConsumedRef = useRef(onNavigationConsumed);
+  onNavigationConsumedRef.current = onNavigationConsumed;
 
   const currentThreadSelection = state.activeThreadId
     ? (threadSelection?.threadId === state.activeThreadId && threadSelection.loaded
@@ -188,6 +208,9 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
   const provider = selection?.tuple?.provider ?? null;
   const selModel = selection?.tuple?.model ?? "";
   const selEffort = selection?.tuple?.effort ?? "default";
+  const currentThread = state.activeThreadId
+    ? state.threads.find((thread) => thread.id === state.activeThreadId) ?? null
+    : null;
 
   const rememberUserSelection = useCallback((tuple: ResearchTuple) => {
     setUserSelection(tuple);
@@ -245,47 +268,100 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     return () => { alive = false; };
   }, [state.activeThreadId, threadSelectionRequestVersion]);
 
-  useEffect(() => {
-    if (state.pending) setThreadMenuId(null);
-  }, [state.pending]);
-
-  // Reload hydration (C-2b): on mount, restore persisted threads + their
-  // messages from the store into the reducer. Best-effort — an empty/failed
-  // fetch just starts clean. (v1 eager-loads each thread's messages; fine for a
-  // local single-user store, revisit with lazy-per-thread if thread counts grow.)
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const { threads } = await getResearchThreads();
-        const entries = await Promise.all(
-          threads.map(async (t) => [t.id, (await getResearchMessages(t.id)).messages.map(toClientMessage)] as const),
-        );
-        if (!alive || threads.length === 0) return;
-        for (const thread of threads) {
-          if (thread.active_run) onObserveRunRef.current?.(thread.active_run, thread.title);
-        }
-        const savedActive = readActiveThreadId();
-        setActiveRunsByThread(Object.fromEntries(
-          threads
-            .filter((t) => t.active_run && !isTerminalRun(t.active_run))
-            .map((t) => [t.id, t.active_run!]),
-        ));
-        dispatch({
-          kind: "hydrate",
-          threads: threads.map(toClientThread),
-          messagesByThread: Object.fromEntries(entries),
-          activeThreadId: savedActive && threads.some((t) => t.id === savedActive) ? savedActive : null,
-        });
-      } catch {
-        /* hydration is best-effort; a clean empty start is fine */
-      }
-    })();
-    return () => { alive = false; };
+  const detachLocalPolling = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    pollingRunIdRef.current = null;
   }, []);
 
-  // Abort any in-flight stream on unmount.
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const observeThreadRun = useCallback((thread: ResearchThreadDTO) => {
+    const activeRun = thread.active_run;
+    setActiveRunsByThread((current) => {
+      const next = { ...current };
+      if (!activeRun || isTerminalRun(activeRun)) delete next[thread.id];
+      else next[thread.id] = activeRun;
+      return next;
+    });
+    if (!activeRun) return;
+    onObserveRunRef.current?.(activeRun, thread.title);
+  }, []);
+
+  const hydrateThread = useCallback(async (thread: ResearchThreadDTO) => {
+    const sequence = ++hydrationSequenceRef.current;
+    setTranscriptPendingThreadId(thread.id);
+    detachLocalPolling();
+    setThreadError(null);
+    setUserSelection(null);
+    writeActiveThreadId(thread.id);
+    observeThreadRun(thread);
+    dispatch({
+      kind: "hydrate",
+      threads: [toClientThread(thread)],
+      messagesByThread: {},
+      activeThreadId: thread.id,
+    });
+    dispatch({ kind: "selectThread", threadId: thread.id });
+    try {
+      const response = await getResearchMessages(thread.id);
+      if (sequence !== hydrationSequenceRef.current) return;
+      dispatch({
+        kind: "hydrateThread",
+        thread: toClientThread(thread),
+        messages: response.messages.map(toClientMessage),
+      });
+      setTranscriptPendingThreadId((current) => current === thread.id ? null : current);
+    } catch {
+      if (sequence === hydrationSequenceRef.current) {
+        setThreadError("無法載入這個研究對話，請從歷史重新選取。");
+      }
+    }
+  }, [detachLocalPolling, observeThreadRun]);
+
+  const hydrateThreadById = useCallback(async (threadId: string) => {
+    const requestSequence = ++hydrationSequenceRef.current;
+    try {
+      const { thread } = await getResearchThread(threadId);
+      if (requestSequence !== hydrationSequenceRef.current) return "unavailable" as const;
+      await hydrateThread(thread);
+      return "loaded" as const;
+    } catch (error) {
+      const missing = isMissingResearchThreadError(error);
+      if (requestSequence === hydrationSequenceRef.current) {
+        setThreadError(missing
+          ? "找不到指定的研究對話，可能已被刪除。"
+          : "暫時無法載入指定的研究對話，請稍後再試。");
+      }
+      return missing ? "missing" as const : "unavailable" as const;
+    }
+  }, [hydrateThread]);
+
+  const handleInitialHistoryRows = useCallback(async (
+    rows: readonly ResearchThreadDTO[],
+  ) => {
+    for (const thread of rows) observeThreadRun(thread);
+    if (navigationRequest || !initialAutoSelectAllowedRef.current) return;
+    const savedActive = readActiveThreadId();
+    if (savedActive) {
+      const target = rows.find((thread) => thread.id === savedActive) ?? null;
+      if (target) {
+        await hydrateThread(target);
+      } else {
+        const result = await hydrateThreadById(savedActive);
+        if (result === "missing" && initialAutoSelectAllowedRef.current && rows[0]) {
+          await hydrateThread(rows[0]);
+        }
+      }
+    } else if (rows[0]) {
+      await hydrateThread(rows[0]);
+    }
+    initialAutoSelectAllowedRef.current = false;
+  }, [hydrateThread, hydrateThreadById, navigationRequest, observeThreadRun]);
+
+  // Ignore transcript responses and detach local replay after unmount.
+  useEffect(() => () => {
+    hydrationSequenceRef.current += 1;
+    detachLocalPolling();
+  }, [detachLocalPolling]);
 
   // --- server-owned run attach/replay ---------------------------------------
   // The sidecar owns execution. The UI only creates a durable run and polls its
@@ -363,6 +439,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
   useEffect(() => {
     const run = state.activeThreadId ? activeRunsByThread[state.activeThreadId] : null;
     if (!run || isTerminalRun(run)) return;
+    if (transcriptPendingThreadId === run.thread_id) return;
     if (state.pending?.threadId === run.thread_id || pollingRunIdRef.current === run.id) return;
     dispatch({
       kind: "attachRun",
@@ -374,7 +451,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
       ts: runStartedMs(run),
     });
     void pollRun(run);
-  }, [activeRunsByThread, pollRun, state.activeThreadId, state.pending?.threadId]);
+  }, [activeRunsByThread, pollRun, state.activeThreadId, state.pending?.threadId, transcriptPendingThreadId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,7 +474,13 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
 
   const submit = useCallback(() => {
     const q = question.trim();
-    if (!q || selection?.state !== "ready" || state.pending) return;
+    if (
+      !q
+      || selection?.state !== "ready"
+      || state.pending
+      || currentThread?.archived_at
+      || transcriptPendingThreadId === state.activeThreadId
+    ) return;
     const ticker = tickerInput.trim().toUpperCase() || null;
     // Client-owned thread id: reuse the active thread to continue, else a fresh
     // uuid for a new conversation (agreed reducer↔store id model).
@@ -416,7 +499,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
       ticker,
       assistant_stance: stanceForRun,
     });
-  }, [question, tickerInput, selection, state.pending, state.activeThreadId, runManaged, stanceForRun]);
+  }, [question, tickerInput, selection, state.pending, state.activeThreadId, currentThread?.archived_at, runManaged, stanceForRun, transcriptPendingThreadId]);
 
   // Abort the live stream + drop the pending turn (explicit Stop only).
   const stopStream = useCallback(() => {
@@ -435,52 +518,45 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     dispatch({ kind: "abort", ts: Date.now() });
   }, [activeRunsByThread, state.activeThreadId]);
   const newThread = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    pollingRunIdRef.current = null;
+    initialAutoSelectAllowedRef.current = false;
+    hydrationSequenceRef.current += 1;
+    detachLocalPolling();
     setThreadError(null);
-    setThreadMenuId(null);
+    setHistoryOpen(false);
+    setTranscriptPendingThreadId(null);
     setUserSelection(null);
     writeActiveThreadId(null);
     dispatch({ kind: "newThread" });
-  }, []);
-  const selectThread = useCallback((id: string) => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    pollingRunIdRef.current = null;
-    setThreadError(null);
-    setThreadMenuId(null);
-    setUserSelection(null);
-    writeActiveThreadId(id);
-    dispatch({ kind: "selectThread", threadId: id });
-  }, []);
+  }, [detachLocalPolling]);
+
   useEffect(() => {
     if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
-    if (!state.threads.some((thread) => thread.id === navigationRequest.target.threadId)) return;
+    initialAutoSelectAllowedRef.current = false;
     consumedNavigationSequenceRef.current = navigationRequest.sequence;
-    selectThread(navigationRequest.target.threadId);
-  }, [navigationRequest, selectThread, state.threads]);
-  const deleteThread = useCallback(async (thread: Thread) => {
-    if (activeRunsByThread[thread.id]) {
-      setThreadError("這個對話仍有研究執行中，請先停止或等待完成。");
-      return;
+    onNavigationConsumedRef.current?.(navigationRequest.sequence);
+    void hydrateThreadById(navigationRequest.target.threadId);
+  }, [hydrateThreadById, navigationRequest]);
+
+  const handleThreadUpdated = useCallback((updated: ResearchThreadDTO) => {
+    dispatch({ kind: "updateThread", thread: toClientThread(updated) });
+    observeThreadRun(updated);
+  }, [observeThreadRun]);
+
+  const handleThreadDeleted = useCallback((threadId: string) => {
+    setActiveRunsByThread((current) => {
+      const next = { ...current };
+      delete next[threadId];
+      return next;
+    });
+    if (state.activeThreadId === threadId) {
+      hydrationSequenceRef.current += 1;
+      detachLocalPolling();
+      setTranscriptPendingThreadId(null);
+      setUserSelection(null);
+      writeActiveThreadId(null);
     }
-    const title = thread.title || "（未命名）";
-    const ok = window.confirm(`刪除「${title}」？\n\n這會移除此對話的本地訊息與這個 thread 的上下文記憶。`);
-    if (!ok) return;
-    setThreadError(null);
-    try {
-      await deleteResearchThread(thread.id);
-      const remaining = state.threads.filter((t) => t.id !== thread.id);
-      const nextActive = state.activeThreadId === thread.id ? (remaining[0]?.id ?? null) : state.activeThreadId;
-      if (state.activeThreadId === thread.id) setUserSelection(null);
-      writeActiveThreadId(nextActive);
-      dispatch({ kind: "deleteThread", threadId: thread.id });
-      setThreadMenuId(null);
-    } catch (e) {
-      setThreadError(e instanceof Error ? e.message : String(e));
-    }
-  }, [activeRunsByThread, state.threads, state.activeThreadId]);
+    dispatch({ kind: "deleteThread", threadId });
+  }, [detachLocalPolling, state.activeThreadId]);
 
   // --- derived view state ----------------------------------------------------
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
@@ -560,7 +636,13 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
   }, [catalog, rememberUserSelection]);
 
   const retryLastFailed = useCallback(() => {
-    if (!retryCandidate || !state.activeThreadId || state.pending || selection?.state !== "ready") return;
+    if (
+      !retryCandidate
+      || !state.activeThreadId
+      || state.pending
+      || selection?.state !== "ready"
+      || currentThread?.archived_at
+    ) return;
     const retryTuple = selection.tuple;
     setThreadError(null);
     dispatch({
@@ -584,79 +666,65 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
       retry_last_failed: true,
       assistant_stance: stanceForRun,
     });
-  }, [retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
+  }, [currentThread?.archived_at, retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
+  const activeRunIds = useMemo(
+    () => new Set(Object.values(activeRunsByThread).map((run) => run.id)),
+    [activeRunsByThread],
+  );
 
   return (
     <main className="main research">
-      <div className="surface-head">
-        <h1 className="surface-title">AI 研究</h1>
-        <span className="muted tiny">工具追蹤與證據整理，支援即時或完成後顯示，依 provider 而定；對話保存於本地（reload 後保留），即時工具追蹤為 ephemeral</span>
-        {selection?.tuple && (
-          <span className="muted tiny">
-            研究模型：{selection.tuple.provider} · {selection.tuple.model} · {selection.tuple.effort}
-            {selection.provenance ? `（${selection.provenance}）` : ""}
-          </span>
+      <PageHeader
+        title="AI 研究"
+        context={(
+          <div className="research-page-context">
+            <span className="muted tiny">對話與研究執行保存於本地；離開頁面後，研究仍會繼續執行。</span>
+            {selection?.tuple && (
+              <span className="muted tiny">
+                研究模型：{selection.tuple.provider} · {selection.tuple.model} · {selection.tuple.effort}
+                {selection.provenance ? `（${selection.provenance}）` : ""}
+              </span>
+            )}
+          </div>
         )}
-      </div>
+        actions={(
+          <>
+            <Button
+              ref={historyTriggerRef}
+              size="compact"
+              tone="secondary"
+              icon={<History size={16} />}
+              onClick={() => setHistoryOpen(true)}
+            >
+              歷史
+            </Button>
+            <Button
+              size="compact"
+              tone="primary"
+              icon={<Plus size={16} />}
+              onClick={newThread}
+            >
+              新對話
+            </Button>
+          </>
+        )}
+      />
 
       <div className="research-grid">
-        {/* ── Left: thread list ───────────────────────────────────────── */}
-        <aside className="research-threads">
-          <button
-            className="btn-ghost small"
-            onClick={newThread}
-            title="新增對話"
-          >
-            ＋ 新對話
-          </button>
-          {state.pending && <p className="muted tiny">回應在 sidecar 繼續執行；可切換對話，停止才會取消目前 run。</p>}
-          {threadError && <p className="error-text tiny">{threadError}</p>}
-          {state.threads.length === 0 ? (
-            <p className="muted tiny" style={{ marginTop: 10 }}>尚無對話。</p>
-          ) : (
-            <ul className="research-threadlist">
-              {state.threads.map((t) => (
-                <li key={t.id}>
-                  <div className={`research-threadrow ${t.id === state.activeThreadId ? "active" : ""}`}>
-                    <button
-                      className="research-threaditem"
-                      onClick={() => selectThread(t.id)}
-                      title={t.title}
-                    >
-                      <span className="research-threadtitle">{t.title || "（未命名）"}</span>
-                      {t.ticker && <span className="list-chip tiny">{t.ticker}</span>}
-                      {activeRunsByThread[t.id] && <span className="list-chip tiny">執行中</span>}
-                    </button>
-                    <button
-                      className="research-threadmenu-btn"
-                      onClick={() => setThreadMenuId((open) => (open === t.id ? null : t.id))}
-                      disabled={!!activeRunsByThread[t.id]}
-                      title={activeRunsByThread[t.id] ? "這個對話仍有研究執行中" : "更多操作"}
-                      aria-label={`開啟對話操作 ${t.title || t.id}`}
-                      aria-expanded={threadMenuId === t.id}
-                    >
-                      …
-                    </button>
-                    {threadMenuId === t.id && !activeRunsByThread[t.id] && (
-                      <div className="research-threadmenu" role="menu">
-                        <button
-                          className="research-threadmenu-item danger"
-                          onClick={() => void deleteThread(t)}
-                          role="menuitem"
-                        >
-                          刪除對話
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
-
-        {/* ── Center: conversation ────────────────────────────────────── */}
+        {/* ── Conversation workspace ──────────────────────────────────── */}
         <section className="research-convo">
+          <div className="research-conversation-head">
+            <h2 className="research-conversation-title">
+              {currentThread?.title?.trim() || "新對話"}
+            </h2>
+            {currentThread?.archived_at ? (
+              <span className="warn-text tiny">此對話已封存；取消封存後才能繼續提問。</span>
+            ) : null}
+            {state.pending ? (
+              <span className="muted tiny">回應在 sidecar 繼續執行；停止才會取消目前 run。</span>
+            ) : null}
+          </div>
+          {threadError ? <p className="error-text tiny">{threadError}</p> : null}
           <div className="research-messages">
             {msgs.length === 0 && !state.pending ? (
               <div className="research-empty">
@@ -675,7 +743,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                   key={i}
                   m={m}
                   onOpenTicker={onOpenTicker}
-                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending}
+                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending && !currentThread?.archived_at}
                   onRetry={retryLastFailed}
                 />
               ))
@@ -805,6 +873,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                     placeholder="Ticker（選填）"
                     value={tickerInput}
                     onChange={(e) => setTickerInput(e.target.value)}
+                    disabled={Boolean(currentThread?.archived_at)}
                   />
                   <textarea
                     className="research-textarea"
@@ -813,6 +882,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                     onChange={(e) => setQuestion(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
                     rows={2}
+                    disabled={Boolean(currentThread?.archived_at)}
                   />
                   {state.pending ? (
                     <button className="btn-ghost danger" onClick={stopStream}>停止</button>
@@ -820,7 +890,12 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                     <button
                       className="btn-ghost"
                       onClick={submit}
-                      disabled={selection?.state !== "ready" || !question.trim()}
+                      disabled={
+                        selection?.state !== "ready"
+                        || !question.trim()
+                        || Boolean(currentThread?.archived_at)
+                        || transcriptPendingThreadId === state.activeThreadId
+                      }
                     >
                       送出
                     </button>
@@ -857,6 +932,21 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
           )}
         </aside>
       </div>
+      <ResearchHistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        activeThreadId={state.activeThreadId}
+        activeRunIds={activeRunIds}
+        onInitialRowsReady={(rows) => void handleInitialHistoryRows(rows)}
+        onSelect={(thread) => {
+          initialAutoSelectAllowedRef.current = false;
+          setHistoryOpen(false);
+          void hydrateThread(thread);
+        }}
+        onThreadUpdated={handleThreadUpdated}
+        onThreadDeleted={handleThreadDeleted}
+        returnFocusRef={historyTriggerRef}
+      />
     </main>
   );
 }

@@ -8,6 +8,7 @@ import type {
   InvestorProfileResponse,
   ModelCatalog,
   ModelTask,
+  ResearchMessageDTO,
   ResearchRunDTO,
   ResearchThreadDTO,
   RuntimeConfig,
@@ -209,6 +210,27 @@ function thread(
   };
 }
 
+function persistedMessage(
+  role: ResearchMessageDTO["role"],
+  content: string,
+  isError = false,
+): ResearchMessageDTO {
+  return {
+    role,
+    content,
+    provider: role === "assistant" ? "openai" : null,
+    model: role === "assistant" ? "gpt-5.6-luna" : null,
+    effort: role === "assistant" ? "high" : null,
+    tools_used: [],
+    tool_calls: [],
+    token_usage: null,
+    tickers: null,
+    elapsed_seconds: role === "assistant" ? 1 : null,
+    is_error: isError,
+    created_at: "2026-07-17T00:03:00Z",
+  };
+}
+
 function json(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
     status,
@@ -216,19 +238,41 @@ function json(value: unknown, status = 200): Response {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 function stubResearchFetch({
   threads,
+  exactThreads = {},
+  exactResponses = {},
+  messages = {},
+  messageResponses = {},
+  messageResponseQueues = {},
+  patchResponses = {},
+  threadResponse,
   createdRun,
   replayRun,
   order,
   selectionResponses,
 }: {
   threads: ResearchThreadDTO[];
+  exactThreads?: Record<string, ResearchThreadDTO>;
+  exactResponses?: Record<string, Response | Promise<Response>>;
+  messages?: Record<string, ResearchMessageDTO[]>;
+  messageResponses?: Record<string, Response | Promise<Response>>;
+  messageResponseQueues?: Record<string, Array<Response | Promise<Response>>>;
+  patchResponses?: Record<string, ResearchThreadDTO>;
+  threadResponse?: Response | Promise<Response>;
   createdRun?: ResearchRunDTO;
   replayRun?: ResearchRunDTO;
   order?: string[];
   selectionResponses?: Response[];
 }) {
+  const patchedThreads: Record<string, ResearchThreadDTO> = {};
+  let pendingThreadResponse = threadResponse;
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     const path = `${url.pathname}${url.search}`;
@@ -238,7 +282,41 @@ function stubResearchFetch({
     }
     if (path === "/config/model-catalog") return json(CATALOG);
     if (path === "/profile/investor") return json(PROFILE);
-    if (path === "/research/threads?limit=50") return json({ threads });
+    if (url.pathname === "/research/threads" && (init?.method ?? "GET") === "GET") {
+      if (pendingThreadResponse) {
+        const response = pendingThreadResponse;
+        pendingThreadResponse = undefined;
+        return await response;
+      }
+      return json({
+        threads: threads.map((thread) => patchedThreads[thread.id] ?? thread),
+        total: threads.length,
+        limit: Number(url.searchParams.get("limit") ?? 50),
+        offset: Number(url.searchParams.get("offset") ?? 0),
+      });
+    }
+    const exactMatch = url.pathname.match(/^\/research\/threads\/([^/]+)$/);
+    if (exactMatch && (init?.method ?? "GET") === "GET") {
+      const threadId = decodeURIComponent(exactMatch[1]);
+      const exactResponse = exactResponses[threadId];
+      if (exactResponse) return await exactResponse;
+      const found = patchedThreads[threadId]
+        ?? exactThreads[threadId]
+        ?? threads.find((candidate) => candidate.id === threadId);
+      return found ? json({ thread: found }) : json({ detail: "thread not found" }, 404);
+    }
+    if (exactMatch && init?.method === "PATCH") {
+      const threadId = decodeURIComponent(exactMatch[1]);
+      const patch = JSON.parse(String(init.body ?? "{}")) as { title?: string };
+      const found = patchResponses[threadId]
+        ?? patchedThreads[threadId]
+        ?? exactThreads[threadId]
+        ?? threads.find((candidate) => candidate.id === threadId);
+      if (!found) return json({ detail: "thread not found" }, 404);
+      const updated = { ...found, ...(patch.title === undefined ? {} : { title: patch.title }) };
+      patchedThreads[threadId] = updated;
+      return json({ thread: updated });
+    }
     if (/^\/research\/threads\/[^/]+\/selection$/.test(url.pathname)) {
       const queued = selectionResponses?.shift();
       if (queued) return queued;
@@ -246,7 +324,11 @@ function stubResearchFetch({
     }
     if (/^\/research\/threads\/[^/]+\/messages$/.test(url.pathname)) {
       const threadId = decodeURIComponent(url.pathname.split("/")[3] ?? "");
-      return json({ thread_id: threadId, messages: [] });
+      const queuedResponse = messageResponseQueues[threadId]?.shift();
+      if (queuedResponse) return await queuedResponse;
+      const response = messageResponses[threadId];
+      if (response) return await response;
+      return json({ thread_id: threadId, messages: messages[threadId] ?? [] });
     }
     if (path === "/research/runs" && init?.method === "POST" && createdRun) {
       order?.push("create-request");
@@ -255,6 +337,23 @@ function stubResearchFetch({
     if (/^\/research\/runs\/[^/]+\/events\?after=0$/.test(path) && replayRun) {
       order?.push("events-request");
       return json({ run: replayRun, events: [], has_more: false });
+    }
+    if (/^\/research\/runs\/[^/]+\/events\?after=0$/.test(path)) {
+      const runId = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+      const active = [...threads, ...Object.values(exactThreads)]
+        .map((candidate) => candidate.active_run)
+        .find((candidate) => candidate?.id === runId);
+      if (active) {
+        return json({
+          run: {
+            ...active,
+            status: "interrupted",
+            completed_at: "2026-07-17T00:02:00Z",
+          },
+          events: [],
+          has_more: false,
+        });
+      }
     }
     throw new Error(`unhandled test request: ${init?.method ?? "GET"} ${path}`);
   });
@@ -304,9 +403,18 @@ async function click(element: Element) {
   });
 }
 
-function threadButton(title: string): HTMLButtonElement {
-  const match = host?.querySelector(`button[title='${title}']`);
-  if (!match) throw new Error(`thread button not found: ${title}`);
+async function setInput(element: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  await act(async () => {
+    setter?.call(element, value);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
+function historyThreadButton(title: string): HTMLButtonElement {
+  const match = document.querySelector(`button[aria-label='開啟對話 ${title}']`);
+  if (!match) throw new Error(`history thread button not found: ${title}`);
   return match as HTMLButtonElement;
 }
 
@@ -322,38 +430,145 @@ afterEach(() => {
 
 describe("Research shell navigation", () => {
   it("consumes a sequenced thread target after hydration and preserves later local thread selection", async () => {
-    vi.stubGlobal("fetch", stubResearchFetch({
-      threads: [thread("thread-a", "Thread A"), thread("thread-b", "Thread B")],
-    }));
+    const target = {
+      ...thread("thread-b", "Thread B"),
+      archived_at: "2026-07-17T02:00:00Z",
+    };
+    const fetchMock = stubResearchFetch({
+      threads: [thread("thread-a", "Thread A")],
+      exactThreads: { "thread-b": target },
+      messages: {
+        "thread-b": [
+          persistedMessage("user", "Retry this research"),
+          persistedMessage("assistant", "Provider failed", true),
+        ],
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const request = (sequence: number): ResearchNavigationRequest => ({
       sequence,
       target: { kind: "research_thread", threadId: "thread-b", runId: "source-run" },
     });
     const mounted = await mountResearch({ navigationRequest: request(1) });
 
-    expect(threadButton("Thread B").closest(".research-threadrow")?.classList.contains("active")).toBe(true);
-    await click(threadButton("Thread A"));
-    expect(threadButton("Thread A").closest(".research-threadrow")?.classList.contains("active")).toBe(true);
+    expect(host!.querySelector(".research-threads")).toBeNull();
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread B");
+    const messageRequests = () => fetchMock.mock.calls
+      .map(([input]) => new URL(String(input)).pathname)
+      .filter((requestPath) => requestPath.endsWith("/messages"));
+    expect(messageRequests()).toEqual(["/research/threads/thread-b/messages"]);
+    expect(Array.from(host!.querySelectorAll("button")).some(
+      (candidate) => candidate.textContent?.trim() === "重試",
+    )).toBe(false);
+
+    const history = Array.from(host!.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === "歷史");
+    expect(history).toBeDefined();
+    await click(history!);
+    await click(historyThreadButton("Thread A"));
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread A");
+    expect(messageRequests()).toEqual([
+      "/research/threads/thread-b/messages",
+      "/research/threads/thread-a/messages",
+    ]);
 
     await mounted.render(request(1));
-    expect(threadButton("Thread A").closest(".research-threadrow")?.classList.contains("active")).toBe(true);
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread A");
 
     await mounted.render(request(2));
-    expect(threadButton("Thread B").closest(".research-threadrow")?.classList.contains("active")).toBe(true);
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread B");
   });
 
   it("reports each hydrated active run to the shell observer", async () => {
     const active = run("active-run", "active-thread", "running");
-    vi.stubGlobal("fetch", stubResearchFetch({
-      threads: [thread("active-thread", "Active research", active)],
-    }));
+    const stale = run("stale-run", "stale-thread", "running");
+    const threadPage = deferred<Response>();
+    const activeMessages = deferred<Response>();
+    const fetchMock = stubResearchFetch({
+      threads: [
+        thread("active-thread", "Active research"),
+        thread("stale-thread", "Stale research", stale),
+      ],
+      exactThreads: { "active-thread": thread("active-thread", "Active research", active) },
+      patchResponses: {
+        "stale-thread": {
+          ...thread("stale-thread", "Stale research complete"),
+          latest_run_status: "succeeded",
+        },
+      },
+      threadResponse: threadPage.promise,
+      messageResponseQueues: {
+        "active-thread": [
+          json({ thread_id: "active-thread", messages: [] }),
+          activeMessages.promise,
+        ],
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const onObserveRun = vi.fn();
-    await mountResearch({ onObserveRun });
+    const mounted = await mountResearch({ onObserveRun });
 
+    const newThread = Array.from(host!.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === "新對話");
+    await click(newThread!);
+    threadPage.resolve(json({
+      threads: [
+        thread("active-thread", "Active research"),
+        thread("stale-thread", "Stale research", stale),
+      ],
+      total: 2,
+      limit: 50,
+      offset: 0,
+    }));
+    await flush();
+
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("新對話");
+    const history = Array.from(host!.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === "歷史");
+    await click(history!);
+    expect(onObserveRun.mock.calls.filter(([observed]) => observed.id === stale.id)).toHaveLength(1);
+    await click(document.querySelector("[aria-label='重新命名 Stale research']")!);
+    await setInput(document.querySelector<HTMLInputElement>("[aria-label='對話名稱']")!, "Stale renamed");
+    await click(Array.from(document.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === "儲存名稱")!);
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Stale renamed"));
+    expect(onObserveRun.mock.calls.filter(([observed]) => observed.id === stale.id)).toHaveLength(1);
+    await click(historyThreadButton("Active research"));
+    const navigation: ResearchNavigationRequest = {
+      sequence: 11,
+      target: { kind: "research_thread", threadId: "active-thread", runId: "active-run" },
+    };
+    await mounted.render(navigation);
     expect(onObserveRun).toHaveBeenCalledWith(active, "Active research");
+    expect(fetchMock.mock.calls.some(([input]) => (
+      new URL(String(input)).pathname === "/research/runs/active-run/events"
+    ))).toBe(false);
+
+    activeMessages.resolve(json({ thread_id: "active-thread", messages: [] }));
+    await flush();
+    await vi.waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
+      new URL(String(input)).pathname === "/research/runs/active-run/events"
+    ))).toBe(true));
   });
 
   it("keeps selection failures fail-closed and lets the user retry", async () => {
+    const transientFetch = stubResearchFetch({
+      threads: [thread("thread-a", "Thread A")],
+      exactResponses: { "transient-thread": json({ detail: "temporary failure" }, 500) },
+    });
+    vi.stubGlobal("fetch", transientFetch);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "transient-thread");
+    await mountResearch();
+
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("新對話");
+    expect(host!.textContent).toContain("暫時無法載入指定的研究對話");
+    expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("transient-thread");
+
+    await act(async () => root!.unmount());
+    root = null;
+    host!.remove();
+    host = null;
+
     const fetchMock = stubResearchFetch({
       threads: [thread("thread-a", "Thread A")],
       selectionResponses: [
@@ -362,8 +577,11 @@ describe("Research shell navigation", () => {
       ],
     });
     vi.stubGlobal("fetch", fetchMock);
-    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "thread-a");
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "missing-thread");
     await mountResearch();
+
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread A");
+    expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("thread-a");
 
     const retry = await vi.waitFor(() => {
       const button = Array.from(host!.querySelectorAll("button"))

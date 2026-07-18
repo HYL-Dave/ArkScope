@@ -122,6 +122,11 @@ export function App() {
     <ResearchView
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
       navigationRequest={researchNavigation}
+      onNavigationConsumed={(sequence) => {
+        setResearchNavigation((current) => (
+          current?.sequence === sequence ? null : current
+        ));
+      }}
       onObserveRun={researchWork.observeRun}
     />
   ) : view === "Holdings" ? (

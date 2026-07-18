@@ -50,6 +50,15 @@ const INITIAL_FILTERS: HistoryFilters = {
   archived: "current",
 };
 
+function isInitialHistoryQuery(filters: HistoryFilters): boolean {
+  return filters.q === ""
+    && filters.ticker === ""
+    && filters.updatedFrom === ""
+    && filters.updatedThrough === ""
+    && filters.runState === "all"
+    && filters.archived === "current";
+}
+
 export interface ResearchHistoryDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -139,7 +148,7 @@ function mutationErrorMessage(error: unknown): string {
   if (/returned 409\b/.test(detail)) {
     return "仍有研究執行中，暫時無法封存或永久刪除。";
   }
-  return detail || "更新研究歷史時發生錯誤。";
+  return "無法更新研究歷史，請稍後重試。";
 }
 
 export function ResearchHistoryDrawer({
@@ -168,8 +177,14 @@ export function ResearchHistoryDrawer({
   const [renameError, setRenameError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ResearchThreadDTO | null>(null);
   const [deleteReturnFocus, setDeleteReturnFocus] = useState<HTMLButtonElement | null>(null);
+  const [pendingFocusRequest, setPendingFocusRequest] = useState<{
+    target: "refresh" | string;
+    sequence: number;
+  } | null>(null);
 
   const rowsRef = useRef<ResearchThreadDTO[]>([]);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const requestSequenceRef = useRef(0);
   const initialRowsNotifiedRef = useRef(false);
   const initialRowsCallbackRef = useRef(onInitialRowsReady);
@@ -178,6 +193,28 @@ export function ResearchHistoryDrawer({
     () => ({ current: deleteReturnFocus }),
     [deleteReturnFocus],
   );
+  const refreshButtonRef = useRef<HTMLButtonElement>(null);
+  const rowSelectRefs = useRef(new Map<string, HTMLButtonElement>());
+  const focusSequenceRef = useRef(0);
+  const renameMutationRef = useRef<string | null>(null);
+
+  const focusAfterRender = useCallback((target: "refresh" | string) => {
+    setPendingFocusRequest({ target, sequence: ++focusSequenceRef.current });
+  }, []);
+
+  useEffect(() => {
+    if (pendingFocusRequest === null) return undefined;
+    const timer = window.setTimeout(() => {
+      const target = pendingFocusRequest.target === "refresh"
+        ? refreshButtonRef.current
+        : rowSelectRefs.current.get(pendingFocusRequest.target) ?? refreshButtonRef.current;
+      target?.focus();
+      setPendingFocusRequest((current) => (
+        current?.sequence === pendingFocusRequest.sequence ? null : current
+      ));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pendingFocusRequest, rows]);
 
   const commitRows = useCallback((next: ResearchThreadDTO[]) => {
     rowsRef.current = next;
@@ -212,7 +249,11 @@ export function ResearchHistoryDrawer({
       setTotal(page.total);
       setNextOffset(page.offset + page.limit);
       setStale(false);
-      if (!initialRowsNotifiedRef.current && page.offset === 0) {
+      if (
+        !initialRowsNotifiedRef.current
+        && page.offset === 0
+        && isInitialHistoryQuery(requestedFilters)
+      ) {
         initialRowsNotifiedRef.current = true;
         initialRowsCallbackRef.current(page.threads);
       }
@@ -266,18 +307,21 @@ export function ResearchHistoryDrawer({
     setMutationError(null);
   }, []);
 
-  const cancelRename = useCallback(() => {
+  const cancelRename = useCallback((focusThreadId?: string) => {
     setRenamingId(null);
     setRenameDraft("");
     setRenameError(null);
-  }, []);
+    if (focusThreadId) focusAfterRender(focusThreadId);
+  }, [focusAfterRender]);
 
   const saveRename = useCallback(async (thread: ResearchThreadDTO) => {
+    if (renameMutationRef.current !== null) return;
     const title = renameDraft.trim();
     if (!title) {
       setRenameError("名稱不可空白");
       return;
     }
+    renameMutationRef.current = thread.id;
     setMutationId(thread.id);
     setMutationError(null);
     setRenameError(null);
@@ -287,12 +331,15 @@ export function ResearchHistoryDrawer({
       replaceRow(updated);
       cancelRename();
       onThreadUpdated(updated);
+      await loadPage(filtersRef.current, 0, false);
+      focusAfterRender(updated.id);
     } catch (error) {
       setRenameError(mutationErrorMessage(error));
     } finally {
+      if (renameMutationRef.current === thread.id) renameMutationRef.current = null;
       setMutationId(null);
     }
-  }, [cancelRename, invalidateLoads, onThreadUpdated, renameDraft, replaceRow]);
+  }, [cancelRename, focusAfterRender, invalidateLoads, loadPage, onThreadUpdated, renameDraft, replaceRow]);
 
   const changeArchive = useCallback(async (thread: ResearchThreadDTO) => {
     const archived = !thread.archived_at;
@@ -304,12 +351,14 @@ export function ResearchHistoryDrawer({
       removeRow(thread.id);
       if (deleteTarget?.id === thread.id) setDeleteTarget(null);
       onThreadUpdated(updated);
+      await loadPage(filtersRef.current, 0, false);
+      focusAfterRender("refresh");
     } catch (error) {
       setMutationError(mutationErrorMessage(error));
     } finally {
       setMutationId(null);
     }
-  }, [deleteTarget?.id, invalidateLoads, onThreadUpdated, removeRow]);
+  }, [deleteTarget?.id, focusAfterRender, invalidateLoads, loadPage, onThreadUpdated, removeRow]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -322,12 +371,14 @@ export function ResearchHistoryDrawer({
       removeRow(deletedId);
       setDeleteTarget(null);
       onThreadDeleted(deletedId);
+      await loadPage(filtersRef.current, 0, false);
+      focusAfterRender("refresh");
     } catch (error) {
       setMutationError(mutationErrorMessage(error));
     } finally {
       setMutationId(null);
     }
-  }, [deleteTarget, invalidateLoads, onThreadDeleted, removeRow]);
+  }, [deleteTarget, focusAfterRender, invalidateLoads, loadPage, onThreadDeleted, removeRow]);
 
   const activeIds = useMemo(() => activeRunIds, [activeRunIds]);
   const isActive = useCallback((thread: ResearchThreadDTO) => {
@@ -439,6 +490,7 @@ export function ResearchHistoryDrawer({
               </label>
             </div>
             <IconButton
+              ref={refreshButtonRef}
               label="重新整理歷史"
               tone="ghost"
               busy={loading}
@@ -496,13 +548,25 @@ export function ResearchHistoryDrawer({
                             autoFocus
                             aria-label="對話名稱"
                             value={renameDraft}
+                            disabled={busy}
                             onChange={(event) => {
                               setRenameDraft(event.currentTarget.value);
                               setRenameError(null);
                             }}
                             onKeyDown={(event) => {
+                              if (renameMutationRef.current === thread.id) {
+                                if (event.key === "Enter" || event.key === "Escape") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }
+                                return;
+                              }
                               if (event.key === "Enter") void saveRename(thread);
-                              if (event.key === "Escape") cancelRename();
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                cancelRename(thread.id);
+                              }
                             }}
                           />
                         </label>
@@ -522,7 +586,7 @@ export function ResearchHistoryDrawer({
                             tone="ghost"
                             icon={<X size={15} />}
                             disabled={busy}
-                            onClick={cancelRename}
+                            onClick={() => cancelRename(thread.id)}
                           />
                         </div>
                         {renameError ? <p className="error-text tiny">{renameError}</p> : null}
@@ -530,6 +594,10 @@ export function ResearchHistoryDrawer({
                     ) : (
                       <>
                         <Button
+                          ref={(node) => {
+                            if (node) rowSelectRefs.current.set(thread.id, node);
+                            else rowSelectRefs.current.delete(thread.id);
+                          }}
                           tone="ghost"
                           className="research-history-select"
                           aria-label={`開啟對話 ${title}`}

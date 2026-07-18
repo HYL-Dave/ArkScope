@@ -103,12 +103,21 @@ vi.mock("./Home", () => ({
 vi.mock("./Research", () => ({
   ResearchView: (props: {
     navigationRequest?: NavigationRequest | null;
+    onNavigationConsumed?: (sequence: number) => void;
     onObserveRun?: (run: ResearchRunDTO, title?: string) => void;
   }) => {
     shellMocks.researchProps = props as unknown as Record<string, unknown>;
     return (
       <main data-testid="research-surface">
         <pre data-testid="research-request">{JSON.stringify(props.navigationRequest ?? null)}</pre>
+        <button
+          type="button"
+          onClick={() => {
+            if (props.navigationRequest) props.onNavigationConsumed?.(props.navigationRequest.sequence);
+          }}
+        >
+          Consume research target
+        </button>
         <button
           type="button"
           onClick={() => props.onObserveRun?.(makeRun("observed-from-research"), "Research observer")}
@@ -273,6 +282,11 @@ describe("App shell integration", () => {
 
     expect(host.querySelector("[data-testid='research-request']")?.textContent).toContain('"threadId":"thread-shell"');
     expect(host.querySelector("[data-testid='research-request']")?.textContent).toContain('"runId":"run-shell"');
+    await click(button("Consume research target"));
+    expect(host.querySelector("[data-testid='research-request']")?.textContent).toBe("null");
+    await click(button("工作台"));
+    await click(button("AI 研究"));
+    expect(host.querySelector("[data-testid='research-request']")?.textContent).toBe("null");
   });
 
   it("opens the exact enabled Settings section from a status target", async () => {

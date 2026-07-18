@@ -2588,11 +2588,12 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
   line-height: 1.45;
 }
 
-/* ── AI 研究 (Layer C-2a): 3-pane evidence-first console ─────────────── */
+/* ── AI 研究: conversation workspace + on-demand history ─────────────── */
 .main.research { display: flex; flex-direction: column; overflow: hidden; }
+.research-page-context { display: flex; flex-direction: column; gap: 2px; }
 .research-grid {
   display: grid;
-  grid-template-columns: 220px 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 12px;
   flex: 1;
   min-height: 0;
@@ -2611,6 +2612,24 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+}
+.research-conversation-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+.research-conversation-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 1.35;
+  letter-spacing: 0;
 }
 .research-threadlist { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .research-threadrow {

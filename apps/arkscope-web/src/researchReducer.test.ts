@@ -720,7 +720,17 @@ describe("reducer · hydrate", () => {
       title: "renamed",
       archived_at: "2026-07-18T00:00:00Z",
     });
-    const cont = reduce(updated, submit({ question: "follow-up in restored thread", threadId: "ta" }));
+    const refreshed = reduce(updated, {
+      kind: "hydrateThread",
+      thread: { ...mkThread("ta", "server title"), archived_at: null },
+      messages: [mkMsg("user", "server question"), mkMsg("assistant", "server answer")],
+    });
+    expect(refreshed.threads[0]).toMatchObject({ title: "server title", archived_at: null });
+    expect(refreshed.messagesByThread.ta.map((message) => message.content)).toEqual([
+      "server question",
+      "server answer",
+    ]);
+    const cont = reduce(refreshed, submit({ question: "follow-up in restored thread", threadId: "ta" }));
     expect(cont.threads).toHaveLength(1); // appended, not a new thread
     expect(cont.messagesByThread["ta"]).toHaveLength(3);
   });

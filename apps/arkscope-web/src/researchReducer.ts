@@ -123,6 +123,7 @@ export type Action =
   | { kind: "selectThread"; threadId: string } // left-pane switch (UI blocks while pending)
   | { kind: "updateThread"; thread: Thread } // server-confirmed rename/archive metadata
   | { kind: "deleteThread"; threadId: string } // persisted delete succeeded; remove local copy
+  | { kind: "hydrateThread"; thread: Thread; messages: Message[] } // selected-thread server snapshot
   | { kind: "hydrate"; threads: Thread[]; messagesByThread: Record<string, Message[]>; activeThreadId?: string | null }; // reload restore (C-2b)
 
 // The exact max-turns sentinel (Anthropic-only; agent.py:516). EXACT equality.
@@ -386,6 +387,26 @@ export function reduce(state: State, action: Action): State {
         ? null
         : state.activeThreadId;
       return { ...state, threads, activeThreadId, messagesByThread, footer: null, terminal: null };
+    }
+    case "hydrateThread": {
+      if (state.pending?.threadId === action.thread.id) return state;
+      const exists = state.threads.some((thread) => thread.id === action.thread.id);
+      const threads = (exists
+        ? state.threads.map((thread) => (
+            thread.id === action.thread.id ? action.thread : thread
+          ))
+        : [...state.threads, action.thread]
+      ).sort((left, right) => (
+        left.updated_at < right.updated_at ? 1 : left.updated_at > right.updated_at ? -1 : 0
+      ));
+      return {
+        ...state,
+        threads,
+        messagesByThread: {
+          ...state.messagesByThread,
+          [action.thread.id]: action.messages,
+        },
+      };
     }
     case "hydrate": {
       // Reload restore. MERGE (not replace) so a slow mount-fetch landing after

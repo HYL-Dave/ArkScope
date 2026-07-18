@@ -261,6 +261,7 @@ function createResearchFetch({
   archived = [],
   messages = {},
   exact = {},
+  patchResponses = {},
   total,
   override,
 }: {
@@ -268,6 +269,7 @@ function createResearchFetch({
   archived?: HistoryThread[];
   messages?: Record<string, ResearchMessageDTO[]>;
   exact?: Record<string, HistoryThread>;
+  patchResponses?: Record<string, Array<Response | Promise<Response>>>;
   total?: number;
   override?: RequestOverride;
 } = {}) {
@@ -304,6 +306,17 @@ function createResearchFetch({
     }
     if (exactMatch && method === "PATCH") {
       const id = decodeURIComponent(exactMatch[1]);
+      const queued = patchResponses[id]?.shift();
+      if (queued) {
+        const response = await queued;
+        if (response.ok) {
+          const body = await response.clone().json() as { thread: HistoryThread };
+          state.current = state.current.filter((candidate) => candidate.id !== id);
+          state.archived = state.archived.filter((candidate) => candidate.id !== id);
+          (body.thread.archived_at ? state.archived : state.current).push(body.thread);
+        }
+        return response;
+      }
       const patch = JSON.parse(String(init?.body ?? "{}")) as { title?: string; archived?: boolean };
       const source = [...state.current, ...state.archived];
       const found = source.find((candidate) => candidate.id === id);
@@ -505,6 +518,13 @@ function controlByLabel<T extends HTMLInputElement | HTMLSelectElement>(label: s
 async function click(element: Element) {
   await act(async () => {
     element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
+async function pressKey(element: Element, key: string) {
+  await act(async () => {
+    element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
     await Promise.resolve();
   });
 }
@@ -745,12 +765,41 @@ describe("Research history drawer", () => {
   });
 
   it("renames inline, rejects a blank title locally, and updates the selected heading", async () => {
+    let currentTitle = "Thread A";
+    let patchCount = 0;
+    let holdRename = true;
+    const delayedRename = deferred<Response>();
     const backend = createResearchFetch({
-      current: [thread("thread-a", "Thread A")],
       messages: { "thread-a": [message("Transcript A")] },
+      override: (url, init) => {
+        if (url.pathname === "/research/threads" && (init?.method ?? "GET") === "GET") {
+          const q = url.searchParams.get("q")?.toLowerCase() ?? "";
+          const rows = !q || currentTitle.toLowerCase().includes(q)
+            ? [thread("thread-a", currentTitle)]
+            : [];
+          return json({ threads: rows, total: rows.length, limit: 50, offset: 0 });
+        }
+        if (url.pathname === "/research/threads/thread-a" && init?.method === "PATCH") {
+          const patch = JSON.parse(String(init.body)) as { title: string };
+          patchCount += 1;
+          if (holdRename && patchCount >= 2) return delayedRename.promise;
+          currentTitle = patch.title;
+          return json({ thread: thread("thread-a", currentTitle) });
+        }
+        return undefined;
+      },
     });
     await mountResearch({ backend });
     await click(buttonByText("歷史", host!));
+    await click(document.querySelector("[aria-label='重新命名 Thread A']")!);
+
+    await click(document.querySelector("[aria-label='取消重新命名']")!);
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label"))
+      .toBe("開啟對話 Thread A"));
+    await click(document.querySelector("[aria-label='重新命名 Thread A']")!);
+    await pressKey(document.querySelector<HTMLInputElement>("[aria-label='對話名稱']")!, "Escape");
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label"))
+      .toBe("開啟對話 Thread A"));
     await click(document.querySelector("[aria-label='重新命名 Thread A']")!);
 
     const rename = controlByLabel<HTMLInputElement>("對話名稱");
@@ -764,25 +813,85 @@ describe("Research history drawer", () => {
     await vi.waitFor(() => expect(
       document.querySelector("[data-research-history-row='thread-a']")?.textContent,
     ).toContain("Renamed research"));
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label"))
+      .toBe("開啟對話 Renamed research"));
     expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Renamed research");
-    const patchCall = backend.fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
-    expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ title: "Renamed research" });
+    await setInput(controlByLabel<HTMLInputElement>("搜尋歷史"), "Renamed research");
+    await vi.waitFor(() => expect(
+      document.querySelector("[data-research-history-row='thread-a']"),
+    ).not.toBeNull());
+    await click(document.querySelector("[aria-label='重新命名 Renamed research']")!);
+    const delayedInput = controlByLabel<HTMLInputElement>("對話名稱");
+    await setInput(delayedInput, "Outside filter");
+    await click(buttonByText("儲存名稱"));
+    await pressKey(delayedInput, "Enter");
+    await pressKey(delayedInput, "Escape");
+    expect(patchCount).toBe(2);
+    expect(controlByLabel<HTMLInputElement>("對話名稱").disabled).toBe(true);
+
+    await setInput(controlByLabel<HTMLInputElement>("搜尋歷史"), "Outside filter");
+    await vi.waitFor(() => expect(
+      document.querySelector("[data-research-history-row='thread-a']"),
+    ).toBeNull());
+    currentTitle = "Outside filter";
+    holdRename = false;
+    delayedRename.resolve(json({ thread: thread("thread-a", currentTitle) }));
+    await flush();
+    await vi.waitFor(() => expect(
+      document.querySelector("[data-research-history-row='thread-a']")?.textContent,
+    ).toContain("Outside filter"));
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Outside filter");
+
+    await click(document.querySelector("[aria-label='重新命名 Outside filter']")!);
+    await setInput(controlByLabel<HTMLInputElement>("對話名稱"), "No longer matches");
+    await click(buttonByText("儲存名稱"));
+    await vi.waitFor(() => expect(
+      document.querySelector("[data-research-history-row='thread-a']"),
+    ).toBeNull());
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label"))
+      .toBe("重新整理歷史"));
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("No longer matches");
+    const patches = backend.fetchMock.mock.calls
+      .filter(([, init]) => init?.method === "PATCH")
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(patches).toEqual([
+      { title: "Renamed research" },
+      { title: "Outside filter" },
+      { title: "No longer matches" },
+    ]);
   });
 
   it("blocks active archive, keeps an archived selected transcript inert, and restores it on unarchive", async () => {
     const active = run("run-active", "thread-b", "running");
-    let archiveAttempts = 0;
+    const archiveResponse = deferred<Response>();
+    const staleFilterResponse = deferred<Response>();
+    let filterCalls = 0;
     const backend = createResearchFetch({
       current: [
         thread("thread-a", "Thread A", { latestRunStatus: "succeeded" }),
         thread("thread-b", "Thread B", { latestRunStatus: "running", activeRun: active }),
       ],
       messages: { "thread-a": [message("Transcript A")] },
+      patchResponses: {
+        "thread-a": [
+          json({ detail: "active research run prevents archiving this thread" }, 409),
+          archiveResponse.promise,
+        ],
+      },
       override: (url, init) => {
-        if (url.pathname !== "/research/threads/thread-a" || init?.method !== "PATCH") return undefined;
-        const patch = JSON.parse(String(init.body)) as { archived?: boolean };
-        if (patch.archived && archiveAttempts++ === 0) {
-          return json({ detail: "active research run prevents archiving this thread" }, 409);
+        if (
+          url.pathname === "/research/threads"
+          && (init?.method ?? "GET") === "GET"
+          && url.searchParams.get("q") === "fresh"
+        ) {
+          filterCalls += 1;
+          if (filterCalls === 1) return staleFilterResponse.promise;
+          return json({
+            threads: [thread("thread-fresh", "Fresh filtered row")],
+            total: 1,
+            limit: 50,
+            offset: 0,
+          });
         }
         return undefined;
       },
@@ -800,9 +909,29 @@ describe("Research history drawer", () => {
     expect(document.querySelector("[data-research-history-row='thread-a']")).not.toBeNull();
 
     await click(document.querySelector("[aria-label='封存 Thread A']")!);
+    await setInput(controlByLabel<HTMLInputElement>("搜尋歷史"), "fresh");
+    await vi.waitFor(() => expect(filterCalls).toBe(1));
+    archiveResponse.resolve(json({
+      thread: thread("thread-a", "Thread A", { archivedAt: "2026-07-18T01:00:00Z" }),
+    }));
+    await flush();
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Fresh filtered row"));
+    staleFilterResponse.resolve(json({
+      threads: [thread("thread-a", "Stale filtered row")],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    }));
+    await flush();
+    expect(document.body.textContent).toContain("Fresh filtered row");
+    expect(document.body.textContent).not.toContain("Stale filtered row");
+
+    await setInput(controlByLabel<HTMLInputElement>("搜尋歷史"), "");
     await vi.waitFor(() => expect(
       document.querySelector("[data-research-history-row='thread-a']"),
     ).toBeNull());
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label"))
+      .toBe("重新整理歷史"));
     expect(host!.textContent).toContain("Transcript A");
     expect(buttonByText("送出", host!).disabled).toBe(true);
 
@@ -820,16 +949,25 @@ describe("Research history drawer", () => {
 
   it("uses ConfirmDialog and preserves a thread on cancel or 409 before successful delete", async () => {
     let deleteAttempts = 0;
-    let historyCalls = 0;
+    let filteredCalls = 0;
     const staleRefresh = deferred<Response>();
     const backend = createResearchFetch({
       current: [thread("thread-a", "Thread A"), thread("thread-b", "Thread B")],
       messages: { "thread-a": [message("Transcript A")] },
       override: (url, init) => {
-        if (url.pathname === "/research/threads" && (init?.method ?? "GET") === "GET") {
-          historyCalls += 1;
-          if (historyCalls === 2) return staleRefresh.promise;
-          return undefined;
+        if (
+          url.pathname === "/research/threads"
+          && (init?.method ?? "GET") === "GET"
+          && url.searchParams.get("q") === "fresh"
+        ) {
+          filteredCalls += 1;
+          if (filteredCalls === 1) return staleRefresh.promise;
+          return json({
+            threads: [thread("thread-b", "Fresh delete result")],
+            total: 1,
+            limit: 50,
+            offset: 0,
+          });
         }
         if (url.pathname !== "/research/threads/thread-a" || init?.method !== "DELETE") return undefined;
         deleteAttempts += 1;
@@ -840,8 +978,8 @@ describe("Research history drawer", () => {
     });
     await mountResearch({ backend });
     await click(buttonByText("歷史", host!));
-    await click(document.querySelector("[aria-label='重新整理歷史']")!);
-    await vi.waitFor(() => expect(historyCalls).toBe(2));
+    await setInput(controlByLabel<HTMLInputElement>("搜尋歷史"), "fresh");
+    await vi.waitFor(() => expect(filteredCalls).toBe(1));
     await click(document.querySelector("[aria-label='永久刪除 Thread A']")!);
     expect(document.querySelector(".ui-confirm-dialog")?.textContent).toContain("永久刪除");
     await click(buttonByText("取消"));
@@ -859,10 +997,13 @@ describe("Research history drawer", () => {
     await vi.waitFor(() => expect(
       document.querySelector("[data-research-history-row='thread-a']"),
     ).toBeNull());
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label"))
+      .toBe("重新整理歷史"));
     expect(document.querySelector("[data-research-history-row='thread-b']")).not.toBeNull();
     expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBeNull();
     expect(host!.textContent).not.toContain("Transcript A");
     expect(host!.textContent).toContain("問一個開放式問題");
+    expect(document.body.textContent).toContain("Fresh delete result");
 
     staleRefresh.resolve(json({
       threads: [thread("thread-a", "Thread A"), thread("thread-b", "Thread B")],
@@ -872,6 +1013,7 @@ describe("Research history drawer", () => {
     }));
     await flush();
     expect(document.querySelector("[data-research-history-row='thread-a']")).toBeNull();
+    expect(document.body.textContent).toContain("Fresh delete result");
   });
 
   it("preserves prior rows as stale after refresh failure and retries without an empty result", async () => {
