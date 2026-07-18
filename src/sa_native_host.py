@@ -679,6 +679,12 @@ def _handle_save_article_content(dal, msg):
             comments,
             detail_ticker=msg.get("detail_ticker"),
             detail_ticker_observed_at=msg.get("detail_ticker_observed_at"),
+            provider_comments_count=msg.get("provider_comments_count"),
+            comment_scan_mode=msg.get("comment_scan_mode", "quick"),
+            comment_scan_stop_reason=msg.get("comment_scan_stop_reason"),
+            comment_scan_stable_bottom_rounds=msg.get(
+                "comment_scan_stable_bottom_rounds", 0
+            ),
         )
         logger.info(
             "save_article_content: %s (%d chars, prepared=%d net_new=%d stored_total=%d reconciliation=%s)",
@@ -699,13 +705,25 @@ def _handle_save_comments_only(dal, msg):
     article_id = msg.get("article_id", "")
     comments = _normalize_comment_ids(article_id, msg.get("comments", []))
     try:
-        stats = dal.save_sa_comments_only(article_id, comments)
+        stats = dal.save_sa_comments_only(
+            article_id,
+            comments,
+            provider_comments_count=msg.get("provider_comments_count"),
+            comment_scan_mode=msg.get("comment_scan_mode", "quick"),
+            comment_scan_stop_reason=msg.get("comment_scan_stop_reason"),
+            comment_scan_stable_bottom_rounds=msg.get(
+                "comment_scan_stable_bottom_rounds", 0
+            ),
+        )
         logger.info(
-            "save_comments_only: %s (prepared=%d net_new=%d stored_total=%d)",
+            "save_comments_only: %s "
+            "(prepared=%d net_new=%d stored_total=%d usable=%s overlap_rate=%.3f)",
             article_id,
             stats.get("prepared_comments", 0),
             stats.get("net_new_comments", 0),
             stats.get("stored_comments_total", 0),
+            stats.get("comment_scan_usable") is True,
+            float(stats.get("comment_scan_identity_overlap_rate") or 0.0),
         )
         return {
             "status": "ok",

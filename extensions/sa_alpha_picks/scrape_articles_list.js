@@ -45,7 +45,8 @@
     var observedAt = new Date().toISOString();
 
     // Extract comments count from comment label or post-date metadata.
-    var commentsCount = extractCommentsCount(card, cardText, date);
+    var comments = extractCommentsCount(card, cardText, date);
+    var commentsObservedAt = comments.observed ? new Date().toISOString() : null;
 
     // Auto-detect article_type from title + ticker presence
     var articleType = detectArticleType(text, ticker);
@@ -58,7 +59,8 @@
       list_ticker: ticker,
       list_ticker_observed_at: ticker ? observedAt : null,
       date: date,
-      comments_count: commentsCount,
+      comments_count: comments.value,
+      comments_count_observed_at: commentsObservedAt,
       article_type: articleType,
     });
   }
@@ -75,7 +77,10 @@
         if (!nodeText) continue;
         var exactMatch = nodeText.match(/^(\d{1,5})\s*Comments?$/i);
         if (exactMatch) {
-          return sanitizeCommentsCount(parseInt(exactMatch[1], 10), date);
+          return {
+            value: sanitizeCommentsCount(parseInt(exactMatch[1], 10), date),
+            observed: true,
+          };
         }
       }
     }
@@ -92,7 +97,10 @@
     if (count === null && searchText !== cardText) {
       count = extractCommentsCountFromText(cardText);
     }
-    return sanitizeCommentsCount(count, date);
+    return {
+      value: sanitizeCommentsCount(count, date),
+      observed: count !== null,
+    };
   }
 
   function extractCommentsCountFromText(text) {

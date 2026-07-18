@@ -153,6 +153,9 @@ def _sanitize_sa_article_meta(article: Dict[str, Any]) -> Dict[str, Any]:
             clean_count,
         )
     normalized["comments_count"] = clean_count
+    normalized["comments_count_observed_at"] = (
+        normalized.get("comments_count_observed_at") or None
+    )
     return normalized
 
 
@@ -1143,15 +1146,57 @@ class DataAccessLayer:
             if a.get("article_id")
         ))
         scanned_ids = set(scanned_article_ids)
-        need_content = [
-            {"article_id": a["article_id"], "url": a.get("url", "")}
-            for a in all_articles
-            if a.get("article_id") in scanned_ids and not a.get("has_content")
-        ]
+        current_count_observations = {
+            a["article_id"]: int(a.get("comments_count") or 0)
+            for a in normalized_articles
+            if a.get("article_id") and a.get("comments_count_observed_at")
+        }
+        articles_by_id = {
+            a["article_id"]: a for a in all_articles if a.get("article_id")
+        }
+
+        def comment_work_item(a: Dict[str, Any]) -> Dict[str, Any]:
+            item = {"article_id": a["article_id"], "url": a.get("url", "")}
+            if a["article_id"] in scanned_ids:
+                provider_count = current_count_observations.get(a["article_id"])
+            elif a.get("comments_count_observed_at"):
+                provider_count = _sanitize_sa_comments_count(
+                    a.get("comments_count"), a.get("published_date")
+                )
+            else:
+                provider_count = None
+            if provider_count is not None:
+                item["provider_comments_count"] = provider_count
+            return item
+
+        need_content = []
+        for article_id in scanned_article_ids:
+            article = articles_by_id.get(article_id)
+            if article is not None and not article.get("has_content"):
+                need_content.append(comment_work_item(article))
 
         # Determine need_comments
         need_comments = []
         need_content_ids = {a["article_id"] for a in need_content}
+        need_comment_ids = set()
+
+        for article_id in scanned_article_ids:
+            article = articles_by_id.get(article_id)
+            if (
+                article is None
+                or article_id in need_content_ids
+                or not article.get("has_content")
+                or article_id not in current_count_observations
+            ):
+                continue
+            provider_count = current_count_observations[article_id]
+            checkpoint = article.get("provider_comments_count_at_last_scan")
+            count_changed = checkpoint is not None and provider_count != int(checkpoint)
+            first_positive = checkpoint is None and provider_count > 0
+            if count_changed or first_positive:
+                need_comments.append(comment_work_item(article))
+                need_comment_ids.add(article_id)
+
         if mode in ("full", "backfill"):
             from src.agents.config import get_agent_config
             try:
@@ -1172,18 +1217,32 @@ class DataAccessLayer:
                 backfill_limit = 50 if mode == "backfill" else 10
             from datetime import datetime, timezone, timedelta
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=ttl)
-            need_comment_ids = set()
-            backfill_candidates = []
+            recovery_candidates = []
+            ttl_candidates = []
             for a in all_articles:
                 if a["article_id"] in need_content_ids:
                     continue  # Mutual exclusion: need_content takes priority
+                if a["article_id"] in need_comment_ids:
+                    continue
                 if not a.get("has_content"):
                     continue
-                remote_count = _sanitize_sa_comments_count(
-                    a.get("comments_count"), a.get("published_date")
-                )
-                stored_count = int(a.get("stored_comments_count") or 0)
-                gap = remote_count - stored_count
+                published = a.get("published_date")
+                if hasattr(published, "isoformat"):
+                    published_key = published.isoformat()
+                elif published is None:
+                    published_key = ""
+                else:
+                    published_key = str(published)
+                order_key = (published_key, str(a["article_id"]))
+
+                state = a.get("comment_recovery_state") or "repaired"
+                if state == "pending":
+                    if mode == "backfill" or not a.get("comment_recovery_parked_at"):
+                        recovery_candidates.append((order_key, a))
+                    continue
+                if state == "unreachable_terminal":
+                    continue
+
                 fetched = a.get("comments_fetched_at")
                 is_stale = fetched is None
                 if fetched:
@@ -1193,50 +1252,20 @@ class DataAccessLayer:
                         )
                     is_stale = fetched <= cutoff
                 if is_stale:
-                    if remote_count <= 0 and stored_count <= 0:
+                    provider_count = _sanitize_sa_comments_count(
+                        a.get("comments_count"), a.get("published_date")
+                    )
+                    stored_count = int(a.get("stored_comments_count") or 0)
+                    if provider_count <= 0 and stored_count <= 0:
                         continue
-                    need_comments.append(
-                        {"article_id": a["article_id"], "url": a.get("url", "")}
-                    )
+                    ttl_candidates.append((order_key, a))
+
+            recovery_candidates.sort(key=lambda item: item[0], reverse=True)
+            ttl_candidates.sort(key=lambda item: item[0], reverse=True)
+            for _, a in (recovery_candidates + ttl_candidates)[:backfill_limit]:
+                if a["article_id"] not in need_comment_ids:
+                    need_comments.append(comment_work_item(a))
                     need_comment_ids.add(a["article_id"])
-                    continue
-                if gap > 0:
-                    published = a.get("published_date")
-                    if hasattr(published, "isoformat"):
-                        published_key = published.isoformat()
-                    elif published is None:
-                        published_key = ""
-                    else:
-                        published_key = str(published)
-                    backfill_candidates.append((gap, published_key, a))
-            if backfill_limit > 0:
-                backfill_candidates.sort(
-                    key=lambda item: (item[0], item[1]),
-                    reverse=True,
-                )
-                for _, _, a in backfill_candidates[:backfill_limit]:
-                    if a["article_id"] in need_comment_ids:
-                        continue
-                    need_comments.append(
-                        {"article_id": a["article_id"], "url": a.get("url", "")}
-                    )
-                    need_comment_ids.add(a["article_id"])
-        elif mode == "quick":
-            for a in all_articles:
-                if a["article_id"] not in scanned_ids:
-                    continue
-                if a["article_id"] in need_content_ids:
-                    continue
-                if not a.get("has_content"):
-                    continue
-                remote_count = _sanitize_sa_comments_count(
-                    a.get("comments_count"), a.get("published_date")
-                )
-                stored_count = int(a.get("stored_comments_count") or 0)
-                if remote_count > stored_count:
-                    need_comments.append(
-                        {"article_id": a["article_id"], "url": a.get("url", "")}
-                    )
 
         # Unresolved symbols (current picks only, metadata-only matching)
         unresolved = self._compute_unresolved_symbols()
@@ -1273,6 +1302,10 @@ class DataAccessLayer:
         *,
         detail_ticker: str | None = None,
         detail_ticker_observed_at=None,
+        provider_comments_count=None,
+        comment_scan_mode="quick",
+        comment_scan_stop_reason=None,
+        comment_scan_stable_bottom_rounds=0,
     ) -> Dict:
         """Capture body/comments first, then reconcile in a separate transaction."""
         if not isinstance(self._backend, DatabaseBackend):
@@ -1283,6 +1316,10 @@ class DataAccessLayer:
             comments,
             detail_ticker=detail_ticker,
             detail_ticker_observed_at=detail_ticker_observed_at,
+            provider_comments_count=provider_comments_count,
+            comment_scan_mode=comment_scan_mode,
+            comment_scan_stop_reason=comment_scan_stop_reason,
+            comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
         )
         try:
             reconciliation = self._backend.reconcile_sa_articles(
@@ -1296,12 +1333,26 @@ class DataAccessLayer:
         return {**captured, "reconciliation": reconciliation}
 
     def save_sa_comments_only(
-        self, article_id: str, comments: List[Dict]
-    ) -> Dict[str, int]:
+        self,
+        article_id: str,
+        comments: List[Dict],
+        *,
+        provider_comments_count=None,
+        comment_scan_mode="quick",
+        comment_scan_stop_reason=None,
+        comment_scan_stable_bottom_rounds=0,
+    ) -> Dict[str, Any]:
         """Update comments only (refresh run). Returns refresh stats."""
         if not isinstance(self._backend, DatabaseBackend):
             return {"prepared_comments": 0, "stored_comments_total": 0, "net_new_comments": 0}
-        return self._backend.update_article_comments(article_id, comments)
+        return self._backend.update_article_comments(
+            article_id,
+            comments,
+            provider_comments_count=provider_comments_count,
+            comment_scan_mode=comment_scan_mode,
+            comment_scan_stop_reason=comment_scan_stop_reason,
+            comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+        )
 
     def audit_sa_unresolved_symbols(self) -> Dict:
         """Compatibility projection of the read-only reconciliation queue."""

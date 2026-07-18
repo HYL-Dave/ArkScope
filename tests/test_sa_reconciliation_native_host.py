@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
 import src.sa_native_host as host
 from src.tools.backends.db_backend import DatabaseBackend
@@ -160,8 +161,14 @@ def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok
         def save_article_with_comments(
             self, article_id, body_markdown, comments, *,
             detail_ticker=None, detail_ticker_observed_at=None,
+            provider_comments_count=None, comment_scan_mode="quick",
+            comment_scan_stop_reason=None, comment_scan_stable_bottom_rounds=0,
         ):
-            calls.append(("capture_body", article_id, body_markdown, detail_ticker))
+            calls.append((
+                "capture_body", article_id, body_markdown, detail_ticker,
+                provider_comments_count, comment_scan_mode,
+                comment_scan_stop_reason, comment_scan_stable_bottom_rounds,
+            ))
             return {
                 "ok": True,
                 "prepared_comments": 0,
@@ -183,10 +190,17 @@ def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok
         "body_markdown": "body",
         "detail_ticker": "BTSG",
         "detail_ticker_observed_at": "2026-07-18T12:00:00Z",
+        "provider_comments_count": 265,
+        "comment_scan_mode": "full",
+        "comment_scan_stop_reason": "stable_bottom",
+        "comment_scan_stable_bottom_rounds": 4,
         "comments": [],
     })
     assert calls == [
-        ("capture_body", "6316639", "body", "BTSG"),
+        (
+            "capture_body", "6316639", "body", "BTSG", 265, "full",
+            "stable_bottom", 4,
+        ),
         ("reconcile", ("6316639",), 100, 4),
     ]
     assert response["status"] == "ok"
@@ -217,6 +231,10 @@ def test_save_article_content_passes_detail_ticker_without_manual_symbol_injecti
         "body_markdown": "body",
         "detail_ticker": "BTSG",
         "detail_ticker_observed_at": "2026-07-18T12:00:00Z",
+        "provider_comments_count": 265,
+        "comment_scan_mode": "backfill",
+        "comment_scan_stop_reason": "stable_bottom",
+        "comment_scan_stable_bottom_rounds": 5,
         "symbol": "WRONG-MANUAL-SYMBOL",
         "comments": [],
     })
@@ -224,7 +242,41 @@ def test_save_article_content_passes_detail_ticker_without_manual_symbol_injecti
     assert dal.capture_kwargs == {
         "detail_ticker": "BTSG",
         "detail_ticker_observed_at": "2026-07-18T12:00:00Z",
+        "provider_comments_count": 265,
+        "comment_scan_mode": "backfill",
+        "comment_scan_stop_reason": "stable_bottom",
+        "comment_scan_stable_bottom_rounds": 5,
     }
+
+
+def test_save_comments_only_forwards_recovery_scan_evidence():
+    dal = MagicMock()
+    dal.save_sa_comments_only.return_value = {
+        "prepared_comments": 0,
+        "stored_comments_total": 592,
+        "net_new_comments": 0,
+        "comment_scan_usable": False,
+        "comment_recovery_state": "pending",
+    }
+    result = host._handle_save_comments_only(dal, {
+        "article_id": "a1",
+        "comments": [],
+        "provider_comments_count": 12,
+        "comment_scan_mode": "backfill",
+        "comment_scan_stop_reason": "stable_bottom",
+        "comment_scan_stable_bottom_rounds": 5,
+    })
+    dal.save_sa_comments_only.assert_called_once_with(
+        "a1",
+        [],
+        provider_comments_count=12,
+        comment_scan_mode="backfill",
+        comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    assert result["status"] == "ok"
+    assert result["comment_scan_usable"] is False
+    assert result["comment_recovery_state"] == "pending"
 
 
 def test_get_reconciliation_queue_action_is_read_only_and_sanitized(

@@ -81,7 +81,12 @@ injectDetailScraper = async function () {
     detail_ticker_observed_at: "2026-07-18T12:00:00Z",
   };
 };
-scrollToComments = async function () {};
+scrollToComments = async function () {
+  return {
+    stop_reason: "stable_bottom", stable_bottom_rounds: 2,
+    comments_loaded: 0, rounds: 2, elapsed_ms: 10,
+  };
+};
 injectCommentsScraper = async function () { return { comments: [] }; };
 """
 
@@ -122,7 +127,11 @@ def test_detail_save_forwards_only_scraped_detail_ticker_observation():
           if (message.action === "save_articles_meta") {
             return {
               status: "ok", saved: 1,
-              need_content: [{ article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a" }],
+              need_content: [{
+                article_id: "a1",
+                url: "https://seekingalpha.com/alpha-picks/articles/1-a",
+                provider_comments_count: 265,
+              }],
               need_comments: [], unresolved_symbols: [],
               reconciliation: { status: "ok", enrichment: [] },
             };
@@ -138,6 +147,10 @@ def test_detail_save_forwards_only_scraped_detail_ticker_observation():
     )
     assert result["detail_ticker"] == "BTSG"
     assert result["detail_ticker_observed_at"] == "2026-07-18T12:00:00Z"
+    assert result["provider_comments_count"] == 265
+    assert result["comment_scan_mode"] == "quick"
+    assert result["comment_scan_stop_reason"] == "stable_bottom"
+    assert result["comment_scan_stable_bottom_rounds"] == 2
     assert "symbol" not in result
     assert "ticker" not in result
 
@@ -335,7 +348,9 @@ def test_comment_refresh_settles_after_ready_before_scrolling():
               unresolved_symbols: [], reconciliation: { status: "ok", enrichment: [] },
             };
           }
-          if (message.action === "save_comments_only") return { status: "ok" };
+          if (message.action === "save_comments_only") return {
+            status: "ok", comment_scan_usable: true,
+          };
           return { status: "ok", unresolved_symbols: [], review_queue: { total: 0, events: [] } };
         };
         await doDetailFetch(1, [], "quick");
@@ -344,6 +359,93 @@ def test_comment_refresh_settles_after_ready_before_scrolling():
     )
 
     assert result == ["ready", "settled", "scrolled"]
+
+
+def test_comment_refresh_counts_only_usable_checkpointed_scan():
+    result = _run_background(
+        _DETAIL_FLOW_SETUP
+        + r"""
+        scrollToComments = async function () {
+          return {
+            stop_reason: "stable_bottom", stable_bottom_rounds: 5,
+            comments_loaded: 0, rounds: 5, elapsed_ms: 10,
+          };
+        };
+        sendNativeMessage2 = async function (message) {
+          calls.push(message);
+          if (message.action === "save_articles_meta") return {
+            status: "ok", saved: 1, need_content: [],
+            need_comments: [{
+              article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a",
+              provider_comments_count: 12,
+            }],
+            unresolved_symbols: [], reconciliation: {status: "ok", enrichment: []},
+          };
+          if (message.action === "save_comments_only") return {
+            status: "ok", comment_scan_usable: false, net_new_comments: 0,
+          };
+          return {status: "ok", unresolved_symbols: [], review_queue: {total: 0, events: []}};
+        };
+        var summary = await doDetailFetch(1, [], "quick");
+        return {calls: calls, summary: summary};
+        """
+    )
+    save = next(
+        item for item in result["calls"] if item["action"] == "save_comments_only"
+    )
+    assert save["provider_comments_count"] == 12
+    assert save["comment_scan_mode"] == "quick"
+    assert save["comment_scan_stop_reason"] == "stable_bottom"
+    assert save["comment_scan_stable_bottom_rounds"] == 5
+    assert result["summary"]["comments_refreshed"] == 0
+    assert result["summary"]["failed"] == 1
+
+
+def test_comment_scroll_reports_stable_bottom_evidence():
+    result = _run_background(
+        r"""
+        sleep = async function () {};
+        chrome.scripting.executeScript = async function () {
+          return [{result: {
+            comments: 12, atBottom: true, clicked: false, loading: false,
+          }}];
+        };
+        var stable = await scrollToComments(1, {
+          mode: "backfill", articleId: "a1",
+        });
+
+        chrome.scripting.executeScript = async function () {
+          return [{result: {
+            comments: 12, atBottom: true, clicked: false, loading: true,
+          }}];
+        };
+        var loading = await scrollToComments(1, {
+          mode: "backfill", articleId: "a2",
+        });
+
+        var counts = [1, 1, 2, 2, 2, 2, 2, 2];
+        var index = 0;
+        chrome.scripting.executeScript = async function () {
+          var count = counts[Math.min(index, counts.length - 1)];
+          index += 1;
+          return [{result: {
+            comments: count, atBottom: true, clicked: false, loading: false,
+          }}];
+        };
+        var growth = await scrollToComments(1, {
+          mode: "backfill", articleId: "a3",
+        });
+        return {stable: stable, loading: loading, growth: growth};
+        """
+    )
+    assert result["stable"]["stop_reason"] == "stable_bottom"
+    assert result["stable"]["stable_bottom_rounds"] == 5
+    assert result["stable"]["comments_loaded"] == 12
+    assert result["loading"]["stop_reason"] in {"max_scrolls", "timeout"}
+    assert result["loading"]["stable_bottom_rounds"] < 5
+    assert result["growth"]["stop_reason"] == "stable_bottom"
+    assert result["growth"]["stable_bottom_rounds"] == 5
+    assert result["growth"]["rounds"] == 8
 
 
 def test_article_settle_resets_to_top_and_waits_two_and_a_half_seconds():

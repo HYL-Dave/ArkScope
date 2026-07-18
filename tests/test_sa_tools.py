@@ -1298,6 +1298,8 @@ class TestDataAccessArticleMeta:
                 "url": "https://example.com/123",
                 "has_content": True,
                 "comments_count": 12,
+                "comments_count_observed_at": "2026-07-19T00:00:00+00:00",
+                "provider_comments_count_at_last_scan": 11,
                 "stored_comments_count": 7,
                 "comments_fetched_at": "2026-03-20T00:00:00+00:00",
             },
@@ -1312,13 +1314,147 @@ class TestDataAccessArticleMeta:
         ])
 
         result = dal.save_sa_articles_meta([
-            {"article_id": "123", "url": "https://example.com/123"},
+            {
+                "article_id": "123",
+                "url": "https://example.com/123",
+                "comments_count": 12,
+                "comments_count_observed_at": "2026-07-19T00:00:00+00:00",
+            },
         ], mode="quick")
 
         assert result["need_content"] == []
         assert result["need_comments"] == [
-            {"article_id": "123", "url": "https://example.com/123"},
+            {
+                "article_id": "123",
+                "url": "https://example.com/123",
+                "provider_comments_count": 12,
+            },
         ]
+
+    def test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap(self):
+        cases = [
+            # provider, checkpoint, inventory, observed, state, parked, scheduled
+            (983, 983, 592, True, "repaired", None, False),
+            (984, 983, 592, True, "repaired", None, True),
+            (982, 983, 592, True, "repaired", None, True),
+            (0, None, 0, True, "repaired", None, False),
+            (983, 982, 592, False, "repaired", None, False),
+            (984, 983, 592, True, "pending", "2026-07-19T00:00:00Z", True),
+        ]
+        for provider, checkpoint, inventory, observed, state, parked, scheduled in cases:
+            dal = self._make_dal()
+            dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+            dal._backend.reconcile_sa_articles = MagicMock(
+                return_value={"status": "ok", "enrichment": []}
+            )
+            dal._backend.query_sa_articles = MagicMock(return_value=[{
+                "article_id": "a1", "url": "https://example.com/a1",
+                "has_content": True, "comments_count": provider,
+                "comments_count_observed_at": (
+                    "2026-07-19T00:00:00+00:00" if observed else None
+                ),
+                "provider_comments_count_at_last_scan": checkpoint,
+                "stored_comments_count": inventory,
+                "comments_fetched_at": "2026-07-18T00:00:00+00:00",
+                "comment_recovery_state": state,
+                "comment_recovery_parked_at": parked,
+            }])
+            incoming = {
+                "article_id": "a1", "url": "https://example.com/a1",
+                "comments_count": provider,
+                "comments_count_observed_at": (
+                    "2026-07-19T00:00:00+00:00" if observed else None
+                ),
+            }
+            result = dal.save_sa_articles_meta([incoming], mode="quick")
+            expected = ([{
+                "article_id": "a1", "url": "https://example.com/a1",
+                "provider_comments_count": provider,
+            }] if scheduled else [])
+            assert result["need_comments"] == expected
+
+    def test_full_and_backfill_prioritize_recovery_state_with_park_boundary(self):
+        old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        rows = [
+            {
+                "article_id": "pending", "url": "https://example.com/pending",
+                "has_content": True, "comments_count": 20,
+                "comments_count_observed_at": recent,
+                "provider_comments_count_at_last_scan": 20,
+                "stored_comments_count": 12, "published_date": "2026-07-18",
+                "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
+            },
+            {
+                "article_id": "parked", "url": "https://example.com/parked",
+                "has_content": True, "comments_count": 30,
+                "comments_count_observed_at": recent,
+                "provider_comments_count_at_last_scan": 30,
+                "stored_comments_count": 12, "published_date": "2026-07-17",
+                "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": recent,
+            },
+            {
+                "article_id": "fresh-gap", "url": "https://example.com/fresh",
+                "has_content": True, "comments_count": 983,
+                "comments_count_observed_at": recent,
+                "provider_comments_count_at_last_scan": 983,
+                "stored_comments_count": 592, "published_date": "2026-07-19",
+                "comments_fetched_at": recent,
+                "comment_recovery_state": "repaired",
+                "comment_recovery_parked_at": None,
+            },
+            {
+                "article_id": "stale-new", "url": "https://example.com/new",
+                "has_content": True, "comments_count": 40,
+                "comments_count_observed_at": old,
+                "provider_comments_count_at_last_scan": 40,
+                "stored_comments_count": 20, "published_date": "2026-07-18",
+                "comments_fetched_at": old,
+                "comment_recovery_state": "repaired",
+                "comment_recovery_parked_at": None,
+            },
+            {
+                "article_id": "terminal", "url": "https://example.com/terminal",
+                "has_content": True, "comments_count": 50,
+                "comments_count_observed_at": old,
+                "provider_comments_count_at_last_scan": 50,
+                "stored_comments_count": 20, "published_date": "2026-07-16",
+                "comments_fetched_at": old,
+                "comment_recovery_state": "unreachable_terminal",
+                "comment_recovery_parked_at": None,
+            },
+        ]
+        expected = {
+            "full": ["pending", "stale-new"],
+            "backfill": ["pending", "parked", "stale-new"],
+        }
+        for mode, expected_ids in expected.items():
+            dal = self._make_dal()
+            dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+            dal._backend.query_sa_articles = MagicMock(return_value=rows)
+            dal._backend.reconcile_sa_articles = MagicMock(
+                return_value={"status": "ok", "enrichment": []}
+            )
+            with patch(
+                "src.agents.config.get_agent_config",
+                return_value=SimpleNamespace(
+                    sa_comments_cache_days=7,
+                    sa_comments_backfill_per_full_scan=2,
+                    sa_comments_backfill_per_backfill_scan=3,
+                ),
+            ):
+                result = dal.save_sa_articles_meta([{
+                    "article_id": "fresh-gap", "url": "https://example.com/fresh",
+                    "comments_count": 983,
+                    "comments_count_observed_at": recent,
+                }], mode=mode)
+            assert [item["article_id"] for item in result["need_comments"]] == expected_ids
+            assert "fresh-gap" not in expected_ids
+            assert "terminal" not in expected_ids
 
     def test_quick_mode_ignores_year_prefixed_gap_artifact(self):
         dal = self._make_dal()
@@ -1421,6 +1557,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 30,
                 "published_date": "2026-03-28",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
             },
             {
                 "article_id": "gap-older-big",
@@ -1430,6 +1568,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 20,
                 "published_date": "2026-03-20",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
             },
             {
                 "article_id": "gap-small",
@@ -1439,6 +1579,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 12,
                 "published_date": "2026-03-27",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": recent,
             },
             {
                 "article_id": "fresh-no-gap",
@@ -1455,7 +1597,7 @@ class TestDataAccessArticleMeta:
             "src.agents.config.get_agent_config",
             return_value=SimpleNamespace(
                 sa_comments_cache_days=7,
-                sa_comments_backfill_per_full_scan=2,
+                sa_comments_backfill_per_full_scan=3,
             ),
         ):
             result = dal.save_sa_articles_meta([
@@ -1469,9 +1611,9 @@ class TestDataAccessArticleMeta:
             {"article_id": "need-content", "url": "https://example.com/need-content"},
         ]
         assert result["need_comments"] == [
-            {"article_id": "ttl-refresh", "url": "https://example.com/ttl-refresh"},
             {"article_id": "gap-newer-big", "url": "https://example.com/gap-newer-big"},
             {"article_id": "gap-older-big", "url": "https://example.com/gap-older-big"},
+            {"article_id": "ttl-refresh", "url": "https://example.com/ttl-refresh"},
         ]
 
 
@@ -1494,7 +1636,7 @@ class TestDataAccessArticleMeta:
             "src.agents.config.get_agent_config",
             return_value=SimpleNamespace(
                 sa_comments_cache_days=7,
-                sa_comments_backfill_per_full_scan=0,
+                sa_comments_backfill_per_full_scan=1,
             ),
         ):
             result = dal.save_sa_articles_meta([
@@ -1529,6 +1671,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 10,
                 "published_date": "2026-03-28",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
             },
         ])
 
@@ -1561,6 +1705,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 10,
                 "published_date": "2026-03-28",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
             },
             {
                 "article_id": "gap-b",
@@ -1570,6 +1716,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 10,
                 "published_date": "2026-03-27",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
             },
             {
                 "article_id": "gap-c",
@@ -1579,6 +1727,8 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 10,
                 "published_date": "2026-03-26",
                 "comments_fetched_at": recent,
+                "comment_recovery_state": "pending",
+                "comment_recovery_parked_at": None,
             },
         ])
 
@@ -1688,6 +1838,10 @@ class TestNativeHostArticles:
             "body_markdown": "# Content",
             "detail_ticker": "NVDA",
             "detail_ticker_observed_at": "2026-07-18T12:00:00Z",
+            "provider_comments_count": 18,
+            "comment_scan_mode": "full",
+            "comment_scan_stop_reason": "stable_bottom",
+            "comment_scan_stable_bottom_rounds": 4,
             "comments": [],
         })
         assert result["status"] == "ok"
@@ -1697,6 +1851,10 @@ class TestNativeHostArticles:
             [],
             detail_ticker="NVDA",
             detail_ticker_observed_at="2026-07-18T12:00:00Z",
+            provider_comments_count=18,
+            comment_scan_mode="full",
+            comment_scan_stop_reason="stable_bottom",
+            comment_scan_stable_bottom_rounds=4,
         )
 
     def test_audit_unresolved(self):

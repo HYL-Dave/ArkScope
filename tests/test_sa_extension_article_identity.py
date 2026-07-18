@@ -48,6 +48,7 @@ def test_btsg_real_list_fixture_extracts_ticker_after_optional_time_and_separato
     assert payload[0]["ticker"] == payload[0]["list_ticker"] == "BTSG"
     assert payload[0]["date"] == "Jul 15, 2026"
     assert payload[0]["comments_count"] == 265
+    assert payload[0]["comments_count_observed_at"].endswith("Z")
     assert payload[0]["article_type"] == "analysis"
     assert payload[0]["list_ticker_observed_at"].endswith("Z")
 
@@ -59,7 +60,30 @@ def test_btsg_list_fixture_keeps_date_comments_and_article_id_intact():
     assert payload["article_id"] == "6316639"
     assert payload["date"] == "Jul 15, 2026"
     assert payload["comments_count"] == 265
+    assert payload["comments_count_observed_at"].endswith("Z")
     assert payload["list_ticker"] == "BTSG"
+
+
+def test_comment_count_observation_distinguishes_zero_from_unknown(tmp_path):
+    fixture = tmp_path / "comment-counts.html"
+    fixture.write_text(
+        """<article><h3><a href='/alpha-picks/articles/10-zero'>
+        A sufficiently long zero comments article title</a></h3>
+        <span>Jul 19, 2026, 12:00 PM</span><a>0 Comments</a></article>
+        <article><h3><a href='/alpha-picks/articles/11-unknown'>
+        A sufficiently long unknown comments article title</a></h3>
+        <span>Jul 18, 2026, 12:00 PM</span></article>""",
+        encoding="utf-8",
+    )
+    payload = _run_fixture(fixture, IDENTITY, LIST_SCRAPER)
+    by_id = {item["article_id"]: item for item in payload}
+    explicit_zero = by_id["10"]
+    unknown = by_id["11"]
+
+    assert explicit_zero["comments_count"] == 0
+    assert explicit_zero["comments_count_observed_at"].endswith("Z")
+    assert unknown["comments_count"] == 0
+    assert unknown["comments_count_observed_at"] is None
 
 
 def test_list_ticker_bearing_node_wins_over_normalized_text_fallback(tmp_path):

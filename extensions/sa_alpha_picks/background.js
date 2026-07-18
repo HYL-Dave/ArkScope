@@ -1600,7 +1600,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
 
       // Scroll down to comments section + load all comments
       // This naturally provides human-like dwell time (10-30s per page)
-      await scrollToComments(tabId, {
+      var bodyScrollStats = await scrollToComments(tabId, {
         mode: scrollMode,
         articleId: item.article_id,
       });
@@ -1617,6 +1617,11 @@ async function doDetailFetch(tabId, currentPicks, mode) {
         comments: comments,
         detail_ticker: detail.detail_ticker || null,
         detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
+        provider_comments_count: item.provider_comments_count,
+        comment_scan_mode: scrollMode,
+        comment_scan_stop_reason: bodyScrollStats && bodyScrollStats.stop_reason,
+        comment_scan_stable_bottom_rounds:
+          (bodyScrollStats && bodyScrollStats.stable_bottom_rounds) || 0,
       });
       if (saveResult && saveResult.ok) {
         fetched++;
@@ -1649,11 +1654,11 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       await chrome.tabs.update(tabId, { url: cItem.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(cItem.url));
       var commentsReady = await waitForArticleReady(tabId);
-      if (!commentsReady.ok) continue;
+      if (!commentsReady.ok) { failed++; continue; }
       await settleArticleBeforeScroll(tabId);
 
       // Scroll to load comments (natural delay)
-      await scrollToComments(tabId, {
+      var commentScrollStats = await scrollToComments(tabId, {
         mode: scrollMode,
         articleId: cItem.article_id,
       });
@@ -1665,13 +1670,25 @@ async function doDetailFetch(tabId, currentPicks, mode) {
         action: "save_comments_only",
         article_id: cItem.article_id,
         comments: cComments,
+        provider_comments_count: cItem.provider_comments_count,
+        comment_scan_mode: scrollMode,
+        comment_scan_stop_reason:
+          commentScrollStats && commentScrollStats.stop_reason,
+        comment_scan_stable_bottom_rounds:
+          (commentScrollStats && commentScrollStats.stable_bottom_rounds) || 0,
       });
       if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
-        commentsRefreshed++;
-        netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
+        if (saveCommentsOnlyResult.comment_scan_usable === true) {
+          commentsRefreshed++;
+          netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
+        } else {
+          failed++;
+        }
+      } else {
+        failed++;
       }
     } catch (err) {
-      // Best effort for comments refresh
+      failed++;
     }
   }
 
@@ -1761,7 +1778,7 @@ async function doManualFetch(items) {
         if (!detail || detail.error) { failed++; continue; }
 
         // Scroll to load comments (v3 path)
-        await scrollToComments(tabId, {
+        var manualScrollStats = await scrollToComments(tabId, {
           mode: "manual",
           articleId: articleId,
         });
@@ -1789,6 +1806,12 @@ async function doManualFetch(items) {
           comments: comments,
           detail_ticker: detail.detail_ticker || null,
           detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
+          provider_comments_count: null,
+          comment_scan_mode: "manual",
+          comment_scan_stop_reason:
+            manualScrollStats && manualScrollStats.stop_reason,
+          comment_scan_stable_bottom_rounds:
+            (manualScrollStats && manualScrollStats.stable_bottom_rounds) || 0,
         });
         if (saveResult && saveResult.ok) {
           fetched++;
@@ -1909,7 +1932,7 @@ async function scrollToComments(tabId, options) {
   var startedAt = Date.now();
   var bestCount = 0;
   var rounds = 0;
-  var staleCount = 0;
+  var stableBottomRounds = 0;
   var stopReason = "max_scrolls";
 
   for (var i = 0; i < profile.maxScrolls; i++) {
@@ -1940,25 +1963,51 @@ async function scrollToComments(tabId, options) {
           }
         }
 
+        var loading = false;
+        var loadingNodes = document.querySelectorAll(
+          '[aria-busy="true"], [role="progressbar"], [class*="loading"], [class*="spinner"]'
+        );
+        for (var l = 0; l < loadingNodes.length; l++) {
+          var loadingRect = loadingNodes[l].getBoundingClientRect();
+          var loadingTop = loadingRect.top + window.scrollY;
+          var loadingStyle = window.getComputedStyle(loadingNodes[l]);
+          if (
+            loadingTop >= pageMiddle &&
+            loadingRect.width > 0 &&
+            loadingRect.height > 0 &&
+            loadingStyle.display !== 'none' &&
+            loadingStyle.visibility !== 'hidden'
+          ) {
+            loading = true;
+            break;
+          }
+        }
+
         window.scrollBy(0, window.innerHeight);
-        return { comments: commentEls.length, atBottom: atBottom, clicked: clicked };
+        return {
+          comments: commentEls.length,
+          atBottom: atBottom,
+          clicked: clicked,
+          loading: loading,
+        };
       },
     });
     var check = result[0] && result[0].result;
     rounds++;
 
-    if (check && check.comments > bestCount) {
+    var grew = Boolean(check && check.comments > bestCount);
+    if (grew) {
       bestCount = check.comments;
     }
 
-    if (check && check.atBottom && !check.clicked) {
-      staleCount++;
-      if (staleCount >= profile.staleRounds) {
-        stopReason = bestCount > 0 ? "stale" : "empty";
+    if (check && check.atBottom && !grew && !check.clicked && !check.loading) {
+      stableBottomRounds++;
+      if (stableBottomRounds >= profile.staleRounds) {
+        stopReason = "stable_bottom";
         break;
       }
     } else {
-      staleCount = 0;
+      stableBottomRounds = 0;
     }
 
     await sleep(profile.settleMs);
@@ -1971,6 +2020,7 @@ async function scrollToComments(tabId, options) {
     rounds: rounds,
     elapsed_ms: Date.now() - startedAt,
     stop_reason: stopReason,
+    stable_bottom_rounds: stableBottomRounds,
   };
   console.info("[SA] scrollToComments", JSON.stringify(stats));
   return stats;
