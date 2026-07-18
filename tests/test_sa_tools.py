@@ -1291,14 +1291,33 @@ class TestDataAccessArticleMeta:
                 "stored_comments_count": 0,
                 "comments_fetched_at": None,
             },
+            {
+                "article_id": "body-current",
+                "url": "https://example.com/body-current",
+                "has_content": False,
+            },
+            {
+                "article_id": "body-historical",
+                "url": "https://example.com/body-historical",
+                "has_content": False,
+            },
         ])
 
         result = dal.save_sa_articles_meta([
             {"article_id": "123", "url": "https://example.com/123"},
+            {
+                "article_id": "body-current",
+                "url": "https://example.com/body-current",
+            },
         ], mode="quick")
 
         assert result["need_comments"] == []
-
+        assert result["need_content"] == [
+            {
+                "article_id": "body-current",
+                "url": "https://example.com/body-current",
+            }
+        ]
 
     def test_full_mode_adds_top_gap_backfill_articles(self):
         dal = self._make_dal()

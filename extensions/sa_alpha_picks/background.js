@@ -191,6 +191,7 @@ const COMMENT_SCROLL_PROFILES = {
     settleMs: 1200,
   },
 };
+const RECONCILIATION_ENRICHMENT_LIMITS = { quick: 4, full: 12, backfill: 20 };
 var marketNewsRefreshInFlight = false;
 var saSyncJobChain = Promise.resolve();
 var saSyncJobInFlight = false;
@@ -1409,6 +1410,88 @@ function getAllAlarms() {
   });
 }
 
+function mergeArticleFetchWork(normalWork, extraWork, mode) {
+  var result = [];
+  var seen = new Set();
+  var normal = normalWork || [];
+  for (var i = 0; i < normal.length; i++) {
+    var normalItem = normal[i];
+    if (!normalItem || !normalItem.article_id || seen.has(normalItem.article_id)) continue;
+    seen.add(normalItem.article_id);
+    result.push(normalItem);
+  }
+
+  var cap = RECONCILIATION_ENRICHMENT_LIMITS[mode] || 4;
+  var added = 0;
+  var extra = extraWork || [];
+  for (var j = 0; j < extra.length; j++) {
+    if (added >= cap) break;
+    var extraItem = extra[j];
+    if (!extraItem || !extraItem.article_id || seen.has(extraItem.article_id)) continue;
+    seen.add(extraItem.article_id);
+    result.push(extraItem);
+    added++;
+  }
+  return result;
+}
+
+function normalizeManualFetchItem(item) {
+  if (!item || typeof item !== "object") return null;
+  var symbol = String(item.symbol || "").trim().toUpperCase();
+  var role = item.role;
+  var anchor = String(item.event_anchor_date || "").trim();
+  if (!/^[A-Z][A-Z.]{0,9}$/.test(symbol)) return null;
+  if (role !== "entry" && role !== "exit") return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(anchor)) return null;
+  var parsedDate = new Date(anchor + "T00:00:00Z");
+  if (isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== anchor) {
+    return null;
+  }
+
+  var parsedUrl;
+  try {
+    parsedUrl = new URL(String(item.url || ""));
+  } catch (_) {
+    return null;
+  }
+  if (
+    parsedUrl.protocol !== "https:" ||
+    parsedUrl.hostname !== "seekingalpha.com" ||
+    parsedUrl.username ||
+    parsedUrl.password ||
+    parsedUrl.search ||
+    parsedUrl.hash
+  ) {
+    return null;
+  }
+  var idMatch = parsedUrl.pathname.match(
+    /^\/alpha-picks\/articles\/(\d+)(?:-[^/]+)?\/?$/
+  );
+  if (!idMatch) return null;
+
+  var lineageId = Number(item.lineage_id);
+  if (item.lineage_id != null && (!Number.isInteger(lineageId) || lineageId <= 0)) {
+    return null;
+  }
+  var replaceLinkId = Number(item.replace_link_id);
+  if (
+    item.replace_link_id != null &&
+    (!Number.isInteger(replaceLinkId) || replaceLinkId <= 0)
+  ) {
+    return null;
+  }
+  return {
+    symbol: symbol,
+    role: role,
+    event_anchor_date: anchor,
+    url: parsedUrl.href,
+    article_id: idMatch[1],
+    lineage_id: item.lineage_id == null ? null : lineageId,
+    replace_link_id: item.replace_link_id == null ? null : replaceLinkId,
+    confirm_warnings: item.confirm_warnings === true,
+  };
+}
+
 // --- Detail fetch (incremental) ---
 
 async function doDetailFetch(tabId, currentPicks, mode) {
@@ -1479,13 +1562,19 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     return { fetched: 0, failed: 0, error: metaError };
   }
 
-  var needContent = metaResult.need_content || [];
+  var needContent = mergeArticleFetchWork(
+    metaResult.need_content || [],
+    (metaResult.reconciliation && metaResult.reconciliation.enrichment) || [],
+    scrollMode
+  );
   var needComments = metaResult.need_comments || [];
   var unresolvedSymbols = metaResult.unresolved_symbols || [];
 
   // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0;
   var netNewComments = 0;
+  var reconciliationFailed =
+    metaResult.reconciliation && metaResult.reconciliation.status === "failed" ? 1 : 0;
   var total = needContent.length + needComments.length;
 
   if (needContent.length > 0) {
@@ -1524,10 +1613,18 @@ async function doDetailFetch(tabId, currentPicks, mode) {
         article_id: item.article_id,
         body_markdown: report,
         comments: comments,
+        detail_ticker: detail.detail_ticker || null,
+        detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
       });
       if (saveResult && saveResult.ok) {
         fetched++;
         netNewComments += saveResult.net_new_comments || 0;
+        if (
+          saveResult.reconciliation &&
+          saveResult.reconciliation.status === "failed"
+        ) {
+          reconciliationFailed++;
+        }
       } else {
         failed++;
       }
@@ -1574,11 +1671,16 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     }
   }
 
-  // ── Step 5: Audit unresolved (full-text fallback) ──
-  sendProgress("Auditing unresolved picks...");
+  // ── Step 5: Read the event-scoped review queue ──
+  sendProgress("Loading article review queue...");
   var auditResult = await sendNativeMessage2({ action: "audit_unresolved" });
+  var reviewRequired = 0;
   if (auditResult && auditResult.status === "ok") {
     unresolvedSymbols = auditResult.unresolved_symbols || [];
+    reviewRequired =
+      auditResult.review_queue && Number.isInteger(auditResult.review_queue.total)
+        ? auditResult.review_queue.total
+        : unresolvedSymbols.length;
   }
 
   return {
@@ -1588,27 +1690,57 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     comments_refreshed: commentsRefreshed,
     net_new_comments: netNewComments,
     unresolved_symbols: unresolvedSymbols,
+    review_required: reviewRequired,
+    reconciliation_failed: reconciliationFailed,
   };
 }
 
 // --- Manual fetch (user-provided URLs for missing tickers) ---
 
 async function doManualFetch(items) {
-  if (items.length === 0) return {};
+  if (items.length === 0) return { fetched: 0, failed: 0 };
 
   var tabId = null;
   var fetched = 0, failed = 0;
-  var succeededSymbols = [];
+  var accepted = 0;
+  var confirmations = [];
+  var prepared = [];
+
+  for (var p = 0; p < items.length; p++) {
+    var normalized = normalizeManualFetchItem(items[p]);
+    if (!normalized) {
+      failed++;
+      continue;
+    }
+    if (normalized.lineage_id == null) {
+      var resolution = await sendNativeMessage2({
+        action: "resolve_reconciliation_event",
+        symbol: normalized.symbol,
+        role: normalized.role,
+        event_anchor_date: normalized.event_anchor_date,
+      });
+      if (!resolution || resolution.status !== "ok" || !resolution.lineage_id) {
+        failed++;
+        continue;
+      }
+      normalized.lineage_id = resolution.lineage_id;
+    }
+    prepared.push(normalized);
+  }
+  if (prepared.length === 0) {
+    return { fetched: 0, failed: failed, accepted: 0, confirmation_required: [] };
+  }
+
   try {
     await cleanupCollectorTabs({ force: true });
     // Create a tab for fetching
-    var tab = await chrome.tabs.create({ url: items[0].url, active: false });
+    var tab = await chrome.tabs.create({ url: prepared[0].url, active: false });
     tabId = tab.id;
     await registerCollectorTab(tabId, "manual_fetch");
 
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      sendProgress("Manual: " + item.symbol + " (" + (i + 1) + "/" + items.length + ")");
+    for (var i = 0; i < prepared.length; i++) {
+      var item = prepared[i];
+      sendProgress("Manual: " + item.symbol + " (" + (i + 1) + "/" + prepared.length + ")");
 
       try {
         if (i > 0) {
@@ -1618,9 +1750,7 @@ async function doManualFetch(items) {
         var ready = await waitForArticleReady(tabId);
         if (!ready.ok) { failed++; continue; }
 
-        // Extract article_id from URL
-        var idMatch = item.url.match(/\/articles\/(\d+)/);
-        var articleId = idMatch ? idMatch[1] : null;
+        var articleId = item.article_id;
 
         var detail = await injectDetailScraper(tabId);
         if (!detail || detail.error) { failed++; continue; }
@@ -1628,55 +1758,64 @@ async function doManualFetch(items) {
         // Scroll to load comments (v3 path)
         await scrollToComments(tabId, {
           mode: "manual",
-          articleId: articleId || item.symbol || "manual",
+          articleId: articleId,
         });
         var commentsResult = await injectCommentsScraper(tabId);
         var comments = (commentsResult && commentsResult.comments) || [];
 
         var report = formatDetailReport(detail);
 
-        if (articleId) {
-          // v3 path: save to sa_articles + auto-sync to picks
-          // Use publish date from article page (scrape_detail.js extracts it)
-          var pubDate = detail.publish_date || null;
-          // First ensure article metadata exists (with date)
-          await sendNativeMessage2({
-            action: "save_articles_meta",
-            mode: "full",
-            articles: [{
-              article_id: articleId,
-              url: item.url,
-              title: detail.title || item.symbol + " analysis",
-              ticker: item.symbol,
-              date: pubDate,
-              article_type: "analysis",
-            }],
-          });
-          var saveResult = await sendNativeMessage2({
-            action: "save_article_content",
+        var pubDate = detail.publish_date || null;
+        await sendNativeMessage2({
+          action: "save_articles_meta",
+          mode: "full",
+          articles: [{
             article_id: articleId,
-            body_markdown: report,
-            comments: comments,
+            url: item.url,
+            title: detail.title || "Alpha Picks article " + articleId,
+            date: pubDate,
+            article_type: "analysis",
+          }],
+        });
+        var saveResult = await sendNativeMessage2({
+          action: "save_article_content",
+          article_id: articleId,
+          body_markdown: report,
+          comments: comments,
+          detail_ticker: detail.detail_ticker || null,
+          detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
+        });
+        if (saveResult && saveResult.ok) {
+          fetched++;
+          var acceptResult = await sendNativeMessage2({
+            action: "accept_reconciliation_link",
+            lineage_id: item.lineage_id,
+            role: item.role,
+            event_anchor_date: item.event_anchor_date,
+            article_id: articleId,
+            article_url: item.url,
+            replace_link_id: item.replace_link_id,
+            confirm_warnings: item.confirm_warnings,
           });
-          if (saveResult && saveResult.ok) {
-            fetched++;
-            succeededSymbols.push(item.symbol);
+          if (acceptResult && acceptResult.status === "ok") {
+            accepted++;
+          } else if (acceptResult && acceptResult.status === "confirmation_required") {
+            confirmations.push({
+              symbol: item.symbol,
+              role: item.role,
+              event_anchor_date: item.event_anchor_date,
+              url: item.url,
+              article_id: articleId,
+              lineage_id: item.lineage_id,
+              replace_link_id: item.replace_link_id,
+              warnings: acceptResult.warnings || [],
+              candidate: acceptResult.candidate || null,
+            });
           } else {
             failed++;
           }
         } else {
-          // Fallback: legacy save_detail_by_symbol
-          var saveResult = await sendNativeMessage2({
-            action: "save_detail_by_symbol",
-            symbol: item.symbol,
-            detail_report: report,
-          });
-          if (saveResult && saveResult.status === "ok") {
-            fetched++;
-            succeededSymbols.push(item.symbol);
-          } else {
-            failed++;
-          }
+          failed++;
         }
       } catch (err) {
         failed++;
@@ -1685,17 +1824,12 @@ async function doManualFetch(items) {
 
     sendProgress("Manual fetch done: " + fetched + " saved");
 
-    // Update storage to clear unresolved_symbols for fetched items
-    var storage = await chrome.storage.local.get("lastRefresh");
-    if (storage.lastRefresh && storage.lastRefresh.details) {
-      var unresolved = storage.lastRefresh.details.unresolved_symbols || storage.lastRefresh.details.no_article || [];
-      // Only clear symbols that actually succeeded (not all attempted)
-      storage.lastRefresh.details.unresolved_symbols = unresolved.filter(function (s) { return succeededSymbols.indexOf(s) < 0; });
-      storage.lastRefresh.details.fetched = (storage.lastRefresh.details.fetched || 0) + fetched;
-      await chrome.storage.local.set({ lastRefresh: storage.lastRefresh });
-    }
-
-    return { fetched: fetched, failed: failed };
+    return {
+      fetched: fetched,
+      failed: failed,
+      accepted: accepted,
+      confirmation_required: confirmations,
+    };
   } finally {
     if (tabId) {
       await safeRemoveTab(tabId);
