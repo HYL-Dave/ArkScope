@@ -18,17 +18,20 @@
 // OpenAI/Anthropic binary, so compatible providers can slot in later.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { History, Plus } from "lucide-react";
+import { FileSearch, History, Plus } from "lucide-react";
 
 import {
   cancelResearchRun, createResearchRun,
   getModelCatalog, getQueryProviders, getResearchRunEvents,
   getResearchThread, getResearchMessages, getResearchSelection,
-  type ModelCatalog,
+  type ModelCatalog, type RuntimeConfig,
   type ResearchMessageDTO, type ResearchRunDTO, type ResearchThreadDTO,
 } from "./api";
 import { MarkdownView } from "./MarkdownView";
 import { ResearchHistoryDrawer } from "./ResearchHistoryDrawer";
+import { ResearchEvidenceDrawer, researchEvidenceRows } from "./ResearchEvidenceDrawer";
+import { ResearchRunProgress } from "./ResearchRunProgress";
+import { presentResearchError } from "./researchErrors";
 import {
   asResearchProviderId,
   RESEARCH_PROVIDER_IDS,
@@ -54,17 +57,15 @@ import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse 
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import { shouldEndResearchReplay } from "./researchRunReplay";
 import type { NavigationRequest, NavigationTarget } from "./shell/navigation";
-import { Button, PageHeader } from "./ui";
+import { Button, PageHeader, useShellOverlay } from "./ui";
 import {
   initialState,
   lastRetryCandidate,
   MAX_TURNS_SENTINEL,
   reduce,
-  selectFooter,
   type Message,
   type PendingTurn,
   type Thread,
-  type ToolTraceRow,
   type TraceRow,
 } from "./researchReducer";
 
@@ -82,6 +83,9 @@ const toClientMessage = (m: ResearchMessageDTO): Message => ({
   elapsed_seconds: m.elapsed_seconds, created_at: m.created_at,
   personalization: m.personalization ?? null,
   isError: m.is_error ?? false, // persisted error turns (MUST-FIX 2) restore as error bubbles
+  runId: m.run_id ?? null,
+  errorCode: m.error_code ?? null,
+  errorDetail: m.error ?? null,
   // store has no maxTurns column — re-derive the badge the same way the reducer does (SF2)
   maxTurns: m.provider === "anthropic" && m.content === MAX_TURNS_SENTINEL,
 });
@@ -98,6 +102,13 @@ const PRESENTATION: Record<ProviderId, { label: string; trace_mode: "live" | "po
 
 const modelReasonLabel = (reason: string): string =>
   MODEL_UX_LABELS.reasons[reason] ?? reason;
+
+const selectionProvenanceLabel = (value: string | null | undefined): string => {
+  if (value === "thread") return "此對話上次成功路線";
+  if (value === "settings") return "設定路線";
+  if (value === "explicit" || value === "user") return "上次明確選擇";
+  return "";
+};
 
 // Suggested prompts scoped to the C-1 SA primitives (get_sa_feed / get_sa_comment_focus).
 const SUGGESTED = [
@@ -147,6 +158,9 @@ export interface ResearchViewProps {
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "research_thread" }>> | null;
   onNavigationConsumed?: (sequence: number) => void;
   onObserveRun?: (run: ResearchRunDTO, threadTitle?: string) => void;
+  runtime?: RuntimeConfig | null;
+  developerMode?: boolean;
+  onNavigate?: (target: NavigationTarget) => void;
 }
 
 export function ResearchView({
@@ -154,6 +168,9 @@ export function ResearchView({
   navigationRequest,
   onNavigationConsumed,
   onObserveRun,
+  runtime = null,
+  developerMode = false,
+  onNavigate,
 }: ResearchViewProps) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [question, setQuestion] = useState("");
@@ -162,9 +179,16 @@ export function ResearchView({
   const [booting, setBooting] = useState(true);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [evidencePinned, setEvidencePinned] = useState(false);
+  const [evidenceMessageIndex, setEvidenceMessageIndex] = useState<number | null>(null);
   const [transcriptPendingThreadId, setTranscriptPendingThreadId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [userSelection, setUserSelection] = useState<ResearchTuple | null>(null);
+  const [incompleteSelection, setIncompleteSelection] = useState<{
+    provider: ProviderId;
+    model: string;
+  } | null>(null);
   const [threadSelection, setThreadSelection] = useState<{
     threadId: string;
     tuple: ResearchTuple | null;
@@ -176,13 +200,19 @@ export function ResearchView({
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [runStance, setRunStance] = useState<AssistantStance>("off");
   const [activeRunsByThread, setActiveRunsByThread] = useState<Record<string, ResearchRunDTO>>({});
+  const [latestRunsByThread, setLatestRunsByThread] = useState<Record<string, ResearchRunDTO>>({});
 
   const abortRef = useRef<AbortController | null>(null);
   const pollingRunIdRef = useRef<string | null>(null);
+  const submissionSequenceRef = useRef(0);
+  const stopRequestRunIdRef = useRef<string | null>(null);
   const hydrationSequenceRef = useRef(0);
   const initialAutoSelectAllowedRef = useRef(true);
   const consumedNavigationSequenceRef = useRef(0);
   const historyTriggerRef = useRef<HTMLButtonElement>(null);
+  const evidenceTriggerRef = useRef<HTMLButtonElement>(null);
+  const evidenceReturnFocusRef = useRef<HTMLElement | null>(null);
+  const shellOverlay = useShellOverlay();
   const onObserveRunRef = useRef(onObserveRun);
   onObserveRunRef.current = onObserveRun;
   const onNavigationConsumedRef = useRef(onNavigationConsumed);
@@ -205,14 +235,16 @@ export function ResearchView({
       : null,
     [catalog, currentThreadSelection, sdk, state.activeThreadId, userSelection],
   );
-  const provider = selection?.tuple?.provider ?? null;
-  const selModel = selection?.tuple?.model ?? "";
-  const selEffort = selection?.tuple?.effort ?? "default";
+  const provider = incompleteSelection?.provider ?? selection?.tuple?.provider ?? null;
+  const selModel = incompleteSelection?.model ?? selection?.tuple?.model ?? "";
+  const selEffort = incompleteSelection ? "" : selection?.tuple?.effort ?? "default";
+  const selectionReady = !incompleteSelection && selection?.state === "ready";
   const currentThread = state.activeThreadId
     ? state.threads.find((thread) => thread.id === state.activeThreadId) ?? null
     : null;
 
   const rememberUserSelection = useCallback((tuple: ResearchTuple) => {
+    setIncompleteSelection(null);
     setUserSelection(tuple);
     writeExplicitResearchSelection(tuple);
   }, []);
@@ -283,15 +315,19 @@ export function ResearchView({
       return next;
     });
     if (!activeRun) return;
+    setLatestRunsByThread((current) => ({ ...current, [thread.id]: activeRun }));
     onObserveRunRef.current?.(activeRun, thread.title);
   }, []);
 
   const hydrateThread = useCallback(async (thread: ResearchThreadDTO) => {
     const sequence = ++hydrationSequenceRef.current;
+    submissionSequenceRef.current += 1;
     setTranscriptPendingThreadId(thread.id);
     detachLocalPolling();
     setThreadError(null);
     setUserSelection(null);
+    setIncompleteSelection(null);
+    setEvidenceMessageIndex(null);
     writeActiveThreadId(thread.id);
     observeThreadRun(thread);
     dispatch({
@@ -360,6 +396,7 @@ export function ResearchView({
   // Ignore transcript responses and detach local replay after unmount.
   useEffect(() => () => {
     hydrationSequenceRef.current += 1;
+    submissionSequenceRef.current += 1;
     detachLocalPolling();
   }, [detachLocalPolling]);
 
@@ -378,6 +415,7 @@ export function ResearchView({
         const res = await getResearchRunEvents(run.id, after);
         onObserveRunRef.current?.(res.run);
         if (abortRef.current !== controller) return; // detached/superseded
+        setLatestRunsByThread((prev) => ({ ...prev, [res.run.thread_id]: res.run }));
         if (res.run.status === "succeeded") {
           const successfulProvider = asResearchProviderId(res.run.provider);
           if (successfulProvider && res.run.model.trim()) {
@@ -413,10 +451,10 @@ export function ResearchView({
         }
         await sleep(1000, controller.signal);
       }
-    } catch (e) {
+    } catch {
       if (abortRef.current !== controller || controller.signal.aborted) return;
-      setThreadError(e instanceof Error ? e.message : String(e));
-      dispatch({ kind: "abort", ts: Date.now() });
+      setThreadError("暫時無法更新研究執行狀態，請稍後重新開啟此對話。");
+      dispatch({ kind: "abort", runId: run.id, ts: Date.now() });
     } finally {
       if (abortRef.current === controller) {
         abortRef.current = null;
@@ -425,13 +463,20 @@ export function ResearchView({
     }
   }, []);
 
-  const runManaged = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean; assistant_stance?: AssistantStance }) => {
+  const runManaged = useCallback(async (
+    body: { question: string; provider: ProviderId; model: string; effort: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean; assistant_stance?: AssistantStance },
+    submissionSequence: number,
+  ) => {
     try {
       const { run } = await createResearchRun(body);
+      if (submissionSequenceRef.current !== submissionSequence) return;
+      dispatch({ kind: "linkRun", runId: run.id, threadId: run.thread_id });
       onObserveRunRef.current?.(run);
       setActiveRunsByThread((prev) => ({ ...prev, [run.thread_id]: run }));
+      setLatestRunsByThread((prev) => ({ ...prev, [run.thread_id]: run }));
       await pollRun(run);
     } catch (e) {
+      if (submissionSequenceRef.current !== submissionSequence) return;
       dispatch({ kind: "streamError", error: e instanceof Error ? e.message : String(e), ts: Date.now() });
     }
   }, [pollRun]);
@@ -443,6 +488,7 @@ export function ResearchView({
     if (state.pending?.threadId === run.thread_id || pollingRunIdRef.current === run.id) return;
     dispatch({
       kind: "attachRun",
+      runId: run.id,
       threadId: run.thread_id,
       provider: run.provider,
       model: run.model,
@@ -477,19 +523,22 @@ export function ResearchView({
     if (
       !q
       || selection?.state !== "ready"
+      || incompleteSelection !== null
       || state.pending
       || currentThread?.archived_at
-      || transcriptPendingThreadId === state.activeThreadId
+      || (!!state.activeThreadId && transcriptPendingThreadId === state.activeThreadId)
     ) return;
     const ticker = tickerInput.trim().toUpperCase() || null;
     // Client-owned thread id: reuse the active thread to continue, else a fresh
     // uuid for a new conversation (agreed reducer↔store id model).
     const threadId = state.activeThreadId ?? crypto.randomUUID();
     const { provider: runProvider, model, effort } = selection.tuple;
+    const submissionSequence = ++submissionSequenceRef.current;
     dispatch({ kind: "submit", question: q, provider: runProvider, model, effort, ticker, ts: Date.now(), threadId });
     writeActiveThreadId(threadId);
     setQuestion("");
     setThreadError(null);
+    setEvidenceMessageIndex(null);
     void runManaged({
       question: q,
       provider: runProvider,
@@ -498,33 +547,50 @@ export function ResearchView({
       thread_id: threadId,
       ticker,
       assistant_stance: stanceForRun,
-    });
-  }, [question, tickerInput, selection, state.pending, state.activeThreadId, currentThread?.archived_at, runManaged, stanceForRun, transcriptPendingThreadId]);
+    }, submissionSequence);
+  }, [question, tickerInput, selection, incompleteSelection, state.pending, state.activeThreadId, currentThread?.archived_at, runManaged, stanceForRun, transcriptPendingThreadId]);
 
-  // Abort the live stream + drop the pending turn (explicit Stop only).
+  // Cancel server work first; keep the pending turn locked until cancellation succeeds.
   const stopStream = useCallback(() => {
-    const runId = state.activeThreadId ? activeRunsByThread[state.activeThreadId]?.id : null;
-    if (runId) void cancelResearchRun(runId).catch((e) => setThreadError(e instanceof Error ? e.message : String(e)));
-    abortRef.current?.abort();
-    abortRef.current = null;
-    pollingRunIdRef.current = null;
-    if (state.activeThreadId) {
-      setActiveRunsByThread((prev) => {
-        const next = { ...prev };
-        delete next[state.activeThreadId!];
-        return next;
+    const runId = state.pending?.runId
+      ?? (state.activeThreadId ? activeRunsByThread[state.activeThreadId]?.id : null);
+    if (!runId || stopRequestRunIdRef.current) return;
+    stopRequestRunIdRef.current = runId;
+    void cancelResearchRun(runId)
+      .then(({ run }) => {
+        setLatestRunsByThread((current) => ({ ...current, [run.thread_id]: run }));
+        setActiveRunsByThread((current) => {
+          if (current[run.thread_id]?.id !== runId) return current;
+          const next = { ...current };
+          delete next[run.thread_id];
+          return next;
+        });
+        onObserveRunRef.current?.(run);
+        if (pollingRunIdRef.current === runId) {
+          abortRef.current?.abort();
+          abortRef.current = null;
+          pollingRunIdRef.current = null;
+        }
+        dispatch({ kind: "abort", runId, ts: Date.now() });
+      })
+      .catch(() => setThreadError("無法停止目前研究，請稍後再試。"))
+      .finally(() => {
+        if (stopRequestRunIdRef.current === runId) stopRequestRunIdRef.current = null;
       });
-    }
-    dispatch({ kind: "abort", ts: Date.now() });
-  }, [activeRunsByThread, state.activeThreadId]);
+  }, [activeRunsByThread, state.activeThreadId, state.pending?.runId]);
   const newThread = useCallback(() => {
     initialAutoSelectAllowedRef.current = false;
     hydrationSequenceRef.current += 1;
+    submissionSequenceRef.current += 1;
     detachLocalPolling();
     setThreadError(null);
     setHistoryOpen(false);
+    setEvidenceOpen(false);
+    setEvidencePinned(false);
+    setEvidenceMessageIndex(null);
     setTranscriptPendingThreadId(null);
     setUserSelection(null);
+    setIncompleteSelection(null);
     writeActiveThreadId(null);
     dispatch({ kind: "newThread" });
   }, [detachLocalPolling]);
@@ -548,6 +614,11 @@ export function ResearchView({
       delete next[threadId];
       return next;
     });
+    setLatestRunsByThread((current) => {
+      const next = { ...current };
+      delete next[threadId];
+      return next;
+    });
     if (state.activeThreadId === threadId) {
       hydrationSequenceRef.current += 1;
       detachLocalPolling();
@@ -561,12 +632,44 @@ export function ResearchView({
   // --- derived view state ----------------------------------------------------
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
   const retryCandidate = useMemo(() => lastRetryCandidate(msgs), [msgs]);
-  const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
-  const traceRows: TraceRow[] = state.pending
-    ? state.pending.trace
-    : (lastAssistant?.tool_calls ?? []).map((c) => ({ kind: "tool", name: c.name, input: c.input, result_preview: c.result_preview, chars: undefined, done: true } as ToolTraceRow));
-  const pendingPresentation = state.pending ? PRESENTATION[state.pending.provider as ProviderId] : null;
-  const footer = selectFooter(state); // derived from the active thread, survives thread-switch
+  let lastAssistantIndex: number | null = null;
+  for (let index = msgs.length - 1; index >= 0; index -= 1) {
+    if (msgs[index].role === "assistant") {
+      lastAssistantIndex = index;
+      break;
+    }
+  }
+  const explicitEvidenceIndex = evidenceMessageIndex != null
+    && msgs[evidenceMessageIndex]?.role === "assistant"
+    ? evidenceMessageIndex
+    : null;
+  const selectedEvidenceIndex = explicitEvidenceIndex ?? lastAssistantIndex;
+  const evidenceMessage = (state.pending && explicitEvidenceIndex == null)
+    || selectedEvidenceIndex == null
+    ? null
+    : msgs[selectedEvidenceIndex];
+  const evidenceTrace: TraceRow[] = explicitEvidenceIndex == null
+    ? state.pending?.trace ?? []
+    : [];
+  const evidenceHasContent = researchEvidenceRows(evidenceMessage, evidenceTrace).length > 0;
+  const evidenceVisible = evidenceOpen && !(shellOverlay && historyOpen);
+  const threadActiveRun = state.activeThreadId ? activeRunsByThread[state.activeThreadId] ?? null : null;
+  const threadLatestRun = state.activeThreadId ? latestRunsByThread[state.activeThreadId] ?? null : null;
+  const pendingRunId = state.pending?.runId ?? null;
+  const currentRun = state.pending
+    ? pendingRunId
+      ? [threadActiveRun, threadLatestRun].find((run) => run?.id === pendingRunId) ?? null
+      : null
+    : threadActiveRun ?? threadLatestRun;
+  useEffect(() => {
+    if (!evidencePinned || evidenceHasContent) return;
+    setEvidencePinned(false);
+    setEvidenceOpen(false);
+  }, [evidenceHasContent, evidencePinned]);
+  useEffect(() => {
+    if (!shellOverlay || !historyOpen || !evidenceOpen) return;
+    setEvidenceOpen(false);
+  }, [evidenceOpen, historyOpen, shellOverlay]);
   const taskProviders = catalog?.effective?.tasks.ai_research?.providers;
   const noProvider = !booting && !PROVIDER_IDS.some((id) => !!catalog?.effective?.providers?.[id]);
   const providerChoices = PROVIDER_IDS.map((id) => {
@@ -610,7 +713,7 @@ export function ResearchView({
         description: "使用 provider 預設 effort",
         applies_to_card_tasks: false,
       }, ...effortOpts];
-  const effortChoices = supportedEffortChoices.some((option) => option.id === selEffort)
+  const effortChoices = !selEffort || supportedEffortChoices.some((option) => option.id === selEffort)
     ? supportedEffortChoices
     : [...supportedEffortChoices, {
         id: selEffort,
@@ -620,7 +723,32 @@ export function ResearchView({
         applies_to_card_tasks: false,
         disabled: true,
       }];
-  const pickerEffortNote = provider ? effortNote(provider, selection?.authMode ?? null, selEffort) : null;
+  const pickerEffortNote = provider && selEffort
+    ? effortNote(provider, selection?.authMode ?? null, selEffort)
+    : null;
+
+  const chooseModel = useCallback((nextModel: string) => {
+    if (!provider || !catalog) return;
+    const entry = catalog.effective?.tasks.ai_research?.providers?.[provider]
+      ?.models.find((candidate) => candidate.id === nextModel);
+    if (!entry) return;
+    const supported = selEffort === "default" || effortOptionsForModel(
+      catalog,
+      provider,
+      nextModel,
+      entry.effort_options,
+    ).some((option) => option.id === selEffort);
+    if (!supported) {
+      setIncompleteSelection({ provider, model: nextModel });
+      return;
+    }
+    rememberUserSelection({ provider, model: nextModel, effort: selEffort });
+  }, [catalog, provider, rememberUserSelection, selEffort]);
+
+  const chooseEffort = useCallback((nextEffort: string) => {
+    if (!provider || !selModel || !nextEffort) return;
+    rememberUserSelection({ provider, model: selModel, effort: nextEffort });
+  }, [provider, rememberUserSelection, selModel]);
 
   const chooseProvider = useCallback((nextProvider: ProviderId) => {
     if (!catalog) return;
@@ -641,10 +769,13 @@ export function ResearchView({
       || !state.activeThreadId
       || state.pending
       || selection?.state !== "ready"
+      || incompleteSelection !== null
       || currentThread?.archived_at
     ) return;
     const retryTuple = selection.tuple;
+    const submissionSequence = ++submissionSequenceRef.current;
     setThreadError(null);
+    setEvidenceMessageIndex(null);
     dispatch({
       kind: "submit",
       question: retryCandidate.question,
@@ -665,8 +796,8 @@ export function ResearchView({
       ticker: retryCandidate.ticker,
       retry_last_failed: true,
       assistant_stance: stanceForRun,
-    });
-  }, [currentThread?.archived_at, retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
+    }, submissionSequence);
+  }, [currentThread?.archived_at, incompleteSelection, retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
   const activeRunIds = useMemo(
     () => new Set(Object.values(activeRunsByThread).map((run) => run.id)),
     [activeRunsByThread],
@@ -679,12 +810,16 @@ export function ResearchView({
         context={(
           <div className="research-page-context">
             <span className="muted tiny">對話與研究執行保存於本地；離開頁面後，研究仍會繼續執行。</span>
-            {selection?.tuple && (
-              <span className="muted tiny">
-                研究模型：{selection.tuple.provider} · {selection.tuple.model} · {selection.tuple.effort}
-                {selection.provenance ? `（${selection.provenance}）` : ""}
+            {incompleteSelection ? (
+              <span className="warn-text tiny">
+                研究模型：{incompleteSelection.provider} · {incompleteSelection.model} · 尚未選擇 effort（未套用）
               </span>
-            )}
+            ) : selection?.tuple ? (
+              <span className="muted tiny">
+                研究模型：{selection.tuple.provider} · {selection.tuple.model} · {selection.tuple.effort === "default" ? "Provider 預設" : selection.tuple.effort}
+                {selection.provenance ? `（${selectionProvenanceLabel(selection.provenance)}）` : ""}
+              </span>
+            ) : null}
           </div>
         )}
         actions={(
@@ -694,9 +829,25 @@ export function ResearchView({
               size="compact"
               tone="secondary"
               icon={<History size={16} />}
-              onClick={() => setHistoryOpen(true)}
+              onClick={() => {
+                if (shellOverlay || !evidencePinned) setEvidenceOpen(false);
+                setHistoryOpen(true);
+              }}
             >
               歷史
+            </Button>
+            <Button
+              ref={evidenceTriggerRef}
+              size="compact"
+              tone="secondary"
+              icon={<FileSearch size={16} />}
+              onClick={() => {
+                evidenceReturnFocusRef.current = evidenceTriggerRef.current;
+                setHistoryOpen(false);
+                setEvidenceOpen(true);
+              }}
+            >
+              證據
             </Button>
             <Button
               size="compact"
@@ -704,13 +855,13 @@ export function ResearchView({
               icon={<Plus size={16} />}
               onClick={newThread}
             >
-              新對話
+              新研究
             </Button>
           </>
         )}
       />
 
-      <div className="research-grid">
+      <div className={`research-workspace${evidenceVisible && evidencePinned && evidenceHasContent && !shellOverlay ? " has-pinned-evidence" : ""}`}>
         {/* ── Conversation workspace ──────────────────────────────────── */}
         <section className="research-convo">
           <div className="research-conversation-head">
@@ -721,7 +872,7 @@ export function ResearchView({
               <span className="warn-text tiny">此對話已封存；取消封存後才能繼續提問。</span>
             ) : null}
             {state.pending ? (
-              <span className="muted tiny">回應在 sidecar 繼續執行；停止才會取消目前 run。</span>
+              <span className="muted tiny">回應由背景服務繼續執行；只有「停止」會取消目前執行。</span>
             ) : null}
           </div>
           {threadError ? <p className="error-text tiny">{threadError}</p> : null}
@@ -731,9 +882,14 @@ export function ResearchView({
                 <p className="muted">問一個開放式問題，看 agent 如何用工具調查並整理證據。</p>
                 <div className="research-suggest">
                   {SUGGESTED.map((s) => (
-                    <button key={s.text} className="btn-ghost small" onClick={() => { setQuestion(s.text); setTickerInput(s.ticker); }}>
+                    <Button
+                      key={s.text}
+                      size="compact"
+                      tone="ghost"
+                      onClick={() => { setQuestion(s.text); setTickerInput(s.ticker); }}
+                    >
                       {s.text}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -743,7 +899,15 @@ export function ResearchView({
                   key={i}
                   m={m}
                   onOpenTicker={onOpenTicker}
-                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending && !currentThread?.archived_at}
+                  developerMode={developerMode}
+                  onNavigate={onNavigate}
+                  onInspect={(trigger) => {
+                    evidenceReturnFocusRef.current = trigger;
+                    setEvidenceMessageIndex(i);
+                    setHistoryOpen(false);
+                    setEvidenceOpen(true);
+                  }}
+                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending && !currentThread?.archived_at && selectionReady}
                   onRetry={retryLastFailed}
                 />
               ))
@@ -753,6 +917,15 @@ export function ResearchView({
               <PendingAssistantBubble pending={state.pending} />
             )}
           </div>
+
+          <ResearchRunProgress
+            pending={state.pending}
+            run={currentRun}
+            runtime={runtime}
+            developerMode={developerMode}
+            onStop={stopStream}
+            onNavigate={onNavigate}
+          />
 
           {/* input + provider control */}
           <div className="research-input">
@@ -765,9 +938,10 @@ export function ResearchView({
                 <div className="research-providerbar">
                   <span className="muted tiny">研究路線：</span>
                   {providerChoices.map((choice) => (
-                    <button
+                    <Button
                       key={choice.id}
-                      className={`btn-ghost small ${provider === choice.id ? "active" : ""}`}
+                      size="compact"
+                      tone={provider === choice.id ? "primary" : "secondary"}
                       onClick={() => chooseProvider(choice.id)}
                       disabled={choice.disabled || !!state.pending}
                       title={choice.providerReason
@@ -775,7 +949,12 @@ export function ResearchView({
                         : `${choice.context?.label ?? choice.id}；${PRESENTATION[choice.id].trace_note}`}
                     >
                       {PRESENTATION[choice.id].label} / {choice.suggestedModel || "無可用模型"}
-                    </button>
+                      {choice.providerReason
+                        ? ` · ${modelReasonLabel(choice.providerReason)}`
+                        : choice.context?.auth_mode
+                          ? ` · ${MODEL_UX_LABELS.authModes[choice.context.auth_mode] ?? choice.context.auth_mode}`
+                          : ""}
+                    </Button>
                   ))}
                 </div>
                 {selection?.state === "needs_selection" && state.activeThreadId && (
@@ -783,12 +962,13 @@ export function ResearchView({
                     {threadSelectionLoadError ? (
                       <>
                         <span className="warn-text tiny">無法確認此對話上次使用的模型；目前不會自動 fallback。</span>
-                        <button
-                          className="btn-ghost tiny"
+                        <Button
+                          size="compact"
+                          tone="ghost"
                           onClick={() => setThreadSelectionRequestVersion((version) => version + 1)}
                         >
                           重新確認模型
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <span className="muted tiny">正在確認此對話上次成功使用的模型…</span>
@@ -801,11 +981,8 @@ export function ResearchView({
                       <span className="muted tiny">模型</span>
                       <select
                         value={selModel}
-                        onChange={(event) => rememberUserSelection({
-                          provider,
-                          model: event.target.value,
-                          effort: selEffort,
-                        })}
+                        aria-label="模型"
+                        onChange={(event) => chooseModel(event.target.value)}
                         disabled={!!state.pending}
                       >
                         {selectedModelMissing && (
@@ -835,16 +1012,17 @@ export function ResearchView({
                       <span className="muted tiny">effort</span>
                       <select
                         value={selEffort}
-                        onChange={(event) => rememberUserSelection({
-                          provider,
-                          model: selModel,
-                          effort: event.target.value,
-                        })}
+                        aria-label="effort"
+                        aria-invalid={incompleteSelection ? "true" : undefined}
+                        onChange={(event) => chooseEffort(event.target.value)}
                         disabled={!!state.pending}
                       >
+                        {incompleteSelection ? (
+                          <option value="" disabled>請選擇此模型支援的 effort</option>
+                        ) : null}
                         {effortChoices.map((o) => (
                           <option key={o.id} value={o.id} disabled={"disabled" in o && o.disabled}>
-                            {o.label ?? o.id}
+                            {o.id === "default" ? "Provider 預設" : o.label ?? o.id}
                           </option>
                         ))}
                       </select>
@@ -855,6 +1033,18 @@ export function ResearchView({
                     {selection?.state === "blocked" && (
                       <span className="warn-text tiny">{selection.reasonLabel}</span>
                     )}
+                    {incompleteSelection ? (
+                      <span className="warn-text tiny">此模型不支援已選 effort，請明確選擇新的 effort。</span>
+                    ) : null}
+                    {(selection?.state === "blocked" || incompleteSelection) && onNavigate ? (
+                      <Button
+                        size="compact"
+                        tone="secondary"
+                        onClick={() => onNavigate({ kind: "settings_section", section: "models" })}
+                      >
+                        前往模型設定
+                      </Button>
+                    ) : null}
                     {stanceEnabled && (
                       <label className="tiny">
                         立場
@@ -884,53 +1074,36 @@ export function ResearchView({
                     rows={2}
                     disabled={Boolean(currentThread?.archived_at)}
                   />
-                  {state.pending ? (
-                    <button className="btn-ghost danger" onClick={stopStream}>停止</button>
-                  ) : (
-                    <button
-                      className="btn-ghost"
-                      onClick={submit}
-                      disabled={
-                        selection?.state !== "ready"
-                        || !question.trim()
-                        || Boolean(currentThread?.archived_at)
-                        || transcriptPendingThreadId === state.activeThreadId
-                      }
-                    >
-                      送出
-                    </button>
-                  )}
+                  <Button
+                    tone="primary"
+                    onClick={submit}
+                    disabled={
+                      !selectionReady
+                      || !!state.pending
+                      || !question.trim()
+                      || Boolean(currentThread?.archived_at)
+                      || (!!state.activeThreadId && transcriptPendingThreadId === state.activeThreadId)
+                    }
+                  >
+                    送出
+                  </Button>
                 </div>
               </>
             )}
           </div>
         </section>
 
-        {/* ── Right: evidence / tool trace ────────────────────────────── */}
-        <aside className="research-trace">
-          <div className="research-trace-head">
-            <h3 className="surface-title tiny">證據·工具追蹤</h3>
-          </div>
-          {traceRows.length === 0 ? (
-            <p className="muted tiny">
-              {state.pending?.thinkingActive && pendingPresentation?.trace_mode === "post_run"
-                ? `${PRESENTATION[state.pending!.provider as ProviderId]?.label} 完成後一次顯示。`
-                : "尚無工具呼叫。"}
-            </p>
-          ) : (
-            <ul className="research-tracelist">
-              {traceRows.map((r, i) => <TraceRowView key={i} row={r} />)}
-            </ul>
-          )}
-          {footer && (
-            <div className="research-trace-footer muted tiny">
-              {typeof footer.total_tokens === "number" && <span>tokens {footer.total_tokens.toLocaleString()}</span>}
-              {typeof footer.turn_count === "number" && <span> · turns {footer.turn_count}</span>}
-              {typeof footer.cache_read_tokens === "number" && <span> · cache read {footer.cache_read_tokens.toLocaleString()}</span>}
-              {typeof footer.cache_creation_tokens === "number" && <span> · cache create {footer.cache_creation_tokens.toLocaleString()}</span>}
-            </div>
-          )}
-        </aside>
+        <ResearchEvidenceDrawer
+          open={evidenceVisible}
+          pinned={evidencePinned}
+          onClose={() => setEvidenceOpen(false)}
+          onPinnedChange={setEvidencePinned}
+          returnFocusRef={evidenceReturnFocusRef}
+          message={evidenceMessage}
+          activeTrace={evidenceTrace}
+          activeRun={currentRun}
+          developerMode={developerMode}
+        />
       </div>
       <ResearchHistoryDrawer
         open={historyOpen}
@@ -954,17 +1127,30 @@ export function ResearchView({
 function Bubble({
   m,
   onOpenTicker,
+  developerMode,
+  onNavigate,
+  onInspect,
   canRetry,
   onRetry,
 }: {
   m: Message;
   onOpenTicker: (t: string) => void;
+  developerMode: boolean;
+  onNavigate?: (target: NavigationTarget) => void;
+  onInspect: (trigger: HTMLButtonElement) => void;
   canRetry?: boolean;
   onRetry?: () => void;
 }) {
-  const cls = `research-bubble ${m.role}${m.isError ? " error" : ""}`;
+  const error = m.role === "assistant" && (m.isError || m.maxTurns)
+    ? presentResearchError({
+        code: m.errorCode ?? (m.maxTurns ? "tool_limit_reached" : null),
+        detail: m.errorDetail ?? m.content,
+        developerMode,
+      })
+    : null;
+  const cls = `research-bubble ${m.role}${error ? ` ${error.state}` : ""}`;
   return (
-    <div className={cls}>
+    <div className={cls} data-state={error?.state}>
       {m.role === "assistant" && (m.model || m.maxTurns) && (
         <div className="research-bubble-meta muted tiny">
           {m.model && <span className="research-model">{m.provider}/{m.model}{m.effort && m.effort !== "default" ? ` · ${m.effort}` : ""}</span>}
@@ -974,7 +1160,12 @@ function Bubble({
         </div>
       )}
       <div className="research-bubble-body">
-        {m.role === "assistant" && !m.isError && !m.maxTurns && m.content ? (
+        {error ? (
+          <>
+            <strong className="research-error-title">{error.title}</strong>
+            <div>{error.detail}</div>
+          </>
+        ) : m.role === "assistant" && m.content ? (
           // assistant answers are Markdown (safe renderer); user/error/maxTurns
           // stay literal text (don't reinterpret a raw question or error string).
           <MarkdownView source={m.content} />
@@ -982,6 +1173,12 @@ function Bubble({
           m.content || (m.role === "assistant" ? "（空回應）" : "")
         )}
       </div>
+      {error?.developerDetail ? (
+        <details className="research-diagnostic">
+          <summary>診斷細節</summary>
+          <pre>{error.developerDetail}</pre>
+        </details>
+      ) : null}
       {m.tickers && m.tickers.length > 0 && (
         <div className="research-bubble-tickers">
           {m.tickers.map((t) => (
@@ -989,17 +1186,32 @@ function Bubble({
           ))}
         </div>
       )}
-      {canRetry && (
+      {m.role === "assistant" ? (
         <div className="research-bubble-actions">
-          <button
-            className="btn-ghost tiny"
-            onClick={onRetry}
-            title="保留同一對話上下文，排除最後失敗回合後重試"
+          <Button
+            size="compact"
+            tone="ghost"
+            onClick={(event) => onInspect(event.currentTarget)}
           >
-            重試
-          </button>
+            查看證據
+          </Button>
+          {error?.actionLabel && error.target && onNavigate ? (
+            <Button size="compact" tone="secondary" onClick={() => onNavigate(error.target!)}>
+              {error.actionLabel}
+            </Button>
+          ) : null}
+          {canRetry ? (
+            <Button
+              size="compact"
+              tone="secondary"
+              onClick={onRetry}
+              title="保留同一對話上下文，排除最後失敗回合後重試"
+            >
+              重試
+            </Button>
+          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1025,22 +1237,5 @@ export function PendingAssistantBubble({ pending }: { pending: PendingTurn }) {
         </div>
       )}
     </div>
-  );
-}
-
-function TraceRowView({ row }: { row: TraceRow }) {
-  if (row.kind === "thinking") {
-    return <li className="research-trace-think muted tiny">💭 {row.text}</li>;
-  }
-  return (
-    <li className={`research-trace-tool ${row.done ? "done" : "open"}`}>
-      <div className="research-trace-tool-head">
-        <span className="mono">{row.name}</span>
-        {!row.done && <span className="muted tiny"> …執行中</span>}
-        {typeof row.chars === "number" && <span className="muted tiny"> · {row.chars}c</span>}
-      </div>
-      {row.input !== undefined && <div className="research-trace-input mono tiny muted">{JSON.stringify(row.input)}</div>}
-      {row.result_preview && <div className="research-trace-preview tiny muted">{row.result_preview}</div>}
-    </li>
   );
 }

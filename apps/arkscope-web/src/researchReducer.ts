@@ -55,6 +55,9 @@ export interface Message {
   maxTurns?: boolean; // true IFF provider==='anthropic' AND content === sentinel
   synthesized?: boolean; // true ONLY for the client-fabricated '連線中斷' bubble
   personalization?: PersonalizationTrace | null; // Track A trace from done.data / store
+  runId?: string | null; // exact durable run link when the sidecar supplied one
+  errorCode?: string | null; // reviewed public code; raw detail stays separate
+  errorDetail?: string | null; // bounded/sanitized provider detail for Developer Mode
 }
 
 export interface RetryCandidate {
@@ -81,6 +84,7 @@ export interface Thread {
 // decision keys on pending===null (NOT on terminal==='done').
 export interface PendingTurn {
   threadId: string;
+  runId: string | null;
   startedAt: number; // submit.ts (epoch ms) — sole wall-clock source for elapsed
   provider: Provider;
   model: string | null; // optimistic from submit, overwritten by thinking.model
@@ -114,9 +118,10 @@ export type Action =
   // threadId is CLIENT-OWNED (UI generates a stable uuid at 新對話, reuses the
   // active thread's id to continue). New thread iff no thread with that id exists.
   | { kind: "submit"; question: string; provider: Provider; model: string | null; effort?: string | null; ticker?: string | null; ts: number; threadId: string }
-  | { kind: "attachRun"; threadId: string; provider: Provider; model: string | null; effort?: string | null; ticker?: string | null; ts: number }
+  | { kind: "attachRun"; runId?: string | null; threadId: string; provider: Provider; model: string | null; effort?: string | null; ticker?: string | null; ts: number }
+  | { kind: "linkRun"; runId: string; threadId?: string }
   | { kind: "frame"; frame: SSEFrame; ts: number }
-  | { kind: "abort"; ts?: number }
+  | { kind: "abort"; runId?: string | null; ts?: number }
   | { kind: "streamEnd"; ts?: number }
   | { kind: "streamError"; error: string; ts?: number }
   | { kind: "newThread" } // + 新對話: next submit starts a fresh thread (UI blocks while pending)
@@ -191,7 +196,7 @@ function onSubmit(state: State, a: Extract<Action, { kind: "submit" }>): State {
     : state.threads;
   const prev = state.messagesByThread[threadId] ?? [];
   const pending: PendingTurn = {
-    threadId, startedAt: a.ts, provider: a.provider, model: a.model, effort: a.effort ?? null,
+    threadId, runId: null, startedAt: a.ts, provider: a.provider, model: a.model, effort: a.effort ?? null,
     interimText: "", trace: [], thinkingActive: true, turnCount: 0, tickers,
   };
   return {
@@ -205,6 +210,7 @@ function onAttachRun(state: State, a: Extract<Action, { kind: "attachRun" }>): S
   const tickers = normTickers(a.ticker);
   const pending: PendingTurn = {
     threadId: a.threadId,
+    runId: a.runId ?? null,
     startedAt: a.ts,
     provider: a.provider,
     model: a.model,
@@ -219,12 +225,28 @@ function onAttachRun(state: State, a: Extract<Action, { kind: "attachRun" }>): S
 }
 
 /** Build a terminal isError/synthesized assistant message, preserving the partial trace. */
-function terminalMsg(p: PendingTurn, content: string, ts: number, synthesized?: boolean): Message {
+function terminalMsg(
+  p: PendingTurn,
+  content: string,
+  ts: number,
+  options: {
+    synthesized?: boolean;
+    errorCode?: string | null;
+    tokenUsage?: Record<string, number> | null;
+    toolsUsed?: string[];
+    personalization?: PersonalizationTrace | null;
+  } = {},
+): Message {
   return {
     role: "assistant", content, provider: p.provider, model: p.model, effort: p.effort,
-    tools_used: [], tool_calls: toolCalls(p.trace), token_usage: null,
+    tools_used: options.toolsUsed ?? [], tool_calls: toolCalls(p.trace),
+    token_usage: options.tokenUsage ?? null,
     tickers: p.tickers, elapsed_seconds: (ts - p.startedAt) / 1000, created_at: iso(ts),
-    isError: true, maxTurns: false, synthesized,
+    isError: true, maxTurns: false, synthesized: options.synthesized,
+    personalization: options.personalization ?? null,
+    runId: p.runId,
+    errorCode: options.errorCode ?? null,
+    errorDetail: content,
   };
 }
 
@@ -241,6 +263,9 @@ function onDone(state: State, p: PendingTurn, data: Record<string, unknown>, ts:
     elapsed_seconds: (ts - p.startedAt) / 1000, created_at: iso(ts),
     isError: false, maxTurns,
     personalization: (data.personalization as PersonalizationTrace | undefined) ?? null,
+    runId: p.runId,
+    errorCode: maxTurns ? "tool_limit_reached" : null,
+    errorDetail: maxTurns ? content : null,
   };
   return {
     ...commit(state, p, msg, maxTurns ? "maxTurns" : "done", ts),
@@ -282,15 +307,25 @@ function onFrame(state: State, a: Extract<Action, { kind: "frame" }>): State {
     case "error": {
       // Agent error {error,...} or route-layer {message}; data.error wins.
       const content = (data.error ?? data.message ?? "") as string;
-      return commit(state, p, terminalMsg(p, content, a.ts), "error", a.ts);
+      const tokenUsage = data.token_usage && typeof data.token_usage === "object"
+        ? data.token_usage as Record<string, number>
+        : null;
+      const toolsUsed = Array.isArray(data.tools_used) ? data.tools_used as string[] : [];
+      return commit(state, p, terminalMsg(p, content, a.ts, {
+        errorCode: typeof data.code === "string" ? data.code : "provider_call_failed",
+        tokenUsage,
+        toolsUsed,
+        personalization: data.personalization ?? null,
+      }), "error", a.ts);
     }
     default:
       return state; // unknown frame type
   }
 }
 
-function onAbort(state: State): State {
+function onAbort(state: State, action: Extract<Action, { kind: "abort" }>): State {
   if (state.pending === null) return state; // no-op: abort after a terminal
+  if (action.runId && state.pending.runId !== action.runId) return state;
   // Drop the in-flight assistant turn; the user message was committed at submit.
   return { ...state, pending: null, terminal: "aborted" };
 }
@@ -299,14 +334,19 @@ function onStreamEnd(state: State, a: Extract<Action, { kind: "streamEnd" }>): S
   const p = state.pending;
   if (p === null) return state; // no-op: clean close after done/error
   const ts = a.ts ?? p.startedAt; // ts optional → avoid Invalid Date in commit
-  return commit(state, p, terminalMsg(p, "連線中斷", ts, true), "disconnect", ts);
+  return commit(state, p, terminalMsg(p, "連線中斷", ts, {
+    synthesized: true,
+    errorCode: "run_interrupted",
+  }), "disconnect", ts);
 }
 
 function onStreamError(state: State, a: Extract<Action, { kind: "streamError" }>): State {
   const p = state.pending;
   if (p === null) return state; // no-op: reader-close throw after a terminal
   const ts = a.ts ?? p.startedAt;
-  return commit(state, p, terminalMsg(p, a.error, ts), "error", ts);
+  return commit(state, p, terminalMsg(p, a.error, ts, {
+    errorCode: "provider_call_failed",
+  }), "error", ts);
 }
 
 /**
@@ -360,10 +400,15 @@ export function reduce(state: State, action: Action): State {
       return onSubmit(state, action);
     case "attachRun":
       return onAttachRun(state, action);
+    case "linkRun":
+      return state.pending === null
+        || (action.threadId !== undefined && action.threadId !== state.pending.threadId)
+        ? state
+        : { ...state, pending: { ...state.pending, runId: action.runId } };
     case "frame":
       return onFrame(state, action);
     case "abort":
-      return onAbort(state);
+      return onAbort(state, action);
     case "streamEnd":
       return onStreamEnd(state, action);
     case "streamError":

@@ -128,6 +128,9 @@ export function App() {
         ));
       }}
       onObserveRun={researchWork.observeRun}
+      runtime={runtime}
+      developerMode={developerMode}
+      onNavigate={navigate}
     />
   ) : view === "Holdings" ? (
     <HoldingsView />

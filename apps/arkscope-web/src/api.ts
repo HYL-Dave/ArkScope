@@ -817,6 +817,7 @@ export interface ResearchRunDTO {
   provider: string;
   model: string;
   effort: string | null;
+  assistant_stance?: string | null;
   auth_mode: string | null;
   credential_id: string | null;
   started_at: string | null;
@@ -917,12 +918,12 @@ export function deleteResearchThread(threadId: string): Promise<{ thread_id: str
   return sendJSON<{ thread_id: string; deleted: boolean }>(`/research/threads/${encodeURIComponent(threadId)}`, "DELETE", undefined, 8_000);
 }
 export function createResearchRun(body: {
-  thread_id?: string;
+  thread_id: string;
   question: string;
   ticker?: string | null;
-  provider: string;
-  model?: string;
-  effort?: string;
+  provider: ModelProvider;
+  model: string;
+  effort: string;
   retry_last_failed?: boolean;
   assistant_stance?: AssistantStance;
 }): Promise<{ run: ResearchRunDTO }> {

@@ -132,6 +132,7 @@ describe("reducer · anthropic live", () => {
   it("full single-turn happy path: interim replaced, footer reads only total_tokens+turn_count, trace chronological", () => {
     const s = run(
       submit({ question: "NVDA 最新 SA 動態？", provider: "anthropic", model: "claude-opus-4-8", effort: "high", ticker: "NVDA", ts: 1000 }),
+      { kind: "linkRun", runId: "run-1" },
       f("thinking", { turn: 1, model: "claude-opus-4-8" }),
       f("thinking_content", { thinking: "pull feed" }),
       f("text", { content: "Checking SA…" }),
@@ -155,6 +156,7 @@ describe("reducer · anthropic live", () => {
       elapsed_seconds: 3, // (4000-1000)/1000
       isError: false,
       maxTurns: false,
+      runId: "run-1",
     });
     expect(assistant(s).token_usage!.total_tokens).toBe(1500);
     expect(s.footer).toEqual({ total_tokens: 1500, turn_count: 2 });
@@ -340,12 +342,34 @@ describe("reducer · openai sparse", () => {
     expect(s.terminal).toBe("done");
   });
 
-  it("agent error frame ({error,scratchpad}, no turn/tools_used) renders error bubble via data.error, clears spinner", () => {
-    const s = run(submit({ question: "q", provider: "openai", model: "gpt-5.4" }), f("thinking", { turn: 1, model: "gpt-5.4" }), f("error", { error: "RuntimeError: boom", scratchpad: "/tmp/x.md" }));
+  it("agent error frame preserves typed code, partial usage, and trace while rendering data.error", () => {
+    const s = run(
+      submit({ question: "q", provider: "openai", model: "gpt-5.4" }),
+      { kind: "linkRun", runId: "run-error" },
+      f("thinking", { turn: 1, model: "gpt-5.4" }),
+      f("tool_end", { tool: "get_sa_feed", summary: "partial evidence", chars: 42 }),
+      f("error", {
+        error: "RuntimeError: boom",
+        code: "tool_limit_reached",
+        token_usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+        tools_used: ["get_sa_feed"],
+        scratchpad: "/tmp/x.md",
+      }),
+    );
     expect(s.pending).toBeNull();
     expect(s.terminal).toBe("error");
     expect(msgs(s)).toHaveLength(2);
-    expect(assistant(s)).toMatchObject({ isError: true, content: "RuntimeError: boom", maxTurns: false, tool_calls: [] });
+    expect(assistant(s)).toMatchObject({
+      isError: true,
+      content: "RuntimeError: boom",
+      errorCode: "tool_limit_reached",
+      errorDetail: "RuntimeError: boom",
+      runId: "run-error",
+      maxTurns: false,
+      tools_used: ["get_sa_feed"],
+      tool_calls: [{ name: "get_sa_feed", result_preview: "partial evidence" }],
+      token_usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+    });
     expect(assistant(s).synthesized).toBeFalsy();
   });
 
@@ -357,7 +381,14 @@ describe("reducer · openai sparse", () => {
   });
 
   it("abort during the silent gap drops pending, keeps user message, clears indicator", () => {
-    const s = run(submit({ question: "q", provider: "openai", model: "gpt-5.4", ticker: "TSLA" }), f("thinking", { turn: 1, model: "gpt-5.4" }), abort());
+    const beforeAbort = run(
+      submit({ question: "q", provider: "openai", model: "gpt-5.4", ticker: "TSLA" }),
+      { kind: "linkRun", runId: "run-current" },
+      f("thinking", { turn: 1, model: "gpt-5.4" }),
+      { kind: "abort", runId: "run-stale" },
+    );
+    expect(beforeAbort.pending?.runId).toBe("run-current");
+    const s = reduce(beforeAbort, { kind: "abort", runId: "run-current" });
     expect(s.pending).toBeNull();
     expect(msgs(s)).toHaveLength(1);
     expect(msgs(s)[0]).toMatchObject({ role: "user", tickers: ["TSLA"] });

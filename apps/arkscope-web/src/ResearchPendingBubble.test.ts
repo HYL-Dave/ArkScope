@@ -21,6 +21,7 @@ afterEach(() => {
 
 const pending = (over: Partial<PendingTurn> = {}): PendingTurn => ({
   threadId: "t1",
+  runId: null,
   startedAt: 0,
   provider: "openai",
   model: "gpt-5.5",

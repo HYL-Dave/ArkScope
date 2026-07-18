@@ -509,7 +509,7 @@ describe("Research shell navigation", () => {
     const mounted = await mountResearch({ onObserveRun });
 
     const newThread = Array.from(host!.querySelectorAll("button"))
-      .find((candidate) => candidate.textContent?.trim() === "新對話");
+      .find((candidate) => candidate.textContent?.trim() === "新研究");
     await click(newThread!);
     threadPage.resolve(json({
       threads: [
