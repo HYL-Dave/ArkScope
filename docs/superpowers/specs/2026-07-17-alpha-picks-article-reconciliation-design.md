@@ -1,10 +1,11 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
-> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM REVISED FOR WRITTEN
-> REVIEW. The 2026-07-19 live gate disproved the lifetime comment-gap retry
-> assumption. Section 3.5 now distinguishes recoverable post-enable continuity
-> breaks from intentionally waived historical deficits; that addendum blocks
-> merge until written review and implementation review are GREEN. The
+> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM APPROVED FOR
+> IMPLEMENTATION after 2026-07-19 written review. The live gate disproved the
+> lifetime comment-gap retry assumption. Section 3.5 now distinguishes
+> recoverable post-enable continuity breaks from intentionally waived historical
+> deficits; that addendum blocks merge until implementation review and live
+> continuity evidence are GREEN. The
 > universe/JSON decision does not pre-approve this design; this is an independent
 > implementation slice.
 
@@ -303,6 +304,12 @@ absent count. An explicit count records `comments_count_observed_at`; an unknown
 count leaves the observation null and must not overwrite the last known provider
 count or trigger/reset the checkpoint. No arbitrary page-wide number scan may
 manufacture a count.
+
+For a usable scan, an explicit provider count of zero closes the current
+continuity question: current state becomes `repaired`, pending watermark/miss/
+park fields clear, and any prior terminal audit remains. This is not a lifetime-
+completeness claim; it records that the provider currently exposes no comment
+interval to bridge.
 
 Quick comment work is limited to articles in the current list scrape that
 already have usable body content. It is scheduled only when a current explicit

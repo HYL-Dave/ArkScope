@@ -8,15 +8,15 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM REVISED FOR WRITTEN
-> REVIEW. Round 2
+> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM CLEARED FOR
+> IMPLEMENTATION after 2026-07-19 written review. Round 2
 > cleared the original `+78/-0` plan. Implementation plus live parser,
 > body-settle, and English-copy corrections reached `18fcfb4` at exact focused
 > `246` / canonical collect `4497`. The live gate then disproved the historical
 > comment-gap retry assumption. The checkpoint-only draft was then rejected
 > because it could not recover post-enable middle intervals. Task 8 is now an
-> exact `+16/-0` RED-first continuity addendum; it blocks merge until written
-> review and implementation review are GREEN.
+> exact `+16/-0` RED-first continuity addendum. Written review is reflected here;
+> merge remains blocked until implementation review and live evidence are GREEN.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
@@ -2005,6 +2005,7 @@ In `tests/test_sa_capture_backend.py`:
 def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
     backend.upsert_sa_articles_meta([
         _article("positive"), _article("zero"), _article("empty"),
+        _article("zero-pending"),
     ])
 
     positive = backend.update_article_comments(
@@ -2016,6 +2017,15 @@ def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
     empty = backend.update_article_comments(
         "empty", [], provider_comments_count=7
     )
+    backend.update_article_comments(
+        "zero-pending", [_comment("zero-old")], provider_comments_count=1
+    )
+    backend.update_article_comments(
+        "zero-pending", [_comment("zero-new")], provider_comments_count=2
+    )
+    zero_pending = backend.update_article_comments(
+        "zero-pending", [], provider_comments_count=0
+    )
 
     rows = {row["article_id"]: row for row in backend.query_sa_articles()}
     assert positive["comment_scan_usable"] is True
@@ -2026,6 +2036,13 @@ def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
     assert empty["comment_scan_usable"] is False
     assert rows["empty"]["provider_comments_count_at_last_scan"] is None
     assert rows["empty"]["comments_fetched_at"] is None
+    assert zero_pending["comment_scan_usable"] is True
+    assert rows["zero-pending"]["provider_comments_count_at_last_scan"] == 0
+    assert rows["zero-pending"]["comment_recovery_state"] == "repaired"
+    assert rows["zero-pending"]["comment_recovery_started_at"] is None
+    assert rows["zero-pending"]["comment_recovery_baseline_max_row_id"] is None
+    assert rows["zero-pending"]["comment_recovery_full_miss_count"] == 0
+    assert rows["zero-pending"]["comment_recovery_parked_at"] is None
 
 
 def test_body_capture_commits_when_comment_scan_is_unusable(backend):
@@ -2099,7 +2116,7 @@ def test_recovery_watermark_is_pre_upsert_and_new_generation_cannot_self_repair(
         provider_comments_count=2, comment_scan_mode="full",
     )
     assert repeated["comment_recovery_state"] == "pending"
-    assert repeated["comment_recovery_baseline_overlap_count"] == 0
+    assert repeated["comment_scan_baseline_overlap_count"] == 0
 
 
 def test_any_mode_overlap_repairs_pending_recovery(backend):
@@ -2125,7 +2142,7 @@ def test_any_mode_overlap_repairs_pending_recovery(backend):
             provider_comments_count=2, comment_scan_mode=mode,
         )
         assert repaired["comment_recovery_state"] == "repaired"
-        assert repaired["comment_recovery_baseline_overlap_count"] == 1
+        assert repaired["comment_scan_baseline_overlap_count"] == 1
         assert repaired["comment_recovery_parked"] is False
 
 
@@ -2168,6 +2185,14 @@ def test_two_usable_full_misses_park_without_terminalizing(backend):
         "park", [_comment("park-new")],
         provider_comments_count=2, comment_scan_mode="quick",
     )
+    raised_row = next(
+        a for a in backend.query_sa_articles() if a["article_id"] == "park"
+    )
+    frozen_watermark = raised_row["comment_recovery_baseline_max_row_id"]
+    frozen_started_at = raised_row["comment_recovery_started_at"]
+    assert frozen_watermark is not None
+    assert frozen_started_at is not None
+
     first = backend.update_article_comments(
         "park", [_comment("park-new")],
         provider_comments_count=2, comment_scan_mode="full",
@@ -2190,6 +2215,11 @@ def test_two_usable_full_misses_park_without_terminalizing(backend):
     assert quick["comment_recovery_state"] == "pending"
     assert quick["comment_recovery_full_miss_count"] == 2
     assert quick["comment_recovery_parked"] is True
+    after_quick = next(
+        a for a in backend.query_sa_articles() if a["article_id"] == "park"
+    )
+    assert after_quick["comment_recovery_baseline_max_row_id"] == frozen_watermark
+    assert after_quick["comment_recovery_started_at"] == frozen_started_at
 
 
 def test_backfill_terminal_requires_five_stable_bottom_rounds(backend):
