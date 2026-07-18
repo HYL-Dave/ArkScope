@@ -221,11 +221,13 @@ function stubResearchFetch({
   createdRun,
   replayRun,
   order,
+  selectionResponses,
 }: {
   threads: ResearchThreadDTO[];
   createdRun?: ResearchRunDTO;
   replayRun?: ResearchRunDTO;
   order?: string[];
+  selectionResponses?: Response[];
 }) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -238,6 +240,8 @@ function stubResearchFetch({
     if (path === "/profile/investor") return json(PROFILE);
     if (path === "/research/threads?limit=50") return json({ threads });
     if (/^\/research\/threads\/[^/]+\/selection$/.test(url.pathname)) {
+      const queued = selectionResponses?.shift();
+      if (queued) return queued;
       return json({ provider: "openai", model: "gpt-5.6-luna", effort: "high" });
     }
     if (/^\/research\/threads\/[^/]+\/messages$/.test(url.pathname)) {
@@ -349,6 +353,40 @@ describe("Research shell navigation", () => {
     expect(onObserveRun).toHaveBeenCalledWith(active, "Active research");
   });
 
+  it("keeps selection failures fail-closed and lets the user retry", async () => {
+    const fetchMock = stubResearchFetch({
+      threads: [thread("thread-a", "Thread A")],
+      selectionResponses: [
+        json({ detail: "temporary failure" }, 500),
+        json({ provider: "openai", model: "gpt-5.6-luna", effort: "high" }),
+      ],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "thread-a");
+    await mountResearch();
+
+    const retry = await vi.waitFor(() => {
+      const button = Array.from(host!.querySelectorAll("button"))
+        .find((candidate) => candidate.textContent?.trim() === "重新確認模型");
+      expect(button).toBeDefined();
+      return button as HTMLButtonElement;
+    });
+    expect(host!.textContent).toContain("無法確認此對話上次使用的模型");
+    const send = Array.from(host!.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === "送出") as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+
+    await click(retry);
+    await vi.waitFor(() => {
+      expect(host!.textContent).not.toContain("無法確認此對話上次使用的模型");
+      expect(host!.textContent).toContain("研究模型：openai · gpt-5.6-luna · high");
+    });
+    const selectionCalls = fetchMock.mock.calls.filter(([input]) => (
+      new URL(String(input)).pathname === "/research/threads/thread-a/selection"
+    ));
+    expect(selectionCalls).toHaveLength(2);
+  });
+
   it("reports a created run before replay and reports the terminal replay DTO", async () => {
     const created = run("new-run", "thread-a", "running");
     const terminal = run("new-run", "thread-a", "succeeded");
@@ -366,9 +404,12 @@ describe("Research shell navigation", () => {
     });
     const mounted = await mountResearch({ onObserveRun });
     await mounted.render();
-    expect(fetchMock.mock.calls.some(([input]) => (
+    const selectionCall = fetchMock.mock.calls.find(([input]) => (
       new URL(String(input)).pathname === "/research/threads/thread-a/selection"
-    ))).toBe(true);
+    ));
+    expect(selectionCall?.[1]).toEqual(expect.objectContaining({
+      signal: expect.any(AbortSignal),
+    }));
     let openAiRoute: HTMLButtonElement | undefined;
     await vi.waitFor(() => {
       openAiRoute = Array.from(host!.querySelectorAll("button"))

@@ -834,6 +834,17 @@ export function getResearchThreads(limit = 50): Promise<{ threads: ResearchThrea
 export function getResearchMessages(threadId: string): Promise<{ thread_id: string; messages: ResearchMessageDTO[] }> {
   return getJSON<{ thread_id: string; messages: ResearchMessageDTO[] }>(`/research/threads/${encodeURIComponent(threadId)}/messages`, 8_000);
 }
+export function getResearchSelection(threadId: string): Promise<{
+  provider: ModelProvider;
+  model: string;
+  effort: string;
+} | null> {
+  return getJSON<{
+    provider: ModelProvider;
+    model: string;
+    effort: string;
+  } | null>(`/research/threads/${encodeURIComponent(threadId)}/selection`, 8_000);
+}
 export function deleteResearchThread(threadId: string): Promise<{ thread_id: string; deleted: boolean }> {
   return sendJSON<{ thread_id: string; deleted: boolean }>(`/research/threads/${encodeURIComponent(threadId)}`, "DELETE", undefined, 8_000);
 }

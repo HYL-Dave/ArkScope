@@ -237,14 +237,9 @@ export function resolveResearchSelection({
 
 export async function loadResearchThreadSelection(
   threadId: string,
-  fetcher: typeof fetch = fetch,
+  loader: (id: string) => Promise<unknown>,
 ): Promise<ResearchTuple | null> {
-  const base = typeof window !== "undefined"
-    ? (window.arkscope?.apiBase ?? (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://127.0.0.1:8420")
-    : "http://127.0.0.1:8420";
-  const response = await fetcher(`${base}/research/threads/${encodeURIComponent(threadId)}/selection`);
-  if (!response.ok) throw new Error(`research selection request failed (${response.status})`);
-  const body = await response.json() as unknown;
+  const body = await loader(threadId);
   if (body === null) return null;
   const tuple = normalizeTuple(body);
   if (!tuple) throw new Error("research selection response is invalid");

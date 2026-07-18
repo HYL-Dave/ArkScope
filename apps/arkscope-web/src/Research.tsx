@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import {
   cancelResearchRun, createResearchRun, deleteResearchThread,
   getModelCatalog, getQueryProviders, getResearchRunEvents,
-  getResearchThreads, getResearchMessages,
+  getResearchThreads, getResearchMessages, getResearchSelection,
   type ModelCatalog,
   type ResearchMessageDTO, type ResearchRunDTO, type ResearchThreadDTO,
 } from "./api";
@@ -155,6 +155,8 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     tuple: ResearchTuple | null;
     loaded: boolean;
   } | null>(null);
+  const [threadSelectionLoadError, setThreadSelectionLoadError] = useState(false);
+  const [threadSelectionRequestVersion, setThreadSelectionRequestVersion] = useState(0);
   // Track A: opt-in investor profile → per-run assistant stance override.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [runStance, setRunStance] = useState<AssistantStance>("off");
@@ -213,13 +215,16 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
     const threadId = state.activeThreadId;
     if (!threadId) {
       setThreadSelection(null);
+      setThreadSelectionLoadError(false);
       return;
     }
     let alive = true;
+    setThreadSelectionLoadError(false);
     setThreadSelection({ threadId, tuple: null, loaded: false });
-    void loadResearchThreadSelection(threadId)
+    void loadResearchThreadSelection(threadId, getResearchSelection)
       .then((tuple) => {
         if (alive) {
+          setThreadSelectionLoadError(false);
           setThreadSelection((current) => (
             current?.threadId === threadId && current.loaded
               ? current
@@ -229,6 +234,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
       })
       .catch(() => {
         if (alive) {
+          setThreadSelectionLoadError(true);
           setThreadSelection((current) => (
             current?.threadId === threadId && current.loaded
               ? current
@@ -237,7 +243,7 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
         }
       });
     return () => { alive = false; };
-  }, [state.activeThreadId]);
+  }, [state.activeThreadId, threadSelectionRequestVersion]);
 
   useEffect(() => {
     if (state.pending) setThreadMenuId(null);
@@ -704,6 +710,23 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                     </button>
                   ))}
                 </div>
+                {selection?.state === "needs_selection" && state.activeThreadId && (
+                  <div className="research-providerbar">
+                    {threadSelectionLoadError ? (
+                      <>
+                        <span className="warn-text tiny">無法確認此對話上次使用的模型；目前不會自動 fallback。</span>
+                        <button
+                          className="btn-ghost tiny"
+                          onClick={() => setThreadSelectionRequestVersion((version) => version + 1)}
+                        >
+                          重新確認模型
+                        </button>
+                      </>
+                    ) : (
+                      <span className="muted tiny">正在確認此對話上次成功使用的模型…</span>
+                    )}
+                  </div>
+                )}
                 {provider && (
                   <div className="research-pickerbar">
                     <label className="research-pick">
@@ -763,9 +786,6 @@ export function ResearchView({ onOpenTicker, navigationRequest, onObserveRun }: 
                     {selection?.billingCopy && <span className="muted tiny">{selection.billingCopy}</span>}
                     {selection?.state === "blocked" && (
                       <span className="warn-text tiny">{selection.reasonLabel}</span>
-                    )}
-                    {selection?.state === "needs_selection" && state.activeThreadId && (
-                      <span className="muted tiny">正在確認此對話上次成功使用的模型…</span>
                     )}
                     {stanceEnabled && (
                       <label className="tiny">
