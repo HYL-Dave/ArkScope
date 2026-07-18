@@ -662,6 +662,40 @@ def test_timeout_causes_and_owned_event_shapes_are_model_timeout(stores):
     )
     assert run_store.get_run("run-cause").error_code == "model_timeout"
 
+    provider_timeout_cases = [
+        ("openai", "openai._exceptions", "model_timeout"),
+        ("anthropic", "anthropic._exceptions", "model_timeout"),
+        ("unrelated", "unrelated._exceptions", "provider_call_failed"),
+    ]
+    for suffix, module, expected_code in provider_timeout_cases:
+        timeout_type = type(
+            "APITimeoutError",
+            (Exception,),
+            {"__module__": module},
+        )
+        thread_id = f"timeout-cause-{suffix}"
+        run_id = f"run-cause-{suffix}"
+        _seed_run(run_store, thread_store, thread_id=thread_id, run_id=run_id)
+
+        async def caused_provider_timeout(_timeout_type=timeout_type, **kwargs):
+            try:
+                raise _timeout_type("provider deadline")
+            except Exception as cause:
+                raise RuntimeError("outer provider failure") from cause
+            yield  # pragma: no cover - async-generator shape
+
+        asyncio.run(
+            execute_research_run(
+                run_id=run_id,
+                run_store=run_store,
+                thread_store=thread_store,
+                dal=object(),
+                history=[],
+                stream_factory=caused_provider_timeout,
+            )
+        )
+        assert run_store.get_run(run_id).error_code == expected_code
+
 
 def test_max_turn_shapes_are_typed_without_fuzzy_near_misses(stores):
     from src.research_run_manager import execute_research_run
@@ -689,12 +723,12 @@ def test_max_turn_shapes_are_typed_without_fuzzy_near_misses(stores):
         ),
         (
             "anthropic-near-miss",
-            EventType.error,
+            EventType.done,
             {
-                "error": f"{MAX_TOOL_CALLS_SENTINEL} trailing",
+                "answer": f"{MAX_TOOL_CALLS_SENTINEL} trailing",
                 "token_usage": {"total_tokens": 20},
             },
-            "provider_call_failed",
+            None,
         ),
         (
             "openai-near-miss",
@@ -752,6 +786,25 @@ def test_max_turn_shapes_are_typed_without_fuzzy_near_misses(stores):
         run = run_store.get_run(run_id)
         terminal = run_store.list_events(run_id)[-1]
         message = thread_store.list_messages(thread_id)[-1]
+        if expected_code is None:
+            assert run.status == "succeeded"
+            assert run.error_code is None
+            assert terminal.type == "done"
+            assert terminal.data["answer"] == terminal_data["answer"]
+            assert "code" not in terminal.data
+            assert message.is_error is False
+            assert (message.run_id, message.error_code) == (run_id, None)
+            assert message.content == terminal_data["answer"]
+            assert message.tool_calls == [
+                {
+                    "name": "get_news",
+                    "input": {"ticker": "MU"},
+                    "result_preview": "partial",
+                }
+            ]
+            assert message.token_usage == terminal_data["token_usage"]
+            assert run.token_usage == terminal_data["token_usage"]
+            continue
         assert run.status == "failed"
         assert run.error_code == expected_code
         assert terminal.type == "error"
