@@ -793,6 +793,8 @@ export interface ResearchThreadDTO {
   id: string; title: string; ticker: string | null;
   provider: string | null; model: string | null;
   created_at: string; updated_at: string;
+  archived_at?: string | null;
+  latest_run_status?: ResearchRunDTO["status"] | null;
   active_run?: ResearchRunDTO | null;
 }
 export interface ResearchMessageDTO {
@@ -801,6 +803,9 @@ export interface ResearchMessageDTO {
   tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
   token_usage: Record<string, number> | null; tickers: string[] | null;
   elapsed_seconds: number | null; is_error: boolean; created_at: string;
+  run_id?: string | null;
+  error_code?: string | null;
+  error?: string | null;
   personalization?: PersonalizationTrace | null;
 }
 export interface ResearchRunDTO {
@@ -817,6 +822,7 @@ export interface ResearchRunDTO {
   started_at: string | null;
   completed_at: string | null;
   error: string | null;
+  error_code?: string | null;
   token_usage: Record<string, number> | null;
   created_at: string;
   updated_at: string;
@@ -828,8 +834,70 @@ export interface ResearchRunEventDTO {
   data: Record<string, unknown>;
   created_at: string;
 }
+export type ResearchHistoryRunState =
+  | "all"
+  | "active"
+  | "succeeded"
+  | "failed"
+  | "interrupted"
+  | "no_run";
+export type ResearchHistoryArchiveMode = "current" | "archived";
+export interface ResearchThreadQueryParams {
+  q?: string;
+  ticker?: string;
+  updated_from?: string;
+  updated_before?: string;
+  run_state?: ResearchHistoryRunState;
+  archived?: ResearchHistoryArchiveMode;
+  limit?: number;
+  offset?: number;
+}
+export interface ResearchThreadsResponse {
+  threads: ResearchThreadDTO[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+export type ResearchThreadPatch = {
+  title?: string;
+  archived?: boolean;
+};
+
+export function queryResearchThreads(
+  params: ResearchThreadQueryParams = {},
+): Promise<ResearchThreadsResponse> {
+  const query = new URLSearchParams();
+  const q = params.q?.trim();
+  const ticker = params.ticker?.trim();
+  if (q) query.set("q", q);
+  if (ticker) query.set("ticker", ticker);
+  if (params.updated_from) query.set("updated_from", params.updated_from);
+  if (params.updated_before) query.set("updated_before", params.updated_before);
+  if (params.run_state !== undefined) query.set("run_state", params.run_state);
+  if (params.archived !== undefined) query.set("archived", params.archived);
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+  return getJSON<ResearchThreadsResponse>(`/research/threads?${query.toString()}`, 8_000);
+}
+export function getResearchThread(threadId: string): Promise<{ thread: ResearchThreadDTO }> {
+  return getJSON<{ thread: ResearchThreadDTO }>(
+    `/research/threads/${encodeURIComponent(threadId)}`,
+    8_000,
+  );
+}
+export function updateResearchThread(
+  threadId: string,
+  patch: ResearchThreadPatch,
+): Promise<{ thread: ResearchThreadDTO }> {
+  return sendJSON<{ thread: ResearchThreadDTO }>(
+    `/research/threads/${encodeURIComponent(threadId)}`,
+    "PATCH",
+    patch,
+    8_000,
+  );
+}
 export function getResearchThreads(limit = 50): Promise<{ threads: ResearchThreadDTO[] }> {
-  return getJSON<{ threads: ResearchThreadDTO[] }>(`/research/threads?limit=${limit}`, 8_000);
+  return queryResearchThreads({ limit });
 }
 export function getResearchMessages(threadId: string): Promise<{ thread_id: string; messages: ResearchMessageDTO[] }> {
   return getJSON<{ thread_id: string; messages: ResearchMessageDTO[] }>(`/research/threads/${encodeURIComponent(threadId)}/messages`, 8_000);
