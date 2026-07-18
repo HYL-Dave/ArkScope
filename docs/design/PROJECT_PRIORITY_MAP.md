@@ -228,8 +228,10 @@ therefore defaults to defer until the hypothesis gate exists.
   2026-07-17 through post-merge scroll hotfix `95662b1`; code, independent review, exact
   frontend accounting, responsive/live, static, backend-byte-identity, and
   merged-tree verification gates are closed.** The external Claude Design
-  companion sync remains the one separate post-merge gate; Slice 3 has not
-  started (`docs/superpowers/plans/2026-07-16-p2-8-slice-2-shell-convergence.md`).
+  companion sync remains the one separate post-merge gate. **Slice 3 Research
+  workspace implementation planning opened 2026-07-18; product code has not
+  started and independent plan review is the next gate**
+  (`docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`).
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
   2026-07-18 through closeout base `b3d9728`**. P2.8 Slice 3 is now the next
   implementation unit. Alpha Picks article reconciliation and DB-derived
@@ -428,6 +430,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-18 (P2.8 SLICE 3 RESEARCH WORKSPACE PLAN OPENED — review pending, implementation not started)**: With NEWS content availability merged/live and the canonical sequence unblocked, the approved Research workspace contract is translated into an eight-task RED-first plan at `docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`. The bounded slice replaces the permanent history/trace columns with on-demand History and wide-pinnable Evidence, adds server-side deterministic metadata filtering plus rename/archive/confirmed delete, links new messages to exact runs, persists typed Research error codes, presents factual session-bound progress, and fixes the known model-selection effect race through one complete-tuple resolver over the same Models-UX effective authority used by Settings. It explicitly does not invent structured claim/citation data, collections, LLM classification, a second model catalog, or a second job registry. Grounded baselines are backend `4378` collected / Research-focused `93` and frontend `56 files / 533 tests`; reviewed targets are backend exact `+34/-0` and frontend raw `+52/-15` (15 obsolete silent-fallback policy tests replaced one-for-one), ending at `60 / 570`. The unrelated dirty `config/tickers_core.json` remains protected. Next gate is independent plan review; do not implement, merge, mark Slice 3 LIVE, or start Alpha Picks/universe code yet.
 
 - **2026-07-18 (NEWS CONTENT AVAILABILITY UNIT 2 MERGED / LIVE COMPLETE)**: The reviewed stack fast-forwarded to `master` through `b3d9728`. One shared derived-at-read classifier, explicit migration/projection-map resolution, SQL-before-pagination content filtering/facets, additive API fields, and a market-only version-skew-safe NEWS selector now ship with honest full/headline-only/unknown and retryable/terminal presentation. Finnhub/Polygon never receive a false recovery promise; IBKR remains the sole reviewed body-recovery source. Canonical virgin A/B at `012dc69` versus final implementation/test tip `eb011d7` retained identical `30 failed / 74 skipped / 18 warnings / 7 errors`, empty bidirectional failure/error identity diff, and exact backend `4248 -> 4267` / collect `+19/-0`; frontend is exact `55/527 -> 56/533` (`+6/-0`). Independent review RED-first closed empty-unknown selection, old-sidecar badge suppression, map precedence, legacy-FTS authority, and mutation-proven SQL predicate/bounded pagination without changing node accounting. The user's independent C-1 SA gate passed search/ticker/day/type/pagination/degraded behavior and proved zero Unit 2 UI leakage. Fresh merged-tree `94`, frontend `56/533`, typecheck/build, no-PG `pg_attempts:[]`, and 1440/1024/390 market/SA visual gates passed; filtered pagination remained `50 -> 100`, with no horizontal overflow or toolbar overlap. Temporary ports `8421/8432/9223` were stopped, and the unrelated dirty `config/tickers_core.json` remained untouched. P2.8 Slice 3 may now open.
 
