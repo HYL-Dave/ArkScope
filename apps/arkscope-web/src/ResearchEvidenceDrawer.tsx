@@ -45,6 +45,11 @@ function authContext(run: ResearchRunDTO): string | null {
   return `${label} · ${subscription ? "使用訂閱額度，非 API 帳單" : "使用 API 額度，會計入 API 帳單"}`;
 }
 
+function effortLabel(value: string | null | undefined, fallback: string): string {
+  if (value === "default") return "Provider 預設";
+  return value || fallback;
+}
+
 function boundedPreview(value: string | undefined): string | null {
   if (!value) return null;
   return value.length > 500 ? `${value.slice(0, 500)}…` : value;
@@ -215,9 +220,9 @@ export function ResearchEvidenceDrawer({
           {hasTranscriptDetails ? (
             <dl className="research-run-detail-list">
               {details ? (
-                <div><dt>路線</dt><dd>{details.provider} · {details.model} · {details.effort || "Provider 預設"}</dd></div>
+                <div><dt>路線</dt><dd>{details.provider} · {details.model} · {effortLabel(details.effort, "Provider 預設")}</dd></div>
               ) : message?.provider || message?.model || message?.effort ? (
-                <div><dt>路線</dt><dd>{message.provider ?? "未知"} · {message.model ?? "未知"} · {message.effort === "default" ? "Provider 預設" : message.effort ?? "未知"}</dd></div>
+                <div><dt>路線</dt><dd>{message.provider ?? "未知"} · {message.model ?? "未知"} · {effortLabel(message.effort, "未知")}</dd></div>
               ) : null}
               {details && authContext(details) ? <div><dt>登入與額度</dt><dd>{authContext(details)}</dd></div> : null}
               {details ? <div><dt>建立</dt><dd>{formatSystemTimestamp(details.created_at)}</dd></div> : null}

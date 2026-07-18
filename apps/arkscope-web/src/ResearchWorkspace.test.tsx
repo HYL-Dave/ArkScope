@@ -679,6 +679,7 @@ describe("Research workspace contracts", () => {
       messages: { "thread-a": [evidence] },
       runDetails: {
         "run-evidence": json({ run: run("run-evidence", "thread-a", "succeeded", {
+          effort: "default",
           assistant_stance: "growth_opportunity",
           token_usage: { total_input_tokens: 100, total_output_tokens: 20, total_tokens: 120 },
         }) }),
@@ -697,6 +698,8 @@ describe("Research workspace contracts", () => {
     expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain("研究歷史");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("中性");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain("成長機會派");
+    expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("openai · gpt-5.6-luna · Provider 預設");
+    expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain(" · default");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("總輸入 tokens");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain("total_input_tokens");
 
