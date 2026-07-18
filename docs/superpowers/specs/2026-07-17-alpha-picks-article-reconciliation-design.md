@@ -1,7 +1,8 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
-> **Status:** DRAFT FOR WRITTEN REVIEW. The universe/JSON decision does not
-> pre-approve this design, and no implementation plan is open.
+> **Status:** DRAFT FOR WRITTEN REVIEW, revised 2026-07-18 with live BTSG
+> capture evidence. The universe/JSON decision does not pre-approve this
+> design, and no implementation plan is open.
 
 ## 1. Purpose
 
@@ -32,7 +33,45 @@ The popup shows `Paste missing article URLs (TICKER URL per line)` only when
 unresolved current picks remain. Successful manual fetches store the article
 and clear the symbol from extension-local unresolved state.
 
-### 2.2 Existing association is not event-safe
+### 2.2 Automatic capture drops explicit provider ticker evidence
+
+User-supplied live screenshots on 2026-07-18 prove that the Alpha Picks
+surfaces expose ticker identity independently of the article title:
+
+- the analysis-list card shows
+  `Jul 15, 2026, 12:00 PM \u2022 BTSG \u2022 265 Comments`; and
+- the article detail header shows
+  `BrightSpring Health Services, Inc. (BTSG) Stock` below a generic title.
+
+This is explicit provider metadata, not a title/body inference. The current
+extension nevertheless loses both facts:
+
+- `scrape_articles_list.js` captures only the calendar-date prefix, then applies
+  an anchored ticker regex to the remaining text as though the ticker followed
+  the date immediately. For the confirmed BTSG shape, the remainder begins
+  with `, 12:00 PM` and separators, so the reviewed current expression returns
+  `null` before reaching `BTSG`.
+- `scrape_detail.js` returns title, author, publication date, body, URL, and
+  scrape time, but does not extract the security-header ticker.
+- the manual URL path supplies the user's symbol directly when saving article
+  metadata. This explains why manually pasting the BTSG URL repaired the link;
+  it does not prove that automatic association was correct.
+
+The failure is therefore an extension parser defect, not evidence that Seeking
+Alpha omitted ticker identity. BTSG is the sole live symbol claim established
+by this evidence; other symbols require their own fixture or live proof and are
+not assumed by analogy.
+
+The implementation must prefer a ticker-bearing element or metadata node from
+the same article card. A reviewed normalized-text grammar may be a fallback,
+but it must admit the confirmed optional time and separators and must not scan
+arbitrary uppercase page text. Detail extraction independently reads the
+security header adjacent to the article heading. Sanitized DOM fixtures from
+the real BTSG list and detail surfaces are required before selectors are
+implemented; screenshots establish visible truth but do not establish DOM
+structure.
+
+### 2.3 Existing association is not event-safe
 
 The current backend has one `canonical_article_id` per pick and copies its body
 into `detail_report`. Automatic association:
@@ -56,7 +95,7 @@ included removal articles correctly dated to `closed_date` but hundreds of days
 from `picked_date`, plus clearly suspicious current links hundreds of days away.
 These numbers are diagnostic snapshots, not acceptance constants.
 
-### 2.3 One canonical field cannot represent the domain
+### 2.4 One canonical field cannot represent the domain
 
 One pick can have distinct articles for:
 
@@ -122,16 +161,43 @@ For compatibility, an accepted `entry` may project to the legacy field; an
 `exit` must not overwrite it. Existing links require a preview/reclassification
 pass and are not grandfathered merely because they are populated.
 
+### 3.3 Provider ticker sources remain separable
+
+The existing single `sa_articles.ticker` field cannot retain list/detail
+provenance or represent disagreement. The new capture contract therefore adds
+`list_ticker`, `list_ticker_observed_at`, `detail_ticker`, and
+`detail_ticker_observed_at` to `sa_articles`. `null` means no explicit ticker was
+captured from that source; it is not proof that the provider supplied none.
+Only the corresponding scraper may update its source observation.
+
+The existing `ticker` field remains a compatibility projection for old readers.
+It may be refreshed from a non-conflicting resolved provider identity, but the
+new matcher never treats that legacy projection as independent provider
+evidence. Existing legacy values are not backfilled into either new source and
+must be recaptured or remain fallback/review-only. A manually supplied symbol
+is user evidence on an explicit link; it never populates or impersonates the
+list/detail provider observations.
+
 ## 4. Deterministic Matching Policy
 
-### 4.1 Candidate evidence
+### 4.1 Candidate evidence and provenance
 
-Candidate construction uses four independent facts:
+Candidate construction uses six independent facts:
 
 1. event-role anchor date;
 2. article publication date;
-3. exact ticker/company evidence from metadata, title, or stored body; and
-4. role evidence from title/body language and the heuristic article type.
+3. exact ticker from the Alpha Picks analysis-list metadata;
+4. exact ticker from the article detail security header;
+5. fallback ticker/company evidence from title or stored body; and
+6. role evidence from title/body language and the heuristic article type.
+
+List and detail ticker evidence retain distinct provenance codes. Each explicit
+provider surface is sufficient to establish exact ticker identity when the
+other is absent. When both are present they must normalize to the same ticker;
+disagreement is `ticker_metadata_conflict`, remains review-only, and cannot be
+overridden by title/body matching. Missing explicit metadata permits the
+bounded fallback in Section 4.3 but is never silently reinterpreted as provider
+confirmation.
 
 Ticker-prefix matching alone is not strong enough for automatic acceptance.
 Article type alone is not strong enough either. No LLM call participates in
@@ -153,11 +219,13 @@ default candidate. There is no unbounded nearest-date fallback.
 An article is auto-linked only when exactly one candidate satisfies one of
 these high-confidence shapes:
 
-- exact anchor date + exact ticker metadata + compatible role evidence;
-- within three days + exact ticker metadata + strong role phrase; or
+- exact anchor date + non-conflicting explicit provider ticker metadata +
+  compatible role evidence;
+- within three days + non-conflicting explicit provider ticker metadata +
+  strong role phrase; or
 - exact anchor date + strong role phrase + an unambiguous ticker/company
-  mention in title or stored body, when article-list ticker extraction is
-  missing.
+  mention in title or stored body, when both explicit provider ticker sources
+  are absent.
 
 Entry phrases include explicit buy/add/initiation language; exit phrases
 include sold/closing/removing/stake-exit language. The implementation plan must
@@ -170,10 +238,13 @@ article ID may order the review list but may not break an identity tie.
 
 ### 4.4 Bounded enrichment before decision
 
-An exact-date/role candidate whose metadata lacks ticker evidence may be queued
-for the existing extension body fetch before final matching. This is a bounded
-enrichment request, not acceptance. After the body is committed, the matcher
-runs again using the new local evidence.
+An exact-date/role candidate whose list metadata lacks ticker evidence may be
+queued for the existing extension detail fetch before final matching. The
+detail result enriches article metadata with the independently extracted
+security-header ticker as well as the body; it does not require a title or body
+mention when that explicit header is present. This is a bounded enrichment
+request, not acceptance. After the enriched metadata/body is committed, the
+matcher runs again using the new local evidence.
 
 The extension must not fetch every historical article merely to resolve one
 pick. Per-refresh candidate-enrichment limits and normal cache/idempotency rules
@@ -187,7 +258,8 @@ shows:
 - ticker/company;
 - event role and anchor date;
 - candidate article date/title;
-- evidence and ambiguity reason; and
+- evidence provenance and ambiguity reason, including list/detail ticker
+  disagreement; and
 - whether body enrichment is pending, failed, or complete.
 
 The default workflow offers a candidate selection or a scoped `使用目前文章`
@@ -252,23 +324,32 @@ be the acceptance authority.
 
 The future implementation plan must prove, RED first:
 
-1. entry uses `picked_date`; exit uses `closed_date`;
-2. exact-date exact-ticker unique candidates auto-link;
-3. ticker-less exact-date candidates require strong body/title evidence;
-4. candidates outside three days never auto-link;
-5. ties remain unresolved and stable ordering does not decide identity;
-6. repeated-symbol picks link independently;
-7. exit links do not overwrite the compatibility entry projection;
-8. refresh/body-enrichment reruns are idempotent and bounded;
-9. manual selection binds one `(pick_id, role)` and rejects malformed/non-SA
-   URLs;
-10. existing suspicious canonical links are reported by preview rather than
+1. a sanitized BTSG list-card fixture with date, time, separators, ticker, and
+   comment count extracts `BTSG` rather than `null`;
+2. a sanitized BTSG detail-header fixture extracts `BTSG` independently of its
+   generic article title and body;
+3. list/detail ticker observations persist independently, while a mismatch
+   remains unresolved as `ticker_metadata_conflict`;
+4. entry uses `picked_date`; exit uses `closed_date`;
+5. exact-date exact-ticker unique candidates auto-link;
+6. ticker-less exact-date candidates require strong body/title evidence;
+7. candidates outside three days never auto-link;
+8. ties remain unresolved and stable ordering does not decide identity;
+9. repeated-symbol picks link independently;
+10. exit links do not overwrite the compatibility entry projection;
+11. refresh/detail-enrichment reruns are idempotent and bounded;
+12. manual selection binds one `(pick_id, role)`, rejects malformed/non-SA
+    URLs, and never populates list/detail provider observations;
+13. existing suspicious canonical links are reported by preview rather than
     silently preserved;
-11. capture facts survive matcher/review failures byte-for-byte; and
-12. a live extension gate covers at least one exact automatic link, one
-    ticker-less body-assisted link, and one ambiguous item retained for review.
+14. capture facts survive matcher/review failures byte-for-byte; and
+15. automated browser/fixture gates cover ticker-less body assistance and
+    list/detail conflict, while a live extension gate proves BTSG automatic
+    metadata capture without manual symbol injection and retains unrelated
+    ambiguity for review.
 
 ## 10. Sequence
 
-This document receives fresh written review. Its implementation remains behind
-P2.8 Slice 3 and stays independent from the DB-universe/JSON-retirement slice.
+P2.8 Slice 3 is complete. This revised document receives fresh written review;
+after approval it may open its own implementation plan, independently from the
+DB-universe/JSON-retirement slice.
