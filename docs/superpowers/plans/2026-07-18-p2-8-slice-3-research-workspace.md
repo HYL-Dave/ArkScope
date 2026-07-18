@@ -93,6 +93,21 @@ backend `+34/-0` and frontend `+52/-15`.
   must be true SQLite interleaving tests, and Task 3 must commit status, event,
   and linked typed message atomically before its review can pass.
 
+### Task 5 — COMPLETE IN PARALLEL (2026-07-18)
+
+- RED-first commit `8e1f1fc` added exactly three Drawer contract nodes and the
+  wide inline-pinned variant without a second breakpoint or new media query.
+- Accessibility review then reproduced two stacked-overlay focus failures:
+  breakpoint transitions could steal focus from a topmost ConfirmDialog, and
+  closing that dialog after the Drawer moved inline could leave focus on the
+  document body. Commits `f9f03eb` and `ccae139` keep one stable overlay-stack
+  entry across modal/inline modes and restore to the present inline pin without
+  granting it modal Escape or focus-trap ownership.
+- Exact accounting is `13` overlay nodes (`+3`). Independent focused replay is
+  `13 passed`; the complete frontend at this checkpoint is `56 files / 536
+  tests`, with typecheck and build passing. Spec review and the original
+  accessibility reviewer both returned final PASS.
+
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
 pinnable Evidence/Run-details surface, complete per-run model selection from
