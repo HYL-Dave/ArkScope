@@ -134,25 +134,40 @@ def _seed(db_path: str) -> datetime:
             "INSERT INTO sa_market_news_tickers (news_row_id, ticker) VALUES (?, ?)",
             [(1, "NVDA"), (1, "SPY"), (2, "NVDA"), (3, "AAPL")],
         )
+        pick_rows = [
+            # PLTR: no canonical/detail AND no PLTR article → unresolved
+            (1, "PLTR", "Palantir", d(30), 0, None, None,
+             ts(hours=1), ts(hours=1), ts(hours=1)),
+            # NVDA: no canonical/detail BUT article a1 matches → resolved
+            (2, "NVDA", "NVIDIA", d(40), 0, None, None,
+             ts(hours=1), ts(hours=1), ts(hours=1)),
+            # MSFT: has detail_report → not a candidate
+            (3, "MSFT", "Microsoft", d(50), 0, None, "existing detail",
+             ts(hours=1), ts(hours=1), ts(hours=1)),
+            # TSLA: stale → excluded
+            (4, "TSLA", "Tesla", d(60), 1, None, None,
+             ts(hours=1), ts(hours=1), ts(hours=1)),
+        ]
+        expanded_pick_rows = []
+        for row in pick_rows:
+            _, symbol, _, picked_date, *_ = row
+            conn.execute(
+                "INSERT OR IGNORE INTO sa_pick_lineages"
+                " (symbol_key, picked_date, created_at) VALUES (?, ?, ?)",
+                (symbol.strip().upper(), picked_date, scs.now_ts()),
+            )
+            lineage_id = conn.execute(
+                "SELECT lineage_id FROM sa_pick_lineages"
+                " WHERE symbol_key=? AND picked_date=?",
+                (symbol.strip().upper(), picked_date),
+            ).fetchone()[0]
+            expanded_pick_rows.append((row[0], lineage_id, *row[1:]))
         conn.executemany(
-            "INSERT INTO sa_alpha_picks (id, symbol, company, picked_date, "
+            "INSERT INTO sa_alpha_picks (id, lineage_id, symbol, company, picked_date, "
             "portfolio_status, is_stale, canonical_article_id, detail_report, "
             "last_seen_snapshot, fetched_at, updated_at) "
-            "VALUES (?, ?, ?, ?, 'current', ?, ?, ?, ?, ?, ?)",
-            [
-                # PLTR: no canonical/detail AND no PLTR article → unresolved
-                (1, "PLTR", "Palantir", d(30), 0, None, None,
-                 ts(hours=1), ts(hours=1), ts(hours=1)),
-                # NVDA: no canonical/detail BUT article a1 matches → resolved
-                (2, "NVDA", "NVIDIA", d(40), 0, None, None,
-                 ts(hours=1), ts(hours=1), ts(hours=1)),
-                # MSFT: has detail_report → not a candidate
-                (3, "MSFT", "Microsoft", d(50), 0, None, "existing detail",
-                 ts(hours=1), ts(hours=1), ts(hours=1)),
-                # TSLA: stale → excluded
-                (4, "TSLA", "Tesla", d(60), 1, None, None,
-                 ts(hours=1), ts(hours=1), ts(hours=1)),
-            ],
+            "VALUES (?, ?, ?, ?, ?, 'current', ?, ?, ?, ?, ?, ?)",
+            expanded_pick_rows,
         )
         conn.commit()
     finally:

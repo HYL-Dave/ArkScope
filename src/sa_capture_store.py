@@ -13,8 +13,8 @@ browser message, and the sidecar/CLI may read concurrently — so in-process
 locks provide zero exclusion here. Every connection therefore self-arms:
 WAL + busy_timeout + PRAGMA foreign_keys=ON (the sa_comment_signals ON DELETE
 CASCADE is load-bearing for comment dedupe), and schema setup is cross-process
-safe (PRAGMA user_version fast-path; first-run DDL is fully idempotent — see
-the precise guarantee in ensure_schema's docstring: it is NOT serialized).
+safe (PRAGMA user_version fast-path; first-run DDL is fully idempotent, while
+versioned rebuilds are serialized and transactional — see ensure_schema).
 
 Type conventions (runbook §1 / SPEC §4.1.4):
   - TIMESTAMPTZ → TEXT, ONE canonical format: UTC ISO-8601 seconds
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 USE_LOCAL_SA_KEY = "use_local_sa"  # profile_settings key for the persisted flip toggle
 
 
@@ -108,8 +108,18 @@ def now_ts() -> str:
 # Ports sql/007 + 014/015 final state: the original UNIQUE(symbol,picked_date[,status])
 # constraints are GONE — identity is the two PARTIAL unique indexes only.
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS sa_pick_lineages (
+    lineage_id   INTEGER PRIMARY KEY,
+    symbol_key   TEXT NOT NULL CHECK(symbol_key <> '' AND symbol_key = UPPER(TRIM(symbol_key))),
+    picked_date  TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    UNIQUE(symbol_key, picked_date)
+);
+
 CREATE TABLE IF NOT EXISTS sa_alpha_picks (
     id                  INTEGER PRIMARY KEY,
+    lineage_id          INTEGER NOT NULL
+                        REFERENCES sa_pick_lineages(lineage_id) ON DELETE RESTRICT,
     symbol              TEXT NOT NULL,
     company             TEXT NOT NULL,
     picked_date         TEXT NOT NULL,             -- 'YYYY-MM-DD'
@@ -139,6 +149,8 @@ CREATE INDEX IF NOT EXISTS idx_sa_picks_symbol ON sa_alpha_picks(symbol);
 CREATE INDEX IF NOT EXISTS idx_sa_picks_snapshot ON sa_alpha_picks(last_seen_snapshot);
 CREATE INDEX IF NOT EXISTS idx_sa_picks_stale ON sa_alpha_picks(is_stale) WHERE is_stale = 1;
 CREATE INDEX IF NOT EXISTS idx_sa_picks_canonical_article ON sa_alpha_picks(canonical_article_id);
+CREATE INDEX IF NOT EXISTS idx_sa_picks_lineage_status
+    ON sa_alpha_picks(lineage_id, portfolio_status, is_stale);
 
 CREATE TABLE IF NOT EXISTS sa_refresh_meta (
     scope            TEXT PRIMARY KEY,             -- 'current' / 'closed'
@@ -166,11 +178,58 @@ CREATE TABLE IF NOT EXISTS sa_articles (
     comments_fetched_at TEXT,
     raw_data            TEXT,                      -- JSON
     fetched_at          TEXT,
-    updated_at          TEXT
+    updated_at          TEXT,
+    list_ticker                TEXT,
+    list_ticker_observed_at    TEXT,
+    detail_ticker              TEXT,
+    detail_ticker_observed_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sa_articles_ticker ON sa_articles(ticker);
 CREATE INDEX IF NOT EXISTS idx_sa_articles_published ON sa_articles(published_date DESC);
 CREATE INDEX IF NOT EXISTS idx_sa_articles_type ON sa_articles(article_type);
+CREATE INDEX IF NOT EXISTS idx_sa_articles_list_ticker ON sa_articles(list_ticker);
+CREATE INDEX IF NOT EXISTS idx_sa_articles_detail_ticker ON sa_articles(detail_ticker);
+
+CREATE TABLE IF NOT EXISTS sa_pick_article_links (
+    link_id             INTEGER PRIMARY KEY,
+    lineage_id          INTEGER NOT NULL
+                        REFERENCES sa_pick_lineages(lineage_id) ON DELETE RESTRICT,
+    article_id          TEXT NOT NULL
+                        REFERENCES sa_articles(article_id) ON DELETE RESTRICT,
+    role                TEXT NOT NULL CHECK(role IN ('entry', 'exit', 'update')),
+    event_anchor_date   TEXT,
+    link_source         TEXT NOT NULL CHECK(link_source IN ('auto', 'user')),
+    evidence_codes      TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(evidence_codes)),
+    supersedes_link_id  INTEGER
+                        REFERENCES sa_pick_article_links(link_id) ON DELETE RESTRICT,
+    linked_at           TEXT NOT NULL,
+    revoked_at          TEXT,
+    CHECK(role = 'update' OR event_anchor_date IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sa_pick_links_active_entry
+    ON sa_pick_article_links(lineage_id)
+    WHERE role = 'entry' AND revoked_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sa_pick_links_active_exit
+    ON sa_pick_article_links(lineage_id, event_anchor_date)
+    WHERE role = 'exit' AND revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_sa_pick_links_event
+    ON sa_pick_article_links(lineage_id, role, event_anchor_date, revoked_at);
+
+CREATE TABLE IF NOT EXISTS sa_pick_article_decisions (
+    decision_id        INTEGER PRIMARY KEY,
+    lineage_id         INTEGER NOT NULL
+                       REFERENCES sa_pick_lineages(lineage_id) ON DELETE RESTRICT,
+    article_id         TEXT NOT NULL
+                       REFERENCES sa_articles(article_id) ON DELETE RESTRICT,
+    role               TEXT NOT NULL CHECK(role IN ('entry', 'exit')),
+    event_anchor_date  TEXT NOT NULL,
+    decision           TEXT NOT NULL CHECK(decision = 'rejected'),
+    reason_code        TEXT NOT NULL,
+    decided_at         TEXT NOT NULL,
+    UNIQUE(lineage_id, role, event_anchor_date, article_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sa_pick_decisions_event
+    ON sa_pick_article_decisions(lineage_id, role, event_anchor_date);
 
 CREATE TABLE IF NOT EXISTS sa_article_comments (
     id                INTEGER PRIMARY KEY,
@@ -288,6 +347,153 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 """
 
 
+_V1_TO_V2_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TABLE sa_pick_lineages (
+        lineage_id   INTEGER PRIMARY KEY,
+        symbol_key   TEXT NOT NULL
+                     CHECK(symbol_key <> '' AND symbol_key = UPPER(TRIM(symbol_key))),
+        picked_date  TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        UNIQUE(symbol_key, picked_date)
+    )
+    """,
+    """
+    INSERT INTO sa_pick_lineages(symbol_key, picked_date, created_at)
+    SELECT UPPER(TRIM(symbol)), picked_date,
+           COALESCE(MIN(updated_at), MIN(fetched_at), MIN(last_seen_snapshot),
+                    strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'))
+    FROM sa_alpha_picks
+    GROUP BY UPPER(TRIM(symbol)), picked_date
+    """,
+    "DROP INDEX IF EXISTS idx_sa_picks_current_unique",
+    "DROP INDEX IF EXISTS idx_sa_picks_closed_unique",
+    "DROP INDEX IF EXISTS idx_sa_picks_status",
+    "DROP INDEX IF EXISTS idx_sa_picks_symbol",
+    "DROP INDEX IF EXISTS idx_sa_picks_snapshot",
+    "DROP INDEX IF EXISTS idx_sa_picks_stale",
+    "DROP INDEX IF EXISTS idx_sa_picks_canonical_article",
+    "ALTER TABLE sa_alpha_picks RENAME TO sa_alpha_picks_v1",
+    """
+    CREATE TABLE sa_alpha_picks (
+        id                   INTEGER PRIMARY KEY,
+        lineage_id           INTEGER NOT NULL
+                             REFERENCES sa_pick_lineages(lineage_id) ON DELETE RESTRICT,
+        symbol               TEXT NOT NULL,
+        company              TEXT NOT NULL,
+        picked_date          TEXT NOT NULL,
+        closed_date          TEXT,
+        portfolio_status     TEXT NOT NULL DEFAULT 'current',
+        is_stale             INTEGER NOT NULL DEFAULT 0,
+        return_pct           REAL,
+        sector               TEXT,
+        sa_rating            TEXT,
+        holding_pct          REAL,
+        detail_report        TEXT,
+        detail_fetched_at    TEXT,
+        raw_data             TEXT,
+        last_seen_snapshot   TEXT,
+        canonical_article_id TEXT,
+        fetched_at           TEXT,
+        updated_at           TEXT
+    )
+    """,
+    """
+    INSERT INTO sa_alpha_picks(
+        id, lineage_id, symbol, company, picked_date, closed_date,
+        portfolio_status, is_stale, return_pct, sector, sa_rating,
+        holding_pct, detail_report, detail_fetched_at, raw_data,
+        last_seen_snapshot, canonical_article_id, fetched_at, updated_at
+    )
+    SELECT p.id, l.lineage_id, p.symbol, p.company, p.picked_date, p.closed_date,
+           p.portfolio_status, p.is_stale, p.return_pct, p.sector, p.sa_rating,
+           p.holding_pct, p.detail_report, p.detail_fetched_at, p.raw_data,
+           p.last_seen_snapshot, p.canonical_article_id, p.fetched_at, p.updated_at
+    FROM sa_alpha_picks_v1 p
+    JOIN sa_pick_lineages l
+      ON l.symbol_key = UPPER(TRIM(p.symbol))
+     AND l.picked_date = p.picked_date
+    """,
+    "DROP TABLE sa_alpha_picks_v1",
+    """
+    CREATE UNIQUE INDEX idx_sa_picks_current_unique
+        ON sa_alpha_picks(symbol, picked_date, portfolio_status)
+        WHERE portfolio_status = 'current'
+    """,
+    """
+    CREATE UNIQUE INDEX idx_sa_picks_closed_unique
+        ON sa_alpha_picks(symbol, picked_date, portfolio_status, closed_date)
+        WHERE portfolio_status = 'closed'
+    """,
+    "CREATE INDEX idx_sa_picks_status ON sa_alpha_picks(portfolio_status)",
+    "CREATE INDEX idx_sa_picks_symbol ON sa_alpha_picks(symbol)",
+    "CREATE INDEX idx_sa_picks_snapshot ON sa_alpha_picks(last_seen_snapshot)",
+    "CREATE INDEX idx_sa_picks_stale ON sa_alpha_picks(is_stale) WHERE is_stale = 1",
+    "CREATE INDEX idx_sa_picks_canonical_article ON sa_alpha_picks(canonical_article_id)",
+    """
+    CREATE INDEX idx_sa_picks_lineage_status
+        ON sa_alpha_picks(lineage_id, portfolio_status, is_stale)
+    """,
+    "ALTER TABLE sa_articles ADD COLUMN list_ticker TEXT",
+    "ALTER TABLE sa_articles ADD COLUMN list_ticker_observed_at TEXT",
+    "ALTER TABLE sa_articles ADD COLUMN detail_ticker TEXT",
+    "ALTER TABLE sa_articles ADD COLUMN detail_ticker_observed_at TEXT",
+    "CREATE INDEX idx_sa_articles_list_ticker ON sa_articles(list_ticker)",
+    "CREATE INDEX idx_sa_articles_detail_ticker ON sa_articles(detail_ticker)",
+    """
+    CREATE TABLE sa_pick_article_links (
+        link_id             INTEGER PRIMARY KEY,
+        lineage_id          INTEGER NOT NULL
+                            REFERENCES sa_pick_lineages(lineage_id) ON DELETE RESTRICT,
+        article_id          TEXT NOT NULL
+                            REFERENCES sa_articles(article_id) ON DELETE RESTRICT,
+        role                TEXT NOT NULL CHECK(role IN ('entry', 'exit', 'update')),
+        event_anchor_date   TEXT,
+        link_source         TEXT NOT NULL CHECK(link_source IN ('auto', 'user')),
+        evidence_codes      TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(evidence_codes)),
+        supersedes_link_id  INTEGER
+                            REFERENCES sa_pick_article_links(link_id) ON DELETE RESTRICT,
+        linked_at           TEXT NOT NULL,
+        revoked_at          TEXT,
+        CHECK(role = 'update' OR event_anchor_date IS NOT NULL)
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX idx_sa_pick_links_active_entry
+        ON sa_pick_article_links(lineage_id)
+        WHERE role = 'entry' AND revoked_at IS NULL
+    """,
+    """
+    CREATE UNIQUE INDEX idx_sa_pick_links_active_exit
+        ON sa_pick_article_links(lineage_id, event_anchor_date)
+        WHERE role = 'exit' AND revoked_at IS NULL
+    """,
+    """
+    CREATE INDEX idx_sa_pick_links_event
+        ON sa_pick_article_links(lineage_id, role, event_anchor_date, revoked_at)
+    """,
+    """
+    CREATE TABLE sa_pick_article_decisions (
+        decision_id        INTEGER PRIMARY KEY,
+        lineage_id         INTEGER NOT NULL
+                           REFERENCES sa_pick_lineages(lineage_id) ON DELETE RESTRICT,
+        article_id         TEXT NOT NULL
+                           REFERENCES sa_articles(article_id) ON DELETE RESTRICT,
+        role               TEXT NOT NULL CHECK(role IN ('entry', 'exit')),
+        event_anchor_date  TEXT NOT NULL,
+        decision           TEXT NOT NULL CHECK(decision = 'rejected'),
+        reason_code        TEXT NOT NULL,
+        decided_at         TEXT NOT NULL,
+        UNIQUE(lineage_id, role, event_anchor_date, article_id)
+    )
+    """,
+    """
+    CREATE INDEX idx_sa_pick_decisions_event
+        ON sa_pick_article_decisions(lineage_id, role, event_anchor_date)
+    """,
+)
+
+
 def connect(db_path: Optional[str] = None, *, read_only: bool = False) -> sqlite3.Connection:
     """Open sa_capture.db with the per-connection discipline EVERY caller needs
     (fresh-per-message host processes get no help from in-process state):
@@ -321,39 +527,96 @@ def connect(db_path: Optional[str] = None, *, read_only: bool = False) -> sqlite
     return conn
 
 
-def ensure_schema(conn: sqlite3.Connection) -> None:
-    """Cross-process-safe, cheap-when-current schema setup.
-
-    Fast path: PRAGMA user_version == SCHEMA_VERSION → return (one pragma read per
-    message — keeps the fresh-process host under the extension's 2s telemetry
-    budget).
-
-    Slow path — PRECISE guarantee (do not overstate): BEGIN IMMEDIATE only
-    serializes the version RE-CHECK; sqlite3's executescript() COMMITS that open
-    transaction before running the script (empirically verified), so the DDL
-    itself executes statement-by-statement OUTSIDE any explicit transaction and
-    two processes MAY interleave it. Safety therefore comes from the DDL being
-    fully IDEMPOTENT (CREATE IF NOT EXISTS / INSERT OR IGNORE / PRAGMA), which the
-    two-real-process race test exercises. ⚠️ A future SCHEMA_VERSION bump with
-    NON-idempotent migration statements must add real cross-process exclusion
-    (flock, like data_scheduler._FileLock) — this function does not provide it."""
-    if conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION:
-        return
+def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
+    """Serialize and atomically migrate one existing v1 capture database."""
     conn.execute("BEGIN IMMEDIATE")
     try:
-        if conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION:
-            conn.execute("COMMIT")
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version == SCHEMA_VERSION:
+            conn.commit()
             return
-        conn.executescript(_SCHEMA)  # executescript implicitly commits the txn above
-        conn.execute("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-                     (SCHEMA_VERSION, now_ts()))
-        conn.execute(f"PRAGMA user_version = {int(SCHEMA_VERSION)}")
+        if version != 1:
+            raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+        if conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='sa_pick_lineages'"
+        ).fetchone() is not None:
+            raise RuntimeError(
+                "sa_capture schema marker mismatch: v1 marker with v2 artifacts"
+            )
+
+        expected_pick_count = int(
+            conn.execute("SELECT COUNT(*) FROM sa_alpha_picks").fetchone()[0]
+        )
+        for statement in _V1_TO_V2_STATEMENTS:
+            conn.execute(statement)
+
+        actual_pick_count = int(
+            conn.execute("SELECT COUNT(*) FROM sa_alpha_picks").fetchone()[0]
+        )
+        null_lineage_count = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM sa_alpha_picks WHERE lineage_id IS NULL"
+            ).fetchone()[0]
+        )
+        if actual_pick_count != expected_pick_count or null_lineage_count:
+            raise RuntimeError(
+                "sa_capture v1-to-v2 migration did not preserve every pick lineage"
+            )
+
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+            (SCHEMA_VERSION, now_ts()),
+        )
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
     except Exception:
-        try:
-            conn.execute("ROLLBACK")
-        except sqlite3.OperationalError:
-            pass
+        conn.rollback()
+        raise
+
+
+def ensure_schema(conn: sqlite3.Connection) -> None:
+    """Ensure a fresh v2 schema or migrate v1 under the correct lock boundary.
+
+    Current databases take one cheap ``PRAGMA user_version`` fast path. Fresh
+    version-0 creation retains the established idempotent ``executescript``
+    guarantee: its implicit commit means concurrent creators may interleave, so
+    every statement in ``_SCHEMA`` remains idempotent. The non-idempotent v1-to-v2
+    rebuild is different: every statement, marker update, and preservation check
+    runs inside one ``BEGIN IMMEDIATE`` transaction with a version re-check, so
+    two native-host processes cannot interleave the migration.
+    """
+    version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if version == SCHEMA_VERSION:
+        return
+    if version == 1:
+        _migrate_v1_to_v2(conn)
+        return
+    if version != 0:
+        raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version == SCHEMA_VERSION:
+            conn.commit()
+            return
+        if version == 1:
+            conn.commit()
+            _migrate_v1_to_v2(conn)
+            return
+        if version != 0:
+            raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+        conn.executescript(_SCHEMA)
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+            (SCHEMA_VERSION, now_ts()),
+        )
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        conn.commit()
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
         raise
 
 

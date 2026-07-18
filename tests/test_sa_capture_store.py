@@ -91,10 +91,20 @@ def test_concurrent_schema_creation_two_processes(tmp_path):
 # --- identity model (partial unique indexes, ports sql/014+015 final state) ------
 
 def _pick(conn, symbol, status, picked="2026-01-01", closed=None, pick_id=None):
+    symbol_key = symbol.strip().upper()
     conn.execute(
-        "INSERT INTO sa_alpha_picks (id, symbol, company, picked_date, closed_date, "
-        "portfolio_status) VALUES (?, ?, ?, ?, ?, ?)",
-        (pick_id, symbol, symbol + " Inc", picked, closed, status))
+        "INSERT OR IGNORE INTO sa_pick_lineages(symbol_key, picked_date, created_at) "
+        "VALUES (?, ?, ?)",
+        (symbol_key, picked, scs.now_ts()),
+    )
+    lineage_id = conn.execute(
+        "SELECT lineage_id FROM sa_pick_lineages WHERE symbol_key=? AND picked_date=?",
+        (symbol_key, picked),
+    ).fetchone()[0]
+    conn.execute(
+        "INSERT INTO sa_alpha_picks (id, lineage_id, symbol, company, picked_date, "
+        "closed_date, portfolio_status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (pick_id, lineage_id, symbol, symbol + " Inc", picked, closed, status))
 
 
 def test_current_identity_rejects_duplicates(db):
