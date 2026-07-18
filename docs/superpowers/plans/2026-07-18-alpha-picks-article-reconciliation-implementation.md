@@ -8,12 +8,15 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CORE IMPLEMENTED; LIVE-GATE ADDENDUM REVIEW PENDING. Round 2
+> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM REVISED FOR WRITTEN
+> REVIEW. Round 2
 > cleared the original `+78/-0` plan. Implementation plus live parser,
 > body-settle, and English-copy corrections reached `18fcfb4` at exact focused
 > `246` / canonical collect `4497`. The live gate then disproved the historical
-> comment-gap retry assumption. Task 8 is a bounded `+8/-0` RED-first addendum;
-> it blocks merge until written review and implementation review are GREEN.
+> comment-gap retry assumption. The checkpoint-only draft was then rejected
+> because it could not recover post-enable middle intervals. Task 8 is now an
+> exact `+16/-0` RED-first continuity addendum; it blocks merge until written
+> review and implementation review are GREEN.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
@@ -31,9 +34,11 @@ review queue. The browser extension captures explicit list/detail ticker facts,
 commits article data before a separate bounded reconciliation pass, and renders
 the review queue in its popup. The two legacy nearest/same-ticker writers retire
 in the same product change, so no dual-writer window exists. A nullable provider
-comment-count checkpoint records the last usable bounded scan; Quick compares
-fresh explicit counts to that checkpoint, while Full/Backfill retain bounded
-newest-first TTL work.
+comment-count checkpoint records the last usable bounded scan. A frozen
+pre-upsert comment-row watermark distinguishes recoverable post-enable
+continuity gaps from waived historical deficits: Quick may raise or evidence-
+clear pending, Full parks after two usable misses without terminalizing, and
+Backfill alone may stop chasing a gap after explicit stable-bottom evidence.
 
 **Tech Stack:** Python 3.11, SQLite/WAL, pytest, JavaScript MV3/WebExtension,
 Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
@@ -109,8 +114,12 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
     and ArkScope's cumulative deduplicated inventory are separate facts. Comment
     work is scheduled from an explicit provider-count observation versus the
     last usable-scan checkpoint, never from provider count minus inventory.
-    Quick has no fixed age cutoff; Full/Backfill retain bounded newest-first TTL
-    work without promising lifetime completeness.
+    A usable zero-overlap count-change scan with pre-existing comments freezes
+    the maximum pre-upsert comment row ID. Quick may raise or clear pending;
+    Full parks after two usable misses and has no terminal authority; Backfill
+    alone may terminalize after five stable-bottom rounds. Unusable scans cannot
+    mutate recovery state. No mode promises lifetime completeness or invents a
+    fixed age cutoff.
 
 ---
 
@@ -184,10 +193,21 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
   focused nodes without removing one: current-portfolio parser `+3`, article
   body/settle behavior `+3`, and English production-copy ratchet `+1`. At
   `18fcfb4`, focused is `246` and full collection is `4497`.
-- Task 8 adds exactly `+8/-0` named nodes. Final reviewed targets become focused
-  `254`, canonical collection `4505`, and behavior-base delta `+93/-0` from
-  `848ffd4`. Any different node delta is a stop condition requiring an exact
-  node-ID ledger.
+- Task 8 adds exactly `+16/-0` named nodes:
+
+  | Existing test file | Added nodes |
+  |---|---:|
+  | `tests/test_sa_article_reconciliation_schema.py` | 1 |
+  | `tests/test_sa_capture_backend.py` | 9 |
+  | `tests/test_sa_extension_article_identity.py` | 1 |
+  | `tests/test_sa_tools.py` | 2 |
+  | `tests/test_sa_reconciliation_native_host.py` | 1 |
+  | `tests/test_sa_extension_reconciliation_flow.py` | 2 |
+  | **Task 8 total** | **16** |
+
+  Final reviewed targets become focused `262`, canonical collection `4513`,
+  and behavior-base delta `+101/-0` from `848ffd4`. Any different node delta is
+  a stop condition requiring an exact node-ID ledger.
 
 ## File Map
 
@@ -215,16 +235,17 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
 **Modify**
 
 - `src/sa_capture_store.py` - schema v2, transactional v1 migration, lineage
-  backfill, provider evidence columns, comment observation/checkpoint columns,
-  and link/decision constraints.
+  backfill, provider evidence columns, comment observation/checkpoint and
+  continuity-recovery columns, and link/decision constraints.
 - `src/tools/backends/sa_capture_backend.py` - resolve lineage during pick
-  refresh, persist source-specific article metadata and comment checkpoints,
-  delegate reconciliation, and remove both legacy mutation paths.
+  refresh, persist source-specific article metadata, pre-upsert comment-row
+  watermarks, checkpoints, and recovery transitions, delegate reconciliation,
+  and remove both legacy mutation paths.
 - `src/tools/backends/db_backend.py` - retired-PG compatibility stubs for the
   new DAL method surface; no PG access.
 - `src/tools/data_access.py` - capture-first pick/article/body orchestration,
-  scan-scoped normal cache work, checkpoint-based comment scheduling, and
-  additive reconciliation/review DTOs.
+  scan-scoped normal cache work, checkpoint/recovery-state comment scheduling,
+  and additive reconciliation/review DTOs.
 - `src/sa_native_host.py` - additive queue/event-resolve/accept/reject actions,
   post-pick-capture reconciliation, detail ticker and provider-comment-count
   propagation, and read-only compatibility audit action.
@@ -234,8 +255,8 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
 - `extensions/sa_alpha_picks/scrape_detail.js` - independent security-header
   ticker capture.
 - `extensions/sa_alpha_picks/background.js` - ordered helper injection,
-  bounded enrichment, checkpoint-aware comment refresh accounting,
-  event-scoped manual flow, and review actions.
+  bounded enrichment, checkpoint-aware comment refresh accounting, stable-
+  bottom scan evidence, event-scoped manual flow, and review actions.
 - `extensions/sa_alpha_picks/popup.html` / `popup.js` - default review queue and
   collapsed Advanced URL escape hatch.
 - `tests/test_sa_capture_store.py`, `tests/test_sa_capture_backend.py`,
@@ -1883,7 +1904,7 @@ git commit -m "feat: add Alpha Picks article review queue"
 
 ---
 
-### Task 8: Live-Gate Recent-Comment Checkpoint Correction
+### Task 8: Live-Gate Comment Continuity Recovery
 
 **Files:**
 - Modify: `src/sa_capture_store.py`
@@ -1903,21 +1924,23 @@ git commit -m "feat: add Alpha Picks article review queue"
 **Interfaces:**
 - Consumes: section 3.5 of the design, the existing `comments_count`,
   `comments_fetched_at`, deduplicated comment store, Quick/Full/Backfill mode
-  bounds, and the list/detail native-host path.
+  bounds, insert-only comment rows, and the list/detail native-host path.
 - Produces: explicit count-observation provenance, a nullable provider-count
-  checkpoint, atomic usable-scan updates, and bounded scheduling that never
-  treats an inaccessible historical inventory difference as pending work.
+  checkpoint, a frozen pre-upsert row-ID watermark, persistent
+  repaired/pending/terminal state, bounded Full parking, Backfill-only terminal
+  evidence, and atomic usable-scan updates. Scheduling never treats an
+  inaccessible historical inventory difference as pending work.
 - Does not add a fixed age cutoff, delete old comments, change capture cadence,
   promise lifetime completeness, or alter the web app.
 
-- [ ] **Step 1: Write three failing schema/backend checkpoint tests**
+- [ ] **Step 1: Write ten failing schema/backend continuity tests**
 
 Add exactly these nodes.
 
 In `tests/test_sa_article_reconciliation_schema.py`:
 
 ```python
-def test_v1_migration_seeds_comment_scan_checkpoint_without_claiming_completeness(
+def test_v1_migration_seeds_comment_checkpoint_without_recovery_flag(
     tmp_path,
 ):
     path = tmp_path / "comments-v1.db"
@@ -1940,18 +1963,37 @@ def test_v1_migration_seeds_comment_scan_checkpoint_without_claiming_completenes
         row["article_id"]: dict(row)
         for row in conn.execute(
             "SELECT article_id, comments_count_observed_at, "
-            "provider_comments_count_at_last_scan FROM sa_articles"
+            "provider_comments_count_at_last_scan, comment_recovery_state, "
+            "comment_recovery_started_at, "
+            "comment_recovery_baseline_max_row_id, "
+            "comment_recovery_full_miss_count, comment_recovery_parked_at, "
+            "comment_recovery_last_terminal_at, "
+            "comment_recovery_last_terminal_reason FROM sa_articles"
         )
     }
     assert rows["legacy-entry"] == {
         "article_id": "legacy-entry",
         "comments_count_observed_at": None,
         "provider_comments_count_at_last_scan": 41,
+        "comment_recovery_state": "repaired",
+        "comment_recovery_started_at": None,
+        "comment_recovery_baseline_max_row_id": None,
+        "comment_recovery_full_miss_count": 0,
+        "comment_recovery_parked_at": None,
+        "comment_recovery_last_terminal_at": None,
+        "comment_recovery_last_terminal_reason": None,
     }
     assert rows["never-scanned"] == {
         "article_id": "never-scanned",
         "comments_count_observed_at": None,
         "provider_comments_count_at_last_scan": None,
+        "comment_recovery_state": "repaired",
+        "comment_recovery_started_at": None,
+        "comment_recovery_baseline_max_row_id": None,
+        "comment_recovery_full_miss_count": 0,
+        "comment_recovery_parked_at": None,
+        "comment_recovery_last_terminal_at": None,
+        "comment_recovery_last_terminal_reason": None,
     }
     assert conn.execute("SELECT COUNT(*) FROM sa_articles").fetchone()[0] == 2
     conn.close()
@@ -2000,19 +2042,244 @@ def test_body_capture_commits_when_comment_scan_is_unusable(backend):
     assert article["provider_comments_count_at_last_scan"] is None
 ```
 
+Add a non-test helper beside `_comments()`:
+
+```python
+def _comment(comment_id: str) -> dict:
+    return {
+        "comment_id": comment_id,
+        "parent_comment_id": None,
+        "commenter": f"user-{comment_id}",
+        "comment_text": f"text-{comment_id}",
+        "upvotes": 0,
+        "comment_date": "2026-07-19T00:00:00Z",
+    }
+```
+
+Add these seven backend nodes, for ten new storage/schema nodes total:
+
+```python
+def test_first_comment_scan_establishes_baseline_without_pending_recovery(backend):
+    backend.upsert_sa_articles_meta([_article("first")])
+    result = backend.update_article_comments(
+        "first", [_comment("first-c1")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    row = backend.query_sa_articles()[0]
+    assert result["comment_scan_usable"] is True
+    assert row["comment_recovery_state"] == "repaired"
+    assert row["comment_recovery_baseline_max_row_id"] is None
+
+
+def test_recovery_watermark_is_pre_upsert_and_new_generation_cannot_self_repair(backend):
+    backend.upsert_sa_articles_meta([_article("gap")])
+    backend.update_article_comments(
+        "gap", [_comment("old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    raised = backend.update_article_comments(
+        "gap", [_comment("new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    with backend._sa_read() as conn:
+        ids = {
+            row["comment_id"]: row["id"]
+            for row in conn.execute(
+                "SELECT id, comment_id FROM sa_article_comments "
+                "WHERE article_id='gap'"
+            )
+        }
+    row = next(a for a in backend.query_sa_articles() if a["article_id"] == "gap")
+    assert raised["comment_recovery_state"] == "pending"
+    assert row["comment_recovery_baseline_max_row_id"] == ids["old"]
+    assert ids["new"] > row["comment_recovery_baseline_max_row_id"]
+
+    repeated = backend.update_article_comments(
+        "gap", [_comment("new")],
+        provider_comments_count=2, comment_scan_mode="full",
+    )
+    assert repeated["comment_recovery_state"] == "pending"
+    assert repeated["comment_recovery_baseline_overlap_count"] == 0
+
+
+def test_any_mode_overlap_repairs_pending_recovery(backend):
+    for mode in ("quick", "full", "backfill"):
+        article_id = f"repair-{mode}"
+        backend.upsert_sa_articles_meta([_article(article_id)])
+        backend.update_article_comments(
+            article_id, [_comment(f"{mode}-old")],
+            provider_comments_count=1, comment_scan_mode="quick",
+        )
+        backend.update_article_comments(
+            article_id, [_comment(f"{mode}-new")],
+            provider_comments_count=2, comment_scan_mode="quick",
+        )
+        if mode == "quick":
+            for _ in range(2):
+                backend.update_article_comments(
+                    article_id, [_comment(f"{mode}-new")],
+                    provider_comments_count=2, comment_scan_mode="full",
+                )
+        repaired = backend.update_article_comments(
+            article_id, [_comment(f"{mode}-new"), _comment(f"{mode}-old")],
+            provider_comments_count=2, comment_scan_mode=mode,
+        )
+        assert repaired["comment_recovery_state"] == "repaired"
+        assert repaired["comment_recovery_baseline_overlap_count"] == 1
+        assert repaired["comment_recovery_parked"] is False
+
+
+def test_unusable_scan_freezes_comment_recovery_state(backend):
+    backend.upsert_sa_articles_meta([_article("frozen")])
+    backend.update_article_comments(
+        "frozen", [_comment("frozen-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "frozen", [_comment("frozen-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    before = next(a for a in backend.query_sa_articles() if a["article_id"] == "frozen")
+    result = backend.update_article_comments(
+        "frozen", [], provider_comments_count=3,
+        comment_scan_mode="backfill", comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    after = next(a for a in backend.query_sa_articles() if a["article_id"] == "frozen")
+    assert result["comment_scan_usable"] is False
+    for key in (
+        "comments_fetched_at", "provider_comments_count_at_last_scan",
+        "comment_recovery_state", "comment_recovery_started_at",
+        "comment_recovery_baseline_max_row_id",
+        "comment_recovery_full_miss_count", "comment_recovery_parked_at",
+        "comment_recovery_last_terminal_at",
+        "comment_recovery_last_terminal_reason",
+    ):
+        assert after[key] == before[key]
+
+
+def test_two_usable_full_misses_park_without_terminalizing(backend):
+    backend.upsert_sa_articles_meta([_article("park")])
+    backend.update_article_comments(
+        "park", [_comment("park-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "park", [_comment("park-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    first = backend.update_article_comments(
+        "park", [_comment("park-new")],
+        provider_comments_count=2, comment_scan_mode="full",
+    )
+    second = backend.update_article_comments(
+        "park", [_comment("park-new")],
+        provider_comments_count=2, comment_scan_mode="full",
+    )
+    assert first["comment_recovery_full_miss_count"] == 1
+    assert first["comment_recovery_parked"] is False
+    assert second["comment_recovery_full_miss_count"] == 2
+    assert second["comment_recovery_parked"] is True
+    assert second["comment_recovery_state"] == "pending"
+
+    quick = backend.update_article_comments(
+        "park", [_comment("park-new"), _comment("park-latest")],
+        provider_comments_count=3, comment_scan_mode="quick",
+    )
+    assert quick["net_new_comments"] == 1
+    assert quick["comment_recovery_state"] == "pending"
+    assert quick["comment_recovery_full_miss_count"] == 2
+    assert quick["comment_recovery_parked"] is True
+
+
+def test_backfill_terminal_requires_five_stable_bottom_rounds(backend):
+    backend.upsert_sa_articles_meta([_article("terminal")])
+    backend.update_article_comments(
+        "terminal", [_comment("terminal-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "terminal", [_comment("terminal-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    for reason, rounds in (("timeout", 5), ("stable_bottom", 4)):
+        result = backend.update_article_comments(
+            "terminal", [_comment("terminal-new")],
+            provider_comments_count=2, comment_scan_mode="backfill",
+            comment_scan_stop_reason=reason,
+            comment_scan_stable_bottom_rounds=rounds,
+        )
+        assert result["comment_recovery_state"] == "pending"
+    result = backend.update_article_comments(
+        "terminal", [_comment("terminal-new")],
+        provider_comments_count=2, comment_scan_mode="backfill",
+        comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    assert result["comment_recovery_state"] == "unreachable_terminal"
+    assert result["comment_recovery_last_terminal_reason"] == "provider_bottom_unbridged"
+
+
+def test_terminal_reanchors_future_epoch_and_preserves_audit(backend):
+    backend.upsert_sa_articles_meta([_article("epoch")])
+    backend.update_article_comments(
+        "epoch", [_comment("epoch-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "epoch", [_comment("epoch-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    terminal = backend.update_article_comments(
+        "epoch", [_comment("epoch-new")],
+        provider_comments_count=2, comment_scan_mode="backfill",
+        comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    terminal_at = terminal["comment_recovery_last_terminal_at"]
+    incidental = backend.update_article_comments(
+        "epoch", [_comment("epoch-old"), _comment("epoch-new")],
+        provider_comments_count=2, comment_scan_mode="backfill",
+    )
+    assert incidental["comment_recovery_state"] == "unreachable_terminal"
+    assert incidental["comment_recovery_last_terminal_at"] == terminal_at
+
+    current = backend.update_article_comments(
+        "epoch", [_comment("epoch-new"), _comment("epoch-latest")],
+        provider_comments_count=3, comment_scan_mode="quick",
+    )
+    assert current["comment_recovery_state"] == "repaired"
+    assert current["comment_recovery_last_terminal_at"] == terminal_at
+    assert current["comment_recovery_last_terminal_reason"] == "provider_bottom_unbridged"
+```
+
+The watermark test is load-bearing: `_fetch_existing_article_comments()` must
+select `id`, and the watermark must be computed from that pre-upsert list. A
+post-upsert `MAX(id)` implementation is forbidden even if every other assertion
+passes.
+
 - [ ] **Step 2: Run the schema/backend tests and prove RED**
 
 ```bash
 pytest -q \
-  tests/test_sa_article_reconciliation_schema.py::test_v1_migration_seeds_comment_scan_checkpoint_without_claiming_completeness \
+  tests/test_sa_article_reconciliation_schema.py::test_v1_migration_seeds_comment_checkpoint_without_recovery_flag \
   tests/test_sa_capture_backend.py::test_comment_scan_checkpoint_advances_only_on_usable_observation \
-  tests/test_sa_capture_backend.py::test_body_capture_commits_when_comment_scan_is_unusable
+  tests/test_sa_capture_backend.py::test_body_capture_commits_when_comment_scan_is_unusable \
+  tests/test_sa_capture_backend.py::test_first_comment_scan_establishes_baseline_without_pending_recovery \
+  tests/test_sa_capture_backend.py::test_recovery_watermark_is_pre_upsert_and_new_generation_cannot_self_repair \
+  tests/test_sa_capture_backend.py::test_any_mode_overlap_repairs_pending_recovery \
+  tests/test_sa_capture_backend.py::test_unusable_scan_freezes_comment_recovery_state \
+  tests/test_sa_capture_backend.py::test_two_usable_full_misses_park_without_terminalizing \
+  tests/test_sa_capture_backend.py::test_backfill_terminal_requires_five_stable_bottom_rounds \
+  tests/test_sa_capture_backend.py::test_terminal_reanchors_future_epoch_and_preserves_audit
 ```
 
-Expected: all three fail because the two columns and keyword argument do not
-exist; no failure may come from malformed fixture SQL.
+Expected: all ten fail because the additive columns, scan-evidence keyword
+arguments, and transition logic do not exist. The critical watermark test must
+fail before it can mistake newly inserted rows for baseline; no failure may come
+from malformed fixture SQL or helper data.
 
-- [ ] **Step 3: Extend not-yet-shipped schema v2 and implement atomic checkpoints**
+- [ ] **Step 3: Extend not-yet-shipped schema v2**
 
 Keep `SCHEMA_VERSION = 2`: production is still v1, and every pre-addendum v2
 file is a disposable live-gate artifact that must be recreated. Add to fresh
@@ -2022,7 +2289,19 @@ file is a disposable live-gate artifact that must be recreated. Add to fresh
 comments_count_observed_at           TEXT,
 provider_comments_count_at_last_scan INTEGER
     CHECK(provider_comments_count_at_last_scan IS NULL
-          OR provider_comments_count_at_last_scan >= 0)
+          OR provider_comments_count_at_last_scan >= 0),
+comment_recovery_state               TEXT NOT NULL DEFAULT 'repaired'
+    CHECK(comment_recovery_state IN
+          ('repaired', 'pending', 'unreachable_terminal')),
+comment_recovery_started_at          TEXT,
+comment_recovery_baseline_max_row_id INTEGER
+    CHECK(comment_recovery_baseline_max_row_id IS NULL
+          OR comment_recovery_baseline_max_row_id >= 0),
+comment_recovery_full_miss_count     INTEGER NOT NULL DEFAULT 0
+    CHECK(comment_recovery_full_miss_count >= 0),
+comment_recovery_parked_at           TEXT,
+comment_recovery_last_terminal_at    TEXT,
+comment_recovery_last_terminal_reason TEXT
 ```
 
 ```sql
@@ -2030,10 +2309,28 @@ ALTER TABLE sa_articles ADD COLUMN comments_count_observed_at TEXT;
 ALTER TABLE sa_articles ADD COLUMN provider_comments_count_at_last_scan INTEGER
   CHECK(provider_comments_count_at_last_scan IS NULL
         OR provider_comments_count_at_last_scan >= 0);
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_state TEXT NOT NULL
+  DEFAULT 'repaired' CHECK(comment_recovery_state IN
+    ('repaired', 'pending', 'unreachable_terminal'));
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_started_at TEXT;
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_baseline_max_row_id INTEGER
+  CHECK(comment_recovery_baseline_max_row_id IS NULL
+        OR comment_recovery_baseline_max_row_id >= 0);
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_full_miss_count INTEGER
+  NOT NULL DEFAULT 0 CHECK(comment_recovery_full_miss_count >= 0);
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_parked_at TEXT;
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_last_terminal_at TEXT;
+ALTER TABLE sa_articles ADD COLUMN comment_recovery_last_terminal_reason TEXT;
 UPDATE sa_articles
 SET provider_comments_count_at_last_scan = COALESCE(comments_count, 0)
 WHERE comments_fetched_at IS NOT NULL;
 ```
+
+Do not seed `pending`, a row-ID watermark, miss count, parked timestamp, or
+terminal audit. The migration structurally waives every pre-v2 inventory
+difference while preserving all article/comment rows. Extend the existing v2-
+artifact mismatch guard: a file that advertises v1 but already contains any new
+continuity column must fail closed instead of rerunning the rebuild.
 
 The list-metadata upsert writes `comments_count` only when
 `comments_count_observed_at` is non-null; unknown input preserves the prior
@@ -2050,6 +2347,8 @@ comments_count_observed_at = COALESCE(
   sa_articles.comments_count_observed_at
 )
 ```
+
+- [ ] **Step 4: Implement the atomic backend transition owner**
 
 Add one backend normalization seam and use it in both save methods:
 
@@ -2068,27 +2367,123 @@ def _comment_scan_usable(prepared_count: int, provider_count: int | None) -> boo
     return prepared_count > 0 or provider_count == 0
 ```
 
+Normalize scan evidence through allowlists:
+
+```python
+_COMMENT_SCAN_MODES = frozenset({"quick", "full", "backfill"})
+_COMMENT_TERMINAL_STOP_REASON = "stable_bottom"
+_COMMENT_TERMINAL_BOTTOM_ROUNDS = 5
+_COMMENT_FULL_MISS_LIMIT = 2
+
+
+def _comment_scan_mode(value) -> str:
+    return value if value in _COMMENT_SCAN_MODES else "quick"
+
+
+def _stable_bottom_rounds(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return max(value, 0)
+```
+
 Evolve signatures in `sa_capture_backend.py`, `db_backend.py`, and DAL:
 
 ```python
 def save_article_with_comments(
     self, article_id, body_markdown, comments, *,
     detail_ticker=None, detail_ticker_observed_at=None,
-    provider_comments_count=None,
+    provider_comments_count=None, comment_scan_mode="quick",
+    comment_scan_stop_reason=None, comment_scan_stable_bottom_rounds=0,
 ) -> dict: ...
 
 def update_article_comments(
-    self, article_id, comments, *, provider_comments_count=None
+    self, article_id, comments, *, provider_comments_count=None,
+    comment_scan_mode="quick", comment_scan_stop_reason=None,
+    comment_scan_stable_bottom_rounds=0,
 ) -> dict: ...
 ```
 
-Inside the existing `BEGIN IMMEDIATE`, upsert comments first. Only a usable scan
-updates `comments_fetched_at`; only a usable scan with a non-null normalized
-provider count updates the checkpoint. Return `comment_scan_usable` with the
-existing counts. `save_article_with_comments()` always commits a valid body and
-detail ticker even when its comment leg is unusable.
+Refactor `_fetch_existing_article_comments()` to select `id` as well as the
+existing identity/content fields. Call it exactly once after `BEGIN IMMEDIATE`
+and before preparing or inserting comments. Refactor `_upsert_article_comments`
+so the caller supplies that preloaded list and receives the normalized prepared
+comments; it must not perform a second read that can blur the generation
+boundary.
 
-- [ ] **Step 4: Run GREEN, compatibility shapes, and commit the storage half**
+Inside the transaction, derive these sets before upsert:
+
+```python
+existing_by_comment_id = {
+    row["comment_id"]: row for row in existing_rows if row.get("comment_id")
+}
+prepared_ids = {
+    row["comment_id"] for row in prepared_comments if row.get("comment_id")
+}
+existing_overlap_ids = prepared_ids & existing_by_comment_id.keys()
+pre_upsert_max_row_id = max(
+    (int(row["id"]) for row in existing_rows), default=None
+)
+```
+
+For a pending row, baseline overlap is restricted to rows at or below the
+frozen watermark:
+
+```python
+baseline_overlap_ids = {
+    comment_id for comment_id in existing_overlap_ids
+    if int(existing_by_comment_id[comment_id]["id"])
+       <= int(article["comment_recovery_baseline_max_row_id"])
+}
+```
+
+Apply this transition table only when `_comment_scan_usable(...)` is true:
+
+| Current fact | Evidence | Transition |
+|---|---|---|
+| any | explicit provider zero | current state `repaired`; clear pending watermark/miss/park; keep terminal audit |
+| `pending` | `baseline_overlap_ids` nonempty | `repaired`; clear pending watermark/miss/park |
+| `pending` | usable Quick miss | remain pending; miss counter unchanged |
+| `pending` | usable Full miss #1 | remain pending; miss count `1` |
+| `pending` | usable Full miss #2 or later | remain pending; saturate miss count at `2`; set/preserve parked timestamp |
+| `pending` | usable Backfill miss without terminal evidence | remain pending/parked unchanged |
+| `pending` | Backfill + `stable_bottom` + rounds >= `5` | `unreachable_terminal`; retain terminal audit; clear pending watermark/miss/park and re-anchor |
+| `repaired` or `unreachable_terminal` | explicit count changed, prior rows exist, zero existing overlap | raise `pending`, freezing `pre_upsert_max_row_id`; a Full raising scan starts miss count at `1`; a qualifying Backfill may terminalize in the same transaction |
+| `repaired` or `unreachable_terminal` | first scan or explicit count changed and scan overlaps prior rows | current epoch `repaired`; terminal audit remains |
+| `unreachable_terminal` | provider count unchanged, with or without overlap | remain terminal; insert any newly visible comments but do not relabel the prior stop decision |
+
+If a pending epoch receives another count change, its original watermark and
+start timestamp stay frozen. The current scan may repair from overlap but may
+not re-anchor a miss. Invalid/unknown mode is normalized to Quick and therefore
+can neither increment Full misses nor terminalize.
+
+Only a usable scan updates `comments_fetched_at`; only a usable scan with a
+non-null normalized provider count updates the checkpoint. An unusable scan
+may still commit a valid article body/detail ticker, but it cannot raise, clear,
+park, terminalize, re-anchor, or alter any prior recovery field.
+
+Return only numeric/sanitized diagnostics, never comment identities:
+
+```python
+{
+    "comment_scan_usable": usable,
+    "comment_scan_existing_overlap_count": len(existing_overlap_ids),
+    "comment_scan_baseline_overlap_count": len(baseline_overlap_ids),
+    "comment_scan_identity_overlap_rate": (
+        len(existing_overlap_ids) / len(prepared_ids) if prepared_ids else 0.0
+    ),
+    "comment_recovery_state": state,
+    "comment_recovery_full_miss_count": full_misses,
+    "comment_recovery_parked": parked_at is not None,
+    "comment_recovery_last_terminal_at": last_terminal_at,
+    "comment_recovery_last_terminal_reason": last_terminal_reason,
+}
+```
+
+Log a sanitized warning when a previously overlapping article abruptly yields
+zero identity overlap; this is a parser-identity diagnostic only and cannot
+change the transition table.
+
+- [ ] **Step 5: Run GREEN, compatibility shapes, and commit the storage half**
 
 ```bash
 pytest -q \
@@ -2098,21 +2493,24 @@ pytest -q \
 git add src/sa_capture_store.py src/tools/backends/sa_capture_backend.py \
   src/tools/backends/db_backend.py tests/test_sa_article_reconciliation_schema.py \
   tests/test_sa_capture_backend.py tests/test_db_backend_retired_pg_sa.py
-git commit -m "fix: checkpoint usable Alpha Picks comment scans"
+git commit -m "fix: track Alpha Picks comment continuity"
 ```
 
-Expected: all selected tests PASS; read-shape key sets include both additive
-fields; schema remains version `2`; no article/comment row is removed.
+Expected: all selected tests PASS; read-shape key sets include every additive
+field; schema remains version `2`; no article/comment row is removed; the
+watermark test proves rows inserted by the raising scan cannot repair
+themselves.
 
-- [ ] **Step 5: Write five failing parser/scheduler/transport tests**
+- [ ] **Step 6: Write six failing parser/scheduler/transport tests**
 
 Add exactly these nodes:
 
 1. `tests/test_sa_extension_article_identity.py::test_comment_count_observation_distinguishes_zero_from_unknown`
 2. `tests/test_sa_tools.py::TestDataAccessArticleMeta::test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap`
-3. `tests/test_sa_tools.py::TestDataAccessArticleMeta::test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap`
-4. `tests/test_sa_reconciliation_native_host.py::test_save_comments_only_forwards_provider_checkpoint_and_usable_state`
+3. `tests/test_sa_tools.py::TestDataAccessArticleMeta::test_full_and_backfill_prioritize_recovery_state_with_park_boundary`
+4. `tests/test_sa_reconciliation_native_host.py::test_save_comments_only_forwards_recovery_scan_evidence`
 5. `tests/test_sa_extension_reconciliation_flow.py::test_comment_refresh_counts_only_usable_checkpointed_scan`
+6. `tests/test_sa_extension_reconciliation_flow.py::test_comment_scroll_reports_stable_bottom_evidence`
 
 The parser node is:
 
@@ -2133,10 +2531,10 @@ def test_comment_count_observation_distinguishes_zero_from_unknown(tmp_path):
     explicit_zero = by_id["10"]
     unknown = by_id["11"]
 
-assert explicit_zero["comments_count"] == 0
-assert explicit_zero["comments_count_observed_at"].endswith("Z")
-assert unknown["comments_count"] == 0
-assert unknown["comments_count_observed_at"] is None
+    assert explicit_zero["comments_count"] == 0
+    assert explicit_zero["comments_count_observed_at"].endswith("Z")
+    assert unknown["comments_count"] == 0
+    assert unknown["comments_count_observed_at"] is None
 ```
 
 Strengthen the existing BTSG fixture node to require its explicit `265` count
@@ -2145,18 +2543,20 @@ has an observation timestamp. Strengthen
 timestamp may update unrelated metadata but must preserve the prior provider
 count and count-observation timestamp.
 
-The Quick node table-drives four rows in one pytest node:
+The Quick node table-drives six rows in one pytest node:
 
 ```python
 def test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap(self):
     cases = [
-        # provider, checkpoint, inventory, observed, scheduled
-        (983, 983, 592, True, False),
-        (984, 983, 592, True, True),
-        (982, 983, 592, True, True),
-        (983, 982, 592, False, False),
+        # provider, checkpoint, inventory, observed, state, parked, scheduled
+        (983, 983, 592, True, "repaired", None, False),
+        (984, 983, 592, True, "repaired", None, True),
+        (982, 983, 592, True, "repaired", None, True),
+        (0, None, 0, True, "repaired", None, False),
+        (983, 982, 592, False, "repaired", None, False),
+        (984, 983, 592, True, "pending", "2026-07-19T00:00:00Z", True),
     ]
-    for provider, checkpoint, inventory, observed, scheduled in cases:
+    for provider, checkpoint, inventory, observed, state, parked, scheduled in cases:
         dal = self._make_dal()
         dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
         dal._backend.reconcile_sa_articles = MagicMock(
@@ -2171,6 +2571,8 @@ def test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap(self):
             "provider_comments_count_at_last_scan": checkpoint,
             "stored_comments_count": inventory,
             "comments_fetched_at": "2026-07-18T00:00:00+00:00",
+            "comment_recovery_state": state,
+            "comment_recovery_parked_at": parked,
         }])
         incoming = {
             "article_id": "a1", "url": "https://example.com/a1",
@@ -2187,19 +2589,42 @@ def test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap(self):
         assert result["need_comments"] == expected
 ```
 
-For each case, the article is in the current scan and has content. The final
-case has `comments_count_observed_at=None`; the others use an ISO timestamp.
-Assert the scheduled item, when present, includes
+For each case, the article is in the current scan and has content. The unknown-
+count case has `comments_count_observed_at=None`; the others use an ISO
+timestamp. The last case proves a parked pending article remains eligible on a
+fresh count change. Assert the scheduled item, when present, includes
 `provider_comments_count=<provider>` and never derives work from `inventory`.
 
-The Full/Backfill node supplies a fresh `983/983/592` historical-gap row plus
-TTL-stale rows and proves newest-first bounded selection:
+The Full/Backfill node supplies unparked/parked pending rows, a fresh
+`983/983/592` historical difference, a TTL-stale repaired row, and a TTL-stale
+terminal row. It proves pending priority, Full parking, Backfill inclusion,
+terminal exclusion, and absence of gap-magnitude work:
 
 ```python
-def test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap(self):
+def test_full_and_backfill_prioritize_recovery_state_with_park_boundary(self):
     old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
     recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
     rows = [
+        {
+            "article_id": "pending", "url": "https://example.com/pending",
+            "has_content": True, "comments_count": 20,
+            "comments_count_observed_at": recent,
+            "provider_comments_count_at_last_scan": 20,
+            "stored_comments_count": 12, "published_date": "2026-07-18",
+            "comments_fetched_at": recent,
+            "comment_recovery_state": "pending",
+            "comment_recovery_parked_at": None,
+        },
+        {
+            "article_id": "parked", "url": "https://example.com/parked",
+            "has_content": True, "comments_count": 30,
+            "comments_count_observed_at": recent,
+            "provider_comments_count_at_last_scan": 30,
+            "stored_comments_count": 12, "published_date": "2026-07-17",
+            "comments_fetched_at": recent,
+            "comment_recovery_state": "pending",
+            "comment_recovery_parked_at": recent,
+        },
         {
             "article_id": "fresh-gap", "url": "https://example.com/fresh",
             "has_content": True, "comments_count": 983,
@@ -2207,6 +2632,8 @@ def test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap(self):
             "provider_comments_count_at_last_scan": 983,
             "stored_comments_count": 592, "published_date": "2026-07-19",
             "comments_fetched_at": recent,
+            "comment_recovery_state": "repaired",
+            "comment_recovery_parked_at": None,
         },
         {
             "article_id": "stale-new", "url": "https://example.com/new",
@@ -2215,17 +2642,25 @@ def test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap(self):
             "provider_comments_count_at_last_scan": 40,
             "stored_comments_count": 20, "published_date": "2026-07-18",
             "comments_fetched_at": old,
+            "comment_recovery_state": "repaired",
+            "comment_recovery_parked_at": None,
         },
         {
-            "article_id": "stale-old", "url": "https://example.com/old",
-            "has_content": True, "comments_count": 80,
+            "article_id": "terminal", "url": "https://example.com/terminal",
+            "has_content": True, "comments_count": 50,
             "comments_count_observed_at": old,
-            "provider_comments_count_at_last_scan": 80,
-            "stored_comments_count": 5, "published_date": "2024-01-01",
+            "provider_comments_count_at_last_scan": 50,
+            "stored_comments_count": 20, "published_date": "2026-07-16",
             "comments_fetched_at": old,
+            "comment_recovery_state": "unreachable_terminal",
+            "comment_recovery_parked_at": None,
         },
     ]
-    for mode in ("full", "backfill"):
+    expected = {
+        "full": ["pending", "stale-new"],
+        "backfill": ["pending", "parked", "stale-new"],
+    }
+    for mode, expected_ids in expected.items():
         dal = self._make_dal()
         dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
         dal._backend.query_sa_articles = MagicMock(return_value=rows)
@@ -2236,8 +2671,8 @@ def test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap(self):
             "src.agents.config.get_agent_config",
             return_value=SimpleNamespace(
                 sa_comments_cache_days=7,
-                sa_comments_backfill_per_full_scan=1,
-                sa_comments_backfill_per_backfill_scan=1,
+                sa_comments_backfill_per_full_scan=2,
+                sa_comments_backfill_per_backfill_scan=3,
             ),
         ):
             result = dal.save_sa_articles_meta([{
@@ -2245,31 +2680,42 @@ def test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap(self):
                 "comments_count": 983,
                 "comments_count_observed_at": recent,
             }], mode=mode)
-        assert result["need_comments"] == [
-            {"article_id": "stale-new", "url": "https://example.com/new"}
-        ]
+        assert [item["article_id"] for item in result["need_comments"]] == expected_ids
+        assert "fresh-gap" not in expected_ids
+        assert "terminal" not in expected_ids
 ```
 
-Keep the existing TTL and mutual-exclusion tests and evolve the old top-gap
-tests in place without renaming their node IDs.
+Recovery rows consume the mode's comment budget before TTL rows; count-delta
+work for the current scan remains ahead of both and is deduplicated. Full skips
+parked pending rows; Backfill includes them. Keep the existing TTL and mutual-
+exclusion tests and evolve the old top-gap tests in place without renaming their
+node IDs.
 
 The native-host node is:
 
 ```python
-def test_save_comments_only_forwards_provider_checkpoint_and_usable_state():
+def test_save_comments_only_forwards_recovery_scan_evidence():
     dal = MagicMock()
     dal.save_sa_comments_only.return_value = {
         "prepared_comments": 0, "stored_comments_total": 592,
         "net_new_comments": 0, "comment_scan_usable": False,
+        "comment_recovery_state": "pending",
     }
     result = host._handle_save_comments_only(dal, {
         "article_id": "a1", "comments": [], "provider_comments_count": 12,
+        "comment_scan_mode": "backfill",
+        "comment_scan_stop_reason": "stable_bottom",
+        "comment_scan_stable_bottom_rounds": 5,
     })
     dal.save_sa_comments_only.assert_called_once_with(
-        "a1", [], provider_comments_count=12
+        "a1", [], provider_comments_count=12,
+        comment_scan_mode="backfill",
+        comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
     )
     assert result["status"] == "ok"
     assert result["comment_scan_usable"] is False
+    assert result["comment_recovery_state"] == "pending"
 ```
 
 The extension-flow node supplies one scheduled comment item with an empty
@@ -2280,6 +2726,12 @@ def test_comment_refresh_counts_only_usable_checkpointed_scan():
     result = _run_background(
         _DETAIL_FLOW_SETUP
         + r"""
+        scrollToComments = async function () {
+          return {
+            stop_reason: "stable_bottom", stable_bottom_rounds: 5,
+            comments_loaded: 0, rounds: 5, elapsed_ms: 10,
+          };
+        };
         sendNativeMessage2 = async function (message) {
           calls.push(message);
           if (message.action === "save_articles_meta") return {
@@ -2303,34 +2755,73 @@ def test_comment_refresh_counts_only_usable_checkpointed_scan():
         item for item in result["calls"] if item["action"] == "save_comments_only"
     )
     assert save["provider_comments_count"] == 12
+    assert save["comment_scan_mode"] == "quick"
+    assert save["comment_scan_stop_reason"] == "stable_bottom"
+    assert save["comment_scan_stable_bottom_rounds"] == 5
     assert result["summary"]["comments_refreshed"] == 0
     assert result["summary"]["failed"] == 1
 ```
 
+The stable-bottom node drives the real `scrollToComments()` loop with five
+unchanged bottom observations and no loader/control. Override only `sleep` and
+the browser execution seam; do not replace the function under test:
+
+```python
+def test_comment_scroll_reports_stable_bottom_evidence():
+    result = _run_background(
+        r"""
+        sleep = async function () {};
+        chrome.scripting.executeScript = async function () {
+          return [{result: {
+            comments: 12, atBottom: true, clicked: false, loading: false,
+          }}];
+        };
+        var stats = await scrollToComments(1, {
+          mode: "backfill", articleId: "a1",
+        });
+        return stats;
+        """
+    )
+    assert result["stop_reason"] == "stable_bottom"
+    assert result["stable_bottom_rounds"] == 5
+    assert result["comments_loaded"] == 12
+```
+
+Strengthen this node in place with a second invocation where
+`loading: true` on every round; it must end by `max_scrolls` or timeout and
+report fewer than five stable-bottom rounds. A visible loader therefore cannot
+manufacture terminal evidence. Add a third invocation whose count is stable for
+two rounds, grows once, and is then stable for five rounds. It must stop only
+after all five post-growth rounds, proving that growth resets rather than merely
+pauses the terminal counter.
+
 Strengthen the existing successful refresh node to return
 `comment_scan_usable: true` and retain its existing ordering assertion.
 Also strengthen the existing body-content native-host and background-flow nodes
-to pass one provider count from a `need_content` work item through
-`save_article_content` into `save_sa_article_with_comments`; these are in-place
-contract upgrades and add no node.
+to pass one provider count plus scan mode/stop reason/stable-bottom rounds from
+a `need_content` work item through `save_article_content` into
+`save_sa_article_with_comments`; these are in-place contract upgrades and add
+no node.
 
-- [ ] **Step 6: Run the five tests and prove RED for the reviewed reasons**
+- [ ] **Step 7: Run the six tests and prove RED for the reviewed reasons**
 
 ```bash
 pytest -q \
   tests/test_sa_extension_article_identity.py::test_comment_count_observation_distinguishes_zero_from_unknown \
   tests/test_sa_tools.py::TestDataAccessArticleMeta::test_quick_comment_work_uses_observation_checkpoint_not_inventory_gap \
-  tests/test_sa_tools.py::TestDataAccessArticleMeta::test_full_and_backfill_bound_newest_ttl_work_without_inventory_gap \
-  tests/test_sa_reconciliation_native_host.py::test_save_comments_only_forwards_provider_checkpoint_and_usable_state \
-  tests/test_sa_extension_reconciliation_flow.py::test_comment_refresh_counts_only_usable_checkpointed_scan
+  tests/test_sa_tools.py::TestDataAccessArticleMeta::test_full_and_backfill_prioritize_recovery_state_with_park_boundary \
+  tests/test_sa_reconciliation_native_host.py::test_save_comments_only_forwards_recovery_scan_evidence \
+  tests/test_sa_extension_reconciliation_flow.py::test_comment_refresh_counts_only_usable_checkpointed_scan \
+  tests/test_sa_extension_reconciliation_flow.py::test_comment_scroll_reports_stable_bottom_evidence
 ```
 
 Expected: parser observation is absent, Quick still schedules from `983 > 592`,
-Full/Backfill still rank inventory gaps, provider count is not forwarded, and an
-empty positive-count scan is falsely counted refreshed. Any unrelated fixture
-or harness failure must be fixed before implementation.
+Full/Backfill still rank inventory gaps without pending/park semantics, recovery
+scan evidence is not forwarded, an empty positive-count scan is falsely counted
+refreshed, and the scroll loop exposes no reviewed stable-bottom proof. Any
+unrelated fixture or harness failure must be fixed before implementation.
 
-- [ ] **Step 7: Implement observed counts and checkpoint scheduling**
+- [ ] **Step 8: Implement observed counts, state-aware scheduling, and scan evidence**
 
 In `scrape_articles_list.js`, make count extraction return both value and
 certainty. Preserve the compatibility numeric `comments_count` while adding a
@@ -2353,17 +2844,54 @@ In `save_sa_articles_meta()` build current-scan count observations from
 `normalized_articles`, not from the persisted row's possibly older timestamp.
 Quick schedules only current scanned/content-ready rows where an explicit count
 is positive with null checkpoint, or differs from a non-null checkpoint. A
-count decrease is work. Unknown count is not work.
+count decrease is work; explicit zero with a null checkpoint is not. Unknown
+count is not work. Pending alone does not make a Quick run repeat the same
+shallow page when the provider count is stable; a parked article remains
+eligible whenever a fresh count change occurs.
 
-For Full/Backfill, add the same current-scan delta work first, then select at
-most the configured mode limit of TTL-stale, content-ready, non-duplicate rows,
-ordered by `(published_date, article_id)` descending. Remove all use of
-`remote_count - stored_count`, gap magnitude sorting, and inventory-gap backlog.
-Keep `need_content` precedence. Add `provider_comments_count` to work items only
-when an explicit observation is available.
+For Full/Backfill, add current-scan count-delta work first. Spend the remaining
+mode comment budget on recovery rows before TTL rows: Full selects pending rows
+with null `comment_recovery_parked_at`; Backfill selects all pending rows. Then
+select TTL-stale, content-ready, non-duplicate rows whose recovery state is not
+`unreachable_terminal`, ordered by
+`(published_date, article_id)` descending. The configured per-mode limit bounds
+the combined recovery+TTL leg. Remove all use of `remote_count - stored_count`,
+gap magnitude sorting, and inventory-gap backlog. Keep `need_content`
+precedence. Add `provider_comments_count` to work items only when an explicit
+observation is available.
 
-Forward that optional field through both background save actions, native host,
-DAL, and backend. In the comment-only loop:
+Update `scrollToComments()` so every injected round also returns whether a
+visible loading indicator exists below the page midpoint. Track consecutive
+rounds where all of these are true:
+
+```javascript
+var grew = check.comments > bestCount;
+if (grew) bestCount = check.comments;
+
+check.atBottom === true &&
+grew === false &&
+check.clicked === false &&
+check.loading === false
+```
+
+Reset the counter on growth, load-more activation, leaving the bottom, or a
+visible loader. Stop with `stop_reason: "stable_bottom"` only when the mode's
+existing `staleRounds` threshold is reached; return the actual
+`stable_bottom_rounds` in the stats. Backfill's existing threshold is five.
+Quick/Full may also report stable-bottom stats, but the backend allowlist gives
+terminal authority only to Backfill with rounds >= five.
+
+Forward provider count plus all three scan-evidence fields through both
+background save actions, native host, DAL, compatibility stubs, and backend:
+
+```javascript
+provider_comments_count: item.provider_comments_count,
+comment_scan_mode: scrollMode,
+comment_scan_stop_reason: scrollStats.stop_reason,
+comment_scan_stable_bottom_rounds: scrollStats.stable_bottom_rounds || 0,
+```
+
+In the comment-only loop:
 
 ```javascript
 if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
@@ -2378,14 +2906,17 @@ if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
 
 Add an `else { failed++; }` for a missing/non-ok native response. The body loop
 forwards the same field but retains body success when
-`comment_scan_usable === false`; the checkpoint simply remains eligible for a
-later comments-only scan.
+`comment_scan_usable === false`; checkpoint and recovery state remain unchanged.
+
+The native host response may expose the reviewed numeric/state diagnostics but
+never baseline row IDs, comment IDs, raw provider DOM, or terminal internals
+beyond the allowlisted reason. Log overlap rate only as a numeric diagnostic.
 
 Exceptions in the comment-only loop also increment `failed`. Body capture keeps
 its independent success semantics; an unusable comment leg cannot roll back or
 mislabel a valid body save.
 
-- [ ] **Step 8: Run GREEN, exact accounting, and semantic ratchets**
+- [ ] **Step 9: Run GREEN, exact accounting, and semantic ratchets**
 
 ```bash
 pytest -q \
@@ -2400,14 +2931,17 @@ pytest -q \
 pytest --collect-only -q
 rg -n 'remote_count\s*-\s*stored_count|remote_count\s*>\s*stored_count|backfill_candidates.*gap' \
   src/tools/data_access.py
+rg -n 'comment_recovery_baseline_max_row_id\s*=.*MAX|MAX\(id\).*comment_recovery' \
+  src/tools/backends/sa_capture_backend.py
 git diff --exit-code 848ffd4 -- apps/arkscope-web config/tickers_core.json
 ```
 
-Expected: focused exact `254`, full collection exact `4505`, semantic delta
-`+93/-0` from `848ffd4`; gap-trigger scan has zero production hit; web app and
-the protected ticker file remain byte-identical. Run `git diff --check`.
+Expected: focused exact `262`, full collection exact `4513`, semantic delta
+`+101/-0` from `848ffd4`; inventory-gap trigger and post-upsert watermark scans
+have zero production hit; web app and the protected ticker file remain byte-
+identical. Run `git diff --check`.
 
-- [ ] **Step 9: Commit the scheduling/transport half and stop for review**
+- [ ] **Step 10: Commit the scheduling/transport half and stop for review**
 
 ```bash
 git add src/tools/data_access.py src/sa_native_host.py \
@@ -2418,15 +2952,18 @@ git add src/tools/data_access.py src/sa_native_host.py \
   tests/test_sa_extension_reconciliation_flow.py \
   docs/superpowers/specs/2026-07-17-alpha-picks-article-reconciliation-design.md \
   docs/superpowers/plans/2026-07-18-alpha-picks-article-reconciliation-implementation.md
-git commit -m "fix: bound Alpha Picks comment refresh work"
+git commit -m "fix: recover bounded Alpha Picks comment gaps"
 ```
 
 Do not rerun the paid/provider live gate or merge yet. Request independent code
 review of the addendum first. After GREEN, recreate the disposable v2 DB copy
 from production v1 and perform one normal Quick run plus a second unchanged
 Quick run: the first may acknowledge current counts; the second must not rescan
-stable historical gaps. A naturally changed provider count is eligible exactly
-once. Dynamic counts are evidence, never acceptance constants.
+stable historical differences. Separately replay the fixture-backed continuity
+sequence on a disposable DB: pre-gap baseline -> Quick zero-overlap pending ->
+new-generation-only Full miss remains pending -> second Full miss parks ->
+Backfill stable-bottom terminalizes. A naturally changed live provider count is
+eligible exactly once. Dynamic counts are evidence, never acceptance constants.
 
 ---
 
@@ -2471,8 +3008,8 @@ pytest -q \
 pytest --collect-only -q
 ```
 
-Expected: focused `254 passed`; full collection exact `4505`, raw node diff
-`+93/-0` from `848ffd4`.
+Expected: focused `262 passed`; full collection exact `4513`, raw node diff
+`+101/-0` from `848ffd4`.
 
 - [ ] **Step 2: Run web-app and protected-boundary gates**
 
@@ -2523,11 +3060,34 @@ Record dynamic counts, not acceptance constants. Verify:
 - legacy canonical/detail/body/comment/pick facts are byte-identical except the
   additive lineage column/schema;
 - no accepted link was created by migration alone;
+- every migrated article has `comment_recovery_state='repaired'`, zero Full
+  misses, and null watermark/park/terminal fields; only rows with an existing
+  `comments_fetched_at` receive a provider-count checkpoint;
 - suspicious distant legacy links appear in preview/review rather than being
   silently accepted;
 - a second preview is byte-identical and read-only.
 
-Delete only the `/tmp` copy after recording aggregate evidence.
+Create a second disposable copy for a state-machine probe; never mutate the
+preview copy above. Insert one unmistakably synthetic article/comment baseline,
+then execute through the public backend methods:
+
+```text
+Quick changed-count/no-overlap -> pending + pre-upsert watermark
+Full new-generation-only miss -> pending, miss=1
+Full new-generation-only miss -> pending, miss=2, parked
+Quick new-generation-only count change -> new comments captured, still parked
+Quick frozen-baseline overlap -> repaired despite park
+new pending -> Backfill timeout -> pending
+Backfill stable_bottom/4 -> pending
+Backfill stable_bottom/5 -> unreachable_terminal + retained audit
+unchanged-count scan exposing an older row -> still unreachable_terminal
+future changed-count/current-baseline overlap -> repaired current epoch,
+                                                  prior terminal audit retained
+```
+
+Record numeric overlap diagnostics and row counts; assert no comment ID or row
+watermark appears in the native-host-shaped response. Delete both `/tmp` copies
+after recording aggregate evidence.
 
 - [ ] **Step 5: Run canonical backend A/B from virgin archives**
 
@@ -2536,10 +3096,10 @@ Run full `pytest -q` sequentially in the same environment. Require:
 
 ```text
 base collect 4412
-head collect 4505
-raw node diff +93/-0
+head collect 4513
+raw node diff +101/-0
 failure/error identity diff empty in both directions
-base 4301 passed -> head 4394 passed, if the known families remain unchanged
+base 4301 passed -> head 4402 passed, if the known families remain unchanged
 74 skipped / 18 warnings / 30 failed / 7 errors unchanged
 ```
 
@@ -2582,8 +3142,11 @@ pre-merge production-schema migration. Use this exact process boundary:
    target, and separately query the copied DB to require schema `2` before the
    first refresh. Any fallback to the normal config, port, main checkout,
    implementation worktree, or production DB is a stop condition;
-6. run one normal Alpha Picks refresh. Do not paste a `TICKER URL` line and do
-   not alter DB rows manually; and
+6. run two consecutive normal Quick refreshes. Do not paste a `TICKER URL` line
+   and do not alter DB rows manually. The first may acknowledge naturally
+   changed counts; on the second, a stable count must not reschedule an old
+   provider-versus-inventory difference. If a count naturally changes between
+   runs, identify that exact article instead of claiming a global zero; and
 7. after evidence is recorded, stop the gate browser/sidecar/native host,
    inspect the disposable checkout diff (a generated ticker snapshot is
    allowed only there), remove the temporary config/copy/worktree, and verify
@@ -2614,7 +3177,11 @@ Prove:
 8. a matcher failure simulation on a copied/disposable DB leaves captured
    article/body/comments intact; and
 9. a successful pick capture followed by an injected matcher failure remains a
-   successful refresh and is not recorded as a provider refresh failure.
+   successful refresh and is not recorded as a provider refresh failure;
+10. the repeated Quick run does not chase a stable historical inventory
+    difference, while changed-count work remains eligible; and
+11. no native-host/popup payload exposes the frozen row-ID watermark or comment
+    identities used to prove overlap.
 
 No live gate fetches every historical article. Record normal-cache work and
 extra enrichment separately and verify the extra count does not exceed the
@@ -2658,16 +3225,19 @@ reviewer focus is:
 7. event-scoped replacement/manual confirmation;
 8. bounded enrichment versus normal cache work;
 9. popup privacy/accessibility and no raw-ID exposure;
-10. explicit comment-count provenance, usable-scan atomicity, and absence of
-    provider-versus-inventory retry logic; and
-11. canonical A/B plus real extension evidence.
+10. explicit comment-count provenance, pre-upsert row-ID watermark, and usable-
+    scan atomicity;
+11. Quick raise/repair, Full two-miss park, Backfill-only five-round terminal,
+    terminal TTL exclusion plus unchanged-count stability, terminal re-anchor/
+    audit retention, and absence of provider-versus-inventory retry logic; and
+12. canonical A/B plus copied-DB/repeated-Quick real extension evidence.
 
 ## Post-Review Merge Closeout
 
 After independent GREEN and user merge approval only:
 
 1. fast-forward merge the reviewed branch;
-2. re-run focused `254`, merged extension fixture gates, no-PG smoke, and one
+2. re-run focused `262`, merged extension fixture gates, no-PG smoke, and one
    merged-tree popup smoke before touching production state;
 3. close the desktop app, all browsers using the extension, all sidecars, and
    every native-host child. Make and retain a timestamped SQLite online backup

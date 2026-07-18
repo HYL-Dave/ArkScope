@@ -1,10 +1,12 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
-> **Status:** APPROVED FOR IMPLEMENTATION PLANNING after 2026-07-18 written
-> review. The 2026-07-19 live gate added the bounded recent-comment checkpoint
-> contract in section 3.5; that addendum is pending written review and blocks
-> merge. The universe/JSON decision does not pre-approve this design; this is an
-> independent implementation slice.
+> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM REVISED FOR WRITTEN
+> REVIEW. The 2026-07-19 live gate disproved the lifetime comment-gap retry
+> assumption. Section 3.5 now distinguishes recoverable post-enable continuity
+> breaks from intentionally waived historical deficits; that addendum blocks
+> merge until written review and implementation review are GREEN. The
+> universe/JSON decision does not pre-approve this design; this is an independent
+> implementation slice.
 
 ## 1. Purpose
 
@@ -255,7 +257,7 @@ ticker-prefix, or unbounded nearest-date helper may write those fields directly.
 Static and behavioral tests must prove the old writer is unreachable before the
 new writer is enabled.
 
-### 3.5 Bounded recent-comment observation checkpoint
+### 3.5 Bounded recent-comment continuity recovery
 
 The provider's article-level comment count, the comments currently exposed in
 one browser DOM, and ArkScope's cumulative deduplicated comment inventory are
@@ -268,7 +270,10 @@ The existing scheduler incorrectly treats
 `provider comments_count > stored_comments_count` as permanent unfinished work.
 That comparison can never converge when Seeking Alpha exposes only a recent
 window, and it repeatedly spends Quick refresh time on inaccessible historical
-comments. V1 replaces the inventory-gap trigger with an observation checkpoint:
+comments. A pure count checkpoint fixes the permanent retry but is too weak: it
+would also waive a recoverable middle interval created while the extension was
+stopped. V1 therefore separates provider-count observation from a bounded
+continuity-recovery state:
 
 ```text
 sa_articles
@@ -276,11 +281,22 @@ sa_articles
   comments_count_observed_at             nullable; parser proved the count was visible
   provider_comments_count_at_last_scan   nullable; last provider count acknowledged
                                          by a usable comment-page scan
+  comment_recovery_state                 repaired | pending | unreachable_terminal
+  comment_recovery_started_at            nullable; start of the current pending epoch
+  comment_recovery_baseline_max_row_id    nullable; frozen pre-upsert comment-row watermark
+  comment_recovery_full_miss_count        non-negative; consecutive usable Full misses
+  comment_recovery_parked_at              nullable; Full stopped selecting this pending gap
+  comment_recovery_last_terminal_at       nullable; retained audit of a stop-chasing decision
+  comment_recovery_last_terminal_reason   nullable; reviewed reason code
 ```
 
 `provider_comments_count_at_last_scan` is an observation checkpoint, not a
 coverage or completeness claim. `stored_comments_count` remains a local
-inventory fact and may be shown or audited, but it never schedules comment work.
+inventory fact and may be shown or audited with a signed difference, but the
+difference never schedules comment work. `repaired` means only that no
+post-enable continuity break is outstanding; it never means lifetime-complete.
+`unreachable_terminal` records a decision to stop pursuing an older interval,
+not proof that the missing comments do not exist.
 
 The list parser must distinguish an explicit `0 Comments` from an unparseable or
 absent count. An explicit count records `comments_count_observed_at`; an unknown
@@ -301,13 +317,75 @@ total. A deletion and addition that cancel numerically cannot be inferred from
 the list card; an explicit Full/Backfill TTL scan may discover it, but Quick does
 not claim that coverage.
 
-Full and Backfill remain explicit, bounded best-effort operations. They use the
-same checkpoint-delta rule for currently scanned articles and may additionally
-rescan TTL-stale historical rows under the existing per-mode limits, newest
-article first. They do not rank or enqueue work by the provider-versus-inventory
-gap and never promise lifetime reconstruction. There is deliberately no fixed
-30/90-day definition of "old": recency is the provider's currently exposed
-window plus newest-first bounded work, not an invented calendar cutoff.
+#### Continuity evidence and frozen baseline
+
+Comment identity is the existing deterministic normalized `comment_id`; the
+same identity already owns deduplication and re-parenting. A large sudden drop
+in overlap rate is therefore a parser/identity diagnostic, not evidence that
+all comments changed.
+
+For every usable scan, the backend must load the existing comment rows,
+including their SQLite `id`, before the upsert loop. When an explicit provider
+count changed, the article already had existing comments, and the scan overlaps
+none of those pre-existing identities, the backend raises `pending`. It freezes
+`MAX(existing.id)` as `comment_recovery_baseline_max_row_id` before inserting
+the newly scraped comments. A first-ever article scan has no prior continuity
+claim and never raises a gap.
+
+While pending, only overlap with an existing comment row whose `id` is at or
+below that frozen watermark proves continuity. Comments first inserted by the
+gap-raising scan have larger IDs and cannot later repair their own gap. The
+watermark and start time remain frozen across nested count changes. Any mode may
+clear pending immediately when it reaches one qualifying baseline identity;
+proof, not mode name, owns repair.
+
+This row-ID watermark is deliberate. `fetched_at` is insert-only, but its
+canonical representation has one-second precision, so a strict timestamp
+comparison cannot safely distinguish baseline and new rows in a same-second
+transaction.
+
+#### Mode responsibilities and bounded termination
+
+The three modes remain distinct:
+
+- **Quick** is the high-frequency automatic path. It performs the shallow
+  count-change scan, may raise pending, and may clear pending when it happens to
+  reach the frozen baseline. A usable Quick miss does not increment the Full
+  miss counter. Parked articles still receive Quick work when their provider
+  count changes, so parking never stops capture of new comments.
+- **Full** is bounded routine repair. It prioritizes unparked pending articles,
+  then retains bounded newest-first TTL work under the existing Full limit. A
+  usable Full scan with no qualifying overlap increments
+  `comment_recovery_full_miss_count`; two consecutive misses set
+  `comment_recovery_parked_at`. Full has no terminal authority and no longer
+  selects a parked gap. Any later qualifying overlap, including one observed by
+  Quick or Backfill, repairs it immediately.
+- **Backfill** is the explicit deep repair path. It includes parked pending
+  articles and retains its larger bounded TTL budget. It is the only mode that
+  may transition a gap to `unreachable_terminal`, and only when a usable scan
+  reports at least five consecutive rounds at the page bottom with no DOM
+  comment growth, no visible loading indicator, and no load-more control
+  activated. Timeout, max-scroll exhaustion, navigation failure, and parser
+  failure are not terminal evidence.
+
+Terminalization records the audit timestamp/reason, clears the old pending
+watermark and park counter, and re-anchors future continuity to the comments
+then stored. A later count change may begin a new epoch and move the current
+state to `pending` or `repaired`, but it never erases the retained terminal
+audit. An unchanged-count scan cannot move `unreachable_terminal` back to
+`repaired`, even if it happens to expose an older comment. Terminal rows are not
+selected for Full/Backfill work solely because their comment TTL is stale; a
+fresh explicit provider-count change may schedule the current epoch normally.
+Old comments that become visible during any otherwise eligible scan are still
+inserted; the past stop-chasing decision is not retroactively relabelled as
+repaired.
+
+Full and Backfill also use the same checkpoint-delta rule for currently scanned
+articles. They never rank work by provider-versus-inventory difference and
+never promise lifetime reconstruction. There is deliberately no fixed 30/90-day
+definition of "old": a post-enable middle interval is pursued until overlap,
+parking, or reviewed Backfill terminal evidence; deficits predating this
+contract are waived structurally.
 
 A comment-page scan is usable when at least one valid comment was parsed, or
 when an explicit provider count of zero was observed and zero comments were
@@ -315,15 +393,18 @@ parsed. A positive provider count with zero valid comments is a parser/readiness
 failure: body capture may still commit, but `comments_fetched_at` and the
 checkpoint do not advance, and a comments-only refresh is not counted as
 refreshed. Navigation, native-host, persistence, or parser failures likewise
-leave the prior checkpoint intact. Comment upserts, `comments_fetched_at`, and a
-checkpoint advance occur in one SQLite transaction.
+cannot raise, clear, park, or terminalize recovery. Comment upserts,
+`comments_fetched_at`, checkpoint advancement, frozen-watermark creation, and
+every recovery-state transition occur in one SQLite transaction.
 
 Because production remains schema v1 until merge, this addendum extends the
 not-yet-shipped v1-to-v2 migration instead of introducing a production v3. The
 migration seeds `provider_comments_count_at_last_scan = comments_count` only for
-rows with an existing `comments_fetched_at`; this intentionally waives the
-pre-migration historical gap. Rows never successfully scanned remain null.
-Pre-addendum disposable v2 gate copies are recreated, never upgraded in place.
+rows with an existing `comments_fetched_at`. It seeds no pending flag or frozen
+watermark: pre-migration historical deficits are waived structurally, and only
+post-enable usable scans may create a recovery epoch. Rows never successfully
+scanned retain a null checkpoint. Pre-addendum disposable v2 gate copies are
+recreated, never upgraded in place.
 
 ## 4. Deterministic Matching Policy
 
@@ -512,21 +593,38 @@ The future implementation plan must prove, RED first:
     ambiguity for review;
 19. list parsing distinguishes explicit zero comments from an unknown count and
     never overwrites a prior observation with unknown;
-20. v1-to-v2 migration seeds the checkpoint only for previously scanned rows
-    and preserves every article/comment row;
+20. v1-to-v2 migration seeds the checkpoint only for previously scanned rows,
+    seeds no recovery flag/watermark, and preserves every article/comment row;
 21. Quick schedules on explicit provider-count change, including a decrease,
-    but does not schedule a stable historical inventory gap;
-22. Full/Backfill retain bounded newest-first TTL work without using inventory
-    gap size as priority or backlog;
-23. positive provider count plus zero parsed comments leaves the checkpoint and
-    `comments_fetched_at` unchanged;
-24. explicit provider zero plus zero parsed comments, and positive provider
-    count plus at least one parsed comment, advance atomically;
-25. body capture survives an unusable comment scan without falsely reporting a
+    but does not schedule a stable historical inventory difference;
+22. a first-ever article scan establishes a baseline without raising pending;
+23. a gap-raising scan freezes the existing maximum comment row ID before its
+    upserts, and a later scan that overlaps only comments inserted after that
+    watermark cannot falsely repair the gap;
+24. any mode repairs pending immediately when it overlaps a qualifying frozen-
+    baseline identity, while unusable scans cannot change recovery state;
+25. two consecutive usable Full misses park pending without terminalizing it;
+    Quick count-change capture and evidence-based repair remain available while
+    parked;
+26. Backfill terminalizes only after five stable-bottom rounds with no growth,
+    loader, or activated load-more control; timeout/max-scroll/failure evidence
+    leaves pending intact;
+27. terminalization re-anchors future capture and retains its audit timestamp
+    and reason through later recovery epochs; unchanged-count overlap cannot
+    erase terminal state, and terminal rows do not re-enter work from TTL alone;
+28. Full/Backfill prioritize eligible recovery state, retain bounded newest-
+    first TTL work, and never use inventory-gap size as priority or backlog;
+29. positive provider count plus zero parsed comments leaves the checkpoint,
+    `comments_fetched_at`, and recovery state unchanged;
+30. explicit provider zero plus zero parsed comments, and positive provider
+    count plus at least one parsed comment, commit their permitted checkpoint
+    and state changes atomically;
+31. body capture survives an unusable comment scan without falsely reporting a
     comment refresh; and
-26. a live rerun proves a stable provider count no longer rescans the same
-    historical gap, while one newly added comment changes the count and becomes
-    eligible once.
+32. a copied-DB/live rerun proves a stable provider count does not rescan a
+    waived historical difference, while a fixture-backed interrupted interval
+    remains pending until frozen-baseline overlap or explicit Backfill terminal
+    evidence.
 
 ## 10. Sequence
 
