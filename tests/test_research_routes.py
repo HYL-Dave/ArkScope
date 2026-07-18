@@ -595,6 +595,90 @@ def test_patch_archive_active_thread_returns_409_without_mutation(
     ]
     assert run_store.latest_active_for_thread("archive-first") is None
 
+    monkeypatch.setattr(thread_store, "_connect", thread_connect)
+    monkeypatch.setattr(run_store, "_connect", run_connect)
+    scheduled = []
+
+    def record_schedule(**kwargs):
+        created_thread = thread_store.get_thread("atomic-create")
+        created_run = run_store.get_run(kwargs["run_id"])
+        created_messages = thread_store.list_messages("atomic-create")
+        assert created_thread is not None
+        assert created_run is not None and created_run.status == "queued"
+        assert [message.content for message in created_messages] == ["atomic question"]
+        scheduled.append(kwargs["run_id"])
+
+    monkeypatch.setattr(r, "schedule_research_run", record_schedule)
+    with sqlite3.connect(thread_store.db_path) as conn:
+        conn.execute(
+            """
+            CREATE TRIGGER abort_atomic_create_message
+            BEFORE INSERT ON research_messages
+            WHEN NEW.thread_id = 'atomic-create'
+            BEGIN
+                SELECT RAISE(ABORT, 'message insert failed');
+            END
+            """
+        )
+
+    atomic_request = r.ResearchRunCreate(
+        thread_id="atomic-create",
+        question="atomic question",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+    )
+    with pytest.raises(sqlite3.IntegrityError, match="message insert failed"):
+        asyncio.run(
+            r.create_research_run(
+                atomic_request,
+                dal=object(),
+                thread_store=thread_store,
+                run_store=run_store,
+            )
+        )
+
+    assert thread_store.get_thread("atomic-create") is None
+    assert thread_store.list_messages("atomic-create") == []
+    with sqlite3.connect(run_store.db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM research_runs WHERE thread_id = ?",
+            ("atomic-create",),
+        ).fetchone()[0] == 0
+        conn.execute("DROP TRIGGER abort_atomic_create_message")
+    assert scheduled == []
+
+    response = asyncio.run(
+        r.create_research_run(
+            atomic_request,
+            dal=object(),
+            thread_store=thread_store,
+            run_store=run_store,
+        )
+    )
+    assert response["run"]["status"] == "queued"
+    assert scheduled == [response["run"]["id"]]
+
+    other_thread_store = ResearchThreadStore(f"{thread_store.db_path}.other")
+    mismatched_request = r.ResearchRunCreate(
+        thread_id="wrong-database",
+        question="must stay absent",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+    )
+    with pytest.raises(ValueError, match="same SQLite database"):
+        asyncio.run(
+            r.create_research_run(
+                mismatched_request,
+                dal=object(),
+                thread_store=other_thread_store,
+                run_store=run_store,
+            )
+        )
+    assert other_thread_store.get_thread("wrong-database") is None
+    assert scheduled == [response["run"]["id"]]
+
 
 def test_patch_archive_and_unarchive_preserve_transcript_and_runs(research_stores):
     thread_store, run_store, history_store = research_stores

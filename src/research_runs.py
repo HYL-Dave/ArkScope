@@ -14,7 +14,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from src.research_threads import ResearchThreadStore
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS research_runs (
@@ -171,39 +174,150 @@ class ResearchRunStore:
         credential_id: Optional[str],
         assistant_stance: Optional[str] = None,
     ) -> ResearchRun:
-        ts = _now()
         with self._write_lock, self._connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            thread = conn.execute(
-                "SELECT archived_at FROM research_threads WHERE id = ?",
-                (thread_id,),
-            ).fetchone()
-            if thread is None:
-                raise ResearchRunUnavailableError(thread_id, "missing")
-            if thread["archived_at"] is not None:
-                raise ResearchRunUnavailableError(thread_id, "archived")
-            active = conn.execute(
-                "SELECT 1 FROM research_runs "
-                "WHERE thread_id = ? AND status IN ('queued','running') LIMIT 1",
-                (thread_id,),
-            ).fetchone()
-            if active is not None:
-                raise ResearchRunUnavailableError(thread_id, "active_run")
-            conn.execute(
-                """
-                INSERT INTO research_runs
-                  (id, thread_id, status, question, ticker, provider, model, effort,
-                   assistant_stance, auth_mode, credential_id, created_at, updated_at)
-                VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (id, thread_id, question, ticker, provider, model, effort,
-                 assistant_stance, auth_mode, credential_id, ts, ts),
-            )
-            row = conn.execute(
-                "SELECT * FROM research_runs WHERE id = ?", (id,)
-            ).fetchone()
-            conn.commit()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                run = self._create_run_on_connection(
+                    conn,
+                    id=id,
+                    thread_id=thread_id,
+                    question=question,
+                    ticker=ticker,
+                    provider=provider,
+                    model=model,
+                    effort=effort,
+                    auth_mode=auth_mode,
+                    credential_id=credential_id,
+                    assistant_stance=assistant_stance,
+                )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        return run
+
+    def _create_run_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        id: str,
+        thread_id: str,
+        question: str,
+        ticker: Optional[str],
+        provider: str,
+        model: str,
+        effort: Optional[str],
+        auth_mode: Optional[str],
+        credential_id: Optional[str],
+        assistant_stance: Optional[str] = None,
+        now: Optional[str] = None,
+    ) -> ResearchRun:
+        """Apply the run-owned insert on a caller-managed transaction."""
+        ts = now or _now()
+        thread = conn.execute(
+            "SELECT archived_at FROM research_threads WHERE id = ?",
+            (thread_id,),
+        ).fetchone()
+        if thread is None:
+            raise ResearchRunUnavailableError(thread_id, "missing")
+        if thread["archived_at"] is not None:
+            raise ResearchRunUnavailableError(thread_id, "archived")
+        active = conn.execute(
+            "SELECT 1 FROM research_runs "
+            "WHERE thread_id = ? AND status IN ('queued','running') LIMIT 1",
+            (thread_id,),
+        ).fetchone()
+        if active is not None:
+            raise ResearchRunUnavailableError(thread_id, "active_run")
+        conn.execute(
+            """
+            INSERT INTO research_runs
+              (id, thread_id, status, question, ticker, provider, model, effort,
+               assistant_stance, auth_mode, credential_id, created_at, updated_at)
+            VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                id, thread_id, question, ticker, provider, model, effort,
+                assistant_stance, auth_mode, credential_id, ts, ts,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM research_runs WHERE id = ?", (id,)
+        ).fetchone()
+        assert row is not None
         return self._run(row)
+
+    def create_run_with_user_message(
+        self,
+        *,
+        thread_store: ResearchThreadStore,
+        new_thread_title: Optional[str],
+        id: str,
+        thread_id: str,
+        question: str,
+        user_content: str,
+        user_tickers: Optional[list],
+        ticker: Optional[str],
+        provider: str,
+        model: str,
+        effort: Optional[str],
+        auth_mode: Optional[str],
+        credential_id: Optional[str],
+        assistant_stance: Optional[str] = None,
+    ) -> ResearchRun:
+        """Atomically queue a run and persist its raw user turn."""
+        try:
+            same_database = Path(self.db_path).samefile(thread_store.db_path)
+        except OSError:
+            same_database = (
+                Path(self.db_path).resolve() == Path(thread_store.db_path).resolve()
+            )
+        if self.db_path == ":memory:" or not same_database:
+            raise ValueError(
+                "thread_store and run_store must use the same SQLite database"
+            )
+
+        ts = _now()
+        with self._write_lock, thread_store._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                if new_thread_title is not None:
+                    thread_store._ensure_thread_on_connection(
+                        conn,
+                        id=thread_id,
+                        title=new_thread_title,
+                        ticker=ticker,
+                        provider=provider,
+                        model=model,
+                        now=ts,
+                    )
+                run = self._create_run_on_connection(
+                    conn,
+                    id=id,
+                    thread_id=thread_id,
+                    question=question,
+                    ticker=ticker,
+                    provider=provider,
+                    model=model,
+                    effort=effort,
+                    auth_mode=auth_mode,
+                    credential_id=credential_id,
+                    assistant_stance=assistant_stance,
+                    now=ts,
+                )
+                thread_store._append_message_on_connection(
+                    conn,
+                    thread_id=thread_id,
+                    role="user",
+                    content=user_content,
+                    tickers=user_tickers,
+                    now=ts,
+                )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        return run
 
     def get_run(self, run_id: str) -> Optional[ResearchRun]:
         with self._connect() as conn:

@@ -260,6 +260,31 @@ class ResearchThreadStore:
 
     # --- writes ----------------------------------------------------------
 
+    def _ensure_thread_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        id: str,
+        title: str,
+        ticker: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        now: Optional[str] = None,
+    ) -> ResearchThread:
+        """Apply the thread-owned insert on a caller-managed transaction."""
+        ts = now or _now()
+        conn.execute(
+            "INSERT INTO research_threads "
+            "(id, title, ticker, provider, model, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
+            (id, title, ticker, provider, model, ts, ts),
+        )
+        row = conn.execute(
+            "SELECT * FROM research_threads WHERE id = ?", (id,)
+        ).fetchone()
+        assert row is not None
+        return self._thread(row)
+
     def ensure_thread(
         self,
         *,
@@ -272,17 +297,70 @@ class ResearchThreadStore:
     ) -> ResearchThread:
         """Idempotent create: the per-turn stream hook calls this every turn, so
         a second call with an existing id is a no-op (title/created_at frozen)."""
-        ts = now or _now()
         with self._write_lock, self._connect() as conn:
-            conn.execute(
-                "INSERT INTO research_threads (id, title, ticker, provider, model, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
-                (id, title, ticker, provider, model, ts, ts),
+            thread = self._ensure_thread_on_connection(
+                conn,
+                id=id,
+                title=title,
+                ticker=ticker,
+                provider=provider,
+                model=model,
+                now=now,
             )
             conn.commit()
-        got = self.get_thread(id)
-        assert got is not None
-        return got
+        return thread
+
+    def _append_message_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        thread_id: str,
+        role: str,
+        content: str = "",
+        run_id: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        tools_used: Optional[list] = None,
+        tool_calls: Optional[list] = None,
+        token_usage: Optional[dict] = None,
+        tickers: Optional[list] = None,
+        elapsed_seconds: Optional[float] = None,
+        is_error: bool = False,
+        error_code: Optional[str] = None,
+        personalization: Optional[dict] = None,
+        now: Optional[str] = None,
+    ) -> ResearchMessage:
+        """Apply the message-owned writes on a caller-managed transaction."""
+        ts = now or _now()
+        cur = conn.execute(
+            """
+            INSERT INTO research_messages
+                (thread_id, run_id, role, content, provider, model, effort, tools_used_json,
+                 tool_calls_json, token_usage_json, tickers_json, elapsed_seconds,
+                 is_error, error_code, personalization_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                thread_id, run_id, role, content, provider, model, effort,
+                json.dumps(tools_used) if tools_used is not None else None,
+                json.dumps(tool_calls) if tool_calls is not None else None,
+                json.dumps(token_usage) if token_usage is not None else None,
+                json.dumps(tickers) if tickers is not None else None,
+                elapsed_seconds, 1 if is_error else 0, error_code,
+                json.dumps(personalization) if personalization is not None else None,
+                ts,
+            ),
+        )
+        conn.execute(
+            "UPDATE research_threads SET updated_at = ? WHERE id = ?",
+            (ts, thread_id),
+        )
+        row = conn.execute(
+            "SELECT * FROM research_messages WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+        assert row is not None
+        return self._message(row)
 
     def append_message(
         self,
@@ -304,33 +382,28 @@ class ResearchThreadStore:
         personalization: Optional[dict] = None,
         now: Optional[str] = None,
     ) -> ResearchMessage:
-        ts = now or _now()
         with self._write_lock, self._connect() as conn:
-            cur = conn.execute(
-                """
-                INSERT INTO research_messages
-                    (thread_id, run_id, role, content, provider, model, effort, tools_used_json,
-                     tool_calls_json, token_usage_json, tickers_json, elapsed_seconds,
-                     is_error, error_code, personalization_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    thread_id, run_id, role, content, provider, model, effort,
-                    json.dumps(tools_used) if tools_used is not None else None,
-                    json.dumps(tool_calls) if tool_calls is not None else None,
-                    json.dumps(token_usage) if token_usage is not None else None,
-                    json.dumps(tickers) if tickers is not None else None,
-                    elapsed_seconds, 1 if is_error else 0, error_code,
-                    json.dumps(personalization) if personalization is not None else None,
-                    ts,
-                ),
+            message = self._append_message_on_connection(
+                conn,
+                thread_id=thread_id,
+                role=role,
+                content=content,
+                run_id=run_id,
+                provider=provider,
+                model=model,
+                effort=effort,
+                tools_used=tools_used,
+                tool_calls=tool_calls,
+                token_usage=token_usage,
+                tickers=tickers,
+                elapsed_seconds=elapsed_seconds,
+                is_error=is_error,
+                error_code=error_code,
+                personalization=personalization,
+                now=now,
             )
-            # Bump the parent thread's activity so list_threads orders it first.
-            conn.execute("UPDATE research_threads SET updated_at = ? WHERE id = ?", (ts, thread_id))
             conn.commit()
-            mid = cur.lastrowid
-            r = conn.execute("SELECT * FROM research_messages WHERE id = ?", (mid,)).fetchone()
-        return self._message(r)
+        return message
 
     def rename_thread(
         self,

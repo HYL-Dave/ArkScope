@@ -322,19 +322,17 @@ async def create_research_run(
     auth_mode, credential_id = _resolve_auth_metadata(provider)
     agent_question = _compose_agent_question(question, request.ticker)
 
-    if existing_thread is None:
-        thread_store.ensure_thread(
-            id=thread_id,
-            title=question[:TITLE_MAX],
-            ticker=(request.ticker or None),
-            provider=provider,
-            model=model,
-        )
     try:
-        run = run_store.create_run(
+        run = run_store.create_run_with_user_message(
+            thread_store=thread_store,
+            new_thread_title=(
+                question[:TITLE_MAX] if existing_thread is None else None
+            ),
             id=str(uuid.uuid4()),
             thread_id=thread_id,
             question=agent_question,
+            user_content=question,
+            user_tickers=[request.ticker] if request.ticker else None,
             ticker=(request.ticker or None),
             provider=provider,
             model=model,
@@ -345,12 +343,6 @@ async def create_research_run(
         )
     except ResearchRunUnavailableError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    thread_store.append_message(
-        thread_id=thread_id,
-        role="user",
-        content=question,
-        tickers=[request.ticker] if request.ticker else None,
-    )
     schedule_research_run(
         run_id=run.id,
         run_store=run_store,
