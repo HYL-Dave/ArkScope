@@ -7,26 +7,32 @@
 (function () {
   "use strict";
 
-  // Try multiple article body selectors (SA DOM may change)
-  var SELECTORS = [
-    "article",
-    '[data-testid="article-body"]',
+  // Prefer provider-owned content containers. Generic <article> nodes can be
+  // disclosure cards, and the page may contain more than one content container.
+  var container = findLargestContainer([
+    '[data-test-id="content-container"]',
     '[data-testid="content-container"]',
+    '[data-test-id="article-body"]',
+    '[data-testid="article-body"]',
     ".paywall-full-content",
     "#content-body",
-    "main",
-  ];
-
-  var container = null;
-  for (var i = 0; i < SELECTORS.length; i++) {
-    container = document.querySelector(SELECTORS[i]);
-    if (container && container.innerText.trim().length > 200) break;
-    container = null;
+  ]);
+  if (!container) {
+    container = findLargestContainer(["article", "main"]);
   }
   if (!container) {
     return {
       error: "Article container not found",
-      selectors_tried: SELECTORS,
+      selectors_tried: [
+        '[data-test-id="content-container"]',
+        '[data-testid="content-container"]',
+        '[data-test-id="article-body"]',
+        '[data-testid="article-body"]',
+        ".paywall-full-content",
+        "#content-body",
+        "article",
+        "main",
+      ],
       page_text_length: (document.body ? document.body.innerText.length : 0),
     };
   }
@@ -75,6 +81,22 @@
     url: location.href,
     scraped_at: new Date().toISOString(),
   };
+
+  function findLargestContainer(selectors) {
+    var best = null;
+    var bestLength = 0;
+    for (var i = 0; i < selectors.length; i++) {
+      var nodes = document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < nodes.length; j++) {
+        var length = (nodes[j].innerText || "").trim().length;
+        if (length > 200 && length > bestLength) {
+          best = nodes[j];
+          bestLength = length;
+        }
+      }
+    }
+    return best;
+  }
 
   // --- Core extraction ---
 

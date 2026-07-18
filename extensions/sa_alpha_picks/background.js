@@ -191,6 +191,7 @@ const COMMENT_SCROLL_PROFILES = {
     settleMs: 1200,
   },
 };
+const ARTICLE_INITIAL_SETTLE_MS = 2500;
 const RECONCILIATION_ENRICHMENT_LIMITS = { quick: 4, full: 12, backfill: 20 };
 var marketNewsRefreshInFlight = false;
 var saSyncJobChain = Promise.resolve();
@@ -1591,6 +1592,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
       var ready = await waitForArticleReady(tabId);
       if (!ready.ok) { failed++; continue; }
+      await settleArticleBeforeScroll(tabId);
 
       // Scrape body
       var detail = await injectDetailScraper(tabId);
@@ -1646,7 +1648,9 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     try {
       await chrome.tabs.update(tabId, { url: cItem.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(cItem.url));
-      await waitForArticleReady(tabId);
+      var commentsReady = await waitForArticleReady(tabId);
+      if (!commentsReady.ok) continue;
+      await settleArticleBeforeScroll(tabId);
 
       // Scroll to load comments (natural delay)
       await scrollToComments(tabId, {
@@ -1749,6 +1753,7 @@ async function doManualFetch(items) {
         await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
         var ready = await waitForArticleReady(tabId);
         if (!ready.ok) { failed++; continue; }
+        await settleArticleBeforeScroll(tabId);
 
         var articleId = item.article_id;
 
@@ -1881,6 +1886,16 @@ async function scrollToLoadAll(tabId, maxScrolls) {
 
 function getCommentScrollProfile(mode) {
   return COMMENT_SCROLL_PROFILES[mode] || COMMENT_SCROLL_PROFILES.quick;
+}
+
+async function settleArticleBeforeScroll(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: function () {
+      window.scrollTo(0, 0);
+    },
+  });
+  await sleep(ARTICLE_INITIAL_SETTLE_MS);
 }
 
 async function scrollToComments(tabId, options) {

@@ -72,6 +72,7 @@ injectArticlesListScraper = async function () {
   return [{ article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a" }];
 };
 waitForArticleReady = async function () { return { ok: true }; };
+settleArticleBeforeScroll = async function () {};
 injectDetailScraper = async function () {
   return {
     title: "Provider title",
@@ -207,6 +208,7 @@ def test_manual_fetch_never_copies_user_symbol_into_provider_or_content_evidence
         chrome.tabs.update = async function () {};
         waitForTabLoad = async function () {};
         waitForArticleReady = async function () { return { ok: true }; };
+        settleArticleBeforeScroll = async function () {};
         injectDetailScraper = async function () {
           return {
             title: "Provider title", publish_date: "Jul 15, 2026",
@@ -303,3 +305,70 @@ def test_capture_success_survives_nested_reconciliation_failure():
     assert result["fetched"] == 1
     assert result["failed"] == 0
     assert result["reconciliation_failed"] == 1
+
+
+def test_comment_refresh_settles_after_ready_before_scrolling():
+    result = _run_background(
+        r"""
+        var events = [];
+        sendProgress = function () {};
+        sleep = async function () {};
+        chrome.tabs.update = async function () {};
+        waitForTabLoad = async function () {};
+        waitForArticlesReady = async function () { return { ok: true }; };
+        scrollToLoadAll = async function () {};
+        injectArticlesListScraper = async function () {
+          return [{ article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a" }];
+        };
+        waitForArticleReady = async function () {
+          events.push("ready");
+          return { ok: true };
+        };
+        settleArticleBeforeScroll = async function () { events.push("settled"); };
+        scrollToComments = async function () { events.push("scrolled"); };
+        injectCommentsScraper = async function () { return { comments: [] }; };
+        sendNativeMessage2 = async function (message) {
+          if (message.action === "save_articles_meta") {
+            return {
+              status: "ok", saved: 1, need_content: [],
+              need_comments: [{ article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a" }],
+              unresolved_symbols: [], reconciliation: { status: "ok", enrichment: [] },
+            };
+          }
+          if (message.action === "save_comments_only") return { status: "ok" };
+          return { status: "ok", unresolved_symbols: [], review_queue: { total: 0, events: [] } };
+        };
+        await doDetailFetch(1, [], "quick");
+        return events;
+        """
+    )
+
+    assert result == ["ready", "settled", "scrolled"]
+
+
+def test_article_settle_resets_to_top_and_waits_two_and_a_half_seconds():
+    assert "async function settleArticleBeforeScroll" in BACKGROUND.read_text(
+        encoding="utf-8"
+    )
+    result = _run_background(
+        r"""
+        var calls = [];
+        chrome.scripting.executeScript = async function (request) {
+          calls.push({
+            kind: "script",
+            tab_id: request.target.tabId,
+            source: String(request.func),
+          });
+        };
+        sleep = async function (milliseconds) {
+          calls.push({ kind: "sleep", milliseconds: milliseconds });
+        };
+        await settleArticleBeforeScroll(17);
+        return calls;
+        """
+    )
+
+    assert result[0]["kind"] == "script"
+    assert result[0]["tab_id"] == 17
+    assert "scrollTo(0, 0)" in result[0]["source"]
+    assert result[1] == {"kind": "sleep", "milliseconds": 2500}

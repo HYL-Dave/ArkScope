@@ -142,3 +142,31 @@ def test_list_and_detail_scrapers_emit_distinct_observation_fields(tmp_path):
     assert detail_payload["detail_ticker"] == "BTSG"
     assert detail_payload["detail_ticker_observed_at"].endswith("Z")
     assert "list_ticker" not in detail_payload
+
+
+def test_detail_scraper_prefers_provider_main_content_over_disclosure_article(tmp_path):
+    fixture = tmp_path / "detail-main-content.html"
+    fixture.write_text(
+        """<!doctype html><html><body>
+        <h1>Stock Buy: A Provider Title Without A Ticker</h1>
+        <article><p>Analyst's Disclosure: no positions. """
+        + ("Disclosure boilerplate. " * 30)
+        + """</p></article>
+        <div data-test-id="content-container">
+          <h2>Business Overview</h2>
+          <p>Provider-captured investment analysis. """
+        + ("Fundamental operating evidence. " * 30)
+        + """</p>
+        </div>
+        <div data-test-id="content-container">
+          <p>Seeking Alpha's Disclosure: informational purposes only.</p>
+        </div>
+        </body></html>""",
+        encoding="utf-8",
+    )
+
+    payload = _run_fixture(fixture, IDENTITY, DETAIL_SCRAPER)
+
+    assert "Business Overview" in payload["body_markdown"]
+    assert "Fundamental operating evidence" in payload["body_markdown"]
+    assert "Analyst's Disclosure" not in payload["body_markdown"]
