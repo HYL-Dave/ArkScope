@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTED FOR REVIEW — ALL IMPLEMENTER GATES CLOSED 2026-07-18
+> **Status:** MERGED / LIVE 2026-07-18 — EXTERNAL DESIGN KIT SYNC PENDING
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -269,6 +269,32 @@ found by the disposable browser gate and recorded under Task 8.
   The user's unrelated `config/tickers_core.json` edit remains untouched.
 - Final product/test tip for independent review is `341e760`; no merge or
   post-review closeout action has been performed.
+
+### Post-Review Merge Closeout — MERGED / LIVE (2026-07-18)
+
+- Independent implementation review passed canonical A/B, frontend, static,
+  no-PG, and a separate 57-check responsive/runtime replay, then explicitly
+  approved local integration at product tip `341e760` / docs tip `5bbc753`.
+- `master` fast-forwarded from `5be79a6` through `5bbc753`. The user's unrelated
+  `config/tickers_core.json` edit remained unstaged and unchanged.
+- Fresh merged-tree verification passed frontend `60 files / 572 tests`,
+  typecheck, production build (only the existing chunk-size warning), no-PG
+  `ok:true / pg_attempts:[]`, and every static layout/privacy/API ratchet.
+  Research-focused backend verification produced `126 passed` plus the known
+  bare-environment `eventkit` no-current-loop setup error already present in
+  the canonical seven-error family; no new product failure appeared.
+- A scheduler-disabled sidecar, fresh `/tmp` profile, Vite, and headless Chrome
+  replayed the six responsive widths on the merged tree. The first harness run
+  omitted two required supplemental seed records and correctly found no
+  background-work trigger; after adding those documented disposable fixtures,
+  the unchanged product passed exact archived navigation, history filters,
+  lifecycle mutations, active-run rejection, typed-error privacy, Developer
+  sanitization, legacy linkage, and all responsive geometry checks.
+- Temporary ports `8421`, `8432`, and `9223` all refused connections after
+  cleanup. The external Claude Design companion cannot be authenticated from
+  this session, so its shipped-screen sync remains a separately named pending
+  gate rather than a false completion claim. The canonical multi-slice spec
+  remains `APPROVED`, not globally complete.
 
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest

@@ -229,11 +229,10 @@ therefore defaults to defer until the hypothesis gate exists.
   frontend accounting, responsive/live, static, backend-byte-identity, and
   merged-tree verification gates are closed.** The external Claude Design
   companion sync remains the one separate post-merge gate. **Slice 3 Research
-  workspace is IMPLEMENTED FOR REVIEW on branch
-  `codex/p2-8-slice-3-research-workspace` at product tip `341e760`; all
-  implementer gates, canonical A/B, responsive browser verification, and the
-  one-call provider smoke are closed, but independent implementation review
-  and merge approval remain pending**
+  workspace is MERGED / LIVE 2026-07-18 through `5bbc753`; independent
+  canonical A/B, merged-tree frontend/no-PG/static gates, responsive browser
+  verification, and the one-call provider smoke are closed. Its external
+  Claude Design companion sync remains separately pending**
   (`docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`).
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
   2026-07-18 through closeout base `b3d9728`**. P2.8 Slice 3 is the active
@@ -433,6 +432,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-18 (P2.8 SLICE 3 RESEARCH WORKSPACE MERGED / LIVE — external Design Kit sync pending)**: Independent implementation review returned PASS and explicitly approved local integration at product tip `341e760` / docs tip `5bbc753`; `master` fast-forwarded from `5be79a6` through `5bbc753` while preserving the user's unstaged `config/tickers_core.json` edit. Reviewer canonical A/B remained exact at backend `+34/-0` with identical `30 failed / 74 skipped / 18 warnings / 7 errors`; merged-tree frontend is `60 files / 572 tests`, typecheck/build pass with only the existing chunk warning, no-PG is `ok:true / pg_attempts:[]`, and static privacy/layout/API ratchets are clean. A fresh merged-tree disposable profile repeated all six responsive widths and passed exact archived navigation, history filtering, lifecycle mutations, active-run rejection, typed-error privacy, Developer sanitization, and legacy linkage; ports `8421/8432/9223` refused connections after cleanup. Focused backend on the merged worktree produced `126 passed` plus the same known bare-environment `eventkit` setup error from the canonical error family. Slice 3 is live; the external Claude Design Research-screen/pinnable-Drawer/progress-error companion sync remains explicitly pending because this session has no authenticated DesignSync capability. Slice 4, Alpha Picks reconciliation, and DB-universe retirement remain separate candidate lines and have not started implicitly.
 
 - **2026-07-18 (P2.8 SLICE 3 RESEARCH WORKSPACE IMPLEMENTED FOR REVIEW — all implementer gates closed)**: Branch `codex/p2-8-slice-3-research-workspace` stops at product tip `341e760` without merge. The shipped transcript/run authorities now support deterministic bounded history, exact run/message linkage, rename/archive/confirmed delete, typed failures, complete per-run provider/model/effort selection from the shared Models-UX authority, factual bounded progress, one conversation workspace, on-demand History, and wide-only pinnable Evidence. Canonical virgin A/B at `c78203a` versus the backend product stack retained identical `30 failed / 74 skipped / 18 warnings / 7 errors`, empty bidirectional failure/error identity diff, and exact `4378 -> 4412` collection / `4267 -> 4301` passed (`+34/-0`). Frontend is exactly `56/533 -> 60/572`, raw `+54/-15`; the extra reviewed node is a RED-first StrictMode exact-target regression found by the browser gate and fixed in `9dcdbfc`. Final self-review then strengthened an existing Evidence node without changing collection and fixed persisted semantic effort `default` to render consistently as `Provider 預設` in `341e760`. Full frontend, typecheck/build, no-PG, static privacy/layout/API ratchets, six responsive boundaries, lifecycle/history mutations, typed error privacy, and process cleanup passed. One authorized live call used `chatgpt_oauth / gpt-5.4-mini / default`, observed `creating -> queued -> running -> succeeded`, retained a local draft, used zero tools, preserved exact tuple/run linkage across leave/return, made no fallback, and deleted its disposable thread through ConfirmDialog. Independent implementation review is the remaining gate; do not merge, mark Slice 3 LIVE, sync the Design Kit, or begin Slice 4/Alpha Picks/universe implementation yet.
 
