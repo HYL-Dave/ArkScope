@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASKS 1–5 COMPLETE / TASK 6 IN PROGRESS 2026-07-18
+> **Status:** IMPLEMENTATION IN PROGRESS — TASKS 1–6 COMPLETE / TASK 7 IN PROGRESS 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -156,6 +156,30 @@ is backend `+34/-0` and frontend `+53/-15`.
   `13 passed`; the complete frontend at this checkpoint is `56 files / 536
   tests`, with typecheck and build passing. Spec review and the original
   accessibility reviewer both returned final PASS.
+
+### Task 6 — COMPLETE (2026-07-18)
+
+- RED-first foundation commits `1bcb5c0` and `2101c63` separated bounded
+  history metadata from visited transcript state, added the typed history
+  clients and focus-managed Drawer, and contributed exactly ten history UI
+  nodes. Product commit `789b734` removed the permanent history column,
+  hydrated only the selected transcript, acknowledged shell targets once, and
+  kept archived transcripts visible but inert.
+- Existing shell/reducer/App nodes were strengthened in place, so review
+  hardening added no collection. The RED evidence covered current-selection
+  hydration before replay, stale-session `404` versus transient `500`, stale
+  active-run cleanup after mutation, filtered rename/archive/delete races,
+  duplicate rename submission, and Cancel/Escape/overlay focus restoration.
+- Exact checkpoint is `58 files / 552 tests`; the four affected suites are
+  `94 passed`. Typecheck and production build pass with only the existing
+  chunk-size warning. Static checks show no production `research-threads`,
+  `threadMenuId`, `window.confirm`, temporary diagnostics, or eager
+  `getResearchThreads` owner.
+- Two independent reviewers re-ran after every correction and returned final
+  PASS: exact-thread `500` preserves the saved target while `404` alone may
+  fall back; revisited replay waits for the current transcript request; all
+  history mutations reload the latest server-side filters and reject stale
+  responses.
 
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
@@ -948,7 +972,7 @@ git commit -m "feat: add pinnable drawer variant"
 `ResearchHistoryDrawer.test.tsx`; evolve existing shell-navigation tests without
 renaming them.
 
-- [ ] **Step 1: Write exactly ten RED history UI tests**
+- [x] **Step 1: Write exactly ten RED history UI tests**
 
 1. initial workspace renders conversation with no permanent history width;
 2. History trigger opens a focus-managed Drawer and loads bounded rows;
@@ -974,14 +998,14 @@ local midnight and the upper bound to the next local midnight, then send UTC
 ISO instants; the backend compares stored UTC timestamps with an exclusive
 upper bound. Do not parse a local date as UTC midnight.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
   src/ResearchHistoryDrawer.test.tsx src/ResearchShellNavigation.test.tsx
 ```
 
-- [ ] **Step 3: Add typed frontend clients**
+- [x] **Step 3: Add typed frontend clients**
 
 Extend DTOs with additive archive/latest-status/run-link/error-code fields. Add:
 
@@ -994,7 +1018,7 @@ Retain `getResearchThreads(limit)` as a small compatibility wrapper if existing
 shell code still needs it; it delegates to the new query and creates no second
 response parser.
 
-- [ ] **Step 4: Decouple the history index from hydrated transcript state**
+- [x] **Step 4: Decouple the history index from hydrated transcript state**
 
 The history component/hook owns rows, filters, total, offset, stale/error state,
 and request sequencing. The reducer owns only visited/hydrated conversations and
@@ -1010,7 +1034,7 @@ Old slow responses cannot overwrite a newer selected thread or filter result.
 Refresh failure keeps prior rows and renders `stale`, never a fabricated empty
 history.
 
-- [ ] **Step 5: Implement deterministic history UI**
+- [x] **Step 5: Implement deterministic history UI**
 
 Use PageHeader/Drawer/Button/IconButton/StatusBadge/ConfirmDialog. Row content:
 
@@ -1028,7 +1052,7 @@ the selected inactive thread leaves its transcript visible but inert. Deleting
 the selected thread clears the session active ID and opens a blank new-thread
 workspace.
 
-- [ ] **Step 6: Run GREEN and commit**
+- [x] **Step 6: Run GREEN and commit**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
