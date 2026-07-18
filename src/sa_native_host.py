@@ -149,7 +149,7 @@ def handle_message(msg):
 
 _SA_PICK_DATE_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$|^\d{4}-\d{2}-\d{2}")
 _SA_PICK_PCT_RE = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?%")
-_SA_PICK_SYMBOL_RE = re.compile(r"^[A-Z][A-Z.]{0,9}$")
+_SA_PICK_SYMBOL_RE = re.compile(r"^[A-Z][A-Z.]{0,9}\*?$")
 _VALID_REFRESH_SCOPES = {"current", "closed"}
 
 

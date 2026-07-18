@@ -122,7 +122,31 @@ def test_alpha_picks_scraper_parses_live_company_column_shape():
                 ],
                 "detail_url": "https://seekingalpha.com/alpha-picks/exit-analysis",
             },
-        }
+        },
+        {
+            "company": "",
+            "symbol": "SMCI*",
+            "picked_date": "2022-11-15",
+            "closed_date": "2024-10-30",
+            "return_pct": 301.41,
+            "sector": "Information Technology",
+            "sa_rating": "HOLD",
+            "holding_pct": None,
+            "detail_url": "https://seekingalpha.com/alpha-picks/smci-exit-analysis",
+            "raw_data": {
+                "cells": [
+                    "",
+                    "SMCI*",
+                    "11/15/2022",
+                    "10/30/2024",
+                    "301.41%",
+                    "Information Technology",
+                    "HOLD",
+                    "Open",
+                ],
+                "detail_url": "https://seekingalpha.com/alpha-picks/smci-exit-analysis",
+            },
+        },
     ]
 
 

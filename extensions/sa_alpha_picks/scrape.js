@@ -100,7 +100,7 @@
   function findSymbolIndex(texts) {
     for (var i = 0; i + 1 < texts.length; i++) {
       var candidate = String(texts[i] || "").trim().toUpperCase();
-      if (!/^[A-Z][A-Z.]{0,9}$/.test(candidate)) continue;
+      if (!/^[A-Z][A-Z.]{0,9}\*?$/.test(candidate)) continue;
       if (parseDate(texts[i + 1])) return i;
     }
     return -1;
