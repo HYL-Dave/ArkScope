@@ -113,6 +113,15 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
   from `848ffd4` and contain this plan plus any reviewed plan-only corrections.
   Never branch implementation directly from `848ffd4`, which would omit its
   own execution authority.
+- Resolved `PLAN_REVIEW_CLEARANCE_COMMIT`:
+  `59e473bbfffb579825de94371657201255d07639`. Isolated implementation branch:
+  `codex/alpha-picks-article-reconciliation` at
+  `/tmp/arkscope-alpha-picks-reconciliation`. The initial single-step checkout
+  stopped before materialization because linked-worktree git-crypt metadata was
+  absent; the retry used `--no-checkout`, copied only the repository's existing
+  worktree key into Git metadata, and populated `HEAD` with `git read-tree`.
+  Final implementation worktree status was clean; no main-worktree file was
+  copied.
 - Canonical behavior baseline collected on 2026-07-18:
 
   ```text
@@ -237,7 +246,7 @@ Chrome/Firefox native messaging, Node.js + jsdom fixture tests, and the existing
   structural fixtures that Task 5 tests consume. No selector may be written
   before these fixtures exist.
 
-- [ ] **Step 1: Create the isolated implementation worktree**
+- [x] **Step 1: Create the isolated implementation worktree**
 
 Invoke `superpowers:using-git-worktrees`, then create:
 
@@ -255,7 +264,7 @@ Do not copy the main worktree's dirty `config/tickers_core.json`. If git-crypt
 requires the repository's existing linked-worktree setup, copy only its key
 through the established worktree mechanism and prove tracked files are clean.
 
-- [ ] **Step 2: Re-run and record exact baselines**
+- [x] **Step 2: Re-run and record exact baselines**
 
 Run in the isolated worktree:
 
@@ -270,7 +279,13 @@ Expected: `4412`, `161`, and `60 files / 572 tests`; typecheck PASS. A changed
 baseline is a stop condition: reconcile it against commits after `848ffd4`
 before writing RED tests.
 
-- [ ] **Step 3: Capture the real BTSG list-card DOM without credentials**
+Recorded from the clean clearance worktree on 2026-07-18: full collection
+`4412`, focused collection `161`, frontend `60 files / 572 tests`, and
+TypeScript typecheck PASS. `npm install` materialized only ignored dependencies;
+its audit reported the repository's existing `1 moderate / 3 high` dependency
+advisories, which are outside this slice and were not auto-mutated.
+
+- [x] **Step 3: Capture the real BTSG list-card DOM without credentials**
 
 On the live `https://seekingalpha.com/alpha-picks/articles` page, run this exact
 DevTools-console expression and inspect the returned clone before saving it:
@@ -301,7 +316,12 @@ visible `Jul 15, 2026, 12:00 PM`, `BTSG`, `265 Comments`, article title, and
 canonical article path, while containing no cookies, account identity, tokens,
 tracking query parameters, unrelated recommendations, or full article body.
 
-- [ ] **Step 4: Capture the real BTSG detail-header DOM independently**
+Captured from the user's authenticated browser on 2026-07-18. The sanitized
+fragment retained the provider's real `data-test-id` structure, exact date,
+ticker, comment count, title, and canonical path. A negative scan found no
+cookie, authorization, token, account, session, or unrelated-content material.
+
+- [x] **Step 4: Capture the real BTSG detail-header DOM independently**
 
 On the BTSG article detail page run:
 
@@ -331,7 +351,13 @@ header. Do not include Summary/body text, account/session material, share
 links, or comments. If either live fixture cannot be captured, stop Task 0;
 screenshots or invented DOM are not substitutes.
 
-- [ ] **Step 5: Add the deterministic jsdom runner**
+Captured independently from the authenticated BTSG detail page on 2026-07-18.
+The provider ancestor contained the whole article, so the fixture deliberately
+retained only its real heading, date, and primary-ticker nodes; the summary,
+body, author, actions, disclosures, and comments were discarded before any repo
+write. The same privacy and unrelated-content negative scan passed.
+
+- [x] **Step 5: Add the deterministic jsdom runner**
 
 Create `tests/js/run_sa_extension_fixture.mjs` with a JSON-lines contract:
 
