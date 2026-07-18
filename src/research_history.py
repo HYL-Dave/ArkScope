@@ -118,7 +118,7 @@ def _utc_bound(value: str | None, field: str) -> tuple[str | None, datetime | No
         raise ValueError(f"research history {field} must be a timezone-aware timestamp")
 
     normalized = parsed.astimezone(timezone.utc)
-    return normalized.isoformat(timespec="seconds"), normalized
+    return normalized.isoformat(), normalized
 
 
 def _normalized_query(

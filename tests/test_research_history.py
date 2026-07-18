@@ -231,6 +231,21 @@ def test_query_filters_updated_window_before_limit(stores):
     )
     _assert_bounded_page(z_page, ["match-z"], total=2)
 
+    after_half_second = history.query_threads(
+        updated_from="2026-07-18T02:00:00.500000Z",
+        updated_before="2026-07-18T03:00:00Z",
+        limit=1,
+    )
+    assert after_half_second.threads == ()
+    assert after_half_second.total == 0
+
+    before_half_second = history.query_threads(
+        updated_from="2026-07-18T01:00:00Z",
+        updated_before="2026-07-18T02:00:00.500000Z",
+        limit=1,
+    )
+    _assert_bounded_page(before_half_second, ["match-z"], total=2)
+
     with pytest.raises(ValueError, match="updated_from"):
         history.query_threads(updated_from="not-a-timestamp")
     with pytest.raises(ValueError, match="updated_before"):
