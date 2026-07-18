@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 1 COMPLETE 2026-07-18
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 2 COMPLETE / TASK 3 IN PROGRESS 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -69,6 +69,29 @@ backend `+34/-0` and frontend `+52/-15`.
   The reviewed suggestion to add an index or redesign the latest-run CTE was
   not adopted because no measured regression justified speculative storage
   or query-plan changes.
+
+### Task 2 — COMPLETE (2026-07-18)
+
+- RED-first lifecycle/API work landed in `3f713d6`; follow-up transaction
+  reviews produced three real SQLite failures before their fixes: active-run
+  archive/delete races, partial multi-field PATCH, and split history/active-run
+  snapshots. Commits `464de35`, `0fdbda1`, and `41b0e2f` serialize those writes,
+  make new thread/run/user-message creation atomic, snapshot prior history in
+  the same writer transaction, and terminalize a failed scheduler handoff
+  without leaving an active orphan.
+- Exact collection accounting remains `27` thread-store nodes, `44` route
+  nodes, and `10` history nodes. Final focused verification is `94 passed`;
+  adjacent store coverage is `13 passed`. The known bare-environment
+  `eventkit` setup family remains `20 passed, 1 error` when that file is added.
+- Independent spec review returned PASS. Quality review confirmed fixed lock
+  order (`run -> thread`), cross-instance `BEGIN IMMEDIATE` serialization,
+  rollback on message failure, same-snapshot history, and post-commit schedule
+  failure recovery.
+- The same review exposed one cross-task terminal seam: cancellation and
+  startup reconciliation still write terminal status before their assistant
+  error turn. This is not waived. Task 3's already-accounted tests 9 and 10
+  must be true SQLite interleaving tests, and Task 3 must commit status, event,
+  and linked typed message atomically before its review can pass.
 
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
