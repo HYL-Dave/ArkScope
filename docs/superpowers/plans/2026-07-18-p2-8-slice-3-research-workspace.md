@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 3 AND TASK 5 COMPLETE / TASK 4 IN PROGRESS 2026-07-18
+> **Status:** IMPLEMENTATION IN PROGRESS — TASKS 1–5 COMPLETE / TASK 6 IN PROGRESS 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -30,8 +30,9 @@ result subtype. Strengthen its existing error-result test in place; do not add a
 node. Any different future SDK shape remains `provider_call_failed` and is a
 stop-and-review condition, not grounds for fuzzy text inference. The shared
 classifier test remains one node and loops over the three central shapes plus
-near misses, including per-tool timeout text. Reviewed accounting remains
-backend `+34/-0` and frontend `+52/-15`.
+near misses, including per-tool timeout text. Task 4 implementation review
+later added one auth/retry regression node, so current authoritative accounting
+is backend `+34/-0` and frontend `+53/-15`.
 
 ## Implementation Ledger
 
@@ -115,6 +116,31 @@ backend `+34/-0` and frontend `+52/-15`.
   remains byte-identical, public error detail is redacted/bounded, new
   selection/message contracts expose no credential identity, and all four
   API-key/OAuth branches receive `None` rather than literal `default`.
+
+### Task 4 — COMPLETE (2026-07-18)
+
+- RED-first product commit `3c1cca9` extracted the shipped Settings option
+  policy into `modelPicker.ts`, replaced Research's permissive discovery and
+  first-option fallbacks with one pure tuple resolver, and removed exactly the
+  reviewed `11 + 4` obsolete policy nodes. The new authorities contributed
+  exactly `8 + 12` nodes; Settings rendering stayed on the same shared reason
+  and grouping functions.
+- Independent review found two coupled desktop failures. The thread-selection
+  request bypassed `api.ts`, so Electron's token guard returned 401; a failed
+  request then left Send disabled with neither visible state nor retry. Commit
+  `a4bdcf7` first proved both failures RED, moved the request through the shared
+  authenticated/timeout client, and added a visible fail-closed retry without
+  fallback.
+- The retry contract adds one reviewed node, reconciling Task 4 to a net `+6`
+  and the full frontend checkpoint to `57 files / 542 tests`. Typecheck and
+  production build pass; the only build output is the pre-existing chunk-size
+  warning. Independent re-review returned PASS.
+- A review suggestion to use the global explicit tuple for an existing thread
+  with no successful run was rejected: canonical spec §8.3 deliberately makes
+  existing-thread continuity and new-thread explicit preference asymmetric.
+  Such a thread therefore reaches the Settings route only when it has no
+  successful thread-owned tuple; it never silently substitutes a tuple that
+  belongs to another thread.
 
 ### Task 5 — COMPLETE IN PARALLEL (2026-07-18)
 
@@ -205,13 +231,15 @@ UI primitives.
   - `tests/test_research_routes.py`: `+8` nodes.
   Focused collection becomes `127`; canonical collection becomes `4412`; if
   the existing family is identical, passed becomes `4301`.
-- Reviewed frontend raw collection delta is exactly `+52/-15`, a net `+37`:
+- Current frontend raw collection delta is exactly `+53/-15`, a net `+38`:
   - new `modelPicker.test.ts`: `8` nodes;
   - new `researchSelection.test.ts`: `12` nodes;
   - new `ResearchHistoryDrawer.test.tsx`: `10` nodes;
   - new `ResearchWorkspace.test.tsx`: `12` nodes;
   - new `researchErrors.test.tsx`: `7` nodes;
   - existing `ui/overlays.test.tsx`: `+3` nodes;
+  - existing `ResearchShellNavigation.test.tsx`: `+1` review-hardening node
+    proving authenticated selection recovery and visible fail-closed retry;
   - remove exactly `11` obsolete `modelOptions` / `defaultModel` /
     `lastAssistantSelection` nodes from `researchModels.test.ts` and exactly
     `4` obsolete `chooseResearchProvider` nodes from
@@ -219,9 +247,9 @@ UI primitives.
   The removed nodes assert the policy this slice deliberately retires: a second
   discovered-model list plus silent route/first-option fallback. Their intents
   map one-for-one into the new shared picker and precedence tests. Final
-  frontend accounting is `60 files / 570 tests`.
+  frontend accounting is `60 files / 571 tests`.
 - Existing tests may be strengthened in place, but any backend delta other than
-  `+34/-0`, any frontend raw delta other than `+52/-15`, or any unexplained
+  `+34/-0`, any frontend raw delta other than `+53/-15`, or any unexplained
   file-count change is a stop condition requiring ledger reconciliation before
   continuing.
 
@@ -773,7 +801,7 @@ modify `Settings.tsx`, `Research.tsx`, `researchModels.ts`,
 `researchModels.test.ts`, and `researchProvider.ts`; delete the obsolete
 `researchProvider.test.ts`.
 
-- [ ] **Step 1: Write eight RED shared-picker tests**
+- [x] **Step 1: Write eight RED shared-picker tests**
 
 Pin:
 
@@ -786,7 +814,7 @@ Pin:
 7. missing active credential is one provider veto for all entries;
 8. Settings and Research receive the same disabled reason for the same fixture.
 
-- [ ] **Step 2: Write twelve RED selection tests**
+- [x] **Step 2: Write twelve RED selection tests**
 
 Pin:
 
@@ -805,21 +833,21 @@ Pin:
     SDK/key fallback. A separately observed missing SDK package may only add a
     fail-closed runtime veto to that effective provider.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
   src/modelPicker.test.ts src/researchSelection.test.ts
 ```
 
-- [ ] **Step 4: Extract, do not fork, the Settings authority**
+- [x] **Step 4: Extract, do not fork, the Settings authority**
 
 Move `optionReason`, `groupedModelEntries`, `compatEntries`, and their public
 types from `Settings.tsx` to `modelPicker.ts`. Migrate Settings imports with no
 rendered or test behavior change. The shared module accepts the exact effective
 provider/model DTOs; it never reads DOM or component state.
 
-- [ ] **Step 5: Implement one selection resolver**
+- [x] **Step 5: Implement one selection resolver**
 
 `researchSelection.ts` owns:
 
@@ -833,7 +861,7 @@ provider/model DTOs; it never reads DOM or component state.
 
 It stores no credential ID, prompt, ticker, run ID, or answer.
 
-- [ ] **Step 6: Remove obsolete fallback policy and reconcile the 15 nodes**
+- [x] **Step 6: Remove obsolete fallback policy and reconcile the 15 nodes**
 
 Remove Research use and implementation of permissive `modelOptions`,
 `defaultModel`, `lastAssistantSelection`, and `chooseResearchProvider` policy.
@@ -842,7 +870,7 @@ Keep provider-ID normalization/constants if still consumed. Delete exactly the
 supersedes its intent in the ledger. Do not leave dead exported fallback helpers
 for a future caller to rediscover.
 
-- [ ] **Step 7: Run shared/Settings GREEN and commit**
+- [x] **Step 7: Run shared/Settings GREEN and commit**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
@@ -1188,7 +1216,7 @@ npm run build --workspace apps/arkscope-web
 ```
 
 Expected: backend `4412` canonical / `127` focused; frontend exactly `60 files /
-570 tests`; typecheck/build pass with only explicitly identified pre-existing
+571 tests`; typecheck/build pass with only explicitly identified pre-existing
 warnings.
 
 - [ ] **Step 2: Run focused backend and no-PG smoke**
