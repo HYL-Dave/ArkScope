@@ -128,6 +128,13 @@
   width: min(100vw, 420px);
   border-radius: 0;
 }
+.ui-drawer-inline {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
 .ui-overlay-head {
   min-height: 48px;
   display: flex;
@@ -137,6 +144,7 @@
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
 }
+.ui-overlay-head-actions { display: flex; align-items: center; gap: var(--space-1); }
 .ui-overlay-head h2, .ui-confirm-dialog h2 { margin: 0; font-size: 16px; letter-spacing: 0; }
 .ui-drawer-body { min-height: 0; overflow: auto; padding: var(--space-3); }
 .ui-drawer-footer { padding: var(--space-3); border-top: 1px solid var(--border); }

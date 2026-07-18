@@ -186,6 +186,122 @@ describe("overlay focus contracts", () => {
     expect(dialog.getAttribute("data-shell-overlay")).toBe("true");
   });
 
+  it("wide_pinned_drawer_is_inline_without_modal_focus_ownership", async () => {
+    stubMatchMedia(false);
+    const onClose = vi.fn();
+
+    await render(
+      <>
+        <button>外部操作</button>
+        <Drawer
+          open
+          pinnable
+          pinned
+          title="研究證據"
+          onClose={onClose}
+          onPinnedChange={vi.fn()}
+        >
+          <button>查看證據</button>
+        </Drawer>
+      </>,
+    );
+
+    const inline = document.querySelector<HTMLElement>('[role="complementary"]')!;
+    const outside = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "外部操作")!;
+    expect(inline).not.toBeNull();
+    expect(host!.contains(inline)).toBe(true);
+    expect(inline.getAttribute("aria-modal")).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector(".ui-overlay-backdrop")).toBeNull();
+    expect(document.querySelector('[aria-label="取消釘選"]')).not.toBeNull();
+
+    outside.focus();
+    await act(async () => pressKey("Escape"));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(outside);
+  });
+
+  it("pinned_drawer_uses_modal_contract_at_the_shell_overlay_token", async () => {
+    stubMatchMedia(true);
+
+    await render(
+      <Drawer
+        open
+        pinnable
+        pinned
+        title="研究證據"
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+      >
+        <button>查看證據</button>
+      </Drawer>,
+    );
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog).not.toBeNull();
+    expect(host!.contains(dialog)).toBe(false);
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("data-shell-overlay")).toBe("true");
+    expect(document.querySelector(".ui-overlay-backdrop")).not.toBeNull();
+    expect(document.querySelector('[aria-label="釘選"]')).toBeNull();
+    expect(document.querySelector('[aria-label="取消釘選"]')).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector('[aria-label="關閉"]'));
+  });
+
+  it("pinning_keeps_focus_in_the_drawer_then_inline_close_restores_the_trigger", async () => {
+    stubMatchMedia(false);
+    const onClose = vi.fn();
+    const onPinnedChange = vi.fn();
+
+    function Fixture() {
+      const triggerRef = useRef<HTMLButtonElement>(null);
+      const [open, setOpen] = useState(false);
+      const [pinned, setPinned] = useState(false);
+      return (
+        <>
+          <button ref={triggerRef} onClick={() => setOpen(true)}>查看研究證據</button>
+          <Drawer
+            open={open}
+            pinnable
+            pinned={pinned}
+            title="研究證據"
+            returnFocusRef={triggerRef}
+            onPinnedChange={(nextPinned) => {
+              onPinnedChange(nextPinned);
+              setPinned(nextPinned);
+            }}
+            onClose={() => {
+              onClose();
+              setOpen(false);
+            }}
+          >
+            <button>查看證據</button>
+          </Drawer>
+        </>
+      );
+    }
+
+    await render(<Fixture />);
+    const trigger = document.querySelector<HTMLButtonElement>("button")!;
+    trigger.focus();
+    await act(async () => trigger.click());
+
+    const pin = document.querySelector<HTMLButtonElement>('[aria-label="釘選"]')!;
+    pin.focus();
+    await act(async () => pin.click());
+    expect(onPinnedChange).toHaveBeenCalledWith(true);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="complementary"]')).not.toBeNull();
+    expect(document.activeElement).not.toBe(trigger);
+    expect(document.activeElement).toBe(document.querySelector('[aria-label="取消釘選"]'));
+
+    const close = document.querySelector<HTMLButtonElement>('[aria-label="關閉"]')!;
+    await act(async () => close.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("confirm_dialog_focuses_cancel_for_a_destructive_action", async () => {
     await render(
       <ConfirmDialog
