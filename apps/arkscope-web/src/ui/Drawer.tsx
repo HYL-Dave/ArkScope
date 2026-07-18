@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
+import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Pin, PinOff, X } from "lucide-react";
 import { IconButton } from "./Button";
@@ -33,21 +33,16 @@ export function Drawer({
   const shellOverlay = useShellOverlay();
   const inline = open && pinnable && pinned && !shellOverlay;
   const modalOpen = open && !inline;
-  const previousModalOpenRef = useRef(modalOpen);
 
   useOverlayFocus({
     open: modalOpen,
+    present: open,
     containerRef: panelRef,
     initialFocusRef: closeRef,
+    inactiveFocusRef: pinRef,
     returnFocusRef,
     onEscape: onClose,
   });
-
-  useEffect(() => {
-    const wasModalOpen = previousModalOpenRef.current;
-    previousModalOpenRef.current = modalOpen;
-    if (inline && wasModalOpen) pinRef.current?.focus();
-  }, [inline, modalOpen]);
 
   if (!open) return null;
 

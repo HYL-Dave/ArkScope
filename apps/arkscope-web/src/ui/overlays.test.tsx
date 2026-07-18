@@ -22,6 +22,31 @@ function stubMatchMedia(matches: boolean) {
   })));
 }
 
+function stubMutableMatchMedia(initialMatches: boolean) {
+  let matches = initialMatches;
+  const listeners = new Set<() => void>();
+  const media = {
+    get matches() { return matches; },
+    media: "(max-width: var(--shell-overlay-breakpoint))",
+    onchange: null,
+    addEventListener: vi.fn((_type: string, listener: () => void) => listeners.add(listener)),
+    removeEventListener: vi.fn((_type: string, listener: () => void) => listeners.delete(listener)),
+    addListener: vi.fn((listener: () => void) => listeners.add(listener)),
+    removeListener: vi.fn((listener: () => void) => listeners.delete(listener)),
+    dispatchEvent: vi.fn(() => true),
+  };
+  vi.stubGlobal("matchMedia", vi.fn(() => media));
+  return {
+    async setMatches(nextMatches: boolean) {
+      matches = nextMatches;
+      await act(async () => {
+        listeners.forEach((listener) => listener());
+        await Promise.resolve();
+      });
+    },
+  };
+}
+
 async function render(node: ReactNode) {
   host = document.createElement("div");
   document.body.append(host);
@@ -250,14 +275,16 @@ describe("overlay focus contracts", () => {
   });
 
   it("pinning_keeps_focus_in_the_drawer_then_inline_close_restores_the_trigger", async () => {
-    stubMatchMedia(false);
+    const viewport = stubMutableMatchMedia(false);
     const onClose = vi.fn();
     const onPinnedChange = vi.fn();
+    const onConfirmCancel = vi.fn();
 
     function Fixture() {
       const triggerRef = useRef<HTMLButtonElement>(null);
       const [open, setOpen] = useState(false);
       const [pinned, setPinned] = useState(false);
+      const [confirmOpen, setConfirmOpen] = useState(false);
       return (
         <>
           <button ref={triggerRef} onClick={() => setOpen(true)}>查看研究證據</button>
@@ -277,7 +304,19 @@ describe("overlay focus contracts", () => {
             }}
           >
             <button>查看證據</button>
+            <button onClick={() => setConfirmOpen(true)}>開啟確認</button>
           </Drawer>
+          <ConfirmDialog
+            open={confirmOpen}
+            title="移除證據"
+            consequence="移除後無法復原。"
+            confirmLabel="移除"
+            onConfirm={vi.fn()}
+            onCancel={() => {
+              onConfirmCancel();
+              setConfirmOpen(false);
+            }}
+          />
         </>
       );
     }
@@ -299,6 +338,34 @@ describe("overlay focus contracts", () => {
     const close = document.querySelector<HTMLButtonElement>('[aria-label="關閉"]')!;
     await act(async () => close.click());
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(trigger);
+
+    await viewport.setMatches(true);
+    await act(async () => trigger.click());
+    const confirmTrigger = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "開啟確認")!;
+    confirmTrigger.focus();
+    await act(async () => confirmTrigger.click());
+    const confirmDialog = document.querySelector<HTMLElement>(".ui-confirm-dialog")!;
+    expect(confirmDialog.contains(document.activeElement)).toBe(true);
+
+    await viewport.setMatches(false);
+    expect(document.querySelector('[role="complementary"]')).not.toBeNull();
+    expect(confirmDialog.contains(document.activeElement)).toBe(true);
+
+    await viewport.setMatches(true);
+    const modalDrawer = document.querySelector<HTMLElement>(".ui-drawer")!;
+    expect(modalDrawer.getAttribute("aria-modal")).toBe("true");
+    expect(confirmDialog.contains(document.activeElement)).toBe(true);
+
+    await act(async () => pressKey("Escape"));
+    expect(onConfirmCancel).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".ui-confirm-dialog")).toBeNull();
+    expect(modalDrawer.contains(document.activeElement)).toBe(true);
+
+    await act(async () => pressKey("Escape"));
+    expect(onClose).toHaveBeenCalledTimes(2);
     expect(document.activeElement).toBe(trigger);
   });
 
