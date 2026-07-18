@@ -235,10 +235,11 @@ therefore defaults to defer until the hypothesis gate exists.
   Claude Design companion sync remains separately pending**
   (`docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`).
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
-  2026-07-18 through closeout base `b3d9728`**. P2.8 Slice 3 is the active
-  review unit. Alpha Picks article reconciliation and DB-derived
-  universe/`tickers_core.json` retirement remain design-only and implement
-  after Slice 3 in separate slices.
+  2026-07-18 through closeout base `b3d9728`**. Alpha Picks article
+  reconciliation core is implemented through `18fcfb4`; its comment-continuity
+  addendum is implemented for independent review at product tip `821b2f3`.
+  Copied-DB/live continuity proof and merge remain pending. DB-derived
+  universe/`tickers_core.json` retirement remains a separate design-only slice.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -432,6 +433,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (ALPHA PICKS COMMENT CONTINUITY IMPLEMENTED FOR REVIEW — LIVE EVIDENCE PENDING)**: Product commits `3149623` and `821b2f3` implement the reviewed `+16/-0` addendum: explicit zero-versus-unknown provider-count provenance, a usable-scan checkpoint, a frozen pre-upsert row-ID watermark, Quick evidence-only repair, Full two-miss parking, Backfill-only five-round terminalization, terminal audit/re-anchor, and recovery-first bounded scheduling with no provider-minus-inventory trigger. Full collection is exactly `4497 -> 4513`; the Task 8 eight-file focused command passes `182`, while the broader Task 9 fourteen-file command passes the reviewed `262` (the original Task 8 expectation had copied the broader command's count). Compile/JS syntax/diff/static/protected-file gates are green. The implementer full run is `4408 passed / 31 failed / 74 skipped / 18 warnings`; the one extra visible failure is a byte-identical date-window test whose fixed 2026-06-22 input expired on 2026-07-19, so no canonical equivalence claim is made. Independent code review comes next, followed by disposable copied-DB state-machine and repeated-Quick provider proof. Production remains schema v1; no browser/profile/provider/production DB gate ran in this implementation phase.
 
 - **2026-07-19 (ALPHA PICKS COMMENT CONTINUITY ADDENDUM WRITTEN REVIEW GREEN — TASK 8 CLEARED)**: The provider gate disproved the old comment scheduler's completeness assumption: a representative article reported `983` lifetime comments, a bounded browser pass exposed about `207`, and the local deduplicated inventory had accumulated `592`. `provider_count > stored_count` creates permanent work, but a pure count checkpoint would also abandon recoverable post-enable outages. User ruling: waive pre-enable and provider-unreachable historical deficits, while repairing middle intervals when current rendering can still bridge them. The approved contract freezes the pre-upsert maximum comment row ID when a usable count-change scan has prior local comments but zero overlap. Quick may raise or evidence-clear pending; Full has no terminal authority and parks after two usable no-overlap attempts; explicit Backfill alone may terminalize after five stable-bottom rounds with no growth, loader, or activated load-more control. Unusable scans freeze the state machine. Terminalization re-anchors future capture while retaining its audit; unchanged-count overlap and stale TTL alone cannot restart a terminal gap. No fixed calendar cutoff or provider-minus-inventory trigger exists. Review repair standardized the baseline-overlap result key and strengthened the existing park node to prove nested count changes cannot re-freeze the watermark/start time; exact accounting remains `+16/-0`. Existing production remains schema v1, and the not-yet-shipped v1-to-v2 migration seeds only count checkpoints with no recovery flag. Task 8 RED-first implementation is authorized; core tip `18fcfb4` remains merge-blocked pending implementation, independent review, and copied-DB/live continuity proof.
 

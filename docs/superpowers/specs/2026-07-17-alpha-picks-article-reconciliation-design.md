@@ -1,10 +1,10 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
-> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM APPROVED FOR
-> IMPLEMENTATION after 2026-07-19 written review. The live gate disproved the
+> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM APPROVED AND
+> IMPLEMENTED FOR INDEPENDENT REVIEW as of 2026-07-19. The live gate disproved the
 > lifetime comment-gap retry assumption. Section 3.5 now distinguishes
 > recoverable post-enable continuity breaks from intentionally waived historical
-> deficits; that addendum blocks merge until implementation review and live
+> deficits; the addendum blocks merge until implementation review and live
 > continuity evidence are GREEN. The
 > universe/JSON decision does not pre-approve this design; this is an independent
 > implementation slice.

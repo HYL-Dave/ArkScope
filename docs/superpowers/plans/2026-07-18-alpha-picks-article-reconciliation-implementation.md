@@ -8,15 +8,16 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM CLEARED FOR
-> IMPLEMENTATION after 2026-07-19 written review. Round 2
+> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM IMPLEMENTED FOR
+> INDEPENDENT REVIEW as of 2026-07-19. Round 2
 > cleared the original `+78/-0` plan. Implementation plus live parser,
 > body-settle, and English-copy corrections reached `18fcfb4` at exact focused
 > `246` / canonical collect `4497`. The live gate then disproved the historical
 > comment-gap retry assumption. The checkpoint-only draft was then rejected
 > because it could not recover post-enable middle intervals. Task 8 is now an
-> exact `+16/-0` RED-first continuity addendum. Written review is reflected here;
-> merge remains blocked until implementation review and live evidence are GREEN.
+> exact `+16/-0` RED-first continuity addendum. Product commits `3149623` and
+> `821b2f3` implement it; merge remains blocked until independent implementation
+> review and copied-DB/live continuity evidence are GREEN.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
@@ -2966,7 +2967,8 @@ rg -n 'comment_recovery_baseline_max_row_id\s*=.*MAX|MAX\(id\).*comment_recovery
 git diff --exit-code 848ffd4 -- apps/arkscope-web config/tickers_core.json
 ```
 
-Expected: focused exact `262`, full collection exact `4513`, semantic delta
+Expected: the literal eight-file command above passes exact `182`; the broader
+Task 9 focused command passes `262`. Full collection is exact `4513`, semantic delta
 `+101/-0` from `848ffd4`; inventory-gap trigger and post-upsert watermark scans
 have zero production hit; web app and the protected ticker file remain byte-
 identical. Run `git diff --check`.
@@ -2994,6 +2996,35 @@ sequence on a disposable DB: pre-gap baseline -> Quick zero-overlap pending ->
 new-generation-only Full miss remains pending -> second Full miss parks ->
 Backfill stable-bottom terminalizes. A naturally changed live provider count is
 eligible exactly once. Dynamic counts are evidence, never acceptance constants.
+
+#### Task 8 implementation ledger (2026-07-19)
+
+- Written-review clearance is `7df2c82`. The schema/backend half is `3149623`;
+  parser, scheduler, native-host transport, and scroll evidence are `821b2f3`.
+- The first RED batch added ten nodes. All ten failed on the reviewed missing
+  schema or scan-evidence contracts before implementation. The second RED batch
+  added six nodes. They failed on absent zero-vs-unknown provenance, the legacy
+  inventory-gap scheduler, missing native evidence forwarding, false refresh
+  success, and absent stable-bottom evidence. Both batches are GREEN.
+- Exact addendum accounting is `+16/-0`: full collection advanced from the
+  locked core baseline `4497` to `4513`. The literal eight-file command printed
+  in Task 8 Step 9 collects and passes `182`; its original `262` expectation was
+  copied from the broader fourteen-file Task 9 focused command, which passes
+  the intended `262`. This command-label correction does not alter node
+  accounting. The three adjacent reconciliation/UI files pass `44` in isolation.
+- The implementer HEAD full run produced `4408 passed / 31 failed / 74 skipped /
+  18 warnings` over `4513` collected nodes. The additional visible failure is
+  `test_route_wires_universe_and_db`, whose hard-coded 2026-06-22 date is outside
+  its current six-day window on 2026-07-19; the route, owner, and test are byte-
+  identical to `848ffd4`. Symmetric virgin canonical A/B remains an independent
+  reviewer gate and is not claimed here.
+- Compile checks, both JavaScript syntax checks, `git diff --check`, the two
+  semantic `rg` ratchets, and byte identity for `apps/arkscope-web` plus
+  `config/tickers_core.json` pass. A test-created untracked risk-free-rate cache
+  was removed and is not part of the branch.
+- No copied production DB, browser profile, native-host config, provider call,
+  production schema, or paid live gate was touched during implementation. Those
+  gates intentionally follow independent implementation review.
 
 ---
 
