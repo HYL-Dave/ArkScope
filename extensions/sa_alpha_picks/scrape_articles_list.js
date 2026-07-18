@@ -40,24 +40,9 @@
     );
     var date = dateMatch ? dateMatch[0] : null;
 
-    // Extract ticker (nullable)
-    var ticker = null;
-    if (date) {
-      var afterDate = cardText.substring(cardText.indexOf(date) + date.length);
-      // Ticker: only uppercase letters + dot (NO digits — digits are comment count)
-      // e.g. "LITE216 Comments" → ticker=LITE, "BRK.B34 Comments" → ticker=BRK.B
-      var tickerMatch = afterDate.match(
-        /^\s*([A-Z][A-Z.]*(?::[A-Z]{1,4})?)\s*\d+\s*Comments?/
-      );
-      if (!tickerMatch) {
-        tickerMatch = afterDate.match(/^\s*([A-Z][A-Z.]{0,9})\s*$/);
-      }
-      if (tickerMatch) {
-        ticker = tickerMatch[1];
-        var colonIdx = ticker.indexOf(":");
-        if (colonIdx > 0) ticker = ticker.substring(0, colonIdx);
-      }
-    }
+    // Provider-owned identity is card-scoped and independent of title/body text.
+    var ticker = ArkScopeArticleIdentity.extractListTicker(card, date);
+    var observedAt = new Date().toISOString();
 
     // Extract comments count from comment label or post-date metadata.
     var commentsCount = extractCommentsCount(card, cardText, date);
@@ -70,6 +55,8 @@
       url: href,
       title: text.substring(0, 200),
       ticker: ticker,
+      list_ticker: ticker,
+      list_ticker_observed_at: ticker ? observedAt : null,
       date: date,
       comments_count: commentsCount,
       article_type: articleType,

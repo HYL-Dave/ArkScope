@@ -35,6 +35,7 @@
   var title = "";
   var h1 = document.querySelector("h1");
   if (h1) title = h1.innerText.trim();
+  var detailTicker = ArkScopeArticleIdentity.extractDetailTicker(document, h1);
 
   var author = "";
   var authorEl =
@@ -68,6 +69,8 @@
     title: title,
     author: author,
     publish_date: publishDate,
+    detail_ticker: detailTicker,
+    detail_ticker_observed_at: detailTicker ? new Date().toISOString() : null,
     body_markdown: bodyMd,
     url: location.href,
     scraped_at: new Date().toISOString(),

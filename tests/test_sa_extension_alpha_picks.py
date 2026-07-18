@@ -38,3 +38,7 @@ def test_alpha_picks_scraper_supports_non_table_row_fallback():
     assert "collectCandidateRows" in text
     assert "role=\"row\"" in text
     assert "role=\"gridcell\"" in text
+    background = _read(BACKGROUND)
+    compact = " ".join(background.split())
+    assert 'files: ["article_identity.js", "scrape_articles_list.js"]' in compact
+    assert 'files: ["article_identity.js", "scrape_detail.js"]' in compact

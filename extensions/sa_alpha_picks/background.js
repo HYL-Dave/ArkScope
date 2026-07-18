@@ -2103,7 +2103,10 @@ async function waitForArticlesReady(tabId, timeoutMs) {
 
 function injectArticlesListScraper(tabId) {
   return chrome.scripting
-    .executeScript({ target: { tabId }, files: ["scrape_articles_list.js"] })
+    .executeScript({
+      target: { tabId },
+      files: ["article_identity.js", "scrape_articles_list.js"],
+    })
     .then(function (results) {
       return (results[0] && results[0].result) || { error: "No result" };
     });
@@ -2142,7 +2145,10 @@ async function waitForArticleReady(tabId, timeoutMs) {
 
 function injectDetailScraper(tabId) {
   return chrome.scripting
-    .executeScript({ target: { tabId }, files: ["scrape_detail.js"] })
+    .executeScript({
+      target: { tabId },
+      files: ["article_identity.js", "scrape_detail.js"],
+    })
     .then(function (results) {
       return (results[0] && results[0].result) || { error: "No result" };
     });
