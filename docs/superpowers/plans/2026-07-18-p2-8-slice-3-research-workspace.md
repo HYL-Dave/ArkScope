@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASKS 1–6 COMPLETE / TASK 7 IN PROGRESS 2026-07-18
+> **Status:** IMPLEMENTATION IN PROGRESS — TASKS 1–7 COMPLETE / TASK 8 IN PROGRESS 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -180,6 +180,35 @@ is backend `+34/-0` and frontend `+53/-15`.
   fall back; revisited replay waits for the current transcript request; all
   history mutations reload the latest server-side filters and reject stale
   responses.
+
+### Task 7 — COMPLETE (2026-07-18)
+
+- RED-first product commit `a135ca1` replaces the fixed Research columns with
+  one conversation workspace, on-demand History, wide-only pinnable Evidence,
+  complete per-run provider/model/effort selection, factual bounded progress,
+  and the shared typed Research error presentation. The new suites contain
+  exactly twelve workspace nodes and seven typed-error nodes.
+- RED evidence covered the absent Evidence/progress/error modules, the legacy
+  three-column layout, permissive model/effort fallback, missing run linkage,
+  raw error copy, and incomplete cancellation/progress semantics. Existing
+  reducer and shell tests were strengthened in place rather than replaced.
+- Two independent read-only reviews then found and reproduced the late-create
+  polling race, cancellation-before-confirmation unlock, stale terminal-run
+  projection, invalid Retry affordance, active-run evidence borrowing, partial
+  detail loss, requested-versus-applied stance drift, internal token labels,
+  and stacked responsive overlays. Each was pinned in an existing reviewed
+  node before correction, so exact collection accounting did not move.
+- Run/message ownership is now exact: stale create responses cannot attach,
+  abort is run-scoped, cancellation keeps the composer locked until the server
+  confirms, legacy messages never borrow an unrelated run, and transcript-owned
+  details survive a failed run-detail fetch. Developer diagnostics remain
+  bounded and sanitized behind Developer Mode.
+- Final focused verification is `6 files / 104 tests`; the complete frontend is
+  `60 files / 571 tests`. Typecheck and production build pass with only the
+  existing chunk-size warning. The responsive contract additionally proves a
+  wide-to-overlay transition leaves exactly one History dialog with focus
+  contained inside it; Evidence is excluded in the same render rather than a
+  later paint.
 
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
@@ -1074,7 +1103,7 @@ git commit -m "feat: add on-demand research history"
 `researchErrors.test.tsx`; modify `Research.tsx`, `researchReducer.ts`,
 `App.tsx`, `api.ts`, and `styles.css`.
 
-- [ ] **Step 1: Write exactly twelve RED workspace tests**
+- [x] **Step 1: Write exactly twelve RED workspace tests**
 
 1. PageHeader actions expose New research, History, and Evidence with no fixed
    left/right columns;
@@ -1095,7 +1124,7 @@ git commit -m "feat: add on-demand research history"
 12. run-detail fetch failure preserves the completed transcript and presents a
     partial detail state rather than replacing the answer with failure.
 
-- [ ] **Step 2: Write exactly seven RED typed-error tests**
+- [x] **Step 2: Write exactly seven RED typed-error tests**
 
 1. `reauth_required` renders login action and no raw-primary text;
 2. `missing_credential` renders provider setup action;
@@ -1106,7 +1135,7 @@ git commit -m "feat: add on-demand research history"
 7. raw sanitized detail is absent in normal mode, present only in Developer
    Mode, and credential IDs/tokens never appear.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
@@ -1114,7 +1143,7 @@ npm test --workspace apps/arkscope-web -- \
   src/ResearchPendingBubble.test.ts
 ```
 
-- [ ] **Step 4: Replace the fixed layout and wire exact navigation**
+- [x] **Step 4: Replace the fixed layout and wire exact navigation**
 
 Use:
 
@@ -1129,7 +1158,7 @@ Remove `.research-grid`, permanent `.research-threads`, permanent
 `.research-trace`, stale auth-copy claims, and raw HTML buttons where a shared
 primitive exists. Preserve the message Markdown renderer and ticker navigation.
 
-- [ ] **Step 5: Implement the complete tuple toolbar**
+- [x] **Step 5: Implement the complete tuple toolbar**
 
 Render both provider choices with the effective credential context; unavailable
 providers remain visible-disabled with reason. Model options use shared groups;
@@ -1147,7 +1176,7 @@ Retry uses this same current validated tuple. The failed message controls only
 the `retry_last_failed` history flag and never forces its historical provider,
 model, or effort back into the request.
 
-- [ ] **Step 6: Implement full BoundedProgress and draft/Stop semantics**
+- [x] **Step 6: Implement full BoundedProgress and draft/Stop semantics**
 
 `ResearchRunProgress` translates:
 
@@ -1162,7 +1191,7 @@ Polling updates are not an `aria-live` region. BoundedProgress owns Stop; the
 composer keeps Send visible-disabled while active. Navigating away does not
 call cancel.
 
-- [ ] **Step 7: Implement honest Evidence and Run details**
+- [x] **Step 7: Implement honest Evidence and Run details**
 
 Evidence content comes from the selected assistant message's persisted
 `tool_calls` (or active reducer trace): tool name, input when present, bounded
@@ -1185,7 +1214,7 @@ projection. Historical diagnostic re-fetch and raw-event rendering occur only
 when Developer Mode opens its diagnostic disclosure. Never render
 `credential_id`; never claim structured claims/citations that are not stored.
 
-- [ ] **Step 8: Implement typed error presentation**
+- [x] **Step 8: Implement typed error presentation**
 
 `researchErrors.ts` is the frontend mapping authority for code -> title,
 next-action text, common state, and optional `NavigationTarget`. Unknown/null
@@ -1199,7 +1228,7 @@ blocked-state actions navigate to `models`; timeout/tool-limit actions navigate
 to `models` with copy naming the adjacent AI Research execution-limits panel.
 Do not invent a target kind before Slice 4 owns exact Settings anchors.
 
-- [ ] **Step 9: Run GREEN and commit**
+- [x] **Step 9: Run GREEN and commit**
 
 ```bash
 npm test --workspace apps/arkscope-web -- \
