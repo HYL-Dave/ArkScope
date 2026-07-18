@@ -170,6 +170,19 @@ def get_run_store():
 
 
 @lru_cache(maxsize=1)
+def get_research_history_store():
+    """Singleton read-only Research history projection over local state."""
+    from src.research_history import ResearchHistoryStore
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    db_path = _local_state_db_path()
+    ResearchThreadStore(db_path)
+    ResearchRunStore(db_path)
+    return ResearchHistoryStore(db_path)
+
+
+@lru_cache(maxsize=1)
 def get_credential_store():
     """Singleton local LLM credential store (same ignored local SQLite DB)."""
     from src.model_credentials import CredentialStore
