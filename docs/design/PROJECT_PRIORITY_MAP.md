@@ -229,8 +229,8 @@ therefore defaults to defer until the hypothesis gate exists.
   frontend accounting, responsive/live, static, backend-byte-identity, and
   merged-tree verification gates are closed.** The external Claude Design
   companion sync remains the one separate post-merge gate. **Slice 3 Research
-  workspace implementation planning opened 2026-07-18; product code has not
-  started and independent plan review is the next gate**
+  workspace implementation plan was independently reviewed and cleared on
+  2026-07-18; product code has not started and Task 0 is the next gate**
   (`docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`).
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
   2026-07-18 through closeout base `b3d9728`**. P2.8 Slice 3 is now the next
@@ -430,6 +430,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-18 (P2.8 SLICE 3 PLAN REVIEW GREEN — cleared for Task 0, implementation not started)**: Independent review reproduced backend `4378` / focused `93` and frontend `56/533`, verified the exact `+34/-0` and `+52/-15` accounting, and found one plan-only omission: max-tool exhaustion has four provider/auth shapes. The plan now recognizes only reviewed code-owned facts: the Anthropic API-key exact done sentinel, OpenAI API-key anchored `MaxTurnsExceeded:` prefix, ChatGPT OAuth full max-turn message, and Claude SDK typed `error_max_turns` subtype normalized to explicit `tool_limit_reached`. The existing Claude driver test is strengthened in place and the central classifier's single table-driven node covers positive/near-miss shapes, so accounting is unchanged. Unknown future SDK prose remains `provider_call_failed` and triggers review rather than fuzzy inference. Plan status is REVIEWED / CLEARED; implementation must start with isolated Task 0 and continue to protect the unrelated dirty `config/tickers_core.json`.
 
 - **2026-07-18 (P2.8 SLICE 3 RESEARCH WORKSPACE PLAN OPENED — review pending, implementation not started)**: With NEWS content availability merged/live and the canonical sequence unblocked, the approved Research workspace contract is translated into an eight-task RED-first plan at `docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`. The bounded slice replaces the permanent history/trace columns with on-demand History and wide-pinnable Evidence, adds server-side deterministic metadata filtering plus rename/archive/confirmed delete, links new messages to exact runs, persists typed Research error codes, presents factual session-bound progress, and fixes the known model-selection effect race through one complete-tuple resolver over the same Models-UX effective authority used by Settings. It explicitly does not invent structured claim/citation data, collections, LLM classification, a second model catalog, or a second job registry. Grounded baselines are backend `4378` collected / Research-focused `93` and frontend `56 files / 533 tests`; reviewed targets are backend exact `+34/-0` and frontend raw `+52/-15` (15 obsolete silent-fallback policy tests replaced one-for-one), ending at `60 / 570`. The unrelated dirty `config/tickers_core.json` remains protected. Next gate is independent plan review; do not implement, merge, mark Slice 3 LIVE, or start Alpha Picks/universe code yet.
 

@@ -8,7 +8,31 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION PLAN REVIEW PENDING — PRODUCT CODE NOT STARTED
+> **Status:** REVIEWED — CLEARED FOR IMPLEMENTATION 2026-07-18 — PRODUCT CODE
+> NOT STARTED
+
+### Plan Review Clearance (2026-07-18)
+
+Independent review reproduced all three baselines and exact accounting. Its one
+must-fix found that max-tool exhaustion has four provider/auth shapes rather
+than one. This revision closes that gap without changing node counts:
+
+- Anthropic API-key: exact successful-frame answer
+  `Maximum tool calls reached. Please try a simpler query.`;
+- OpenAI API-key: anchored `MaxTurnsExceeded:` error prefix emitted by the
+  in-repo agent wrapper;
+- ChatGPT OAuth: anchored full driver message
+  `Reached maximum number of turns (N)`;
+- Claude SDK subscription: typed `ResultMessage.subtype == "error_max_turns"`
+  is normalized by the driver to explicit `code=tool_limit_reached`.
+
+The installed Claude Agent SDK documents `error_max_turns` as a structured
+result subtype. Strengthen its existing error-result test in place; do not add a
+node. Any different future SDK shape remains `provider_call_failed` and is a
+stop-and-review condition, not grounds for fuzzy text inference. The shared
+classifier test remains one node and loops over the three central shapes plus
+near misses, including per-tool timeout text. Reviewed accounting remains
+backend `+34/-0` and frontend `+52/-15`.
 
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
@@ -199,9 +223,13 @@ UI primitives.
 | cancelled / sidecar restart | `interrupted` | explicit Stop or service interruption |
 
 `max_tool_calls` exhaustion is not a successful answer. At the durable run
-boundary it becomes `failed` with `error_code=tool_limit_reached`, while token
-usage and the partial tool trace remain available. The low-level agent event
-enum is unchanged.
+boundary it becomes `failed` with `error_code=tool_limit_reached`; any supplied
+token usage and the accumulated partial tool trace remain available.
+Recognition is restricted to the four reviewed shapes in Plan Review
+Clearance: three exact/anchored central classifier inputs plus Claude SDK's
+typed `error_max_turns` subtype normalized to an explicit code at the driver
+boundary. Per-tool timeout text and near matches remain ordinary tool/provider
+facts. The low-level agent event enum is unchanged.
 
 ## File Map
 
@@ -212,6 +240,7 @@ enum is unchanged.
 - Modify: `src/research_threads.py`
 - Modify: `src/research_runs.py`
 - Modify: `src/research_run_manager.py`
+- Modify: `src/auth_drivers/claude_code_sdk_driver.py`
 - Modify: `src/api/routes/query.py`
 - Modify: `src/api/routes/research.py`
 - Modify: `src/api/dependencies.py`
@@ -223,6 +252,8 @@ enum is unchanged.
 - Modify: `tests/test_research_runs.py`
 - Modify: `tests/test_research_routes.py` (`6` lifecycle/history nodes in Task
   2 plus `2` selection/error nodes in Task 3)
+- Modify in place: `tests/test_claude_code_sdk_driver.py` (strengthen one
+  existing error-result node; no collection delta)
 
 **Frontend product owners**
 
@@ -489,8 +520,9 @@ git commit -m "feat: add research history lifecycle APIs"
 
 **Files:** create `src/research_errors.py`; modify `src/research_runs.py`,
 `src/research_run_manager.py`, `src/api/routes/query.py`,
-`src/api/routes/research.py`, `tests/test_research_runs.py`, and route tests
-already opened in Task 2.
+`src/api/routes/research.py`, `src/auth_drivers/claude_code_sdk_driver.py`,
+`tests/test_research_runs.py`, `tests/test_claude_code_sdk_driver.py`, and route
+tests already opened in Task 2.
 
 - [ ] **Step 1: Add exactly ten RED run tests**
 
@@ -503,8 +535,11 @@ already opened in Task 2.
 6. unknown exception becomes `provider_call_failed` with redacted bounded detail;
 7. timeout exception/cause and the exact code-owned API-key/subscription
    timeout event shapes become `model_timeout`;
-8. exact max-tool sentinel becomes failed `tool_limit_reached` while preserving
-   usage and partial tool trace;
+8. one table-driven node recognizes the Anthropic done sentinel, anchored
+   OpenAI `MaxTurnsExceeded:` prefix, and exact ChatGPT OAuth max-turn message
+   as failed `tool_limit_reached`, preserves any supplied usage plus accumulated
+   partial tool trace, and rejects near misses including
+   `tool 'x' timed out after Ns`;
 9. explicit cancellation persists `run_cancelled` on run and message;
 10. startup reconciliation persists `run_interrupted` on run and message.
 
@@ -545,7 +580,9 @@ run_interrupted
 Rules:
 
 - preserve an explicit allowlisted event code;
-- exact max-tool sentinel -> `tool_limit_reached`;
+- exact Anthropic done sentinel, anchored OpenAI-agent `MaxTurnsExceeded:`
+  prefix, or full-match ChatGPT OAuth `Reached maximum number of turns (N)` ->
+  `tool_limit_reached`; no substring match is allowed;
 - `asyncio.TimeoutError` or a provider timeout in the cause/context chain ->
   `model_timeout`;
 - an anchored match of the exact timeout shapes emitted by in-repo code ->
@@ -557,6 +594,14 @@ Rules:
 - cancellation/restart are assigned at their explicit lifecycle seams;
 - public detail is `src.auth_drivers.probe_harness.redact(str(value))[:500]`;
 - no substring inference for auth, refusal, or credentials.
+
+Strengthen the existing Claude SDK driver error-result test in place with a
+synthetic `ResultMessage(is_error=True, subtype="error_max_turns", ...)` and
+assert exactly one terminal error carrying `code=tool_limit_reached`. Generic
+SDK error subtypes must not receive that code. This proves the installed typed
+SDK seam without adding a test node. If implementation or a live probe reveals
+a different max-turn shape, stop for review and leave it as
+`provider_call_failed`; do not infer from arbitrary result prose.
 
 - [ ] **Step 4: Extend durable run/message contracts**
 
@@ -574,11 +619,13 @@ their current call shapes. At the run-manager boundary:
 - never turn an error into an empty successful assistant message;
 - keep persistence best-effort ordering and terminal run completion.
 
-For the exact max-tool sentinel, the run manager converts the provider's `done`
-frame into a durable typed `error` replay frame before storage. The source
-agent's own event contract remains unchanged, but attached and reloaded clients
-therefore agree that this run failed with `tool_limit_reached` rather than
-briefly committing a successful answer and correcting it later.
+For a reviewed max-tool shape, the run manager converts any Anthropic
+API-key `done` frame into a durable typed `error` replay frame before storage
+and classifies the two reviewed error-message shapes. The Claude SDK driver
+supplies the explicit code from its typed subtype. Source agent event enums
+remain unchanged, but attached and reloaded clients therefore agree that these
+runs failed with `tool_limit_reached` rather than briefly committing a
+successful answer and correcting it later.
 
 The cancel-route fallback used when no in-process task is found must receive the
 thread store and persist the same typed cancelled terminal; it may not leave a
@@ -612,10 +659,13 @@ compatibility decision.
 - [ ] **Step 7: Run GREEN and commit**
 
 ```bash
-pytest -q tests/test_research_runs.py tests/test_research_routes.py tests/test_events.py
+pytest -q tests/test_research_runs.py tests/test_research_routes.py tests/test_events.py \
+  tests/test_claude_code_sdk_driver.py::test_is_error_result_single_error_terminal
 git add src/research_errors.py src/research_runs.py src/research_run_manager.py \
+  src/auth_drivers/claude_code_sdk_driver.py \
   src/api/routes/query.py src/api/routes/research.py \
-  tests/test_research_runs.py tests/test_research_routes.py
+  tests/test_research_runs.py tests/test_research_routes.py \
+  tests/test_claude_code_sdk_driver.py
 git commit -m "feat: type research runs and selections"
 ```
 
@@ -1077,6 +1127,9 @@ rg -n "placeOrder|cancelOrder|modifyOrder|exerciseOptions" \
 ```
 
 Also run the existing shared-class coverage and no-new-raw-exception gates.
+Run the strengthened existing Claude SDK error-result node separately; it is an
+in-place contract and does not enter the `127` Research-focused collection
+account.
 
 - [ ] **Step 4: Canonical backend A/B**
 
@@ -1148,6 +1201,7 @@ Reviewer focus:
 3. run/message linkage and migrations preserve old rows;
 4. semantic `default` persists but never reaches provider wire;
 5. explicit codes survive; unknown/raw errors cannot become primary UI text;
+   all four reviewed max-tool paths fail consistently and near matches do not;
 6. Models Settings and Research share one option/reason authority;
 7. saved invalid tuple blocks with no fallback;
 8. selection effect-order race is structurally removed;
@@ -1206,3 +1260,5 @@ Stop and return to review before continuing if any of these becomes true:
 12. implementation touches `config/tickers_core.json`, Alpha Picks capture,
     universe membership, NEWS, card generation, provider credentials, or order
     APIs.
+13. Claude SDK max-turn exhaustion no longer exposes the reviewed typed
+    `error_max_turns` subtype and would require guessing from arbitrary prose.
