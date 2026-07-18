@@ -207,6 +207,7 @@ export function ResearchView({
   const submissionSequenceRef = useRef(0);
   const stopRequestRunIdRef = useRef<string | null>(null);
   const hydrationSequenceRef = useRef(0);
+  const lifecycleGenerationRef = useRef(0);
   const initialAutoSelectAllowedRef = useRef(true);
   const consumedNavigationSequenceRef = useRef(0);
   const historyTriggerRef = useRef<HTMLButtonElement>(null);
@@ -394,10 +395,18 @@ export function ResearchView({
   }, [hydrateThread, hydrateThreadById, navigationRequest, observeThreadRun]);
 
   // Ignore transcript responses and detach local replay after unmount.
-  useEffect(() => () => {
-    hydrationSequenceRef.current += 1;
-    submissionSequenceRef.current += 1;
-    detachLocalPolling();
+  useEffect(() => {
+    const generation = ++lifecycleGenerationRef.current;
+    return () => {
+      // React StrictMode synchronously replays setup after this cleanup. Defer
+      // invalidation one microtask so only a real unmount remains current.
+      queueMicrotask(() => {
+        if (lifecycleGenerationRef.current !== generation) return;
+        hydrationSequenceRef.current += 1;
+        submissionSequenceRef.current += 1;
+        detachLocalPolling();
+      });
+    };
   }, [detachLocalPolling]);
 
   // --- server-owned run attach/replay ---------------------------------------

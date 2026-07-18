@@ -373,22 +373,25 @@ async function flush() {
 async function mountResearch({
   navigationRequest,
   onObserveRun = vi.fn(),
+  strictMode = false,
 }: {
   navigationRequest?: ResearchNavigationRequest | null;
   onObserveRun?: (run: ResearchRunDTO, title?: string) => void;
+  strictMode?: boolean;
 } = {}) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const render = async (nextRequest = navigationRequest) => {
     await act(async () => {
-      root!.render(
+      const view = (
         <ResearchView
           onOpenTicker={vi.fn()}
           navigationRequest={nextRequest}
           onObserveRun={onObserveRun}
-        />,
+        />
       );
+      root!.render(strictMode ? <React.StrictMode>{view}</React.StrictMode> : view);
     });
     await flush();
   };
@@ -477,6 +480,31 @@ describe("Research shell navigation", () => {
 
     await mounted.render(request(2));
     expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread B");
+  });
+
+  it("hydrates an exact shell target during the StrictMode effect replay used by the app", async () => {
+    const target = {
+      ...thread("thread-b", "Archived Thread B"),
+      archived_at: "2026-07-17T02:00:00Z",
+    };
+    const fetchMock = stubResearchFetch({
+      threads: [thread("thread-a", "Thread A")],
+      exactThreads: { "thread-b": target },
+      messages: {
+        "thread-b": [persistedMessage("assistant", "Exact archived result")],
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const navigationRequest: ResearchNavigationRequest = {
+      sequence: 1,
+      target: { kind: "research_thread", threadId: "thread-b", runId: "source-run" },
+    };
+
+    await mountResearch({ navigationRequest, strictMode: true });
+
+    expect(host!.querySelector(".research-conversation-title")?.textContent)
+      .toBe("Archived Thread B");
+    expect(host!.textContent).toContain("Exact archived result");
   });
 
   it("reports each hydrated active run to the shell observer", async () => {
