@@ -950,6 +950,103 @@ def test_list_messages_route_roundtrip(store):
     assert res["messages"][0]["is_error"] is False  # serialized for the client mapper
 
 
+def test_latest_selection_route_returns_semantic_tuple_without_credentials(
+    research_stores,
+):
+    thread_store, run_store, _ = research_stores
+    thread_store.ensure_thread(id="selection", title="Selection")
+    run_store.create_run(
+        id="successful",
+        thread_id="selection",
+        question="successful",
+        ticker=None,
+        provider="anthropic",
+        model="claude-sonnet-5",
+        effort=None,
+        auth_mode="claude_code_oauth",
+        credential_id="local:secret",
+    )
+    run_store.mark_terminal("successful", "succeeded")
+    run_store.create_run(
+        id="newer-failed",
+        thread_id="selection",
+        question="failed",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.6-luna",
+        effort="high",
+        auth_mode="api_key",
+        credential_id="local:other-secret",
+    )
+    run_store.mark_terminal("newer-failed", "failed", error="failed")
+
+    response = r.get_research_thread_selection(
+        "selection",
+        store=thread_store,
+        run_store=run_store,
+    )
+
+    assert response == {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "effort": "default",
+    }
+    assert all("credential" not in key for key in response)
+
+
+def test_run_and_message_routes_expose_typed_redacted_failure_details(
+    research_stores,
+):
+    thread_store, run_store, _ = research_stores
+    secret = "AbCdEf1234567890"
+    raw_error = f"failed access_token={secret} " + ("detail " * 100)
+    thread_store.ensure_thread(id="typed-error", title="Typed error")
+    run_store.create_run(
+        id="typed-run",
+        thread_id="typed-error",
+        question="q",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="default",
+        auth_mode="api_key",
+        credential_id="local:compat-only",
+    )
+    run_store.mark_terminal(
+        "typed-run",
+        "failed",
+        error=raw_error,
+        error_code="model_timeout",
+    )
+    thread_store.append_message(
+        thread_id="typed-error",
+        run_id="typed-run",
+        role="assistant",
+        content=raw_error,
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="default",
+        is_error=True,
+        error_code="model_timeout",
+    )
+
+    run_response = r.get_research_run("typed-run", run_store=run_store)["run"]
+    message_response = r.list_research_messages(
+        "typed-error", store=thread_store
+    )["messages"][-1]
+
+    assert run_response["error_code"] == "model_timeout"
+    assert secret not in run_response["error"]
+    assert "[REDACTED]" in run_response["error"]
+    assert len(run_response["error"]) <= 500
+    assert message_response["run_id"] == "typed-run"
+    assert message_response["error_code"] == "model_timeout"
+    assert message_response["error"] == message_response["content"]
+    assert secret not in str(message_response)
+    assert len(message_response["error"]) <= 500
+    assert all("credential" not in key for key in message_response)
+
+
 def test_list_messages_404_for_missing(store):
     from fastapi import HTTPException
 

@@ -133,7 +133,7 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
         model=model,
         instructions=instructions,
         input_messages=[*history, {"role": "user", "content": question}],
-        reasoning_effort=None if effort in (None, "", "default") else effort,
+        reasoning_effort=effort,
     )
     return driver.stream_llm(req)
 
@@ -183,7 +183,7 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
         model=model,
         instructions=instructions,
         input_messages=[*history, {"role": "user", "content": question}],
-        reasoning_effort=None if effort in (None, "", "default") else effort,
+        reasoning_effort=effort,
     )
     return driver.stream_llm(req)
 
@@ -197,6 +197,7 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
     and event framing.
     """
     provider = provider.lower()
+    wire_effort = None if effort in (None, "", "default") else effort
     from src.research_runtime_config import resolve_research_runtime
     runtime = resolve_research_runtime()
     from src.auth_drivers.live_resolver import resolve_live_auth
@@ -210,12 +211,12 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
         if _auth.source == "oauth_driver_unwired":
             return _openai_subscription_stream(
                 credential_id=_auth.credential_id, question=question,
-                model=model, effort=effort, dal=dal, history=history, **_pctx,
+                model=model, effort=wire_effort, dal=dal, history=history, **_pctx,
             )
         from src.agents.openai_agent.agent import run_query_stream
         return run_query_stream(
             question=question, model=model, dal=dal,
-            reasoning_effort=effort, history=history,
+            reasoning_effort=wire_effort, history=history,
             max_tool_calls=runtime.max_tool_calls, **_pctx,
         )
 
@@ -224,12 +225,12 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
         if _auth.source == "oauth_driver_unwired":
             return _anthropic_subscription_stream(
                 credential_id=_auth.credential_id, question=question,
-                model=model, effort=effort, dal=dal, history=history, **_pctx,
+                model=model, effort=wire_effort, dal=dal, history=history, **_pctx,
             )
         from src.agents.anthropic_agent.agent import run_query_stream
         return run_query_stream(
             question=question, model=model, dal=dal,
-            effort=effort, history=history,
+            effort=wire_effort, history=history,
             max_tool_calls=runtime.max_tool_calls, **_pctx,
         )
 
@@ -245,32 +246,62 @@ def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, t
         logger.warning("research persist (user turn) failed, continuing: %s", e)
 
 
-def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed, effort=None, personalization=None) -> None:
+def _persist_assistant_turn(
+    store,
+    *,
+    thread_id,
+    done_data,
+    collected,
+    elapsed,
+    effort=None,
+    personalization=None,
+    run_id=None,
+    error_code=None,
+) -> None:
     """Best-effort assistant persistence on a `done` terminal (#3 tool_calls from
     the trace, #4 safe). accumulate_tool_calls runs INSIDE the guard (SF1)."""
     try:
         store.append_message(
             thread_id=thread_id, role="assistant",
+            run_id=run_id,
             content=done_data.get("answer", "") or "",
             provider=done_data.get("provider"), model=done_data.get("model"),
             effort=effort,
             tools_used=done_data.get("tools_used"), tool_calls=accumulate_tool_calls(collected),
             token_usage=done_data.get("token_usage"), elapsed_seconds=elapsed,
+            error_code=error_code,
             personalization=personalization,
         )
     except Exception as e:  # noqa: BLE001 — best-effort by design
         logger.warning("research persist (assistant turn) failed, continuing: %s", e)
 
 
-def _persist_error_turn(store, *, thread_id, content, collected, provider, model, elapsed, effort=None, personalization=None) -> None:
+def _persist_error_turn(
+    store,
+    *,
+    thread_id,
+    content,
+    collected,
+    provider,
+    model,
+    elapsed,
+    effort=None,
+    personalization=None,
+    run_id=None,
+    error_code=None,
+    token_usage=None,
+) -> None:
     """Best-effort persistence of a NON-`done` terminal (agent error / stream
     exception) as an is_error assistant turn — so reload doesn't show a dangling
     user question with no reply (MUST-FIX 2). Partial trace preserved."""
     try:
         store.append_message(
             thread_id=thread_id, role="assistant", content=content or "(error)",
+            run_id=run_id,
             provider=provider, model=model, effort=effort, tool_calls=accumulate_tool_calls(collected),
-            elapsed_seconds=elapsed, is_error=True, personalization=personalization,
+            token_usage=token_usage,
+            elapsed_seconds=elapsed, is_error=True, error_code=error_code,
+            personalization=personalization,
         )
     except Exception as e:  # noqa: BLE001 — best-effort by design
         logger.warning("research persist (error turn) failed, continuing: %s", e)

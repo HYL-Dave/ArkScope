@@ -386,8 +386,11 @@ def build_ark_mcp_server(
 # ===========================================================================
 # Terminal/error event helpers (§6 — mirror 7A so the reducer reads identical keys)
 # ===========================================================================
-def _err(request: LLMRequest, message: str) -> AgentEvent:
-    return AgentEvent(EventType.error, {"error": message, "provider": "anthropic", "model": request.model})
+def _err(request: LLMRequest, message: str, *, code: Optional[str] = None) -> AgentEvent:
+    data = {"error": message, "provider": "anthropic", "model": request.model}
+    if code is not None:
+        data["code"] = code
+    return AgentEvent(EventType.error, data)
 
 
 # ===========================================================================
@@ -612,13 +615,23 @@ class AnthropicClaudeCodeSdkDriver:
 
         if isinstance(msg, ResultMessage):
             # The SOLE terminal. Guard BOTH is_error AND subtype=="error".
-            if msg.is_error or msg.subtype == "error":
+            if msg.is_error or msg.subtype in ("error", "error_max_turns"):
                 err_text = (
                     msg.result
                     or (str(msg.errors) if getattr(msg, "errors", None) else None)
                     or "claude agent reported an error"
                 )
-                return [_err(request, _redact_bridge(err_text, token))]
+                return [
+                    _err(
+                        request,
+                        _redact_bridge(err_text, token),
+                        code=(
+                            "tool_limit_reached"
+                            if msg.subtype == "error_max_turns"
+                            else None
+                        ),
+                    )
+                ]
             return [
                 AgentEvent(
                     EventType.done,

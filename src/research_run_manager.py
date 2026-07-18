@@ -14,8 +14,9 @@ from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 from src.agents.shared.events import AgentEvent
 from src.api.routes.query import accumulate_tool_calls, _persist_assistant_turn, _persist_error_turn
+from src.research_errors import ResearchFailure, classify_research_failure
 from src.research_runs import ResearchRunStore
-from src.research_threads import ResearchThreadStore
+from src.research_threads import MAX_TOOL_CALLS_SENTINEL, ResearchThreadStore
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,30 @@ async def _maybe_await(value):
     if hasattr(value, "__await__"):
         return await value
     return value
+
+
+def _typed_error_event_data(
+    data: dict,
+    failure: ResearchFailure,
+    *,
+    personalization: Optional[dict] = None,
+) -> dict:
+    out = {
+        key: data[key]
+        for key in (
+            "provider",
+            "model",
+            "token_usage",
+            "tools_used",
+            "stop_details",
+        )
+        if key in data
+    }
+    out["error"] = failure.detail
+    out["code"] = failure.code
+    if personalization is not None:
+        out["personalization"] = dict(personalization)
+    return out
 
 
 async def execute_research_run(
@@ -52,7 +77,8 @@ async def execute_research_run(
     assert run is not None
     collected: list[tuple[str, dict]] = []
     done_data: Optional[dict] = None
-    error_content: Optional[str] = None
+    failure: Optional[ResearchFailure] = None
+    terminal_token_usage: Optional[dict] = None
     t0 = time.monotonic()
 
     if stream_factory is None:
@@ -85,35 +111,77 @@ async def execute_research_run(
         ))
         async for event in stream:
             etype = _etype(event)
-            data = event.data or {}
+            data = dict(event.data or {})
+            if etype in ("tool_start", "tool_end"):
+                run_store.append_event(run_id, etype, data)
+                collected.append((etype, data))
+                continue
+            if etype == "done" and data.get("answer") == MAX_TOOL_CALLS_SENTINEL:
+                failure = classify_research_failure(data.get("answer"))
+                terminal_token_usage = data.get("token_usage")
+                run_store.append_event(
+                    run_id,
+                    "error",
+                    _typed_error_event_data(
+                        data,
+                        failure,
+                        personalization=personalization,
+                    ),
+                )
+                break
             if etype == "done":
                 # Enrich BEFORE persisting: the replay event and the transcript
                 # must carry the same trace the prompt actually received.
                 data = {**data, "personalization": dict(personalization)}
-            run_store.append_event(run_id, etype, data)
-            if etype in ("tool_start", "tool_end"):
-                collected.append((etype, data))
-            elif etype == "done":
+                run_store.append_event(run_id, etype, data)
                 done_data = data
                 break
-            elif etype == "error":
-                error_content = data.get("error") or data.get("message") or "research run failed"
+            if etype == "error":
+                raw_detail = data.get("error") or data.get("message") or "research run failed"
+                failure = classify_research_failure(
+                    raw_detail,
+                    explicit_code=data.get("code"),
+                )
+                terminal_token_usage = data.get("token_usage")
+                run_store.append_event(
+                    run_id,
+                    "error",
+                    _typed_error_event_data(data, failure),
+                )
                 break
+            run_store.append_event(run_id, etype, data)
     except asyncio.CancelledError:
-        run_store.append_event(run_id, "error", {"error": "research run cancelled"})
-        run_store.mark_terminal(run_id, "cancelled", error="research run cancelled")
-        _persist_error_turn(
-            thread_store, thread_id=run.thread_id, content="research run cancelled",
-            collected=collected, provider=run.provider, model=run.model,
-            effort=run.effort,
-            elapsed=round(time.monotonic() - t0, 3),
-            personalization=personalization,
+        cancelled = classify_research_failure(
+            "research run cancelled",
+            explicit_code="run_cancelled",
         )
+        try:
+            run_store.terminalize_error_with_message(
+                thread_store=thread_store,
+                run_id=run_id,
+                status="cancelled",
+                error=cancelled.detail,
+                error_code=cancelled.code,
+                tool_calls=accumulate_tool_calls(collected),
+                elapsed_seconds=round(time.monotonic() - t0, 3),
+                personalization=personalization,
+            )
+        except Exception:
+            logger.exception("failed to persist atomic cancellation for research run %s", run_id)
         raise
     except Exception as exc:  # noqa: BLE001 — terminal error, not route crash
-        logger.exception("research run %s failed", run_id)
-        error_content = str(exc)
-        run_store.append_event(run_id, "error", {"error": error_content})
+        failure = classify_research_failure(exc)
+        logger.error(
+            "research run %s failed (%s): %s",
+            run_id,
+            failure.code,
+            failure.detail,
+        )
+        run_store.append_event(
+            run_id,
+            "error",
+            {"error": failure.detail, "code": failure.code},
+        )
 
     elapsed = round(time.monotonic() - t0, 3)
     if done_data is not None:
@@ -121,19 +189,29 @@ async def execute_research_run(
             thread_store, thread_id=run.thread_id, done_data=done_data,
             collected=collected, elapsed=elapsed, effort=run.effort,
             personalization=personalization,
+            run_id=run_id,
         )
         run_store.mark_terminal(
             run_id, "succeeded",
             token_usage=done_data.get("token_usage") if isinstance(done_data, dict) else None,
         )
     else:
-        content = error_content or "research run failed"
+        failure = failure or classify_research_failure("research run failed")
         _persist_error_turn(
-            thread_store, thread_id=run.thread_id, content=content, collected=collected,
+            thread_store, thread_id=run.thread_id, content=failure.detail, collected=collected,
             provider=run.provider, model=run.model, effort=run.effort, elapsed=elapsed,
             personalization=personalization,
+            run_id=run_id,
+            error_code=failure.code,
+            token_usage=terminal_token_usage,
         )
-        run_store.mark_terminal(run_id, "failed", error=content)
+        run_store.mark_terminal(
+            run_id,
+            "failed",
+            error=failure.detail,
+            error_code=failure.code,
+            token_usage=terminal_token_usage,
+        )
 
 
 def schedule_research_run(

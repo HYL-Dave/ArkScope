@@ -294,18 +294,26 @@ def test_result_model_usage_aggregates_cache_tokens_when_top_level_missing(monke
 # 2. is_error ResultMessage -> single error terminal
 # ===========================================================================
 def test_is_error_result_single_error_terminal(monkeypatch):
-    capture: dict = {}
-    msgs = [
-        SystemMessage(subtype="init", data={"apiKeySource": "none"}),
-        _result_msg(is_error=True, subtype="error", result="rate limited"),
-    ]
-    _install_fake_query(monkeypatch, msgs, capture)
-    events = asyncio.run(_collect(_make_driver(), _REQ))
+    for subtype, expected_code in (
+        ("error", None),
+        ("error_max_turns", "tool_limit_reached"),
+    ):
+        capture: dict = {}
+        msgs = [
+            SystemMessage(subtype="init", data={"apiKeySource": "none"}),
+            _result_msg(is_error=True, subtype=subtype, result="rate limited"),
+        ]
+        _install_fake_query(monkeypatch, msgs, capture)
+        events = asyncio.run(_collect(_make_driver(), _REQ))
 
-    assert len(events) == 1
-    assert events[0].type == EventType.error
-    assert events[0].data["error"] == "rate limited"
-    assert events[0].data["provider"] == "anthropic"
+        assert len(events) == 1
+        assert events[0].type == EventType.error
+        assert events[0].data["error"] == "rate limited"
+        assert events[0].data["provider"] == "anthropic"
+        if expected_code is None:
+            assert "code" not in events[0].data
+        else:
+            assert events[0].data["code"] == expected_code
 
 
 def test_is_error_true_but_subtype_success_still_error(monkeypatch):

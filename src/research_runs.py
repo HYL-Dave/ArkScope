@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
     started_at       TEXT,
     completed_at     TEXT,
     error            TEXT,
+    error_code       TEXT,
     token_usage_json TEXT,
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS research_run_events (
 ACTIVE_STATUSES = ("queued", "running")
 TERMINAL_STATUSES = ("succeeded", "failed", "cancelled", "interrupted")
 MAX_ACTIVE_THREAD_BATCH = 200
+MAX_RUN_BATCH = 200
 
 
 class ResearchRunUnavailableError(RuntimeError):
@@ -90,6 +92,7 @@ class ResearchRun:
     started_at: Optional[str]
     completed_at: Optional[str]
     error: Optional[str]
+    error_code: Optional[str]
     token_usage: Optional[dict]
     created_at: str
     updated_at: str
@@ -102,6 +105,13 @@ class ResearchRunEvent:
     type: str
     data: dict
     created_at: str
+
+
+@dataclass(frozen=True)
+class ResearchSelection:
+    provider: str
+    model: str
+    effort: str
 
 
 class ResearchRunStore:
@@ -130,12 +140,16 @@ class ResearchRunStore:
             except sqlite3.OperationalError:
                 pass
             conn.executescript(_SCHEMA)
-            # Migration: pre-existing research_runs tables gain the Track A
-            # stance column (same tolerant ALTER pattern as the other stores).
+            # Additive migrations use the same tolerant pattern as the other stores.
             cols = {r[1] for r in conn.execute("PRAGMA table_info(research_runs)").fetchall()}
-            if "assistant_stance" not in cols:
+            for column, definition in (
+                ("assistant_stance", "assistant_stance TEXT"),
+                ("error_code", "error_code TEXT"),
+            ):
+                if column in cols:
+                    continue
                 try:
-                    conn.execute("ALTER TABLE research_runs ADD COLUMN assistant_stance TEXT")
+                    conn.execute(f"ALTER TABLE research_runs ADD COLUMN {definition}")
                 except sqlite3.OperationalError:
                     pass
             conn.commit()
@@ -149,6 +163,7 @@ class ResearchRunStore:
             assistant_stance=r["assistant_stance"], auth_mode=r["auth_mode"],
             credential_id=r["credential_id"], started_at=r["started_at"],
             completed_at=r["completed_at"], error=r["error"],
+            error_code=r["error_code"],
             token_usage=_loads(r["token_usage_json"]), created_at=r["created_at"],
             updated_at=r["updated_at"],
         )
@@ -376,10 +391,154 @@ class ResearchRunStore:
                 raise
         return failed_run
 
+    def _terminalize_error_on_connection(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        thread_store: ResearchThreadStore,
+        run_id: str,
+        status: str,
+        error: str,
+        error_code: str,
+        expected_statuses: Sequence[str],
+        event_data: Optional[dict] = None,
+        tool_calls: Optional[list] = None,
+        token_usage: Optional[dict] = None,
+        elapsed_seconds: Optional[float] = None,
+        personalization: Optional[dict] = None,
+        now: Optional[str] = None,
+    ) -> Optional[ResearchRun]:
+        """Apply one linked terminal error under a caller-owned transaction."""
+        ts = now or _now()
+        current = conn.execute(
+            "SELECT * FROM research_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+        if current is None or current["status"] not in tuple(expected_statuses):
+            return self._run(current) if current is not None else None
+        terminal = self._mark_terminal_on_connection(
+            conn,
+            run_id,
+            status,
+            error=error,
+            error_code=error_code,
+            token_usage=token_usage,
+            expected_status=current["status"],
+            now=ts,
+        )
+        if terminal is None:
+            return None
+        normalized_event = dict(event_data or {})
+        normalized_event["error"] = error
+        normalized_event["code"] = error_code
+        self._append_event_on_connection(
+            conn,
+            run_id,
+            "error",
+            normalized_event,
+            now=ts,
+        )
+        thread_store._append_message_on_connection(
+            conn,
+            thread_id=terminal.thread_id,
+            run_id=run_id,
+            role="assistant",
+            content=error,
+            provider=terminal.provider,
+            model=terminal.model,
+            effort=terminal.effort,
+            tool_calls=tool_calls,
+            token_usage=token_usage,
+            elapsed_seconds=elapsed_seconds,
+            is_error=True,
+            error_code=error_code,
+            personalization=personalization,
+            now=ts,
+        )
+        return terminal
+
+    def terminalize_error_with_message(
+        self,
+        *,
+        thread_store: ResearchThreadStore,
+        run_id: str,
+        status: str,
+        error: str,
+        error_code: str,
+        expected_statuses: Sequence[str] = ACTIVE_STATUSES,
+        event_data: Optional[dict] = None,
+        tool_calls: Optional[list] = None,
+        token_usage: Optional[dict] = None,
+        elapsed_seconds: Optional[float] = None,
+        personalization: Optional[dict] = None,
+    ) -> Optional[ResearchRun]:
+        """Atomically persist terminal status, replay event, and linked turn."""
+        self._require_shared_database(thread_store)
+        with self._write_lock, thread_store._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                terminal = self._terminalize_error_on_connection(
+                    conn,
+                    thread_store=thread_store,
+                    run_id=run_id,
+                    status=status,
+                    error=error,
+                    error_code=error_code,
+                    expected_statuses=expected_statuses,
+                    event_data=event_data,
+                    tool_calls=tool_calls,
+                    token_usage=token_usage,
+                    elapsed_seconds=elapsed_seconds,
+                    personalization=personalization,
+                )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        return terminal
+
     def get_run(self, run_id: str) -> Optional[ResearchRun]:
         with self._connect() as conn:
             r = conn.execute("SELECT * FROM research_runs WHERE id = ?", (run_id,)).fetchone()
         return self._run(r) if r else None
+
+    def get_runs(self, run_ids: Sequence[str]) -> dict[str, ResearchRun]:
+        """Fetch a bounded set of exact run ids with one query."""
+        if isinstance(run_ids, (str, bytes)) or not isinstance(run_ids, Sequence):
+            raise TypeError("run_ids must be a bounded sequence")
+        if len(run_ids) > MAX_RUN_BATCH:
+            raise ValueError(f"run_ids cannot exceed {MAX_RUN_BATCH} entries")
+        if any(not isinstance(run_id, str) for run_id in run_ids):
+            raise TypeError("run_ids must contain strings")
+        unique_ids = tuple(dict.fromkeys(run_ids))
+        if not unique_ids:
+            return {}
+        placeholders = ",".join("?" for _ in unique_ids)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM research_runs WHERE id IN ({placeholders})",
+                unique_ids,
+            ).fetchall()
+        return {row["id"]: self._run(row) for row in rows}
+
+    def latest_successful_for_thread(
+        self,
+        thread_id: str,
+    ) -> Optional[ResearchSelection]:
+        """Return the deterministic latest successful semantic selection."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT provider, model, effort FROM research_runs "
+                "WHERE thread_id = ? AND status = 'succeeded' "
+                "ORDER BY completed_at DESC, id DESC LIMIT 1",
+                (thread_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ResearchSelection(
+            provider=row["provider"],
+            model=row["model"],
+            effort=row["effort"] if row["effort"] not in (None, "") else "default",
+        )
 
     def latest_active_for_thread(self, thread_id: str) -> Optional[ResearchRun]:
         with self._connect() as conn:
@@ -446,12 +605,16 @@ class ResearchRunStore:
         status: str,
         *,
         error: Optional[str] = None,
+        error_code: Optional[str] = None,
         token_usage: Optional[dict] = None,
         expected_status: Optional[str] = None,
         now: Optional[str] = None,
     ) -> Optional[ResearchRun]:
+        from src.research_errors import require_research_error_code
+
         if status not in TERMINAL_STATUSES:
             raise ValueError(f"invalid terminal status: {status}")
+        error_code = require_research_error_code(error_code)
         ts = now or _now()
         expected_clause = " AND status = ?" if expected_status is not None else ""
         params = [
@@ -459,6 +622,7 @@ class ResearchRunStore:
             ts,
             ts,
             error,
+            error_code,
             json.dumps(token_usage) if token_usage is not None else None,
             run_id,
         ]
@@ -466,7 +630,7 @@ class ResearchRunStore:
             params.append(expected_status)
         cur = conn.execute(
             "UPDATE research_runs SET status = ?, completed_at = ?, updated_at = ?, "
-            f"error = ?, token_usage_json = ? WHERE id = ?{expected_clause}",
+            f"error = ?, error_code = ?, token_usage_json = ? WHERE id = ?{expected_clause}",
             params,
         )
         if cur.rowcount == 0:
@@ -483,6 +647,7 @@ class ResearchRunStore:
         status: str,
         *,
         error: Optional[str] = None,
+        error_code: Optional[str] = None,
         token_usage: Optional[dict] = None,
     ) -> None:
         with self._write_lock, self._connect() as conn:
@@ -491,6 +656,7 @@ class ResearchRunStore:
                 run_id,
                 status,
                 error=error,
+                error_code=error_code,
                 token_usage=token_usage,
             )
             conn.commit()
@@ -545,35 +711,71 @@ class ResearchRunStore:
     def reconcile_interrupted(self, *, thread_store=None) -> list[str]:
         """Mark orphaned queued/running runs terminal on process boot/store init.
 
-        When a thread_store is provided, also persist an error assistant turn so
-        reload never shows a dangling user message after a sidecar crash.
+        With a thread store, status/event/linked message commit as one write so a
+        new run can never observe a terminal predecessor without its transcript.
         """
+        from src.research_errors import classify_research_failure
+
         ts = _now()
-        with self._write_lock, self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM research_runs WHERE status IN ('queued','running')"
-            ).fetchall()
-            ids = [r["id"] for r in rows]
-            for run_id in ids:
-                conn.execute(
-                    "UPDATE research_runs SET status = 'interrupted', completed_at = ?, "
-                    "updated_at = ?, error = ? WHERE id = ?",
-                    (ts, ts, "research run interrupted by sidecar restart", run_id),
-                )
-            conn.commit()
+        failure = classify_research_failure(
+            "research run interrupted by sidecar restart",
+            explicit_code="run_interrupted",
+        )
+
         if thread_store is not None:
-            for row in rows:
+            self._require_shared_database(thread_store)
+            with self._write_lock, thread_store._write_lock, self._connect() as conn:
                 try:
-                    thread_store.append_message(
-                        thread_id=row["thread_id"],
-                        role="assistant",
-                        content="research run interrupted by sidecar restart",
-                        provider=row["provider"],
-                        model=row["model"],
-                        elapsed_seconds=None,
-                        is_error=True,
+                    conn.execute("BEGIN IMMEDIATE")
+                    rows = conn.execute(
+                        "SELECT * FROM research_runs "
+                        "WHERE status IN ('queued','running') ORDER BY created_at, id"
+                    ).fetchall()
+                    ids = [row["id"] for row in rows]
+                    for row in rows:
+                        self._terminalize_error_on_connection(
+                            conn,
+                            thread_store=thread_store,
+                            run_id=row["id"],
+                            status="interrupted",
+                            error=failure.detail,
+                            error_code=failure.code,
+                            expected_statuses=(row["status"],),
+                            now=ts,
+                        )
+                    conn.commit()
+                except BaseException:
+                    conn.rollback()
+                    raise
+            return ids
+
+        with self._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                rows = conn.execute(
+                    "SELECT * FROM research_runs "
+                    "WHERE status IN ('queued','running') ORDER BY created_at, id"
+                ).fetchall()
+                ids = [row["id"] for row in rows]
+                for row in rows:
+                    self._mark_terminal_on_connection(
+                        conn,
+                        row["id"],
+                        "interrupted",
+                        error=failure.detail,
+                        error_code=failure.code,
+                        expected_status=row["status"],
+                        now=ts,
                     )
-                except Exception:
-                    # Best-effort reconciliation; the run row remains terminal.
-                    pass
+                    self._append_event_on_connection(
+                        conn,
+                        row["id"],
+                        "error",
+                        {"error": failure.detail, "code": failure.code},
+                        now=ts,
+                    )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
         return ids

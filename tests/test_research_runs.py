@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import pytest
 
+from src.api.routes import query as q
 from src.api.routes import research as r
 from src.auth_drivers.live_resolver import LiveAuthResolution
 from src.agents.shared.events import AgentEvent, EventType
@@ -17,6 +21,52 @@ def stores(tmp_path):
     return ResearchRunStore(db), ResearchThreadStore(db)
 
 
+def _seed_run(
+    run_store,
+    thread_store,
+    *,
+    thread_id,
+    run_id,
+    provider="openai",
+    model="gpt-5.4-mini",
+    effort="low",
+):
+    thread_store.ensure_thread(id=thread_id, title=f"Question {thread_id}")
+    run = run_store.create_run(
+        id=run_id,
+        thread_id=thread_id,
+        question=f"question {thread_id}",
+        ticker=None,
+        provider=provider,
+        model=model,
+        effort=effort,
+        auth_mode="api_key",
+        credential_id="local:test",
+    )
+    thread_store.append_message(
+        thread_id=thread_id,
+        run_id=run_id,
+        role="user",
+        content=f"question {thread_id}",
+    )
+    return run
+
+
+def _pause_terminal_message(monkeypatch, thread_store, *, error_code):
+    paused = threading.Event()
+    release = threading.Event()
+    original = thread_store._append_message_on_connection
+
+    def pausing_append(conn, **kwargs):
+        if kwargs.get("error_code") == error_code:
+            paused.set()
+            assert release.wait(timeout=5), "terminal message pause was not released"
+        return original(conn, **kwargs)
+
+    monkeypatch.setattr(thread_store, "_append_message_on_connection", pausing_append)
+    return paused, release
+
+
 def test_run_store_create_events_and_active_summary(stores):
     run_store, thread_store = stores
     thread_store.ensure_thread(id="t1", title="q", provider="openai", model="gpt-5.4-mini")
@@ -28,6 +78,9 @@ def test_run_store_create_events_and_active_summary(stores):
     )
     assert run.status == "queued"
     assert run_store.latest_active_for_thread("t1").id == "r1"
+    assert list(run_store.get_runs(["r1", "missing", "r1"])) == ["r1"]
+    with pytest.raises(ValueError, match="cannot exceed"):
+        run_store.get_runs([f"run-{index}" for index in range(201)])
 
     e1 = run_store.append_event("r1", "thinking", {"turn": 1})
     e2 = run_store.append_event("r1", "done", {"answer": "ok"})
@@ -227,11 +280,517 @@ def test_cancel_run_route_terminalizes_when_no_in_memory_task(stores, monkeypatc
     )
     monkeypatch.setattr(r, "cancel_research_run", lambda run_id: False)
 
-    res = r.cancel_research_run_route("r1", run_store=run_store)
+    res = r.cancel_research_run_route(
+        "r1", run_store=run_store, thread_store=thread_store
+    )
 
     assert res["run"]["status"] == "cancelled"
     assert run_store.get_run("r1").status == "cancelled"
     assert run_store.list_events("r1")[-1].type == "error"
+
+
+# ─── P2.8 Slice 3: semantic selection + typed terminal outcomes ─────────────
+
+
+def test_latest_successful_selection_ignores_non_success_and_maps_default(stores):
+    run_store, thread_store = stores
+    _seed_run(
+        run_store,
+        thread_store,
+        thread_id="selection",
+        run_id="success",
+        provider="anthropic",
+        model="claude-sonnet-5",
+        effort=None,
+    )
+    run_store.mark_terminal("success", "succeeded")
+    run_store.create_run(
+        id="failed",
+        thread_id="selection",
+        question="failed",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.6-luna",
+        effort="high",
+        auth_mode="api_key",
+        credential_id=None,
+    )
+    run_store.mark_terminal("failed", "failed", error="failed")
+    run_store.create_run(
+        id="active",
+        thread_id="selection",
+        question="active",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.6-sol",
+        effort="xhigh",
+        auth_mode="api_key",
+        credential_id=None,
+    )
+
+    selection = run_store.latest_successful_for_thread("selection")
+
+    assert selection is not None
+    assert (selection.provider, selection.model, selection.effort) == (
+        "anthropic",
+        "claude-sonnet-5",
+        "default",
+    )
+
+
+def test_latest_successful_selection_orders_by_completion_then_id(stores):
+    run_store, thread_store = stores
+    thread_store.ensure_thread(id="selection-order", title="selection")
+    for run_id, model in (("a-run", "gpt-5.4-mini"), ("z-run", "gpt-5.6-sol")):
+        run_store.create_run(
+            id=run_id,
+            thread_id="selection-order",
+            question=run_id,
+            ticker=None,
+            provider="openai",
+            model=model,
+            effort="high",
+            auth_mode="api_key",
+            credential_id=None,
+        )
+        run_store.mark_terminal(run_id, "succeeded")
+    with sqlite3.connect(run_store.db_path) as conn:
+        conn.execute(
+            "UPDATE research_runs SET completed_at = ? WHERE id IN (?, ?)",
+            ("2026-07-18T06:00:00+00:00", "a-run", "z-run"),
+        )
+
+    selection = run_store.latest_successful_for_thread("selection-order")
+
+    assert selection is not None
+    assert selection.model == "gpt-5.6-sol"
+
+
+def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeypatch):
+    run_store, thread_store = stores
+    scheduled = {}
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.update(kwargs))
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", "local:test"))
+
+    response = asyncio.run(
+        r.create_research_run(
+            r.ResearchRunCreate(
+                question="default effort",
+                provider="openai",
+                model="gpt-5.4-mini",
+                effort=None,
+            ),
+            dal=object(),
+            thread_store=thread_store,
+            run_store=run_store,
+        )
+    )
+    run = run_store.get_run(response["run"]["id"])
+    assert run is not None and run.effort == "default"
+
+    captured = {}
+    sentinel = object()
+
+    def fake_openai_stream(**kwargs):
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "db_api_key", "local:test"),
+    )
+    monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_openai_stream)
+    result = q._research_provider_stream(
+        provider="openai",
+        question="q",
+        model=run.model,
+        effort=run.effort,
+        dal=object(),
+        history=[],
+    )
+
+    assert result is sentinel
+    assert captured["reasoning_effort"] is None
+
+
+def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monkeypatch):
+    run_store, thread_store = stores
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: None)
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", "local:test"))
+
+    response = asyncio.run(
+        r.create_research_run(
+            r.ResearchRunCreate(
+                question="default effort",
+                provider="anthropic",
+                model="claude-sonnet-5",
+                effort=None,
+            ),
+            dal=object(),
+            thread_store=thread_store,
+            run_store=run_store,
+        )
+    )
+    run = run_store.get_run(response["run"]["id"])
+    assert run is not None and run.effort == "default"
+
+    captured = {}
+    sentinel = object()
+
+    def fake_anthropic_stream(**kwargs):
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "db_api_key", "local:test"),
+    )
+    monkeypatch.setattr(
+        "src.agents.anthropic_agent.agent.run_query_stream", fake_anthropic_stream
+    )
+    result = q._research_provider_stream(
+        provider="anthropic",
+        question="q",
+        model=run.model,
+        effort=run.effort,
+        dal=object(),
+        history=[],
+    )
+
+    assert result is sentinel
+    assert captured["effort"] is None
+
+
+def test_explicit_error_code_survives_event_run_and_linked_message(stores):
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="explicit", run_id="explicit-run")
+
+    async def stream_factory(**kwargs):
+        yield AgentEvent(
+            EventType.error,
+            {"error": "model declined", "code": "model_refusal"},
+        )
+
+    asyncio.run(
+        execute_research_run(
+            run_id="explicit-run",
+            run_store=run_store,
+            thread_store=thread_store,
+            dal=object(),
+            history=[],
+            stream_factory=stream_factory,
+        )
+    )
+
+    run = run_store.get_run("explicit-run")
+    terminal = run_store.list_events("explicit-run")[-1]
+    message = thread_store.list_messages("explicit")[-1]
+    assert run is not None and run.error_code == "model_refusal"
+    assert terminal.data["code"] == "model_refusal"
+    assert (message.run_id, message.error_code) == ("explicit-run", "model_refusal")
+
+
+def test_unknown_exception_is_typed_redacted_and_bounded(stores):
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="unknown", run_id="unknown-run")
+    secret = "AbCdEf1234567890"
+    raw = f"provider exploded access_token={secret} " + ("detail " * 120)
+
+    async def stream_factory(**kwargs):
+        raise RuntimeError(raw)
+        yield  # pragma: no cover - async-generator shape
+
+    asyncio.run(
+        execute_research_run(
+            run_id="unknown-run",
+            run_store=run_store,
+            thread_store=thread_store,
+            dal=object(),
+            history=[],
+            stream_factory=stream_factory,
+        )
+    )
+
+    run = run_store.get_run("unknown-run")
+    terminal = run_store.list_events("unknown-run")[-1]
+    message = thread_store.list_messages("unknown")[-1]
+    assert run is not None and run.error_code == "provider_call_failed"
+    assert secret not in (run.error or "") and "[REDACTED]" in (run.error or "")
+    assert len(run.error or "") <= 500
+    assert terminal.data == {
+        "error": run.error,
+        "code": "provider_call_failed",
+    }
+    assert message.content == run.error
+    assert message.error_code == "provider_call_failed"
+
+
+def test_timeout_causes_and_owned_event_shapes_are_model_timeout(stores):
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    cases = [
+        ("api-openai", "APITimeoutError: request deadline exceeded"),
+        ("api-anthropic", "TimeoutError: request deadline exceeded"),
+        ("chatgpt", "ChatGPT OAuth driver timed out after 45s"),
+        ("claude-sdk", "claude agent-sdk timed out after 45s"),
+        ("claude-cli", "claude -p timed out after 45s"),
+    ]
+    for suffix, detail in cases:
+        thread_id = f"timeout-{suffix}"
+        run_id = f"run-{suffix}"
+        _seed_run(run_store, thread_store, thread_id=thread_id, run_id=run_id)
+
+        async def event_stream(_detail=detail, **kwargs):
+            yield AgentEvent(EventType.error, {"error": _detail})
+
+        asyncio.run(
+            execute_research_run(
+                run_id=run_id,
+                run_store=run_store,
+                thread_store=thread_store,
+                dal=object(),
+                history=[],
+                stream_factory=event_stream,
+            )
+        )
+        assert run_store.get_run(run_id).error_code == "model_timeout"
+
+    _seed_run(run_store, thread_store, thread_id="timeout-cause", run_id="run-cause")
+
+    async def caused_timeout(**kwargs):
+        try:
+            raise asyncio.TimeoutError("provider deadline")
+        except asyncio.TimeoutError as cause:
+            raise RuntimeError("outer provider failure") from cause
+        yield  # pragma: no cover - async-generator shape
+
+    asyncio.run(
+        execute_research_run(
+            run_id="run-cause",
+            run_store=run_store,
+            thread_store=thread_store,
+            dal=object(),
+            history=[],
+            stream_factory=caused_timeout,
+        )
+    )
+    assert run_store.get_run("run-cause").error_code == "model_timeout"
+
+
+def test_max_turn_shapes_are_typed_without_fuzzy_near_misses(stores):
+    from src.research_run_manager import execute_research_run
+    from src.research_threads import MAX_TOOL_CALLS_SENTINEL
+
+    run_store, thread_store = stores
+    cases = [
+        (
+            "anthropic",
+            EventType.done,
+            {"answer": MAX_TOOL_CALLS_SENTINEL, "token_usage": {"total_tokens": 17}},
+            "tool_limit_reached",
+        ),
+        (
+            "openai",
+            EventType.error,
+            {"error": "MaxTurnsExceeded: maximum turns (8) exceeded", "token_usage": {"total_tokens": 18}},
+            "tool_limit_reached",
+        ),
+        (
+            "chatgpt",
+            EventType.error,
+            {"error": "Reached maximum number of turns (8)", "token_usage": {"total_tokens": 19}},
+            "tool_limit_reached",
+        ),
+        (
+            "tool-timeout-near-miss",
+            EventType.error,
+            {"error": "tool 'x' timed out after 8s", "token_usage": {"total_tokens": 20}},
+            "provider_call_failed",
+        ),
+        (
+            "chatgpt-near-miss",
+            EventType.error,
+            {"error": "Reached maximum number of turns (8) trailing", "token_usage": {"total_tokens": 21}},
+            "provider_call_failed",
+        ),
+    ]
+    for suffix, terminal_type, terminal_data, expected_code in cases:
+        thread_id = f"limit-{suffix}"
+        run_id = f"limit-run-{suffix}"
+        _seed_run(run_store, thread_store, thread_id=thread_id, run_id=run_id)
+
+        async def stream_factory(
+            _terminal_type=terminal_type,
+            _terminal_data=terminal_data,
+            **kwargs,
+        ):
+            yield AgentEvent(
+                EventType.tool_start,
+                {"tool": "get_news", "input": {"ticker": "MU"}},
+            )
+            yield AgentEvent(
+                EventType.tool_end,
+                {"tool": "get_news", "summary": "partial", "chars": 7},
+            )
+            yield AgentEvent(_terminal_type, dict(_terminal_data))
+
+        asyncio.run(
+            execute_research_run(
+                run_id=run_id,
+                run_store=run_store,
+                thread_store=thread_store,
+                dal=object(),
+                history=[],
+                stream_factory=stream_factory,
+            )
+        )
+
+        run = run_store.get_run(run_id)
+        terminal = run_store.list_events(run_id)[-1]
+        message = thread_store.list_messages(thread_id)[-1]
+        assert run.status == "failed"
+        assert run.error_code == expected_code
+        assert terminal.type == "error"
+        assert terminal.data["code"] == expected_code
+        assert message.is_error is True
+        assert (message.run_id, message.error_code) == (run_id, expected_code)
+        assert message.tool_calls == [
+            {"name": "get_news", "input": {"ticker": "MU"}, "result_preview": "partial"}
+        ]
+        assert message.token_usage == terminal_data["token_usage"]
+        assert run.token_usage == terminal_data["token_usage"]
+
+
+def test_cancel_fallback_atomically_persists_typed_terminal_before_next_run(
+    stores, monkeypatch
+):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="cancel-race", run_id="cancel-old")
+    second_run_store = ResearchRunStore(run_store.db_path)
+    second_thread_store = ResearchThreadStore(thread_store.db_path)
+    paused, release = _pause_terminal_message(
+        monkeypatch, thread_store, error_code="run_cancelled"
+    )
+    scheduled = {}
+    monkeypatch.setattr(r, "cancel_research_run", lambda run_id: False)
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", None))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.update(kwargs))
+    request = r.ResearchRunCreate(
+        thread_id="cancel-race",
+        question="new question",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        cancel_future = executor.submit(
+            r.cancel_research_run_route,
+            "cancel-old",
+            run_store=run_store,
+            thread_store=thread_store,
+        )
+        assert paused.wait(timeout=2)
+        create_future = executor.submit(
+            lambda: asyncio.run(
+                r.create_research_run(
+                    request,
+                    dal=object(),
+                    thread_store=second_thread_store,
+                    run_store=second_run_store,
+                )
+            )
+        )
+        try:
+            with pytest.raises(FutureTimeoutError):
+                create_future.result(timeout=0.1)
+        finally:
+            release.set()
+        cancelled = cancel_future.result(timeout=5)
+        created = create_future.result(timeout=5)
+
+    assert cancelled["run"]["error_code"] == "run_cancelled"
+    assert created["run"]["status"] == "queued"
+    assert scheduled["history"] == [
+        {"role": "user", "content": "question cancel-race"},
+    ]
+    messages = second_thread_store.list_messages("cancel-race")
+    assert [message.content for message in messages] == [
+        "question cancel-race",
+        "research run cancelled",
+        "new question",
+    ]
+    assert (messages[1].run_id, messages[1].error_code) == (
+        "cancel-old",
+        "run_cancelled",
+    )
+
+
+def test_restart_reconciliation_atomically_persists_typed_terminal_before_next_run(
+    stores, monkeypatch
+):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="restart-race", run_id="restart-old")
+    second_run_store = ResearchRunStore(run_store.db_path)
+    second_thread_store = ResearchThreadStore(thread_store.db_path)
+    paused, release = _pause_terminal_message(
+        monkeypatch, thread_store, error_code="run_interrupted"
+    )
+    scheduled = {}
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", None))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.update(kwargs))
+    request = r.ResearchRunCreate(
+        thread_id="restart-race",
+        question="new question",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        reconcile_future = executor.submit(
+            run_store.reconcile_interrupted,
+            thread_store=thread_store,
+        )
+        assert paused.wait(timeout=2)
+        create_future = executor.submit(
+            lambda: asyncio.run(
+                r.create_research_run(
+                    request,
+                    dal=object(),
+                    thread_store=second_thread_store,
+                    run_store=second_run_store,
+                )
+            )
+        )
+        try:
+            with pytest.raises(FutureTimeoutError):
+                create_future.result(timeout=0.1)
+        finally:
+            release.set()
+        changed = reconcile_future.result(timeout=5)
+        created = create_future.result(timeout=5)
+
+    assert changed == ["restart-old"]
+    assert created["run"]["status"] == "queued"
+    assert scheduled["history"] == [
+        {"role": "user", "content": "question restart-race"},
+    ]
+    messages = second_thread_store.list_messages("restart-race")
+    assert [message.content for message in messages] == [
+        "question restart-race",
+        "research run interrupted by sidecar restart",
+        "new question",
+    ]
+    assert (messages[1].run_id, messages[1].error_code) == (
+        "restart-old",
+        "run_interrupted",
+    )
 
 
 # ─── Track A: personalization on server-owned runs ───────────────────────────

@@ -11,6 +11,11 @@ from pydantic import BaseModel
 from src.agents.config import resolve_research_route
 from src.api.routes.query import _compose_agent_question, TITLE_MAX
 from src.auth_drivers.live_resolver import resolve_live_auth
+from src.research_errors import (
+    classify_research_failure,
+    public_research_error_code,
+    sanitize_research_detail,
+)
 from src.research_run_manager import cancel_research_run, schedule_research_run
 from src.research_runs import (
     ACTIVE_STATUSES,
@@ -72,7 +77,8 @@ def _run_dict(run: ResearchRun | None) -> dict | None:
         "credential_id": run.credential_id,
         "started_at": run.started_at,
         "completed_at": run.completed_at,
-        "error": run.error,
+        "error": sanitize_research_detail(run.error) if run.error is not None else None,
+        "error_code": public_research_error_code(run.error_code),
         "token_usage": run.token_usage,
         "created_at": run.created_at,
         "updated_at": run.updated_at,
@@ -107,9 +113,13 @@ def _thread_dict(t: ResearchThread, *, active_run=_MISSING) -> dict:
 
 
 def _message_dict(m: ResearchMessage) -> dict:
+    content = sanitize_research_detail(m.content) if m.is_error else m.content
     return {
-        "role": m.role, "content": m.content, "provider": m.provider, "model": m.model,
+        "role": m.role, "content": content, "provider": m.provider, "model": m.model,
         "effort": m.effort,
+        "run_id": m.run_id,
+        "error_code": public_research_error_code(m.error_code),
+        "error": content if m.is_error else None,
         "tools_used": m.tools_used, "tool_calls": m.tool_calls,
         "token_usage": m.token_usage, "tickers": m.tickers,
         "elapsed_seconds": m.elapsed_seconds, "is_error": m.is_error, "created_at": m.created_at,
@@ -236,6 +246,31 @@ def patch_research_thread(
     return {"thread": _thread_with_active_run(updated, run_store)}
 
 
+@router.get("/research/threads/{thread_id}/selection")
+def get_research_thread_selection(
+    thread_id: str,
+    store=Depends(get_thread_store),
+    run_store=Depends(get_run_store),
+) -> dict | None:
+    if not valid_thread_id(thread_id):
+        raise HTTPException(status_code=422, detail="invalid thread_id")
+    if store.get_thread(thread_id) is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    run_store = _resolve_run_store(run_store, store)
+    if not hasattr(run_store, "latest_successful_for_thread"):
+        from src.research_runs import ResearchRunStore
+
+        run_store = ResearchRunStore(store.db_path)
+    selection = run_store.latest_successful_for_thread(thread_id)
+    if selection is None:
+        return None
+    return {
+        "provider": selection.provider,
+        "model": selection.model,
+        "effort": selection.effort,
+    }
+
+
 @router.get("/research/threads/{thread_id}/messages")
 def list_research_messages(
     thread_id: str,
@@ -311,6 +346,8 @@ async def create_research_run(
     model, effort = request.model, request.effort
     if model is None:
         model, effort = resolve_research_route(provider)
+    if effort in (None, ""):
+        effort = "default"
     auth_mode, credential_id = _resolve_auth_metadata(provider)
     agent_question = _compose_agent_question(question, request.ticker)
 
@@ -395,12 +432,22 @@ def list_research_run_events(
 def cancel_research_run_route(
     run_id: str,
     run_store=Depends(get_run_store),
+    thread_store=Depends(get_thread_store),
 ) -> dict:
     run = run_store.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")
     if run.status in ACTIVE_STATUSES:
         if not cancel_research_run(run_id):
-            run_store.append_event(run_id, "error", {"error": "research run cancelled"})
-            run_store.mark_terminal(run_id, "cancelled", error="research run cancelled")
+            failure = classify_research_failure(
+                "research run cancelled",
+                explicit_code="run_cancelled",
+            )
+            run_store.terminalize_error_with_message(
+                thread_store=thread_store,
+                run_id=run_id,
+                status="cancelled",
+                error=failure.detail,
+                error_code=failure.code,
+            )
     return {"run": _run_dict(run_store.get_run(run_id))}
