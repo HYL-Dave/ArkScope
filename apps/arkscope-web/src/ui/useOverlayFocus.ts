@@ -44,6 +44,15 @@ function focusOverlay(entry: OverlayEntry) {
   initial.focus();
 }
 
+function topmostInactiveFocusTarget(): HTMLElement | null {
+  for (let index = overlayStack.length - 1; index >= 0; index -= 1) {
+    const entry = overlayStack[index];
+    const target = entry.active ? null : entry.inactiveFocusRef?.current;
+    if (target?.isConnected) return target;
+  }
+  return null;
+}
+
 function restoreAfterRemoval(entry: OverlayEntry) {
   const nextOverlay = topmostActiveOverlay();
   if (nextOverlay) {
@@ -55,7 +64,12 @@ function restoreAfterRemoval(entry: OverlayEntry) {
     }
     return;
   }
-  if (entry.previous?.isConnected) entry.previous.focus();
+  if (entry.previous?.isConnected) {
+    entry.previous.focus();
+    return;
+  }
+  const inactiveTarget = topmostInactiveFocusTarget();
+  if (inactiveTarget) inactiveTarget.focus();
   else entry.fallbackFocusRef?.current?.focus();
 }
 

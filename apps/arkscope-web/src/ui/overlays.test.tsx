@@ -353,13 +353,29 @@ describe("overlay focus contracts", () => {
     expect(document.querySelector('[role="complementary"]')).not.toBeNull();
     expect(confirmDialog.contains(document.activeElement)).toBe(true);
 
+    await act(async () => pressKey("Escape"));
+    expect(onConfirmCancel).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".ui-confirm-dialog")).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector('[aria-label="取消釘選"]'));
+
+    await act(async () => pressKey("Escape"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    const secondConfirmTrigger = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "開啟確認")!;
+    secondConfirmTrigger.focus();
+    await act(async () => secondConfirmTrigger.click());
+    const secondConfirmDialog = document.querySelector<HTMLElement>(".ui-confirm-dialog")!;
+    expect(secondConfirmDialog.contains(document.activeElement)).toBe(true);
+
     await viewport.setMatches(true);
     const modalDrawer = document.querySelector<HTMLElement>(".ui-drawer")!;
     expect(modalDrawer.getAttribute("aria-modal")).toBe("true");
-    expect(confirmDialog.contains(document.activeElement)).toBe(true);
+    expect(secondConfirmDialog.contains(document.activeElement)).toBe(true);
 
     await act(async () => pressKey("Escape"));
-    expect(onConfirmCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirmCancel).toHaveBeenCalledTimes(2);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(document.querySelector(".ui-confirm-dialog")).toBeNull();
     expect(modalDrawer.contains(document.activeElement)).toBe(true);
