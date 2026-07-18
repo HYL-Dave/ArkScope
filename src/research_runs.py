@@ -54,6 +54,15 @@ TERMINAL_STATUSES = ("succeeded", "failed", "cancelled", "interrupted")
 MAX_ACTIVE_THREAD_BATCH = 200
 
 
+class ResearchRunUnavailableError(RuntimeError):
+    """The owning thread cannot accept a new run in its current state."""
+
+    def __init__(self, thread_id: str, reason: str):
+        self.thread_id = thread_id
+        self.reason = reason
+        super().__init__(f"research thread is unavailable for a new run: {reason}")
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -164,6 +173,22 @@ class ResearchRunStore:
     ) -> ResearchRun:
         ts = _now()
         with self._write_lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            thread = conn.execute(
+                "SELECT archived_at FROM research_threads WHERE id = ?",
+                (thread_id,),
+            ).fetchone()
+            if thread is None:
+                raise ResearchRunUnavailableError(thread_id, "missing")
+            if thread["archived_at"] is not None:
+                raise ResearchRunUnavailableError(thread_id, "archived")
+            active = conn.execute(
+                "SELECT 1 FROM research_runs "
+                "WHERE thread_id = ? AND status IN ('queued','running') LIMIT 1",
+                (thread_id,),
+            ).fetchone()
+            if active is not None:
+                raise ResearchRunUnavailableError(thread_id, "active_run")
             conn.execute(
                 """
                 INSERT INTO research_runs
@@ -174,10 +199,11 @@ class ResearchRunStore:
                 (id, thread_id, question, ticker, provider, model, effort,
                  assistant_stance, auth_mode, credential_id, ts, ts),
             )
+            row = conn.execute(
+                "SELECT * FROM research_runs WHERE id = ?", (id,)
+            ).fetchone()
             conn.commit()
-        got = self.get_run(id)
-        assert got is not None
-        return got
+        return self._run(row)
 
     def get_run(self, run_id: str) -> Optional[ResearchRun]:
         with self._connect() as conn:
@@ -194,7 +220,10 @@ class ResearchRunStore:
         return self._run(r) if r else None
 
     def latest_active_for_threads(
-        self, thread_ids: Sequence[str]
+        self,
+        thread_ids: Sequence[str],
+        *,
+        conn: sqlite3.Connection | None = None,
     ) -> dict[str, ResearchRun]:
         """Resolve one latest active run per thread with one bounded query."""
         if isinstance(thread_ids, (str, bytes)) or not isinstance(thread_ids, Sequence):
@@ -210,13 +239,19 @@ class ResearchRunStore:
 
         unique_ids = tuple(dict.fromkeys(thread_ids))
         placeholders = ",".join("?" for _ in unique_ids)
-        with self._connect() as conn:
-            rows = conn.execute(
-                f"SELECT * FROM research_runs WHERE thread_id IN ({placeholders}) "
-                "AND status IN ('queued','running') "
-                "ORDER BY thread_id ASC, created_at DESC, id DESC",
-                unique_ids,
-            ).fetchall()
+        sql = (
+            f"SELECT * FROM research_runs WHERE thread_id IN ({placeholders}) "
+            "AND status IN ('queued','running') "
+            "ORDER BY thread_id ASC, created_at DESC, id DESC"
+        )
+        if conn is not None:
+            rows = conn.execute(sql, unique_ids).fetchall()
+        else:
+            with self._connect() as owned_conn:
+                rows = owned_conn.execute(
+                    sql,
+                    unique_ids,
+                ).fetchall()
 
         latest: dict[str, ResearchRun] = {}
         for row in rows:

@@ -7,6 +7,10 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.research_runs import ResearchRun, ResearchRunStore
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,7 @@ class ResearchHistoryPage:
     total: int
     limit: int
     offset: int
+    active_runs: tuple[ResearchRun, ...] = ()
 
     @property
     def threads(self) -> tuple[ResearchHistoryThread, ...]:
@@ -251,6 +256,7 @@ class ResearchHistoryStore:
         archive_mode: str = "current",
         limit: int = 50,
         offset: int = 0,
+        run_store: ResearchRunStore | None = None,
     ) -> ResearchHistoryPage:
         query = _normalized_query(
             q=q,
@@ -273,6 +279,7 @@ class ResearchHistoryStore:
             "ORDER BY t.updated_at DESC, t.id DESC\nLIMIT ? OFFSET ?"
         )
 
+        active_runs: tuple[ResearchRun, ...] = ()
         with closing(self._connect()) as conn:
             conn.execute("BEGIN")
             try:
@@ -281,6 +288,16 @@ class ResearchHistoryStore:
                     items_sql,
                     (*params, query.limit, query.offset),
                 ).fetchall()
+                if run_store is not None:
+                    active_by_thread = run_store.latest_active_for_threads(
+                        [row["id"] for row in rows],
+                        conn=conn,
+                    )
+                    active_runs = tuple(
+                        active_by_thread[row["id"]]
+                        for row in rows
+                        if row["id"] in active_by_thread
+                    )
             finally:
                 conn.rollback()
 
@@ -289,4 +306,5 @@ class ResearchHistoryStore:
             total=total,
             limit=query.limit,
             offset=query.offset,
+            active_runs=active_runs,
         )

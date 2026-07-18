@@ -61,21 +61,16 @@ def _add_run(
     created_at: str = MATCHED_AT,
     question: str = "question",
 ) -> None:
-    run_store.create_run(
-        id=run_id,
-        thread_id=thread_id,
-        question=question,
-        ticker=None,
-        provider="openai",
-        model="gpt-5.4-mini",
-        effort="low",
-        auth_mode="api_key",
-        credential_id=None,
-    )
     with sqlite3.connect(run_store.db_path) as conn:
         conn.execute(
-            "UPDATE research_runs SET status = ?, created_at = ?, updated_at = ? WHERE id = ?",
-            (status, created_at, created_at, run_id),
+            """
+            INSERT INTO research_runs
+                (id, thread_id, status, question, provider, model, effort,
+                 auth_mode, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'openai', 'gpt-5.4-mini', 'low',
+                    'api_key', ?, ?)
+            """,
+            (run_id, thread_id, status, question, created_at, created_at),
         )
 
 
@@ -98,17 +93,31 @@ class _AfterFetchCursor:
         return row
 
 
+class _AfterFetchAllCursor:
+    def __init__(self, cursor, after_fetch):
+        self._cursor = cursor
+        self._after_fetch = after_fetch
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        self._after_fetch()
+        return rows
+
+
 class _InterleavingConnection:
-    def __init__(self, conn, after_count):
+    def __init__(self, conn, after_count, after_items=lambda: None):
         self._conn = conn
         self._after_count = after_count
+        self._after_items = after_items
 
     def execute(self, sql, params=()):
         cursor = self._conn.execute(sql, params)
-        if "COUNT(*) AS total" not in sql:
-            return cursor
-        assert self._conn.in_transaction, "count and page require an explicit snapshot"
-        return _AfterFetchCursor(cursor, self._after_count)
+        if "COUNT(*) AS total" in sql:
+            assert self._conn.in_transaction, "count and page require an explicit snapshot"
+            return _AfterFetchCursor(cursor, self._after_count)
+        if "lr.status AS latest_run_status" in sql:
+            return _AfterFetchAllCursor(cursor, self._after_items)
+        return cursor
 
     def __getattr__(self, name):
         return getattr(self._conn, name)
@@ -132,6 +141,7 @@ def test_query_searches_stored_title_and_ticker_before_limit(stores, monkeypatch
         status="succeeded",
         question="100%_ appears only in the run question",
     )
+    _add_run(run_store, "match-z", "snapshot-run", status="queued")
     original_connect = history._connect
 
     def add_interleaved_match():
@@ -142,15 +152,27 @@ def test_query_searches_stored_title_and_ticker_before_limit(stores, monkeypatch
             updated_at="2026-07-18T04:00:00+00:00",
         )
 
+    def terminalize_active_run_after_items():
+        run_store.mark_terminal("snapshot-run", "failed", error="interleaved")
+
     monkeypatch.setattr(
         history,
         "_connect",
-        lambda: _InterleavingConnection(original_connect(), add_interleaved_match),
+        lambda: _InterleavingConnection(
+            original_connect(),
+            add_interleaved_match,
+            terminalize_active_run_after_items,
+        ),
     )
 
-    page = history.query_threads(q="%_", limit=1)
+    page = history.query_threads(q="%_", limit=1, run_store=run_store)
 
     _assert_bounded_page(page, ["match-z"], total=2)
+    assert page.threads[0].latest_run_status == "queued"
+    assert [(run.id, run.status) for run in page.active_runs] == [
+        ("snapshot-run", "queued")
+    ]
+    assert run_store.get_run("snapshot-run").status == "failed"
     assert thread_store.get_thread("interleaved-match") is not None
     assert isinstance(page.threads[0], ResearchHistoryThread)
     assert isinstance(page.threads, tuple)

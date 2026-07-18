@@ -11,8 +11,18 @@ from src.agents.config import resolve_research_route
 from src.api.routes.query import _compose_agent_question, TITLE_MAX
 from src.auth_drivers.live_resolver import resolve_live_auth
 from src.research_run_manager import cancel_research_run, schedule_research_run
-from src.research_runs import ACTIVE_STATUSES, ResearchRun, ResearchRunEvent
-from src.research_threads import ResearchMessage, ResearchThread, valid_thread_id
+from src.research_runs import (
+    ACTIVE_STATUSES,
+    ResearchRun,
+    ResearchRunEvent,
+    ResearchRunUnavailableError,
+)
+from src.research_threads import (
+    ResearchMessage,
+    ResearchThread,
+    ResearchThreadActiveError,
+    valid_thread_id,
+)
 
 from ..dependencies import (
     get_dal,
@@ -138,12 +148,12 @@ def list_research_threads(
             archive_mode=archived,
             limit=limit,
             offset=offset,
+            run_store=run_store,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    thread_ids = [thread.id for thread in page.threads]
-    active_runs = run_store.latest_active_for_threads(thread_ids)
+    active_runs = {run.thread_id: run for run in page.active_runs}
     return {
         "threads": [
             _thread_dict(thread, active_run=active_runs.get(thread.id))
@@ -194,9 +204,6 @@ def patch_research_thread(
 ) -> dict:
     if not valid_thread_id(thread_id):
         raise HTTPException(status_code=422, detail="invalid thread_id")
-    thread = store.get_thread(thread_id)
-    if thread is None:
-        raise HTTPException(status_code=404, detail="thread not found")
     if request.title is None and request.archived is None:
         raise HTTPException(status_code=422, detail="at least one field is required")
 
@@ -210,18 +217,19 @@ def patch_research_thread(
             )
 
     run_store = _resolve_run_store(run_store, store)
-    if request.archived is True and run_store.latest_active_for_thread(thread_id):
+    try:
+        updated = store.update_thread_lifecycle(
+            thread_id,
+            title=title,
+            archived=request.archived,
+        )
+    except ResearchThreadActiveError as exc:
         raise HTTPException(
             status_code=409,
             detail="active research run prevents archiving this thread",
-        )
-
-    updated = thread
-    if title is not None:
-        updated = store.rename_thread(thread_id, title)
-    if request.archived is not None:
-        updated = store.set_thread_archived(thread_id, request.archived)
-    assert updated is not None
+        ) from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail="thread not found")
     return {"thread": _thread_with_active_run(updated, run_store)}
 
 
@@ -251,13 +259,14 @@ def delete_research_thread(
     """
     if not valid_thread_id(thread_id):
         raise HTTPException(status_code=422, detail="invalid thread_id")
-    run_store = _resolve_run_store(run_store, store)
-    if run_store.latest_active_for_thread(thread_id) is not None:
+    try:
+        deleted = store.delete_thread(thread_id)
+    except ResearchThreadActiveError as exc:
         raise HTTPException(
             status_code=409,
             detail="active research run prevents deleting this thread",
-        )
-    return {"thread_id": thread_id, "deleted": store.delete_thread(thread_id)}
+        ) from exc
+    return {"thread_id": thread_id, "deleted": deleted}
 
 
 def _resolve_auth_metadata(provider: str) -> tuple[str | None, str | None]:
@@ -294,18 +303,17 @@ async def create_research_run(
     thread_id = request.thread_id or str(uuid.uuid4())
     if not valid_thread_id(thread_id):
         raise HTTPException(status_code=422, detail="invalid thread_id")
-    if run_store.latest_active_for_thread(thread_id) is not None:
-        raise HTTPException(status_code=409, detail="thread already has an active research run")
 
     from src.research_threads import build_thread_history
 
+    existing_thread = thread_store.get_thread(thread_id)
     history = (
         build_thread_history(
             thread_store,
             thread_id,
             exclude_last_failed_pair=request.retry_last_failed,
         )
-        if thread_store.get_thread(thread_id) is not None
+        if existing_thread is not None
         else []
     )
     model, effort = request.model, request.effort
@@ -314,30 +322,34 @@ async def create_research_run(
     auth_mode, credential_id = _resolve_auth_metadata(provider)
     agent_question = _compose_agent_question(question, request.ticker)
 
-    thread_store.ensure_thread(
-        id=thread_id,
-        title=question[:TITLE_MAX],
-        ticker=(request.ticker or None),
-        provider=provider,
-        model=model,
-    )
+    if existing_thread is None:
+        thread_store.ensure_thread(
+            id=thread_id,
+            title=question[:TITLE_MAX],
+            ticker=(request.ticker or None),
+            provider=provider,
+            model=model,
+        )
+    try:
+        run = run_store.create_run(
+            id=str(uuid.uuid4()),
+            thread_id=thread_id,
+            question=agent_question,
+            ticker=(request.ticker or None),
+            provider=provider,
+            model=model,
+            effort=effort,
+            auth_mode=auth_mode,
+            credential_id=credential_id,
+            assistant_stance=request.assistant_stance,
+        )
+    except ResearchRunUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     thread_store.append_message(
         thread_id=thread_id,
         role="user",
         content=question,
         tickers=[request.ticker] if request.ticker else None,
-    )
-    run = run_store.create_run(
-        id=str(uuid.uuid4()),
-        thread_id=thread_id,
-        question=agent_question,
-        ticker=(request.ticker or None),
-        provider=provider,
-        model=model,
-        effort=effort,
-        auth_mode=auth_mode,
-        credential_id=credential_id,
-        assistant_stance=request.assistant_stance,
     )
     schedule_research_run(
         run_id=run.id,

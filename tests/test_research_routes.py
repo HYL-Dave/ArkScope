@@ -9,7 +9,10 @@ persistence (#4 — store errors never propagate), thread_id validation (#5).
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import pytest
 
@@ -61,6 +64,96 @@ def _add_run(run_store, thread_id, run_id, *, status="queued", created_at=None):
                 (status, timestamp, timestamp, run_id),
             )
     return run_store.get_run(run_id)
+
+
+def _begin_writer(db_path):
+    conn = sqlite3.connect(db_path, timeout=5.0, isolation_level=None)
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("BEGIN IMMEDIATE")
+    return conn
+
+
+def _insert_active_run(conn, thread_id, run_id):
+    conn.execute(
+        """
+        INSERT INTO research_runs
+            (id, thread_id, status, question, provider, model, created_at, updated_at)
+        VALUES
+            (?, ?, 'queued', 'question', 'openai', 'gpt-5.4-mini',
+             '2026-07-18T02:00:00+00:00', '2026-07-18T02:00:00+00:00')
+        """,
+        (run_id, thread_id),
+    )
+
+
+def _capture(call):
+    try:
+        return None, call()
+    except Exception as exc:  # assertions inspect the exact routed failure
+        return exc, None
+
+
+class _WriteSignalingConnection:
+    def __init__(self, conn, blocked):
+        self._conn = conn
+        self._blocked = blocked
+
+    def execute(self, sql, params=()):
+        normalized = " ".join(sql.split())
+        if (
+            normalized == "BEGIN IMMEDIATE"
+            or normalized.startswith("UPDATE research_threads SET")
+            or normalized.startswith("DELETE FROM research_threads")
+            or normalized.startswith("INSERT INTO research_messages")
+        ):
+            self._blocked.set()
+        return self._conn.execute(sql, params)
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        return self._conn.__exit__(*args)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def _install_write_signal(
+    monkeypatch,
+    thread_store,
+    run_store,
+    thread_connect,
+    run_connect,
+):
+    blocked = threading.Event()
+    monkeypatch.setattr(
+        thread_store,
+        "_connect",
+        lambda: _WriteSignalingConnection(thread_connect(), blocked),
+    )
+    monkeypatch.setattr(
+        run_store,
+        "_connect",
+        lambda: _WriteSignalingConnection(run_connect(), blocked),
+    )
+    return blocked
+
+
+def _finish_after_writer_commit(writer, call, blocked):
+
+    def invoke():
+        return _capture(call)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(invoke)
+        assert blocked.wait(timeout=1)
+        with pytest.raises(FutureTimeoutError):
+            future.result(timeout=0.1)
+        writer.commit()
+        return future.result(timeout=5)
 
 
 # --- #2: server composes the agent prompt; the RAW question is what's stored ---
@@ -196,7 +289,7 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
     research_stores, monkeypatch
 ):
     thread_store, run_store, history_store = research_stores
-    for thread_id, title, ticker, updated_at, archived in [
+    thread_specs = [
         ("match-new", "Needle newest", "NVDA", "2026-07-18T03:00:00+00:00", True),
         ("match-old", "Needle older", "nvda", "2026-07-18T02:00:00+00:00", True),
         ("wrong-q", "Unrelated", "NVDA", "2026-07-18T02:30:00+00:00", True),
@@ -204,7 +297,8 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
         ("outside-window", "Needle old", "NVDA", "2026-07-18T00:30:00+00:00", True),
         ("terminal", "Needle failed", "NVDA", "2026-07-18T02:30:00+00:00", True),
         ("current", "Needle current", "NVDA", "2026-07-18T02:30:00+00:00", False),
-    ]:
+    ]
+    for thread_id, title, ticker, updated_at, _ in thread_specs:
         thread_store.ensure_thread(
             id=thread_id,
             title=title,
@@ -213,9 +307,6 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
             model="gpt-5.4-mini",
             now=updated_at,
         )
-        if archived:
-            _archive_thread(thread_store, thread_id, updated_at)
-
     for thread_id in [
         "match-new",
         "match-old",
@@ -226,20 +317,25 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
     ]:
         _add_run(run_store, thread_id, f"r-{thread_id}")
     _add_run(run_store, "terminal", "r-terminal", status="failed")
+    for thread_id, _, _, updated_at, archived in thread_specs:
+        if archived:
+            _archive_thread(thread_store, thread_id, updated_at)
 
     history_calls = []
     real_query = history_store.query_threads
 
     def recording_query(**kwargs):
         history_calls.append(kwargs)
-        return real_query(**kwargs)
+        page = real_query(**kwargs)
+        run_store.mark_terminal("r-match-old", "failed", error="interleaved")
+        return page
 
     batch_calls = []
     real_batch = run_store.latest_active_for_threads
 
-    def recording_batch(thread_ids):
-        batch_calls.append(list(thread_ids))
-        return real_batch(thread_ids)
+    def recording_batch(thread_ids, *, conn=None):
+        batch_calls.append((list(thread_ids), conn is not None))
+        return real_batch(thread_ids, conn=conn)
 
     def forbid_single_lookup(*args, **kwargs):
         raise AssertionError("list route must not call latest_active_for_thread")
@@ -272,6 +368,7 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
             "archive_mode": "archived",
             "limit": 1,
             "offset": 1,
+            "run_store": run_store,
         }
     ]
     assert response["total"] == 2
@@ -280,8 +377,10 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
     thread = response["threads"][0]
     assert thread["latest_run_status"] == "queued"
     assert thread["archived_at"] == "2026-07-18T02:00:00+00:00"
-    assert thread["active_run"] == r._run_dict(run_store.get_run("r-match-old"))
-    assert batch_calls == [["match-old"]]
+    assert thread["active_run"]["id"] == "r-match-old"
+    assert thread["active_run"]["status"] == "queued"
+    assert run_store.get_run("r-match-old").status == "failed"
+    assert batch_calls == [(["match-old"], True)]
     assert run_store.latest_active_for_threads([]) == {}
     with pytest.raises(ValueError):
         run_store.latest_active_for_threads([f"thread-{i}" for i in range(201)])
@@ -311,7 +410,9 @@ def test_exact_thread_route_returns_archived_target_outside_history_page(researc
     assert response["thread"]["active_run"] is None
 
 
-def test_patch_thread_renames_and_rejects_invalid_titles_without_mutation(research_stores):
+def test_patch_thread_renames_and_rejects_invalid_titles_without_mutation(
+    research_stores, monkeypatch
+):
     from fastapi import HTTPException
 
     thread_store, run_store, _ = research_stores
@@ -332,6 +433,39 @@ def test_patch_thread_renames_and_rejects_invalid_titles_without_mutation(resear
     assert response["thread"]["updated_at"] != original.updated_at
     assert [m.content for m in thread_store.list_messages("t1")] == ["keep me"]
 
+    with sqlite3.connect(thread_store.db_path) as conn:
+        conn.execute(
+            """
+            CREATE TRIGGER abort_thread_archive
+            BEFORE UPDATE OF archived_at ON research_threads
+            WHEN NEW.id = 't1'
+            BEGIN
+                SELECT RAISE(ABORT, 'archive write failed');
+            END
+            """
+        )
+    with pytest.raises(sqlite3.IntegrityError, match="archive write failed"):
+        r.patch_research_thread(
+            thread_id="t1",
+            request=r.ResearchThreadPatch(title="Must roll back", archived=True),
+            store=thread_store,
+            run_store=run_store,
+        )
+    rolled_back = thread_store.get_thread("t1")
+    assert rolled_back.title == "Renamed"
+    assert rolled_back.archived_at is None
+    with sqlite3.connect(thread_store.db_path) as conn:
+        conn.execute("DROP TRIGGER abort_thread_archive")
+
+    combined = r.patch_research_thread(
+        thread_id="t1",
+        request=r.ResearchThreadPatch(title="Atomic rename", archived=True),
+        store=thread_store,
+        run_store=run_store,
+    )
+    assert combined["thread"]["title"] == "Atomic rename"
+    assert combined["thread"]["archived_at"] is not None
+
     for invalid_title in ("   ", "x" * 61):
         with pytest.raises(HTTPException) as exc_info:
             r.patch_research_thread(
@@ -341,7 +475,7 @@ def test_patch_thread_renames_and_rejects_invalid_titles_without_mutation(resear
                 run_store=run_store,
             )
         assert exc_info.value.status_code == 422
-        assert thread_store.get_thread("t1").title == "Renamed"
+        assert thread_store.get_thread("t1").title == "Atomic rename"
     with pytest.raises(HTTPException) as exc_info:
         r.patch_research_thread(
             thread_id="t1",
@@ -350,13 +484,34 @@ def test_patch_thread_renames_and_rejects_invalid_titles_without_mutation(resear
             run_store=run_store,
         )
     assert exc_info.value.status_code == 422
-    assert thread_store.get_thread("t1").title == "Renamed"
+    assert thread_store.get_thread("t1").title == "Atomic rename"
+
+    thread_store.ensure_thread(id="missing-race", title="Race")
+    real_update = thread_store.update_thread_lifecycle
+
+    def delete_before_update(thread_id, **kwargs):
+        assert thread_store.delete_thread(thread_id) is True
+        return real_update(thread_id, **kwargs)
+
+    monkeypatch.setattr(thread_store, "update_thread_lifecycle", delete_before_update)
+    with pytest.raises(HTTPException) as exc_info:
+        r.patch_research_thread(
+            thread_id="missing-race",
+            request=r.ResearchThreadPatch(title="Gone"),
+            store=thread_store,
+            run_store=run_store,
+        )
+    assert exc_info.value.status_code == 404
 
 
-def test_patch_archive_active_thread_returns_409_without_mutation(research_stores):
+def test_patch_archive_active_thread_returns_409_without_mutation(
+    research_stores, monkeypatch
+):
     from fastapi import HTTPException
 
     thread_store, run_store, _ = research_stores
+    thread_connect = thread_store._connect
+    run_connect = run_store._connect
     thread_store.ensure_thread(id="t1", title="Active")
     thread_store.append_message(thread_id="t1", role="user", content="question")
     _add_run(run_store, "t1", "r1")
@@ -373,6 +528,72 @@ def test_patch_archive_active_thread_returns_409_without_mutation(research_store
     assert thread_store.get_thread("t1").archived_at is None
     assert [m.content for m in thread_store.list_messages("t1")] == ["question"]
     assert run_store.get_run("r1").status == "queued"
+
+    thread_store.ensure_thread(id="run-first-archive", title="Run first")
+    blocked = _install_write_signal(
+        monkeypatch, thread_store, run_store, thread_connect, run_connect
+    )
+    writer = _begin_writer(thread_store.db_path)
+    try:
+        _insert_active_run(writer, "run-first-archive", "r-run-first-archive")
+        error, _ = _finish_after_writer_commit(
+            writer,
+            lambda: r.patch_research_thread(
+                thread_id="run-first-archive",
+                request=r.ResearchThreadPatch(archived=True),
+                store=thread_store,
+                run_store=run_store,
+            ),
+            blocked,
+        )
+    finally:
+        writer.close()
+    assert isinstance(error, HTTPException) and error.status_code == 409
+    assert thread_store.get_thread("run-first-archive").archived_at is None
+    assert run_store.get_run("r-run-first-archive").status == "queued"
+
+    thread_store.ensure_thread(id="archive-first", title="Archive first")
+    thread_store.append_message(
+        thread_id="archive-first", role="assistant", content="existing"
+    )
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: (None, None))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: None)
+    blocked = _install_write_signal(
+        monkeypatch, thread_store, run_store, thread_connect, run_connect
+    )
+    writer = _begin_writer(thread_store.db_path)
+    try:
+        writer.execute(
+            "UPDATE research_threads SET archived_at = ? WHERE id = ?",
+            ("2026-07-18T03:00:00+00:00", "archive-first"),
+        )
+        request = r.ResearchRunCreate(
+            thread_id="archive-first",
+            question="must not append",
+            provider="openai",
+            model="gpt-5.4-mini",
+            effort="low",
+        )
+        error, _ = _finish_after_writer_commit(
+            writer,
+            lambda: asyncio.run(
+                r.create_research_run(
+                    request,
+                    dal=object(),
+                    thread_store=thread_store,
+                    run_store=run_store,
+                )
+            ),
+            blocked,
+        )
+    finally:
+        writer.close()
+    assert isinstance(error, HTTPException) and error.status_code == 409
+    assert thread_store.get_thread("archive-first").archived_at is not None
+    assert [m.content for m in thread_store.list_messages("archive-first")] == [
+        "existing"
+    ]
+    assert run_store.latest_active_for_thread("archive-first") is None
 
 
 def test_patch_archive_and_unarchive_preserve_transcript_and_runs(research_stores):
@@ -406,10 +627,14 @@ def test_patch_archive_and_unarchive_preserve_transcript_and_runs(research_store
     assert [event.type for event in run_store.list_events("r1")] == ["done"]
 
 
-def test_delete_active_thread_returns_409_without_cascade(research_stores):
+def test_delete_active_thread_returns_409_without_cascade(
+    research_stores, monkeypatch
+):
     from fastapi import HTTPException
 
     thread_store, run_store, _ = research_stores
+    thread_connect = thread_store._connect
+    run_connect = run_store._connect
     thread_store.ensure_thread(id="t1", title="Active")
     thread_store.append_message(thread_id="t1", role="user", content="question")
     _add_run(run_store, "t1", "r1")
@@ -425,6 +650,66 @@ def test_delete_active_thread_returns_409_without_cascade(research_stores):
     assert [m.content for m in thread_store.list_messages("t1")] == ["question"]
     assert run_store.get_run("r1").status == "queued"
     assert [event.type for event in run_store.list_events("r1")] == ["thinking"]
+
+    thread_store.ensure_thread(id="run-first-delete", title="Run first")
+    blocked = _install_write_signal(
+        monkeypatch, thread_store, run_store, thread_connect, run_connect
+    )
+    writer = _begin_writer(thread_store.db_path)
+    try:
+        _insert_active_run(writer, "run-first-delete", "r-run-first-delete")
+        error, _ = _finish_after_writer_commit(
+            writer,
+            lambda: r.delete_research_thread(
+                thread_id="run-first-delete",
+                store=thread_store,
+                run_store=run_store,
+            ),
+            blocked,
+        )
+    finally:
+        writer.close()
+    assert isinstance(error, HTTPException) and error.status_code == 409
+    assert thread_store.get_thread("run-first-delete") is not None
+    assert run_store.get_run("r-run-first-delete").status == "queued"
+
+    thread_store.ensure_thread(id="delete-first", title="Delete first")
+    thread_store.append_message(
+        thread_id="delete-first", role="assistant", content="removed with thread"
+    )
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: (None, None))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: None)
+    blocked = _install_write_signal(
+        monkeypatch, thread_store, run_store, thread_connect, run_connect
+    )
+    writer = _begin_writer(thread_store.db_path)
+    try:
+        writer.execute("DELETE FROM research_threads WHERE id = ?", ("delete-first",))
+        request = r.ResearchRunCreate(
+            thread_id="delete-first",
+            question="must not append",
+            provider="openai",
+            model="gpt-5.4-mini",
+            effort="low",
+        )
+        error, _ = _finish_after_writer_commit(
+            writer,
+            lambda: asyncio.run(
+                r.create_research_run(
+                    request,
+                    dal=object(),
+                    thread_store=thread_store,
+                    run_store=run_store,
+                )
+            ),
+            blocked,
+        )
+    finally:
+        writer.close()
+    assert isinstance(error, HTTPException) and error.status_code == 409
+    assert thread_store.get_thread("delete-first") is None
+    assert thread_store.list_messages("delete-first") == []
+    assert run_store.latest_active_for_thread("delete-first") is None
 
 
 def test_list_messages_route_roundtrip(store):

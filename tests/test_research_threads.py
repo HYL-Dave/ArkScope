@@ -207,9 +207,11 @@ def test_archive_never_deletes_runs_or_messages(store):
         auth_mode="api_key",
         credential_id=None,
     )
+    run_store.mark_terminal("r1", "succeeded")
 
-    store.set_thread_archived("t1", True)
+    archived = store.set_thread_archived("t1", True)
 
+    assert archived is not None and archived.archived_at is not None
     assert run_store.get_run("r1") is not None
     assert [m.content for m in store.list_messages("t1")] == ["question"]
 

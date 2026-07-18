@@ -62,6 +62,10 @@ MAX_THREAD_ID = 200
 MAX_TOOL_CALLS_SENTINEL = "Maximum tool calls reached. Please try a simpler query."
 
 
+class ResearchThreadActiveError(RuntimeError):
+    """An active run prevents a destructive thread lifecycle transition."""
+
+
 def valid_thread_id(tid: Optional[str]) -> bool:
     """Client-owned thread id must be non-blank and bounded (route gate + the
     stream-hook persistence gate both use this)."""
@@ -335,19 +339,7 @@ class ResearchThreadStore:
         *,
         now: Optional[str] = None,
     ) -> Optional[ResearchThread]:
-        ts = now or _now()
-        with self._write_lock, self._connect() as conn:
-            cur = conn.execute(
-                "UPDATE research_threads SET title = ?, updated_at = ? WHERE id = ?",
-                (title, ts, thread_id),
-            )
-            if cur.rowcount == 0:
-                return None
-            row = conn.execute(
-                "SELECT * FROM research_threads WHERE id = ?", (thread_id,)
-            ).fetchone()
-            conn.commit()
-        return self._thread(row)
+        return self.update_thread_lifecycle(thread_id, title=title, now=now)
 
     def set_thread_archived(
         self,
@@ -356,15 +348,55 @@ class ResearchThreadStore:
         *,
         now: Optional[str] = None,
     ) -> Optional[ResearchThread]:
+        return self.update_thread_lifecycle(
+            thread_id,
+            archived=archived,
+            now=now,
+        )
+
+    def update_thread_lifecycle(
+        self,
+        thread_id: str,
+        *,
+        title: Optional[str] = None,
+        archived: Optional[bool] = None,
+        now: Optional[str] = None,
+    ) -> Optional[ResearchThread]:
+        """Atomically apply one lifecycle patch under the SQLite writer lock."""
+        if title is None and archived is None:
+            raise ValueError("at least one lifecycle field is required")
         ts = now or _now()
-        archived_at = ts if archived else None
         with self._write_lock, self._connect() as conn:
-            cur = conn.execute(
-                "UPDATE research_threads SET archived_at = ?, updated_at = ? WHERE id = ?",
-                (archived_at, ts, thread_id),
-            )
-            if cur.rowcount == 0:
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute(
+                "SELECT * FROM research_threads WHERE id = ?", (thread_id,)
+            ).fetchone()
+            if current is None:
+                conn.rollback()
                 return None
+            if archived is True:
+                active = conn.execute(
+                    "SELECT 1 FROM research_runs "
+                    "WHERE thread_id = ? AND status IN ('queued','running') LIMIT 1",
+                    (thread_id,),
+                ).fetchone()
+                if active is not None:
+                    raise ResearchThreadActiveError(thread_id)
+
+            assignments: list[str] = []
+            params: list[object] = []
+            if title is not None:
+                assignments.append("title = ?")
+                params.append(title)
+            if archived is not None:
+                assignments.append("archived_at = ?")
+                params.append(ts if archived else None)
+            assignments.append("updated_at = ?")
+            params.extend((ts, thread_id))
+            conn.execute(
+                f"UPDATE research_threads SET {', '.join(assignments)} WHERE id = ?",
+                params,
+            )
             row = conn.execute(
                 "SELECT * FROM research_threads WHERE id = ?", (thread_id,)
             ).fetchone()
@@ -374,6 +406,20 @@ class ResearchThreadStore:
     def delete_thread(self, thread_id: str) -> bool:
         """Delete one persisted research conversation and all of its messages."""
         with self._write_lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute(
+                "SELECT 1 FROM research_threads WHERE id = ?", (thread_id,)
+            ).fetchone()
+            if current is None:
+                conn.rollback()
+                return False
+            active = conn.execute(
+                "SELECT 1 FROM research_runs "
+                "WHERE thread_id = ? AND status IN ('queued','running') LIMIT 1",
+                (thread_id,),
+            ).fetchone()
+            if active is not None:
+                raise ResearchThreadActiveError(thread_id)
             cur = conn.execute("DELETE FROM research_threads WHERE id = ?", (thread_id,))
             conn.commit()
         return cur.rowcount > 0
