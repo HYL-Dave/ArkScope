@@ -73,6 +73,12 @@ _DIRTY_BODY_PATTERN = r"^# .+\n\n# "
 
 _EPOCH_TS = "1970-01-01T00:00:00+00:00"  # COALESCE floor, canonical format
 
+_COMMENT_SCAN_MODES = frozenset({"quick", "full", "backfill"})
+_COMMENT_TERMINAL_STOP_REASON = "stable_bottom"
+_COMMENT_TERMINAL_BOTTOM_ROUNDS = 5
+_COMMENT_FULL_MISS_LIMIT = 2
+_COMMENT_TERMINAL_REASON = "provider_bottom_unbridged"
+
 
 def _regexp(pattern: str, value: Optional[str]) -> int:
     """SQLite REGEXP user function: ``X REGEXP Y`` calls ``regexp(Y, X)``."""
@@ -104,6 +110,32 @@ def _parse_date(value: Any) -> Optional[date]:
         return date.fromisoformat(str(value)[:10])
     except ValueError:
         return None
+
+
+def _provider_comment_count(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _comment_scan_usable(
+    prepared_count: int, provider_count: Optional[int]
+) -> bool:
+    return prepared_count > 0 or provider_count == 0
+
+
+def _comment_scan_mode(value: Any) -> str:
+    return value if value in _COMMENT_SCAN_MODES else "quick"
+
+
+def _stable_bottom_rounds(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return max(value, 0)
 
 
 class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
@@ -760,15 +792,24 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                     """INSERT INTO sa_articles
                     (article_id, url, title, ticker, published_date,
                      article_type, comments_count, raw_data, fetched_at, updated_at,
-                     list_ticker, list_ticker_observed_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     list_ticker, list_ticker_observed_at,
+                     comments_count_observed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (article_id) DO UPDATE SET
                         title = excluded.title,
                         url = excluded.url,
                         ticker = COALESCE(excluded.ticker, sa_articles.ticker),
                         published_date = COALESCE(excluded.published_date, sa_articles.published_date),
                         article_type = COALESCE(excluded.article_type, sa_articles.article_type),
-                        comments_count = excluded.comments_count,
+                        comments_count = CASE
+                          WHEN excluded.comments_count_observed_at IS NOT NULL
+                            THEN excluded.comments_count
+                          ELSE sa_articles.comments_count
+                        END,
+                        comments_count_observed_at = COALESCE(
+                            excluded.comments_count_observed_at,
+                            sa_articles.comments_count_observed_at
+                        ),
                         list_ticker = COALESCE(excluded.list_ticker, sa_articles.list_ticker),
                         list_ticker_observed_at = COALESCE(
                             excluded.list_ticker_observed_at,
@@ -789,6 +830,7 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                         now,  # updated_at (INSERT)
                         a.get("list_ticker"),
                         store.canon_ts(a.get("list_ticker_observed_at")),
+                        store.canon_ts(a.get("comments_count_observed_at")),
                         now,  # updated_at (DO UPDATE)
                     ),
                 )
@@ -864,7 +906,7 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         self, conn: sqlite3.Connection, article_id: str
     ) -> List[Dict[str, Any]]:
         rows = conn.execute(
-            "SELECT comment_id, parent_comment_id, commenter, comment_text, "
+            "SELECT id, comment_id, parent_comment_id, commenter, comment_text, "
             "upvotes, comment_date "
             "FROM sa_article_comments WHERE article_id = ?",
             (article_id,),
@@ -879,14 +921,11 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         return int(row[0] or 0) if row else 0
 
     def _upsert_article_comments(
-        self, conn: sqlite3.Connection, article_id: str, comments: list
+        self,
+        conn: sqlite3.Connection,
+        article_id: str,
+        prepared_comments: List[Dict[str, Any]],
     ) -> int:
-        # Re-parenting / identity-merge logic is the SHARED module-level helper
-        # from db_backend (_prepare_comments_for_upsert) — zero logic duplication.
-        prepared_comments = _prepare_comments_for_upsert(
-            self._fetch_existing_article_comments(conn, article_id),
-            comments,
-        )
         now = store.now_ts()
         for comment in prepared_comments:
             conn.execute(
@@ -1039,6 +1078,244 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         finally:
             conn.close()
 
+    @staticmethod
+    def _comment_recovery_transition(
+        article: Dict[str, Any],
+        *,
+        usable: bool,
+        provider_count: Optional[int],
+        mode: str,
+        stop_reason: Any,
+        stable_bottom_rounds: int,
+        had_existing_rows: bool,
+        existing_overlap_count: int,
+        baseline_overlap_count: int,
+        pre_upsert_max_row_id: Optional[int],
+        now: str,
+    ) -> Dict[str, Any]:
+        state = str(article.get("comment_recovery_state") or "repaired")
+        started_at = article.get("comment_recovery_started_at")
+        baseline_max_row_id = article.get("comment_recovery_baseline_max_row_id")
+        full_misses = int(article.get("comment_recovery_full_miss_count") or 0)
+        parked_at = article.get("comment_recovery_parked_at")
+        last_terminal_at = article.get("comment_recovery_last_terminal_at")
+        last_terminal_reason = article.get("comment_recovery_last_terminal_reason")
+
+        if not usable:
+            return {
+                "state": state,
+                "started_at": started_at,
+                "baseline_max_row_id": baseline_max_row_id,
+                "full_misses": full_misses,
+                "parked_at": parked_at,
+                "last_terminal_at": last_terminal_at,
+                "last_terminal_reason": last_terminal_reason,
+            }
+
+        terminal_evidence = (
+            mode == "backfill"
+            and stop_reason == _COMMENT_TERMINAL_STOP_REASON
+            and stable_bottom_rounds >= _COMMENT_TERMINAL_BOTTOM_ROUNDS
+        )
+
+        if provider_count == 0:
+            state = "repaired"
+            started_at = None
+            baseline_max_row_id = None
+            full_misses = 0
+            parked_at = None
+        elif state == "pending":
+            if baseline_overlap_count:
+                state = "repaired"
+                started_at = None
+                baseline_max_row_id = None
+                full_misses = 0
+                parked_at = None
+            elif terminal_evidence:
+                state = "unreachable_terminal"
+                started_at = None
+                baseline_max_row_id = None
+                full_misses = 0
+                parked_at = None
+                last_terminal_at = now
+                last_terminal_reason = _COMMENT_TERMINAL_REASON
+            elif mode == "full":
+                full_misses = min(full_misses + 1, _COMMENT_FULL_MISS_LIMIT)
+                if full_misses >= _COMMENT_FULL_MISS_LIMIT and parked_at is None:
+                    parked_at = now
+        else:
+            previous_count = _provider_comment_count(
+                article.get("provider_comments_count_at_last_scan")
+            )
+            count_changed = (
+                provider_count is not None and provider_count != previous_count
+            )
+            if state != "unreachable_terminal" or count_changed:
+                if count_changed and had_existing_rows and not existing_overlap_count:
+                    state = "pending"
+                    started_at = now
+                    baseline_max_row_id = pre_upsert_max_row_id
+                    full_misses = 1 if mode == "full" else 0
+                    parked_at = None
+                    if terminal_evidence:
+                        state = "unreachable_terminal"
+                        started_at = None
+                        baseline_max_row_id = None
+                        full_misses = 0
+                        last_terminal_at = now
+                        last_terminal_reason = _COMMENT_TERMINAL_REASON
+                elif count_changed:
+                    state = "repaired"
+                    started_at = None
+                    baseline_max_row_id = None
+                    full_misses = 0
+                    parked_at = None
+
+        return {
+            "state": state,
+            "started_at": started_at,
+            "baseline_max_row_id": baseline_max_row_id,
+            "full_misses": full_misses,
+            "parked_at": parked_at,
+            "last_terminal_at": last_terminal_at,
+            "last_terminal_reason": last_terminal_reason,
+        }
+
+    def _capture_comment_scan(
+        self,
+        conn: sqlite3.Connection,
+        article_id: str,
+        comments: list,
+        *,
+        provider_comments_count: Any,
+        comment_scan_mode: Any,
+        comment_scan_stop_reason: Any,
+        comment_scan_stable_bottom_rounds: Any,
+        now: str,
+    ) -> Dict[str, Any]:
+        article_row = conn.execute(
+            "SELECT comments_fetched_at, provider_comments_count_at_last_scan, "
+            "comment_recovery_state, comment_recovery_started_at, "
+            "comment_recovery_baseline_max_row_id, "
+            "comment_recovery_full_miss_count, comment_recovery_parked_at, "
+            "comment_recovery_last_terminal_at, "
+            "comment_recovery_last_terminal_reason "
+            "FROM sa_articles WHERE article_id = ?",
+            (article_id,),
+        ).fetchone()
+        if article_row is None:
+            raise ValueError(f"unknown SA article: {article_id}")
+        article = dict(article_row)
+
+        existing_rows = self._fetch_existing_article_comments(conn, article_id)
+        prepared_comments = _prepare_comments_for_upsert(existing_rows, comments)
+        existing_by_comment_id = {
+            row["comment_id"]: row
+            for row in existing_rows
+            if row.get("comment_id")
+        }
+        prepared_ids = {
+            row["comment_id"]
+            for row in prepared_comments
+            if row.get("comment_id")
+        }
+        existing_overlap_ids = prepared_ids & existing_by_comment_id.keys()
+        pre_upsert_max_row_id = max(
+            (int(row["id"]) for row in existing_rows), default=None
+        )
+        baseline_overlap_ids: set[str] = set()
+        frozen_watermark = article.get("comment_recovery_baseline_max_row_id")
+        if article.get("comment_recovery_state") == "pending" and frozen_watermark is not None:
+            baseline_overlap_ids = {
+                comment_id
+                for comment_id in existing_overlap_ids
+                if int(existing_by_comment_id[comment_id]["id"])
+                <= int(frozen_watermark)
+            }
+
+        if existing_rows and prepared_ids and not existing_overlap_ids:
+            logger.warning(
+                "SA comment identity overlap dropped to zero for article %s",
+                article_id,
+            )
+
+        before_count = len(existing_rows)
+        prepared_count = self._upsert_article_comments(
+            conn, article_id, prepared_comments
+        )
+        after_count = self._count_article_comments(conn, article_id)
+        provider_count = _provider_comment_count(provider_comments_count)
+        mode = _comment_scan_mode(comment_scan_mode)
+        stable_bottom_rounds = _stable_bottom_rounds(
+            comment_scan_stable_bottom_rounds
+        )
+        usable = _comment_scan_usable(prepared_count, provider_count)
+        transition = self._comment_recovery_transition(
+            article,
+            usable=usable,
+            provider_count=provider_count,
+            mode=mode,
+            stop_reason=comment_scan_stop_reason,
+            stable_bottom_rounds=stable_bottom_rounds,
+            had_existing_rows=bool(existing_rows),
+            existing_overlap_count=len(existing_overlap_ids),
+            baseline_overlap_count=len(baseline_overlap_ids),
+            pre_upsert_max_row_id=pre_upsert_max_row_id,
+            now=now,
+        )
+
+        if usable:
+            checkpoint = (
+                provider_count
+                if provider_count is not None
+                else article.get("provider_comments_count_at_last_scan")
+            )
+            conn.execute(
+                "UPDATE sa_articles SET comments_fetched_at = ?, "
+                "provider_comments_count_at_last_scan = ?, "
+                "comment_recovery_state = ?, comment_recovery_started_at = ?, "
+                "comment_recovery_baseline_max_row_id = ?, "
+                "comment_recovery_full_miss_count = ?, "
+                "comment_recovery_parked_at = ?, "
+                "comment_recovery_last_terminal_at = ?, "
+                "comment_recovery_last_terminal_reason = ?, updated_at = ? "
+                "WHERE article_id = ?",
+                (
+                    now,
+                    checkpoint,
+                    transition["state"],
+                    transition["started_at"],
+                    transition["baseline_max_row_id"],
+                    transition["full_misses"],
+                    transition["parked_at"],
+                    transition["last_terminal_at"],
+                    transition["last_terminal_reason"],
+                    now,
+                    article_id,
+                ),
+            )
+
+        return {
+            "prepared_comments": prepared_count,
+            "stored_comments_total": after_count,
+            "net_new_comments": max(after_count - before_count, 0),
+            "comment_scan_usable": usable,
+            "comment_scan_existing_overlap_count": len(existing_overlap_ids),
+            "comment_scan_baseline_overlap_count": len(baseline_overlap_ids),
+            "comment_scan_identity_overlap_rate": (
+                len(existing_overlap_ids) / len(prepared_ids)
+                if prepared_ids
+                else 0.0
+            ),
+            "comment_recovery_state": transition["state"],
+            "comment_recovery_full_miss_count": transition["full_misses"],
+            "comment_recovery_parked": transition["parked_at"] is not None,
+            "comment_recovery_last_terminal_at": transition["last_terminal_at"],
+            "comment_recovery_last_terminal_reason": transition[
+                "last_terminal_reason"
+            ],
+        }
+
     def save_article_with_comments(
         self,
         article_id: str,
@@ -1047,22 +1324,24 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         *,
         detail_ticker: str | None = None,
         detail_ticker_observed_at=None,
+        provider_comments_count=None,
+        comment_scan_mode="quick",
+        comment_scan_stop_reason=None,
+        comment_scan_stable_bottom_rounds=0,
     ) -> dict:
         """Capture article content, detail ticker evidence, and comments atomically."""
         conn = self._sa_conn()
         try:
             now = store.now_ts()
             conn.execute("BEGIN IMMEDIATE")
-            before_count = self._count_article_comments(conn, article_id)
             conn.execute(
                 "UPDATE sa_articles SET body_markdown = ?, "
-                "detail_fetched_at = ?, comments_fetched_at = ?, "
+                "detail_fetched_at = ?, "
                 "detail_ticker = COALESCE(?, detail_ticker), "
                 "detail_ticker_observed_at = COALESCE(?, detail_ticker_observed_at), "
                 "updated_at = ? WHERE article_id = ?",
                 (
                     body_markdown,
-                    now,
                     now,
                     detail_ticker,
                     store.canon_ts(detail_ticker_observed_at),
@@ -1087,15 +1366,18 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                 """,
                 (article_id,),
             )
-            prepared_count = self._upsert_article_comments(conn, article_id, comments)
-            after_count = self._count_article_comments(conn, article_id)
+            scan = self._capture_comment_scan(
+                conn,
+                article_id,
+                comments,
+                provider_comments_count=provider_comments_count,
+                comment_scan_mode=comment_scan_mode,
+                comment_scan_stop_reason=comment_scan_stop_reason,
+                comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+                now=now,
+            )
             conn.commit()
-            return {
-                "ok": True,
-                "prepared_comments": prepared_count,
-                "stored_comments_total": after_count,
-                "net_new_comments": max(after_count - before_count, 0),
-            }
+            return {"ok": True, **scan}
         except Exception as e:
             try:
                 conn.rollback()
@@ -1106,26 +1388,33 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         finally:
             conn.close()
 
-    def update_article_comments(self, article_id: str, comments: list) -> Dict[str, int]:
+    def update_article_comments(
+        self,
+        article_id: str,
+        comments: list,
+        *,
+        provider_comments_count=None,
+        comment_scan_mode="quick",
+        comment_scan_stop_reason=None,
+        comment_scan_stable_bottom_rounds=0,
+    ) -> Dict[str, Any]:
         """Comments-only update (refresh runs). Returns refresh stats."""
         conn = self._sa_conn()
         try:
             now = store.now_ts()
             conn.execute("BEGIN IMMEDIATE")
-            before_count = self._count_article_comments(conn, article_id)
-            prepared_count = self._upsert_article_comments(conn, article_id, comments)
-            conn.execute(
-                "UPDATE sa_articles SET comments_fetched_at = ?, "
-                "updated_at = ? WHERE article_id = ?",
-                (now, now, article_id),
+            result = self._capture_comment_scan(
+                conn,
+                article_id,
+                comments,
+                provider_comments_count=provider_comments_count,
+                comment_scan_mode=comment_scan_mode,
+                comment_scan_stop_reason=comment_scan_stop_reason,
+                comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+                now=now,
             )
-            after_count = self._count_article_comments(conn, article_id)
             conn.commit()
-            return {
-                "prepared_comments": prepared_count,
-                "stored_comments_total": after_count,
-                "net_new_comments": max(after_count - before_count, 0),
-            }
+            return result
         except Exception as e:
             try:
                 conn.rollback()
@@ -1267,7 +1556,13 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                 f"SELECT article_id, url, title, ticker, published_date, "
                 f"article_type, comments_count, "
                 f"CASE WHEN body_markdown IS NOT NULL THEN 1 ELSE 0 END AS has_content, "
-                f"detail_fetched_at, comments_fetched_at, "
+                f"detail_fetched_at, comments_fetched_at, comments_count_observed_at, "
+                f"provider_comments_count_at_last_scan, comment_recovery_state, "
+                f"comment_recovery_started_at, "
+                f"comment_recovery_baseline_max_row_id, "
+                f"comment_recovery_full_miss_count, comment_recovery_parked_at, "
+                f"comment_recovery_last_terminal_at, "
+                f"comment_recovery_last_terminal_reason, "
                 f"(SELECT COUNT(*) FROM sa_article_comments c "
                 f" WHERE c.article_id = sa_articles.article_id) AS stored_comments_count "
                 f"FROM sa_articles WHERE {where} "

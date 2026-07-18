@@ -182,7 +182,23 @@ CREATE TABLE IF NOT EXISTS sa_articles (
     list_ticker                TEXT,
     list_ticker_observed_at    TEXT,
     detail_ticker              TEXT,
-    detail_ticker_observed_at  TEXT
+    detail_ticker_observed_at  TEXT,
+    comments_count_observed_at TEXT,
+    provider_comments_count_at_last_scan INTEGER
+        CHECK(provider_comments_count_at_last_scan IS NULL
+              OR provider_comments_count_at_last_scan >= 0),
+    comment_recovery_state TEXT NOT NULL DEFAULT 'repaired'
+        CHECK(comment_recovery_state IN
+              ('repaired', 'pending', 'unreachable_terminal')),
+    comment_recovery_started_at TEXT,
+    comment_recovery_baseline_max_row_id INTEGER
+        CHECK(comment_recovery_baseline_max_row_id IS NULL
+              OR comment_recovery_baseline_max_row_id >= 0),
+    comment_recovery_full_miss_count INTEGER NOT NULL DEFAULT 0
+        CHECK(comment_recovery_full_miss_count >= 0),
+    comment_recovery_parked_at TEXT,
+    comment_recovery_last_terminal_at TEXT,
+    comment_recovery_last_terminal_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sa_articles_ticker ON sa_articles(ticker);
 CREATE INDEX IF NOT EXISTS idx_sa_articles_published ON sa_articles(published_date DESC);
@@ -438,6 +454,35 @@ _V1_TO_V2_STATEMENTS: tuple[str, ...] = (
     "ALTER TABLE sa_articles ADD COLUMN list_ticker_observed_at TEXT",
     "ALTER TABLE sa_articles ADD COLUMN detail_ticker TEXT",
     "ALTER TABLE sa_articles ADD COLUMN detail_ticker_observed_at TEXT",
+    "ALTER TABLE sa_articles ADD COLUMN comments_count_observed_at TEXT",
+    """
+    ALTER TABLE sa_articles ADD COLUMN provider_comments_count_at_last_scan INTEGER
+        CHECK(provider_comments_count_at_last_scan IS NULL
+              OR provider_comments_count_at_last_scan >= 0)
+    """,
+    """
+    ALTER TABLE sa_articles ADD COLUMN comment_recovery_state TEXT NOT NULL
+        DEFAULT 'repaired' CHECK(comment_recovery_state IN
+            ('repaired', 'pending', 'unreachable_terminal'))
+    """,
+    "ALTER TABLE sa_articles ADD COLUMN comment_recovery_started_at TEXT",
+    """
+    ALTER TABLE sa_articles ADD COLUMN comment_recovery_baseline_max_row_id INTEGER
+        CHECK(comment_recovery_baseline_max_row_id IS NULL
+              OR comment_recovery_baseline_max_row_id >= 0)
+    """,
+    """
+    ALTER TABLE sa_articles ADD COLUMN comment_recovery_full_miss_count INTEGER
+        NOT NULL DEFAULT 0 CHECK(comment_recovery_full_miss_count >= 0)
+    """,
+    "ALTER TABLE sa_articles ADD COLUMN comment_recovery_parked_at TEXT",
+    "ALTER TABLE sa_articles ADD COLUMN comment_recovery_last_terminal_at TEXT",
+    "ALTER TABLE sa_articles ADD COLUMN comment_recovery_last_terminal_reason TEXT",
+    """
+    UPDATE sa_articles
+    SET provider_comments_count_at_last_scan = COALESCE(comments_count, 0)
+    WHERE comments_fetched_at IS NOT NULL
+    """,
     "CREATE INDEX idx_sa_articles_list_ticker ON sa_articles(list_ticker)",
     "CREATE INDEX idx_sa_articles_detail_ticker ON sa_articles(detail_ticker)",
     """
@@ -537,10 +582,25 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
             return
         if version != 1:
             raise RuntimeError(f"unsupported sa_capture schema version: {version}")
-        if conn.execute(
+        has_v2_table = conn.execute(
             "SELECT 1 FROM sqlite_master "
             "WHERE type='table' AND name='sa_pick_lineages'"
-        ).fetchone() is not None:
+        ).fetchone() is not None
+        article_columns = {
+            str(row[1]) for row in conn.execute("PRAGMA table_info(sa_articles)")
+        }
+        continuity_columns = {
+            "comments_count_observed_at",
+            "provider_comments_count_at_last_scan",
+            "comment_recovery_state",
+            "comment_recovery_started_at",
+            "comment_recovery_baseline_max_row_id",
+            "comment_recovery_full_miss_count",
+            "comment_recovery_parked_at",
+            "comment_recovery_last_terminal_at",
+            "comment_recovery_last_terminal_reason",
+        }
+        if has_v2_table or article_columns & continuity_columns:
             raise RuntimeError(
                 "sa_capture schema marker mismatch: v1 marker with v2 artifacts"
             )

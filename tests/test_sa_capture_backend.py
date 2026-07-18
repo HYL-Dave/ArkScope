@@ -95,6 +95,17 @@ def _comments():
     ]
 
 
+def _comment(comment_id: str) -> dict:
+    return {
+        "comment_id": comment_id,
+        "parent_comment_id": None,
+        "commenter": f"user-{comment_id}",
+        "comment_text": f"text-{comment_id}",
+        "upvotes": 0,
+        "comment_date": "2026-07-19T00:00:00Z",
+    }
+
+
 # --- (1) isinstance gate + lazy PG -------------------------------------------------
 
 
@@ -300,7 +311,7 @@ def test_invalidate_dirty_market_news_detail(backend):
 
 def test_articles_meta_upsert_and_query(backend):
     assert backend.upsert_sa_articles_meta([
-        _article("a1"),
+        _article("a1", comments_count_observed_at=T1),
         _article("a2", title="Quick note", ticker="AAPL",
                  published_date="2026-06-05", article_type="news",
                  comments_count=0, raw_data=None),
@@ -320,7 +331,8 @@ def test_articles_meta_upsert_and_query(backend):
     assert a1["ticker"] == "NVDA"
     assert a1["published_date"] == "2026-06-01"
     assert a1["article_type"] == "analysis"
-    assert a1["comments_count"] == 7
+    assert a1["comments_count"] == 2
+    assert a1["comments_count_observed_at"] == T1_CANON
     assert a1["has_content"] is False
     assert a1["stored_comments_count"] == 0
 
@@ -367,6 +379,274 @@ def test_save_article_with_comments_shape_and_pick_sync(backend):
 
     missing = backend.get_sa_article_with_comments("nope")
     assert missing is None
+
+
+def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
+    backend.upsert_sa_articles_meta([
+        _article("positive"),
+        _article("zero"),
+        _article("empty"),
+        _article("zero-pending"),
+    ])
+
+    positive = backend.update_article_comments(
+        "positive", _comments(), provider_comments_count=12
+    )
+    zero = backend.update_article_comments(
+        "zero", [], provider_comments_count=0
+    )
+    empty = backend.update_article_comments(
+        "empty", [], provider_comments_count=7
+    )
+    backend.update_article_comments(
+        "zero-pending", [_comment("zero-old")], provider_comments_count=1
+    )
+    backend.update_article_comments(
+        "zero-pending", [_comment("zero-new")], provider_comments_count=2
+    )
+    zero_pending = backend.update_article_comments(
+        "zero-pending", [], provider_comments_count=0
+    )
+
+    rows = {row["article_id"]: row for row in backend.query_sa_articles()}
+    assert positive["comment_scan_usable"] is True
+    assert rows["positive"]["provider_comments_count_at_last_scan"] == 12
+    assert positive["prepared_comments"] == 2
+    assert zero["comment_scan_usable"] is True
+    assert rows["zero"]["provider_comments_count_at_last_scan"] == 0
+    assert empty["comment_scan_usable"] is False
+    assert rows["empty"]["provider_comments_count_at_last_scan"] is None
+    assert rows["empty"]["comments_fetched_at"] is None
+    assert zero_pending["comment_scan_usable"] is True
+    assert rows["zero-pending"]["provider_comments_count_at_last_scan"] == 0
+    assert rows["zero-pending"]["comment_recovery_state"] == "repaired"
+    assert rows["zero-pending"]["comment_recovery_started_at"] is None
+    assert rows["zero-pending"]["comment_recovery_baseline_max_row_id"] is None
+    assert rows["zero-pending"]["comment_recovery_full_miss_count"] == 0
+    assert rows["zero-pending"]["comment_recovery_parked_at"] is None
+
+
+def test_body_capture_commits_when_comment_scan_is_unusable(backend):
+    backend.upsert_sa_articles_meta([_article("body-only")])
+    result = backend.save_article_with_comments(
+        "body-only", "Provider body", [], provider_comments_count=9
+    )
+    article = backend.get_sa_article_with_comments("body-only")
+    assert result["ok"] is True
+    assert result["comment_scan_usable"] is False
+    assert article["body_markdown"] == "Provider body"
+    assert article["detail_fetched_at"] is not None
+    assert article["comments_fetched_at"] is None
+    assert article["provider_comments_count_at_last_scan"] is None
+
+
+def test_first_comment_scan_establishes_baseline_without_pending_recovery(backend):
+    backend.upsert_sa_articles_meta([_article("first")])
+    result = backend.update_article_comments(
+        "first",
+        [_comment("first-c1")],
+        provider_comments_count=1,
+        comment_scan_mode="quick",
+    )
+    row = backend.query_sa_articles()[0]
+    assert result["comment_scan_usable"] is True
+    assert row["comment_recovery_state"] == "repaired"
+    assert row["comment_recovery_baseline_max_row_id"] is None
+
+
+def test_recovery_watermark_is_pre_upsert_and_new_generation_cannot_self_repair(backend):
+    backend.upsert_sa_articles_meta([_article("gap")])
+    backend.update_article_comments(
+        "gap", [_comment("old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    raised = backend.update_article_comments(
+        "gap", [_comment("new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    with backend._sa_read() as conn:
+        ids = {
+            row["comment_id"]: row["id"]
+            for row in conn.execute(
+                "SELECT id, comment_id FROM sa_article_comments "
+                "WHERE article_id='gap'"
+            )
+        }
+    row = next(a for a in backend.query_sa_articles() if a["article_id"] == "gap")
+    assert raised["comment_recovery_state"] == "pending"
+    assert row["comment_recovery_baseline_max_row_id"] == ids["old"]
+    assert ids["new"] > row["comment_recovery_baseline_max_row_id"]
+
+    repeated = backend.update_article_comments(
+        "gap", [_comment("new")],
+        provider_comments_count=2, comment_scan_mode="full",
+    )
+    assert repeated["comment_recovery_state"] == "pending"
+    assert repeated["comment_scan_baseline_overlap_count"] == 0
+
+
+def test_any_mode_overlap_repairs_pending_recovery(backend):
+    for mode in ("quick", "full", "backfill"):
+        article_id = f"repair-{mode}"
+        backend.upsert_sa_articles_meta([_article(article_id)])
+        backend.update_article_comments(
+            article_id, [_comment(f"{mode}-old")],
+            provider_comments_count=1, comment_scan_mode="quick",
+        )
+        backend.update_article_comments(
+            article_id, [_comment(f"{mode}-new")],
+            provider_comments_count=2, comment_scan_mode="quick",
+        )
+        if mode == "quick":
+            for _ in range(2):
+                backend.update_article_comments(
+                    article_id, [_comment(f"{mode}-new")],
+                    provider_comments_count=2, comment_scan_mode="full",
+                )
+        repaired = backend.update_article_comments(
+            article_id, [_comment(f"{mode}-new"), _comment(f"{mode}-old")],
+            provider_comments_count=2, comment_scan_mode=mode,
+        )
+        assert repaired["comment_recovery_state"] == "repaired"
+        assert repaired["comment_scan_baseline_overlap_count"] == 1
+        assert repaired["comment_recovery_parked"] is False
+
+
+def test_unusable_scan_freezes_comment_recovery_state(backend):
+    backend.upsert_sa_articles_meta([_article("frozen")])
+    backend.update_article_comments(
+        "frozen", [_comment("frozen-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "frozen", [_comment("frozen-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    before = next(a for a in backend.query_sa_articles() if a["article_id"] == "frozen")
+    result = backend.update_article_comments(
+        "frozen", [], provider_comments_count=3,
+        comment_scan_mode="backfill", comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    after = next(a for a in backend.query_sa_articles() if a["article_id"] == "frozen")
+    assert result["comment_scan_usable"] is False
+    for key in (
+        "comments_fetched_at", "provider_comments_count_at_last_scan",
+        "comment_recovery_state", "comment_recovery_started_at",
+        "comment_recovery_baseline_max_row_id",
+        "comment_recovery_full_miss_count", "comment_recovery_parked_at",
+        "comment_recovery_last_terminal_at",
+        "comment_recovery_last_terminal_reason",
+    ):
+        assert after[key] == before[key]
+
+
+def test_two_usable_full_misses_park_without_terminalizing(backend):
+    backend.upsert_sa_articles_meta([_article("park")])
+    backend.update_article_comments(
+        "park", [_comment("park-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "park", [_comment("park-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    raised_row = next(
+        a for a in backend.query_sa_articles() if a["article_id"] == "park"
+    )
+    frozen_watermark = raised_row["comment_recovery_baseline_max_row_id"]
+    frozen_started_at = raised_row["comment_recovery_started_at"]
+    assert frozen_watermark is not None
+    assert frozen_started_at is not None
+
+    first = backend.update_article_comments(
+        "park", [_comment("park-new")],
+        provider_comments_count=2, comment_scan_mode="full",
+    )
+    second = backend.update_article_comments(
+        "park", [_comment("park-new")],
+        provider_comments_count=2, comment_scan_mode="full",
+    )
+    assert first["comment_recovery_full_miss_count"] == 1
+    assert first["comment_recovery_parked"] is False
+    assert second["comment_recovery_full_miss_count"] == 2
+    assert second["comment_recovery_parked"] is True
+    assert second["comment_recovery_state"] == "pending"
+
+    quick = backend.update_article_comments(
+        "park", [_comment("park-new"), _comment("park-latest")],
+        provider_comments_count=3, comment_scan_mode="quick",
+    )
+    assert quick["net_new_comments"] == 1
+    assert quick["comment_recovery_state"] == "pending"
+    assert quick["comment_recovery_full_miss_count"] == 2
+    assert quick["comment_recovery_parked"] is True
+    after_quick = next(
+        a for a in backend.query_sa_articles() if a["article_id"] == "park"
+    )
+    assert after_quick["comment_recovery_baseline_max_row_id"] == frozen_watermark
+    assert after_quick["comment_recovery_started_at"] == frozen_started_at
+
+
+def test_backfill_terminal_requires_five_stable_bottom_rounds(backend):
+    backend.upsert_sa_articles_meta([_article("terminal")])
+    backend.update_article_comments(
+        "terminal", [_comment("terminal-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "terminal", [_comment("terminal-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    for reason, rounds in (("timeout", 5), ("stable_bottom", 4)):
+        result = backend.update_article_comments(
+            "terminal", [_comment("terminal-new")],
+            provider_comments_count=2, comment_scan_mode="backfill",
+            comment_scan_stop_reason=reason,
+            comment_scan_stable_bottom_rounds=rounds,
+        )
+        assert result["comment_recovery_state"] == "pending"
+    result = backend.update_article_comments(
+        "terminal", [_comment("terminal-new")],
+        provider_comments_count=2, comment_scan_mode="backfill",
+        comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    assert result["comment_recovery_state"] == "unreachable_terminal"
+    assert result["comment_recovery_last_terminal_reason"] == "provider_bottom_unbridged"
+
+
+def test_terminal_reanchors_future_epoch_and_preserves_audit(backend):
+    backend.upsert_sa_articles_meta([_article("epoch")])
+    backend.update_article_comments(
+        "epoch", [_comment("epoch-old")],
+        provider_comments_count=1, comment_scan_mode="quick",
+    )
+    backend.update_article_comments(
+        "epoch", [_comment("epoch-new")],
+        provider_comments_count=2, comment_scan_mode="quick",
+    )
+    terminal = backend.update_article_comments(
+        "epoch", [_comment("epoch-new")],
+        provider_comments_count=2, comment_scan_mode="backfill",
+        comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5,
+    )
+    terminal_at = terminal["comment_recovery_last_terminal_at"]
+    incidental = backend.update_article_comments(
+        "epoch", [_comment("epoch-old"), _comment("epoch-new")],
+        provider_comments_count=2, comment_scan_mode="backfill",
+    )
+    assert incidental["comment_recovery_state"] == "unreachable_terminal"
+    assert incidental["comment_recovery_last_terminal_at"] == terminal_at
+
+    current = backend.update_article_comments(
+        "epoch", [_comment("epoch-new"), _comment("epoch-latest")],
+        provider_comments_count=3, comment_scan_mode="quick",
+    )
+    assert current["comment_recovery_state"] == "repaired"
+    assert current["comment_recovery_last_terminal_at"] == terminal_at
+    assert current["comment_recovery_last_terminal_reason"] == "provider_bottom_unbridged"
 
 
 def test_comment_dedupe_cascade_leaves_no_orphan_signals(backend):
@@ -538,7 +818,11 @@ PG_MARKET_NEWS_KEYS = {
 PG_QUERY_SA_ARTICLES_KEYS = {
     "article_id", "url", "title", "ticker", "published_date", "article_type",
     "comments_count", "has_content", "detail_fetched_at", "comments_fetched_at",
-    "stored_comments_count",
+    "stored_comments_count", "comments_count_observed_at",
+    "provider_comments_count_at_last_scan", "comment_recovery_state",
+    "comment_recovery_started_at", "comment_recovery_baseline_max_row_id",
+    "comment_recovery_full_miss_count", "comment_recovery_parked_at",
+    "comment_recovery_last_terminal_at", "comment_recovery_last_terminal_reason",
 }
 # get_sa_article_with_comments is SELECT * plus the injected "comments"; v2 adds
 # source-specific provider observations while preserving every legacy key.
@@ -547,7 +831,11 @@ PG_ARTICLE_WITH_COMMENTS_KEYS = {
     "article_type", "body_markdown", "comments_count", "detail_fetched_at",
     "comments_fetched_at", "raw_data", "fetched_at", "updated_at", "comments",
     "list_ticker", "list_ticker_observed_at", "detail_ticker",
-    "detail_ticker_observed_at",
+    "detail_ticker_observed_at", "comments_count_observed_at",
+    "provider_comments_count_at_last_scan", "comment_recovery_state",
+    "comment_recovery_started_at", "comment_recovery_baseline_max_row_id",
+    "comment_recovery_full_miss_count", "comment_recovery_parked_at",
+    "comment_recovery_last_terminal_at", "comment_recovery_last_terminal_reason",
 }
 PG_COMMENT_KEYS = {
     "comment_id", "parent_comment_id", "commenter", "comment_text",

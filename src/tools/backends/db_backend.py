@@ -864,6 +864,10 @@ class DatabaseBackend:
         *,
         detail_ticker: str | None = None,
         detail_ticker_observed_at=None,
+        provider_comments_count=None,
+        comment_scan_mode="quick",
+        comment_scan_stop_reason=None,
+        comment_scan_stable_bottom_rounds=0,
     ) -> dict:
         return {
             "ok": False,
@@ -873,7 +877,16 @@ class DatabaseBackend:
             "reason": "pg_sa_retired",
         }
 
-    def update_article_comments(self, article_id: str, comments: list) -> Dict[str, int]:
+    def update_article_comments(
+        self,
+        article_id: str,
+        comments: list,
+        *,
+        provider_comments_count=None,
+        comment_scan_mode="quick",
+        comment_scan_stop_reason=None,
+        comment_scan_stable_bottom_rounds=0,
+    ) -> Dict[str, int]:
         return {
             "prepared_comments": 0,
             "stored_comments_total": 0,

@@ -267,6 +267,63 @@ def test_v1_migration_does_not_grandfather_legacy_canonical_values(tmp_path):
         conn.close()
 
 
+def test_v1_migration_seeds_comment_checkpoint_without_recovery_flag(tmp_path):
+    path = tmp_path / "comments-v1.db"
+    _create_v1(path)
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "UPDATE sa_articles SET comments_count=41, comments_fetched_at=? "
+        "WHERE article_id='legacy-entry'",
+        ("2026-07-18T00:00:00+00:00",),
+    )
+    raw.execute(
+        "INSERT INTO sa_articles(article_id,url,title,comments_count) "
+        "VALUES ('never-scanned','https://sa/never','Never scanned article',18)"
+    )
+    raw.commit()
+    raw.close()
+
+    conn = scs.connect(str(path))
+    rows = {
+        row["article_id"]: dict(row)
+        for row in conn.execute(
+            "SELECT article_id, comments_count_observed_at, "
+            "provider_comments_count_at_last_scan, comment_recovery_state, "
+            "comment_recovery_started_at, "
+            "comment_recovery_baseline_max_row_id, "
+            "comment_recovery_full_miss_count, comment_recovery_parked_at, "
+            "comment_recovery_last_terminal_at, "
+            "comment_recovery_last_terminal_reason FROM sa_articles"
+        )
+    }
+    assert rows["legacy-entry"] == {
+        "article_id": "legacy-entry",
+        "comments_count_observed_at": None,
+        "provider_comments_count_at_last_scan": 41,
+        "comment_recovery_state": "repaired",
+        "comment_recovery_started_at": None,
+        "comment_recovery_baseline_max_row_id": None,
+        "comment_recovery_full_miss_count": 0,
+        "comment_recovery_parked_at": None,
+        "comment_recovery_last_terminal_at": None,
+        "comment_recovery_last_terminal_reason": None,
+    }
+    assert rows["never-scanned"] == {
+        "article_id": "never-scanned",
+        "comments_count_observed_at": None,
+        "provider_comments_count_at_last_scan": None,
+        "comment_recovery_state": "repaired",
+        "comment_recovery_started_at": None,
+        "comment_recovery_baseline_max_row_id": None,
+        "comment_recovery_full_miss_count": 0,
+        "comment_recovery_parked_at": None,
+        "comment_recovery_last_terminal_at": None,
+        "comment_recovery_last_terminal_reason": None,
+    }
+    assert conn.execute("SELECT COUNT(*) FROM sa_articles").fetchone()[0] == 2
+    conn.close()
+
+
 def test_active_entry_and_exit_uniqueness_retains_revoked_history(tmp_path):
     conn = scs.connect(str(tmp_path / "fresh.db"))
     try:
