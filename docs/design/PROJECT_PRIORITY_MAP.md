@@ -229,12 +229,15 @@ therefore defaults to defer until the hypothesis gate exists.
   frontend accounting, responsive/live, static, backend-byte-identity, and
   merged-tree verification gates are closed.** The external Claude Design
   companion sync remains the one separate post-merge gate. **Slice 3 Research
-  workspace implementation plan was independently reviewed and cleared on
-  2026-07-18; product code has not started and Task 0 is the next gate**
+  workspace is IMPLEMENTED FOR REVIEW on branch
+  `codex/p2-8-slice-3-research-workspace` at product tip `341e760`; all
+  implementer gates, canonical A/B, responsive browser verification, and the
+  one-call provider smoke are closed, but independent implementation review
+  and merge approval remain pending**
   (`docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`).
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
-  2026-07-18 through closeout base `b3d9728`**. P2.8 Slice 3 is now the next
-  implementation unit. Alpha Picks article reconciliation and DB-derived
+  2026-07-18 through closeout base `b3d9728`**. P2.8 Slice 3 is the active
+  review unit. Alpha Picks article reconciliation and DB-derived
   universe/`tickers_core.json` retirement remain design-only and implement
   after Slice 3 in separate slices.
   The first focused irritation slice, **Models Routing UX,
@@ -430,6 +433,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-18 (P2.8 SLICE 3 RESEARCH WORKSPACE IMPLEMENTED FOR REVIEW — all implementer gates closed)**: Branch `codex/p2-8-slice-3-research-workspace` stops at product tip `341e760` without merge. The shipped transcript/run authorities now support deterministic bounded history, exact run/message linkage, rename/archive/confirmed delete, typed failures, complete per-run provider/model/effort selection from the shared Models-UX authority, factual bounded progress, one conversation workspace, on-demand History, and wide-only pinnable Evidence. Canonical virgin A/B at `c78203a` versus the backend product stack retained identical `30 failed / 74 skipped / 18 warnings / 7 errors`, empty bidirectional failure/error identity diff, and exact `4378 -> 4412` collection / `4267 -> 4301` passed (`+34/-0`). Frontend is exactly `56/533 -> 60/572`, raw `+54/-15`; the extra reviewed node is a RED-first StrictMode exact-target regression found by the browser gate and fixed in `9dcdbfc`. Final self-review then strengthened an existing Evidence node without changing collection and fixed persisted semantic effort `default` to render consistently as `Provider 預設` in `341e760`. Full frontend, typecheck/build, no-PG, static privacy/layout/API ratchets, six responsive boundaries, lifecycle/history mutations, typed error privacy, and process cleanup passed. One authorized live call used `chatgpt_oauth / gpt-5.4-mini / default`, observed `creating -> queued -> running -> succeeded`, retained a local draft, used zero tools, preserved exact tuple/run linkage across leave/return, made no fallback, and deleted its disposable thread through ConfirmDialog. Independent implementation review is the remaining gate; do not merge, mark Slice 3 LIVE, sync the Design Kit, or begin Slice 4/Alpha Picks/universe implementation yet.
 
 - **2026-07-18 (P2.8 SLICE 3 PLAN REVIEW GREEN — cleared for Task 0, implementation not started)**: Independent review reproduced backend `4378` / focused `93` and frontend `56/533`, verified the exact `+34/-0` and `+52/-15` accounting, and found one plan-only omission: max-tool exhaustion has four provider/auth shapes. The plan now recognizes only reviewed code-owned facts: the Anthropic API-key exact done sentinel, OpenAI API-key anchored `MaxTurnsExceeded:` prefix, ChatGPT OAuth full max-turn message, and Claude SDK typed `error_max_turns` subtype normalized to explicit `tool_limit_reached`. The existing Claude driver test is strengthened in place and the central classifier's single table-driven node covers positive/near-miss shapes, so accounting is unchanged. Unknown future SDK prose remains `provider_call_failed` and triggers review rather than fuzzy inference. Plan status is REVIEWED / CLEARED; implementation must start with isolated Task 0 and continue to protect the unrelated dirty `config/tickers_core.json`.
 

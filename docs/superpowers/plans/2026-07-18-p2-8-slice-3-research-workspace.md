@@ -8,7 +8,7 @@
 > Steps use checkbox syntax; completed steps become `- [x]` and the ledger
 > records the exact RED and GREEN evidence.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASKS 1–7 COMPLETE / TASK 8 IN PROGRESS 2026-07-18
+> **Status:** IMPLEMENTED FOR REVIEW — ALL IMPLEMENTER GATES CLOSED 2026-07-18
 
 ### Plan Review Clearance (2026-07-18)
 
@@ -32,7 +32,9 @@ stop-and-review condition, not grounds for fuzzy text inference. The shared
 classifier test remains one node and loops over the three central shapes plus
 near misses, including per-tool timeout text. Task 4 implementation review
 later added one auth/retry regression node, so current authoritative accounting
-is backend `+34/-0` and frontend `+53/-15`.
+is backend `+34/-0` and frontend `+54/-15`. The one-node frontend increase
+beyond the reviewed target is the RED-first StrictMode navigation regression
+found by the disposable browser gate and recorded under Task 8.
 
 ## Implementation Ledger
 
@@ -210,6 +212,64 @@ is backend `+34/-0` and frontend `+53/-15`.
   contained inside it; Evidence is excluded in the same render rather than a
   later paint.
 
+### Task 8 — COMPLETE / REVIEW-READY STOP (2026-07-18)
+
+- Canonical virgin-archive A/B at behavioral base `c78203a` versus product tip
+  `a135ca1` passed: base `4267 passed / 30 failed / 74 skipped / 18 warnings /
+  7 errors` with `4378` collected; head `4301 passed` with `4412` collected.
+  Existing failure/error identities are equal in both directions and the
+  collection delta is exactly backend `+34/-0`. The later StrictMode commit is
+  frontend-only, so this backend proof remains byte-for-byte applicable.
+- Frontend verification after visual hardening is exactly `60 files / 572
+  tests`, raw collection `+54/-15` from `56/533`; typecheck and production build
+  pass with only the existing chunk-size warning. Shared-class coverage,
+  typed-error, Claude SDK `error_max_turns`, legacy-layout, picker-owner,
+  breakpoint, confirm, privacy, and order-API ratchets pass. The existing
+  no-PG smoke returned `ok:true` with `pg_attempts:[]`.
+- The disposable SQLite/browser gate exercised `1440x900`, `1024x768`, `961px`,
+  `960px`, `959px`, and `390x844`. It proved one permanent conversation,
+  zero-width closed regions, wide-only Evidence pinning, mutually exclusive
+  modal Drawers, focus trap/restore, bounded history filters/load-more,
+  rename/archive/unarchive/confirmed-delete, active mutation rejection, typed
+  error privacy, Developer sanitization, legacy nullable linkage, wrapping, and
+  no horizontal overflow, nested cards, duplicate focus controls, or blank
+  third column.
+- That gate found one real browser-only failure: React StrictMode's
+  setup-cleanup-setup replay invalidated an exact archived/out-of-page shell
+  target before its GET completed. Commit `9dcdbfc` first pinned the failure in
+  a real `<React.StrictMode>` mount, then deferred lifecycle invalidation by one
+  microtask while retaining true-unmount cancellation. The resulting extra
+  frontend node reconciles the final count to `572`; the complete visual gate
+  then passed.
+- Final self-review found one additional display-only contract gap: persisted
+  run details rendered semantic effort `default` literally while the picker,
+  header, and message fallback correctly said `Provider 預設`. Commit
+  `341e760` strengthened the existing Evidence workspace node in place, proved
+  the literal-label behavior RED, and made both run-detail paths share the same
+  formatter. The node count remains `572`; full frontend, typecheck, build,
+  shared-class/error gates, and all mechanical ratchets passed again. The
+  already-successful provider call was not repeated for this deterministic UI
+  correction.
+- Browser evidence lives at
+  `/tmp/arkscope-p2-8-s3-{wide-evidence-1440x900,history-overlay-960x768,workspace-1024x768,workspace-961x768,workspace-959x768,workspace-390x844,typed-error-normal-1024x768,typed-error-developer-1024x768}.png`.
+- One user-authorized provider smoke used the normal profile with exactly one
+  `chatgpt_oauth` create: `openai / gpt-5.4-mini / default`. The UI observed
+  `creating -> queued -> running -> succeeded`; the local draft survived every
+  transition; the assistant made zero tool calls; the persisted assistant turn
+  retained its exact run link and complete tuple; leaving and returning kept
+  the result/Evidence addressable; and no provider/model/effort fallback
+  occurred. Success with semantic `default`, together with the reviewed
+  dispatch seam, confirms the provider received no literal `default`. The
+  disposable thread was deleted through the shipped ConfirmDialog and a final
+  GET returned 404.
+- The two preliminary browser-script failures both stopped before run creation
+  (narrow viewport hid nav; then an existing Anthropic thread was inspected
+  before New Research reset selection). They consumed no provider call. After
+  all gates, temporary ports `8420`, `8431`, and `9223` each refused connection.
+  The user's unrelated `config/tickers_core.json` edit remains untouched.
+- Final product/test tip for independent review is `341e760`; no merge or
+  post-review closeout action has been performed.
+
 **Goal:** Replace the fixed three-column AI Research page with the approved
 conversation-first workspace: on-demand deterministic history, an honest
 pinnable Evidence/Run-details surface, complete per-run model selection from
@@ -284,7 +344,7 @@ UI primitives.
   - `tests/test_research_routes.py`: `+8` nodes.
   Focused collection becomes `127`; canonical collection becomes `4412`; if
   the existing family is identical, passed becomes `4301`.
-- Current frontend raw collection delta is exactly `+53/-15`, a net `+38`:
+- Current frontend raw collection delta is exactly `+54/-15`, a net `+39`:
   - new `modelPicker.test.ts`: `8` nodes;
   - new `researchSelection.test.ts`: `12` nodes;
   - new `ResearchHistoryDrawer.test.tsx`: `10` nodes;
@@ -293,6 +353,8 @@ UI primitives.
   - existing `ui/overlays.test.tsx`: `+3` nodes;
   - existing `ResearchShellNavigation.test.tsx`: `+1` review-hardening node
     proving authenticated selection recovery and visible fail-closed retry;
+  - existing `ResearchShellNavigation.test.tsx`: `+1` visual-gate hardening
+    node proving exact shell hydration survives the app's StrictMode replay;
   - remove exactly `11` obsolete `modelOptions` / `defaultModel` /
     `lastAssistantSelection` nodes from `researchModels.test.ts` and exactly
     `4` obsolete `chooseResearchProvider` nodes from
@@ -300,9 +362,9 @@ UI primitives.
   The removed nodes assert the policy this slice deliberately retires: a second
   discovered-model list plus silent route/first-option fallback. Their intents
   map one-for-one into the new shared picker and precedence tests. Final
-  frontend accounting is `60 files / 571 tests`.
+  frontend accounting is `60 files / 572 tests`.
 - Existing tests may be strengthened in place, but any backend delta other than
-  `+34/-0`, any frontend raw delta other than `+53/-15`, or any unexplained
+  `+34/-0`, any frontend raw delta other than `+54/-15`, or any unexplained
   file-count change is a stop condition requiring ledger reconciliation before
   continuing.
 
@@ -619,7 +681,7 @@ git commit -m "feat: add bounded research history projection"
 **Files:** modify `src/research_threads.py`, `src/api/routes/research.py`,
 `tests/test_research_threads.py`, and `tests/test_research_routes.py`.
 
-- [ ] **Step 1: Add six RED store tests**
+- [x] **Step 1: Add six RED store tests**
 
 1. rename changes title/`updated_at` but preserves `created_at` and transcript;
 2. archive hides from default list while exact lookup survives;
@@ -629,7 +691,7 @@ git commit -m "feat: add bounded research history projection"
 6. a pre-migration message table gains nullable `run_id` and `error_code`
    without changing existing rows.
 
-- [ ] **Step 2: Add six RED lifecycle/history direct-route tests**
+- [x] **Step 2: Add six RED lifecycle/history direct-route tests**
 
 1. GET history forwards all filters before pagination and returns `total`,
    `latest_run_status`, `archived_at`, and one batch-resolved `active_run`;
@@ -646,13 +708,13 @@ response remains additive-compatible; do not rename or count it as a new node.
 Use real stores and call route functions directly. Patch only the dependency
 seam or use actual arguments; do not mock SQL return shapes.
 
-- [ ] **Step 3: Run focused RED**
+- [x] **Step 3: Run focused RED**
 
 ```bash
 pytest -q tests/test_research_threads.py tests/test_research_routes.py
 ```
 
-- [ ] **Step 4: Implement tolerant message linkage and lifecycle writes**
+- [x] **Step 4: Implement tolerant message linkage and lifecycle writes**
 
 Add nullable `run_id` and `error_code` to `research_messages` in both fresh
 schema and tolerant `ALTER` migration. `run_id` is a nullable
@@ -668,7 +730,7 @@ set_thread_archived(thread_id, archived, *, now=None) -> ResearchThread | None
 Do not overload `ensure_thread`; it remains idempotent create/frozen-title for
 legacy execution paths.
 
-- [ ] **Step 5: Implement additive HTTP contracts**
+- [x] **Step 5: Implement additive HTTP contracts**
 
 Add:
 
@@ -685,7 +747,7 @@ fields are additive. Resolve active run rows in one batch method, never one SQL
 call per thread. Exact lookup is the path for an archived/out-of-page
 `NavigationTarget`.
 
-- [ ] **Step 6: Run GREEN and commit**
+- [x] **Step 6: Run GREEN and commit**
 
 ```bash
 pytest -q tests/test_research_threads.py tests/test_research_routes.py
@@ -702,7 +764,7 @@ git commit -m "feat: add research history lifecycle APIs"
 `tests/test_research_runs.py`, `tests/test_claude_code_sdk_driver.py`, and route
 tests already opened in Task 2.
 
-- [ ] **Step 1: Add exactly ten RED run tests**
+- [x] **Step 1: Add exactly ten RED run tests**
 
 1. latest successful selection ignores queued/running/failed rows and maps null
    effort to `default`;
@@ -723,7 +785,7 @@ tests already opened in Task 2.
 
 Do not change `EventType` or its pinned enum set.
 
-- [ ] **Step 1b: Add the remaining two RED route nodes**
+- [x] **Step 1b: Add the remaining two RED route nodes**
 
 7. `GET /research/threads/{thread_id}/selection` returns only the deterministic
    latest successful semantic tuple and maps legacy null effort to `default`;
@@ -734,13 +796,13 @@ Together with Task 2's six nodes, `tests/test_research_routes.py` remains exact
 `+8`. Strengthen the existing default-list compatibility node in place without
 renaming it.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pytest -q tests/test_research_runs.py
 ```
 
-- [ ] **Step 3: Add one error-code authority**
+- [x] **Step 3: Add one error-code authority**
 
 `src/research_errors.py` owns the allowlist and classifier:
 
@@ -781,7 +843,7 @@ SDK seam without adding a test node. If implementation or a live probe reveals
 a different max-turn shape, stop for review and leave it as
 `provider_call_failed`; do not infer from arbitrary result prose.
 
-- [ ] **Step 4: Extend durable run/message contracts**
+- [x] **Step 4: Extend durable run/message contracts**
 
 Add nullable `error_code` to fresh and migrated `research_runs`; add it to the
 dataclass and `mark_terminal`. Add `latest_successful_for_thread()` and bounded
@@ -810,7 +872,7 @@ thread store and persist the same typed cancelled terminal; it may not leave a
 dangling user turn. Startup reconciliation uses the identical linked-message
 shape with `run_interrupted`.
 
-- [ ] **Step 5: Normalize semantic effort at the single provider seam**
+- [x] **Step 5: Normalize semantic effort at the single provider seam**
 
 At `_research_provider_stream`, derive:
 
@@ -821,7 +883,7 @@ wire_effort = None if effort in (None, "", "default") else effort
 Pass `wire_effort` to every API-key/OAuth provider branch. Do not duplicate the
 normalization in four drivers. Existing callers using `None` remain identical.
 
-- [ ] **Step 6: Add latest-selection and typed DTO routes**
+- [x] **Step 6: Add latest-selection and typed DTO routes**
 
 Add `GET /research/threads/{thread_id}/selection` returning either null or:
 
@@ -834,7 +896,7 @@ render or add credential identity to any new response. Existing `credential_id`
 compatibility is not expanded and will be removed only under a separate API
 compatibility decision.
 
-- [ ] **Step 7: Run GREEN and commit**
+- [x] **Step 7: Run GREEN and commit**
 
 ```bash
 pytest -q tests/test_research_runs.py tests/test_research_routes.py tests/test_events.py \
@@ -946,7 +1008,7 @@ git commit -m "refactor: share research model picker authority"
 **Files:** modify `ui/Drawer.tsx`, `ui/primitives.css`, and
 `ui/overlays.test.tsx`.
 
-- [ ] **Step 1: Add exactly three RED overlay contracts**
+- [x] **Step 1: Add exactly three RED overlay contracts**
 
 1. wide `pinnable + pinned` renders inline `complementary`, no backdrop,
    `aria-modal`, focus trap, or portal;
@@ -958,13 +1020,13 @@ git commit -m "refactor: share research model picker authority"
 Stub `matchMedia` before render. Existing transient Drawer tests remain
 byte-for-byte behavior authorities.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 npm test --workspace apps/arkscope-web -- src/ui/overlays.test.tsx
 ```
 
-- [ ] **Step 3: Implement the additive variant**
+- [x] **Step 3: Implement the additive variant**
 
 Add optional props:
 
@@ -984,7 +1046,7 @@ Rules:
 - no new media query or breakpoint literal;
 - consumer owns auto-unpin on empty Evidence.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
 ```bash
 npm test --workspace apps/arkscope-web -- src/ui/overlays.test.tsx
@@ -1252,7 +1314,7 @@ git commit -m "feat: converge research workspace"
 
 **Files:** product files above plus this plan and project map for evidence only.
 
-- [ ] **Step 1: Prove exact test accounting**
+- [x] **Step 1: Prove exact test accounting**
 
 ```bash
 pytest --collect-only -q
@@ -1268,11 +1330,12 @@ npm run typecheck --workspace apps/arkscope-web
 npm run build --workspace apps/arkscope-web
 ```
 
-Expected: backend `4412` canonical / `127` focused; frontend exactly `60 files /
-571 tests`; typecheck/build pass with only explicitly identified pre-existing
-warnings.
+Expected and observed: backend `4412` canonical / `127` focused; frontend
+exactly `60 files / 572 tests` after the one RED-first StrictMode visual-gate
+regression node; typecheck/build pass with only the explicitly identified
+pre-existing chunk-size warning.
 
-- [ ] **Step 2: Run focused backend and no-PG smoke**
+- [x] **Step 2: Run focused backend and no-PG smoke**
 
 ```bash
 pytest -q \
@@ -1286,7 +1349,7 @@ pytest -q \
 Run the repository's existing no-PG smoke. It must return `ok:true` and
 `pg_attempts:[]`. Research history/lifecycle is local profile-state only.
 
-- [ ] **Step 3: Run mechanical ratchets**
+- [x] **Step 3: Run mechanical ratchets**
 
 All must be zero or match only an explicitly reviewed compatibility owner:
 
@@ -1309,7 +1372,7 @@ Run the strengthened existing Claude SDK error-result node separately; it is an
 in-place contract and does not enter the `127` Research-focused collection
 account.
 
-- [ ] **Step 4: Canonical backend A/B**
+- [x] **Step 4: Canonical backend A/B**
 
 Build symmetric virgin archives at behavioral base `c78203a` and final
 implementation/test tip. Run the canonical backend suite sequentially in the
@@ -1323,7 +1386,7 @@ same environment. Required verdict:
 
 Do not use the dirty main worktree for either archive.
 
-- [ ] **Step 5: Disposable browser/SQLite gate**
+- [x] **Step 5: Disposable browser/SQLite gate**
 
 Use a copied/fresh profile DB, scheduler disabled, a branch sidecar, branch
 Vite, and headless Chromium. Do not mutate the user's normal profile. Seed:
@@ -1353,7 +1416,7 @@ Verify at `1440x900`, `1024x768`, `961px`, `960px`, `959px`, and `390x844`:
 Screenshots and process/PID cleanup go in the ledger. Temporary ports must
 refuse connections afterward.
 
-- [ ] **Step 6: User-authorized provider smoke**
+- [x] **Step 6: User-authorized provider smoke**
 
 Only after the deterministic gate passes, use the normal single-sidecar
 environment and the user's chosen active Research credential. Create one
@@ -1370,7 +1433,7 @@ tool-free execution if the model independently calls a tool. Delete the
 disposable thread only through the shipped ConfirmDialog after evidence is
 recorded.
 
-- [ ] **Step 7: Self-review the changed diff**
+- [x] **Step 7: Self-review the changed diff**
 
 Reviewer focus:
 
@@ -1389,7 +1452,7 @@ Reviewer focus:
 12. global work registry, fixed tasks, Settings routes, and transcript authority
     have not forked.
 
-- [ ] **Step 8: Stop at implementation review-ready**
+- [x] **Step 8: Stop at implementation review-ready**
 
 After every implementer gate passes:
 
