@@ -8,10 +8,10 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** PLAN REVIEW ROUND 2 READY. Round 1 was conditionally GREEN; its
-> single must-fix (MF-A: native-host/live-migration process discipline and
-> schema-marker downgrade protection) is verified and absorbed below. Do not
-> implement until the reviewer confirms this bounded revision.
+> **Status:** REVIEWED / CLEARED FOR IMPLEMENTATION. Round 2 confirmed the
+> bounded MF-A revision, exact `+78/-0` accounting, and disposable live-gate
+> boundary. Task 0 must branch from the dedicated clearance commit containing
+> this status, not from behavior base `848ffd4`.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
