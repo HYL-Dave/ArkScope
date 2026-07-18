@@ -2,16 +2,35 @@
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND = ROOT / "extensions" / "sa_alpha_picks" / "background.js"
 SCRAPER = ROOT / "extensions" / "sa_alpha_picks" / "scrape.js"
+RUNNER = ROOT / "tests" / "js" / "run_sa_extension_fixture.mjs"
+FIXTURES = ROOT / "tests" / "fixtures" / "sa_alpha_picks"
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _run_scraper(fixture: Path, url: str, *, check: bool = True):
+    env = os.environ.copy()
+    env["ARKSCOPE_FIXTURE_URL"] = url
+    completed = subprocess.run(
+        ["node", str(RUNNER), str(fixture), str(SCRAPER)],
+        cwd=ROOT,
+        env=env,
+        check=check,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(completed.stdout) if check else completed
 
 
 def test_alpha_picks_flow_waits_for_dom_readiness_not_tab_complete():
@@ -42,3 +61,86 @@ def test_alpha_picks_scraper_supports_non_table_row_fallback():
     compact = " ".join(background.split())
     assert 'files: ["article_identity.js", "scrape_articles_list.js"]' in compact
     assert 'files: ["article_identity.js", "scrape_detail.js"]' in compact
+
+
+def test_alpha_picks_scraper_parses_live_company_column_shape():
+    current = _run_scraper(
+        FIXTURES / "current_portfolio_company_column.html",
+        "https://seekingalpha.com/alpha-picks/picks/current",
+    )
+    removed = _run_scraper(
+        FIXTURES / "removed_portfolio_company_column.html",
+        "https://seekingalpha.com/alpha-picks/picks/removed",
+    )
+
+    assert current == [
+        {
+            "company": "",
+            "symbol": "ACME",
+            "picked_date": "2026-07-15",
+            "return_pct": 3.12,
+            "sector": "Health Care",
+            "sa_rating": "STRONG BUY",
+            "holding_pct": 0.38,
+            "detail_url": "https://seekingalpha.com/alpha-picks/acme-analysis",
+            "raw_data": {
+                "cells": [
+                    "",
+                    "ACME",
+                    "07/15/2026",
+                    "3.12%",
+                    "Health Care",
+                    "STRONG BUY",
+                    "0.38%",
+                    "Open",
+                ],
+                "detail_url": "https://seekingalpha.com/alpha-picks/acme-analysis",
+            },
+        }
+    ]
+    assert removed == [
+        {
+            "company": "",
+            "symbol": "EXIT",
+            "picked_date": "2024-10-15",
+            "closed_date": "2026-07-17",
+            "return_pct": 356.94,
+            "sector": "Industrials",
+            "sa_rating": "HOLD",
+            "holding_pct": None,
+            "detail_url": "https://seekingalpha.com/alpha-picks/exit-analysis",
+            "raw_data": {
+                "cells": [
+                    "",
+                    "EXIT",
+                    "10/15/2024",
+                    "07/17/2026",
+                    "356.94%",
+                    "Industrials",
+                    "HOLD",
+                    "Open",
+                ],
+                "detail_url": "https://seekingalpha.com/alpha-picks/exit-analysis",
+            },
+        }
+    ]
+
+
+def test_alpha_picks_scraper_fails_closed_when_visible_rows_parse_to_zero(tmp_path):
+    fixture = tmp_path / "unparseable-portfolio.html"
+    fixture.write_text(
+        """<table><tbody><tr>
+        <td></td><td>not a ticker</td><td>not a date</td>
+        <td>n/a</td><td>Unknown</td><td>n/a</td>
+        </tr></tbody></table>""",
+        encoding="utf-8",
+    )
+
+    completed = _run_scraper(
+        fixture,
+        "https://seekingalpha.com/alpha-picks/picks/current",
+        check=False,
+    )
+
+    assert completed.returncode != 0
+    assert "rows were present but none could be parsed" in completed.stderr

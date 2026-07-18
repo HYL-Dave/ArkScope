@@ -149,6 +149,7 @@ def handle_message(msg):
 
 _SA_PICK_DATE_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$|^\d{4}-\d{2}-\d{2}")
 _SA_PICK_PCT_RE = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?%")
+_SA_PICK_SYMBOL_RE = re.compile(r"^[A-Z][A-Z.]{0,9}$")
 _VALID_REFRESH_SCOPES = {"current", "closed"}
 
 
@@ -179,12 +180,27 @@ def _infer_pick_scope(pick):
 
     cells = raw_data.get("cells") if isinstance(raw_data, dict) else None
     if isinstance(cells, list) and len(cells) >= 4:
-        # current: Symbol | Picked | Return% | Sector | Rating | Holding%
-        # closed:  Symbol | Picked | Closed | Return% | Sector | Rating
-        if _looks_like_sa_date(cells[2]) and _looks_like_sa_pct(cells[3]):
-            return "closed"
-        if _looks_like_sa_pct(cells[2]):
-            return "current"
+        # A provider-owned Company cell may precede Symbol. Locate Symbol by
+        # requiring that the next cell is the pick date, then classify the
+        # remaining current/closed shape relative to that index.
+        for symbol_index in range(len(cells) - 1):
+            symbol = str(cells[symbol_index] or "").strip().upper()
+            if not _SA_PICK_SYMBOL_RE.fullmatch(symbol):
+                continue
+            if not _looks_like_sa_date(cells[symbol_index + 1]):
+                continue
+            if (
+                symbol_index + 3 < len(cells)
+                and _looks_like_sa_date(cells[symbol_index + 2])
+                and _looks_like_sa_pct(cells[symbol_index + 3])
+            ):
+                return "closed"
+            if (
+                symbol_index + 2 < len(cells)
+                and _looks_like_sa_pct(cells[symbol_index + 2])
+            ):
+                return "current"
+            break
 
     if pick.get("closed_date"):
         return "closed"

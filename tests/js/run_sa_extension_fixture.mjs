@@ -4,7 +4,8 @@ import { JSDOM } from "jsdom";
 
 const [fixturePath, ...scriptPaths] = process.argv.slice(2);
 const dom = new JSDOM(fs.readFileSync(fixturePath, "utf8"), {
-  url: "https://seekingalpha.com/alpha-picks/articles/6316639-stock-buy",
+  url: process.env.ARKSCOPE_FIXTURE_URL ||
+    "https://seekingalpha.com/alpha-picks/articles/6316639-stock-buy",
   runScripts: "outside-only",
 });
 Object.defineProperty(dom.window.HTMLElement.prototype, "innerText", {

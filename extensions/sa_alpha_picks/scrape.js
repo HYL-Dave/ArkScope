@@ -6,13 +6,11 @@
 //
 // Current page (/alpha-picks/picks/current):
 //   Header: Company | Symbol | Picked | Return | Sector | Rating | Holding% | (link)
-//   Data:   Symbol  | Picked | Return%| Sector | Rating | Holding% | (link)
-//   Note: header has Company column but data rows do NOT
+//   Data may include a leading Company cell before Symbol.
 //
 // Removed page (/alpha-picks/picks/removed):
 //   Header: Company | Symbol | Picked | Closed | Return | Sector | Rating | (link)
-//   Data:   Symbol  | Picked | Closed | Return%| Sector | Rating | (link)
-//   Note: same quirk — header has Company but data rows do NOT
+//   Data may include a leading Company cell before Symbol.
 //
 // Detection: URL path (most reliable)
 
@@ -21,6 +19,10 @@
 
   var isRemovedPage = location.pathname.includes("/removed");
 
+  var visibleRowCount = document.querySelectorAll("table tbody tr").length;
+  if (visibleRowCount === 0) {
+    visibleRowCount = document.querySelectorAll('[role="row"]').length;
+  }
   var rows = collectCandidateRows();
   var picks = [];
 
@@ -35,38 +37,32 @@
     var detailUrl = link ? link.href : null;
     var pick;
 
+    var symbolIndex = findSymbolIndex(texts);
+    if (symbolIndex < 0) continue;
+    var symbol = (texts[symbolIndex] || "").toUpperCase();
+
     if (isRemovedPage) {
-      // Removed data rows (no Company td despite header having it):
-      // Symbol | Picked | Closed | Return% | Sector | Rating | (link)
-      if (texts.length < 6) continue;
-      var symbol = (texts[0] || "").toUpperCase();
-      if (!symbol || symbol.length > 10) continue;
       pick = {
         company: "",
         symbol: symbol,
-        picked_date: parseDate(texts[1]),
-        closed_date: parseDate(texts[2]),
-        return_pct: parsePct(texts[3]),
-        sector: texts[4] || null,
-        sa_rating: parseRating(texts[5]),
+        picked_date: parseDate(texts[symbolIndex + 1]),
+        closed_date: parseDate(texts[symbolIndex + 2]),
+        return_pct: parsePct(texts[symbolIndex + 3]),
+        sector: texts[symbolIndex + 4] || null,
+        sa_rating: parseRating(texts[symbolIndex + 5]),
         holding_pct: null,
         detail_url: detailUrl,
         raw_data: { cells: texts, detail_url: detailUrl },
       };
     } else {
-      // Current data rows (no Company td despite header having it):
-      // Symbol | Picked | Return% | Sector | Rating | Holding% | (link)
-      if (texts.length < 5) continue;
-      var symbol = (texts[0] || "").toUpperCase();
-      if (!symbol || symbol.length > 10) continue;
       pick = {
         company: "",
         symbol: symbol,
-        picked_date: parseDate(texts[1]),
-        return_pct: parsePct(texts[2]),
-        sector: texts[3] || null,
-        sa_rating: parseRating(texts[4]),
-        holding_pct: parsePct(texts[5]),
+        picked_date: parseDate(texts[symbolIndex + 1]),
+        return_pct: parsePct(texts[symbolIndex + 2]),
+        sector: texts[symbolIndex + 3] || null,
+        sa_rating: parseRating(texts[symbolIndex + 4]),
+        holding_pct: parsePct(texts[symbolIndex + 5]),
         detail_url: detailUrl,
         raw_data: { cells: texts, detail_url: detailUrl },
       };
@@ -75,6 +71,9 @@
     picks.push(pick);
   }
 
+  if (visibleRowCount > 0 && picks.length === 0) {
+    throw new Error("Alpha Picks rows were present but none could be parsed");
+  }
   return picks;
 
   // --- Helpers ---
@@ -85,9 +84,10 @@
     var roleRows = Array.prototype.slice.call(document.querySelectorAll('[role="row"]'));
     return roleRows.filter(function (row) {
       var cells = collectCells(row);
-      if (cells.length < 5) return false;
-      var first = (cells[0].innerText || "").trim();
-      return /^[A-Z. -]{1,12}$/.test(first);
+      var texts = Array.prototype.map.call(cells, function (cell) {
+        return (cell.innerText || "").trim();
+      });
+      return findSymbolIndex(texts) >= 0;
     });
   }
 
@@ -95,6 +95,15 @@
     var cells = row.querySelectorAll("td");
     if (cells.length) return cells;
     return row.querySelectorAll('[role="cell"], [role="gridcell"]');
+  }
+
+  function findSymbolIndex(texts) {
+    for (var i = 0; i + 1 < texts.length; i++) {
+      var candidate = String(texts[i] || "").trim().toUpperCase();
+      if (!/^[A-Z][A-Z.]{0,9}$/.test(candidate)) continue;
+      if (parseDate(texts[i + 1])) return i;
+    }
+    return -1;
   }
 
   function parseDate(text) {

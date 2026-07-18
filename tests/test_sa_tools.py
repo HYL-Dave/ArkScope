@@ -321,6 +321,76 @@ class TestNativeHost:
             call_picks = mock_dal.apply_sa_refresh.call_args[1].get("picks")
             assert call_picks[0]["closed_date"] == "2026-05-15"
 
+    def test_refresh_scope_accepts_live_leading_company_cell_shapes(self):
+        from src.sa_native_host import handle_message
+
+        payloads = (
+            (
+                "current",
+                {
+                    "symbol": "ACME",
+                    "picked_date": "2026-07-15",
+                    "return_pct": 3.12,
+                    "holding_pct": 0.38,
+                    "raw_data": {
+                        "cells": [
+                            "",
+                            "ACME",
+                            "07/15/2026",
+                            "3.12%",
+                            "Health Care",
+                            "STRONG BUY",
+                            "0.38%",
+                            "Open",
+                        ]
+                    },
+                },
+            ),
+            (
+                "closed",
+                {
+                    "symbol": "EXIT",
+                    "picked_date": "2024-10-15",
+                    "closed_date": "2026-07-17",
+                    "return_pct": 356.94,
+                    "raw_data": {
+                        "cells": [
+                            "",
+                            "EXIT",
+                            "10/15/2024",
+                            "07/17/2026",
+                            "356.94%",
+                            "Industrials",
+                            "HOLD",
+                            "Open",
+                        ]
+                    },
+                },
+            ),
+        )
+
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, patch(
+            "src.sa_native_host._try_ticker_sync"
+        ):
+            mock_dal = MagicMock()
+            mock_dal.apply_sa_refresh.return_value = 1
+            MockDAL.return_value = mock_dal
+
+            results = [
+                handle_message(
+                    {
+                        "action": "refresh",
+                        "scope": scope,
+                        "batch_ts": "2026-07-18T18:00:00Z",
+                        "picks": [pick],
+                    }
+                )
+                for scope, pick in payloads
+            ]
+
+        assert [result["status"] for result in results] == ["ok", "ok"]
+        assert mock_dal.apply_sa_refresh.call_count == 2
+
 
 # ============================================================
 # SA Alpha Picks storage contract
