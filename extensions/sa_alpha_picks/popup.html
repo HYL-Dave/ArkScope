@@ -284,15 +284,15 @@
   <div class="btn-hint">Quick: recent updates &nbsp;|&nbsp; Full: balanced scan &nbsp;|&nbsp; Backfill: overnight comments &nbsp;|&nbsp; News Catchup: latest + backlog</div>
   <div id="progress"></div>
   <section id="reconciliationSection">
-    <div class="reconciliation-heading">文章關聯檢視</div>
+    <div class="reconciliation-heading">Article link review</div>
     <div id="reconciliationError" hidden></div>
-    <div id="reconciliationQueue">正在載入待檢視事件…</div>
+    <div id="reconciliationQueue">Loading events to review...</div>
     <div id="manualConfirmation"></div>
     <details id="manualAdvanced">
-      <summary>進階：指定文章網址</summary>
-      <label for="manualInput">每行：標的 事件 日期 文章網址</label>
+      <summary>Advanced: specify article URLs</summary>
+      <label for="manualInput">One per line: TICKER ROLE DATE ARTICLE_URL</label>
       <textarea id="manualInput" rows="3"></textarea>
-      <button id="manualBtn">擷取並檢查</button>
+      <button id="manualBtn">Fetch and review</button>
     </details>
   </section>
   <script src="reconciliation_ui.js"></script>

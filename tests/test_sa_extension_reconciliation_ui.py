@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -77,11 +78,11 @@ def test_review_queue_renders_event_role_anchor_title_and_provenance():
     )
     for text in (
         "BTSG",
-        "建倉",
+        "Entry",
         "2026-07-15",
         "Stock Buy: Top Health Care Services Stock Delivers Double-Digit Growth",
-        "清單標的",
-        "日期接近",
+        "List ticker",
+        "Date within window",
     ):
         assert text in result["text"]
     assert "777" not in result["text"]
@@ -101,10 +102,10 @@ def test_review_queue_renders_ticker_conflict_and_content_state_honestly():
         return container.textContent;
         """
     )
-    assert "清單與文章標的衝突" in result
-    assert "僅標題" in result
-    assert "清單標的" in result
-    assert "文章標的" in result
+    assert "List and article tickers conflict" in result
+    assert "Headline only" in result
+    assert "List ticker" in result
+    assert "Article ticker" in result
 
 
 def test_use_candidate_action_sends_exact_stable_event_key_without_displaying_ids():
@@ -195,16 +196,16 @@ def test_mismatch_or_replacement_uses_inline_second_confirmation_not_window_conf
         """
     )
     assert result["nativeConfirmCalls"] == 0
-    assert "文章日期與事件不一致" in result["warningText"]
-    assert "取代目前連結" in result["warningText"]
-    assert "仍要使用" in result["warningText"]
+    assert "Article date differs from event" in result["warningText"]
+    assert "Replaces current link" in result["warningText"]
+    assert "Use anyway" in result["warningText"]
     assert [call["confirm_warnings"] for call in result["calls"]] == [False, True]
 
 
 def test_advanced_manual_section_is_collapsed_by_default():
     html = POPUP_HTML.read_text(encoding="utf-8")
     assert '<details id="manualAdvanced">' in html
-    assert '<summary>進階：指定文章網址</summary>' in html
+    assert '<summary>Advanced: specify article URLs</summary>' in html
     assert "<details id=\"manualAdvanced\" open" not in html
     assert html.index('src="reconciliation_ui.js"') < html.index('src="popup.js"')
 
@@ -244,4 +245,12 @@ def test_unresolved_queue_does_not_prefill_legacy_ticker_url_lines():
     assert "Missing:" not in source
     assert "unresolved.map" not in source
     assert 'action: "get_reconciliation_queue"' in source
-    assert "待檢視" in source
+    assert "events to review" in source
+
+
+def test_reconciliation_surface_copy_remains_english():
+    production_copy = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (POPUP_HTML, UI, POPUP_JS)
+    )
+    assert re.search(r"[\u3400-\u9fff]", production_copy) is None

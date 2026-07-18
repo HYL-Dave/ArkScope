@@ -2,27 +2,27 @@
   "use strict";
 
   var ROLE_LABELS = {
-    entry: "建倉",
-    exit: "出場",
+    entry: "Entry",
+    exit: "Exit",
   };
   var EVIDENCE_LABELS = {
-    list_ticker: "清單標的",
-    detail_ticker: "文章標的",
-    exact_ticker: "標的一致",
-    date_within_window: "日期接近",
-    exact_event_date: "事件日期一致",
-    user_selected: "使用者選擇",
-    user_confirmed: "使用者確認",
+    list_ticker: "List ticker",
+    detail_ticker: "Article ticker",
+    exact_ticker: "Ticker match",
+    date_within_window: "Date within window",
+    exact_event_date: "Event date match",
+    user_selected: "User selected",
+    user_confirmed: "User confirmed",
   };
   var REASON_LABELS = {
-    ambiguous_candidates: "有多篇候選文章",
-    ticker_metadata_conflict: "清單與文章標的衝突",
-    missing_event_anchor: "缺少事件日期，需人工確認",
-    outside_match_window: "文章日期距離事件過遠",
-    date_mismatch: "文章日期與事件不一致",
-    replacement: "將取代目前連結",
-    no_candidate: "尚無候選文章",
-    review_required: "需要人工確認",
+    ambiguous_candidates: "Multiple candidate articles",
+    ticker_metadata_conflict: "List and article tickers conflict",
+    missing_event_anchor: "Event date missing; manual review required",
+    outside_match_window: "Article date outside matching window",
+    date_mismatch: "Article date differs from event",
+    replacement: "Replaces current link",
+    no_candidate: "No candidate article",
+    review_required: "Manual review required",
   };
 
   function element(tag, className, text) {
@@ -33,7 +33,7 @@
   }
 
   function reasonLabel(code) {
-    return REASON_LABELS[code] || "需要人工確認";
+    return REASON_LABELS[code] || "Manual review required";
   }
 
   function eventPayload(event, candidate, confirmWarnings) {
@@ -63,7 +63,7 @@
   function showActionError(candidateNode) {
     var prior = candidateNode.querySelector("[data-action-error]");
     if (prior) prior.remove();
-    var error = element("div", "reconciliation-action-error", "操作未完成，請稍後重試");
+    var error = element("div", "reconciliation-action-error", "Action failed. Try again.");
     error.setAttribute("data-action-error", "");
     candidateNode.appendChild(error);
   }
@@ -82,15 +82,15 @@
     confirmation.setAttribute("data-confirmation", "");
     var warningCodes = Array.isArray(result.warnings) ? result.warnings : [];
     var warningText = warningCodes.length > 0
-      ? warningCodes.map(reasonLabel).join("；")
-      : "此連結需要再次確認";
+      ? warningCodes.map(reasonLabel).join("; ")
+      : "This link requires another confirmation";
     confirmation.appendChild(element("div", "reconciliation-warning", warningText));
 
     var actions = element("div", "reconciliation-confirm-actions");
-    var confirmButton = element("button", "reconciliation-confirm", "仍要使用");
+    var confirmButton = element("button", "reconciliation-confirm", "Use anyway");
     confirmButton.type = "button";
     confirmButton.setAttribute("data-action", "confirm-candidate");
-    var cancelButton = element("button", "reconciliation-cancel", "取消");
+    var cancelButton = element("button", "reconciliation-cancel", "Cancel");
     cancelButton.type = "button";
     cancelButton.setAttribute("data-action", "cancel-confirmation");
     actions.append(confirmButton, cancelButton);
@@ -123,7 +123,7 @@
   function candidateNode(event, candidate, handlers) {
     var node = element("article", "reconciliation-candidate");
     var title = element("a", "reconciliation-candidate-title");
-    title.textContent = candidate.title || "Alpha Picks 文章";
+    title.textContent = candidate.title || "Alpha Picks article";
     title.href = candidate.url;
     title.target = "_blank";
     title.rel = "noreferrer";
@@ -133,10 +133,10 @@
     details.appendChild(element(
       "span",
       "reconciliation-content-state",
-      candidate.content_state === "complete" ? "有內文" : "僅標題"
+      candidate.content_state === "complete" ? "Full text" : "Headline only"
     ));
     if (candidate.published_date) {
-      details.appendChild(element("span", "", "文章日期 " + candidate.published_date));
+      details.appendChild(element("span", "", "Article date " + candidate.published_date));
     }
     node.appendChild(details);
 
@@ -150,7 +150,7 @@
       node.appendChild(element(
         "div",
         "reconciliation-evidence",
-        "依據：" + evidenceLabels.join("、")
+        "Evidence: " + evidenceLabels.join(", ")
       ));
     }
     if (candidate.reason_code && candidate.reason_code !== "review_required") {
@@ -162,10 +162,10 @@
     }
 
     var actions = element("div", "reconciliation-candidate-actions");
-    var useButton = element("button", "reconciliation-use", "使用此文章");
+    var useButton = element("button", "reconciliation-use", "Use article");
     useButton.type = "button";
     useButton.setAttribute("data-action", "use-candidate");
-    var rejectButton = element("button", "reconciliation-reject", "排除此候選");
+    var rejectButton = element("button", "reconciliation-reject", "Reject candidate");
     rejectButton.type = "button";
     rejectButton.setAttribute("data-action", "reject-candidate");
     actions.append(useButton, rejectButton);
@@ -224,21 +224,21 @@
     container.appendChild(element(
       "div",
       "reconciliation-summary",
-      total > 0 ? "待檢視 " + total + " 個事件" : "目前沒有待檢視事件"
+      total > 0 ? total + " events to review" : "No events to review"
     ));
 
     events.forEach(function (event) {
       var eventNode = element("section", "reconciliation-event");
-      var role = ROLE_LABELS[event.role] || "事件";
+      var role = ROLE_LABELS[event.role] || "Event";
       eventNode.appendChild(element(
         "div",
         "reconciliation-event-title",
-        String(event.symbol || "未知標的") + " · " + role
+        String(event.symbol || "Unknown ticker") + " · " + role
       ));
       eventNode.appendChild(element(
         "div",
         "reconciliation-event-meta",
-        "事件日期：" + (event.event_anchor_date || "未提供")
+        "Event date: " + (event.event_anchor_date || "Not provided")
       ));
       if (event.reason_code) {
         eventNode.appendChild(element(
@@ -252,7 +252,7 @@
         eventNode.appendChild(element(
           "div",
           "reconciliation-no-candidate",
-          "尚無可用候選文章"
+          "No candidate articles available"
         ));
       } else {
         candidates.forEach(function (candidate) {
@@ -271,7 +271,7 @@
       if (!line) return;
       var parts = line.split(/\s+/);
       if (parts.length !== 4) {
-        errors.push({ line: index + 1, message: "格式應為：標的 事件 日期 文章網址" });
+        errors.push({ line: index + 1, message: "Expected: TICKER ROLE DATE ARTICLE_URL" });
         return;
       }
       var symbol = parts[0].toUpperCase();
@@ -301,7 +301,7 @@
         || !validDate
         || !validUrl
       ) {
-        errors.push({ line: index + 1, message: "事件或文章網址無效" });
+        errors.push({ line: index + 1, message: "Invalid event or article URL" });
         return;
       }
       items.push({

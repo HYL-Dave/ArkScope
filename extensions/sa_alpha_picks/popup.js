@@ -416,7 +416,7 @@ function loadReconciliationQueue() {
         return lastReconciliationQueue;
       }
       reconciliationErrorEl.hidden = false;
-      reconciliationErrorEl.textContent = "無法更新文章關聯佇列，請稍後重試";
+      reconciliationErrorEl.textContent = "Unable to update article link review. Try again.";
       if (lastReconciliationQueue) renderReconciliationQueue(lastReconciliationQueue);
       return null;
     });
@@ -429,17 +429,17 @@ function renderManualConfirmations(confirmations) {
     row.className = "reconciliation-confirmation";
     var warning = document.createElement("div");
     warning.className = "reconciliation-warning";
-    warning.textContent = item.symbol + " 的文章日期或既有連結需要再次確認";
+    warning.textContent = item.symbol + " needs another confirmation because of its article date or existing link";
     var actions = document.createElement("div");
     actions.className = "reconciliation-confirm-actions";
     var confirmButton = document.createElement("button");
     confirmButton.type = "button";
     confirmButton.className = "reconciliation-confirm";
-    confirmButton.textContent = "仍要使用";
+    confirmButton.textContent = "Use anyway";
     var cancelButton = document.createElement("button");
     cancelButton.type = "button";
     cancelButton.className = "reconciliation-cancel";
-    cancelButton.textContent = "取消";
+    cancelButton.textContent = "Cancel";
     actions.append(confirmButton, cancelButton);
     row.append(warning, actions);
     manualConfirmationEl.appendChild(row);
@@ -467,7 +467,7 @@ function renderManualConfirmations(confirmations) {
         confirmButton.disabled = false;
         progressEl.style.display = "block";
         progressEl.style.color = "#c62828";
-        progressEl.textContent = "確認未完成，請稍後重試";
+        progressEl.textContent = "Confirmation failed. Try again.";
       });
     });
   });
@@ -479,36 +479,38 @@ manualBtn.addEventListener("click", function () {
     progressEl.style.display = "block";
     progressEl.style.color = "#c62828";
     progressEl.textContent = parsed.errors.length > 0
-      ? "第 " + parsed.errors[0].line + " 行格式不正確"
-      : "請輸入至少一筆完整事件";
+      ? "Line " + parsed.errors[0].line + " has invalid format"
+      : "Enter at least one complete event";
     return;
   }
 
   manualBtn.disabled = true;
-  manualBtn.textContent = "擷取中…";
+  manualBtn.textContent = "Fetching...";
   progressEl.style.display = "block";
   chrome.runtime.sendMessage({ action: "manual_fetch", items: parsed.items }, function (result) {
     manualBtn.disabled = false;
-    manualBtn.textContent = "擷取並檢查";
+    manualBtn.textContent = "Fetch and review";
     progressEl.style.display = "block";
     var confirmations = result && Array.isArray(result.confirmation_required)
       ? result.confirmation_required
       : [];
     renderManualConfirmations(confirmations);
     if (confirmations.length > 0) {
-      progressEl.textContent = "文章已擷取，請確認關聯";
+      progressEl.textContent = "Article fetched; confirm the link";
       progressEl.style.color = "#e65100";
     } else if (result && result.fetched > 0) {
-      progressEl.textContent = "已擷取 " + result.fetched + " 篇文章" +
-        (result.failed > 0 ? "，" + result.failed + " 篇失敗" : "");
+      progressEl.textContent = "Fetched " + result.fetched + " article" +
+        (result.fetched === 1 ? "" : "s") +
+        (result.failed > 0 ? "; " + result.failed + " failed" : "");
       progressEl.style.color = "#2e7d32";
       manualInput.value = "";
       chrome.storage.local.remove("manualDraft");
     } else if (result && result.failed > 0) {
-      progressEl.textContent = "有 " + result.failed + " 篇文章無法擷取或關聯";
+      progressEl.textContent = result.failed + " article" +
+        (result.failed === 1 ? " could" : "s could") + " not be fetched or linked";
       progressEl.style.color = "#c62828";
     } else {
-      progressEl.textContent = "沒有可處理的文章，請檢查輸入";
+      progressEl.textContent = "No valid articles to process. Check the input.";
       progressEl.style.color = "#e65100";
     }
     loadReconciliationQueue();
@@ -650,7 +652,7 @@ function renderStatus(lastRefresh) {
     if (Number.isInteger(details.review_required) && details.review_required > 0) {
       statusEl.append(
         document.createElement("br"),
-        document.createTextNode("文章關聯：待檢視 " + details.review_required + " 個事件")
+        document.createTextNode("Article links: " + details.review_required + " events to review")
       );
     }
   }
