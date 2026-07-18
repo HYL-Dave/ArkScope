@@ -179,8 +179,8 @@ def test_failure_rolls_back_and_records_failure_meta(backend):
     backend.apply_sa_refresh("current", [_pick("AAPL")], T1, T1)
 
     bad = _pick("BAD")
-    bad["symbol"] = None  # NOT NULL violation mid-transaction
-    with pytest.raises(sqlite3.IntegrityError):
+    bad["symbol"] = None  # rejected before stale-marking transaction begins
+    with pytest.raises(ValueError, match="symbol and picked_date"):
         backend.apply_sa_refresh("current", [_pick("GOOD2"), bad], T2, T2)
 
     rows = backend.query_sa_picks("current", include_stale=True)
@@ -190,7 +190,7 @@ def test_failure_rolls_back_and_records_failure_meta(backend):
 
     meta = backend.get_sa_refresh_meta()["current"]
     assert meta["ok"] is False
-    assert "NOT NULL" in meta["last_error"]
+    assert "symbol and picked_date" in meta["last_error"]
     assert meta["last_attempt_at"] == T2_CANON              # failed attempt recorded
     assert meta["last_success_at"] == T1_CANON              # success state preserved
     assert meta["snapshot_ts"] == T1_CANON
@@ -331,6 +331,9 @@ def test_articles_meta_upsert_and_query(backend):
 
 
 def test_save_article_with_comments_shape_and_pick_sync(backend):
+    # Historical node name retained for collection accounting. The v2 contract
+    # deliberately proves capture no longer mutates pick/article links in the
+    # same transaction; reconciliation is a separate call.
     backend.apply_sa_refresh("current", [_pick("NVDA", picked="2026-06-01")], T1, T1)
     backend.upsert_sa_articles_meta([_article("a1")])
 
@@ -339,7 +342,7 @@ def test_save_article_with_comments_shape_and_pick_sync(backend):
     assert res["prepared_comments"] == 2
     assert res["stored_comments_total"] == 2
     assert res["net_new_comments"] == 2
-    assert res["synced_picks"] == 1                          # analysis + ticker match
+    assert "synced_picks" not in res
 
     art = backend.get_sa_article_with_comments("a1")
     assert art["body_markdown"] == "## Thesis\nbody"
@@ -349,8 +352,8 @@ def test_save_article_with_comments_shape_and_pick_sync(backend):
     assert art["comments"][1]["parent_comment_id"] == "c1"
 
     pick = backend.get_sa_pick_detail("NVDA")
-    assert pick["detail_report"] == "## Thesis\nbody"
-    assert pick["canonical_article_id"] == "a1"
+    assert pick["detail_report"] is None
+    assert pick["canonical_article_id"] is None
 
     # comments-only refresh: one new comment, totals move by exactly one
     extra = _comments() + [
@@ -395,7 +398,7 @@ def test_comment_dedupe_cascade_leaves_no_orphan_signals(backend):
     conn.commit()
     conn.close()
 
-    backend.save_article_with_comments("a1", "body", [], sync_picks=False)
+    backend.save_article_with_comments("a1", "body", [])
 
     art = backend.get_sa_article_with_comments("a1")
     by_id = {c["comment_id"]: c for c in art["comments"]}
@@ -442,6 +445,9 @@ def test_sanitize_corrupted_comments_counts(backend):
 
 
 def test_audit_unresolved_symbols_exact_and_like_fallback(backend):
+    # Historical node name retained for collection accounting. The compatibility
+    # audit is now a read-only alias for event-scoped review; it never performs
+    # the retired exact/prefix/full-text mutation.
     backend.apply_sa_refresh("current", [
         _pick("NVDA", picked="2026-06-01"),
         _pick("TSM", picked="2026-06-01"),
@@ -452,14 +458,25 @@ def test_audit_unresolved_symbols_exact_and_like_fallback(backend):
         _article("a2", title="Why TSM wins the foundry war", ticker=None,
                  published_date="2026-06-03"),
     ])
-    backend.save_article_with_comments("a1", "NVDA body", [], sync_picks=False)
-    backend.save_article_with_comments("a2", "TSM thesis body", [], sync_picks=False)
+    backend.save_article_with_comments("a1", "NVDA body", [])
+    backend.save_article_with_comments("a2", "TSM thesis body", [])
+
+    conn = scs.connect(backend._sa_db)
+    before = [tuple(row) for row in conn.execute(
+        "SELECT id, canonical_article_id, detail_report FROM sa_alpha_picks ORDER BY id"
+    )]
+    conn.close()
 
     out = backend.audit_unresolved_symbols()
-    # NVDA via exact ticker match, TSM via the v1 LIKE full-text degradation
-    assert out == {"unresolved_symbols": ["ZZZQ"], "resolved_by_fulltext": 2}
-    assert backend.get_sa_pick_detail("NVDA")["canonical_article_id"] == "a1"
-    assert backend.get_sa_pick_detail("TSM")["canonical_article_id"] == "a2"
+    assert out["unresolved_symbols"] == ["NVDA", "TSM", "ZZZQ"]
+    assert out["resolved_by_fulltext"] == 0
+    assert out["review_queue"]["total"] == 3
+    conn = scs.connect(backend._sa_db)
+    after = [tuple(row) for row in conn.execute(
+        "SELECT id, canonical_article_id, detail_report FROM sa_alpha_picks ORDER BY id"
+    )]
+    conn.close()
+    assert after == before
 
 
 # --- (9) NO-PG-FALLBACK proof -------------------------------------------------------
@@ -488,7 +505,10 @@ def test_no_pg_fallback_even_on_empty_results(backend, monkeypatch):
     assert backend.query_sa_articles() == []
     assert backend.get_sa_article_with_comments("missing") is None
     assert backend.audit_unresolved_symbols() == {
-        "unresolved_symbols": [], "resolved_by_fulltext": 0}
+        "unresolved_symbols": [],
+        "resolved_by_fulltext": 0,
+        "review_queue": {"events": [], "total": 0},
+    }
     assert backend.invalidate_dirty_sa_market_news_detail() == 0
     assert backend.sanitize_corrupted_sa_comments_counts() == 0
     assert backend.cleanup_mixed_null_date_comment_duplicates() == {
@@ -520,11 +540,14 @@ PG_QUERY_SA_ARTICLES_KEYS = {
     "comments_count", "has_content", "detail_fetched_at", "comments_fetched_at",
     "stored_comments_count",
 }
-# get_sa_article_with_comments is SELECT * (sql/008) + the injected "comments"
+# get_sa_article_with_comments is SELECT * plus the injected "comments"; v2 adds
+# source-specific provider observations while preserving every legacy key.
 PG_ARTICLE_WITH_COMMENTS_KEYS = {
     "id", "article_id", "url", "title", "ticker", "author", "published_date",
     "article_type", "body_markdown", "comments_count", "detail_fetched_at",
     "comments_fetched_at", "raw_data", "fetched_at", "updated_at", "comments",
+    "list_ticker", "list_ticker_observed_at", "detail_ticker",
+    "detail_ticker_observed_at",
 }
 PG_COMMENT_KEYS = {
     "comment_id", "parent_comment_id", "commenter", "comment_text",

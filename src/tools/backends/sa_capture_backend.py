@@ -56,6 +56,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from ... import sa_capture_store as store
+from ... import sa_article_reconciliation_store as reconciliation_store
 from .db_backend import (
     DatabaseBackend,  # noqa: F401  (re-exported for isinstance users/tests)
     _plan_comment_duplicate_cleanup,
@@ -144,6 +145,13 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         snapshot = store.canon_ts(snapshot_ts) or store.now_ts()
         conn = self._sa_conn()
         try:
+            normalized_picks = []
+            for pick in picks:
+                symbol = str(pick.get("symbol") or "").strip().upper()
+                picked_date = store.canon_date(pick.get("picked_date"))
+                if not symbol or not picked_date:
+                    raise ValueError("Alpha Picks refresh requires symbol and picked_date")
+                normalized_picks.append((pick, symbol, picked_date))
             now = store.now_ts()
             conn.execute("BEGIN IMMEDIATE")
 
@@ -158,6 +166,7 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
             # 2. Upsert picks against the scope-asymmetric PARTIAL unique indexes
             #    (sql/014/015 parity, rebuilt verbatim in sa_capture_store._SCHEMA).
             update_set = (
+                "lineage_id = excluded.lineage_id, "
                 "company = excluded.company, "
                 "closed_date = excluded.closed_date, "
                 "is_stale = 0, "
@@ -181,19 +190,25 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                 )
             sql = (
                 "INSERT INTO sa_alpha_picks "
-                "(symbol, company, picked_date, closed_date, portfolio_status, "
+                "(lineage_id, symbol, company, picked_date, closed_date, portfolio_status, "
                 " is_stale, return_pct, sector, sa_rating, holding_pct, "
                 " raw_data, last_seen_snapshot, fetched_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?) " + conflict_clause
+                "VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?) " + conflict_clause
             )
             count = 0
-            for pick in picks:
+            for pick, symbol, picked_date in normalized_picks:
+                lineage_id = reconciliation_store.resolve_lineage(
+                    conn,
+                    symbol=symbol,
+                    picked_date=picked_date,
+                )
                 conn.execute(
                     sql,
                     (
-                        pick.get("symbol"),
+                        lineage_id,
+                        symbol,
                         pick.get("company", ""),
-                        store.canon_date(pick.get("picked_date")),
+                        picked_date,
                         store.canon_date(pick.get("closed_date")),
                         scope,
                         pick.get("return_pct"),
@@ -350,6 +365,7 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
             if not row:
                 return None
             d = dict(row)
+            d.pop("lineage_id", None)  # internal reconciliation identity, not legacy DTO
             d["is_stale"] = bool(d["is_stale"])
             d["raw_data"] = _loads(d.get("raw_data"))  # psycopg2 jsonb→dict parity
             return d
@@ -743,8 +759,9 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                 conn.execute(
                     """INSERT INTO sa_articles
                     (article_id, url, title, ticker, published_date,
-                     article_type, comments_count, raw_data, fetched_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     article_type, comments_count, raw_data, fetched_at, updated_at,
+                     list_ticker, list_ticker_observed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (article_id) DO UPDATE SET
                         title = excluded.title,
                         url = excluded.url,
@@ -752,6 +769,11 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                         published_date = COALESCE(excluded.published_date, sa_articles.published_date),
                         article_type = COALESCE(excluded.article_type, sa_articles.article_type),
                         comments_count = excluded.comments_count,
+                        list_ticker = COALESCE(excluded.list_ticker, sa_articles.list_ticker),
+                        list_ticker_observed_at = COALESCE(
+                            excluded.list_ticker_observed_at,
+                            sa_articles.list_ticker_observed_at
+                        ),
                         updated_at = ?
                     """,
                     (
@@ -765,8 +787,26 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
                         json.dumps(a.get("raw_data")) if a.get("raw_data") is not None else None,
                         now,  # fetched_at (INSERT only)
                         now,  # updated_at (INSERT)
+                        a.get("list_ticker"),
+                        store.canon_ts(a.get("list_ticker_observed_at")),
                         now,  # updated_at (DO UPDATE)
                     ),
+                )
+                conn.execute(
+                    """UPDATE sa_articles
+                    SET ticker = CASE
+                      WHEN list_ticker IS NOT NULL AND detail_ticker IS NOT NULL
+                           AND UPPER(TRIM(list_ticker)) = UPPER(TRIM(detail_ticker))
+                        THEN UPPER(TRIM(list_ticker))
+                      WHEN list_ticker IS NOT NULL AND detail_ticker IS NULL
+                        THEN UPPER(TRIM(list_ticker))
+                      WHEN detail_ticker IS NOT NULL AND list_ticker IS NULL
+                        THEN UPPER(TRIM(detail_ticker))
+                      ELSE ticker
+                    END
+                    WHERE article_id = ?
+                    """,
+                    (a.get("article_id"),),
                 )
                 conn.commit()
                 count += 1
@@ -1004,11 +1044,12 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         article_id: str,
         body_markdown: str,
         comments: list,
-        sync_picks: bool = True,
+        *,
+        detail_ticker: str | None = None,
+        detail_ticker_observed_at=None,
     ) -> dict:
-        """Atomic: article content + comments + pick sync in a single transaction."""
+        """Capture article content, detail ticker evidence, and comments atomically."""
         conn = self._sa_conn()
-        synced = 0
         try:
             now = store.now_ts()
             conn.execute("BEGIN IMMEDIATE")
@@ -1016,17 +1057,41 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
             conn.execute(
                 "UPDATE sa_articles SET body_markdown = ?, "
                 "detail_fetched_at = ?, comments_fetched_at = ?, "
+                "detail_ticker = COALESCE(?, detail_ticker), "
+                "detail_ticker_observed_at = COALESCE(?, detail_ticker_observed_at), "
                 "updated_at = ? WHERE article_id = ?",
-                (body_markdown, now, now, now, article_id),
+                (
+                    body_markdown,
+                    now,
+                    now,
+                    detail_ticker,
+                    store.canon_ts(detail_ticker_observed_at),
+                    now,
+                    article_id,
+                ),
+            )
+            conn.execute(
+                """UPDATE sa_articles
+                SET ticker = CASE
+                  WHEN list_ticker IS NOT NULL AND detail_ticker IS NOT NULL
+                       AND UPPER(TRIM(list_ticker)) = UPPER(TRIM(detail_ticker))
+                    THEN UPPER(TRIM(list_ticker))
+                  WHEN list_ticker IS NOT NULL AND detail_ticker IS NULL
+                    THEN UPPER(TRIM(list_ticker))
+                  WHEN detail_ticker IS NOT NULL AND list_ticker IS NULL
+                    THEN UPPER(TRIM(detail_ticker)
+                    )
+                  ELSE ticker
+                END
+                WHERE article_id = ?
+                """,
+                (article_id,),
             )
             prepared_count = self._upsert_article_comments(conn, article_id, comments)
             after_count = self._count_article_comments(conn, article_id)
-            if sync_picks:
-                synced = self._sync_canonical_to_picks(conn, article_id)
             conn.commit()
             return {
                 "ok": True,
-                "synced_picks": synced,
                 "prepared_comments": prepared_count,
                 "stored_comments_total": after_count,
                 "net_new_comments": max(after_count - before_count, 0),
@@ -1071,162 +1136,97 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
         finally:
             conn.close()
 
-    def _sync_canonical_to_picks(self, conn: sqlite3.Connection, article_id: str) -> int:
-        """Sync an article into matching picks (same connection = same txn).
-        PG date subtraction on DATE columns → Python date math on the canonical
-        'YYYY-MM-DD' TEXT values."""
-        article = conn.execute(
-            "SELECT article_id, ticker, article_type, published_date, body_markdown "
-            "FROM sa_articles WHERE article_id = ?",
-            (article_id,),
-        ).fetchone()
-        if not article or not article["ticker"]:
-            return 0
-        ticker = article["ticker"]
-        article_type = article["article_type"]
-        published_date = article["published_date"]
-        body_md = article["body_markdown"]
-
-        if article_type not in ("analysis", "removal"):
-            return 0
-        if not body_md:
-            return 0
-
-        rows = conn.execute(
-            "SELECT id, symbol, picked_date, canonical_article_id "
-            "FROM sa_alpha_picks WHERE symbol = ?",
-            (ticker,),
-        ).fetchall()
-        if not rows:
-            rows = conn.execute(
-                "SELECT id, symbol, picked_date, canonical_article_id "
-                "FROM sa_alpha_picks WHERE ? LIKE symbol || '%' "
-                "AND LENGTH(?) <= LENGTH(symbol) * 2",
-                (ticker, ticker),
-            ).fetchall()
-
-        now = store.now_ts()
-        synced = 0
-        for row in rows:
-            pick_id = row["id"]
-            picked_date = row["picked_date"]
-            current_canonical = row["canonical_article_id"]
-            if current_canonical == article_id:
-                conn.execute(
-                    "UPDATE sa_alpha_picks SET detail_report = ?, "
-                    "detail_fetched_at = ?, canonical_article_id = ?, "
-                    "updated_at = ? WHERE id = ?",
-                    (body_md, now, article_id, now, pick_id),
-                )
-                synced += 1
-                continue
-
-            if current_canonical and published_date and picked_date:
-                existing = conn.execute(
-                    "SELECT published_date FROM sa_articles WHERE article_id = ?",
-                    (current_canonical,),
-                ).fetchone()
-                if existing and existing["published_date"]:
-                    existing_dt = _parse_date(existing["published_date"])
-                    new_dt = _parse_date(published_date)
-                    picked_dt = _parse_date(picked_date)
-                    if existing_dt and new_dt and picked_dt:
-                        existing_dist = abs((existing_dt - picked_dt).days)
-                        new_dist = abs((new_dt - picked_dt).days)
-                        if new_dist >= existing_dist:
-                            continue  # existing canonical is closer
-
-            conn.execute(
-                "UPDATE sa_alpha_picks SET detail_report = ?, "
-                "detail_fetched_at = ?, canonical_article_id = ?, "
-                "updated_at = ? WHERE id = ?",
-                (body_md, now, article_id, now, pick_id),
-            )
-            synced += 1
-
-        return synced
-
     def audit_unresolved_symbols(self) -> dict:
-        """Current picks without a canonical article; try exact/prefix ticker match,
-        then a full-text fallback.
+        """Compatibility alias for the read-only event-scoped review queue."""
+        queue = self.query_sa_article_review_queue(limit=200)
+        return {
+            "unresolved_symbols": sorted({
+                event["symbol"] for event in queue["events"]
+            }),
+            "resolved_by_fulltext": 0,
+            "review_queue": queue,
+        }
 
-        LOCKED DECISION (runbook L8 / out-of-scope list): the PG
-        to_tsvector/plainto_tsquery fallback DEGRADES to LIKE '%symbol%' in v1 —
-        no stemming/tokenization — which can change unresolved counts vs PG.
-        Explicitly accepted; FTS5-ifying this audit is a follow-up.
-        """
+    def reconcile_sa_articles(
+        self,
+        *,
+        pick_keys=None,
+        article_ids=None,
+        max_events: int = reconciliation_store.MAX_EVENTS_PER_RECONCILIATION,
+        enrichment_limit: int = 4,
+    ) -> dict:
         conn = self._sa_conn()
-        unresolved: list = []
-        resolved = 0
         try:
-            now = store.now_ts()
-            conn.execute("BEGIN IMMEDIATE")
-            picks = conn.execute(
-                "SELECT id, symbol, picked_date FROM sa_alpha_picks "
-                "WHERE portfolio_status = 'current' AND is_stale = 0 "
-                "AND canonical_article_id IS NULL "
-                "AND detail_report IS NULL"
-            ).fetchall()
-
-            for pick in picks:
-                pick_id, symbol, picked_date = pick["id"], pick["symbol"], pick["picked_date"]
-                # exact/prefix ticker match first (analysis/removal only); PG's
-                # ABS(published_date - %s::date) → julianday delta; PG's default
-                # ASC NULLS LAST → explicit (… IS NULL) prefix.
-                match = conn.execute(
-                    "SELECT article_id, published_date FROM sa_articles "
-                    "WHERE (ticker = ? OR (ticker LIKE ? AND LENGTH(ticker) <= LENGTH(?) * 2)) "
-                    "AND article_type IN ('analysis', 'removal') "
-                    "AND body_markdown IS NOT NULL "
-                    "ORDER BY (published_date IS NULL), "
-                    "ABS(julianday(published_date) - julianday(?)) "
-                    "LIMIT 1",
-                    (symbol, symbol + "%", symbol, picked_date),
-                ).fetchone()
-
-                if not match:
-                    # v1 LIKE degradation of the PG full-text fallback (see docstring)
-                    match = conn.execute(
-                        "SELECT article_id, published_date FROM sa_articles "
-                        "WHERE body_markdown IS NOT NULL "
-                        "AND article_type IN ('analysis', 'removal') "
-                        "AND (title LIKE ? OR body_markdown LIKE ?) "
-                        "ORDER BY (published_date IS NULL), "
-                        "ABS(julianday(published_date) - julianday(?)) "
-                        "LIMIT 1",
-                        (f"%{symbol}%", f"%{symbol}%", picked_date),
-                    ).fetchone()
-
-                if match:
-                    art_id = match["article_id"]
-                    body_row = conn.execute(
-                        "SELECT body_markdown FROM sa_articles WHERE article_id = ?",
-                        (art_id,),
-                    ).fetchone()
-                    if body_row and body_row["body_markdown"]:
-                        conn.execute(
-                            "UPDATE sa_alpha_picks SET detail_report = ?, "
-                            "detail_fetched_at = ?, canonical_article_id = ?, "
-                            "updated_at = ? WHERE id = ?",
-                            (body_row["body_markdown"], now, art_id, now, pick_id),
-                        )
-                        resolved += 1
+            lineage_ids = None
+            if pick_keys is not None:
+                lineage_ids = []
+                for symbol, picked_date in pick_keys:
+                    symbol_key = str(symbol or "").strip().upper()
+                    canonical_date = store.canon_date(picked_date)
+                    if not symbol_key or not canonical_date:
                         continue
-
-                unresolved.append(symbol)
-
-            conn.commit()
-        except Exception as e:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            logger.error("audit_unresolved_symbols failed: %s", e)
-            raise
+                    row = conn.execute(
+                        "SELECT lineage_id FROM sa_pick_lineages "
+                        "WHERE symbol_key=? AND picked_date=?",
+                        (symbol_key, canonical_date),
+                    ).fetchone()
+                    if row is not None:
+                        lineage_ids.append(int(row[0]))
+            return reconciliation_store.reconcile_events(
+                conn,
+                lineage_ids=lineage_ids,
+                article_ids=article_ids,
+                max_events=max_events,
+                enrichment_limit=enrichment_limit,
+            )
         finally:
             conn.close()
 
-        return {"unresolved_symbols": unresolved, "resolved_by_fulltext": resolved}
+    def query_sa_article_review_queue(self, limit: int = 50) -> dict:
+        conn = self._sa_conn()
+        try:
+            return reconciliation_store.list_review_queue(conn, limit=limit)
+        finally:
+            conn.close()
+
+    def resolve_sa_reconciliation_event(
+        self,
+        *,
+        symbol: str,
+        role: str,
+        event_anchor_date: str,
+    ) -> dict:
+        conn = self._sa_conn()
+        try:
+            return reconciliation_store.resolve_event(
+                conn,
+                symbol=symbol,
+                role=role,
+                event_anchor_date=event_anchor_date,
+            )
+        finally:
+            conn.close()
+
+    def accept_sa_article_link(self, **kwargs) -> dict:
+        conn = self._sa_conn()
+        try:
+            return reconciliation_store.accept_link(conn, **kwargs)
+        finally:
+            conn.close()
+
+    def reject_sa_article_candidate(self, **kwargs) -> dict:
+        conn = self._sa_conn()
+        try:
+            return reconciliation_store.reject_candidate(conn, **kwargs)
+        finally:
+            conn.close()
+
+    def preview_sa_legacy_article_links(self, limit: int = 200) -> dict:
+        conn = self._sa_conn()
+        try:
+            return reconciliation_store.preview_legacy_links(conn, limit=limit)
+        finally:
+            conn.close()
 
     def query_sa_articles(
         self,
