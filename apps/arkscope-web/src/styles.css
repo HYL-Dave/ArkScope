@@ -965,6 +965,11 @@ table.wl tbody tr.archived td {
   margin: 0 0 4px;
   font-size: 18px;
 }
+.settings-section-head > .btn-ghost {
+  align-self: flex-start;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .settings-panel {
   padding: 14px;
 }
@@ -974,6 +979,10 @@ table.wl tbody tr.archived td {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+.settings-panel-head > .btn-ghost {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .settings-panel h2 {
   margin: 0 0 4px;

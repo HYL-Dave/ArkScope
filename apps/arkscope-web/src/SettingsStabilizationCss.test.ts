@@ -57,6 +57,10 @@ describe("Settings stabilization CSS contracts", () => {
     expect(rule(".settings-wrap-text")).toMatch(/white-space:\s*normal/);
     expect(rule(".settings-wrap-text")).toMatch(/overflow-wrap:\s*anywhere/);
     expect(rule(".settings-wrap-text")).not.toMatch(/font-size:/);
+    expect(rule(".settings-section-head > .btn-ghost")).toMatch(/flex-shrink:\s*0/);
+    expect(rule(".settings-section-head > .btn-ghost")).toMatch(/white-space:\s*nowrap/);
+    expect(rule(".settings-panel-head > .btn-ghost")).toMatch(/flex-shrink:\s*0/);
+    expect(rule(".settings-panel-head > .btn-ghost")).toMatch(/white-space:\s*nowrap/);
 
     const normalSections = [
       sourceSection("function DataStorageSection()", "function NewsStorageSection()"),
