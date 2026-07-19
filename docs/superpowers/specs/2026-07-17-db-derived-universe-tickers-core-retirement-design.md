@@ -1,14 +1,16 @@
 # DB-Derived Universe and `tickers_core.json` Retirement Design
 
-> **Status:** ADOPTED DESIGN; WRITTEN REVIEW PENDING. Implementation is
-> deliberately deferred until after P2.8 Slice 3.
+> **Status:** FRESHLY GROUNDED; WRITTEN REVIEW READY. P2.8 Slice 3 and the
+> Alpha Picks reconciliation line are live. Implementation remains blocked on
+> independent written review and a separate RED-first implementation plan.
 
 ## 1. Purpose
 
 Make local databases the runtime authority for ArkScope's active ticker
 universe, automatically include current Alpha Picks as one derived source, and
-retire `config/tickers_core.json` from both runtime reads and extension writes.
-Retain an explicit, deterministic, on-demand compatibility export.
+retire `config/tickers_core.json` from both runtime reads and
+native-host/fallback writes. Retain an explicit, deterministic, on-demand
+compatibility export.
 
 This design retires `tickers_core.json`; it does not claim to retire every
 ticker-bearing legacy setting in `config/user_profile.yaml`.
@@ -18,11 +20,14 @@ ticker-bearing legacy setting in `config/user_profile.yaml`.
 ### 2.1 Alpha Picks facts already live in SQLite
 
 Every successful Alpha Picks current/closed refresh writes pick facts to
-`data/sa_capture.db`. On current-refresh success, the native host separately
-calls `sync_tickers_to_collection()` and rewrites
+schema-v2 `data/sa_capture.db`. On current-refresh success, the native host
+separately calls `sync_tickers_to_collection()` and rewrites
 `tier3_user_watchlist.sa_alpha_picks_auto` in `config/tickers_core.json`.
+The v2 lineage/link/decision tables are orthogonal to universe membership;
+current eligibility still comes from `sa_alpha_picks` itself.
 
-The extension's `Auto-sync Alpha Picks` control only schedules Chrome alarms.
+The extension's `Auto-sync Alpha Picks` control only schedules browser alarms
+through the Chrome-compatible extension API used by both shipped builds.
 Turning it off stops future automatic refreshes; it does not delete captured
 facts or revoke ticker eligibility. Browser extension uninstall has no cleanup
 hook for ArkScope's DB or universe.
@@ -39,10 +44,20 @@ compatibility reader, and one writer, not ten direct readers:
 4. the compatibility `DataAccessLayer.get_tier_tickers()` can read JSON, but no
    current production caller was found.
 
-The writer is `sa_native_host._try_ticker_sync()`. Maintained news collectors,
-the scheduler, and `daily_update` already resolve their ticker scope through
-`src.universe_scope.resolve_active_universe()`, which reads
-`profile_state.db`; they no longer use JSON as their default.
+The sole write implementation is
+`SAAlphaPicksClient.sync_tickers_to_collection()`. It is reached both from
+`sa_native_host._try_ticker_sync()` after a successful current refresh and from
+the optional `refresh_portfolio(sync_tickers=True)` fallback. Both call paths
+retire in this slice. Maintained news collectors, the scheduler,
+`daily_update`, the market-data coverage route, and direct market-data helpers
+already call `src.universe_scope.resolve_active_universe()` rather than JSON.
+
+That resolver is not yet the target authority: it selects every distinct
+`watchlist_memberships.ticker`, does not join the parent list or filter either
+archive column, does not include open portfolio positions or current Alpha
+Picks, and returns `[]` for both a valid empty universe and an unavailable DB.
+The new structured accessor replaces those semantics; this is not a cosmetic
+refactor of the existing query.
 
 The writer also checks legacy key `tier2_extended`, while the tracked file and
 current loader use `tier2_expanded`. Flattened set parity, rather than trusting
@@ -52,18 +67,57 @@ writer is retired after cutover instead of receiving a separate cleanup slice.
 The exact migration inventory, rather than a remembered reader count, is the
 review/ratchet authority.
 
-### 2.3 Existing DB sources do not exactly equal the JSON snapshot
+### 2.3 Fresh read-only parity snapshot
 
-A read-only 2026-07-17 comparison found `152` active JSON tickers versus `151`
-in the union of active local lists, open holdings, and current non-stale Alpha
-Picks. The diff was two JSON-only symbols and one DB-only symbol. This is not a
-reason to choose one side silently; it proves the need for an explicit preview,
-import, and strict post-migration parity gate.
+A fresh read-only probe at `2026-07-19T11:48:38+08:00`, against production
+schema v2 and the live dirty JSON file, produced:
 
-The working tree also currently contains an uncommitted Alpha-Picks-style
-addition to `config/tickers_core.json`. Implementation must preserve and
-preview the live file; it must never overwrite or discard that edit during
-migration.
+| Set | Distinct symbols |
+|---|---:|
+| active JSON tiers | 152 |
+| active manual-list membership | 148 |
+| open positions under unarchived accounts | 10 |
+| current, non-stale Alpha Picks | 44 |
+| raw union of the three DB-derived sources | 151 |
+| DB-derived union after the explicit hidden veto | 150 |
+
+The raw diff is exact: JSON-only `ATGE` and `LC`; DB-only `HAPN`. The profile
+also hides `ATGE` and `BRK.B`; `BRK.B` is still a real Alpha Picks source fact,
+but the explicit veto removes it from the effective universe. Therefore the
+migration preview must classify at least three different cases instead of
+calling all JSON-only rows missing data:
+
+- hidden JSON-only `ATGE` is not imported as active membership;
+- visible JSON-only `LC` requires an explicit keep/import decision; and
+- DB-only `HAPN` enters the generated transition snapshot from its DB source.
+
+The working tree's one-line uncommitted addition is `BTSG` under
+`sa_alpha_picks_auto`. It is already represented by the current Alpha Picks DB
+source, so it must survive preview without becoming a duplicate permanent
+`legacy_config_seed` membership. Implementation must preserve and preview the
+live file; it must never stage, overwrite, revert, or silently replace that
+edit during setup.
+
+These counts are evidence snapshots, not migration constants. The cutover gate
+recomputes every set and fingerprint immediately before it writes anything.
+
+### 2.4 Other legacy inputs are not hidden membership sources
+
+`config/user_profile.yaml` currently contributes 17 tickers to the legacy
+overview, and all 17 are already represented by active manual-list membership.
+After migration, that overview may enrich rows and its theme groups may still
+seed classification tags, but it does not independently qualify active
+membership. Cutover must prove its current ticker set is a subset of the
+accepted accessor or stop for an explicit import decision.
+
+`all_universe_tickers()` also exposes 46 `legacy_reference`-only symbols to the
+offline symbol-catalog seed. They are not active membership. The current SEC
+cache already carries 43 of them; `ANSS`, `SGEN`, and `WBA` are absent from that
+cache and from every active source. This slice deliberately does not import the
+46 as active or compatibility membership. The symbol catalog continues to use
+the active snapshot as its guaranteed local seed and the existing SEC cache as
+its broad reference authority; retiring stale `legacy_reference` may narrow
+cache-less offline autocomplete, but may not enlarge the active universe.
 
 ## 3. Locked Product Decisions
 
@@ -90,6 +144,15 @@ migration.
    runtime effect. User additions go through DB-owned list/universe actions.
 8. **One accessor owns resolution.** Runtime readers consume the same structured
    active-universe snapshot; no consumer assembles its own union.
+9. **Universe identity is exact after trim/uppercase.** The accessor does not
+   apply market-data alias collapse. `BRK.B` and `BRK B` remain distinct source
+   keys so hiding the duplicate `BRK.B` cannot accidentally suppress canonical
+   `BRK B`; downstream market reads keep their independent alias resolver.
+10. **Legacy reference is not membership.** `legacy_reference` is neither
+    imported nor exported as active universe state.
+11. **Legacy overview is enrichment, not qualification.** Ticker-bearing
+    `user_profile.yaml` fields remain outside this retirement slice, but no
+    longer enter `/profile/universe` through an independent union leg.
 
 ## 4. Source and Accessor Model
 
@@ -99,19 +162,22 @@ The registry defines source keys and read adapters:
 
 | Source | Authority | Active membership |
 |---|---|---|
-| `manual_lists` | `profile_state.db` | membership and parent list both unarchived |
-| `portfolio_open` | `profile_state.db` | position open and account unarchived |
-| `sa_alpha_picks_current` | `sa_capture.db` | `portfolio_status='current' AND is_stale=0` |
-| `legacy_config_seed` | `profile_state.db` | one-time imported active JSON membership not otherwise represented |
+| `manual_lists` | `profile_state.db` | membership and parent list both have `archived_at IS NULL` |
+| `portfolio_open` | `profile_state.db` | `position.closed_at IS NULL` and account `archived_at IS NULL`; `include_in_total` is irrelevant to membership |
+| `sa_alpha_picks_current` | `sa_capture.db` | distinct exact symbols where `portfolio_status='current' AND is_stale=0` |
+| `legacy_config_seed` | `profile_state.db` | user-approved active JSON-only membership with `archived_at IS NULL` |
 
 The registry contains no V1 `enabled` flag for Alpha Picks. It may reserve an
 additive source-policy interface for the named retirement follow-up, but must
 not ship a hidden environment flag or dead UI branch.
 
-The one-time JSON importer stores tier/category metadata only for compatibility
-round-tripping; tier does not regain product priority semantics. Existing
-classification tags remain on their independent facet/source axis and do not
-qualify a ticker by themselves.
+The one-time JSON importer stores annotations for every reviewed active JSON
+entry, even when another DB source already qualifies that ticker. It creates a
+`legacy_config_seed` membership only for user-approved JSON-only entries.
+Therefore category round-tripping does not require duplicating Alpha Picks,
+portfolio, or manual-list membership. Tier does not regain product priority
+semantics. Existing classification tags remain on their independent
+facet/source axis and do not qualify a ticker by themselves.
 
 Persisted compatibility membership uses a normalized profile-state shape:
 
@@ -131,10 +197,13 @@ universe_source_annotations
   PRIMARY KEY (source_key, ticker, annotation_key, annotation_value)
 ```
 
-Only `legacy_config_seed` needs these rows in V1. Manual lists, open portfolio
-positions, and current Alpha Picks remain direct derived reads from their
-existing authorities. The one-to-many annotation table prevents round-trip
-metadata from being collapsed to one arbitrary category.
+Only `legacy_config_seed` writes `universe_source_memberships` in V1. The
+annotation table may contain rows for any reviewed active JSON ticker and has
+no membership authority; it must not have a foreign key that requires a
+matching membership row. Manual lists, open portfolio positions, and current
+Alpha Picks remain direct derived reads from their existing authorities. The
+one-to-many annotation table prevents round-trip metadata from being collapsed
+to one arbitrary category.
 
 ### 4.2 Structured snapshot
 
@@ -142,16 +211,22 @@ The single accessor returns more than a bare list:
 
 ```text
 ActiveUniverseSnapshot
-  tickers[]                 sorted canonical symbols
+  tickers[]                 sorted exact normalized symbols
   sources_by_ticker{}       ticker -> sorted source keys
-  source_status{}           available, last_success_at, optional warning
+  source_status{}           available, optional last_success_at, optional warning
   unavailable_sources[]
   generated_at
 ```
 
 `resolve_active_universe()` remains a thin compatibility adapter over
-`snapshot.tickers` while callers migrate. New readers use the structured
-snapshot so UI/export can explain why a symbol is present.
+`snapshot.tickers` while callers migrate. It returns a list only from a complete
+accepted snapshot; source failure raises a typed `ActiveUniverseUnavailable`
+rather than returning the same `[]` used by a valid empty universe. New readers
+use the structured snapshot so UI/export can explain why a symbol is present.
+
+All source symbols use the same trim-and-uppercase normalization. Alias
+canonicalization is intentionally absent at this layer. Source provenance is
+collected before `ticker_meta.hidden_at` applies its exact-key final veto.
 
 `ticker_meta.hidden_at` remains the final explicit user veto over the union.
 An archived list member is not active merely because the current resolver used
@@ -159,15 +234,27 @@ to select every membership row without archive predicates.
 
 ### 4.3 Cross-database failure behavior
 
-The accessor reads databases in read-only mode and never copies Alpha Picks or
-portfolio facts into a second membership table. If a registered DB source is
-unavailable:
+The accessor opens short read-only transactions against `profile_state.db` and
+`sa_capture.db` and never copies Alpha Picks or portfolio facts into a second
+membership table. `source_status.available` means the source DB and required
+schema were readable, not that the provider's latest refresh succeeded. For
+Alpha Picks, `sa_refresh_meta(scope='current')` supplies the optional
+`last_success_at` and warning: a failed latest refresh preserves the last
+successful current set and reports a warning instead of withdrawing it. Local
+list, portfolio, and legacy-seed sources do not invent a provider-success
+timestamp.
+
+If any registered source required for a complete snapshot is unavailable:
 
 - scheduler/collector callers fail closed rather than silently collect an
   incomplete universe;
-- UI callers may render the last accepted snapshot only when its stale/source
-  warning is explicit; and
+- V1 UI/API callers return a typed unavailable response rather than inventing
+  an empty or partial universe; and
 - an unavailable source is not reported as an observed empty set.
+
+V1 adds no second persisted last-snapshot cache. A future cache may be additive
+only if it carries explicit source staleness and never masquerades as a fresh
+read.
 
 Age may drive a warning but never automatic source removal. Last-success time
 is evidence of freshness, not evidence that a subscription ended.
@@ -178,46 +265,60 @@ Migration proceeds in this order:
 
 1. introduce the source registry, structured accessor, and deterministic
    fixtures without changing any reader;
-2. preview active JSON against the other DB-derived sources, then import only
-   user-approved JSON-only entries into `legacy_config_seed`, preserving the
-   live working-file contents and legacy category metadata without giving
-   already-represented Alpha Picks a duplicate permanent source;
-3. migrate `/profile/universe` and profile import/tag bootstrap;
-4. migrate the symbol-catalog local seed;
-5. replace or remove the currently unused DAL tier compatibility method;
-6. generate a reviewed transition snapshot from the accessor so DB-only symbols
-   are added to JSON and JSON-only symbols already imported remain present;
-7. verify every runtime reader uses the accessor and current JSON/accessor sets
-   are exactly equal at the reviewed cutover snapshot;
-8. stop `sa_native_host` and `SAAlphaPicksClient` from writing JSON; then
-9. remove runtime JSON loaders and retire the tracked file.
+2. preview the exact live active JSON set against DB-derived sources and the
+   hidden veto, categorizing hidden, JSON-only, DB-only, and overlapping rows;
+3. persist reviewed annotations for all active JSON entries, but create
+   `legacy_config_seed` membership only for user-approved visible JSON-only
+   entries; separately prove every current `user_profile.yaml` overview ticker
+   is already represented or stop for an explicit import decision;
+4. migrate `/profile/universe` and profile import/tag bootstrap so the overview
+   enriches accepted rows but no longer contributes an independent membership
+   union leg;
+5. migrate the symbol-catalog guaranteed local seed to the accepted active
+   snapshot while retaining the SEC cache as its broad reference authority;
+6. replace or remove the currently unused DAL tier compatibility method;
+7. generate a reviewed transition snapshot from the accessor so DB-only symbols
+   are added, approved legacy membership remains present, and hidden symbols
+   plus `legacy_reference` are absent;
+8. verify every runtime reader uses the accessor and the generated transition
+   snapshot/accessor sets are exactly equal;
+9. remove both callers and the implementation of
+   `sync_tickers_to_collection()`; then
+10. remove runtime JSON loaders and retire the tracked file.
 
-Writer-last is mandatory. Stopping the extension writer before readers and
-import are complete can strand current Alpha Picks; leaving it active after
-cutover recreates background git noise and dual authority.
+Writer-last is mandatory. Stopping the native-host/fallback writer before
+readers and import are complete can strand current Alpha Picks; leaving it
+active after cutover recreates background git noise and dual authority.
 
 Static acceptance includes zero runtime `tickers_core.json` reads/writes after
 the exporter/importer compatibility module is excluded from the search.
 
 ## 6. Strict Parity and Cutover Safety
 
-During the dual-path transition, parity means strict set equality:
+The dirty input file is preview evidence, not the final parity target. Its raw
+active set currently includes hidden symbols. After user decisions and import,
+the app generates a transition snapshot whose active tiers contain exactly the
+effective accessor set:
 
 ```text
-flatten(active JSON tiers) == new accessor tickers
+flatten(generated transition JSON active tiers) == accepted snapshot.tickers
 ```
 
 It is never a subset/superset assertion. A mismatch is either an unimported
 legacy membership, a missing DB source, an archive/hidden-policy discrepancy,
-or a real bug that requires an explicit decision.
+an exact-key normalization error, or a real bug that requires an explicit
+decision. Hidden input rows remain visible in preview but are absent from both
+sides of the final equality.
 
 The implementation plan must provide:
 
 - deterministic fixture parity tests for every source and overlap;
-- a read-only live preview listing JSON-only and DB-only symbols;
+- a read-only live preview listing JSON-only, DB-only, hidden, and overlapping
+  symbols with their exact source/category provenance;
 - an explicit, gated import of JSON-only active membership;
+- a current `user_profile.yaml`-ticker subset proof;
 - a generated transition snapshot that includes DB-only membership after user
-  review, followed by an exact current-JSON/accessor comparison;
+  review, followed by an exact generated-JSON/accessor comparison;
 - source/database fingerprints rechecked immediately before writer cutover; and
 - a stop condition if the file or source DBs change during the cutover window.
 
@@ -235,10 +336,14 @@ The exporter:
 - emits deterministic sorted JSON with atomic file replacement or a browser
   download;
 - is invoked only on demand;
-- includes source-derived groups needed by legacy consumers;
+- reconstructs reviewed legacy tier/category groups from annotations and puts
+  otherwise ungrouped active source members in deterministic generated groups;
 - preserves imported legacy tier/category metadata for round-trip
   compatibility; and
 - never mutates DB state.
+
+It filters every group through the accepted effective snapshot. Hidden symbols
+and the old `legacy_reference` block are never exported as active entries.
 
 Because JSON has no comments, its generated warning is a top-level metadata
 object:
@@ -272,8 +377,9 @@ UI must opt into/follow Alpha Picks through a new gated action. V1 is automatic
 derived eligibility with no second switch. A future explicit source-retirement
 control is additive and withdraws eligibility without deleting facts.
 
-The catalog wording changes in the same commit as this adopted design so the
-two authorities never describe contradictory product behavior.
+The catalog wording changed with the adopted design; fresh review confirms it
+still describes automatic eligibility and the writer-last transition rather
+than the retired opt-in proposal.
 
 ## 9. Alternatives Rejected
 
@@ -307,7 +413,7 @@ must not silently remove or delete.
 - changing Alpha Picks capture cadence;
 - implementing Alpha Picks article matching;
 - making exported JSON editable authority; or
-- combining this migration with P2.8 Slice 3.
+- implementing P2.8 Slice 4 Settings changes in the same branch.
 
 ## 11. Verification Contract
 
@@ -316,22 +422,36 @@ The future implementation plan must prove:
 1. source sets union deterministically and retain all source provenance;
 2. an Alpha Pick removal withdraws only `sa_alpha_picks_current`;
 3. holdings/list overlap keeps a removed Alpha Picks ticker active;
-4. archived list/account/position state follows the locked predicates;
+4. archived lists/memberships/accounts and closed positions follow the exact
+   locked predicates, while `include_in_total=false` does not withdraw a holding;
 5. stopped/stale Alpha Picks capture warns but does not age-expire membership;
-6. unavailable source DBs fail closed and never masquerade as empty;
-7. JSON-only live entries survive the gated import;
-8. strict parity is exact before writer cutover;
-9. all readers migrate before the native-host writer is removed;
-10. the off/retirement path remains absent in V1 rather than existing untested;
-11. export is deterministic, generated-labelled, and exact-set equivalent;
-12. manual changes to an exported file have no runtime effect;
-13. runtime static scans find no JSON reader/writer outside explicit
+6. an accessible Alpha Picks DB with failed latest refresh remains available
+   with warning and preserved membership;
+7. unavailable source DBs raise typed failure and never masquerade as empty;
+8. exact normalization preserves `BRK.B` and `BRK B` as distinct keys, so the
+   existing `BRK.B` veto does not hide `BRK B`;
+9. annotations for already-represented JSON tickers do not create duplicate
+   permanent membership;
+10. JSON-only live entries survive the gated import when approved, while hidden
+    JSON-only entries do not become active;
+11. all current legacy-overview tickers are represented before that union leg
+    is removed;
+12. `legacy_reference` never enters active membership or active export;
+13. strict hidden-aware parity is exact before writer cutover;
+14. all readers migrate before both native-host/fallback writer paths and the
+    shared writer implementation are removed;
+15. the off/retirement path remains absent in V1 rather than existing untested;
+16. export is deterministic, generated-labelled, and exact-set equivalent;
+17. manual changes to an exported file have no runtime effect;
+18. runtime static scans find no JSON reader/writer outside explicit
     import/export compatibility code; and
-14. the current uncommitted JSON edit is preserved through preview and is not
+19. the current uncommitted JSON edit is preserved through preview and is not
     staged, overwritten, or reverted by implementation setup.
 
 ## 12. Sequence
 
-Written review may refine this design now. Implementation begins only after
-P2.8 Slice 3, in a separate branch and plan from Alpha Picks article
-reconciliation.
+P2.8 Slice 3 and Alpha Picks reconciliation are live, so the former sequencing
+block is satisfied. The next gate is independent written review of this freshly
+grounded document. Only a GREEN review may open the separate RED-first
+implementation plan; P2.8 Slice 4 remains next after this bounded authority
+retirement rather than sharing its branch or A/B baseline.
