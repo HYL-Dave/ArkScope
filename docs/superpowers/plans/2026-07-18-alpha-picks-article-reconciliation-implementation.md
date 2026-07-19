@@ -3153,7 +3153,12 @@ after recording aggregate evidence.
 - [ ] **Step 5: Run canonical backend A/B from virgin archives**
 
 Create symmetric virgin archives at base `848ffd4` and the final product tip.
-Run full `pytest -q` sequentially in the same environment. Require:
+Before pytest, run `npm ci` at each archive's repository root (or attach the
+exact same-lockfile root `node_modules`). The backend collection includes 24
+extension fixture nodes whose harness imports workspace-hoisted `jsdom`; a
+virgin archive without root npm dependencies is an environment setup failure,
+not a product failure or a permitted skip. Run full `pytest -q` sequentially in
+the same environment. Require:
 
 ```text
 base collect 4412
