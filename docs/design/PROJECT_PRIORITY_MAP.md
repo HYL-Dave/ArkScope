@@ -246,13 +246,15 @@ therefore defaults to defer until the hypothesis gate exists.
   preserved the user-edited JSON in retained mode-0600 backups, imported only
   reviewed compatibility annotations, established exact 150-ticker
   DB-derived/export parity, and retired all runtime readers and writers. **P2.8
-  Slice 4 Settings workspace is IMPLEMENTED FOR REVIEW at product tip
-  `2611464` on isolated branch `codex/p2-8-slice-4-settings`; it is not merged
-  or LIVE.** Exact frontend accounting is `572 -> 606` (`+34/-0`), all
+  Slice 4 Settings workspace is FAST-FORWARD MERGED through review docs tip
+  `8a0fc9c` (reviewed product tip `2611464`); desktop user verification and
+  final LIVE closeout remain pending.** Exact frontend accounting is
+  `572 -> 606` (`+34/-0`), all
   frontend/type/build/static/byte-identity gates are closed, and the six-size
   real-browser gate is green after four RED-first integration repairs.
-  Independent implementation review is the next gate; Slice 5 and the external
-  Design Kit sync remain unopened.
+  Independent implementation review is GREEN, merged-tree gates are green,
+  and the desktop now runs merged `master`. Slice 5 remains unopened; the
+  external Design Kit companion sync remains a separately recorded closeout.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -446,6 +448,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (P2.8 SLICE 4 SETTINGS WORKSPACE FAST-FORWARD MERGED — DESKTOP USER CHECK / LIVE CLOSEOUT PENDING)**: Independent implementation review reproduced the pure-move `60/572`, final `63/606`, exact `+34/-0`, all byte/static gates, and a separate 35-check browser interaction matrix. With the user's merge approval, `master` fast-forwarded from `7e56bce` through review docs tip `8a0fc9c` (product tip `2611464`) without a merge commit or push. Merged-tree focused `18/135`, full `63/606`, typecheck, build, four byte-identity gates, and all reviewed static ratchets passed. The old desktop process group exited through its launcher cleanup path; Vite `8430` and old sidecar `37255` were closed before merged `master` started a fresh Vite `8430`, Electron, and sidecar `45343`. Health and initial product requests return `200`. The plan remains short of LIVE until the user checks the normal desktop Settings directory/search/collapse, Models action placement, Providers, Investor Profile, and Data Sources table. Slice 5 is not started; external Design Kit sync remains a separate closeout record.
 
 - **2026-07-19 (P2.8 SLICE 4 SETTINGS WORKSPACE IMPLEMENTED FOR REVIEW — NOT MERGED / NOT LIVE)**: Product tip `2611464` on isolated branch `codex/p2-8-slice-4-settings` completes the reviewed single-page Settings workspace. The pure-move stage reduced `Settings.tsx` from 3,742 to 671 lines without collection drift, then one static registry established three workflow groups, nine anchors, static search, fail-closed remembered collapse, and the canonical wide-directory/narrow-Drawer split. Model actions now stay with their owner, catalog failure is bounded to AI content, and both prior Settings `window.confirm` paths use `ConfirmDialog`. Exact fresh accounting is `60/572 -> 63/606` (`+34/-0`), focused is `18/135`, typecheck/build pass with only the existing chunk warning, and backend/API/Investor Profile/Dashboard/extension trees remain byte-identical. The six-viewport browser gate found and RED-first repaired four real integration defects: the `IBKR client id` search alias, provenance-only retired-sync rendering, expand-before-focus navigation, and fixed-grid overflow at 1024/961px. Search, collapse persistence, exact System-to-Data-Sources navigation, focus return, scrolling, long-table fit, and no-overlap checks now pass at 1440/1024/961/960/959/390 widths. Isolated services are stopped; the copied production profile and disposable browser data are removed. Next gate is independent implementation review before any merge, LIVE status, Design Kit sync, or Slice 5 work.
 

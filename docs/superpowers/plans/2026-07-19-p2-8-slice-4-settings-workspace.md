@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTED FOR REVIEW — INDEPENDENT IMPLEMENTATION REVIEW PENDING
+> **Status:** MERGED TO MASTER — DESKTOP USER CHECK AND LIVE CLOSEOUT PENDING
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -259,6 +259,11 @@ TASK_7_BROWSER_GATE: PASS at 1440x900, 1024x768, 961x768, 960x768, 959x768, and 
 TASK_7_PROFILE_INTEGRITY: isolated profile SHA-256 remained ebbb5a5985979f3d4f219bdda23b6392f7050e0bbff71e34dcddf65abe954ef5 before and after the visual gate
 TASK_7_CLEANUP: isolated sidecar 8424, Vite 8434, and Chrome 9225 stopped and verified closed; the production-profile copy, disposable browser profile, source archive, and helper were removed; only screenshots and non-sensitive node lists remain under /tmp
 REVIEW_READY_PRODUCT_TIP: 26114648ea512a11ecd85c412bbfc7c174da6d70
+INDEPENDENT_IMPLEMENTATION_REVIEW: GREEN; reviewer reproduced pure-move 60/572, final 63/606, exact +34/-0, byte/static gates, and a separate 35-check browser interaction gate
+MERGE: fast-forward 7e56bce -> 8a0fc9c on master; no merge commit and no push
+MERGED_TREE_VERIFICATION: focused 18 files / 135 tests; full frontend 63 files / 606 tests; typecheck clean; production build clean except the existing chunk-size warning; all four byte-identity gates and reviewed static ratchets clean
+MERGED_DESKTOP_RESTART: old process group 2983501 exited through the launcher cleanup path; Vite 8430 and sidecar 37255 were closed before restart; merged master started Vite 8430, Electron, and sidecar 45343 with health and initial product requests returning 200
+LIVE_CLOSEOUT_PENDING: user desktop Settings check, final LIVE docs commit, external Design Kit companion sync record, and implementation worktree/branch cleanup
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
