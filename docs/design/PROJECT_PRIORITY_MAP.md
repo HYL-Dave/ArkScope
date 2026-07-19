@@ -254,10 +254,11 @@ therefore defaults to defer until the hypothesis gate exists.
   Independent review reproduced exact frontend accounting `+42/-12`
   (`63/606 -> 65/636`), all static and immutable byte gates, and a separate
   41-check browser matrix. Merged-tree focused `18/164`, full `65/636`,
-  typecheck, and build are green. **The corrected Settings surface is not yet
-  marked LIVE pending the normal desktop user check.** The app-wide i18n
-  decision follows that check; Slice 5 remains queued. Design Kit sync #5 is
-  held for the same closeout.
+  typecheck, and build are green. **The corrected Settings surface is LIVE
+  COMPLETE after the merged-master normal desktop check passed all five user
+  acceptance points and a separate merged-master sandbox replay passed 41
+  interactions.** Design Kit sync #5 is handed to Fable and remains separately
+  pending. The app-wide i18n decision document is next; Slice 5 remains queued.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -451,6 +452,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (P2.8 SLICE 4.1 SETTINGS CORRECTION LIVE COMPLETE)**: The merged-master user check passed all five acceptance points: three clear workflow tabs, one mounted panel instead of an all-groups long page, compact FRED truth under Data Sources, detailed FRED content under `總經資料`, and cross-tab exact search/navigation. An independent sandbox built from merged `master` separately replayed 41 interactions, including keyboard tabs, dirty-confirm privacy, responsive `961/960/959/390` behavior, and exact OAuth/FRED targeting, without touching the normal desktop or production DB. Slice 4 remains historical merged infrastructure whose rejected IA is superseded; the corrected Settings contract is LIVE through Slice 4.1. Design Kit sync #5 is handed to Fable and pending; the app-wide i18n decision document is the single next design unit, while Slice 5 stays queued.
 
 - **2026-07-20 (P2.8 SLICE 4.1 FAST-FORWARD MERGED — DESKTOP USER CHECK PENDING)**: Independent implementation review approved product tip `4931050` after reproducing the exact `+42/-12` ledger, `65/636` frontend suite, static/immutable gates, code-level Tabs/guard/FRED contracts, and a separate 41-check responsive interaction matrix. With user approval, `master` fast-forwarded through evidence tip `bfdc32c`; merged-tree focused `18/164`, full `65/636`, typecheck, and build are green with only the existing chunk-size warning. The correction replaces the rejected all-groups Settings page with three automatic-activation workflow tabs and one mounted group, protects dirty and busy work during navigation, and gives detailed FRED state one owner under `總經資料`. LIVE status, Design Kit sync #5, and the app-wide i18n decision remain gated on the normal desktop user check; Slice 5 stays queued.
 

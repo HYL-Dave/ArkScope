@@ -7,7 +7,8 @@
 > implementation slice still requires its own separately reviewed plan.
 > **Settings IA amendment, 2026-07-19:** Slice 4.1 replaces the rejected
 > all-groups single-page composition. Its written review is approved at
-> `2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md`.
+> `2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md` and the
+> corrected Settings contract is LIVE COMPLETE as of 2026-07-20.
 
 ## 1. Purpose and Authority
 
@@ -684,6 +685,9 @@ check rejected its all-groups long-page composition. It is historical delivery,
 not the final LIVE contract.
 
 ### Slice 4.1: Settings navigation correction
+
+**LIVE COMPLETE 2026-07-20** through reviewed product tip `4931050` and merged
+evidence tip `bfdc32c`; merged-master desktop verification is GREEN.
 
 1. Shared automatic-activation `Tabs`, first consumed by Settings.
 2. Three workflow tabs with one mounted group and current-group directory.

@@ -1,6 +1,7 @@
 # P2.8 Slice 4.1 Settings Navigation Correction Design
 
-> **Status: ADOPTED DESIGN; WRITTEN SPEC REVIEW APPROVED, 2026-07-19.**
+> **Status: LIVE COMPLETE, 2026-07-20; reviewed product tip `4931050`, merged
+> evidence tip `bfdc32c`, merged-master user verification GREEN.**
 > This is a bounded corrective addendum to the P2.8 canonical shell and
 > interaction design. It supersedes only the Settings information-architecture
 > decisions delivered by Slice 4. All other P2.8 contracts remain in force.
@@ -23,10 +24,13 @@ found that the resulting information architecture was not acceptable:
 - detailed FRED snapshot content lives under Data Sources while the
   `macro_storage` anchor owns the FRED search target.
 
-Therefore Slice 4 is merged but is not LIVE. Slice 4.1 is the owning correction
-for the rejected IA. It preserves Slice 4's useful infrastructure and changes
-only navigation composition, FRED/Macro presentation ownership, and the
-terminology authority needed to describe those changes consistently.
+At design adoption, Slice 4 was merged but not LIVE. Slice 4.1 became the
+owning correction for the rejected IA. It preserves Slice 4's useful
+infrastructure and changes only navigation composition, FRED/Macro
+presentation ownership, and the terminology authority needed to describe
+those changes consistently. The correction is now merged, independently
+verified, and accepted on the normal desktop; the corrected Settings surface
+is LIVE through Slice 4.1.
 
 Authority order for this work:
 
@@ -462,15 +466,16 @@ line:
 - §17 replaces the locked single-page Settings decision.
 
 The original Slice 4 plan remains historical evidence of a reviewed and merged
-implementation, but its IA is superseded and it is not marked LIVE.
+implementation, but its IA is superseded. The corrected Settings contract is
+marked LIVE only through this Slice 4.1 addendum.
 
-After Slice 4.1 implementation and user verification:
+Closeout status after implementation and user verification:
 
-1. mark Slice 4.1 and the corrected Settings surface LIVE;
-2. perform Design Kit sync #5 for the Tabs primitive, three-tab Settings IA,
-   and `總經資料` states;
-3. open the app-wide i18n decision document; and
-4. keep Slice 5 Investor Profile UX queued until that sequencing decision is
+1. Slice 4.1 and the corrected Settings surface are LIVE;
+2. Design Kit sync #5 for the Tabs primitive, three-tab Settings IA, and
+   `總經資料` states is handed to Fable and remains separately pending;
+3. the app-wide i18n decision document is next; and
+4. Slice 5 Investor Profile UX stays queued until that sequencing decision is
    recorded.
 
 The i18n decision document owns runtime locale mechanism, locale authority,
