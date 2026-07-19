@@ -14,6 +14,7 @@ let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   if (root) {
     act(() => root!.unmount());
     root = null;
@@ -56,6 +57,12 @@ function changeInput(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
   setter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
 }
 
 describe("CredentialList", () => {
@@ -225,6 +232,48 @@ describe("CredentialList", () => {
     });
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onDelete).toHaveBeenCalledWith("local:8");
+  });
+
+  it("reports_probe_as_navigation_blocking_until_settled", async () => {
+    const response = deferred<{ ok: boolean; status: number; json: () => Promise<unknown> }>();
+    vi.stubGlobal("fetch", vi.fn(() => response.promise));
+    const onNavigationGuardChange = vi.fn();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(CredentialList, {
+        credentials: [cred({})],
+        renames: {},
+        metadataDrafts: {},
+        onRenameDraft: vi.fn(),
+        onMetadataDraft: vi.fn(),
+        onSaveCredentialDetails: vi.fn(),
+        onSetActive: vi.fn(),
+        onDelete: vi.fn(),
+        onDiscover: vi.fn(),
+        discoverLoadingId: null,
+        onNavigationGuardChange,
+      }));
+    });
+
+    await act(async () => { buttonByText("測試 token").click(); });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: false,
+      busy: true,
+      reason: "Credential 驗證正在進行。",
+    });
+    response.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({ passed: true, probes: [] }),
+    });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: false,
+      busy: false,
+      reason: null,
+    });
   });
 });
 

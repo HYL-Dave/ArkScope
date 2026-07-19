@@ -1,6 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
-  getMacroSnapshot,
   getProvidersConfig,
   getProvidersHealth,
   getSAExtensionHealth,
@@ -10,8 +9,6 @@ import {
   putSchedule,
   runScheduleNow,
   testProvider,
-  type MacroSnapshot,
-  type MacroSnapshotItem,
   type ProviderConfigEntry,
   type ProviderConfigField,
   type ProviderConfigSetupState,
@@ -41,6 +38,10 @@ import {
 import { formatSystemTimestamp } from "../timeDisplay";
 import { ConfirmDialog, StatusBadge } from "../ui";
 import { shortTs } from "./DataStorageSection";
+import {
+  CLEAR_SETTINGS_NAVIGATION_GUARD,
+  type SettingsNavigationGuardReporter,
+} from "./settingsNavigationGuard";
 
 function providerConfigSourceLabel(source: string): string {
   if (source === "app") return "App";
@@ -64,12 +65,6 @@ function formatCount(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toLocaleString("en-US")
     : "—";
-}
-
-function formatMacroValue(item: MacroSnapshotItem): string {
-  if (item.value == null || !Number.isFinite(item.value)) return "—";
-  const value = item.value.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  return item.units ? `${value} ${item.units}` : value;
 }
 
 type FredSnapshotSignal = {
@@ -113,7 +108,11 @@ function fredProviderDetail(p: ProviderHealth): string | null {
     parts.push("尚無資料");
   }
   if (snap?.latest_fetched_at) parts.push(`最後抓取 ${shortDate(snap.latest_fetched_at)}`);
-  parts.push(auto ? "自動刷新已啟用" : "自動刷新未啟用");
+  parts.push(auto === true
+    ? "自動刷新已啟用"
+    : auto === false
+      ? "自動刷新未啟用"
+      : "自動刷新狀態未知");
   return parts.join(" · ");
 }
 
@@ -141,10 +140,13 @@ function ProviderHealthState({ provider }: { provider: ProviderHealth }) {
     : <StatusBadge state={state} label={providerHealthStatusLabel(provider)} />;
 }
 
-export function DataSourcesSection() {
+export function DataSourcesSection({
+  onNavigationGuardChange,
+}: {
+  onNavigationGuardChange?: SettingsNavigationGuardReporter;
+}) {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
-  const [macroSnapshot, setMacroSnapshot] = useState<MacroSnapshot | null>(null);
   const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
@@ -165,6 +167,26 @@ export function DataSourcesSection() {
   const acceptedScheduleSequenceRef = useRef(0);
   const schedulePollInFlightRef = useRef<Promise<void> | null>(null);
   const dataSourcesMountedRef = useRef(true);
+  const dirty = Object.values(drafts).some((value) => value !== "")
+    || Object.values(keyDrafts).some((value) => value !== "")
+    || pendingGuardedEdit !== null;
+  const navigationBusy = busy !== "";
+
+  useEffect(() => {
+    onNavigationGuardChange?.({
+      dirty,
+      busy: navigationBusy,
+      reason: navigationBusy
+        ? "資料來源設定更新正在進行。"
+        : dirty
+          ? "資料來源與排程有未儲存的變更。"
+          : null,
+    });
+  }, [dirty, navigationBusy, onNavigationGuardChange]);
+
+  useEffect(() => () => {
+    onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [onNavigationGuardChange]);
 
   useEffect(() => {
     dataSourcesMountedRef.current = true;
@@ -192,8 +214,8 @@ export function DataSourcesSection() {
 
   const load = useCallback(async () => {
     const scheduleSequence = ++scheduleRequestSequenceRef.current;
-    const [rs, rh, rc, rm] = await Promise.allSettled([
-      getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot()]);
+    const [rs, rh, rc] = await Promise.allSettled([
+      getSchedule(), getProvidersHealth(), getProvidersConfig()]);
     if (!dataSourcesMountedRef.current) return;
     if (rs.status === "fulfilled") acceptSchedule(rs.value.sources, scheduleSequence);
     if (rh.status === "fulfilled") setHealth(rh.value);
@@ -201,8 +223,7 @@ export function DataSourcesSection() {
       setCfg(rc.value.providers);
       setCfgSetup(rc.value.setup);
     }
-    if (rm.status === "fulfilled") setMacroSnapshot(rm.value);
-    const bad = [rs, rh, rc, rm].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
       : null);
@@ -660,45 +681,6 @@ export function DataSourcesSection() {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </div>
-
-      <div className="settings-panel" style={{ marginTop: 16 }}>
-        <h4 className="detail-section">FRED 資料快照</h4>
-        {!macroSnapshot ? (
-          <p className="muted tiny">loading…</p>
-        ) : (
-          <>
-            <p className="muted tiny">
-              {macroSnapshot.available
-                ? `${formatCount(macroSnapshot.series_count)} 序列 · ${formatCount(macroSnapshot.observation_count)} 觀測值 · 最後抓取 ${shortDate(macroSnapshot.latest_fetched_at)} · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`
-                : `尚無資料 · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`}
-            </p>
-            {macroSnapshot.items.length > 0 ? (
-              <div className="settings-table-scroll" data-testid="fred-snapshot-scroll">
-                <table className="data-table settings-fred-table">
-                  <thead>
-                    <tr><th>指標</th><th>值</th><th>觀測日</th><th>抓取時間</th></tr>
-                  </thead>
-                  <tbody>
-                    {macroSnapshot.items.slice(0, 11).map((item) => (
-                      <tr key={item.series_id}>
-                        <td className="settings-wrap-text">
-                          {item.label}
-                          <div className="muted tiny">{item.series_id}{item.title ? ` · ${item.title}` : ""}</div>
-                        </td>
-                        <td>{formatMacroValue(item)}</td>
-                        <td>{shortDate(item.observation_date)}</td>
-                        <td>{shortDate(item.fetched_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="muted tiny">尚無可顯示的 FRED 觀測值。</p>
-            )}
           </>
         )}
       </div>

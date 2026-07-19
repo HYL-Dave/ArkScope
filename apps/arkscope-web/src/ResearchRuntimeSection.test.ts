@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResearchRuntimeSection } from "./Settings";
 import type { ResearchRuntimeSettings } from "./api";
+import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -33,6 +34,7 @@ function render(
   settings: ResearchRuntimeSettings = runtime(),
   onSave = vi.fn(),
   onReset = vi.fn(),
+  onNavigationGuardChange?: SettingsNavigationGuardReporter,
 ) {
   host = document.createElement("div");
   document.body.append(host);
@@ -43,6 +45,7 @@ function render(
       saving: false,
       onSave,
       onReset,
+      onNavigationGuardChange,
     }));
   });
   return { onSave, onReset };
@@ -96,5 +99,36 @@ describe("ResearchRuntimeSection", () => {
       reset!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
     expect(onReset).toHaveBeenCalledOnce();
+  });
+
+  it("reports_runtime_draft_dirty_and_clears_when_settings_catch_up", () => {
+    const onNavigationGuardChange = vi.fn();
+    const onSave = vi.fn();
+    const onReset = vi.fn();
+    render(runtime(), onSave, onReset, onNavigationGuardChange);
+
+    act(() => {
+      setInputValue(input("session_timeout_s"), "1200");
+    });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "AI 研究執行限制有未儲存的變更。",
+    });
+
+    act(() => {
+      root!.render(React.createElement(ResearchRuntimeSection, {
+        settings: runtime({ session_timeout_s: 1200 }),
+        saving: false,
+        onSave,
+        onReset,
+        onNavigationGuardChange,
+      }));
+    });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: false,
+      busy: false,
+      reason: null,
+    });
   });
 });

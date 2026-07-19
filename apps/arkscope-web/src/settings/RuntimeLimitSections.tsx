@@ -4,6 +4,10 @@ import type {
   FixedTaskRuntimeSettings,
   ResearchRuntimeSettings,
 } from "../api";
+import {
+  CLEAR_SETTINGS_NAVIGATION_GUARD,
+  type SettingsNavigationGuardReporter,
+} from "./settingsNavigationGuard";
 
 function runtimeSourceBadge(
   source: ResearchRuntimeSettings["source"] | FixedTaskRuntimeSettings["source"],
@@ -26,6 +30,7 @@ export function FixedTaskRuntimeSection({
   saving,
   onSave,
   onReset,
+  onNavigationGuardChange,
 }: {
   settings: FixedTaskRuntimeMap;
   saving: boolean;
@@ -36,6 +41,7 @@ export function FixedTaskRuntimeSection({
     };
   }) => void | Promise<void>;
   onReset: () => void | Promise<void>;
+  onNavigationGuardChange?: SettingsNavigationGuardReporter;
 }) {
   const [draft, setDraft] = useState({
     card_synthesis: String(settings.card_synthesis.model_timeout_s),
@@ -56,6 +62,18 @@ export function FixedTaskRuntimeSection({
   const translation = parseFixedTaskTimeout(draft.card_translation);
   const disabled = saving || synthesis == null || translation == null;
   const canReset = settings.card_synthesis.db_saved || settings.card_translation.db_saved;
+  const dirty = draft.card_synthesis !== String(settings.card_synthesis.model_timeout_s)
+    || draft.card_translation !== String(settings.card_translation.model_timeout_s);
+
+  useEffect(() => {
+    onNavigationGuardChange?.(dirty
+      ? { dirty: true, busy: false, reason: "固定 AI 任務執行限制有未儲存的變更。" }
+      : CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [dirty, onNavigationGuardChange]);
+
+  useEffect(() => () => {
+    onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [onNavigationGuardChange]);
   const rows: Array<{
     key: "card_synthesis" | "card_translation";
     label: string;
@@ -148,11 +166,13 @@ export function ResearchRuntimeSection({
   saving,
   onSave,
   onReset,
+  onNavigationGuardChange,
 }: {
   settings: ResearchRuntimeSettings;
   saving: boolean;
   onSave: (body: Pick<ResearchRuntimeSettings, "max_tool_calls" | "session_timeout_s" | "per_tool_timeout_s">) => void | Promise<void>;
   onReset: () => void | Promise<void>;
+  onNavigationGuardChange?: SettingsNavigationGuardReporter;
 }) {
   const [draft, setDraft] = useState({
     max_tool_calls: String(settings.max_tool_calls),
@@ -170,6 +190,19 @@ export function ResearchRuntimeSection({
 
   const badge = runtimeSourceBadge(settings.source);
   const disabled = saving || !draft.max_tool_calls || !draft.session_timeout_s || !draft.per_tool_timeout_s;
+  const dirty = draft.max_tool_calls !== String(settings.max_tool_calls)
+    || draft.session_timeout_s !== String(settings.session_timeout_s)
+    || draft.per_tool_timeout_s !== String(settings.per_tool_timeout_s);
+
+  useEffect(() => {
+    onNavigationGuardChange?.(dirty
+      ? { dirty: true, busy: false, reason: "AI 研究執行限制有未儲存的變更。" }
+      : CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [dirty, onNavigationGuardChange]);
+
+  useEffect(() => () => {
+    onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [onNavigationGuardChange]);
 
   return (
     <section className="settings-panel research-runtime-panel">

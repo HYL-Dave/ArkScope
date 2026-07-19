@@ -9,6 +9,7 @@ import type {
   FixedTaskRuntimeSettings,
   FixedTaskRuntimeTask,
 } from "./api";
+import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -48,6 +49,7 @@ function render(
   current = settings(),
   onSave = vi.fn(),
   onReset = vi.fn(),
+  onNavigationGuardChange?: SettingsNavigationGuardReporter,
 ) {
   host = document.createElement("div");
   document.body.append(host);
@@ -58,6 +60,7 @@ function render(
       saving: false,
       onSave,
       onReset,
+      onNavigationGuardChange,
     }));
   });
   return { onSave, onReset };
@@ -132,5 +135,36 @@ describe("FixedTaskRuntimeSection", () => {
     render();
     expect(host!.textContent).toContain("較高 effort");
     expect(host!.textContent).toContain("不會變更模型或 effort");
+  });
+
+  it("reports_runtime_draft_dirty_and_clears_when_settings_catch_up", () => {
+    const onNavigationGuardChange = vi.fn();
+    const onSave = vi.fn();
+    const onReset = vi.fn();
+    render(settings(), onSave, onReset, onNavigationGuardChange);
+
+    act(() => {
+      setInputValue(input("card_synthesis_model_timeout_s"), "1200");
+    });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "固定 AI 任務執行限制有未儲存的變更。",
+    });
+
+    act(() => {
+      root!.render(React.createElement(FixedTaskRuntimeSection, {
+        settings: settings({ model_timeout_s: 1200 }),
+        saving: false,
+        onSave,
+        onReset,
+        onNavigationGuardChange,
+      }));
+    });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: false,
+      busy: false,
+      reason: null,
+    });
   });
 });

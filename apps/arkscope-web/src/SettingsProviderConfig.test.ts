@@ -5,16 +5,17 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  getMacroSnapshot,
   getProvidersConfig,
   getProvidersHealth,
   getSchedule,
+  putProviderConfig,
   type ModelCatalog,
   type ModelTask,
   type ProvidersHealthResponse,
   type TaskRoute,
 } from "./api";
 import { formatSystemTimestamp } from "./timeDisplay";
+import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -377,40 +378,6 @@ vi.mock("./api", async (importOriginal) => {
           "check the native-host binding and retry the extension health check.",
       }],
     })),
-    getMacroSnapshot: vi.fn(async () => ({
-      available: true,
-      macro_db: "/tmp/macro_calendar.db",
-      series_count: 11,
-      observation_count: 29571,
-      release_dates_count: 4659,
-      latest_fetched_at: "2026-06-25T01:09:52Z",
-      auto_refresh_enabled: false,
-      missing_series: [],
-      items: [
-        {
-          series_id: "FEDFUNDS",
-          label: "Fed Funds",
-          title: "Federal Funds Effective Rate",
-          units: "Percent",
-          value: 5.33,
-          observation_date: "2026-06-01",
-          fetched_at: "2026-06-25T01:09:52Z",
-          realtime_start: "2026-06-01",
-          realtime_end: "9999-12-31",
-        },
-        {
-          series_id: "DGS10",
-          label: "10Y",
-          title: "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity",
-          units: "Percent",
-          value: 4.24,
-          observation_date: "2026-06-24",
-          fetched_at: "2026-06-25T01:09:52Z",
-          realtime_start: "2026-06-24",
-          realtime_end: "9999-12-31",
-        },
-      ],
-    })),
     getProvidersConfig: vi.fn(async () => mocked.providersConfig),
     importProviderConfigField: vi.fn(async (provider: string, field: string, sourceEnvVar?: string | null) => {
       mocked.importCalls.push({ provider, field, sourceEnvVar });
@@ -425,6 +392,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { SettingsView } from "./Settings";
+import { DataSourcesSection } from "./settings/DataSourcesSection";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -447,12 +415,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function renderDataSources() {
+async function renderDataSources(onNavigationGuardChange?: SettingsNavigationGuardReporter) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    root!.render(onNavigationGuardChange
+      ? React.createElement(DataSourcesSection, { onNavigationGuardChange })
+      : React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
   });
   await act(async () => { await Promise.resolve(); });
   await act(async () => { await Promise.resolve(); });
@@ -462,7 +432,24 @@ function clearDataSourceReadMocks() {
   vi.mocked(getSchedule).mockClear();
   vi.mocked(getProvidersHealth).mockClear();
   vi.mocked(getProvidersConfig).mockClear();
-  vi.mocked(getMacroSnapshot).mockClear();
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+async function waitForReport(
+  callback: ReturnType<typeof vi.fn>,
+  predicate: (report: { dirty: boolean; busy: boolean; reason: string | null }) => boolean,
+) {
+  for (let index = 0; index < 20; index += 1) {
+    const report = callback.mock.calls.at(-1)?.[0];
+    if (report && predicate(report)) return;
+    await act(async () => { await Promise.resolve(); });
+  }
+  expect(predicate(callback.mock.calls.at(-1)?.[0])).toBe(true);
 }
 
 function setInputValue(el: HTMLInputElement, value: string) {
@@ -782,16 +769,65 @@ describe("Settings provider config authority", () => {
     expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
   });
 
-  it("renders the FRED local snapshot panel", async () => {
+  it("does_not_request_or_render_the_detailed_fred_snapshot", async () => {
+    clearDataSourceReadMocks();
     await renderDataSources();
-    expect(host!.textContent).toContain("FRED 資料快照");
-    expect(host!.textContent).toContain("11 序列");
-    expect(host!.textContent).toContain("29,571 觀測值");
-    expect(host!.textContent).toContain("最後抓取 2026-06-25");
-    expect(host!.textContent).toContain("自動刷新關閉");
-    expect(host!.textContent).toContain("Fed Funds");
-    expect(host!.textContent).toContain("5.33");
-    expect(host!.textContent).toContain("2026-06-01");
+    expect(Array.from(host!.querySelectorAll("h4"))
+      .some((heading) => heading.textContent?.trim() === "FRED 資料快照")).toBe(false);
+    expect(host!.textContent).not.toContain("Fed Funds");
+    expect(host!.querySelector("[data-testid='fred-snapshot-scroll']")).toBeNull();
+    expect(getSchedule).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports_unsaved_provider_and_schedule_drafts_to_navigation_owner", async () => {
+    const onNavigationGuardChange = vi.fn();
+    await renderDataSources(onNavigationGuardChange);
+    const interval = host!.querySelector<HTMLInputElement>("input.ds-interval:not(.ds-keyinput)");
+    if (!interval) throw new Error("missing schedule interval draft");
+
+    await act(async () => { setInputValue(interval, "777"); });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "資料來源與排程有未儲存的變更。",
+    });
+    expect(JSON.stringify(onNavigationGuardChange.mock.calls)).not.toContain("777");
+
+    const providerDraft = host!.querySelector<HTMLInputElement>('input.ds-keyinput[type="password"]');
+    if (!providerDraft) throw new Error("missing provider field draft");
+    await act(async () => {
+      setInputValue(interval, "");
+      setInputValue(providerDraft, "planted-provider-secret");
+    });
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0].dirty).toBe(true);
+    expect(JSON.stringify(onNavigationGuardChange.mock.calls)).not.toContain("planted-provider-secret");
+  });
+
+  it("reports_mutations_as_navigation_blocking_and_clears_after_completion", async () => {
+    const onNavigationGuardChange = vi.fn();
+    await renderDataSources(onNavigationGuardChange);
+    const providerDraft = host!.querySelector<HTMLInputElement>('input.ds-keyinput[type="password"]');
+    if (!providerDraft) throw new Error("missing provider field draft");
+    await act(async () => { setInputValue(providerDraft, "planted-busy-secret"); });
+    const pending = deferred<Awaited<ReturnType<typeof putProviderConfig>>>();
+    vi.mocked(putProviderConfig).mockImplementationOnce(() => pending.promise);
+    const row = providerDraft.closest("tr");
+    const save = Array.from(row?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+      .find((button) => button.textContent?.trim() === "儲存");
+    if (!save) throw new Error("missing provider save button");
+
+    await act(async () => { save.click(); });
+    await waitForReport(onNavigationGuardChange, (report) => report.busy);
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: true,
+      busy: true,
+      reason: "資料來源設定更新正在進行。",
+    });
+    pending.resolve(mocked.providersConfig.providers.polygon);
+    await waitForReport(onNavigationGuardChange, (report) => !report.busy && !report.dirty);
+    expect(JSON.stringify(onNavigationGuardChange.mock.calls)).not.toContain("planted-busy-secret");
   });
 
   it("renders IBKR connection settings as one grouped block with derived ids below the client id", async () => {
@@ -809,7 +845,6 @@ describe("Settings provider config authority", () => {
     for (const id of [
       "provider-health-scroll",
       "sa-health-scroll",
-      "fred-snapshot-scroll",
       "provider-config-scroll",
       "schedule-scroll",
     ]) {
@@ -823,7 +858,7 @@ describe("Settings provider config authority", () => {
     await renderDataSources();
     const wrapCells = Array.from(host!.querySelectorAll(".settings-wrap-text"));
     expect(wrapCells.some((cell) => cell.textContent?.includes("native-host binding"))).toBe(true);
-    expect(wrapCells.some((cell) => cell.textContent?.includes("Treasury Securities"))).toBe(true);
+    expect(wrapCells.some((cell) => cell.textContent?.includes("request_id=provider-health-check"))).toBe(true);
     expect(host!.querySelector(".ds-last-run-cell.settings-wrap-text")).not.toBeNull();
   });
 
@@ -845,7 +880,6 @@ describe("Settings provider config authority", () => {
     expect(getSchedule).toHaveBeenCalledTimes(1);
     expect(getProvidersHealth).not.toHaveBeenCalled();
     expect(getProvidersConfig).not.toHaveBeenCalled();
-    expect(getMacroSnapshot).not.toHaveBeenCalled();
     expect(host!.querySelector("[aria-live]")).toBeNull();
   });
 
@@ -862,7 +896,6 @@ describe("Settings provider config authority", () => {
     expect(getSchedule).toHaveBeenCalledTimes(2);
     expect(getProvidersHealth).toHaveBeenCalledTimes(1);
     expect(getProvidersConfig).toHaveBeenCalledTimes(1);
-    expect(getMacroSnapshot).toHaveBeenCalledTimes(1);
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("IBKR 新聞"));
     expect(row?.textContent).toContain("上次成功");
@@ -911,7 +944,6 @@ describe("Settings provider config authority", () => {
     expect(getSchedule).toHaveBeenCalledTimes(2);
     expect(getProvidersHealth).toHaveBeenCalledTimes(1);
     expect(getProvidersConfig).toHaveBeenCalledTimes(1);
-    expect(getMacroSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it("coalesces timer and focus reads and preserves prior truth on poll failure", async () => {

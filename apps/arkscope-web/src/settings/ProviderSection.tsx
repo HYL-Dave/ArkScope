@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   addCredential,
   cancelOpenAIOAuth,
@@ -41,6 +41,10 @@ import {
 } from "../chatgptOAuth";
 import { formatSystemTimestamp } from "../timeDisplay";
 import { ConfirmDialog } from "../ui";
+import {
+  CLEAR_SETTINGS_NAVIGATION_GUARD,
+  type SettingsNavigationGuardReporter,
+} from "./settingsNavigationGuard";
 
 export type DiscoveryState = Partial<Record<ModelProvider, {
   loading: boolean;
@@ -61,6 +65,7 @@ export function ProviderSection({
   onDiscover,
   onClearDiscovery,
   onUseModel,
+  onNavigationGuardChange,
 }: {
   catalog: ModelCatalog;
   runtime: RuntimeConfig | null;
@@ -69,6 +74,7 @@ export function ProviderSection({
   onDiscover: (provider: ModelProvider, credentialId: string | null) => Promise<void>;
   onClearDiscovery: (provider: ModelProvider) => void;
   onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
+  onNavigationGuardChange?: SettingsNavigationGuardReporter;
 }) {
   const [selectedCreds, setSelectedCreds] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newAlias, setNewAlias] = useState<Partial<Record<ModelProvider, string>>>({});
@@ -99,6 +105,8 @@ export function ProviderSection({
   const [pollBusy, setPollBusy] = useState(false);
   const [manualBusy, setManualBusy] = useState(false);
   const [manualValue, setManualValue] = useState("");
+  const [credentialMutationCount, setCredentialMutationCount] = useState(0);
+  const [credentialProbeBusy, setCredentialProbeBusy] = useState(false);
   // ONE ChatGPT login/re-login flow at a time: :1455 is a fixed loopback port, so
   // every trigger (登入 ChatGPT / row 重新登入 / discovery reauth hint) shares this.
   const chatgptLoginBusy = pollBusy || manualBusy || oauth != null;
@@ -106,6 +114,59 @@ export function ProviderSection({
   // stops it immediately (rather than leaving it to run — and pin pollBusy — for the
   // full timeout). A per-login token object; the poll closure reads token.aborted.
   const pollToken = useRef<{ aborted: boolean }>({ aborted: false });
+
+  const onCredentialNavigationGuardChange = useCallback(
+    (guard: { busy: boolean }) => setCredentialProbeBusy(guard.busy),
+    [],
+  );
+  const providerDirty = [
+    ...Object.values(newAlias),
+    ...Object.values(newSecret),
+    claudeAlias,
+    claudeLabel,
+    claudeToken,
+    manualValue,
+  ].some((value) => value !== "")
+    || Object.keys(renames).length > 0
+    || Object.keys(metadataDrafts).length > 0
+    || Object.entries(newMakeActive).some(([provider, value]) => {
+      const credentials = catalog.credentials?.[provider as ModelProvider] ?? [];
+      return value !== defaultMakeActiveOnAdd(credentials);
+    })
+    || Object.entries(oauthMakeActive).some(([provider, value]) => {
+      const credentials = catalog.credentials?.[provider as ModelProvider] ?? [];
+      const defaultValue = provider === "anthropic" ? defaultMakeActiveOnAdd(credentials) : false;
+      return value !== defaultValue;
+    });
+  const providerBusy = credentialMutationCount > 0
+    || pollBusy
+    || manualBusy
+    || oauth !== null
+    || credentialProbeBusy;
+
+  useEffect(() => {
+    onNavigationGuardChange?.({
+      dirty: providerDirty,
+      busy: providerBusy,
+      reason: providerBusy
+        ? "Provider 登入或 Credential 更新正在進行。"
+        : providerDirty
+          ? "Provider 登入與憑證有未儲存的變更。"
+          : null,
+    });
+  }, [onNavigationGuardChange, providerBusy, providerDirty]);
+
+  useEffect(() => () => {
+    onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [onNavigationGuardChange]);
+
+  function beginCredentialMutation() {
+    setCredentialMutationCount((count) => count + 1);
+  }
+
+  function endCredentialMutation() {
+    setCredentialMutationCount((count) => Math.max(0, count - 1));
+  }
 
   async function addKey(provider: ModelProvider, makeActive: boolean) {
     const alias = (newAlias[provider] ?? "").trim();
@@ -116,6 +177,7 @@ export function ProviderSection({
     }
     setProviderErr(null);
     setProviderMsg(null);
+    beginCredentialMutation();
     try {
       await addCredential({
         provider,
@@ -130,6 +192,8 @@ export function ProviderSection({
       await onRefresh();
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      endCredentialMutation();
     }
   }
 
@@ -141,6 +205,7 @@ export function ProviderSection({
     }
     setProviderErr(null);
     setProviderMsg(null);
+    beginCredentialMutation();
     try {
       await importOAuthCredential({
         provider: "anthropic",
@@ -158,6 +223,8 @@ export function ProviderSection({
     } catch (e) {
       setClaudeToken(""); // also clear on failure — don't keep the token around
       setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      endCredentialMutation();
     }
   }
 
@@ -270,12 +337,15 @@ export function ProviderSection({
   async function setActive(credentialId: string) {
     setProviderErr(null);
     setProviderMsg(null);
+    beginCredentialMutation();
     try {
       await updateCredential(credentialId, { active: true });
       setProviderMsg("Active key 已更新。");
       await onRefresh();
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      endCredentialMutation();
     }
   }
 
@@ -287,6 +357,7 @@ export function ProviderSection({
   ) {
     setProviderErr(null);
     setProviderMsg(null);
+    beginCredentialMutation();
     try {
       const cleanAlias = alias.trim();
       const body: { alias?: string; account_label: string; expires_at?: string } = {
@@ -309,18 +380,23 @@ export function ProviderSection({
       await onRefresh();
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      endCredentialMutation();
     }
   }
 
   async function removeKey(credentialId: string) {
     setProviderErr(null);
     setProviderMsg(null);
+    beginCredentialMutation();
     try {
       await deleteCredential(credentialId);
       setProviderMsg("Credential 已刪除。");
       await onRefresh();
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      endCredentialMutation();
     }
   }
 
@@ -405,6 +481,7 @@ export function ProviderSection({
                 discoverLoadingId={discoveryState?.loading ? discoveryState.credentialId ?? null : null}
                 onRelogin={provider === "openai" ? startChatGPTRelogin : undefined}
                 reloginBusy={chatgptLoginBusy}
+                onNavigationGuardChange={onCredentialNavigationGuardChange}
               />
               {discoveryState?.result && (
                 <DiscoveryResultView
@@ -673,6 +750,7 @@ export function CredentialList({
   discoverLoadingId,
   onRelogin,
   reloginBusy,
+  onNavigationGuardChange,
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
@@ -688,6 +766,7 @@ export function CredentialList({
   // token in place. Optional so existing render sites stay valid.
   onRelogin?: (id: string) => void;
   reloginBusy?: boolean;
+  onNavigationGuardChange?: SettingsNavigationGuardReporter;
 }) {
   // Per-row probe state (claude_code_oauth only). Local — the probe result is
   // ephemeral and never leaves this view.
@@ -695,6 +774,16 @@ export function CredentialList({
   const [probeResults, setProbeResults] = useState<Record<string, ProbeResponse | { error: string }>>({});
   const [pendingDelete, setPendingDelete] = useState<ProviderCredential | null>(null);
   const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    onNavigationGuardChange?.(probing === null
+      ? CLEAR_SETTINGS_NAVIGATION_GUARD
+      : { dirty: false, busy: true, reason: "Credential 驗證正在進行。" });
+  }, [onNavigationGuardChange, probing]);
+
+  useEffect(() => () => {
+    onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [onNavigationGuardChange]);
 
   async function runProbe(id: string) {
     setProbing(id);

@@ -43,7 +43,7 @@ function catalog(): ModelCatalog {
   } as ModelCatalog;
 }
 
-function renderSection() {
+function renderSection(extra: Record<string, unknown> = {}) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -56,8 +56,32 @@ function renderSection() {
       onDiscover: vi.fn().mockResolvedValue(undefined),
       onClearDiscovery: vi.fn(),
       onUseModel: vi.fn(),
+      ...extra,
     }));
   });
+}
+
+function changeInput(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function providerCard(provider: string): HTMLElement {
+  const card = Array.from(host!.querySelectorAll<HTMLElement>(".provider-card"))
+    .find((item) => item.querySelector("h2")?.textContent === provider);
+  if (!card) throw new Error(`missing provider card ${provider}`);
+  return card;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function latestReport(callback: ReturnType<typeof vi.fn>) {
+  return callback.mock.calls.at(-1)?.[0] as { dirty: boolean; busy: boolean; reason: string | null };
 }
 
 function reloginButtons(): HTMLButtonElement[] {
@@ -145,5 +169,100 @@ describe("ProviderSection manual fallback gating (F4)", () => {
     expect(host!.textContent).toContain("已失效");
     expect(host!.textContent).not.toContain("完成登入");   // no dead-end manual form
     expect(reloginButtons().every((b) => !b.disabled)).toBe(true); // flow reset, retry allowed
+  });
+});
+
+describe("ProviderSection Settings navigation guard", () => {
+  it("reports_credential_and_oauth_form_drafts_without_exposing_secret_values", async () => {
+    const onNavigationGuardChange = vi.fn();
+    renderSection({ onNavigationGuardChange });
+    const anthropic = providerCard("anthropic");
+    const apiKey = anthropic.querySelector<HTMLInputElement>('input[type="password"]')!;
+    const alias = Array.from(anthropic.querySelectorAll<HTMLInputElement>("input"))
+      .find((input) => input.placeholder === "anthropic primary")!;
+
+    await act(async () => {
+      changeInput(alias, "planted-alias-value");
+      changeInput(apiKey, "sk-planted-secret-value");
+    });
+    expect(latestReport(onNavigationGuardChange)).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "Provider 登入與憑證有未儲存的變更。",
+    });
+    expect(JSON.stringify(onNavigationGuardChange.mock.calls)).not.toContain("planted-alias-value");
+    expect(JSON.stringify(onNavigationGuardChange.mock.calls)).not.toContain("sk-planted-secret-value");
+
+    await act(async () => {
+      changeInput(alias, "");
+      changeInput(apiKey, "");
+      const openaiToggle = Array.from(providerCard("openai").querySelectorAll("label"))
+        .find((label) => label.textContent?.includes("登入後設為 active"))
+        ?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+      openaiToggle?.click();
+    });
+    expect(latestReport(onNavigationGuardChange).dirty).toBe(true);
+  });
+
+  it("reports_oauth_and_credential_mutations_as_navigation_blocking_until_settled", async () => {
+    const credentialResponse = deferred<{ ok: boolean; status: number; json: () => Promise<unknown> }>();
+    const fetchMock = vi.fn(() => credentialResponse.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const onCredentialGuard = vi.fn();
+    renderSection({ onNavigationGuardChange: onCredentialGuard });
+    const anthropic = providerCard("anthropic");
+    const apiKey = anthropic.querySelector<HTMLInputElement>('input[type="password"]')!;
+    await act(async () => { changeInput(apiKey, "sk-planted-mutation-secret"); });
+    const addButton = Array.from(anthropic.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("新增"));
+    if (!addButton) throw new Error("missing add credential button");
+    await act(async () => { addButton.click(); });
+    expect(latestReport(onCredentialGuard)).toEqual({
+      dirty: true,
+      busy: true,
+      reason: "Provider 登入或 Credential 更新正在進行。",
+    });
+    credentialResponse.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({ credential: anthropicKey }),
+    });
+    await waitFor(() => latestReport(onCredentialGuard)?.busy === false);
+    expect(JSON.stringify(onCredentialGuard.mock.calls)).not.toContain("sk-planted-mutation-secret");
+
+    act(() => root!.unmount());
+    root = null;
+    host!.remove();
+    host = null;
+
+    const oauthStart = deferred<{ ok: boolean; status: number; json: () => Promise<unknown> }>();
+    vi.stubGlobal("open", vi.fn());
+    vi.stubGlobal("fetch", vi.fn((url: unknown) => {
+      if (String(url).includes("/oauth/start")) return oauthStart.promise;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: "error", credential: null, detail: "closed", manual_completable: false }),
+      });
+    }));
+    const onOauthGuard = vi.fn();
+    renderSection({ onNavigationGuardChange: onOauthGuard });
+    const login = Array.from(providerCard("openai").querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "登入 ChatGPT");
+    if (!login) throw new Error("missing ChatGPT login button");
+    await act(async () => { login.click(); });
+    expect(latestReport(onOauthGuard).busy).toBe(true);
+    oauthStart.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        auth_url: "https://auth.openai.com/planted-public-state",
+        state: "planted-public-state",
+        expires_at: "2026-07-20T00:00:00Z",
+        manual_code_supported: true,
+      }),
+    });
+    await waitFor(() => latestReport(onOauthGuard)?.busy === false);
+    expect(JSON.stringify(onOauthGuard.mock.calls)).not.toContain("planted-public-state");
   });
 });
