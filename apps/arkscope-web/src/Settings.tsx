@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { ChevronDown, ChevronRight, Download, Menu, Save, Upload } from "lucide-react";
+import { Download, Menu, Save, Upload } from "lucide-react";
 import {
   discoverModels,
   deleteModelRoute,
@@ -55,16 +55,30 @@ import {
 import { SettingsDirectory } from "./settings/SettingsDirectory";
 import { SettingsSectionAnchor } from "./settings/SettingsSectionAnchor";
 import {
+  CLEAR_SETTINGS_NAVIGATION_GUARD,
+  type SettingsNavigationGuard,
+} from "./settings/settingsNavigationGuard";
+import {
   SETTINGS_GROUPS,
+  firstSettingsAnchor,
   settingsGroupFor,
   type SettingsAnchorId,
   type SettingsGroupId,
 } from "./settings/settingsRegistry";
 import {
-  readCollapsedSettingsGroups,
-  writeCollapsedSettingsGroups,
+  readActiveSettingsGroup,
+  writeActiveSettingsGroup,
 } from "./settings/settingsPreferences";
-import { Button, Drawer, IconButton, PageHeader, useShellOverlay } from "./ui";
+import {
+  Button,
+  ConfirmDialog,
+  Drawer,
+  InlineAlert,
+  PageHeader,
+  Tabs,
+  useShellOverlay,
+  type TabItem,
+} from "./ui";
 
 export {
   CredentialList,
@@ -82,6 +96,20 @@ export interface SettingsViewProps {
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "settings_section" }>> | null;
 }
 
+type SettingsNavigationIntent = {
+  group: SettingsGroupId;
+  anchor: SettingsAnchorId;
+  kind: "manual_group" | "exact_anchor";
+};
+
+function firstBusyOrDirtyGuard(
+  guards: readonly SettingsNavigationGuard[],
+): SettingsNavigationGuard {
+  const busy = guards.find((guard) => guard.busy);
+  if (busy) return busy;
+  return guards.find((guard) => guard.dirty) ?? CLEAR_SETTINGS_NAVIGATION_GUARD;
+}
+
 export function SettingsView({
   runtime,
   onRuntimeChanged,
@@ -94,56 +122,116 @@ export function SettingsView({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [section, setSection] = useState<SettingsAnchorId>("models");
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<SettingsGroupId>>(
-    () => readCollapsedSettingsGroups(),
-  );
+  const [activeGroup, setActiveGroup] = useState<SettingsGroupId>(() => readActiveSettingsGroup());
+  const [section, setSection] = useState<SettingsAnchorId>(() => firstSettingsAnchor(activeGroup));
   const [directoryQuery, setDirectoryQuery] = useState("");
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [pendingReveal, setPendingReveal] = useState<SettingsAnchorId | null>(null);
+  const [pendingIntent, setPendingIntent] = useState<SettingsNavigationIntent | null>(null);
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
+  const [providerGuard, setProviderGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [fixedRuntimeGuard, setFixedRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [researchRuntimeGuard, setResearchRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [dataSourcesGuard, setDataSourcesGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [investorPotentialDirty, setInvestorPotentialDirty] = useState(false);
   const consumedNavigationSequenceRef = useRef(0);
   const directoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const aiModelsTabRef = useRef<HTMLButtonElement>(null);
+  const personalizationTabRef = useRef<HTMLButtonElement>(null);
+  const dataSyncTabRef = useRef<HTMLButtonElement>(null);
+  const dialogReturnFocusRef = useRef<HTMLElement | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryState>({});
   const [testState, setTestState] = useState<TestState>({});
   const shellOverlay = useShellOverlay();
 
-  const revealSection = useCallback((id: SettingsAnchorId) => {
-    const groupId = settingsGroupFor(id).id;
-    setCollapsedGroups((current) => {
-      if (!current.has(groupId)) return current;
-      const next = new Set(current);
-      next.delete(groupId);
-      writeCollapsedSettingsGroups(next);
-      return next;
-    });
-    setSection(id);
-    setDirectoryOpen(false);
-    setPendingReveal(id);
+  const tabRefFor = useCallback((group: SettingsGroupId) => {
+    if (group === "ai_models") return aiModelsTabRef;
+    if (group === "personalization") return personalizationTabRef;
+    return dataSyncTabRef;
   }, []);
 
-  const toggleGroup = useCallback((id: SettingsGroupId) => {
-    setCollapsedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      writeCollapsedSettingsGroups(next);
-      return next;
-    });
+  const applySettingsIntent = useCallback((intent: SettingsNavigationIntent) => {
+    setActiveGroup(intent.group);
+    writeActiveSettingsGroup(intent.group);
+    setSection(intent.anchor);
+    setDirectoryOpen(false);
+    setPendingReveal(intent.kind === "exact_anchor" ? intent.anchor : null);
+    setBlockedNotice(null);
   }, []);
+
+  const currentNavigationGuard = useCallback((): SettingsNavigationGuard => {
+    if (activeGroup === "ai_models") {
+      return firstBusyOrDirtyGuard([
+        saving
+          ? { dirty: false, busy: true, reason: "AI 與模型設定正在儲存。" }
+          : CLEAR_SETTINGS_NAVIGATION_GUARD,
+        providerGuard,
+        fixedRuntimeGuard,
+        researchRuntimeGuard,
+      ]);
+    }
+    if (activeGroup === "personalization") {
+      const investorBusy = !!document.querySelector(
+        '[data-settings-anchor="investor_profile"] .investor-profile-panel[aria-busy="true"]',
+      );
+      if (investorBusy) {
+        return { dirty: investorPotentialDirty, busy: true, reason: "投資人設定正在儲存，完成後再切換。" };
+      }
+      return investorPotentialDirty
+        ? { dirty: true, busy: false, reason: "投資人設定可能有尚未儲存的變更。" }
+        : CLEAR_SETTINGS_NAVIGATION_GUARD;
+    }
+    return dataSourcesGuard;
+  }, [
+    activeGroup,
+    dataSourcesGuard,
+    fixedRuntimeGuard,
+    investorPotentialDirty,
+    providerGuard,
+    researchRuntimeGuard,
+    saving,
+  ]);
+
+  const requestSettingsNavigation = useCallback((intent: SettingsNavigationIntent): boolean => {
+    if (intent.kind === "manual_group") setPendingReveal(null);
+    if (intent.group === activeGroup) {
+      applySettingsIntent(intent);
+      return true;
+    }
+
+    const guard = currentNavigationGuard();
+    if (guard.busy) {
+      setPendingIntent(null);
+      setBlockedNotice(guard.reason ?? "目前工作尚未完成，完成或取消後再切換設定群組。");
+      return false;
+    }
+    if (guard.dirty) {
+      dialogReturnFocusRef.current = tabRefFor(activeGroup).current;
+      setBlockedNotice(null);
+      setPendingIntent(intent);
+      return false;
+    }
+    applySettingsIntent(intent);
+    return true;
+  }, [activeGroup, applySettingsIntent, currentNavigationGuard, tabRefFor]);
+
+  const revealSection = useCallback((id: SettingsAnchorId) => requestSettingsNavigation({
+    group: settingsGroupFor(id).id,
+    anchor: id,
+    kind: "exact_anchor",
+  }), [requestSettingsNavigation]);
 
   useEffect(() => {
     if (!pendingReveal) return undefined;
-    const frame = requestAnimationFrame(() => {
-      const anchor = document.querySelector<HTMLElement>(
-        `[data-settings-anchor="${pendingReveal}"]`,
-      );
-      if (!anchor) return;
-      anchor.scrollIntoView({ block: "start" });
-      anchor.focus({ preventScroll: true });
-      setPendingReveal((current) => (current === pendingReveal ? null : current));
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [collapsedGroups, pendingReveal]);
+    if (settingsGroupFor(pendingReveal).id !== activeGroup) return;
+    const anchor = document.querySelector<HTMLElement>(
+      `[data-settings-anchor="${pendingReveal}"]`,
+    );
+    if (!anchor) return;
+    anchor.scrollIntoView({ block: "start" });
+    anchor.focus({ preventScroll: true });
+    setPendingReveal((current) => (current === pendingReveal ? null : current));
+  }, [activeGroup, pendingReveal]);
 
   useEffect(() => {
     if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
@@ -427,6 +515,7 @@ export function SettingsView({
             onDraftForTask(setDraft, task, provider, model);
             revealSection("models");
           }}
+          onNavigationGuardChange={setProviderGuard}
         />
       );
     }
@@ -568,6 +657,7 @@ export function SettingsView({
           saving={saving}
           onSave={saveFixedTaskLimits}
           onReset={resetFixedTaskLimits}
+          onNavigationGuardChange={setFixedRuntimeGuard}
         />
       ) : null;
     }
@@ -579,12 +669,22 @@ export function SettingsView({
           saving={saving}
           onSave={saveRuntimeLimits}
           onReset={resetRuntimeLimits}
+          onNavigationGuardChange={setResearchRuntimeGuard}
         />
       ) : null;
     }
 
-    if (id === "investor_profile") return <InvestorProfilePanel />;
-    if (id === "data_sources") return <DataSourcesSection />;
+    if (id === "investor_profile") {
+      const markPotentialDirty = () => setInvestorPotentialDirty(true);
+      return (
+        <div onInputCapture={markPotentialDirty} onChangeCapture={markPotentialDirty}>
+          <InvestorProfilePanel />
+        </div>
+      );
+    }
+    if (id === "data_sources") {
+      return <DataSourcesSection onNavigationGuardChange={setDataSourcesGuard} />;
+    }
     if (id === "data_storage") return <DataStorageSection />;
     if (id === "news_storage") return <NewsStorageSection />;
     return <MacroStorageSection />;
@@ -594,10 +694,29 @@ export function SettingsView({
     <SettingsDirectory
       query={directoryQuery}
       currentTarget={section}
+      activeGroup={activeGroup}
       onQueryChange={setDirectoryQuery}
       onSelect={revealSection}
     />
   );
+
+  const tabItems: readonly TabItem<SettingsGroupId>[] = SETTINGS_GROUPS.map((group) => ({
+    value: group.id,
+    label: group.title,
+    tabRef: tabRefFor(group.id),
+    panel: (
+      <div className="settings-workspace-layout">
+        {!shellOverlay ? <aside className="settings-directory-rail">{directory}</aside> : null}
+        <div className="settings-workspace-groups">
+          {group.sections.map((definition) => (
+            <SettingsSectionAnchor id={definition.id} key={definition.id}>
+              {renderSection(definition.id)}
+            </SettingsSectionAnchor>
+          ))}
+        </div>
+      </div>
+    ),
+  }));
 
   return (
     <main className="main settings-workspace" data-settings-overlay={String(shellOverlay)}>
@@ -605,6 +724,11 @@ export function SettingsView({
 
       {err && <p className="error-text">{err}</p>}
       {msg && <p className="ok-text">{msg}</p>}
+      {blockedNotice ? (
+        <InlineAlert state="blocked" title="目前無法切換設定群組">
+          {blockedNotice}
+        </InlineAlert>
+      ) : null}
       {shellOverlay ? (
         <Button
           ref={directoryTriggerRef}
@@ -618,38 +742,17 @@ export function SettingsView({
         </Button>
       ) : null}
 
-      <div className="settings-workspace-layout">
-        {!shellOverlay ? <aside className="settings-directory-rail">{directory}</aside> : null}
-        <div className="settings-workspace-groups">
-          {SETTINGS_GROUPS.map((group) => {
-            const expanded = !collapsedGroups.has(group.id);
-            return (
-              <section className="settings-workspace-group" key={group.id}>
-                <header>
-                  <h2>{group.title}</h2>
-                  <IconButton
-                    label={`${expanded ? "收合" : "展開"} ${group.title}`}
-                    tone="ghost"
-                    size="compact"
-                    icon={expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    aria-expanded={expanded}
-                    onClick={() => toggleGroup(group.id)}
-                  />
-                </header>
-                {expanded ? (
-                  <div className="settings-workspace-group-body">
-                    {group.sections.map((definition) => (
-                      <SettingsSectionAnchor id={definition.id} key={definition.id}>
-                        {renderSection(definition.id)}
-                      </SettingsSectionAnchor>
-                    ))}
-                  </div>
-                ) : null}
-              </section>
-            );
-          })}
-        </div>
-      </div>
+      <Tabs
+        className="settings-workflow-tabs"
+        ariaLabel="設定工作流程"
+        value={activeGroup}
+        items={tabItems}
+        onValueChange={(group) => requestSettingsNavigation({
+          group,
+          anchor: firstSettingsAnchor(group),
+          kind: "manual_group",
+        })}
+      />
 
       <Drawer
         open={shellOverlay && directoryOpen}
@@ -659,6 +762,26 @@ export function SettingsView({
       >
         {directory}
       </Drawer>
+
+      <ConfirmDialog
+        open={pendingIntent !== null}
+        title="捨棄未儲存的變更？"
+        consequence="切換設定群組會捨棄目前群組中尚未儲存的變更。"
+        confirmLabel="捨棄並切換"
+        returnFocusRef={dialogReturnFocusRef}
+        onCancel={() => {
+          dialogReturnFocusRef.current = tabRefFor(activeGroup).current;
+          setPendingIntent(null);
+        }}
+        onConfirm={() => {
+          if (!pendingIntent) return;
+          const intent = pendingIntent;
+          dialogReturnFocusRef.current = tabRefFor(intent.group).current;
+          if (activeGroup === "personalization") setInvestorPotentialDirty(false);
+          setPendingIntent(null);
+          applySettingsIntent(intent);
+        }}
+      />
     </main>
   );
 }

@@ -4,7 +4,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelCatalog, ModelTask, RuntimeConfig, TaskRoute } from "./api";
+import type {
+  ModelCatalog,
+  ModelDiscoveryResult,
+  ModelTask,
+  ProviderCredential,
+  RuntimeConfig,
+  TaskRoute,
+} from "./api";
 import type {
   EnabledSettingsSection,
   SettingsNavigationRequest,
@@ -15,8 +22,10 @@ import type {
 
 const controls = vi.hoisted(() => ({
   saveFixedTaskRuntime: vi.fn(async () => ({ fixed_task_runtime: {} })),
+  discoverModels: vi.fn(),
   catalogPending: null as Promise<ModelCatalog> | null,
   catalogError: null as Error | null,
+  catalogOverride: null as ModelCatalog | null,
 }));
 
 const taskRoute = (
@@ -87,8 +96,9 @@ vi.mock("./api", async (importOriginal) => {
     getModelCatalog: vi.fn(async () => {
       if (controls.catalogPending) return controls.catalogPending;
       if (controls.catalogError) throw controls.catalogError;
-      return catalog;
+      return controls.catalogOverride ?? catalog;
     }),
+    discoverModels: controls.discoverModels,
     saveFixedTaskRuntime: controls.saveFixedTaskRuntime,
   };
 });
@@ -101,6 +111,8 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   controls.catalogPending = null;
   controls.catalogError = null;
+  controls.catalogOverride = null;
+  controls.discoverModels.mockReset();
   window.localStorage.clear();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
@@ -128,6 +140,18 @@ afterEach(() => {
 
 async function flush() {
   await act(async () => { await Promise.resolve(); });
+}
+
+function tabWithText(text: string): HTMLButtonElement {
+  const tab = Array.from(host!.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    .find((candidate) => candidate.textContent?.trim() === text);
+  if (!tab) throw new Error(`missing tab: ${text}`);
+  return tab;
+}
+
+async function click(element: HTMLElement) {
+  await act(async () => element.click());
+  await flush();
 }
 
 describe("Settings model route save gate", () => {
@@ -234,6 +258,7 @@ describe("Settings model route save gate", () => {
   });
 
   it("opens an enabled section from a sequenced shell request", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
     window.localStorage.setItem("arkscope.settings.collapsedGroups.v1", '["data_sync"]');
     const dataSources = "data_sources" satisfies EnabledSettingsSection;
     const navigationRequest: SettingsNavigationRequest = {
@@ -253,7 +278,7 @@ describe("Settings model route save gate", () => {
     await flush();
 
     expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="data_sources"]'));
-    expect(window.localStorage.getItem("arkscope.settings.collapsedGroups.v1")).toBe("[]");
+    expect(window.localStorage.getItem("arkscope.settings.activeGroup.v1")).toBe("data_sync");
   });
 
   it("reapplies the same section only when its request sequence advances", async () => {
@@ -299,10 +324,12 @@ describe("Settings model route save gate", () => {
     });
     await flush();
 
-    expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
-    expect(host.querySelector('[data-settings-anchor="data_sources"]')).not.toBeNull();
     expect(host.querySelector('[data-settings-anchor="providers"]')?.textContent)
       .toContain("Loading model catalog");
+    await click(tabWithText("個人化"));
+    expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
+    await click(tabWithText("資料與同步"));
+    expect(host.querySelector('[data-settings-anchor="data_sources"]')).not.toBeNull();
   });
 
   it("catalog_failure_stays_inside_ai_group_and_preserves_other_sections", async () => {
@@ -317,9 +344,11 @@ describe("Settings model route save gate", () => {
 
     const providers = host.querySelector('[data-settings-anchor="providers"]');
     expect(providers?.textContent).toContain("無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。");
-    expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
-    expect(host.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
     expect(host.textContent).not.toContain("private catalog transport detail");
+    await click(tabWithText("個人化"));
+    expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
+    await click(tabWithText("資料與同步"));
+    expect(host.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
   });
 
   it("owns_save_in_models_and_import_export_in_a_closed_advanced_disclosure", async () => {
@@ -393,5 +422,81 @@ describe("Settings model route save gate", () => {
     expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
     await render(request(2));
     expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="research_runtime"]'));
+  });
+
+  it("preserves_model_route_drafts_across_workflow_tab_unmounts", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    });
+    await flush();
+
+    const research = host.querySelector('[data-testid="route-ai_research"]')!;
+    const anthropic = Array.from(research.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Anthropic")!;
+    await click(anthropic);
+    expect(anthropic.getAttribute("aria-pressed")).toBe("true");
+
+    await click(tabWithText("資料與同步"));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(host.querySelector('[data-testid="route-ai_research"]')).toBeNull();
+    await click(tabWithText("AI 與模型"));
+
+    const restored = host.querySelector('[data-testid="route-ai_research"]')!;
+    const restoredAnthropic = Array.from(restored.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Anthropic")!;
+    expect(restoredAnthropic.getAttribute("aria-pressed")).toBe("true");
+    expect(host.textContent).toContain("本次變更尚未儲存");
+  });
+
+  it("preserves_discovery_state_across_workflow_tab_unmounts", async () => {
+    const credential: ProviderCredential = {
+      id: "local:7",
+      provider: "openai",
+      auth_type: "api_key",
+      label: "OpenAI API",
+      account_label: null,
+      expires_at: null,
+      source: "profile_state.db",
+      available: true,
+      masked: "sk-a…AAAA",
+      active: true,
+      editable: true,
+      can_discover_models: true,
+      can_test_models: true,
+      notes: "",
+    };
+    controls.catalogOverride = {
+      ...catalog,
+      credentials: { ...catalog.credentials, openai: [credential] },
+    };
+    const discovery: ModelDiscoveryResult = {
+      provider: "openai",
+      credential_id: credential.id,
+      status: "ok",
+      models: [{ id: "gpt-discovered", provider: "openai", label: "gpt-discovered", source: "provider_api" }],
+      error: null,
+      source_url: null,
+    };
+    controls.discoverModels.mockResolvedValue(discovery);
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    });
+    await flush();
+    const discover = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "列模型")!;
+    await click(discover);
+    expect(host.textContent).toContain("gpt-discovered");
+
+    await click(tabWithText("資料與同步"));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await click(tabWithText("AI 與模型"));
+    expect(host.textContent).toContain("gpt-discovered");
   });
 });

@@ -79,6 +79,7 @@ async function flush() {
 }
 
 async function renderNewsSection() {
+  window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);

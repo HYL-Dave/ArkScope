@@ -416,6 +416,7 @@ afterEach(() => {
 });
 
 async function renderDataSources(onNavigationGuardChange?: SettingsNavigationGuardReporter) {
+  window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);

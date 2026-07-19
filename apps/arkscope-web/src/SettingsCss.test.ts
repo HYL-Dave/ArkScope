@@ -10,10 +10,12 @@ import { SETTINGS_ANCHOR_IDS } from "./settings/settingsRegistry";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const settingsPath = resolve(here, "./Settings.tsx");
 const settingsRoot = resolve(here, "./settings");
+const settingsPreferencesPath = resolve(settingsRoot, "./settingsPreferences.ts");
 const stylesCss = readFileSync(resolve(here, "./styles.css"), "utf8");
 const primitivesCss = readFileSync(resolve(here, "./ui/primitives.css"), "utf8");
 const settingsCss = readFileSync(resolve(settingsRoot, "./settings.css"), "utf8");
 const allCss = [stylesCss, primitivesCss, settingsCss].join("\n");
+const settingsSource = readFileSync(settingsPath, "utf8");
 
 function sourceFiles(root: string): string[] {
   if (!existsSync(root)) return [];
@@ -28,6 +30,7 @@ function sourceFiles(root: string): string[] {
 
 const settingsSourcePaths = [settingsPath, ...sourceFiles(settingsRoot)];
 const settingsSources = settingsSourcePaths.map((path) => readFileSync(path, "utf8")).join("\n");
+const settingsPreferencesSource = readFileSync(settingsPreferencesPath, "utf8");
 
 function literalClasses(source: string): string[] {
   return Array.from(source.matchAll(/className="([^"]+)"/g))
@@ -60,6 +63,9 @@ describe("Settings workspace CSS contract", () => {
     expect(ruleBody(".settings-workspace .provider-grid")).toMatch(/repeat\(auto-fit/);
     expect(ruleBody(".settings-workspace .credential-actions")).toMatch(/repeat\(auto-fit/);
     expect(ruleBody(".settings-workspace .runtime-limit-grid")).toMatch(/repeat\(auto-fit/);
+    expect(primitivesCss).toContain(".ui-tab-list");
+    expect(primitivesCss).toContain(".ui-tab-panel");
+    expect(settingsCss).toContain(".settings-workflow-tabs");
   });
 
   it("defines_every_literal_class_in_extracted_settings_modules", () => {
@@ -76,5 +82,10 @@ describe("Settings workspace CSS contract", () => {
     expect(settingsSources).not.toContain("window.confirm");
     expect(SETTINGS_ANCHOR_IDS).not.toContain("app_records");
     expect(SETTINGS_ANCHOR_IDS).not.toContain("permissions");
+    expect(settingsSource).not.toMatch(/readCollapsedSettingsGroups|writeCollapsedSettingsGroups/);
+    expect(settingsSource).not.toMatch(/settings-workspace-group(?=["\s])|aria-expanded/);
+    expect(settingsCss).not.toMatch(/settings-workspace-group(?=[\s.{:#,>+~\[])/);
+    expect(settingsPreferencesSource).not.toMatch(/export function (?:read|write)CollapsedSettingsGroups/);
+    expect(settingsPreferencesSource.match(/arkscope\.settings\.activeGroup\.v1/g)).toHaveLength(1);
   });
 });

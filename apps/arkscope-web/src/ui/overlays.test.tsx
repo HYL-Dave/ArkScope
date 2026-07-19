@@ -404,19 +404,32 @@ describe("overlay focus contracts", () => {
   it("confirm_dialog_cancel_does_not_confirm_and_restores_focus", async () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
+    let retarget!: () => void;
 
     function Fixture() {
       const triggerRef = useRef<HTMLButtonElement>(null);
+      const latestRef = useRef<HTMLButtonElement>(null);
+      const returnFocusRef = useRef<HTMLElement | null>(null);
       const [open, setOpen] = useState(false);
+      retarget = () => {
+        returnFocusRef.current = latestRef.current;
+      };
       return (
         <>
-          <button ref={triggerRef} onClick={() => setOpen(true)}>刪除觀察清單</button>
+          <button
+            ref={triggerRef}
+            onClick={() => {
+              returnFocusRef.current = triggerRef.current;
+              setOpen(true);
+            }}
+          >刪除觀察清單</button>
+          <button ref={latestRef}>新的返回目標</button>
           <ConfirmDialog
             open={open}
             title="刪除觀察清單"
             consequence="刪除後無法復原。"
             confirmLabel="刪除"
-            returnFocusRef={triggerRef}
+            returnFocusRef={returnFocusRef}
             onConfirm={onConfirm}
             onCancel={() => {
               onCancel();
@@ -431,13 +444,14 @@ describe("overlay focus contracts", () => {
     const trigger = document.querySelector<HTMLButtonElement>("button")!;
     trigger.focus();
     await act(async () => trigger.click());
+    act(() => retarget());
     const cancel = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent === "取消")!;
     await act(async () => cancel.click());
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(trigger);
+    expect(document.activeElement?.textContent).toBe("新的返回目標");
   });
 
   it("confirm_dialog_confirms_once_then_uses_fallback_if_the_trigger_disappears", async () => {

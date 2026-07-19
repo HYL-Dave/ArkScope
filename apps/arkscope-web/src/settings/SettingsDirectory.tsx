@@ -4,33 +4,38 @@ import { Button } from "../ui";
 import {
   SETTINGS_GROUPS,
   searchSettings,
+  settingsGroup,
   type SettingsAnchorId,
+  type SettingsGroupId,
 } from "./settingsRegistry";
 
 export function SettingsDirectory({
   query,
   currentTarget,
+  activeGroup,
   onQueryChange,
   onSelect,
 }: {
   query: string;
   currentTarget: SettingsAnchorId;
+  activeGroup: SettingsGroupId;
   onQueryChange: (query: string) => void;
   onSelect: (id: SettingsAnchorId) => void;
 }) {
-  const matches = searchSettings(query);
+  const normalizedQuery = query.normalize("NFKC").trim();
+  const matches = normalizedQuery ? searchSettings(query) : settingsGroup(activeGroup).sections;
   const matchIds = new Set(matches.map((section) => section.id));
 
   return (
     <nav className="settings-directory" aria-label="設定目錄">
       <label className="settings-directory-search">
-        <span className="ui-visually-hidden">搜尋設定</span>
+        <span className="ui-visually-hidden">搜尋所有設定</span>
         <Search size={15} aria-hidden="true" />
         <input
           type="search"
           value={query}
-          aria-label="搜尋設定"
-          placeholder="搜尋設定"
+          aria-label="搜尋所有設定"
+          placeholder="搜尋所有設定"
           onChange={(event) => onQueryChange(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || matches.length === 0) return;

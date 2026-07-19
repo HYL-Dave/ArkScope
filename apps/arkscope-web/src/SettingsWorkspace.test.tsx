@@ -6,13 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog, ModelTask, TaskRoute } from "./api";
 import type { SettingsNavigationRequest } from "./shell/navigation";
-import { SETTINGS_ANCHOR_IDS } from "./settings/settingsRegistry";
+import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
   getModelCatalog: vi.fn(),
+  dataMounts: 0,
+  dataUnmounts: 0,
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -30,13 +32,73 @@ vi.mock("./api", async (importOriginal) => {
   return { ...actual, getModelCatalog: mocks.getModelCatalog };
 });
 
-vi.mock("./InvestorProfilePanel", () => ({ InvestorProfilePanel: () => null }));
-vi.mock("./settings/DataSourcesSection", () => ({ DataSourcesSection: () => null }));
-vi.mock("./settings/DataStorageSection", () => ({ DataStorageSection: () => null }));
-vi.mock("./settings/MacroStorageSection", () => ({ MacroStorageSection: () => null }));
-vi.mock("./settings/NewsStorageSection", () => ({ NewsStorageSection: () => null }));
+vi.mock("./InvestorProfilePanel", async () => {
+  const { useState } = await import("react");
+  return {
+    InvestorProfilePanel: () => {
+      const [busy, setBusy] = useState(false);
+      return (
+        <div className="investor-profile-panel" aria-busy={busy}>
+          <label>
+            投資目標
+            <input aria-label="投資目標" defaultValue="長期成長" />
+          </label>
+          <button type="button" onClick={() => setBusy(true)}>開始儲存投資人設定</button>
+        </div>
+      );
+    },
+  };
+});
+
+vi.mock("./settings/DataSourcesSection", async () => {
+  const { useEffect } = await import("react");
+  return {
+    DataSourcesSection: ({
+      onNavigationGuardChange,
+    }: {
+      onNavigationGuardChange?: SettingsNavigationGuardReporter;
+    }) => {
+      useEffect(() => {
+        mocks.dataMounts += 1;
+        return () => {
+          mocks.dataUnmounts += 1;
+          onNavigationGuardChange?.({ dirty: false, busy: false, reason: null });
+        };
+      }, [onNavigationGuardChange]);
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => onNavigationGuardChange?.({
+              dirty: true,
+              busy: false,
+              reason: "資料來源有尚未儲存的設定。",
+            })}
+          >標記資料草稿</button>
+          <button
+            type="button"
+            onClick={() => onNavigationGuardChange?.({
+              dirty: false,
+              busy: true,
+              reason: "資料來源設定正在儲存。",
+            })}
+          >開始資料變更</button>
+        </div>
+      );
+    },
+  };
+});
+vi.mock("./settings/DataStorageSection", () => ({
+  DataStorageSection: () => <p>市場資料內容</p>,
+}));
+vi.mock("./settings/MacroStorageSection", () => ({
+  MacroStorageSection: () => <p>總經資料內容</p>,
+}));
+vi.mock("./settings/NewsStorageSection", () => ({
+  NewsStorageSection: () => <p>新聞資料內容</p>,
+}));
 vi.mock("./settings/ModelRoutingSection", () => ({
-  ModelRoutingSection: () => null,
+  ModelRoutingSection: () => <p>模型路由內容</p>,
   TASK_LABELS: {
     card_synthesis: "AI 卡片生成",
     card_translation: "卡片翻譯",
@@ -44,14 +106,37 @@ vi.mock("./settings/ModelRoutingSection", () => ({
   },
 }));
 vi.mock("./settings/ProviderSection", () => ({
-  ProviderSection: () => null,
+  ProviderSection: ({
+    onNavigationGuardChange,
+  }: {
+    onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onNavigationGuardChange?.({
+          dirty: true,
+          busy: false,
+          reason: "Provider 有尚未儲存的設定。",
+        })}
+      >標記 Provider 草稿</button>
+      <button
+        type="button"
+        onClick={() => onNavigationGuardChange?.({
+          dirty: false,
+          busy: true,
+          reason: "Provider 授權正在進行。",
+        })}
+      >開始 Provider 授權</button>
+    </div>
+  ),
   CredentialList: () => null,
   DiscoveryResultView: () => null,
   SetupDisclosure: () => null,
 }));
 vi.mock("./settings/RuntimeLimitSections", () => ({
-  FixedTaskRuntimeSection: () => null,
-  ResearchRuntimeSection: () => null,
+  FixedTaskRuntimeSection: () => <p>固定任務內容</p>,
+  ResearchRuntimeSection: () => <p>研究限制內容</p>,
 }));
 
 import { SettingsView } from "./Settings";
@@ -119,6 +204,13 @@ function buttonWithText(text: string, scope: ParentNode = document): HTMLButtonE
   return button;
 }
 
+function tabWithText(text: string): HTMLButtonElement {
+  const tab = Array.from(host!.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    .find((candidate) => candidate.textContent?.trim() === text);
+  if (!tab) throw new Error(`missing tab: ${text}`);
+  return tab;
+}
+
 async function click(element: HTMLElement) {
   await act(async () => {
     element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
@@ -127,7 +219,7 @@ async function click(element: HTMLElement) {
 }
 
 async function setSearch(value: string) {
-  const input = document.querySelector('input[aria-label="搜尋設定"]');
+  const input = document.querySelector('input[aria-label="搜尋所有設定"]');
   if (!(input instanceof HTMLInputElement)) throw new Error("missing settings search");
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
   await act(async () => {
@@ -140,19 +232,13 @@ async function setSearch(value: string) {
 beforeEach(() => {
   mocks.getModelCatalog.mockReset();
   mocks.getModelCatalog.mockResolvedValue(emptyCatalog);
+  mocks.dataMounts = 0;
+  mocks.dataUnmounts = 0;
   window.localStorage.clear();
   scrollIntoView.mockReset();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
     value: scrollIntoView,
-  });
-  Object.defineProperty(window, "requestAnimationFrame", {
-    configurable: true,
-    value: (callback: FrameRequestCallback) => window.setTimeout(() => callback(0), 0),
-  });
-  Object.defineProperty(window, "cancelAnimationFrame", {
-    configurable: true,
-    value: (handle: number) => window.clearTimeout(handle),
   });
 });
 
@@ -163,14 +249,22 @@ afterEach(() => {
 });
 
 describe("Settings workspace", () => {
-  it("renders_generic_page_header_and_all_shipped_groups_and_anchors", async () => {
+  it("renders_page_header_tabs_and_only_default_group_anchors", async () => {
     await renderSettings();
 
     expect(host!.querySelector("h1")?.textContent).toBe("設定");
-    expect(Array.from(host!.querySelectorAll(".settings-workspace-group > header h2"))
-      .map((heading) => heading.textContent)).toEqual(["AI 與模型", "個人化", "資料與同步"]);
+    expect(Array.from(host!.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent)).toEqual([
+      "AI 與模型",
+      "個人化",
+      "資料與同步",
+    ]);
     expect(Array.from(host!.querySelectorAll("[data-settings-anchor]"))
-      .map((anchor) => anchor.getAttribute("data-settings-anchor"))).toEqual(SETTINGS_ANCHOR_IDS);
+      .map((anchor) => anchor.getAttribute("data-settings-anchor"))).toEqual([
+        "providers",
+        "models",
+        "fixed_task_runtime",
+        "research_runtime",
+      ]);
   });
 
   it("omits_legacy_model_header_runtime_band_and_global_route_actions", async () => {
@@ -192,7 +286,7 @@ describe("Settings workspace", () => {
     await renderSettings();
 
     expect(host!.querySelectorAll('nav[aria-label="設定目錄"]')).toHaveLength(1);
-    expect(host!.querySelectorAll('input[aria-label="搜尋設定"]')).toHaveLength(1);
+    expect(host!.querySelectorAll('input[aria-label="搜尋所有設定"]')).toHaveLength(1);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(Array.from(host!.querySelectorAll("button")).some((node) => node.textContent === "設定目錄")).toBe(false);
   });
@@ -204,54 +298,56 @@ describe("Settings workspace", () => {
     const trigger = buttonWithText("設定目錄", host!);
     await click(trigger);
     expect(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).toHaveLength(1);
-    expect(document.querySelectorAll('input[aria-label="搜尋設定"]')).toHaveLength(1);
+    expect(document.querySelectorAll('input[aria-label="搜尋所有設定"]')).toHaveLength(1);
   });
 
-  it("collapses_persists_and_unmounts_a_group_body", async () => {
+  it("manual_tab_switch_unmounts_prior_group_and_targets_first_anchor", async () => {
     await renderSettings();
 
-    await click(document.querySelector('button[aria-label="收合 AI 與模型"]') as HTMLElement);
+    await click(tabWithText("個人化"));
     expect(host!.querySelector('[data-settings-anchor="providers"]')).toBeNull();
-    expect(host!.querySelector('[data-settings-anchor="models"]')).toBeNull();
-    expect(window.localStorage.getItem("arkscope.settings.collapsedGroups.v1")).toBe('["ai_models"]');
+    expect(host!.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
+    expect(window.localStorage.getItem("arkscope.settings.activeGroup.v1")).toBe("personalization");
+    expect(buttonWithText("投資人設定", host!.querySelector('nav[aria-label="設定目錄"]')!)
+      .getAttribute("aria-current")).toBe("location");
+    expect(document.activeElement).toBe(tabWithText("個人化"));
   });
 
-  it("restores_remembered_collapse_while_first_use_stays_expanded", async () => {
-    await renderSettings();
-    expect(host!.querySelectorAll("[data-settings-anchor]")).toHaveLength(9);
-
-    dispose();
+  it("restores_valid_active_group_and_ignores_retired_collapse_key", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
     window.localStorage.setItem("arkscope.settings.collapsedGroups.v1", '["data_sync"]');
     await renderSettings();
-    expect(host!.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
-    expect(host!.querySelector('[data-settings-anchor="data_sources"]')).toBeNull();
+
+    expect(tabWithText("資料與同步").getAttribute("aria-selected")).toBe("true");
+    expect(host!.querySelector('[data-settings-anchor="data_sources"]')).not.toBeNull();
+    expect(host!.querySelector('[data-settings-anchor="providers"]')).toBeNull();
   });
 
-  it("searches_chinese_and_english_aliases_without_filtering_page_content", async () => {
+  it("searches_all_groups_while_empty_directory_stays_in_active_group", async () => {
     await renderSettings();
-
-    await setSearch("FRED");
     const directory = host!.querySelector('nav[aria-label="設定目錄"]')!;
+
+    expect(directory.textContent).toContain("Provider 登入與憑證");
+    expect(directory.textContent).not.toContain("總經資料");
+    await setSearch("FRED");
     expect(Array.from(directory.querySelectorAll("button")).map((node) => node.textContent?.trim()))
-      .toContain("總體經濟與行事曆");
-    expect(directory.textContent).not.toContain("Provider 登入與憑證");
-    expect(host!.querySelectorAll("[data-settings-anchor]")).toHaveLength(9);
+      .toEqual(["總經資料"]);
+    expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).toBeNull();
 
     await setSearch("OAuth");
     expect(directory.textContent).toContain("Provider 登入與憑證");
   });
 
-  it("selecting_a_result_expands_scrolls_and_focuses_the_exact_anchor", async () => {
-    window.localStorage.setItem("arkscope.settings.collapsedGroups.v1", '["data_sync"]');
+  it("selecting_cross_group_result_mounts_group_then_focuses_exact_anchor", async () => {
     await renderSettings();
     await setSearch("FRED");
 
-    await click(buttonWithText("總體經濟與行事曆", host!.querySelector('nav[aria-label="設定目錄"]')!));
+    await click(buttonWithText("總經資料", host!.querySelector('nav[aria-label="設定目錄"]')!));
     const anchor = host!.querySelector('[data-settings-anchor="macro_storage"]');
     expect(anchor).not.toBeNull();
     expect(document.activeElement).toBe(anchor);
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
-    expect(window.localStorage.getItem("arkscope.settings.collapsedGroups.v1")).toBe("[]");
+    expect(window.localStorage.getItem("arkscope.settings.activeGroup.v1")).toBe("data_sync");
   });
 
   it("enter_selects_the_first_deterministic_search_result", async () => {
@@ -283,7 +379,7 @@ describe("Settings workspace", () => {
     const anchor = host!.querySelector('[data-settings-anchor="investor_profile"]');
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(anchor);
-    expect(document.querySelectorAll('input[aria-label="搜尋設定"]')).toHaveLength(0);
+    expect(document.querySelectorAll('input[aria-label="搜尋所有設定"]')).toHaveLength(0);
   });
 
   it("renders_no_empty_advanced_group_or_historical_disabled_section", async () => {
@@ -294,18 +390,102 @@ describe("Settings workspace", () => {
     expect(host!.querySelector('[data-settings-anchor="permissions"]')).toBeNull();
   });
 
-  it("exposes_compact_accessible_group_toggles_with_aria_expanded", async () => {
+  it("renders_three_workflow_tabs_with_one_selected_panel", async () => {
     await renderSettings();
-    const toggles = Array.from(host!.querySelectorAll<HTMLButtonElement>(".settings-workspace-group > header button"));
+    const tabs = Array.from(host!.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
 
-    expect(toggles.map((button) => [button.getAttribute("aria-label"), button.getAttribute("aria-expanded")]))
+    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("aria-selected"), tab.tabIndex]))
       .toEqual([
-        ["收合 AI 與模型", "true"],
-        ["收合 個人化", "true"],
-        ["收合 資料與同步", "true"],
+        ["AI 與模型", "true", 0],
+        ["個人化", "false", -1],
+        ["資料與同步", "false", -1],
       ]);
-    await click(toggles[1]);
-    expect(toggles[1].getAttribute("aria-expanded")).toBe("false");
-    expect(toggles[1].getAttribute("aria-label")).toBe("展開 個人化");
+    expect(host!.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
+    expect(tabs[0].getAttribute("aria-controls")).toBe(host!.querySelector('[role="tabpanel"]')?.id);
+  });
+
+  it("manual_tab_change_clears_stale_pending_anchor", async () => {
+    await renderSettings();
+    await setSearch("FRED");
+    await click(buttonWithText("總經資料", host!.querySelector('nav[aria-label="設定目錄"]')!));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    await click(tabWithText("AI 與模型"));
+    await click(tabWithText("資料與同步"));
+    expect(document.activeElement).toBe(tabWithText("資料與同步"));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it("navigation_target_overrides_persisted_active_group", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
+    await renderSettings({
+      navigationRequest: {
+        sequence: 1,
+        target: { kind: "settings_section", section: "data_storage" },
+      },
+    });
+
+    expect(tabWithText("資料與同步").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(host!.querySelector('[data-settings-anchor="data_storage"]'));
+  });
+
+  it("unmounts_data_sources_polling_when_leaving_data_sync", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
+    await renderSettings();
+    expect(mocks.dataMounts).toBe(1);
+    expect(mocks.dataUnmounts).toBe(0);
+
+    await click(tabWithText("AI 與模型"));
+    expect(mocks.dataUnmounts).toBe(1);
+    expect(host!.querySelector('[data-settings-anchor="data_sources"]')).toBeNull();
+  });
+
+  it("dirty_section_requires_explicit_discard_before_group_change", async () => {
+    await renderSettings();
+    await click(buttonWithText("標記 Provider 草稿", host!));
+
+    await click(tabWithText("資料與同步"));
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("捨棄未儲存的變更");
+    expect(tabWithText("AI 與模型").getAttribute("aria-selected")).toBe("true");
+    await click(buttonWithText("取消", document.querySelector('[role="dialog"]')!));
+    expect(document.activeElement).toBe(tabWithText("AI 與模型"));
+
+    await click(tabWithText("資料與同步"));
+    await click(buttonWithText("捨棄並切換", document.querySelector('[role="dialog"]')!));
+    expect(tabWithText("資料與同步").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tabWithText("資料與同步"));
+  });
+
+  it("busy_section_blocks_group_change_with_visible_reason", async () => {
+    await renderSettings();
+    await click(buttonWithText("開始 Provider 授權", host!));
+
+    await click(tabWithText("資料與同步"));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain("Provider 授權正在進行。");
+    expect(tabWithText("AI 與模型").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tabWithText("AI 與模型"));
+  });
+
+  it("investor_profile_guard_blocks_busy_and_confirms_potential_draft_without_modifying_panel", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
+    await renderSettings();
+    const input = host!.querySelector<HTMLInputElement>('input[aria-label="投資目標"]')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(input, "保守成長");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    await click(tabWithText("資料與同步"));
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("捨棄未儲存的變更");
+    await click(buttonWithText("取消", document.querySelector('[role="dialog"]')!));
+
+    await click(buttonWithText("開始儲存投資人設定", host!));
+    await click(tabWithText("資料與同步"));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain("投資人設定正在儲存");
+    expect(tabWithText("個人化").getAttribute("aria-selected")).toBe("true");
   });
 });

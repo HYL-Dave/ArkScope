@@ -20,6 +20,7 @@ type OverlayEntry = {
   initialFocusRef?: RefObject<HTMLElement | null>;
   inactiveFocusRef?: RefObject<HTMLElement | null>;
   fallbackFocusRef?: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   previous: HTMLElement | null;
 };
 
@@ -54,14 +55,21 @@ function topmostInactiveFocusTarget(): HTMLElement | null {
 }
 
 function restoreAfterRemoval(entry: OverlayEntry) {
+  const requestedReturn = entry.returnFocusRef?.current;
   const nextOverlay = topmostActiveOverlay();
   if (nextOverlay) {
     const nextContainer = nextOverlay.containerRef.current;
-    if (entry.previous?.isConnected && nextContainer?.contains(entry.previous)) {
+    if (requestedReturn?.isConnected && nextContainer?.contains(requestedReturn)) {
+      requestedReturn.focus();
+    } else if (entry.previous?.isConnected && nextContainer?.contains(entry.previous)) {
       entry.previous.focus();
     } else {
       focusOverlay(nextOverlay);
     }
+    return;
+  }
+  if (requestedReturn?.isConnected) {
+    requestedReturn.focus();
     return;
   }
   if (entry.previous?.isConnected) {
@@ -100,6 +108,7 @@ export function useOverlayFocus({
     entryRef.current.initialFocusRef = initialFocusRef;
     entryRef.current.inactiveFocusRef = inactiveFocusRef;
     entryRef.current.fallbackFocusRef = fallbackFocusRef;
+    entryRef.current.returnFocusRef = returnFocusRef;
   }
 
   useEffect(() => {
@@ -111,8 +120,8 @@ export function useOverlayFocus({
       initialFocusRef,
       inactiveFocusRef,
       fallbackFocusRef,
-      previous: returnFocusRef?.current
-        ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null),
+      returnFocusRef,
+      previous: document.activeElement instanceof HTMLElement ? document.activeElement : null,
     };
     entryRef.current = entry;
     overlayStack.push(entry);

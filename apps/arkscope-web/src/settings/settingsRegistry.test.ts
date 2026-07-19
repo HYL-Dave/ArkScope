@@ -90,8 +90,20 @@ describe("settings workspace registry", () => {
     expect(searchSettings("AI 研究").map((section) => section.id)).toEqual(["research_runtime"]);
     expect(searchSettings("投資人").map((section) => section.id)).toEqual(["investor_profile"]);
     expect(searchSettings("FRED").map((section) => section.id)).toEqual(["macro_storage"]);
+    expect(searchSettings("snapshot").map((section) => section.id)).toEqual(["macro_storage"]);
+    expect(searchSettings("series").map((section) => section.id)).toEqual(["macro_storage"]);
+    expect(searchSettings("observation").map((section) => section.id)).toEqual(["macro_storage"]);
     expect(searchSettings("Seeking Alpha").map((section) => section.id)).toEqual(["data_sources"]);
     expect(searchSettings("IBKR client id").map((section) => section.id)).toEqual(["data_sources"]);
+    expect(searchSettings("schedule").map((section) => section.id)).toEqual(["data_sources"]);
+    expect(searchSettings("health").map((section) => section.id)).toEqual(["data_sources"]);
+    expect(searchSettings("FRED snapshot").map((section) => section.id)).toEqual(["macro_storage"]);
+    expect(settingsSection("macro_storage").title).toBe("總經資料");
+    expect(settingsSection("data_sources").keywords).not.toContain("fred");
+    expect(SETTINGS_GROUPS.flatMap((group) => group.sections.map((section) => section.title)))
+      .not.toEqual(expect.arrayContaining([
+        expect.stringMatching(/Calendar|行事曆|\s·\s/),
+      ]));
   });
 
   it("returns_deterministic_static_matches_without_dynamic_values", () => {

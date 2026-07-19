@@ -149,6 +149,7 @@ afterEach(() => {
 });
 
 async function renderSettings() {
+  window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -205,15 +206,10 @@ describe("post-PG-exit storage panels", () => {
     const directory = host!.querySelector('nav[aria-label="設定目錄"]');
     expect(Array.from(directory!.querySelectorAll("button")).map((button) => button.textContent?.trim()))
       .toEqual([
-        "Provider 登入與憑證",
-        "模型與任務路由",
-        "固定 AI 任務執行限制",
-        "AI 研究執行限制",
-        "投資人設定",
         "資料來源與排程",
         "市場資料",
         "新聞資料",
-        "總體經濟與行事曆",
+        "總經資料",
       ]);
     expect(directory!.textContent).not.toMatch(/PG mirror routes|PostgreSQL exit|本地總經|一次性遷移/);
   });
