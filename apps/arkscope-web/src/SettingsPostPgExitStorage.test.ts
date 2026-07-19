@@ -160,11 +160,22 @@ async function renderSettings() {
 
 describe("post-PG-exit storage panels", () => {
   it("shows Data Storage as normal market data status", async () => {
+    mocked.marketStatus = {
+      ...marketStatus,
+      sync: {
+        ...marketStatus.sync,
+        prices: {
+          retired: true,
+          authority: "local",
+        } as unknown as MarketDataStatus["sync"]["prices"],
+      },
+    };
     await renderSettings();
 
     expect(host!.querySelector('[data-settings-anchor="data_storage"]')).not.toBeNull();
     expect(host!.textContent).toContain("市場資料 · Market Data");
     expect(host!.textContent).toContain("價格");
+    expect(host!.textContent).toContain("價格 —");
     expect(host!.textContent).toContain("財務快取");
     expect(host!.textContent).not.toMatch(
       /PG fallback|SQLite|local authority|本地市場資料庫|本地市場庫|本地路由/,

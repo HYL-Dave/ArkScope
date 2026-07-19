@@ -234,10 +234,11 @@ describe("Settings model route save gate", () => {
   });
 
   it("opens an enabled section from a sequenced shell request", async () => {
-    const providers = "providers" satisfies EnabledSettingsSection;
+    window.localStorage.setItem("arkscope.settings.collapsedGroups.v1", '["data_sync"]');
+    const dataSources = "data_sources" satisfies EnabledSettingsSection;
     const navigationRequest: SettingsNavigationRequest = {
       sequence: 1,
-      target: { kind: "settings_section", section: providers },
+      target: { kind: "settings_section", section: dataSources },
     };
     host = document.createElement("div");
     document.body.append(host);
@@ -251,7 +252,8 @@ describe("Settings model route save gate", () => {
     });
     await flush();
 
-    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="data_sources"]'));
+    expect(window.localStorage.getItem("arkscope.settings.collapsedGroups.v1")).toBe("[]");
   });
 
   it("reapplies the same section only when its request sequence advances", async () => {

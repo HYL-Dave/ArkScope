@@ -56,6 +56,10 @@ describe("Settings workspace CSS contract", () => {
     expect(ruleBody(".settings-directory-links .ui-button")).toMatch(/overflow-wrap:\s*anywhere/);
     expect(ruleBody(".settings-workspace-groups")).toMatch(/min-width:\s*0/);
     expect(ruleBody(".settings-workspace-group")).not.toMatch(/background|border-radius/);
+    expect(ruleBody(".settings-workspace .settings-grid")).toMatch(/repeat\(auto-fit/);
+    expect(ruleBody(".settings-workspace .provider-grid")).toMatch(/repeat\(auto-fit/);
+    expect(ruleBody(".settings-workspace .credential-actions")).toMatch(/repeat\(auto-fit/);
+    expect(ruleBody(".settings-workspace .runtime-limit-grid")).toMatch(/repeat\(auto-fit/);
   });
 
   it("defines_every_literal_class_in_extracted_settings_modules", () => {

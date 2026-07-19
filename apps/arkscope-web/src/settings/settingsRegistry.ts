@@ -82,7 +82,17 @@ export const SETTINGS_GROUPS: readonly SettingsGroupDefinition[] = [
         group: "data_sync",
         title: "資料來源與排程",
         description: "查看資料來源健康度、排程與瀏覽器擴充同步狀態。",
-        keywords: ["data sources", "schedule", "資料來源", "排程", "health", "seeking alpha", "sa extension"],
+        keywords: [
+          "data sources",
+          "schedule",
+          "資料來源",
+          "排程",
+          "health",
+          "seeking alpha",
+          "sa extension",
+          "ibkr client id",
+          "IBKR 用戶端 ID",
+        ],
       },
       {
         id: "data_storage",

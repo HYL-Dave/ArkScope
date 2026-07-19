@@ -17,6 +17,7 @@ function syncLine(status: MarketDataStatus): string {
   const fmt = (m: SyncMeta | null) => {
     if (!m) return "—";
     if (m.last_error) return `錯誤（${m.last_error.slice(0, 40)}）`;
+    if (!Number.isFinite(m.rows_added)) return "—";
     const ts = formatSystemTimestamp(m.last_success);
     return `+${m.rows_added.toLocaleString()} @ ${ts}`;
   };

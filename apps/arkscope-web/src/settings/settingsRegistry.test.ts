@@ -82,6 +82,7 @@ describe("settings workspace registry", () => {
     expect(searchSettings("投資人").map((section) => section.id)).toEqual(["investor_profile"]);
     expect(searchSettings("FRED").map((section) => section.id)).toEqual(["macro_storage"]);
     expect(searchSettings("Seeking Alpha").map((section) => section.id)).toEqual(["data_sources"]);
+    expect(searchSettings("IBKR client id").map((section) => section.id)).toEqual(["data_sources"]);
   });
 
   it("returns_deterministic_static_matches_without_dynamic_values", () => {

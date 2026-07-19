@@ -100,9 +100,9 @@ export function SettingsView({
   );
   const [directoryQuery, setDirectoryQuery] = useState("");
   const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [pendingReveal, setPendingReveal] = useState<SettingsAnchorId | null>(null);
   const consumedNavigationSequenceRef = useRef(0);
   const directoryTriggerRef = useRef<HTMLButtonElement>(null);
-  const revealFrameRef = useRef<number | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryState>({});
   const [testState, setTestState] = useState<TestState>({});
   const shellOverlay = useShellOverlay();
@@ -118,14 +118,7 @@ export function SettingsView({
     });
     setSection(id);
     setDirectoryOpen(false);
-    if (revealFrameRef.current != null) cancelAnimationFrame(revealFrameRef.current);
-    revealFrameRef.current = requestAnimationFrame(() => {
-      revealFrameRef.current = null;
-      const anchor = document.querySelector<HTMLElement>(`[data-settings-anchor="${id}"]`);
-      if (!anchor) return;
-      anchor.scrollIntoView({ block: "start" });
-      anchor.focus({ preventScroll: true });
-    });
+    setPendingReveal(id);
   }, []);
 
   const toggleGroup = useCallback((id: SettingsGroupId) => {
@@ -138,9 +131,19 @@ export function SettingsView({
     });
   }, []);
 
-  useEffect(() => () => {
-    if (revealFrameRef.current != null) cancelAnimationFrame(revealFrameRef.current);
-  }, []);
+  useEffect(() => {
+    if (!pendingReveal) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const anchor = document.querySelector<HTMLElement>(
+        `[data-settings-anchor="${pendingReveal}"]`,
+      );
+      if (!anchor) return;
+      anchor.scrollIntoView({ block: "start" });
+      anchor.focus({ preventScroll: true });
+      setPendingReveal((current) => (current === pendingReveal ? null : current));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [collapsedGroups, pendingReveal]);
 
   useEffect(() => {
     if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;

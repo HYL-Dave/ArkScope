@@ -102,6 +102,22 @@
   min-width: 0;
 }
 
+.settings-workspace .settings-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+}
+
+.settings-workspace .provider-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+
+.settings-workspace .credential-actions {
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+}
+
+.settings-workspace .runtime-limit-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+}
+
 .settings-model-actions {
   display: grid;
   gap: var(--space-2);
