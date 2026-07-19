@@ -1843,7 +1843,15 @@ def test_adapter_universe_unavailable_fails_loud(monkeypatch):
     import src.collectors.finnhub_news as cfn
     import src.universe_scope as universe_scope
 
-    calls = {"scope": 0, "adapter": 0, "provider": 0, "writer": 0, "subprocess": 0}
+    calls = {
+        "scope": 0,
+        "adapter": 0,
+        "provider": 0,
+        "writer": 0,
+        "json_worker": 0,
+        "prices_worker": 0,
+        "subprocess_run": 0,
+    }
 
     def _called(name):
         def _fail(*args, **kwargs):
@@ -1865,14 +1873,28 @@ def test_adapter_universe_unavailable_fails_loud(monkeypatch):
     monkeypatch.setattr(cfn, "run_incremental", _called("adapter"))
     monkeypatch.setattr("src.news_providers.make_news_provider", _called("provider"))
     monkeypatch.setattr("src.news_direct.backfill_news_direct", _called("writer"))
-    monkeypatch.setattr(ds, "_run_subprocess", _called("subprocess"))
+    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", _called("json_worker"))
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_prices_worker_subprocess",
+        _called("prices_worker"),
+    )
+    monkeypatch.setattr(ds.subprocess, "run", _called("subprocess_run"))
 
     res = ds.run_source("finnhub_news")
 
     safe_error = "active_universe_unavailable: manual_lists,sa_alpha_picks_current"
     assert res["status"] == "failed"
     assert res["error"] == safe_error
-    assert calls == {"scope": 1, "adapter": 0, "provider": 0, "writer": 0, "subprocess": 0}
+    assert calls == {
+        "scope": 1,
+        "adapter": 0,
+        "provider": 0,
+        "writer": 0,
+        "json_worker": 0,
+        "prices_worker": 0,
+        "subprocess_run": 0,
+    }
 
     durable = ds._state_store().get("finnhub_news")
     assert durable["last_status"] == "failed"
