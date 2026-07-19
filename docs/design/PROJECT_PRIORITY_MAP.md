@@ -246,20 +246,18 @@ therefore defaults to defer until the hypothesis gate exists.
   preserved the user-edited JSON in retained mode-0600 backups, imported only
   reviewed compatibility annotations, established exact 150-ticker
   DB-derived/export parity, and retired all runtime readers and writers. **P2.8
-  Slice 4 Settings workspace is FAST-FORWARD MERGED through review docs tip
-  `8a0fc9c` (reviewed product tip `2611464`), but the desktop user check rejected
-  its all-groups long-page composition. It is **NOT LIVE; its IA is superseded
-  by the adopted Slice 4.1 correction design, whose written review is APPROVED.**
-  Exact Slice 4 frontend accounting remains
-  `572 -> 606` (`+34/-0`), all
-  frontend/type/build/static/byte-identity gates are closed, and the six-size
-  real-browser gate is green after four RED-first integration repairs.
-  Independent implementation review is GREEN, merged-tree gates are green,
-  and the desktop now runs merged `master`. The Slice 4.1 implementation plan
-  is written and independently review-pending; implementation remains unopened
-  until that review clears. The app-wide i18n decision
-  follows Slice 4.1; Slice 5 remains queued. Design Kit sync #5 stays on hold
-  until the correction lands.
+  Slice 4.1 Settings navigation correction is FAST-FORWARD MERGED to `master`
+  through evidence tip `bfdc32c` (reviewed product tip `4931050`) on
+  2026-07-20.** It supersedes Slice 4's rejected all-groups long page with
+  three accessible workflow tabs and one mounted group, preserves guarded
+  drafts/in-flight work, and makes `總經資料` the sole detailed FRED owner.
+  Independent review reproduced exact frontend accounting `+42/-12`
+  (`63/606 -> 65/636`), all static and immutable byte gates, and a separate
+  41-check browser matrix. Merged-tree focused `18/164`, full `65/636`,
+  typecheck, and build are green. **The corrected Settings surface is not yet
+  marked LIVE pending the normal desktop user check.** The app-wide i18n
+  decision follows that check; Slice 5 remains queued. Design Kit sync #5 is
+  held for the same closeout.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -453,6 +451,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (P2.8 SLICE 4.1 FAST-FORWARD MERGED — DESKTOP USER CHECK PENDING)**: Independent implementation review approved product tip `4931050` after reproducing the exact `+42/-12` ledger, `65/636` frontend suite, static/immutable gates, code-level Tabs/guard/FRED contracts, and a separate 41-check responsive interaction matrix. With user approval, `master` fast-forwarded through evidence tip `bfdc32c`; merged-tree focused `18/164`, full `65/636`, typecheck, and build are green with only the existing chunk-size warning. The correction replaces the rejected all-groups Settings page with three automatic-activation workflow tabs and one mounted group, protects dirty and busy work during navigation, and gives detailed FRED state one owner under `總經資料`. LIVE status, Design Kit sync #5, and the app-wide i18n decision remain gated on the normal desktop user check; Slice 5 stays queued.
 
 - **2026-07-19 (P2.8 SLICE 4.1 WRITTEN REVIEW GREEN — IMPLEMENTATION PLAN NEXT)**: Independent full-document review approved the 4.1 correction spec and the single terminology authority after one sentence-level repair. The backend boundary is now absolute: `src/`, `data_sources/`, and all backend tests must remain byte-identical; the former open-ended “reviewed fixture adjustment” exception is removed. Every negotiated navigation, preference, Tabs, FRED-owner, honest-state, terminology, test-ledger, and six-viewport contract is otherwise unchanged. Plan review must focus on the self-added dirty-draft/in-flight guarantee: Provider OAuth and discovery, provider-config drafts, Investor Profile drafts, and runtime drafts need an explicit owner-by-owner preserve-or-block design under one-mounted-group semantics, with OAuth lifecycle treated as the highest-risk seam. Next gate is a separately reviewed Slice 4.1 implementation plan; implementation remains unopened.
 

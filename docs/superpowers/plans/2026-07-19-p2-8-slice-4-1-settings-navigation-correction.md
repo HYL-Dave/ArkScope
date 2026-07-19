@@ -9,11 +9,12 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTED FOR REVIEW — NOT MERGED
+> **Status:** FAST-FORWARD MERGED — DESKTOP USER CHECK PENDING
 >
 > Independent plan review returned GREEN on 2026-07-20 with no must-fix.
-> Implementation and local verification are complete on the isolated branch;
-> independent implementation review remains required before integration.
+> Independent implementation review returned GREEN on product tip `4931050`.
+> `master` fast-forwarded through evidence tip `bfdc32c`; merged-tree gates are
+> green, but LIVE status still requires the normal desktop user check.
 
 **Goal:** Correct the rejected Slice 4 Settings composition by replacing the
 all-groups long page with three accessible workflow tabs and one mounted group,
@@ -56,7 +57,8 @@ Dashboard/System, and browser extensions are immutable in this slice.
 | immutable/static gates | all six `git diff --exit-code f797673` gates are empty (`src data_sources tests`, `api.ts`, `Holdings.tsx`, `InvestorProfilePanel.tsx`, `Dashboard.tsx`, `extensions`); retired collapse key appears only as cleanup constant and is never read; active-group key has one owner; Macro snapshot has one production consumer; old Calendar labels, detailed Data Sources snapshot owner, Settings `window.confirm`, `aria-live`, local media queries, and 959/960/961 literals are absent; class coverage passes |
 | six-viewport interaction gate | PASS at `1440x900`, `1024x768`, `961x768`, `960x768`, `959x768`, and `390x844`; screenshots retained under `/tmp/arkscope-p2-8-s4-1-visual/shots/`; verified one mounted panel, rail/overlay exclusivity, tabs keyboard/focus, exact navigation precedence, stale-focus clearing, dirty confirm/busy veto, preserved parent state, Data Sources effect cleanup, five Macro truth states, no overlap or page overflow, and no browser exceptions; polling evidence `2 -> 2` while unmounted and `2 -> 4` after remount |
 | process cleanup | profile and Macro backup SHA-256 values were byte-identical before/after the browser gate; isolated sidecar/Vite/Chrome stopped and ports `8426/8436/9226` refuse connections; temporary SQLite copies and Chrome profile deleted; only screenshots retained |
-| independent implementation review | pending |
+| independent implementation review | GREEN on product tip `4931050`: reviewer independently reproduced `65/636`, exact `+42/-12`, all static and six immutable byte gates, code-level guard/Tabs/FRED contracts, and a separate 41-check responsive interaction matrix |
+| merge and merged-tree verification | `master` fast-forwarded `1a68c3a -> bfdc32c`; focused `18/164`, full `65/636`, typecheck, and build pass on the merged tree; only the existing chunk-size warning remains; desktop user check and LIVE closeout pending |
 
 ---
 
