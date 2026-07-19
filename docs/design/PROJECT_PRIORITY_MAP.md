@@ -249,14 +249,14 @@ therefore defaults to defer until the hypothesis gate exists.
   Slice 4 Settings workspace is FAST-FORWARD MERGED through review docs tip
   `8a0fc9c` (reviewed product tip `2611464`), but the desktop user check rejected
   its all-groups long-page composition. It is **NOT LIVE; its IA is superseded
-  by the adopted Slice 4.1 correction design, whose written review is pending.**
+  by the adopted Slice 4.1 correction design, whose written review is APPROVED.**
   Exact Slice 4 frontend accounting remains
   `572 -> 606` (`+34/-0`), all
   frontend/type/build/static/byte-identity gates are closed, and the six-size
   real-browser gate is green after four RED-first integration repairs.
   Independent implementation review is GREEN, merged-tree gates are green,
   and the desktop now runs merged `master`. The single next implementation unit
-  is Slice 4.1 after written-spec and plan review. The app-wide i18n decision
+  is Slice 4.1 after implementation-plan review. The app-wide i18n decision
   follows Slice 4.1; Slice 5 remains queued. Design Kit sync #5 stays on hold
   until the correction lands.
   The first focused irritation slice, **Models Routing UX,
@@ -452,6 +452,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (P2.8 SLICE 4.1 WRITTEN REVIEW GREEN — IMPLEMENTATION PLAN NEXT)**: Independent full-document review approved the 4.1 correction spec and the single terminology authority after one sentence-level repair. The backend boundary is now absolute: `src/`, `data_sources/`, and all backend tests must remain byte-identical; the former open-ended “reviewed fixture adjustment” exception is removed. Every negotiated navigation, preference, Tabs, FRED-owner, honest-state, terminology, test-ledger, and six-viewport contract is otherwise unchanged. Plan review must focus on the self-added dirty-draft/in-flight guarantee: Provider OAuth and discovery, provider-config drafts, Investor Profile drafts, and runtime drafts need an explicit owner-by-owner preserve-or-block design under one-mounted-group semantics, with OAuth lifecycle treated as the highest-risk seam. Next gate is a separately reviewed Slice 4.1 implementation plan; implementation remains unopened.
 
 - **2026-07-19 (P2.8 SLICE 4.1 SETTINGS NAVIGATION CORRECTION DESIGN ADOPTED — WRITTEN REVIEW PENDING)**: The desktop user check rejected Slice 4's technically valid but operationally poor all-groups long page, so Slice 4 remains merged but NOT LIVE. The adopted correction at `docs/superpowers/specs/2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md` replaces collapse with three automatic-activation workflow tabs and one mounted group, preserves nine stable anchors, keeps empty-query navigation scoped while making `搜尋所有設定` explicitly cross-group, and requires search/NavigationTarget to switch group before exact focus. It introduces shared `ui/Tabs` with Settings as first consumer while leaving Holdings byte-identical and tracking its local tablist as named debt. It also corrects FRED ownership: Data Sources retains compact provider/config health from existing payloads only, while `總經資料` becomes the sole detailed `/macro/snapshot` owner and no longer promises a Calendar feature. The retired collapse key is never read; a fail-closed active-group key replaces it. `docs/design/ARKSCOPE_TERMINOLOGY.md` is now the single terminology authority: Traditional Chinese uses natural grammar with professional English retained where translation is lossy, duplicate `譯文 · Original` labels are disallowed by default, and invisible EN aliases remain searchable. Verification must include the canonical six viewports, explicitly including 960x768. Next gate is full written-spec review, then a separately reviewed Slice 4.1 implementation plan. After 4.1, the single next design line is app-wide i18n (Shell + Settings first); Slice 5 remains queued and Design Kit sync #5 remains held.
 

@@ -6,7 +6,7 @@
 > sequence. The Claude Design companion was synchronized after approval; each
 > implementation slice still requires its own separately reviewed plan.
 > **Settings IA amendment, 2026-07-19:** Slice 4.1 replaces the rejected
-> all-groups single-page composition. Its written review is pending at
+> all-groups single-page composition. Its written review is approved at
 > `2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md`.
 
 ## 1. Purpose and Authority

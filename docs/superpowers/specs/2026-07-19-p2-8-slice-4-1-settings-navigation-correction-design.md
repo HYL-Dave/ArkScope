@@ -1,6 +1,6 @@
 # P2.8 Slice 4.1 Settings Navigation Correction Design
 
-> **Status: ADOPTED DESIGN; WRITTEN SPEC REVIEW PENDING, 2026-07-19.**
+> **Status: ADOPTED DESIGN; WRITTEN SPEC REVIEW APPROVED, 2026-07-19.**
 > This is a bounded corrective addendum to the P2.8 canonical shell and
 > interaction design. It supersedes only the Settings information-architecture
 > decisions delivered by Slice 4. All other P2.8 contracts remain in force.
@@ -415,8 +415,7 @@ The plan must cover:
 
 The implementation must prove byte identity for:
 
-- backend `src/`, `data_sources/`, and backend tests outside any explicitly
-  reviewed test-only fixture adjustment;
+- backend `src/`, `data_sources/`, and all backend tests, without exception;
 - frontend API DTO/runtime client code;
 - Holdings, including its local tabs;
 - Investor Profile;
