@@ -9,11 +9,11 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION PLAN WRITTEN; INDEPENDENT REVIEW PENDING
+> **Status:** CLEARED FOR IMPLEMENTATION
 >
-> Do not open the implementation worktree until this plan has an explicit
-> independent GREEN review and the resulting clearance commit is recorded as
-> `PLAN_REVIEW_CLEARANCE_COMMIT`.
+> Independent plan review returned GREEN on 2026-07-20 with no must-fix.
+> Record this status-change commit as `PLAN_REVIEW_CLEARANCE_COMMIT` before
+> opening the implementation worktree.
 
 **Goal:** Correct the rejected Slice 4 Settings composition by replacing the
 all-groups long page with three accessible workflow tabs and one mounted group,
@@ -43,8 +43,8 @@ Dashboard/System, and browser extensions are immutable in this slice.
 
 ## Implementation Ledger
 
-> **Not opened.** Populate only after independent plan review changes this
-> document to `CLEARED FOR IMPLEMENTATION` and records
+> **Cleared, not opened.** Populate from the isolated implementation worktree;
+> the first entry records this status-change commit as
 > `PLAN_REVIEW_CLEARANCE_COMMIT`.
 
 | Item | Evidence |
