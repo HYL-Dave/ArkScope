@@ -9,3 +9,10 @@ export {
   isUiLocale,
 } from "./locale";
 export type { UiLocale, UiLocaleCache } from "./locale";
+export { LocaleProvider, useUiLocale } from "./LocaleProvider";
+export { createUiLocaleController } from "./localeController";
+export type {
+  UiLocaleAuthority,
+  UiLocaleController,
+  UiLocaleState,
+} from "./localeController";

@@ -5,6 +5,7 @@
 // Vite dev server in a plain browser.
 
 import { SSEFrameParser, type SSEFrame } from "./sse";
+import type { UiLocale } from "./i18n/locale";
 
 export interface ApiStatus {
   status: string;
@@ -1955,6 +1956,19 @@ export function setDefaultWatchlist(
   listId: number | null,
 ): Promise<{ default_watchlist_id: number | null }> {
   return sendJSON("/profile/settings/default-watchlist", "PUT", { list_id: listId });
+}
+
+export interface UiLocaleResponse {
+  locale: UiLocale;
+  source: "default" | "stored";
+}
+
+export function getUiLocale(): Promise<UiLocaleResponse> {
+  return getJSON<UiLocaleResponse>("/profile/settings/ui-locale");
+}
+
+export function setUiLocale(locale: UiLocale): Promise<UiLocaleResponse> {
+  return sendJSON<UiLocaleResponse>("/profile/settings/ui-locale", "PUT", { locale });
 }
 
 export function setArchived(ticker: string, archived: boolean): Promise<TickerAggregate> {
