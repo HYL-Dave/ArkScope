@@ -216,6 +216,27 @@ extension are out of scope.
 
 ---
 
+## Execution Ledger
+
+```text
+PLAN_REVIEW_CLEARANCE_COMMIT: 7e56bce508e0ec74e9d74a61e0250f2dc200bb2f
+IMPLEMENTATION_BASE: 7e56bce508e0ec74e9d74a61e0250f2dc200bb2f
+IMPLEMENTATION_BRANCH: codex/p2-8-slice-4-settings
+IMPLEMENTATION_WORKTREE: /tmp/arkscope-p2-8-slice-4
+WORKTREE_MATERIALIZATION: initial checkout stopped at the known linked-worktree git-crypt smudge boundary; retry used --no-checkout, copied only .git/git-crypt/keys/default into linked Git metadata, then git read-tree -mu HEAD; final status clean
+FOCUSED_BASELINE: 15 files / 101 tests passed
+FRONTEND_BASELINE: 60 files / 572 tests passed
+TYPECHECK_BASELINE: clean
+BUILD_BASELINE: clean except the reviewed chunk-size warning (595.06 kB main bundle)
+STRUCTURAL_BASELINE: Settings.tsx 3742 lines; two window.confirm owners; settings-band/settings-nav-card/settings-section-button present
+```
+
+Product RED/GREEN commits, exact collection reconciliation, static gates, and
+browser evidence are appended here as they exist. Do not pre-fill passing
+claims.
+
+---
+
 ## File Map
 
 ### Create
