@@ -9,12 +9,14 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox syntax for tracking.
 
-> **Status:** WRITTEN IMPLEMENTATION PLAN — INDEPENDENT REVIEW PENDING
+> **Status:** CLEARED FOR IMPLEMENTATION — INDEPENDENT PLAN REVIEW GREEN,
+> 2026-07-20
 >
 > The app-wide i18n decision received independent written-review GREEN at
-> <code>ad53508</code>. This plan is not implementation clearance. Product code,
-> dependencies, and lockfiles must remain unchanged until this plan receives
-> independent review GREEN and its clearance commit is recorded below.
+> <code>ad53508</code>. Independent plan review subsequently returned GREEN
+> with no must-fix. Product implementation is authorized only from the
+> clearance commit created by this status transition and must stop at
+> review-ready before merge.
 
 **Goal:** Establish the additive I18N-0 foundation: one profile-backed locale
 authority, synchronous cache-first rendering, typed bundled resources, a
