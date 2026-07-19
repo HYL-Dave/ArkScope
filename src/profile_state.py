@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +56,29 @@ CREATE TABLE IF NOT EXISTS watchlist_memberships (
 );
 
 CREATE INDEX IF NOT EXISTS idx_membership_ticker ON watchlist_memberships(ticker);
+
+CREATE TABLE IF NOT EXISTS universe_source_memberships (
+    source_key  TEXT NOT NULL,
+    ticker      TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    archived_at TEXT,
+    PRIMARY KEY (source_key, ticker)
+);
+
+CREATE INDEX IF NOT EXISTS idx_universe_source_memberships_active
+ON universe_source_memberships(source_key, ticker)
+WHERE archived_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS universe_source_annotations (
+    source_key       TEXT NOT NULL,
+    ticker           TEXT NOT NULL,
+    annotation_key   TEXT NOT NULL,
+    annotation_value TEXT NOT NULL,
+    PRIMARY KEY (source_key, ticker, annotation_key, annotation_value)
+);
+
+CREATE INDEX IF NOT EXISTS idx_universe_source_annotations_ticker
+ON universe_source_annotations(ticker, source_key);
 
 CREATE TABLE IF NOT EXISTS ticker_notes (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,6 +122,8 @@ CREATE TABLE IF NOT EXISTS profile_settings (
 """
 
 _PRIORITIES = ("high", "medium", "low")
+_LEGACY_SOURCE_KEY = "legacy_config_seed"
+_LEGACY_ANNOTATION_KEYS = frozenset({"legacy_tier", "legacy_category"})
 
 # source families a user may edit/remove via the API; the rest are read-only
 # facts owned by import/providers.
@@ -131,6 +157,22 @@ def _infer_kind(name: str) -> str:
     if n.startswith("theme") or ":" in n:
         return "theme"
     return "custom"
+
+
+def _prettify_category_key(key: str) -> str:
+    return " ".join(
+        word.capitalize()
+        for word in str(key).replace("-", "_").split("_")
+        if word
+    )
+
+
+@dataclass(frozen=True)
+class UniverseSourceAnnotation:
+    source_key: str
+    ticker: str
+    annotation_key: str
+    annotation_value: str
 
 
 @dataclass
@@ -369,7 +411,204 @@ class ProfileStateStore:
         named = [{"name": g, "tickers": ts} for g, ts in by_group.items()]
         return self.import_lists(named)
 
+    def replace_legacy_config_import(
+        self,
+        *,
+        approved_memberships: Iterable[str],
+        annotations: Iterable[UniverseSourceAnnotation],
+    ) -> dict[str, int]:
+        """Atomically replace reviewed legacy memberships and annotations."""
+        approved_set: set[str] = set()
+        for ticker in approved_memberships:
+            normalized_ticker = _norm(ticker)
+            if not normalized_ticker:
+                raise ValueError("approved membership ticker is required")
+            approved_set.add(normalized_ticker)
+        approved = sorted(approved_set)
+
+        annotation_set: set[UniverseSourceAnnotation] = set()
+        for annotation in annotations:
+            if annotation.source_key != _LEGACY_SOURCE_KEY:
+                raise ValueError(f"source_key must be {_LEGACY_SOURCE_KEY!r}")
+            ticker = _norm(annotation.ticker)
+            if not ticker:
+                raise ValueError("annotation ticker is required")
+            key = annotation.annotation_key
+            if key not in _LEGACY_ANNOTATION_KEYS:
+                raise ValueError(f"invalid legacy annotation key: {key}")
+            value = (annotation.annotation_value or "").strip()
+            if not value:
+                raise ValueError("annotation value is required")
+            if key == "legacy_category":
+                parts = value.split("/")
+                if len(parts) != 2 or not all(part.strip() for part in parts):
+                    raise ValueError(
+                        "legacy_category must contain one nonblank tier/category path"
+                    )
+                value = "/".join(part.strip() for part in parts)
+            annotation_set.add(
+                UniverseSourceAnnotation(
+                    source_key=_LEGACY_SOURCE_KEY,
+                    ticker=ticker,
+                    annotation_key=key,
+                    annotation_value=value,
+                )
+            )
+        normalized_annotations = sorted(
+            annotation_set,
+            key=lambda row: (
+                row.source_key,
+                row.ticker,
+                row.annotation_key,
+                row.annotation_value,
+            ),
+        )
+
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                if approved:
+                    placeholders = ",".join("?" for _ in approved)
+                    archived = conn.execute(
+                        "UPDATE universe_source_memberships SET archived_at = ? "
+                        "WHERE source_key = ? AND archived_at IS NULL "
+                        f"AND ticker NOT IN ({placeholders})",
+                        (now, _LEGACY_SOURCE_KEY, *approved),
+                    )
+                else:
+                    archived = conn.execute(
+                        "UPDATE universe_source_memberships SET archived_at = ? "
+                        "WHERE source_key = ? AND archived_at IS NULL",
+                        (now, _LEGACY_SOURCE_KEY),
+                    )
+                archived_count = archived.rowcount
+
+                for ticker in approved:
+                    conn.execute(
+                        "INSERT INTO universe_source_memberships "
+                        "(source_key, ticker, created_at, archived_at) "
+                        "VALUES (?, ?, ?, NULL) "
+                        "ON CONFLICT(source_key, ticker) DO UPDATE SET archived_at = NULL",
+                        (_LEGACY_SOURCE_KEY, ticker, now),
+                    )
+
+                conn.execute(
+                    "DELETE FROM universe_source_annotations WHERE source_key = ?",
+                    (_LEGACY_SOURCE_KEY,),
+                )
+                for annotation in normalized_annotations:
+                    conn.execute(
+                        "INSERT INTO universe_source_annotations "
+                        "(source_key, ticker, annotation_key, annotation_value) "
+                        "VALUES (?, ?, ?, ?)",
+                        (
+                            annotation.source_key,
+                            annotation.ticker,
+                            annotation.annotation_key,
+                            annotation.annotation_value,
+                        ),
+                    )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+        return {
+            "memberships_active": len(approved),
+            "memberships_archived": archived_count,
+            "annotations": len(normalized_annotations),
+        }
+
     # --- reads -----------------------------------------------------------
+
+    def list_active_universe_source_memberships(
+        self, source_key: str = _LEGACY_SOURCE_KEY
+    ) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT ticker FROM universe_source_memberships "
+                "WHERE source_key = ? AND archived_at IS NULL ORDER BY ticker",
+                (source_key,),
+            ).fetchall()
+        return [row["ticker"] for row in rows]
+
+    def list_universe_source_annotations(
+        self, source_key: str = _LEGACY_SOURCE_KEY
+    ) -> list[UniverseSourceAnnotation]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT source_key, ticker, annotation_key, annotation_value "
+                "FROM universe_source_annotations WHERE source_key = ? "
+                "ORDER BY source_key, ticker, annotation_key, annotation_value",
+                (source_key,),
+            ).fetchall()
+        return [
+            UniverseSourceAnnotation(
+                source_key=row["source_key"],
+                ticker=row["ticker"],
+                annotation_key=row["annotation_key"],
+                annotation_value=row["annotation_value"],
+            )
+            for row in rows
+        ]
+
+    def legacy_annotation_tag_groups(self) -> list[dict]:
+        groups: dict[tuple[str, str, str], set[str]] = {}
+
+        def add(facet: str, value: str, ticker: str) -> None:
+            if value:
+                groups.setdefault((facet, value, "legacy"), set()).add(ticker)
+
+        for annotation in self.list_universe_source_annotations():
+            if annotation.annotation_key != "legacy_category":
+                continue
+            parts = annotation.annotation_value.split("/")
+            if len(parts) != 2 or not all(part.strip() for part in parts):
+                continue
+            category = parts[1].strip()
+            if category == "sa_alpha_picks_auto":
+                add("provenance", "Alpha Picks", annotation.ticker)
+            elif category.startswith("seeking_picks_"):
+                add("provenance", "Seeking Alpha", annotation.ticker)
+                add(
+                    "category",
+                    _prettify_category_key(category[len("seeking_picks_") :]),
+                    annotation.ticker,
+                )
+            else:
+                add("category", _prettify_category_key(category), annotation.ticker)
+
+        return [
+            {
+                "facet": facet,
+                "value": value,
+                "source": source,
+                "tickers": sorted(groups[(facet, value, source)]),
+            }
+            for facet, value, source in sorted(groups)
+        ]
+
+    def archived_list_tickers(self) -> list[str]:
+        """Tickers with list history and no active list-membership pair."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT history.ticker
+                FROM watchlist_memberships AS history
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM watchlist_memberships AS active_membership
+                    JOIN watchlists AS active_list
+                      ON active_list.id = active_membership.list_id
+                    WHERE active_membership.ticker = history.ticker
+                      AND active_membership.archived_at IS NULL
+                      AND active_list.archived_at IS NULL
+                )
+                ORDER BY history.ticker
+                """
+            ).fetchall()
+        return [row["ticker"] for row in rows]
 
     def list_watchlists(self, include_archived: bool = False) -> list[WatchlistSummary]:
         where = "" if include_archived else "WHERE w.archived_at IS NULL"
