@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CredentialList } from "./Settings";
 import type { ProviderCredential } from "./api";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
@@ -135,6 +138,93 @@ describe("CredentialList", () => {
     // the original (unlike the neighbouring account-label/expiry fields, which DO clear on save).
     // So the edit field must not borrow the add/import flow's "可留空" framing.
     expect(inputByLabel("season alias").placeholder).toBe("必填；留空則保留原名稱");
+  });
+
+  it("opens_credential_delete_confirmation_and_cancel_restores_trigger_focus", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const onDelete = vi.fn();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(CredentialList, {
+        credentials: [cred({})],
+        renames: {},
+        metadataDrafts: {},
+        onRenameDraft: vi.fn(),
+        onMetadataDraft: vi.fn(),
+        onSaveCredentialDetails: vi.fn(),
+        onSetActive: vi.fn(),
+        onDelete,
+        onDiscover: vi.fn(),
+        discoverLoadingId: null,
+      }));
+    });
+
+    const deleteTrigger = buttonByText("刪除");
+    deleteTrigger.focus();
+    await act(async () => {
+      deleteTrigger.click();
+    });
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("刪除 Credential？");
+    expect(dialog?.textContent).toContain("season");
+    expect(onDelete).not.toHaveBeenCalled();
+    const cancelButton = Array.from(dialog?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "取消") as HTMLButtonElement | undefined;
+    if (!cancelButton) throw new Error("missing credential-delete cancel button");
+    await act(async () => {
+      cancelButton.click();
+    });
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(deleteTrigger);
+  });
+
+  it("confirms_only_the_selected_credential_delete", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onDelete = vi.fn();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(CredentialList, {
+        credentials: [
+          cred({ id: "local:6", label: "season" }),
+          cred({ id: "local:8", label: "backup", active: false }),
+        ],
+        renames: {},
+        metadataDrafts: {},
+        onRenameDraft: vi.fn(),
+        onMetadataDraft: vi.fn(),
+        onSaveCredentialDetails: vi.fn(),
+        onSetActive: vi.fn(),
+        onDelete,
+        onDiscover: vi.fn(),
+        discoverLoadingId: null,
+      }));
+    });
+
+    const backupRow = Array.from(host!.querySelectorAll<HTMLElement>(".credential-row"))
+      .find((row) => row.querySelector("strong")?.textContent === "backup");
+    const deleteTrigger = Array.from(backupRow?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "刪除") as HTMLButtonElement | undefined;
+    if (!deleteTrigger) throw new Error("missing backup credential delete button");
+    await act(async () => {
+      deleteTrigger.click();
+    });
+    expect(onDelete).not.toHaveBeenCalled();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("backup");
+    expect(dialog?.textContent).not.toContain("local:8");
+    const confirmButton = Array.from(dialog?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "刪除 Credential") as HTMLButtonElement | undefined;
+    if (!confirmButton) throw new Error("missing credential-delete confirm button");
+    await act(async () => {
+      confirmButton.click();
+    });
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith("local:8");
   });
 });
 

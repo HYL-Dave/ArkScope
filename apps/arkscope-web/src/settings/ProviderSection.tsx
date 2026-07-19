@@ -40,6 +40,7 @@ import {
   probeRuntimeNote,
 } from "../chatgptOAuth";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { ConfirmDialog } from "../ui";
 
 export type DiscoveryState = Partial<Record<ModelProvider, {
   loading: boolean;
@@ -692,6 +693,8 @@ export function CredentialList({
   // ephemeral and never leaves this view.
   const [probing, setProbing] = useState<string | null>(null);
   const [probeResults, setProbeResults] = useState<Record<string, ProbeResponse | { error: string }>>({});
+  const [pendingDelete, setPendingDelete] = useState<ProviderCredential | null>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   async function runProbe(id: string) {
     setProbing(id);
@@ -845,8 +848,9 @@ export function CredentialList({
                   <button
                     type="button"
                     className="btn-ghost small danger"
-                    onClick={() => {
-                      if (window.confirm(`刪除 ${cred.label}？`)) onDelete(cred.id);
+                    onClick={(event) => {
+                      deleteTriggerRef.current = event.currentTarget;
+                      setPendingDelete(cred);
                     }}
                   >
                     刪除
@@ -858,6 +862,22 @@ export function CredentialList({
           </div>
         );
       })}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="刪除 Credential？"
+        consequence={pendingDelete
+          ? <>將移除已儲存的登入項目「<strong>{pendingDelete.label}</strong>」。</>
+          : null}
+        confirmLabel="刪除 Credential"
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const id = pendingDelete.id;
+          setPendingDelete(null);
+          onDelete(id);
+        }}
+        onCancel={() => setPendingDelete(null)}
+        returnFocusRef={deleteTriggerRef}
+      />
     </div>
   );
 }

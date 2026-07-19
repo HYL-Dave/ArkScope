@@ -39,7 +39,7 @@ import {
   type DataSourceScheduleMap,
 } from "../dataSourceSchedulePolling";
 import { formatSystemTimestamp } from "../timeDisplay";
-import { StatusBadge } from "../ui";
+import { ConfirmDialog, StatusBadge } from "../ui";
 import { shortTs } from "./DataStorageSection";
 
 function providerConfigSourceLabel(source: string): string {
@@ -153,6 +153,13 @@ export function DataSourcesSection() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
   const [testResults, setTestResults] = useState<Record<string, string>>({});
+  const [pendingGuardedEdit, setPendingGuardedEdit] = useState<{
+    provider: string;
+    field: string;
+    value: string;
+    fieldMeta: ProviderConfigField;
+  } | null>(null);
+  const guardedEditTriggerRef = useRef<HTMLButtonElement>(null);
   const scheduleRef = useRef<DataSourceScheduleMap | null>(null);
   const scheduleRequestSequenceRef = useRef(0);
   const acceptedScheduleSequenceRef = useRef(0);
@@ -318,18 +325,13 @@ export function DataSourcesSection() {
     }
   }
 
-  async function saveField(
+  async function commitField(
     provider: string,
     field: string,
     value: string | null,
     fieldMeta?: ProviderConfigField,
-  ) {
-    if (busy) return;
-    const confirmGuarded =
-      fieldMeta?.guarded && value !== null
-        ? window.confirm(fieldMeta.guard_reason ?? "此設定需要確認後才會變更。")
-        : true;
-    if (!confirmGuarded) return;
+  ): Promise<boolean> {
+    if (busy) return false;
     setBusy(`${provider}.${field}`);
     try {
       await putProviderConfig(
@@ -339,11 +341,38 @@ export function DataSourcesSection() {
       );
       setKeyDrafts((d) => ({ ...d, [`${provider}.${field}`]: "" }));
       await load();
+      return true;
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setBusy("");
     }
+  }
+
+  async function saveField(
+    provider: string,
+    field: string,
+    value: string | null,
+    fieldMeta?: ProviderConfigField,
+  ) {
+    if (busy) return;
+    if (fieldMeta?.guarded && value !== null) {
+      setPendingGuardedEdit({ provider, field, value, fieldMeta });
+      return;
+    }
+    await commitField(provider, field, value, fieldMeta);
+  }
+
+  async function confirmGuardedEdit() {
+    if (!pendingGuardedEdit || busy) return;
+    const saved = await commitField(
+      pendingGuardedEdit.provider,
+      pendingGuardedEdit.field,
+      pendingGuardedEdit.value,
+      pendingGuardedEdit.fieldMeta,
+    );
+    if (saved) setPendingGuardedEdit(null);
   }
 
   async function runTest(provider: string) {
@@ -426,7 +455,11 @@ export function DataSourcesSection() {
             }}
           />
           {draft && (
-            <button className="btn-ghost tiny" onClick={() => void saveField(pid, f.field, draft, f)}>
+            <button
+              ref={f.guarded ? guardedEditTriggerRef : undefined}
+              className="btn-ghost tiny"
+              onClick={() => void saveField(pid, f.field, draft, f)}
+            >
               儲存
             </button>
           )}
@@ -894,6 +927,20 @@ export function DataSourcesSection() {
           新觸發會顯示為已跳過，不會重複抓取。
         </p>
       </div>
+      <ConfirmDialog
+        open={pendingGuardedEdit !== null}
+        title="套用受保護的設定？"
+        consequence={
+          pendingGuardedEdit?.fieldMeta.guard_reason
+          ?? "此設定需要確認後才會變更。"
+        }
+        confirmLabel="套用變更"
+        tone="primary"
+        busy={pendingGuardedEdit !== null && busy === `${pendingGuardedEdit.provider}.${pendingGuardedEdit.field}`}
+        onConfirm={() => void confirmGuardedEdit()}
+        onCancel={() => setPendingGuardedEdit(null)}
+        returnFocusRef={guardedEditTriggerRef}
+      />
     </div>
   );
 }

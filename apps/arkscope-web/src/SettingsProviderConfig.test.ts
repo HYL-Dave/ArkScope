@@ -507,12 +507,64 @@ describe("Settings provider config authority", () => {
     await act(async () => {
       saveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mocked.putCalls.at(-1)).toEqual({
+    expect(mocked.putCalls).toHaveLength(0);
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("Changing IBKR client_id can disturb active Gateway sessions.");
+    const confirmButton = Array.from(dialog?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "套用變更");
+    if (!confirmButton) throw new Error("missing guarded-edit confirm button");
+    await act(async () => {
+      confirmButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    expect(mocked.putCalls).toEqual([{
       provider: "ibkr",
       fields: { client_id: "7" },
       confirmGuarded: { client_id: true },
+    }]);
+  });
+
+  it("cancels_a_guarded_provider_edit_without_mutation_and_restores_focus", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderDataSources();
+    const input = Array.from(host!.querySelectorAll("input")).find((node) =>
+      node.getAttribute("placeholder") === "Client ID") as HTMLInputElement | undefined;
+    if (!input) throw new Error("missing client-id input");
+    await act(async () => {
+      setInputValue(input, "7");
     });
+    const row = input.closest("tr");
+    const saveButton = Array.from(row?.querySelectorAll("button") ?? []).find((button) =>
+      button.textContent?.includes("儲存")) as HTMLButtonElement | undefined;
+    if (!saveButton) throw new Error("missing save button");
+
+    saveButton.focus();
+    await act(async () => {
+      saveButton.click();
+    });
+    let dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    const cancelButton = Array.from(dialog?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "取消") as HTMLButtonElement | undefined;
+    if (!cancelButton) throw new Error("missing guarded-edit cancel button");
+    await act(async () => {
+      cancelButton.click();
+    });
+    expect(mocked.putCalls).toHaveLength(0);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(saveButton);
+    expect(input.value).toBe("7");
+
+    await act(async () => {
+      saveButton.click();
+    });
+    dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+    expect(mocked.putCalls).toHaveLength(0);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(saveButton);
+    expect(input.value).toBe("7");
   });
 
   it("shows backend-driven derived IBKR client ids with live draft preview", async () => {
