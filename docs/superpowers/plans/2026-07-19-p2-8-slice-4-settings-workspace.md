@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 4 COMPLETE
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 5 COMPLETE
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -244,6 +244,9 @@ TASK_4_RED: five new nodes collected; catalog failure isolation and closed impor
 TASK_4_INTEGRATION: the existing workspace node that had asserted import/export buttons were globally absent was strengthened in place to require both actions exclusively inside the models anchor's closed disclosure; zero node IDs changed
 TASK_4_GREEN: SettingsModelRouting 9/9; full frontend 62 files / 600 tests; typecheck/build clean except the reviewed chunk warning (596.27 kB main bundle)
 TASK_4_PRODUCT_COMMIT: 3e3e0b1
+TASK_5_RED: four behavior failures across two files—guarded provider edits mutated before an in-app confirmation or exposed no dialog, and credential deletion either exposed no dialog or immediately deleted the selected row through window.confirm
+TASK_5_GREEN: SettingsProviderConfig + CredentialList 35/35; full frontend 62 files / 603 tests; typecheck/build clean except the reviewed chunk warning (597.11 kB main bundle); Settings production window.confirm owners reduced from two to zero
+TASK_5_PRODUCT_COMMIT: dbbeb2e
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -851,7 +854,7 @@ become exact actionable destinations.
 **Contract:** Replace both `window.confirm` calls with typed shared dialogs while
 preserving mutation payloads and preventing cancel/Escape from mutating.
 
-- [ ] **Step 1: Add/strengthen the provider-config dialog contracts**
+- [x] **Step 1: Add/strengthen the provider-config dialog contracts**
 
   Strengthen the existing
   `confirms guarded IBKR client id edits` node so Save first opens a dialog and
@@ -863,7 +866,7 @@ preserving mutation payloads and preventing cancel/Escape from mutating.
   Its cancel and Escape paths leave the draft intact, make zero PUT calls, close
   the dialog, and return focus to the Save trigger.
 
-- [ ] **Step 2: Implement pending guarded edit state**
+- [x] **Step 2: Implement pending guarded edit state**
 
   Store `{provider, field, value, fieldMeta}` only after the user clicks Save and
   assign that button to a `useRef<HTMLElement | null>` return-focus owner. Pass
@@ -873,7 +876,7 @@ preserving mutation payloads and preventing cancel/Escape from mutating.
   `putProviderConfig` path with `{[field]: true}`. Busy state disables both
   actions through the existing dialog contract.
 
-- [ ] **Step 3: Add exactly two credential-delete nodes**
+- [x] **Step 3: Add exactly two credential-delete nodes**
 
   Add:
 
@@ -883,7 +886,7 @@ preserving mutation payloads and preventing cancel/Escape from mutating.
   Use two credential rows in the second test to prove exact identity. Before
   confirmation, `onDelete` has zero calls.
 
-- [ ] **Step 4: Implement one credential delete dialog owner**
+- [x] **Step 4: Implement one credential delete dialog owner**
 
   `CredentialList` stores the selected editable credential and assigns the
   clicked button to one `useRef<HTMLElement | null>` passed as
@@ -892,7 +895,7 @@ preserving mutation payloads and preventing cancel/Escape from mutating.
   that the saved login entry is removed. Confirmation calls the unchanged
   `onDelete(id)` once and closes. Do not show credential IDs or token details.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
   Expected cumulative collection: `+31`; full frontend `603`.
 
