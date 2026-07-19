@@ -13,7 +13,11 @@ import type {
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
 
-const saveFixedTaskRuntime = vi.hoisted(() => vi.fn(async () => ({ fixed_task_runtime: {} })));
+const controls = vi.hoisted(() => ({
+  saveFixedTaskRuntime: vi.fn(async () => ({ fixed_task_runtime: {} })),
+  catalogPending: null as Promise<ModelCatalog> | null,
+  catalogError: null as Error | null,
+}));
 
 const taskRoute = (
   task: ModelTask,
@@ -80,8 +84,12 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    getModelCatalog: vi.fn(async () => catalog),
-    saveFixedTaskRuntime,
+    getModelCatalog: vi.fn(async () => {
+      if (controls.catalogPending) return controls.catalogPending;
+      if (controls.catalogError) throw controls.catalogError;
+      return catalog;
+    }),
+    saveFixedTaskRuntime: controls.saveFixedTaskRuntime,
   };
 });
 
@@ -91,6 +99,8 @@ let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
 beforeEach(() => {
+  controls.catalogPending = null;
+  controls.catalogError = null;
   window.localStorage.clear();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
@@ -145,7 +155,7 @@ describe("Settings model route save gate", () => {
   });
 
   it("wires the fixed-task panel to one atomic settings request", async () => {
-    saveFixedTaskRuntime.mockClear();
+    controls.saveFixedTaskRuntime.mockClear();
     const runtime = {
       anthropic: {
         model: "claude-sonnet-5",
@@ -214,7 +224,7 @@ describe("Settings model route save gate", () => {
     await act(async () => save.click());
     await flush();
 
-    expect(saveFixedTaskRuntime).toHaveBeenCalledWith({
+    expect(controls.saveFixedTaskRuntime).toHaveBeenCalledWith({
       tasks: {
         card_synthesis: { model_timeout_s: 1200 },
         card_translation: { model_timeout_s: 900 },
@@ -275,5 +285,111 @@ describe("Settings model route save gate", () => {
 
     await render(request(2));
     expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="models"]'));
+  });
+
+  it("catalog_loading_does_not_hide_personalization_or_data_groups", async () => {
+    controls.catalogPending = new Promise<ModelCatalog>(() => undefined);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    });
+    await flush();
+
+    expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
+    expect(host.querySelector('[data-settings-anchor="data_sources"]')).not.toBeNull();
+    expect(host.querySelector('[data-settings-anchor="providers"]')?.textContent)
+      .toContain("Loading model catalog");
+  });
+
+  it("catalog_failure_stays_inside_ai_group_and_preserves_other_sections", async () => {
+    controls.catalogError = new Error("private catalog transport detail");
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    });
+    await flush();
+
+    const providers = host.querySelector('[data-settings-anchor="providers"]');
+    expect(providers?.textContent).toContain("無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。");
+    expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
+    expect(host.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
+    expect(host.textContent).not.toContain("private catalog transport detail");
+  });
+
+  it("owns_save_in_models_and_import_export_in_a_closed_advanced_disclosure", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    });
+    await flush();
+
+    const models = host.querySelector('[data-settings-anchor="models"]')!;
+    expect(Array.from(models.querySelectorAll("button")).some((button) => button.textContent?.trim() === "儲存路由"))
+      .toBe(true);
+    const transfer = Array.from(models.querySelectorAll("details"))
+      .find((details) => details.querySelector("summary")?.textContent === "匯入與匯出");
+    expect(transfer?.open).toBe(false);
+    expect(Array.from(transfer?.querySelectorAll("button") ?? []).map((button) => button.textContent?.trim()))
+      .toEqual(["從設定檔匯入", "匯出到設定檔"]);
+    expect(host.querySelector(".ui-page-header-actions")).toBeNull();
+  });
+
+  it("opens_fixed_task_runtime_from_a_sequenced_exact_target", async () => {
+    const navigationRequest: SettingsNavigationRequest = {
+      sequence: 1,
+      target: { kind: "settings_section", section: "fixed_task_runtime" },
+    };
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        onRuntimeChanged: vi.fn(),
+        navigationRequest,
+      }));
+    });
+    await flush();
+
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="fixed_task_runtime"]'));
+  });
+
+  it("opens_research_runtime_only_when_the_request_sequence_advances", async () => {
+    const request = (sequence: number): SettingsNavigationRequest => ({
+      sequence,
+      target: { kind: "settings_section", section: "research_runtime" },
+    });
+    const render = async (navigationRequest: SettingsNavigationRequest) => {
+      await act(async () => {
+        root!.render(React.createElement(SettingsView, {
+          runtime: null,
+          onRuntimeChanged: vi.fn(),
+          navigationRequest,
+        }));
+      });
+      await flush();
+    };
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await render(request(1));
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="research_runtime"]'));
+
+    const providers = Array.from(host.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "Provider 登入與憑證") as HTMLButtonElement;
+    await act(async () => providers.click());
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
+
+    await render(request(1));
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
+    await render(request(2));
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="research_runtime"]'));
   });
 });

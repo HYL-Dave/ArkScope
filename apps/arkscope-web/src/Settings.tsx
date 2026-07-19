@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { ChevronDown, ChevronRight, Menu } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Menu, Save, Upload } from "lucide-react";
 import {
   discoverModels,
   deleteModelRoute,
@@ -89,7 +89,8 @@ export function SettingsView({
 }: SettingsViewProps) {
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [draft, setDraft] = useState<Partial<Record<ModelTask, DraftRoute>>>({});
-  const [loading, setLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogFailed, setCatalogFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -150,17 +151,17 @@ export function SettingsView({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setLoading(true);
-      setErr(null);
+      setCatalogLoading(true);
+      setCatalogFailed(false);
       try {
         const data = await getModelCatalog();
         if (cancelled) return;
         setCatalog(data);
         setDraft(fromRoutes(data.routes));
-      } catch (e) {
-        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } catch {
+        if (!cancelled) setCatalogFailed(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setCatalogLoading(false);
       }
     }
     void load();
@@ -386,7 +387,17 @@ export function SettingsView({
 
   function renderSection(id: SettingsAnchorId) {
     if (id === "providers") {
-      if (!catalog) return loading ? <p className="muted">Loading model catalog…</p> : null;
+      if (!catalog) {
+        if (catalogLoading) return <p className="muted">Loading model catalog…</p>;
+        if (catalogFailed) {
+          return (
+            <p className="error-text">
+              無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。
+            </p>
+          );
+        }
+        return null;
+      }
       return (
         <ProviderSection
           catalog={catalog}
@@ -421,15 +432,48 @@ export function SettingsView({
       if (!catalog) return null;
       return (
         <>
-          <div className="ui-action-row">
-            <Button
-              tone="primary"
-              onClick={() => void save()}
-              disabled={saving || loading || routeSaveBlocks.length > 0}
-              aria-describedby={routeSaveBlocks.length ? "route-save-blocked" : undefined}
-            >
-              {saving ? "儲存中…" : "儲存路由"}
-            </Button>
+          <div className="settings-model-actions">
+            <div className="ui-action-row">
+              <Button
+                tone="primary"
+                icon={<Save size={16} />}
+                onClick={() => void save()}
+                disabled={saving || catalogLoading || routeSaveBlocks.length > 0}
+                aria-describedby={routeSaveBlocks.length ? "route-save-blocked" : undefined}
+              >
+                {saving ? "儲存中…" : "儲存路由"}
+              </Button>
+            </div>
+            {routeSaveBlocks.length > 0 ? (
+              <p id="route-save-blocked" className="warn-text">
+                本次變更尚未儲存：請先到 Providers 完成所選 provider 的登入。
+              </p>
+            ) : null}
+            <details className="settings-model-transfer">
+              <summary>匯入與匯出</summary>
+              <div className="ui-action-row">
+                <Button
+                  tone="secondary"
+                  size="compact"
+                  icon={<Upload size={15} />}
+                  onClick={() => void importRoutes()}
+                  disabled={saving || catalogLoading}
+                  title="把設定檔（user_profile.local.yaml）裡的路由匯入成 DB 權威"
+                >
+                  從設定檔匯入
+                </Button>
+                <Button
+                  tone="secondary"
+                  size="compact"
+                  icon={<Download size={15} />}
+                  onClick={() => void exportRoutes()}
+                  disabled={saving || catalogLoading}
+                  title="把 DB 路由寫回設定檔備份（鏡像 DB 狀態：有則寫入、無則清除）"
+                >
+                  匯出到設定檔
+                </Button>
+              </div>
+            </details>
           </div>
           <ModelRoutingSection
             catalog={catalog}
@@ -558,12 +602,6 @@ export function SettingsView({
 
       {err && <p className="error-text">{err}</p>}
       {msg && <p className="ok-text">{msg}</p>}
-      {routeSaveBlocks.length > 0 && (
-        <p id="route-save-blocked" className="warn-text">
-          本次變更尚未儲存：請先到 Providers 完成所選 provider 的登入。
-        </p>
-      )}
-
       {shellOverlay ? (
         <Button
           ref={directoryTriggerRef}

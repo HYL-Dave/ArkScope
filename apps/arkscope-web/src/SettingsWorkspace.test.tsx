@@ -179,8 +179,13 @@ describe("Settings workspace", () => {
     expect(host!.querySelectorAll("h1")).toHaveLength(1);
     expect(host!.querySelector(".settings-band")).toBeNull();
     expect(host!.querySelector(".ui-page-header-actions")).toBeNull();
-    expect(buttonWithText.bind(null, "從設定檔匯入", host!)).toThrow();
-    expect(buttonWithText.bind(null, "匯出到設定檔", host!)).toThrow();
+    const models = host!.querySelector('[data-settings-anchor="models"]')!;
+    const transfer = models.querySelector("details");
+    expect(transfer?.open).toBe(false);
+    expect(buttonWithText("從設定檔匯入", transfer!)).not.toBeNull();
+    expect(buttonWithText("匯出到設定檔", transfer!)).not.toBeNull();
+    expect(host!.querySelectorAll('[data-settings-anchor]:not([data-settings-anchor="models"]) details button'))
+      .toHaveLength(0);
   });
 
   it("renders_one_persistent_searchable_directory_on_wide_screens", async () => {

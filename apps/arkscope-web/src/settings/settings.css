@@ -102,6 +102,28 @@
   min-width: 0;
 }
 
+.settings-model-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.settings-model-transfer {
+  color: var(--muted);
+}
+
+.settings-model-transfer summary {
+  width: max-content;
+  max-width: 100%;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-model-transfer[open] summary {
+  margin-bottom: var(--space-2);
+}
+
 .settings-workspace-group {
   min-width: 0;
   border-top: 1px solid var(--border);
