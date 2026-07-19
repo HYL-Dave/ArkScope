@@ -1,0 +1,51 @@
+{
+  "_description": "Synthetic legacy universe compatibility fixture",
+  "tier1_core": {
+    "_description": "Synthetic core review groups",
+    "core_platforms": {
+      "_description": "Synthetic established symbols",
+      "tickers": [
+        "AAPL",
+        "LC"
+      ]
+    },
+    "review_candidates": [
+      "ATGE"
+    ]
+  },
+  "tier2_expanded": {
+    "identity_access": {
+      "_description": "Synthetic identity software group",
+      "tickers": [
+        "OKTA"
+      ]
+    }
+  },
+  "tier3_user_watchlist": {
+    "sa_alpha_picks_auto": {
+      "_description": "Synthetic provider overlap group",
+      "tickers": [
+        "BTSG",
+        "OKTA"
+      ]
+    },
+    "seeking_picks_tech": [
+      "BTSG"
+    ]
+  },
+  "legacy_reference": {
+    "_description": "Synthetic reference-only group",
+    "tickers": [
+      "WBA"
+    ]
+  },
+  "settings": {
+    "default_tier": "tier1_core",
+    "include_tier2": true,
+    "include_tier3": true,
+    "include_etf_benchmarks": true,
+    "auto_expand_on_capacity": false,
+    "max_tickers_per_request": 50,
+    "news_lookback_days": 30
+  }
+}
