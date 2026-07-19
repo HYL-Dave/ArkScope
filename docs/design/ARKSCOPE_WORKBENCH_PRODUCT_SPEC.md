@@ -59,7 +59,8 @@ Watchlist, and Holdings. This Product Spec does not duplicate that table.
 
 English and Traditional Chinese remain target interfaces. Runtime locale
 selection and string externalization are owned by the separately sequenced
-i18n decision, not by this product-definition section.
+[`app-wide i18n decision`](../superpowers/specs/2026-07-20-app-wide-i18n-decision.md),
+not by this product-definition section.
 
 ---
 

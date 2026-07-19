@@ -473,7 +473,7 @@ Closeout status after implementation and user verification:
 
 1. Slice 4.1 and the corrected Settings surface are LIVE;
 2. Design Kit sync #5 for the Tabs primitive, three-tab Settings IA, and
-   `總經資料` states is handed to Fable and remains separately pending;
+   `總經資料` states is complete;
 3. the app-wide i18n decision document is next; and
 4. Slice 5 Investor Profile UX stays queued until that sequencing decision is
    recorded.

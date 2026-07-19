@@ -1,7 +1,8 @@
 # ArkScope Terminology and Language Policy
 
 > **Status: ADOPTED TERMINOLOGY POLICY; WRITTEN REVIEW APPROVED WITH P2.8
-> SLICE 4.1, 2026-07-19.**
+> SLICE 4.1, 2026-07-19; APP-WIDE I18N AUTONYM ADDENDUM WRITTEN REVIEW
+> PENDING, 2026-07-20.**
 > This is the single repository authority for product-facing English and
 > Traditional Chinese terminology. Other documents link here instead of
 > copying canonical term tables.
@@ -65,6 +66,13 @@ A visible label must not repeat one concept as `譯文 · Original`,
 Parallel bilingual display is allowed only for a case-specific product need
 with its reason recorded in the owning design. It is not a global display mode.
 
+Recorded exception: after the app-wide i18n release gate passes, the Settings
+PageHeader language selector may show `繁體中文` and `English` together as
+locale autonyms. The options remain self-named regardless of the current
+locale so a user can always recognize the return path. This exception applies
+only to the selector options and does not authorize duplicate bilingual labels
+elsewhere.
+
 ### 2.6 Search aliases need not be visible
 
 English and Traditional Chinese aliases may be indexed in registry keywords or
@@ -121,5 +129,7 @@ aliases.
 5. A proposed bilingual-label exception records its audience and reason in the
    owning design before implementation.
 
-The future i18n decision may add locale-specific string keys and translation
-workflow metadata, but it does not create a competing terminology table.
+The app-wide i18n decision at
+[`2026-07-20-app-wide-i18n-decision.md`](../superpowers/specs/2026-07-20-app-wide-i18n-decision.md)
+may add locale-specific string keys and translation workflow metadata, but it
+does not create a competing terminology table.
