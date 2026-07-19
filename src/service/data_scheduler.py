@@ -84,9 +84,7 @@ class SourceDef:
     default_interval_min: int = 60
     description: str = ""
     # Pass the ACTIVE UNIVERSE (profile DB, read-only) as the explicit ticker
-    # list — the collectors' own default is the LEGACY config/tickers_core.json
-    # tiers; the universe is the in-app authority (best-effort: falls back to the
-    # collector default with a warning when the profile DB is unavailable).
+    # list; the universe is the in-app authority.
     universe_tickers: bool = False
     # In-process provider adapter: (module, function) resolved lazily at run time.
     # The news collectors are import-safe modules now — calling run_incremental()

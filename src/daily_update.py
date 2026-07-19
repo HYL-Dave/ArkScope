@@ -17,7 +17,7 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
     # 查看所有資料狀態
     python -m src.daily_update --status
 
-    # 更新所有新聞 (顯式 scope 必填——tickers_core.json 已非 runtime 預設)
+    # 更新所有新聞 (顯式 scope 必填)
     python -m src.daily_update --news --scope active-universe
 
     # 更新所有新聞 + 股價 (--all 不含 IV)
@@ -448,10 +448,7 @@ Note: IBKR sources require TWS/Gateway running.
       scheduler skips the run instead of double-fetching; IBKR serializes.
       Without --sync-db a run is TRUE collect-only (Parquet only — no PG sync,
       no local-mirror refresh).
-      Explicit scope (--tickers / --scope active-universe) is required —
-      config/tickers_core.json serves no runtime default in this path (legacy
-      touchpoints remain elsewhere: SA native-host ticker sync writes tier3;
-      orphan collectors + --tier debug flags still read it).
+      Explicit scope (--tickers / --scope active-universe) is required.
         """
     )
 
@@ -546,7 +543,7 @@ Note: IBKR sources require TWS/Gateway running.
         else:
             logger.error(
                 "explicit ticker scope required: --tickers A,B,... or --scope "
-                "active-universe (config/tickers_core.json is no longer a runtime default)")
+                "active-universe (reads the local profile DB read-only)")
             sys.exit(1)
 
     start_time = datetime.now()

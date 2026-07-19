@@ -31,7 +31,7 @@ Finnhub 特點:
     python -m src.collectors.finnhub_news --tickers GM,NEM,AFRM
 
 重要限制:
-    --incremental 使用全域最新 timestamp 作為起始點，新加入 tickers_core.json
+    --incremental 使用全域最新 timestamp 作為起始點，新加入追蹤範圍
     的 ticker 不會自動補抓歷史。但因 Finnhub 只提供 ~7 天歷史，影響有限。
     補抓方式: --tickers <新ticker> (會抓最近 7 天)
 """
@@ -463,8 +463,7 @@ def _scope_error(prog: str) -> RuntimeError:
     return RuntimeError(
         "explicit ticker scope required: --tickers AAPL,MSFT,... or --scope "
         "active-universe (reads the local profile DB read-only). "
-        "config/tickers_core.json is a bootstrap/seed file, no longer a runtime "
-        f"default. Example: python {prog} --incremental --scope active-universe")
+        f"Example: python {prog} --incremental --scope active-universe")
 
 
 def load_tickers(tickers_arg: Optional[str] = None,
@@ -472,8 +471,7 @@ def load_tickers(tickers_arg: Optional[str] = None,
     """Resolve the EXPLICIT ticker scope (3e-E, aligned with daily_update's Q7
     lock: no implicit universe guessing). ``tickers_arg`` = comma-separated
     list; ``scope='active-universe'`` = the local profile DB (read-only), the
-    in-app authority. Bare calls raise — the legacy tickers_core.json tiers
-    default is retired from runtime."""
+    in-app authority. Bare calls raise when no explicit scope is supplied."""
     if tickers_arg:
         return [t.strip().upper() for t in tickers_arg.split(',') if t.strip()]
     if scope == "active-universe":

@@ -35,7 +35,7 @@ Polygon.io 新聞收集腳本
 重要限制:
     --incremental 使用「所有 ticker 中最新一篇文章的時間」作為起始點，
     對每個 ticker 統一從該時間點開始查詢。這意味著：
-    - 新加入 tickers_core.json 的 ticker 不會被補抓歷史資料
+    - 新加入追蹤範圍的 ticker 不會被補抓歷史資料
     - 只有「該時間點之後」發布的新聞才會被抓到
     - 若需要補抓新 ticker 的歷史，必須用 --tickers + --start 手動指定
 """
@@ -639,8 +639,7 @@ def _scope_error(prog: str) -> RuntimeError:
     return RuntimeError(
         "explicit ticker scope required: --tickers AAPL,MSFT,... or --scope "
         "active-universe (reads the local profile DB read-only). "
-        "config/tickers_core.json is a bootstrap/seed file, no longer a runtime "
-        f"default. Example: python {prog} --incremental --scope active-universe")
+        f"Example: python {prog} --incremental --scope active-universe")
 
 
 def load_tickers(tickers_arg: Optional[str] = None,
@@ -648,8 +647,7 @@ def load_tickers(tickers_arg: Optional[str] = None,
     """Resolve the EXPLICIT ticker scope (3e-E, aligned with daily_update's Q7
     lock: no implicit universe guessing). ``tickers_arg`` = comma-separated
     list; ``scope='active-universe'`` = the local profile DB (read-only), the
-    in-app authority. Bare calls raise — the legacy tickers_core.json tiers
-    default is retired from runtime."""
+    in-app authority. Bare calls raise when no explicit scope is supplied."""
     if tickers_arg:
         return [t.strip().upper() for t in tickers_arg.split(',') if t.strip()]
     if scope == "active-universe":

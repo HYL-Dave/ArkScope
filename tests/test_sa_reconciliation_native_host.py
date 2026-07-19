@@ -68,10 +68,7 @@ def _dal_with_backend(backend) -> DataAccessLayer:
     return dal
 
 
-def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconciliation(
-    monkeypatch,
-):
-    monkeypatch.setattr(host, "_try_ticker_sync", lambda *args, **kwargs: None)
+def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconciliation():
     pick_calls = []
 
     class PickDal:

@@ -79,6 +79,8 @@ env/
 *.sqlite3
 /data/
 data_lake/
+# Retired runtime authority; explicit compatibility exports are local artifacts.
+/config/tickers_core.json
 # NewsExtraction/ — retired local FNSPID/o3 pipeline (280G purged 2026-06).
 # Provenance: docs/history/FNSPID_NEWS_EXTRACTION.md. Tombstone keeps any re-created dir untracked.
 NewsExtraction/

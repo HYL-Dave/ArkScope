@@ -258,10 +258,6 @@ def _handle_refresh(dal, scope, picks, attempt_ts):
         )
         logger.info("Refresh %s: %d picks saved", scope, count)
 
-        # Ticker sync: only on current scope success
-        if scope == "current" and picks:
-            _try_ticker_sync(dal, picks)
-
     except Exception as e:
         logger.error("Refresh %s failed: %s", scope, e)
         try:
@@ -1068,17 +1064,6 @@ def _parse_iso_dt(value):
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-
-
-def _try_ticker_sync(dal, picks):
-    """Best-effort ticker sync to tickers_core.json."""
-    try:
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(dal=dal)
-        client.sync_tickers_to_collection(picks)
-        logger.info("Ticker sync completed")
-    except Exception as e:
-        logger.warning("Ticker sync failed (best-effort): %s", e)
 
 
 def main():

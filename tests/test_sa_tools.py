@@ -7,6 +7,7 @@ Unit tests mock Playwright and DAL. Integration tests require:
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import sys
@@ -127,8 +128,7 @@ class TestNativeHost:
         sys.path.insert(0, str(project_root))
         from src.sa_native_host import handle_message
 
-        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
-             patch("src.sa_native_host._try_ticker_sync"):
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 3
             MockDAL.return_value = mock_dal
@@ -186,8 +186,7 @@ class TestNativeHost:
         """JS Date.toISOString() Z suffix is parsed correctly."""
         from src.sa_native_host import handle_message
 
-        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
-             patch("src.sa_native_host._try_ticker_sync"):
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 0
             MockDAL.return_value = mock_dal
@@ -205,8 +204,7 @@ class TestNativeHost:
         """Extension pick with raw_data.detail_url is passed through to DAL."""
         from src.sa_native_host import handle_message
 
-        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
-             patch("src.sa_native_host._try_ticker_sync"):
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 1
             MockDAL.return_value = mock_dal
@@ -369,9 +367,7 @@ class TestNativeHost:
             ),
         )
 
-        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, patch(
-            "src.sa_native_host._try_ticker_sync"
-        ):
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 1
             MockDAL.return_value = mock_dal
@@ -639,63 +635,64 @@ class TestDALDualBackend:
 
 
 # ============================================================
-# Ticker sync
+# Ticker sync retirement
 # ============================================================
 
 class TestTickerSync:
-    def test_current_picks_synced_to_tickers_core(self):
-        """Current non-stale picks are synced to tickers_core.json."""
+    def test_current_refresh_never_calls_or_writes_tickers_core(self):
+        import src.sa_native_host as host
+
+        events = []
+
+        class FakeDal:
+            def apply_sa_refresh(self, **kwargs):
+                events.append(("capture", kwargs))
+                return 1
+
+            def reconcile_sa_articles(self, **kwargs):
+                events.append(("reconcile", kwargs))
+                return {"status": "ok", "enrichment": []}
+
+            def record_sa_refresh_failure(self, *args, **kwargs):
+                raise AssertionError("refresh must not record a failure")
+
+        real_open = open
+        write_attempts = []
+
+        def fail_writes(path, mode="r", *args, **kwargs):
+            if any(flag in mode for flag in ("w", "a", "x", "+")):
+                write_attempts.append((os.fspath(path), mode))
+                raise AssertionError("refresh attempted a filesystem write")
+            return real_open(path, mode, *args, **kwargs)
+
+        with patch("builtins.open", side_effect=fail_writes), patch(
+            "os.replace", side_effect=AssertionError("refresh attempted os.replace")
+        ) as replace:
+            result = host._handle_refresh(
+                FakeDal(),
+                "current",
+                [{"symbol": "BTSG", "picked_date": "2026-07-15"}],
+                datetime(2026, 7, 19, tzinfo=timezone.utc),
+            )
+
+        assert [event[0] for event in events] == ["capture", "reconcile"]
+        assert result["status"] == "ok"
+        assert result["count"] == 1
+        assert result["reconciliation"]["status"] == "ok"
+        assert write_attempts == []
+        replace.assert_not_called()
+
+    def test_refresh_portfolio_signature_has_no_sync_tickers_escape_hatch(self):
         from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(dal=MagicMock())
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tickers_path = Path(tmpdir) / "tickers_core.json"
-            tickers_path.write_text(json.dumps({
-                "tier3_user_watchlist": {},
-            }))
+        signature = inspect.signature(SAAlphaPicksClient.refresh_portfolio)
+        refresh_source = inspect.getsource(SAAlphaPicksClient.refresh_portfolio)
+        class_source = inspect.getsource(SAAlphaPicksClient)
 
-            with patch("data_sources.sa_alpha_picks_client.Path", return_value=tickers_path):
-                # Direct call with mock path
-                picks = [
-                    {"symbol": "ACME", "portfolio_status": "current", "is_stale": False},
-                    {"symbol": "BETA", "portfolio_status": "current", "is_stale": False},
-                ]
-                # We need to patch the Path("config/tickers_core.json") call
-                with patch("builtins.open", create=True) as mock_open:
-                    # For simplicity, test the filter logic directly
-                    symbols = sorted({
-                        p["symbol"] for p in picks
-                        if p.get("portfolio_status") == "current"
-                        and not p.get("is_stale", False)
-                    })
-                    assert symbols == ["ACME", "BETA"]
-
-    def test_closed_picks_not_synced(self):
-        """Closed picks are excluded from ticker sync."""
-        picks = [
-            {"symbol": "ACME", "portfolio_status": "current", "is_stale": False},
-            {"symbol": "GONE", "portfolio_status": "closed", "is_stale": False},
-        ]
-        symbols = sorted({
-            p["symbol"] for p in picks
-            if p.get("portfolio_status") == "current"
-            and not p.get("is_stale", False)
-        })
-        assert "GONE" not in symbols
-        assert "ACME" in symbols
-
-    def test_stale_picks_not_synced(self):
-        """Stale current picks are excluded from ticker sync."""
-        picks = [
-            {"symbol": "ACME", "portfolio_status": "current", "is_stale": False},
-            {"symbol": "OLD", "portfolio_status": "current", "is_stale": True},
-        ]
-        symbols = sorted({
-            p["symbol"] for p in picks
-            if p.get("portfolio_status") == "current"
-            and not p.get("is_stale", False)
-        })
-        assert "OLD" not in symbols
+        assert "sync_tickers" not in signature.parameters
+        assert "sync_tickers" not in refresh_source
+        assert not hasattr(SAAlphaPicksClient, "sync_tickers_to_collection")
+        assert "sync_tickers_to_collection" not in class_source
 
 
 # ============================================================
