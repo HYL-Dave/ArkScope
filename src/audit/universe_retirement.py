@@ -53,10 +53,19 @@ _PROFILE_SCHEMA = {
     ),
     "ticker_meta": frozenset({"ticker", "hidden_at"}),
     "universe_source_memberships": frozenset(
-        {"source_key", "ticker", "archived_at"}
+        {"source_key", "ticker", "created_at", "archived_at"}
     ),
     "universe_source_annotations": frozenset(
         {"source_key", "ticker", "annotation_key", "annotation_value"}
+    ),
+}
+_PROFILE_UNIQUE_SHAPES = {
+    "universe_source_memberships": ("source_key", "ticker"),
+    "universe_source_annotations": (
+        "source_key",
+        "ticker",
+        "annotation_key",
+        "annotation_value",
     ),
 }
 _SA_SCHEMA = {
@@ -164,6 +173,13 @@ class ApprovalMismatch(UniverseRetirementError):
         }
 
 
+class InvalidApproval(UniverseRetirementError):
+    code = "invalid_approval"
+
+    def __init__(self):
+        super().__init__(self.code)
+
+
 class TransitionParityError(UniverseRetirementError):
     code = "transition_parity_failed"
 
@@ -171,11 +187,33 @@ class TransitionParityError(UniverseRetirementError):
         super().__init__(self.code)
 
 
+class RestoreRequired(UniverseRetirementError):
+    code = "restore_required"
+
+    def __init__(self, stage: str):
+        self.stage = stage
+        super().__init__(f"{self.code}: {stage}")
+
+    def as_dict(self) -> dict[str, object]:
+        return {"code": self.code, "stage": self.stage}
+
+
 class OutputPathConflict(UniverseRetirementError):
     code = "output_path_conflict"
 
     def __init__(self):
         super().__init__(self.code)
+
+
+class OutputPreflightError(UniverseRetirementError):
+    code = "output_preflight_failed"
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"{self.code}: {reason}")
+
+    def as_dict(self) -> dict[str, object]:
+        return {"code": self.code, "reason": self.reason}
 
 
 class OverviewUnavailable(UniverseRetirementError):
@@ -276,6 +314,18 @@ def _normalize_ticker_set(values: Iterable[object]) -> tuple[str, ...]:
     )
 
 
+def _normalize_approvals(values: Iterable[object]) -> tuple[str, ...]:
+    if isinstance(values, str):
+        values = (values,)
+    normalized: set[str] = set()
+    for value in values:
+        ticker = _normalize_ticker(value)
+        if not ticker:
+            raise InvalidApproval
+        normalized.add(ticker)
+    return tuple(sorted(normalized))
+
+
 def _canonical_json_bytes(value: object) -> bytes:
     return json.dumps(
         value,
@@ -315,6 +365,7 @@ def _require_schema(
     connection: sqlite3.Connection,
     source: str,
     requirements: Mapping[str, frozenset[str]],
+    unique_shapes: Mapping[str, tuple[str, ...]] | None = None,
 ) -> None:
     tables = {
         row["name"]
@@ -336,6 +387,39 @@ def _require_schema(
         missing.extend(
             f"{table}.{column}" for column in sorted(required_columns - columns)
         )
+    for table, required_shape in (unique_shapes or {}).items():
+        if table not in tables:
+            continue
+        unique_column_shapes: set[tuple[str, ...]] = set()
+        table_info = connection.execute(
+            f"PRAGMA table_info({_quoted_identifier(table)})"
+        ).fetchall()
+        primary_key = tuple(
+            row["name"]
+            for row in sorted(
+                (row for row in table_info if int(row["pk"]) > 0),
+                key=lambda row: int(row["pk"]),
+            )
+        )
+        if primary_key:
+            unique_column_shapes.add(primary_key)
+        indexes = connection.execute(
+            f"PRAGMA index_list({_quoted_identifier(table)})"
+        ).fetchall()
+        for index in indexes:
+            if not int(index["unique"]) or int(index["partial"]):
+                continue
+            columns = connection.execute(
+                f"PRAGMA index_info({_quoted_identifier(index['name'])})"
+            ).fetchall()
+            unique_column_shapes.add(
+                tuple(
+                    row["name"]
+                    for row in sorted(columns, key=lambda row: int(row["seqno"]))
+                )
+            )
+        if required_shape not in unique_column_shapes:
+            missing.append(f"{table}.unique({','.join(required_shape)})")
     if missing:
         raise RequiredSchemaMissing(source, missing)
 
@@ -343,7 +427,12 @@ def _require_schema(
 def _read_profile_sources(path: str | Path) -> _ProfileSources:
     connection = _open_read_only(path, "profile")
     try:
-        _require_schema(connection, "profile", _PROFILE_SCHEMA)
+        _require_schema(
+            connection,
+            "profile",
+            _PROFILE_SCHEMA,
+            _PROFILE_UNIQUE_SHAPES,
+        )
         active_list_rows = connection.execute(
             """
             SELECT w.name, w.kind, m.ticker
@@ -573,6 +662,14 @@ def _fingerprints_from_report(report: object) -> InputFingerprints:
     return InputFingerprints.from_mapping(report.get("fingerprints"))
 
 
+def _changed_fingerprints(
+    expected: Mapping[str, str], current: Mapping[str, str]
+) -> list[str]:
+    return [
+        key for key in _FINGERPRINT_KEYS if expected[key] != current[key]
+    ]
+
+
 def _profile_store_for_existing_schema(path: str | Path) -> ProfileStateStore:
     store = object.__new__(ProfileStateStore)
     store.db_path = str(path)
@@ -604,9 +701,43 @@ def _assert_transition_parity(document: Mapping[str, object], snapshot) -> None:
 
 def _same_path(first: str | Path, second: str | Path) -> bool:
     try:
-        return Path(first).resolve() == Path(second).resolve()
-    except OSError:
+        first_path = Path(first)
+        second_path = Path(second)
+        if first_path.resolve() == second_path.resolve():
+            return True
+        if first_path.exists() and second_path.exists():
+            return os.path.samefile(first_path, second_path)
         return False
+    except (OSError, RuntimeError):
+        raise OutputPreflightError("output_uninspectable") from None
+
+
+def _preflight_output(
+    output: str | Path,
+    *,
+    protected_paths: Iterable[str | Path],
+) -> Path:
+    target = Path(output)
+    if any(_same_path(target, protected) for protected in protected_paths):
+        raise OutputPathConflict
+
+    parent = target.parent
+    try:
+        if not parent.exists():
+            raise OutputPreflightError("parent_missing")
+        if not parent.is_dir():
+            raise OutputPreflightError("parent_not_directory")
+        if not (parent.stat().st_mode & 0o222) or not os.access(parent, os.W_OK):
+            raise OutputPreflightError("parent_not_writable")
+        if target.is_symlink():
+            raise OutputPreflightError("target_symlink")
+        if target.exists() and not target.is_file():
+            raise OutputPreflightError("target_not_regular_file")
+    except OutputPreflightError:
+        raise
+    except OSError:
+        raise OutputPreflightError("output_uninspectable") from None
+    return target
 
 
 def apply_reviewed_preview(
@@ -618,6 +749,7 @@ def apply_reviewed_preview(
     preview_report: Mapping[str, object],
     approved_json_only: Iterable[object],
     transition_out: str | Path,
+    preview_report_path: str | Path | None = None,
     now: datetime | None = None,
 ) -> dict[str, object]:
     """Apply an unchanged preview, then emit one exact transition export."""
@@ -630,9 +762,7 @@ def apply_reviewed_preview(
     reviewed_fingerprints = _fingerprints_from_report(preview_report)
     current_map = state.fingerprints.as_dict()
     reviewed_map = reviewed_fingerprints.as_dict()
-    changed = [
-        key for key in _FINGERPRINT_KEYS if current_map[key] != reviewed_map[key]
-    ]
+    changed = _changed_fingerprints(reviewed_map, current_map)
     if changed:
         raise FingerprintMismatch(changed)
 
@@ -650,13 +780,15 @@ def apply_reviewed_preview(
         if row.classification == "json_only"
         and row.default_action == "requires_approval"
     }
-    supplied_approvals = set(_normalize_ticker_set(approved_json_only))
+    supplied_approvals = set(_normalize_approvals(approved_json_only))
     missing_approvals = required_approvals - supplied_approvals
     extra_approvals = supplied_approvals - required_approvals
     if missing_approvals or extra_approvals:
         raise ApprovalMismatch(missing=missing_approvals, extra=extra_approvals)
-    if _same_path(legacy_json, transition_out):
-        raise OutputPathConflict
+    protected_paths: list[str | Path] = [profile_db, sa_db, legacy_json]
+    if preview_report_path is not None:
+        protected_paths.append(preview_report_path)
+    _preflight_output(transition_out, protected_paths=protected_paths)
 
     reviewed = build_reviewed_import(rows, supplied_approvals)
     retained_memberships = {
@@ -673,28 +805,46 @@ def apply_reviewed_preview(
         annotations=reviewed.annotations,
     )
 
+    # This closes in-process hook seams only. The reviewed production procedure
+    # must still stop external writers throughout preview and apply.
+    final_state = _input_state(
+        profile_db=profile_db,
+        sa_db=sa_db,
+        legacy_json=legacy_json,
+        legacy_overview_tickers=legacy_overview_tickers,
+    )
+    final_map = final_state.fingerprints.as_dict()
+    final_changes = _changed_fingerprints(current_map, final_map)
+    if final_changes:
+        raise FingerprintMismatch(final_changes)
+
     store = _profile_store_for_existing_schema(profile_db)
     import_summary = store.replace_legacy_config_import(
         approved_memberships=reviewed.approved_memberships,
         annotations=reviewed.annotations,
     )
 
-    snapshot_after = _snapshot(profile_db=profile_db, sa_db=sa_db, now=now)
-    profile_after = _read_profile_sources(profile_db)
     try:
+        snapshot_after = _snapshot(profile_db=profile_db, sa_db=sa_db, now=now)
+        profile_after = _read_profile_sources(profile_db)
         document = build_compat_export(
             snapshot_after,
             _legacy_annotations(profile_after),
         )
-    except (TypeError, ValueError):
-        raise TransitionParityError from None
-    _assert_transition_parity(document, snapshot_after)
-    write_compat_export(transition_out, document)
+        _assert_transition_parity(document, snapshot_after)
+        transition_active = len(flatten_generated_active_tickers(document))
+    except Exception:
+        raise RestoreRequired("post_commit_verification") from None
+    try:
+        _preflight_output(transition_out, protected_paths=protected_paths)
+        write_compat_export(transition_out, document)
+    except Exception:
+        raise RestoreRequired("transition_write") from None
     return {
         "fingerprints": current_map,
         "counts": {
             "snapshot_active": len(snapshot_after.tickers),
-            "transition_active": len(flatten_generated_active_tickers(document)),
+            "transition_active": transition_active,
         },
         "import": import_summary,
     }
@@ -708,6 +858,7 @@ def export_transition_snapshot(
     now: datetime | None = None,
 ) -> dict[str, object]:
     """Export the current accepted snapshot without consulting legacy JSON."""
+    _preflight_output(output, protected_paths=(profile_db, sa_db))
     profile = _read_profile_sources(profile_db)
     _read_sa_sources(sa_db)
     snapshot = _snapshot(profile_db=profile_db, sa_db=sa_db, now=now)
@@ -757,8 +908,13 @@ def _read_preview_report(path: str | Path) -> Mapping[str, object]:
     return value
 
 
-def _write_report(path: str | Path, report: Mapping[str, object]) -> None:
-    target = Path(path)
+def _write_report(
+    path: str | Path,
+    report: Mapping[str, object],
+    *,
+    protected_paths: Iterable[str | Path] = (),
+) -> None:
+    target = _preflight_output(path, protected_paths=protected_paths)
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -776,6 +932,7 @@ def _write_report(path: str | Path, report: Mapping[str, object]) -> None:
             handle.flush()
             os.fchmod(handle.fileno(), 0o600)
             os.fsync(handle.fileno())
+        _preflight_output(target, protected_paths=protected_paths)
         os.replace(temporary, target)
     except Exception:
         if temporary is not None:
@@ -784,6 +941,29 @@ def _write_report(path: str | Path, report: Mapping[str, object]) -> None:
             except FileNotFoundError:
                 pass
         raise
+
+
+def write_preview_report(
+    *,
+    profile_db: str | Path,
+    sa_db: str | Path,
+    legacy_json: str | Path,
+    legacy_overview_tickers: Iterable[object],
+    report_out: str | Path,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Build and atomically write a preview after validating its destination."""
+    protected = (profile_db, sa_db, legacy_json)
+    _preflight_output(report_out, protected_paths=protected)
+    report = build_preview_report(
+        profile_db=profile_db,
+        sa_db=sa_db,
+        legacy_json=legacy_json,
+        legacy_overview_tickers=legacy_overview_tickers,
+        now=now,
+    )
+    _write_report(report_out, report, protected_paths=protected)
+    return report
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -824,15 +1004,13 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _build_parser().parse_args(argv)
     try:
         if arguments.command == "preview":
-            if _same_path(arguments.legacy_json, arguments.report_out):
-                raise OutputPathConflict
-            result = build_preview_report(
+            result = write_preview_report(
                 profile_db=arguments.profile_db,
                 sa_db=arguments.sa_db,
                 legacy_json=arguments.legacy_json,
                 legacy_overview_tickers=_load_production_overview_tickers(),
+                report_out=arguments.report_out,
             )
-            _write_report(arguments.report_out, result)
         elif arguments.command == "apply":
             result = apply_reviewed_preview(
                 profile_db=arguments.profile_db,
@@ -842,6 +1020,7 @@ def main(argv: list[str] | None = None) -> int:
                 preview_report=_read_preview_report(arguments.preview_report),
                 approved_json_only=arguments.approve_json_only or (),
                 transition_out=arguments.transition_out,
+                preview_report_path=arguments.preview_report,
             )
         else:
             result = export_transition_snapshot(

@@ -8,7 +8,6 @@ import importlib
 import json
 import os
 import sqlite3
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -159,6 +158,37 @@ def _sqlite_semantic_digest(path: Path) -> str:
     return hashlib.sha256(_json_bytes(payload)).hexdigest()
 
 
+def _sqlite_backup(source: Path, target: Path) -> None:
+    with _REAL_SQLITE_CONNECT(source) as source_conn:
+        with _REAL_SQLITE_CONNECT(target) as target_conn:
+            source_conn.backup(target_conn)
+
+
+def _break_writer_schema(path: Path, finding: str) -> None:
+    with _REAL_SQLITE_CONNECT(path) as conn:
+        if finding == "membership_created_at":
+            conn.execute("DROP TABLE universe_source_memberships")
+            conn.execute(
+                "CREATE TABLE universe_source_memberships ("
+                "source_key TEXT NOT NULL, ticker TEXT NOT NULL, archived_at TEXT, "
+                "PRIMARY KEY (source_key, ticker))"
+            )
+        elif finding == "membership_conflict_shape":
+            conn.execute("DROP TABLE universe_source_memberships")
+            conn.execute(
+                "CREATE TABLE universe_source_memberships ("
+                "source_key TEXT NOT NULL, ticker TEXT NOT NULL, "
+                "created_at TEXT NOT NULL, archived_at TEXT)"
+            )
+        else:
+            conn.execute("DROP TABLE universe_source_annotations")
+            conn.execute(
+                "CREATE TABLE universe_source_annotations ("
+                "source_key TEXT NOT NULL, ticker TEXT NOT NULL, "
+                "annotation_key TEXT NOT NULL, annotation_value TEXT NOT NULL)"
+            )
+
+
 def _legacy_rows(path: Path) -> dict[str, list[list[object]]]:
     with _REAL_SQLITE_CONNECT(path) as conn:
         memberships = [
@@ -246,6 +276,17 @@ def _path(value: object) -> Path | None:
         return None
 
 
+def _alias_path(root: Path, source: Path, alias_kind: str, label: str) -> Path:
+    if alias_kind == "direct":
+        return source
+    alias = root / f"{label}-{alias_kind}"
+    if alias_kind == "symlink":
+        alias.symlink_to(source)
+    else:
+        os.link(source, alias)
+    return alias
+
+
 def _install_source_write_guard(monkeypatch, audit, source: Path):
     source = source.resolve()
     open_modes: list[str] = []
@@ -306,7 +347,21 @@ def _preview(audit, sources, *, overview=None):
     )
 
 
-def _apply(audit, sources, report, output: Path, *, overview=None, approvals=None):
+def _apply(
+    audit,
+    sources,
+    report,
+    output: Path,
+    *,
+    overview=None,
+    approvals=None,
+    preview_report_path=None,
+):
+    optional = (
+        {"preview_report_path": preview_report_path}
+        if preview_report_path is not None
+        else {}
+    )
     return audit.apply_reviewed_preview(
         profile_db=sources.profile_path,
         sa_db=sources.sa_path,
@@ -318,6 +373,7 @@ def _apply(audit, sources, report, output: Path, *, overview=None, approvals=Non
         ),
         transition_out=output,
         now=NOW,
+        **optional,
     )
 
 
@@ -402,6 +458,37 @@ def test_preview_is_read_only_and_emits_semantic_source_fingerprints(
     assert exc_info.value.source == "profile"
     assert str(missing_schema) not in str(exc_info.value)
 
+    writer_schema_cases = (
+        (
+            "membership_created_at",
+            "universe_source_memberships.created_at",
+        ),
+        (
+            "membership_conflict_shape",
+            "universe_source_memberships.unique(source_key,ticker)",
+        ),
+        (
+            "annotation_conflict_shape",
+            "universe_source_annotations.unique(source_key,ticker,annotation_key,annotation_value)",
+        ),
+    )
+    for index, (finding, required_shape) in enumerate(writer_schema_cases):
+        malformed = tmp_path / f"malformed-writer-{index}.db"
+        _sqlite_backup(sources.profile_path, malformed)
+        _break_writer_schema(malformed, finding)
+
+        with pytest.raises(audit.RequiredSchemaMissing) as malformed_exc:
+            audit.build_preview_report(
+                profile_db=malformed,
+                sa_db=sources.sa_path,
+                legacy_json=sources.legacy_json,
+                legacy_overview_tickers=sources.overview,
+                now=NOW,
+            )
+
+        assert required_shape in malformed_exc.value.missing
+        assert str(malformed) not in str(malformed_exc.value)
+
 
 def test_preview_proves_legacy_overview_subset_or_stops(sources, tmp_path):
     audit = _audit()
@@ -429,7 +516,9 @@ def test_preview_proves_legacy_overview_subset_or_stops(sources, tmp_path):
     assert not transition.exists()
 
 
-def test_apply_rejects_changed_json_or_database_fingerprint_before_write(tmp_path):
+def test_apply_rejects_changed_json_or_database_fingerprint_before_write(
+    tmp_path, monkeypatch
+):
     audit = _audit()
     cases = (
         "legacy_json_sha256",
@@ -465,6 +554,61 @@ def test_apply_rejects_changed_json_or_database_fingerprint_before_write(tmp_pat
         assert _sqlite_semantic_digest(case.profile_path) == profile_before
         assert not transition.exists()
 
+    for index, changed_key in enumerate(cases):
+        case = _make_sources(tmp_path / f"hook-case-{index}")
+        overview = list(case.overview)
+        report = _preview(audit, case, overview=overview)
+        legacy_before = _legacy_rows(case.profile_path)
+        accepted_row_tickers: list[str] = []
+        original_build = audit.build_reviewed_import
+
+        def build_then_mutate(rows, approvals):
+            reviewed = original_build(rows, approvals)
+            accepted_row_tickers.extend(row.ticker for row in rows)
+            if changed_key == "legacy_json_sha256":
+                document = json.loads(case.legacy_json.read_text(encoding="utf-8"))
+                document["tier2_expanded"]["identity_access"]["tickers"].append(
+                    "RACE"
+                )
+                case.legacy_json.write_text(
+                    json.dumps(document, sort_keys=True),
+                    encoding="utf-8",
+                )
+            elif changed_key == "profile_sources_sha256":
+                case.profile.import_lists(
+                    [{"name": "Concurrent", "tickers": ["RACE"]}]
+                )
+            elif changed_key == "sa_sources_sha256":
+                _insert_pick(case.sa_path, "RACE", picked_date="2026-07-03")
+            else:
+                overview.append("RACE")
+            return reviewed
+
+        def forbid_profile_transaction(_path):
+            raise AssertionError("profile transaction reached after source changed")
+
+        transition = tmp_path / f"hook-rejected-{index}.json"
+        with monkeypatch.context() as scoped:
+            scoped.setattr(audit, "build_reviewed_import", build_then_mutate)
+            scoped.setattr(
+                audit,
+                "_profile_store_for_existing_schema",
+                forbid_profile_transaction,
+            )
+            with pytest.raises(audit.FingerprintMismatch) as hook_exc:
+                _apply(
+                    audit,
+                    case,
+                    report,
+                    transition,
+                    overview=overview,
+                )
+
+        assert hook_exc.value.changed == (changed_key,)
+        assert _legacy_rows(case.profile_path) == legacy_before
+        assert "RACE" not in accepted_row_tickers
+        assert not transition.exists()
+
 
 def test_apply_requires_explicit_approval_for_every_visible_json_only_symbol(
     sources, tmp_path
@@ -474,6 +618,18 @@ def test_apply_requires_explicit_approval_for_every_visible_json_only_symbol(
     assert report["requires_approval"] == ["OKTA"]
 
     profile_before = _sqlite_semantic_digest(sources.profile_path)
+    for index, blank in enumerate(("", " ", "\t\n")):
+        blank_output = tmp_path / f"blank-approval-{index}.json"
+        with pytest.raises(audit.InvalidApproval):
+            _apply(
+                audit,
+                sources,
+                report,
+                blank_output,
+                approvals=(blank,),
+            )
+        assert not blank_output.exists()
+
     missing_output = tmp_path / "missing-approval.json"
     with pytest.raises(audit.ApprovalMismatch) as missing_exc:
         _apply(audit, sources, report, missing_output, approvals=())
@@ -495,9 +651,38 @@ def test_apply_requires_explicit_approval_for_every_visible_json_only_symbol(
     assert not missing_output.exists()
     assert not extra_output.exists()
 
+    apply_argv = [
+        "apply",
+        "--profile-db",
+        "profile.db",
+        "--sa-db",
+        "sa.db",
+        "--legacy-json",
+        "legacy.json",
+        "--preview-report",
+        "preview.json",
+        "--transition-out",
+        "transition.json",
+    ]
+    parser = audit._build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(apply_argv)
+    approve_none = parser.parse_args([*apply_argv, "--approve-none"])
+    assert approve_none.approve_none is True
+    assert approve_none.approve_json_only is None
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                *apply_argv,
+                "--approve-json-only",
+                "OKTA",
+                "--approve-none",
+            ]
+        )
+
 
 def test_apply_and_transition_export_are_exact_and_idempotent_after_fresh_preview(
-    sources, tmp_path
+    sources, tmp_path, monkeypatch
 ):
     audit = _audit()
     first_preview = _preview(audit, sources)
@@ -554,22 +739,174 @@ def test_apply_and_transition_export_are_exact_and_idempotent_after_fresh_previe
     )
     assert exported.read_bytes() == bytes_before
 
+    failure_cases = (
+        ("post_commit_verification", "build_compat_export", ValueError),
+        ("transition_write", "write_compat_export", OSError),
+    )
+    for index, (stage, patched_name, failure_type) in enumerate(failure_cases):
+        case = _make_sources(tmp_path / f"post-commit-{index}")
+        preview = _preview(audit, case)
+        backup = tmp_path / f"profile-backup-{index}.db"
+        _sqlite_backup(case.profile_path, backup)
+        backup_digest = _sqlite_semantic_digest(backup)
+        transition = tmp_path / f"post-commit-{index}.json"
+        original_transition = b""
+        if stage == "transition_write":
+            original_transition = b"existing transition\n"
+            transition.write_bytes(original_transition)
+
+        def fail_after_commit(*_args, **_kwargs):
+            raise failure_type("synthetic post-commit failure")
+
+        with monkeypatch.context() as scoped:
+            scoped.setattr(audit, patched_name, fail_after_commit)
+            with pytest.raises(audit.RestoreRequired) as restore_exc:
+                _apply(audit, case, preview, transition)
+
+        assert restore_exc.value.stage == stage
+        assert restore_exc.value.as_dict() == {
+            "code": "restore_required",
+            "stage": stage,
+        }
+        assert _legacy_rows(case.profile_path)["memberships"]
+        assert _sqlite_semantic_digest(case.profile_path) != backup_digest
+        assert _sqlite_semantic_digest(backup) == backup_digest
+        assert _legacy_rows(backup) == {"memberships": [], "annotations": []}
+        if stage == "transition_write":
+            assert transition.read_bytes() == original_transition
+        else:
+            assert not transition.exists()
+
 
 def test_audit_never_opens_or_replaces_the_source_json_for_write(
     sources, tmp_path, monkeypatch
 ):
     audit = _audit()
     report = _preview(audit, sources)
+    preview_report_path = tmp_path / "preview-report.json"
+    preview_report_path.write_text(json.dumps(report), encoding="utf-8")
     source_before = sources.legacy_json.read_bytes()
     source_mode = sources.legacy_json.stat().st_mode
+    profile_before = _sqlite_semantic_digest(sources.profile_path)
+    sa_before = _sqlite_semantic_digest(sources.sa_path)
+    preview_report_before = preview_report_path.read_bytes()
     open_modes, replacements = _install_source_write_guard(
         monkeypatch,
         audit,
         sources.legacy_json,
     )
+
+    def invoke_with_output(operation: str, output: Path) -> None:
+        if operation == "preview":
+            audit.write_preview_report(
+                profile_db=sources.profile_path,
+                sa_db=sources.sa_path,
+                legacy_json=sources.legacy_json,
+                legacy_overview_tickers=sources.overview,
+                report_out=output,
+                now=NOW,
+            )
+        elif operation == "apply":
+            _apply(
+                audit,
+                sources,
+                report,
+                output,
+                preview_report_path=preview_report_path,
+            )
+        else:
+            audit.export_transition_snapshot(
+                profile_db=sources.profile_path,
+                sa_db=sources.sa_path,
+                output=output,
+                now=NOW,
+            )
+
+    protected_outputs = (
+        ("preview", "profile", sources.profile_path),
+        ("preview", "sa", sources.sa_path),
+        ("preview", "legacy", sources.legacy_json),
+        ("apply", "profile", sources.profile_path),
+        ("apply", "sa", sources.sa_path),
+        ("apply", "legacy", sources.legacy_json),
+        ("apply", "report", preview_report_path),
+        ("export", "profile", sources.profile_path),
+        ("export", "sa", sources.sa_path),
+    )
+    alias_root = tmp_path / "aliases"
+    alias_root.mkdir()
+    for operation, label, protected in protected_outputs:
+        for alias_kind in ("direct", "symlink", "hardlink"):
+            alias = _alias_path(
+                alias_root,
+                protected,
+                alias_kind,
+                f"{operation}-{label}",
+            )
+            try:
+                with pytest.raises(audit.OutputPathConflict):
+                    invoke_with_output(operation, alias)
+            finally:
+                if alias_kind != "direct" and os.path.lexists(alias):
+                    os.unlink(alias)
+
+    assert _sqlite_semantic_digest(sources.profile_path) == profile_before
+    assert _sqlite_semantic_digest(sources.sa_path) == sa_before
+    assert sources.legacy_json.read_bytes() == source_before
+    assert preview_report_path.read_bytes() == preview_report_before
+    assert replacements == []
+
+    preflight_cases = (
+        "missing_parent",
+        "directory_target",
+        "parent_not_directory",
+        "symlink_target",
+        "symlink_loop",
+        "unwritable_parent",
+    )
+    for index, shape in enumerate(preflight_cases):
+        case = _make_sources(tmp_path / f"preflight-{index}")
+        case_report = _preview(audit, case)
+        legacy_before = _legacy_rows(case.profile_path)
+        if shape == "missing_parent":
+            output = tmp_path / f"absent-{index}" / "transition.json"
+        elif shape == "directory_target":
+            output = tmp_path / f"directory-target-{index}"
+            output.mkdir()
+        elif shape == "parent_not_directory":
+            parent = tmp_path / f"parent-file-{index}"
+            parent.write_text("not a directory", encoding="utf-8")
+            output = parent / "transition.json"
+        elif shape == "symlink_target":
+            target = tmp_path / f"unrelated-target-{index}.json"
+            target.write_text("unrelated", encoding="utf-8")
+            output = tmp_path / f"unrelated-link-{index}.json"
+            output.symlink_to(target)
+        elif shape == "symlink_loop":
+            output = tmp_path / f"loop-link-{index}.json"
+            output.symlink_to(output.name)
+        else:
+            parent = tmp_path / f"unwritable-{index}"
+            parent.mkdir()
+            parent.chmod(0o500)
+            output = parent / "transition.json"
+        try:
+            with pytest.raises(audit.OutputPreflightError):
+                _apply(audit, case, case_report, output)
+        finally:
+            if shape == "unwritable_parent":
+                output.parent.chmod(0o700)
+        assert _legacy_rows(case.profile_path) == legacy_before
+
     transition = tmp_path / "allowed-transition.json"
 
-    _apply(audit, sources, report, transition)
+    _apply(
+        audit,
+        sources,
+        report,
+        transition,
+        preview_report_path=preview_report_path,
+    )
 
     assert open_modes and set(open_modes) <= {"r", "rb"}
     assert replacements
