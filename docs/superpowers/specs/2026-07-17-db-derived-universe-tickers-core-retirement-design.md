@@ -1,11 +1,10 @@
 # DB-Derived Universe and `tickers_core.json` Retirement Design
 
-> **Status:** APPROVED; WRITTEN REVIEW GREEN; IMPLEMENTATION PLAN REVIEW GREEN.
-> P2.8 Slice 3 and the Alpha Picks reconciliation line are live. The cleared
-> RED-first implementation plan is at
-> `docs/superpowers/plans/2026-07-19-db-derived-universe-tickers-core-retirement.md`;
-> implementation may proceed in an isolated worktree while the user's dirty
-> JSON remains protected.
+> **Status:** LIVE COMPLETE — MERGED TO `master` THROUGH `cddea39`; STOPPED-
+> SERVICE PRODUCTION CUTOVER COMPLETE 2026-07-19. The reviewed product tip is
+> `8f2f9be`; the execution record, retained-backup paths, exact-set migration
+> evidence, and merged live smoke are in
+> `docs/superpowers/plans/2026-07-19-db-derived-universe-tickers-core-retirement.md`.
 
 ## 1. Purpose
 

@@ -9,12 +9,11 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTED FOR REVIEW — NOT MERGED; PRODUCTION CUTOVER NOT
-> STARTED. Independent implementation re-review is GREEN at product tip
-> `8f2f9be`; exact raw accounting remains `+54/-6`. The user's unstaged
-> `config/tickers_core.json` edit remains outside this branch with SHA-256
-> `00d197cf9cc04bf1cb83a877aea0a647ee25c958ba122607bd33e45be325964f` and
-> remains protected until the reviewed stopped-service cutover.
+> **Status:** LIVE COMPLETE — FAST-FORWARD MERGED THROUGH `cddea39`; REVIEWED
+> PRODUCT TIP `8f2f9be`; STOPPED-SERVICE PRODUCTION CUTOVER, MERGED-TREE
+> VERIFICATION, DESKTOP RESTART, AND LIVE SMOKE COMPLETE 2026-07-19. Exact raw
+> accounting remains `+54/-6`; the former dirty JSON is retained byte-for-byte
+> under `data/backups/` and no longer exists as a runtime or tracked authority.
 
 **Goal:** Make one complete, explainable SQLite-derived snapshot the runtime
 authority for ArkScope's active ticker universe, migrate every reader to it,
@@ -1635,13 +1634,13 @@ git commit -m "docs: record DB universe implementation evidence"
 These steps execute only after independent implementation GREEN and explicit
 user approval. Use `superpowers:finishing-a-development-branch`.
 
-- [ ] **Close every writer before the destructive path transition**
+- [x] **Close every writer before the destructive path transition**
 
 Ask the user to close ArkScope and browsers/disable extension auto-sync. Prove
 no sidecar, native host, extension browser, Vite/Electron, or scheduled writer
 process remains. The IB Gateway may stay open; it does not write this JSON/DB.
 
-- [ ] **Create retained mode-0600 backups before touching main's dirty file**
+- [x] **Create retained mode-0600 backups before touching main's dirty file**
 
 Create timestamped SQLite online backups for production `profile_state.db` and
 `sa_capture.db`, plus an exact byte copy and patch of main's dirty JSON under
@@ -1649,21 +1648,21 @@ Create timestamped SQLite online backups for production `profile_state.db` and
 the reviewed product tip against those exact inputs and show the user the
 classification/approval set.
 
-- [ ] **Obtain explicit user approval for the cutover**
+- [x] **Obtain explicit user approval for the cutover**
 
 If a fresh visible generic JSON-only ticker appears, stop and ask whether to
 import it. Hidden and `LC` keep their reviewed defaults; BTSG remains overlap.
 Approval must explicitly cover preserving the dirty file in backup, removing
 the working path, and proceeding with DB import/merge.
 
-- [ ] **Make main mergeable without losing the user artifact**
+- [x] **Make main mergeable without losing the user artifact**
 
 Only after approval and verified backup, restore main's tracked JSON path to its
 current committed `HEAD` bytes so the reviewed fast-forward deletion can apply.
 Record that this is the sole authorized handling of the user edit. If merge does
 not complete, immediately restore the dirty file from the retained backup.
 
-- [ ] **Fast-forward merge and keep services stopped**
+- [x] **Fast-forward merge and keep services stopped**
 
 ```bash
 git merge --ff-only codex/db-derived-universe
@@ -1672,7 +1671,7 @@ git merge --ff-only codex/db-derived-universe
 Do not restart yet. Verify merged product tip and absence/ignore status of
 `config/tickers_core.json`.
 
-- [ ] **Initialize additive profile schema, recheck fingerprints, and apply**
+- [x] **Initialize additive profile schema, recheck fingerprints, and apply**
 
 Using merged code only, instantiate `ProfileStateStore` once to create the
 additive tables. Run audit preview against production DBs and the retained JSON
@@ -1680,7 +1679,7 @@ backup. Require semantic fingerprints and decisions to equal the stopped-window
 preview. Run `apply` with the user-approved exact list and write a retained
 transition export under `data/backups/`, never at the retired config path.
 
-- [ ] **Verify production truth before restart**
+- [x] **Verify production truth before restart**
 
 Require:
 
@@ -1700,13 +1699,13 @@ Compare unaffected table multiset digests to backups. If any gate fails, keep
 all services stopped, restore DB backups, and restore the JSON backup before
 deciding how to repair; do not let old writer code reopen migrated state.
 
-- [ ] **Restart merged desktop/browser components and run live smoke**
+- [x] **Restart merged desktop/browser components and run live smoke**
 
 Restart ArkScope from merged `master`; browser extension needs no reload because
 its bytes did not change. Verify `/profile/universe`, symbol search, Data Sources
 scheduler scope, and one no-provider dry run. Do not force a paid/provider run.
 
-- [ ] **Close documentation and remove the worktree**
+- [x] **Close documentation and remove the worktree**
 
 Update spec to LIVE, plan ledger to COMPLETE, priority map with merge/cutover
 hashes and retained backup paths, and memory terminology. Remove the
@@ -1815,10 +1814,39 @@ INDEPENDENT REVIEW:
   targeted RED -> GREEN and copied-preview BRK.B evidence closed it. Re-review
   verdict: GREEN, no new blockers; worktree clean and main dirty SHA preserved.
 MERGE COMMIT:
+  master fast-forwarded c526783 -> cddea39; reviewed product bytes end at
+  8f2f9be and the remaining commits are documentation-only.
 PRODUCTION BACKUPS:
+  Retained mode-0600 backup set 20260719T105534Z under data/backups/:
+  profile_state-pre-universe-retirement-20260719T105534Z.db,
+  sa_capture-pre-universe-retirement-20260719T105534Z.db,
+  tickers_core-pre-retirement-20260719T105534Z.json (SHA-256
+  00d197cf9cc04bf1cb83a877aea0a647ee25c958ba122607bd33e45be325964f),
+  its 292-byte patch, and the approved preview report. Transition and
+  verification reports are retained beside them.
 PRODUCTION CUTOVER:
+  All writers were stopped before the path transition. The production
+  pre-apply report was byte-identical to the user-approved stopped-window
+  preview: json_active=152, snapshot_active=150, overview_missing=[] and
+  requires_approval=[], with all four semantic fingerprints unchanged.
+  Merged apply --approve-none exported exactly 150 active tickers and wrote
+  zero active/archived legacy_config_seed memberships plus 335 compatibility
+  annotations. Both DB integrity checks are ok and FK checks empty. Exact
+  table-multiset verification preserved all 43 pre-existing profile tables
+  (42,572 rows) and all 23 SA tables (230,146 rows); only the two reviewed
+  additive universe tables were new. ATGE/BRK.B/LC are absent; BRK B remains
+  manual_lists, BTSG remains sa_alpha_picks_current, and HAPN remains
+  manual_lists. The retired path is absent and covered by the anchored ignore.
+  Merged focused execution produced 433 passed / 3 known bare-environment NVDA
+  fundamentals failures; the universe/caller subset passed 405/405. no-PG is
+  ok:true with pg_attempts:[], git diff --check is clean, and runtime writer,
+  JSON-path, audit-import, and alias-import ratchets have zero matches.
 PROCESS CLEANUP:
-  Canonical/test sessions exited; no branch app, browser, native host, sidecar,
-  or scheduler service was started. Disposable copied DB/evidence files remain
-  under /tmp for review and are not production authorities.
+  The merged desktop restarted from master at Vite 8430 with sidecar 37255.
+  Authenticated live smoke returned universe 150/150, BTSG tracked search,
+  seven scheduler sources, and DB-derived export authority; the no-provider
+  daily-update dry run resolved 150 tickers and executed nothing. The merged
+  implementation worktree and local feature branch were removed. Retained
+  production backups remain; no browser-extension reload was required because
+  its bytes are unchanged.
 ```

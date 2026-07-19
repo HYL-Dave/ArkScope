@@ -241,10 +241,12 @@ therefore defaults to defer until the hypothesis gate exists.
   migration/state-machine, repeated-Quick, merged popup/privacy, no-PG, and
   stopped-service production migration gates are closed. Production is schema
   v2 with integrity/FK clean and legacy logical facts preserved. DB-derived
-  universe/`tickers_core.json` retirement now has written-review GREEN;
-  implementation remains not started pending a separate RED-first plan and
-  independent plan review. It is the next bounded authority-retirement unit
-  before P2.8 Slice 4 rather than part of the Settings branch.
+  universe/`tickers_core.json` retirement is **MERGED / LIVE COMPLETE
+  2026-07-19 through `cddea39`**. The stopped-service production cutover
+  preserved the user-edited JSON in retained mode-0600 backups, imported only
+  reviewed compatibility annotations, established exact 150-ticker
+  DB-derived/export parity, and retired all runtime readers and writers. P2.8
+  Slice 4 Settings is again the next main UI slice.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -438,6 +440,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (DB-DERIVED UNIVERSE / `tickers_core.json` RETIREMENT MERGED / LIVE COMPLETE)**: User-approved stopped-service cutover fast-forwarded `master` through docs tip `cddea39` (reviewed product tip `8f2f9be`). Before the destructive path transition, mode-0600 online backups of both production DBs plus the exact dirty JSON and patch were retained under `data/backups/` with timestamp `20260719T105534Z`. Merged-code pre-apply preview was byte-identical to the approved report (`152` JSON active, `150` accepted, no missing overview or approval rows, all four fingerprints unchanged); `apply --approve-none` produced exact 150-ticker transition parity, zero legacy memberships, and `335` compatibility annotations. Integrity/FK checks passed, and logical multiset comparison preserved every pre-existing row across 43 profile tables and 23 SA tables. ATGE/BRK.B/LC remain absent; BRK B/BTSG/HAPN retain their reviewed distinct provenance. Merged verification closed at universe/caller `405/405`, no-PG `ok:true / pg_attempts:[]`, clean static retirement ratchets, a no-provider 150-ticker dry run, and authenticated desktop live smoke (`/profile/universe`, symbol search, seven-source schedule, DB-derived export). The only broader focused failures were the three already-reviewed missing NVDA fundamentals fixture nodes. The desktop now runs merged `master`; implementation worktree/branch are removed, while backups remain. Next main UI unit: P2.8 Slice 4 Settings.
 
 - **2026-07-19 (DB-DERIVED UNIVERSE / `tickers_core.json` RETIREMENT IMPLEMENTED FOR REVIEW — NOT MERGED / NO PRODUCTION CUTOVER)**: Product tip `8f2f9be` completes the reviewed readers-first/writer-last slice in isolated branch `codex/db-derived-universe`. Exact collection is `4514 -> 4562` (`+54/-6`, semantic `+48`); final virgin HEAD is `29 failed / 4452 passed / 74 skipped / 18 warnings / 7 errors`. The one base-only failure is a reviewed deterministic same-node clock repair in `test_route_wires_universe_and_db`, so no HEAD-only failure/error identity exists. Frontend remains byte-identical at `60/572`, typecheck/build pass, no-PG is `ok:true / pg_attempts:[]`, and all runtime/static retirement ratchets are clean. A mode-0600 copied-DB preview found JSON `152` versus accepted snapshot `150`, no missing overview or approval rows, and preserved exact pre-veto provenance for hidden `BRK.B`; copied apply exported `150`, wrote zero active legacy memberships plus `335` annotations, was semantically idempotent, and failed closed before write after a fingerprint mutation. Independent review's sole provenance blocker was fixed RED-first in `8f2f9be`; re-review is GREEN with no new blockers. Production DBs and services were not touched, and main's unstaged `config/tickers_core.json` remains byte-identical at SHA-256 `00d197cf9cc04bf1cb83a877aea0a647ee25c958ba122607bd33e45be325964f`. Next gate is explicit user merge/cutover approval followed by the plan's stopped-service backup, fast-forward, fingerprinted apply, production verification, and restart sequence.
 
