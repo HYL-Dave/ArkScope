@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 2 COMPLETE
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 3 COMPLETE
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -235,6 +235,11 @@ TASK_1_VERIFICATION: focused 15 files / 101 tests; full frontend 60 files / 572 
 TASK_1_PRODUCT_COMMIT: 6195026 (pure extraction); ledger commit 8489ae4
 TASK_2_RED: settingsRegistry.test.ts failed because settingsRegistry/settingsPreferences did not exist
 TASK_2_GREEN: registry/preferences 10 nodes added; navigation node strengthened in place; SettingsSection type-only union widened to close the nine-anchor compiler contract before Task 3 rendering; full frontend 61 files / 582 tests; typecheck clean
+TASK_2_PRODUCT_COMMIT: 9c38c4e; ledger commit 3b209b0
+TASK_3_RED: 13 workspace nodes collected; 12 failed for the reviewed old shell shape and the existing App Records exclusion node remained green
+TASK_3_INTEGRATION: one-page mounting required zero-node helper evolution in SettingsNewsStorage/SettingsProviderConfig and focus-based evolution of the two existing model navigation nodes; class coverage began reading settings.css; the existing save-route contract required moving its button into the models anchor before the Task 4 import/export and catalog-isolation work
+TASK_3_GREEN: 13/13 new workspace nodes; full frontend 62 files / 595 tests; typecheck/build clean except the reviewed chunk warning (594.11 kB main bundle)
+TASK_3_PRODUCT_COMMIT: ef30ef8
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -644,7 +649,7 @@ a second seven-value list.
 shipped anchors. The directory is navigation within the page, not another route
 layer. Collapse unmounts group bodies; exact selection restores them first.
 
-- [ ] **Step 1: Add exactly thirteen RED workspace nodes**
+- [x] **Step 1: Add exactly thirteen RED workspace nodes**
 
   Add these tests with real registry/preferences and leaf components mocked only
   at their public section boundaries:
@@ -669,7 +674,7 @@ layer. Collapse unmounts group bodies; exact selection restores them first.
   `useShellOverlay` itself. In node 11, selection ends on the target anchor after
   Drawer cleanup; plain Escape is the path that returns focus to the trigger.
 
-- [ ] **Step 2: Add section and group wrappers**
+- [x] **Step 2: Add section and group wrappers**
 
   `SettingsSectionAnchor` renders the stable DOM ID, `tabIndex={-1}`, and a
   `data-settings-anchor` marker. It does not add a visible card or duplicate the
@@ -679,7 +684,7 @@ layer. Collapse unmounts group bodies; exact selection restores them first.
   `ChevronDown`/`ChevronRight`; `aria-expanded` reflects the body. The body is
   absent, not merely hidden, when collapsed.
 
-- [ ] **Step 3: Build one reusable directory body**
+- [x] **Step 3: Build one reusable directory body**
 
   `SettingsDirectory` receives registry data, query, current target, and
   callbacks. Use a labelled search input with the `Search` icon. Render group
@@ -689,7 +694,7 @@ layer. Collapse unmounts group bodies; exact selection restores them first.
   renders only the matched title and owning group. Do not render duplicate
   wide/narrow directories in one DOM.
 
-- [ ] **Step 4: Compose the generic page shell**
+- [x] **Step 4: Compose the generic page shell**
 
   `SettingsView` renders the narrow `設定目錄` command with a `Menu` icon and
   otherwise follows this shape:
@@ -710,7 +715,7 @@ layer. Collapse unmounts group bodies; exact selection restores them first.
   anchor. Group collapse uses `readCollapsedSettingsGroups` at initialization
   and writes only on an explicit toggle or exact-target expansion.
 
-- [ ] **Step 5: Implement exact local reveal behavior**
+- [x] **Step 5: Implement exact local reveal behavior**
 
   One `revealSection(id)` function must:
 
@@ -724,7 +729,7 @@ layer. Collapse unmounts group bodies; exact selection restores them first.
   directory clicks, search result selection, Enter, provider-to-model links,
   and shell requests.
 
-- [ ] **Step 6: Add namespaced responsive CSS**
+- [x] **Step 6: Add namespaced responsive CSS**
 
   Import `settings/settings.css` after `ui/primitives.css` in `main.tsx`, without
   reordering the existing three shared stylesheets. Wide layout is a stable
@@ -735,14 +740,14 @@ layer. Collapse unmounts group bodies; exact selection restores them first.
   visible; `scroll-margin-top` accounts for the shell top bar. Add no numeric
   media query.
 
-- [ ] **Step 7: Evolve existing directory tests in place**
+- [x] **Step 7: Evolve existing directory tests in place**
 
   Keep all five `SettingsPostPgExitStorage.test.ts` node IDs. Replace assertions
   about active category buttons with assertions that all enabled sections are
   present together, retired App Records is absent, and user-facing titles no
   longer narrate migration history.
 
-- [ ] **Step 8: Run GREEN and commit**
+- [x] **Step 8: Run GREEN and commit**
 
   Expected cumulative collection: `+23` and full frontend `595`.
 
