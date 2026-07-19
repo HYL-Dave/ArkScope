@@ -1,0 +1,14 @@
+import i18n from "i18next";
+import { useTranslation } from "react-i18next";
+
+const staticCopy = i18n.t(($) => $.i18n.missingTranslation);
+const dynamicCopy = i18n.t(`settings.${section}`);
+
+export function View({ keyName }: { keyName: string }) {
+  const { t: translate } = useTranslation();
+  const known = translate(($) => $.locale.writeFailed, { ns: "settings" });
+  const unknown = translate(keyName);
+  const t = (value: string) => value;
+  const unrelated = t(keyName);
+  return <>{staticCopy}{dynamicCopy}{known}{unknown}{unrelated}</>;
+}

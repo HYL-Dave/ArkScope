@@ -1,0 +1,3 @@
+const field = { placeholder: "Filter settings" };
+
+export const view = <input placeholder="Search all settings" name="query" />;

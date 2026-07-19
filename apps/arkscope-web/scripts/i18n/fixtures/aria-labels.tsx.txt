@@ -1,0 +1,3 @@
+const action = { ariaLabel: "Open activity" };
+
+export const view = <button aria-label="Close panel" data-action="close" />;

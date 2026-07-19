@@ -1,0 +1,7 @@
+const card = {
+  label: "Provider status",
+  description: "Current connection health",
+  machineKey: "provider_status",
+};
+
+export const view = <img title="Account value" alt="Value history chart" data-code="chart-1" />;

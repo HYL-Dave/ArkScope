@@ -1,0 +1,13 @@
+declare function setErr(value: string): void;
+
+setErr("Could not load settings");
+
+const emptyState = {
+  emptyMessage: "No records available",
+};
+
+export function providerStatusLabel() {
+  return "Ready";
+}
+
+const runtimeCopy = "同步作業失敗";

@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "scopes": [
+    "src/i18n/**",
+    "src/main.tsx"
+  ]
+}

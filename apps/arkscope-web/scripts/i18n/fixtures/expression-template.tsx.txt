@@ -1,0 +1,8 @@
+export function Progress({ count }: { count: number }) {
+  return (
+    <div>
+      <span>{"Visible expression"}</span>
+      <span>{`Running ${count} items`}</span>
+    </div>
+  );
+}

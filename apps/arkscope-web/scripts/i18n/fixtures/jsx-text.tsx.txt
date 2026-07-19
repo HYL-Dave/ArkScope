@@ -1,0 +1,9 @@
+export function Example() {
+  return (
+    <div>
+      Visible copy!
+      <span>Secondary label</span>
+      <span> · </span>
+    </div>
+  );
+}

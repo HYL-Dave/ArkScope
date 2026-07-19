@@ -1,0 +1,6489 @@
+{
+  "version": 1,
+  "signatures": [
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"${card.ticker} AI 卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"AI 卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"saved as report\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"主要理由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"反方理由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"失效條件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"市場敘事\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"新聞範圍\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"與共識分歧\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"觀察清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"觸發條件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"針對 ${ticker} 的問題（可留空）…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"關鍵假設\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_attribute\",\"風險\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"· ${item.freshness}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"· ${tr.completeness.note}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"· realtime\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"▴ 進階\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"▾ 進階\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"✓ 已存報告\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"✨ 產生卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"${card.ticker} · AI 卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"AI 卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"as-of —\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"as-of ${item.as_of}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"存成報告\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"存檔中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"產生中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"繁中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_expression\",\"翻譯中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"· fundamentals\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"· technicals\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"✕ 關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"completeness — news\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"EN\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"loading…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"Q：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"single-model inference:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"最多採用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"最近卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"卡片載入失敗。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"可信度說明：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"天\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"尚無卡片。按上方「產生卡片」建立第一張。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"引用）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"引用證據摘要（\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"新聞回看\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"此卡片沒有可對應的 evidence item。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"每條主張的引用（claim → evidence_id）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"源 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"立場\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"篇（最近期）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"翻譯失敗：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"蒐集客觀證據 + 合成卡片，單檔約 1–2 分鐘…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"資料來源 · 可追溯性（\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"jsx_text\",\"預設 21 天 / 12 篇；不會用上全部保留的新聞。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/AICard.tsx\",\"runtime_cjk\",\"← 卡片列表\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/api.ts\",\"presenter_return\",\"/profile/investor/calibration/messages\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/api.ts\",\"presenter_return\",\"${path} returned ${r.status}${detail}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/api.ts\",\"presenter_return\",\"POST\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/App.tsx\",\"jsx_attribute\",\"主要導覽\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/App.tsx\",\"jsx_attribute\",\"導覽\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/App.tsx\",\"jsx_attribute\",\"開啟導覽\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"presenter_return\",\"Token / backend\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"presenter_return\",\"參數相容性\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"presenter_return\",\"可用模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"presenter_return\",\"工具呼叫\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"runtime_cjk\",\"backend 會拒絕 max_output_tokens；driver 需移除此參數\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"runtime_cjk\",\"function-call streaming 可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"runtime_cjk\",\"OAuth 不是 public API key；ChatGPT backend 可 streaming\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"runtime_cjk\",\"可用模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"runtime_cjk\",\"會向 api.openai.com 與 ChatGPT backend 發出最小診斷請求，確認 token 類型、streaming、工具呼叫與可用模型；不回傳 token，可能消耗少量訂閱額度。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/chatgptOAuth.ts\",\"runtime_cjk\",\"會執行 claude -p 並向 api.anthropic.com 做最小診斷請求，確認 setup-token 可用且 raw SDK 會拒絕該 token；不回傳 token，可能消耗少量訂閱額度。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"object_property\",\"API key\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"object_property\",\"ChatGPT OAuth\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"object_property\",\"Claude OAuth\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"object_property\",\"無 credential\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"${provider} key 已新增（未切換 active）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"${provider} key 已新增並設為 active。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"Anthropic API · live\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"anthropic\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"ChatGPT backend · live\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"claude_code_oauth\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"OpenAI API · live\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"seed · 非即時 discovery\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"來源：${credential.label} / ${credential.auth_type}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"來源：未指定 credential\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"列模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"列模型結果\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"新增 API key\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"新增並設為 active\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"查看候選模型\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/credentialDisplay.ts\",\"presenter_return\",\"缺少\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_attribute\",\"Registry tools\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_attribute\",\"Server time\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_attribute\",\"Status\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_expression\",\"✓ set\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_expression\",\"✗ missing\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"anthropic (default / advanced)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"API keys present\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"card synthesis\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"card translation\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"Data sources (tickers)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"Developer Mode\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"Models in use\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"openai (default / advanced)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"Tool categories\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"本機 Sidecar 已連線。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"正在連線至本機 Sidecar…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"無法連線至本機 Sidecar\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"資料來源設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Dashboard.tsx\",\"jsx_text\",\"顯示本機診斷資訊\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Asset Class\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Avg Cost\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Currency\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Notes\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Quantity\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Symbol\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Tags\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Edit Thesis\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Notes\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"NVDA\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"optional\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Quantity\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"帳戶明細目前不可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"帳戶總覽無法載入；持倉仍可使用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"持倉\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"持倉帳戶篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"持倉檢視\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"持倉載入失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"留空清除\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"載入帳戶明細\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"逗號分隔\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"關閉 ${pendingClose.symbol}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"關閉持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_attribute\",\"顯示已關閉持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Asset\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Avg Cost\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"broker · synced\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Currency\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Notes\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Options\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Positions\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Quantity\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"rows\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Symbol\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Tags\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Thesis\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"Unrealized P&amp;L\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"全部帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"已關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"新增手動持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"新增持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"請重新整理；若剛更新版本，請重啟應用程式後再試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"進階選擇權風險尚未建模；此區只呈現 broker 回傳的持倉快照。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"jsx_text\",\"顯示已關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"message_setter\",\"Ticker and non-zero quantity are required\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"message_setter\",\"均價必須留空或為數字\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"message_setter\",\"數量必須是非零數字\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"${positions.length} 筆持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"同步紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"尚無持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"帳戶明細\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"更新中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"活動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"編輯\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"載入失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"載入持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"object_property\",\"關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"runtime_cjk\",\"尚無一般持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"runtime_cjk\",\"尚無選擇權持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"runtime_cjk\",\"確認關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Holdings.tsx\",\"runtime_cjk\",\"這是軟關閉；持倉與筆記會保留，之後可在「顯示已關閉」檢視中查看。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_attribute\",\"告警\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_attribute\",\"自選股\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_attribute\",\"資料來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_attribute\",\"資料時間\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"7d %\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"Close\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"News\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"Priority\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"recent research cards\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"top movers · 7d\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"最近 AI 卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"到自選股產生 →\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"尚無 AI 卡片。在自選股詳情頁產生第一張研究卡片。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"尚無自選股。到「自選股」建立清單並加入標的。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"查看全部 →\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"無法載入工作台資料：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"自選股動態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"jsx_text\",\"重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"runtime_cjk\",\"共 ${rows.length + archivedCount} · ${archivedCount} 已封存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Home.tsx\",\"runtime_cjk\",\"尚未啟用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_attribute\",\"待核准校準提案\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_attribute\",\"投資人設定失敗\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_attribute\",\"校準訊息\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_attribute\",\"正在更新投資人設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_attribute\",\"載入投資人設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_expression\",\"你\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_expression\",\"助手\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"偏好優勢\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"儲存設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"可承受回撤 %\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"單一部位上限 %\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"套用校準提案\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"想避開的(逗號分隔)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"技能模式:off(技能建議屬後續階段,尚未啟用)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"投資人設定\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"投資風格\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"拒絕提案\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"持有週期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"啟用個人化(目前生效立場:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"未設定\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"校準對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"校準對話只用來整理投資人輪廓,不是投資建議或個股推薦。只有你核准的結構化設定會影響研究;原始對話不會進入研究 prompt。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"校準提案\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"校準訊息\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"產生設定草稿\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"研究個人化輔助（非投資建議、非適足性評估）。啟用後,助手依你的風險輪廓與所選立場調整 分析重點;證據蒐集與反方論點完全不受影響。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"自由描述(目標、自我觀察、想被怎麼協助)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"行為傾向(供助手校準,非診斷)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"送出校準訊息\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"開始校準對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"預設助手立場\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"風險意願(1-10)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"風險意願與風險承受能力:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"jsx_text\",\"風險承受能力(1-10)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"message_setter\",\"校準提案已套用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"事件驅動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"價值\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"動能\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"均衡\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"多年\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"成長投資人（預設）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"收益\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"數天〜數週\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"數月\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"混合\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"當沖\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"object_property\",\"自訂\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"runtime_cjk\",\"已儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"runtime_cjk\",\"校準回覆已更新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"runtime_cjk\",\"校準對話已開始\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"runtime_cjk\",\"校準提案已拒絕\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/InvestorProfilePanel.tsx\",\"runtime_cjk\",\"草稿已產生(未儲存)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/MarkdownView.tsx\",\"jsx_expression\",\"[image]\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"（${row.holiday}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"weekend\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"上次失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"上次已跳過\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"上次成功\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"假日${row.holiday ? `（${row.holiday}）` : \\\"\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"內文佇列：${parts.join(\\\" · \\\")}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"內文待處理狀態暫時無法讀取\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"執行過久\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"尚未執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"疑似不足（最多 ${row.max_observed_bar_count ?? 0} 根）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"盤中（未收盤）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"缺資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"覆蓋完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"週末\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分完成（${bodies} 篇內文待後續處理）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分完成（${tickers} 個標的、${bodies} 篇內文待後續處理）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分完成（${tickers} 個標的待後續處理）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分完成（尚有資料待後續處理）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分完成（待補抓 ${actionable}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"object_property\",\"部分覆蓋（${row.well_covered ?? 0}/${row.covered ?? 0} 檔完整）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"bad\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Blocked\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Legacy local compatibility surface (N8b pending)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Legacy local direct surface\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Legacy local direct writer\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Legacy PG mirror surface\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Legacy PG sync + local mirror\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"muted\"]",
+      "count": 6
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Normalized SQLite + legacy local projection\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"Normalized SQLite + legacy local projection（pre-exit test）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"ok\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"warn\"]",
+      "count": 9
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"不可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"可用（尚未退出）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"回退 PG 鏡像（env 強制關閉）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"回退至 PG 同步／本地鏡像\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"已退出（不可回退到 PG）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"啟用中（本地${envNote}）· 待 ingestion 建立\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"啟用中（本地${envNote}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"本地快照讀取可用；自動刷新未啟用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"本地權威（legacy flag 未設定；PG fallback 已退役）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"本地權威（PG fallback 已退役）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"直寫本地（env 強制開啟）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"直寫本地（已設定）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"直寫本地（預設）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"presenter_return\",\"設定已開，待建立資料庫\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"· env 強制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"${due} 篇目前可處理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"${due} 篇目前可處理（其中 ${neverAttempted} 篇尚未嘗試）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"${providerNotEntitled} 篇來源目前未訂閱（標題已保留，開通後自動重試）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"${scheduled} 篇已排程稍後重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"已停用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"未設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"正常\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"無訊號\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"維護中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"缺金鑰\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/marketDataDisplay.ts\",\"runtime_cjk\",\"過期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelPicker.ts\",\"object_property\",\"${model.label} · 未驗證（舊 sidecar 相容模式）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelPicker.ts\",\"object_property\",\"${row.model} · 未驗證（舊 sidecar 相容模式）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelPicker.ts\",\"presenter_return\",\"missing_active_credential\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelPicker.ts\",\"presenter_return\",\"model_not_visible\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelPicker.ts\",\"presenter_return\",\"task_auth_mode_unsupported\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelPicker.ts\",\"presenter_return\",\"task_capability_missing\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRouteDisplay.ts\",\"object_property\",\"DB（已儲存）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRouteDisplay.ts\",\"object_property\",\"env 覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRouteDisplay.ts\",\"object_property\",\"內建預設\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRouteDisplay.ts\",\"object_property\",\"設定檔 fallback\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"ChatGPT 訂閱登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"Claude 訂閱登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"provider 實際呼叫失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"使用手動 thinking budget\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"可供此任務使用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"可選擇 adaptive thinking\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"固定開啟 adaptive thinking\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"尚未設定此 provider 的登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"暫時無法讀取模型探索狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"此登入可見\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"此登入方式不支援這個任務\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"此登入方式尚不支援實際測試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"此登入的探索清單未顯示此模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"無特殊 thinking 行為\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"登入已失效，請重新登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"目前路由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"缺少任務能力\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"自訂／未知模型，尚未驗證能力\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"進階／未驗證\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/modelRoutingUx.ts\",\"runtime_cjk\",\"預設開啟 adaptive thinking\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"SA 類型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"Ticker（Enter）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"來源\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"內文狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"搜尋標題／摘要（Enter）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"開啟 ${it.ticker}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_attribute\",\"開啟 ${t}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_expression\",\"· 💬 ${it.comments_count.toLocaleString()}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_expression\",\"· 原文 ↗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_expression\",\"${it.publisher} ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_expression\",\"Seeking Alpha 文章＋市場新聞（本地 sa_capture.db）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_expression\",\"全部來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_expression\",\"本地新聞庫（score-free）· 搜尋為字詞 AND\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"· 搜尋「\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"」（按相關性排序，標題加權）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"✕ 清除搜尋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"loading…\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"SA\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"Seeking Alpha\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"僅標題 (\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"全部 (\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"共\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"天\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"市場新聞\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"新聞·事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"有內文 (\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"本地新聞庫尚未建立 — 到 Settings → Data Storage 建立本地市場庫。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"此條件下沒有 Seeking Alpha 內容。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"此條件下沒有文章。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"狀態不明 (\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"筆\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"篇\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"jsx_text\",\"載入更多（\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"object_property\",\"全部類型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"object_property\",\"分析文章\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"object_property\",\"市場新聞\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"presenter_return\",\"僅標題 · 來源未提供內文\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"presenter_return\",\"僅標題 · 內文待處理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"presenter_return\",\"內文狀態不明\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"runtime_cjk\",\"Seeking Alpha 本地資料路徑尚未就緒。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"runtime_cjk\",\"Seeking Alpha 資料尚未就緒。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"runtime_cjk\",\"分析文章\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/News.tsx\",\"runtime_cjk\",\"市場新聞\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"一致\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"中性\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"互補投資人\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"估值理性派\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"嚴格風控\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"套用技能：${trace.applied_skills.join(\\\"、\\\")}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"對齊投資人\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"建議技能：${trace.suggested_skills.join(\\\"、\\\")}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"成長機會派\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"承受能力高於風險意願\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"未評估\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"立場：${stanceLabel(trace.assistant_stance)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/personalizationDisplay.ts\",\"runtime_cjk\",\"風險意願高於承受能力\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"${account.label} 納入總計\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"Buying Power\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"Net Liquidation\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"Total Cash\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"今日已實現損益（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"今日損益合計（已實現 + 未實現，ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"今日未實現損益（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"尚無帳戶快照\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"已取得帳戶快照\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"帳戶最新快照明細\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"帳戶總覽\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_attribute\",\"手動帳戶持倉小計\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_expression\",\"手動帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"Broker 觀察：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"最新觀察值，不是績效曲線；空值表示 provider 未回報。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"只包含已勾選且未關閉的手動帳戶持倉；不與 IBKR Net Liquidation 相加。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"尚無納入總計的手動持倉。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"帳戶明細\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"帳戶總覽\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"手動帳戶 broker-base 小計\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"手動帳戶持倉小計\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"未實現\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"本地持倉核准 / 同步：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"無帳戶價值資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"筆 · 未實現\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"jsx_text\",\"納入總計\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"Broker 觀察\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"今日合計（已實現 + 未實現，ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"今日已實現（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"今日未實現（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"尚無帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"尚無帳戶快照\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"本地持倉核准 / 同步\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioAccountOverview.tsx\",\"runtime_cjk\",\"無帳戶價值資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"Capture 範圍\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"Symbol 篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"佣金\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"來源篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"原因\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"名目金額（確定性算術）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"已實現損益\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"已載入 ${page.items.length} 筆\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"帳戶篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"平倉範圍\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"成交均價\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"成交覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"投資組合活動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"投資組合活動紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"持倉方向\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"時間窗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"歷史起點\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"殘差\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"活動載入失敗；請重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"清除活動註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"狀態篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"確認意圖\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"結束\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"結束日期（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"編輯活動註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"覆蓋不完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"調整前\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"調整後\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"載入活動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"開始\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"開始日期（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_attribute\",\"預期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"· 修正 ${execution.corrects_exec_id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"· 最新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"· 歷史版本\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"· 生效版本\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"活動歷史尚未開始；目前沒有可確認的 Broker 擷取範圍。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_expression\",\"活動歷史起點：${formatSystemTimestamp(page.history_started_at_utc, { localTimeZone })}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"· Yield\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"· 已實現損益\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"· 贖回日\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"· 首次觀察 Run #\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"Broker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"Commission #\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"Exec\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"Position #\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"Symbol\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"不適用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"佣金修訂：未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"儲存註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"全部來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"全部帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"全部狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"套用篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"已實現損益為零\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"已實現獲利\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"已實現虧損\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"成交家族 #\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"手動紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"手動調整\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"日期篩選以美東時間（ET）為準。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"未匹配持倉變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"未匹配變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"未確認\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"歷史起點\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"殘差\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"活動紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"清除註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"確認意圖\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"系統覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"結束日期（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"結果未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"覆蓋缺口\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"載入更多\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"重設\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"開始日期（ET）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"首次成功擷取 Run #\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"jsx_text\",\"首次觀察 Run #\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"object_property\",\"收合明細\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"object_property\",\"查看明細\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"object_property\",\"編輯註記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"${item.symbol} 手動調整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"${item.symbol} 未匹配變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"${item.symbol} 獨立成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"${item.symbol} 訂單成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"Broker 日期覆蓋缺口\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"broker_day_gap\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"增加\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"完全平倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"建立\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"成交覆蓋不完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"方向未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"更新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"未匹配變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"未平倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"未知\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"活動歷史起點\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"混合\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"減少\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"獨立成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"覆蓋不完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"覆蓋完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"覆蓋缺口\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"訂單成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"買進\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"賣出\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"部分平倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"presenter_return\",\"關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"Run #${item.from_run_id ?? \\\"未知\\\"} → #${item.to_run_id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"Symbol / 事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"停損\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"全部帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"其他\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"再平衡\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"客觀結果\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"尚無活動紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"已實現損益為零\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"已實現獲利\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"已實現虧損\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"已確認的意圖與註記將被清除；Broker 與手動活動事實不受影響。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"手動紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"投資論點失效\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"時間\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"未知\"]",
+      "count": 10
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"未確認\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"獲利了結\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"確認意圖\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"確認清除\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"系統覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"結果未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"註記未儲存；請重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"註記未清除；請重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioActivity.tsx\",\"runtime_cjk\",\"資金需求\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"${safeCapture.review.changes.length} 項變更\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"IBKR 尚未設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"封存帳戶有新活動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"待檢視\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"持倉同步待檢視差異\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"持倉同步紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"持倉同步間隔（分鐘）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_attribute\",\"啟用持倉同步排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_expression\",\"下一次：${formatLocalTime(safeCapture.next_due_at)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_expression\",\"排程已停用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"5-1440 分鐘\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"交易 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"個封存帳戶有新觀察，未自動解除封存。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"個新帳戶。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"儲存排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"最近一次\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"前往設定 &gt; Data Sources &gt; IBKR\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"同步紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"唯讀同步會擷取 IBKR 帳戶、成交與持倉事實；ArkScope 不會下單。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"套用同步\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"尚無同步紀錄。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"帳戶 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"待套用差異\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"持倉 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"啟用排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"發現\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"立即同步\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"jsx_text\",\"間隔\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"message_setter\",\"同步變更已套用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"message_setter\",\"排程已儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"object_property\",\"同步狀態載入失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"object_property\",\"套用同步失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"object_property\",\"持倉同步失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"object_property\",\"排程儲存失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"object_property\",\"排程設定無效\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"presenter_return\",\"同步失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"presenter_return\",\"同步已中止\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"presenter_return\",\"同步已阻擋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"presenter_return\",\"同步資料不完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"presenter_return\",\"同步資訊\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"${item.inserted_execution_count} 筆成交 · ${item.inserted_commission_count} 筆費用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"同步 ${item.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"失敗\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"尚無同步紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"已中止\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"已阻擋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"成功\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"手動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"持倉同步狀態格式不相容，請重啟應用程式後再試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"持倉同步設定回應格式不相容，請重啟應用程式後再試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"啟動補抓\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"數量\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"新增事實\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"新帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"未執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"標的\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"沒有待套用差異\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"變更\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"部分完成\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"開始時間\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioCapturePanel.tsx\",\"runtime_cjk\",\"間隔必須是 5-1440 分鐘的整數\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_attribute\",\"開啟完整活動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"全部\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"最近\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"日\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"日有\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"筆未匹配變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"近\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"jsx_text\",\"近期活動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"${item.symbol} 手動調整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"${item.symbol} 未匹配變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"${item.symbol} 獨立成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"${item.symbol} 訂單成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"Broker 日期覆蓋缺口\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"broker_day_gap\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"建立\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"成交覆蓋不完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"所有帳戶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"方向未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"更新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"未匹配變動\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"活動歷史起點\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"混合\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"獨立成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"訂單成交\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"買入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"賣出\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"presenter_return\",\"關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"${manualActionLabel(item.action)} · ${item.changes.length} 項欄位\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"Broker 日期資料缺口\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"已實現損益為零\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"已實現獲利\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"已實現虧損\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"成交資料不完整\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"殘差 ${formatNumber(item.residual_quantity)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"結果未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/PortfolioRecentActivity.tsx\",\"runtime_cjk\",\"開始保留活動紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"${choice.context?.label ?? choice.id}；${PRESENTATION[choice.id].trace_note}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"AI 研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"effort\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"Ticker（選填）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"保留同一對話上下文，排除最後失敗回合後重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"輸入問題…（Enter 送出，Shift+Enter 換行）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_attribute\",\"開啟 ${t}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"· ${m.effort}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"· ${MODEL_UX_LABELS.authModes[choice.context.auth_mode] ?? choice.context.auth_mode}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"· ${modelReasonLabel(choice.providerReason)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"· ${modelReasonLabel(entry.disabledReason ?? entry.reason_code ?? \\\"\\\")}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"（${selectionProvenanceLabel(selection.provenance)}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"（空回應）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"Provider 預設\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"新對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_expression\",\"無可用模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"· 尚未選擇 effort（未套用）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"· 已達工具呼叫上限\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"· 此登入未顯示\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"effort\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"s\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"前往模型設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"問一個開放式問題，看 agent 如何用工具調查並整理證據。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"回應由背景服務繼續執行；只有「停止」會取消目前執行。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"對話與研究執行保存於本地；離開頁面後，研究仍會繼續執行。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"尚未設定可執行 AI 研究的登入。請到「設定」→ Providers 完成登入。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"新研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"查看證據\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"正在確認此對話上次成功使用的模型…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"此對話已封存；取消封存後才能繼續提問。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"此模型不支援已選 effort，請明確選擇新的 effort。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"無法確認此對話上次使用的模型；目前不會自動 fallback。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"研究模型：\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"研究路線：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"立場\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"診斷細節\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"請選擇此模型支援的 effort\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"證據\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"載入 provider…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"送出\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"重新確認模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"jsx_text\",\"重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"object_property\",\"${selEffort} · 此模型不支援\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"object_property\",\"Anthropic\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"object_property\",\"default\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"object_property\",\"OpenAI\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"object_property\",\"使用 provider 預設 effort\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"object_property\",\"此儲存值不再受目前模型支援\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"presenter_return\",\"上次明確選擇\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"presenter_return\",\"此對話上次成功路線\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"presenter_return\",\"設定路線\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"${providerLabel} 執行中，完成後一次顯示工具追蹤…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"CLS 過去 14 天的 SA 評論焦點與情緒變化？\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"MXL 的高價值留言在吵什麼？焦點是什麼？\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"NVDA 最新 SA 動態與評論焦點重點整理。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"最近 SA 對 SMCI 有什麼新文章和評論焦點？\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"即時工具追蹤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"完成後一次顯示工具追蹤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"思考中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"找不到指定的研究對話，可能已被刪除。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"暫時無法更新研究執行狀態，請稍後重新開啟此對話。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"暫時無法載入指定的研究對話，請稍後再試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"無法停止目前研究，請稍後再試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"無法載入這個研究對話，請從歷史重新選取。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Research.tsx\",\"runtime_cjk\",\"生成中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"Provider 呼叫失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"尚未設定登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"已達工具呼叫上限\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"模型執行逾時\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"模型拒絕回答\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"研究已中止\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"研究已取消\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"object_property\",\"需要重新登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"Provider 已回應，但模型拒絕完成這次要求。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"Provider 未能完成這次研究呼叫，請稍後重試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"前往登入設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"執行在完成前中止；已取得的內容仍會保留。\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"已保留目前取得的內容與工具紀錄；請簡化問題或調整限制後重試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"模型未在目前 AI 研究執行上界內完成。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"檢查 AI 研究執行限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"此 Provider 沒有可供 AI 研究使用的登入。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"目前登入已失效，完成重新登入後再執行研究。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"簡化問題或重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"設定 Provider\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchErrors.ts\",\"runtime_cjk\",\"這次研究由使用者停止。\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"complete\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"running\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"執行詳情只載入了一部分\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"已記錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_attribute\",\"證據與執行詳情\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_expression\",\"未知\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"s\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"回合保存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"執行詳情\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"套用技能\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"對話內容與已保存的工具紀錄仍然可用。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"工具\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"工具證據\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"建立\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"模型耗時\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"此回合沒有可用的工具證據紀錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"此舊回合沒有精確 run 連結\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"登入與額度\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"立場\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"診斷事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"路線\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"載入執行詳情…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"jsx_text\",\"開始\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"Provider 預設\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"最近一輪輸入 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"快取寫入 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"快取讀取 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"總 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"總輸入 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"總輸出 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"輸入 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"presenter_return\",\"輸出 tokens\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"runtime_cjk\",\"${label} · ${subscription ? \\\"使用訂閱額度，非 API 帳單\\\" : \\\"使用 API 額度，會計入 API 帳單\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"runtime_cjk\",\"Provider 預設\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"runtime_cjk\",\"使用 API 額度，會計入 API 帳單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"runtime_cjk\",\"使用訂閱額度，非 API 帳單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"runtime_cjk\",\"未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchEvidenceDrawer.tsx\",\"runtime_cjk\",\"無法載入診斷事件。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"${thread.archived_at ? \\\"取消封存\\\" : \\\"封存\\\"} ${title}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"取消封存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"取消重新命名\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"執行狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"封存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"封存狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"對話名稱\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"搜尋歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"更新日期起日\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"更新日期迄日\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"永久刪除 ${title}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"永久刪除對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"無法載入研究歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"研究歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"研究歷史清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"資料可能已過期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"載入研究歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"這個對話仍在執行中\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"重新命名 ${title}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"重新整理歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_attribute\",\"開啟對話 ${title}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_expression\",\"（未命名）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"」的訊息與研究執行紀錄將永久刪除。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"儲存名稱\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"全部狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"執行狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"封存狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"對話名稱\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"尚無執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"已中斷\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"已完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"已封存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"建立\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"找不到符合條件的對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"搜尋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"更新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"更新日期起日\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"更新日期迄日\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"目前對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"載入更多\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"jsx_text\",\"重試\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"尚無執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"已中斷\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"已取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"已完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"object_property\",\"排程中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"presenter_return\",\"仍有研究執行中，暫時無法封存或永久刪除。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"presenter_return\",\"無法更新研究歷史，請稍後重試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"runtime_cjk\",\"（未命名）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"runtime_cjk\",\"名稱不可空白\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchHistoryDrawer.tsx\",\"runtime_cjk\",\"永久刪除\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchReducer.ts\",\"runtime_cjk\",\"連線中斷\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"jsx_text\",\"診斷細節\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"完成後顯示於此對話\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"已保存於此對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"已取得的內容仍保留於此對話\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"建立執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"建立後會在此對話顯示\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"模型與工具執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"研究失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"研究完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"研究已中止\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"研究已取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ResearchRunProgress.tsx\",\"runtime_cjk\",\"等待執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchSelection.ts\",\"presenter_return\",\"此 provider 的執行環境目前不可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchSelection.ts\",\"presenter_return\",\"此模型不支援已選 effort\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchSelection.ts\",\"runtime_cjk\",\"使用 API 額度，會計入 API 帳單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/researchSelection.ts\",\"runtime_cjk\",\"使用訂閱額度，非 API 帳單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"主機測試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"最近遙測\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"啟動器\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"瀏覽器註冊\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"設定檔\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"資料回讀\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/saExtensionHealthDisplay.ts\",\"runtime_cjk\",\"遙測綁定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"把 DB 路由寫回設定檔備份（鏡像 DB 狀態：有則寫入、無則清除）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"把設定檔（user_profile.local.yaml）裡的路由匯入成 DB 權威\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"捨棄未儲存的變更？\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"目前無法切換設定群組\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"設定工作流程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_attribute\",\"設定目錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_expression\",\"儲存中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_expression\",\"儲存路由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"Loading model catalog…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"匯入與匯出\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"匯出到設定檔\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"從設定檔匯入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"本次變更尚未儲存：請先到 Providers 完成所選 provider 的登入。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"jsx_text\",\"設定目錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"，清除 ${res.cleared.length} 個無 DB 路由的舊鍵\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"，略過 ${res.skipped.length}（不完整／不一致）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"${TASK_LABELS[task.id]} 缺少 model id\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"${TASK_LABELS[task]} 已重設為設定檔／內建預設。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"${TASK_LABELS[task]}：所選 provider 尚未設定登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"AI 研究執行限制已儲存到 profile DB。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"AI 研究執行限制已重設為設定檔／內建預設。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"AI 與模型設定正在儲存。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"切換設定群組會捨棄目前群組中尚未儲存的變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"匯入 ${res.imported.length}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"固定 AI 任務執行限制已儲存到 profile DB。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"固定 AI 任務執行限制已重設為環境變數／內建預設。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"已將 DB 路由寫回設定檔（${res.exported.length} 筆${cleared}）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"已從設定檔匯入路由到 DB：${imp}${skip}。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"投資人設定可能有尚未儲存的變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"投資人設定正在儲存，完成後再切換。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"捨棄並切換\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"無可匯入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Settings.tsx\",\"runtime_cjk\",\"目前工作尚未完成，完成或取消後再切換設定群組。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"：${compactMessage(durableError)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"${ss.label}${durableError ? `：${compactMessage(durableError)}` : \\\"\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"ok\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"warn\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"套用受保護的設定？\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"手動補抓上次部分完成剩餘的標的\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"新觸發已略過\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"正常\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"注意\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_attribute\",\"貼上金鑰…\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"· 最早 ${formatSystemTimestamp(bodyBacklog.earliestNextRetryAt)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"（執行中，自動更新）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"（外部）\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"profile DB unavailable\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"免金鑰\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"排程開啟\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"排程關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"鏈路可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_expression\",\"鏈路有中斷\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"· 建議匯入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"· 預設\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"↻ 重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"▶ Run\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"loading…\"]",
+      "count": 4
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"Provider 健康\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"Provider 設定需要修復：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"Provider\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"SA Extension 健康\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"不提供（按次計費）\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"來源標示會說明每個值由 App、環境變數或 config/.env 管理。 App 內儲存的設定會立即生效；敏感值只顯示遮罩內容。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"儲存\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"免金鑰 · 預設可用\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"最近一次\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"最近成功\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"最近錯誤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"匯入\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"執行保護：同一資料來源與 IBKR 工作同時間只執行一次；若已有工作進行中， 新觸發會顯示為已跳過，不會重複抓取。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"套用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"完整訊息\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"已跳過：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"已退役\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"建議匯入\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"排程（每來源獨立）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"未設定\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"檢查瀏覽器 extension、native host、sidecar 回報與資料接收狀態。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"欄位\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"段落\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"清除\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"測試\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"狀態\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"目前值（來源）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"立即執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"細節\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"補抓\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"資料來源 · Data Sources\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"連線測試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"連線與金鑰\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"重新檢查\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"金鑰\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"間隔（分）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"jsx_text\",\"集中檢視各資料來源的健康狀態、連線設定、排程與手動執行。 每個來源可獨立設定；IBKR 工作會共用 Gateway 鎖以避免重疊。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"message_setter\",\"${source}: ${r.reason ?? \\\"已在執行\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"message_setter\",\"已在執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"object_property\",\"失敗訊息\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"object_property\",\"新觸發略過\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"object_property\",\"跳過原因\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"presenter_return\",\"${text.slice(0, max - 1)}…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"presenter_return\",\"App\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"presenter_return\",\"config/.env\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"presenter_return\",\"未設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"presenter_return\",\"環境變數\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"最後抓取 ${shortDate(snap.latest_fetched_at)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"各域用戶端 ID：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"各域用戶端 ID（環境變數控制中）：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"執行中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"套用變更\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"存檔後 ID：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"尚無資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"已在執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"已有執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"此設定需要確認後才會變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"測試中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"自動刷新已啟用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"自動刷新未啟用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"自動刷新狀態未知\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"資料來源與排程有未儲存的變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"資料來源設定更新正在進行。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataSourcesSection.tsx\",\"runtime_cjk\",\"資料快照可用：${formatCount(snap.series_count)} 序列 · ${formatCount(snap.observation_count)} 觀測值\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${formatSystemTimestamp(fc!.latest_fetched_at)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"${fd!.row_count.toLocaleString()} 列 · ${fd!.ticker_count} 檔 · 最新 ${fd!.latest_date ?? \\\"—\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"${iv!.row_count.toLocaleString()} 列 · ${iv!.ticker_count} 檔 · 最新 ${iv!.latest_date ?? \\\"—\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"${nw!.row_count.toLocaleString()} 篇 · ${nw!.source_count} 來源 · 最新 ${nw!.latest_published ?? \\\"—\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"${pr!.row_count.toLocaleString()} 列 · ${pr!.ticker_count} 檔 · 最新 ${pr!.latest_datetime ?? \\\"—\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_expression\",\"尚無資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"；full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"· 產生於\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"↻ 重新整理\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"IV\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"partial：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"partial\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"provider 錯誤：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"universe\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"交易日 / 價格覆蓋 · Trading-day coverage\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"價格\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"最多 bars\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"最近\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"最近增量更新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"唯讀診斷，不會自動補抓\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"基本面\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"天數\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"天的 15min 價格覆蓋。每列以 coverage_status 為準： 覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日。點開可看缺漏與 partial 標的、以及 provider 錯誤。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"市場資料 · Market Data\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"市場資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"新聞\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"日期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"檔 · interval\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"缺\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"缺（\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"財務快取\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"jsx_text\",\"顯示價格、新聞、隱含波動率、基本面與財務快取的資料量、最新時間及最近更新。 資料抓取由 Data Sources 管理。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"runtime_cjk\",\"價格 ${fmt(s.prices)} · 新聞 ${fmt(s.news)} · IV ${fmt(s.iv)} · 基本面 ${fmt(s.fundamentals)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"runtime_cjk\",\"尚未增量更新\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/DataStorageSection.tsx\",\"runtime_cjk\",\"錯誤（${m.last_error.slice(0, 40)}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_expression\",\"↻ 預覽 (dry-run)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_expression\",\"執行遷移 (apply) · ${totalToInsert} 筆\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_expression\",\"已全部遷移\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_expression\",\"遷移中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_expression\",\"預覽中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"、衝突（同 id 不同內容）會拒絕不寫。 先按「預覽」(dry-run，不寫入)，確認沒有衝突再「執行遷移」。遷移成功後才在他處啟用 use_local_records（本面板不提供切換）。 需要 PG 可連線。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"。備份：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"（卡片→報告連結不會斷）、\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"（有衝突，無法遷移）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"✓ 已本地化：PG 與本地一致，無待遷移項目（reports/memories/queries 走 profile_state.db）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"✓ 遷移完成：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"✗ 有\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"App Records 遷移 · reports / memories / queries\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"PG\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"保留原始 id\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"先備份本地 DB\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"已存在\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"待遷移\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"把報告、記憶、查詢記錄從 PostgreSQL 一次性遷移到本地 profile_state.db。這些是不可再生的使用者/agent 資料。 遷移\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"按「預覽」檢視 PG 與本地的差異（不會寫入）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"本地\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"筆 file_path 找不到對應檔案（metadata 仍會遷移）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"筆同 id 不同內容的衝突 — 遷移會被拒絕（不寫入）。請先排查再重試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"缺檔\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"衝突\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"jsx_text\",\"表\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"runtime_cjk\",\"${l} +${r.inserted}（略過 ${r.skipped}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"runtime_cjk\",\"報告\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"runtime_cjk\",\"查詢記錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/legacy/AppRecordsSection.tsx\",\"runtime_cjk\",\"記憶\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_attribute\",\"總經資料只載入了一部分\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_attribute\",\"總經資料目前無法載入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_attribute\",\"資料庫或必要資料表目前不可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_expression\",\"· 最後抓取 ${formatSystemTimestamp(snapshot.latest_fetched_at)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_expression\",\"自動刷新開啟\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_expression\",\"自動刷新關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"0 筆已儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"FRED 快照\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"Series ID\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"儲存覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"最後抓取\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"最新值\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"可用的資料已保留，請稍後重新整理其餘狀態。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"名稱\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"查看 FRED 序列快照、儲存量與事件資料覆蓋；排程與 Provider 健康狀態由 Data Sources 管理。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"筆已儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"總經資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"觀測日期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"請稍後重新整理；既有資料不會被清除。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"jsx_text\",\"重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"${count} · 最後抓取 ${formatSystemTimestamp(table.last_fetched_at)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"${table.row_count.toLocaleString()} 筆已儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"FRED 序列\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"FRED 發布資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"FRED 觀測值\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"IPO 事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"不可用\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"經濟事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/MacroStorageSection.tsx\",\"runtime_cjk\",\"財報事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"anthropic\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"claude-…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"default\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"Effort ${task.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"gpt-…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"Provider ${task.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"模型 ${task.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"模型限制 ${task.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"自訂 model id ${task.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"路由權威 ${routeSourceBadge(effectiveRoute?.source ?? \\\"default\\\").label}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_attribute\",\"重設 ${task.id}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"· ${MODEL_UX_LABELS.reasons[entry.disabledReason] ?? entry.disabledReason}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"· ${MODEL_UX_LABELS.reasons[entry.reason_code] ?? entry.reason_code}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"· 未驗證\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"· 進階\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"Anthropic\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"OpenAI\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"Provider default.\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"可實際呼叫\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"實際測試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"尚未探索此登入的模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"已取得可見模型清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"此通道無法線上列出模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"測試中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_expression\",\"測試失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"cost\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"Effort\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"fallback effort:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"Model\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"ms\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"Provider\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"speed\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"Thinking\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"verified\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"不可選：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"任務模型路由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"最後驗證可見\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"前往 Providers\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"尚未設定此 provider 的登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"未驗證（舊 sidecar 相容模式）。請重啟／更新 sidecar 後再執行模型測試。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"消耗訂閱額度，非 API 帳單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"登入在 Providers 管理；這裡只決定每個任務使用哪個 provider、模型與 effort。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"自訂 id 仍會經過「實際測試」；不會被當成已驗證模型。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"自訂 model id · 未驗證\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"輸入自訂 model id\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"返回模型列表\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"這個 model id 不在 seed catalog；請用 Providers 的 discovery/test 確認此 credential 是否可用。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"選擇已變更——重新測試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"選擇模型…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"重新驗證列表\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"jsx_text\",\"重設為 fallback\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"runtime_cjk\",\"AI 卡片生成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"runtime_cjk\",\"AI 研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ModelRoutingSection.tsx\",\"runtime_cjk\",\"卡片翻譯\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_expression\",\"${status.news.row_count.toLocaleString()} 篇 · ${status.news.source_count} 來源 · 最新 ${status.news.latest_published ?? \\\"—\\\"}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_expression\",\"尚未執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_expression\",\"尚無資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"↻ 重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"最近收集嘗試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"最近收集成功\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"最近錯誤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"收集狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"新聞資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"新聞資料狀態 · News Data\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/NewsStorageSection.tsx\",\"jsx_text\",\"顯示新聞資料量、最新文章、最近收集時間與錯誤。各來源排程與手動執行由 Data Sources 管理。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"${cred.label} account label\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"${cred.label} alias\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"${cred.label} expires at\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"${provider} primary\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"chatgpt_oauth\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"Claude subscription\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"claude_code_oauth\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"code 或 http://localhost:1455/auth/callback?code=…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"gpt / claude / mini…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"openai\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"sk-…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"sk-ant-…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"以此列身分重新登入 ChatGPT，原地更換 token（不新增 credential；alias／active 保留）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"例如 Claude Pro / Max\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"列出此 credential 後端可見的模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"刪除 Credential？\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"到期日（可留空）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"實測 ChatGPT OAuth backend\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"帳號／方案標籤（可留空）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"帳號／用途標籤（可留空）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"必填；留空則保留原名稱\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"查看候選模型（seed，非即時 discovery）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"測試 Claude setup-token\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_attribute\",\"貼上 claude setup-token 產生的 token\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\".env／環境變數 fallback（唯讀；DB credential 才是主要選擇面）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"✓ OAuth 驗證通過\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"✗ OAuth 驗證未通過\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"${discoverButtonLabel(selectedAuthMode)}（此 credential）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"Claude setup-token 可由上方匯入（token 存 token-store/keyring，不進 credential DB）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"OpenAI ChatGPT 訂閱可由上方「登入 ChatGPT」（token 存 token-store/keyring，不進 credential DB）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"完成中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"完成登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"實測 OAuth\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"本機 Settings credential（profile DB · 可編輯、可設為 active）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"測試 token\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"測試中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"登入 ChatGPT\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"登入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_expression\",\"讀取中…\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"（非公開 OpenAI API host；Research 啟用前會用實測確認 backend 行為）。 Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"＋ 新增 API key 或登入訂閱\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"AI 研究、卡片合成與翻譯會依 active credential 使用 ChatGPT 訂閱後端； 可見模型仍須用任務內的實際測試確認。預設不設為 active——登入不應悄悄切換使用中的 credential。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"ChatGPT backend 相容路徑\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"claude setup-token\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"Claude setup-token\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"credential\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"error:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"expected:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"observed:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"official source\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"probe 失敗：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"Provider 狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"Provider/channel 和 task routing 分開管理。這裡顯示本機 credential 狀態；每個 credential 可依其類型做 model discovery / capability test（API key 與 OAuth 方式各自不同）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"seed models · direct model id input allowed\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"source\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"token 已失效——需要重新登入。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。 用終端機\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"使用中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"個 provider 回傳模型；任務頁仍可直接輸入任何 model id。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"儲存顯示資訊\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"刪除\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"到期：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"匯入 Claude setup-token（訂閱登入）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"匯入 setup-token\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"匯入後設為 active\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"只在瀏覽器已完成登入、但本機 callback 沒收到時使用。貼上授權碼或整個回呼網址：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"可在此新增本機 API key credential（存於本機 profile DB）；env/config/.env 與 key pool 為唯讀來源。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"將移除已儲存的登入項目「\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"帳號／方案：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"帳號／方案標籤（可留空）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"授權碼／回呼網址\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"搜尋模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"新增 API key alias\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"新增 API key\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"新增後設為 active\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"沒有自動返回？手動貼上授權碼\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"產生後貼上。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"用於生成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"用於翻譯\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"登入 ChatGPT 訂閱（OpenAI subscription）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"登入後設為 active\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"等待瀏覽器登入完成…（已開新分頁）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"細節\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"複製登入連結\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"設為 active\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"這不是 Anthropic API key。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"這不是 OpenAI API key。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"這是\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"進階：指定某個 credential 做 discovery（一般用上方各列的「列模型／查看候選模型」即可）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"重新登入\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"顯示\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"jsx_text\",\"顯示名稱（可留空）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"object_property\",\"未命名 credential\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"${provider}: API key 不可為空\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Active key 已更新。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"ChatGPT 訂閱已登入（token 存入 token-store，未存入 credential DB）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"ChatGPT 訂閱已登入（手動完成；token 存入 token-store）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Claude setup-token 不可為空\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Claude setup-token 已匯入（存入 token-store，未存入 credential DB）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Credential 已刪除。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Credential 顯示資訊已更新。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Credential 驗證正在進行。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Provider 登入或 Credential 更新正在進行。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"Provider 登入與憑證有未儲存的變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"刪除 Credential\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"此瀏覽器不支援自動複製，請從新分頁的網址列手動複製登入連結。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"無法複製連結（瀏覽器剪貼簿權限被拒）。請從新分頁完成登入，或重新點「登入 ChatGPT」。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"登入失敗：${res.detail}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"登入失敗：${res.detail}（此登入工作階段已失效，請重新點「登入 ChatGPT」）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"登入工作階段不存在或已過期，請重新點「登入 ChatGPT」。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"登入連結已複製。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"等不到瀏覽器回呼（可能 popup 被擋，或本機 :1455 沒收到）。請改用下方手動貼上授權碼。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/ProviderSection.tsx\",\"runtime_cjk\",\"請貼上授權碼或回呼網址\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_expression\",\"儲存中…\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_expression\",\"儲存固定任務限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_expression\",\"儲存限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"AI 研究執行限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"Max turns\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"Session timeout 秒\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"subscription driver 的整體牆鐘時間；0 代表不設整體 timeout。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"subscription driver 裡單一 ArkScope 工具呼叫的 timeout。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"固定 AI 任務執行限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"控制單次 AI 研究的工具輪數與 subscription driver timeout。API-key 路徑目前只套用 max turns；切頁不中斷與並行會由 server-owned run manager 解決。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"模型可連續呼叫工具的最大輪數；API-key 與 subscription Research 都會套用。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"每工具 timeout 秒\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"較高 effort 的模型可能需要更久；這裡只控制最長等待時間，不會變更模型或 effort。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"重設固定任務限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"jsx_text\",\"重設限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"object_property\",\"AI 卡片生成 - 模型執行上限（秒）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"object_property\",\"DB 已儲存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"object_property\",\"env override\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"object_property\",\"內建預設\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"object_property\",\"卡片翻譯 - 模型執行上限（秒）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"object_property\",\"設定檔 fallback\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"runtime_cjk\",\"AI 研究執行限制有未儲存的變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/RuntimeLimitSections.tsx\",\"runtime_cjk\",\"固定 AI 任務執行限制有未儲存的變更。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/SettingsDirectory.tsx\",\"jsx_attribute\",\"搜尋所有設定\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/settings/SettingsDirectory.tsx\",\"jsx_attribute\",\"設定目錄\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/SettingsDirectory.tsx\",\"jsx_text\",\"找不到符合的設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/SettingsDirectory.tsx\",\"jsx_text\",\"搜尋所有設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"AI 研究執行限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"AI 與模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"Provider 登入與憑證\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"依任務選擇模型、provider 與推理強度。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"個人化\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"固定 AI 任務執行限制\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"市場資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"投資人設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"新聞資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"查看 FRED series、資料快照與總經資料覆蓋。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"查看價格、IV、基本面與交易日資料覆蓋。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"查看新聞資料量、攝入狀態與最近更新。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"查看資料來源健康度、排程與瀏覽器擴充同步狀態。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"模型與任務路由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"管理 AI provider 登入、訂閱與 API 憑證。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"管理投資人輪廓、風險意願與研究個人化。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"總經資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"設定 AI 卡片生成與翻譯的模型執行上界。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"設定 AI 研究 session 與單次執行限制。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"資料來源與排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"object_property\",\"資料與同步\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"ai 研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"IBKR 用戶端 ID\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"任務\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"個人化\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"價格\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"卡片生成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"卡片翻譯\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"基本面\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"市場資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"憑證\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"投資人\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"排程\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"文章\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"新聞\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"模型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"登入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"總經\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"總體經濟\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"資料來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"資料快照\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"路由\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"風險意願\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/settings/settingsRegistry.ts\",\"runtime_cjk\",\"風險承受能力\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_attribute\",\"AI 研究背景工作：${triggerLabel}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_attribute\",\"忽略 ${item.runId}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_attribute\",\"背景工作\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_text\",\"僅顯示此桌面工作階段觀察到的 AI 研究。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_text\",\"開啟對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"AI 研究執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"研究完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"研究已中止\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"研究未完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"等待執行\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"執行中 ${work.activeCount}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"待查看 ${work.attentionCount}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"研究未完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"結果留在 AI 研究對話\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"開啟原對話查看可採取的下一步。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"AI 研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"System / Health\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"全部標的\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"工作台\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"持倉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"探索\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"新聞·事件\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"系統\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"自選股\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"設定\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"追蹤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/researchWork.ts\",\"runtime_cjk\",\"AI 研究\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_attribute\",\"Developer diagnostics\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"API\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"ArkScope\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Card model\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Developer diagnostics\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Last status\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Sidecar 已連線\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Sidecar 無法連線\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Tools\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"正在連線\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/SourceRunProgress.tsx\",\"jsx_attribute\",\"${sourceLabel}執行進度\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/SourceRunProgress.tsx\",\"jsx_attribute\",\"執行中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/SourceRunProgress.tsx\",\"jsx_expression\",\"處理中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"object_property\",\"Category\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"object_property\",\"Industry\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"object_property\",\"Provenance\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"object_property\",\"Sector\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"object_property\",\"Theme\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"presenter_return\",\"${facetLabel(t.facet)} · ${t.value} (${t.source})${ro}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/tags.tsx\",\"runtime_cjk\",\"· 唯讀\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"＋標籤（可挑現有或新建）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"Add a note on ${ticker}…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"Balance sheet\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"Cash flow\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"Delete note\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"Income statements\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"標籤類型\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_attribute\",\"移除標籤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_expression\",\"· ${fund.data_source}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_expression\",\"· ${iv.signal}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_expression\",\"（${state.note_count}）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_expression\",\"↻ 重新整理\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_expression\",\"讀取中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"「本次來源」= 此次讀取的真實來源（本地命中 / PG 回退 / PG / 無）；「本地覆蓋」= 本地市場庫是否存有此標的的列。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"← 自選股\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"⌘/Ctrl+Enter to save\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"Add note\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"AI 卡片\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"archived\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"ATM IV\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"HV30\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"IV 歷史（最近\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"loading…\"]",
+      "count": 4
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"No notes yet.\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"Price (\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"price / volume / range / 多窗報酬 — 之後接 IBKR 即時與歷史 OHLCV\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"price detail unavailable:\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"Quotes\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"Raw snapshot\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"Spot\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"VRP\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"主題\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"圖表（price / volume）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"圖表元件規劃中\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"基本面\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"尚無標籤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"指標\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"數據\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"新增\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"日期\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"期）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"板塊/類別\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"無 IV 資料。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"無基本面資料。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"筆 · 來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"筆記\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"總覽\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"資料來源 / 新鮮度\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"部分資料無法載入：\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"jsx_text\",\"隱含波動率 IV\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"presenter_return\",\"PG\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"presenter_return\",\"PG（本地缺→回退）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"presenter_return\",\"本地\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"presenter_return\",\"本地檔案\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"presenter_return\",\"無資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"IV · 本地覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"IV · 本次來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"IV 歷史\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"基本面 · 本地覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"基本面 · 本次來源\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"基本面\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"啟用中（本地優先，缺資料回 PG）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"有\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"本地市場資料\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"無\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"狀態\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"設定已開，待建立本地庫（目前用 PG）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/TickerDetail.tsx\",\"runtime_cjk\",\"關閉（使用 PG）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_attribute\",\"工作失敗\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"可從此處取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"工作未完成，請依錯誤指示處理。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"無法從此處取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"離開頁面後不保證追蹤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"離開頁面後繼續\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"停止\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"已達上界，等待伺服器確認\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"本階段上界\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"結果：\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"總耗時\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"階段耗時\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"runtime_cjk\",\"工作完成\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"runtime_cjk\",\"工作已中止\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/BoundedProgress.tsx\",\"runtime_cjk\",\"已達上界，等待伺服器確認\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/ConfirmDialog.tsx\",\"runtime_cjk\",\"取消\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/DataTable.tsx\",\"jsx_attribute\",\"${label} 操作\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/DataTable.tsx\",\"jsx_text\",\"操作\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/Drawer.tsx\",\"jsx_attribute\",\"取消釘選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/Drawer.tsx\",\"jsx_attribute\",\"釘選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/ui/Drawer.tsx\",\"jsx_attribute\",\"關閉\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_attribute\",\"${r.note_count} note(s)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_attribute\",\"依 ${f.label} 篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_attribute\",\"尚無市場摘要\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_attribute\",\"從全部標的移除（已下市/重複代號）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_attribute\",\"搜尋 ticker…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_attribute\",\"清除分類篩選\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_expression\",\"· ${meta.archived} 已封存\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_expression\",\"⤓ 匯入分類\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_expression\",\"匯入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_expression\",\"尚無標的。按「匯入分類」從現有設定種入。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_expression\",\"沒有符合的標的。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"（全部）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"↻ Refresh\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"7d %\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"archived\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"Close\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"Lists\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"News\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"Tags\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"全部標的 · Universe\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"庫存來自 active universe 設定（不受清單增減影響）。「匯入分類」會從 config 種入分類標籤 （category / theme / 來源），並移除舊的 config 清單；可重複執行，使用者自訂的標籤不會被覆蓋。 分類用標籤管理，清單只放你的工作清單（與「自選股」同一組）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"所有清單（\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"有摘要 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"檔 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"清除分類 ✕\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"無摘要\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"jsx_text\",\"載入中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"⚠ 主題來源暫時無法連線，已略過 theme 標籤。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"匯入失敗：${e instanceof Error ? e.message : String(e)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"匯入完成：${bits.join(\\\"、\\\")}。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"從「全部標的」移除 ${ticker}？（用於已下市/重複的代號）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"新增 ${r.tags.tags_added} 個分類標籤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"移除 ${r.lists_removed} 個舊清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Universe.tsx\",\"runtime_cjk\",\"移除失敗：${e instanceof Error ? e.message : String(e)}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"${li.kind} · ${li.active_count} active\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"${r.note_count} note(s)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"app 內建立的自訂清單中 active 標的的聯集；完整 inventory 在「全部標的」\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Archive (global)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Chg 7d\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Finnhub analyst consensus (daily-cached)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Finnhub rate limit；稍後重新整理可重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"News\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Open detail\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Price\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Priority\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Restore (global)\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"Ticker\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"分析師資料來源錯誤；重新整理可重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"刪除清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"加入標的到「${selectedList.name}」… 輸入代號或公司名（Enter 直接加入）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"尚無市場摘要\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"從「${selectedList.name}」移除\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"改名\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"暫無資料或資料來源暫時失敗；重新整理可重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"未設定 FINNHUB_API_KEY\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"清單名稱…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"無分析師覆蓋\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"目前的預設清單（點擊取消）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"設定優先級\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"設為進入自選股的預設清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_attribute\",\"載入失敗，重新整理可重試\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"· ${archivedCount} archived\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"· ${railLists.length} 個自訂清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"· as of ${asOf}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"· 全部標的 ${universeCount}\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"（或試試 Show archived）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"（試試 Show archived）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"「全部清單」= app 內自訂清單中 active 標的的聯集；舊設定匯入與完整 inventory 在「全部標的」。新增請到清單裡加。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"↻ Refresh\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"✓ Archived\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"✕ 從此清單移除 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_expression\",\"Show archived\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"↗ 開詳情 ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"＋ 新增清單\"]",
+      "count": 2
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"＋ 直接加入代號\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"🗄 全域封存（所有清單）· Priority 下拉可設定。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"Actions\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"archived\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"Consensus\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"error\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"high\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"Loading…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"low\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"medium\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"Tags\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"你的清單目前沒有 active 標的\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"全部清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"已追蹤\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"建立你的第一個 app 自訂清單；舊設定匯入與 tier inventory 會留在「全部標的」，不會自動填入自選股。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"搜尋中…\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"檔\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"無摘要\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"目錄無相符（精確/前綴比對，非模糊）。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"自選股\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"這個清單還沒有標的 — 用上方搜尋加入\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"jsx_text\",\"還沒有任何清單。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"runtime_cjk\",\"（快取）\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"runtime_cjk\",\"全部清單\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"runtime_cjk\",\"刪除清單「${li.name}」？ 只移除這個清單與其成員關係 —— 不會刪除標的本身或任何市場資料，標的仍保留在其他清單中。\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"runtime_cjk\",\"強力買進 ${cn.strongBuy ?? 0} · 買進 ${cn.buy ?? 0} · 持有 ${cn.hold ?? 0} ·\"]",
+      "count": 1
+    },
+    {
+      "signature": "[\"src/Watchlist.tsx\",\"runtime_cjk\",\"賣出 ${cn.sell ?? 0} · 強力賣出 ${cn.strongSell ?? 0} 共 ${d.total} 位分析師 · 更新 ${when}\"]",
+      "count": 1
+    }
+  ]
+}

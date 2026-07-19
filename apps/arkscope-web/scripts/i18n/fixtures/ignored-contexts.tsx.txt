@@ -1,0 +1,10 @@
+// 這是註解，不是 runtime copy。
+import type { 中文型別 } from "./中文型別";
+
+type Status = "中文型別字面值";
+interface Shape {
+  "中文屬性鍵": string;
+}
+
+const STABLE_MACHINE_CODE = "provider_status";
+export const punctuation = <span> · </span>;
