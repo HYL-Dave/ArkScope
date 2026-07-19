@@ -1,9 +1,11 @@
 # DB-Derived Universe and `tickers_core.json` Retirement Design
 
-> **Status:** APPROVED; WRITTEN REVIEW GREEN. P2.8 Slice 3 and the Alpha Picks
-> reconciliation line are live. Product implementation has not started; the
-> next gate is a separate RED-first implementation plan and independent plan
-> review.
+> **Status:** APPROVED; WRITTEN REVIEW GREEN; IMPLEMENTATION PLAN REVIEW
+> PENDING. P2.8 Slice 3 and the Alpha Picks reconciliation line are live. The
+> RED-first implementation plan is open at
+> `docs/superpowers/plans/2026-07-19-db-derived-universe-tickers-core-retirement.md`;
+> product implementation remains prohibited until independent plan review is
+> GREEN.
 
 ## 1. Purpose
 
