@@ -6,6 +6,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog, ModelTask, NewsStatus, TaskRoute } from "./api";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 const mocked = vi.hoisted(() => ({
   newsStatus: null as NewsStatus | null,
   newsError: null as Error | null,
@@ -86,12 +89,6 @@ async function renderNewsSection() {
     }));
   });
   await flush();
-  const button = Array.from(host.querySelectorAll("button")).find((node) =>
-    node.textContent?.includes("News Data"));
-  if (!button) throw new Error("missing News Data section button");
-  await act(async () => {
-    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  });
   await flush();
 }
 
@@ -121,7 +118,8 @@ describe("SettingsView news storage copy", () => {
       direct_active: false,
     });
     await renderNewsSection();
-    expect(host!.querySelectorAll("input[type='checkbox']")).toHaveLength(0);
+    const newsAnchor = host!.querySelector('[data-settings-anchor="news_storage"]')!;
+    expect(newsAnchor.querySelectorAll("input[type='checkbox']")).toHaveLength(0);
     expect(host!.textContent).not.toContain("Legacy local writer");
     expect(host!.textContent).not.toContain("Normalized news writes");
     const api = await import("./api");

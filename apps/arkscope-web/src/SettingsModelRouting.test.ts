@@ -2,13 +2,16 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog, ModelTask, RuntimeConfig, TaskRoute } from "./api";
 import type {
   EnabledSettingsSection,
   SettingsNavigationRequest,
 } from "./shell/navigation";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 const saveFixedTaskRuntime = vi.hoisted(() => vi.fn(async () => ({ fixed_task_runtime: {} })));
 
@@ -86,6 +89,25 @@ import { SettingsView } from "./Settings";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(() => {
+  window.localStorage.clear();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
+  Object.defineProperty(window, "requestAnimationFrame", {
+    configurable: true,
+    value: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    },
+  });
+  Object.defineProperty(window, "cancelAnimationFrame", {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
 
 afterEach(() => {
   if (root) act(() => root!.unmount());
@@ -219,7 +241,7 @@ describe("Settings model route save gate", () => {
     });
     await flush();
 
-    expect(host.querySelector("button[title='Providers']")?.classList.contains("active")).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
   });
 
   it("reapplies the same section only when its request sequence advances", async () => {
@@ -243,14 +265,15 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await render(request(1));
-    const providers = host.querySelector("button[title='Providers']") as HTMLButtonElement;
+    const providers = Array.from(host.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "Provider 登入與憑證") as HTMLButtonElement;
     await act(async () => providers.click());
-    expect(providers.classList.contains("active")).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
 
     await render(request(1));
-    expect(host.querySelector("button[title='Providers']")?.classList.contains("active")).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="providers"]'));
 
     await render(request(2));
-    expect(host.querySelector("button[title='Models']")?.classList.contains("active")).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector('[data-settings-anchor="models"]'));
   });
 });

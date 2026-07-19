@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { ChevronDown, ChevronRight, Menu } from "lucide-react";
 import {
   discoverModels,
   deleteModelRoute,
@@ -51,8 +52,19 @@ import {
   FixedTaskRuntimeSection,
   ResearchRuntimeSection,
 } from "./settings/RuntimeLimitSections";
-import { AppRecordsSection } from "./settings/legacy/AppRecordsSection";
-import type { SettingsAnchorId } from "./settings/settingsRegistry";
+import { SettingsDirectory } from "./settings/SettingsDirectory";
+import { SettingsSectionAnchor } from "./settings/SettingsSectionAnchor";
+import {
+  SETTINGS_GROUPS,
+  settingsGroupFor,
+  type SettingsAnchorId,
+  type SettingsGroupId,
+} from "./settings/settingsRegistry";
+import {
+  readCollapsedSettingsGroups,
+  writeCollapsedSettingsGroups,
+} from "./settings/settingsPreferences";
+import { Button, Drawer, IconButton, PageHeader, useShellOverlay } from "./ui";
 
 export {
   CredentialList,
@@ -63,72 +75,6 @@ export {
   ResearchRuntimeSection,
   SetupDisclosure,
 };
-
-type SettingsSection = SettingsAnchorId | "app_records" | "permissions";
-
-const SETTINGS_SECTIONS: Array<{
-  id: SettingsSection;
-  title: string;
-  description: string;
-  enabled: boolean;
-}> = [
-  {
-    id: "models",
-    title: "Models",
-    description: "任務路由、model id、effort。",
-    enabled: true,
-  },
-  {
-    id: "investor_profile",
-    title: "投資人設定",
-    description: "Investor Profile + 助手立場（opt-in 研究個人化；非投資建議）。",
-    enabled: true,
-  },
-  {
-    id: "providers",
-    title: "Providers",
-    description: "Anthropic / OpenAI key 狀態與可用模型來源。",
-    enabled: true,
-  },
-  {
-    id: "data_storage",
-    title: "Data Storage",
-    description: "價格、新聞、IV、基本面與財務快取狀態。",
-    enabled: true,
-  },
-  {
-    id: "news_storage",
-    title: "News Data",
-    description: "新聞資料量、最新文章、收集狀態與最近錯誤。",
-    enabled: true,
-  },
-  {
-    id: "macro_storage",
-    title: "Macro / Calendar",
-    description: "FRED 總經資料與經濟、財報、IPO 行事曆狀態。",
-    enabled: true,
-  },
-  {
-    id: "app_records",
-    // One-time PG→local migration tool; migration is done (use_local_records=true) so this is
-    // demoted out of the active nav. Component + backend route kept until the final PG-exit step.
-    title: "App Records",
-    description: "報告／記憶／查詢記錄已本地化（use_local_records=true）。一次性 PG→本地遷移工具，已完成。",
-    enabled: false,
-  },
-  {
-    id: "data_sources",
-    title: "Data Sources",
-    description: "資料源健康狀態 + 每來源獨立排程（app 直接發起，免 cron）。",
-    enabled: true,
-  },
-  {
-    id: "permissions",
-    title: "Permissions",
-    description: "profile_state_write / metered_spend 等權限門檻。",
-    enabled: false,
-  },
-];
 
 export interface SettingsViewProps {
   runtime: RuntimeConfig | null;
@@ -147,16 +93,59 @@ export function SettingsView({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [section, setSection] = useState<SettingsSection>("models");
+  const [section, setSection] = useState<SettingsAnchorId>("models");
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<SettingsGroupId>>(
+    () => readCollapsedSettingsGroups(),
+  );
+  const [directoryQuery, setDirectoryQuery] = useState("");
+  const [directoryOpen, setDirectoryOpen] = useState(false);
   const consumedNavigationSequenceRef = useRef(0);
+  const directoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const revealFrameRef = useRef<number | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryState>({});
   const [testState, setTestState] = useState<TestState>({});
+  const shellOverlay = useShellOverlay();
+
+  const revealSection = useCallback((id: SettingsAnchorId) => {
+    const groupId = settingsGroupFor(id).id;
+    setCollapsedGroups((current) => {
+      if (!current.has(groupId)) return current;
+      const next = new Set(current);
+      next.delete(groupId);
+      writeCollapsedSettingsGroups(next);
+      return next;
+    });
+    setSection(id);
+    setDirectoryOpen(false);
+    if (revealFrameRef.current != null) cancelAnimationFrame(revealFrameRef.current);
+    revealFrameRef.current = requestAnimationFrame(() => {
+      revealFrameRef.current = null;
+      const anchor = document.querySelector<HTMLElement>(`[data-settings-anchor="${id}"]`);
+      if (!anchor) return;
+      anchor.scrollIntoView({ block: "start" });
+      anchor.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const toggleGroup = useCallback((id: SettingsGroupId) => {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      writeCollapsedSettingsGroups(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (revealFrameRef.current != null) cancelAnimationFrame(revealFrameRef.current);
+  }, []);
 
   useEffect(() => {
     if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
     consumedNavigationSequenceRef.current = navigationRequest.sequence;
-    setSection(navigationRequest.target.section);
-  }, [navigationRequest]);
+    revealSection(navigationRequest.target.section);
+  }, [navigationRequest, revealSection]);
 
   useEffect(() => {
     let cancelled = false;
@@ -395,43 +384,177 @@ export function SettingsView({
     }
   }
 
+  function renderSection(id: SettingsAnchorId) {
+    if (id === "providers") {
+      if (!catalog) return loading ? <p className="muted">Loading model catalog…</p> : null;
+      return (
+        <ProviderSection
+          catalog={catalog}
+          runtime={runtime}
+          discovery={discovery}
+          onRefresh={async () => {
+            const refreshed = await getModelCatalog();
+            setCatalog(refreshed);
+            invalidateAllTaskTests();
+            await onRuntimeChanged();
+          }}
+          onDiscover={async (provider, credentialId) => {
+            await discoverAndRefresh(provider, credentialId);
+          }}
+          onClearDiscovery={(provider) => {
+            setDiscovery((prev) => {
+              const next = { ...prev };
+              delete next[provider];
+              return next;
+            });
+          }}
+          onUseModel={(provider, model, task) => {
+            invalidateTaskTest(task);
+            onDraftForTask(setDraft, task, provider, model);
+            revealSection("models");
+          }}
+        />
+      );
+    }
+
+    if (id === "models") {
+      if (!catalog) return null;
+      return (
+        <>
+          <div className="ui-action-row">
+            <Button
+              tone="primary"
+              onClick={() => void save()}
+              disabled={saving || loading || routeSaveBlocks.length > 0}
+              aria-describedby={routeSaveBlocks.length ? "route-save-blocked" : undefined}
+            >
+              {saving ? "儲存中…" : "儲存路由"}
+            </Button>
+          </div>
+          <ModelRoutingSection
+            catalog={catalog}
+            draft={draft}
+            modelsByProvider={modelsByProvider}
+            testState={testState}
+            onDraft={setDraft}
+            onTest={async (task) => {
+            const row = draft[task];
+            if (!row || !row.model.trim()) return;
+            const context = modelProviderContexts[row.provider];
+            if (!context) return;
+            const snapshot: TaskTestSnapshot = {
+              task,
+              provider: row.provider,
+              model: row.model.trim(),
+              effort: row.effort || "default",
+              credential_id: context.credential_id,
+            };
+            setTestState((prev) => ({
+              ...prev,
+              [task]: { loading: true, result: null, snapshot, stale: false },
+            }));
+            try {
+              const result = await testTaskModelAccess(
+                task, row.provider, row.model.trim(), row.effort || "default",
+              );
+              setTestState((prev) => ({
+                ...prev,
+                [task]: {
+                  loading: false,
+                  result,
+                  snapshot,
+                  stale: prev[task]?.stale ?? false,
+                },
+              }));
+            } catch (e) {
+              setTestState((prev) => ({
+                ...prev,
+                [task]: {
+                  loading: false,
+                  snapshot,
+                  stale: prev[task]?.stale ?? false,
+                  result: {
+                    task,
+                    provider: row.provider,
+                    auth_mode: context.auth_mode,
+                    credential_id: null,
+                    model: row.model,
+                    effort: row.effort || "default",
+                    status: "error",
+                    error_code: "provider_call_failed",
+                    latency_ms: null,
+                    tested_at: new Date().toISOString(),
+                    warning: e instanceof Error ? e.message : String(e),
+                    fallback_effort: null,
+                  },
+                },
+              }));
+            }
+            }}
+            onInvalidateTest={invalidateTaskTest}
+            onDiscover={discoverAndRefresh}
+            onOpenProviders={() => revealSection("providers")}
+            onReset={async (task) => {
+            setErr(null);
+            setMsg(null);
+            try {
+              await deleteModelRoute(task);
+              const refreshed = await getModelCatalog();
+              setCatalog(refreshed);
+              setDraft(fromRoutes(refreshed.routes));
+              invalidateTaskTest(task);
+              await onRuntimeChanged();
+              setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : String(e));
+            }
+            }}
+          />
+        </>
+      );
+    }
+
+    if (id === "fixed_task_runtime") {
+      return runtime?.fixed_task_runtime ? (
+        <FixedTaskRuntimeSection
+          settings={runtime.fixed_task_runtime}
+          saving={saving}
+          onSave={saveFixedTaskLimits}
+          onReset={resetFixedTaskLimits}
+        />
+      ) : null;
+    }
+
+    if (id === "research_runtime") {
+      return runtime?.research_runtime ? (
+        <ResearchRuntimeSection
+          settings={runtime.research_runtime}
+          saving={saving}
+          onSave={saveRuntimeLimits}
+          onReset={resetRuntimeLimits}
+        />
+      ) : null;
+    }
+
+    if (id === "investor_profile") return <InvestorProfilePanel />;
+    if (id === "data_sources") return <DataSourcesSection />;
+    if (id === "data_storage") return <DataStorageSection />;
+    if (id === "news_storage") return <NewsStorageSection />;
+    return <MacroStorageSection />;
+  }
+
+  const directory = (
+    <SettingsDirectory
+      query={directoryQuery}
+      currentTarget={section}
+      onQueryChange={setDirectoryQuery}
+      onSelect={revealSection}
+    />
+  );
+
   return (
-    <main className="main settings-page">
-      <div className="page-head">
-        <div>
-          <p className="eyebrow">Settings</p>
-          <h1>模型與任務路由</h1>
-          <p className="muted">
-            為每個 AI 任務選擇 provider、model id 和 effort。Provider 頁可用目前 active key discovery/test 實際可用模型。
-          </p>
-        </div>
-        <div className="page-head-actions">
-          <button
-            className="btn-ghost"
-            onClick={() => void importRoutes()}
-            disabled={saving || loading || !catalog}
-            title="把設定檔（user_profile.local.yaml）裡的路由匯入成 DB 權威"
-          >
-            從設定檔匯入
-          </button>
-          <button
-            className="btn-ghost"
-            onClick={() => void exportRoutes()}
-            disabled={saving || loading || !catalog}
-            title="把 DB 路由寫回設定檔備份（鏡像 DB 狀態：有則寫入、無則清除）"
-          >
-            匯出到設定檔
-          </button>
-          <button
-            className="btn-ghost"
-            onClick={() => void save()}
-            disabled={saving || loading || !catalog || routeSaveBlocks.length > 0}
-            aria-describedby={routeSaveBlocks.length ? "route-save-blocked" : undefined}
-          >
-            {saving ? "儲存中…" : "儲存路由"}
-          </button>
-        </div>
-      </div>
+    <main className="main settings-workspace" data-settings-overlay={String(shellOverlay)}>
+      <PageHeader title="設定" />
 
       {err && <p className="error-text">{err}</p>}
       {msg && <p className="ok-text">{msg}</p>}
@@ -441,191 +564,60 @@ export function SettingsView({
         </p>
       )}
 
-      {runtime && (
-        <section className="settings-band">
-          <div>
-            <span className="label">Anthropic key</span>
-            <strong>{runtime.anthropic.key_set ? "已設定" : "未設定"}</strong>
-          </div>
-          <div>
-            <span className="label">OpenAI key</span>
-            <strong>{runtime.openai.key_set ? "已設定" : "未設定"}</strong>
-          </div>
-          <div>
-            <span className="label">目前合成</span>
-            <strong>{runtime.card_synthesis.provider}/{runtime.card_synthesis.model}</strong>
-          </div>
-          <div>
-            <span className="label">目前翻譯</span>
-            <strong>{runtime.card_translation.provider}/{runtime.card_translation.model}</strong>
-          </div>
-        </section>
-      )}
+      {shellOverlay ? (
+        <Button
+          ref={directoryTriggerRef}
+          className="settings-directory-trigger"
+          tone="secondary"
+          size="compact"
+          icon={<Menu size={16} />}
+          onClick={() => setDirectoryOpen(true)}
+        >
+          設定目錄
+        </Button>
+      ) : null}
 
-      {loading && <p className="muted">Loading model catalog…</p>}
-
-      {catalog && (
-        <div className="settings-layout">
-          <aside className="settings-nav-card">
-            <p className="eyebrow">設定分類</p>
-            <div className="settings-section-list">
-              {SETTINGS_SECTIONS.filter((item) => item.enabled).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`settings-section-button ${section === item.id ? "active" : ""}`}
-                  onClick={() => setSection(item.id)}
-                  title={item.title}
-                >
-                  <strong>{item.title}</strong>
-                  <span>{item.description}</span>
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          <section className="settings-content">
-            {section === "models" ? (
-              <>
-                <ModelRoutingSection
-                  catalog={catalog}
-                  draft={draft}
-                  modelsByProvider={modelsByProvider}
-                  testState={testState}
-                  onDraft={setDraft}
-                  onTest={async (task) => {
-                    const row = draft[task];
-                    if (!row || !row.model.trim()) return;
-                    const context = modelProviderContexts[row.provider];
-                    if (!context) return;
-                    const snapshot: TaskTestSnapshot = {
-                      task,
-                      provider: row.provider,
-                      model: row.model.trim(),
-                      effort: row.effort || "default",
-                      credential_id: context.credential_id,
-                    };
-                    setTestState((prev) => ({
-                      ...prev,
-                      [task]: { loading: true, result: null, snapshot, stale: false },
-                    }));
-                    try {
-                      const result = await testTaskModelAccess(
-                        task, row.provider, row.model.trim(), row.effort || "default",
-                      );
-                      setTestState((prev) => ({
-                        ...prev,
-                        [task]: {
-                          loading: false,
-                          result,
-                          snapshot,
-                          stale: prev[task]?.stale ?? false,
-                        },
-                      }));
-                    } catch (e) {
-                      setTestState((prev) => ({
-                        ...prev,
-                        [task]: {
-                          loading: false,
-                          snapshot,
-                          stale: prev[task]?.stale ?? false,
-                          result: {
-                            task,
-                            provider: row.provider,
-                            auth_mode: context.auth_mode,
-                            credential_id: null,
-                            model: row.model,
-                            effort: row.effort || "default",
-                            status: "error",
-                            error_code: "provider_call_failed",
-                            latency_ms: null,
-                            tested_at: new Date().toISOString(),
-                            warning: e instanceof Error ? e.message : String(e),
-                            fallback_effort: null,
-                          },
-                        },
-                      }));
-                    }
-                  }}
-                  onInvalidateTest={invalidateTaskTest}
-                  onDiscover={discoverAndRefresh}
-                  onOpenProviders={() => setSection("providers")}
-                  onReset={async (task) => {
-                    setErr(null);
-                    setMsg(null);
-                    try {
-                      await deleteModelRoute(task);
-                      const refreshed = await getModelCatalog();
-                      setCatalog(refreshed);
-                      setDraft(fromRoutes(refreshed.routes));
-                      invalidateTaskTest(task);
-                      await onRuntimeChanged();
-                      setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
-                    } catch (e) {
-                      setErr(e instanceof Error ? e.message : String(e));
-                    }
-                  }}
-                />
-                {runtime?.fixed_task_runtime && (
-                  <FixedTaskRuntimeSection
-                    settings={runtime.fixed_task_runtime}
-                    saving={saving}
-                    onSave={saveFixedTaskLimits}
-                    onReset={resetFixedTaskLimits}
+      <div className="settings-workspace-layout">
+        {!shellOverlay ? <aside className="settings-directory-rail">{directory}</aside> : null}
+        <div className="settings-workspace-groups">
+          {SETTINGS_GROUPS.map((group) => {
+            const expanded = !collapsedGroups.has(group.id);
+            return (
+              <section className="settings-workspace-group" key={group.id}>
+                <header>
+                  <h2>{group.title}</h2>
+                  <IconButton
+                    label={`${expanded ? "收合" : "展開"} ${group.title}`}
+                    tone="ghost"
+                    size="compact"
+                    icon={expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    aria-expanded={expanded}
+                    onClick={() => toggleGroup(group.id)}
                   />
-                )}
-                {runtime?.research_runtime && (
-                  <ResearchRuntimeSection
-                    settings={runtime.research_runtime}
-                    saving={saving}
-                    onSave={saveRuntimeLimits}
-                    onReset={resetRuntimeLimits}
-                  />
-                )}
-              </>
-            ) : section === "investor_profile" ? (
-              <InvestorProfilePanel />
-            ) : section === "providers" ? (
-              <ProviderSection
-                catalog={catalog}
-                runtime={runtime}
-                discovery={discovery}
-                onRefresh={async () => {
-                  const refreshed = await getModelCatalog();
-                  setCatalog(refreshed);
-                  invalidateAllTaskTests();
-                  await onRuntimeChanged();
-                }}
-                onDiscover={async (provider, credentialId) => {
-                  await discoverAndRefresh(provider, credentialId);
-                }}
-                onClearDiscovery={(provider) => {
-                  setDiscovery((prev) => {
-                    const next = { ...prev };
-                    delete next[provider];
-                    return next;
-                  });
-                }}
-                onUseModel={(provider, model, task) => {
-                  invalidateTaskTest(task);
-                  onDraftForTask(setDraft, task, provider, model);
-                  setSection("models");
-                }}
-              />
-            ) : section === "data_storage" ? (
-              <DataStorageSection />
-            ) : section === "news_storage" ? (
-              <NewsStorageSection />
-            ) : section === "macro_storage" ? (
-              <MacroStorageSection />
-            ) : section === "app_records" ? (
-              <AppRecordsSection />
-            ) : section === "data_sources" ? (
-              <DataSourcesSection />
-            ) : null}
-          </section>
+                </header>
+                {expanded ? (
+                  <div className="settings-workspace-group-body">
+                    {group.sections.map((definition) => (
+                      <SettingsSectionAnchor id={definition.id} key={definition.id}>
+                        {renderSection(definition.id)}
+                      </SettingsSectionAnchor>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      <Drawer
+        open={shellOverlay && directoryOpen}
+        title="設定目錄"
+        onClose={() => setDirectoryOpen(false)}
+        returnFocusRef={directoryTriggerRef}
+      >
+        {directory}
+      </Drawer>
     </main>
   );
 }

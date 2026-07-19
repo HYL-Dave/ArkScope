@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const primitiveCss = readFileSync(resolve(here, "./primitives.css"), "utf8");
-const css = [readFileSync(resolve(here, "../styles.css"), "utf8"), primitiveCss].join("\n");
+const settingsCss = readFileSync(resolve(here, "../settings/settings.css"), "utf8");
+const css = [readFileSync(resolve(here, "../styles.css"), "utf8"), primitiveCss, settingsCss].join("\n");
 
 function tsxSources(root: string): string[] {
   if (!existsSync(root)) return [];
@@ -28,7 +29,6 @@ const settingsSources = [
 ].join("\n");
 
 const settingsBaselineUndefinedClasses = [
-  "settings-page",
   "ds-table",
   "provider-config-field-label",
   "provider-config-field-current",

@@ -455,12 +455,6 @@ async function renderDataSources() {
     root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
   });
   await act(async () => { await Promise.resolve(); });
-  const dataButton = Array.from(host.querySelectorAll("button")).find((button) =>
-    button.textContent?.includes("Data Sources"));
-  if (!dataButton) throw new Error("missing Data Sources section button");
-  await act(async () => {
-    dataButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  });
   await act(async () => { await Promise.resolve(); });
 }
 

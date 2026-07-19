@@ -5,6 +5,7 @@ import { installUiTokens } from "./ui/tokens";
 import "./styles.css";
 import "./shell/shell.css";
 import "./ui/primitives.css";
+import "./settings/settings.css";
 
 installUiTokens(document.documentElement);
 
