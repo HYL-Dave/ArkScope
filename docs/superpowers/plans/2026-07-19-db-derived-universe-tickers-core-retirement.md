@@ -1845,8 +1845,13 @@ PROCESS CLEANUP:
   The merged desktop restarted from master at Vite 8430 with sidecar 37255.
   Authenticated live smoke returned universe 150/150, BTSG tracked search,
   seven scheduler sources, and DB-derived export authority; the no-provider
-  daily-update dry run resolved 150 tickers and executed nothing. The merged
-  implementation worktree and local feature branch were removed. Retained
-  production backups remain; no browser-extension reload was required because
-  its bytes are unchanged.
+  daily-update dry run resolved 150 tickers and executed nothing. A post-restart
+  live-aware digest pass found changes only in the six expected runtime
+  telemetry/observation tables: startup portfolio capture run 182 succeeded
+  with one account snapshot and ten position observations, and scheduler jobs
+  collect.ibkr_news / collect.ibkr_prices succeeded. The other 37 profile
+  tables and all 23 SA tables still match the retained backup logically. The
+  merged implementation worktree and local feature branch were removed.
+  Retained production backups remain; no browser-extension reload was required
+  because its bytes are unchanged.
 ```
