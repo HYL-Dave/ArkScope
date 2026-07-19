@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, TaskRoute, TradingDayCoverage } from "./api";
+import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, TaskRoute, TradingDayCoverage } from "./api";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -12,8 +12,10 @@ import type { MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus
 const mocked = vi.hoisted(() => ({
   marketStatus: null as MarketDataStatus | null,
   macroStatus: null as MacroStatus | null,
+  macroSnapshot: null as MacroSnapshot | null,
   marketError: null as Error | null,
   macroError: null as Error | null,
+  macroSnapshotError: null as Error | null,
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -56,8 +58,31 @@ const macroStatus: MacroStatus = {
   local_first_active: true,
 };
 
+const macroSnapshot: MacroSnapshot = {
+  available: true,
+  macro_db: "/tmp/macro_calendar.db",
+  series_count: 2,
+  observation_count: 29_571,
+  release_dates_count: 3,
+  latest_fetched_at: "2026-07-01T00:00:00+00:00",
+  auto_refresh_enabled: false,
+  items: [{
+    series_id: "FEDFUNDS",
+    label: "Fed Funds",
+    title: "Federal Funds Effective Rate",
+    units: "Percent",
+    value: 4.33,
+    observation_date: "2026-06-01",
+    fetched_at: "2026-07-01T00:00:00+00:00",
+    realtime_start: "2026-06-01",
+    realtime_end: "2026-06-01",
+  }],
+  missing_series: [],
+};
+
 mocked.marketStatus = marketStatus;
 mocked.macroStatus = macroStatus;
+mocked.macroSnapshot = macroSnapshot;
 
 const coverage: TradingDayCoverage = {
   interval: "15min",
@@ -123,6 +148,10 @@ vi.mock("./api", async (importOriginal) => {
       if (mocked.macroError) throw mocked.macroError;
       return mocked.macroStatus!;
     }),
+    getMacroSnapshot: vi.fn(async () => {
+      if (mocked.macroSnapshotError) throw mocked.macroSnapshotError;
+      return mocked.macroSnapshot!;
+    }),
     getTradingDayCoverage: vi.fn(async () => coverage),
     getNewsStatus: vi.fn(async () => newsStatus),
   };
@@ -144,8 +173,10 @@ afterEach(() => {
   dispose();
   mocked.marketStatus = marketStatus;
   mocked.macroStatus = macroStatus;
+  mocked.macroSnapshot = macroSnapshot;
   mocked.marketError = null;
   mocked.macroError = null;
+  mocked.macroSnapshotError = null;
 });
 
 async function renderSettings() {
@@ -183,13 +214,14 @@ describe("post-PG-exit storage panels", () => {
     );
   });
 
-  it("shows Macro / Calendar as normal macro and calendar status", async () => {
+  it("shows_total_macro_data_without_claiming_calendar_product", async () => {
     await renderSettings();
 
     expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
-    expect(host!.textContent).toContain("總經與行事曆 · Macro / Calendar");
+    expect(host!.textContent).toContain("總經資料");
     expect(host!.textContent).toContain("FRED 序列");
-    expect(host!.textContent).toContain("Finnhub 付費方案");
+    expect(host!.textContent).toContain("Fed Funds");
+    expect(host!.textContent).not.toMatch(/Macro \/ Calendar|行事曆|Finnhub 付費方案/);
     expect(host!.textContent).not.toMatch(/PostgreSQL|PG|SQLite|local-only|本地總經庫|本地路由/);
   });
 
@@ -214,7 +246,7 @@ describe("post-PG-exit storage panels", () => {
     expect(directory!.textContent).not.toMatch(/PG mirror routes|PostgreSQL exit|本地總經|一次性遷移/);
   });
 
-  it("renders_market_empty_and_macro_failed_states_as_user_outcomes", async () => {
+  it("renders_market_empty_and_macro_partial_failures_as_user_outcomes", async () => {
     mocked.marketStatus = {
       ...marketStatus,
       exists: false,
@@ -225,10 +257,11 @@ describe("post-PG-exit storage panels", () => {
 
     dispose();
     mocked.marketStatus = marketStatus;
-    mocked.macroError = new Error("macro status unavailable");
+    mocked.macroSnapshotError = new Error("RAW_MACRO_SNAPSHOT_TRANSPORT_DETAIL");
     await renderSettings();
-    expect(host!.textContent).toContain("macro status unavailable");
-    expect(host!.querySelector(".errorbox")).not.toBeNull();
+    expect(host!.textContent).toContain("29,571 筆已儲存");
+    expect(host!.querySelector('[data-state="partial"]')).not.toBeNull();
+    expect(host!.textContent).not.toContain("RAW_MACRO_SNAPSHOT_TRANSPORT_DETAIL");
     expect(host!.textContent).not.toMatch(/SQLite|PG fallback|local-only/);
   });
 });
