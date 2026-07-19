@@ -5,5 +5,6 @@ export * from "./DataTable";
 export * from "./Drawer";
 export * from "./PageHeader";
 export * from "./Status";
+export * from "./Tabs";
 export * from "./tokens";
 export * from "./useShellOverlay";

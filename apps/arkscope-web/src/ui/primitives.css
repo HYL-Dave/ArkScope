@@ -25,6 +25,33 @@
 .ui-icon-button { width: var(--control-height-default); padding: 0; }
 .ui-icon-button .ui-button-icon { margin: 0; }
 
+.ui-tabs { min-width: 0; display: grid; gap: var(--space-4); }
+.ui-tab-list {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.ui-tab {
+  min-height: var(--control-height-default);
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.ui-tab:hover { color: var(--fg); background: var(--panel2); }
+.ui-tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.ui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ui-tab-panel { min-width: 0; }
+
 .ui-page-header {
   display: flex;
   align-items: flex-start;
