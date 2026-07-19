@@ -411,7 +411,7 @@ no runtime module may import from `src.audit`.
 - Modify later: plan ledger only
 - Protect: main checkout `config/tickers_core.json`
 
-- [ ] **Step 1: Record the independently reviewed branch point**
+- [x] **Step 1: Record the independently reviewed branch point**
 
 After plan review GREEN, record:
 
@@ -424,7 +424,7 @@ MAIN_CHECKOUT=/mnt/md0/PycharmProjects/ArkScope
 Expected: clearance descends from `0fb872d`; its product diff from `0fb872d` is
 empty.
 
-- [ ] **Step 2: Create an isolated implementation worktree**
+- [x] **Step 2: Create an isolated implementation worktree**
 
 Use `superpowers:using-git-worktrees`. Preferred branch/path:
 
@@ -437,7 +437,7 @@ If linked-worktree git-crypt metadata requires the established `--no-checkout`
 flow, copy only Git metadata/key material, then populate with `git read-tree`.
 Never copy a working-tree file from main.
 
-- [ ] **Step 3: Prove the main dirty-file boundary before any RED**
+- [x] **Step 3: Prove the main dirty-file boundary before any RED**
 
 Run from main:
 
@@ -458,7 +458,7 @@ git diff -- config/tickers_core.json
 
 Expected: clean worktree and no copied user edit.
 
-- [ ] **Step 4: Reproduce baseline collections**
+- [x] **Step 4: Reproduce baseline collections**
 
 Run the focused collection command from the accounting section and:
 
@@ -469,7 +469,7 @@ pytest --collect-only -q
 Expected: focused `388`, full `4514`. A different baseline must be explained
 before tests are authored.
 
-- [ ] **Step 5: Reproduce byte-protected frontend baseline**
+- [x] **Step 5: Reproduce byte-protected frontend baseline**
 
 ```bash
 cd apps/arkscope-web
@@ -481,7 +481,7 @@ npm run build
 Expected: `60 files / 572 tests`, clean typecheck, build with at most the known
 chunk-size warning.
 
-- [ ] **Step 6: Commit only the execution-ledger update**
+- [x] **Step 6: Commit only the execution-ledger update**
 
 ```bash
 git add docs/superpowers/plans/2026-07-19-db-derived-universe-tickers-core-retirement.md
@@ -1740,13 +1740,15 @@ Stop and return to review/design if any of the following occurs:
 Record evidence here during implementation; do not pre-fill passing claims:
 
 ```text
-PLAN_REVIEW_CLEARANCE_COMMIT:
-IMPLEMENTATION_BRANCH:
-IMPLEMENTATION_WORKTREE:
-MAIN_DIRTY_JSON_SHA256:
-FOCUSED_BASELINE:
-FULL_COLLECT_BASELINE:
-FRONTEND_BASELINE:
+PLAN_REVIEW_CLEARANCE_COMMIT: c526783ff19b9de2de1502acf5e2b520e01af65a
+BEHAVIOR_AB_BASE: 5d8748f
+IMPLEMENTATION_BRANCH: codex/db-derived-universe
+IMPLEMENTATION_WORKTREE: /tmp/arkscope-db-universe
+WORKTREE_MATERIALIZATION: initial checkout stopped at the expected linked-worktree git-crypt smudge boundary; retry used --no-checkout, copied only .git/git-crypt/keys/default into linked Git metadata, then git read-tree -mu HEAD; final status clean
+MAIN_DIRTY_JSON_SHA256: 00d197cf9cc04bf1cb83a877aea0a647ee25c958ba122607bd33e45be325964f (one unstaged BTSG line, main checkout only)
+FOCUSED_BASELINE: 388 tests collected
+FULL_COLLECT_BASELINE: 4514 tests collected
+FRONTEND_BASELINE: 60 files / 572 tests; typecheck clean; production build clean except reviewed chunk-size warning
 RED COMMITS:
 GREEN COMMITS:
 RAW NODE DELTA:
