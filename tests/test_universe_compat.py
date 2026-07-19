@@ -69,6 +69,7 @@ def _review_preview():
         compat.parse_active_json(_fixture_document()),
         snapshot=snapshot,
         hidden_tickers={"ATGE"},
+        observed_sources_by_ticker=snapshot.sources_by_ticker,
     )
 
 
@@ -132,7 +133,12 @@ def test_preview_classifies_hidden_overlap_json_only_and_db_only():
     rows = compat.build_legacy_preview(
         compat.parse_active_json(_fixture_document()),
         snapshot=snapshot,
-        hidden_tickers={" atge "},
+        hidden_tickers={" atge ", " hidden-db "},
+        observed_sources_by_ticker={
+            **snapshot.sources_by_ticker,
+            "ATGE": (SA_SOURCE,),
+            "HIDDEN-DB": ("manual_lists",),
+        },
     )
 
     assert [(row.ticker, row.classification) for row in rows] == [
@@ -140,6 +146,7 @@ def test_preview_classifies_hidden_overlap_json_only_and_db_only():
         ("ATGE", "hidden"),
         ("BTSG", "json_only"),
         ("HAPN", "db_only"),
+        ("HIDDEN-DB", "hidden"),
         ("LC", "superseded_by_rename"),
         ("MSFT", "db_only"),
         ("OKTA", "overlap"),
@@ -147,6 +154,9 @@ def test_preview_classifies_hidden_overlap_json_only_and_db_only():
     by_ticker = {row.ticker: row for row in rows}
     assert by_ticker["AAPL"].sources == ("manual_lists", "portfolio_open")
     assert by_ticker["ATGE"].default_action == "annotate_only"
+    assert by_ticker["ATGE"].sources == (SA_SOURCE,)
+    assert by_ticker["HIDDEN-DB"].sources == ("manual_lists",)
+    assert by_ticker["HIDDEN-DB"].category_paths == ()
     assert by_ticker["BTSG"].default_action == "requires_approval"
     assert by_ticker["BTSG"].category_paths == (
         "tier3_user_watchlist/sa_alpha_picks_auto",
@@ -162,6 +172,9 @@ def test_preview_classifies_lc_as_superseded_by_hapn_default_no_import():
             compat.parse_active_json(_fixture_document()),
             snapshot=_snapshot(active_tickers),
             hidden_tickers=(),
+            observed_sources_by_ticker={
+                ticker: ("manual_lists",) for ticker in active_tickers
+            },
         )
 
         lc = next(row for row in rows if row.ticker == "LC")
@@ -179,6 +192,7 @@ def test_preview_treats_dirty_btsg_as_alpha_overlap_not_seed_membership():
         compat.parse_active_json(_fixture_document()),
         snapshot=_snapshot(("BTSG",), sources={"BTSG": (SA_SOURCE,)}),
         hidden_tickers=(),
+        observed_sources_by_ticker={"BTSG": (SA_SOURCE,)},
     )
 
     btsg = next(row for row in rows if row.ticker == "BTSG")

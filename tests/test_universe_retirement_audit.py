@@ -94,10 +94,12 @@ def _make_sources(root: Path) -> SimpleNamespace:
         quantity=1,
     )
     profile.set_universe_hidden("ATGE", True)
+    profile.set_universe_hidden("BRK.B", True)
 
     sa_capture_store.connect(str(sa_path)).close()
     _insert_pick(sa_path, "BTSG")
-    _set_current_refresh(sa_path)
+    _insert_pick(sa_path, "BRK.B")
+    _set_current_refresh(sa_path, row_count=2)
     return SimpleNamespace(
         profile_path=profile_path,
         sa_path=sa_path,
@@ -412,11 +414,15 @@ def test_preview_is_read_only_and_emits_semantic_source_fingerprints(
     assert [(row["ticker"], row["classification"]) for row in report["rows"]] == [
         ("AAPL", "overlap"),
         ("ATGE", "hidden"),
+        ("BRK.B", "hidden"),
         ("BTSG", "overlap"),
         ("HAPN", "db_only"),
         ("LC", "superseded_by_rename"),
         ("OKTA", "json_only"),
     ]
+    by_ticker = {row["ticker"]: row for row in report["rows"]}
+    assert by_ticker["BRK.B"]["sources"] == ["sa_alpha_picks_current"]
+    assert by_ticker["BRK.B"]["category_paths"] == []
     assert denied == []
     assert database_opens
     assert traces

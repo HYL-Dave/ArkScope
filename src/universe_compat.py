@@ -122,8 +122,9 @@ def build_legacy_preview(
     *,
     snapshot: ActiveUniverseSnapshot,
     hidden_tickers: Iterable[str],
+    observed_sources_by_ticker: Mapping[str, Iterable[str]],
 ) -> tuple[LegacyPreviewRow, ...]:
-    """Classify legacy entries against one complete active-universe snapshot."""
+    """Classify legacy entries against effective and pre-veto source facts."""
     categories_by_ticker: dict[str, set[str]] = {}
     for entry in entries:
         ticker = _normalize_ticker(entry.ticker)
@@ -141,18 +142,22 @@ def build_legacy_preview(
         if (ticker := _normalize_ticker(raw_ticker))
     }
     sources_by_ticker: dict[str, set[str]] = {}
-    for raw_ticker, source_keys in snapshot.sources_by_ticker.items():
-        ticker = _normalize_ticker(raw_ticker)
-        if not ticker:
-            continue
-        sources_by_ticker.setdefault(ticker, set()).update(
-            source.strip()
-            for source in source_keys
-            if isinstance(source, str) and source.strip()
-        )
+    for source_map in (snapshot.sources_by_ticker, observed_sources_by_ticker):
+        for raw_ticker, source_keys in source_map.items():
+            ticker = _normalize_ticker(raw_ticker)
+            if not ticker:
+                continue
+            values = (source_keys,) if isinstance(source_keys, str) else source_keys
+            sources_by_ticker.setdefault(ticker, set()).update(
+                source.strip()
+                for source in values
+                if isinstance(source, str) and source.strip()
+            )
 
     rows: list[LegacyPreviewRow] = []
-    for ticker in sorted(set(categories_by_ticker) | active_tickers):
+    for ticker in sorted(
+        set(categories_by_ticker) | active_tickers | set(sources_by_ticker)
+    ):
         in_json = ticker in categories_by_ticker
         superseded_by = KNOWN_RENAMES.get(ticker)
         if ticker in hidden:

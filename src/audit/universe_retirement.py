@@ -21,6 +21,7 @@ from pathlib import Path
 
 from src.active_universe import (
     ActiveUniverseUnavailable,
+    EQUITY_ASSET_CLASSES,
     build_active_universe_snapshot,
 )
 from src.profile_state import ProfileStateStore, UniverseSourceAnnotation
@@ -284,6 +285,7 @@ class _SaSources:
 class _InputState:
     legacy_json_bytes: bytes
     profile: _ProfileSources
+    sa: _SaSources
     overview_tickers: tuple[str, ...]
     fingerprints: InputFingerprints
 
@@ -577,6 +579,7 @@ def _input_state(
     return _InputState(
         legacy_json_bytes=raw,
         profile=profile,
+        sa=sa,
         overview_tickers=overview,
         fingerprints=fingerprints,
     )
@@ -599,11 +602,38 @@ def _snapshot(*, profile_db: str | Path, sa_db: str | Path, now: datetime | None
         raise SourceUnavailable("active_universe", reason) from None
 
 
+def _observed_sources_by_ticker(
+    state: _InputState,
+) -> dict[str, tuple[str, ...]]:
+    sources: dict[str, set[str]] = {}
+
+    def record(raw_ticker: object, source_key: str) -> None:
+        ticker = _normalize_ticker(raw_ticker)
+        if ticker:
+            sources.setdefault(ticker, set()).add(source_key)
+
+    for _name, _kind, ticker in state.profile.active_lists:
+        record(ticker, "manual_lists")
+    for ticker, asset_class in state.profile.open_portfolio:
+        if _normalize_asset_class(asset_class) in EQUITY_ASSET_CLASSES:
+            record(ticker, "portfolio_open")
+    for ticker in state.profile.legacy_membership:
+        record(ticker, _LEGACY_SOURCE_KEY)
+    for ticker in state.sa.current_nonstale_picks:
+        record(ticker, "sa_alpha_picks_current")
+
+    return {
+        ticker: tuple(sorted(source_keys))
+        for ticker, source_keys in sorted(sources.items())
+    }
+
+
 def _preview_rows(state: _InputState, snapshot) -> tuple[LegacyPreviewRow, ...]:
     return build_legacy_preview(
         _parse_legacy_entries(state.legacy_json_bytes),
         snapshot=snapshot,
         hidden_tickers=state.profile.hidden,
+        observed_sources_by_ticker=_observed_sources_by_ticker(state),
     )
 
 
