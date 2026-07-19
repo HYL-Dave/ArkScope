@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -44,6 +45,8 @@ from src.tools.data_access import DataAccessLayer
 from src.universe_compat import build_compat_export
 
 DEFAULT_WATCHLIST_KEY = "default_watchlist_id"
+UI_LOCALE_KEY = "ui_locale"
+UI_LOCALES = frozenset({"zh-Hant", "en"})
 
 router = APIRouter(tags=["profile"])
 
@@ -391,6 +394,30 @@ def set_default_watchlist(
         DEFAULT_WATCHLIST_KEY, str(body.list_id) if body.list_id is not None else None
     )
     return {"default_watchlist_id": body.list_id}
+
+
+class UiLocaleBody(BaseModel):
+    locale: Literal["zh-Hant", "en"]
+
+
+@router.get("/profile/settings/ui-locale")
+def get_ui_locale(store: ProfileStateStore = Depends(get_profile_store)):
+    locale = store.get_setting(UI_LOCALE_KEY)
+    if locale is None:
+        return {"locale": "zh-Hant", "source": "default"}
+    if locale not in UI_LOCALES:
+        raise HTTPException(status_code=500, detail={"code": "invalid_ui_locale"})
+    return {"locale": locale, "source": "stored"}
+
+
+@router.put("/profile/settings/ui-locale")
+def set_ui_locale(
+    body: UiLocaleBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    require_profile_state_write("set_ui_locale", {"locale": body.locale})
+    store.set_setting(UI_LOCALE_KEY, body.locale)
+    return {"locale": body.locale, "source": "stored"}
 
 
 class ListCreateBody(BaseModel):
