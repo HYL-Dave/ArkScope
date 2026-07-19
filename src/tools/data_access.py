@@ -2,7 +2,7 @@
 DataAccessLayer — unified interface for all data queries.
 
 Wraps a DataBackend (file or database) and adds:
-- Config access (user_profile.yaml, tickers_core.json, sectors.yaml)
+- Config access (user_profile.yaml and sectors.yaml)
 - Simple in-memory cache with TTL
 - Helper methods for watchlists, sectors, strategy weights
 """
@@ -523,20 +523,6 @@ class DataAccessLayer:
             strategy = weights.get("default_strategy", "my_custom")
 
         return weights.get(strategy, {})
-
-    def get_tickers_config(self) -> dict:
-        """Get tickers_core.json config."""
-        return self._load_json("tickers_core.json")
-
-    def get_tier_tickers(self, tier: str = "tier1_core") -> List[str]:
-        """Get all tickers in a given tier."""
-        config = self.get_tickers_config()
-        tier_data = config.get(tier, {})
-        tickers = set()
-        for group_key, group_val in tier_data.items():
-            if isinstance(group_val, dict) and "tickers" in group_val:
-                tickers.update(group_val["tickers"])
-        return sorted(tickers)
 
     # ============================================================
     # Data Access (delegates to backend)

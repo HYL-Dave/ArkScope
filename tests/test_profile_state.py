@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from src import active_universe, sa_capture_store
+from src.api.routes import profile as profile_routes
 from src.api.routes.profile import (
     ArchiveBody,
     ImportBody,
@@ -33,7 +40,9 @@ from src.api.routes.profile import (
     set_ticker_priority,
     universe,
 )
-from src.profile_state import ProfileStateStore
+from src.portfolio_state import PortfolioStore
+from src.profile_state import ProfileStateStore, UniverseSourceAnnotation
+from src.universe_compat import flatten_generated_active_tickers
 
 # A canned /overview payload so the cockpit-DTO route never touches the DB.
 CANNED_OVERVIEW = {
@@ -59,6 +68,39 @@ CANNED_OVERVIEW = {
 }
 
 SEED_ROWS = CANNED_OVERVIEW["tickers"]
+ROUTE_NOW = datetime(2026, 7, 19, 12, 0, 0, tzinfo=timezone.utc)
+ROUTE_NOW_TEXT = "2026-07-19T12:00:00+00:00"
+
+
+def _insert_sa_pick(path: Path, symbol: str, *, picked_date: str = "2026-07-01") -> None:
+    symbol_key = symbol.strip().upper()
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO sa_pick_lineages "
+            "(symbol_key, picked_date, created_at) VALUES (?, ?, ?)",
+            (symbol_key, picked_date, ROUTE_NOW_TEXT),
+        )
+        lineage_id = conn.execute(
+            "SELECT lineage_id FROM sa_pick_lineages "
+            "WHERE symbol_key=? AND picked_date=?",
+            (symbol_key, picked_date),
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO sa_alpha_picks "
+            "(lineage_id, symbol, company, picked_date, portfolio_status, is_stale) "
+            "VALUES (?, ?, ?, ?, 'current', 0)",
+            (lineage_id, symbol, f"{symbol_key} Inc", picked_date),
+        )
+
+
+def _set_sa_current_refresh(path: Path) -> None:
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO sa_refresh_meta "
+            "(scope, last_attempt_at, last_success_at, ok, updated_at) "
+            "VALUES ('current', ?, ?, 1, ?)",
+            (ROUTE_NOW_TEXT, ROUTE_NOW_TEXT, ROUTE_NOW_TEXT),
+        )
 
 
 # --- store unit tests -----------------------------------------------------
@@ -232,16 +274,42 @@ def test_add_note_rejects_blank(store):
 
 
 @pytest.fixture()
-def api_store(tmp_path, monkeypatch):
-    test_store = ProfileStateStore(tmp_path / "api_profile.db")
+def universe_databases(tmp_path, monkeypatch):
+    profile_path = tmp_path / "profile_state.db"
+    sa_path = tmp_path / "sa_capture.db"
+    profile_store = ProfileStateStore(profile_path)
+    portfolio_store = PortfolioStore(profile_path)
+    conn = sa_capture_store.connect(str(sa_path))
+    conn.close()
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(sa_path))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "absent-market.db"))
     monkeypatch.setattr(
-        "src.api.routes.profile.get_watchlist_overview",
+        profile_routes,
+        "get_watchlist_overview",
+        lambda dal: {"date": "2026-07-19", "ticker_count": 0, "tickers": []},
+    )
+    monkeypatch.setattr(profile_routes, "get_universe_summaries", lambda dal, days=7: {})
+    return SimpleNamespace(
+        profile_path=profile_path,
+        sa_path=sa_path,
+        profile=profile_store,
+        portfolio=portfolio_store,
+    )
+
+
+@pytest.fixture()
+def api_store(universe_databases, monkeypatch):
+    test_store = universe_databases.profile
+    test_store.replace_legacy_config_import(
+        approved_memberships=["AAPL", "MSFT", "TSLA"],
+        annotations=[],
+    )
+    monkeypatch.setattr(
+        profile_routes,
+        "get_watchlist_overview",
         lambda dal: CANNED_OVERVIEW,
     )
-    # Hermetic: get_universe_summaries reads the LOCAL market DB (post-N9 rewrite);
-    # point it at an absent tmp DB or the dev data/market_data.db leaks real prices
-    # into these route tests (same class as the macro-toggle hermeticity fix).
-    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "absent-market.db"))
     return test_store
 
 
@@ -412,6 +480,245 @@ def test_universe_surfaces_all_imported_with_has_summary(api_store):
     assert u["summarized"] == 3  # only the 3 overview tickers are summarized
 
 
+def test_universe_route_uses_snapshot_and_keeps_archived_history_non_active(
+    universe_databases, monkeypatch
+):
+    profile = universe_databases.profile
+    profile.import_lists(
+        [{"name": "History", "kind": "custom", "tickers": ["ARCHIVED", "HELD"]}]
+    )
+    profile.archive_ticker("ARCHIVED")
+    profile.archive_ticker("HELD")
+    account = universe_databases.portfolio.ensure_manual_account()
+    universe_databases.portfolio.upsert_manual_position(
+        account_id=account.id,
+        symbol="HELD",
+        quantity=1,
+    )
+    _insert_sa_pick(universe_databases.sa_path, "SAONLY")
+    _set_sa_current_refresh(universe_databases.sa_path)
+
+    calls = []
+
+    def build_snapshot(*, profile_db):
+        calls.append(profile_db)
+        return active_universe.build_active_universe_snapshot(
+            profile_db=profile_db,
+            sa_db=universe_databases.sa_path,
+            now=ROUTE_NOW,
+        )
+
+    monkeypatch.setattr(
+        profile_routes,
+        "build_active_universe_snapshot",
+        build_snapshot,
+        raising=False,
+    )
+
+    active = universe(include_archived=False, dal=None, store=profile)
+    assert calls == [profile.db_path]
+    assert active["total"] == 3
+    assert active["shown"] == 2
+    assert active["archived_count"] == 1
+    active_rows = {row["ticker"]: row for row in active["rows"]}
+    assert set(active_rows) == {"HELD", "SAONLY"}
+    assert active_rows["HELD"]["archived"] is False
+    assert active_rows["HELD"]["archived_lists"] == ["History"]
+    assert active_rows["HELD"]["sources"] == ["portfolio_open"]
+    assert active_rows["SAONLY"]["sources"] == ["sa_alpha_picks_current"]
+    assert set(active["source_status"]) == set(active_universe.SOURCE_KEYS)
+    assert all(status["available"] for status in active["source_status"].values())
+
+    with_history = universe(include_archived=True, dal=None, store=profile)
+    assert calls == [profile.db_path, profile.db_path]
+    all_rows = {row["ticker"]: row for row in with_history["rows"]}
+    assert set(all_rows) == {"ARCHIVED", "HELD", "SAONLY"}
+    assert all_rows["ARCHIVED"]["archived"] is True
+    assert all_rows["ARCHIVED"]["sources"] == []
+    assert all_rows["ARCHIVED"]["archived_lists"] == ["History"]
+
+
+def test_universe_route_returns_sanitized_503_for_unavailable_source(
+    universe_databases, monkeypatch
+):
+    hostile_path = universe_databases.sa_path.parent / "password=do-not-leak.db"
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(hostile_path))
+
+    with pytest.raises(HTTPException) as caught:
+        universe(dal=None, store=universe_databases.profile)
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail == {
+        "code": "active_universe_unavailable",
+        "status": "unavailable",
+        "unavailable_sources": ["sa_alpha_picks_current"],
+        "source_reasons": {"sa_alpha_picks_current": "source_db_missing"},
+    }
+    rendered = repr(caught.value.detail)
+    assert "do-not-leak" not in rendered
+    assert str(hostile_path) not in rendered
+
+
+def test_legacy_overview_enriches_but_never_qualifies_universe(
+    universe_databases, monkeypatch
+):
+    universe_databases.profile.import_lists(
+        [{"name": "Accepted", "kind": "custom", "tickers": ["AAPL"]}]
+    )
+    monkeypatch.setattr(
+        profile_routes,
+        "get_watchlist_overview",
+        lambda dal: {
+            "date": "2026-07-19",
+            "tickers": [
+                {
+                    "ticker": "AAPL",
+                    "group": "Holdings",
+                    "priority": "high",
+                    "latest_close": 215.0,
+                    "change_7d_pct": 2.5,
+                    "news_count_7d": 3,
+                    "sentiment_mean": 0.4,
+                    "bullish_ratio": 0.75,
+                },
+                {
+                    "ticker": "OVERVIEWONLY",
+                    "group": "Interested",
+                    "latest_close": 1.0,
+                },
+            ],
+        },
+    )
+
+    response = universe(dal=None, store=universe_databases.profile)
+
+    assert [row["ticker"] for row in response["rows"]] == ["AAPL"]
+    assert response["rows"][0]["group"] == "Holdings"
+    assert response["rows"][0]["latest_close"] == 215.0
+
+
+def test_import_universe_uses_annotations_without_opening_json(
+    universe_databases, monkeypatch
+):
+    profile = universe_databases.profile
+    profile.replace_legacy_config_import(
+        approved_memberships=[],
+        annotations=[
+            UniverseSourceAnnotation(
+                "legacy_config_seed",
+                "NVDA",
+                "legacy_category",
+                "tier1_core/sa_alpha_picks_auto",
+            ),
+            UniverseSourceAnnotation(
+                "legacy_config_seed",
+                "MSFT",
+                "legacy_category",
+                "tier2_expanded/seeking_picks_technology",
+            ),
+        ],
+    )
+    original_read_text = Path.read_text
+
+    def reject_retired_json(path, *args, **kwargs):
+        if path.name == "tickers_core.json":
+            raise AssertionError("retired universe JSON was opened")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", reject_retired_json)
+
+    response = import_universe(
+        ImportBody(include_groups=False, include_tiers=True),
+        dal=None,
+        store=profile,
+    )
+
+    assert response["tags"] == {"tags_added": 3}
+    tags = profile.get_tags(["MSFT", "NVDA"])
+    assert tags["NVDA"] == [
+        {"facet": "provenance", "value": "Alpha Picks", "source": "legacy"}
+    ]
+    assert tags["MSFT"] == [
+        {"facet": "category", "value": "Technology", "source": "legacy"},
+        {"facet": "provenance", "value": "Seeking Alpha", "source": "legacy"},
+    ]
+
+
+def test_universe_export_route_is_deterministic_read_only_and_omits_settings(
+    universe_databases, monkeypatch
+):
+    profile = universe_databases.profile
+    profile.replace_legacy_config_import(
+        approved_memberships=["AAPL"],
+        annotations=[
+            UniverseSourceAnnotation(
+                "legacy_config_seed", "AAPL", "legacy_tier", "tier1_core"
+            ),
+            UniverseSourceAnnotation(
+                "legacy_config_seed",
+                "AAPL",
+                "legacy_category",
+                "tier1_core/mega_cap_tech",
+            ),
+        ],
+    )
+    profile.import_lists(
+        [{"name": "History", "kind": "custom", "tickers": ["ARCHIVED"]}]
+    )
+    profile.archive_ticker("ARCHIVED")
+    profile.set_setting("private-export-setting", "must-not-leak")
+    _insert_sa_pick(universe_databases.sa_path, "SAONLY")
+    _set_sa_current_refresh(universe_databases.sa_path)
+
+    calls = []
+
+    def build_snapshot(*, profile_db):
+        calls.append(profile_db)
+        return active_universe.build_active_universe_snapshot(
+            profile_db=profile_db,
+            sa_db=universe_databases.sa_path,
+            now=ROUTE_NOW,
+        )
+
+    def reject_file_write(*args, **kwargs):
+        raise AssertionError("route attempted to write an export file")
+
+    monkeypatch.setattr(
+        profile_routes,
+        "build_active_universe_snapshot",
+        build_snapshot,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        profile_routes,
+        "write_compat_export",
+        reject_file_write,
+        raising=False,
+    )
+    before = (
+        profile.get_setting("private-export-setting"),
+        profile.list_watchlists(include_archived=True),
+        profile.list_universe_source_annotations(),
+    )
+
+    first = profile_routes.export_universe(store=profile)
+    second = profile_routes.export_universe(store=profile)
+
+    assert calls == [profile.db_path, profile.db_path]
+    assert first == second
+    assert first["_generated"]["generated_at"] == ROUTE_NOW_TEXT
+    assert "settings" not in first
+    assert "legacy_reference" not in first
+    assert "must-not-leak" not in repr(first)
+    assert flatten_generated_active_tickers(first) == {"AAPL", "SAONLY"}
+    assert "ARCHIVED" not in repr(first)
+    assert before == (
+        profile.get_setting("private-export-setting"),
+        profile.list_watchlists(include_archived=True),
+        profile.list_universe_source_annotations(),
+    )
+
+
 # --- tags (two-dimensional facet × source, decoupled from list membership) ---
 
 
@@ -484,34 +791,6 @@ def test_add_tag_rejects_blank(store):
         store.add_tag("", "x")
 
 
-def test_config_tag_seeds_structure():
-    from src.universe_config import config_tag_seeds
-
-    seeds = config_tag_seeds()
-    for g in seeds:  # tolerant: empty if config absent, else well-formed
-        assert g["facet"] in {"category", "provenance"}
-        assert g["value"] and isinstance(g["value"], str)
-        assert g["tickers"] and all(isinstance(t, str) and t == t.upper() for t in g["tickers"])
-    if seeds:  # real config present
-        families = {(g["facet"], g["source"]) for g in seeds}
-        assert ("category", "legacy") in families
-        assert ("provenance", "legacy") in families  # provenance is editable (not read-only system)
-        assert all(g["source"] != "system" for g in seeds)  # config seed is all legacy/editable
-        assert all(g["facet"] != "tier" for g in seeds)  # Tier retired (not a tag)
-        provenance = {g["value"] for g in seeds if g["facet"] == "provenance"}
-        assert provenance <= {"Seeking Alpha", "Alpha Picks"}
-
-
-def test_active_universe_excludes_legacy_reference():
-    from src.universe_config import active_universe_tickers, all_universe_tickers
-
-    active = set(active_universe_tickers())
-    every = set(all_universe_tickers())
-    # active ⊆ all; all also carries legacy_reference for the broad search seed
-    assert active <= every
-    assert all(t == t.upper() for t in active)
-
-
 def test_cockpit_universe_ticker_state_carry_tags(api_store):
     api_store.seed_tags(
         [
@@ -564,14 +843,26 @@ def test_import_universe_seeds_theme_tags_and_drops_groups(api_store, monkeypatc
 
 def test_import_universe_theme_groups_best_effort(api_store, monkeypatch):
     # If the overview/DAL is unreachable, theme-group import is skipped but the
-    # config-file tiers/category/provenance seed still runs (groups_ok=False).
+    # persisted reviewed category/provenance projection still runs.
+    api_store.replace_legacy_config_import(
+        approved_memberships=["AAPL", "MSFT", "TSLA"],
+        annotations=[
+            UniverseSourceAnnotation(
+                "legacy_config_seed",
+                "NVDA",
+                "legacy_category",
+                "tier1_core/sa_alpha_picks_auto",
+            )
+        ],
+    )
+
     def _boom(dal):
         raise RuntimeError("PG down")
 
     monkeypatch.setattr("src.api.routes.profile.get_watchlist_overview", _boom)
     out = import_universe(ImportBody(include_groups=True, include_tiers=True), dal=None, store=api_store)
     assert out["groups_ok"] is False
-    assert out["tags"]["tags_added"] > 0  # config seed (category/provenance) still applied
+    assert out["tags"] == {"tags_added": 1}
 
 
 def test_import_universe_deletes_non_custom_lists(api_store):

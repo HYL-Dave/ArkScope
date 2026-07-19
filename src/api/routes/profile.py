@@ -12,9 +12,10 @@ multi-list model (ProductSpec §168); the cockpit surface derives an aggregate
 view from app-created custom lists plus an Archived filter.
 
 Read endpoints are PURE READS — they never mutate profile state. Seeding the
-list substrate from existing categories (user_profile groups + tickers_core
-tiers) is an EXPLICIT, gated action (``POST /profile/import-universe``), so
-opening a page never triggers a ``profile_state_write``.
+list substrate from existing categories (user_profile groups + persisted
+reviewed legacy annotations) is an EXPLICIT, gated action
+(``POST /profile/import-universe``), so opening a page never triggers a
+``profile_state_write``.
 """
 
 from __future__ import annotations
@@ -27,6 +28,11 @@ from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_dal, get_profile_store
 from src.api.permissions import require_profile_state_write
+from src.active_universe import (
+    ActiveUniverseSnapshot,
+    ActiveUniverseUnavailable,
+    build_active_universe_snapshot,
+)
 from src.profile_state import (
     EDITABLE_TAG_SOURCES,
     ProfileStateStore,
@@ -35,7 +41,7 @@ from src.profile_state import (
 )
 from src.tools.analysis_tools import get_universe_summaries, get_watchlist_overview
 from src.tools.data_access import DataAccessLayer
-from src.universe_config import active_universe_tickers, config_tag_seeds
+from src.universe_compat import build_compat_export
 
 DEFAULT_WATCHLIST_KEY = "default_watchlist_id"
 
@@ -52,6 +58,24 @@ class NoteBody(BaseModel):
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _accepted_universe_snapshot(store: ProfileStateStore) -> ActiveUniverseSnapshot:
+    try:
+        return build_active_universe_snapshot(profile_db=store.db_path)
+    except ActiveUniverseUnavailable as exc:
+        raise HTTPException(status_code=503, detail=exc.as_dict()) from None
+
+
+def _source_status_payload(snapshot: ActiveUniverseSnapshot) -> dict[str, dict]:
+    return {
+        key: {
+            "available": status.available,
+            "last_success_at": status.last_success_at,
+            "warnings": list(status.warnings),
+        }
+        for key, status in snapshot.source_status.items()
+    }
 
 
 def _ticker_state_payload(
@@ -147,7 +171,8 @@ def cockpit_watchlist(
 
 class ImportBody(BaseModel):
     include_groups: bool = True  # user_profile theme groups → legacy:theme tags
-    include_tiers: bool = True   # tickers_core categories → legacy:category + provenance tags
+    # API-compatible name: project persisted reviewed legacy category annotations.
+    include_tiers: bool = True
 
 
 @router.post("/profile/import-universe")
@@ -156,13 +181,11 @@ def import_universe(
     dal: DataAccessLayer = Depends(get_dal),
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    """De-mess bootstrap: seed CLASSIFICATION TAGS from config, drop the legacy
-    config-seeded lists (EXPLICIT + gated).
+    """Seed classification tags from reviewed state and drop legacy lists.
 
-    The classification model is two-dimensional (facet × source). ``tickers_core``
-    is now just a *seed*, not the authority:
+    The classification model is two-dimensional (facet × source):
       - theme groups (``theme:量子計算``) → ``legacy:theme`` tags (editable);
-      - ``tickers_core`` categories → ``legacy:category`` + read-only
+      - persisted reviewed legacy categories → ``legacy:category`` + editable
         ``provenance`` tags (Seeking Alpha / Alpha Picks);
       - Tier is retired entirely (no list, no tag, no priority migration);
       - ``core_holdings`` / ``interested`` groups are NOT preserved (they only
@@ -177,8 +200,7 @@ def import_universe(
     groups_ok = True
     if opts.include_groups:
         # Theme groups come from the overview (DAL/PG). Best-effort: a DB outage
-        # must NOT abort the whole import — the config-file tiers/category/
-        # provenance seed below has no DB dependency and should still run.
+        # must NOT abort the stored category/provenance projection below.
         try:
             overview = get_watchlist_overview(dal)
             by_group: dict[str, list[str]] = {}
@@ -199,7 +221,7 @@ def import_universe(
         except Exception:
             groups_ok = False  # reported back so the UI can note themes were skipped
     if opts.include_tiers:
-        tag_groups.extend(config_tag_seeds())  # legacy:category + provenance (config file, no DB)
+        tag_groups.extend(store.legacy_annotation_tag_groups())
 
     require_profile_state_write(
         "import_universe",
@@ -212,7 +234,7 @@ def import_universe(
         "lists_removed": lists_removed,
         "tags": tag_summary,
         # False when theme-group import was requested but the DAL/overview was
-        # unreachable — tiers/category/provenance still seeded.
+        # unreachable; stored category/provenance tags are still seeded.
         "groups_ok": groups_ok,
         "lists": [asdict(li) for li in store.list_watchlists()],
     }
@@ -233,32 +255,35 @@ def universe(
     ``has_summary`` is True when price data exists for the ticker in the window;
     universe tickers with no price bars render with null fields.
     """
-    overview = get_watchlist_overview(dal)
-    by_ticker = {r.get("ticker"): r for r in overview.get("tickers", []) if r.get("ticker")}
-    as_of = overview.get("date")
-    summaries = get_universe_summaries(dal)  # {TICKER: {latest_close, change_pct, ...}}
-
-    # Active-universe direct: inventory = active config catalog ⊕ list-only
-    # additions ⊕ overview — decoupled from list membership, so retiring the tier
-    # lists never shrinks 全部標的. User-suppressed tickers (dead/duplicate, e.g.
-    # a delisted symbol) are excluded from the final set so they stay gone.
+    snapshot = _accepted_universe_snapshot(store)
+    active = set(snapshot.tickers)
     hidden = store.get_hidden_tickers()
-    tickers = sorted(
-        (set(active_universe_tickers()) | set(store.all_tickers()) | set(by_ticker)) - hidden
-    )
+    archived_only = (set(store.archived_list_tickers()) - active) - hidden
+    inventory = active | archived_only
+    visible = inventory if include_archived else active
+
+    overview = get_watchlist_overview(dal)
+    by_ticker = {
+        ticker: row
+        for row in overview.get("tickers", [])
+        if (ticker := _norm(row.get("ticker"))) in inventory
+    }
+    as_of = overview.get("date")
+    summaries = {
+        ticker: summary
+        for raw_ticker, summary in get_universe_summaries(dal).items()
+        if (ticker := _norm(raw_ticker)) in inventory
+    }
+
+    tickers = sorted(inventory)
     agg = store.get_aggregate(tickers)
     prios = store.get_priorities(tickers)  # user override wins
     tags = store.get_tags(tickers)
 
     rows: list[dict] = []
-    archived_count = 0
-    for t in tickers:
+    for t in sorted(visible):
         a = agg.get(_norm(t))
-        archived = a.archived if a else False
-        if archived:
-            archived_count += 1
-        if archived and not include_archived:
-            continue
+        archived = t not in active
         ov = by_ticker.get(t)
         s = summaries.get(_norm(t))
         # has_summary: real market data available (batch price OR curated overview)
@@ -289,6 +314,7 @@ def universe(
                 "all_lists": a.all_lists if a else [],
                 "archived_lists": a.archived_lists if a else [],
                 "archived": archived,
+                "sources": sorted(snapshot.sources_by_ticker.get(t, ())),
                 "tags": tags.get(_norm(t), []),
                 "note_count": a.note_count if a else 0,
             }
@@ -296,13 +322,24 @@ def universe(
 
     return {
         "as_of": as_of,
-        "generated_at": _utcnow(),
+        "generated_at": snapshot.generated_at,
         "total": len(tickers),
         "shown": len(rows),
-        "archived_count": archived_count,
+        "archived_count": len(archived_only),
         "summarized": sum(1 for r in rows if r["has_summary"]),
+        "source_status": _source_status_payload(snapshot),
         "rows": rows,
     }
+
+
+@router.get("/profile/universe/export")
+def export_universe(
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Return a deterministic compatibility document from one accepted snapshot."""
+    snapshot = _accepted_universe_snapshot(store)
+    annotations = store.list_universe_source_annotations()
+    return build_compat_export(snapshot, annotations)
 
 
 @router.get("/profile/lists")

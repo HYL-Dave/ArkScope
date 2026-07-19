@@ -104,14 +104,6 @@ class TestConfigAccess:
         weights = dal.get_strategy_weights()
         assert len(weights) > 0
 
-    def test_get_tier_tickers(self, dal):
-        """get_tier_tickers() should return tickers for a tier."""
-        tier1 = dal.get_tier_tickers("tier1_core")
-        assert "NVDA" in tier1
-        assert "AAPL" in tier1
-        assert len(tier1) >= 20  # tier1 has ~30 tickers
-
-
 # ============================================================
 # News
 # ============================================================
