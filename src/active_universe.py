@@ -120,12 +120,12 @@ def _utc_seconds(value: datetime | None) -> datetime:
     return current.astimezone(timezone.utc).replace(microsecond=0)
 
 
-def _parse_timestamp(value: str | None) -> datetime | None:
-    if not value:
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
         return None
     try:
         parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-    except (AttributeError, ValueError):
+    except ValueError:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
@@ -272,11 +272,13 @@ def _read_sa_source(
         warnings.append("never_refreshed")
     else:
         raw_last_success = refresh["last_success_at"]
-        if isinstance(raw_last_success, str) and raw_last_success.strip():
-            last_success_at = raw_last_success
+        parsed_success = _parse_timestamp(raw_last_success)
+        if parsed_success is not None:
+            last_success_at = parsed_success.isoformat(timespec="seconds")
+        elif raw_last_success is not None:
+            warnings.append("invalid_last_success_at")
         if refresh["ok"] == 0:
             warnings.append("latest_refresh_failed")
-        parsed_success = _parse_timestamp(last_success_at)
         if parsed_success is not None and now - parsed_success > timedelta(
             hours=SA_STALE_AFTER_HOURS
         ):

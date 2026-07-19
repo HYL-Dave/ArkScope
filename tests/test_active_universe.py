@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 import sqlite3
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -296,15 +297,33 @@ def test_alpha_latest_refresh_failure_warns_without_withdrawing_facts(databases)
 def test_alpha_age_warning_uses_48_hours_without_expiring_membership(databases):
     au = _active_universe()
     _insert_pick(databases.sa_path, "AAPL")
-    exactly_48_hours = (NOW - timedelta(hours=au.SA_STALE_AFTER_HOURS)).isoformat(
-        timespec="seconds"
+    secret = f"{databases.sa_path.parent}/SECRET_LAST_SUCCESS_TOKEN"
+    _set_current_refresh(databases.sa_path, last_success_at=secret, ok=1)
+
+    invalid = _snapshot(databases)
+
+    invalid_status = invalid.source_status[SA_SOURCE]
+    assert invalid.tickers == ("AAPL",)
+    assert invalid_status.last_success_at is None
+    assert invalid_status.warnings == ("invalid_last_success_at",)
+    rendered = f"{invalid}\n{json.dumps(asdict(invalid), sort_keys=True)}"
+    assert secret not in rendered
+    assert "SECRET_LAST_SUCCESS_TOKEN" not in rendered
+
+    exactly_48_hours_with_offset = "2026-07-17T20:00:00+08:00"
+    exactly_48_hours_utc = "2026-07-17T12:00:00+00:00"
+    _set_current_refresh(
+        databases.sa_path,
+        last_success_at=exactly_48_hours_with_offset,
+        ok=1,
     )
-    _set_current_refresh(databases.sa_path, last_success_at=exactly_48_hours, ok=1)
 
     fresh_boundary = _snapshot(databases)
 
     assert fresh_boundary.tickers == ("AAPL",)
-    assert fresh_boundary.source_status[SA_SOURCE].warnings == ()
+    fresh_status = fresh_boundary.source_status[SA_SOURCE]
+    assert fresh_status.last_success_at == exactly_48_hours_utc
+    assert fresh_status.warnings == ()
 
     older = (
         NOW - timedelta(hours=au.SA_STALE_AFTER_HOURS, seconds=1)
