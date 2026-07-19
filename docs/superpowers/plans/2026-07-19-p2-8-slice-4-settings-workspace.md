@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 3 COMPLETE
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 4 COMPLETE
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -240,6 +240,10 @@ TASK_3_RED: 13 workspace nodes collected; 12 failed for the reviewed old shell s
 TASK_3_INTEGRATION: one-page mounting required zero-node helper evolution in SettingsNewsStorage/SettingsProviderConfig and focus-based evolution of the two existing model navigation nodes; class coverage began reading settings.css; the existing save-route contract required moving its button into the models anchor before the Task 4 import/export and catalog-isolation work
 TASK_3_GREEN: 13/13 new workspace nodes; full frontend 62 files / 595 tests; typecheck/build clean except the reviewed chunk warning (594.11 kB main bundle)
 TASK_3_PRODUCT_COMMIT: ef30ef8
+TASK_4_RED: five new nodes collected; catalog failure isolation and closed import/export ownership failed for the reviewed missing behavior, while catalog loading plus both exact-target nodes were already satisfied by Task 3's generic workspace infrastructure and remained characterization-green
+TASK_4_INTEGRATION: the existing workspace node that had asserted import/export buttons were globally absent was strengthened in place to require both actions exclusively inside the models anchor's closed disclosure; zero node IDs changed
+TASK_4_GREEN: SettingsModelRouting 9/9; full frontend 62 files / 600 tests; typecheck/build clean except the reviewed chunk warning (596.27 kB main bundle)
+TASK_4_PRODUCT_COMMIT: 3e3e0b1
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -777,7 +781,7 @@ catalog state and actions stay inside AI-owned anchors, while unrelated groups
 remain available. Existing target IDs still work and the two new runtime anchors
 become exact actionable destinations.
 
-- [ ] **Step 1: Add exactly five RED nodes**
+- [x] **Step 1: Add exactly five RED nodes**
 
   Add:
 
@@ -790,7 +794,7 @@ become exact actionable destinations.
   Evolve the existing Models/Providers sequence nodes in place to assert focused
   anchors rather than an `.active` category button. Do not rename them.
 
-- [ ] **Step 2: Remove the whole-page catalog gate**
+- [x] **Step 2: Remove the whole-page catalog gate**
 
   Rename the controller's loading/error state to catalog-specific state. The
   page, groups, directory, Investor Profile, and data sections render before the
@@ -802,7 +806,7 @@ become exact actionable destinations.
   New catalog failure copy is stable and does not interpolate the thrown value:
   `無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。`
 
-- [ ] **Step 3: Relocate route actions**
+- [x] **Step 3: Relocate route actions**
 
   Delete the global `.page-head-actions` and `.settings-band` rendering. In the
   `models` anchor:
@@ -815,14 +819,14 @@ become exact actionable destinations.
 
   Do not add autosave or change import/export destinations.
 
-- [ ] **Step 4: Route in-page cross-links through the exact reveal function**
+- [x] **Step 4: Route in-page cross-links through the exact reveal function**
 
   `ModelRoutingSection.onOpenProviders` reveals `providers`; Provider
   `onUseModel` updates the same draft and then reveals `models`. No category state
   remains. Shell requests reuse the same sequence discipline and exact reveal
   path.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
   Expected cumulative collection: `+28`; full frontend `600`.
 
