@@ -157,17 +157,20 @@ def test_preview_classifies_hidden_overlap_json_only_and_db_only():
 
 def test_preview_classifies_lc_as_superseded_by_hapn_default_no_import():
     compat = _compat()
-    rows = compat.build_legacy_preview(
-        compat.parse_active_json(_fixture_document()),
-        snapshot=_snapshot(("HAPN",)),
-        hidden_tickers=(),
-    )
+    for active_tickers in (("HAPN",), ()):
+        rows = compat.build_legacy_preview(
+            compat.parse_active_json(_fixture_document()),
+            snapshot=_snapshot(active_tickers),
+            hidden_tickers=(),
+        )
 
-    lc = next(row for row in rows if row.ticker == "LC")
+        lc = next(row for row in rows if row.ticker == "LC")
 
-    assert lc.classification == "superseded_by_rename"
-    assert lc.superseded_by == "HAPN"
-    assert lc.default_action == "do_not_import"
+        assert lc.classification == "superseded_by_rename"
+        assert lc.superseded_by == "HAPN"
+        assert lc.default_action == "do_not_import"
+        with pytest.raises(ValueError, match="visible json_only"):
+            compat.build_reviewed_import(rows, ("LC",))
 
 
 def test_preview_treats_dirty_btsg_as_alpha_overlap_not_seed_membership():

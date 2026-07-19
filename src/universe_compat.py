@@ -159,7 +159,7 @@ def build_legacy_preview(
             classification = "hidden"
             default_action = "annotate_only"
             superseded_by = None
-        elif in_json and superseded_by in active_tickers:
+        elif in_json and superseded_by is not None:
             classification = "superseded_by_rename"
             default_action = "do_not_import"
         elif in_json and ticker in active_tickers:
