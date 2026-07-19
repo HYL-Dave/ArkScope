@@ -8,16 +8,18 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM IMPLEMENTED FOR
-> INDEPENDENT REVIEW as of 2026-07-19. Round 2
-> cleared the original `+78/-0` plan. Implementation plus live parser,
-> body-settle, and English-copy corrections reached `18fcfb4` at exact focused
-> `246` / canonical collect `4497`. The live gate then disproved the historical
-> comment-gap retry assumption. The checkpoint-only draft was then rejected
-> because it could not recover post-enable middle intervals. Task 8 is now an
-> exact `+16/-0` RED-first continuity addendum. Product commits `3149623` and
-> `821b2f3` implement it; merge remains blocked until independent implementation
-> review and copied-DB/live continuity evidence are GREEN.
+> **Status:** IMPLEMENTATION REVIEW GREEN; PRE-MERGE COPIED-DB AND LIVE
+> CONTINUITY GATES GREEN; MERGE-READY as of 2026-07-19. Round 2 cleared the
+> original `+78/-0` plan. Implementation plus live parser, body-settle, and
+> English-copy corrections reached `18fcfb4` at exact focused `246` / canonical
+> collect `4497`. The provider gate then disproved the historical comment-gap
+> retry assumption, and product commits `3149623` and `821b2f3` implemented the
+> reviewed exact `+16/-0` continuity addendum. Independent canonical A/B is
+> exact at `4412 -> 4513` (`+101/-0`) with unchanged known non-passing families;
+> copied-DB migration/state-machine and source-pinned repeated-Quick evidence
+> are GREEN. The SF-2 prerequisite fix is `9e4f945`; this ledger records the
+> closeout evidence. Merge and the stopped-service production
+> v1-to-v2 migration remain pending; production is still schema v1.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
@@ -3025,6 +3027,67 @@ eligible exactly once. Dynamic counts are evidence, never acceptance constants.
 - No copied production DB, browser profile, native-host config, provider call,
   production schema, or paid live gate was touched during implementation. Those
   gates intentionally follow independent implementation review.
+
+#### Task 9 independent review and pre-merge gate ledger (2026-07-19)
+
+- Independent review GREEN at implementation/docs tip `b321a14`: symmetric
+  virgin canonical A/B against `848ffd4` collected exact `4412 -> 4513`, with
+  raw node diff `+101/-0`, bidirectionally identical existing failure/error
+  identities, and unchanged `30 failed / 74 skipped / 18 warnings / 7 errors`.
+  Head passed `4402` after supplying the exact same-lockfile workspace-hoisted
+  `jsdom` dependency. Focused execution passed `262/262`.
+- Review SF-2 is closed in docs commit `9e4f945`: canonical archives must run
+  root `npm ci` or attach an exact same-lockfile root `node_modules`, because 24
+  backend-collected extension fixture nodes import workspace-hoisted `jsdom`.
+  A virgin archive without that prerequisite is an environment setup failure,
+  not a product failure or permitted skip.
+- SQLite online backup created separate preview and state-machine copies from
+  production schema v1. Preview migration reached schema 2 with
+  `integrity_check='ok'`, zero FK violations, and unchanged legacy aggregates
+  (`114` picks, `400` articles, `42,794` comments, `2` refresh-meta rows). It
+  produced `103` lineages, zero accepted links/decisions, `15` legacy-preview
+  rows, and a `166`-event review queue (`103` entry / `63` exit). All 400
+  migrated articles were `repaired`; no recovery flag, watermark, park, or
+  terminal state was seeded. A second preview was read-only and identical.
+- The isolated synthetic copy passed the full public-method transition:
+  repaired baseline -> Quick pending -> Full miss one -> Full miss two/parked
+  -> nested Quick with frozen watermark -> Quick baseline-overlap repair -> new
+  pending -> Backfill timeout -> stable-bottom four pending -> stable-bottom
+  five terminal -> unchanged old overlap remains terminal -> future changed-
+  count/current-baseline repair with prior terminal audit retained. Native-
+  shaped results exposed neither comment IDs nor watermark values.
+- The provider gate used a second disposable detached worktree at exact docs
+  tip `9e4f945`, an online-backup DB copy migrated to schema 2 before refresh,
+  a `0600` ephemeral native-host config/token, a scheduler-disabled sidecar on
+  `8423`, and a fresh Chrome profile on CDP `9224`. Native ping identified the
+  disposable root and branch sidecar; auto-sync alarms were absent.
+- Two preliminary Quick runs were excluded from product acceptance after
+  source inspection proved Chrome had retained an old MV3 service worker from
+  `18fcfb4`: it lacked `provider_comments_count`, rescanned four articles twice,
+  and left their checkpoints stale. This was an environment arbitration, not a
+  product-tip result. `chrome.runtime.reload()` was followed by source pins for
+  the reviewed `provider_comments_count` and `stable_bottom` code before any
+  acceptance run.
+- The first valid product-tip Quick completed in `86.8s`, saved the 60 scanned
+  article rows, refreshed four comment sets, added zero comments, failed zero,
+  and advanced all four checkpoints exactly to current provider counts
+  (`929`, `279`, `67`, `69`) in repaired/unparked state. The immediate unchanged
+  Quick completed in `18.9s` with `comments_refreshed=0`,
+  `net_new_comments=0`, and `failed=0`: stable historical inventory was not
+  requeued. Popup/native inspection found no watermark or comment-identity key.
+- Cleanup is complete: gate Chrome, sidecar, and native-host children stopped;
+  ports `9224` and `8423` refuse connections; temporary token/config, DB/profile
+  copies, scripts, and disposable worktree were removed. Formal config SHA-256
+  remains `dade42f4740ca011ca4323fbe13a9bbe2f47b6356716b11eed4609bcc2301503`;
+  production DB SHA-256 remains
+  `811e2908b84badf52b344d51d60373f1a5f2dfb6a28127284afa0de4d3a4c9d4`, at
+  schema v1 with integrity OK, zero FK violations, and the same four logical
+  aggregates. The implementation worktree is clean and the main checkout still
+  contains only the protected user modification to `config/tickers_core.json`.
+
+All pre-merge gates are closed. No further provider replay is required before
+user-approved fast-forward merge; production migration remains a distinct
+post-merge stopped-service operation.
 
 ---
 

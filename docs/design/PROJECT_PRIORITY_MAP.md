@@ -237,8 +237,11 @@ therefore defaults to defer until the hypothesis gate exists.
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
   2026-07-18 through closeout base `b3d9728`**. Alpha Picks article
   reconciliation core is implemented through `18fcfb4`; its comment-continuity
-  addendum is implemented for independent review at product tip `821b2f3`.
-  Copied-DB/live continuity proof and merge remain pending. DB-derived
+  addendum is implemented at product tip `821b2f3`, independently reviewed, and
+  pre-merge copied-DB/state-machine/repeated-Quick gates are GREEN. The SF-2
+  prerequisite landed at `9e4f945`; this closeout records the remaining proof.
+  It is merge-ready; production remains schema v1, so merge and
+  the stopped-service v1-to-v2 migration remain pending. DB-derived
   universe/`tickers_core.json` retirement remains a separate design-only slice.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
@@ -433,6 +436,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (ALPHA PICKS ARTICLE RECONCILIATION + COMMENT CONTINUITY MERGE-READY — PRODUCTION STILL V1)**: Independent implementation review is GREEN at product tip `821b2f3`; SF-2 prerequisite tip is `9e4f945`, with final gate evidence recorded by this entry. Canonical virgin A/B against `848ffd4` is exact at collect `4412 -> 4513` (`+101/-0`), head passed `4402`, and the existing `30 failed / 74 skipped / 18 warnings / 7 errors` identities are unchanged. Review SF-2 now documents the root `npm ci`/same-lockfile hoisted-`jsdom` prerequisite for 24 extension fixture nodes. Online-backup migration preview reached schema 2 with integrity/FK clean, preserved `114` picks / `400` articles / `42,794` comments / `2` refresh-meta rows, created `103` lineages and no accepted links, and exposed a `166`-event review queue; the second-copy ten-step continuity probe passed Quick raise/repair, Full two-miss park, Backfill-only terminalization, terminal audit retention, and future re-anchor. The real-provider gate initially exposed a stale Chrome MV3 worker from `18fcfb4`; those two runs are explicitly excluded. After `chrome.runtime.reload()` and source pins proved the reviewed worker loaded, the first Quick advanced four checkpoints to current counts with zero new comments/failures, and the immediate unchanged Quick returned `comments_refreshed=0 / net_new_comments=0 / failed=0`. Popup/native payloads exposed no watermark/comment identity. All gate processes and disposable artifacts are removed; ports `8423/9224` are closed. Formal config/DB hashes and logical aggregates are byte-identical to pre-gate, production remains schema v1, and the user's dirty `config/tickers_core.json` is untouched. Next: user-approved fast-forward merge, merged-tree gates, then an exclusive merged-code production v1-to-v2 migration before app/browser restart. DB-universe/JSON retirement remains separate.
 
 - **2026-07-19 (ALPHA PICKS COMMENT CONTINUITY IMPLEMENTED FOR REVIEW — LIVE EVIDENCE PENDING)**: Product commits `3149623` and `821b2f3` implement the reviewed `+16/-0` addendum: explicit zero-versus-unknown provider-count provenance, a usable-scan checkpoint, a frozen pre-upsert row-ID watermark, Quick evidence-only repair, Full two-miss parking, Backfill-only five-round terminalization, terminal audit/re-anchor, and recovery-first bounded scheduling with no provider-minus-inventory trigger. Full collection is exactly `4497 -> 4513`; the Task 8 eight-file focused command passes `182`, while the broader Task 9 fourteen-file command passes the reviewed `262` (the original Task 8 expectation had copied the broader command's count). Compile/JS syntax/diff/static/protected-file gates are green. The implementer full run is `4408 passed / 31 failed / 74 skipped / 18 warnings`; the one extra visible failure is a byte-identical date-window test whose fixed 2026-06-22 input expired on 2026-07-19, so no canonical equivalence claim is made. Independent code review comes next, followed by disposable copied-DB state-machine and repeated-Quick provider proof. Production remains schema v1; no browser/profile/provider/production DB gate ran in this implementation phase.
 
