@@ -9,14 +9,15 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox syntax for tracking.
 
-> **Status:** CLEARED FOR IMPLEMENTATION — INDEPENDENT PLAN REVIEW GREEN,
-> 2026-07-20
+> **Status:** IMPLEMENTATION COMPLETE — INDEPENDENT IMPLEMENTATION REVIEW
+> PENDING, 2026-07-20
 >
 > The app-wide i18n decision received independent written-review GREEN at
 > <code>ad53508</code>. Independent plan review subsequently returned GREEN
 > with no must-fix. Product implementation is authorized only from the
-> clearance commit created by this status transition and must stop at
-> review-ready before merge.
+> clearance commit created by that status transition. Product tip
+> <code>69a8ca2</code> is review-ready and remains unmerged; I18N-1 and the
+> public locale selector remain unopened.
 
 **Goal:** Establish the additive I18N-0 foundation: one profile-backed locale
 authority, synchronous cache-first rendering, typed bundled resources, a
@@ -54,14 +55,17 @@ verification.
 | implementation worktree/base | <code>/tmp/arkscope-i18n-0-foundation</code> on <code>codex/i18n-0-foundation</code>, descended from <code>2a35f1b08c94970086c51845f9a3b86718f096b2</code>; product-behavior baseline remains <code>220e163</code> |
 | Task 0 baseline | frontend <code>65 files / 636 tests</code>; backend collect <code>4562</code>; focused profile collect <code>47</code>; product diff against <code>220e163</code> empty; worktree clean |
 | allowed-file baseline SHA-256 | <code>package.json faf1c3c5</code>; <code>package-lock.json aef24e35</code>; <code>profile.py 70f2a7e3</code>; <code>api.ts 0c6ae26b</code>; <code>main.tsx 96f910e2</code>; <code>index.html 67d560ce</code>; <code>vitest.config.ts be95d358</code> |
-| typed-key mode selected | pending Task 2 probe: selector API preferred; standard typed dot-path is the sole pre-approved fallback |
-| RED/GREEN commits | pending |
-| backend node accounting | reviewed target <code>+7/-0</code>; collect <code>4562 -> 4569</code> |
-| frontend node accounting | reviewed target <code>+44/-0</code>; <code>65 files / 636 tests -> 73 files / 680 tests</code> |
-| resource ledger | exactly two non-empty keys per locale in I18N-0; no public-selector labels or autonyms |
-| literal-ratchet ledger | pending deterministic debt snapshot count, migrated-scope list, exact allowlist count, and second-run equality proof |
-| verification | pending focused/full/typecheck/build/A-B/static/runtime evidence |
-| deviations | none authorized beyond the selector-typing fallback in Locked Decision 18 |
+| typed-key mode selected | i18next selector API with <code>enableSelector: "optimize"</code>; pinned declarations typecheck, so the dot-path fallback was not used |
+| RED/GREEN commits | baseline ledger <code>fba6d20</code>; backend route <code>f90f316</code>; resources <code>2728621</code>; bootstrap <code>e979943</code>; controller/provider <code>734145e</code>; pre-React integration <code>4a9dc88</code>; AST ratchet <code>69a8ca2</code> |
+| backend node accounting | virgin collect <code>4562 -> 4569</code>, exactly <code>+7/-0</code>; all additions are the reviewed <code>tests/test_ui_locale_routes.py</code> nodes |
+| frontend node accounting | virgin <code>65 files / 636 tests -> 73 files / 680 tests</code>, exactly <code>+44/-0</code>: API 2, provider 3, bootstrap 3, boundaries 6, cache 5, controller 9, resources 6, scanner 10 |
+| resource ledger | pinned <code>i18next 26.3.6</code> and <code>react-i18next 17.0.10</code>; exact non-empty key paths <code>common.i18n.missingTranslation</code> and <code>settings.locale.writeFailed</code> in both locales; <code>shell</code> intentionally empty; no selector labels or autonyms |
+| literal-ratchet ledger | <code>1709</code> candidates, <code>1621</code> normalized signatures/debt signatures, <code>0</code> allowlist entries; migrated scopes <code>src/i18n/**</code> and <code>src/main.tsx</code> are zero; two check runs preserved SHA-256 <code>bcafa2c0c42c847d8c1877e4b7ddc9ec60211a8dca510c5262cee676e487bf0e</code> |
+| focused/full verification | backend focused <code>7 passed</code>; frontend focused <code>8 files / 44 passed</code>; full frontend <code>73/680</code>; typecheck clean; production build successful with only the existing chunk-size warning; scanner check and no-PG smoke (<code>ok:true</code>, <code>pg_attempts:[]</code>) pass |
+| canonical A/B status | virgin node ledgers are exact; full base run and direct base/head probes all hang symmetrically at the pre-existing <code>tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint</code>. Per Task 7 Step 4, canonical full-suite completion is delegated to the independent reviewer and is not claimed PASS here |
+| static/runtime evidence | exact file map; protected domain, surface, CSS, desktop, and extension paths byte-identical; no detector/loader/Suspense/dynamic resource import/dynamic key/public selector/raw locale error. Isolated temporary-DB CDP smoke passed default, cached-English correction, stored-English reconciliation, and failed-GET fail-open first-paint cases; 1440x900 and 390x844 had no blank shell, runtime exception, selector, or horizontal overflow |
+| cleanup | isolated API/Vite/Chrome processes stopped; ports <code>8423/8432/9225</code> released; temporary DBs, browser profile, screenshots, A/B archives, logs, and harness deleted; no production DB or browser storage was used |
+| deviations | none; <code>initAsync:false</code> is the pinned i18next version's typed synchronous-init equivalent allowed by the decision, and the selector fallback was unnecessary |
 | independent implementation review | pending |
 | merge/user verification | forbidden before independent implementation GREEN and user approval |
 
@@ -476,7 +480,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Create <code>tests/test_ui_locale_routes.py</code>
 - Modify <code>src/api/routes/profile.py</code>
 
-- [ ] **Step 1: Write all seven route tests first**
+- [x] **Step 1: Write all seven route tests first**
 
   Use direct handler calls and temporary <code>ProfileStateStore</code>
   instances; do not use TestClient. For the invalid stored-value test, plant a
@@ -485,7 +489,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   For the gate-order test, use an event-recording fake permission function and
   store so the required order is <code>permission -> set_setting</code>.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ~~~bash
   pytest -q tests/test_ui_locale_routes.py
@@ -495,7 +499,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   handlers do not exist. A failure caused by TestClient startup, real DB access,
   or an unrelated route is invalid RED.
 
-- [ ] **Step 3: Implement the narrow route contract**
+- [x] **Step 3: Implement the narrow route contract**
 
   Add one key constant, one two-value allowlist, one Pydantic body model, a pure
   GET handler, and a gated PUT handler beside the default-watchlist precedent.
@@ -515,7 +519,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   contents. PUT validation occurs before the permission gate; the gate occurs
   before the store write.
 
-- [ ] **Step 4: Run GREEN and accounting**
+- [x] **Step 4: Run GREEN and accounting**
 
   ~~~bash
   pytest -q tests/test_ui_locale_routes.py
@@ -525,7 +529,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 
   Expected: 7/7 and backend collect 4569, with no existing node removed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Commit only the route and seven tests with message
   <code>feat: add profile ui locale routes</code>.
@@ -541,7 +545,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   <code>i18next.d.ts</code>, <code>index.ts</code>, and
   <code>resources.test.ts</code>
 
-- [ ] **Step 1: Install exactly the reviewed versions**
+- [x] **Step 1: Install exactly the reviewed versions**
 
   ~~~bash
   npm install --save-exact i18next@26.3.6 react-i18next@17.0.10 --workspace apps/arkscope-web
@@ -551,7 +555,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   The web manifest must contain exact versions without caret or tilde. No
   detector, backend, ICU, extraction, or localization package may appear.
 
-- [ ] **Step 2: Write six resource tests**
+- [x] **Step 2: Write six resource tests**
 
   Tests must recursively flatten both locale trees, compare namespace and key
   sets, reject empty/whitespace leaves, prove immediate translations in both
@@ -561,7 +565,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   selector callback style and <code>enableSelector: "optimize"</code>. Do not
   cast the translation function or resource tree.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run src/i18n/resources.test.ts
@@ -571,7 +575,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Expected: missing resource/runtime modules. Once the modules exist, the type
   probe must independently settle the selector decision.
 
-- [ ] **Step 4: Apply the selector advisory exactly once**
+- [x] **Step 4: Apply the selector advisory exactly once**
 
   Preferred GREEN is selector mode. If pinned selector declarations fail a
   minimal known-key compile probe, record the exact compiler diagnostic and
@@ -579,7 +583,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   <code>enableSelector</code> rather than leaving dead config. Do not try a
   third form and do not mix styles.
 
-- [ ] **Step 5: Implement resources and runtime initialization**
+- [x] **Step 5: Implement resources and runtime initialization**
 
   Both locales export the exact two-key ledger above. The Shell namespace is an
   intentionally empty typed object. Build a static resource object and one
@@ -593,7 +597,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   - <code>interpolation.escapeValue: false</code>, because React owns output
     escaping and unsafe HTML rendering remains forbidden.
 
-- [ ] **Step 6: Run GREEN and inspect dependency diff**
+- [x] **Step 6: Run GREEN and inspect dependency diff**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run src/i18n/resources.test.ts
@@ -604,7 +608,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Expected: 1 file / 6 tests. Lockfile changes must be limited to the two
   reviewed packages and their actual resolved metadata.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
   Commit dependency and resource foundation together with message
   <code>feat: add typed bundled i18n resources</code>. Record selector or
@@ -620,7 +624,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Create <code>src/i18n/locale.test.ts</code>
 - Create <code>src/i18n/bootstrap.test.ts</code>
 
-- [ ] **Step 1: Write eight tests**
+- [x] **Step 1: Write eight tests**
 
   Use an injected storage resolver returning
   <code>Pick&lt;Storage, "getItem"|"setItem"&gt; | null</code>, an injected
@@ -633,7 +637,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   <code>lang</code> immediately after the synchronous function returns. Waiting
   a microtask would not prove the first-paint contract.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -643,7 +647,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 
   Expected: missing cache/bootstrap modules.
 
-- [ ] **Step 3: Implement one locale owner**
+- [x] **Step 3: Implement one locale owner**
 
   <code>locale.ts</code> owns:
 
@@ -656,14 +660,14 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 
   It must not import React, API functions, or Settings.
 
-- [ ] **Step 4: Implement bootstrap**
+- [x] **Step 4: Implement bootstrap**
 
   Bootstrap reads cache exactly once, applies valid cache or
   <code>zh-Hant</code> through the initialized i18next instance, updates the
   root <code>lang</code>, and returns the chosen locale. It must not write
   storage, call fetch, create a controller, or read DB authority.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -687,13 +691,13 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Create <code>src/i18n/localeController.test.ts</code>
 - Create <code>src/i18n/LocaleProvider.test.tsx</code>
 
-- [ ] **Step 1: Write two API tests**
+- [x] **Step 1: Write two API tests**
 
   Stub fetch and prove the exact GET path, PUT method, JSON content type, and
   body containing only <code>locale</code>. No generic setting key may enter the
   frontend function signature.
 
-- [ ] **Step 2: Write nine controller tests with deferred promises**
+- [x] **Step 2: Write nine controller tests with deferred promises**
 
   Construct a fake adapter with:
 
@@ -708,14 +712,14 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   and PUT promises to prove both stale-response cases, not fake resolved
   ordering.
 
-- [ ] **Step 3: Write three provider tests**
+- [x] **Step 3: Write three provider tests**
 
   Mount a probe under StrictMode. The state-preservation node keeps a child
   counter/input value across a locale update and proves the child was not
   remounted. The provider exposes state and command through context only; it
   renders no control or status copy.
 
-- [ ] **Step 4: Run RED**
+- [x] **Step 4: Run RED**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -726,13 +730,13 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 
   Expected: missing client functions, controller, and provider.
 
-- [ ] **Step 5: Implement API functions**
+- [x] **Step 5: Implement API functions**
 
   Add type-only <code>UiLocale</code> import to <code>api.ts</code> and runtime
   response validation in the controller boundary. A malformed success payload
   is treated as a failed authority read/write; it never becomes a locale.
 
-- [ ] **Step 6: Implement the controller state machine**
+- [x] **Step 6: Implement the controller state machine**
 
   State is limited to:
 
@@ -749,7 +753,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Cache-write exceptions are swallowed after authority success. Raw caught
   objects never enter state, events, logs intended for normal UI, or context.
 
-- [ ] **Step 7: Implement provider**
+- [x] **Step 7: Implement provider**
 
   Use <code>useSyncExternalStore</code> or an equivalent subscription that is
   safe under concurrent React. The effect calls one-shot reconciliation.
@@ -758,7 +762,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   <code>t(state.errorCode)</code>; the dynamic-key prohibition remains
   absolute.
 
-- [ ] **Step 8: Run GREEN and commit**
+- [x] **Step 8: Run GREEN and commit**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -782,7 +786,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Create <code>apps/arkscope-web/src/test/setupI18n.ts</code>
 - Create <code>apps/arkscope-web/src/i18n/foundationBoundaries.test.ts</code>
 
-- [ ] **Step 1: Write all six boundary tests**
+- [x] **Step 1: Write all six boundary tests**
 
   Static tests may read source, but must assert semantic order rather than
   whitespace. The selector-absence node scans production App, Shell, Settings,
@@ -790,7 +794,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   label, autonym pair, locale select, disabled placeholder, or fourth workflow
   tab.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -800,7 +804,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Expected failures include wrong static <code>lang</code>, no bootstrap before
   <code>createRoot</code>, no providers, and no test setup.
 
-- [ ] **Step 3: Integrate in strict order**
+- [x] **Step 3: Integrate in strict order**
 
   Main performs:
 
@@ -814,13 +818,13 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Set static HTML fallback to <code>zh-Hant</code>. Do not make
   <code>main.tsx</code> async and do not wait for DB before render.
 
-- [ ] **Step 4: Establish deterministic test locale**
+- [x] **Step 4: Establish deterministic test locale**
 
   Add one Vitest setup file that initializes/reset the singleton to
   <code>zh-Hant</code> before each test without clearing product state or
   changing timezone. Existing tests must require no source edits.
 
-- [ ] **Step 5: Run focused then full GREEN**
+- [x] **Step 5: Run focused then full GREEN**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -838,7 +842,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Expected checkpoint: 72 files / 670 tests. All pre-existing 65/636 nodes
   remain.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   Commit as <code>feat: bootstrap locale before React render</code>.
 
@@ -852,14 +856,14 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Create scanner, manifests, fixtures, debt snapshot, and
   <code>visibleLiteralScanner.test.ts</code>
 
-- [ ] **Step 1: Write eight fixture files before scanner code**
+- [x] **Step 1: Write eight fixture files before scanner code**
 
   Fixtures are source text with a non-compiled suffix. Each positive fixture
   contains one narrowly named category plus near-miss code. The ignored fixture
   contains comments, import paths, test/resource/declaration paths, stable
   non-visible constants, and punctuation-only JSX.
 
-- [ ] **Step 2: Write all ten scanner tests**
+- [x] **Step 2: Write all ten scanner tests**
 
   Invoke the real Node CLI with <code>process.execPath</code>; do not reimplement
   scanner logic in tests. Parse its JSON output and compare deterministic
@@ -867,7 +871,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   allowlists fail, legacy counts can only decrease, a new literal/count fails,
   and migrated scopes reject even snapshotted debt.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -877,7 +881,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Expected: all nodes fail because the CLI is absent. A regex-only partial
   script is not accepted as intermediate GREEN.
 
-- [ ] **Step 4: Implement AST candidate extraction**
+- [x] **Step 4: Implement AST candidate extraction**
 
   Use <code>typescript.createSourceFile</code> with TSX parsing. Detect:
 
@@ -902,7 +906,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   imports and <code>useTranslation</code> destructuring; do not classify every
   unrelated function named <code>t</code> as a translation function.
 
-- [ ] **Step 5: Implement deterministic policy checking**
+- [x] **Step 5: Implement deterministic policy checking**
 
   CLI modes are:
 
@@ -920,7 +924,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   reasons, debt increases, candidate debt in migrated scopes, dynamic keys, or
   nondeterministic output.
 
-- [ ] **Step 6: Generate and review the one-time debt snapshot**
+- [x] **Step 6: Generate and review the one-time debt snapshot**
 
   Run snapshot against all production
   <code>src/**/*.{ts,tsx}</code>, excluding only:
@@ -948,7 +952,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   another exact structural exclusion. An unexplained file is a scanner defect
   and stop condition, not acceptable baseline debt.
 
-- [ ] **Step 7: Prove deterministic equality and GREEN**
+- [x] **Step 7: Prove deterministic equality and GREEN**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -962,7 +966,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   The two hashes must be identical: check mode cannot rewrite or reorder the
   snapshot. Expected focused result: 1 file / 10 tests.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
   Commit scanner, fixtures, manifests, snapshot, test, and package script as
   <code>test: enforce visible localization debt</code>.
@@ -975,7 +979,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Modify no product file unless a reviewed test exposes a defect.
 - Update implementation ledger with commands and exact outputs.
 
-- [ ] **Step 1: Run exact focused gates**
+- [x] **Step 1: Run exact focused gates**
 
   ~~~bash
   pytest -q tests/test_ui_locale_routes.py
@@ -992,7 +996,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 
   Expected: backend 7, frontend 8 files / 44 tests.
 
-- [ ] **Step 2: Run full frontend gates**
+- [x] **Step 2: Run full frontend gates**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run
@@ -1004,14 +1008,14 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Expected: 73 files / 680 tests; clean typecheck; successful build with only
   the pre-existing chunk-size warning.
 
-- [ ] **Step 3: Prove exact node accounting**
+- [x] **Step 3: Prove exact node accounting**
 
   Compare sorted <code>vitest list</code> output from virgin archives of
   <code>220e163</code> and product tip using the same node_modules. Required
   comm result is exactly +44/-0 with the distribution in this plan. Compare
   backend node IDs similarly; required result is +7/-0.
 
-- [ ] **Step 4: Run canonical backend A/B**
+- [x] **Step 4: Run canonical backend A/B**
 
   Run sequential full pytest from virgin archives of <code>220e163</code> and
   product tip in the same environment. Require:
@@ -1026,7 +1030,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   preserve both sides symmetrically and hand canonical completion to the
   independent reviewer rather than claiming PASS.
 
-- [ ] **Step 5: Run immutable/static ratchets**
+- [x] **Step 5: Run immutable/static ratchets**
 
   Prove:
 
@@ -1043,7 +1047,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   - scanner debt does not increase and migrated scopes are zero; and
   - no raw exception is stored in locale context.
 
-- [ ] **Step 6: Run isolated browser/desktop smoke**
+- [x] **Step 6: Run isolated browser/desktop smoke**
 
   Use a temporary profile DB and isolated ports. Never mutate the production
   profile or browser storage.
@@ -1065,7 +1069,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   Instrument document-lang changes before navigation; a screenshot taken after
   settlement cannot prove first-paint ordering.
 
-- [ ] **Step 7: Run no-PG and final worktree gates**
+- [x] **Step 7: Run no-PG and final worktree gates**
 
   Run the established no-PG smoke, then:
 
@@ -1086,24 +1090,24 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Modify this plan implementation ledger
 - Modify <code>docs/design/PROJECT_PRIORITY_MAP.md</code> status only
 
-- [ ] **Step 1: Reconcile the ledger**
+- [x] **Step 1: Reconcile the ledger**
 
   Record clearance/base hashes, typed-key mode, each RED/GREEN commit, exact
   +7/-0 and +44/-0 proof, resource key paths, debt/allowlist/scope totals,
   focused/full/A-B/static/runtime results, process cleanup, and every reviewed
   deviation.
 
-- [ ] **Step 2: Mark implementation review-ready, not LIVE**
+- [x] **Step 2: Mark implementation review-ready, not LIVE**
 
   Priority map entry must say I18N-0 implementation is complete for independent
   review; I18N-1 remains queued and is not opened.
 
-- [ ] **Step 3: Commit evidence**
+- [x] **Step 3: Commit evidence**
 
   Commit only plan/map evidence with message
   <code>docs: record i18n foundation verification</code>.
 
-- [ ] **Step 4: Stop**
+- [x] **Step 4: Stop**
 
   Request independent implementation review. Do not merge, expose a selector,
   begin Shell translation, update Design Kit, alter production DB preference,

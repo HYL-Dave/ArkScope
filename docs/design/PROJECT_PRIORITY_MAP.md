@@ -258,10 +258,12 @@ therefore defaults to defer until the hypothesis gate exists.
   COMPLETE after the merged-master normal desktop check passed all five user
   acceptance points and a separate merged-master sandbox replay passed 41
   interactions.** Design Kit sync #5 is complete. The app-wide i18n decision
-  document is written and independently review-approved; I18N-0 is the single
-  next implementation-planning unit. Slice 5 remains queued behind
-  the Shell + Settings first migration tranche and must ship bilingual from
-  birth.
+  document is written and independently review-approved. **I18N-0 foundation
+  implementation is complete at product tip `69a8ca2` and is awaiting
+  independent implementation review; that review is the single next gate.**
+  I18N-1 remains queued and unopened, the public selector remains absent, and
+  Slice 5 remains queued behind the Shell + Settings first migration tranche
+  and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -455,6 +457,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-0 IMPLEMENTATION REVIEW-READY — INDEPENDENT REVIEW NEXT)**: Product tip <code>69a8ca2</code> completes the reviewed foundation without translating a surface or exposing a selector: key-specific profile locale authority, synchronous cache-first bundled i18next bootstrap, monotonic StrictMode-safe controller/provider, and a TypeScript-AST visible-literal debt ratchet. Exact ledgers are backend <code>+7/-0</code> (<code>4562 -> 4569</code>) and frontend <code>+44/-0</code> (<code>65/636 -> 73/680</code>); frontend full/typecheck/build, scanner, static boundaries, no-PG, and isolated first-paint/runtime smoke are green. This environment reproduces the known canonical pytest hang symmetrically on base and head at <code>test_providers_endpoint</code>, so independent review owns canonical full-suite completion per the reviewed plan. I18N-1 and the public locale selector remain queued and unopened.
 
 - **2026-07-20 (I18N-0 PLAN REVIEW GREEN — IMPLEMENTATION CLEARED)**: Independent written review approved the complete I18N-0 foundation plan with no must-fix. The reviewed scope remains profile-backed locale authority, synchronous cache-first bootstrap, exact bundled typed resources, monotonic StrictMode-safe controller, and the standalone TypeScript-AST literal ratchet with exact debt/allowlist separation. Implementation is now the single NEXT unit, must descend from the plan-clearance commit, and must stop at review-ready; I18N-1 and the public selector remain unopened.
 
