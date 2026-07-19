@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CLEARED FOR IMPLEMENTATION — IMPLEMENTATION NOT STARTED
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 2 COMPLETE
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -232,6 +232,9 @@ STRUCTURAL_BASELINE: Settings.tsx 3742 lines; two window.confirm owners; setting
 TASK_1_TEST_GUARD: recursive source coverage first exposed nine pre-existing undefined Settings classes; Task 1 pins that exact unordered debt set so pure-move cannot add drift, and Task 6 owns reducing it to zero
 TASK_1_EXTRACTION: Settings.tsx 3742 -> 671 lines; seven section modules plus one legacy module; source-level base comparison PASS for controller and every moved JSX/function block
 TASK_1_VERIFICATION: focused 15 files / 101 tests; full frontend 60 files / 572 tests; typecheck/build clean except reviewed chunk warning
+TASK_1_PRODUCT_COMMIT: 6195026 (pure extraction); ledger commit 8489ae4
+TASK_2_RED: settingsRegistry.test.ts failed because settingsRegistry/settingsPreferences did not exist
+TASK_2_GREEN: registry/preferences 10 nodes added; navigation node strengthened in place; SettingsSection type-only union widened to close the nine-anchor compiler contract before Task 3 rendering; full frontend 61 files / 582 tests; typecheck clean
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -515,7 +518,7 @@ CSS classes, exports, and all 572 frontend nodes.
 search alias. Shell target typing consumes that authority instead of maintaining
 a second seven-value list.
 
-- [ ] **Step 1: Add exactly ten RED registry/preference nodes**
+- [x] **Step 1: Add exactly ten RED registry/preference nodes**
 
   Add these non-parameterized tests:
 
@@ -532,7 +535,7 @@ a second seven-value list.
 
   RED must be missing modules/exports, not a fixture typo.
 
-- [ ] **Step 2: Implement the exact registry shape**
+- [x] **Step 2: Implement the exact registry shape**
 
   Use literal readonly data with this public shape:
 
@@ -576,7 +579,7 @@ a second seven-value list.
   fields only. Blank query returns all sections in registry order. Matching does
   not inspect the DOM or runtime objects.
 
-- [ ] **Step 3: Implement fail-closed preferences**
+- [x] **Step 3: Implement fail-closed preferences**
 
   ```ts
   export const SETTINGS_COLLAPSE_STORAGE_KEY = "arkscope.settings.collapsedGroups.v1";
@@ -598,7 +601,7 @@ a second seven-value list.
   malformed/non-array/unknown-only input yields an empty set, meaning all groups
   expanded.
 
-- [ ] **Step 4: Make shell target typing consume the registry**
+- [x] **Step 4: Make shell target typing consume the registry**
 
   In `shell/navigation.ts`:
 
@@ -611,7 +614,7 @@ a second seven-value list.
   sequence envelopes unchanged. Strengthen the existing navigation test node to
   loop over all nine IDs without adding collection.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
   Expected new collection: `+10`, full frontend `582`. Then:
 
