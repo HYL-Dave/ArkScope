@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 6 COMPLETE
+> **Status:** IMPLEMENTED FOR REVIEW — INDEPENDENT IMPLEMENTATION REVIEW PENDING
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -250,6 +250,15 @@ TASK_5_PRODUCT_COMMIT: dbbeb2e
 TASK_6_RED: three new static nodes collected; data-driven overlay/breakpoint ownership was already satisfied by Task 3, while class coverage failed on the exact eight pinned legacy omissions and the shell ratchet failed on the superseded CSS selectors
 TASK_6_GREEN: focused 18 files / 135 tests; full frontend 63 files / 606 tests; typecheck/build clean except the reviewed chunk warning (597.11 kB main bundle); CSS bundle 65.96 -> 65.22 kB; eight undefined Settings classes and all legacy shell selectors reduced to zero
 TASK_6_PRODUCT_COMMIT: c8f071e
+TASK_7_VISUAL_RED: the six-viewport real-browser gate exposed four integration defects: the static search registry did not route "IBKR client id" to Data Sources; the retired price-sync row crashed on a provenance-only payload with no rows_added; exact NavigationTarget focus ran before a collapsed group mounted; and legacy fixed grids overflowed the narrower workspace track at 1024/961px
+TASK_7_TDD: existing nodes were strengthened in place for all four defects before the fixes; no collected node ID changed; product commit 2611464
+TASK_7_VERIFICATION: focused 18 files / 135 tests; full frontend 63 files / 606 tests; typecheck clean; production build clean except the existing chunk-size warning; final CSS 65.64 kB and main JS 597.15 kB
+TASK_7_ACCOUNTING: fresh Vitest node lists prove raw 572 -> 606, exact +34/-0; reviewer artifacts retained at /tmp/arkscope-p2-8-s4-base-nodes.json and /tmp/arkscope-p2-8-s4-head-nodes-final.json
+TASK_7_SCOPE_GATES: backend/src/tests, api.ts, InvestorProfilePanel.tsx, Dashboard.tsx, and extensions are byte-identical to 7e56bce; window.confirm, legacy Settings selectors, production 959/960/961 literals, aria-live, app_records, and permissions ratchets are zero; collapse-key and registry ownership are each exactly one
+TASK_7_BROWSER_GATE: PASS at 1440x900, 1024x768, 961x768, 960x768, 959x768, and 390x844; search, persisted collapse, exact System -> Data Sources navigation, both confirmation focus returns, Drawer focus return, page/table scrolling, fit, and browser-exception checks passed; screenshots retained at /tmp/arkscope-p2-8-s4-visual/
+TASK_7_PROFILE_INTEGRITY: isolated profile SHA-256 remained ebbb5a5985979f3d4f219bdda23b6392f7050e0bbff71e34dcddf65abe954ef5 before and after the visual gate
+TASK_7_CLEANUP: isolated sidecar 8424, Vite 8434, and Chrome 9225 stopped and verified closed; the production-profile copy, disposable browser profile, source archive, and helper were removed; only screenshots and non-sensitive node lists remain under /tmp
+REVIEW_READY_PRODUCT_TIP: 26114648ea512a11ecd85c412bbfc7c174da6d70
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -975,7 +984,7 @@ free of stale category/card selectors.
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Must not modify: product code unless a new RED reproduces a discovered defect
 
-- [ ] **Step 1: Run exact focused and full frontend gates**
+- [x] **Step 1: Run exact focused and full frontend gates**
 
   Run the updated focused command including the three new test files. Expected:
   `18 files / 135 tests`. Then run:
@@ -988,7 +997,7 @@ free of stale category/card selectors.
 
   Expected: `63 files / 606 tests`; only the existing chunk warning is allowed.
 
-- [ ] **Step 2: Run constructive backend and scope gates**
+- [x] **Step 2: Run constructive backend and scope gates**
 
   ```bash
   git diff --exit-code IMPLEMENTATION_BASE -- src data_sources tests
@@ -999,7 +1008,7 @@ free of stale category/card selectors.
 
   Any output is a stop condition.
 
-- [ ] **Step 3: Run mechanical ratchets**
+- [x] **Step 3: Run mechanical ratchets**
 
   Prove:
 
@@ -1015,7 +1024,7 @@ free of stale category/card selectors.
   - no nested group-card selector/background;
   - all literal classes resolve.
 
-- [ ] **Step 4: Run a disposable real-browser visual/interaction gate**
+- [x] **Step 4: Run a disposable real-browser visual/interaction gate**
 
   Start an isolated Vite instance against one isolated sidecar/profile copy;
   never reuse or mutate the user's running desktop profile. Check:
@@ -1039,13 +1048,13 @@ free of stale category/card selectors.
   Store screenshots only under `/tmp`, record paths/dimensions, and stop all
   disposable processes. Do not save Settings mutations during this gate.
 
-- [ ] **Step 5: Self-review exact accounting and diff**
+- [x] **Step 5: Self-review exact accounting and diff**
 
   Use Vitest's collected node list to prove raw `+34/-0`; reconcile any drift
   before review. Inspect every changed file for secret/dynamic-search leakage,
   duplicated authorities, stale imports, and unrelated formatting churn.
 
-- [ ] **Step 6: Update docs and stop review-ready**
+- [x] **Step 6: Update docs and stop review-ready**
 
   Record commit hashes, RED/GREEN evidence, exact counts, static gates, browser
   evidence, and process cleanup in this plan. Update the priority map to

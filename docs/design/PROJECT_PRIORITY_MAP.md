@@ -245,8 +245,14 @@ therefore defaults to defer until the hypothesis gate exists.
   2026-07-19 through `cddea39`**. The stopped-service production cutover
   preserved the user-edited JSON in retained mode-0600 backups, imported only
   reviewed compatibility annotations, established exact 150-ticker
-  DB-derived/export parity, and retired all runtime readers and writers. P2.8
-  Slice 4 Settings is again the next main UI slice.
+  DB-derived/export parity, and retired all runtime readers and writers. **P2.8
+  Slice 4 Settings workspace is IMPLEMENTED FOR REVIEW at product tip
+  `2611464` on isolated branch `codex/p2-8-slice-4-settings`; it is not merged
+  or LIVE.** Exact frontend accounting is `572 -> 606` (`+34/-0`), all
+  frontend/type/build/static/byte-identity gates are closed, and the six-size
+  real-browser gate is green after four RED-first integration repairs.
+  Independent implementation review is the next gate; Slice 5 and the external
+  Design Kit sync remain unopened.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -440,6 +446,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (P2.8 SLICE 4 SETTINGS WORKSPACE IMPLEMENTED FOR REVIEW — NOT MERGED / NOT LIVE)**: Product tip `2611464` on isolated branch `codex/p2-8-slice-4-settings` completes the reviewed single-page Settings workspace. The pure-move stage reduced `Settings.tsx` from 3,742 to 671 lines without collection drift, then one static registry established three workflow groups, nine anchors, static search, fail-closed remembered collapse, and the canonical wide-directory/narrow-Drawer split. Model actions now stay with their owner, catalog failure is bounded to AI content, and both prior Settings `window.confirm` paths use `ConfirmDialog`. Exact fresh accounting is `60/572 -> 63/606` (`+34/-0`), focused is `18/135`, typecheck/build pass with only the existing chunk warning, and backend/API/Investor Profile/Dashboard/extension trees remain byte-identical. The six-viewport browser gate found and RED-first repaired four real integration defects: the `IBKR client id` search alias, provenance-only retired-sync rendering, expand-before-focus navigation, and fixed-grid overflow at 1024/961px. Search, collapse persistence, exact System-to-Data-Sources navigation, focus return, scrolling, long-table fit, and no-overlap checks now pass at 1440/1024/961/960/959/390 widths. Isolated services are stopped; the copied production profile and disposable browser data are removed. Next gate is independent implementation review before any merge, LIVE status, Design Kit sync, or Slice 5 work.
 
 - **2026-07-19 (P2.8 SLICE 4 SETTINGS WORKSPACE PLAN REVIEW GREEN — cleared for implementation, implementation not started)**: Independent review cleared `docs/superpowers/plans/2026-07-19-p2-8-slice-4-settings-workspace.md` with no must-fix and locked exact frontend accounting at `+34/-0` (`60/572 -> 63/606`, focused `101 -> 135`). The frontend-only plan first extracts the 3,742-line Settings leaf sections under strict zero-behavior/zero-collection equivalence, then replaces the one-category switcher with one searchable single page containing exactly three non-empty workflow groups (`AI 與模型`, `個人化`, `資料與同步`) and nine stable anchors. It preserves Providers versus Models ownership, keeps Developer Mode in System / Health, omits disabled App Records/Permissions and any empty advanced group, isolates model-catalog failure from unrelated settings, moves route save/import/export into the Models owner, remembers fail-closed collapsed groups, and uses the canonical 960px authority for a wide directory versus transient narrow Drawer. Both remaining Settings `window.confirm` owners migrate to `ConfirmDialog`; Investor Profile semantics remain Slice 5. Next gate is isolated-worktree TDD implementation, followed by an independent implementation review before merge.
 
