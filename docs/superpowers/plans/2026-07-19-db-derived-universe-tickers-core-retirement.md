@@ -9,9 +9,10 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** PLAN REVIEW PENDING; IMPLEMENTATION NOT STARTED. No product-code
-> change is authorized until independent plan review is GREEN. The user's
-> unstaged `config/tickers_core.json` edit remains outside this plan commit.
+> **Status:** CLEARED FOR IMPLEMENTATION; IMPLEMENTATION NOT STARTED.
+> Independent plan review is GREEN with exact raw accounting `+54/-6`. The
+> user's unstaged `config/tickers_core.json` edit remains outside this plan
+> commit and must remain protected through the reviewed cutover gate.
 
 **Goal:** Make one complete, explainable SQLite-derived snapshot the runtime
 authority for ArkScope's active ticker universe, migrate every reader to it,
