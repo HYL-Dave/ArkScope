@@ -1,10 +1,10 @@
 # ArkScope App-Wide i18n Decision
 
-> **Status: WRITTEN DECISION REVIEW PENDING, 2026-07-20.**
+> **Status: WRITTEN DECISION REVIEW APPROVED, 2026-07-20.**
 > This document chooses the app-wide locale authority, runtime localization
 > mechanism, migration sequence, public-switch gate, and verification contract.
-> It authorizes implementation planning only after written review approval; it
-> does not itself authorize product-code changes.
+> Independent written review returned GREEN. I18N-0 implementation planning is
+> authorized; product-code changes still require a separately reviewed plan.
 
 ## 1. Purpose and Authority
 

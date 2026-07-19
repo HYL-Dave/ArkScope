@@ -2,7 +2,7 @@
 
 > **Status: ADOPTED TERMINOLOGY POLICY; WRITTEN REVIEW APPROVED WITH P2.8
 > SLICE 4.1, 2026-07-19; APP-WIDE I18N AUTONYM ADDENDUM WRITTEN REVIEW
-> PENDING, 2026-07-20.**
+> APPROVED, 2026-07-20.**
 > This is the single repository authority for product-facing English and
 > Traditional Chinese terminology. Other documents link here instead of
 > copying canonical term tables.

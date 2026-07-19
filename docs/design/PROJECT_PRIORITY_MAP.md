@@ -258,8 +258,8 @@ therefore defaults to defer until the hypothesis gate exists.
   COMPLETE after the merged-master normal desktop check passed all five user
   acceptance points and a separate merged-master sandbox replay passed 41
   interactions.** Design Kit sync #5 is complete. The app-wide i18n decision
-  document is written and pending independent review; after approval, I18N-0 is
-  the single next implementation-planning unit. Slice 5 remains queued behind
+  document is written and independently review-approved; I18N-0 is the single
+  next implementation-planning unit. Slice 5 remains queued behind
   the Shell + Settings first migration tranche and must ship bilingual from
   birth.
   The first focused irritation slice, **Models Routing UX,
@@ -455,6 +455,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (APP-WIDE I18N DECISION REVIEW GREEN — I18N-0 PLAN NEXT)**: Independent full-document review approved `docs/superpowers/specs/2026-07-20-app-wide-i18n-decision.md` with no must-fix. Two non-blocking implementation advisories are assigned to I18N-0: typed selector support must have a standard typed dot-path fallback if the pinned i18next selector API proves unstable, without reopening the mechanism decision; and the TypeScript-aware visible-literal scanner must be a standalone RED-first deliverable with fixtures for JSX text, visible props, ARIA labels, placeholders, and template strings. The decision and terminology autonym addendum are now APPROVED. I18N-0 foundation planning is the single next unit; no product implementation is authorized until that plan receives independent review GREEN.
 
 - **2026-07-20 (APP-WIDE I18N DECISION WRITTEN — INDEPENDENT REVIEW PENDING)**: The bounded decision at `docs/superpowers/specs/2026-07-20-app-wide-i18n-decision.md` records the four approved product choices: profile DB authority plus write-through first-paint cache; synchronous bundled `i18next + react-i18next` resources with no detector/Suspense; selector-last rollout after mechanically complete app coverage; and one compact autonym selector in the Settings PageHeader rather than registry, a fourth tab, or Shell topbar. It also fixes the backend-copy boundary, typed semantic-key discipline, exact two-locale resource/literal/DTO gates, test-ledger framework, and migration sequence: I18N-0 foundation, Shell, Settings, bilingual-from-birth Slice 5, remaining surfaces, then release. `ARKSCOPE_TERMINOLOGY.md` records the narrow `繁體中文` / `English` autonym exception. Design Kit sync #5 is now complete; no partial i18n screen is pre-rendered. Next gate is full written-decision review; implementation and implementation-plan drafting remain unopened until GREEN.
 
