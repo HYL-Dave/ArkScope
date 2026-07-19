@@ -229,6 +229,9 @@ FRONTEND_BASELINE: 60 files / 572 tests passed
 TYPECHECK_BASELINE: clean
 BUILD_BASELINE: clean except the reviewed chunk-size warning (595.06 kB main bundle)
 STRUCTURAL_BASELINE: Settings.tsx 3742 lines; two window.confirm owners; settings-band/settings-nav-card/settings-section-button present
+TASK_1_TEST_GUARD: recursive source coverage first exposed nine pre-existing undefined Settings classes; Task 1 pins that exact unordered debt set so pure-move cannot add drift, and Task 6 owns reducing it to zero
+TASK_1_EXTRACTION: Settings.tsx 3742 -> 671 lines; seven section modules plus one legacy module; source-level base comparison PASS for controller and every moved JSX/function block
+TASK_1_VERIFICATION: focused 15 files / 101 tests; full frontend 60 files / 572 tests; typecheck/build clean except reviewed chunk warning
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -348,13 +351,13 @@ claims.
 **Files:**
 - Modify later: this plan's execution ledger only
 
-- [ ] **Step 1: Record independent plan-review clearance**
+- [x] **Step 1: Record independent plan-review clearance**
 
   Do not implement from this draft commit. After independent review returns
   GREEN, update the status to `CLEARED FOR IMPLEMENTATION`, commit that docs-only
   change, and record its full hash as `PLAN_REVIEW_CLEARANCE_COMMIT`.
 
-- [ ] **Step 2: Create an isolated worktree from the clearance commit**
+- [x] **Step 2: Create an isolated worktree from the clearance commit**
 
   ```bash
   git worktree add /tmp/arkscope-p2-8-slice-4 -b codex/p2-8-slice-4-settings PLAN_REVIEW_CLEARANCE_COMMIT
@@ -363,7 +366,7 @@ claims.
   Record `IMPLEMENTATION_BASE=$(git rev-parse HEAD)` and prove the worktree is
   clean. Do not reuse the running master checkout or disturb the user's desktop.
 
-- [ ] **Step 3: Reproduce the exact baseline**
+- [x] **Step 3: Reproduce the exact baseline**
 
   Run the 15-file focused command above and the complete frontend suite.
   Expected: `101` focused and `60/572` full. Then run:
@@ -375,7 +378,7 @@ claims.
 
   Record the existing build warning separately; any test drift is a stop.
 
-- [ ] **Step 4: Record the structural inventory**
+- [x] **Step 4: Record the structural inventory**
 
   Confirm before RED:
 
@@ -388,7 +391,7 @@ claims.
   Expected: 3,742 lines, two `window.confirm` owners, and all three superseded
   layout families present.
 
-- [ ] **Step 5: Commit no product changes in Task 0**
+- [x] **Step 5: Commit no product changes in Task 0**
 
   Add the baseline evidence to this plan ledger only after it exists. Task 1 is
   the first code task.
@@ -408,7 +411,7 @@ claims.
 current category-switched DOM, catalog gate, labels, API calls, state ownership,
 CSS classes, exports, and all 572 frontend nodes.
 
-- [ ] **Step 1: Make source-based tests extraction-safe without changing nodes**
+- [x] **Step 1: Make source-based tests extraction-safe without changing nodes**
 
   Evolve `SettingsStabilizationCss.test.ts` so its two existing tests concatenate
   `Settings.tsx` plus every `.tsx` below `src/settings/`, discovered recursively
@@ -419,12 +422,12 @@ CSS classes, exports, and all 572 frontend nodes.
   from every extracted Settings TSX file must resolve in `styles.css` or
   `ui/primitives.css`. Keep the existing node ID.
 
-- [ ] **Step 2: Run the unchanged GREEN baseline**
+- [x] **Step 2: Run the unchanged GREEN baseline**
 
   Run the 15-file command. Expected: exactly `101 passed`; collection must not
   change.
 
-- [ ] **Step 3: Move leaf components by responsibility**
+- [x] **Step 3: Move leaf components by responsibility**
 
   Move functions and their private helpers without rewriting them:
 
@@ -440,7 +443,7 @@ CSS classes, exports, and all 572 frontend nodes.
   Keep `SettingsView`, route draft/controller helpers, and current section switch
   in `Settings.tsx` for this commit.
 
-- [ ] **Step 4: Preserve compatibility imports and exports**
+- [x] **Step 4: Preserve compatibility imports and exports**
 
   `Settings.tsx` must import the moved bindings it still renders locally and
   re-export the names existing tests and consumers import. A forwarding export
@@ -473,7 +476,7 @@ CSS classes, exports, and all 572 frontend nodes.
 
   Do not update existing importers merely to make the move visible.
 
-- [ ] **Step 5: Prove pure-move equivalence**
+- [x] **Step 5: Prove pure-move equivalence**
 
   Run all 12 current Settings-focused files: exactly `83 passed`. Run the full
   frontend: exactly `60 files / 572 tests`. Typecheck and build must pass.
@@ -487,7 +490,7 @@ CSS classes, exports, and all 572 frontend nodes.
 
   No label, branch, request, mutation, class, or JSX structure change is allowed.
 
-- [ ] **Step 6: Commit the pure move**
+- [x] **Step 6: Commit the pure move**
 
   ```bash
   git add apps/arkscope-web/src/Settings.tsx \
