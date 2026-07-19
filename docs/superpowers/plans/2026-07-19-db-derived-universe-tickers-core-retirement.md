@@ -9,10 +9,12 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CLEARED FOR IMPLEMENTATION; IMPLEMENTATION NOT STARTED.
-> Independent plan review is GREEN with exact raw accounting `+54/-6`. The
-> user's unstaged `config/tickers_core.json` edit remains outside this plan
-> commit and must remain protected through the reviewed cutover gate.
+> **Status:** IMPLEMENTED FOR REVIEW — NOT MERGED; PRODUCTION CUTOVER NOT
+> STARTED. Independent implementation re-review is GREEN at product tip
+> `8f2f9be`; exact raw accounting remains `+54/-6`. The user's unstaged
+> `config/tickers_core.json` edit remains outside this branch with SHA-256
+> `00d197cf9cc04bf1cb83a877aea0a647ee25c958ba122607bd33e45be325964f` and
+> remains protected until the reviewed stopped-service cutover.
 
 **Goal:** Make one complete, explainable SQLite-derived snapshot the runtime
 authority for ArkScope's active ticker universe, migrate every reader to it,
@@ -496,7 +498,7 @@ git commit -m "docs: open DB universe implementation ledger"
 - Modify: `src/profile_state.py`
 - Create: `tests/test_active_universe_profile_store.py`
 
-- [ ] **Step 1: Write the six RED schema/store tests**
+- [x] **Step 1: Write the six RED schema/store tests**
 
 Create exactly these nodes:
 
@@ -519,7 +521,7 @@ and exact repeat. The paired-path test uses one ticker in two categories and
 asserts no Cartesian expansion. The archive test covers parent-list archive,
 membership archive, and a ticker with another active list.
 
-- [ ] **Step 2: Run RED for reviewed reasons**
+- [x] **Step 2: Run RED for reviewed reasons**
 
 ```bash
 pytest -q tests/test_active_universe_profile_store.py
@@ -528,7 +530,7 @@ pytest -q tests/test_active_universe_profile_store.py
 Expected: collection succeeds and all six fail because the schema/types/methods
 do not exist. A failure caused by importing `universe_config` is the wrong seam.
 
-- [ ] **Step 3: Add the exact additive schema**
+- [x] **Step 3: Add the exact additive schema**
 
 Append to `_SCHEMA` in `src/profile_state.py`:
 
@@ -558,7 +560,7 @@ ON universe_source_annotations(ticker, source_key);
 Do not add a user-version migration or FK. Existing `_ensure_schema()` is the
 idempotent profile schema owner.
 
-- [ ] **Step 4: Add validated data types and normalization**
+- [x] **Step 4: Add validated data types and normalization**
 
 Add the dataclass and constants:
 
@@ -579,7 +581,7 @@ key, nonblank normalized ticker/value, allowlisted key, and for
 `legacy_category` exactly one `/` separating nonblank tier/category. Deduplicate
 the fully normalized input deterministically.
 
-- [ ] **Step 5: Implement one short atomic replacement transaction**
+- [x] **Step 5: Implement one short atomic replacement transaction**
 
 Use this transaction order under `self._write_lock`:
 
@@ -603,7 +605,7 @@ membership rows; withdrawal sets `archived_at`. Return deterministic counts:
 }
 ```
 
-- [ ] **Step 6: Implement read projections**
+- [x] **Step 6: Implement read projections**
 
 `list_active_universe_source_memberships()` filters `archived_at IS NULL` and
 sorts. `list_universe_source_annotations()` sorts all four columns.
@@ -623,7 +625,7 @@ all other categories      -> category / prettified category key
 
 Tier annotations never become tags or priority.
 
-- [ ] **Step 7: Run GREEN and relevant existing profile tests**
+- [x] **Step 7: Run GREEN and relevant existing profile tests**
 
 ```bash
 pytest -q tests/test_active_universe_profile_store.py tests/test_profile_state.py
@@ -631,7 +633,7 @@ pytest -q tests/test_active_universe_profile_store.py tests/test_profile_state.p
 
 Expected: six new nodes pass; existing tests remain at baseline for now.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/profile_state.py tests/test_active_universe_profile_store.py
@@ -647,7 +649,7 @@ git commit -m "feat: add universe compatibility state"
 - Modify: `src/universe_scope.py`
 - Create: `tests/test_active_universe.py`
 
-- [ ] **Step 1: Write the fourteen RED snapshot tests**
+- [x] **Step 1: Write the fourteen RED snapshot tests**
 
 Create exactly these nodes:
 
@@ -674,7 +676,7 @@ production schemas except in the explicit missing-schema arms. For malformed
 asset classes and exceptions use hostile values containing a temp path/token and
 assert neither appears in `as_dict()` or `str(exc)`.
 
-- [ ] **Step 2: Run RED for reviewed reasons**
+- [x] **Step 2: Run RED for reviewed reasons**
 
 ```bash
 pytest -q tests/test_active_universe.py
@@ -682,7 +684,7 @@ pytest -q tests/test_active_universe.py
 
 Expected: fourteen failures because `src.active_universe` does not exist.
 
-- [ ] **Step 3: Implement read-only connection and typed error primitives**
+- [x] **Step 3: Implement read-only connection and typed error primitives**
 
 Use one helper:
 
@@ -704,7 +706,7 @@ source keys against `SOURCE_KEYS` and emits no raw cause. Preserve the cause
 internally by raising the sanitized exception with the original exception as
 its cause only at construction boundaries; do not serialize that cause.
 
-- [ ] **Step 4: Implement the profile source adapter in one read transaction**
+- [x] **Step 4: Implement the profile source adapter in one read transaction**
 
 Use these predicates, not post-filter approximations:
 
@@ -730,7 +732,7 @@ Normalize symbols after read. Include stock/ETF/option; skip others. Emit only
 safe warnings such as `unsupported_asset_class_count=2` and
 `invalid_symbol_count=1`.
 
-- [ ] **Step 5: Implement the Alpha Picks source adapter**
+- [x] **Step 5: Implement the Alpha Picks source adapter**
 
 In one SA read transaction query:
 
@@ -747,7 +749,7 @@ No meta row means available with warning `never_refreshed`. `ok=0` means
 `latest_refresh_failed`. A parseable `last_success_at` older than 48 hours means
 `stale_refresh`. These warnings may coexist. They never change membership.
 
-- [ ] **Step 6: Assemble provenance, apply the exact hidden veto, and finalize**
+- [x] **Step 6: Assemble provenance, apply the exact hidden veto, and finalize**
 
 Build `ticker -> set(source_key)` before removing every exact hidden key. Sort
 tickers, each source tuple, status keys, warning tuples, and unavailable keys.
@@ -757,7 +759,7 @@ Resolve default paths without FastAPI dependencies: `ARKSCOPE_PROFILE_DB` or
 `<repo>/data/profile_state.db`, and `sa_capture_store.resolve_sa_db_path()` for
 SA.
 
-- [ ] **Step 7: Reduce `universe_scope.py` to the compatibility adapter**
+- [x] **Step 7: Reduce `universe_scope.py` to the compatibility adapter**
 
 Its entire behavior becomes:
 
@@ -771,7 +773,7 @@ def resolve_active_universe() -> list[str]:
 Retain the public function name only. Remove its SQLite/path/logger code and all
 `tickers_core.json` commentary.
 
-- [ ] **Step 8: Run GREEN and no-create probes**
+- [x] **Step 8: Run GREEN and no-create probes**
 
 ```bash
 pytest -q tests/test_active_universe.py tests/test_active_universe_profile_store.py
@@ -780,7 +782,7 @@ pytest -q tests/test_active_universe.py tests/test_active_universe_profile_store
 Also run a temp-path probe that calls the accessor with two absent paths and
 asserts neither path exists afterward.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/active_universe.py src/universe_scope.py \
@@ -797,7 +799,7 @@ git commit -m "feat: derive the active universe from SQLite"
 - Create: `tests/fixtures/universe/tickers_core_legacy.json`
 - Create: `tests/test_universe_compat.py`
 
-- [ ] **Step 1: Add the sanitized legacy fixture**
+- [x] **Step 1: Add the sanitized legacy fixture**
 
 The fixture must include:
 
@@ -813,7 +815,7 @@ settings: every retired settings key
 Use synthetic descriptions only. Do not copy licensed Alpha Picks article data
 or user profile content.
 
-- [ ] **Step 2: Write the twelve RED compatibility tests**
+- [x] **Step 2: Write the twelve RED compatibility tests**
 
 Create exactly:
 
@@ -837,7 +839,7 @@ The `BTSG` test uses a snapshot source of `sa_alpha_picks_current` and asserts
 `superseded_by='HAPN'`, `do_not_import`. The inert-edit test writes an export,
 modifies it, then rebuilds a snapshot and proves no runtime read touches it.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 pytest -q tests/test_universe_compat.py
@@ -845,7 +847,7 @@ pytest -q tests/test_universe_compat.py
 
 Expected: twelve failures because the compatibility module is absent.
 
-- [ ] **Step 4: Implement parser and preview classification**
+- [x] **Step 4: Implement parser and preview classification**
 
 Use exact constants:
 
@@ -870,7 +872,7 @@ snapshot-only -> db_only
 
 Rows sort by ticker/classification. Categories and sources sort and dedupe.
 
-- [ ] **Step 5: Implement explicit import materialization**
+- [x] **Step 5: Implement explicit import materialization**
 
 `build_reviewed_import(preview, approved_json_only)` must reject approval names
 not present as visible generic `json_only`. It returns:
@@ -893,7 +895,7 @@ Emit `legacy_tier` and paired `legacy_category` annotations for every active
 input row regardless of membership action. Hidden, overlap, and superseded rows
 remain annotate-only/no-membership.
 
-- [ ] **Step 6: Implement deterministic export and exact flattening**
+- [x] **Step 6: Implement deterministic export and exact flattening**
 
 The returned dict starts with:
 
@@ -921,14 +923,14 @@ flatten_generated_active_tickers(document) == set(snapshot.tickers)
 
 Do not emit `settings` or `legacy_reference`.
 
-- [ ] **Step 7: Implement optional atomic file replacement**
+- [x] **Step 7: Implement optional atomic file replacement**
 
 `write_compat_export(path, document)` writes UTF-8 JSON to a sibling temp file,
 flushes and `os.fsync()`s it, sets mode `0600`, and calls `os.replace()`. Clean
 the temp file on failure and preserve any existing target. Runtime code does not
 call this writer; the API returns a browser-downloadable JSON body.
 
-- [ ] **Step 8: Run GREEN**
+- [x] **Step 8: Run GREEN**
 
 ```bash
 pytest -q tests/test_universe_compat.py
@@ -936,7 +938,7 @@ pytest -q tests/test_universe_compat.py
 
 Expected: twelve pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/universe_compat.py tests/fixtures/universe/tickers_core_legacy.json \
@@ -957,7 +959,7 @@ git commit -m "feat: add reviewed universe compatibility bridge"
 - Modify: `tests/test_symbol_catalog.py`
 - Modify: `tests/test_data_access.py`
 
-- [ ] **Step 1: Add five RED profile-route nodes**
+- [x] **Step 1: Add five RED profile-route nodes**
 
 Add exactly:
 
@@ -975,7 +977,7 @@ with archived list history plus an active holding. Assert archived-only is shown
 only when requested and never appears in `sources_by_ticker`/export. The
 unavailable fixture includes path-like error text and asserts it is absent.
 
-- [ ] **Step 2: Add three RED symbol tests and strengthen the existing route node**
+- [x] **Step 2: Add three RED symbol tests and strengthen the existing route node**
 
 Add:
 
@@ -988,7 +990,7 @@ test_symbol_search_unavailable_returns_sanitized_503
 Strengthen `test_route_flags_tracked` in place: an Alpha-Picks-only ticker is
 tracked, archived-list-only is not, and `BRK.B` hidden does not affect `BRK B`.
 
-- [ ] **Step 3: Run the route/symbol RED set**
+- [x] **Step 3: Run the route/symbol RED set**
 
 ```bash
 pytest -q tests/test_profile_state.py tests/test_symbol_catalog.py
@@ -998,7 +1000,7 @@ Expected: new nodes fail because routes still use JSON/all historical
 memberships; existing nodes may fail only where their old authority is being
 intentionally evolved.
 
-- [ ] **Step 4: Migrate `/profile/universe` without deleting archive UX**
+- [x] **Step 4: Migrate `/profile/universe` without deleting archive UX**
 
 Build the snapshot with `profile_db=store.db_path`. On
 `ActiveUniverseUnavailable`, raise `HTTPException(status_code=503,
@@ -1018,21 +1020,21 @@ keys. A row is `archived = ticker not in active`. Add sorted `sources` per row a
 top-level serialized `source_status`; preserve existing response fields and
 batch summary behavior.
 
-- [ ] **Step 5: Replace config tag seeding with stored annotation projection**
+- [x] **Step 5: Replace config tag seeding with stored annotation projection**
 
 Remove `src.universe_config` imports. Keep `ImportBody.include_tiers` for API
 compatibility, but document it as the persisted reviewed legacy-category
 projection. When true, call `store.legacy_annotation_tag_groups()`. It must not
 open the retired file. Theme overview import remains best-effort enrichment.
 
-- [ ] **Step 6: Add the on-demand export route**
+- [x] **Step 6: Add the on-demand export route**
 
 Add `GET /profile/universe/export`. It builds one accepted snapshot, loads
 stored annotations, calls `build_compat_export()`, and returns the dict. It does
 not write a server file or mutate DB state. Unavailable returns the same typed
 503.
 
-- [ ] **Step 7: Migrate symbol catalog and search tracking**
+- [x] **Step 7: Migrate symbol catalog and search tracking**
 
 `symbol_catalog.search()` and `load_catalog()` gain an optional
 `active_tickers` argument. Without it they build one structured snapshot; on
@@ -1047,7 +1049,7 @@ that tuple for `tracked`. It returns typed 503 on unavailable rather than markin
 every hit false. This avoids two cross-database reads per keystroke and keeps
 autocomplete reference availability distinct from universe truth.
 
-- [ ] **Step 8: Remove the dormant DAL tier reader and obsolete JSON tests**
+- [x] **Step 8: Remove the dormant DAL tier reader and obsolete JSON tests**
 
 Delete `DataAccessLayer.get_tickers_config()` and `get_tier_tickers()`, update
 the module docstring, and remove only
@@ -1055,7 +1057,7 @@ the module docstring, and remove only
 `universe_config` tests from `tests/test_profile_state.py`; their stronger
 replacement nodes already exist.
 
-- [ ] **Step 9: Run GREEN and account removals**
+- [x] **Step 9: Run GREEN and account removals**
 
 ```bash
 pytest -q tests/test_profile_state.py tests/test_symbol_catalog.py tests/test_data_access.py
@@ -1066,7 +1068,7 @@ pytest --collect-only -q \
 Record added/removed node IDs. At this point raw accounting must reflect Task 4
 `+8/-3` and no other removal.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/api/routes/profile.py src/api/routes/symbols.py \
@@ -1092,7 +1094,7 @@ git commit -m "refactor: migrate universe read surfaces to SQLite"
 - Modify: `tests/test_market_data_direct.py`
 - Modify: `tests/test_trading_day_coverage.py`
 
-- [ ] **Step 1: Strengthen scheduler and shared-scope tests in place**
+- [x] **Step 1: Strengthen scheduler and shared-scope tests in place**
 
 Evolve, without renaming:
 
@@ -1107,7 +1109,7 @@ raising, and durable scheduler state stores only the stable code/safe source
 names. The collector node loops over Finnhub and Polygon, proving typed
 unavailable is not confused with valid empty.
 
-- [ ] **Step 2: Add exactly six caller landing nodes**
+- [x] **Step 2: Add exactly six caller landing nodes**
 
 ```text
 # tests/test_collector_adapters.py
@@ -1130,7 +1132,7 @@ The CLI subprocess fixture must initialize full profile/portfolio/SA schemas and
 pass both `ARKSCOPE_PROFILE_DB` and `ARKSCOPE_SA_DB`; the unavailable arm points
 only the SA path to a missing file.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 pytest -q \
@@ -1143,7 +1145,7 @@ pytest -q \
 
 Expected: new typed paths fail; no test should contact a provider.
 
-- [ ] **Step 4: Preserve scheduler loop survival and safe durable failure**
+- [x] **Step 4: Preserve scheduler loop survival and safe durable failure**
 
 No second catch layer is needed around `scheduler_loop()`: `run_source()` already
 owns generic failure persistence. Ensure `_resolve_price_scope()` lets the typed
@@ -1151,7 +1153,7 @@ error reach that catch before any provider/subprocess work. Since
 `ActiveUniverseUnavailable.__str__()` is sanitized, the existing truncated
 durable error remains safe. Do not convert it to `[]`.
 
-- [ ] **Step 5: Reorder collector scope resolution before provider construction**
+- [x] **Step 5: Reorder collector scope resolution before provider construction**
 
 Finnhub already resolves scope before `collect_news`; retain that. In Polygon
 `run_incremental`, move `load_tickers()` before `load_env()` and
@@ -1161,7 +1163,7 @@ Finnhub already resolves scope before `collect_news`; retain that. In Polygon
 Valid complete empty retains the existing explicit empty-scope error; it is not
 serialized as `active_universe_unavailable`.
 
-- [ ] **Step 6: Add one pre-loop daily-update catch**
+- [x] **Step 6: Add one pre-loop daily-update catch**
 
 Wrap only active-universe resolution:
 
@@ -1176,7 +1178,7 @@ except ActiveUniverseUnavailable as exc:
 This occurs before `ensure_env_loaded`, source loop construction/execution, DB
 telemetry, or provider work. Existing explicit `--tickers` bypasses it.
 
-- [ ] **Step 7: Keep direct-market and coverage boundaries typed**
+- [x] **Step 7: Keep direct-market and coverage boundaries typed**
 
 `backfill_prices_direct()` resolves scope before `_default_ibkr_src()` or
 `_default_polygon_src()` and lets typed unavailable propagate. It retains its
@@ -1186,7 +1188,7 @@ existing valid-empty `RuntimeError`.
 HTTP 503 with `exc.as_dict()`. A complete empty list reaches the existing
 coverage summarizer and returns a zero-universe result.
 
-- [ ] **Step 8: Run GREEN**
+- [x] **Step 8: Run GREEN**
 
 ```bash
 pytest -q \
@@ -1200,7 +1202,7 @@ pytest -q \
 Expected: six added nodes pass, strengthened nodes retain names, no provider or
 PG access occurs.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/service/data_scheduler.py src/collectors/finnhub_news.py \
@@ -1220,7 +1222,7 @@ git commit -m "fix: fail closed when universe sources are unavailable"
 - Create: `src/audit/universe_retirement.py`
 - Create: `tests/test_universe_retirement_audit.py`
 
-- [ ] **Step 1: Write the six RED maintenance tests**
+- [x] **Step 1: Write the six RED maintenance tests**
 
 Create exactly:
 
@@ -1241,7 +1243,7 @@ test runs apply, creates a fresh post-apply preview/fingerprint, applies that
 fresh report, and compares rows/export bytes. Reusing a stale pre-apply report
 must fail its fingerprint check rather than pretending to be idempotent.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pytest -q tests/test_universe_retirement_audit.py
@@ -1249,7 +1251,7 @@ pytest -q tests/test_universe_retirement_audit.py
 
 Expected: six failures because the audit module is absent.
 
-- [ ] **Step 3: Implement canonical semantic fingerprints**
+- [x] **Step 3: Implement canonical semantic fingerprints**
 
 Define `InputFingerprints` over canonical JSON encodings of:
 
@@ -1265,7 +1267,7 @@ Fingerprint queries are read-only and sort every row/field. Do not use raw DB
 file hashes: WAL/checkpoint layout is not semantic state. Missing required
 schema is a typed failure, not an empty fingerprint.
 
-- [ ] **Step 4: Implement preview as a pure read**
+- [x] **Step 4: Implement preview as a pure read**
 
 `build_preview_report` accepts explicit profile/SA/JSON paths and an
 injected overview ticker set for tests. The CLI obtains production overview via
@@ -1285,7 +1287,7 @@ read is unavailable. It returns:
 No raw DB path or exception is written to the report. `overview_missing` must be
 empty before apply.
 
-- [ ] **Step 5: Implement fingerprinted explicit apply**
+- [x] **Step 5: Implement fingerprinted explicit apply**
 
 `apply_reviewed_preview()` performs this order:
 
@@ -1305,7 +1307,7 @@ It never writes/replaces the source JSON. If any post-write parity check fails,
 the caller's production procedure restores the pre-write online backup; the
 unit test uses a copy and asserts the failure is loud.
 
-- [ ] **Step 6: Add an explicit CLI without hidden defaults**
+- [x] **Step 6: Add an explicit CLI without hidden defaults**
 
 Support:
 
@@ -1327,7 +1329,7 @@ and exact approval list, even when empty (use `--approve-none`). Make
 `--approve-json-only` repeatable and make `--approve-none` mutually exclusive
 with it.
 
-- [ ] **Step 7: Run GREEN and the no-PG smoke**
+- [x] **Step 7: Run GREEN and the no-PG smoke**
 
 ```bash
 pytest -q tests/test_universe_retirement_audit.py tests/test_universe_compat.py
@@ -1337,7 +1339,7 @@ python -m src.smoke.pg_unreachable_e2e
 Expected: twelve compatibility plus six audit nodes pass; no-PG reports
 `ok:true` and `pg_attempts:[]`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/audit/universe_retirement.py tests/test_universe_retirement_audit.py
@@ -1359,7 +1361,7 @@ git commit -m "feat: add fingerprinted universe retirement audit"
 - Modify: `tests/test_sa_reconciliation_native_host.py`
 - Modify any existing native-host test that patches `_try_ticker_sync` in place
 
-- [ ] **Step 1: Prove all readers are already migrated before touching writers**
+- [x] **Step 1: Prove all readers are already migrated before touching writers**
 
 Run:
 
@@ -1374,7 +1376,7 @@ legacy writer code, and stale copy/comments in files this task will edit. Any
 runtime reader outside `src/universe_compat.py`/`src/audit/universe_retirement.py`
 is a stop condition.
 
-- [ ] **Step 2: Replace three obsolete writer-policy tests with two RED absence tests**
+- [x] **Step 2: Replace three obsolete writer-policy tests with two RED absence tests**
 
 Remove exactly the three `TestTickerSync` nodes and add:
 
@@ -1389,7 +1391,7 @@ second uses `inspect.signature()` and source/static checks to prove both the
 parameter and writer method are absent. Remove `_try_ticker_sync` monkeypatches
 from existing tests without changing their node names.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 pytest -q tests/test_sa_tools.py tests/test_sa_reconciliation_native_host.py
@@ -1397,7 +1399,7 @@ pytest -q tests/test_sa_tools.py tests/test_sa_reconciliation_native_host.py
 
 Expected: new tests fail because both writer paths still exist.
 
-- [ ] **Step 4: Remove native-host and fallback writer paths**
+- [x] **Step 4: Remove native-host and fallback writer paths**
 
 In `_handle_refresh`, remove only:
 
@@ -1413,7 +1415,7 @@ Delete `_try_ticker_sync`. In `SAAlphaPicksClient`, change
 typing imports. Capture, refresh status, and reconciliation ordering stay byte-
 semantically unchanged.
 
-- [ ] **Step 5: Delete the loader and branch copy of the tracked file**
+- [x] **Step 5: Delete the loader and branch copy of the tracked file**
 
 Delete `src/universe_config.py`. Add this anchored ignore rule:
 
@@ -1426,7 +1428,7 @@ Use `git rm config/tickers_core.json` only in the isolated implementation
 worktree, whose file is the clean committed base. Before/after, prove main's
 dirty path SHA and diff are unchanged.
 
-- [ ] **Step 6: Run writer/static GREEN**
+- [x] **Step 6: Run writer/static GREEN**
 
 ```bash
 pytest -q tests/test_sa_tools.py tests/test_sa_reconciliation_native_host.py
@@ -1443,7 +1445,7 @@ Expected: production writer symbols zero; runtime Python path references zero
 (comments/docstrings included, to prevent future recoupling). Tests may refer to
 the retired name only inside explicit negative/static assertions.
 
-- [ ] **Step 7: Prove browser/web byte boundaries**
+- [x] **Step 7: Prove browser/web byte boundaries**
 
 ```bash
 git diff --exit-code "$BEHAVIOR_AB_BASE" -- apps/arkscope-web extensions/sa_alpha_picks
@@ -1451,7 +1453,7 @@ git diff --exit-code "$BEHAVIOR_AB_BASE" -- apps/arkscope-web extensions/sa_alph
 
 Expected: empty.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/sa_native_host.py data_sources/sa_alpha_picks_client.py \
@@ -1472,7 +1474,7 @@ Do not merge yet. Main's user edit must still be present and unstaged.
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Do not modify production DBs in the pre-review phase
 
-- [ ] **Step 1: Run exact focused and full accounting**
+- [x] **Step 1: Run exact focused and full accounting**
 
 Run the focused command with the four new files appended:
 
@@ -1503,7 +1505,7 @@ pytest --collect-only -q
 Expected: `4562 tests collected`. Generate exact added/removed node sets against
 `5d8748f`; require `+54/-6` with the six reviewed removals and no other loss.
 
-- [ ] **Step 2: Run canonical virgin-archive A/B**
+- [x] **Step 2: Run canonical virgin-archive A/B**
 
 Create separate virgin archives for `5d8748f` and product tip. Supply the same
 installed Python/Node dependencies to both without copying source or DB state.
@@ -1520,7 +1522,7 @@ If environment-only node-module/import behavior differs, document and prove it
 with the same dependency mount on both sides; never hide a product failure as an
 environment exception.
 
-- [ ] **Step 3: Run frontend, static, and no-PG gates**
+- [x] **Step 3: Run frontend, static, and no-PG gates**
 
 ```bash
 git diff --exit-code "$BEHAVIOR_AB_BASE" -- apps/arkscope-web extensions/sa_alpha_picks
@@ -1538,7 +1540,7 @@ git diff --check
 Expected: frontend exact `60/572`, no-PG `ok:true / pg_attempts:[]`, and no
 whitespace errors.
 
-- [ ] **Step 4: Run structural ratchets**
+- [x] **Step 4: Run structural ratchets**
 
 Prove:
 
@@ -1556,7 +1558,7 @@ no raw DB/path/error fields in typed envelope
 
 Use AST/import inspection where a plain string scan would confuse tests/docs.
 
-- [ ] **Step 5: Run a read-only live preview against online-backup copies**
+- [x] **Step 5: Run a read-only live preview against online-backup copies**
 
 Do not close or mutate production yet. Create mode-0600 online backups of
 `profile_state.db` and `sa_capture.db` in `/tmp`, initialize only the additive
@@ -1581,7 +1583,7 @@ overview_missing -> []
 Counts are observations, not constants. Record source fingerprints and confirm
 main JSON SHA/diff remain exactly Task 0 values.
 
-- [ ] **Step 6: Replay apply/export on the copies**
+- [x] **Step 6: Replay apply/export on the copies**
 
 Apply with `--approve-none`, because current known JSON-only rows are hidden or
 superseded. Require:
@@ -1600,7 +1602,7 @@ foreign_key_check: empty
 Modify one fingerprinted input on a third disposable copy and prove apply stops
 before any write.
 
-- [ ] **Step 7: Request independent implementation review**
+- [x] **Step 7: Request independent implementation review**
 
 Use `superpowers:requesting-code-review`. Reviewer focus:
 
@@ -1618,7 +1620,7 @@ Use `superpowers:requesting-code-review`. Reviewer focus:
 Do not merge or touch production state before independent GREEN and user merge
 approval.
 
-- [ ] **Step 8: Record review-ready evidence and commit docs only**
+- [x] **Step 8: Record review-ready evidence and commit docs only**
 
 ```bash
 git add docs/superpowers/plans/2026-07-19-db-derived-universe-tickers-core-retirement.md \
@@ -1750,16 +1752,73 @@ FOCUSED_BASELINE: 388 tests collected
 FULL_COLLECT_BASELINE: 4514 tests collected
 FRONTEND_BASELINE: 60 files / 572 tests; typecheck clean; production build clean except reviewed chunk-size warning
 RED COMMITS:
+  No standalone RED commits. Each task's reviewed tests were run RED before its
+  implementation and committed with the corresponding GREEN product change.
 GREEN COMMITS:
+  8a6a0da ledger; b5903cd compatibility state; 44b5c87 structured accessor;
+  7004dea timestamp sanitizer; 177bf5c compatibility bridge; b611f7b rename
+  classification; ede97d1 reader migration; 7cb49ac cache hardening; 47c627d
+  fail-closed landings; 909dbf0 scheduler launch guard; 9ce9b5f audit workflow;
+  5903cf8 audit hardening; f4d0802 writer-last retirement; f1f2ef1 retired-copy
+  cleanup; 8f2f9be hidden-source provenance review fix.
 RAW NODE DELTA:
+  collect 4514 -> 4562; exact added 54 / removed 6; semantic +48. The six
+  removed nodes are exactly the reviewed dormant config/ticker-writer tests;
+  no additional node was removed or renamed.
 CANONICAL A/B:
+  Virgin base 5d8748f: 30 failed / 4403 passed / 74 skipped / 18 warnings /
+  7 errors in 286.98s. Final virgin head 8f2f9be: 29 failed / 4452 passed /
+  74 skipped / 18 warnings / 7 errors in 294.63s. No head-only failure/error
+  identity exists. The sole base-only failure is the in-place deterministic
+  repair of tests/test_trading_day_coverage.py::test_route_wires_universe_and_db:
+  its fixed 2026-06-22 fixture is now evaluated against a pinned 2026-06-23
+  clock instead of the wall-clock rolling window. Isolated base/head replay and
+  independent review accepted this deliberate test-only deviation from the
+  planned 30/4451 arithmetic; raw +54/-6 remains exact.
+  Focused universe/caller coverage passed 427 nodes in the isolated worktree;
+  nine data-backed nodes require integration fixtures absent there. A fresh
+  archive with read-only data mounts passed 433/436; the remaining three require
+  the absent data_lake/raw/ibkr_fundamentals fixture and belong to the canonical
+  bare-environment family. The focused implementation/review subsets passed
+  94 and 18 respectively after the final blocker fix.
 NO-PG:
+  python -m src.smoke.pg_unreachable_e2e -> ok:true, pg_attempts:[].
 STATIC RATCHETS:
+  Exactly six explicit runtime accessor callers; zero runtime legacy JSON
+  loader/writer outside compatibility/audit; zero runtime src.audit import;
+  zero alias resolver/source-enable/Alpha-age membership policy; annotations
+  have no membership FK; typed failures expose allowlisted sources/reasons only;
+  apps/arkscope-web and extensions/sa_alpha_picks are byte-identical to base.
+  Frontend remains 60 files / 572 tests; typecheck and build pass with only the
+  existing chunk-size warning.
 COPIED-DB PREVIEW:
+  Mode-0600 SQLite online backups at timestamp 20260719T094140Z; both integrity
+  checks ok. Final preview counts json_active=152 / snapshot_active=150,
+  overview_missing=[] / requires_approval=[]. ATGE is hidden; LC is
+  superseded_by_rename(HAPN)/do_not_import; BTSG overlaps
+  sa_alpha_picks_current; BRK.B is hidden while retaining pre-veto source
+  provenance sa_alpha_picks_current; BRK B remains a distinct manual-list fact.
+  Preview fingerprint legacy_json_sha256 equals the protected main dirty-file
+  SHA above.
 COPIED-DB APPLY/PARITY:
+  --approve-none produced 150 exported active tickers, zero active
+  legacy_config_seed memberships, and 335 compatibility annotations. A second
+  preview/apply preserved row digests and semantic export bytes (only the
+  caller-supplied generated_at differed). integrity_check=ok and
+  foreign_key_check=[]; hidden/reference/settings rows are absent. Mutating one
+  fingerprinted input on a third copy returned fingerprint_mismatch before any
+  DB or transition-file write. Production DBs were never opened for write.
 INDEPENDENT REVIEW:
+  Initial review found one blocker: hidden DB-sourced tickers lost pre-veto
+  provenance in migration preview. Commit 8f2f9be added an explicit pre-veto
+  observed-facts input without changing runtime post-veto snapshot/export;
+  targeted RED -> GREEN and copied-preview BRK.B evidence closed it. Re-review
+  verdict: GREEN, no new blockers; worktree clean and main dirty SHA preserved.
 MERGE COMMIT:
 PRODUCTION BACKUPS:
 PRODUCTION CUTOVER:
 PROCESS CLEANUP:
+  Canonical/test sessions exited; no branch app, browser, native host, sidecar,
+  or scheduler service was started. Disposable copied DB/evidence files remain
+  under /tmp for review and are not production authorities.
 ```
