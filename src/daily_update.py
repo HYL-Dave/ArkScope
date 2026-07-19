@@ -522,8 +522,8 @@ Note: IBKR sources require TWS/Gateway running.
     if args.iv_history:
         sources.append("iv_history")
 
-    # Resolve the EXPLICIT scope once (Q7, now for every source: the collectors'
-    # legacy tickers_core default is retired).
+    # Resolve the explicit scope once for every source; collectors no longer
+    # own an implicit universe default.
     tickers: Optional[List[str]] = None
     if sources:
         if args.tickers:

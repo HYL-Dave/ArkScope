@@ -1282,8 +1282,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     if d.universe_tickers:
                         scope = tickers if tickers is not None else _resolve_price_scope()
                         if not scope:
-                            # 3e-E: the collectors' legacy tickers_core default is
-                            # retired — no scope means FAIL, not silently-collect-other.
+                            # No implicit collector universe remains: an empty
+                            # scope must fail rather than collect something else.
                             raise RuntimeError(
                                 "active-universe scope empty/unavailable (profile DB)")
                         kwargs["tickers_arg"] = ",".join(scope)
