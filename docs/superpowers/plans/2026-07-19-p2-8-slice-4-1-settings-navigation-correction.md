@@ -9,11 +9,11 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CLEARED FOR IMPLEMENTATION
+> **Status:** IMPLEMENTED FOR REVIEW — NOT MERGED
 >
 > Independent plan review returned GREEN on 2026-07-20 with no must-fix.
-> Record this status-change commit as `PLAN_REVIEW_CLEARANCE_COMMIT` before
-> opening the implementation worktree.
+> Implementation and local verification are complete on the isolated branch;
+> independent implementation review remains required before integration.
 
 **Goal:** Correct the rejected Slice 4 Settings composition by replacing the
 all-groups long page with three accessible workflow tabs and one mounted group,
@@ -43,20 +43,19 @@ Dashboard/System, and browser extensions are immutable in this slice.
 
 ## Implementation Ledger
 
-> **Cleared, not opened.** Populate from the isolated implementation worktree;
-> the first entry records this status-change commit as
-> `PLAN_REVIEW_CLEARANCE_COMMIT`.
+> Populated from the isolated implementation worktree. Product behavior remains
+> unmerged until independent implementation review and explicit user approval.
 
 | Item | Evidence |
 |---|---|
-| plan-review clearance commit | pending |
-| implementation worktree/base | pending |
-| RED/GREEN commits | pending |
-| raw node accounting | pending (`+42/-12` reviewed target) |
-| focused/full frontend gates | pending (`18/164`, `65/636` targets) |
-| immutable/static gates | pending |
-| six-viewport interaction gate | pending |
-| process cleanup | pending |
+| plan-review clearance commit | `1a68c3a51590701eceaea2b86c9b370073671c82` |
+| implementation worktree/base | `codex/p2-8-slice-4-1-settings` at `/tmp/arkscope-p2-8-slice-4-1`, opened from clearance `1a68c3a`; product-behavior baseline `f797673`; linked-worktree checkout used the established `--no-checkout` flow and copied only the existing git-crypt key into linked Git metadata |
+| RED/GREEN commits | Task 1 `f45dddc` (missing shared Tabs -> six primitive contracts); Task 2 `0e8bbb1` (collapse metadata -> active-group contracts); Task 3 `b5328d7` (value-free dirty/busy owner reports); Task 4 `51c6067` (guarded one-panel workflow tabs, commit-keyed focus, lifecycle preservation); Task 5 `1bc388f` (independent FRED status/snapshot legs and single detailed owner); visual review hardening `4931050` (RED CSS contract, then no-wrap narrow-screen actions) |
+| raw node accounting | sorted focused-node comm from virgin `f797673` archive to product head: exactly `+42/-12`; all 12 removals match the reviewed list and no other node disappeared; net `+30`, `134 -> 164` |
+| focused/full frontend gates | final fresh run: focused `18 files / 164 tests` and full `65 files / 636 tests`, all passing; `npm run typecheck` clean; production build succeeds with only the pre-existing chunk-size warning |
+| immutable/static gates | all six `git diff --exit-code f797673` gates are empty (`src data_sources tests`, `api.ts`, `Holdings.tsx`, `InvestorProfilePanel.tsx`, `Dashboard.tsx`, `extensions`); retired collapse key appears only as cleanup constant and is never read; active-group key has one owner; Macro snapshot has one production consumer; old Calendar labels, detailed Data Sources snapshot owner, Settings `window.confirm`, `aria-live`, local media queries, and 959/960/961 literals are absent; class coverage passes |
+| six-viewport interaction gate | PASS at `1440x900`, `1024x768`, `961x768`, `960x768`, `959x768`, and `390x844`; screenshots retained under `/tmp/arkscope-p2-8-s4-1-visual/shots/`; verified one mounted panel, rail/overlay exclusivity, tabs keyboard/focus, exact navigation precedence, stale-focus clearing, dirty confirm/busy veto, preserved parent state, Data Sources effect cleanup, five Macro truth states, no overlap or page overflow, and no browser exceptions; polling evidence `2 -> 2` while unmounted and `2 -> 4` after remount |
+| process cleanup | profile and Macro backup SHA-256 values were byte-identical before/after the browser gate; isolated sidecar/Vite/Chrome stopped and ports `8426/8436/9226` refuse connections; temporary SQLite copies and Chrome profile deleted; only screenshots retained |
 | independent implementation review | pending |
 
 ---
@@ -309,7 +308,7 @@ this ledger before implementation continues.
 - Record evidence in this plan's implementation ledger section after review
   clearance.
 
-- [ ] **Step 1: Record the plan-review clearance base**
+- [x] **Step 1: Record the plan-review clearance base**
 
   After independent review, flip the status to `CLEARED FOR IMPLEMENTATION`,
   commit that docs-only change, and record its hash:
@@ -322,7 +321,7 @@ this ledger before implementation continues.
   The first hash is `PLAN_REVIEW_CLEARANCE_COMMIT`. The second command must be
   empty because plan review is docs-only.
 
-- [ ] **Step 2: Create the isolated worktree from clearance**
+- [x] **Step 2: Create the isolated worktree from clearance**
 
   ```bash
   git worktree add ../ArkScope-p2-8-slice-4-1 -b codex/p2-8-slice-4-1-settings PLAN_REVIEW_CLEARANCE_COMMIT
@@ -332,7 +331,7 @@ this ledger before implementation continues.
   Stop if the worktree is not clean. Do not use the main checkout for
   implementation.
 
-- [ ] **Step 3: Reproduce all baselines before RED**
+- [x] **Step 3: Reproduce all baselines before RED**
 
   From `apps/arkscope-web`:
 
@@ -360,7 +359,7 @@ this ledger before implementation continues.
   Require `63/606` and focused `134`. Record the exact node list as the raw
   accounting base.
 
-- [ ] **Step 4: Capture immutable-path digests**
+- [x] **Step 4: Capture immutable-path digests**
 
   Record `git hash-object` for:
 
@@ -374,7 +373,7 @@ this ledger before implementation continues.
   Also record name-only trees for `src/`, `data_sources/`, `tests/`, and
   `extensions/`. These become final byte gates.
 
-- [ ] **Step 5: Commit no code in Task 0**
+- [x] **Step 5: Commit no code in Task 0**
 
   The first product commit belongs to Task 1 after its RED tests fail for the
   intended missing primitive.
@@ -389,7 +388,7 @@ this ledger before implementation continues.
 - Modify: `apps/arkscope-web/src/ui/index.ts`
 - Modify: `apps/arkscope-web/src/ui/primitives.css`
 
-- [ ] **Step 1: Write six RED tests**
+- [x] **Step 1: Write six RED tests**
 
   Add exactly these nodes:
 
@@ -407,7 +406,7 @@ this ledger before implementation continues.
   available to the owner, return `false` from the callback, and prove selection
   and focus stay on the current tab.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ```bash
   npm test -- --run src/ui/Tabs.test.tsx
@@ -415,7 +414,7 @@ this ledger before implementation continues.
 
   Expected failure: `./Tabs` does not exist. Any unrelated failure is a stop.
 
-- [ ] **Step 3: Implement the narrow V1 interface**
+- [x] **Step 3: Implement the narrow V1 interface**
 
   Use this reviewed shape (names may differ only mechanically):
 
@@ -444,14 +443,14 @@ this ledger before implementation continues.
   return value accepts the request and focuses the activated tab. Do not add a
   mode prop, disabled-item model, URL routing, or persistence.
 
-- [ ] **Step 4: Add primitive CSS**
+- [x] **Step 4: Add primitive CSS**
 
   Add `.ui-tabs`, `.ui-tab-list`, `.ui-tab`, and `.ui-tab-panel` rules in
   `primitives.css`. Use existing tokens, radius cap, no negative letter spacing,
   no viewport-scaled font, and stable minimum heights. The tab row may wrap only
   when needed; it must not create page-level horizontal overflow.
 
-- [ ] **Step 5: Export and run GREEN**
+- [x] **Step 5: Export and run GREEN**
 
   ```bash
   npm test -- --run src/ui/Tabs.test.tsx src/ui/primitives.test.tsx src/ui/classCoverage.test.ts
@@ -460,7 +459,7 @@ this ledger before implementation continues.
 
   Expected checkpoint: new Tabs `6/6`, existing primitive/class nodes unchanged.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add apps/arkscope-web/src/ui/Tabs.tsx apps/arkscope-web/src/ui/Tabs.test.tsx apps/arkscope-web/src/ui/index.ts apps/arkscope-web/src/ui/primitives.css
@@ -476,7 +475,7 @@ this ledger before implementation continues.
 - Modify: `apps/arkscope-web/src/settings/settingsPreferences.ts`
 - Modify: `apps/arkscope-web/src/settings/settingsRegistry.test.ts`
 
-- [ ] **Step 1: Replace three collapse nodes with five active-group nodes**
+- [x] **Step 1: Replace three collapse nodes with five active-group nodes**
 
   Remove the three IDs listed in the accounting section and add exactly:
 
@@ -493,7 +492,7 @@ this ledger before implementation continues.
   must let `setItem` succeed, make `removeItem` throw, and prove the new value
   remains accepted.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ```bash
   npm test -- --run src/settings/settingsRegistry.test.ts
@@ -503,7 +502,7 @@ this ledger before implementation continues.
   exist. Keep visible registry metadata and the current directory API unchanged
   in this task so the pre-tabs consumer remains green between commits.
 
-- [ ] **Step 3: Add preference and registry helpers without breaking the current consumer**
+- [x] **Step 3: Add preference and registry helpers without breaking the current consumer**
 
   Add:
 
@@ -527,7 +526,7 @@ this ledger before implementation continues.
   must derive from `SETTINGS_GROUPS`; do not retain or introduce a second
   hand-written group-ID set in `settingsPreferences.ts`.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
   ```bash
   npm test -- --run src/settings/settingsRegistry.test.ts
@@ -539,7 +538,7 @@ this ledger before implementation continues.
   `64 files / 614 tests` at this cumulative point (Task 1 added one file/six
   nodes; Task 2 is net +2).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add apps/arkscope-web/src/settings/settingsRegistry.ts apps/arkscope-web/src/settings/settingsPreferences.ts apps/arkscope-web/src/settings/settingsRegistry.test.ts
@@ -561,7 +560,7 @@ this ledger before implementation continues.
 - Modify: `apps/arkscope-web/src/ResearchRuntimeSection.test.ts`
 - Modify: `apps/arkscope-web/src/SettingsProviderConfig.test.ts`
 
-- [ ] **Step 1: Write seven RED owner tests**
+- [x] **Step 1: Write seven RED owner tests**
 
   Add exactly:
 
@@ -591,7 +590,7 @@ this ledger before implementation continues.
   contain only booleans and fixed reason copy; planted token/API-key/draft
   strings must never appear in callback arguments.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ```bash
   npm test -- --run src/ProviderSection.test.ts src/CredentialList.test.ts src/FixedTaskRuntimeSection.test.tsx src/ResearchRuntimeSection.test.ts src/SettingsProviderConfig.test.ts
@@ -599,12 +598,12 @@ this ledger before implementation continues.
 
   Expected failures: navigation guard props/types do not exist.
 
-- [ ] **Step 3: Add the shared type, not a second state store**
+- [x] **Step 3: Add the shared type, not a second state store**
 
   `settingsNavigationGuard.ts` contains only the interface, callback type, and
   an immutable clear constant. It must not import API types or persist data.
 
-- [ ] **Step 4: Report Provider state**
+- [x] **Step 4: Report Provider state**
 
   Add optional `onNavigationGuardChange` to `ProviderSection`. Dirty is true
   when any user-entered setup/API-key/OAuth/manual/rename/metadata draft exists.
@@ -620,14 +619,14 @@ this ledger before implementation continues.
   An effect reports derived booleans and stable copy; cleanup reports clear.
   Never put draft values in the report or a DOM data attribute.
 
-- [ ] **Step 5: Report runtime state**
+- [x] **Step 5: Report runtime state**
 
   Each runtime section compares its controlled draft strings against current
   settings props and reports dirty. `saving` remains parent-owned and is not
   duplicated as child busy. Existing settings-prop effects must still reset the
   draft after successful refresh.
 
-- [ ] **Step 6: Report Data Sources state and remove its detailed snapshot owner**
+- [x] **Step 6: Report Data Sources state and remove its detailed snapshot owner**
 
   Report dirty when any interval draft or provider-field draft is non-empty, or
   `pendingGuardedEdit` is non-null. Report busy when the existing `busy` string
@@ -641,7 +640,7 @@ this ledger before implementation continues.
   `auto_refresh_enabled`. If the auto-refresh signal is absent, render an
   unknown neutral phrase instead of claiming it is off.
 
-- [ ] **Step 7: Replace the one superseded Data Sources node**
+- [x] **Step 7: Replace the one superseded Data Sources node**
 
   Rename `renders the FRED local snapshot panel` to
   `does_not_request_or_render_the_detailed_fred_snapshot`. Remove the snapshot
@@ -655,7 +654,7 @@ this ledger before implementation continues.
 
   Update existing polling assertions in place; do not rename them.
 
-- [ ] **Step 8: Run GREEN**
+- [x] **Step 8: Run GREEN**
 
   ```bash
   npm test -- --run src/ProviderSection.test.ts src/CredentialList.test.ts src/FixedTaskRuntimeSection.test.tsx src/ResearchRuntimeSection.test.ts src/SettingsProviderConfig.test.ts
@@ -665,7 +664,7 @@ this ledger before implementation continues.
   Expected raw checkpoint: `+8/-1`, with every pre-existing non-snapshot node
   retained. Cumulative full-package target: `64 files / 621 tests`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
   ```bash
   git add apps/arkscope-web/src/settings/settingsNavigationGuard.ts apps/arkscope-web/src/settings/ProviderSection.tsx apps/arkscope-web/src/settings/RuntimeLimitSections.tsx apps/arkscope-web/src/settings/DataSourcesSection.tsx apps/arkscope-web/src/ProviderSection.test.ts apps/arkscope-web/src/CredentialList.test.ts apps/arkscope-web/src/FixedTaskRuntimeSection.test.tsx apps/arkscope-web/src/ResearchRuntimeSection.test.ts apps/arkscope-web/src/SettingsProviderConfig.test.ts
@@ -692,7 +691,7 @@ this ledger before implementation continues.
 - Modify: `apps/arkscope-web/src/SettingsNewsStorage.test.ts`
 - Modify: `apps/arkscope-web/src/SettingsCss.test.ts`
 
-- [ ] **Step 1: Replace six superseded workspace nodes**
+- [x] **Step 1: Replace six superseded workspace nodes**
 
   Add these six replacement IDs (each is one raw add paired to one explicit
   removal):
@@ -706,7 +705,7 @@ this ledger before implementation continues.
 
   Preserve and evolve the other seven existing workspace IDs in place.
 
-- [ ] **Step 2: Add six new workspace guard/navigation nodes**
+- [x] **Step 2: Add six new workspace guard/navigation nodes**
 
   Add exactly:
 
@@ -722,7 +721,7 @@ this ledger before implementation continues.
   `aria-busy` shape and editable input as the immutable real component; do not
   change `InvestorProfilePanel.tsx`.
 
-- [ ] **Step 3: Add two parent-preservation nodes**
+- [x] **Step 3: Add two parent-preservation nodes**
 
   In `SettingsModelRouting.test.ts`, add exactly:
 
@@ -733,7 +732,7 @@ this ledger before implementation continues.
   trip without a discard dialog. Existing exact-target tests must migrate from
   the collapse key to the active-group key without renaming.
 
-- [ ] **Step 4: Strengthen registry and static RED expectations**
+- [x] **Step 4: Strengthen registry and static RED expectations**
 
   In the existing registry terminology/search nodes, require:
 
@@ -756,7 +755,7 @@ this ledger before implementation continues.
   This must fail because the current overlay stack snapshots the element only
   when the dialog opens. Do not add or rename an overlay node.
 
-- [ ] **Step 5: Run RED**
+- [x] **Step 5: Run RED**
 
   ```bash
   npm test -- --run src/SettingsWorkspace.test.tsx src/SettingsModelRouting.test.ts src/SettingsCss.test.ts src/settings/settingsRegistry.test.ts src/ui/overlays.test.tsx
@@ -766,7 +765,7 @@ this ledger before implementation continues.
   guards are not integrated, old Macro navigation metadata remains, and the
   old one-frame reveal remains.
 
-- [ ] **Step 6: Move data-panel harnesses onto the explicit active group**
+- [x] **Step 6: Move data-panel harnesses onto the explicit active group**
 
   Before changing production composition, update the shared render helpers in
   `SettingsProviderConfig.test.ts`, `SettingsPostPgExitStorage.test.ts`, and
@@ -780,7 +779,7 @@ this ledger before implementation continues.
   its historical Macro-content node IDs until their explicit Task 5
   replacements.
 
-- [ ] **Step 7: Finalize directory filtering and navigation metadata**
+- [x] **Step 7: Finalize directory filtering and navigation metadata**
 
   Add `activeGroup: SettingsGroupId` to `SettingsDirectory`. For a normalized
   empty query, use only `settingsGroup(activeGroup).sections`; for a non-empty
@@ -802,7 +801,7 @@ this ledger before implementation continues.
   data-panel harnesses. Do not expose the final directory prop or final visible
   metadata in Task 2 while the long-page consumer still owns the old API.
 
-- [ ] **Step 8: Implement one guarded intent reducer in `SettingsView`**
+- [x] **Step 8: Implement one guarded intent reducer in `SettingsView`**
 
   Replace `collapsedGroups`/`toggleGroup` with `activeGroup` initialized from
   `readActiveSettingsGroup()`. Derive the initial current anchor with
@@ -840,7 +839,7 @@ this ledger before implementation continues.
   to the destination tab immediately before confirm. Never locate a tab by
   label or CSS query.
 
-- [ ] **Step 9: Integrate local guard reports**
+- [x] **Step 9: Integrate local guard reports**
 
   Store only the latest guard per local owner. Combine:
 
@@ -854,7 +853,7 @@ this ledger before implementation continues.
   preserved in `SettingsView`. Report cleanup on section unmount must not make
   an already-approved intent race or reopen the dialog.
 
-- [ ] **Step 10: Render `Tabs` with only the selected panel**
+- [x] **Step 10: Render `Tabs` with only the selected panel**
 
   Remove `ChevronDown`, `ChevronRight`, group headers, collapse buttons, and
   all-groups mapping. Build three `TabItem<SettingsGroupId>` values from the
@@ -864,7 +863,7 @@ this ledger before implementation continues.
   Keep the workflow tabs above the rail/content layout. Do not put tab panels,
   groups, or the directory in decorative cards.
 
-- [ ] **Step 11: Replace reveal timing with a commit-keyed effect**
+- [x] **Step 11: Replace reveal timing with a commit-keyed effect**
 
   The exact-focus effect depends on `[activeGroup, pendingReveal]`, verifies the
   pending anchor belongs to the mounted group, queries the now-committed anchor,
@@ -875,14 +874,14 @@ this ledger before implementation continues.
   Manual group changes set the first anchor but clear `pendingReveal`; focus
   remains on the activated tab. Search/NavigationTarget set pending exact focus.
 
-- [ ] **Step 12: Preserve responsive directory exclusivity**
+- [x] **Step 12: Preserve responsive directory exclusivity**
 
   Pass `activeGroup` to both directory render forms. Keep the persistent rail
   only when `shellOverlay` is false and the Drawer only when true/open. Search
   result selection from the Drawer closes it before exact focus. Escape without
   selection still returns focus to the directory trigger.
 
-- [ ] **Step 13: Update CSS and satisfy static contracts**
+- [x] **Step 13: Update CSS and satisfy static contracts**
 
   Remove obsolete `.settings-workspace-group > header` and collapse-specific
   rules. Add only Settings-local layout classes around the shared Tabs output.
@@ -904,7 +903,7 @@ this ledger before implementation continues.
   confirm-to-destination focus. Existing Drawer and nested-overlay behavior
   must remain unchanged.
 
-- [ ] **Step 14: Run GREEN**
+- [x] **Step 14: Run GREEN**
 
   ```bash
   npm test -- --run src/SettingsWorkspace.test.tsx src/SettingsModelRouting.test.ts src/SettingsProviderConfig.test.ts src/SettingsPostPgExitStorage.test.ts src/SettingsNewsStorage.test.ts src/SettingsCss.test.ts src/settings/settingsRegistry.test.ts src/ui/Tabs.test.tsx src/ui/overlays.test.tsx
@@ -915,7 +914,7 @@ this ledger before implementation continues.
   `SettingsCss` or overlay node change. Cumulative full-package target:
   `64 files / 629 tests`.
 
-- [ ] **Step 15: Commit**
+- [x] **Step 15: Commit**
 
   ```bash
   git add apps/arkscope-web/src/Settings.tsx apps/arkscope-web/src/settings/SettingsDirectory.tsx apps/arkscope-web/src/settings/settingsRegistry.ts apps/arkscope-web/src/settings/settingsPreferences.ts apps/arkscope-web/src/settings/settings.css apps/arkscope-web/src/settings/settingsRegistry.test.ts apps/arkscope-web/src/ui/useOverlayFocus.ts apps/arkscope-web/src/ui/overlays.test.tsx apps/arkscope-web/src/SettingsWorkspace.test.tsx apps/arkscope-web/src/SettingsModelRouting.test.ts apps/arkscope-web/src/SettingsProviderConfig.test.ts apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts apps/arkscope-web/src/SettingsNewsStorage.test.ts apps/arkscope-web/src/SettingsCss.test.ts
@@ -932,7 +931,7 @@ this ledger before implementation continues.
 - Modify: `apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts`
 - Verify: `apps/arkscope-web/src/settings/DataSourcesSection.tsx`
 
-- [ ] **Step 1: Write seven isolated Macro RED tests**
+- [x] **Step 1: Write seven isolated Macro RED tests**
 
   Add exactly:
 
@@ -949,7 +948,7 @@ this ledger before implementation continues.
   leg, not merely show an alert. The refresh node must select the accessible
   `重新整理` command rather than a glyph or CSS selector.
 
-- [ ] **Step 2: Replace two storage integration node IDs**
+- [x] **Step 2: Replace two storage integration node IDs**
 
   Replace the two IDs listed in accounting with:
 
@@ -964,7 +963,7 @@ this ledger before implementation continues.
   `getMacroSnapshot()` call fall through to real `fetch`. Keep the other three
   node IDs unchanged.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   ```bash
   npm test -- --run src/settings/MacroStorageSection.test.tsx src/SettingsPostPgExitStorage.test.ts
@@ -973,7 +972,7 @@ this ledger before implementation continues.
   Expected failures: Macro owns no snapshot leg, raw errors render, and old
   Calendar copy remains.
 
-- [ ] **Step 4: Implement independent read legs**
+- [x] **Step 4: Implement independent read legs**
 
   `MacroStorageSection` owns separate `status`, `snapshot`, `statusUnavailable`,
   and `snapshotUnavailable` state. `load()` uses one `Promise.allSettled` over
@@ -989,7 +988,7 @@ this ledger before implementation continues.
   Add an unmount/sequence guard so a late older refresh cannot replace a newer
   accepted leg. Do not add a third request, cache, schema, or DTO.
 
-- [ ] **Step 5: Render honest detailed truth**
+- [x] **Step 5: Render honest detailed truth**
 
   Use visible title `總經資料`. Render:
 
@@ -1007,7 +1006,7 @@ this ledger before implementation continues.
   do not retain the raw `↻` glyph button, invent a chip, or add a local alert
   style.
 
-- [ ] **Step 6: Prove ownership mechanically**
+- [x] **Step 6: Prove ownership mechanically**
 
   ```bash
   rg -n "getMacroSnapshot" apps/arkscope-web/src/Settings.tsx apps/arkscope-web/src/settings
@@ -1018,7 +1017,7 @@ this ledger before implementation continues.
   `MacroStorageSection.tsx`; type/test references are outside this scoped
   command. The second command must return no matches.
 
-- [ ] **Step 7: Run GREEN**
+- [x] **Step 7: Run GREEN**
 
   ```bash
   npm test -- --run src/settings/MacroStorageSection.test.tsx src/SettingsPostPgExitStorage.test.ts src/SettingsProviderConfig.test.ts src/SettingsStabilizationCss.test.ts
@@ -1029,7 +1028,7 @@ this ledger before implementation continues.
   Sources retains its Task 3 `+3/-1` accounting. Cumulative full-package
   target: `65 files / 636 tests`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
   ```bash
   git add apps/arkscope-web/src/settings/MacroStorageSection.tsx apps/arkscope-web/src/settings/MacroStorageSection.test.tsx apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts apps/arkscope-web/src/settings/DataSourcesSection.tsx apps/arkscope-web/src/SettingsProviderConfig.test.ts
@@ -1045,13 +1044,13 @@ this ledger before implementation continues.
   adjustment.
 - Do not add behavior or broaden scope.
 
-- [ ] **Step 1: List and diff test nodes**
+- [x] **Step 1: List and diff test nodes**
 
   Generate baseline and head node lists from the exact focused command. Use
   sorted `comm` output to verify raw `+42/-12`. The 12 removed IDs must be the
   exact reviewed set; every other removal is a stop condition.
 
-- [ ] **Step 2: Run the focused 18-file gate**
+- [x] **Step 2: Run the focused 18-file gate**
 
   ```bash
   npm test -- --run \
@@ -1077,7 +1076,7 @@ this ledger before implementation continues.
 
   Require `18 files / 164 tests`.
 
-- [ ] **Step 3: Run static ratchets**
+- [x] **Step 3: Run static ratchets**
 
   Require all of the following:
 
@@ -1093,7 +1092,7 @@ this ledger before implementation continues.
   - no new `aria-live` in Settings; and
   - class coverage remains empty.
 
-- [ ] **Step 4: Prove immutable paths**
+- [x] **Step 4: Prove immutable paths**
 
   ```bash
   git diff --exit-code f797673 -- src data_sources tests
@@ -1106,7 +1105,7 @@ this ledger before implementation continues.
 
   No exception is allowed, including backend test fixtures.
 
-- [ ] **Step 5: Run the full frontend gate**
+- [x] **Step 5: Run the full frontend gate**
 
   ```bash
   npm test -- --run
@@ -1117,7 +1116,7 @@ this ledger before implementation continues.
   Require `65 files / 636 tests`, clean typecheck, and build success. The
   already-known chunk-size warning is acceptable; any new warning is not.
 
-- [ ] **Step 6: Commit only ledger/test hardening if needed**
+- [x] **Step 6: Commit only ledger/test hardening if needed**
 
   If no changes were needed, do not create an empty commit. Any accounting
   deviation requires explicit plan amendment and review before continuing.
@@ -1130,12 +1129,12 @@ this ledger before implementation continues.
 - No product edits unless a failing reviewed contract first gets a RED test.
 - Store screenshots/evidence outside tracked product paths.
 
-- [ ] **Step 1: Start an isolated no-scheduler sidecar and Vite server**
+- [x] **Step 1: Start an isolated no-scheduler sidecar and Vite server**
 
   Use temporary profile/data paths and unused ports. Never point a test server
   at production writable DBs. Record PIDs, roots, ports, and cleanup commands.
 
-- [ ] **Step 2: Verify all six exact viewports**
+- [x] **Step 2: Verify all six exact viewports**
 
   Capture and inspect:
 
@@ -1153,13 +1152,13 @@ this ledger before implementation continues.
   persistent rail and no trigger/Drawer. At 960px, 959px, and 390px require one
   trigger, no persistent rail, and one transient Drawer only when open.
 
-- [ ] **Step 3: Verify Tabs keyboard contract**
+- [x] **Step 3: Verify Tabs keyboard contract**
 
   Starting on `AI 與模型`, use ArrowRight twice, ArrowLeft with wrap, Home, and
   End. Selection, focus, mounted panel, current-group directory, and stored
   group must move together. Mouse activation must match keyboard behavior.
 
-- [ ] **Step 4: Verify search and exact-target timing**
+- [x] **Step 4: Verify search and exact-target timing**
 
   - Empty query lists only current-group anchors.
   - `FRED` finds `總經資料`, switches to `資料與同步`, then focuses
@@ -1170,7 +1169,7 @@ this ledger before implementation continues.
   - A seeded persisted `data_sync` group is overridden by a fresh Provider
     `NavigationTarget`.
 
-- [ ] **Step 5: Verify dirty/busy lifecycle behavior without real credentials**
+- [x] **Step 5: Verify dirty/busy lifecycle behavior without real credentials**
 
   Use safe non-secret drafts and mocked/isolated delayed responses:
 
@@ -1185,14 +1184,14 @@ this ledger before implementation continues.
   - Model route draft and discovery result survive AI -> data -> AI without a
     discard dialog.
 
-- [ ] **Step 6: Verify polling lifecycle**
+- [x] **Step 6: Verify polling lifecycle**
 
   With `資料與同步` selected, observe Data Sources schedule polling listener/timer
   existence. Switch away and prove listener/timer cleanup and no later state
   write. Switch back and prove one fresh lifecycle, not accumulated duplicate
   polling.
 
-- [ ] **Step 7: Verify FRED ownership and honest states**
+- [x] **Step 7: Verify FRED ownership and honest states**
 
   Using fixture-backed API responses, inspect both-success, each one-leg
   failure, missing DB/table, zero rows, and refresh-off/stored-data states.
@@ -1200,7 +1199,7 @@ this ledger before implementation continues.
   detailed table. No raw planted exception or top-level Calendar feature
   promise may appear; factual stored event-table labels remain allowed.
 
-- [ ] **Step 8: Stop every process**
+- [x] **Step 8: Stop every process**
 
   Confirm the chosen sidecar/Vite/browser ports refuse connections and record
   cleanup. Do not end the task with a live verification session.
@@ -1215,7 +1214,7 @@ this ledger before implementation continues.
   status changes
 - Do not mark the product LIVE before merge and user verification.
 
-- [ ] **Step 1: Fill the implementation ledger**
+- [x] **Step 1: Fill the implementation ledger**
 
   Record:
 
@@ -1229,7 +1228,7 @@ this ledger before implementation continues.
   - process cleanup; and
   - every reviewed deviation, if any.
 
-- [ ] **Step 2: Run final worktree checks**
+- [x] **Step 2: Run final worktree checks**
 
   ```bash
   git status --short
@@ -1241,14 +1240,14 @@ this ledger before implementation continues.
   the final docs commit. No generated screenshots, DBs, tokens, or browser
   profiles may be staged.
 
-- [ ] **Step 3: Commit review evidence**
+- [x] **Step 3: Commit review evidence**
 
   ```bash
   git add docs/superpowers/plans/2026-07-19-p2-8-slice-4-1-settings-navigation-correction.md
   git commit -m "docs: record Settings correction verification"
   ```
 
-- [ ] **Step 4: Stop review-ready**
+- [x] **Step 4: Stop review-ready**
 
   Request independent implementation review. Do not merge, sync Design Kit,
   mark LIVE, open i18n implementation, or delete the worktree yet.
