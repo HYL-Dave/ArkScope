@@ -10,7 +10,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from src import sa_capture_store, symbol_catalog
+from src import active_universe, sa_capture_store, symbol_catalog
+from src.api.routes import symbols as symbol_routes
 from src.api.routes.symbols import symbols_search
 from src.portfolio_state import PortfolioStore
 from src.profile_state import ProfileStateStore
@@ -162,18 +163,66 @@ def test_local_seed_works_when_sec_unavailable(monkeypatch):
 
 
 def test_cache_reoverlays_sec_names_when_stale(monkeypatch):
-    # First load with SEC down → blank names; once stale, a later load picks up
-    # SEC names without a process restart (self-heal).
+    # Active-seed churn rebuilds immediately without touching the independent SEC
+    # success TTL. Once that TTL expires, SEC names refresh normally.
     symbol_catalog.reset_for_tests()
-    monkeypatch.setattr(symbol_catalog, "_local_seed", lambda: {"RKLB": ""})
-    monkeypatch.setattr(symbol_catalog, "_load_sec", lambda force: {})  # SEC down
-    symbol_catalog.load_catalog(force=True)
-    assert symbol_catalog.search("RKLB")[0]["name"] == ""  # blank for now
-    # SEC recovers; mark the in-memory cache stale → next (force=False) load rebuilds
-    monkeypatch.setattr(symbol_catalog, "_load_sec", lambda force: {"RKLB": "Rocket Lab"})
-    symbol_catalog._cache_built_at = 0.0
-    symbol_catalog.load_catalog()  # not forced, but stale → re-overlay
-    assert symbol_catalog.search("RKLB")[0]["name"] == "Rocket Lab"
+    success_calls = []
+
+    def load_success(force):
+        success_calls.append(force)
+        name = "Rocket Lab" if len(success_calls) == 1 else "Rocket Lab Refreshed"
+        return {"RKLB": name}
+
+    monkeypatch.setattr(symbol_catalog, "_load_sec", load_success)
+    initial = symbol_catalog.load_catalog(force=True, active_tickers=("RKLB",))
+    initial_sec_checked_at = symbol_catalog._sec_checked_at
+    assert initial == [{"ticker": "RKLB", "name": "Rocket Lab"}]
+    assert success_calls == [True]
+
+    changed = symbol_catalog.load_catalog(active_tickers=("MXL", "RKLB"))
+    assert {row["ticker"] for row in changed} == {"MXL", "RKLB"}
+    assert symbol_catalog._cache_seed_key == ("MXL", "RKLB")
+    assert success_calls == [True]
+    assert symbol_catalog._sec_checked_at == initial_sec_checked_at
+
+    symbol_catalog._sec_checked_at = (
+        symbol_catalog.time.time() - symbol_catalog._TTL_SECONDS
+    )
+    refreshed = symbol_catalog.load_catalog(active_tickers=("MXL", "RKLB"))
+    assert success_calls == [True, False]
+    assert next(row for row in refreshed if row["ticker"] == "RKLB")["name"] == (
+        "Rocket Lab Refreshed"
+    )
+
+    # The failed-SEC retry clock is independent too: seed churn cannot postpone
+    # the backoff retry that lets a long-running process self-heal.
+    symbol_catalog.reset_for_tests()
+    failure_calls = []
+
+    def load_after_failure(force):
+        failure_calls.append(force)
+        return {} if len(failure_calls) == 1 else {"RKLB": "Rocket Lab Recovered"}
+
+    monkeypatch.setattr(symbol_catalog, "_load_sec", load_after_failure)
+    failed = symbol_catalog.load_catalog(force=True, active_tickers=("RKLB",))
+    failed_sec_checked_at = symbol_catalog._sec_checked_at
+    assert failed == [{"ticker": "RKLB", "name": ""}]
+
+    changed_after_failure = symbol_catalog.load_catalog(
+        active_tickers=("MXL", "RKLB")
+    )
+    assert {row["ticker"] for row in changed_after_failure} == {"MXL", "RKLB"}
+    assert failure_calls == [True]
+    assert symbol_catalog._sec_checked_at == failed_sec_checked_at
+
+    symbol_catalog._sec_checked_at = (
+        symbol_catalog.time.time() - symbol_catalog._RETRY_AFTER_SEC_FAIL
+    )
+    recovered = symbol_catalog.load_catalog(active_tickers=("MXL", "RKLB"))
+    assert failure_calls == [True, False]
+    assert next(row for row in recovered if row["ticker"] == "RKLB")["name"] == (
+        "Rocket Lab Recovered"
+    )
 
 
 def test_sec_overlay_enriches_names(monkeypatch):
@@ -185,7 +234,7 @@ def test_sec_overlay_enriches_names(monkeypatch):
     assert cat["TSLA"] == "Tesla Inc"   # SEC-only ticker also present
 
 
-def test_route_flags_tracked(symbol_databases):
+def test_route_flags_tracked(symbol_databases, monkeypatch):
     store = symbol_databases.profile
     store.import_lists(
         [
@@ -198,18 +247,48 @@ def test_route_flags_tracked(symbol_databases):
     _insert_sa_pick(symbol_databases.sa_path, "NVDA")
     _set_sa_current_refresh(symbol_databases.sa_path)
 
-    nvda = symbols_search(q="NVDA", limit=10, store=store)["results"][0]
-    msft = symbols_search(q="MSFT", limit=10, store=store)["results"][0]
-    brk = {
-        row["ticker"]: row
-        for row in symbols_search(q="BRK", limit=10, store=store)["results"]
-    }
+    symbol_catalog.reset_for_tests()
+    sec_calls = []
 
-    assert nvda["tracked"] is True  # active only through Alpha Picks
-    assert nvda["name"] == "NVIDIA Corp"
-    assert msft["tracked"] is False  # archived list history is not active
-    assert brk["BRK.B"]["tracked"] is False
-    assert brk["BRK B"]["tracked"] is True
+    def load_sec(force):
+        sec_calls.append(force)
+        return {
+            "NVDA": "NVIDIA Match",
+            "MSFT": "Microsoft Match",
+            "BRK.B": "Berkshire Hidden Match",
+            "BRK B": "Berkshire Active Match",
+        }
+
+    snapshot_calls = []
+
+    def build_route_snapshot(*, profile_db):
+        snapshot_calls.append(profile_db)
+        return active_universe.build_active_universe_snapshot(
+            profile_db=profile_db,
+            sa_db=symbol_databases.sa_path,
+        )
+
+    def reject_duplicate_snapshot(**kwargs):
+        raise AssertionError("symbol catalog opened a duplicate active snapshot")
+
+    monkeypatch.setattr(symbol_catalog, "_load_sec", load_sec)
+    monkeypatch.setattr(
+        symbol_catalog, "build_active_universe_snapshot", reject_duplicate_snapshot
+    )
+    monkeypatch.setattr(
+        symbol_routes, "build_active_universe_snapshot", build_route_snapshot
+    )
+
+    response = symbols_search(q="match", limit=10, store=store)
+    by_ticker = {row["ticker"]: row for row in response["results"]}
+
+    assert snapshot_calls == [store.db_path]
+    assert sec_calls == [False]
+    assert symbol_catalog._cache_seed_key == ("BRK B", "NVDA")
+    assert by_ticker["NVDA"]["tracked"] is True  # Alpha Picks only
+    assert by_ticker["MSFT"]["tracked"] is False  # archived list history only
+    assert by_ticker["BRK.B"]["tracked"] is False
+    assert by_ticker["BRK B"]["tracked"] is True
 
 
 def test_symbol_search_unavailable_returns_sanitized_503(

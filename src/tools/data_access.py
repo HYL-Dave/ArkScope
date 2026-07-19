@@ -10,7 +10,6 @@ Wraps a DataBackend (file or database) and adds:
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from pathlib import Path
@@ -425,21 +424,6 @@ class DataAccessLayer:
 
         with open(path) as f:
             data = yaml.safe_load(f) or {}
-        self._config_cache[name] = data
-        return data
-
-    def _load_json(self, name: str) -> dict:
-        """Load and cache a JSON config file."""
-        if name in self._config_cache:
-            return self._config_cache[name]
-
-        path = self._base / "config" / name
-        if not path.exists():
-            logger.warning(f"Config file not found: {path}")
-            return {}
-
-        with open(path) as f:
-            data = json.load(f)
         self._config_cache[name] = data
         return data
 

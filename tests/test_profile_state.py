@@ -11,7 +11,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from src import active_universe, sa_capture_store
+from src import active_universe, sa_capture_store, universe_compat
 from src.api.routes import profile as profile_routes
 from src.api.routes.profile import (
     ArchiveBody,
@@ -680,20 +680,31 @@ def test_universe_export_route_is_deterministic_read_only_and_omits_settings(
             now=ROUTE_NOW,
         )
 
+    writer_calls = []
+    temp_file_calls = []
+
     def reject_file_write(*args, **kwargs):
-        raise AssertionError("route attempted to write an export file")
+        writer_calls.append((args, kwargs))
+        raise AssertionError("route attempted to call the compatibility writer")
+
+    def reject_temp_file(*args, **kwargs):
+        temp_file_calls.append((args, kwargs))
+        raise AssertionError("route attempted to open an export temp file")
 
     monkeypatch.setattr(
         profile_routes,
         "build_active_universe_snapshot",
         build_snapshot,
-        raising=False,
     )
     monkeypatch.setattr(
-        profile_routes,
+        universe_compat,
         "write_compat_export",
         reject_file_write,
-        raising=False,
+    )
+    monkeypatch.setattr(
+        universe_compat.tempfile,
+        "NamedTemporaryFile",
+        reject_temp_file,
     )
     before = (
         profile.get_setting("private-export-setting"),
@@ -705,6 +716,8 @@ def test_universe_export_route_is_deterministic_read_only_and_omits_settings(
     second = profile_routes.export_universe(store=profile)
 
     assert calls == [profile.db_path, profile.db_path]
+    assert writer_calls == []
+    assert temp_file_calls == []
     assert first == second
     assert first["_generated"]["generated_at"] == ROUTE_NOW_TEXT
     assert "settings" not in first

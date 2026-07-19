@@ -58,6 +58,7 @@ class TestBackendProtocol:
 class TestConfigAccess:
     def test_get_watchlist(self, dal):
         """get_watchlist() should return tickers from user_profile.yaml."""
+        assert not hasattr(dal, "_load_json")
         result = dal.get_watchlist()
         assert isinstance(result, WatchlistResult)
         assert len(result.tickers) > 0

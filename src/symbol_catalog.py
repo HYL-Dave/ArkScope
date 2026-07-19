@@ -38,9 +38,10 @@ def _user_agent() -> str:
 
 _lock = threading.Lock()
 _cache: Optional[list[dict]] = None  # in-memory [{ticker, name}]
-_cache_built_at: float = 0.0        # when _cache was last (re)built
-_cache_sec_ok: bool = False         # did the last build get SEC names?
 _cache_seed_key: tuple[str, ...] | None = None
+_sec_cache: dict[str, str] | None = None
+_sec_checked_at: float = 0.0
+_sec_ok: bool = False
 _test_catalog_override: bool = False
 # If a build's SEC overlay failed (offline/403), let a later call retry rather
 # than serving blank names for the whole process — but not on every keystroke.
@@ -126,7 +127,7 @@ def load_catalog(
     seed. A typed snapshot outage contributes no seed, while SEC data remains
     available for autocomplete.
     """
-    global _cache, _cache_built_at, _cache_sec_ok, _cache_seed_key
+    global _cache, _cache_seed_key, _sec_cache, _sec_checked_at, _sec_ok
     with _lock:
         if _test_catalog_override and _cache is not None and not force:
             return _cache
@@ -135,24 +136,27 @@ def load_catalog(
     seed_key = tuple(sorted(seed))
 
     with _lock:
-        if _cache is not None and not force:
-            age = time.time() - _cache_built_at
-            stale = age >= _TTL_SECONDS
-            # Self-heal: if the last build couldn't reach SEC (blank names), let
-            # a later call retry after a backoff so a long-running server picks
-            # up SEC names without a restart.
-            retry_after_fail = (not _cache_sec_ok) and age >= _RETRY_AFTER_SEC_FAIL
-            seed_changed = _cache_seed_key != seed_key
-            if not seed_changed and not stale and not retry_after_fail:
-                return _cache
-        merged = seed
-        sec = _load_sec(force)
+        sec_age = time.time() - _sec_checked_at
+        sec_stale = _sec_cache is None or sec_age >= _TTL_SECONDS
+        # Self-heal after an empty/failed SEC load without coupling retry timing
+        # to active-universe changes.
+        retry_after_fail = (not _sec_ok) and sec_age >= _RETRY_AFTER_SEC_FAIL
+        refresh_sec = force or sec_stale or retry_after_fail
+        seed_changed = _cache_seed_key != seed_key
+        if _cache is not None and not seed_changed and not refresh_sec:
+            return _cache
+
+        if refresh_sec:
+            _sec_cache = _load_sec(force)
+            _sec_checked_at = time.time()
+            _sec_ok = bool(_sec_cache)
+
+        merged = dict(seed)
+        sec = _sec_cache or {}
         for ticker, name in sec.items():
             # SEC name enriches; SEC-only tickers are added too (broad US list).
             merged[ticker] = name or merged.get(ticker, "")
         _cache = [{"ticker": t, "name": n} for t, n in merged.items()]
-        _cache_built_at = time.time()
-        _cache_sec_ok = bool(sec)
         _cache_seed_key = seed_key
         return _cache
 
@@ -188,21 +192,25 @@ def search(
 
 
 def reset_for_tests() -> None:
-    global _cache, _cache_built_at, _cache_sec_ok, _cache_seed_key, _test_catalog_override
+    global _cache, _cache_seed_key, _sec_cache, _sec_checked_at, _sec_ok
+    global _test_catalog_override
     with _lock:
         _cache = None
-        _cache_built_at = 0.0
-        _cache_sec_ok = False
         _cache_seed_key = None
+        _sec_cache = None
+        _sec_checked_at = 0.0
+        _sec_ok = False
         _test_catalog_override = False
 
 
 def set_catalog_for_tests(entries: list[dict]) -> None:
     """Inject a ``[{ticker, name}]`` catalog directly (avoids network in tests)."""
-    global _cache, _cache_built_at, _cache_sec_ok, _cache_seed_key, _test_catalog_override
+    global _cache, _cache_seed_key, _sec_cache, _sec_checked_at, _sec_ok
+    global _test_catalog_override
     with _lock:
         _cache = [{"ticker": str(e["ticker"]).upper(), "name": e.get("name", "")} for e in entries]
-        _cache_built_at = time.time()
-        _cache_sec_ok = True
         _cache_seed_key = tuple(sorted(e["ticker"] for e in _cache))
+        _sec_cache = {e["ticker"]: e["name"] for e in _cache}
+        _sec_checked_at = time.time()
+        _sec_ok = True
         _test_catalog_override = True
