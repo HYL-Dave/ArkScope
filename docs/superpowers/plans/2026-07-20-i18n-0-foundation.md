@@ -50,8 +50,10 @@ verification.
 
 | Item | Evidence |
 |---|---|
-| plan-review clearance commit | pending independent plan review |
-| implementation worktree/base | pending; branch must descend from the plan-review clearance commit; product-behavior baseline is <code>220e163</code> because <code>eb89bd1</code> and <code>ad53508</code> are documentation-only |
+| plan-review clearance commit | <code>2a35f1b08c94970086c51845f9a3b86718f096b2</code> |
+| implementation worktree/base | <code>/tmp/arkscope-i18n-0-foundation</code> on <code>codex/i18n-0-foundation</code>, descended from <code>2a35f1b08c94970086c51845f9a3b86718f096b2</code>; product-behavior baseline remains <code>220e163</code> |
+| Task 0 baseline | frontend <code>65 files / 636 tests</code>; backend collect <code>4562</code>; focused profile collect <code>47</code>; product diff against <code>220e163</code> empty; worktree clean |
+| allowed-file baseline SHA-256 | <code>package.json faf1c3c5</code>; <code>package-lock.json aef24e35</code>; <code>profile.py 70f2a7e3</code>; <code>api.ts 0c6ae26b</code>; <code>main.tsx 96f910e2</code>; <code>index.html 67d560ce</code>; <code>vitest.config.ts be95d358</code> |
 | typed-key mode selected | pending Task 2 probe: selector API preferred; standard typed dot-path is the sole pre-approved fallback |
 | RED/GREEN commits | pending |
 | backend node accounting | reviewed target <code>+7/-0</code>; collect <code>4562 -> 4569</code> |
@@ -430,7 +432,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
 - Modify this plan status/ledger only after independent plan GREEN.
 - Do not change product files in this task.
 
-- [ ] **Step 1: Record plan clearance**
+- [x] **Step 1: Record plan clearance**
 
   After independent review GREEN, change status to CLEARED FOR IMPLEMENTATION,
   commit that docs-only change, and record the full commit as
@@ -438,14 +440,14 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   descend from that commit. Keep <code>220e163</code> separately as
   <code>PRODUCT_BEHAVIOR_BASE</code>.
 
-- [ ] **Step 2: Create an isolated worktree**
+- [x] **Step 2: Create an isolated worktree**
 
   Use the established linked-worktree mechanism and branch name
   <code>codex/i18n-0-foundation</code>. Copy only the existing git-crypt key
   into linked Git metadata if required. Do not copy databases, tokens, browser
   profiles, node_modules, or dirty files.
 
-- [ ] **Step 3: Re-run baselines before RED**
+- [x] **Step 3: Re-run baselines before RED**
 
   ~~~bash
   npm test --workspace apps/arkscope-web -- --run
@@ -460,7 +462,7 @@ The file count counts Vitest files, not production modules or scanner fixtures.
   failure family from the latest canonical merged evidence; do not run the
   full five-minute baseline twice unless the reviewer requests it.
 
-- [ ] **Step 4: Protect scope**
+- [x] **Step 4: Protect scope**
 
   Record SHA-256 for every allowed-to-change existing product file and a
   name-only diff baseline. Any pre-existing user change is a stop condition;
