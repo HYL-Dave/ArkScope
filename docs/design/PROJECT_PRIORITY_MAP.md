@@ -241,10 +241,10 @@ therefore defaults to defer until the hypothesis gate exists.
   migration/state-machine, repeated-Quick, merged popup/privacy, no-PG, and
   stopped-service production migration gates are closed. Production is schema
   v2 with integrity/FK clean and legacy logical facts preserved. DB-derived
-  universe/`tickers_core.json` retirement is now freshly grounded and written
-  review-ready; implementation remains not started pending independent review.
-  It is the next bounded authority-retirement unit before P2.8 Slice 4 rather
-  than part of the Settings branch.
+  universe/`tickers_core.json` retirement now has written-review GREEN;
+  implementation remains not started pending a separate RED-first plan and
+  independent plan review. It is the next bounded authority-retirement unit
+  before P2.8 Slice 4 rather than part of the Settings branch.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -438,6 +438,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (DB-DERIVED UNIVERSE / `tickers_core.json` RETIREMENT WRITTEN REVIEW GREEN — implementation plan next)**: Independent review found no must-fix and fresh verification closed its three sentence-level gaps plus one live-data classification. `portfolio_open` now admits only reviewed equity/news identities (`stock`, `etf`, and an option's stored underlying symbol); cash/future/FX/bond/unknown classes are excluded with a source warning rather than silently injected. All six existing `resolve_active_universe()` callers have explicit unavailable-source landings, including durable scheduler failure without loop escape, pre-provider collector/direct aborts, pre-loop daily-update exit, and a sanitized HTTP 503 coverage response. The exporter explicitly drops the unread top-level legacy settings block. Commit `7150ba7` and migrated state prove `LC -> HAPN`, so preview classifies `LC` as `superseded_by_rename` and defaults to no import rather than reviving a dead symbol. The user-owned unstaged `BTSG` JSON edit remains untouched. A separate RED-first implementation plan may now open; no product code is authorized before independent plan review.
 
 - **2026-07-19 (DB-DERIVED UNIVERSE / `tickers_core.json` RETIREMENT FRESHLY GROUNDED — written review ready, implementation not started)**: The former P2.8 Slice 3 sequencing block is satisfied, so the adopted 2026-07-17 design has been re-grounded against merged Alpha Picks schema v2 and the live dirty JSON before any implementation plan opens. Exact runtime inventory remains three live JSON read surfaces, one dormant DAL compatibility reader, and one shared writer reached by native-host plus fallback call paths; the maintained collectors' existing profile resolver is not yet the target because it includes archived membership, omits portfolio/Alpha Picks, and collapses unavailable into `[]`. A read-only `2026-07-19T11:48:38+08:00` snapshot found active JSON `152`, active manual membership `148`, open-position symbols `10`, current non-stale Alpha Picks symbols `44`, raw DB-source union `151`, and hidden-filtered union `150`. Exact differences are JSON-only `ATGE`/`LC`, DB-only `HAPN`, with `ATGE` and `BRK.B` explicitly hidden; the user's unstaged `BTSG` line is already represented by the Alpha Picks DB source and must not become duplicate legacy membership. The revised contract makes parity hidden-aware against a generated transition snapshot, separates all-entry annotations from approved JSON-only membership, preserves exact `BRK.B` versus `BRK B` identity, gives unavailable sources a typed failure instead of fake empty, and explicitly declines to promote the 46 `legacy_reference`-only symbols into active membership. All 17 legacy-overview tickers are currently covered by active manual lists and receive a cutover subset gate. Next gate is independent written review; only GREEN may open a separate RED-first plan. The dirty JSON remains modified only by the user and is excluded from this docs commit.
 

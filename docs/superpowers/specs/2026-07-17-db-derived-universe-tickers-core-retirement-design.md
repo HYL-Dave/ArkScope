@@ -1,8 +1,9 @@
 # DB-Derived Universe and `tickers_core.json` Retirement Design
 
-> **Status:** FRESHLY GROUNDED; WRITTEN REVIEW READY. P2.8 Slice 3 and the
-> Alpha Picks reconciliation line are live. Implementation remains blocked on
-> independent written review and a separate RED-first implementation plan.
+> **Status:** APPROVED; WRITTEN REVIEW GREEN. P2.8 Slice 3 and the Alpha Picks
+> reconciliation line are live. Product implementation has not started; the
+> next gate is a separate RED-first implementation plan and independent plan
+> review.
 
 ## 1. Purpose
 
@@ -81,6 +82,10 @@ schema v2 and the live dirty JSON file, produced:
 | raw union of the three DB-derived sources | 151 |
 | DB-derived union after the explicit hidden veto | 150 |
 
+All 10 current open-position rows have `asset_class='stock'`. That is snapshot
+evidence, not the future membership predicate; §4.1 explicitly covers ETF,
+option-underlying, and unsupported-class behavior.
+
 The raw diff is exact: JSON-only `ATGE` and `LC`; DB-only `HAPN`. The profile
 also hides `ATGE` and `BRK.B`; `BRK.B` is still a real Alpha Picks source fact,
 but the explicit veto removes it from the effective universe. Therefore the
@@ -88,7 +93,10 @@ migration preview must classify at least three different cases instead of
 calling all JSON-only rows missing data:
 
 - hidden JSON-only `ATGE` is not imported as active membership;
-- visible JSON-only `LC` requires an explicit keep/import decision; and
+- visible JSON-only `LC` is classified `superseded_by_rename`, because commit
+  `7150ba7` and the migrated market/profile state establish `LC -> HAPN`; its
+  default action is **do not import** unless the user explicitly overrides that
+  known rename; and
 - DB-only `HAPN` enters the generated transition snapshot from its DB source.
 
 The working tree's one-line uncommitted addition is `BTSG` under
@@ -163,13 +171,20 @@ The registry defines source keys and read adapters:
 | Source | Authority | Active membership |
 |---|---|---|
 | `manual_lists` | `profile_state.db` | membership and parent list both have `archived_at IS NULL` |
-| `portfolio_open` | `profile_state.db` | `position.closed_at IS NULL` and account `archived_at IS NULL`; `include_in_total` is irrelevant to membership |
+| `portfolio_open` | `profile_state.db` | `position.closed_at IS NULL`, account `archived_at IS NULL`, and normalized `asset_class` is one of `stock`, `etf`, or `option`; an IBKR option row contributes its stored underlying `symbol`; `include_in_total` is irrelevant to membership |
 | `sa_alpha_picks_current` | `sa_capture.db` | distinct exact symbols where `portfolio_status='current' AND is_stale=0` |
 | `legacy_config_seed` | `profile_state.db` | user-approved active JSON-only membership with `archived_at IS NULL` |
 
 The registry contains no V1 `enabled` flag for Alpha Picks. It may reserve an
 additive source-policy interface for the named retirement follow-up, but must
 not ship a hidden environment flag or dead UI branch.
+
+Portfolio rows with `cash`, futures, FX, bonds, or any unknown/unsupported
+asset class do not enter this equity/news universe. Their exclusion is exposed
+as a `portfolio_open` source warning rather than silently treating an unknown
+class as an equity ticker. This deliberately retains ETF holdings and the
+underlying symbol of option holdings while refusing to inject non-equity
+contract keys.
 
 The one-time JSON importer stores annotations for every reviewed active JSON
 entry, even when another DB source already qualifies that ticker. It creates a
@@ -224,6 +239,11 @@ accepted snapshot; source failure raises a typed `ActiveUniverseUnavailable`
 rather than returning the same `[]` used by a valid empty universe. New readers
 use the structured snapshot so UI/export can explain why a symbol is present.
 
+The typed failure has one sanitized boundary shape: stable code
+`active_universe_unavailable`, sorted `unavailable_sources`, and safe
+source-level reason codes. It never carries raw SQLite exceptions, file paths,
+provider credentials, or source rows.
+
 All source symbols use the same trim-and-uppercase normalization. Alias
 canonicalization is intentionally absent at this layer. Source provenance is
 collected before `ticker_meta.hidden_at` applies its exact-key final veto.
@@ -251,6 +271,21 @@ If any registered source required for a complete snapshot is unavailable:
 - V1 UI/API callers return a typed unavailable response rather than inventing
   an empty or partial universe; and
 - an unavailable source is not reported as an observed empty set.
+
+Every current compatibility caller has an explicit landing contract:
+
+| Caller | Required unavailable-source behavior |
+|---|---|
+| `service.data_scheduler` | `run_source()` records a durable `failed` outcome before any provider/subprocess call and returns normally so the scheduler loop survives |
+| `collectors.finnhub_news` | abort scope resolution before provider construction/fetch; the CLI exits non-zero with a sanitized universe error |
+| `collectors.polygon_news` | abort scope resolution before provider construction/fetch; the CLI exits non-zero with a sanitized universe error |
+| `daily_update` | catch the typed failure once before its per-source loop, log the stable code, and exit non-zero without running any source |
+| `market_data_direct` | propagate the typed failure before constructing or calling IBKR/Polygon providers |
+| `api.routes.market_data` coverage route | return HTTP 503 with the sanitized typed envelope; do not return a fabricated zero-coverage result |
+
+A complete but genuinely empty snapshot remains a distinct value. Each caller
+may apply its existing empty-work policy, but tests must prove it is not
+reported as `active_universe_unavailable`.
 
 V1 adds no second persisted last-snapshot cache. A future cache may be additive
 only if it carries explicit source staleness and never masquerades as a fresh
@@ -340,6 +375,9 @@ The exporter:
   otherwise ungrouped active source members in deterministic generated groups;
 - preserves imported legacy tier/category metadata for round-trip
   compatibility; and
+- omits the retired top-level `settings` block (`default_tier`, tier-inclusion,
+  capacity, request-size, and news-lookback keys), because fresh static review
+  found no runtime reader and export is not a round-trip authority; and
 - never mutates DB state.
 
 It filters every group through the accepted effective snapshot. Hidden symbols
@@ -423,35 +461,43 @@ The future implementation plan must prove:
 2. an Alpha Pick removal withdraws only `sa_alpha_picks_current`;
 3. holdings/list overlap keeps a removed Alpha Picks ticker active;
 4. archived lists/memberships/accounts and closed positions follow the exact
-   locked predicates, while `include_in_total=false` does not withdraw a holding;
+   locked predicates, `include_in_total=false` does not withdraw a holding,
+   `stock`/`etf`/`option` contribute the reviewed equity symbol, and every other
+   or unknown asset class is excluded with a source warning;
 5. stopped/stale Alpha Picks capture warns but does not age-expire membership;
 6. an accessible Alpha Picks DB with failed latest refresh remains available
    with warning and preserved membership;
 7. unavailable source DBs raise typed failure and never masquerade as empty;
-8. exact normalization preserves `BRK.B` and `BRK B` as distinct keys, so the
+8. every one of the six current compatibility callers exercises its explicit
+   fail-closed landing: scheduler survival with durable failure, two collector
+   non-zero exits, pre-loop `daily_update` abort, pre-provider direct-market
+   abort, and sanitized HTTP 503 coverage response;
+9. exact normalization preserves `BRK.B` and `BRK B` as distinct keys, so the
    existing `BRK.B` veto does not hide `BRK B`;
-9. annotations for already-represented JSON tickers do not create duplicate
+10. annotations for already-represented JSON tickers do not create duplicate
    permanent membership;
-10. JSON-only live entries survive the gated import when approved, while hidden
-    JSON-only entries do not become active;
-11. all current legacy-overview tickers are represented before that union leg
+11. approved JSON-only live entries survive the gated import, hidden JSON-only
+    entries do not become active, and known rename predecessor `LC` is previewed
+    as `superseded_by_rename` with default action `do_not_import`;
+12. all current legacy-overview tickers are represented before that union leg
     is removed;
-12. `legacy_reference` never enters active membership or active export;
-13. strict hidden-aware parity is exact before writer cutover;
-14. all readers migrate before both native-host/fallback writer paths and the
+13. `legacy_reference` never enters active membership or active export;
+14. strict hidden-aware parity is exact before writer cutover;
+15. all readers migrate before both native-host/fallback writer paths and the
     shared writer implementation are removed;
-15. the off/retirement path remains absent in V1 rather than existing untested;
-16. export is deterministic, generated-labelled, and exact-set equivalent;
-17. manual changes to an exported file have no runtime effect;
-18. runtime static scans find no JSON reader/writer outside explicit
+16. the off/retirement path remains absent in V1 rather than existing untested;
+17. export is deterministic, generated-labelled, exact-set equivalent, and
+    omits the retired settings block;
+18. manual changes to an exported file have no runtime effect;
+19. runtime static scans find no JSON reader/writer outside explicit
     import/export compatibility code; and
-19. the current uncommitted JSON edit is preserved through preview and is not
+20. the current uncommitted JSON edit is preserved through preview and is not
     staged, overwritten, or reverted by implementation setup.
 
 ## 12. Sequence
 
 P2.8 Slice 3 and Alpha Picks reconciliation are live, so the former sequencing
-block is satisfied. The next gate is independent written review of this freshly
-grounded document. Only a GREEN review may open the separate RED-first
-implementation plan; P2.8 Slice 4 remains next after this bounded authority
-retirement rather than sharing its branch or A/B baseline.
+block is satisfied. Independent written review is GREEN. The separate RED-first
+implementation plan may now open; product implementation remains blocked until
+that plan receives independent review. P2.8 Slice 4 remains next after this
+bounded authority retirement rather than sharing its branch or A/B baseline.
