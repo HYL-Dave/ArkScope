@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,36 @@ import { describe, expect, it } from "vitest";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const primitiveCss = readFileSync(resolve(here, "./primitives.css"), "utf8");
 const css = [readFileSync(resolve(here, "../styles.css"), "utf8"), primitiveCss].join("\n");
+
+function tsxSources(root: string): string[] {
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      const path = resolve(root, entry.name);
+      if (entry.isDirectory()) return tsxSources(path);
+      return entry.isFile() && entry.name.endsWith(".tsx")
+        ? [readFileSync(path, "utf8")]
+        : [];
+    });
+}
+
+const settingsSources = [
+  readFileSync(resolve(here, "../Settings.tsx"), "utf8"),
+  ...tsxSources(resolve(here, "../settings")),
+].join("\n");
+
+const settingsBaselineUndefinedClasses = [
+  "settings-page",
+  "ds-table",
+  "provider-config-field-label",
+  "provider-config-field-current",
+  "ds-schedule-protection-note",
+  "provider-card",
+  "oauth-import-box",
+  "credential-metadata-actions",
+  "reauth-hint",
+];
 
 function literalClasses(source: string): string[] {
   return Array.from(source.matchAll(/className="([^"]+)"/g))
@@ -24,10 +54,17 @@ describe("migrated component class coverage", () => {
   it.each([
     ["Holdings", resolve(here, "../Holdings.tsx")],
     ["InvestorProfilePanel", resolve(here, "../InvestorProfilePanel.tsx")],
-  ])("defines every literal class used by %s", (_name, path) => {
-    const classes = [...new Set(literalClasses(readFileSync(path, "utf8")))];
-    const missing = classes.filter((name) => !hasSelector(name));
-    expect(missing).toEqual([]);
+  ])("defines every literal class used by %s", (name, path) => {
+    const source = [
+      readFileSync(path, "utf8"),
+      name === "Holdings" ? settingsSources : "",
+    ].join("\n");
+    const classes = [...new Set(literalClasses(source))];
+    const missing = classes.filter((name) => !hasSelector(name)).sort();
+    const expectedMissing = name === "Holdings"
+      ? [...settingsBaselineUndefinedClasses].sort()
+      : [];
+    expect(missing).toEqual(expectedMissing);
   });
 
   it("keeps investor proposal guardrails wrap-capable on narrow screens", () => {

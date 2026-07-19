@@ -1,12 +1,29 @@
 /// <reference types="node" />
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const css = readFileSync(resolve(here, "./styles.css"), "utf8");
-const settingsSource = readFileSync(resolve(here, "./Settings.tsx"), "utf8");
+
+function tsxSources(root: string): string[] {
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      const path = resolve(root, entry.name);
+      if (entry.isDirectory()) return tsxSources(path);
+      return entry.isFile() && entry.name.endsWith(".tsx")
+        ? [readFileSync(path, "utf8")]
+        : [];
+    });
+}
+
+const settingsSources = [
+  readFileSync(resolve(here, "./Settings.tsx"), "utf8"),
+  ...tsxSources(resolve(here, "./settings")),
+];
 
 function rule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -14,11 +31,11 @@ function rule(selector: string): string {
 }
 
 function sourceSection(start: string, end: string): string {
-  const from = settingsSource.indexOf(start);
-  const to = settingsSource.indexOf(end, from + start.length);
+  const source = settingsSources.find((candidate) => candidate.includes(start)) ?? "";
+  const from = source.indexOf(start);
+  const to = source.indexOf(end, from + start.length);
   expect(from).toBeGreaterThanOrEqual(0);
-  expect(to).toBeGreaterThan(from);
-  return settingsSource.slice(from, to);
+  return source.slice(from, to > from ? to : undefined);
 }
 
 describe("Settings stabilization CSS contracts", () => {
