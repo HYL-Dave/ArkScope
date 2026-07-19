@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION IN PROGRESS — TASK 5 COMPLETE
+> **Status:** IMPLEMENTATION IN PROGRESS — TASK 6 COMPLETE
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -247,6 +247,9 @@ TASK_4_PRODUCT_COMMIT: 3e3e0b1
 TASK_5_RED: four behavior failures across two files—guarded provider edits mutated before an in-app confirmation or exposed no dialog, and credential deletion either exposed no dialog or immediately deleted the selected row through window.confirm
 TASK_5_GREEN: SettingsProviderConfig + CredentialList 35/35; full frontend 62 files / 603 tests; typecheck/build clean except the reviewed chunk warning (597.11 kB main bundle); Settings production window.confirm owners reduced from two to zero
 TASK_5_PRODUCT_COMMIT: dbbeb2e
+TASK_6_RED: three new static nodes collected; data-driven overlay/breakpoint ownership was already satisfied by Task 3, while class coverage failed on the exact eight pinned legacy omissions and the shell ratchet failed on the superseded CSS selectors
+TASK_6_GREEN: focused 18 files / 135 tests; full frontend 63 files / 606 tests; typecheck/build clean except the reviewed chunk warning (597.11 kB main bundle); CSS bundle 65.96 -> 65.22 kB; eight undefined Settings classes and all legacy shell selectors reduced to zero
+TASK_6_PRODUCT_COMMIT: c8f071e
 ```
 
 Product RED/GREEN commits, exact collection reconciliation, static gates, and
@@ -921,7 +924,7 @@ preserving mutation payloads and preventing cancel/Escape from mutating.
 specialized panels. The Settings shell is compact, unframed, token-driven, and
 free of stale category/card selectors.
 
-- [ ] **Step 1: Add exactly three RED static/CSS nodes**
+- [x] **Step 1: Add exactly three RED static/CSS nodes**
 
   Add:
 
@@ -934,14 +937,14 @@ free of stale category/card selectors.
   `window.confirm`. It also asserts `app_records` and `permissions` are absent
   from the registry.
 
-- [ ] **Step 2: Remove only superseded page-shell CSS**
+- [x] **Step 2: Remove only superseded page-shell CSS**
 
   Delete the old directory card/button/layout/runtime-band rules and their 760px
   directory overrides. Keep `.settings-grid`, `.settings-panel`,
   `.settings-section-head`, model/provider/data table classes, and component-local
   wrapping rules unless the new namespaced shell replaces them explicitly.
 
-- [ ] **Step 3: Complete class and layout coverage**
+- [x] **Step 3: Complete class and layout coverage**
 
   The strengthened class-coverage test must recursively inspect every
   production TSX under `src/settings/` plus `Settings.tsx`, and must resolve
@@ -950,7 +953,7 @@ free of stale category/card selectors.
   directory labels use normal wrapping, group bands do not have panel
   backgrounds/radii, and the content track has `min-width: 0`.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
   Expected final collection: focused `135`, full frontend
   `63 files / 606 tests`.
