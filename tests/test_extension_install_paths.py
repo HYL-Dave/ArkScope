@@ -43,3 +43,18 @@ def test_installer_host_script_path_exists(script_name, pattern):
         f"{script_name} references {rel}, which does not exist in the repo; "
         "update the installer to the host script's current location"
     )
+
+
+def test_firefox_installer_copies_every_popup_script_dependency():
+    popup_html = (EXT_DIR / "popup.html").read_text(encoding="utf-8")
+    installer = (EXT_DIR / "install_firefox.sh").read_text(encoding="utf-8")
+    popup_scripts = re.findall(r'<script src="([^"]+\.js)"></script>', popup_html)
+
+    assert popup_scripts
+    for script_name in popup_scripts:
+        expected_copy = (
+            f'cp "$SCRIPT_DIR/{script_name}" "$BUILD_DIR/{script_name}"'
+        )
+        assert expected_copy in installer, (
+            f"Firefox installer does not copy popup dependency {script_name}"
+        )
