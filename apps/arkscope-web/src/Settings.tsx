@@ -52,6 +52,7 @@ import {
   ResearchRuntimeSection,
 } from "./settings/RuntimeLimitSections";
 import { AppRecordsSection } from "./settings/legacy/AppRecordsSection";
+import type { SettingsAnchorId } from "./settings/settingsRegistry";
 
 export {
   CredentialList,
@@ -63,16 +64,7 @@ export {
   SetupDisclosure,
 };
 
-type SettingsSection =
-  | "models"
-  | "investor_profile"
-  | "providers"
-  | "data_storage"
-  | "news_storage"
-  | "macro_storage"
-  | "app_records"
-  | "data_sources"
-  | "permissions";
+type SettingsSection = SettingsAnchorId | "app_records" | "permissions";
 
 const SETTINGS_SECTIONS: Array<{
   id: SettingsSection;

@@ -5,6 +5,7 @@ import {
   nextNavigationRequest,
   resolveNavigationTarget,
 } from "./navigation";
+import { SETTINGS_ANCHOR_IDS } from "../settings/settingsRegistry";
 
 describe("shell navigation authority", () => {
   it("publishes the approved four workflow groups in canonical order", () => {
@@ -54,19 +55,20 @@ describe("shell navigation authority", () => {
       threadId: "thread-1",
       runId: "run-1",
     });
-    const settings = nextNavigationRequest(8, {
-      kind: "settings_section",
-      section: "providers",
-    });
-
     expect(resolveNavigationTarget(research)).toEqual({
       view: "Research",
       research,
     });
-    expect(resolveNavigationTarget(settings)).toEqual({
-      view: "Settings",
-      settings,
-    });
+    for (const section of SETTINGS_ANCHOR_IDS) {
+      const settings = nextNavigationRequest(8, {
+        kind: "settings_section",
+        section,
+      });
+      expect(resolveNavigationTarget(settings)).toEqual({
+        view: "Settings",
+        settings,
+      });
+    }
   });
 
   it("increments the request sequence even when the exact target repeats", () => {

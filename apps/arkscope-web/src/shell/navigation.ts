@@ -1,3 +1,5 @@
+import type { SettingsAnchorId } from "../settings/settingsRegistry";
+
 export type ShellView =
   | "Home"
   | "Watchlist"
@@ -68,14 +70,7 @@ export function shellViewLabel(view: ShellView): string {
   throw new Error(`unknown shell view: ${String(view)}`);
 }
 
-export type EnabledSettingsSection =
-  | "models"
-  | "investor_profile"
-  | "providers"
-  | "data_storage"
-  | "news_storage"
-  | "macro_storage"
-  | "data_sources";
+export type EnabledSettingsSection = SettingsAnchorId;
 
 export type NavigationTarget =
   | { kind: "view"; view: ShellView }
