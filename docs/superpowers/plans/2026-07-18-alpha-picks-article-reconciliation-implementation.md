@@ -8,18 +8,15 @@
 > `superpowers:verification-before-completion` before review-ready claims.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION REVIEW GREEN; PRE-MERGE COPIED-DB AND LIVE
-> CONTINUITY GATES GREEN; MERGE-READY as of 2026-07-19. Round 2 cleared the
-> original `+78/-0` plan. Implementation plus live parser, body-settle, and
-> English-copy corrections reached `18fcfb4` at exact focused `246` / canonical
-> collect `4497`. The provider gate then disproved the historical comment-gap
-> retry assumption, and product commits `3149623` and `821b2f3` implemented the
-> reviewed exact `+16/-0` continuity addendum. Independent canonical A/B is
+> **Status:** LIVE COMPLETE as of 2026-07-19. Independent canonical A/B is
 > exact at `4412 -> 4513` (`+101/-0`) with unchanged known non-passing families;
 > copied-DB migration/state-machine and source-pinned repeated-Quick evidence
-> are GREEN. The SF-2 prerequisite fix is `9e4f945`; this ledger records the
-> closeout evidence. Merge and the stopped-service production
-> v1-to-v2 migration remain pending; production is still schema v1.
+> are GREEN. The reviewed stack fast-forwarded to `master` through `bf378f1`.
+> Merged-tree focused `262`, extension fixtures `24`, no-PG, popup/privacy, and
+> native-host gates passed before the stopped-service production migration.
+> Production `sa_capture.db` is now schema v2, integrity/FK clean, with all
+> legacy logical facts preserved; the desktop app and installed Chrome
+> extension were restarted from merged `master`.
 
 **Goal:** Automatically preserve Alpha Picks list/detail ticker evidence and
 associate entry and exit events with the correct bounded-date article, while
@@ -3389,3 +3386,34 @@ After independent GREEN and user merge approval only:
 8. return to the reviewed sequence. DB-universe/`tickers_core.json` retirement
    remains a separate slice, and the Advanced URL escape hatch remains until
    observed automatic coverage justifies a later removal decision.
+
+### Post-review merged production closeout ledger (2026-07-19)
+
+- User-approved fast-forward integration moved `master` to reviewed docs tip
+  `bf378f1`; no product bytes changed after reviewed product tip `821b2f3`.
+- Before touching production, merged-tree verification passed focused `262`,
+  dedicated extension fixtures `24`, and no-PG smoke with `ok:true` and
+  `pg_attempts:[]`. The isolated merged popup displayed `166` review events,
+  kept Advanced collapsed, exposed no lineage/link/comment/watermark identity,
+  and used only a disposable online-backup copy.
+- All app/browser/sidecar/native-host processes were stopped. This also found
+  and terminated stale PID `2289588`, whose cwd and data paths both belonged to
+  a deleted 2026-07-18 disposable gate. The reviewed old `/tmp` DB copies,
+  WAL/SHM shells, native-host configs, and queue-evidence JSON were removed.
+- The retained mode-0600 production backup is
+  `data/backups/sa_capture-v1-pre-alpha-reconciliation-20260719T025246Z.db`.
+  It is schema v1, integrity/FK clean, and contains the exact pre-migration
+  aggregates: `114` picks, `400` articles, `42,794` comments, and `2` refresh
+  metadata rows.
+- Only merged code opened the stopped production DB. Independent read-only
+  verification reports `user_version=2`, `integrity_check=ok`, zero FK errors,
+  `103` lineages, zero picks without lineage, zero accepted links/decisions,
+  all `400` articles seeded `repaired` with checkpoints, and zero non-default
+  recovery rows. Multiset digests for every pre-existing table matched the v1
+  backup exactly.
+- The merged desktop app restarted on Vite `8430` with sidecar `41017`; health
+  and the installed native-host framed ping both returned `ok` and identified
+  `/mnt/md0/PycharmProjects/ArkScope` as the project root. Chrome Profile 1's
+  installed unpacked extension path resolves to the same merged-main tree.
+  The user's unrelated `config/tickers_core.json` edit remained unstaged and
+  byte-untouched throughout.

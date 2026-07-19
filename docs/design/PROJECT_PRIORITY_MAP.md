@@ -236,12 +236,11 @@ therefore defaults to defer until the hypothesis gate exists.
   (`docs/superpowers/plans/2026-07-18-p2-8-slice-3-research-workspace.md`).
   The bounded NEWS `content_availability` Unit 2 is **MERGED / LIVE COMPLETE
   2026-07-18 through closeout base `b3d9728`**. Alpha Picks article
-  reconciliation core is implemented through `18fcfb4`; its comment-continuity
-  addendum is implemented at product tip `821b2f3`, independently reviewed, and
-  pre-merge copied-DB/state-machine/repeated-Quick gates are GREEN. The SF-2
-  prerequisite landed at `9e4f945`; this closeout records the remaining proof.
-  It is merge-ready; production remains schema v1, so merge and
-  the stopped-service v1-to-v2 migration remain pending. DB-derived
+  reconciliation and comment-continuity line is **MERGED / LIVE COMPLETE
+  2026-07-19 through `bf378f1`**. Independent canonical A/B, copied-DB
+  migration/state-machine, repeated-Quick, merged popup/privacy, no-PG, and
+  stopped-service production migration gates are closed. Production is schema
+  v2 with integrity/FK clean and legacy logical facts preserved. DB-derived
   universe/`tickers_core.json` retirement remains a separate design-only slice.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
@@ -436,6 +435,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (ALPHA PICKS RECONCILIATION + COMMENT CONTINUITY MERGED / LIVE COMPLETE)**: User-approved fast-forward integration moved `master` through reviewed docs tip `bf378f1` without changing product bytes after `821b2f3` or touching the user's unstaged `config/tickers_core.json`. Merged-tree focused `262`, extension fixtures `24`, no-PG `ok:true / pg_attempts:[]`, and an isolated merged popup/privacy smoke all passed before production state changed; the popup showed `166` review events, kept Advanced collapsed, and exposed no raw relationship/comment/watermark identity. All app/browser/native-host/sidecar processes were stopped, including stale disposable-gate PID `2289588`. A retained mode-0600 v1 online backup lives at `data/backups/sa_capture-v1-pre-alpha-reconciliation-20260719T025246Z.db`. Merged code alone migrated production to schema v2: integrity is `ok`, FK violations are zero, all pre-existing table multiset digests match the backup, `103` lineages cover all `114` picks, and no accepted links/decisions or recovery flags were invented. Desktop Vite `8430`, sidecar `41017`, the normal native-host launcher, and Chrome Profile 1's unpacked extension now resolve to merged main and are healthy. The Advanced manual URL path remains until real automatic coverage supports a separate removal ruling; DB-universe/`tickers_core.json` retirement remains independent.
 
 - **2026-07-19 (ALPHA PICKS ARTICLE RECONCILIATION + COMMENT CONTINUITY MERGE-READY — PRODUCTION STILL V1)**: Independent implementation review is GREEN at product tip `821b2f3`; SF-2 prerequisite tip is `9e4f945`, with final gate evidence recorded by this entry. Canonical virgin A/B against `848ffd4` is exact at collect `4412 -> 4513` (`+101/-0`), head passed `4402`, and the existing `30 failed / 74 skipped / 18 warnings / 7 errors` identities are unchanged. Review SF-2 now documents the root `npm ci`/same-lockfile hoisted-`jsdom` prerequisite for 24 extension fixture nodes. Online-backup migration preview reached schema 2 with integrity/FK clean, preserved `114` picks / `400` articles / `42,794` comments / `2` refresh-meta rows, created `103` lineages and no accepted links, and exposed a `166`-event review queue; the second-copy ten-step continuity probe passed Quick raise/repair, Full two-miss park, Backfill-only terminalization, terminal audit retention, and future re-anchor. The real-provider gate initially exposed a stale Chrome MV3 worker from `18fcfb4`; those two runs are explicitly excluded. After `chrome.runtime.reload()` and source pins proved the reviewed worker loaded, the first Quick advanced four checkpoints to current counts with zero new comments/failures, and the immediate unchanged Quick returned `comments_refreshed=0 / net_new_comments=0 / failed=0`. Popup/native payloads exposed no watermark/comment identity. All gate processes and disposable artifacts are removed; ports `8423/9224` are closed. Formal config/DB hashes and logical aggregates are byte-identical to pre-gate, production remains schema v1, and the user's dirty `config/tickers_core.json` is untouched. Next: user-approved fast-forward merge, merged-tree gates, then an exclusive merged-code production v1-to-v2 migration before app/browser restart. DB-universe/JSON retirement remains separate.
 

@@ -1,13 +1,11 @@
 # Alpha Picks Article Reconciliation Mini-Design
 
-> **Status:** CORE IMPLEMENTED; COMMENT-CONTINUITY ADDENDUM APPROVED AND
-> IMPLEMENTED FOR INDEPENDENT REVIEW as of 2026-07-19. The live gate disproved the
-> lifetime comment-gap retry assumption. Section 3.5 now distinguishes
-> recoverable post-enable continuity breaks from intentionally waived historical
-> deficits; the addendum blocks merge until implementation review and live
-> continuity evidence are GREEN. The
-> universe/JSON decision does not pre-approve this design; this is an independent
-> implementation slice.
+> **Status:** IMPLEMENTED / LIVE as of 2026-07-19. Independent review, canonical
+> A/B, copied-DB migration/state-machine, repeated-Quick, merged popup/privacy,
+> and production migration gates are GREEN. The reviewed stack is merged through
+> `bf378f1`; production `sa_capture.db` is schema v2 with integrity/FK checks and
+> legacy logical-fact digests preserved. The universe/JSON decision remains a
+> separate, not-yet-implemented slice.
 
 ## 1. Purpose
 
@@ -635,8 +633,9 @@ The future implementation plan must prove, RED first:
 
 ## 10. Sequence
 
-P2.8 Slice 3 is complete and the 2026-07-18 written review is closed. Core
-implementation reached its live gate, where the invalid lifetime-gap retry
-assumption was discovered. The section 3.5 addendum and its implementation-plan
-task require written review before implementation resumes. This remains
-independent from the DB-universe/JSON-retirement slice.
+P2.8 Slice 3 and this independent reconciliation line are complete. Core and
+comment-continuity implementation, independent review, copied-DB/live proof,
+merged-tree verification, and the exclusive production v1-to-v2 migration are
+closed. The Advanced manual URL escape hatch remains available until observed
+automatic coverage justifies a separate removal decision. DB-universe/JSON
+retirement remains an independent next-line candidate.
