@@ -5,13 +5,16 @@ import {
   SETTINGS_GROUPS,
   searchSettings,
   settingsAnchorDomId,
+  firstSettingsAnchor,
+  settingsGroup,
   settingsGroupFor,
   settingsSection,
 } from "./settingsRegistry";
 import {
-  SETTINGS_COLLAPSE_STORAGE_KEY,
-  readCollapsedSettingsGroups,
-  writeCollapsedSettingsGroups,
+  RETIRED_SETTINGS_COLLAPSE_STORAGE_KEY,
+  SETTINGS_ACTIVE_GROUP_STORAGE_KEY,
+  readActiveSettingsGroup,
+  writeActiveSettingsGroup,
 } from "./settingsPreferences";
 
 describe("settings workspace registry", () => {
@@ -22,6 +25,12 @@ describe("settings workspace registry", () => {
       ["data_sync", "資料與同步"],
     ]);
     expect(SETTINGS_GROUPS.every((group) => group.sections.length > 0)).toBe(true);
+    expect(settingsGroup("ai_models")).toBe(SETTINGS_GROUPS[0]);
+    expect(settingsGroup("personalization")).toBe(SETTINGS_GROUPS[1]);
+    expect(settingsGroup("data_sync")).toBe(SETTINGS_GROUPS[2]);
+    expect(firstSettingsAnchor("ai_models")).toBe("providers");
+    expect(firstSettingsAnchor("personalization")).toBe("investor_profile");
+    expect(firstSettingsAnchor("data_sync")).toBe("data_sources");
   });
 
   it("assigns_every_shipped_anchor_exactly_once", () => {
@@ -93,38 +102,70 @@ describe("settings workspace registry", () => {
     expect(searchSettings("model")).toEqual(searchSettings("model"));
   });
 
-  it("defaults_every_group_expanded_when_storage_is_absent", () => {
-    expect(readCollapsedSettingsGroups()).toEqual(new Set());
-    expect(readCollapsedSettingsGroups({ getItem: () => null })).toEqual(new Set());
+  it("defaults_active_group_to_ai_models_without_storage", () => {
+    expect(readActiveSettingsGroup()).toBe("ai_models");
+    expect(readActiveSettingsGroup({ getItem: () => null })).toBe("ai_models");
   });
 
-  it("round_trips_only_known_collapsed_group_ids", () => {
+  it("round_trips_only_known_active_group_ids", () => {
     let stored: string | null = null;
-    const writer = { setItem: (key: string, value: string) => {
-      expect(key).toBe(SETTINGS_COLLAPSE_STORAGE_KEY);
-      stored = value;
-    } };
-
-    writeCollapsedSettingsGroups(new Set(["data_sync", "ai_models"]), writer);
-    expect(stored).toBe('["ai_models","data_sync"]');
-    expect(readCollapsedSettingsGroups({
-      getItem: (key: string) => {
-        expect(key).toBe(SETTINGS_COLLAPSE_STORAGE_KEY);
-        return '["data_sync","unknown","ai_models","data_sync"]';
+    const storage = {
+      setItem: (key: string, value: string) => {
+        expect(key).toBe(SETTINGS_ACTIVE_GROUP_STORAGE_KEY);
+        stored = value;
       },
-    })).toEqual(new Set(["data_sync", "ai_models"]));
+      getItem: (key: string) => {
+        expect(key).toBe(SETTINGS_ACTIVE_GROUP_STORAGE_KEY);
+        return stored;
+      },
+      removeItem: () => undefined,
+    };
+
+    writeActiveSettingsGroup("data_sync", storage);
+    expect(stored).toBe("data_sync");
+    expect(readActiveSettingsGroup(storage)).toBe("data_sync");
+
+    writeActiveSettingsGroup("unknown" as never, storage);
+    expect(stored).toBe("ai_models");
   });
 
-  it("fails_closed_to_expanded_for_malformed_or_unknown_storage", () => {
-    const cases = ["not json", "{}", '["unknown"]', "null"];
+  it("fails_closed_to_ai_models_for_malformed_unknown_or_unavailable_storage", () => {
+    const cases = ["not json", "{}", '["data_sync"]', "unknown", ""];
 
     for (const value of cases) {
-      expect(readCollapsedSettingsGroups({ getItem: () => value })).toEqual(new Set());
+      expect(readActiveSettingsGroup({ getItem: () => value })).toBe("ai_models");
     }
-    expect(readCollapsedSettingsGroups({ getItem: () => { throw new Error("blocked"); } })).toEqual(new Set());
-    expect(() => writeCollapsedSettingsGroups(
-      new Set(["ai_models"]),
+    expect(readActiveSettingsGroup({ getItem: () => { throw new Error("blocked"); } })).toBe("ai_models");
+    expect(() => writeActiveSettingsGroup(
+      "personalization",
       { setItem: () => { throw new Error("blocked"); } },
     )).not.toThrow();
+  });
+
+  it("never_reads_or_interprets_the_retired_collapse_key", () => {
+    expect(readActiveSettingsGroup({
+      getItem: (key: string) => {
+        if (key === RETIRED_SETTINGS_COLLAPSE_STORAGE_KEY) {
+          throw new Error("retired collapse state was read");
+        }
+        expect(key).toBe(SETTINGS_ACTIVE_GROUP_STORAGE_KEY);
+        return "personalization";
+      },
+    })).toBe("personalization");
+  });
+
+  it("best_effort_cleanup_failure_never_blocks_active_group_write", () => {
+    let stored: string | null = null;
+    const storage = {
+      setItem: (_key: string, value: string) => { stored = value; },
+      removeItem: (key: string) => {
+        expect(key).toBe(RETIRED_SETTINGS_COLLAPSE_STORAGE_KEY);
+        throw new Error("cleanup blocked");
+      },
+    };
+
+    expect(() => writeActiveSettingsGroup("personalization", storage)).not.toThrow();
+    expect(stored).toBe("personalization");
+    expect(readActiveSettingsGroup({ getItem: () => stored })).toBe("personalization");
   });
 });

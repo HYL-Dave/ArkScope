@@ -131,6 +131,10 @@ const GROUPS_BY_SECTION_ID = new Map<SettingsAnchorId, SettingsGroupDefinition>(
   SETTINGS_GROUPS.flatMap((group) => group.sections.map((section) => [section.id, group] as const)),
 );
 
+const GROUPS_BY_ID = new Map<SettingsGroupId, SettingsGroupDefinition>(
+  SETTINGS_GROUPS.map((group) => [group.id, group] as const),
+);
+
 export function settingsSection(id: SettingsAnchorId): SettingsSectionDefinition {
   const section = SECTIONS_BY_ID.get(id);
   if (!section) throw new Error(`unknown settings section: ${String(id)}`);
@@ -141,6 +145,18 @@ export function settingsGroupFor(id: SettingsAnchorId): SettingsGroupDefinition 
   const group = GROUPS_BY_SECTION_ID.get(id);
   if (!group) throw new Error(`unknown settings section: ${String(id)}`);
   return group;
+}
+
+export function settingsGroup(id: SettingsGroupId): SettingsGroupDefinition {
+  const group = GROUPS_BY_ID.get(id);
+  if (!group) throw new Error(`unknown settings group: ${String(id)}`);
+  return group;
+}
+
+export function firstSettingsAnchor(id: SettingsGroupId): SettingsAnchorId {
+  const section = settingsGroup(id).sections[0];
+  if (!section) throw new Error(`settings group has no sections: ${String(id)}`);
+  return section.id;
 }
 
 export function settingsAnchorDomId(id: SettingsAnchorId): string {
