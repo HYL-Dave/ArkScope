@@ -9,33 +9,49 @@ only).
 from __future__ import annotations
 
 import os
-import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from src import sa_capture_store
+from src.portfolio_state import PortfolioStore
+from src.profile_state import ProfileStateStore
+
 _MODULE = "src.daily_update"
 
 
-def _profile_db(tmp_path: Path) -> str:
-    db = tmp_path / "profile_state.db"
-    conn = sqlite3.connect(db)
-    try:
-        conn.execute("CREATE TABLE watchlist_memberships (ticker TEXT NOT NULL)")
-        conn.executemany(
-            "INSERT INTO watchlist_memberships (ticker) VALUES (?)",
-            [("AAPL",), ("NVDA",)],
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    return str(db)
+@pytest.fixture()
+def universe_dbs(tmp_path: Path) -> dict[str, str]:
+    profile_db = tmp_path / "profile_state.db"
+    sa_db = tmp_path / "sa_capture.db"
+
+    profile = ProfileStateStore(profile_db)
+    profile.import_lists([{"name": "Core", "tickers": ["AAPL", "NVDA"]}])
+    portfolio = PortfolioStore(profile_db)
+    account = portfolio.ensure_manual_account()
+    portfolio.upsert_manual_position(
+        account_id=account.id,
+        symbol="MSFT",
+        quantity=1,
+    )
+    sa_conn = sa_capture_store.connect(str(sa_db))
+    sa_conn.close()
+
+    return {"profile_db": str(profile_db), "sa_db": str(sa_db)}
 
 
-def _run(*flags: str, profile_db: str | None = None) -> subprocess.CompletedProcess:
+def _run(
+    *flags: str,
+    profile_db: str | None = None,
+    sa_db: str | None = None,
+) -> subprocess.CompletedProcess:
     env = os.environ.copy()
     if profile_db is not None:
         env["ARKSCOPE_PROFILE_DB"] = profile_db
+    if sa_db is not None:
+        env["ARKSCOPE_SA_DB"] = sa_db
     return subprocess.run([sys.executable, "-m", _MODULE, *flags],
                           capture_output=True, text=True, timeout=120, env=env)
 
@@ -50,7 +66,7 @@ def test_help_exits_zero_with_full_flag_set():
         assert flag in r.stdout, f"flag {flag} missing from --help"
 
 
-def test_protected_command_dry_run_plan(tmp_path):
+def test_protected_command_dry_run_plan(universe_dbs):
     # The protected gate command in plan-only mode: same source step set as the
     # pre-wrapper orchestrator (news x3 + prices; IV stays opt-in), exit 0.
     r = _run(
@@ -59,7 +75,8 @@ def test_protected_command_dry_run_plan(tmp_path):
         "active-universe",
         "--sync-db",
         "--dry-run",
-        profile_db=_profile_db(tmp_path),
+        profile_db=universe_dbs["profile_db"],
+        sa_db=universe_dbs["sa_db"],
     )
     out = r.stdout + r.stderr
     assert r.returncode == 0
@@ -101,3 +118,54 @@ def test_scores_flag_is_retired_and_does_not_shell_to_pg_importer():
     assert r.returncode != 0
     assert "retired" in out.lower()
     assert "migrate_to_supabase" not in out
+
+
+def test_daily_update_unavailable_scope_exits_before_any_source(
+    universe_dbs, tmp_path, monkeypatch,
+):
+    missing_sa = tmp_path / "missing-sa-capture.db"
+    assert not missing_sa.exists()
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", universe_dbs["profile_db"])
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(missing_sa))
+
+    import src.daily_update as daily_update
+    import src.env_keys as env_keys
+    import src.service.data_scheduler as data_scheduler
+
+    calls = {"ensure_env": 0, "source": 0, "telemetry": 0}
+
+    def _must_not_run(name):
+        def _fail(*args, **kwargs):
+            calls[name] += 1
+            raise AssertionError(f"{name} must not run for unavailable scope")
+        return _fail
+
+    monkeypatch.setattr(env_keys, "ensure_env_loaded", _must_not_run("ensure_env"))
+    monkeypatch.setattr(data_scheduler, "run_source", _must_not_run("source"))
+    monkeypatch.setattr(daily_update, "_RunTelemetry", _must_not_run("telemetry"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["daily_update", "--all", "--scope", "active-universe"],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        daily_update.main()
+
+    assert caught.value.code == 1
+    assert calls == {"ensure_env": 0, "source": 0, "telemetry": 0}
+
+    result = _run(
+        "--all",
+        "--scope",
+        "active-universe",
+        "--dry-run",
+        profile_db=universe_dbs["profile_db"],
+        sa_db=str(missing_sa),
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 1
+    assert "active_universe_unavailable: sa_alpha_picks_current" in output
+    assert str(missing_sa) not in output
+    assert "Traceback" not in output

@@ -748,7 +748,11 @@ def _normalized_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optiona
 
 def _resolve_price_scope() -> List[str]:
     """Active-universe tickers — delegates to the ONE shared resolver
-    (src.universe_scope), same contract as the collectors' --scope flag."""
+    (src.universe_scope), same contract as the collectors' --scope flag.
+
+    ``ActiveUniverseUnavailable`` deliberately propagates to ``run_source``'s
+    existing failure boundary; an unavailable snapshot must never become ``[]``.
+    """
     from src.universe_scope import resolve_active_universe
 
     return resolve_active_universe()

@@ -16,6 +16,7 @@ import pytest
 
 import src.market_data_admin as mda
 import src.market_data_direct as mdd
+from src.active_universe import ActiveUniverseUnavailable
 
 
 # --- _normalize_utc: byte-identical to PG TO_CHAR + DST-correct (THE invariant) ----
@@ -515,6 +516,40 @@ def test_backfill_empty_scope_fails_loud(tmp_path, monkeypatch):
     db = _backfill_db(tmp_path)
     with pytest.raises(RuntimeError):
         mdd.backfill_prices_direct(tickers_arg="  ,  ", db_path=str(db), today=date(2026, 6, 18))
+
+
+def test_backfill_unavailable_scope_raises_before_provider_construction(
+    tmp_path, monkeypatch,
+):
+    import src.universe_scope as universe_scope
+
+    calls = {"scope": 0, "ibkr": 0, "polygon": 0}
+    unavailable = ActiveUniverseUnavailable({
+        "sa_alpha_picks_current": "source_db_missing",
+    })
+
+    def _unavailable():
+        calls["scope"] += 1
+        raise unavailable
+
+    def _constructor(name):
+        def _construct():
+            calls[name] += 1
+            return object()
+        return _construct
+
+    monkeypatch.setattr(universe_scope, "resolve_active_universe", _unavailable)
+    monkeypatch.setattr(mdd, "_default_ibkr_src", _constructor("ibkr"))
+    monkeypatch.setattr(mdd, "_default_polygon_src", _constructor("polygon"))
+
+    with pytest.raises(ActiveUniverseUnavailable) as caught:
+        mdd.backfill_prices_direct(
+            db_path=str(tmp_path / "market_data.db"),
+            today=date(2026, 6, 18),
+        )
+
+    assert caught.value is unavailable
+    assert calls == {"scope": 1, "ibkr": 0, "polygon": 0}
 
 
 def test_backfill_progress_cb_shape(tmp_path, monkeypatch):

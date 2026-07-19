@@ -164,9 +164,13 @@ def market_data_trading_days(
     ``market_data.db`` — no PG, no provider call, no write, no scheduling. Powers the
     Settings → Data Storage coverage panel.
     """
+    from src.active_universe import ActiveUniverseUnavailable
     from src.universe_scope import resolve_active_universe
 
-    universe = list(resolve_active_universe() or [])
+    try:
+        universe = list(resolve_active_universe())
+    except ActiveUniverseUnavailable as exc:
+        raise HTTPException(status_code=503, detail=exc.as_dict()) from None
     return summarize_trading_day_coverage(
         universe, interval=interval, lookback_days=lookback_days,
         db_path=resolve_market_db_path(),

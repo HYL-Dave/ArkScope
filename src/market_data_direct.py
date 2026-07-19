@@ -710,7 +710,7 @@ def backfill_prices_direct(
         raw = [t.strip() for t in tickers_arg.split(",") if t.strip()]
     else:
         from src.universe_scope import resolve_active_universe
-        raw = list(resolve_active_universe() or [])
+        raw = list(resolve_active_universe())
     if not raw:
         raise RuntimeError("backfill_prices_direct: empty ticker scope (active universe unavailable)")
 

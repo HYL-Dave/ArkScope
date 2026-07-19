@@ -532,8 +532,14 @@ Note: IBKR sources require TWS/Gateway running.
         if args.tickers:
             tickers = [x.strip().upper() for x in args.tickers.split(',') if x.strip()]
         elif args.scope == 'active-universe':
+            from src.active_universe import ActiveUniverseUnavailable
             from src.universe_scope import resolve_active_universe
-            tickers = resolve_active_universe()
+
+            try:
+                tickers = resolve_active_universe()
+            except ActiveUniverseUnavailable as exc:
+                logger.error("%s: %s", exc.code, ",".join(exc.unavailable_sources))
+                sys.exit(1)
             if not tickers:
                 logger.error("active-universe scope is empty/unavailable (profile DB)")
                 sys.exit(1)

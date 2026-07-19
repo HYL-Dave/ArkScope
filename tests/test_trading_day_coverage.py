@@ -249,10 +249,90 @@ def test_route_wires_universe_and_db(db, monkeypatch):
     import src.universe_scope as us
     monkeypatch.setattr(us, "resolve_active_universe", lambda: list(_UNIVERSE))
     monkeypatch.setattr(mroutes, "resolve_market_db_path", lambda: db)
+    monkeypatch.setattr(
+        mroutes,
+        "summarize_trading_day_coverage",
+        lambda universe, **kwargs: summarize_trading_day_coverage(
+            universe,
+            **kwargs,
+            today=date(2026, 6, 23),
+            now_et=datetime(2026, 6, 23, 11, 45, tzinfo=_ET),
+        ),
+    )
     out = mroutes.market_data_trading_days(lookback_days=6, interval="15min")
     assert out["universe_count"] == 3 and out["interval"] == "15min"
     assert any(d["date"] == "2026-06-22" for d in out["days"])
     assert any(e["ticker"] == "LC" for e in out["provider_errors"])
+
+
+def test_route_unavailable_returns_sanitized_503(monkeypatch):
+    from fastapi import HTTPException
+
+    import src.api.routes.market_data as mroutes
+    import src.universe_scope as universe_scope
+    from src.active_universe import ActiveUniverseUnavailable
+
+    calls = {"scope": 0, "db": 0, "summary": 0}
+    unavailable = ActiveUniverseUnavailable({
+        "manual_lists": "source_db_unreadable",
+        "sa_alpha_picks_current": "source_db_missing",
+    })
+
+    def _unavailable():
+        calls["scope"] += 1
+        raise unavailable
+
+    def _db_path():
+        calls["db"] += 1
+        return "/unused/market_data.db"
+
+    def _summary(*args, **kwargs):
+        calls["summary"] += 1
+        return {"universe_count": -1}
+
+    monkeypatch.setattr(universe_scope, "resolve_active_universe", _unavailable)
+    monkeypatch.setattr(mroutes, "resolve_market_db_path", _db_path)
+    monkeypatch.setattr(mroutes, "summarize_trading_day_coverage", _summary)
+
+    with pytest.raises(HTTPException) as caught:
+        mroutes.market_data_trading_days(lookback_days=6, interval="15min")
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail == unavailable.as_dict()
+    assert calls == {"scope": 1, "db": 0, "summary": 0}
+
+
+def test_route_complete_empty_is_not_unavailable(tmp_path, monkeypatch):
+    import src.api.routes.market_data as mroutes
+    import src.universe_scope as universe_scope
+
+    calls = {"scope": 0, "db": 0, "summary": 0}
+    def _complete_empty():
+        calls["scope"] += 1
+        return []
+
+    def _db_path():
+        calls["db"] += 1
+        return str(tmp_path / "complete-empty-market-data.db")
+
+    def _summary(universe, **kwargs):
+        calls["summary"] += 1
+        assert universe == []
+        return summarize_trading_day_coverage(
+            universe,
+            **kwargs,
+            today=date(2026, 6, 23),
+            now_et=datetime(2026, 6, 23, 11, 45, tzinfo=_ET),
+        )
+
+    monkeypatch.setattr(universe_scope, "resolve_active_universe", _complete_empty)
+    monkeypatch.setattr(mroutes, "resolve_market_db_path", _db_path)
+    monkeypatch.setattr(mroutes, "summarize_trading_day_coverage", _summary)
+
+    result = mroutes.market_data_trading_days(lookback_days=6, interval="15min")
+    assert result["universe_count"] == 0
+    assert result["provider_errors"] == []
+    assert calls == {"scope": 1, "db": 1, "summary": 1}
 
 
 def test_route_registered():

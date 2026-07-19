@@ -8,12 +8,14 @@ fast paths WITHOUT any network/API access.
 from __future__ import annotations
 
 import logging
+import sys
 from datetime import datetime, timedelta
 
 import pytest
 
 import src.collectors.finnhub_news as cfn
 import src.collectors.polygon_news as cpn
+from src.active_universe import ActiveUniverseUnavailable
 
 
 def test_collectors_expose_contract_from_src_package():
@@ -72,7 +74,7 @@ def test_polygon_missing_key_raises(monkeypatch):
                         lambda self: datetime.now() - timedelta(hours=6))
     monkeypatch.setattr(cpn, "load_env", lambda: "")
     with pytest.raises(RuntimeError, match="POLYGON_API_KEY"):
-        cpn.run_incremental()
+        cpn.run_incremental(tickers_arg="AAPL")
 
 
 def test_finnhub_up_to_date_short_circuit(monkeypatch):
@@ -122,8 +124,83 @@ def test_load_tickers_requires_explicit_scope():
 
 def test_load_tickers_active_universe(monkeypatch):
     import src.universe_scope as us
+
     monkeypatch.setattr(us, "resolve_active_universe", lambda: ["AAPL", "MSFT"])
-    assert cpn.load_tickers(scope="active-universe") == ["AAPL", "MSFT"]
+    for mod in (cfn, cpn):
+        assert mod.load_tickers(scope="active-universe") == ["AAPL", "MSFT"]
+
     monkeypatch.setattr(us, "resolve_active_universe", lambda: [])
-    with pytest.raises(RuntimeError, match="empty/unavailable"):
-        cpn.load_tickers(scope="active-universe")
+    for mod in (cfn, cpn):
+        with pytest.raises(RuntimeError, match="empty/unavailable") as caught:
+            mod.load_tickers(scope="active-universe")
+        assert type(caught.value) is RuntimeError
+
+    unavailable = ActiveUniverseUnavailable({
+        "sa_alpha_picks_current": "source_db_missing",
+    })
+
+    def _unavailable():
+        raise unavailable
+
+    monkeypatch.setattr(us, "resolve_active_universe", _unavailable)
+    for mod in (cfn, cpn):
+        with pytest.raises(ActiveUniverseUnavailable) as caught:
+            mod.load_tickers(scope="active-universe")
+        assert caught.value is unavailable
+
+
+def _assert_unavailable_cli_exits_before_provider(mod, provider_name, monkeypatch, caplog):
+    import src.universe_scope as us
+
+    calls = {"scope": 0, "env": 0, "provider": 0, "stats_write": 0}
+    unavailable = ActiveUniverseUnavailable({
+        "sa_alpha_picks_current": "source_db_missing",
+    })
+
+    def _unavailable():
+        calls["scope"] += 1
+        raise unavailable
+
+    def _load_env():
+        calls["env"] += 1
+        return "test-key"
+
+    def _provider(*args, **kwargs):
+        calls["provider"] += 1
+        return object()
+
+    def _stats_write(*args, **kwargs):
+        calls["stats_write"] += 1
+        return "/unused"
+
+    monkeypatch.setattr(us, "resolve_active_universe", _unavailable)
+    monkeypatch.setattr(mod.StorageManager, "get_latest_timestamp",
+                        lambda self: datetime.now() - timedelta(days=2))
+    monkeypatch.setattr(mod, "load_env", _load_env)
+    monkeypatch.setattr(mod, provider_name, _provider)
+    monkeypatch.setattr(mod, "_save_collection_stats", _stats_write)
+    monkeypatch.setattr(mod, "_setup_cli_logging", lambda: None)
+    monkeypatch.setattr(sys, "argv", [mod.__name__, "--incremental", "--scope", "active-universe"])
+
+    with caplog.at_level(logging.ERROR), pytest.raises(SystemExit) as caught:
+        mod.main()
+
+    assert caught.value.code == 1
+    assert calls == {"scope": 1, "env": 0, "provider": 0, "stats_write": 0}
+    assert "active_universe_unavailable: sa_alpha_picks_current" in caplog.text
+
+
+def test_finnhub_unavailable_scope_exits_before_provider_construction(
+    monkeypatch, caplog,
+):
+    _assert_unavailable_cli_exits_before_provider(
+        cfn, "FinnhubNewsCollector", monkeypatch, caplog,
+    )
+
+
+def test_polygon_unavailable_scope_exits_before_provider_construction(
+    monkeypatch, caplog,
+):
+    _assert_unavailable_cli_exits_before_provider(
+        cpn, "PolygonNewsCollector", monkeypatch, caplog,
+    )

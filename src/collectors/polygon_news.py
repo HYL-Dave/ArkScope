@@ -55,6 +55,8 @@ from dataclasses import dataclass, asdict
 import requests
 import pandas as pd
 
+from src.active_universe import ActiveUniverseUnavailable
+
 logger = logging.getLogger(__name__)
 
 # Anchor all storage paths to the repo root (resolved from this file), NOT the
@@ -916,12 +918,12 @@ def run_incremental(tickers_arg: Optional[str] = None,
     logger.info(f"  Latest article: {latest_ts.isoformat()}")
     logger.info(f"  Fetching from:  {start_timestamp.isoformat()}")
 
+    tickers = load_tickers(tickers_arg, scope=scope)
     api_key = load_env()
     if not api_key:
         raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
 
     collector = PolygonNewsCollector(api_key, config)
-    tickers = load_tickers(tickers_arg, scope=scope)
     collected_at = datetime.now()
 
     logger.info(f"Tickers: {len(tickers)} stocks")
@@ -1048,6 +1050,9 @@ Examples:
     if args.incremental:
         try:
             run_incremental(args.tickers, end_date=end_date, scope=args.scope)
+        except ActiveUniverseUnavailable as e:
+            logger.error("%s", e)
+            sys.exit(1)
         except RuntimeError as e:
             logger.error(str(e))
             sys.exit(1)
@@ -1065,6 +1070,9 @@ Examples:
     # Load tickers
     try:
         tickers = load_tickers(args.tickers, scope=args.scope)
+    except ActiveUniverseUnavailable as e:
+        logger.error("%s", e)
+        sys.exit(1)
     except RuntimeError as e:
         logger.error(str(e))
         sys.exit(1)

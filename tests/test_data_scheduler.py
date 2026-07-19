@@ -14,10 +14,12 @@ from types import SimpleNamespace
 import pytest
 
 import src.service.data_scheduler as ds
+from src.active_universe import ActiveUniverseUnavailable
 from src.profile_state import ProfileStateStore
 
 _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
 _REAL_LOCAL_REFRESH = ds._local_refresh
+_REAL_RESOLVE_PRICE_SCOPE = ds._resolve_price_scope
 
 
 @pytest.fixture(autouse=True)
@@ -1836,16 +1838,48 @@ def test_adapter_gets_universe_tickers_and_progress(monkeypatch):
 
 
 def test_adapter_universe_unavailable_fails_loud(monkeypatch):
-    # 3e-E: the collectors' legacy tickers_core default is retired — no scope
-    # means the run FAILS (fail loud), never silently-collect-something-else.
+    # A typed source-read failure reaches run_source's generic failure boundary:
+    # it never becomes an empty scope and never reaches provider work.
     import src.collectors.finnhub_news as cfn
-    monkeypatch.setattr(cfn, "run_incremental",
-                        lambda **kw: (_ for _ in ()).throw(
-                            AssertionError("adapter must not run without scope")))
-    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
+    import src.universe_scope as universe_scope
+
+    calls = {"scope": 0, "adapter": 0, "provider": 0, "writer": 0, "subprocess": 0}
+
+    def _called(name):
+        def _fail(*args, **kwargs):
+            calls[name] += 1
+            raise AssertionError(f"{name} must not run without a complete universe")
+        return _fail
+
+    unavailable = ActiveUniverseUnavailable({
+        "manual_lists": "source_db_unreadable",
+        "sa_alpha_picks_current": "source_db_missing",
+    })
+
+    def _unavailable_scope():
+        calls["scope"] += 1
+        raise unavailable
+
+    monkeypatch.setattr(universe_scope, "resolve_active_universe", _unavailable_scope)
+    monkeypatch.setattr(ds, "_resolve_price_scope", _REAL_RESOLVE_PRICE_SCOPE)
+    monkeypatch.setattr(cfn, "run_incremental", _called("adapter"))
+    monkeypatch.setattr("src.news_providers.make_news_provider", _called("provider"))
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _called("writer"))
+    monkeypatch.setattr(ds, "_run_subprocess", _called("subprocess"))
+
     res = ds.run_source("finnhub_news")
+
+    safe_error = "active_universe_unavailable: manual_lists,sa_alpha_picks_current"
     assert res["status"] == "failed"
-    assert "scope" in res["error"]
+    assert res["error"] == safe_error
+    assert calls == {"scope": 1, "adapter": 0, "provider": 0, "writer": 0, "subprocess": 0}
+
+    durable = ds._state_store().get("finnhub_news")
+    assert durable["last_status"] == "failed"
+    assert durable["last_error"] == safe_error
+    assert durable["last_result"]["error"] == safe_error
+    assert "source_db_unreadable" not in json.dumps(durable, sort_keys=True)
+    assert "source_db_missing" not in json.dumps(durable, sort_keys=True)
 
 
 def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):

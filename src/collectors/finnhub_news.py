@@ -51,6 +51,8 @@ from dataclasses import dataclass, asdict
 import requests
 import pandas as pd
 
+from src.active_universe import ActiveUniverseUnavailable
+
 logger = logging.getLogger(__name__)
 
 # Anchor all storage paths to the repo root (resolved from this file), NOT the
@@ -753,6 +755,9 @@ For historical news, use python -m src.collectors.polygon_news instead.
     if args.incremental:
         try:
             run_incremental(args.tickers, end_date=end_date, scope=args.scope)
+        except ActiveUniverseUnavailable as e:
+            logger.error("%s", e)
+            sys.exit(1)
         except RuntimeError as e:
             logger.error(str(e))
             sys.exit(1)
@@ -765,6 +770,9 @@ For historical news, use python -m src.collectors.polygon_news instead.
     # Load tickers
     try:
         tickers = load_tickers(args.tickers, scope=args.scope)
+    except ActiveUniverseUnavailable as e:
+        logger.error("%s", e)
+        sys.exit(1)
     except RuntimeError as e:
         logger.error(str(e))
         sys.exit(1)
