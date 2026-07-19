@@ -28,17 +28,6 @@ const settingsSources = [
   ...tsxSources(resolve(here, "../settings")),
 ].join("\n");
 
-const settingsBaselineUndefinedClasses = [
-  "ds-table",
-  "provider-config-field-label",
-  "provider-config-field-current",
-  "ds-schedule-protection-note",
-  "provider-card",
-  "oauth-import-box",
-  "credential-metadata-actions",
-  "reauth-hint",
-];
-
 function literalClasses(source: string): string[] {
   return Array.from(source.matchAll(/className="([^"]+)"/g))
     .flatMap((match) => match[1].split(/\s+/))
@@ -61,10 +50,7 @@ describe("migrated component class coverage", () => {
     ].join("\n");
     const classes = [...new Set(literalClasses(source))];
     const missing = classes.filter((name) => !hasSelector(name)).sort();
-    const expectedMissing = name === "Holdings"
-      ? [...settingsBaselineUndefinedClasses].sort()
-      : [];
-    expect(missing).toEqual(expectedMissing);
+    expect(missing).toEqual([]);
   });
 
   it("keeps investor proposal guardrails wrap-capable on narrow screens", () => {

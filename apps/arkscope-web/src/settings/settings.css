@@ -124,6 +124,40 @@
   margin-bottom: var(--space-2);
 }
 
+.ds-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.provider-card,
+.oauth-import-box,
+.credential-metadata-actions {
+  min-width: 0;
+}
+
+.provider-config-field-label {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.provider-config-field-current {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ds-schedule-protection-note {
+  max-width: 80ch;
+  overflow-wrap: anywhere;
+}
+
+.reauth-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .settings-workspace-group {
   min-width: 0;
   border-top: 1px solid var(--border);
