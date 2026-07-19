@@ -9,7 +9,13 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** MERGED TO MASTER — DESKTOP USER CHECK AND LIVE CLOSEOUT PENDING
+> **Status:** MERGED TO MASTER — IA SUPERSEDED BY SLICE 4.1; NOT LIVE
+>
+> The post-merge desktop user check rejected the all-groups single-page
+> composition. The extraction, registry, anchors, confirmation migration, and
+> test evidence remain valid, but the IA cannot be marked LIVE. The corrective
+> authority is
+> `docs/superpowers/specs/2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md`.
 
 > **Independent plan review (2026-07-19):** GREEN with no must-fix. Exact
 > accounting is locked at frontend `+34/-0`; implementation must stop
@@ -1119,6 +1125,12 @@ Stop and return to design/review if implementation requires any of the following
 ---
 
 ## Post-Review Merge Closeout
+
+Historical closeout stopped at the desktop user check in Step 5: the user
+rejected the all-groups long-page IA. Steps 6-8 below are retained as the
+original reviewed procedure but must not now be used to mark this plan LIVE.
+Slice 4.1 owns corrected user verification, final LIVE status, Design Kit sync
+#5, and subsequent sequencing.
 
 Only after independent implementation GREEN and explicit user approval:
 

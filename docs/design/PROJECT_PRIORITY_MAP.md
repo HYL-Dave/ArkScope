@@ -247,14 +247,18 @@ therefore defaults to defer until the hypothesis gate exists.
   reviewed compatibility annotations, established exact 150-ticker
   DB-derived/export parity, and retired all runtime readers and writers. **P2.8
   Slice 4 Settings workspace is FAST-FORWARD MERGED through review docs tip
-  `8a0fc9c` (reviewed product tip `2611464`); desktop user verification and
-  final LIVE closeout remain pending.** Exact frontend accounting is
+  `8a0fc9c` (reviewed product tip `2611464`), but the desktop user check rejected
+  its all-groups long-page composition. It is **NOT LIVE; its IA is superseded
+  by the adopted Slice 4.1 correction design, whose written review is pending.**
+  Exact Slice 4 frontend accounting remains
   `572 -> 606` (`+34/-0`), all
   frontend/type/build/static/byte-identity gates are closed, and the six-size
   real-browser gate is green after four RED-first integration repairs.
   Independent implementation review is GREEN, merged-tree gates are green,
-  and the desktop now runs merged `master`. Slice 5 remains unopened; the
-  external Design Kit companion sync remains a separately recorded closeout.
+  and the desktop now runs merged `master`. The single next implementation unit
+  is Slice 4.1 after written-spec and plan review. The app-wide i18n decision
+  follows Slice 4.1; Slice 5 remains queued. Design Kit sync #5 stays on hold
+  until the correction lands.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -448,6 +452,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-19 (P2.8 SLICE 4.1 SETTINGS NAVIGATION CORRECTION DESIGN ADOPTED — WRITTEN REVIEW PENDING)**: The desktop user check rejected Slice 4's technically valid but operationally poor all-groups long page, so Slice 4 remains merged but NOT LIVE. The adopted correction at `docs/superpowers/specs/2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md` replaces collapse with three automatic-activation workflow tabs and one mounted group, preserves nine stable anchors, keeps empty-query navigation scoped while making `搜尋所有設定` explicitly cross-group, and requires search/NavigationTarget to switch group before exact focus. It introduces shared `ui/Tabs` with Settings as first consumer while leaving Holdings byte-identical and tracking its local tablist as named debt. It also corrects FRED ownership: Data Sources retains compact provider/config health from existing payloads only, while `總經資料` becomes the sole detailed `/macro/snapshot` owner and no longer promises a Calendar feature. The retired collapse key is never read; a fail-closed active-group key replaces it. `docs/design/ARKSCOPE_TERMINOLOGY.md` is now the single terminology authority: Traditional Chinese uses natural grammar with professional English retained where translation is lossy, duplicate `譯文 · Original` labels are disallowed by default, and invisible EN aliases remain searchable. Verification must include the canonical six viewports, explicitly including 960x768. Next gate is full written-spec review, then a separately reviewed Slice 4.1 implementation plan. After 4.1, the single next design line is app-wide i18n (Shell + Settings first); Slice 5 remains queued and Design Kit sync #5 remains held.
 
 - **2026-07-19 (P2.8 SLICE 4 SETTINGS WORKSPACE FAST-FORWARD MERGED — DESKTOP USER CHECK / LIVE CLOSEOUT PENDING)**: Independent implementation review reproduced the pure-move `60/572`, final `63/606`, exact `+34/-0`, all byte/static gates, and a separate 35-check browser interaction matrix. With the user's merge approval, `master` fast-forwarded from `7e56bce` through review docs tip `8a0fc9c` (product tip `2611464`) without a merge commit or push. Merged-tree focused `18/135`, full `63/606`, typecheck, build, four byte-identity gates, and all reviewed static ratchets passed. The old desktop process group exited through its launcher cleanup path; Vite `8430` and old sidecar `37255` were closed before merged `master` started a fresh Vite `8430`, Electron, and sidecar `45343`. Health and initial product requests return `200`. The plan remains short of LIVE until the user checks the normal desktop Settings directory/search/collapse, Models action placement, Providers, Investor Profile, and Data Sources table. Slice 5 is not started; external Design Kit sync remains a separate closeout record.
 

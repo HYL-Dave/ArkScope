@@ -5,6 +5,9 @@
 > interaction primitives, cross-surface navigation, and the bounded UI repair
 > sequence. The Claude Design companion was synchronized after approval; each
 > implementation slice still requires its own separately reviewed plan.
+> **Settings IA amendment, 2026-07-19:** Slice 4.1 replaces the rejected
+> all-groups single-page composition. Its written review is pending at
+> `2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md`.
 
 ## 1. Purpose and Authority
 
@@ -167,9 +170,11 @@ same amount of information.
 ### 5.3 Terminology
 
 Visible names use user tasks and outcomes, not internal module names. Existing
-canonical EN/zh maps remain domain authorities. Navigation groups, Settings
-groups, and other high-frequency labels require a terminology pass before their
-implementation plan is approved.
+canonical EN/zh terms and mixed-language policy live in the single authority
+[`ARKSCOPE_TERMINOLOGY.md`](../../design/ARKSCOPE_TERMINOLOGY.md). Navigation
+groups, Settings groups, and other high-frequency labels require a terminology
+pass before their implementation plan is approved. Domain specs link to that
+authority rather than copying shared terminology tables.
 
 ## 6. App Shell and Navigation
 
@@ -223,6 +228,7 @@ The shared set includes:
 - text input, textarea, select, checkbox/toggle, numeric input, and slider where
   numeric position is meaningful;
 - command button, icon button, menu, and disclosure;
+- automatic-activation `Tabs` where a small stable set switches peer views;
 - `StatusBadge`, inline alert, empty state, loading state, and typed error state;
 - `DataTable`, row-action menu, inline editor, archived/closed filter;
 - `ConfirmDialog`;
@@ -402,25 +408,33 @@ separate server-owned fixed-task run slice lands.
 
 ## 9. Settings Information Architecture
 
-### 9.1 One grouped, scannable page
+### 9.1 Workflow tabs with a scoped directory
 
-Settings remains one scannable workspace. It uses semantic groups but does not
-force users through a nested route for every category.
+Settings remains one application view and does not create a nested route for
+every category. Its content is composed as three workflow tabs: AI and Models,
+Personalization, and Data and Sync.
 
-- All groups are expanded by default.
-- Groups may be collapsed and remember their state.
-- A compact left rail provides search and in-page anchors; clicking an anchor
-  scrolls rather than entering another navigation layer.
-- Search crosses collapsed groups. A match expands the group and scrolls/focuses
-  the matching setting.
-- Stable anchors allow `NavigationTarget` to open a precise Settings section.
+- Only the active workflow group is mounted.
+- A compact left rail lists anchors for the active group; at and below the
+  shell breakpoint the same directory is a transient Drawer.
+- The search control is explicitly global. Empty search lists the active group;
+  a non-empty search crosses all groups and groups its results by workflow.
+- Selecting a cross-group result switches the workflow, waits for mount, then
+  scrolls/focuses the exact stable anchor.
+- `NavigationTarget` has precedence over the remembered group and follows the
+  same mount-before-focus contract.
+- Manual tab selection clears any pending search/navigation anchor.
+- The last active group is remembered fail-closed. The retired collapse-state
+  preference is never read or migrated.
 
-Code ownership is separate from visual routing. Settings is decomposed into
-section modules even though the UI remains one page.
+Code ownership remains separate from visual routing. Settings stays decomposed
+into section modules. The exact preference, focus, FRED/Macro ownership, and
+verification contracts are owned by the Slice 4.1 addendum
+`2026-07-19-p2-8-slice-4-1-settings-navigation-correction-design.md`.
 
 ### 9.2 Grouping and migration map
 
-Group names are provisional until the terminology pass, but their ownership is
+Group names follow the canonical terminology authority; their ownership is
 locked.
 
 | Current owner/surface | Target group | Target subsection/ruling |
@@ -433,7 +447,7 @@ locked.
 | `InvestorProfilePanel` | Personalization | Profile summary, calibration, approved settings |
 | `DataStorageSection` | Data and Sync | Local market storage/read authority |
 | `NewsStorageSection` | Data and Sync | News ingestion/write route |
-| `MacroStorageSection` | Data and Sync | Macro/calendar snapshot and refresh state |
+| `MacroStorageSection` | Data and Sync | Detailed FRED/Macro snapshot and stored coverage; no Calendar feature claim |
 | `DataSourcesSection` | Data and Sync | Provider health, schedules, SA telemetry/setup |
 | `AppRecordsSection` (disabled) | App and Advanced | Historical migration disclosure only; not normal navigation |
 | Permissions (disabled) | App and Advanced | Render only when an implemented permission surface exists |
@@ -607,7 +621,8 @@ not shrink text until it overlaps or becomes unreadable. Font size does not
 scale with viewport width.
 
 Required viewport checks include 1440x900, 1024x768, both sides of the shell
-breakpoint (961px and 959px), and 390x844.
+breakpoint (961x768 and 959x768), the breakpoint itself (960x768, on the overlay
+side), and 390x844.
 
 ## 13. Implementation Sequence
 
@@ -661,8 +676,22 @@ classification require a separately reviewed data-model slice.
 ### Slice 4: Settings
 
 1. Pure-move extraction with strict A/B equivalence.
-2. Grouped expanded single-page IA, anchors, search, and remembered collapse.
+2. Initial grouped single-page IA, anchors, search, and remembered collapse.
 3. Terminology review and exact NavigationTarget anchors.
+
+The initial IA was merged and independently verified, but the desktop user
+check rejected its all-groups long-page composition. It is historical delivery,
+not the final LIVE contract.
+
+### Slice 4.1: Settings navigation correction
+
+1. Shared automatic-activation `Tabs`, first consumed by Settings.
+2. Three workflow tabs with one mounted group and current-group directory.
+3. Global search and NavigationTarget mount-before-focus behavior.
+4. Versioned active-group preference; retired collapse state is never read.
+5. Detailed FRED snapshot ownership under `總經資料`, with only compact
+   operational FRED state retained in Data Sources.
+6. Single terminology authority and exact six-viewport verification.
 
 ### Slice 5: Investor Profile UX
 
@@ -725,7 +754,10 @@ set, unchanged passed count, no behavioral edits in the move commit.
 | Research title/archive/search gaps | Slice 3 and bounded follow-ups |
 | Generic Research errors | Slice 3 |
 | 3,839-line Settings ownership | Slice 4 pure move before IA changes |
-| Settings title/content mismatch and technical names | Slice 4 IA/terminology |
+| Settings title/content mismatch and technical names | Slice 4, corrected and completed by Slice 4.1 |
+| Rejected all-groups Settings long page | Slice 4.1 workflow tabs and one mounted group |
+| Split detailed FRED ownership and false Calendar promise | Slice 4.1 `總經資料` ownership correction |
+| Holdings local tablist duplicates shared `Tabs` semantics | Next Holdings-owning slice; Slice 4.1 keeps Holdings byte-identical |
 | Abstract Investor Profile form hierarchy | Slice 5 |
 | Generic card synthesis/translation exception strings | Owning card surface/runtime follow-up; typed timeout remains the precedent |
 | Watchlist 148-row live profile and dense cryptic actions | Separate operational-list follow-up after primitives exist |
@@ -763,7 +795,7 @@ Locked here:
 - transient and pinnable Drawer modes;
 - stage-aware BoundedProgress and global-work notification semantics;
 - adaptive Research workspace and model-selection precedence;
-- single-page grouped Settings IA;
+- workflow-tab Settings IA with one mounted group and global exact-anchor search;
 - summary-first Investor Profile with guided scenario calibration;
 - separate NavigationTarget and Reference contracts;
 - 960px shell breakpoint;

@@ -52,17 +52,14 @@ Not high-frequency trading. Not an RL trading system (retired; lives offline und
 
 ### 1.5 Terminology (EN / 繁體中文 — both interfaces ship; LOCK)
 
-UI copy must use these canonical pairs. Prefer standard US-finance terms over literal calques; **never** translate "Universe" as 「宇宙」.
+The single terminology authority is
+[`ARKSCOPE_TERMINOLOGY.md`](ARKSCOPE_TERMINOLOGY.md). It owns canonical pairs,
+mixed professional-language rules, and the distinction among Universe, Pool,
+Watchlist, and Holdings. This Product Spec does not duplicate that table.
 
-| Concept | EN | 繁中 | Note |
-|---|---|---|---|
-| Full tracked inventory | Universe | 全部標的 | Every instrument the system tracks (the inventory surface). |
-| Curated/filtered subset | Pool | 池 (e.g. 標的池 / 選擇權標的池) | A purpose-built subset *derived from* the Universe (e.g. options-eligible pool, screening/strategy pool). Not the inventory. |
-| Daily research lists | Watchlist | 自選股 | Working cockpit; a view over the same profile-state substrate as Universe. |
-| Broker portfolio | Holdings | 持倉 | IBKR-first / broker-authoritative; its own surface. |
-| §2 structured card | AI card | AI 卡片 | Per-claim 可追溯性 (traceability); 無摘要 = a tracked ticker with no market data. |
-
-Universe, Watchlist, and Holdings are **distinct views over (or onto) the same profile-state substrate**, not three separate data universes.
+English and Traditional Chinese remain target interfaces. Runtime locale
+selection and string externalization are owned by the separately sequenced
+i18n decision, not by this product-definition section.
 
 ---
 
