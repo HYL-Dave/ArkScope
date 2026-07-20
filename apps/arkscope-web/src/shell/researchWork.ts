@@ -9,14 +9,13 @@ import {
 
 export const RESEARCH_WORK_STORAGE_KEY = "arkscope.shell.researchWork.v1";
 const MAX_PERSISTED_IDENTITIES = 50;
-const FALLBACK_THREAD_TITLE = "AI 研究";
 
 export type ShellResearchWorkStatus = ResearchRunDTO["status"];
 
 export interface ResearchWorkItem {
   runId: string;
   threadId: string;
-  threadTitle: string;
+  threadTitle: string | null;
   status: ShellResearchWorkStatus;
   createdAt: string;
   startedAt: string | null;
@@ -28,7 +27,7 @@ export interface ResearchWorkState {
   activeCount: number;
   attentionCount: number;
   refresh: () => Promise<void>;
-  observeRun: (run: ResearchRunDTO, threadTitle?: string) => void;
+  observeRun: (run: ResearchRunDTO, threadTitle?: string | null) => void;
   dismiss: (runId: string) => void;
 }
 
@@ -60,14 +59,17 @@ function isActive(status: ShellResearchWorkStatus): boolean {
   return status === "queued" || status === "running";
 }
 
-function normalizedTitle(value: string | undefined, previous?: string): string {
+function normalizedTitle(
+  value: string | null | undefined,
+  previous?: string | null,
+): string | null {
   const title = value?.trim();
-  return title || previous || FALLBACK_THREAD_TITLE;
+  return title || previous || null;
 }
 
 function projectRun(
   run: ResearchRunDTO,
-  threadTitle: string | undefined,
+  threadTitle: string | null | undefined,
   previous?: ResearchWorkItem,
 ): ResearchWorkItem {
   return {
@@ -176,7 +178,7 @@ export function useResearchWorkRegistry(options: ResearchWorkOptions = {}): Rese
     ]);
   }, [replaceIdentities]);
 
-  const observeRun = useCallback((run: ResearchRunDTO, threadTitle?: string) => {
+  const observeRun = useCallback((run: ResearchRunDTO, threadTitle?: string | null) => {
     if (!run.id.trim() || !run.thread_id.trim()) return;
     setItemsById((current) => {
       const next = {

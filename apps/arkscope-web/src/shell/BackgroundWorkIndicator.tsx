@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
+import type { TFunction } from "i18next";
 import { ArrowRight, Bell, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { BoundedProgress, type BoundedWorkStatus } from "../ui/BoundedProgress";
 import { Button, IconButton } from "../ui/Button";
 import { Drawer } from "../ui/Drawer";
 import type { NavigationTarget } from "./navigation";
 import type { ResearchWorkItem, ResearchWorkState } from "./researchWork";
+import { shellViewLabel } from "./shellLabels";
 
 export interface BackgroundWorkIndicatorProps {
   work: ResearchWorkState;
@@ -35,12 +38,12 @@ function progressStatus(item: ResearchWorkItem): BoundedWorkStatus {
   return "interrupted";
 }
 
-function stageLabel(item: ResearchWorkItem): string {
-  if (item.status === "queued") return "等待執行";
-  if (item.status === "running") return "AI 研究執行中";
-  if (item.status === "succeeded") return "研究完成";
-  if (item.status === "failed") return "研究未完成";
-  return "研究已中止";
+function stageLabel(item: ResearchWorkItem, t: TFunction<"shell">): string {
+  if (item.status === "queued") return t(($) => $.backgroundWork.stages.queued);
+  if (item.status === "running") return t(($) => $.backgroundWork.stages.running);
+  if (item.status === "succeeded") return t(($) => $.backgroundWork.stages.succeeded);
+  if (item.status === "failed") return t(($) => $.backgroundWork.stages.failed);
+  return t(($) => $.backgroundWork.stages.interrupted);
 }
 
 function WorkProgress({
@@ -50,6 +53,7 @@ function WorkProgress({
   item: ResearchWorkItem;
   researchSessionBoundMs: number | null;
 }) {
+  const { t } = useTranslation("shell");
   const now = Date.now();
   const end = item.completedAt;
   const overallElapsed = elapsedMs(item.createdAt, end, now);
@@ -58,15 +62,15 @@ function WorkProgress({
   return (
     <BoundedProgress
       status={progressStatus(item)}
-      stageLabel={stageLabel(item)}
+      stageLabel={stageLabel(item, t)}
       overallElapsedMs={overallElapsed}
       stageElapsedMs={stageElapsed}
       stageBoundMs={item.status === "running" ? researchSessionBoundMs : null}
       continuesAfterNavigation={true}
       canCancel={false}
-      resultLabel="結果留在 AI 研究對話"
-      errorTitle={item.status === "failed" ? "研究未完成" : undefined}
-      errorDetail={item.status === "failed" ? "開啟原對話查看可採取的下一步。" : undefined}
+      resultLabel={t(($) => $.backgroundWork.resultDestination)}
+      errorTitle={item.status === "failed" ? t(($) => $.backgroundWork.stages.failed) : undefined}
+      errorDetail={item.status === "failed" ? t(($) => $.backgroundWork.failureNextStep) : undefined}
     />
   );
 }
@@ -76,15 +80,18 @@ export function BackgroundWorkIndicator({
   researchSessionBoundMs,
   onNavigate,
 }: BackgroundWorkIndicatorProps) {
+  const { t } = useTranslation("shell");
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   if (work.activeCount === 0 && work.attentionCount === 0) return null;
 
   const countLabels = [
-    work.activeCount > 0 ? `執行中 ${work.activeCount}` : null,
-    work.attentionCount > 0 ? `待查看 ${work.attentionCount}` : null,
-  ].filter((value): value is string => value !== null);
+    work.activeCount > 0 ? t(($) => $.backgroundWork.activeCount, { count: work.activeCount }) : null,
+    work.attentionCount > 0
+      ? t(($) => $.backgroundWork.attentionCount, { count: work.attentionCount })
+      : null,
+  ].filter((value) => value !== null);
   const triggerLabel = countLabels.join(" · ");
 
   const navigateToWork = (item: ResearchWorkItem) => {
@@ -105,17 +112,17 @@ export function BackgroundWorkIndicator({
         size="compact"
         tone="ghost"
         icon={<Bell size={15} />}
-        aria-label={`AI 研究背景工作：${triggerLabel}`}
+        aria-label={t(($) => $.backgroundWork.triggerAria, { summary: triggerLabel })}
         onClick={() => setOpen(true)}
       >
         {triggerLabel}
       </Button>
       <Drawer
         open={open}
-        title="背景工作"
+        title={t(($) => $.backgroundWork.drawerTitle)}
         onClose={() => setOpen(false)}
         returnFocusRef={triggerRef}
-        footer={<span className="muted tiny">僅顯示此桌面工作階段觀察到的 AI 研究。</span>}
+        footer={<span className="muted tiny">{t(($) => $.backgroundWork.sessionScope)}</span>}
       >
         <div className="shell-work-list">
           {work.items.map((item) => (
@@ -126,10 +133,10 @@ export function BackgroundWorkIndicator({
               data-work-status={item.status}
             >
               <div className="shell-work-row-head">
-                <strong>{item.threadTitle}</strong>
+                <strong>{item.threadTitle ?? shellViewLabel("Research", t)}</strong>
                 {!isActive(item) ? (
                   <IconButton
-                    label={`忽略 ${item.runId}`}
+                    label={t(($) => $.backgroundWork.dismissAria, { runId: item.runId })}
                     tone="ghost"
                     size="compact"
                     icon={<X size={14} />}
@@ -146,7 +153,7 @@ export function BackgroundWorkIndicator({
                 icon={<ArrowRight size={14} />}
                 onClick={() => navigateToWork(item)}
               >
-                開啟對話
+                {t(($) => $.backgroundWork.openConversation)}
               </Button>
             </article>
           ))}

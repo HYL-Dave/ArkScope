@@ -383,4 +383,23 @@ describe("App shell integration", () => {
     expect(host.querySelector('[data-testid="shell-context"]')?.textContent).toBe("AI Research");
     expect(host.querySelector("[aria-current='page']")?.textContent).toContain("AI Research");
   });
+
+  it("switches locale without closing the background-work drawer", async () => {
+    shellMocks.work = emptyWork([workItem()]);
+    const host = await renderApp();
+    const home = host.querySelector('[data-testid="home-surface"]');
+    const trigger = host.querySelector('[data-testid="background-work-trigger"]')!;
+    await click(trigger);
+    const dialog = document.body.querySelector('[role="dialog"]');
+    const row = document.body.querySelector("[data-work-run-id='run-shell']");
+    const focusedControl = document.activeElement;
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(document.body.querySelector('[role="dialog"]')).toBe(dialog);
+    expect(document.body.querySelector("[data-work-run-id='run-shell']")).toBe(row);
+    expect(host.querySelector('[data-testid="home-surface"]')).toBe(home);
+    expect(document.activeElement).toBe(focusedControl);
+    expect(dialog?.textContent).toContain("Background work");
+    expect(trigger.textContent).toContain("Running 1");
+  });
 });

@@ -2,6 +2,7 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BackgroundWorkIndicator } from "./BackgroundWorkIndicator";
@@ -231,7 +232,49 @@ describe("BackgroundWorkIndicator", () => {
     const dialog = document.body.querySelector("[role='dialog']");
 
     expect(dialog?.textContent).toContain("離開頁面後繼續");
-    expect(dialog?.textContent).toContain("結果：結果留在 AI 研究對話");
+    expect(dialog?.textContent).toContain("結果：AI 研究對話");
     expect(Array.from(dialog?.querySelectorAll("button") ?? [], (button) => button.textContent)).not.toContain("停止");
+  });
+
+  it("renders English background-work chrome while preserving source titles", async () => {
+    await act(async () => { await i18n.changeLanguage("en"); });
+    await renderIndicator({
+      work: workState([
+        item("running", { threadTitle: "MU source title" }),
+        item("failed", { runId: "run-terminal", threadTitle: "Terminal source title" }),
+      ]),
+    });
+    const trigger = await openDrawer();
+    const dialog = document.body.querySelector("[role='dialog']");
+
+    expect(trigger.textContent).toContain("Running 1");
+    expect(trigger.textContent).toContain("To review 1");
+    expect(dialog?.textContent).toContain("Background work");
+    expect(dialog?.textContent).toContain("AI Research running");
+    expect(dialog?.textContent).toContain("Result: AI Research conversation");
+    expect(dialog?.textContent).toContain("Open conversation");
+    expect(dialog?.textContent).toContain("MU source title");
+    expect(dialog?.textContent).toContain("Terminal source title");
+    expect(dialog?.querySelector('[aria-label="Dismiss run-terminal"]')).not.toBeNull();
+  });
+
+  it("updates only fallback copy when locale changes with the drawer open", async () => {
+    await renderIndicator({
+      work: workState([item("running", { threadTitle: null })]),
+    });
+    const trigger = await openDrawer();
+    const dialog = document.body.querySelector("[role='dialog']");
+    const row = document.body.querySelector("[data-work-run-id='run-running']");
+    const activeCount = 1;
+
+    expect(row?.textContent).toContain("AI 研究");
+    expect(trigger.textContent).toContain(`執行中 ${activeCount}`);
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    expect(document.body.querySelector("[role='dialog']")).toBe(dialog);
+    expect(document.body.querySelector("[data-work-run-id='run-running']")).toBe(row);
+    expect(row?.textContent).toContain("AI Research");
+    expect(row?.textContent).not.toContain("AI 研究");
+    expect(trigger.textContent).toContain(`Running ${activeCount}`);
   });
 });

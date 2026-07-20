@@ -254,8 +254,23 @@ describe("useResearchWorkRegistry", () => {
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(registry.state().items).toEqual([
-      expect.objectContaining({ runId, status: "succeeded", threadTitle: "AI 研究" }),
+      expect.objectContaining({ runId, status: "succeeded", threadTitle: null }),
     ]);
+  });
+
+  it("keeps a missing thread title semantic instead of capturing localized fallback copy", async () => {
+    const storage = memoryStorage();
+    const registry = await renderRegistry({ api: emptyApi(), storage });
+    const run = makeRun("running", { id: "semantic-title", thread_id: "thread-semantic" });
+
+    await observe(run, "   ");
+    expect(registry.state().items[0]?.threadTitle).toBeNull();
+    const serialized = `${JSON.stringify(registry.state().items)}\n${storage.value(RESEARCH_WORK_STORAGE_KEY)}`;
+    expect(serialized).not.toContain("AI 研究");
+    expect(serialized).not.toContain("AI Research");
+
+    await observe(run, "Provider source title");
+    expect(registry.state().items[0]?.threadTitle).toBe("Provider source title");
   });
 
   it("preserves prior work when either polling leg fails", async () => {
