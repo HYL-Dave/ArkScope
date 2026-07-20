@@ -259,9 +259,12 @@ therefore defaults to defer until the hypothesis gate exists.
   acceptance points and a separate merged-master sandbox replay passed 41
   interactions.** Design Kit sync #5 is complete. The app-wide i18n decision
   document is written and independently review-approved. **I18N-0 foundation
-  implementation is complete at product tip `69a8ca2` and is awaiting
-  independent implementation review; that review is the single next gate.**
-  I18N-1 remains queued and unopened, the public selector remains absent, and
+  is LIVE COMPLETE at reviewed product tip `69a8ca2`, fast-forward merged
+  through evidence tip `64017f4`.** Independent review completed canonical
+  backend A/B at exact `+7/-0`; merged-tree backend `7`, frontend `73/680`,
+  typecheck, build, scanner, no-PG, and isolated startup smoke are green.
+  **I18N-1 Shell + common UI is the single NEXT unit**, the public selector
+  remains absent, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
@@ -457,6 +460,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-0 FOUNDATION LIVE COMPLETE — I18N-1 NEXT)**: Independent implementation review approved product tip <code>69a8ca2</code> and completed canonical virgin backend A/B: collect <code>4562 -> 4569</code>, exact <code>+7/-0</code>, with isolated reruns proving the apparent <code>test_agents</code> differences were pre-existing order-sensitive fixture noise. With user approval, <code>master</code> fast-forwarded through evidence tip <code>64017f4</code>. Merged-tree verification passed backend <code>7</code>, frontend focused <code>8/44</code>, full frontend <code>73/680</code>, typecheck, build, literal scanner, no-PG, and isolated synchronous-first-paint startup smoke at desktop/mobile widths. The normal desktop was concurrently active, so SQLite byte-hash equality was not observable; read-only inspection proved <code>profile_settings.ui_locale</code> remains absent and the isolated profile reported the default without persisting it. I18N-0 adds no selector or translated surface, so Design Kit is unchanged. I18N-1 Shell + common UI is now the single NEXT unit; I18N-2, bilingual-from-birth Slice 5, and later migrations remain queued.
 
 - **2026-07-20 (I18N-0 IMPLEMENTATION REVIEW-READY — INDEPENDENT REVIEW NEXT)**: Product tip <code>69a8ca2</code> completes the reviewed foundation without translating a surface or exposing a selector: key-specific profile locale authority, synchronous cache-first bundled i18next bootstrap, monotonic StrictMode-safe controller/provider, and a TypeScript-AST visible-literal debt ratchet. Exact ledgers are backend <code>+7/-0</code> (<code>4562 -> 4569</code>) and frontend <code>+44/-0</code> (<code>65/636 -> 73/680</code>); frontend full/typecheck/build, scanner, static boundaries, no-PG, and isolated first-paint/runtime smoke are green. This environment reproduces the known canonical pytest hang symmetrically on base and head at <code>test_providers_endpoint</code>, so independent review owns canonical full-suite completion per the reviewed plan. I18N-1 and the public locale selector remain queued and unopened.
 

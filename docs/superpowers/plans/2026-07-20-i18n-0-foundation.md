@@ -9,15 +9,15 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox syntax for tracking.
 
-> **Status:** IMPLEMENTATION COMPLETE — INDEPENDENT IMPLEMENTATION REVIEW
-> PENDING, 2026-07-20
+> **Status:** MERGED / LIVE COMPLETE, 2026-07-20
 >
 > The app-wide i18n decision received independent written-review GREEN at
 > <code>ad53508</code>. Independent plan review subsequently returned GREEN
-> with no must-fix. Product implementation is authorized only from the
-> clearance commit created by that status transition. Product tip
-> <code>69a8ca2</code> is review-ready and remains unmerged; I18N-1 and the
-> public locale selector remain unopened.
+> with no must-fix. Independent implementation review then returned GREEN for
+> product tip <code>69a8ca2</code>, completed canonical backend A/B, and
+> approved merge. <code>master</code> fast-forwarded through evidence tip
+> <code>64017f4</code>; merged-tree verification is green. I18N-1 is the single
+> next unit and the public locale selector remains absent.
 
 **Goal:** Establish the additive I18N-0 foundation: one profile-backed locale
 authority, synchronous cache-first rendering, typed bundled resources, a
@@ -62,12 +62,14 @@ verification.
 | resource ledger | pinned <code>i18next 26.3.6</code> and <code>react-i18next 17.0.10</code>; exact non-empty key paths <code>common.i18n.missingTranslation</code> and <code>settings.locale.writeFailed</code> in both locales; <code>shell</code> intentionally empty; no selector labels or autonyms |
 | literal-ratchet ledger | <code>1709</code> candidates, <code>1621</code> normalized signatures/debt signatures, <code>0</code> allowlist entries; migrated scopes <code>src/i18n/**</code> and <code>src/main.tsx</code> are zero; two check runs preserved SHA-256 <code>bcafa2c0c42c847d8c1877e4b7ddc9ec60211a8dca510c5262cee676e487bf0e</code> |
 | focused/full verification | backend focused <code>7 passed</code>; frontend focused <code>8 files / 44 passed</code>; full frontend <code>73/680</code>; typecheck clean; production build successful with only the existing chunk-size warning; scanner check and no-PG smoke (<code>ok:true</code>, <code>pg_attempts:[]</code>) pass |
-| canonical A/B status | virgin node ledgers are exact; full base run and direct base/head probes all hang symmetrically at the pre-existing <code>tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint</code>. Per Task 7 Step 4, canonical full-suite completion is delegated to the independent reviewer and is not claimed PASS here |
+| canonical A/B status | independent reviewer PASS on virgin archives: base <code>220e163</code> completed in 4m54s and product tip <code>69a8ca2</code> in 4m58s; collect <code>4562 -> 4569</code>, exactly <code>+7/-0</code>; skipped/warning families remained <code>74/18</code>. Apparent full-suite differences were confined to the pre-existing order-sensitive <code>test_agents</code> fixture family; fresh isolated reruns produced identical <code>1 failed / 7 errors</code> sets on both sides, including the same <code>bad_provider</code> failure. |
 | static/runtime evidence | exact file map; protected domain, surface, CSS, desktop, and extension paths byte-identical; no detector/loader/Suspense/dynamic resource import/dynamic key/public selector/raw locale error. Isolated temporary-DB CDP smoke passed default, cached-English correction, stored-English reconciliation, and failed-GET fail-open first-paint cases; 1440x900 and 390x844 had no blank shell, runtime exception, selector, or horizontal overflow |
-| cleanup | isolated API/Vite/Chrome processes stopped; ports <code>8423/8432/9225</code> released; temporary DBs, browser profile, screenshots, A/B archives, logs, and harness deleted; no production DB or browser storage was used |
+| merged-tree closeout | <code>master</code> fast-forwarded through <code>64017f4</code>; backend <code>7 passed</code>, frontend focused <code>8 files / 44 passed</code>, full frontend <code>73/680</code>, typecheck, build, scanner, and no-PG smoke all pass. An isolated temporary-DB startup smoke passed synchronous <code>zh-Hant</code> first paint, authoritative default read, zero selector, zero runtime exceptions, and no horizontal overflow at 1440x900 or 390x844. |
+| production profile observation | the normal desktop app and scheduler were running during closeout, so unrelated SQLite writes/checkpointing made byte-hash equality unobservable. Read-only inspection proved no <code>profile_settings.ui_locale</code> row exists, while the isolated profile returned <code>{locale: "zh-Hant", source: "default"}</code>; I18N-0 therefore performed no locale persistence. The already-running desktop process requires one normal restart before it loads the merged backend route. |
+| cleanup | feature and merged-smoke API/Vite/Chrome processes stopped; ports <code>8423/8432/9225</code> released; temporary DBs, browser profile, screenshots, A/B archives, logs, and harness deleted; no production browser storage was used |
 | deviations | none; <code>initAsync:false</code> is the pinned i18next version's typed synchronous-init equivalent allowed by the decision, and the selector fallback was unnecessary |
-| independent implementation review | pending |
-| merge/user verification | forbidden before independent implementation GREEN and user approval |
+| independent implementation review | GREEN; reviewer independently reproduced exact backend <code>+7/-0</code>, frontend <code>+44/-0</code>, code/static gates, and <code>10/10</code> runtime smoke scenarios |
+| merge/user verification | user-approved fast-forward merge complete; merged-tree closeout passed; no visible selector or translated product surface was introduced |
 
 ---
 
