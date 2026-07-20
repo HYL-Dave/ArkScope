@@ -1,4 +1,13 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {
+      "file": "src/shell/ShellTopBar.tsx",
+      "kind": "jsx_text",
+      "literal": "ArkScope",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "ArkScope is the product name and is identical in every locale."
+    }
+  ]
 }

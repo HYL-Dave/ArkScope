@@ -250,18 +250,6 @@
       "count": 1
     },
     {
-      "signature": "[\"src/App.tsx\",\"jsx_attribute\",\"主要導覽\"]",
-      "count": 2
-    },
-    {
-      "signature": "[\"src/App.tsx\",\"jsx_attribute\",\"導覽\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/App.tsx\",\"jsx_attribute\",\"開啟導覽\"]",
-      "count": 1
-    },
-    {
       "signature": "[\"src/chatgptOAuth.ts\",\"presenter_return\",\"Token / backend\"]",
       "count": 1
     },
@@ -5522,158 +5510,6 @@
       "count": 1
     },
     {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_attribute\",\"AI 研究背景工作：${triggerLabel}\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_attribute\",\"忽略 ${item.runId}\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_attribute\",\"背景工作\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_text\",\"僅顯示此桌面工作階段觀察到的 AI 研究。\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"jsx_text\",\"開啟對話\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"AI 研究執行中\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"研究完成\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"研究已中止\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"研究未完成\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"presenter_return\",\"等待執行\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"執行中 ${work.activeCount}\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"待查看 ${work.attentionCount}\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"研究未完成\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"結果留在 AI 研究對話\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/BackgroundWorkIndicator.tsx\",\"runtime_cjk\",\"開啟原對話查看可採取的下一步。\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"AI 研究\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"System / Health\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"全部標的\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"工作台\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"持倉\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"探索\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"新聞·事件\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"研究\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"系統\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"自選股\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"設定\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/navigation.ts\",\"object_property\",\"追蹤\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/researchWork.ts\",\"runtime_cjk\",\"AI 研究\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_attribute\",\"Developer diagnostics\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"API\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"ArkScope\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Card model\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Developer diagnostics\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Last status\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Sidecar 已連線\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Sidecar 無法連線\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"Tools\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/shell/ShellTopBar.tsx\",\"jsx_text\",\"正在連線\"]",
-      "count": 1
-    },
-    {
       "signature": "[\"src/SourceRunProgress.tsx\",\"jsx_attribute\",\"${sourceLabel}執行進度\"]",
       "count": 1
     },
@@ -5994,66 +5830,6 @@
       "count": 1
     },
     {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_attribute\",\"工作失敗\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"可從此處取消\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"工作未完成，請依錯誤指示處理。\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"無法從此處取消\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"離開頁面後不保證追蹤\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_expression\",\"離開頁面後繼續\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"停止\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"已達上界，等待伺服器確認\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"本階段上界\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"結果：\"]",
-      "count": 2
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"總耗時\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"jsx_text\",\"階段耗時\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"runtime_cjk\",\"工作完成\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"runtime_cjk\",\"工作已中止\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/BoundedProgress.tsx\",\"runtime_cjk\",\"已達上界，等待伺服器確認\"]",
-      "count": 1
-    },
-    {
       "signature": "[\"src/ui/ConfirmDialog.tsx\",\"runtime_cjk\",\"取消\"]",
       "count": 1
     },
@@ -6063,18 +5839,6 @@
     },
     {
       "signature": "[\"src/ui/DataTable.tsx\",\"jsx_text\",\"操作\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/Drawer.tsx\",\"jsx_attribute\",\"取消釘選\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/Drawer.tsx\",\"jsx_attribute\",\"釘選\"]",
-      "count": 1
-    },
-    {
-      "signature": "[\"src/ui/Drawer.tsx\",\"jsx_attribute\",\"關閉\"]",
       "count": 1
     },
     {

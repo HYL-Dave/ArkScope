@@ -2,6 +2,10 @@
   "version": 1,
   "scopes": [
     "src/i18n/**",
-    "src/main.tsx"
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/shell/**",
+    "src/ui/BoundedProgress.tsx",
+    "src/ui/Drawer.tsx"
   ]
 }

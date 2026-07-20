@@ -102,4 +102,45 @@ describe("I18N-0 foundation boundaries", () => {
     expect(controller).toMatch(/authority\s*\.\s*put\(locale\)/);
     expect(controller).toContain("writeCache(locale)");
   });
+
+  it("records the exact I18N-1 migrated scopes and sole ArkScope allowlist", () => {
+    const migrated = JSON.parse(read("scripts/i18n/migrated-scopes.json")) as {
+      scopes: string[];
+    };
+    const allowlist = JSON.parse(read("scripts/i18n/visible-literal-allowlist.json")) as {
+      entries: Array<Record<string, unknown>>;
+    };
+    const debt = JSON.parse(read("scripts/i18n/visible-literal-debt.json")) as {
+      signatures: Array<{ signature: string }>;
+    };
+
+    expect(migrated.scopes).toEqual([
+      "src/i18n/**",
+      "src/main.tsx",
+      "src/App.tsx",
+      "src/shell/**",
+      "src/ui/BoundedProgress.tsx",
+      "src/ui/Drawer.tsx",
+    ]);
+    expect(allowlist.entries).toEqual([{
+      file: "src/shell/ShellTopBar.tsx",
+      kind: "jsx_text",
+      literal: "ArkScope",
+      count: 1,
+      classification: "stable_identifier",
+      reason: "ArkScope is the product name and is identical in every locale.",
+    }]);
+
+    const owned = (file: string) => (
+      file === "src/App.tsx"
+      || file.startsWith("src/shell/")
+      || file === "src/ui/Drawer.tsx"
+      || file === "src/ui/BoundedProgress.tsx"
+    );
+    const ownedDebt = debt.signatures.filter(({ signature }) => {
+      const [file] = JSON.parse(signature) as [string];
+      return owned(file);
+    });
+    expect(ownedDebt).toEqual([]);
+  });
 });
