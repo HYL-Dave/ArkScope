@@ -2,9 +2,11 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MacroSnapshot, MacroStatus } from "../api";
+import { formatSystemTimestamp } from "../timeDisplay";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -130,7 +132,8 @@ function refreshButton(): HTMLButtonElement {
   return button;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
   controls.status = statusFixture;
   controls.snapshot = snapshotFixture;
   controls.statusQueue = [];
@@ -261,5 +264,83 @@ describe("MacroStorageSection", () => {
     });
     expect(host!.textContent).toContain("Newest Fed Funds");
     expect(host!.textContent).not.toMatch(/RAW_LATE_STATUS_EXCEPTION|RAW_LATE_SNAPSHOT_EXCEPTION/);
+  });
+
+  it("renders English Macro Data status snapshot and table headings", async () => {
+    await i18n.changeLanguage("en");
+    const withoutTable = (tableName: string): MacroStatus["tables"] =>
+      Object.fromEntries(Object.entries(statusFixture.tables).filter(([key]) =>
+        key !== tableName));
+    const optionalTableMissing = withoutTable("cal_ipo_events");
+    const requiredTableMissing = withoutTable("macro_observations");
+    const cases: Array<{
+      status: MacroStatus;
+      expectedUnavailable: "table" | "database";
+    }> = [
+      {
+        status: { ...statusFixture, tables: optionalTableMissing },
+        expectedUnavailable: "table",
+      },
+      {
+        status: { ...statusFixture, exists: false },
+        expectedUnavailable: "database",
+      },
+      {
+        status: { ...statusFixture, tables: requiredTableMissing },
+        expectedUnavailable: "database",
+      },
+    ];
+
+    for (const [index, scenario] of cases.entries()) {
+      controls.status = scenario.status;
+      await renderMacro();
+
+      expect.soft(host!.querySelector("h2")?.textContent).toBe("Macro Data");
+      expect.soft(host!.textContent).toContain("FRED Snapshot");
+      expect.soft(host!.textContent).toContain("12 stored");
+      expect.soft(host!.textContent).toContain("FEDFUNDS");
+      expect.soft(host!.textContent).toContain("Federal Funds Effective Rate");
+      expect.soft(host!.textContent).toContain("4.33 Percent");
+      expect.soft(host!.textContent).toContain("2026-07-01");
+      expect.soft(host!.textContent).toContain(
+        formatSystemTimestamp("2026-07-19T03:00:00Z"),
+      );
+      expect.soft(Array.from(host!.querySelectorAll("th")).map((node) => node.textContent))
+        .toEqual(["Series ID", "Name", "Latest value", "Observation date", "Last fetch"]);
+
+      if (scenario.expectedUnavailable === "table") {
+        const ipoLabel = Array.from(host!.querySelectorAll("dt")).find((node) =>
+          node.textContent === "IPO Events");
+        expect.soft(ipoLabel?.nextElementSibling?.textContent).toBe("Unavailable");
+        expect.soft(host!.querySelector('[data-state="blocked"]')).toBeNull();
+      } else {
+        expect.soft(host!.querySelector('[data-state="blocked"]')?.textContent)
+          .toContain("The database or required tables are currently unavailable");
+      }
+      expect.soft(host!.textContent).not.toContain("Macro Data is currently unavailable");
+      expect(getMacroStatus).toHaveBeenCalledTimes(index + 1);
+      expect(getMacroSnapshot).toHaveBeenCalledTimes(index + 1);
+      dispose();
+    }
+  });
+
+  it("switches locale without refetching either status leg", async () => {
+    await renderMacro();
+    expect(getMacroStatus).toHaveBeenCalledOnce();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("總經資料");
+    expect(host!.textContent).toContain("FEDFUNDS");
+    expect(host!.textContent).toContain("12 筆已儲存");
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(getMacroStatus).toHaveBeenCalledOnce();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("Macro Data");
+    expect(host!.textContent).toContain("FEDFUNDS");
+    expect(host!.textContent).toContain("12 stored");
+    expect(host!.textContent).toContain("2026-07-01");
   });
 });

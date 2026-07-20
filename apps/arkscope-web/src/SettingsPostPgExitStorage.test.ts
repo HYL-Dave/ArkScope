@@ -2,9 +2,11 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, TaskRoute, TradingDayCoverage } from "./api";
+import { formatSystemTimestamp } from "./timeDisplay";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -16,6 +18,7 @@ const mocked = vi.hoisted(() => ({
   marketError: null as Error | null,
   macroError: null as Error | null,
   macroSnapshotError: null as Error | null,
+  coverage: null as TradingDayCoverage | null,
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -93,6 +96,8 @@ const coverage: TradingDayCoverage = {
   provider_errors: [],
 };
 
+mocked.coverage = coverage;
+
 const newsStatus: NewsStatus = {
   market_db: "/tmp/market.db",
   exists: true,
@@ -152,11 +157,12 @@ vi.mock("./api", async (importOriginal) => {
       if (mocked.macroSnapshotError) throw mocked.macroSnapshotError;
       return mocked.macroSnapshot!;
     }),
-    getTradingDayCoverage: vi.fn(async () => coverage),
+    getTradingDayCoverage: vi.fn(async () => mocked.coverage!),
     getNewsStatus: vi.fn(async () => newsStatus),
   };
 });
 
+import { getMarketDataStatus, getTradingDayCoverage } from "./api";
 import { SettingsView } from "./Settings";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -169,6 +175,11 @@ function dispose() {
   host = null;
 }
 
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+  vi.clearAllMocks();
+});
+
 afterEach(() => {
   dispose();
   mocked.marketStatus = marketStatus;
@@ -177,9 +188,10 @@ afterEach(() => {
   mocked.marketError = null;
   mocked.macroError = null;
   mocked.macroSnapshotError = null;
+  mocked.coverage = coverage;
 });
 
-async function renderSettings() {
+async function renderSettings(developerMode = false) {
   window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
@@ -187,7 +199,7 @@ async function renderSettings() {
   await act(async () => {
     root!.render(React.createElement(SettingsView, {
       runtime: null,
-      developerMode: false,
+      developerMode,
       onRuntimeChanged: vi.fn(),
     }));
   });
@@ -267,5 +279,123 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.querySelector('[data-state="partial"]')).not.toBeNull();
     expect(host!.textContent).not.toContain("RAW_MACRO_SNAPSHOT_TRANSPORT_DETAIL");
     expect(host!.textContent).not.toMatch(/SQLite|PG fallback|local-only/);
+  });
+
+  it("renders English market data and storage outcomes", async () => {
+    await i18n.changeLanguage("en");
+    await renderSettings();
+
+    const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
+    if (!storage) throw new Error("missing Market Data section");
+    expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
+    expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))
+      .toEqual([
+        "Market Data",
+        "Prices",
+        "News",
+        "IV",
+        "Fundamentals",
+        "Financial Cache",
+        "Latest Incremental Update",
+      ]);
+    expect(storage.textContent).toContain(
+      "2,324,487 rows · 149 tickers · latest 2026-07-03T20:00:00+0000",
+    );
+    expect(storage.textContent).toContain(
+      `24 rows (7 valid · 17 expired) · latest fetch ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
+    );
+    expect(storage.textContent).toContain("No incremental update yet");
+
+    const coveragePanel = Array.from(storage.querySelectorAll("h2")).find((heading) =>
+      heading.textContent === "Trading-day / Price Coverage")?.parentElement?.parentElement;
+    if (!coveragePanel) throw new Error("missing trading-day coverage panel");
+    expect(coveragePanel.textContent).toContain("Days");
+    expect(Array.from(coveragePanel.querySelectorAll("th")).map((node) => node.textContent))
+      .toEqual(["Date", "Status", "Maximum bars", "Covered", "Missing", "Partial tickers", ""]);
+    expect(getMarketDataStatus).toHaveBeenCalledOnce();
+    expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+  });
+
+  it("keeps corrected single-locale headings without migration narration", async () => {
+    await renderSettings();
+
+    const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
+    const news = host!.querySelector('[data-settings-anchor="news_storage"]');
+    const macro = host!.querySelector('[data-settings-anchor="macro_storage"]');
+    expect(Array.from(storage?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
+      .toEqual(["市場資料", "交易日 / 價格覆蓋"]);
+    expect(Array.from(news?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
+      .toEqual(["新聞資料"]);
+    expect(Array.from(macro?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
+      .toEqual(["總經資料"]);
+    expect(host!.textContent).not.toMatch(
+      /Market Data|Trading-day coverage|News Data|PG fallback|PostgreSQL exit|SQLite|一次性遷移/,
+    );
+  });
+
+  it("hides storage provider errors outside Developer Mode", async () => {
+    const syncDiagnostic = "RAW_MARKET_SYNC_DETAIL";
+    const providerDiagnostic = "RAW_COVERAGE_PROVIDER_DETAIL";
+    mocked.marketStatus = {
+      ...marketStatus,
+      sync: {
+        ...marketStatus.sync,
+        prices: {
+          last_success: null,
+          last_error: syncDiagnostic,
+          rows_added: 0,
+          updated_at: "2026-07-20T03:00:00Z",
+        },
+      },
+    };
+    mocked.coverage = {
+      ...coverage,
+      days: [{
+        date: "2026-07-18",
+        is_trading_day: true,
+        reason: "regular_trading_day",
+        holiday: null,
+        session_complete: true,
+        coverage_status: "partial",
+        max_observed_bar_count: 26,
+        full: 1,
+        well_covered: 1,
+        partial: 0,
+        missing: 1,
+        covered: 1,
+        missing_tickers: ["AAPL"],
+        partial_tickers: [],
+      }],
+      provider_errors: [{
+        ticker: "AAPL",
+        interval: "15min",
+        last_error: providerDiagnostic,
+        updated_at: "2026-07-20T03:00:00Z",
+      }],
+    };
+
+    const openCoverageRow = () => {
+      const row = Array.from(host!.querySelectorAll<HTMLTableRowElement>("tbody tr")).find((candidate) =>
+        candidate.textContent?.includes("2026-07-18"));
+      if (!row) throw new Error("missing planted coverage row");
+      act(() => row.click());
+    };
+
+    await renderSettings(false);
+    openCoverageRow();
+    expect(host!.textContent).toContain("增量更新失敗");
+    expect(host!.textContent).toContain("Provider 錯誤");
+    expect(host!.textContent).not.toContain(syncDiagnostic);
+    expect(host!.textContent).not.toContain(providerDiagnostic);
+    expect(host!.querySelector(".developer-diagnostics")).toBeNull();
+
+    dispose();
+    await renderSettings(true);
+    openCoverageRow();
+    expect(host!.querySelector(".developer-diagnostics")).not.toBeNull();
+    expect(host!.textContent).toContain(syncDiagnostic);
+    expect(host!.textContent).toContain(providerDiagnostic);
+    expect(getMarketDataStatus).toHaveBeenCalledTimes(2);
+    expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);
   });
 });
