@@ -228,6 +228,9 @@ describe("post-PG-exit storage panels", () => {
       "覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日",
     );
     expect(storage!.textContent).toContain("點開可看缺漏與 partial 標的、以及 provider 錯誤。");
+    expect(storage!.textContent).toContain(
+      "full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。",
+    );
     expect(storage!.textContent).toContain("全部標的 149 檔");
     expect(host!.textContent).toContain("價格");
     expect(host!.textContent).toContain("價格 —");
@@ -341,6 +344,9 @@ describe("post-PG-exit storage panels", () => {
       .toBe(true);
     expect(storage.textContent).toContain("Days");
     expect(storage.textContent).toContain("Universe 149 tickers");
+    expect(storage.textContent).toContain(
+      "Full, partial, and missing are drill-downs relative to the best-covered ticker for that day.",
+    );
     expect(Array.from(storage.querySelectorAll("table th")).map((node) => node.textContent))
       .toEqual(["Date", "Status", "Maximum bars", "Covered", "Missing", "Partial tickers", ""]);
     const coverageRow = Array.from(storage.querySelectorAll<HTMLTableRowElement>("tbody tr"))
