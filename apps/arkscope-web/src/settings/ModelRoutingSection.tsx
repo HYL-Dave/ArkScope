@@ -24,7 +24,9 @@ import {
 } from "../modelRoutingUx";
 import { effortOptionsForModel } from "../researchModels";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { modelReasonLabel } from "./settingsBackendCopy";
 import {
+  settingsEffortDescription,
   settingsEffortLabel,
   settingsTaskLabel,
   settingsThinkingLabel,
@@ -55,31 +57,6 @@ function modelGroupLabel(group: ModelEntryGroupId, t: SettingsT): string {
   }
 }
 
-function modelReasonLabel(reason: string, t: SettingsT): string {
-  switch (reason) {
-    case "missing_active_credential":
-      return t(($) => $.models.credentials.missing);
-    case "task_auth_mode_unsupported":
-      return t(($) => $.models.compatibility.unsupported);
-    case "task_test_unsupported":
-      return t(($) => $.models.test.unsupported);
-    case "task_capability_missing":
-      return t(($) => $.models.compatibility.missingCapability);
-    case "model_not_visible":
-      return t(($) => $.models.compatibility.modelNotVisible);
-    case "model_not_in_registry":
-      return t(($) => $.models.custom.unknown);
-    case "discovery_unavailable":
-      return t(($) => $.models.catalog.unavailable);
-    case "provider_call_failed":
-      return t(($) => $.models.test.failed);
-    case "reauth_required":
-      return t(($) => $.providers.openAI.tokenExpired);
-    default:
-      return reason;
-  }
-}
-
 function authModeLabel(authMode: string, t: SettingsT): string {
   switch (authMode) {
     case "api_key":
@@ -104,15 +81,27 @@ function providerLabel(provider: ModelProvider, t: SettingsT): string {
 function modelEntrySuffix(entry: ModelEntryWithReason, t: SettingsT): string | null {
   if (entry.disabledReason) return modelReasonLabel(entry.disabledReason, t);
   if (entry.compatibility === "legacy_unverified") {
-    return t(($) => $.models.compatibility.legacyMode);
+    return t(($) => $.models.compatibility.unverified);
   }
-  if (entry.status === "advanced" || entry.status === "seed") {
-    return t(($) => $.models.groups.advanced);
-  }
+  if (entry.status === "advanced") return t(($) => $.models.compatibility.advanced);
+  if (entry.status === "seed") return t(($) => $.models.compatibility.unverified);
   if (entry.status === "route" && entry.reason_code) {
     return modelReasonLabel(entry.reason_code, t);
   }
   return null;
+}
+
+function modelCatalogStateLabel(cacheState: string | undefined, t: SettingsT): string {
+  switch (cacheState) {
+    case "ok":
+      return t(($) => $.models.catalog.visibleListLoaded);
+    case "seed_only":
+      return t(($) => $.models.catalog.seedOnly);
+    case "never_discovered":
+      return t(($) => $.models.catalog.neverDiscovered);
+    default:
+      return t(($) => $.models.catalog.unavailable);
+  }
 }
 
 function DeveloperDiagnostics({
@@ -228,6 +217,9 @@ export function ModelRoutingSection({
             row.model,
             selectedEntry?.effort_options,
           );
+          const selectedEffort = effortOptions.some(
+            (item) => item.id === (row.effort || "default"),
+          ) ? (row.effort || "default") : "default";
           const currentTest = testState[task.id];
           const testIsCurrent = !!(
             currentTest?.snapshot
@@ -264,7 +256,7 @@ export function ModelRoutingSection({
 
               {envLocked ? (
                 <p className="warn-text">
-                  {t(($) => $.models.route.authority)}: {routeBadge.label}
+                  {t(($) => $.models.route.envOverrideDetail)}
                 </p>
               ) : null}
               {developerMode ? (
@@ -309,16 +301,10 @@ export function ModelRoutingSection({
                   <>
                     <strong>{context.label}</strong>
                     <span>{authModeLabel(context.auth_mode, t)}</span>
-                    <span>
-                      {providerBlock?.cache_state === "ok"
-                        ? t(($) => $.models.groups.available)
-                        : providerBlock?.cache_state === "seed_only"
-                          ? t(($) => $.models.catalog.seedOnly)
-                          : t(($) => $.models.catalog.unavailable)}
-                    </span>
+                    <span>{modelCatalogStateLabel(providerBlock?.cache_state, t)}</span>
                     {providerBlock?.discovered_at && (
                       <span>
-                        {t(($) => $.models.metrics.testedAt, {
+                        {t(($) => $.models.metrics.verifiedAt, {
                           timestamp: formatSystemTimestamp(providerBlock.discovered_at),
                         })}
                       </span>
@@ -342,7 +328,10 @@ export function ModelRoutingSection({
               </div>
 
               {compatMode ? (
-                <p className="warn-text">{t(($) => $.models.compatibility.legacyMode)}</p>
+                <p className="warn-text">
+                  {t(($) => $.models.compatibility.legacyMode)}{" "}
+                  {t(($) => $.models.compatibility.restartSidecar)}
+                </p>
               ) : null}
 
               {!row.custom ? (
@@ -388,7 +377,11 @@ export function ModelRoutingSection({
                       className="field-help"
                       aria-label={`${t(($) => $.models.fields.model)} ${task.id}`}
                     >
-                      {disabledReasons.map((reason) => modelReasonLabel(reason, t)).join("; ")}
+                      {t(($) => $.models.compatibility.unavailableReasons, {
+                        value: disabledReasons
+                          .map((reason) => modelReasonLabel(reason, t))
+                          .join("; "),
+                      })}
                     </p>
                   )}
                   <button
@@ -406,7 +399,7 @@ export function ModelRoutingSection({
                   <input
                     aria-label={`${t(($) => $.models.custom.label)} ${task.id}`}
                     value={row.model}
-                    placeholder={t(($) => $.models.custom.placeholder)}
+                    placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
                     onChange={(event) => updateTask(task.id, {
                       ...row,
                       model: event.currentTarget.value.trim(),
@@ -419,7 +412,7 @@ export function ModelRoutingSection({
                     className="btn-ghost small model-custom-toggle"
                     onClick={() => updateTask(task.id, { ...row, custom: false })}
                   >
-                    {t(($) => $.actions.cancel)}
+                    {t(($) => $.models.custom.returnToList)}
                   </button>
                 </div>
               )}
@@ -428,9 +421,7 @@ export function ModelRoutingSection({
                 <span>{t(($) => $.models.fields.effort)}</span>
                 <select
                   aria-label={`${t(($) => $.models.fields.effort)} ${task.id}`}
-                  value={effortOptions.some((item) => item.id === (row.effort || "default"))
-                    ? (row.effort || "default")
-                    : "default"}
+                  value={selectedEffort}
                   onChange={(event) => updateTask(task.id, {
                     ...row,
                     effort: event.currentTarget.value,
@@ -442,6 +433,9 @@ export function ModelRoutingSection({
                     </option>
                   ))}
                 </select>
+                <span className="field-help">
+                  {settingsEffortDescription(row.provider, selectedEffort, t)}
+                </span>
               </label>
 
               <div className="model-thinking-line">
@@ -455,7 +449,6 @@ export function ModelRoutingSection({
                 models={modelsByProvider[row.provider] ?? []}
                 selected={row.model}
                 custom={row.custom}
-                developerMode={developerMode}
                 t={t}
               />
 
@@ -470,18 +463,24 @@ export function ModelRoutingSection({
                     ? t(($) => $.models.test.running)
                     : t(($) => $.models.test.run)}
                 </button>
+                {context?.auth_mode.includes("oauth") ? (
+                  <span className="muted tiny">{t(($) => $.models.test.subscriptionQuota)}</span>
+                ) : null}
                 {routeIsOverridable(effectiveRoute?.source ?? "default") && (
                   <button
                     type="button"
                     className="btn-ghost small"
-                    aria-label={`${t(($) => $.actions.reset)} ${task.id}`}
+                    aria-label={`${t(($) => $.models.route.resetToFallback)} ${task.id}`}
                     onClick={() => void onReset(task.id)}
                   >
-                    {t(($) => $.actions.reset)}
+                    {t(($) => $.models.route.resetToFallback)}
                   </button>
                 )}
               </div>
 
+              {currentTest && !testIsCurrent ? (
+                <p className="muted tiny">{t(($) => $.models.test.stale)}</p>
+              ) : null}
               {currentTest?.result && testIsCurrent && (
                 <TaskModelTestStatus
                   result={currentTest.result}
@@ -516,7 +515,9 @@ function TaskModelTestStatus({
       <span>{t(($) => $.models.metrics.testedAt, { timestamp: formatSystemTimestamp(result.tested_at) })}</span>
       {result.fallback_effort && (
         <p className="muted tiny">
-          {t(($) => $.models.fields.effort)}: {settingsEffortLabel(result.fallback_effort, t)}
+          {t(($) => $.models.test.fallbackEffort, {
+            value: settingsEffortLabel(result.fallback_effort, t),
+          })}
         </p>
       )}
       {developerMode ? <DeveloperDiagnostics diagnostics={[result.warning]} t={t} /> : null}
@@ -527,19 +528,24 @@ function ModelNotes({
   models,
   selected,
   custom,
-  developerMode,
   t,
 }: {
   models: ModelOption[];
   selected: string;
   custom: boolean;
-  developerMode: boolean;
   t: SettingsT;
 }) {
   if (custom) {
-    return <p className="muted tiny">{t(($) => $.models.custom.unknown)}</p>;
+    return <p className="muted tiny">{t(($) => $.models.custom.guidance)}</p>;
   }
   const model = models.find((m) => m.id === selected);
-  if (!model || !developerMode) return null;
-  return <DeveloperDiagnostics diagnostics={[model.notes]} t={t} />;
+  if (!model) return null;
+  return (
+    <div className="model-note">
+      <span>{t(($) => $.models.metrics.speed, { value: model.speed })}</span>
+      <span>{t(($) => $.models.metrics.costTier, { value: model.cost_tier })}</span>
+      <span>{t(($) => $.models.metrics.verifiedAt, { timestamp: model.verified_at })}</span>
+      {model.notes ? <p>{model.notes}</p> : null}
+    </div>
+  );
 }

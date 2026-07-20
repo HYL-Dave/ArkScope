@@ -55,6 +55,7 @@ const settings = {
       failure: "無法載入模型目錄。",
     },
     routes: {
+      saveBlocked: "本次變更尚未儲存：請先到 Provider 登入與憑證完成 {{value}}所選 provider 的登入。",
       saved: "模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。",
       saveFailed: "無法儲存任務路由。",
       imported: "已從設定檔匯入任務路由到 profile DB。匯入：{{count}}；因不完整或不一致而略過：{{value}}。",
@@ -138,7 +139,7 @@ const settings = {
   models: {
     section: {
       title: "任務模型路由",
-      description: "登入由 Provider 管理；這裡決定每個任務使用的 provider、模型與 effort。",
+      description: "登入在 Providers 管理；這裡只決定每個任務使用哪個 provider、模型與 effort。",
     },
     tasks: {
       cardSynthesis: {
@@ -156,6 +157,8 @@ const settings = {
     },
     route: {
       authority: "路由權威",
+      envOverrideDetail: "目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。",
+      resetToFallback: "重設為 fallback",
       sources: {
         env: "env 覆蓋",
         db: "DB（已儲存）",
@@ -177,7 +180,9 @@ const settings = {
       loading: "正在載入模型目錄…",
       unavailable: "暫時無法讀取模型探索狀態",
       select: "選擇模型…",
+      visibleListLoaded: "已取得可見模型清單",
       seedOnly: "此通道無法線上列出模型。",
+      neverDiscovered: "尚未探索此登入的模型",
       verifyAgain: "重新驗證列表",
     },
     credentials: {
@@ -190,6 +195,10 @@ const settings = {
     },
     compatibility: {
       legacyMode: "未驗證（舊 sidecar 相容模式）。",
+      advanced: "進階",
+      unverified: "未驗證",
+      restartSidecar: "請重啟／更新 sidecar 後再執行模型測試。",
+      unavailableReasons: "不可選：{{value}}",
       missingCapability: "缺少任務能力",
       unsupported: "此登入方式不支援這個任務",
       modelNotVisible: "此登入的探索清單未顯示此模型",
@@ -205,6 +214,8 @@ const settings = {
       placeholder: "輸入 model ID",
       use: "使用自訂模型",
       unknown: "自訂／未知模型，尚未驗證能力",
+      guidance: "這個 model id 不在 seed catalog；請用 Providers 的 discovery/test 確認此 credential 是否可用。",
+      returnToList: "返回模型列表",
     },
     effort: {
       default: "預設",
@@ -214,6 +225,25 @@ const settings = {
       high: "高",
       xhigh: "極高",
       max: "最大",
+    },
+    effortDescriptions: {
+      openai: {
+        default: "不送 effort；實際檔位由目前模型與後端決定。",
+        none: "明確送出 none；這不是未設定或供應商預設。",
+        low: "Low reasoning effort.",
+        medium: "Balanced reasoning effort.",
+        high: "High reasoning effort for more difficult synthesis.",
+        xhigh: "SDK-supported high-end reasoning effort; only use if the selected model/account accepts it.",
+        max: "Maximum reasoning effort; currently supported by {{sourceId}} models.",
+      },
+      anthropic: {
+        default: "Do not send output_config.effort; use the Claude API default.",
+        low: "Lower effort via Anthropic output_config.effort.",
+        medium: "Medium effort via Anthropic output_config.effort.",
+        high: "High effort via Anthropic output_config.effort.",
+        xhigh: "Extra-high effort via Anthropic output_config.effort where available.",
+        max: "Maximum effort via Anthropic output_config.effort where available.",
+      },
     },
     thinking: {
       none: "無特殊 thinking 行為",
@@ -228,20 +258,26 @@ const settings = {
       succeeded: "實際測試通過",
       failed: "provider 實際呼叫失敗",
       unsupported: "此登入方式尚不支援實際測試",
+      subscriptionQuota: "消耗訂閱額度，非 API 帳單",
+      stale: "選擇已變更——重新測試",
+      fallbackEffort: "使用的 fallback effort：{{value}}。",
     },
     metrics: {
       latency: "延遲 {{value}} ms",
       testedAt: "測試時間 {{timestamp}}",
+      speed: "速度：{{value}}",
+      costTier: "成本級別：{{value}}",
+      verifiedAt: "驗證時間：{{timestamp}}",
     },
-    resetSuccess: "已移除儲存的路由，將使用 fallback。",
+    resetSuccess: "已移除 profile DB 中儲存的路由，將改用設定檔／內建 fallback。",
   },
   runtime: {
     fixed: {
       title: "固定 AI 任務執行限制",
-      description: "設定 AI 卡片生成與翻譯的模型執行上界。",
+      description: "較高 effort 的模型可能需要更久；這裡只控制最長等待時間，不會變更模型或 effort。",
       fields: {
-        cardSynthesis: "AI 卡片生成逾時",
-        cardTranslation: "卡片翻譯逾時",
+        cardSynthesis: "AI 卡片生成 - 模型執行上限（秒）",
+        cardTranslation: "卡片翻譯 - 模型執行上限（秒）",
       },
       help: {
         seconds: "以秒為單位。",
@@ -249,24 +285,25 @@ const settings = {
         maximum: "最大值為 {{value}} 秒。",
       },
       dirty: "固定任務執行限制有未儲存的變更。",
-      saved: "固定任務執行限制已儲存。",
-      reset: "固定任務執行限制已還原。",
+      saved: "固定 AI 任務執行限制已儲存到 profile DB。",
+      reset: "固定 AI 任務執行限制已重設為環境變數／內建預設。",
     },
     research: {
       title: "AI 研究執行限制",
-      description: "設定 AI 研究 session 與單次工具執行限制。",
+      description: "控制單次 AI 研究的工具輪數與 subscription driver timeout。API-key 路徑目前只套用 max turns；切頁不中斷與並行會由 server-owned run manager 解決。",
       fields: {
         maxToolCalls: "最多工具呼叫次數",
         sessionTimeout: "Session 逾時",
         perToolTimeout: "單次工具逾時",
       },
       help: {
-        session: "限制整個 AI 研究 session 的執行時間。",
-        perTool: "限制每次工具呼叫可使用的時間。",
+        maxToolCalls: "模型可連續呼叫工具的最大輪數；API-key 與 subscription Research 都會套用。",
+        session: "subscription driver 的整體牆鐘時間；0 代表不設整體 timeout。",
+        perTool: "subscription driver 裡單一 ArkScope 工具呼叫的 timeout。",
       },
       dirty: "AI 研究執行限制有未儲存的變更。",
-      saved: "AI 研究執行限制已儲存。",
-      reset: "AI 研究執行限制已還原。",
+      saved: "AI 研究執行限制已儲存到 profile DB。",
+      reset: "AI 研究執行限制已重設為設定檔／內建預設。",
     },
   },
   providers: {

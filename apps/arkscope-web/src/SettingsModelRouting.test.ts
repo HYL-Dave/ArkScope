@@ -183,7 +183,18 @@ describe("Settings model route save gate", () => {
     await flush();
 
     expect(save.disabled).toBe(true);
-    expect(host.textContent).toContain("AI 研究: 尚未設定此 provider 的登入");
+    const blocked = host.querySelector("#route-save-blocked")!;
+    expect(blocked.textContent).toBe(
+      "本次變更尚未儲存：請先到 Provider 登入與憑證完成 AI 研究所選 provider 的登入。",
+    );
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    expect(host.querySelector("#route-save-blocked")).toBe(blocked);
+    expect(blocked.textContent).toBe(
+      "These changes were not saved. Complete the selected provider sign-in for AI Research under Provider Sign-in and Credentials first.",
+    );
+    expect(save.disabled).toBe(true);
   });
 
   it("wires the fixed-task panel to one atomic settings request", async () => {
@@ -269,12 +280,14 @@ describe("Settings model route save gate", () => {
     });
     expect(onRuntimeChanged).toHaveBeenCalledOnce();
     const outcome = host.querySelector(".ok-text")!;
-    expect(outcome.textContent).toBe("固定任務執行限制已儲存。");
+    expect(outcome.textContent).toBe("固定 AI 任務執行限制已儲存到 profile DB。");
 
     await act(async () => { await i18n.changeLanguage("en"); });
 
     expect(host.querySelector(".ok-text")).toBe(outcome);
-    expect(outcome.textContent).toBe("Fixed task runtime limits saved.");
+    expect(outcome.textContent).toBe(
+      "Fixed AI task runtime limits were saved to the profile DB.",
+    );
   });
 
   it("opens an enabled section from a sequenced shell request", async () => {
@@ -488,7 +501,9 @@ describe("Settings model route save gate", () => {
     const restoredAnthropic = Array.from(restored.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "Anthropic")!;
     expect(restoredAnthropic.getAttribute("aria-pressed")).toBe("true");
-    expect(host.textContent).toContain("AI 研究: 尚未設定此 provider 的登入");
+    expect(host.textContent).toContain(
+      "本次變更尚未儲存：請先到 Provider 登入與憑證完成 AI 研究所選 provider 的登入。",
+    );
   });
 
   it("preserves_discovery_state_across_workflow_tab_unmounts", async () => {
@@ -580,6 +595,9 @@ describe("Settings model route save gate", () => {
     expect(models.textContent).toContain("Card Translation");
     expect(models.textContent).toContain("AI Research");
     expect(models.textContent).toContain("Generate source-grounded AI cards.");
+    expect(models.textContent).toContain(
+      "Do not send effort; the current model and backend determine the effective level.",
+    );
     expect(models.textContent).not.toContain("BACKEND TASK");
     expect(models.textContent).not.toContain("BACKEND EFFORT");
   });

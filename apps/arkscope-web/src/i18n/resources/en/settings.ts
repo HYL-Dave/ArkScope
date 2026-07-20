@@ -56,6 +56,7 @@ const settings = {
       failure: "Could not load the model catalog.",
     },
     routes: {
+      saveBlocked: "These changes were not saved. Complete the selected provider sign-in for {{value}} under Provider Sign-in and Credentials first.",
       saved: "Task routes saved to the profile DB (the profile file remains the fallback and import/export mirror).",
       saveFailed: "Could not save task routes.",
       imported: "Imported task routes from the profile file into the profile DB. Imported: {{count}}; skipped as incomplete or inconsistent: {{value}}.",
@@ -157,6 +158,8 @@ const settings = {
     },
     route: {
       authority: "Route authority",
+      envOverrideDetail: "The environment currently controls this route. You can save a DB value, but runtime continues to follow the environment override.",
+      resetToFallback: "Reset to fallback",
       sources: {
         env: "Environment override",
         db: "DB (saved)",
@@ -178,7 +181,9 @@ const settings = {
       loading: "Loading the model catalog...",
       unavailable: "Model discovery status is temporarily unavailable",
       select: "Select a model...",
+      visibleListLoaded: "Visible model list loaded",
       seedOnly: "This channel cannot list models online.",
+      neverDiscovered: "Models have not been discovered for this sign-in",
       verifyAgain: "Verify list again",
     },
     credentials: {
@@ -191,6 +196,10 @@ const settings = {
     },
     compatibility: {
       legacyMode: "Unverified (legacy sidecar compatibility mode).",
+      advanced: "Advanced",
+      unverified: "Unverified",
+      restartSidecar: "Restart or update the sidecar before running a live model test.",
+      unavailableReasons: "Unavailable: {{value}}",
       missingCapability: "Task capability is missing",
       unsupported: "This sign-in method does not support the task",
       modelNotVisible: "This model does not appear in the discovery list for this sign-in",
@@ -206,6 +215,8 @@ const settings = {
       placeholder: "Enter a model ID",
       use: "Use a custom model",
       unknown: "Custom or unknown model; capabilities are unverified",
+      guidance: "This model ID is not in the seed catalog. Use Providers discovery and testing to confirm whether this credential can use it.",
+      returnToList: "Return to model list",
     },
     effort: {
       default: "Default",
@@ -215,6 +226,25 @@ const settings = {
       high: "High",
       xhigh: "Extra high",
       max: "Maximum",
+    },
+    effortDescriptions: {
+      openai: {
+        default: "Do not send effort; the current model and backend determine the effective level.",
+        none: "Explicitly send none; this is not unset or the provider default.",
+        low: "Low reasoning effort.",
+        medium: "Balanced reasoning effort.",
+        high: "High reasoning effort for more difficult synthesis.",
+        xhigh: "SDK-supported high-end reasoning effort; only use if the selected model/account accepts it.",
+        max: "Maximum reasoning effort; currently supported by {{sourceId}} models.",
+      },
+      anthropic: {
+        default: "Do not send output_config.effort; use the Claude API default.",
+        low: "Lower effort via Anthropic output_config.effort.",
+        medium: "Medium effort via Anthropic output_config.effort.",
+        high: "High effort via Anthropic output_config.effort.",
+        xhigh: "Extra-high effort via Anthropic output_config.effort where available.",
+        max: "Maximum effort via Anthropic output_config.effort where available.",
+      },
     },
     thinking: {
       none: "No special thinking behavior",
@@ -229,20 +259,26 @@ const settings = {
       succeeded: "Live test passed",
       failed: "The live provider call failed",
       unsupported: "This sign-in method does not yet support live testing",
+      subscriptionQuota: "Uses subscription quota, not API billing.",
+      stale: "The selection changed. Run the test again.",
+      fallbackEffort: "Fallback effort used: {{value}}.",
     },
     metrics: {
       latency: "Latency: {{value}} ms",
       testedAt: "Tested {{timestamp}}",
+      speed: "Speed: {{value}}",
+      costTier: "Cost tier: {{value}}",
+      verifiedAt: "Verified: {{timestamp}}",
     },
-    resetSuccess: "The saved route was removed; its fallback will be used.",
+    resetSuccess: "The route saved in the profile DB was removed; the profile file or built-in fallback will be used.",
   },
   runtime: {
     fixed: {
       title: "Fixed AI Task Runtime Limits",
-      description: "Set upper runtime limits for AI card synthesis and translation.",
+      description: "Higher-effort models may need more time. These limits only control the maximum wait; they do not change the model or effort.",
       fields: {
-        cardSynthesis: "AI card synthesis timeout",
-        cardTranslation: "Card translation timeout",
+        cardSynthesis: "AI Card Synthesis - model runtime limit (seconds)",
+        cardTranslation: "Card Translation - model runtime limit (seconds)",
       },
       help: {
         seconds: "Measured in seconds.",
@@ -250,24 +286,25 @@ const settings = {
         maximum: "The maximum is {{value}} seconds.",
       },
       dirty: "Fixed task runtime limits have unsaved changes.",
-      saved: "Fixed task runtime limits saved.",
-      reset: "Fixed task runtime limits reset.",
+      saved: "Fixed AI task runtime limits were saved to the profile DB.",
+      reset: "Fixed AI task runtime limits were reset to the environment or built-in defaults.",
     },
     research: {
       title: "AI Research Runtime Limits",
-      description: "Set limits for AI Research sessions and individual tool runs.",
+      description: "Controls tool turns and subscription-driver timeouts for one AI Research run. The API-key path currently applies only the maximum turn limit; page navigation continuity and concurrency remain owned by the server run manager.",
       fields: {
         maxToolCalls: "Maximum tool calls",
         sessionTimeout: "Session timeout",
         perToolTimeout: "Per-tool timeout",
       },
       help: {
-        session: "Limits the total runtime of an AI Research session.",
-        perTool: "Limits how long each tool call may run.",
+        maxToolCalls: "The maximum number of consecutive tool-call turns; applies to both API-key and subscription Research.",
+        session: "The subscription driver's total wall-clock time; 0 disables the overall timeout.",
+        perTool: "The timeout for one ArkScope tool call inside the subscription driver.",
       },
       dirty: "AI Research runtime limits have unsaved changes.",
-      saved: "AI Research runtime limits saved.",
-      reset: "AI Research runtime limits reset.",
+      saved: "AI Research runtime limits were saved to the profile DB.",
+      reset: "AI Research runtime limits were reset to the profile file or built-in defaults.",
     },
   },
   providers: {

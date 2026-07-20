@@ -80,7 +80,18 @@ describe("ResearchRuntimeSection", () => {
     expect(input("session_timeout_s").value).toBe("1800");
     expect(input("per_tool_timeout_s").value).toBe("75");
     expect(host!.textContent).toContain("DB（已儲存）");
-    expect(host!.textContent).toContain("設定 AI 研究 session 與單次工具執行限制。");
+    expect(host!.textContent).toContain(
+      "控制單次 AI 研究的工具輪數與 subscription driver timeout。API-key 路徑目前只套用 max turns；切頁不中斷與並行會由 server-owned run manager 解決。",
+    );
+    expect(host!.textContent).toContain(
+      "模型可連續呼叫工具的最大輪數；API-key 與 subscription Research 都會套用。",
+    );
+    expect(host!.textContent).toContain(
+      "subscription driver 的整體牆鐘時間；0 代表不設整體 timeout。",
+    );
+    expect(host!.textContent).toContain(
+      "subscription driver 裡單一 ArkScope 工具呼叫的 timeout。",
+    );
   });
 
   it("saves numeric values", () => {
@@ -160,6 +171,18 @@ describe("ResearchRuntimeSection", () => {
     expect(host!.textContent).toContain("Maximum tool calls");
     expect(host!.textContent).toContain("Session timeout");
     expect(host!.textContent).toContain("Per-tool timeout");
+    expect(host!.textContent).toContain(
+      "Controls tool turns and subscription-driver timeouts for one AI Research run. The API-key path currently applies only the maximum turn limit; page navigation continuity and concurrency remain owned by the server run manager.",
+    );
+    expect(host!.textContent).toContain(
+      "The maximum number of consecutive tool-call turns; applies to both API-key and subscription Research.",
+    );
+    expect(host!.textContent).toContain(
+      "The subscription driver's total wall-clock time; 0 disables the overall timeout.",
+    );
+    expect(host!.textContent).toContain(
+      "The timeout for one ArkScope tool call inside the subscription driver.",
+    );
     expect(input("session_timeout_s")).toBe(session);
     expect(input("max_tool_calls").value).toBe("60");
     expect(session.value).toBe("1200");

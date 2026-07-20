@@ -8,6 +8,7 @@ import type {
   AssistantStance,
   InvestorPreset,
   InvestorProfile,
+  ModelProvider,
   ModelTask,
   TaskRoute,
 } from "../api";
@@ -15,6 +16,7 @@ import { initializeI18n } from "../i18n/resources";
 import { mismatchLabel, stanceLabel } from "../personalizationDisplay";
 import type { SettingsAnchorId, SettingsGroupId } from "./settingsRegistry";
 import {
+  settingsEffortDescription,
   settingsEffortLabel,
   settingsGroupLabel,
   settingsInvestorHorizonLabel,
@@ -219,6 +221,25 @@ describe("Settings static copy authority", () => {
       {
         locale: "zh-Hant" as const,
         efforts: ["預設", "無", "低", "中", "高", "極高", "最大"],
+        descriptions: {
+          openai: [
+            "不送 effort；實際檔位由目前模型與後端決定。",
+            "明確送出 none；這不是未設定或供應商預設。",
+            "Low reasoning effort.",
+            "Balanced reasoning effort.",
+            "High reasoning effort for more difficult synthesis.",
+            "SDK-supported high-end reasoning effort; only use if the selected model/account accepts it.",
+            "Maximum reasoning effort; currently supported by GPT-5.6 models.",
+          ],
+          anthropic: [
+            "Do not send output_config.effort; use the Claude API default.",
+            "Lower effort via Anthropic output_config.effort.",
+            "Medium effort via Anthropic output_config.effort.",
+            "High effort via Anthropic output_config.effort.",
+            "Extra-high effort via Anthropic output_config.effort where available.",
+            "Maximum effort via Anthropic output_config.effort where available.",
+          ],
+        },
         thinking: [
           "無特殊 thinking 行為",
           "使用手動 thinking budget",
@@ -230,6 +251,25 @@ describe("Settings static copy authority", () => {
       {
         locale: "en" as const,
         efforts: ["Default", "None", "Low", "Medium", "High", "Extra high", "Maximum"],
+        descriptions: {
+          openai: [
+            "Do not send effort; the current model and backend determine the effective level.",
+            "Explicitly send none; this is not unset or the provider default.",
+            "Low reasoning effort.",
+            "Balanced reasoning effort.",
+            "High reasoning effort for more difficult synthesis.",
+            "SDK-supported high-end reasoning effort; only use if the selected model/account accepts it.",
+            "Maximum reasoning effort; currently supported by GPT-5.6 models.",
+          ],
+          anthropic: [
+            "Do not send output_config.effort; use the Claude API default.",
+            "Lower effort via Anthropic output_config.effort.",
+            "Medium effort via Anthropic output_config.effort.",
+            "High effort via Anthropic output_config.effort.",
+            "Extra-high effort via Anthropic output_config.effort where available.",
+            "Maximum effort via Anthropic output_config.effort where available.",
+          ],
+        },
         thinking: [
           "No special thinking behavior",
           "Uses a manual thinking budget",
@@ -243,8 +283,18 @@ describe("Settings static copy authority", () => {
     for (const expected of cases) {
       const t = settingsT(expected.locale);
       expect(efforts.map((id) => settingsEffortLabel(id, t))).toEqual(expected.efforts);
+      const providerEfforts: Record<ModelProvider, string[]> = {
+        openai: efforts,
+        anthropic: ["default", "low", "medium", "high", "xhigh", "max"],
+      };
+      expect(providerEfforts.openai.map((id) => settingsEffortDescription("openai", id, t)))
+        .toEqual(expected.descriptions.openai);
+      expect(providerEfforts.anthropic.map((id) => settingsEffortDescription("anthropic", id, t)))
+        .toEqual(expected.descriptions.anthropic);
       expect(thinking.map((id) => settingsThinkingLabel(id, t))).toEqual(expected.thinking);
       expect(settingsEffortLabel("future_effort", t)).toBe("future_effort");
+      expect(settingsEffortDescription("openai", "future_effort", t)).toBe("future_effort");
+      expect(settingsEffortDescription("anthropic", "future_effort", t)).toBe("future_effort");
       expect(settingsThinkingLabel("future_thinking", t)).toBe("future_thinking");
     }
   });
@@ -346,6 +396,7 @@ describe("Settings static copy authority", () => {
     expect(selectorCalls).toHaveLength(translationCalls.length);
     expect(`${source}\n${backendSource}`).not.toMatch(/\bt\([^)]*(?:\+|`|\[)/);
     expect(resources).not.toMatch(/NVDA|gpt-[\w.-]+|sk-(?:ant-)?[\w-]+|https?:\/\//i);
+    expect(source).toContain('sourceId: "GPT-5.6"');
     expect(source).toMatch(/function stableUnknown\(value: never\): string/);
 
     const exported = [...source.matchAll(/export (?:type|function)\s+(\w+)/g)]
@@ -357,6 +408,7 @@ describe("Settings static copy authority", () => {
       "settingsSearchValues",
       "settingsTaskLabel",
       "settingsEffortLabel",
+      "settingsEffortDescription",
       "settingsThinkingLabel",
       "settingsRouteSourceLabel",
       "settingsInvestorPresetLabel",

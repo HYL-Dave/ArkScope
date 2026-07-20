@@ -4,6 +4,7 @@ import type {
   AssistantStance,
   InvestorPreset,
   InvestorProfile,
+  ModelProvider,
   ModelTask,
   TaskRoute,
 } from "../api";
@@ -174,6 +175,53 @@ export function settingsEffortLabel(id: string, t: SettingsT): string {
       return t(($) => $.models.effort.max);
     default:
       return id;
+  }
+}
+
+export function settingsEffortDescription(
+  provider: ModelProvider,
+  id: string,
+  t: SettingsT,
+): string {
+  switch (provider) {
+    case "openai":
+      switch (id) {
+        case "default":
+          return t(($) => $.models.effortDescriptions.openai.default);
+        case "none":
+          return t(($) => $.models.effortDescriptions.openai.none);
+        case "low":
+          return t(($) => $.models.effortDescriptions.openai.low);
+        case "medium":
+          return t(($) => $.models.effortDescriptions.openai.medium);
+        case "high":
+          return t(($) => $.models.effortDescriptions.openai.high);
+        case "xhigh":
+          return t(($) => $.models.effortDescriptions.openai.xhigh);
+        case "max":
+          return t(($) => $.models.effortDescriptions.openai.max, {
+            sourceId: "GPT-5.6",
+          });
+        default:
+          return id;
+      }
+    case "anthropic":
+      switch (id) {
+        case "default":
+          return t(($) => $.models.effortDescriptions.anthropic.default);
+        case "low":
+          return t(($) => $.models.effortDescriptions.anthropic.low);
+        case "medium":
+          return t(($) => $.models.effortDescriptions.anthropic.medium);
+        case "high":
+          return t(($) => $.models.effortDescriptions.anthropic.high);
+        case "xhigh":
+          return t(($) => $.models.effortDescriptions.anthropic.xhigh);
+        case "max":
+          return t(($) => $.models.effortDescriptions.anthropic.max);
+        default:
+          return id;
+      }
   }
 }
 

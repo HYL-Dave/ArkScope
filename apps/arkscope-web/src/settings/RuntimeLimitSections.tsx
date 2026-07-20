@@ -237,6 +237,7 @@ export function ResearchRuntimeSection({
             value={draft.max_tool_calls}
             onChange={(e) => setDraft((prev) => ({ ...prev, max_tool_calls: e.target.value }))}
           />
+          <span className="field-help">{t(($) => $.runtime.research.help.maxToolCalls)}</span>
         </label>
         <label className="field">
           <span>{t(($) => $.runtime.research.fields.sessionTimeout)}</span>

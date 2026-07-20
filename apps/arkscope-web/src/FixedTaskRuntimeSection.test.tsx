@@ -102,8 +102,8 @@ describe("FixedTaskRuntimeSection", () => {
 
     expect(input("card_synthesis_model_timeout_s").value).toBe("1200");
     expect(input("card_translation_model_timeout_s").value).toBe("600");
-    expect(host!.textContent).toContain("AI 卡片生成逾時");
-    expect(host!.textContent).toContain("卡片翻譯逾時");
+    expect(host!.textContent).toContain("AI 卡片生成 - 模型執行上限（秒）");
+    expect(host!.textContent).toContain("卡片翻譯 - 模型執行上限（秒）");
     expect(host!.textContent).toContain("env 覆蓋");
     expect(host!.textContent).toContain("內建預設");
     expect(button("重設")).toBeTruthy();
@@ -143,7 +143,8 @@ describe("FixedTaskRuntimeSection", () => {
 
   it("explains effort sensitivity without changing route quality", () => {
     render();
-    expect(host!.textContent).toContain("設定 AI 卡片生成與翻譯的模型執行上界。");
+    expect(host!.textContent).toContain("較高 effort 的模型可能需要更久");
+    expect(host!.textContent).toContain("不會變更模型或 effort");
     expect(host!.textContent).toContain("以秒為單位。");
   });
 
@@ -197,8 +198,11 @@ describe("FixedTaskRuntimeSection", () => {
     await act(async () => { await i18n.changeLanguage("en"); });
 
     expect(host!.textContent).toContain("Fixed AI Task Runtime Limits");
-    expect(host!.textContent).toContain("AI card synthesis timeout");
-    expect(host!.textContent).toContain("Card translation timeout");
+    expect(host!.textContent).toContain("AI Card Synthesis - model runtime limit (seconds)");
+    expect(host!.textContent).toContain("Card Translation - model runtime limit (seconds)");
+    expect(host!.textContent).toContain(
+      "Higher-effort models may need more time. These limits only control the maximum wait; they do not change the model or effort.",
+    );
     expect(input("card_synthesis_model_timeout_s")).toBe(synthesis);
     expect(input("card_translation_model_timeout_s")).toBe(translation);
     expect(synthesis.value).toBe("1200");

@@ -678,11 +678,11 @@ export function SettingsView({
             </div>
             {routeSaveBlocks.length > 0 ? (
               <p id="route-save-blocked" className="warn-text">
-                {routeSaveBlocks
-                  .map(({ task }) => (
-                    `${settingsTaskLabel(task, t)}: ${t(($) => $.models.credentials.missing)}`
-                  ))
-                  .join("; ")}
+                {t(($) => $.workspace.routes.saveBlocked, {
+                  value: routeSaveBlocks
+                    .map(({ task }) => settingsTaskLabel(task, t))
+                    .join(", "),
+                })}
               </p>
             ) : null}
             <details className="settings-model-transfer">
