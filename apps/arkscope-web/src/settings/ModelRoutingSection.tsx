@@ -232,8 +232,11 @@ export function ModelRoutingSection({
                 </div>
                 <span
                   className={`route-source ${routeBadge.tone}`}
-                  aria-label={[t(($) => $.models.route.authority), " ", routeBadge.label].join("")}
-                  title={effectiveRoute?.source ?? "default"}
+                  aria-label={[
+                    t(($) => $.models.route.authority),
+                    " ",
+                    routeSourceBadge(effectiveRoute?.source ?? "default", t).label,
+                  ].join("")}
                 >
                   {routeBadge.label}
                 </span>

@@ -640,7 +640,10 @@ describe("ModelRoutingSection provider-first UX", () => {
     const defaultRouteBadge = host!.querySelector(
       '[data-testid="route-card_synthesis"] .route-source',
     )!;
-    expect(defaultRouteBadge.getAttribute("title")).toBe("default");
+    expect(defaultRouteBadge.getAttribute("aria-label")).toBe(
+      "Route authority Built-in default",
+    );
+    expect(defaultRouteBadge.getAttribute("title")).toBeNull();
     expect(host!.textContent).not.toContain("BACKEND TASK");
     expect(host!.textContent).not.toContain("BACKEND EFFORT");
   });
