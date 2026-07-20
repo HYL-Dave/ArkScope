@@ -111,11 +111,62 @@ function resetButtons(): HTMLButtonElement[] {
     (b) => b.textContent?.trim() === "重設為 fallback") as HTMLButtonElement[];
 }
 
+type RouteFieldLabel = "provider" | "model" | "custom-model" | "effort";
+
+function labelledControl(card: Element, field: RouteFieldLabel): HTMLElement {
+  const testId = card.getAttribute("data-testid");
+  if (!testId?.startsWith("route-")) throw new Error("missing route test id");
+  const task = testId.slice("route-".length);
+  const taskLabelId = `model-route-${task}-task-label`;
+  const fieldLabelId = `model-route-${task}-${field}-label`;
+  const control = card.querySelector(
+    `[aria-labelledby="${taskLabelId} ${fieldLabelId}"]`,
+  );
+  if (!(control instanceof HTMLElement)) throw new Error(`missing labelled ${field} control`);
+  return control;
+}
+
+function resolvedLabelledByText(element: Element): string {
+  const labelledBy = element.getAttribute("aria-labelledby");
+  if (!labelledBy) throw new Error("missing aria-labelledby");
+  return labelledBy.split(/\s+/).map((id) => {
+    const label = document.getElementById(id);
+    if (!label) throw new Error(`missing label node ${id}`);
+    return label.textContent?.trim() ?? "";
+  }).join(" ");
+}
+
+function expectLocalizedControlName(
+  card: Element,
+  field: RouteFieldLabel,
+  expected: string,
+): HTMLElement {
+  const control = labelledControl(card, field);
+  const name = resolvedLabelledByText(control);
+  expect(name).toBe(expected);
+  expect(name).not.toMatch(/ai_research|card_synthesis|card_translation/);
+  return control;
+}
+
+function expectNoKnownTaskId(value: string | null | undefined) {
+  expect(value ?? "").not.toMatch(/ai_research|card_synthesis|card_translation/);
+}
+
 describe("ModelRoutingSection reset affordance", () => {
-  it("shows '重設為 fallback' ONLY for a DB-authoritative route", () => {
+  it("shows '重設為 fallback' ONLY for a DB-authoritative route", async () => {
     render();
     // one DB route (ai_research) → exactly one reset button; the profile/default rows have none
     expect(resetButtons()).toHaveLength(1);
+    const reset = resetButtons()[0];
+    expect(reset.getAttribute("aria-label")).toBeNull();
+    expect(reset.textContent?.trim()).toBe("重設為 fallback");
+    expectNoKnownTaskId(reset.textContent);
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(reset.textContent?.trim()).toBe("Reset to fallback");
+    expect(reset.getAttribute("aria-label")).toBeNull();
+    expectNoKnownTaskId(reset.textContent);
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
 
     disposeRender();
     const envCatalog = catalog();
@@ -235,6 +286,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     }) as unknown as DraftDispatch;
     const invalidate = vi.fn();
     render(vi.fn(), catalogV2(), onDraft, { onInvalidateTest: invalidate });
+    expectLocalizedControlName(researchCard(), "provider", "AI 研究 Provider");
 
     act(() => buttonByText(researchCard(), "Anthropic").click());
     const updated = drafts.at(-1) as Record<string, { provider: string; model: string; effort: string }>;
@@ -245,7 +297,12 @@ describe("ModelRoutingSection provider-first UX", () => {
   it("renders one selector with four groups and disables ineligible entries with text reasons", () => {
     render(vi.fn(), catalogV2());
     const card = researchCard();
-    const select = card.querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement;
+    const select = expectLocalizedControlName(
+      card,
+      "model",
+      "AI 研究 Model",
+    ) as HTMLSelectElement;
+    expectLocalizedControlName(card, "effort", "AI 研究 Effort");
     expect(Array.from(select.querySelectorAll("optgroup")).map((g) => g.label)).toEqual([
       "可供此任務使用", "此登入可見", "進階／未驗證", "目前路由",
     ]);
@@ -254,11 +311,17 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(luna.textContent).toContain("缺少任務能力");
     expect(luna.getAttribute("title")).toBeNull();
     expect(card.textContent).toContain("不可選：缺少任務能力");
+    const modelLimitHelp = card.querySelector("p.field-help")!;
+    expect(modelLimitHelp.getAttribute("aria-label")).toBeNull();
+    expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
+    expectNoKnownTaskId(modelLimitHelp.textContent);
     expect(Array.from(select.options).find((option) => option.value === "gpt-5.6-terra")?.textContent)
       .toContain("進階");
     const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
-    const translationSelect = translation.querySelector(
-      '[aria-label="Model card_translation"]',
+    const translationSelect = expectLocalizedControlName(
+      translation,
+      "model",
+      "卡片翻譯 Model",
     ) as HTMLSelectElement;
     expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-sonnet-5")?.textContent)
@@ -273,10 +336,10 @@ describe("ModelRoutingSection provider-first UX", () => {
     const card = researchCard();
     expect(card.querySelector('[aria-label="顯示進階模型"]')).toBeNull();
     expect(card.querySelector("details")).toBeNull();
-    expect(card.querySelectorAll('select[aria-label="Model ai_research"]')).toHaveLength(1);
+    expect(card.querySelectorAll('[aria-labelledby$="-model-label"]')).toHaveLength(1);
   });
 
-  it("reveals a clearly marked custom id input", () => {
+  it("reveals a clearly marked custom id input", async () => {
     const drafts: unknown[] = [];
     const onDraft = vi.fn((updater: unknown) => {
       if (typeof updater === "function") {
@@ -303,12 +366,23 @@ describe("ModelRoutingSection provider-first UX", () => {
       },
     });
     const openAiCustom = researchCard();
-    expect(openAiCustom.querySelector('[aria-label="自訂 model ID ai_research"]')).toBeTruthy();
-    expect((openAiCustom.querySelector("input") as HTMLInputElement).placeholder).toBe("gpt-…");
+    const customInput = expectLocalizedControlName(
+      openAiCustom,
+      "custom-model",
+      "AI 研究 自訂 model ID",
+    ) as HTMLInputElement;
+    expect(customInput.placeholder).toBe("gpt-…");
     expect(openAiCustom.textContent).toContain(
       "這個 model id 不在 seed catalog；請用 Providers 的 discovery/test 確認此 credential 是否可用。",
     );
     expect(buttonByText(openAiCustom, "返回模型列表")).toBeTruthy();
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(expectLocalizedControlName(
+      openAiCustom,
+      "custom-model",
+      "AI Research Custom model ID",
+    )).toBe(customInput);
 
     disposeRender();
     render(vi.fn(), catalogV2(), undefined, {
@@ -345,7 +419,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat);
     const card = researchCard();
     expect(card.textContent).toContain("尚未設定此 provider 的登入");
-    expect((card.querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement).disabled).toBe(true);
+    expect((labelledControl(card, "model") as HTMLSelectElement).disabled).toBe(true);
     expect(card.textContent).toContain("前往 Provider 登入與憑證");
   });
 
@@ -397,7 +471,7 @@ describe("ModelRoutingSection provider-first UX", () => {
         card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
       },
     });
-    const miniEffort = researchCard().querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    const miniEffort = labelledControl(researchCard(), "effort") as HTMLSelectElement;
     expect(Array.from(miniEffort.options).map((option) => option.value)).toEqual([
       "default", "none", "low", "medium", "high", "xhigh",
     ]);
@@ -417,7 +491,7 @@ describe("ModelRoutingSection provider-first UX", () => {
         card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
       },
     });
-    const lunaEffort = researchCard().querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    const lunaEffort = labelledControl(researchCard(), "effort") as HTMLSelectElement;
     expect(Array.from(lunaEffort.options).map((option) => option.value)).toEqual([
       "default", "none", "low", "medium", "high", "xhigh", "max",
     ]);
@@ -435,7 +509,7 @@ describe("ModelRoutingSection provider-first UX", () => {
 
   it("keeps route-pinned unknown models in the current route group", () => {
     render(vi.fn(), catalogV2());
-    const select = researchCard().querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement;
+    const select = labelledControl(researchCard(), "model") as HTMLSelectElement;
     const routeGroup = Array.from(select.querySelectorAll("optgroup"))
       .find((group) => group.label === "目前路由")!;
     expect(routeGroup.textContent).toContain("mystery-model");
@@ -544,7 +618,17 @@ describe("ModelRoutingSection provider-first UX", () => {
         "Advanced / unverified",
         "Current route",
       ]);
-    const effort = research.querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    expectLocalizedControlName(research, "provider", "AI Research Provider");
+    expectLocalizedControlName(research, "model", "AI Research Model");
+    const effort = expectLocalizedControlName(
+      research,
+      "effort",
+      "AI Research Effort",
+    ) as HTMLSelectElement;
+    const modelLimitHelp = research.querySelector("p.field-help")!;
+    expect(modelLimitHelp.getAttribute("aria-label")).toBeNull();
+    expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
+    expectNoKnownTaskId(modelLimitHelp.textContent);
     expect(Array.from(effort.options).map((option) => option.textContent)).toContain("Low");
     expect(research.textContent).toContain("Low reasoning effort.");
     expect(research.textContent).toContain(
@@ -574,8 +658,16 @@ describe("ModelRoutingSection provider-first UX", () => {
       modelsByProvider: { anthropic: [MODELS[1]], openai: [selectedModel] },
     });
     const research = researchCard();
-    const model = research.querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement;
-    const effort = research.querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    const model = expectLocalizedControlName(
+      research,
+      "model",
+      "AI 研究 Model",
+    ) as HTMLSelectElement;
+    const effort = expectLocalizedControlName(
+      research,
+      "effort",
+      "AI 研究 Effort",
+    ) as HTMLSelectElement;
     const openai = buttonByText(research, "OpenAI");
     expect(model.value).toBe("gpt-5.4-mini");
     expect(effort.value).toBe("low");
@@ -590,8 +682,16 @@ describe("ModelRoutingSection provider-first UX", () => {
     await act(async () => { await i18n.changeLanguage("en"); });
 
     const translatedResearch = researchCard();
-    expect(translatedResearch.querySelector('[aria-label="Model ai_research"]')).toBe(model);
-    expect(translatedResearch.querySelector('[aria-label="Effort ai_research"]')).toBe(effort);
+    expect(expectLocalizedControlName(
+      translatedResearch,
+      "model",
+      "AI Research Model",
+    )).toBe(model);
+    expect(expectLocalizedControlName(
+      translatedResearch,
+      "effort",
+      "AI Research Effort",
+    )).toBe(effort);
     expect(model.value).toBe("gpt-5.4-mini");
     expect(effort.value).toBe("low");
     expect(buttonByText(translatedResearch, "OpenAI")).toBe(openai);

@@ -156,7 +156,7 @@ describe("bundled i18n resources", () => {
         missingModel: "儲存前，請為 AI 研究選擇或輸入模型。",
         environmentRoute: "目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。",
         unavailable: "不可選：缺少任務能力",
-        maximumEffort: "Maximum reasoning effort; currently supported by GPT-5.6 models.",
+        maximumEffort: "使用最大 reasoning effort；目前只有 GPT-5.6 系列 model 支援。",
         fixedDescription: "較高 effort 的模型可能需要更久；這裡只控制最長等待時間，不會變更模型或 effort。",
         fixedSaved: "固定 AI 任務執行限制已儲存到 profile DB。",
         fixedReset: "固定 AI 任務執行限制已重設為環境變數／內建預設。",

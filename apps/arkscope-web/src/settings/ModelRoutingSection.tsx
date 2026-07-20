@@ -24,6 +24,7 @@ import {
 } from "../modelRoutingUx";
 import { effortOptionsForModel } from "../researchModels";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { modelReasonLabel } from "./settingsBackendCopy";
 import {
   settingsEffortDescription,
@@ -102,27 +103,6 @@ function modelCatalogStateLabel(cacheState: string | undefined, t: SettingsT): s
     default:
       return t(($) => $.models.catalog.unavailable);
   }
-}
-
-function DeveloperDiagnostics({
-  diagnostics,
-  t,
-}: {
-  diagnostics: readonly (string | null | undefined)[];
-  t: SettingsT;
-}) {
-  const visible = diagnostics.filter((value): value is string => !!value);
-  if (!visible.length) return null;
-  return (
-    <details className="developer-diagnostics">
-      <summary>{t(($) => $.errors.diagnostics.title)}</summary>
-      {visible.map((value, index) => (
-        <p key={`${index}:${value}`}>
-          <strong>{t(($) => $.errors.diagnostics.detail)}</strong>: {value}
-        </p>
-      ))}
-    </details>
-  );
 }
 
 export interface DraftRoute extends DraftRouteValue {}
@@ -239,11 +219,16 @@ export function ModelRoutingSection({
             || !!currentTest?.loading
           );
           const routeBadge = routeSourceBadge(effectiveRoute?.source ?? "default", t);
+          const taskLabelId = `model-route-${task.id}-task-label`;
+          const providerLabelId = `model-route-${task.id}-provider-label`;
+          const modelLabelId = `model-route-${task.id}-model-label`;
+          const customModelLabelId = `model-route-${task.id}-custom-model-label`;
+          const effortLabelId = `model-route-${task.id}-effort-label`;
           return (
             <div className="settings-panel" key={task.id} data-testid={`route-${task.id}`}>
               <div className="settings-panel-head">
                 <div>
-                  <h2>{settingsTaskLabel(task.id, t)}</h2>
+                  <h2 id={taskLabelId}>{settingsTaskLabel(task.id, t)}</h2>
                   <p className="muted">{taskDescription(task.id, t)}</p>
                 </div>
                 <span
@@ -264,11 +249,11 @@ export function ModelRoutingSection({
               ) : null}
 
               <div className="field">
-                <span>{t(($) => $.models.fields.provider)}</span>
+                <span id={providerLabelId}>{t(($) => $.models.fields.provider)}</span>
                 <div
                   className="model-provider-toggle"
                   role="group"
-                  aria-label={`${t(($) => $.models.fields.provider)} ${task.id}`}
+                  aria-labelledby={`${taskLabelId} ${providerLabelId}`}
                 >
                   {(["openai", "anthropic"] as ModelProvider[]).map((provider) => (
                     <button
@@ -336,9 +321,9 @@ export function ModelRoutingSection({
 
               {!row.custom ? (
                 <div className="field">
-                  <span>{t(($) => $.models.fields.model)}</span>
+                  <span id={modelLabelId}>{t(($) => $.models.fields.model)}</span>
                   <select
-                    aria-label={`${t(($) => $.models.fields.model)} ${task.id}`}
+                    aria-labelledby={`${taskLabelId} ${modelLabelId}`}
                     value={entries.some((entry) => entry.id === row.model) ? row.model : ""}
                     disabled={modelSelectDisabled}
                     onChange={(event) => {
@@ -373,10 +358,7 @@ export function ModelRoutingSection({
                     ))}
                   </select>
                   {disabledReasons.length > 0 && (
-                    <p
-                      className="field-help"
-                      aria-label={`${t(($) => $.models.fields.model)} ${task.id}`}
-                    >
+                    <p className="field-help">
                       {t(($) => $.models.compatibility.unavailableReasons, {
                         value: disabledReasons
                           .map((reason) => modelReasonLabel(reason, t))
@@ -395,9 +377,9 @@ export function ModelRoutingSection({
                 </div>
               ) : (
                 <div className="field">
-                  <span>{t(($) => $.models.custom.label)}</span>
+                  <span id={customModelLabelId}>{t(($) => $.models.custom.label)}</span>
                   <input
-                    aria-label={`${t(($) => $.models.custom.label)} ${task.id}`}
+                    aria-labelledby={`${taskLabelId} ${customModelLabelId}`}
                     value={row.model}
                     placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
                     onChange={(event) => updateTask(task.id, {
@@ -418,9 +400,9 @@ export function ModelRoutingSection({
               )}
 
               <label className="field">
-                <span>{t(($) => $.models.fields.effort)}</span>
+                <span id={effortLabelId}>{t(($) => $.models.fields.effort)}</span>
                 <select
-                  aria-label={`${t(($) => $.models.fields.effort)} ${task.id}`}
+                  aria-labelledby={`${taskLabelId} ${effortLabelId}`}
                   value={selectedEffort}
                   onChange={(event) => updateTask(task.id, {
                     ...row,
@@ -470,7 +452,6 @@ export function ModelRoutingSection({
                   <button
                     type="button"
                     className="btn-ghost small"
-                    aria-label={`${t(($) => $.models.route.resetToFallback)} ${task.id}`}
                     onClick={() => void onReset(task.id)}
                   >
                     {t(($) => $.models.route.resetToFallback)}

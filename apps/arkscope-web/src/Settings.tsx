@@ -34,6 +34,7 @@ import type {
 } from "./shell/navigation";
 import { DataSourcesSection } from "./settings/DataSourcesSection";
 import { DataStorageSection } from "./settings/DataStorageSection";
+import { DeveloperDiagnostics } from "./settings/DeveloperDiagnostics";
 import { MacroStorageSection } from "./settings/MacroStorageSection";
 import {
   ModelRoutingSection,
@@ -901,13 +902,8 @@ export function SettingsView({
       {runtimeOutcomePresentation?.tone === "ok" ? (
         <p className="ok-text">{runtimeOutcomePresentation.message}</p>
       ) : null}
-      {developerMode && runtimeDiagnostic ? (
-        <details className="developer-diagnostics">
-          <summary>{t(($) => $.errors.diagnostics.title)}</summary>
-          <p>
-            <strong>{t(($) => $.errors.diagnostics.detail)}</strong>: {runtimeDiagnostic}
-          </p>
-        </details>
+      {developerMode ? (
+        <DeveloperDiagnostics diagnostics={[runtimeDiagnostic]} t={t} />
       ) : null}
       {blockedNotice ? (
         <InlineAlert state="blocked" title={t(($) => $.workspace.blocked.title)}>

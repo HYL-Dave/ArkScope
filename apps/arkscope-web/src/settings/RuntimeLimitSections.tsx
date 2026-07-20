@@ -10,19 +10,8 @@ import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
-import type { SettingsT } from "./settingsCopy";
+import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 
-function RuntimeDiagnostics({ warning, t }: { warning: string | null; t: SettingsT }) {
-  if (!warning) return null;
-  return (
-    <details className="developer-diagnostics">
-      <summary>{t(($) => $.errors.diagnostics.title)}</summary>
-      <p>
-        <strong>{t(($) => $.errors.diagnostics.detail)}</strong>: {warning}
-      </p>
-    </details>
-  );
-}
 function parseFixedTaskTimeout(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -129,11 +118,20 @@ export function FixedTaskRuntimeSection({
               />
               <span className={`route-source ${badge.tone}`}>{badge.label}</span>
               <span className="field-help">{t(($) => $.runtime.fixed.help.seconds)}</span>
-              {developerMode ? <RuntimeDiagnostics warning={row.settings.warning} t={t} /> : null}
             </label>
           );
         })}
       </div>
+
+      {developerMode ? (
+        <DeveloperDiagnostics
+          diagnostics={[
+            settings.card_synthesis.warning,
+            settings.card_translation.warning,
+          ]}
+          t={t}
+        />
+      ) : null}
 
       <div className="settings-actions">
         <button
@@ -223,7 +221,7 @@ export function ResearchRuntimeSection({
         <span className={`route-source ${badge.tone}`}>{badge.label}</span>
       </div>
 
-      {developerMode ? <RuntimeDiagnostics warning={settings.warning} t={t} /> : null}
+      {developerMode ? <DeveloperDiagnostics diagnostics={[settings.warning]} t={t} /> : null}
 
       <div className="runtime-limit-grid">
         <label className="field">

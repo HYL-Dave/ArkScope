@@ -762,7 +762,9 @@ describe("Settings model route save gate", () => {
       inputSetter?.call(custom, "gpt-custom-preserved");
       custom.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const effort = research.querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    const effort = research.querySelector(
+      '[aria-labelledby="model-route-ai_research-task-label model-route-ai_research-effort-label"]',
+    ) as HTMLSelectElement;
     const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     await act(async () => {
       selectSetter?.call(effort, "high");
@@ -783,7 +785,9 @@ describe("Settings model route save gate", () => {
     expect(translatedResearch).toBe(research);
     expect(translatedResearch.querySelector("input")).toBe(custom);
     expect(custom.value).toBe("gpt-custom-preserved");
-    expect(translatedResearch.querySelector('[aria-label="Effort ai_research"]')).toBe(effort);
+    expect(translatedResearch.querySelector(
+      '[aria-labelledby="model-route-ai_research-task-label model-route-ai_research-effort-label"]',
+    )).toBe(effort);
     expect(effort.value).toBe("high");
     expect(openai.getAttribute("aria-pressed")).toBe("true");
     expect(save.disabled).toBe(false);

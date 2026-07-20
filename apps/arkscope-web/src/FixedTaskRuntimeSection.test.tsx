@@ -226,5 +226,9 @@ describe("FixedTaskRuntimeSection", () => {
     expect(host!.textContent).toContain("Developer diagnostics");
     expect(host!.textContent).toContain("PLANTED SYNTHESIS RUNTIME WARNING");
     expect(host!.textContent).toContain("PLANTED TRANSLATION RUNTIME WARNING");
+    const diagnostics = Array.from(host!.querySelectorAll("details.developer-diagnostics"));
+    expect(diagnostics.length).toBeGreaterThan(0);
+    expect(diagnostics.every((details) => details.closest("label") === null)).toBe(true);
+    expect(host!.querySelector("label details.developer-diagnostics")).toBeNull();
   });
 });
