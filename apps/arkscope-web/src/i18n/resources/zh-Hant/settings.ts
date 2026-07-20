@@ -52,10 +52,11 @@ const settings = {
     },
     catalog: {
       loading: "正在載入模型目錄…",
-      failure: "無法載入模型目錄。",
+      failure: "無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。",
     },
     routes: {
       saveBlocked: "本次變更尚未儲存：請先到 Provider 登入與憑證完成 {{value}}所選 provider 的登入。",
+      missingModel: "儲存前，請為 {{taskLabel}}選擇或輸入模型。",
       saved: "模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。",
       saveFailed: "無法儲存任務路由。",
       imported: "已從設定檔匯入任務路由到 profile DB。匯入：{{count}}；因不完整或不一致而略過：{{value}}。",

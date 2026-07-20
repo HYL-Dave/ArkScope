@@ -53,10 +53,11 @@ const settings = {
     },
     catalog: {
       loading: "Loading the model catalog...",
-      failure: "Could not load the model catalog.",
+      failure: "Could not load AI model settings. Refresh the page, or check the connection under System / Health.",
     },
     routes: {
       saveBlocked: "These changes were not saved. Complete the selected provider sign-in for {{value}} under Provider Sign-in and Credentials first.",
+      missingModel: "Select or enter a model for {{taskLabel}} before saving.",
       saved: "Task routes saved to the profile DB (the profile file remains the fallback and import/export mirror).",
       saveFailed: "Could not save task routes.",
       imported: "Imported task routes from the profile file into the profile DB. Imported: {{count}}; skipped as incomplete or inconsistent: {{value}}.",

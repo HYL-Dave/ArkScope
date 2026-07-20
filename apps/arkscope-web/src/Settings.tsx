@@ -106,6 +106,7 @@ type SettingsNavigationIntent = {
 
 type SettingsRouteOutcome =
   | { kind: "save_succeeded" }
+  | { kind: "missing_model"; task: ModelTask }
   | { kind: "save_failed" }
   | { kind: "import_succeeded"; imported: number; skipped: number }
   | { kind: "import_failed" }
@@ -140,6 +141,13 @@ function settingsRouteOutcomePresentation(
   switch (outcome.kind) {
     case "save_succeeded":
       return { tone: "ok", message: t(($) => $.workspace.routes.saved) };
+    case "missing_model":
+      return {
+        tone: "error",
+        message: t(($) => $.workspace.routes.missingModel, {
+          taskLabel: settingsTaskLabel(outcome.task, t),
+        }),
+      };
     case "save_failed":
       return { tone: "error", message: t(($) => $.workspace.routes.saveFailed) };
     case "import_succeeded":
@@ -431,7 +439,10 @@ export function SettingsView({
       const routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string; effort: string }>> = {};
       for (const task of catalog.tasks) {
         const row = draft[task.id];
-        if (!row || !row.model.trim()) throw new Error("invalid model route");
+        if (!row || !row.model.trim()) {
+          setRouteOutcome({ kind: "missing_model", task: task.id });
+          return;
+        }
         routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort || "default" };
       }
       await saveModelRoutes(routes);

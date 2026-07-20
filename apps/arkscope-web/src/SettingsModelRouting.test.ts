@@ -23,6 +23,7 @@ import type {
 
 const controls = vi.hoisted(() => ({
   saveFixedTaskRuntime: vi.fn(async () => ({ fixed_task_runtime: {} })),
+  saveModelRoutes: vi.fn(),
   discoverModels: vi.fn(),
   catalogPending: null as Promise<ModelCatalog> | null,
   catalogError: null as Error | null,
@@ -101,6 +102,7 @@ vi.mock("./api", async (importOriginal) => {
     }),
     discoverModels: controls.discoverModels,
     saveFixedTaskRuntime: controls.saveFixedTaskRuntime,
+    saveModelRoutes: controls.saveModelRoutes,
   };
 });
 
@@ -117,6 +119,8 @@ beforeEach(async () => {
   controls.discoverModels.mockReset();
   controls.saveFixedTaskRuntime.mockReset();
   controls.saveFixedTaskRuntime.mockResolvedValue({ fixed_task_runtime: {} });
+  controls.saveModelRoutes.mockReset();
+  controls.saveModelRoutes.mockResolvedValue(undefined);
   window.localStorage.clear();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
@@ -386,7 +390,9 @@ describe("Settings model route save gate", () => {
     await flush();
 
     const providers = host.querySelector('[data-settings-anchor="providers"]');
-    expect(providers?.textContent).toContain("無法載入模型目錄。");
+    expect(providers?.textContent).toContain(
+      "無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。",
+    );
     expect(host.textContent).not.toContain("private catalog transport detail");
     await click(tabWithText("個人化"));
     expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
@@ -408,14 +414,50 @@ describe("Settings model route save gate", () => {
     await flush();
 
     const models = host.querySelector('[data-settings-anchor="models"]')!;
-    expect(Array.from(models.querySelectorAll("button")).some((button) => button.textContent?.trim() === "儲存"))
-      .toBe(true);
+    const save = Array.from(models.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!;
+    expect(save).not.toBeNull();
     const transfer = Array.from(models.querySelectorAll("details"))
       .find((details) => details.querySelector("summary")?.textContent === "從設定檔匯入 / 匯出到設定檔");
     expect(transfer?.open).toBe(false);
     expect(Array.from(transfer?.querySelectorAll("button") ?? []).map((button) => button.textContent?.trim()))
       .toEqual(["從設定檔匯入", "匯出到設定檔"]);
     expect(host.querySelector(".ui-page-header-actions")).toBeNull();
+
+    const research = host.querySelector('[data-testid="route-ai_research"]')!;
+    await click(research.querySelector<HTMLButtonElement>(".model-custom-toggle")!);
+    const customModel = research.querySelector<HTMLInputElement>("input")!;
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    await act(async () => {
+      inputSetter?.call(customModel, "   ");
+      customModel.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(save);
+
+    const validationOutcome = host.querySelector(".error-text")!;
+    expect(validationOutcome.textContent).toBe(
+      "儲存前，請為 AI 研究選擇或輸入模型。",
+    );
+    expect(controls.saveModelRoutes).not.toHaveBeenCalled();
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(host.querySelector(".error-text")).toBe(validationOutcome);
+    expect(validationOutcome.textContent).toBe(
+      "Select or enter a model for AI Research before saving.",
+    );
+
+    await act(async () => {
+      inputSetter?.call(customModel, "gpt-restored");
+      customModel.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    controls.saveModelRoutes.mockRejectedValueOnce(
+      new Error("PLANTED ROUTE SAVE TRANSPORT DETAIL"),
+    );
+    await click(save);
+
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+    expect(host.querySelector(".error-text")?.textContent).toBe("Could not save task routes.");
+    expect(host.textContent).not.toContain("PLANTED ROUTE SAVE TRANSPORT DETAIL");
   });
 
   it("opens_fixed_task_runtime_from_a_sequenced_exact_target", async () => {

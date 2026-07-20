@@ -151,7 +151,9 @@ describe("bundled i18n resources", () => {
         investor: "風險意願高於承受能力",
         backlog: "內文佇列：待處理",
         earliest: "最早 2026-07-21T03:04:05Z",
+        catalogFailure: "無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。",
         routeBlocked: "本次變更尚未儲存：請先到 Provider 登入與憑證完成 AI 研究所選 provider 的登入。",
+        missingModel: "儲存前，請為 AI 研究選擇或輸入模型。",
         environmentRoute: "目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。",
         unavailable: "不可選：缺少任務能力",
         maximumEffort: "Maximum reasoning effort; currently supported by GPT-5.6 models.",
@@ -177,7 +179,9 @@ describe("bundled i18n resources", () => {
         investor: "Risk appetite above capacity",
         backlog: "Body queue: Pending",
         earliest: "Earliest retry: 2026-07-21T03:04:05Z",
+        catalogFailure: "Could not load AI model settings. Refresh the page, or check the connection under System / Health.",
         routeBlocked: "These changes were not saved. Complete the selected provider sign-in for AI Research under Provider Sign-in and Credentials first.",
+        missingModel: "Select or enter a model for AI Research before saving.",
         environmentRoute: "The environment currently controls this route. You can save a DB value, but runtime continues to follow the environment override.",
         unavailable: "Unavailable: Task capability is missing",
         maximumEffort: "Maximum reasoning effort; currently supported by GPT-5.6 models.",
@@ -209,8 +213,11 @@ describe("bundled i18n resources", () => {
         .toBe(expected.backlog);
       expect(t(($) => $.dataSources.schedule.backlog.earliest, { timestamp: "2026-07-21T03:04:05Z" }))
         .toBe(expected.earliest);
+      expect(t(($) => $.workspace.catalog.failure)).toBe(expected.catalogFailure);
       expect(t(($) => $.workspace.routes.saveBlocked, { value: expected.task }))
         .toBe(expected.routeBlocked);
+      expect(t(($) => $.workspace.routes.missingModel, { taskLabel: expected.task }))
+        .toBe(expected.missingModel);
       expect(t(($) => $.models.route.envOverrideDetail)).toBe(expected.environmentRoute);
       expect(t(($) => $.models.compatibility.unavailableReasons, {
         value: expected.locale === "en" ? "Task capability is missing" : "缺少任務能力",
@@ -227,10 +234,10 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 519 Settings leaves per locale", () => {
+  it("contains exactly 520 Settings leaves per locale", () => {
     const expectedSubtreeCounts = {
       actions: 18,
-      workspace: 28,
+      workspace: 29,
       registry: 30,
       errors: 13,
       models: 91,
@@ -245,7 +252,7 @@ describe("bundled i18n resources", () => {
 
     for (const locale of ["zh-Hant", "en"] as const) {
       const settings = resources[locale].settings as ResourceTree;
-      expect(flattenResource(settings).size).toBe(519);
+      expect(flattenResource(settings).size).toBe(520);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(1);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(flattenResource(settings[subtree] as ResourceTree).size, `${locale}.${subtree}`)
