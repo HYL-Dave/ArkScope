@@ -644,6 +644,7 @@ export function SettingsView({
           catalog={catalog}
           runtime={runtime}
           discovery={discovery}
+          developerMode={developerMode}
           onRefresh={async () => {
             const refreshed = await getModelCatalog();
             setCatalog(refreshed);

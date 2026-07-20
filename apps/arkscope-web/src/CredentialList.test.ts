@@ -2,7 +2,8 @@
 import React, { useState } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CredentialList } from "./Settings";
 import type { ProviderCredential } from "./api";
@@ -12,6 +13,10 @@ import type { ProviderCredential } from "./api";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -65,6 +70,103 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function renderCredentialList(
+  credentials: ProviderCredential[],
+  extra: Record<string, unknown> = {},
+) {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  act(() => {
+    root!.render(React.createElement(CredentialList, {
+      credentials,
+      renames: {},
+      metadataDrafts: {},
+      onRenameDraft: vi.fn(),
+      onMetadataDraft: vi.fn(),
+      onSaveCredentialDetails: vi.fn(),
+      onSetActive: vi.fn(),
+      onDelete: vi.fn(),
+      onDiscover: vi.fn(),
+      discoverLoadingId: null,
+      ...extra,
+    }));
+  });
+}
+
+async function settleProbe() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+const plantedProbe = {
+  passed: false,
+  probes: [{
+    name: "P2b: ChatGPT backend returns a function-call output item",
+    passed: false,
+    expected: "planted-probe-expected",
+    observed: "planted-probe-observed",
+    error: "planted-probe-error",
+  }],
+};
+
+describe("CredentialList localization", () => {
+  it("renders English credential actions while preserving aliases and masked values", async () => {
+    await i18n.changeLanguage("en");
+    renderCredentialList([cred({
+      label: "planted-alias-value",
+      masked: "sk-ant-...MASKED",
+      active: false,
+      can_discover_models: true,
+    })]);
+
+    expect(host!.textContent).toContain("planted-alias-value");
+    expect(host!.textContent).toContain("sk-ant-...MASKED");
+    expect(host!.textContent).toContain("Set active");
+    expect(host!.textContent).toContain("Save display information");
+    expect(host!.textContent).toContain("View candidate models");
+    expect(host!.textContent).toContain("Delete");
+  });
+
+  it("hides probe expected observed and error fields in normal mode", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => plantedProbe,
+    }));
+    renderCredentialList([cred({})], { developerMode: false });
+    await act(async () => { buttonByText("測試 Claude setup-token").click(); });
+    await settleProbe();
+
+    expect(host!.textContent).toContain("OAuth 驗證未通過");
+    expect(host!.textContent).not.toContain("planted-probe-expected");
+    expect(host!.textContent).not.toContain("planted-probe-observed");
+    expect(host!.textContent).not.toContain("planted-probe-error");
+  });
+
+  it("shows planted probe diagnostics only in Developer Mode", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => plantedProbe,
+    }));
+    renderCredentialList([cred({})], { developerMode: true });
+    await act(async () => { buttonByText("測試 Claude setup-token").click(); });
+    await settleProbe();
+
+    expect(host!.textContent).toContain("開發者診斷");
+    expect(host!.textContent).toContain("預期");
+    expect(host!.textContent).toContain("planted-probe-expected");
+    expect(host!.textContent).toContain("觀察結果");
+    expect(host!.textContent).toContain("planted-probe-observed");
+    expect(host!.textContent).toContain("錯誤");
+    expect(host!.textContent).toContain("planted-probe-error");
+    expect(host!.querySelector(".developer-diagnostics")?.getAttribute("aria-live")).toBeNull();
+  });
+});
+
 describe("CredentialList", () => {
   it("saves alias, account label, and OAuth expiry together from one display-info action", async () => {
     const onSaveCredentialDetails = vi.fn();
@@ -97,13 +199,13 @@ describe("CredentialList", () => {
     });
 
     await act(async () => {
-      const alias = inputByLabel("season alias");
+      const alias = inputByLabel("season · 新增 API key alias");
       changeInput(alias, "PRO");
 
-      const account = inputByLabel("season account label");
+      const account = inputByLabel("season · 帳號／用途標籤（可留空）");
       changeInput(account, "Claude Pro");
 
-      const expires = inputByLabel("season expires at");
+      const expires = inputByLabel("season · 到期日（可留空）");
       changeInput(expires, "2027-06-22");
     });
 
@@ -144,7 +246,8 @@ describe("CredentialList", () => {
     // alias is NOT NULL + the row's primary display name → blanking it is a no-op that keeps
     // the original (unlike the neighbouring account-label/expiry fields, which DO clear on save).
     // So the edit field must not borrow the add/import flow's "可留空" framing.
-    expect(inputByLabel("season alias").placeholder).toBe("必填；留空則保留原名稱");
+    expect(inputByLabel("season · 新增 API key alias").required).toBe(true);
+    expect(inputByLabel("season · 新增 API key alias").placeholder).toBe("新增 API key alias");
   });
 
   it("opens_credential_delete_confirmation_and_cancel_restores_trigger_focus", async () => {
@@ -225,7 +328,7 @@ describe("CredentialList", () => {
     expect(dialog?.textContent).toContain("backup");
     expect(dialog?.textContent).not.toContain("local:8");
     const confirmButton = Array.from(dialog?.querySelectorAll("button") ?? [])
-      .find((button) => button.textContent?.trim() === "刪除 Credential") as HTMLButtonElement | undefined;
+      .find((button) => button.textContent?.trim() === "刪除") as HTMLButtonElement | undefined;
     if (!confirmButton) throw new Error("missing credential-delete confirm button");
     await act(async () => {
       confirmButton.click();
@@ -257,11 +360,11 @@ describe("CredentialList", () => {
       }));
     });
 
-    await act(async () => { buttonByText("測試 token").click(); });
+    await act(async () => { buttonByText("測試 Claude setup-token").click(); });
     expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
       dirty: false,
       busy: true,
-      reason: "Credential 驗證正在進行。",
+      reason: "Provider 登入或 Credential 更新正在進行。",
     });
     response.resolve({
       ok: true,

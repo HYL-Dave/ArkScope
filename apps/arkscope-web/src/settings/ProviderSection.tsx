@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   addCredential,
   cancelOpenAIOAuth,
@@ -41,6 +42,9 @@ import {
 } from "../chatgptOAuth";
 import { formatSystemTimestamp } from "../timeDisplay";
 import { ConfirmDialog } from "../ui";
+import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
+import { modelReasonLabel, settingsErrorPresentation } from "./settingsBackendCopy";
+import type { SettingsT } from "./settingsCopy";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
@@ -57,6 +61,96 @@ type CredentialMetadataDraft = {
   expires_at?: string;
 };
 
+type ProviderNotice =
+  | { kind: "api_key_added"; provider: ModelProvider; makeActive: boolean }
+  | { kind: "claude_imported" }
+  | { kind: "link_copied" }
+  | { kind: "oauth_signed_in" }
+  | { kind: "oauth_signed_in_manual" }
+  | { kind: "active_updated" }
+  | { kind: "display_updated" }
+  | { kind: "deleted" };
+
+type ProviderFailure =
+  | { kind: "empty_key"; provider: ModelProvider }
+  | { kind: "empty_claude_token" }
+  | { kind: "copy_unsupported" }
+  | { kind: "copy_denied" }
+  | { kind: "oauth_timeout" }
+  | { kind: "oauth_error"; detail: string; manualCompletable: boolean }
+  | { kind: "oauth_expired" }
+  | { kind: "missing_code" }
+  | { kind: "request"; error: unknown };
+
+function providerNoticeText(notice: ProviderNotice, t: SettingsT): string {
+  switch (notice.kind) {
+    case "api_key_added":
+      return addApiKeySuccessMessage(notice.provider, notice.makeActive, t);
+    case "claude_imported":
+      return t(($) => $.providers.claude.imported);
+    case "link_copied":
+      return t(($) => $.providers.openAI.copied);
+    case "oauth_signed_in":
+      return t(($) => $.providers.openAI.signedIn);
+    case "oauth_signed_in_manual":
+      return t(($) => $.providers.openAI.signedInManual);
+    case "active_updated":
+      return t(($) => $.providers.credential.activeUpdated);
+    case "display_updated":
+      return t(($) => $.providers.credential.displayUpdated);
+    case "deleted":
+      return t(($) => $.providers.credential.deleted);
+  }
+}
+
+function providerFailureText(failure: ProviderFailure, t: SettingsT): string {
+  switch (failure.kind) {
+    case "empty_key":
+      return t(($) => $.providers.credential.emptyKey, { providerId: failure.provider });
+    case "empty_claude_token":
+      return t(($) => $.providers.claude.emptyToken);
+    case "copy_unsupported":
+      return t(($) => $.providers.openAI.copyUnsupported);
+    case "copy_denied":
+      return t(($) => $.providers.openAI.copyDenied);
+    case "oauth_timeout":
+      return t(($) => $.providers.openAI.callbackTimeout);
+    case "oauth_error":
+      return failure.manualCompletable
+        ? t(($) => $.providers.openAI.callbackTimeout)
+        : t(($) => $.providers.openAI.sessionExpired);
+    case "oauth_expired":
+      return t(($) => $.providers.openAI.sessionExpired);
+    case "missing_code":
+      return t(($) => $.providers.openAI.missingCode);
+    case "request":
+      return settingsErrorPresentation(failure.error, t).message;
+  }
+}
+
+function providerFailureDiagnostic(failure: ProviderFailure | null, t: SettingsT): string | null {
+  if (!failure) return null;
+  if (failure.kind === "oauth_error") return failure.detail;
+  if (failure.kind === "request") return settingsErrorPresentation(failure.error, t).diagnostic;
+  return null;
+}
+
+function discoveryStatusLabel(
+  status: ModelDiscoveryResult["status"],
+  t: SettingsT,
+): string {
+  switch (status) {
+    case "ok":
+      return t(($) => $.dataStorage.available);
+    case "missing_credential":
+      return t(($) => $.models.credentials.missing);
+    case "unsupported":
+      return t(($) => $.models.test.unsupported);
+    case "error":
+      return t(($) => $.providers.discovery.failure);
+  }
+}
+
 export function ProviderSection({
   catalog,
   runtime,
@@ -66,6 +160,7 @@ export function ProviderSection({
   onClearDiscovery,
   onUseModel,
   onNavigationGuardChange,
+  developerMode = false,
 }: {
   catalog: ModelCatalog;
   runtime: RuntimeConfig | null;
@@ -75,7 +170,9 @@ export function ProviderSection({
   onClearDiscovery: (provider: ModelProvider) => void;
   onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  developerMode?: boolean;
 }) {
+  const { t } = useTranslation("settings");
   const [selectedCreds, setSelectedCreds] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newAlias, setNewAlias] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newSecret, setNewSecret] = useState<Partial<Record<ModelProvider, string>>>({});
@@ -90,8 +187,8 @@ export function ProviderSection({
   // use the smart default (collapsed once the provider has any usable credential);
   // a user toggle pins it. Keyed by provider so toggling one card doesn't move others.
   const [setupOpen, setSetupOpen] = useState<Record<string, boolean>>({});
-  const [providerMsg, setProviderMsg] = useState<string | null>(null);
-  const [providerErr, setProviderErr] = useState<string | null>(null);
+  const [providerMsg, setProviderMsg] = useState<ProviderNotice | null>(null);
+  const [providerErr, setProviderErr] = useState<ProviderFailure | null>(null);
   // Claude setup-token import (anthropic only). The token is held in form state
   // only until submit, then cleared — it never persists in React beyond that.
   const [claudeAlias, setClaudeAlias] = useState("");
@@ -149,12 +246,12 @@ export function ProviderSection({
       dirty: providerDirty,
       busy: providerBusy,
       reason: providerBusy
-        ? "Provider 登入或 Credential 更新正在進行。"
+        ? t(($) => $.providers.guard.busy)
         : providerDirty
-          ? "Provider 登入與憑證有未儲存的變更。"
+          ? t(($) => $.providers.guard.dirty)
           : null,
     });
-  }, [onNavigationGuardChange, providerBusy, providerDirty]);
+  }, [onNavigationGuardChange, providerBusy, providerDirty, t]);
 
   useEffect(() => () => {
     onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -172,7 +269,7 @@ export function ProviderSection({
     const alias = (newAlias[provider] ?? "").trim();
     const secret = (newSecret[provider] ?? "").trim();
     if (!secret) {
-      setProviderErr(`${provider}: API key 不可為空`);
+      setProviderErr({ kind: "empty_key", provider });
       return;
     }
     setProviderErr(null);
@@ -182,16 +279,16 @@ export function ProviderSection({
       await addCredential({
         provider,
         auth_type: "api_key",
-        alias: alias || `${provider} key`,
+        alias: alias || `${provider} ${t(($) => $.providers.authModes.apiKey)}`,
         secret,
         make_active: makeActive,
       });
       setNewAlias((prev) => ({ ...prev, [provider]: "" }));
       setNewSecret((prev) => ({ ...prev, [provider]: "" }));
-      setProviderMsg(addApiKeySuccessMessage(provider, makeActive));
+      setProviderMsg({ kind: "api_key_added", provider, makeActive });
       await onRefresh();
     } catch (e) {
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       endCredentialMutation();
     }
@@ -200,7 +297,7 @@ export function ProviderSection({
   async function importClaudeToken(makeActive: boolean) {
     const token = claudeToken.trim();
     if (!token) {
-      setProviderErr("Claude setup-token 不可為空");
+      setProviderErr({ kind: "empty_claude_token" });
       return;
     }
     setProviderErr(null);
@@ -210,7 +307,7 @@ export function ProviderSection({
       await importOAuthCredential({
         provider: "anthropic",
         auth_mode: "claude_code_oauth",
-        alias: claudeAlias.trim() || "Claude subscription",
+        alias: claudeAlias.trim() || t(($) => $.providers.authModes.claudeCodeOAuth),
         token,
         account_label: claudeLabel.trim() || undefined,
         make_active: makeActive,
@@ -218,11 +315,11 @@ export function ProviderSection({
       setClaudeToken(""); // clear the token from state immediately on success
       setClaudeAlias("");
       setClaudeLabel("");
-      setProviderMsg("Claude setup-token 已匯入（存入 token-store，未存入 credential DB）。");
+      setProviderMsg({ kind: "claude_imported" });
       await onRefresh();
     } catch (e) {
       setClaudeToken(""); // also clear on failure — don't keep the token around
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       endCredentialMutation();
     }
@@ -231,14 +328,14 @@ export function ProviderSection({
   async function copyLoginLink() {
     if (!oauth?.authUrl) return;
     if (!navigator.clipboard) {
-      setProviderErr("此瀏覽器不支援自動複製，請從新分頁的網址列手動複製登入連結。");
+      setProviderErr({ kind: "copy_unsupported" });
       return;
     }
     try {
       await navigator.clipboard.writeText(oauth.authUrl);
-      setProviderMsg("登入連結已複製。");
+      setProviderMsg({ kind: "link_copied" });
     } catch {
-      setProviderErr("無法複製連結（瀏覽器剪貼簿權限被拒）。請從新分頁完成登入，或重新點「登入 ChatGPT」。");
+      setProviderErr({ kind: "copy_denied" });
     }
   }
 
@@ -262,28 +359,28 @@ export function ProviderSection({
       if (res.kind === "aborted") return; // a manual completion / cancel superseded this poll
       if (res.kind === "success") {
         setOauth(null);
-        setProviderMsg("ChatGPT 訂閱已登入（token 存入 token-store，未存入 credential DB）。");
+        setProviderMsg({ kind: "oauth_signed_in" });
         await onRefresh();
       } else if (res.kind === "timeout") {
         setOauth((o) => (o ? { ...o, phase: "manual" } : o));
-        setProviderErr("等不到瀏覽器回呼（可能 popup 被擋，或本機 :1455 沒收到）。請改用下方手動貼上授權碼。");
+        setProviderErr({ kind: "oauth_timeout" });
       } else if (res.kind === "error") {
         // surface the backend reason as-is — NO silent fallback to an API key.
         // F4: offer the manual paste ONLY when it can still succeed (the state
         // wasn't consumed by a failed completion) — else reset the flow.
         if (res.manualCompletable) {
           setOauth((o) => (o ? { ...o, phase: "manual" } : o));
-          setProviderErr(`登入失敗：${res.detail}`);
+          setProviderErr({ kind: "oauth_error", detail: res.detail, manualCompletable: true });
         } else {
           setOauth(null);
-          setProviderErr(`登入失敗：${res.detail}（此登入工作階段已失效，請重新點「登入 ChatGPT」）`);
+          setProviderErr({ kind: "oauth_error", detail: res.detail, manualCompletable: false });
         }
       } else {
         setOauth(null);
-        setProviderErr("登入工作階段不存在或已過期，請重新點「登入 ChatGPT」。");
+        setProviderErr({ kind: "oauth_expired" });
       }
     } catch (e) {
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       setPollBusy(false);
     }
@@ -296,6 +393,7 @@ export function ProviderSection({
   // chatgptLoginBusy guard so two flows can't race for the :1455 callback port.
   function startChatGPTRelogin(credentialId: string) {
     setSetupOpen((prev) => ({ ...prev, openai: true }));
+    setSelectedCreds((prev) => ({ ...prev, openai: credentialId }));
     void startChatGPTLogin(false, credentialId);
   }
 
@@ -313,7 +411,7 @@ export function ProviderSection({
     if (!oauth) return;
     const pasted = manualValue.trim();
     if (!pasted) {
-      setProviderErr("請貼上授權碼或回呼網址");
+      setProviderErr({ kind: "missing_code" });
       return;
     }
     setProviderErr(null);
@@ -324,11 +422,11 @@ export function ProviderSection({
       pollToken.current.aborted = true; // manual won — stop the still-running loopback poll
       setManualValue("");
       setOauth(null);
-      setProviderMsg("ChatGPT 訂閱已登入（手動完成；token 存入 token-store）。");
+      setProviderMsg({ kind: "oauth_signed_in_manual" });
       await onRefresh();
     } catch (e) {
       // a bad/expired/forged state or a token-exchange error 400s here — show it, no fallback
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       setManualBusy(false);
     }
@@ -340,10 +438,10 @@ export function ProviderSection({
     beginCredentialMutation();
     try {
       await updateCredential(credentialId, { active: true });
-      setProviderMsg("Active key 已更新。");
+      setProviderMsg({ kind: "active_updated" });
       await onRefresh();
     } catch (e) {
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       endCredentialMutation();
     }
@@ -376,10 +474,10 @@ export function ProviderSection({
         delete next[credentialId];
         return next;
       });
-      setProviderMsg("Credential 顯示資訊已更新。");
+      setProviderMsg({ kind: "display_updated" });
       await onRefresh();
     } catch (e) {
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       endCredentialMutation();
     }
@@ -391,27 +489,29 @@ export function ProviderSection({
     beginCredentialMutation();
     try {
       await deleteCredential(credentialId);
-      setProviderMsg("Credential 已刪除。");
+      setProviderMsg({ kind: "deleted" });
       await onRefresh();
     } catch (e) {
-      setProviderErr(e instanceof Error ? e.message : String(e));
+      setProviderErr({ kind: "request", error: e });
     } finally {
       endCredentialMutation();
     }
   }
 
+  const providerErrorText = providerErr ? providerFailureText(providerErr, t) : null;
+  const providerDiagnostic = providerFailureDiagnostic(providerErr, t);
+
   return (
     <>
       <div className="settings-section-head">
         <div>
-          <h2>Provider 狀態</h2>
-          <p className="muted">
-            Provider/channel 和 task routing 分開管理。這裡顯示本機 credential 狀態；每個 credential 可依其類型做 model discovery / capability test（API key 與 OAuth 方式各自不同）。
-          </p>
+          <h2>{t(($) => $.providers.section.title)}</h2>
+          <p className="muted">{t(($) => $.providers.section.description)}</p>
         </div>
       </div>
-      {providerErr && <p className="error-text">{providerErr}</p>}
-      {providerMsg && <p className="ok-text">{providerMsg}</p>}
+      {providerErrorText && <p className="error-text">{providerErrorText}</p>}
+      {developerMode ? <DeveloperDiagnostics diagnostics={[providerDiagnostic]} t={t} /> : null}
+      {providerMsg && <p className="ok-text">{providerNoticeText(providerMsg, t)}</p>}
       <div className="provider-grid">
         {catalog.providers.map((provider) => {
           const models = catalog.models.filter((m) => m.provider === provider);
@@ -420,7 +520,7 @@ export function ProviderSection({
             (provider === "anthropic" ? runtime?.anthropic.credentials : runtime?.openai.credentials) ??
             [];
           const activeCred = credentials.find((c) => c.active && c.available) ?? null;
-          const pill = credentialPill(activeCred);
+          const pill = credentialPill(activeCred, t);
           // Smart-collapse the setup forms: expanded only when the provider has NO
           // usable credential (the empty-state where setup IS the task); a user
           // toggle (setupOpen[provider]) overrides.
@@ -452,7 +552,11 @@ export function ProviderSection({
               <div className="settings-panel-head">
                 <div>
                   <h2>{provider}</h2>
-                  <p className="muted">{models.length} seed models · direct model id input allowed</p>
+                  <p className="muted">
+                    {t(($) => $.providers.discovery.modelCount, { count: models.length })}
+                    {" · "}
+                    {t(($) => $.providers.discovery.directIdAllowed)}
+                  </p>
                 </div>
                 <span className={`key-pill ${pill.ok ? "ok" : "missing"}`}>
                   {pill.label}
@@ -482,6 +586,7 @@ export function ProviderSection({
                 onRelogin={provider === "openai" ? startChatGPTRelogin : undefined}
                 reloginBusy={chatgptLoginBusy}
                 onNavigationGuardChange={onCredentialNavigationGuardChange}
+                developerMode={developerMode}
               />
               {discoveryState?.result && (
                 <DiscoveryResultView
@@ -496,14 +601,15 @@ export function ProviderSection({
                       : undefined
                   }
                   reloginBusy={chatgptLoginBusy}
+                  developerMode={developerMode}
                 />
               )}
               <div className="settings-actions">
                 <p className="muted tiny" style={{ width: "100%" }}>
-                  進階：指定某個 credential 做 discovery（一般用上方各列的「列模型／查看候選模型」即可）。
+                  {t(($) => $.providers.discovery.description)}
                 </p>
                 <label className="field credential-select">
-                  <span>credential</span>
+                  <span>{t(($) => $.providers.discovery.credentialLabel)}</span>
                   <select
                     value={selectedCredential ?? ""}
                     onChange={(e) => setSelectedCreds((prev) => ({ ...prev, [provider]: e.target.value }))}
@@ -521,7 +627,9 @@ export function ProviderSection({
                   disabled={!selectedCredential || discoveryState?.loading}
                   onClick={() => void onDiscover(provider, selectedCredential)}
                 >
-                  {discoveryState?.loading ? "讀取中…" : `${discoverButtonLabel(selectedAuthMode)}（此 credential）`}
+                  {discoveryState?.loading
+                    ? t(($) => $.providers.discovery.listing)
+                    : discoverButtonLabel(selectedAuthMode, t)}
                 </button>
               </div>
               {/* Low-frequency setup: collapsed once a usable credential exists. */}
@@ -532,15 +640,15 @@ export function ProviderSection({
               >
                 <div className="credential-add-box">
                   <label className="field">
-                    <span>新增 API key alias</span>
+                    <span>{t(($) => $.providers.credential.alias)}</span>
                     <input
                       value={newAlias[provider] ?? ""}
-                      placeholder={`${provider} primary`}
+                      placeholder={`${provider} ${t(($) => $.providers.row.primary)}`}
                       onChange={(e) => setNewAlias((prev) => ({ ...prev, [provider]: e.target.value }))}
                     />
                   </label>
                   <label className="field">
-                    <span>新增 API key</span>
+                    <span>{t(($) => $.providers.credential.addApiKey)}</span>
                     <input
                       type="password"
                       value={newSecret[provider] ?? ""}
@@ -555,47 +663,46 @@ export function ProviderSection({
                         checked={makeNewKeyActive}
                         onChange={(e) => setNewMakeActive((prev) => ({ ...prev, [provider]: e.target.checked }))}
                       />
-                      <span>新增後設為 active</span>
+                      <span>{t(($) => $.providers.credential.addAsActive)}</span>
                     </label>
                     <button
                       type="button"
                       className="btn-ghost small"
                       onClick={() => void addKey(provider, makeNewKeyActive)}
                     >
-                      {addApiKeyButtonLabel(makeNewKeyActive)}
+                      {addApiKeyButtonLabel(makeNewKeyActive, t)}
                     </button>
                   </div>
                 </div>
                 {provider === "anthropic" && (
                   <div className="credential-add-box oauth-import-box">
                     <p className="muted tiny" style={{ marginBottom: 8 }}>
-                      匯入 Claude setup-token（訂閱登入）。<strong>這不是 Anthropic API key。</strong>
-                      Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
-                      用終端機 <code className="mono">claude setup-token</code> 產生後貼上。
+                      {t(($) => $.providers.claude.description)}{" "}
+                      <strong>{t(($) => $.providers.credential.invalidAnthropicKey)}</strong>
                     </p>
                     <label className="field">
-                      <span>顯示名稱（可留空）</span>
+                      <span>{t(($) => $.providers.credential.alias)}</span>
                       <input
                         value={claudeAlias}
-                        placeholder="Claude subscription"
+                        placeholder={t(($) => $.providers.authModes.claudeCodeOAuth)}
                         onChange={(e) => setClaudeAlias(e.target.value)}
                       />
                     </label>
                     <label className="field">
-                      <span>帳號／方案標籤（可留空）</span>
+                      <span>{t(($) => $.providers.credential.accountPurpose)}</span>
                       <input
                         value={claudeLabel}
-                        placeholder="例如 Claude Pro / Max"
+                        placeholder={t(($) => $.providers.credential.accountPurpose)}
                         onChange={(e) => setClaudeLabel(e.target.value)}
                       />
                     </label>
                     <label className="field">
-                      <span>Claude setup-token</span>
+                      <span>{t(($) => $.providers.claude.tokenLabel)}</span>
                       <input
                         type="password"
                         autoComplete="off"
                         value={claudeToken}
-                        placeholder="貼上 claude setup-token 產生的 token"
+                        placeholder={t(($) => $.providers.claude.tokenPlaceholder)}
                         onChange={(e) => setClaudeToken(e.target.value)}
                       />
                     </label>
@@ -606,10 +713,10 @@ export function ProviderSection({
                           checked={claudeImportActive}
                           onChange={(e) => setOauthMakeActive((prev) => ({ ...prev, anthropic: e.target.checked }))}
                         />
-                        <span>匯入後設為 active</span>
+                        <span>{t(($) => $.providers.claude.importAsActive)}</span>
                       </label>
                       <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken(claudeImportActive)}>
-                        匯入 setup-token
+                        {t(($) => $.providers.claude.import)}
                       </button>
                     </div>
                   </div>
@@ -617,9 +724,8 @@ export function ProviderSection({
                 {provider === "openai" && (
                   <div className="credential-add-box oauth-import-box">
                     <p className="muted tiny" style={{ marginBottom: 8 }}>
-                      登入 ChatGPT 訂閱（OpenAI subscription）。<strong>這不是 OpenAI API key。</strong>
-                      這是<strong>ChatGPT backend 相容路徑</strong>（非公開 OpenAI API host；Research 啟用前會用實測確認 backend 行為）。
-                      Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
+                      {t(($) => $.providers.openAI.description)}{" "}
+                      <strong>{t(($) => $.providers.credential.invalidOpenAiKey)}</strong>
                     </p>
                     {!oauth && (
                       <>
@@ -629,11 +735,10 @@ export function ProviderSection({
                             checked={chatgptLoginActive}
                             onChange={(e) => setOauthMakeActive((prev) => ({ ...prev, openai: e.target.checked }))}
                           />
-                          <span>登入後設為 active</span>
+                          <span>{t(($) => $.providers.openAI.signInAsActive)}</span>
                         </label>
                         <p className="muted tiny">
-                          AI 研究、卡片合成與翻譯會依 active credential 使用 ChatGPT 訂閱後端；
-                          可見模型仍須用任務內的實際測試確認。預設不設為 active——登入不應悄悄切換使用中的 credential。
+                          {t(($) => $.models.test.subscriptionQuota)}
                         </p>
                         <button
                           type="button"
@@ -641,36 +746,38 @@ export function ProviderSection({
                           disabled={pollBusy}
                           onClick={() => void startChatGPTLogin(chatgptLoginActive)}
                         >
-                          {pollBusy ? "登入中…" : "登入 ChatGPT"}
+                          {pollBusy
+                            ? t(($) => $.providers.openAI.signingIn)
+                            : t(($) => $.providers.openAI.signIn)}
                         </button>
                       </>
                     )}
                     {oauth?.phase === "waiting" && (
                       <div>
-                        <p className="muted tiny">等待瀏覽器登入完成…（已開新分頁）</p>
+                        <p className="muted tiny">{t(($) => $.providers.openAI.waiting)}</p>
                         <button type="button" className="btn-ghost small" onClick={() => void copyLoginLink()}>
-                          複製登入連結
+                          {t(($) => $.providers.openAI.copyLink)}
                         </button>
                         <button
                           type="button"
                           className="btn-ghost small"
                           onClick={() => setOauth((o) => (o ? { ...o, phase: "manual" } : o))}
                         >
-                          沒有自動返回？手動貼上授權碼
+                          {t(($) => $.providers.openAI.manualToggle)}
                         </button>
                       </div>
                     )}
                     {oauth?.phase === "manual" && (
                       <div>
                         <p className="muted tiny">
-                          只在瀏覽器已完成登入、但本機 callback 沒收到時使用。貼上授權碼或整個回呼網址：
+                          {t(($) => $.providers.openAI.manualDescription)}
                         </p>
                         <label className="field">
-                          <span>授權碼／回呼網址</span>
+                          <span>{t(($) => $.providers.openAI.manualCodeLabel)}</span>
                           <input
                             value={manualValue}
                             autoComplete="off"
-                            placeholder="code 或 http://localhost:1455/auth/callback?code=…"
+                            placeholder={t(($) => $.providers.openAI.manualCodePlaceholder)}
                             onChange={(e) => setManualValue(e.target.value)}
                           />
                         </label>
@@ -680,10 +787,12 @@ export function ProviderSection({
                           disabled={manualBusy}
                           onClick={() => void completeChatGPTManual()}
                         >
-                          {manualBusy ? "完成中…" : "完成登入"}
+                          {manualBusy
+                            ? t(($) => $.providers.openAI.completing)
+                            : t(($) => $.providers.openAI.complete)}
                         </button>
                         <button type="button" className="btn-ghost small" onClick={cancelChatGPTLogin}>
-                          取消
+                          {t(($) => $.actions.cancel)}
                         </button>
                       </div>
                     )}
@@ -693,15 +802,13 @@ export function ProviderSection({
               <div className="provider-links">
                 {sourceUrls.map((url) => (
                   <a key={url} href={url} target="_blank" rel="noreferrer">
-                    official source
+                    {t(($) => $.providers.discovery.officialSource)}
                   </a>
                 ))}
               </div>
               <p className="muted tiny">
-                可在此新增本機 API key credential（存於本機 profile DB）；env/config/.env 與 key pool 為唯讀來源。
-                {provider === "anthropic"
-                  ? " Claude setup-token 可由上方匯入（token 存 token-store/keyring，不進 credential DB）。"
-                  : " OpenAI ChatGPT 訂閱可由上方「登入 ChatGPT」（token 存 token-store/keyring，不進 credential DB）。"}
+                {t(($) => $.providers.credential.localDescription)}{" "}
+                {t(($) => $.providers.credential.environmentFallback)}
               </p>
             </div>
           );
@@ -722,6 +829,7 @@ export function SetupDisclosure({
   onOpenChange: (provider: ModelProvider, open: boolean) => void;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation("settings");
   return (
     <details
       className="cred-setup"
@@ -731,7 +839,7 @@ export function SetupDisclosure({
         onOpenChange(provider, nextOpen);
       }}
     >
-      <summary>＋ 新增 API key 或登入訂閱</summary>
+      <summary>＋ {t(($) => $.providers.credential.add)}</summary>
       {children}
     </details>
   );
@@ -751,6 +859,7 @@ export function CredentialList({
   onRelogin,
   reloginBusy,
   onNavigationGuardChange,
+  developerMode = false,
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
@@ -767,7 +876,9 @@ export function CredentialList({
   onRelogin?: (id: string) => void;
   reloginBusy?: boolean;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  developerMode?: boolean;
 }) {
+  const { t } = useTranslation("settings");
   // Per-row probe state (claude_code_oauth only). Local — the probe result is
   // ephemeral and never leaves this view.
   const [probing, setProbing] = useState<string | null>(null);
@@ -778,8 +889,8 @@ export function CredentialList({
   useEffect(() => {
     onNavigationGuardChange?.(probing === null
       ? CLEAR_SETTINGS_NAVIGATION_GUARD
-      : { dirty: false, busy: true, reason: "Credential 驗證正在進行。" });
-  }, [onNavigationGuardChange, probing]);
+      : { dirty: false, busy: true, reason: t(($) => $.providers.guard.busy) });
+  }, [onNavigationGuardChange, probing, t]);
 
   useEffect(() => () => {
     onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -821,18 +932,22 @@ export function CredentialList({
           <div className="credential-row" key={cred.id}>
             <div>
               <strong>{cred.label}</strong>
-              {cred.account_label && <span>帳號／方案：{cred.account_label}</span>}
-              {showExpiry && cred.expires_at && <span>到期：{formatSystemTimestamp(cred.expires_at)}</span>}
-              {cred.active && <span className="active-badge">使用中</span>}
+              {cred.account_label && (
+                <span>{t(($) => $.providers.credential.accountLabel, { value: cred.account_label })}</span>
+              )}
+              {showExpiry && cred.expires_at && (
+                <span>{t(($) => $.providers.credential.expiresAt, { timestamp: formatSystemTimestamp(cred.expires_at) })}</span>
+              )}
+              {cred.active && <span className="active-badge">{t(($) => $.providers.credential.active)}</span>}
               <span>{cred.auth_type}</span>
             </div>
             <span className={`key-pill credential-status-pill ${cred.available ? "ok" : "missing"}`}>
-              {credentialAvailabilityText(cred)}
+              {credentialAvailabilityText(cred, t)}
             </span>
             <p className="muted tiny">
               {cred.id.startsWith("local:")
-                ? "本機 Settings credential（profile DB · 可編輯、可設為 active）"
-                : ".env／環境變數 fallback（唯讀；DB credential 才是主要選擇面）"}
+                ? t(($) => $.providers.credential.localDescription)
+                : t(($) => $.providers.credential.environmentFallback)}
             </p>
             <p>{cred.notes}</p>
             {(cred.editable || cred.can_discover_models) && (
@@ -841,9 +956,10 @@ export function CredentialList({
                   <>
                     <input
                       value={aliasDraft}
+                      required
                       onChange={(e) => onRenameDraft(cred.id, e.target.value)}
-                      aria-label={`${cred.label} alias`}
-                      placeholder="必填；留空則保留原名稱"
+                      aria-label={`${cred.label} · ${t(($) => $.providers.credential.alias)}`}
+                      placeholder={t(($) => $.providers.credential.alias)}
                     />
                     <button
                       type="button"
@@ -851,7 +967,7 @@ export function CredentialList({
                       disabled={cred.active}
                       onClick={() => onSetActive(cred.id)}
                     >
-                      設為 active
+                      {t(($) => $.providers.credential.setActive)}
                     </button>
                   </>
                 )}
@@ -859,16 +975,16 @@ export function CredentialList({
                   <div className="credential-actions credential-metadata-actions">
                     <input
                       value={accountLabelDraft}
-                      placeholder={showExpiry ? "帳號／方案標籤（可留空）" : "帳號／用途標籤（可留空）"}
-                      aria-label={`${cred.label} account label`}
+                      placeholder={t(($) => $.providers.credential.accountPurpose)}
+                      aria-label={`${cred.label} · ${t(($) => $.providers.credential.accountPurpose)}`}
                       onChange={(e) => onMetadataDraft(cred.id, "account_label", e.target.value)}
                     />
                     {showExpiry && (
                       <input
                         type="date"
                         value={expiresAtDraft}
-                        aria-label={`${cred.label} expires at`}
-                        title="到期日（可留空）"
+                        aria-label={`${cred.label} · ${t(($) => $.providers.credential.expiresOptional)}`}
+                        title={t(($) => $.providers.credential.expiresOptional)}
                         onChange={(e) => onMetadataDraft(cred.id, "expires_at", e.target.value)}
                       />
                     )}
@@ -884,7 +1000,7 @@ export function CredentialList({
                         )
                       }
                     >
-                      儲存顯示資訊
+                      {t(($) => $.providers.credential.editDisplay)}
                     </button>
                   </div>
                 )}
@@ -895,12 +1011,14 @@ export function CredentialList({
                     disabled={discoverLoadingId === cred.id}
                     title={
                       cred.auth_type === "claude_code_oauth"
-                        ? "查看候選模型（seed，非即時 discovery）"
-                        : "列出此 credential 後端可見的模型"
+                        ? t(($) => $.providers.discovery.seedNotice)
+                        : t(($) => $.providers.discovery.description)
                     }
                     onClick={() => onDiscover(cred.id)}
                   >
-                    {discoverLoadingId === cred.id ? "讀取中…" : discoverButtonLabel(cred.auth_type)}
+                    {discoverLoadingId === cred.id
+                      ? t(($) => $.providers.discovery.listing)
+                      : discoverButtonLabel(cred.auth_type, t)}
                   </button>
                 )}
                 {cred.auth_type === "chatgpt_oauth" && onRelogin && (
@@ -908,10 +1026,10 @@ export function CredentialList({
                     type="button"
                     className="btn-ghost small"
                     disabled={reloginBusy}
-                    title="以此列身分重新登入 ChatGPT，原地更換 token（不新增 credential；alias／active 保留）"
+                    title={t(($) => $.providers.openAI.reloginDescription)}
                     onClick={() => onRelogin(cred.id)}
                   >
-                    重新登入
+                    {t(($) => $.providers.openAI.relogin)}
                   </button>
                 )}
                 {isLocalOAuth && (
@@ -921,16 +1039,16 @@ export function CredentialList({
                     disabled={probing === cred.id}
                     title={
                       cred.auth_type === "chatgpt_oauth"
-                        ? "實測 ChatGPT OAuth backend"
-                        : "測試 Claude setup-token"
+                        ? t(($) => $.providers.probe.title)
+                        : t(($) => $.providers.claude.test)
                     }
                     onClick={() => void runProbe(cred.id)}
                   >
                     {probing === cred.id
-                      ? "測試中…"
+                      ? t(($) => $.providers.probe.running)
                       : cred.auth_type === "chatgpt_oauth"
-                        ? "實測 OAuth"
-                        : "測試 token"}
+                        ? t(($) => $.providers.probe.run)
+                        : t(($) => $.providers.claude.test)}
                   </button>
                 )}
                 {cred.editable && (
@@ -942,22 +1060,28 @@ export function CredentialList({
                       setPendingDelete(cred);
                     }}
                   >
-                    刪除
+                    {t(($) => $.actions.delete)}
                   </button>
                 )}
               </div>
             )}
-            {probe && <ProbeResultView probe={probe} authType={cred.auth_type} />}
+            {probe && (
+              <ProbeResultView
+                probe={probe}
+                authType={cred.auth_type}
+                developerMode={developerMode}
+              />
+            )}
           </div>
         );
       })}
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="刪除 Credential？"
+        title={t(($) => $.providers.credential.deleteTitle)}
         consequence={pendingDelete
-          ? <>將移除已儲存的登入項目「<strong>{pendingDelete.label}</strong>」。</>
+          ? t(($) => $.providers.credential.deleteConsequence, { value: pendingDelete.label })
           : null}
-        confirmLabel="刪除 Credential"
+        confirmLabel={t(($) => $.actions.delete)}
         onConfirm={() => {
           if (!pendingDelete) return;
           const id = pendingDelete.id;
@@ -974,27 +1098,37 @@ export function CredentialList({
 function ProbeResultView({
   probe,
   authType,
+  developerMode,
 }: {
   probe: ProbeResponse | { error: string };
   authType: ProviderCredential["auth_type"];
+  developerMode: boolean;
 }) {
+  const { t } = useTranslation("settings");
   if ("error" in probe) {
-    return <p className="error-text tiny">probe 失敗：{probe.error}</p>;
+    return (
+      <div className="probe-result">
+        <p className="error-text tiny">{t(($) => $.errors.testFailed)}</p>
+        {developerMode ? <DeveloperDiagnostics diagnostics={[probe.error]} t={t} /> : null}
+      </div>
+    );
   }
-  const note = probeRuntimeNote(authType);
+  const note = probeRuntimeNote(authType, t);
   return (
     <div className="probe-result">
       <p className={probe.passed ? "ok-text tiny" : "warn-text tiny"}>
-        {probe.passed ? "✓ OAuth 驗證通過" : "✗ OAuth 驗證未通過"}
+        {probe.passed
+          ? `✓ ${t(($) => $.providers.probe.passed)}`
+          : `✗ ${t(($) => $.providers.probe.failed)}`}
       </p>
       {note && <p className="probe-note tiny">{note}</p>}
       <ul className="probe-list">
         {probe.probes.map((p) => {
-          const summary = probeDisplaySummary(p);
+          const summary = probeDisplaySummary(p, t);
           return (
             <li key={p.name} className="tiny">
               <span className={p.passed ? "ok-text" : "warn-text"}>{p.passed ? "✓" : "✗"}</span>
-              <span className="probe-label">{probeDisplayLabel(p.name)}</span>
+              <span className="probe-label">{probeDisplayLabel(p.name, t)}</span>
               <span className="probe-summary">{summary.text}</span>
               {summary.models.length > 0 && (
                 <span className="probe-models">
@@ -1003,12 +1137,16 @@ function ProbeResultView({
                   ))}
                 </span>
               )}
-              <details className="probe-detail">
-                <summary>細節</summary>
-                <div>expected: {p.expected}</div>
-                <div>observed: {p.observed}</div>
-                {p.error && <div>error: {p.error}</div>}
-              </details>
+              {developerMode ? (
+                <DeveloperDiagnostics
+                  diagnostics={[
+                    p.expected ? `${t(($) => $.providers.probe.expected)}: ${p.expected}` : null,
+                    p.observed ? `${t(($) => $.providers.probe.observed)}: ${p.observed}` : null,
+                    p.error ? `${t(($) => $.providers.probe.error)}: ${p.error}` : null,
+                  ]}
+                  t={t}
+                />
+              ) : null}
             </li>
           );
         })}
@@ -1025,6 +1163,7 @@ export function DiscoveryResultView({
   onUse,
   onRelogin,
   reloginBusy,
+  developerMode = false,
 }: {
   result: ModelDiscoveryResult;
   authMode: ProviderCredential["auth_type"] | null;
@@ -1035,7 +1174,9 @@ export function DiscoveryResultView({
   // in-place re-login right where the error is shown. Optional (old sites OK).
   onRelogin?: () => void;
   reloginBusy?: boolean;
+  developerMode?: boolean;
 }) {
+  const { t } = useTranslation("settings");
   const [query, setQuery] = useState("");
   const models = result.models.filter((model) =>
     model.id.toLowerCase().includes(query.trim().toLowerCase()),
@@ -1046,56 +1187,71 @@ export function DiscoveryResultView({
   const sources = Array.from(new Set(result.models.map((m) => m.source)));
   const sourceBadge =
     sources.length === 1
-      ? discoverySourceLabel(result.provider, authMode, sources[0])
+      ? discoverySourceLabel(result.provider, authMode, sources[0], t)
       : sources.join(" / ");
   const credentialSummary = discoveryResultCredentialLabel(
-    authMode ? { label: credentialLabel ?? "未命名 credential", auth_type: authMode } : null,
+    authMode
+      ? { label: credentialLabel ?? t(($) => $.providers.credential.unnamed), auth_type: authMode }
+      : null,
+    t,
   );
+  const errorMessage = result.error
+    ? result.error_code
+      ? modelReasonLabel(result.error_code, t)
+      : t(($) => $.providers.discovery.failure)
+    : null;
   return (
     <div className="discovery-box">
       <div className="discovery-head">
         <div>
-          <strong>{discoveryHeaderTitle(authMode)} · {result.status}</strong>
+          <strong>{discoveryHeaderTitle(authMode, t)} · {discoveryStatusLabel(result.status, t)}</strong>
           <span className="discovery-credential tiny">{credentialSummary}</span>
         </div>
         {result.models.length > 0 && <span className="source-badge tiny">{sourceBadge}</span>}
         {result.source_url && (
           <a href={result.source_url} target="_blank" rel="noreferrer">
-            source
+            {t(($) => $.providers.discovery.officialSource)}
           </a>
         )}
         <button type="button" className="btn-ghost tiny" onClick={onClose}>
-          關閉
+          {t(($) => $.actions.close)}
         </button>
       </div>
-      {result.error && <p className="warn-text tiny">{result.error}</p>}
+      {errorMessage && <p className="warn-text tiny">{errorMessage}</p>}
+      {developerMode ? <DeveloperDiagnostics diagnostics={[result.error]} t={t} /> : null}
       {result.error_code === "reauth_required" && onRelogin && (
         <div className="reauth-hint">
-          <span className="warn-text tiny">token 已失效——需要重新登入。</span>
+          <span className="warn-text tiny">{t(($) => $.providers.openAI.tokenExpired)}</span>
           <button type="button" className="btn-ghost small" disabled={reloginBusy} onClick={onRelogin}>
-            重新登入
+            {t(($) => $.providers.openAI.relogin)}
           </button>
         </div>
       )}
       <label className="field discovery-filter">
-        <span>搜尋模型</span>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="gpt / claude / mini…" />
+        <span>{t(($) => $.providers.discovery.searchLabel)}</span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t(($) => $.providers.discovery.searchPlaceholder)}
+        />
       </label>
       <div className="discovery-models">
         {models.map((model) => (
           <div className="model-discovery-row" key={model.id}>
             <span>{model.id}</span>
             <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_synthesis")}>
-              用於生成
+              {t(($) => $.providers.discovery.useForSynthesis)}
             </button>
             <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_translation")}>
-              用於翻譯
+              {t(($) => $.providers.discovery.useForTranslation)}
             </button>
           </div>
         ))}
       </div>
       <p className="muted tiny">
-        顯示 {models.length} / {result.models.length} 個 provider 回傳模型；任務頁仍可直接輸入任何 model id。
+        {t(($) => $.providers.discovery.modelCount, { count: models.length })}
+        {" / "}{result.models.length}{" · "}
+        {t(($) => $.providers.discovery.directIdAllowed)}
       </p>
     </div>
   );

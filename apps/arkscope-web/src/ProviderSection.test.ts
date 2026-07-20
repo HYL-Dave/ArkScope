@@ -2,13 +2,21 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderSection } from "./Settings";
 import type { ModelCatalog, ProviderCredential } from "./api";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -90,6 +98,13 @@ function reloginButtons(): HTMLButtonElement[] {
   ) as HTMLButtonElement[];
 }
 
+function disposeRender() {
+  act(() => root!.unmount());
+  root = null;
+  host!.remove();
+  host = null;
+}
+
 async function waitFor(pred: () => boolean, timeoutMs = 3000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -100,6 +115,112 @@ async function waitFor(pred: () => boolean, timeoutMs = 3000) {
   }
   expect(pred()).toBe(true);
 }
+
+describe("ProviderSection localization", () => {
+  it("renders English Provider OAuth and credential setup without changing active work", async () => {
+    renderSection();
+    const anthropic = providerCard("anthropic");
+    const disclosure = anthropic.querySelector<HTMLDetailsElement>("details.cred-setup")!;
+    const alias = anthropic.querySelector<HTMLInputElement>(
+      ".credential-add-box:not(.oauth-import-box) input:not([type='password'])",
+    )!;
+
+    await act(async () => {
+      disclosure.open = true;
+      disclosure.dispatchEvent(new Event("toggle", { bubbles: false }));
+      changeInput(alias, "planted-provider-draft");
+      await i18n.changeLanguage("en");
+    });
+
+    expect(host!.textContent).toContain("Provider Status");
+    expect(host!.textContent).toContain("Add an API key or subscription sign-in");
+    expect(host!.textContent).toContain("Sign in to ChatGPT");
+    expect(disclosure.open).toBe(true);
+    expect(alias.value).toBe("planted-provider-draft");
+    expect(host!.querySelector('[data-testid="locale-selector"]')).toBeNull();
+  });
+
+  it("hides OAuth backend detail in normal mode and reveals it only in Developer Mode", async () => {
+    const rawDetail = "planted-oauth-detail";
+    const fetchMock = vi.fn().mockImplementation(async (url: unknown) => ({
+      ok: true,
+      status: 200,
+      json: async () => String(url).includes("/oauth/start")
+        ? { auth_url: "https://auth.openai.com/x", state: "S", expires_at: "t", manual_code_supported: true }
+        : { status: "error", credential: null, detail: rawDetail, manual_completable: false },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("open", vi.fn());
+
+    renderSection({ developerMode: false });
+    await act(async () => { reloginButtons()[0].click(); });
+    await waitFor(() => !reloginButtons()[0].disabled);
+    expect(host!.textContent).toContain("登入工作階段不存在或已過期");
+    expect(host!.textContent).not.toContain(rawDetail);
+
+    disposeRender();
+    renderSection({ developerMode: true });
+    await act(async () => { reloginButtons()[0].click(); });
+    await waitFor(() => (host!.textContent ?? "").includes(rawDetail));
+    expect(host!.textContent).toContain("開發者診斷");
+    expect(host!.querySelector(".developer-diagnostics")?.getAttribute("aria-live")).toBeNull();
+  });
+
+  it("switches locale during OAuth without cancelling or duplicating the flow", async () => {
+    const statusResponse = deferred<{ ok: boolean; status: number; json: () => Promise<unknown> }>();
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const openaiKey: ProviderCredential = {
+      ...chatgptCred,
+      id: "local:2",
+      auth_type: "api_key",
+      label: "OpenAI primary",
+      masked: "sk-p...MASKED",
+      active: true,
+    };
+    const oauthCatalog = catalog();
+    oauthCatalog.credentials.openai = [openaiKey, chatgptCred];
+    const fetchMock = vi.fn().mockImplementation((url: unknown) => {
+      if (String(url).includes("/oauth/start")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ auth_url: "https://auth.openai.com/x", state: "S", expires_at: "t", manual_code_supported: true }),
+        });
+      }
+      if (String(url).includes("/oauth/status")) return statusResponse.promise;
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
+    });
+    const openWindow = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("open", openWindow);
+    renderSection({ catalog: oauthCatalog, onRefresh });
+
+    await act(async () => { reloginButtons()[0].click(); });
+    await waitFor(() => fetchMock.mock.calls.some(([url]) => String(url).includes("/oauth/status")));
+    const select = providerCard("openai").querySelector<HTMLSelectElement>("select")!;
+    expect(select.value).toBe("local:7");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(providerCard("openai").querySelector<HTMLDetailsElement>("details.cred-setup")!.open).toBe(true);
+    expect(select.value).toBe("local:7");
+    expect(host!.textContent).toContain("Waiting for browser sign-in...");
+
+    await act(async () => {
+      statusResponse.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: "success", credential: chatgptCred, detail: null }),
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => onRefresh.mock.calls.length === 1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/oauth/start"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/oauth/status"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/oauth/cancel"))).toHaveLength(0);
+    expect(openWindow).toHaveBeenCalledTimes(1);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("ProviderSection re-login integration (S3 credential lifecycle)", () => {
   it("row re-login opens the OpenAI setup disclosure, starts the flow with the target, and blocks a second trigger", async () => {
@@ -131,7 +252,7 @@ describe("ProviderSection re-login integration (S3 credential lifecycle)", () =>
     // the OpenAI setup disclosure (waiting/manual/cancel home) is expanded
     expect(host!.querySelectorAll("details.cred-setup[open]").length).toBe(1);
     // the poll settles on the backend error → manual fallback surfaces in the SAME region
-    await waitFor(() => (host!.textContent ?? "").includes("登入失敗"));
+    await waitFor(() => (host!.textContent ?? "").includes("等不到瀏覽器回呼"));
     expect(host!.textContent).toContain("完成登入");
     // a second trigger cannot start while this flow is active
     expect(reloginButtons().every((b) => b.disabled)).toBe(true);
@@ -141,8 +262,12 @@ describe("ProviderSection re-login integration (S3 credential lifecycle)", () =>
     vi.stubGlobal("fetch", vi.fn());
     renderSection();
     expect(host!.textContent).not.toContain("尚未接上");
-    expect(host!.textContent).toContain("AI 研究、卡片合成與翻譯會依 active credential 使用 ChatGPT 訂閱後端");
-    expect(host!.textContent).toContain("預設不設為 active");
+    expect(host!.textContent).toContain("使用 ChatGPT 訂閱後端");
+    expect(host!.textContent).toContain("消耗訂閱額度，非 API 帳單");
+    const activeToggle = Array.from(providerCard("openai").querySelectorAll("label"))
+      .find((label) => label.textContent?.includes("登入後設為 active"))
+      ?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(activeToggle?.checked).toBe(false);
   });
 });
 
@@ -165,8 +290,7 @@ describe("ProviderSection manual fallback gating (F4)", () => {
     await act(async () => {
       btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
-    await waitFor(() => (host!.textContent ?? "").includes("登入失敗"));
-    expect(host!.textContent).toContain("已失效");
+    await waitFor(() => (host!.textContent ?? "").includes("登入工作階段不存在或已過期"));
     expect(host!.textContent).not.toContain("完成登入");   // no dead-end manual form
     expect(reloginButtons().every((b) => !b.disabled)).toBe(true); // flow reset, retry allowed
   });
@@ -178,8 +302,9 @@ describe("ProviderSection Settings navigation guard", () => {
     renderSection({ onNavigationGuardChange });
     const anthropic = providerCard("anthropic");
     const apiKey = anthropic.querySelector<HTMLInputElement>('input[type="password"]')!;
-    const alias = Array.from(anthropic.querySelectorAll<HTMLInputElement>("input"))
-      .find((input) => input.placeholder === "anthropic primary")!;
+    const alias = anthropic.querySelector<HTMLInputElement>(
+      ".credential-add-box:not(.oauth-import-box) input:not([type='password'])",
+    )!;
 
     await act(async () => {
       changeInput(alias, "planted-alias-value");

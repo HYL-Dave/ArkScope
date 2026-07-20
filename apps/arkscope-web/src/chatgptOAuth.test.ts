@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
 
 import { cancelOpenAIOAuth, completeOpenAIOAuthManual, openAIOAuthStatus, startOpenAIOAuth, updateCredential } from "./api";
 import type { OAuthStatusResult, ProbeResult } from "./api";
@@ -11,6 +12,13 @@ import {
   probeDisplaySummary,
   pollOAuthStatus,
 } from "./chatgptOAuth";
+import type { SettingsT } from "./settings/settingsCopy";
+
+function settingsT(locale: "zh-Hant" | "en"): SettingsT {
+  return i18n.getFixedT(locale, "settings") as SettingsT;
+}
+
+const zhT = settingsT("zh-Hant");
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -242,10 +250,10 @@ describe("probe display helpers", () => {
   });
 
   it("uses short stable labels for the ChatGPT OAuth probe steps", () => {
-    expect(probeDisplayLabel("P1: OAuth token rejected by api.openai.com")).toBe("Token / backend");
-    expect(probeDisplayLabel("P2a: ChatGPT backend 400s max_output_tokens")).toBe("參數相容性");
-    expect(probeDisplayLabel("P2b: ChatGPT backend returns a function-call output item")).toBe("工具呼叫");
-    expect(probeDisplayLabel("P2c: model discovery needs extra_query")).toBe("可用模型");
+    expect(probeDisplayLabel("P1: OAuth token rejected by api.openai.com", zhT)).toBe("實際後端探測");
+    expect(probeDisplayLabel("P2a: ChatGPT backend 400s max_output_tokens", zhT)).toBe("探測細節");
+    expect(probeDisplayLabel("P2b: ChatGPT backend returns a function-call output item", zhT)).toBe("最多工具呼叫次數");
+    expect(probeDisplayLabel("P2c: model discovery needs extra_query", zhT)).toBe("模型探索");
   });
 
   it("extracts model ids from P2c observed text", () => {
@@ -258,22 +266,53 @@ describe("probe display helpers", () => {
     const summary = probeDisplaySummary(probe(
       "P2c: model discovery needs extra_query",
       "plain models.list 400'd; extra_query client_version returned 2 model ids: gpt-5.4-mini, gpt-5.5",
-    ));
-    expect(summary.text).toBe("可用模型");
+    ), zhT);
+    expect(summary.text).toBe("2 個 provider 回傳模型");
     expect(summary.models).toEqual(["gpt-5.4-mini", "gpt-5.5"]);
   });
 
   it("keeps failed probe detail visible but compact", () => {
-    expect(probeDisplaySummary(probe("P2b: ChatGPT backend returns a function-call output item", "raw observed", "no call")).text)
-      .toBe("no call");
+    expect(probeDisplaySummary(probe("P2b: ChatGPT backend returns a function-call output item", "raw observed", "no call"), zhT).text)
+      .toBe("OAuth 驗證未通過");
   });
 
   it("uses auth-mode-specific probe notes", () => {
-    expect(probeRuntimeNote("chatgpt_oauth")).toContain("api.openai.com");
-    expect(probeRuntimeNote("chatgpt_oauth")).toContain("ChatGPT backend");
-    expect(probeRuntimeNote("claude_code_oauth")).toContain("claude -p");
-    expect(probeRuntimeNote("claude_code_oauth")).toContain("api.anthropic.com");
-    expect(probeRuntimeNote("claude_code_oauth")).not.toContain("api.openai.com");
-    expect(probeRuntimeNote("api_key")).toBeNull();
+    expect(probeRuntimeNote("chatgpt_oauth", zhT)).toContain("ChatGPT 訂閱後端");
+    expect(probeRuntimeNote("claude_code_oauth", zhT)).toContain("本機 token-store");
+    expect(probeRuntimeNote("api_key", zhT)).toBeNull();
+  });
+});
+
+describe("localized OAuth probe presentation", () => {
+  it("renders OAuth probe labels and notes in both locales", () => {
+    const enT = settingsT("en");
+    expect(probeDisplayLabel("P2a: parameter compatibility", zhT)).toBe("探測細節");
+    expect(probeDisplayLabel("P2a: parameter compatibility", enT)).toBe("Probe details");
+    expect(probeDisplayLabel("P2b: tool call", zhT)).toBe("最多工具呼叫次數");
+    expect(probeDisplayLabel("P2b: tool call", enT)).toBe("Maximum tool calls");
+    expect(probeRuntimeNote("chatgpt_oauth", zhT)).toContain("ChatGPT 訂閱後端");
+    expect(probeRuntimeNote("chatgpt_oauth", enT)).toContain("ChatGPT subscription backend");
+    expect(probeRuntimeNote("claude_code_oauth", zhT)).toContain("本機 token-store");
+    expect(probeRuntimeNote("claude_code_oauth", enT)).toContain("local token store");
+  });
+
+  it("keeps OAuth result detail as diagnostic data instead of translated copy", async () => {
+    const detail = "planted-oauth-transport-detail";
+    const statusFn = vi.fn().mockResolvedValue({
+      status: "error",
+      credential: null,
+      detail,
+      manual_completable: false,
+    });
+    const result = await pollOAuthStatus("S", {
+      statusFn,
+      ...fakeClock(),
+      timeoutMs: 5000,
+      intervalMs: 100,
+    });
+
+    expect(result).toEqual({ kind: "error", detail, manualCompletable: false });
+    expect(JSON.stringify(result)).not.toContain("登入失敗");
+    expect(JSON.stringify(result)).not.toContain("Sign-in failed");
   });
 });

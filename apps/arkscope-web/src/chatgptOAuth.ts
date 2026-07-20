@@ -3,6 +3,7 @@
 // researchProvider.ts). The Settings component injects the real status client + a
 // real clock/sleep; tests inject fakes.
 import type { OAuthStatusResult, ProbeResult, ProviderCredential } from "./api";
+import type { SettingsT } from "./settings/settingsCopy";
 
 export type PollResult =
   | { kind: "success"; credential: ProviderCredential | null }
@@ -68,11 +69,11 @@ export function buildManualCompletion(
   return looksLikeUrl ? { state, redirect_url: v } : { state, code: v };
 }
 
-export function probeDisplayLabel(name: string): string {
-  if (name.startsWith("P1")) return "Token / backend";
-  if (name.startsWith("P2a")) return "參數相容性";
-  if (name.startsWith("P2b")) return "工具呼叫";
-  if (name.startsWith("P2c")) return "可用模型";
+export function probeDisplayLabel(name: string, t: SettingsT): string {
+  if (name.startsWith("P1")) return t(($) => $.providers.probe.title);
+  if (name.startsWith("P2a")) return t(($) => $.providers.probe.details);
+  if (name.startsWith("P2b")) return t(($) => $.runtime.research.fields.maxToolCalls);
+  if (name.startsWith("P2c")) return t(($) => $.providers.discovery.title);
   return name;
 }
 
@@ -86,30 +87,44 @@ export function extractProbeModels(observed: string): string[] {
     .filter(Boolean);
 }
 
-export function probeDisplaySummary(probe: ProbeResult): { text: string; models: string[] } {
-  if (probe.error) return { text: probe.error, models: [] };
+export function probeDisplaySummary(
+  probe: ProbeResult,
+  t: SettingsT,
+): { text: string; models: string[] } {
+  if (probe.error) return { text: t(($) => $.providers.probe.failed), models: [] };
   if (probe.name.startsWith("P1")) {
-    return { text: probe.passed ? "OAuth 不是 public API key；ChatGPT backend 可 streaming" : probe.observed, models: [] };
+    return { text: probe.passed ? t(($) => $.providers.probe.passed) : t(($) => $.providers.probe.failed), models: [] };
   }
   if (probe.name.startsWith("P2a")) {
-    return { text: probe.passed ? "backend 會拒絕 max_output_tokens；driver 需移除此參數" : probe.observed, models: [] };
+    return { text: probe.passed ? t(($) => $.providers.probe.passed) : t(($) => $.providers.probe.failed), models: [] };
   }
   if (probe.name.startsWith("P2b")) {
-    return { text: probe.passed ? "function-call streaming 可用" : probe.observed, models: [] };
+    return { text: probe.passed ? t(($) => $.providers.probe.passed) : t(($) => $.providers.probe.failed), models: [] };
   }
   if (probe.name.startsWith("P2c")) {
     const models = extractProbeModels(probe.observed);
-    return { text: models.length ? "可用模型" : probe.observed, models };
+    return {
+      text: models.length
+        ? t(($) => $.providers.discovery.modelCount, { count: models.length })
+        : t(($) => $.providers.probe.failed),
+      models,
+    };
   }
-  return { text: probe.observed, models: [] };
+  return {
+    text: probe.passed ? t(($) => $.providers.probe.passed) : t(($) => $.providers.probe.failed),
+    models: [],
+  };
 }
 
-export function probeRuntimeNote(authType: ProviderCredential["auth_type"]): string | null {
+export function probeRuntimeNote(
+  authType: ProviderCredential["auth_type"],
+  t: SettingsT,
+): string | null {
   if (authType === "chatgpt_oauth") {
-    return "會向 api.openai.com 與 ChatGPT backend 發出最小診斷請求，確認 token 類型、streaming、工具呼叫與可用模型；不回傳 token，可能消耗少量訂閱額度。";
+    return t(($) => $.providers.openAI.description);
   }
   if (authType === "claude_code_oauth") {
-    return "會執行 claude -p 並向 api.anthropic.com 做最小診斷請求，確認 setup-token 可用且 raw SDK 會拒絕該 token；不回傳 token，可能消耗少量訂閱額度。";
+    return t(($) => $.providers.claude.description);
   }
   return null;
 }

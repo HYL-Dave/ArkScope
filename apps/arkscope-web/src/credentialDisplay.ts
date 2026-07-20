@@ -3,6 +3,7 @@
 // a model id is NOT split, but its SOURCE/capability is shown per credential's
 // (provider, auth_mode) — never as one global catalog.
 import type { CredentialAuthType, ModelProvider } from "./api";
+import type { SettingsT } from "./settings/settingsCopy";
 
 // Discovery-result badge. `provider_api` is ambiguous at the data layer (OpenAI API
 // AND the ChatGPT backend both report it), so disambiguate by auth_mode; `seed` is
@@ -11,34 +12,44 @@ export function discoverySourceLabel(
   provider: ModelProvider,
   authMode: CredentialAuthType | null,
   modelSource: "provider_api" | "seed",
+  t: SettingsT,
 ): string {
-  if (modelSource === "seed") return "seed · 非即時 discovery";
-  if (authMode === "chatgpt_oauth") return "ChatGPT backend · live";
-  return provider === "anthropic" ? "Anthropic API · live" : "OpenAI API · live";
+  if (modelSource === "seed") return t(($) => $.providers.discovery.seedNotice);
+  const source = authMode === "chatgpt_oauth"
+    ? t(($) => $.providers.authModes.chatgptOAuth)
+    : provider === "anthropic"
+      ? `${t(($) => $.models.providers.anthropic)} API`
+      : `${t(($) => $.models.providers.openai)} API`;
+  return `${source} · ${t(($) => $.models.catalog.visibleListLoaded)}`;
 }
 
 // Provider-card pill: reflect the ACTIVE credential's mode, not "key set/no key"
 // (which misreads an OAuth-only provider as having no credential).
 export function credentialPill(
   active: { auth_type: CredentialAuthType } | null,
+  t: SettingsT,
 ): { label: string; ok: boolean } {
-  if (!active) return { label: "無 credential", ok: false };
+  if (!active) return { label: t(($) => $.models.credentials.missing), ok: false };
   switch (active.auth_type) {
     case "api_key":
+      return { label: t(($) => $.providers.authModes.apiKey), ok: true };
     case "api_key_pool":
-      return { label: "API key", ok: true };
+      return { label: t(($) => $.providers.authModes.apiKeyPool), ok: true };
     case "chatgpt_oauth":
-      return { label: "ChatGPT OAuth", ok: true };
+      return { label: t(($) => $.providers.authModes.chatgptOAuth), ok: true };
     case "claude_code_oauth":
-      return { label: "Claude OAuth", ok: true };
+      return { label: t(($) => $.providers.authModes.claudeCodeOAuth), ok: true };
     default:
       return { label: active.auth_type, ok: true };
   }
 }
 
-export function credentialAvailabilityText(cred: { available: boolean; masked: string | null }): string {
-  if (!cred.available) return "缺少";
-  return cred.masked ?? "可用";
+export function credentialAvailabilityText(
+  cred: { available: boolean; masked: string | null },
+  t: SettingsT,
+): string {
+  if (!cred.available) return t(($) => $.providers.credential.unavailable);
+  return cred.masked ?? t(($) => $.dataStorage.available);
 }
 
 // Only claude_code_oauth exposes a user-set expiry. chatgpt_oauth's access token is
@@ -66,8 +77,10 @@ export function dateInputToIso(dateInput: string): string {
 
 // Discover-button label: claude_code_oauth has no live discovery API (seed only) →
 // 查看候選模型; everything else does live 列模型.
-export function discoverButtonLabel(authMode: CredentialAuthType | null): string {
-  return authMode === "claude_code_oauth" ? "查看候選模型" : "列模型";
+export function discoverButtonLabel(authMode: CredentialAuthType | null, t: SettingsT): string {
+  return authMode === "claude_code_oauth"
+    ? t(($) => $.providers.discovery.candidates)
+    : t(($) => $.providers.discovery.listModels);
 }
 
 // Active credential first (then the rest in their existing order) so the credential
@@ -88,20 +101,35 @@ export function defaultMakeActiveOnAdd(creds: { id: string }[]): boolean {
   return !creds.some((c) => c.id.startsWith("local:"));
 }
 
-export function addApiKeyButtonLabel(makeActive: boolean): string {
-  return makeActive ? "新增並設為 active" : "新增 API key";
+export function addApiKeyButtonLabel(makeActive: boolean, t: SettingsT): string {
+  return makeActive
+    ? t(($) => $.providers.credential.addAsActive)
+    : t(($) => $.providers.credential.addApiKey);
 }
 
-export function addApiKeySuccessMessage(provider: ModelProvider, makeActive: boolean): string {
-  return makeActive ? `${provider} key 已新增並設為 active。` : `${provider} key 已新增（未切換 active）。`;
+export function addApiKeySuccessMessage(
+  provider: ModelProvider | string,
+  makeActive: boolean,
+  t: SettingsT,
+): string {
+  const state = makeActive
+    ? t(($) => $.providers.credential.active)
+    : t(($) => $.providers.credential.inactive);
+  return `${provider}: ${state}`;
 }
 
-export function discoveryHeaderTitle(authMode: CredentialAuthType | null): string {
-  return authMode === "claude_code_oauth" ? "查看候選模型" : "列模型結果";
+export function discoveryHeaderTitle(authMode: CredentialAuthType | null, t: SettingsT): string {
+  return authMode === "claude_code_oauth"
+    ? t(($) => $.providers.discovery.candidates)
+    : t(($) => $.providers.discovery.listModels);
 }
 
 export function discoveryResultCredentialLabel(
   credential: { label: string; auth_type: CredentialAuthType } | null,
+  t: SettingsT,
 ): string {
-  return credential ? `來源：${credential.label} / ${credential.auth_type}` : "來源：未指定 credential";
+  const value = credential
+    ? `${credential.label} / ${credential.auth_type}`
+    : t(($) => $.providers.credential.unnamed);
+  return `${t(($) => $.providers.credential.source)}: ${value}`;
 }

@@ -2,12 +2,20 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DiscoveryResultView } from "./Settings";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   if (root) {
@@ -16,6 +24,70 @@ afterEach(() => {
   }
   host?.remove();
   host = null;
+});
+
+describe("DiscoveryResultView localization", () => {
+  it("renders English discovery result chrome while preserving model ids", async () => {
+    await i18n.changeLanguage("en");
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => {
+      root!.render(React.createElement(DiscoveryResultView, {
+        result: {
+          provider: "openai",
+          credential_id: "local:7",
+          status: "ok",
+          models: [{ id: "gpt-5.4-mini", provider: "openai", label: "GPT source label", source: "provider_api" }],
+          error: null,
+          source_url: "https://platform.openai.com/docs/models",
+        },
+        authMode: "chatgpt_oauth",
+        credentialLabel: "TS_Codex",
+        onClose: vi.fn(),
+        onUse: vi.fn(),
+      }));
+    });
+
+    expect(host.textContent).toContain("List models");
+    expect(host.textContent).toContain("Search models");
+    expect(host.textContent).toContain("Use for synthesis");
+    expect(host.textContent).toContain("Use for translation");
+    expect(host.textContent).toContain("gpt-5.4-mini");
+    expect(host.textContent).toContain("TS_Codex");
+    expect(host.textContent).toContain("chatgpt_oauth");
+    expect(host.textContent).not.toContain("local:7");
+  });
+
+  it("maps reauthentication by stable error code without raw backend copy", async () => {
+    await i18n.changeLanguage("en");
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => {
+      root!.render(React.createElement(DiscoveryResultView, {
+        result: {
+          provider: "openai",
+          credential_id: "local:7",
+          status: "error",
+          models: [],
+          error: "planted-discovery-backend-copy",
+          error_code: "reauth_required",
+          source_url: null,
+        },
+        authMode: "chatgpt_oauth",
+        credentialLabel: "Sub",
+        onClose: vi.fn(),
+        onUse: vi.fn(),
+        onRelogin: vi.fn(),
+        developerMode: false,
+      }));
+    });
+
+    expect(host.textContent).toContain("The sign-in has expired. Sign in again");
+    expect(host.textContent).toContain("Sign in again");
+    expect(host.textContent).not.toContain("planted-discovery-backend-copy");
+  });
 });
 
 describe("DiscoveryResultView", () => {
@@ -45,9 +117,9 @@ describe("DiscoveryResultView", () => {
       );
     });
 
-    expect(host.textContent).toContain("列模型結果");
-    expect(host.textContent).toContain("ChatGPT backend · live");
-    expect(host.textContent).toContain("來源：TS_Codex / chatgpt_oauth");
+    expect(host.textContent).toContain("列出模型");
+    expect(host.textContent).toContain("ChatGPT 訂閱 · 已取得可見模型清單");
+    expect(host.textContent).toContain("來源: TS_Codex / chatgpt_oauth");
 
     const closeButton = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "關閉");
     expect(closeButton).toBeTruthy();
