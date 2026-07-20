@@ -2,14 +2,22 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResearchRuntimeSection } from "./Settings";
 import type { ResearchRuntimeSettings } from "./api";
 import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   if (root) {
@@ -35,6 +43,7 @@ function render(
   onSave = vi.fn(),
   onReset = vi.fn(),
   onNavigationGuardChange?: SettingsNavigationGuardReporter,
+  developerMode = false,
 ) {
   host = document.createElement("div");
   document.body.append(host);
@@ -46,6 +55,7 @@ function render(
       onSave,
       onReset,
       onNavigationGuardChange,
+      developerMode,
     }));
   });
   return { onSave, onReset };
@@ -69,8 +79,8 @@ describe("ResearchRuntimeSection", () => {
     expect(input("max_tool_calls").value).toBe("96");
     expect(input("session_timeout_s").value).toBe("1800");
     expect(input("per_tool_timeout_s").value).toBe("75");
-    expect(host!.textContent).toContain("DB 已儲存");
-    expect(host!.textContent).toContain("API-key 路徑目前只套用 max turns");
+    expect(host!.textContent).toContain("DB（已儲存）");
+    expect(host!.textContent).toContain("設定 AI 研究 session 與單次工具執行限制。");
   });
 
   it("saves numeric values", () => {
@@ -80,7 +90,7 @@ describe("ResearchRuntimeSection", () => {
       setInputValue(input("session_timeout_s"), "3600");
       setInputValue(input("per_tool_timeout_s"), "90");
     });
-    const save = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent?.includes("儲存限制"));
+    const save = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent?.includes("儲存"));
     act(() => {
       save!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
@@ -93,7 +103,7 @@ describe("ResearchRuntimeSection", () => {
 
   it("offers reset only when DB-authoritative", () => {
     const { onReset } = render(runtime({ source: "db" }));
-    const reset = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent?.includes("重設限制"));
+    const reset = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent?.includes("重設"));
     expect(reset).toBeTruthy();
     act(() => {
       reset!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
@@ -123,6 +133,7 @@ describe("ResearchRuntimeSection", () => {
         onSave,
         onReset,
         onNavigationGuardChange,
+        developerMode: false,
       }));
     });
     expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
@@ -130,5 +141,46 @@ describe("ResearchRuntimeSection", () => {
       busy: false,
       reason: null,
     });
+  });
+
+  it("renders English Research limits without changing values or dirty state", async () => {
+    const current = runtime({ warning: "PLANTED RESEARCH RUNTIME WARNING" });
+    const onSave = vi.fn();
+    const onReset = vi.fn();
+    const onNavigationGuardChange = vi.fn();
+    render(current, onSave, onReset, onNavigationGuardChange);
+    const session = input("session_timeout_s");
+    act(() => setInputValue(session, "1200"));
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0].dirty).toBe(true);
+    expect(host!.textContent).not.toContain("PLANTED RESEARCH RUNTIME WARNING");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    expect(host!.textContent).toContain("AI Research Runtime Limits");
+    expect(host!.textContent).toContain("Maximum tool calls");
+    expect(host!.textContent).toContain("Session timeout");
+    expect(host!.textContent).toContain("Per-tool timeout");
+    expect(input("session_timeout_s")).toBe(session);
+    expect(input("max_tool_calls").value).toBe("60");
+    expect(session.value).toBe("1200");
+    expect(input("per_tool_timeout_s").value).toBe("45");
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "AI Research runtime limits have unsaved changes.",
+    });
+
+    act(() => {
+      root!.render(React.createElement(ResearchRuntimeSection, {
+        settings: current,
+        saving: false,
+        onSave,
+        onReset,
+        onNavigationGuardChange,
+        developerMode: true,
+      }));
+    });
+    expect(host!.textContent).toContain("Developer diagnostics");
+    expect(host!.textContent).toContain("PLANTED RESEARCH RUNTIME WARNING");
   });
 });

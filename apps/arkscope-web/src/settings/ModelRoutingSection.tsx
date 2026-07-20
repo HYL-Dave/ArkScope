@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   ModelCatalog,
   ModelOption,
@@ -11,23 +12,129 @@ import {
   groupedModelEntries,
   modelProviderReason,
   optionReason,
+  type ModelEntryGroupId,
+  type ModelEntryWithReason,
 } from "../modelPicker";
 import { routeIsOverridable, routeSourceBadge } from "../modelRouteDisplay";
 import {
   isTaskTestSnapshotCurrent,
-  MODEL_UX_LABELS,
   providerContexts,
   type DraftRouteValue,
   type TaskTestSnapshot,
 } from "../modelRoutingUx";
 import { effortOptionsForModel } from "../researchModels";
 import { formatSystemTimestamp } from "../timeDisplay";
+import {
+  settingsEffortLabel,
+  settingsTaskLabel,
+  settingsThinkingLabel,
+  type SettingsT,
+} from "./settingsCopy";
 
-export const TASK_LABELS: Record<ModelTask, string> = {
-  card_synthesis: "AI 卡片生成",
-  card_translation: "卡片翻譯",
-  ai_research: "AI 研究",
-};
+function taskDescription(task: ModelTask, t: SettingsT): string {
+  switch (task) {
+    case "card_synthesis":
+      return t(($) => $.models.tasks.cardSynthesis.description);
+    case "card_translation":
+      return t(($) => $.models.tasks.cardTranslation.description);
+    case "ai_research":
+      return t(($) => $.models.tasks.aiResearch.description);
+  }
+}
+
+function modelGroupLabel(group: ModelEntryGroupId, t: SettingsT): string {
+  switch (group) {
+    case "available":
+      return t(($) => $.models.groups.available);
+    case "visible_disabled":
+      return t(($) => $.models.groups.visibleDisabled);
+    case "advanced":
+      return t(($) => $.models.groups.advanced);
+    case "current":
+      return t(($) => $.models.groups.current);
+  }
+}
+
+function modelReasonLabel(reason: string, t: SettingsT): string {
+  switch (reason) {
+    case "missing_active_credential":
+      return t(($) => $.models.credentials.missing);
+    case "task_auth_mode_unsupported":
+      return t(($) => $.models.compatibility.unsupported);
+    case "task_test_unsupported":
+      return t(($) => $.models.test.unsupported);
+    case "task_capability_missing":
+      return t(($) => $.models.compatibility.missingCapability);
+    case "model_not_visible":
+      return t(($) => $.models.compatibility.modelNotVisible);
+    case "model_not_in_registry":
+      return t(($) => $.models.custom.unknown);
+    case "discovery_unavailable":
+      return t(($) => $.models.catalog.unavailable);
+    case "provider_call_failed":
+      return t(($) => $.models.test.failed);
+    case "reauth_required":
+      return t(($) => $.providers.openAI.tokenExpired);
+    default:
+      return reason;
+  }
+}
+
+function authModeLabel(authMode: string, t: SettingsT): string {
+  switch (authMode) {
+    case "api_key":
+      return t(($) => $.models.credentials.apiKey);
+    case "api_key_pool":
+      return t(($) => $.models.credentials.apiKeyPool);
+    case "chatgpt_oauth":
+      return t(($) => $.models.credentials.chatgptOAuth);
+    case "claude_code_oauth":
+      return t(($) => $.models.credentials.claudeCodeOAuth);
+    default:
+      return authMode;
+  }
+}
+
+function providerLabel(provider: ModelProvider, t: SettingsT): string {
+  return provider === "openai"
+    ? t(($) => $.models.providers.openai)
+    : t(($) => $.models.providers.anthropic);
+}
+
+function modelEntrySuffix(entry: ModelEntryWithReason, t: SettingsT): string | null {
+  if (entry.disabledReason) return modelReasonLabel(entry.disabledReason, t);
+  if (entry.compatibility === "legacy_unverified") {
+    return t(($) => $.models.compatibility.legacyMode);
+  }
+  if (entry.status === "advanced" || entry.status === "seed") {
+    return t(($) => $.models.groups.advanced);
+  }
+  if (entry.status === "route" && entry.reason_code) {
+    return modelReasonLabel(entry.reason_code, t);
+  }
+  return null;
+}
+
+function DeveloperDiagnostics({
+  diagnostics,
+  t,
+}: {
+  diagnostics: readonly (string | null | undefined)[];
+  t: SettingsT;
+}) {
+  const visible = diagnostics.filter((value): value is string => !!value);
+  if (!visible.length) return null;
+  return (
+    <details className="developer-diagnostics">
+      <summary>{t(($) => $.errors.diagnostics.title)}</summary>
+      {visible.map((value, index) => (
+        <p key={`${index}:${value}`}>
+          <strong>{t(($) => $.errors.diagnostics.detail)}</strong>: {value}
+        </p>
+      ))}
+    </details>
+  );
+}
 
 export interface DraftRoute extends DraftRouteValue {}
 
@@ -49,6 +156,7 @@ export function ModelRoutingSection({
   onDiscover = async () => {},
   onInvalidateTest = () => {},
   onOpenProviders = () => {},
+  developerMode,
 }: {
   catalog: ModelCatalog;
   draft: Partial<Record<ModelTask, DraftRoute>>;
@@ -60,7 +168,9 @@ export function ModelRoutingSection({
   onDiscover?: (provider: ModelProvider, credentialId: string) => Promise<void> | void;
   onInvalidateTest?: (task: ModelTask) => void;
   onOpenProviders?: () => void;
+  developerMode: boolean;
 }) {
+  const { t } = useTranslation("settings");
   const contexts = providerContexts(catalog.effective?.providers, catalog.credentials);
   const compatMode = !catalog.effective?.providers;
 
@@ -73,10 +183,8 @@ export function ModelRoutingSection({
     <>
       <div className="settings-section-head">
         <div>
-          <h2>任務模型路由</h2>
-          <p className="muted">
-            登入在 Providers 管理；這裡只決定每個任務使用哪個 provider、模型與 effort。
-          </p>
+          <h2>{t(($) => $.models.section.title)}</h2>
+          <p className="muted">{t(($) => $.models.section.description)}</p>
         </div>
       </div>
       <div className="settings-grid">
@@ -138,31 +246,38 @@ export function ModelRoutingSection({
             || !!selectedReason
             || !!currentTest?.loading
           );
+          const routeBadge = routeSourceBadge(effectiveRoute?.source ?? "default", t);
           return (
             <div className="settings-panel" key={task.id} data-testid={`route-${task.id}`}>
               <div className="settings-panel-head">
                 <div>
-                  <h2>{TASK_LABELS[task.id]}</h2>
-                  <p className="muted">{task.description}</p>
+                  <h2>{settingsTaskLabel(task.id, t)}</h2>
+                  <p className="muted">{taskDescription(task.id, t)}</p>
                 </div>
                 <span
-                  className={`route-source ${routeSourceBadge(effectiveRoute?.source ?? "default").tone}`}
-                  aria-label={`路由權威 ${routeSourceBadge(effectiveRoute?.source ?? "default").label}`}
+                  className={`route-source ${routeBadge.tone}`}
+                  aria-label={`${t(($) => $.models.route.authority)} ${routeBadge.label}`}
                 >
-                  {routeSourceBadge(effectiveRoute?.source ?? "default").label}
+                  {routeBadge.label}
                 </span>
               </div>
 
-              {envLocked && (
+              {envLocked ? (
                 <p className="warn-text">
-                  目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。
+                  {t(($) => $.models.route.authority)}: {routeBadge.label}
                 </p>
-              )}
-              {effectiveRoute?.warning && <p className="warn-text">{effectiveRoute.warning}</p>}
+              ) : null}
+              {developerMode ? (
+                <DeveloperDiagnostics diagnostics={[effectiveRoute?.warning]} t={t} />
+              ) : null}
 
               <div className="field">
-                <span>Provider</span>
-                <div className="model-provider-toggle" role="group" aria-label={`Provider ${task.id}`}>
+                <span>{t(($) => $.models.fields.provider)}</span>
+                <div
+                  className="model-provider-toggle"
+                  role="group"
+                  aria-label={`${t(($) => $.models.fields.provider)} ${task.id}`}
+                >
                   {(["openai", "anthropic"] as ModelProvider[]).map((provider) => (
                     <button
                       key={provider}
@@ -183,7 +298,7 @@ export function ModelRoutingSection({
                         });
                       }}
                     >
-                      {provider === "openai" ? "OpenAI" : "Anthropic"}
+                      {providerLabel(provider, t)}
                     </button>
                   ))}
                 </div>
@@ -193,46 +308,48 @@ export function ModelRoutingSection({
                 {context ? (
                   <>
                     <strong>{context.label}</strong>
-                    <span>{MODEL_UX_LABELS.authModes[context.auth_mode] ?? context.auth_mode}</span>
+                    <span>{authModeLabel(context.auth_mode, t)}</span>
                     <span>
                       {providerBlock?.cache_state === "ok"
-                        ? "已取得可見模型清單"
+                        ? t(($) => $.models.groups.available)
                         : providerBlock?.cache_state === "seed_only"
-                          ? "此通道無法線上列出模型"
-                          : "尚未探索此登入的模型"}
+                          ? t(($) => $.models.catalog.seedOnly)
+                          : t(($) => $.models.catalog.unavailable)}
                     </span>
                     {providerBlock?.discovered_at && (
-                      <span>最後驗證可見 {formatSystemTimestamp(providerBlock.discovered_at)}</span>
+                      <span>
+                        {t(($) => $.models.metrics.testedAt, {
+                          timestamp: formatSystemTimestamp(providerBlock.discovered_at),
+                        })}
+                      </span>
                     )}
                     <button
                       type="button"
                       className="btn-ghost small"
                       onClick={() => void onDiscover(row.provider, context.credential_id)}
                     >
-                      重新驗證列表
+                      {t(($) => $.models.catalog.verifyAgain)}
                     </button>
                   </>
                 ) : (
                   <>
-                    <strong>尚未設定此 provider 的登入</strong>
+                    <strong>{t(($) => $.models.credentials.missing)}</strong>
                     <button type="button" className="btn-ghost small" onClick={onOpenProviders}>
-                      前往 Providers
+                      {t(($) => $.models.credentials.openProviders)}
                     </button>
                   </>
                 )}
               </div>
 
-              {compatMode && (
-                <p className="warn-text">
-                  未驗證（舊 sidecar 相容模式）。請重啟／更新 sidecar 後再執行模型測試。
-                </p>
-              )}
+              {compatMode ? (
+                <p className="warn-text">{t(($) => $.models.compatibility.legacyMode)}</p>
+              ) : null}
 
               {!row.custom ? (
                 <div className="field">
-                  <span>Model</span>
+                  <span>{t(($) => $.models.fields.model)}</span>
                   <select
-                    aria-label={`模型 ${task.id}`}
+                    aria-label={`${t(($) => $.models.fields.model)} ${task.id}`}
                     value={entries.some((entry) => entry.id === row.model) ? row.model : ""}
                     disabled={modelSelectDisabled}
                     onChange={(event) => {
@@ -248,33 +365,30 @@ export function ModelRoutingSection({
                       updateTask(task.id, { ...row, model, effort, custom: false });
                     }}
                   >
-                    <option value="">選擇模型…</option>
+                    <option value="">{t(($) => $.models.catalog.select)}</option>
                     {groups.map((group) => (
-                      <optgroup key={group.label} label={group.label}>
-                        {group.entries.map((entry) => (
-                          <option
-                            key={`${group.label}:${entry.id}`}
-                            value={entry.id}
-                            disabled={!!entry.disabledReason}
-                          >
-                            {entry.label}
-                            {entry.disabledReason
-                              ? ` · ${MODEL_UX_LABELS.reasons[entry.disabledReason] ?? entry.disabledReason}`
-                              : entry.status === "advanced"
-                                ? " · 進階"
-                                : entry.status === "seed"
-                                  ? " · 未驗證"
-                                  : entry.status === "route" && entry.reason_code
-                                    ? ` · ${MODEL_UX_LABELS.reasons[entry.reason_code] ?? entry.reason_code}`
-                                    : ""}
-                          </option>
-                        ))}
+                      <optgroup key={group.id} label={modelGroupLabel(group.id, t)}>
+                        {group.entries.map((entry) => {
+                          const suffix = modelEntrySuffix(entry, t);
+                          return (
+                            <option
+                              key={`${group.id}:${entry.id}`}
+                              value={entry.id}
+                              disabled={!!entry.disabledReason}
+                            >
+                              {entry.baseLabel}{suffix ? ` · ${suffix}` : ""}
+                            </option>
+                          );
+                        })}
                       </optgroup>
                     ))}
                   </select>
                   {disabledReasons.length > 0 && (
-                    <p className="field-help" aria-label={`模型限制 ${task.id}`}>
-                      不可選：{disabledReasons.map((reason) => MODEL_UX_LABELS.reasons[reason] ?? reason).join("；")}
+                    <p
+                      className="field-help"
+                      aria-label={`${t(($) => $.models.fields.model)} ${task.id}`}
+                    >
+                      {disabledReasons.map((reason) => modelReasonLabel(reason, t)).join("; ")}
                     </p>
                   )}
                   <button
@@ -283,37 +397,37 @@ export function ModelRoutingSection({
                     disabled={!context}
                     onClick={() => updateTask(task.id, { ...row, effort: "default", custom: true })}
                   >
-                    輸入自訂 model id
+                    {t(($) => $.models.custom.use)}
                   </button>
                 </div>
               ) : (
                 <div className="field">
-                  <span>自訂 model id · 未驗證</span>
+                  <span>{t(($) => $.models.custom.label)}</span>
                   <input
-                    aria-label={`自訂 model id ${task.id}`}
+                    aria-label={`${t(($) => $.models.custom.label)} ${task.id}`}
                     value={row.model}
-                    placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
+                    placeholder={t(($) => $.models.custom.placeholder)}
                     onChange={(event) => updateTask(task.id, {
                       ...row,
                       model: event.currentTarget.value.trim(),
                       custom: true,
                     })}
                   />
-                  <span className="field-help">自訂 id 仍會經過「實際測試」；不會被當成已驗證模型。</span>
+                  <span className="field-help">{t(($) => $.models.custom.unknown)}</span>
                   <button
                     type="button"
                     className="btn-ghost small model-custom-toggle"
                     onClick={() => updateTask(task.id, { ...row, custom: false })}
                   >
-                    返回模型列表
+                    {t(($) => $.actions.cancel)}
                   </button>
                 </div>
               )}
 
               <label className="field">
-                <span>Effort</span>
+                <span>{t(($) => $.models.fields.effort)}</span>
                 <select
-                  aria-label={`Effort ${task.id}`}
+                  aria-label={`${t(($) => $.models.fields.effort)} ${task.id}`}
                   value={effortOptions.some((item) => item.id === (row.effort || "default"))
                     ? (row.effort || "default")
                     : "default"}
@@ -323,21 +437,17 @@ export function ModelRoutingSection({
                   })}
                 >
                   {effortOptions.map((effort) => (
-                    <option key={effort.id} value={effort.id}>{effort.label}</option>
+                    <option key={effort.id} value={effort.id}>
+                      {settingsEffortLabel(effort.id, t)}
+                    </option>
                   ))}
                 </select>
-                <span className="field-help">
-                  {effortOptions.find((item) => item.id === (row.effort || "default"))?.description
-                    ?? "Provider default."}
-                </span>
               </label>
 
               <div className="model-thinking-line">
-                <span>Thinking</span>
+                <span>{t(($) => $.models.fields.thinking)}</span>
                 <strong>
-                  {MODEL_UX_LABELS.thinking[selectedEntry?.thinking_mode ?? "none"]
-                    ?? selectedEntry?.thinking_mode
-                    ?? MODEL_UX_LABELS.thinking.none}
+                  {settingsThinkingLabel(selectedEntry?.thinking_mode ?? "none", t)}
                 </strong>
               </div>
 
@@ -345,6 +455,8 @@ export function ModelRoutingSection({
                 models={modelsByProvider[row.provider] ?? []}
                 selected={row.model}
                 custom={row.custom}
+                developerMode={developerMode}
+                t={t}
               />
 
               <div className="settings-actions">
@@ -354,28 +466,28 @@ export function ModelRoutingSection({
                   disabled={testDisabled}
                   onClick={() => void onTest(task.id)}
                 >
-                  {currentTest?.loading && testIsCurrent ? "測試中…" : "實際測試"}
+                  {currentTest?.loading && testIsCurrent
+                    ? t(($) => $.models.test.running)
+                    : t(($) => $.models.test.run)}
                 </button>
-                {context?.auth_mode.includes("oauth") && (
-                  <span className="muted tiny">消耗訂閱額度，非 API 帳單</span>
-                )}
                 {routeIsOverridable(effectiveRoute?.source ?? "default") && (
                   <button
                     type="button"
                     className="btn-ghost small"
-                    aria-label={`重設 ${task.id}`}
+                    aria-label={`${t(($) => $.actions.reset)} ${task.id}`}
                     onClick={() => void onReset(task.id)}
                   >
-                    重設為 fallback
+                    {t(($) => $.actions.reset)}
                   </button>
                 )}
               </div>
 
-              {currentTest && !testIsCurrent && (
-                <p className="muted tiny">選擇已變更——重新測試</p>
-              )}
               {currentTest?.result && testIsCurrent && (
-                <TaskModelTestStatus result={currentTest.result} />
+                <TaskModelTestStatus
+                  result={currentTest.result}
+                  developerMode={developerMode}
+                  t={t}
+                />
               )}
             </div>
           );
@@ -384,17 +496,30 @@ export function ModelRoutingSection({
     </>
   );
 }
-function TaskModelTestStatus({ result }: { result: TaskModelTestResult }) {
+function TaskModelTestStatus({
+  result,
+  developerMode,
+  t,
+}: {
+  result: TaskModelTestResult;
+  developerMode: boolean;
+  t: SettingsT;
+}) {
   const ok = result.status === "ok";
-  const action = result.error_code ? MODEL_UX_LABELS.reasons[result.error_code] : null;
+  const action = result.error_code ? modelReasonLabel(result.error_code, t) : null;
   return (
     <div className={`test-status ${ok ? "ok" : "bad"}`}>
-      <strong>{ok ? "可實際呼叫" : action ?? "測試失敗"}</strong>
-      {result.latency_ms != null && <span>{result.latency_ms} ms</span>}
-      {result.warning && <p className="warn-text">{result.warning}</p>}
+      <strong>{ok ? t(($) => $.models.test.succeeded) : action ?? t(($) => $.models.test.failed)}</strong>
+      {result.latency_ms != null ? (
+        <span>{t(($) => $.models.metrics.latency, { value: result.latency_ms })}</span>
+      ) : null}
+      <span>{t(($) => $.models.metrics.testedAt, { timestamp: formatSystemTimestamp(result.tested_at) })}</span>
       {result.fallback_effort && (
-        <p className="muted tiny">fallback effort: {result.fallback_effort}</p>
+        <p className="muted tiny">
+          {t(($) => $.models.fields.effort)}: {settingsEffortLabel(result.fallback_effort, t)}
+        </p>
       )}
+      {developerMode ? <DeveloperDiagnostics diagnostics={[result.warning]} t={t} /> : null}
     </div>
   );
 }
@@ -402,26 +527,19 @@ function ModelNotes({
   models,
   selected,
   custom,
+  developerMode,
+  t,
 }: {
   models: ModelOption[];
   selected: string;
   custom: boolean;
+  developerMode: boolean;
+  t: SettingsT;
 }) {
   if (custom) {
-    return (
-      <p className="muted tiny">
-        這個 model id 不在 seed catalog；請用 Providers 的 discovery/test 確認此 credential 是否可用。
-      </p>
-    );
+    return <p className="muted tiny">{t(($) => $.models.custom.unknown)}</p>;
   }
   const model = models.find((m) => m.id === selected);
-  if (!model) return null;
-  return (
-    <div className="model-note">
-      <span>{model.speed} speed</span>
-      <span>{model.cost_tier} cost</span>
-      <span>verified {model.verified_at}</span>
-      <p>{model.notes}</p>
-    </div>
-  );
+  if (!model || !developerMode) return null;
+  return <DeveloperDiagnostics diagnostics={[model.notes]} t={t} />;
 }

@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   FixedTaskRuntimeMap,
   FixedTaskRuntimeSettings,
   ResearchRuntimeSettings,
 } from "../api";
+import { routeSourceBadge } from "../modelRouteDisplay";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
+import type { SettingsT } from "./settingsCopy";
 
-function runtimeSourceBadge(
-  source: ResearchRuntimeSettings["source"] | FixedTaskRuntimeSettings["source"],
-) {
-  if (source === "db") return { label: "DB 已儲存", tone: "active" };
-  if (source === "env") return { label: "env override", tone: "override" };
-  if (source === "profile") return { label: "設定檔 fallback", tone: "fallback" };
-  return { label: "內建預設", tone: "default" };
+function RuntimeDiagnostics({ warning, t }: { warning: string | null; t: SettingsT }) {
+  if (!warning) return null;
+  return (
+    <details className="developer-diagnostics">
+      <summary>{t(($) => $.errors.diagnostics.title)}</summary>
+      <p>
+        <strong>{t(($) => $.errors.diagnostics.detail)}</strong>: {warning}
+      </p>
+    </details>
+  );
 }
 function parseFixedTaskTimeout(raw: string): number | null {
   const trimmed = raw.trim();
@@ -31,6 +37,7 @@ export function FixedTaskRuntimeSection({
   onSave,
   onReset,
   onNavigationGuardChange,
+  developerMode,
 }: {
   settings: FixedTaskRuntimeMap;
   saving: boolean;
@@ -42,7 +49,9 @@ export function FixedTaskRuntimeSection({
   }) => void | Promise<void>;
   onReset: () => void | Promise<void>;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  developerMode: boolean;
 }) {
+  const { t } = useTranslation("settings");
   const [draft, setDraft] = useState({
     card_synthesis: String(settings.card_synthesis.model_timeout_s),
     card_translation: String(settings.card_translation.model_timeout_s),
@@ -67,9 +76,9 @@ export function FixedTaskRuntimeSection({
 
   useEffect(() => {
     onNavigationGuardChange?.(dirty
-      ? { dirty: true, busy: false, reason: "固定 AI 任務執行限制有未儲存的變更。" }
+      ? { dirty: true, busy: false, reason: t(($) => $.runtime.fixed.dirty) }
       : CLEAR_SETTINGS_NAVIGATION_GUARD);
-  }, [dirty, onNavigationGuardChange]);
+  }, [dirty, onNavigationGuardChange, t]);
 
   useEffect(() => () => {
     onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -81,12 +90,12 @@ export function FixedTaskRuntimeSection({
   }> = [
     {
       key: "card_synthesis",
-      label: "AI 卡片生成 - 模型執行上限（秒）",
+      label: t(($) => $.runtime.fixed.fields.cardSynthesis),
       settings: settings.card_synthesis,
     },
     {
       key: "card_translation",
-      label: "卡片翻譯 - 模型執行上限（秒）",
+      label: t(($) => $.runtime.fixed.fields.cardTranslation),
       settings: settings.card_translation,
     },
   ];
@@ -95,16 +104,14 @@ export function FixedTaskRuntimeSection({
     <section className="settings-panel research-runtime-panel">
       <div className="settings-panel-head">
         <div>
-          <h2>固定 AI 任務執行限制</h2>
-          <p className="muted">
-            較高 effort 的模型可能需要更久；這裡只控制最長等待時間，不會變更模型或 effort。
-          </p>
+          <h2>{t(($) => $.runtime.fixed.title)}</h2>
+          <p className="muted">{t(($) => $.runtime.fixed.description)}</p>
         </div>
       </div>
 
       <div className="runtime-limit-grid">
         {rows.map((row) => {
-          const badge = runtimeSourceBadge(row.settings.source);
+          const badge = routeSourceBadge(row.settings.source, t);
           return (
             <label className="field" key={row.key}>
               <span>{row.label}</span>
@@ -121,9 +128,8 @@ export function FixedTaskRuntimeSection({
                 }))}
               />
               <span className={`route-source ${badge.tone}`}>{badge.label}</span>
-              {row.settings.warning && (
-                <span className="warn-text">{row.settings.warning}</span>
-              )}
+              <span className="field-help">{t(($) => $.runtime.fixed.help.seconds)}</span>
+              {developerMode ? <RuntimeDiagnostics warning={row.settings.warning} t={t} /> : null}
             </label>
           );
         })}
@@ -144,7 +150,7 @@ export function FixedTaskRuntimeSection({
             });
           }}
         >
-          {saving ? "儲存中…" : "儲存固定任務限制"}
+          {saving ? t(($) => $.actions.saving) : t(($) => $.actions.save)}
         </button>
         {canReset && (
           <button
@@ -153,7 +159,7 @@ export function FixedTaskRuntimeSection({
             disabled={saving}
             onClick={() => void onReset()}
           >
-            重設固定任務限制
+            {t(($) => $.actions.reset)}
           </button>
         )}
       </div>
@@ -167,13 +173,16 @@ export function ResearchRuntimeSection({
   onSave,
   onReset,
   onNavigationGuardChange,
+  developerMode,
 }: {
   settings: ResearchRuntimeSettings;
   saving: boolean;
   onSave: (body: Pick<ResearchRuntimeSettings, "max_tool_calls" | "session_timeout_s" | "per_tool_timeout_s">) => void | Promise<void>;
   onReset: () => void | Promise<void>;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  developerMode: boolean;
 }) {
+  const { t } = useTranslation("settings");
   const [draft, setDraft] = useState({
     max_tool_calls: String(settings.max_tool_calls),
     session_timeout_s: String(settings.session_timeout_s),
@@ -188,7 +197,7 @@ export function ResearchRuntimeSection({
     });
   }, [settings.max_tool_calls, settings.session_timeout_s, settings.per_tool_timeout_s]);
 
-  const badge = runtimeSourceBadge(settings.source);
+  const badge = routeSourceBadge(settings.source, t);
   const disabled = saving || !draft.max_tool_calls || !draft.session_timeout_s || !draft.per_tool_timeout_s;
   const dirty = draft.max_tool_calls !== String(settings.max_tool_calls)
     || draft.session_timeout_s !== String(settings.session_timeout_s)
@@ -196,9 +205,9 @@ export function ResearchRuntimeSection({
 
   useEffect(() => {
     onNavigationGuardChange?.(dirty
-      ? { dirty: true, busy: false, reason: "AI 研究執行限制有未儲存的變更。" }
+      ? { dirty: true, busy: false, reason: t(($) => $.runtime.research.dirty) }
       : CLEAR_SETTINGS_NAVIGATION_GUARD);
-  }, [dirty, onNavigationGuardChange]);
+  }, [dirty, onNavigationGuardChange, t]);
 
   useEffect(() => () => {
     onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -208,19 +217,17 @@ export function ResearchRuntimeSection({
     <section className="settings-panel research-runtime-panel">
       <div className="settings-panel-head">
         <div>
-          <h2>AI 研究執行限制</h2>
-          <p className="muted">
-            控制單次 AI 研究的工具輪數與 subscription driver timeout。API-key 路徑目前只套用 max turns；切頁不中斷與並行會由 server-owned run manager 解決。
-          </p>
+          <h2>{t(($) => $.runtime.research.title)}</h2>
+          <p className="muted">{t(($) => $.runtime.research.description)}</p>
         </div>
         <span className={`route-source ${badge.tone}`}>{badge.label}</span>
       </div>
 
-      {settings.warning && <p className="warn-text">{settings.warning}</p>}
+      {developerMode ? <RuntimeDiagnostics warning={settings.warning} t={t} /> : null}
 
       <div className="runtime-limit-grid">
         <label className="field">
-          <span>Max turns</span>
+          <span>{t(($) => $.runtime.research.fields.maxToolCalls)}</span>
           <input
             name="max_tool_calls"
             type="number"
@@ -230,10 +237,9 @@ export function ResearchRuntimeSection({
             value={draft.max_tool_calls}
             onChange={(e) => setDraft((prev) => ({ ...prev, max_tool_calls: e.target.value }))}
           />
-          <span className="field-help">模型可連續呼叫工具的最大輪數；API-key 與 subscription Research 都會套用。</span>
         </label>
         <label className="field">
-          <span>Session timeout 秒</span>
+          <span>{t(($) => $.runtime.research.fields.sessionTimeout)}</span>
           <input
             name="session_timeout_s"
             type="number"
@@ -243,10 +249,10 @@ export function ResearchRuntimeSection({
             value={draft.session_timeout_s}
             onChange={(e) => setDraft((prev) => ({ ...prev, session_timeout_s: e.target.value }))}
           />
-          <span className="field-help">subscription driver 的整體牆鐘時間；0 代表不設整體 timeout。</span>
+          <span className="field-help">{t(($) => $.runtime.research.help.session)}</span>
         </label>
         <label className="field">
-          <span>每工具 timeout 秒</span>
+          <span>{t(($) => $.runtime.research.fields.perToolTimeout)}</span>
           <input
             name="per_tool_timeout_s"
             type="number"
@@ -256,7 +262,7 @@ export function ResearchRuntimeSection({
             value={draft.per_tool_timeout_s}
             onChange={(e) => setDraft((prev) => ({ ...prev, per_tool_timeout_s: e.target.value }))}
           />
-          <span className="field-help">subscription driver 裡單一 ArkScope 工具呼叫的 timeout。</span>
+          <span className="field-help">{t(($) => $.runtime.research.help.perTool)}</span>
         </label>
       </div>
 
@@ -271,11 +277,11 @@ export function ResearchRuntimeSection({
             per_tool_timeout_s: Number(draft.per_tool_timeout_s),
           })}
         >
-          {saving ? "儲存中…" : "儲存限制"}
+          {saving ? t(($) => $.actions.saving) : t(($) => $.actions.save)}
         </button>
         {settings.db_saved && (
           <button type="button" className="btn-ghost small" disabled={saving} onClick={() => onReset()}>
-            重設限制
+            {t(($) => $.actions.reset)}
           </button>
         )}
       </div>

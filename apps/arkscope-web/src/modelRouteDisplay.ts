@@ -2,23 +2,27 @@
 // The model route resolves through real env > DB > yaml > default; the badge tells the
 // user WHICH authority a row currently comes from so "save" / "reset" aren't a black box.
 import type { TaskRoute } from "./api";
+import { settingsRouteSourceLabel, type SettingsT } from "./settings/settingsCopy";
 
 export type RouteSource = TaskRoute["source"]; // "env" | "db" | "profile" | "default"
 export type RouteBadgeTone = "active" | "fallback" | "override" | "default";
 
 // Source badge: DB = the app-saved authority; profile = user_profile.local.yaml fallback
 // (DB empty); env = an operator ARKSCOPE_* var that outranks the DB; default = built-in seed.
-export function routeSourceBadge(source: RouteSource): { label: string; tone: RouteBadgeTone } {
+export function routeSourceBadge(
+  source: RouteSource,
+  t: SettingsT,
+): { label: string; tone: RouteBadgeTone } {
   switch (source) {
     case "db":
-      return { label: "DB（已儲存）", tone: "active" };
+      return { label: settingsRouteSourceLabel(source, t), tone: "active" };
     case "profile":
-      return { label: "設定檔 fallback", tone: "fallback" };
+      return { label: settingsRouteSourceLabel(source, t), tone: "fallback" };
     case "env":
-      return { label: "env 覆蓋", tone: "override" };
+      return { label: settingsRouteSourceLabel(source, t), tone: "override" };
     case "default":
     default:
-      return { label: "內建預設", tone: "default" };
+      return { label: settingsRouteSourceLabel(source, t), tone: "default" };
   }
 }
 

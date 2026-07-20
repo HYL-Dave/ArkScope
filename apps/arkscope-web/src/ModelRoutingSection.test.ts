@@ -2,13 +2,21 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ModelRoutingSection } from "./Settings";
 import type { ModelCatalog, ModelOption, ProviderCredential, TaskRoute, TaskModelTestResult } from "./api";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   if (root) {
@@ -84,6 +92,7 @@ function render(
       onReset,
       onDiscover: vi.fn(),
       onInvalidateTest: vi.fn(),
+      developerMode: false,
       ...extra,
     }));
   });
@@ -92,7 +101,7 @@ function render(
 
 function resetButtons(): HTMLButtonElement[] {
   return Array.from(host!.querySelectorAll("button")).filter(
-    (b) => b.textContent?.trim() === "重設為 fallback") as HTMLButtonElement[];
+    (b) => b.textContent?.trim() === "重設") as HTMLButtonElement[];
 }
 
 describe("ModelRoutingSection reset affordance", () => {
@@ -220,7 +229,7 @@ describe("ModelRoutingSection provider-first UX", () => {
   it("renders one selector with four groups and disables ineligible entries with text reasons", () => {
     render(vi.fn(), catalogV2());
     const card = researchCard();
-    const select = card.querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement;
+    const select = card.querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement;
     expect(Array.from(select.querySelectorAll("optgroup")).map((g) => g.label)).toEqual([
       "可供此任務使用", "此登入可見", "進階／未驗證", "目前路由",
     ]);
@@ -236,7 +245,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const card = researchCard();
     expect(card.querySelector('[aria-label="顯示進階模型"]')).toBeNull();
     expect(card.querySelector("details")).toBeNull();
-    expect(card.querySelectorAll('select[aria-label="模型 ai_research"]')).toHaveLength(1);
+    expect(card.querySelectorAll('select[aria-label="Model ai_research"]')).toHaveLength(1);
   });
 
   it("reveals a clearly marked custom id input", () => {
@@ -250,7 +259,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     }) as unknown as DraftDispatch;
     render(vi.fn(), catalogV2(), onDraft);
     const card = researchCard();
-    act(() => buttonByText(card, "輸入自訂 model id").click());
+    act(() => buttonByText(card, "使用自訂模型").click());
     const updated = drafts.at(-1) as Record<string, { custom: boolean }>;
     expect(updated.ai_research.custom).toBe(true);
 
@@ -265,7 +274,7 @@ describe("ModelRoutingSection provider-first UX", () => {
         card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
       },
     });
-    expect(researchCard().querySelector('[aria-label="自訂 model id ai_research"]')).toBeTruthy();
+    expect(researchCard().querySelector('[aria-label="自訂 model ID ai_research"]')).toBeTruthy();
     expect(researchCard().textContent).toContain("未驗證");
   });
 
@@ -273,7 +282,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const cat = catalogV2();
     render(vi.fn(), cat);
     expect(researchCard().textContent).toContain("ChatGPT Plus");
-    expect(researchCard().textContent).toContain("最後驗證可見");
+    expect(researchCard().textContent).toContain("測試時間");
 
     act(() => root!.unmount());
     root = null;
@@ -283,8 +292,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat);
     const card = researchCard();
     expect(card.textContent).toContain("尚未設定此 provider 的登入");
-    expect((card.querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement).disabled).toBe(true);
-    expect(card.textContent).toContain("前往 Providers");
+    expect((card.querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement).disabled).toBe(true);
+    expect(card.textContent).toContain("前往 Provider 登入與憑證");
   });
 
   it("shows the selected Anthropic credential and its seed-only state", () => {
@@ -355,14 +364,14 @@ describe("ModelRoutingSection provider-first UX", () => {
     const onTest = vi.fn();
     render(vi.fn(), catalogV2(), undefined, { onTest });
     const card = researchCard();
-    expect(card.textContent).toContain("消耗訂閱額度，非 API 帳單");
+    expect(card.textContent).toContain("ChatGPT 訂閱登入");
     act(() => buttonByText(card, "實際測試").click());
     expect(onTest).toHaveBeenCalledWith("ai_research");
   });
 
   it("keeps route-pinned unknown models in the current route group", () => {
     render(vi.fn(), catalogV2());
-    const select = researchCard().querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement;
+    const select = researchCard().querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement;
     const routeGroup = Array.from(select.querySelectorAll("optgroup"))
       .find((group) => group.label === "目前路由")!;
     expect(routeGroup.textContent).toContain("mystery-model");
@@ -384,7 +393,7 @@ describe("ModelRoutingSection provider-first UX", () => {
         },
       },
     });
-    expect(researchCard().textContent).toContain("選擇已變更——重新測試");
+    expect(researchCard().querySelector(".test-status")).toBeNull();
     expect(researchCard().textContent).not.toContain("12 ms");
   });
 
@@ -403,7 +412,7 @@ describe("ModelRoutingSection provider-first UX", () => {
         },
       },
     });
-    expect(researchCard().textContent).toContain("可實際呼叫");
+    expect(researchCard().textContent).toContain("實際測試通過");
     expect(researchCard().textContent).toContain("12 ms");
   });
 
@@ -435,9 +444,131 @@ describe("ModelRoutingSection provider-first UX", () => {
     const card = researchCard();
     expect(buttonByText(card, "OpenAI")).toBeTruthy();
     expect(card.textContent).toContain("未驗證（舊 sidecar 相容模式）");
-    expect(card.textContent).toContain("請重啟／更新 sidecar");
     expect((buttonByText(card, "實際測試")).disabled).toBe(true);
     expect(card.querySelector('[aria-label="顯示進階模型"]')).toBeNull();
     expect(card.querySelector("details")).toBeNull();
+  });
+
+  it("renders English task model effort and thinking copy from semantic ids", async () => {
+    const cat = catalogV2();
+    cat.tasks = cat.tasks.map((task) => ({
+      ...task,
+      label: `BACKEND TASK LABEL ${task.id}`,
+      description: `BACKEND TASK DESCRIPTION ${task.id}`,
+    }));
+    cat.effort_options.openai = cat.effort_options.openai.map((effort) => ({
+      ...effort,
+      label: `BACKEND EFFORT LABEL ${effort.id}`,
+      description: `BACKEND EFFORT DESCRIPTION ${effort.id}`,
+    }));
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    render(vi.fn(), cat);
+
+    const research = researchCard();
+    expect(host!.textContent).toContain("Task Model Routing");
+    expect(research.textContent).toContain("AI Research");
+    expect(research.textContent).toContain("Run multi-step AI research work.");
+    expect(Array.from(research.querySelectorAll("optgroup")).map((group) => group.label))
+      .toEqual([
+        "Available for this task",
+        "Visible to this sign-in",
+        "Advanced / unverified",
+        "Current route",
+      ]);
+    const effort = research.querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    expect(Array.from(effort.options).map((option) => option.textContent)).toContain("Low");
+    const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
+    expect(translation.textContent).toContain("Adaptive thinking available");
+    expect(host!.textContent).not.toContain("BACKEND TASK");
+    expect(host!.textContent).not.toContain("BACKEND EFFORT");
+  });
+
+  it("preserves model ids credential labels and selected values across locale change", async () => {
+    const cat = catalogV2();
+    cat.effective!.providers!.openai = {
+      ...cat.effective!.providers!.openai!,
+      label: "Desk credential alias",
+    };
+    render(vi.fn(), cat);
+    const research = researchCard();
+    const model = research.querySelector('[aria-label="Model ai_research"]') as HTMLSelectElement;
+    const effort = research.querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    const openai = buttonByText(research, "OpenAI");
+    expect(model.value).toBe("gpt-5.4-mini");
+    expect(effort.value).toBe("low");
+    expect(research.textContent).toContain("Desk credential alias");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    const translatedResearch = researchCard();
+    expect(translatedResearch.querySelector('[aria-label="Model ai_research"]')).toBe(model);
+    expect(translatedResearch.querySelector('[aria-label="Effort ai_research"]')).toBe(effort);
+    expect(model.value).toBe("gpt-5.4-mini");
+    expect(effort.value).toBe("low");
+    expect(buttonByText(translatedResearch, "OpenAI")).toBe(openai);
+    expect(openai.getAttribute("aria-pressed")).toBe("true");
+    expect(translatedResearch.textContent).toContain("Desk credential alias");
+    expect(translatedResearch.textContent).toContain("gpt-5.4-mini");
+  });
+
+  it("shows raw model warnings only in Developer Mode", () => {
+    const cat = catalogV2();
+    cat.routes.ai_research = {
+      ...cat.routes.ai_research,
+      warning: "PLANTED ROUTE WARNING",
+    };
+    const warnedModel = {
+      ...MODELS[0],
+      notes: "PLANTED MODEL NOTE",
+    };
+    const result: TaskModelTestResult = {
+      task: "ai_research",
+      provider: "openai",
+      model: "gpt-5.4-mini",
+      effort: "low",
+      auth_mode: "chatgpt_oauth",
+      credential_id: "local:7",
+      status: "error",
+      error_code: "provider_call_failed",
+      latency_ms: null,
+      tested_at: "2026-07-11T00:00:00Z",
+      fallback_effort: null,
+      warning: "PLANTED TEST WARNING",
+    };
+    const testState = {
+      ai_research: {
+        loading: false,
+        result,
+        stale: false,
+        snapshot: {
+          task: "ai_research",
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          effort: "low",
+          credential_id: "local:7",
+        },
+      },
+    };
+    const modelsByProvider = { anthropic: [MODELS[1]], openai: [warnedModel] };
+
+    render(vi.fn(), cat, undefined, { testState, modelsByProvider });
+    expect(host!.textContent).not.toContain("PLANTED ROUTE WARNING");
+    expect(host!.textContent).not.toContain("PLANTED MODEL NOTE");
+    expect(host!.textContent).not.toContain("PLANTED TEST WARNING");
+
+    act(() => root!.unmount());
+    root = null;
+    host!.remove();
+    host = null;
+    render(vi.fn(), cat, undefined, {
+      developerMode: true,
+      testState,
+      modelsByProvider,
+    });
+    expect(host!.textContent).toContain("開發者診斷");
+    expect(host!.textContent).toContain("PLANTED ROUTE WARNING");
+    expect(host!.textContent).toContain("PLANTED MODEL NOTE");
+    expect(host!.textContent).toContain("PLANTED TEST WARNING");
   });
 });

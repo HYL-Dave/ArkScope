@@ -7,14 +7,24 @@ import type {
 } from "./api";
 import { MODEL_UX_LABELS, type DraftRouteValue } from "./modelRoutingUx";
 
+export type ModelEntryGroupId = "available" | "visible_disabled" | "advanced" | "current";
+
 export type ModelEntryWithReason = EffectiveProviderModelEntry & {
   disabledReason: string | null;
+  baseLabel: string;
+  compatibility: "legacy_unverified" | null;
 };
 
 export type ModelEntryGroup = {
+  id: ModelEntryGroupId;
   label: string;
   entries: ModelEntryWithReason[];
 };
+
+type ModelEntryInput = EffectiveProviderModelEntry & Partial<Pick<
+  ModelEntryWithReason,
+  "baseLabel" | "compatibility"
+>>;
 
 export function modelProviderReason(
   context: EffectiveProviderSummary | null | undefined,
@@ -40,27 +50,33 @@ export function optionReason(
 }
 
 export function groupedModelEntries(
-  entries: EffectiveProviderModelEntry[],
+  entries: ModelEntryInput[],
   providerReason: string | null,
 ): ModelEntryGroup[] {
   const withReason = entries.map((entry) => ({
     ...entry,
     disabledReason: optionReason(entry, providerReason),
+    baseLabel: entry.baseLabel ?? entry.label,
+    compatibility: entry.compatibility ?? null,
   }));
   return [
     {
+      id: "available",
       label: MODEL_UX_LABELS.groups[0],
       entries: withReason.filter((entry) => entry.status === "visible" && !entry.disabledReason),
     },
     {
+      id: "visible_disabled",
       label: MODEL_UX_LABELS.groups[1],
       entries: withReason.filter((entry) => entry.status === "visible" && !!entry.disabledReason),
     },
     {
+      id: "advanced",
       label: MODEL_UX_LABELS.groups[2],
       entries: withReason.filter((entry) => entry.status === "advanced" || entry.status === "seed"),
     },
     {
+      id: "current",
       label: MODEL_UX_LABELS.groups[3],
       entries: withReason.filter((entry) => entry.status === "route"),
     },
@@ -71,10 +87,12 @@ export function compatEntries(
   provider: ModelProvider,
   row: Pick<DraftRouteValue, "model">,
   modelsByProvider: Record<ModelProvider, ModelOption[]>,
-): EffectiveProviderModelEntry[] {
-  const entries: EffectiveProviderModelEntry[] = (modelsByProvider[provider] ?? []).map((model) => ({
+): ModelEntryInput[] {
+  const entries: ModelEntryInput[] = (modelsByProvider[provider] ?? []).map((model) => ({
     id: model.id,
     label: `${model.label} · 未驗證（舊 sidecar 相容模式）`,
+    baseLabel: model.label,
+    compatibility: "legacy_unverified",
     status: "advanced",
     visible_to_credential: null,
     eligible: true,
@@ -86,6 +104,8 @@ export function compatEntries(
     entries.push({
       id: row.model,
       label: `${row.model} · 未驗證（舊 sidecar 相容模式）`,
+      baseLabel: row.model,
+      compatibility: "legacy_unverified",
       status: "route",
       visible_to_credential: null,
       eligible: true,

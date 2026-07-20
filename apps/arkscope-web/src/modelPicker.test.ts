@@ -86,13 +86,23 @@ describe("shared model picker authority", () => {
       entry("advanced", { status: "advanced" }),
       entry("route", { status: "route" }),
     ], null);
-    expect(groups.map((group) => [group.label, group.entries.map((item) => item.id)]))
+    expect(groups.map((group) => [group.id, group.label, group.entries.map((item) => item.id)]))
       .toEqual([
-        ["可供此任務使用", ["ready"]],
-        ["此登入可見", ["disabled"]],
-        ["進階／未驗證", ["advanced"]],
-        ["目前路由", ["route"]],
+        ["available", "可供此任務使用", ["ready"]],
+        ["visible_disabled", "此登入可見", ["disabled"]],
+        ["advanced", "進階／未驗證", ["advanced"]],
+        ["current", "目前路由", ["route"]],
       ]);
+    expect(groups.flatMap((group) => group.entries).map((item) => ({
+      id: item.id,
+      baseLabel: item.baseLabel,
+      compatibility: item.compatibility,
+    }))).toEqual([
+      { id: "ready", baseLabel: "ready", compatibility: null },
+      { id: "disabled", baseLabel: "disabled", compatibility: null },
+      { id: "advanced", baseLabel: "advanced", compatibility: null },
+      { id: "route", baseLabel: "route", compatibility: null },
+    ]);
   });
 
   it("keeps old-sidecar compatibility entries visibly unverified", () => {
@@ -110,19 +120,43 @@ describe("shared model picker authority", () => {
       verified_at: "",
       notes: "",
     };
-    expect(compatEntries("openai", { model: "gpt-custom" }, { openai: [seed], anthropic: [] }))
-      .toEqual([
+    const compatibility = compatEntries(
+      "openai",
+      { model: "gpt-custom" },
+      { openai: [seed], anthropic: [] },
+    );
+    expect(compatibility).toEqual([
         expect.objectContaining({
           id: "gpt-5.4-mini",
           status: "advanced",
           label: "GPT-5.4 mini · 未驗證（舊 sidecar 相容模式）",
+          baseLabel: "GPT-5.4 mini",
+          compatibility: "legacy_unverified",
         }),
         expect.objectContaining({
           id: "gpt-custom",
           status: "route",
           reason_code: "model_not_in_registry",
+          baseLabel: "gpt-custom",
+          compatibility: "legacy_unverified",
         }),
       ]);
+    expect(groupedModelEntries(compatibility, null).flatMap((group) => group.entries).map((item) => ({
+      id: item.id,
+      baseLabel: item.baseLabel,
+      compatibility: item.compatibility,
+    }))).toEqual([
+      {
+        id: "gpt-5.4-mini",
+        baseLabel: "GPT-5.4 mini",
+        compatibility: "legacy_unverified",
+      },
+      {
+        id: "gpt-custom",
+        baseLabel: "gpt-custom",
+        compatibility: "legacy_unverified",
+      },
+    ]);
   });
 
   it("turns a missing active credential into one provider veto for every entry", () => {

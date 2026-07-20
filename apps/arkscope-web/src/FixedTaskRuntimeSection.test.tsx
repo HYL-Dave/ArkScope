@@ -2,7 +2,8 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FixedTaskRuntimeSection } from "./Settings";
 import type {
@@ -11,8 +12,15 @@ import type {
 } from "./api";
 import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   if (root) act(() => root!.unmount());
@@ -50,6 +58,7 @@ function render(
   onSave = vi.fn(),
   onReset = vi.fn(),
   onNavigationGuardChange?: SettingsNavigationGuardReporter,
+  developerMode = false,
 ) {
   host = document.createElement("div");
   document.body.append(host);
@@ -61,6 +70,7 @@ function render(
       onSave,
       onReset,
       onNavigationGuardChange,
+      developerMode,
     }));
   });
   return { onSave, onReset };
@@ -92,11 +102,11 @@ describe("FixedTaskRuntimeSection", () => {
 
     expect(input("card_synthesis_model_timeout_s").value).toBe("1200");
     expect(input("card_translation_model_timeout_s").value).toBe("600");
-    expect(host!.textContent).toContain("AI 卡片生成 - 模型執行上限（秒）");
-    expect(host!.textContent).toContain("卡片翻譯 - 模型執行上限（秒）");
-    expect(host!.textContent).toContain("env override");
+    expect(host!.textContent).toContain("AI 卡片生成逾時");
+    expect(host!.textContent).toContain("卡片翻譯逾時");
+    expect(host!.textContent).toContain("env 覆蓋");
     expect(host!.textContent).toContain("內建預設");
-    expect(button("重設固定任務限制")).toBeTruthy();
+    expect(button("重設")).toBeTruthy();
   });
 
   it("saves both task values atomically", () => {
@@ -105,7 +115,7 @@ describe("FixedTaskRuntimeSection", () => {
       setInputValue(input("card_synthesis_model_timeout_s"), "1500");
       setInputValue(input("card_translation_model_timeout_s"), "750");
     });
-    act(() => button("儲存固定任務限制")!.click());
+    act(() => button("儲存")!.click());
 
     expect(onSave).toHaveBeenCalledWith({
       tasks: {
@@ -122,19 +132,19 @@ describe("FixedTaskRuntimeSection", () => {
       act(() => {
         setInputValue(input("card_synthesis_model_timeout_s"), value);
       });
-      expect(button("儲存固定任務限制")!.disabled).toBe(true);
+      expect(button("儲存")!.disabled).toBe(true);
     },
   );
 
   it("hides reset only when neither task has a saved DB row", () => {
     render(settings({ source: "default", db_saved: false }, { source: "default", db_saved: false }));
-    expect(button("重設固定任務限制")).toBeUndefined();
+    expect(button("重設")).toBeUndefined();
   });
 
   it("explains effort sensitivity without changing route quality", () => {
     render();
-    expect(host!.textContent).toContain("較高 effort");
-    expect(host!.textContent).toContain("不會變更模型或 effort");
+    expect(host!.textContent).toContain("設定 AI 卡片生成與翻譯的模型執行上界。");
+    expect(host!.textContent).toContain("以秒為單位。");
   });
 
   it("reports_runtime_draft_dirty_and_clears_when_settings_catch_up", () => {
@@ -149,7 +159,7 @@ describe("FixedTaskRuntimeSection", () => {
     expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
       dirty: true,
       busy: false,
-      reason: "固定 AI 任務執行限制有未儲存的變更。",
+      reason: "固定任務執行限制有未儲存的變更。",
     });
 
     act(() => {
@@ -159,6 +169,7 @@ describe("FixedTaskRuntimeSection", () => {
         onSave,
         onReset,
         onNavigationGuardChange,
+        developerMode: false,
       }));
     });
     expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
@@ -166,5 +177,50 @@ describe("FixedTaskRuntimeSection", () => {
       busy: false,
       reason: null,
     });
+  });
+
+  it("renders English fixed-task limits without changing values or dirty state", async () => {
+    const current = settings(
+      { warning: "PLANTED SYNTHESIS RUNTIME WARNING" },
+      { warning: "PLANTED TRANSLATION RUNTIME WARNING" },
+    );
+    const onSave = vi.fn();
+    const onReset = vi.fn();
+    const onNavigationGuardChange = vi.fn();
+    render(current, onSave, onReset, onNavigationGuardChange);
+    const synthesis = input("card_synthesis_model_timeout_s");
+    const translation = input("card_translation_model_timeout_s");
+    act(() => setInputValue(synthesis, "1200"));
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0].dirty).toBe(true);
+    expect(host!.textContent).not.toContain("PLANTED SYNTHESIS RUNTIME WARNING");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    expect(host!.textContent).toContain("Fixed AI Task Runtime Limits");
+    expect(host!.textContent).toContain("AI card synthesis timeout");
+    expect(host!.textContent).toContain("Card translation timeout");
+    expect(input("card_synthesis_model_timeout_s")).toBe(synthesis);
+    expect(input("card_translation_model_timeout_s")).toBe(translation);
+    expect(synthesis.value).toBe("1200");
+    expect(translation.value).toBe("900");
+    expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "Fixed task runtime limits have unsaved changes.",
+    });
+
+    act(() => {
+      root!.render(React.createElement(FixedTaskRuntimeSection, {
+        settings: current,
+        saving: false,
+        onSave,
+        onReset,
+        onNavigationGuardChange,
+        developerMode: true,
+      }));
+    });
+    expect(host!.textContent).toContain("Developer diagnostics");
+    expect(host!.textContent).toContain("PLANTED SYNTHESIS RUNTIME WARNING");
+    expect(host!.textContent).toContain("PLANTED TRANSLATION RUNTIME WARNING");
   });
 });

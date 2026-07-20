@@ -2,6 +2,7 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -108,11 +109,14 @@ import { SettingsView } from "./Settings";
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
   controls.catalogPending = null;
   controls.catalogError = null;
   controls.catalogOverride = null;
   controls.discoverModels.mockReset();
+  controls.saveFixedTaskRuntime.mockReset();
+  controls.saveFixedTaskRuntime.mockResolvedValue({ fixed_task_runtime: {} });
   window.localStorage.clear();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
@@ -169,7 +173,7 @@ describe("Settings model route save gate", () => {
     await flush();
 
     const save = Array.from(host.querySelectorAll("button"))
-      .find((button) => button.textContent?.trim() === "儲存路由") as HTMLButtonElement;
+      .find((button) => button.textContent?.trim() === "儲存") as HTMLButtonElement;
     expect(save.disabled).toBe(false);
 
     const research = host.querySelector('[data-testid="route-ai_research"]')!;
@@ -179,7 +183,7 @@ describe("Settings model route save gate", () => {
     await flush();
 
     expect(save.disabled).toBe(true);
-    expect(host.textContent).toContain("本次變更尚未儲存");
+    expect(host.textContent).toContain("AI 研究: 尚未設定此 provider 的登入");
   });
 
   it("wires the fixed-task panel to one atomic settings request", async () => {
@@ -251,8 +255,9 @@ describe("Settings model route save gate", () => {
       setter?.call(synthesis, "1200");
       synthesis.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const save = Array.from(host.querySelectorAll("button"))
-      .find((item) => item.textContent?.includes("儲存固定任務限制")) as HTMLButtonElement;
+    const fixed = host.querySelector('[data-settings-anchor="fixed_task_runtime"]')!;
+    const save = Array.from(fixed.querySelectorAll("button"))
+      .find((item) => item.textContent?.includes("儲存")) as HTMLButtonElement;
     await act(async () => save.click());
     await flush();
 
@@ -263,6 +268,13 @@ describe("Settings model route save gate", () => {
       },
     });
     expect(onRuntimeChanged).toHaveBeenCalledOnce();
+    const outcome = host.querySelector(".ok-text")!;
+    expect(outcome.textContent).toBe("固定任務執行限制已儲存。");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    expect(host.querySelector(".ok-text")).toBe(outcome);
+    expect(outcome.textContent).toBe("Fixed task runtime limits saved.");
   });
 
   it("opens an enabled section from a sequenced shell request", async () => {
@@ -339,7 +351,7 @@ describe("Settings model route save gate", () => {
     await flush();
 
     expect(host.querySelector('[data-settings-anchor="providers"]')?.textContent)
-      .toContain("Loading model catalog");
+      .toContain("正在載入模型目錄…");
     await click(tabWithText("個人化"));
     expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
     await click(tabWithText("資料與同步"));
@@ -361,7 +373,7 @@ describe("Settings model route save gate", () => {
     await flush();
 
     const providers = host.querySelector('[data-settings-anchor="providers"]');
-    expect(providers?.textContent).toContain("無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。");
+    expect(providers?.textContent).toContain("無法載入模型目錄。");
     expect(host.textContent).not.toContain("private catalog transport detail");
     await click(tabWithText("個人化"));
     expect(host.querySelector('[data-settings-anchor="investor_profile"]')).not.toBeNull();
@@ -383,10 +395,10 @@ describe("Settings model route save gate", () => {
     await flush();
 
     const models = host.querySelector('[data-settings-anchor="models"]')!;
-    expect(Array.from(models.querySelectorAll("button")).some((button) => button.textContent?.trim() === "儲存路由"))
+    expect(Array.from(models.querySelectorAll("button")).some((button) => button.textContent?.trim() === "儲存"))
       .toBe(true);
     const transfer = Array.from(models.querySelectorAll("details"))
-      .find((details) => details.querySelector("summary")?.textContent === "匯入與匯出");
+      .find((details) => details.querySelector("summary")?.textContent === "從設定檔匯入 / 匯出到設定檔");
     expect(transfer?.open).toBe(false);
     expect(Array.from(transfer?.querySelectorAll("button") ?? []).map((button) => button.textContent?.trim()))
       .toEqual(["從設定檔匯入", "匯出到設定檔"]);
@@ -476,7 +488,7 @@ describe("Settings model route save gate", () => {
     const restoredAnthropic = Array.from(restored.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "Anthropic")!;
     expect(restoredAnthropic.getAttribute("aria-pressed")).toBe("true");
-    expect(host.textContent).toContain("本次變更尚未儲存");
+    expect(host.textContent).toContain("AI 研究: 尚未設定此 provider 的登入");
   });
 
   it("preserves_discovery_state_across_workflow_tab_unmounts", async () => {
@@ -530,5 +542,283 @@ describe("Settings model route save gate", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     await click(tabWithText("AI 與模型"));
     expect(host.textContent).toContain("gpt-discovered");
+  });
+
+  it("renders the model-routing owner in English without backend task labels", async () => {
+    controls.catalogOverride = {
+      ...catalog,
+      tasks: catalog.tasks.map((task) => ({
+        ...task,
+        label: `BACKEND TASK LABEL ${task.id}`,
+        description: `BACKEND TASK DESCRIPTION ${task.id}`,
+      })),
+      effort_options: {
+        openai: catalog.effort_options.openai.map((effort) => ({
+          ...effort,
+          label: "BACKEND EFFORT LABEL",
+          description: "BACKEND EFFORT DESCRIPTION",
+        })),
+        anthropic: catalog.effort_options.anthropic,
+      },
+    };
+    await i18n.changeLanguage("en");
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const models = host.querySelector('[data-settings-anchor="models"]')!;
+    expect(models.textContent).toContain("Task Model Routing");
+    expect(models.textContent).toContain("AI Card Synthesis");
+    expect(models.textContent).toContain("Card Translation");
+    expect(models.textContent).toContain("AI Research");
+    expect(models.textContent).toContain("Generate source-grounded AI cards.");
+    expect(models.textContent).not.toContain("BACKEND TASK");
+    expect(models.textContent).not.toContain("BACKEND EFFORT");
+  });
+
+  it("keeps model route drafts and discovery state through locale change", async () => {
+    const credential: ProviderCredential = {
+      id: "local:7",
+      provider: "openai",
+      auth_type: "api_key",
+      label: "Desk credential alias",
+      account_label: null,
+      expires_at: null,
+      source: "profile_state.db",
+      available: true,
+      masked: "sk-a…AAAA",
+      active: true,
+      editable: true,
+      can_discover_models: true,
+      can_test_models: true,
+      notes: "",
+    };
+    const openAiModels = [
+      {
+        id: "gpt-5.4-mini",
+        label: "gpt-5.4-mini",
+        status: "visible" as const,
+        visible_to_credential: true,
+        eligible: true,
+        reason_code: null,
+        thinking_mode: "none",
+        effort_options: ["low", "high"],
+      },
+      {
+        id: "gpt-custom-preserved",
+        label: "gpt-custom-preserved",
+        status: "advanced" as const,
+        visible_to_credential: true,
+        eligible: true,
+        reason_code: null,
+        thinking_mode: "none",
+        effort_options: ["low", "high"],
+      },
+    ];
+    const openAiBlock = {
+      executable: true,
+      reason_code: null,
+      cache_state: "ok" as const,
+      discovered_at: "2026-07-11T00:00:00Z",
+      models: openAiModels,
+    };
+    controls.catalogOverride = {
+      ...catalog,
+      credentials: { ...catalog.credentials, openai: [credential] },
+      effort_options: {
+        ...catalog.effort_options,
+        openai: ["default", "low", "high"].map((id) => ({
+          id: id as "default" | "low" | "high",
+          provider: "openai" as const,
+          label: `BACKEND ${id}`,
+          description: `BACKEND ${id}`,
+          applies_to_card_tasks: true,
+        })),
+      },
+      effective: {
+        providers: {
+          ...catalog.effective!.providers,
+          openai: {
+            credential_id: credential.id,
+            auth_mode: "api_key",
+            label: credential.label,
+          },
+        },
+        tasks: Object.fromEntries((Object.keys(routes) as ModelTask[]).map((task) => [task, {
+          verified: [],
+          advanced: [],
+          cache_state: "ok",
+          discovered_at: null,
+          current_provider: routes[task].provider,
+          providers: {
+            openai: openAiBlock,
+            anthropic: providerBlock("anthropic", "claude-sonnet-5"),
+          },
+        }])) as NonNullable<ModelCatalog["effective"]>["tasks"],
+      },
+    };
+    controls.discoverModels.mockResolvedValue({
+      provider: "openai",
+      credential_id: credential.id,
+      status: "ok",
+      models: [{
+        id: "gpt-discovered",
+        provider: "openai",
+        label: "gpt-discovered",
+        source: "provider_api",
+      }],
+      error: null,
+      source_url: null,
+    } satisfies ModelDiscoveryResult);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const discover = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "列模型")!;
+    await click(discover);
+    const research = host.querySelector('[data-testid="route-ai_research"]')!;
+    const customToggle = research.querySelector<HTMLButtonElement>(".model-custom-toggle")!;
+    await click(customToggle);
+    const custom = research.querySelector("input") as HTMLInputElement;
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    await act(async () => {
+      inputSetter?.call(custom, "gpt-custom-preserved");
+      custom.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const effort = research.querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      selectSetter?.call(effort, "high");
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const openai = Array.from(research.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "OpenAI")!;
+    const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!;
+    expect(host.textContent).toContain("gpt-discovered");
+    expect(custom.value).toBe("gpt-custom-preserved");
+    expect(effort.value).toBe("high");
+    expect(save.disabled).toBe(false);
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    const translatedResearch = host.querySelector('[data-testid="route-ai_research"]')!;
+    expect(translatedResearch).toBe(research);
+    expect(translatedResearch.querySelector("input")).toBe(custom);
+    expect(custom.value).toBe("gpt-custom-preserved");
+    expect(translatedResearch.querySelector('[aria-label="Effort ai_research"]')).toBe(effort);
+    expect(effort.value).toBe("high");
+    expect(openai.getAttribute("aria-pressed")).toBe("true");
+    expect(save.disabled).toBe(false);
+    expect(host.textContent).toContain("gpt-discovered");
+  });
+
+  it("hides raw catalog and mutation diagnostics outside Developer Mode", async () => {
+    const plantedWarning = "PLANTED RAW MODEL CATALOG WARNING";
+    controls.catalogOverride = {
+      ...catalog,
+      routes: {
+        ...catalog.routes,
+        ai_research: { ...catalog.routes.ai_research, warning: plantedWarning },
+      },
+    };
+    controls.saveFixedTaskRuntime.mockRejectedValueOnce(
+      new Error("PLANTED RAW MUTATION DIAGNOSTIC"),
+    );
+    const runtime = {
+      anthropic: {
+        model: "claude-sonnet-5",
+        model_advanced: "claude-opus-4-8",
+        effort: null,
+        thinking: false,
+        key_set: true,
+        credentials: [],
+      },
+      openai: {
+        model: "gpt-5.4-mini",
+        model_advanced: "gpt-5.6-luna",
+        reasoning_effort: "default",
+        key_set: true,
+        credentials: [],
+      },
+      card_synthesis: routes.card_synthesis,
+      card_translation: routes.card_translation,
+      ai_research: routes.ai_research,
+      research_runtime: {
+        max_tool_calls: 60,
+        session_timeout_s: 900,
+        per_tool_timeout_s: 45,
+        source: "default",
+        db_saved: false,
+        warning: "PLANTED RAW RESEARCH RUNTIME WARNING",
+      },
+      fixed_task_runtime: {
+        card_synthesis: {
+          task: "card_synthesis",
+          model_timeout_s: 900,
+          source: "db",
+          db_saved: true,
+          warning: "PLANTED RAW FIXED RUNTIME WARNING",
+        },
+        card_translation: {
+          task: "card_translation",
+          model_timeout_s: 900,
+          source: "db",
+          db_saved: true,
+          warning: null,
+        },
+      },
+      data_keys: {},
+    } satisfies RuntimeConfig;
+    await i18n.changeLanguage("en");
+    const onRuntimeChanged = vi.fn(async () => undefined);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, {
+        runtime,
+        developerMode: false,
+        onRuntimeChanged,
+      }));
+    });
+    await flush();
+
+    expect(host.textContent).not.toContain(plantedWarning);
+    expect(host.textContent).not.toContain("PLANTED RAW RESEARCH RUNTIME WARNING");
+    expect(host.textContent).not.toContain("PLANTED RAW FIXED RUNTIME WARNING");
+    const fixed = host.querySelector('[data-settings-anchor="fixed_task_runtime"]')!;
+    const save = fixed.querySelector<HTMLButtonElement>("button")!;
+    expect.soft(save.textContent?.trim()).toBe("Save");
+    await click(save);
+    expect(host.textContent).toContain("Could not save settings.");
+    expect(host.textContent).not.toContain("PLANTED RAW MUTATION DIAGNOSTIC");
+
+    await act(async () => {
+      root!.render(React.createElement(SettingsView, {
+        runtime,
+        developerMode: true,
+        onRuntimeChanged,
+      }));
+    });
+    expect(host.textContent).toContain("Developer diagnostics");
+    expect(host.textContent).toContain("PLANTED RAW MUTATION DIAGNOSTIC");
   });
 });

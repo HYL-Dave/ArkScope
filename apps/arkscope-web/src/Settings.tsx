@@ -37,7 +37,6 @@ import { DataStorageSection } from "./settings/DataStorageSection";
 import { MacroStorageSection } from "./settings/MacroStorageSection";
 import {
   ModelRoutingSection,
-  TASK_LABELS,
   type DraftRoute,
   type TestState,
 } from "./settings/ModelRoutingSection";
@@ -120,6 +119,16 @@ type SettingsRouteOutcomePresentation = {
   message: string;
 };
 
+type SettingsRuntimeOutcome =
+  | { kind: "fixed_save_succeeded" }
+  | { kind: "fixed_save_failed"; diagnostic: string }
+  | { kind: "fixed_reset_succeeded" }
+  | { kind: "fixed_reset_failed"; diagnostic: string }
+  | { kind: "research_save_succeeded" }
+  | { kind: "research_save_failed"; diagnostic: string }
+  | { kind: "research_reset_succeeded" }
+  | { kind: "research_reset_failed"; diagnostic: string };
+
 function unreachableRouteOutcome(outcome: never): never {
   throw new Error(`unknown Settings route outcome: ${String(outcome)}`);
 }
@@ -167,6 +176,32 @@ function settingsRouteOutcomePresentation(
   }
 }
 
+function settingsRuntimeOutcomePresentation(
+  outcome: SettingsRuntimeOutcome,
+  t: SettingsT,
+): SettingsRouteOutcomePresentation {
+  switch (outcome.kind) {
+    case "fixed_save_succeeded":
+      return { tone: "ok", message: t(($) => $.runtime.fixed.saved) };
+    case "fixed_reset_succeeded":
+      return { tone: "ok", message: t(($) => $.runtime.fixed.reset) };
+    case "research_save_succeeded":
+      return { tone: "ok", message: t(($) => $.runtime.research.saved) };
+    case "research_reset_succeeded":
+      return { tone: "ok", message: t(($) => $.runtime.research.reset) };
+    case "fixed_save_failed":
+    case "research_save_failed":
+      return { tone: "error", message: t(($) => $.errors.saveFailed) };
+    case "fixed_reset_failed":
+    case "research_reset_failed":
+      return { tone: "error", message: t(($) => $.errors.mutationFailed) };
+  }
+}
+
+function runtimeOutcomeDiagnostic(outcome: SettingsRuntimeOutcome | null): string | null {
+  return outcome && "diagnostic" in outcome ? outcome.diagnostic : null;
+}
+
 function firstBusyOrDirtyGuard(
   guards: readonly SettingsNavigationGuard[],
 ): SettingsNavigationGuard {
@@ -198,9 +233,8 @@ export function SettingsView({
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const [routeOutcome, setRouteOutcome] = useState<SettingsRouteOutcome | null>(null);
+  const [runtimeOutcome, setRuntimeOutcome] = useState<SettingsRuntimeOutcome | null>(null);
   const [activeGroup, setActiveGroup] = useState<SettingsGroupId>(() => readActiveSettingsGroup());
   const [section, setSection] = useState<SettingsAnchorId>(() => firstSettingsAnchor(activeGroup));
   const [directoryQuery, setDirectoryQuery] = useState("");
@@ -389,25 +423,15 @@ export function SettingsView({
 
   async function save() {
     if (!catalog) return;
-    if (routeSaveBlocks.length) {
-      setRouteOutcome(null);
-      setMsg(null);
-      setErr(
-        routeSaveBlocks
-          .map(({ task }) => `${TASK_LABELS[task]}：所選 provider 尚未設定登入`)
-          .join("；"),
-      );
-      return;
-    }
+    if (routeSaveBlocks.length) return;
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       const routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string; effort: string }>> = {};
       for (const task of catalog.tasks) {
         const row = draft[task.id];
-        if (!row || !row.model.trim()) throw new Error(`${TASK_LABELS[task.id]} 缺少 model id`);
+        if (!row || !row.model.trim()) throw new Error("invalid model route");
         routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort || "default" };
       }
       await saveModelRoutes(routes);
@@ -426,9 +450,8 @@ export function SettingsView({
 
   async function importRoutes() {
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       const result = await importModelRoutes();
       const refreshed = await getModelCatalog();
@@ -450,9 +473,8 @@ export function SettingsView({
 
   async function exportRoutes() {
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       const result = await exportModelRoutes();
       // the clear branch can drop a task from profile→default, so refresh the badge/draft
@@ -477,15 +499,17 @@ export function SettingsView({
     body: Pick<ResearchRuntimeSettings, "max_tool_calls" | "session_timeout_s" | "per_tool_timeout_s">,
   ) {
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       await saveResearchRuntime(body);
       await onRuntimeChanged();
-      setMsg("AI 研究執行限制已儲存到 profile DB。");
+      setRuntimeOutcome({ kind: "research_save_succeeded" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setRuntimeOutcome({
+        kind: "research_save_failed",
+        diagnostic: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setSaving(false);
     }
@@ -493,15 +517,17 @@ export function SettingsView({
 
   async function resetRuntimeLimits() {
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       await deleteResearchRuntime();
       await onRuntimeChanged();
-      setMsg("AI 研究執行限制已重設為設定檔／內建預設。");
+      setRuntimeOutcome({ kind: "research_reset_succeeded" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setRuntimeOutcome({
+        kind: "research_reset_failed",
+        diagnostic: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setSaving(false);
     }
@@ -514,15 +540,17 @@ export function SettingsView({
     };
   }) {
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       await saveFixedTaskRuntime(body);
       await onRuntimeChanged();
-      setMsg("固定 AI 任務執行限制已儲存到 profile DB。");
+      setRuntimeOutcome({ kind: "fixed_save_succeeded" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setRuntimeOutcome({
+        kind: "fixed_save_failed",
+        diagnostic: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setSaving(false);
     }
@@ -530,15 +558,17 @@ export function SettingsView({
 
   async function resetFixedTaskLimits() {
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     setRouteOutcome(null);
+    setRuntimeOutcome(null);
     try {
       await deleteFixedTaskRuntime();
       await onRuntimeChanged();
-      setMsg("固定 AI 任務執行限制已重設為環境變數／內建預設。");
+      setRuntimeOutcome({ kind: "fixed_reset_succeeded" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setRuntimeOutcome({
+        kind: "fixed_reset_failed",
+        diagnostic: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setSaving(false);
     }
@@ -648,7 +678,11 @@ export function SettingsView({
             </div>
             {routeSaveBlocks.length > 0 ? (
               <p id="route-save-blocked" className="warn-text">
-                本次變更尚未儲存：請先到 Providers 完成所選 provider 的登入。
+                {routeSaveBlocks
+                  .map(({ task }) => (
+                    `${settingsTaskLabel(task, t)}: ${t(($) => $.models.credentials.missing)}`
+                  ))
+                  .join("; ")}
               </p>
             ) : null}
             <details className="settings-model-transfer">
@@ -684,6 +718,7 @@ export function SettingsView({
             draft={draft}
             modelsByProvider={modelsByProvider}
             testState={testState}
+            developerMode={developerMode}
             onDraft={setDraft}
             onTest={async (task) => {
             const row = draft[task];
@@ -743,9 +778,8 @@ export function SettingsView({
             onDiscover={discoverAndRefresh}
             onOpenProviders={() => revealSection("providers")}
             onReset={async (task) => {
-            setErr(null);
-            setMsg(null);
             setRouteOutcome(null);
+            setRuntimeOutcome(null);
             try {
               await deleteModelRoute(task);
               const refreshed = await getModelCatalog();
@@ -771,6 +805,7 @@ export function SettingsView({
           onSave={saveFixedTaskLimits}
           onReset={resetFixedTaskLimits}
           onNavigationGuardChange={setFixedRuntimeGuard}
+          developerMode={developerMode}
         />
       ) : null;
     }
@@ -783,6 +818,7 @@ export function SettingsView({
           onSave={saveRuntimeLimits}
           onReset={resetRuntimeLimits}
           onNavigationGuardChange={setResearchRuntimeGuard}
+          developerMode={developerMode}
         />
       ) : null;
     }
@@ -833,18 +869,34 @@ export function SettingsView({
   const routeOutcomePresentation = routeOutcome
     ? settingsRouteOutcomePresentation(routeOutcome, t)
     : null;
+  const runtimeOutcomePresentation = runtimeOutcome
+    ? settingsRuntimeOutcomePresentation(runtimeOutcome, t)
+    : null;
+  const runtimeDiagnostic = runtimeOutcomeDiagnostic(runtimeOutcome);
 
   return (
     <main className="main settings-workspace" data-settings-overlay={String(shellOverlay)}>
       <PageHeader title={t(($) => $.workspace.title)} />
 
-      {err && <p className="error-text">{err}</p>}
       {routeOutcomePresentation?.tone === "error" ? (
         <p className="error-text">{routeOutcomePresentation.message}</p>
       ) : null}
-      {msg && <p className="ok-text">{msg}</p>}
+      {runtimeOutcomePresentation?.tone === "error" ? (
+        <p className="error-text">{runtimeOutcomePresentation.message}</p>
+      ) : null}
       {routeOutcomePresentation?.tone === "ok" ? (
         <p className="ok-text">{routeOutcomePresentation.message}</p>
+      ) : null}
+      {runtimeOutcomePresentation?.tone === "ok" ? (
+        <p className="ok-text">{runtimeOutcomePresentation.message}</p>
+      ) : null}
+      {developerMode && runtimeDiagnostic ? (
+        <details className="developer-diagnostics">
+          <summary>{t(($) => $.errors.diagnostics.title)}</summary>
+          <p>
+            <strong>{t(($) => $.errors.diagnostics.detail)}</strong>: {runtimeDiagnostic}
+          </p>
+        </details>
       ) : null}
       {blockedNotice ? (
         <InlineAlert state="blocked" title={t(($) => $.workspace.blocked.title)}>
