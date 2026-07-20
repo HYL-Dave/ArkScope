@@ -298,6 +298,9 @@ describe("MacroStorageSection", () => {
       expect.soft(host!.querySelector("h2")?.textContent).toBe("Macro Data");
       expect.soft(host!.textContent).toContain("FRED Snapshot");
       expect.soft(host!.textContent).toContain("12 stored");
+      expect.soft(host!.textContent).toContain(
+        `12 stored · last fetched ${formatSystemTimestamp("2026-07-19T03:00:00Z")}`,
+      );
       expect.soft(host!.textContent).toContain("FEDFUNDS");
       expect.soft(host!.textContent).toContain("Federal Funds Effective Rate");
       expect.soft(host!.textContent).toContain("4.33 Percent");
