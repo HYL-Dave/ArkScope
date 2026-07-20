@@ -1,6 +1,8 @@
 import { Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "../ui";
+import { settingsGroupLabel, settingsSectionCopy } from "./settingsCopy";
 import {
   SETTINGS_GROUPS,
   searchSettings,
@@ -22,20 +24,26 @@ export function SettingsDirectory({
   onQueryChange: (query: string) => void;
   onSelect: (id: SettingsAnchorId) => void;
 }) {
+  const { t } = useTranslation("settings");
   const normalizedQuery = query.normalize("NFKC").trim();
   const matches = normalizedQuery ? searchSettings(query) : settingsGroup(activeGroup).sections;
   const matchIds = new Set(matches.map((section) => section.id));
 
   return (
-    <nav className="settings-directory" aria-label="設定目錄">
+    <nav
+      className="settings-directory"
+      aria-label={t(($) => $.workspace.directory.title)}
+    >
       <label className="settings-directory-search">
-        <span className="ui-visually-hidden">搜尋所有設定</span>
+        <span className="ui-visually-hidden">
+          {t(($) => $.workspace.directory.searchLabel)}
+        </span>
         <Search size={15} aria-hidden="true" />
         <input
           type="search"
           value={query}
-          aria-label="搜尋所有設定"
-          placeholder="搜尋所有設定"
+          aria-label={t(($) => $.workspace.directory.searchLabel)}
+          placeholder={t(($) => $.workspace.directory.searchPlaceholder)}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || matches.length === 0) return;
@@ -46,7 +54,9 @@ export function SettingsDirectory({
       </label>
 
       {matches.length === 0 ? (
-        <p className="settings-directory-empty">找不到符合的設定</p>
+        <p className="settings-directory-empty">
+          {t(($) => $.workspace.directory.noMatch)}
+        </p>
       ) : (
         <div className="settings-directory-groups">
           {SETTINGS_GROUPS.map((group) => {
@@ -54,19 +64,22 @@ export function SettingsDirectory({
             if (sections.length === 0) return null;
             return (
               <div className="settings-directory-group" key={group.id}>
-                <p>{group.title}</p>
+                <p>{settingsGroupLabel(group.id, t)}</p>
                 <div className="settings-directory-links">
-                  {sections.map((section) => (
-                    <Button
-                      key={section.id}
-                      tone="ghost"
-                      size="compact"
-                      aria-current={currentTarget === section.id ? "location" : undefined}
-                      onClick={() => onSelect(section.id)}
-                    >
-                      {section.title}
-                    </Button>
-                  ))}
+                  {sections.map((section) => {
+                    const copy = settingsSectionCopy(section.id, t);
+                    return (
+                      <Button
+                        key={section.id}
+                        tone="ghost"
+                        size="compact"
+                        aria-current={currentTarget === section.id ? "location" : undefined}
+                        onClick={() => onSelect(section.id)}
+                      >
+                        {copy.title}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             );

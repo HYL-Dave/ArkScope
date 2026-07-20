@@ -14,6 +14,7 @@ const shellMocks = vi.hoisted(() => ({
   work: null as ResearchWorkState | null,
   homeProps: null as Record<string, unknown> | null,
   researchProps: null as Record<string, unknown> | null,
+  settingsProps: null as Record<string, unknown> | null,
   settingsRequests: [] as NavigationRequest[],
 }));
 
@@ -131,7 +132,11 @@ vi.mock("./Research", () => ({
 }));
 
 vi.mock("./Settings", () => ({
-  SettingsView: (props: { navigationRequest?: NavigationRequest | null }) => {
+  SettingsView: (props: {
+    developerMode?: boolean;
+    navigationRequest?: NavigationRequest | null;
+  }) => {
+    shellMocks.settingsProps = props as unknown as Record<string, unknown>;
     if (props.navigationRequest) shellMocks.settingsRequests.push(props.navigationRequest);
     return (
       <main data-testid="settings-surface">
@@ -252,6 +257,7 @@ beforeEach(() => {
   shellMocks.work = emptyWork();
   shellMocks.homeProps = null;
   shellMocks.researchProps = null;
+  shellMocks.settingsProps = null;
   shellMocks.settingsRequests = [];
   window.localStorage.clear();
 });
@@ -310,6 +316,25 @@ describe("App shell integration", () => {
     await click(button("資料來源設定"));
 
     expect(host.querySelector("[data-testid='settings-request']")?.textContent).toContain('"section":"data_sources"');
+  });
+
+  it("passes Developer Mode into Settings without adding a second owner", async () => {
+    const host = await renderApp();
+    await click(button("System / Health"));
+    const developerMode = host.querySelector<HTMLInputElement>(
+      '#developer-mode-heading + label input[type="checkbox"]',
+    );
+    expect(developerMode).not.toBeNull();
+
+    await act(async () => {
+      developerMode!.click();
+      await Promise.resolve();
+    });
+    await click(button("資料來源設定"));
+
+    expect(shellMocks.settingsProps?.developerMode).toBe(true);
+    expect(window.localStorage.getItem("arkscope.shell.developerMode.v1")).toBe("enabled");
+    expect(Object.keys(window.localStorage)).toEqual(["arkscope.shell.developerMode.v1"]);
   });
 
   it("increments delivery when the same exact target is requested twice", async () => {

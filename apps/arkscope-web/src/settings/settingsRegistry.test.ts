@@ -1,5 +1,10 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import i18n from "i18next";
 import { describe, expect, it } from "vitest";
 
+import { SettingsDirectory } from "./SettingsDirectory";
+import type { SettingsAnchorId } from "./settingsRegistry";
 import {
   SETTINGS_ANCHOR_IDS,
   SETTINGS_GROUPS,
@@ -17,12 +22,83 @@ import {
   writeActiveSettingsGroup,
 } from "./settingsPreferences";
 
+// Frozen from settingsRegistry.ts at the reviewed pre-I18N-2 baseline 707a5705.
+// Do not derive this fixture from localized resources or the live registry.
+const BASELINE_SECTIONS: ReadonlyArray<{
+  id: SettingsAnchorId;
+  title: string;
+  description: string;
+  keywords: readonly string[];
+}> = [
+  {
+    id: "providers",
+    title: "Provider 登入與憑證",
+    description: "管理 AI provider 登入、訂閱與 API 憑證。",
+    keywords: ["provider", "oauth", "api key", "credential", "憑證", "登入", "anthropic", "openai", "chatgpt", "claude"],
+  },
+  {
+    id: "models",
+    title: "模型與任務路由",
+    description: "依任務選擇模型、provider 與推理強度。",
+    keywords: ["model", "models", "模型", "任務", "路由", "routing", "effort"],
+  },
+  {
+    id: "fixed_task_runtime",
+    title: "固定 AI 任務執行限制",
+    description: "設定 AI 卡片生成與翻譯的模型執行上界。",
+    keywords: ["timeout", "runtime", "卡片生成", "卡片翻譯", "fixed task"],
+  },
+  {
+    id: "research_runtime",
+    title: "AI 研究執行限制",
+    description: "設定 AI 研究 session 與單次執行限制。",
+    keywords: ["ai 研究", "research", "timeout", "runtime", "session"],
+  },
+  {
+    id: "investor_profile",
+    title: "投資人設定",
+    description: "管理投資人輪廓、風險意願與研究個人化。",
+    keywords: ["投資人", "個人化", "investor profile", "risk appetite", "風險意願", "風險承受能力"],
+  },
+  {
+    id: "data_sources",
+    title: "資料來源與排程",
+    description: "查看資料來源健康度、排程與瀏覽器擴充同步狀態。",
+    keywords: [
+      "data sources", "schedule", "資料來源", "排程", "health",
+      "provider health", "credential", "seeking alpha", "sa extension",
+      "ibkr client id", "IBKR 用戶端 ID",
+    ],
+  },
+  {
+    id: "data_storage",
+    title: "市場資料",
+    description: "查看價格、IV、基本面與交易日資料覆蓋。",
+    keywords: ["market data", "市場資料", "price", "價格", "iv", "基本面", "coverage", "sqlite"],
+  },
+  {
+    id: "news_storage",
+    title: "新聞資料",
+    description: "查看新聞資料量、攝入狀態與最近更新。",
+    keywords: ["news", "新聞", "ingestion", "文章", "polygon", "finnhub", "ibkr"],
+  },
+  {
+    id: "macro_storage",
+    title: "總經資料",
+    description: "查看 FRED series、資料快照與總經資料覆蓋。",
+    keywords: [
+      "macro", "總經", "總體經濟", "fred", "fred snapshot", "snapshot",
+      "series", "observation", "資料快照",
+    ],
+  },
+];
+
 describe("settings workspace registry", () => {
   it("declares_three_nonempty_groups_in_workflow_order", () => {
-    expect(SETTINGS_GROUPS.map((group) => [group.id, group.title])).toEqual([
-      ["ai_models", "AI 與模型"],
-      ["personalization", "個人化"],
-      ["data_sync", "資料與同步"],
+    expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual([
+      "ai_models",
+      "personalization",
+      "data_sync",
     ]);
     expect(SETTINGS_GROUPS.every((group) => group.sections.length > 0)).toBe(true);
     expect(settingsGroup("ai_models")).toBe(SETTINGS_GROUPS[0]);
@@ -58,9 +134,9 @@ describe("settings workspace registry", () => {
   it("keeps_provider_login_separate_and_before_model_routing", () => {
     const ai = SETTINGS_GROUPS[0];
 
-    expect(ai.sections.slice(0, 2).map((section) => [section.id, section.title])).toEqual([
-      ["providers", "Provider 登入與憑證"],
-      ["models", "模型與任務路由"],
+    expect(ai.sections.slice(0, 2).map((section) => section.id)).toEqual([
+      "providers",
+      "models",
     ]);
     expect(settingsGroupFor("providers")).toBe(ai);
     expect(settingsGroupFor("models")).toBe(ai);
@@ -73,8 +149,8 @@ describe("settings workspace registry", () => {
       "fixed_task_runtime",
       "research_runtime",
     ]);
-    expect(settingsSection("fixed_task_runtime").title).toBe("固定 AI 任務執行限制");
-    expect(settingsSection("research_runtime").title).toBe("AI 研究執行限制");
+    expect(settingsSection("fixed_task_runtime").group).toBe("ai_models");
+    expect(settingsSection("research_runtime").group).toBe("ai_models");
   });
 
   it("excludes_app_records_permissions_and_empty_advanced_groups", () => {
@@ -98,12 +174,69 @@ describe("settings workspace registry", () => {
     expect(searchSettings("schedule").map((section) => section.id)).toEqual(["data_sources"]);
     expect(searchSettings("health").map((section) => section.id)).toEqual(["data_sources"]);
     expect(searchSettings("FRED snapshot").map((section) => section.id)).toEqual(["macro_storage"]);
-    expect(settingsSection("macro_storage").title).toBe("總經資料");
-    expect(settingsSection("data_sources").keywords).not.toContain("fred");
-    expect(SETTINGS_GROUPS.flatMap((group) => group.sections.map((section) => section.title)))
-      .not.toEqual(expect.arrayContaining([
-        expect.stringMatching(/Calendar|行事曆|\s·\s/),
-      ]));
+    expect(settingsGroupFor("macro_storage").id).toBe("data_sync");
+    expect(searchSettings("fred").map((section) => section.id)).not.toContain("data_sources");
+  });
+
+  it("stores only semantic ids and no visible source-language copy", () => {
+    expect(SETTINGS_GROUPS.every((group) => (
+      JSON.stringify(Object.keys(group).sort()) === JSON.stringify(["id", "sections"])
+    ))).toBe(true);
+    expect(SETTINGS_GROUPS.flatMap((group) => group.sections).every((section) => (
+      JSON.stringify(Object.keys(section).sort()) === JSON.stringify(["group", "id"])
+    ))).toBe(true);
+    expect(JSON.stringify(SETTINGS_GROUPS)).not.toMatch(
+      /AI 與模型|Provider 登入與憑證|AI and Models|Provider Sign-in and Credentials/,
+    );
+  });
+
+  it("resolves registry copy through the active locale", async () => {
+    const props = {
+      query: "",
+      currentTarget: "providers" as const,
+      activeGroup: "ai_models" as const,
+      onQueryChange: () => undefined,
+      onSelect: () => undefined,
+    };
+    await i18n.changeLanguage("en");
+    const english = renderToStaticMarkup(createElement(SettingsDirectory, props));
+    expect(english).toContain("AI and Models");
+    expect(english).toContain("Provider Sign-in and Credentials");
+    expect(english).not.toContain("Provider 登入與憑證");
+
+    await i18n.changeLanguage("zh-Hant");
+    const chinese = renderToStaticMarkup(createElement(SettingsDirectory, props));
+    expect(chinese).toContain("AI 與模型");
+    expect(chinese).toContain("Provider 登入與憑證");
+  });
+
+  it("keeps bilingual search metadata independent from rendered locale", async () => {
+    const idsFor = (query: string) => searchSettings(query).map((section) => section.id);
+    const bilingualQueries: ReadonlyArray<[string, SettingsAnchorId]> = [
+      ["Provider Sign-in and Credentials", "providers"],
+      ["subscription credentials", "providers"],
+      ["Model and Task Routing", "models"],
+      ["Fixed AI Task Runtime Limits", "fixed_task_runtime"],
+      ["AI Research Runtime Limits", "research_runtime"],
+      ["Investor Profile", "investor_profile"],
+      ["Data Sources and Schedules", "data_sources"],
+      ["trading-day coverage", "data_storage"],
+      ["News Data", "news_storage"],
+      ["Macro Data", "macro_storage"],
+    ];
+
+    for (const locale of ["zh-Hant", "en"] as const) {
+      await i18n.changeLanguage(locale);
+      for (const section of BASELINE_SECTIONS) {
+        for (const query of [section.title, section.description, ...section.keywords]) {
+          expect(idsFor(query), `${locale}: ${section.id}: ${query}`).toContain(section.id);
+        }
+      }
+      for (const [query, id] of bilingualQueries) {
+        expect(idsFor(query), `${locale}: ${id}: ${query}`).toContain(id);
+      }
+      expect(idsFor("   ")).toEqual(SETTINGS_ANCHOR_IDS);
+    }
   });
 
   it("returns_deterministic_static_matches_without_dynamic_values", () => {

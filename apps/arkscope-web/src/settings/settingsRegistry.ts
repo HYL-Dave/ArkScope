@@ -1,3 +1,5 @@
+import { settingsSearchValues } from "./settingsCopy";
+
 export type SettingsGroupId = "ai_models" | "personalization" | "data_sync";
 
 export type SettingsAnchorId =
@@ -14,118 +16,62 @@ export type SettingsAnchorId =
 export interface SettingsSectionDefinition {
   id: SettingsAnchorId;
   group: SettingsGroupId;
-  title: string;
-  description: string;
-  keywords: readonly string[];
 }
 
 export interface SettingsGroupDefinition {
   id: SettingsGroupId;
-  title: string;
   sections: readonly SettingsSectionDefinition[];
 }
 
 export const SETTINGS_GROUPS: readonly SettingsGroupDefinition[] = [
   {
     id: "ai_models",
-    title: "AI 與模型",
     sections: [
       {
         id: "providers",
         group: "ai_models",
-        title: "Provider 登入與憑證",
-        description: "管理 AI provider 登入、訂閱與 API 憑證。",
-        keywords: ["provider", "oauth", "api key", "credential", "憑證", "登入", "anthropic", "openai", "chatgpt", "claude"],
       },
       {
         id: "models",
         group: "ai_models",
-        title: "模型與任務路由",
-        description: "依任務選擇模型、provider 與推理強度。",
-        keywords: ["model", "models", "模型", "任務", "路由", "routing", "effort"],
       },
       {
         id: "fixed_task_runtime",
         group: "ai_models",
-        title: "固定 AI 任務執行限制",
-        description: "設定 AI 卡片生成與翻譯的模型執行上界。",
-        keywords: ["timeout", "runtime", "卡片生成", "卡片翻譯", "fixed task"],
       },
       {
         id: "research_runtime",
         group: "ai_models",
-        title: "AI 研究執行限制",
-        description: "設定 AI 研究 session 與單次執行限制。",
-        keywords: ["ai 研究", "research", "timeout", "runtime", "session"],
       },
     ],
   },
   {
     id: "personalization",
-    title: "個人化",
     sections: [
       {
         id: "investor_profile",
         group: "personalization",
-        title: "投資人設定",
-        description: "管理投資人輪廓、風險意願與研究個人化。",
-        keywords: ["投資人", "個人化", "investor profile", "risk appetite", "風險意願", "風險承受能力"],
       },
     ],
   },
   {
     id: "data_sync",
-    title: "資料與同步",
     sections: [
       {
         id: "data_sources",
         group: "data_sync",
-        title: "資料來源與排程",
-        description: "查看資料來源健康度、排程與瀏覽器擴充同步狀態。",
-        keywords: [
-          "data sources",
-          "schedule",
-          "資料來源",
-          "排程",
-          "health",
-          "provider health",
-          "credential",
-          "seeking alpha",
-          "sa extension",
-          "ibkr client id",
-          "IBKR 用戶端 ID",
-        ],
       },
       {
         id: "data_storage",
         group: "data_sync",
-        title: "市場資料",
-        description: "查看價格、IV、基本面與交易日資料覆蓋。",
-        keywords: ["market data", "市場資料", "price", "價格", "iv", "基本面", "coverage", "sqlite"],
       },
       {
         id: "news_storage",
         group: "data_sync",
-        title: "新聞資料",
-        description: "查看新聞資料量、攝入狀態與最近更新。",
-        keywords: ["news", "新聞", "ingestion", "文章", "polygon", "finnhub", "ibkr"],
       },
       {
         id: "macro_storage",
         group: "data_sync",
-        title: "總經資料",
-        description: "查看 FRED series、資料快照與總經資料覆蓋。",
-        keywords: [
-          "macro",
-          "總經",
-          "總體經濟",
-          "fred",
-          "fred snapshot",
-          "snapshot",
-          "series",
-          "observation",
-          "資料快照",
-        ],
       },
     ],
   },
@@ -185,7 +131,7 @@ export function searchSettings(query: string): readonly SettingsSectionDefinitio
   if (!normalizedQuery) return sections;
 
   return sections.filter((section) => {
-    const values = [section.title, section.description, ...section.keywords];
-    return values.some((value) => normalizeSearchValue(value).includes(normalizedQuery));
+    return settingsSearchValues(section.id)
+      .some((value) => normalizeSearchValue(value).includes(normalizedQuery));
   });
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Download, Menu, Save, Upload } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   discoverModels,
   deleteModelRoute,
@@ -69,6 +70,7 @@ import {
   readActiveSettingsGroup,
   writeActiveSettingsGroup,
 } from "./settings/settingsPreferences";
+import type { SettingsT } from "./settings/settingsCopy";
 import {
   Button,
   ConfirmDialog,
@@ -92,6 +94,7 @@ export {
 
 export interface SettingsViewProps {
   runtime: RuntimeConfig | null;
+  developerMode?: boolean;
   onRuntimeChanged: () => Promise<void>;
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "settings_section" }>> | null;
 }
@@ -110,11 +113,24 @@ function firstBusyOrDirtyGuard(
   return guards.find((guard) => guard.dirty) ?? CLEAR_SETTINGS_NAVIGATION_GUARD;
 }
 
+function settingsWorkspaceTabLabel(id: SettingsGroupId, t: SettingsT): string {
+  switch (id) {
+    case "ai_models":
+      return t(($) => $.workspace.tabs.aiModels);
+    case "personalization":
+      return t(($) => $.workspace.tabs.personalization);
+    case "data_sync":
+      return t(($) => $.workspace.tabs.dataSync);
+  }
+}
+
 export function SettingsView({
   runtime,
+  developerMode = false,
   onRuntimeChanged,
   navigationRequest,
 }: SettingsViewProps) {
+  const { t } = useTranslation("settings");
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [draft, setDraft] = useState<Partial<Record<ModelTask, DraftRoute>>>({});
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -163,7 +179,11 @@ export function SettingsView({
     if (activeGroup === "ai_models") {
       return firstBusyOrDirtyGuard([
         saving
-          ? { dirty: false, busy: true, reason: "AI 與模型設定正在儲存。" }
+          ? {
+              dirty: false,
+              busy: true,
+              reason: t(($) => $.workspace.guard.busyModels),
+            }
           : CLEAR_SETTINGS_NAVIGATION_GUARD,
         providerGuard,
         fixedRuntimeGuard,
@@ -175,10 +195,18 @@ export function SettingsView({
         '[data-settings-anchor="investor_profile"] .investor-profile-panel[aria-busy="true"]',
       );
       if (investorBusy) {
-        return { dirty: investorPotentialDirty, busy: true, reason: "投資人設定正在儲存，完成後再切換。" };
+        return {
+          dirty: investorPotentialDirty,
+          busy: true,
+          reason: t(($) => $.workspace.blocked.description),
+        };
       }
       return investorPotentialDirty
-        ? { dirty: true, busy: false, reason: "投資人設定可能有尚未儲存的變更。" }
+        ? {
+            dirty: true,
+            busy: false,
+            reason: t(($) => $.workspace.blocked.description),
+          }
         : CLEAR_SETTINGS_NAVIGATION_GUARD;
     }
     return dataSourcesGuard;
@@ -190,6 +218,7 @@ export function SettingsView({
     providerGuard,
     researchRuntimeGuard,
     saving,
+    t,
   ]);
 
   const requestSettingsNavigation = useCallback((intent: SettingsNavigationIntent): boolean => {
@@ -202,7 +231,7 @@ export function SettingsView({
     const guard = currentNavigationGuard();
     if (guard.busy) {
       setPendingIntent(null);
-      setBlockedNotice(guard.reason ?? "目前工作尚未完成，完成或取消後再切換設定群組。");
+      setBlockedNotice(guard.reason ?? t(($) => $.workspace.blocked.description));
       return false;
     }
     if (guard.dirty) {
@@ -213,7 +242,7 @@ export function SettingsView({
     }
     applySettingsIntent(intent);
     return true;
-  }, [activeGroup, applySettingsIntent, currentNavigationGuard, tabRefFor]);
+  }, [activeGroup, applySettingsIntent, currentNavigationGuard, t, tabRefFor]);
 
   const revealSection = useCallback((id: SettingsAnchorId) => requestSettingsNavigation({
     group: settingsGroupFor(id).id,
@@ -321,9 +350,9 @@ export function SettingsView({
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
       await onRuntimeChanged();
-      setMsg("模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setMsg(t(($) => $.workspace.routes.saved));
+    } catch {
+      setErr(t(($) => $.workspace.routes.saveFailed));
     } finally {
       setSaving(false);
     }
@@ -334,17 +363,15 @@ export function SettingsView({
     setErr(null);
     setMsg(null);
     try {
-      const res = await importModelRoutes();
+      await importModelRoutes();
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
       await onRuntimeChanged();
-      const imp = res.imported.length ? `匯入 ${res.imported.length}` : "無可匯入";
-      const skip = res.skipped.length ? `，略過 ${res.skipped.length}（不完整／不一致）` : "";
-      setMsg(`已從設定檔匯入路由到 DB：${imp}${skip}。`);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setMsg(t(($) => $.workspace.routes.imported));
+    } catch {
+      setErr(t(($) => $.workspace.routes.importFailed));
     } finally {
       setSaving(false);
     }
@@ -355,17 +382,16 @@ export function SettingsView({
     setErr(null);
     setMsg(null);
     try {
-      const res = await exportModelRoutes();
+      await exportModelRoutes();
       // the clear branch can drop a task from profile→default, so refresh the badge/draft
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
       await onRuntimeChanged();
-      const cleared = res.cleared.length ? `，清除 ${res.cleared.length} 個無 DB 路由的舊鍵` : "";
-      setMsg(`已將 DB 路由寫回設定檔（${res.exported.length} 筆${cleared}）。`);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setMsg(t(($) => $.workspace.routes.exported));
+    } catch {
+      setErr(t(($) => $.workspace.routes.exportFailed));
     } finally {
       setSaving(false);
     }
@@ -479,11 +505,13 @@ export function SettingsView({
   function renderSection(id: SettingsAnchorId) {
     if (id === "providers") {
       if (!catalog) {
-        if (catalogLoading) return <p className="muted">Loading model catalog…</p>;
+        if (catalogLoading) {
+          return <p className="muted">{t(($) => $.workspace.catalog.loading)}</p>;
+        }
         if (catalogFailed) {
           return (
             <p className="error-text">
-              無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。
+              {t(($) => $.workspace.catalog.failure)}
             </p>
           );
         }
@@ -533,7 +561,9 @@ export function SettingsView({
                 disabled={saving || catalogLoading || routeSaveBlocks.length > 0}
                 aria-describedby={routeSaveBlocks.length ? "route-save-blocked" : undefined}
               >
-                {saving ? "儲存中…" : "儲存路由"}
+                {saving
+                  ? t(($) => $.actions.saving)
+                  : t(($) => $.actions.save)}
               </Button>
             </div>
             {routeSaveBlocks.length > 0 ? (
@@ -542,7 +572,9 @@ export function SettingsView({
               </p>
             ) : null}
             <details className="settings-model-transfer">
-              <summary>匯入與匯出</summary>
+              <summary>
+                {t(($) => $.actions.import)} / {t(($) => $.actions.export)}
+              </summary>
               <div className="ui-action-row">
                 <Button
                   tone="secondary"
@@ -550,9 +582,9 @@ export function SettingsView({
                   icon={<Upload size={15} />}
                   onClick={() => void importRoutes()}
                   disabled={saving || catalogLoading}
-                  title="把設定檔（user_profile.local.yaml）裡的路由匯入成 DB 權威"
+                  title={t(($) => $.actions.import)}
                 >
-                  從設定檔匯入
+                  {t(($) => $.actions.import)}
                 </Button>
                 <Button
                   tone="secondary"
@@ -560,9 +592,9 @@ export function SettingsView({
                   icon={<Download size={15} />}
                   onClick={() => void exportRoutes()}
                   disabled={saving || catalogLoading}
-                  title="把 DB 路由寫回設定檔備份（鏡像 DB 狀態：有則寫入、無則清除）"
+                  title={t(($) => $.actions.export)}
                 >
-                  匯出到設定檔
+                  {t(($) => $.actions.export)}
                 </Button>
               </div>
             </details>
@@ -640,9 +672,9 @@ export function SettingsView({
               setDraft(fromRoutes(refreshed.routes));
               invalidateTaskTest(task);
               await onRuntimeChanged();
-              setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
-            } catch (e) {
-              setErr(e instanceof Error ? e.message : String(e));
+              setMsg(t(($) => $.workspace.routes.reset));
+            } catch {
+              setErr(t(($) => $.errors.mutationFailed));
             }
             }}
           />
@@ -702,7 +734,7 @@ export function SettingsView({
 
   const tabItems: readonly TabItem<SettingsGroupId>[] = SETTINGS_GROUPS.map((group) => ({
     value: group.id,
-    label: group.title,
+    label: settingsWorkspaceTabLabel(group.id, t),
     tabRef: tabRefFor(group.id),
     panel: (
       <div className="settings-workspace-layout">
@@ -720,12 +752,12 @@ export function SettingsView({
 
   return (
     <main className="main settings-workspace" data-settings-overlay={String(shellOverlay)}>
-      <PageHeader title="設定" />
+      <PageHeader title={t(($) => $.workspace.title)} />
 
       {err && <p className="error-text">{err}</p>}
       {msg && <p className="ok-text">{msg}</p>}
       {blockedNotice ? (
-        <InlineAlert state="blocked" title="目前無法切換設定群組">
+        <InlineAlert state="blocked" title={t(($) => $.workspace.blocked.title)}>
           {blockedNotice}
         </InlineAlert>
       ) : null}
@@ -738,13 +770,13 @@ export function SettingsView({
           icon={<Menu size={16} />}
           onClick={() => setDirectoryOpen(true)}
         >
-          設定目錄
+          {t(($) => $.workspace.directory.title)}
         </Button>
       ) : null}
 
       <Tabs
         className="settings-workflow-tabs"
-        ariaLabel="設定工作流程"
+        ariaLabel={t(($) => $.workspace.tabs.label)}
         value={activeGroup}
         items={tabItems}
         onValueChange={(group) => requestSettingsNavigation({
@@ -756,7 +788,7 @@ export function SettingsView({
 
       <Drawer
         open={shellOverlay && directoryOpen}
-        title="設定目錄"
+        title={t(($) => $.workspace.directory.title)}
         onClose={() => setDirectoryOpen(false)}
         returnFocusRef={directoryTriggerRef}
       >
@@ -765,9 +797,10 @@ export function SettingsView({
 
       <ConfirmDialog
         open={pendingIntent !== null}
-        title="捨棄未儲存的變更？"
-        consequence="切換設定群組會捨棄目前群組中尚未儲存的變更。"
-        confirmLabel="捨棄並切換"
+        title={t(($) => $.workspace.blocked.title)}
+        consequence={t(($) => $.workspace.blocked.description)}
+        confirmLabel={t(($) => $.workspace.blocked.discard)}
+        cancelLabel={t(($) => $.workspace.blocked.stay)}
         returnFocusRef={dialogReturnFocusRef}
         onCancel={() => {
           dialogReturnFocusRef.current = tabRefFor(activeGroup).current;

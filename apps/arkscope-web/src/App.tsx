@@ -148,6 +148,7 @@ export function App() {
   ) : (
     <SettingsView
       runtime={runtime}
+      developerMode={developerMode}
       onRuntimeChanged={refreshRuntime}
       navigationRequest={settingsNavigation}
     />
