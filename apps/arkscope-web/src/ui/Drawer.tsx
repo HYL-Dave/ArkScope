@@ -1,6 +1,7 @@
 import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Pin, PinOff, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { IconButton } from "./Button";
 import { useOverlayFocus } from "./useOverlayFocus";
 import { useShellOverlay } from "./useShellOverlay";
@@ -26,6 +27,7 @@ export function Drawer({
   pinned?: boolean;
   onPinnedChange?: (pinned: boolean) => void;
 }) {
+  const { t } = useTranslation("common");
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const pinRef = useRef<HTMLButtonElement>(null);
@@ -67,7 +69,9 @@ export function Drawer({
           {pinnable && !shellOverlay && onPinnedChange ? (
             <IconButton
               ref={pinRef}
-              label={pinned ? "取消釘選" : "釘選"}
+              label={pinned
+                ? t(($) => $.actions.unpin)
+                : t(($) => $.actions.pin)}
               tone="ghost"
               icon={pinned ? <PinOff size={18} /> : <Pin size={18} />}
               onClick={() => onPinnedChange(!pinned)}
@@ -75,7 +79,7 @@ export function Drawer({
           ) : null}
           <IconButton
             ref={closeRef}
-            label="關閉"
+            label={t(($) => $.actions.close)}
             tone="ghost"
             icon={<X size={18} />}
             onClick={close}

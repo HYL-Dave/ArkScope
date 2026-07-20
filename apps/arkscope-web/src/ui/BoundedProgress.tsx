@@ -1,4 +1,5 @@
 import { Square } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 import { InlineAlert, StatusBadge, type CommonUiState } from "./Status";
 
@@ -41,24 +42,28 @@ export function BoundedProgress({
   errorTitle?: string;
   errorDetail?: string;
 }) {
+  const { t } = useTranslation("common");
   const awaitingConfirmation = status === "running"
     && stageBoundMs != null
     && stageElapsedMs >= stageBoundMs;
   const phase = awaitingConfirmation ? "awaiting-confirmation" : status;
   const cancellationAvailable = status === "running" && canCancel && Boolean(onCancel);
   const announcement = awaitingConfirmation
-    ? "已達上界，等待伺服器確認"
+    ? t(($) => $.boundedProgress.awaitingConfirmation)
     : status === "succeeded"
-      ? "工作完成"
+      ? t(($) => $.boundedProgress.completedAnnouncement)
       : status === "interrupted"
-        ? "工作已中止"
+        ? t(($) => $.boundedProgress.interruptedAnnouncement)
         : null;
 
   if (status === "failed") {
     return (
-      <InlineAlert state="failed" title={errorTitle ?? "工作失敗"}>
-        <div>{errorDetail ?? "工作未完成，請依錯誤指示處理。"}</div>
-        <div>結果：{resultLabel}</div>
+      <InlineAlert
+        state="failed"
+        title={errorTitle ?? t(($) => $.boundedProgress.failureTitle)}
+      >
+        <div>{errorDetail ?? t(($) => $.boundedProgress.failureDetail)}</div>
+        <div>{t(($) => $.boundedProgress.result, { destination: resultLabel })}</div>
       </InlineAlert>
     );
   }
@@ -67,14 +72,30 @@ export function BoundedProgress({
     <section className="ui-bounded-progress" data-progress-phase={phase}>
       <div className="ui-bounded-progress-head">
         <StatusBadge state={stateFor(status)} label={stageLabel} />
-        <span className="ui-bounded-progress-overall">總耗時 {formatElapsed(overallElapsedMs)}</span>
+        <span className="ui-bounded-progress-overall">
+          {t(($) => $.boundedProgress.overallElapsed, {
+            duration: formatElapsed(overallElapsedMs),
+          })}
+        </span>
       </div>
       <div className="ui-bounded-progress-stage">
-        <span>階段耗時 {formatElapsed(stageElapsedMs)}</span>
-        {stageBoundMs != null ? <span>本階段上界 {formatElapsed(stageBoundMs)}</span> : null}
+        <span>
+          {t(($) => $.boundedProgress.stageElapsed, {
+            duration: formatElapsed(stageElapsedMs),
+          })}
+        </span>
+        {stageBoundMs != null ? (
+          <span>
+            {t(($) => $.boundedProgress.stageBound, {
+              duration: formatElapsed(stageBoundMs),
+            })}
+          </span>
+        ) : null}
       </div>
       {awaitingConfirmation ? (
-        <div className="ui-bounded-progress-grace">已達上界，等待伺服器確認</div>
+        <div className="ui-bounded-progress-grace">
+          {t(($) => $.boundedProgress.awaitingConfirmation)}
+        </div>
       ) : null}
       {announcement ? (
         <span className="ui-visually-hidden" role="status" aria-live="polite">
@@ -82,13 +103,21 @@ export function BoundedProgress({
         </span>
       ) : null}
       <div className="ui-bounded-progress-meta">
-        <span>{continuesAfterNavigation ? "離開頁面後繼續" : "離開頁面後不保證追蹤"}</span>
-        <span>{cancellationAvailable ? "可從此處取消" : "無法從此處取消"}</span>
-        <span>結果：{resultLabel}</span>
+        <span>
+          {continuesAfterNavigation
+            ? t(($) => $.boundedProgress.continuesAfterNavigation)
+            : t(($) => $.boundedProgress.trackingNotGuaranteed)}
+        </span>
+        <span>
+          {cancellationAvailable
+            ? t(($) => $.boundedProgress.cancellationAvailable)
+            : t(($) => $.boundedProgress.cancellationUnavailable)}
+        </span>
+        <span>{t(($) => $.boundedProgress.result, { destination: resultLabel })}</span>
       </div>
       {cancellationAvailable ? (
         <Button tone="danger" size="compact" icon={<Square size={13} />} onClick={onCancel}>
-          停止
+          {t(($) => $.actions.stop)}
         </Button>
       ) : null}
     </section>

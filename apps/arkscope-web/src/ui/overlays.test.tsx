@@ -2,6 +2,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Drawer } from "./Drawer";
@@ -545,5 +546,31 @@ describe("overlay focus contracts", () => {
     expect.soft(onDrawerClose).not.toHaveBeenCalled();
     expect.soft(onCancel).not.toHaveBeenCalled();
     expect.soft(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("localizes Drawer controls without remounting the open panel", async () => {
+    stubMatchMedia(false);
+    await render(
+      <Drawer
+        open
+        pinnable
+        pinned={false}
+        title="Source title"
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+      >
+        <button>Source child</button>
+      </Drawer>,
+    );
+    const panel = document.querySelector('[role="dialog"]');
+    expect(document.querySelector('[aria-label="釘選"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="關閉"]')).not.toBeNull();
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(document.querySelector('[role="dialog"]')).toBe(panel);
+    expect(document.querySelector('[aria-label="Pin"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Close"]')).not.toBeNull();
+    expect(panel?.textContent).toContain("Source title");
+    expect(panel?.textContent).toContain("Source child");
   });
 });

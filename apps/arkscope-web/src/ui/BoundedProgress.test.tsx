@@ -2,6 +2,7 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BoundedProgress } from "./BoundedProgress";
 
@@ -158,5 +159,28 @@ describe("BoundedProgress", () => {
     expect(host!.querySelector('[role="status"][aria-live="polite"]')?.textContent)
       .toContain("工作已中止");
     expect(host!.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it("renders English generic progress copy while preserving owner-provided values", async () => {
+    await act(async () => { await i18n.changeLanguage("en"); });
+    await mount(
+      <BoundedProgress
+        {...baseProps}
+        status="running"
+        stageLabel="Provider-owned stage"
+        resultLabel="Owner destination"
+        canCancel
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(host!.textContent).toContain("Provider-owned stage");
+    expect(host!.textContent).toContain("Overall elapsed 15m 30s");
+    expect(host!.textContent).toContain("Stage elapsed 2m 00s");
+    expect(host!.textContent).toContain("Stage bound 15m 00s");
+    expect(host!.textContent).toContain("Continues after leaving this page");
+    expect(host!.textContent).toContain("Can be cancelled here");
+    expect(host!.textContent).toContain("Result: Owner destination");
+    expect(host!.querySelector("button")?.textContent).toContain("Stop");
   });
 });
