@@ -223,6 +223,12 @@ describe("post-PG-exit storage panels", () => {
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
     expect(storage).not.toBeNull();
     expect(storage!.querySelector("h2")?.textContent).toBe("市場資料");
+    expect(storage!.textContent).toContain("資料抓取由 Data Sources 管理。");
+    expect(storage!.textContent).toContain(
+      "覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日",
+    );
+    expect(storage!.textContent).toContain("點開可看缺漏與 partial 標的、以及 provider 錯誤。");
+    expect(storage!.textContent).toContain("全部標的 149 檔");
     expect(host!.textContent).toContain("價格");
     expect(host!.textContent).toContain("價格 —");
     expect(host!.textContent).toContain("財務快取");
@@ -236,6 +242,7 @@ describe("post-PG-exit storage panels", () => {
 
     expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
     expect(host!.textContent).toContain("總經資料");
+    expect(host!.textContent).toContain("Provider 健康狀態由 Data Sources 管理。");
     expect(host!.textContent).toContain("FRED 序列");
     expect(host!.textContent).toContain("Fed Funds");
     expect(host!.textContent).not.toMatch(/Macro \/ Calendar|行事曆|Finnhub 付費方案/);
@@ -284,6 +291,25 @@ describe("post-PG-exit storage panels", () => {
 
   it("renders English market data and storage outcomes", async () => {
     await i18n.changeLanguage("en");
+    mocked.coverage = {
+      ...coverage,
+      days: [{
+        date: "2026-07-18",
+        is_trading_day: true,
+        reason: "regular_trading_day",
+        holiday: null,
+        session_complete: true,
+        coverage_status: "partial",
+        max_observed_bar_count: 26,
+        full: 1,
+        well_covered: 1,
+        partial: 1,
+        missing: 1,
+        covered: 2,
+        missing_tickers: ["AAPL"],
+        partial_tickers: [{ ticker: "MSFT", bars: 12 }],
+      }],
+    };
     await renderSettings();
 
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
@@ -307,12 +333,22 @@ describe("post-PG-exit storage panels", () => {
     );
     expect(storage.textContent).toContain("No incremental update yet");
 
-    const coveragePanel = Array.from(storage.querySelectorAll("h2")).find((heading) =>
-      heading.textContent === "Trading-day / Price Coverage")?.parentElement?.parentElement;
-    if (!coveragePanel) throw new Error("missing trading-day coverage panel");
-    expect(coveragePanel.textContent).toContain("Days");
-    expect(Array.from(coveragePanel.querySelectorAll("th")).map((node) => node.textContent))
+    const coverageHeading = Array.from(storage.querySelectorAll("h2")).find((heading) =>
+      heading.textContent === "Trading-day / Price Coverage");
+    if (!coverageHeading) throw new Error("missing trading-day coverage heading");
+    expect(coverageHeading.parentElement?.querySelector("p.muted.tiny")).not.toBeNull();
+    expect(coverageHeading.parentElement?.parentElement?.classList.contains("settings-section-head"))
+      .toBe(true);
+    expect(storage.textContent).toContain("Days");
+    expect(storage.textContent).toContain("Universe 149 tickers");
+    expect(Array.from(storage.querySelectorAll("table th")).map((node) => node.textContent))
       .toEqual(["Date", "Status", "Maximum bars", "Covered", "Missing", "Partial tickers", ""]);
+    const coverageRow = Array.from(storage.querySelectorAll<HTMLTableRowElement>("tbody tr"))
+      .find((row) => row.textContent?.includes("2026-07-18"));
+    if (!coverageRow) throw new Error("missing English coverage row");
+    act(() => coverageRow.click());
+    expect(storage.textContent).toContain("Missing tickers (1): AAPL");
+    expect(storage.textContent).toContain("Partial tickers: MSFT(12)");
     expect(getMarketDataStatus).toHaveBeenCalledOnce();
     expect(getTradingDayCoverage).toHaveBeenCalledOnce();
   });
@@ -361,11 +397,11 @@ describe("post-PG-exit storage panels", () => {
         max_observed_bar_count: 26,
         full: 1,
         well_covered: 1,
-        partial: 0,
+        partial: 1,
         missing: 1,
-        covered: 1,
+        covered: 2,
         missing_tickers: ["AAPL"],
-        partial_tickers: [],
+        partial_tickers: [{ ticker: "MSFT", bars: 12 }],
       }],
       provider_errors: [{
         ticker: "AAPL",
@@ -386,6 +422,8 @@ describe("post-PG-exit storage panels", () => {
     openCoverageRow();
     expect(host!.textContent).toContain("增量更新失敗");
     expect(host!.textContent).toContain("Provider 錯誤");
+    expect(host!.textContent).toContain("缺（1）：AAPL");
+    expect(host!.textContent).toContain("partial：MSFT(12)");
     expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).not.toContain(providerDiagnostic);
     expect(host!.querySelector(".developer-diagnostics")).toBeNull();

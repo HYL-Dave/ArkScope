@@ -134,6 +134,7 @@ describe("SettingsView news storage copy", () => {
     expect(section?.querySelector("h2")?.textContent).toBe("新聞資料");
     expect(host!.textContent).toContain("10 篇 · 2 來源");
     expect(host!.textContent).toContain("最近收集成功");
+    expect(host!.textContent).toContain("各來源排程與手動執行由 Data Sources 管理。");
     expect(host!.textContent).not.toMatch(/PostgreSQL|PG exit|SQLite|legacy|mirror|本地新聞庫/);
   });
 
