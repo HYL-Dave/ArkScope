@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -294,7 +296,35 @@ describe("post-PG-exit storage panels", () => {
   });
 
   it("renders English market data and storage outcomes", async () => {
-    await i18n.changeLanguage("en");
+    mocked.marketStatus = {
+      ...marketStatus,
+      sync: {
+        prices: {
+          last_success: "2026-07-20T01:00:00Z",
+          last_error: null,
+          rows_added: 11,
+          updated_at: "2026-07-20T01:00:01Z",
+        },
+        news: {
+          last_success: "2026-07-20T02:00:00Z",
+          last_error: null,
+          rows_added: 12,
+          updated_at: "2026-07-20T02:00:01Z",
+        },
+        iv: {
+          last_success: "2026-07-20T03:00:00Z",
+          last_error: null,
+          rows_added: 13,
+          updated_at: "2026-07-20T03:00:01Z",
+        },
+        fundamentals: {
+          last_success: "2026-07-20T04:00:00Z",
+          last_error: null,
+          rows_added: 14,
+          updated_at: "2026-07-20T04:00:01Z",
+        },
+      },
+    };
     mocked.coverage = {
       ...coverage,
       days: [{
@@ -316,8 +346,22 @@ describe("post-PG-exit storage panels", () => {
     };
     await renderSettings();
 
+    const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
+    if (!mountedStorage) throw new Error("missing mounted Market Data section");
+    expect(mountedStorage.textContent).toContain(
+      `價格 +11 @ ${formatSystemTimestamp("2026-07-20T01:00:00Z")}`,
+    );
+    expect(mountedStorage.textContent).toContain("2,324,487 列 · 149 檔");
+    expect(getMarketDataStatus).toHaveBeenCalledOnce();
+    expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!storage) throw new Error("missing Market Data section");
+    expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))
       .toEqual([
@@ -335,7 +379,18 @@ describe("post-PG-exit storage panels", () => {
     expect(storage.textContent).toContain(
       `24 rows (7 valid · 17 expired) · latest fetch ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
     );
-    expect(storage.textContent).toContain("No incremental update yet");
+    expect(storage.textContent).toContain(
+      `Prices +11 @ ${formatSystemTimestamp("2026-07-20T01:00:00Z")}`,
+    );
+    expect(storage.textContent).toContain(
+      `News +12 @ ${formatSystemTimestamp("2026-07-20T02:00:00Z")}`,
+    );
+    expect(storage.textContent).toContain(
+      `IV +13 @ ${formatSystemTimestamp("2026-07-20T03:00:00Z")}`,
+    );
+    expect(storage.textContent).toContain(
+      `Fundamentals +14 @ ${formatSystemTimestamp("2026-07-20T04:00:00Z")}`,
+    );
 
     const coverageHeading = Array.from(storage.querySelectorAll("h2")).find((heading) =>
       heading.textContent === "Trading-day / Price Coverage");
@@ -361,6 +416,12 @@ describe("post-PG-exit storage panels", () => {
     expect(storage.textContent).toContain("Partial tickers: MSFT(12)");
     expect(getMarketDataStatus).toHaveBeenCalledOnce();
     expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+    const dataStorageSource = readFileSync(
+      resolve(import.meta.dirname, "./settings/DataStorageSection.tsx"),
+      "utf8",
+    );
+    expect(dataStorageSource).toContain("$.dataStorage.update.succeeded");
+    expect(dataStorageSource).not.toContain('.join(" · ")');
   });
 
   it("keeps corrected single-locale headings without migration narration", async () => {

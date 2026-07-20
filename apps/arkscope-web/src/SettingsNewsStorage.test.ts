@@ -173,7 +173,6 @@ describe("SettingsView news storage copy", () => {
   });
 
   it("renders English news storage copy without changing counts", async () => {
-    await i18n.changeLanguage("en");
     const cases = [
       ["running", "Running"],
       ["succeeded", "Last run succeeded"],
@@ -181,11 +180,24 @@ describe("SettingsView news storage copy", () => {
       ["partial", "Partially completed"],
     ] as const;
 
-    for (const [status, expectedStatus] of cases) {
+    for (const [index, [status, expectedStatus]] of cases.entries()) {
       mocked.newsStatus = newsStatus({ sync: newsSync(status) });
       await renderNewsSection();
-      const section = host!.querySelector('[data-settings-anchor="news_storage"]');
+      let section = host!.querySelector('[data-settings-anchor="news_storage"]');
       if (!section) throw new Error("missing News Data section");
+      if (index === 0) {
+        expect(section.querySelector("h2")?.textContent).toBe("新聞資料");
+        expect(section.textContent).toContain("10 篇 · 2 來源 · 最新 2026-06-27T00:00:00+00:00");
+        expect(section.textContent).toContain(formatSystemTimestamp("2026-07-20T03:00:00Z"));
+        expect(getNewsStatus).toHaveBeenCalledOnce();
+        const mountedSection = section;
+        await act(async () => {
+          await i18n.changeLanguage("en");
+        });
+        section = host!.querySelector('[data-settings-anchor="news_storage"]');
+        expect(section).toBe(mountedSection);
+        expect(getNewsStatus).toHaveBeenCalledOnce();
+      }
       expect(section.querySelector("h2")?.textContent).toBe("News Data");
       expect(section.textContent).toContain("10 articles · 2 sources · latest 2026-06-27T00:00:00+00:00");
       expect(section.textContent).toContain("Latest successful collection");
