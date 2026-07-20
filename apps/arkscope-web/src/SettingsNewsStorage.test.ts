@@ -130,7 +130,8 @@ describe("SettingsView news storage copy", () => {
     mocked.newsStatus = newsStatus();
     await renderNewsSection();
 
-    expect(host!.textContent).toContain("新聞資料狀態 · News Data");
+    const section = host!.querySelector('[data-settings-anchor="news_storage"]');
+    expect(section?.querySelector("h2")?.textContent).toBe("新聞資料");
     expect(host!.textContent).toContain("10 篇 · 2 來源");
     expect(host!.textContent).toContain("最近收集成功");
     expect(host!.textContent).not.toMatch(/PostgreSQL|PG exit|SQLite|legacy|mirror|本地新聞庫/);
@@ -165,7 +166,8 @@ describe("SettingsView news storage copy", () => {
     dispose();
     mocked.newsError = new Error("news status unavailable");
     await renderNewsSection();
-    expect(host!.textContent).toContain("news status unavailable");
+    expect(host!.textContent).toContain("要求失敗，請稍後再試。");
+    expect(host!.textContent).not.toContain("news status unavailable");
     expect(host!.querySelector(".errorbox")).not.toBeNull();
   });
 

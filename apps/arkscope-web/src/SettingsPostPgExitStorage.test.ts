@@ -220,8 +220,9 @@ describe("post-PG-exit storage panels", () => {
     };
     await renderSettings();
 
-    expect(host!.querySelector('[data-settings-anchor="data_storage"]')).not.toBeNull();
-    expect(host!.textContent).toContain("市場資料 · Market Data");
+    const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
+    expect(storage).not.toBeNull();
+    expect(storage!.querySelector("h2")?.textContent).toBe("市場資料");
     expect(host!.textContent).toContain("價格");
     expect(host!.textContent).toContain("價格 —");
     expect(host!.textContent).toContain("財務快取");
