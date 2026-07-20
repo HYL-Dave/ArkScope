@@ -175,13 +175,13 @@ const settings = {
     },
     catalog: {
       loading: "正在載入模型目錄…",
-      unavailable: "模型目錄目前無法使用。",
+      unavailable: "暫時無法讀取模型探索狀態",
       select: "選擇模型…",
       seedOnly: "此通道無法線上列出模型。",
       verifyAgain: "重新驗證列表",
     },
     credentials: {
-      missing: "尚未設定此 provider 的登入。",
+      missing: "尚未設定此 provider 的登入",
       apiKey: "API key",
       apiKeyPool: "API key pool",
       chatgptOAuth: "ChatGPT 訂閱登入",
@@ -192,7 +192,7 @@ const settings = {
       legacyMode: "未驗證（舊 sidecar 相容模式）。",
       missingCapability: "缺少任務能力",
       unsupported: "此登入方式不支援這個任務",
-      unverified: "進階／未驗證",
+      modelNotVisible: "此登入的探索清單未顯示此模型",
     },
     groups: {
       available: "可供此任務使用",
@@ -226,8 +226,8 @@ const settings = {
       run: "實際測試",
       running: "實際測試中…",
       succeeded: "實際測試通過",
-      failed: "實際測試失敗",
-      unsupported: "此登入方式不提供實際測試",
+      failed: "provider 實際呼叫失敗",
+      unsupported: "此登入方式尚不支援實際測試",
     },
     metrics: {
       latency: "延遲 {{value}} ms",
@@ -355,7 +355,7 @@ const settings = {
       signedInManual: "ChatGPT 訂閱已手動完成登入。",
       relogin: "重新登入",
       reloginDescription: "以此 credential 身分重新登入並原地更換 token。",
-      tokenExpired: "Token 已失效，需要重新登入。",
+      tokenExpired: "登入已失效，請重新登入",
     },
     probe: {
       title: "實際後端探測",
@@ -514,10 +514,12 @@ const settings = {
         unknown: "{{sourceId}}：上次狀態為 {{value}}",
       },
       backlog: {
+        queue: "內文佇列：{{value}}",
+        earliest: "最早 {{timestamp}}",
         due: "{{count}} 篇目前可處理",
         dueWithNever: "{{count}} 篇目前可處理（其中 {{value}} 篇尚未嘗試）",
         scheduled: "{{count}} 篇已排程稍後重試",
-        notEntitled: "{{count}} 篇來源目前未訂閱",
+        notEntitled: "{{count}} 篇來源目前未訂閱（標題已保留，開通後自動重試）",
         unavailable: "內文待處理狀態暫時無法讀取",
       },
       progress: "正在處理 {{value}}",

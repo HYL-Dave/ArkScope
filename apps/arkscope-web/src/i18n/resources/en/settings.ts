@@ -176,13 +176,13 @@ const settings = {
     },
     catalog: {
       loading: "Loading the model catalog...",
-      unavailable: "The model catalog is currently unavailable.",
+      unavailable: "Model discovery status is temporarily unavailable",
       select: "Select a model...",
       seedOnly: "This channel cannot list models online.",
       verifyAgain: "Verify list again",
     },
     credentials: {
-      missing: "No sign-in is configured for this provider.",
+      missing: "No sign-in is configured for this provider",
       apiKey: "API key",
       apiKeyPool: "API key pool",
       chatgptOAuth: "ChatGPT subscription sign-in",
@@ -193,7 +193,7 @@ const settings = {
       legacyMode: "Unverified (legacy sidecar compatibility mode).",
       missingCapability: "Task capability is missing",
       unsupported: "This sign-in method does not support the task",
-      unverified: "Advanced / unverified",
+      modelNotVisible: "This model does not appear in the discovery list for this sign-in",
     },
     groups: {
       available: "Available for this task",
@@ -227,8 +227,8 @@ const settings = {
       run: "Run live test",
       running: "Running live test...",
       succeeded: "Live test passed",
-      failed: "Live test failed",
-      unsupported: "This sign-in method does not offer a live test",
+      failed: "The live provider call failed",
+      unsupported: "This sign-in method does not yet support live testing",
     },
     metrics: {
       latency: "Latency: {{value}} ms",
@@ -356,7 +356,7 @@ const settings = {
       signedInManual: "ChatGPT subscription sign-in completed manually.",
       relogin: "Sign in again",
       reloginDescription: "Sign in as this credential and replace its token in place.",
-      tokenExpired: "The token has expired and requires another sign-in.",
+      tokenExpired: "The sign-in has expired. Sign in again",
     },
     probe: {
       title: "Live Backend Probe",
@@ -515,10 +515,12 @@ const settings = {
         unknown: "{{sourceId}}: Last status was {{value}}",
       },
       backlog: {
+        queue: "Body queue: {{value}}",
+        earliest: "Earliest retry: {{timestamp}}",
         due: "{{count}} available now",
         dueWithNever: "{{count}} available now ({{value}} not yet attempted)",
         scheduled: "{{count}} scheduled for a later retry",
-        notEntitled: "{{count}} unavailable under the current subscription",
+        notEntitled: "{{count}} unavailable under the current subscription (titles retained; retries resume automatically when access is enabled)",
         unavailable: "Body backlog status is temporarily unavailable",
       },
       progress: "Processing {{value}}",

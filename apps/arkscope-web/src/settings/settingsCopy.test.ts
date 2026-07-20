@@ -284,6 +284,7 @@ describe("Settings static copy authority", () => {
       const t = settingsT(expected.locale);
       expect(presets.map((id) => settingsInvestorPresetLabel(id, t))).toEqual(expected.presets);
       expect(horizons.map((id) => settingsInvestorHorizonLabel(id, t))).toEqual(expected.horizons);
+      expect(settingsInvestorPresetLabel("future_preset" as InvestorPreset, t)).toBe("future_preset");
       expect(settingsInvestorHorizonLabel("future_horizon", t)).toBe("future_horizon");
     }
   });
@@ -324,6 +325,11 @@ describe("Settings static copy authority", () => {
     const enT = settingsT("en");
     expect(stances.map((id) => settingsStanceLabel(id, enT))).toEqual(enStances);
     expect(mismatches.map((id) => settingsMismatchLabel(id, enT))).toEqual(enMismatches);
+    expect(settingsStanceLabel("future_stance" as AssistantStance, enT)).toBe("future_stance");
+    expect(settingsMismatchLabel(
+      "future_mismatch" as InvestorProfile["risk_mismatch"],
+      enT,
+    )).toBe("future_mismatch");
   });
 
   it("contains no dynamic translation key or source value", () => {
@@ -340,6 +346,7 @@ describe("Settings static copy authority", () => {
     expect(selectorCalls).toHaveLength(translationCalls.length);
     expect(`${source}\n${backendSource}`).not.toMatch(/\bt\([^)]*(?:\+|`|\[)/);
     expect(resources).not.toMatch(/NVDA|gpt-[\w.-]+|sk-(?:ant-)?[\w-]+|https?:\/\//i);
+    expect(source).toMatch(/function stableUnknown\(value: never\): string/);
 
     const exported = [...source.matchAll(/export (?:type|function)\s+(\w+)/g)]
       .map((match) => match[1]);

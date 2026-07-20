@@ -7,12 +7,14 @@ import { ApiError, type ProviderStatus, type ScheduleRunResult } from "../api";
 import { initializeI18n } from "../i18n/resources";
 import {
   diagnosticValue,
+  modelReasonLabel,
   providerClientDomainLabel,
   providerConfigFieldLabel,
   providerHealthCopy,
   providerName,
   providerTestCopy,
   saSegmentLabel,
+  scheduleBodyBacklogCopy,
   scheduleOutcomeCopy,
   scheduleSourceCopy,
   settingsErrorPresentation,
@@ -181,6 +183,7 @@ describe("Settings backend copy boundary", () => {
   });
 
   it("maps durable body backlog counts in both locales", () => {
+    const earliestNextRetryAt = "2026-07-21T03:04:05Z";
     const result: ScheduleRunResult = {
       source: "ibkr_news",
       status: "partial",
@@ -191,23 +194,35 @@ describe("Settings backend copy boundary", () => {
           never_attempted: 3,
           scheduled_later: 9,
           provider_not_entitled: 4,
+          earliest_next_retry_at: earliestNextRetryAt,
         },
       },
     };
     const cases = [
       {
         locale: "zh-Hant" as const,
-        fragments: ["IBKR 新聞：部分完成", "12 篇目前可處理", "3 篇尚未嘗試", "9 篇已排程稍後重試", "4 篇來源目前未訂閱"],
+        presentation: {
+          label: "內文佇列：12 篇目前可處理（其中 3 篇尚未嘗試） · 9 篇已排程稍後重試 · 4 篇來源目前未訂閱（標題已保留，開通後自動重試）",
+          tone: "muted" as const,
+          earliestNextRetryAt,
+        },
+        outcome: "IBKR 新聞：部分完成",
       },
       {
         locale: "en" as const,
-        fragments: ["IBKR News: Partially completed", "12 available now", "3 not yet attempted", "9 scheduled for a later retry", "4 unavailable under the current subscription"],
+        presentation: {
+          label: "Body queue: 12 available now (3 not yet attempted) · 9 scheduled for a later retry · 4 unavailable under the current subscription (titles retained; retries resume automatically when access is enabled)",
+          tone: "muted" as const,
+          earliestNextRetryAt,
+        },
+        outcome: "IBKR News: Partially completed",
       },
     ];
 
     for (const expected of cases) {
-      const value = scheduleOutcomeCopy("ibkr_news", result, settingsT(expected.locale));
-      for (const fragment of expected.fragments) expect(value).toContain(fragment);
+      const t = settingsT(expected.locale);
+      expect(scheduleBodyBacklogCopy(result, t)).toEqual(expected.presentation);
+      expect(scheduleOutcomeCopy("ibkr_news", result, t)).toBe(expected.outcome);
     }
   });
 
@@ -254,6 +269,17 @@ describe("Settings backend copy boundary", () => {
   });
 
   it("localizes known and unknown ApiError outcomes", () => {
+    const reasonIds = [
+      "missing_active_credential",
+      "task_auth_mode_unsupported",
+      "task_test_unsupported",
+      "task_capability_missing",
+      "model_not_visible",
+      "model_not_in_registry",
+      "discovery_unavailable",
+      "provider_call_failed",
+      "reauth_required",
+    ];
     const cases = [
       {
         locale: "zh-Hant" as const,
@@ -261,6 +287,17 @@ describe("Settings backend copy boundary", () => {
         invalidProfile: "投資人設定內容無效。",
         unknown: "要求失敗（代碼：future_error）。",
         generic: "要求失敗，請稍後再試。",
+        reasons: [
+          "尚未設定此 provider 的登入",
+          "此登入方式不支援這個任務",
+          "此登入方式尚不支援實際測試",
+          "缺少任務能力",
+          "此登入的探索清單未顯示此模型",
+          "自訂／未知模型，尚未驗證能力",
+          "暫時無法讀取模型探索狀態",
+          "provider 實際呼叫失敗",
+          "登入已失效，請重新登入",
+        ],
       },
       {
         locale: "en" as const,
@@ -268,6 +305,17 @@ describe("Settings backend copy boundary", () => {
         invalidProfile: "The Investor Profile is invalid.",
         unknown: "Request failed (code: future_error).",
         generic: "The request failed. Try again later.",
+        reasons: [
+          "No sign-in is configured for this provider",
+          "This sign-in method does not support the task",
+          "This sign-in method does not yet support live testing",
+          "Task capability is missing",
+          "This model does not appear in the discovery list for this sign-in",
+          "Custom or unknown model; capabilities are unverified",
+          "Model discovery status is temporarily unavailable",
+          "The live provider call failed",
+          "The sign-in has expired. Sign in again",
+        ],
       },
     ];
 
@@ -286,6 +334,11 @@ describe("Settings backend copy boundary", () => {
         t,
       ).message).toBe(expected.unknown);
       expect(settingsErrorPresentation(new Error("network exploded"), t).message).toBe(expected.generic);
+      expect(reasonIds.map((id) => modelReasonLabel(id, t))).toEqual(expected.reasons);
+      expect(reasonIds.map((code) => settingsErrorPresentation(
+        new ApiError("raw", "/models", 409, code, `RAW_${code}`),
+        t,
+      ).message)).toEqual(expected.reasons);
     }
   });
 
@@ -305,6 +358,7 @@ describe("Settings backend copy boundary", () => {
         .toBe("future_provider.future_field");
       expect(providerClientDomainLabel("future_domain", t)).toBe("future_domain");
       expect(saSegmentLabel("future_segment", t)).toBe("future_segment");
+      expect(modelReasonLabel("future_model_reason", t)).toBe("future_model_reason");
       const source = scheduleSourceCopy("future_source", t);
       expect(source.label).toBe("future_source");
       expect(source.description).toContain("future_source");

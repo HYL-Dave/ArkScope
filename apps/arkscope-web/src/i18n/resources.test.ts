@@ -149,6 +149,8 @@ describe("bundled i18n resources", () => {
         news: "新聞資料",
         macro: "總經資料",
         investor: "風險意願高於承受能力",
+        backlog: "內文佇列：待處理",
+        earliest: "最早 2026-07-21T03:04:05Z",
       },
       {
         locale: "en" as const,
@@ -162,6 +164,8 @@ describe("bundled i18n resources", () => {
         news: "News Data",
         macro: "Macro Data",
         investor: "Risk appetite above capacity",
+        backlog: "Body queue: Pending",
+        earliest: "Earliest retry: 2026-07-21T03:04:05Z",
       },
     ];
 
@@ -179,10 +183,14 @@ describe("bundled i18n resources", () => {
       expect(t(($) => $.newsStorage.title)).toBe(expected.news);
       expect(t(($) => $.macroStorage.title)).toBe(expected.macro);
       expect(t(($) => $.investor.mismatch.appetiteAboveCapacity)).toBe(expected.investor);
+      expect(t(($) => $.dataSources.schedule.backlog.queue, { value: expected.locale === "en" ? "Pending" : "待處理" }))
+        .toBe(expected.backlog);
+      expect(t(($) => $.dataSources.schedule.backlog.earliest, { timestamp: "2026-07-21T03:04:05Z" }))
+        .toBe(expected.earliest);
     }
   });
 
-  it("contains exactly 486 Settings leaves per locale", () => {
+  it("contains exactly 488 Settings leaves per locale", () => {
     const expectedSubtreeCounts = {
       actions: 18,
       workspace: 27,
@@ -191,7 +199,7 @@ describe("bundled i18n resources", () => {
       models: 62,
       runtime: 20,
       providers: 104,
-      dataSources: 83,
+      dataSources: 85,
       dataStorage: 37,
       newsStorage: 11,
       macroStorage: 27,
@@ -200,7 +208,7 @@ describe("bundled i18n resources", () => {
 
     for (const locale of ["zh-Hant", "en"] as const) {
       const settings = resources[locale].settings as ResourceTree;
-      expect(flattenResource(settings).size).toBe(486);
+      expect(flattenResource(settings).size).toBe(488);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(1);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(flattenResource(settings[subtree] as ResourceTree).size, `${locale}.${subtree}`)

@@ -11,6 +11,12 @@ export type SettingsErrorPresentation = {
   diagnostic: string | null;
 };
 
+export type ScheduleBodyBacklogPresentation = {
+  label: string;
+  tone: "muted" | "warn";
+  earliestNextRetryAt: string | null;
+};
+
 function providerConfigErrorMessage(code: string, t: SettingsT): string | null {
   switch (code) {
     case "provider_config_setup_required":
@@ -28,29 +34,39 @@ function providerConfigErrorMessage(code: string, t: SettingsT): string | null {
   }
 }
 
-function modelErrorMessage(code: string, t: SettingsT): string | null {
-  switch (code) {
+function knownModelReasonLabel(id: string, t: SettingsT): string | null {
+  switch (id) {
     case "missing_active_credential":
       return t(($) => $.models.credentials.missing);
-    case "reauth_required":
-      return t(($) => $.providers.openAI.tokenExpired);
-    case "model_not_visible":
-      return t(($) => $.models.compatibility.unverified);
+    case "task_auth_mode_unsupported":
+      return t(($) => $.models.compatibility.unsupported);
+    case "task_test_unsupported":
+      return t(($) => $.models.test.unsupported);
     case "task_capability_missing":
       return t(($) => $.models.compatibility.missingCapability);
+    case "model_not_visible":
+      return t(($) => $.models.compatibility.modelNotVisible);
+    case "model_not_in_registry":
+      return t(($) => $.models.custom.unknown);
     case "discovery_unavailable":
       return t(($) => $.models.catalog.unavailable);
     case "provider_call_failed":
-      return t(($) => $.errors.testFailed);
+      return t(($) => $.models.test.failed);
+    case "reauth_required":
+      return t(($) => $.providers.openAI.tokenExpired);
     default:
       return null;
   }
 }
 
+export function modelReasonLabel(id: string, t: SettingsT): string {
+  return knownModelReasonLabel(id, t) ?? id;
+}
+
 function apiErrorMessage(code: string, t: SettingsT): string {
   const providerMessage = providerConfigErrorMessage(code, t);
   if (providerMessage) return providerMessage;
-  const modelMessage = modelErrorMessage(code, t);
+  const modelMessage = knownModelReasonLabel(code, t);
   if (modelMessage) return modelMessage;
   switch (code) {
     case "invalid_investor_profile":
@@ -69,11 +85,18 @@ function backlogCount(value: unknown): number | null {
     : null;
 }
 
-function scheduleBacklogCopy(result: ScheduleRunResult, t: SettingsT): string[] {
-  const backlog = result.collect?.body_backlog;
-  if (!backlog) return [];
+export function scheduleBodyBacklogCopy(
+  result: ScheduleRunResult | null,
+  t: SettingsT,
+): ScheduleBodyBacklogPresentation | null {
+  const backlog = result?.collect?.body_backlog;
+  if (!backlog) return null;
   if (backlog.status !== "ok") {
-    return [t(($) => $.dataSources.schedule.backlog.unavailable)];
+    return {
+      label: t(($) => $.dataSources.schedule.backlog.unavailable),
+      tone: "warn",
+      earliestNextRetryAt: null,
+    };
   }
 
   const due = backlogCount(backlog.due_now);
@@ -87,8 +110,14 @@ function scheduleBacklogCopy(result: ScheduleRunResult, t: SettingsT): string[] 
     || notEntitled === null
     || never > due
   ) {
-    return [t(($) => $.dataSources.schedule.backlog.unavailable)];
+    return {
+      label: t(($) => $.dataSources.schedule.backlog.unavailable),
+      tone: "warn",
+      earliestNextRetryAt: null,
+    };
   }
+
+  if (due === 0 && scheduled === 0 && notEntitled === 0) return null;
 
   const copy: string[] = [];
   if (due > 0) {
@@ -105,7 +134,15 @@ function scheduleBacklogCopy(result: ScheduleRunResult, t: SettingsT): string[] 
   if (notEntitled > 0) {
     copy.push(t(($) => $.dataSources.schedule.backlog.notEntitled, { count: notEntitled }));
   }
-  return copy;
+  return {
+    label: t(($) => $.dataSources.schedule.backlog.queue, {
+      value: copy.join(" · "),
+    }),
+    tone: "muted",
+    earliestNextRetryAt: typeof backlog.earliest_next_retry_at === "string"
+      ? backlog.earliest_next_retry_at
+      : null,
+  };
 }
 
 export function settingsErrorPresentation(
@@ -340,9 +377,7 @@ export function scheduleOutcomeCopy(
         break;
     }
   }
-  if (!result) return outcome;
-  const backlog = scheduleBacklogCopy(result, t);
-  return backlog.length > 0 ? [outcome, ...backlog].join(" · ") : outcome;
+  return outcome;
 }
 
 export function saSegmentLabel(key: string, t: SettingsT): string {

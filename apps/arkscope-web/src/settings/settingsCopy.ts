@@ -13,6 +13,10 @@ import type { SettingsAnchorId, SettingsGroupId } from "./settingsRegistry";
 
 export type SettingsT = TFunction<"settings">;
 
+function stableUnknown(value: never): string {
+  return String(value);
+}
+
 type SearchCopy = {
   title: string;
   description: string;
@@ -226,7 +230,7 @@ export function settingsInvestorPresetLabel(
     case "custom":
       return t(($) => $.investor.presets.custom);
     default:
-      return String(id);
+      return stableUnknown(id);
   }
 }
 
@@ -264,7 +268,7 @@ export function settingsStanceLabel(id: AssistantStance, t: SettingsT): string {
     case "growth_opportunity":
       return t(($) => $.investor.stances.growthOpportunity);
     default:
-      return String(id);
+      return stableUnknown(id);
   }
 }
 
@@ -282,6 +286,6 @@ export function settingsMismatchLabel(
     case "unclear":
       return t(($) => $.investor.mismatch.unclear);
     default:
-      return String(id);
+      return stableUnknown(id);
   }
 }
