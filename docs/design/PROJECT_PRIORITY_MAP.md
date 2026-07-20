@@ -263,8 +263,12 @@ therefore defaults to defer until the hypothesis gate exists.
   through evidence tip `64017f4`.** Independent review completed canonical
   backend A/B at exact `+7/-0`; merged-tree backend `7`, frontend `73/680`,
   typecheck, build, scanner, no-PG, and isolated startup smoke are green.
-  **I18N-1 Shell + common UI implementation plan is REVIEW GREEN / CLEARED,
-  and implementation is the single NEXT gate.** The public selector remains
+  **I18N-1 Shell + common UI is IMPLEMENTATION COMPLETE / REVIEW-READY at
+  frozen product tip `5a76528d`; independent implementation review is the
+  single NEXT gate.** Exact frontend accounting is `+15/-0`
+  (`73/680 -> 74/695`), focused is `12/108`, scanner is
+  `1649/1563/1562/1`, and the both-locale six-viewport gate is green after one
+  reviewed single-line topbar wrap correction. The public selector remains
   absent, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
@@ -461,6 +465,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-1 SHELL + COMMON UI IMPLEMENTATION REVIEW-READY)**: Frozen product tip <code>5a76528d</code> completes the bounded Shell/Common migration without exposing a locale selector. Virgin frontend node A/B is exact <code>680 -> 695</code>, <code>+15/-0</code>; full frontend is <code>74/695</code>, focused is <code>12/108</code>, backend remains byte-identical at <code>4569</code>, resources remain exact <code>common +17</code>/<code>shell +37</code>, and the literal scanner is <code>1649/1563/1562/1</code>. The English <code>390px</code> runtime gate exposed a real topbar overflow and correctly triggered the plan stop condition. Reviewed scope amendment <code>06c99f98</code> authorized one named RED-first CSS node and one declaration, <code>.shell-topbar-primary { flex-wrap: wrap; }</code>. Real geometry then disproved the provisional claim that Traditional Chinese should remain one flex row: old nowrap hid the problem by compressing the work button to about <code>51x80px</code> and making the primary bar <code>92px</code> high; the reviewed layout gives both locales two clean rows at <code>390px</code>, one row at every canonical width <code>>=959px</code>, complete labels, and zero overflow. Both-locale six-viewport, Drawer/focus/state/privacy, typecheck, build, no-PG, immutable-tree, and process-cleanup gates are green. Independent implementation review is the single NEXT gate; merge, I18N-2, and the public selector remain unauthorized.
 
 - **2026-07-20 (I18N-1 PLAN REVIEW GREEN — IMPLEMENTATION CLEARED)**: Independent written review approved the complete I18N-1 plan with no must-fix. The one advisory is resolved in the clearance commit: the assertion-ledger summary now explicitly names all three reviewed evolutions, namely the Background Work result-copy correction, navigation authority labels-to-IDs/views, and missing Research thread title to semantic <code>null</code>. Exact scope and accounting remain unchanged at frontend <code>+14/-0</code> (<code>73/680 -> 74/694</code>), focused <code>10/87 -> 11/101</code>, backend byte-identical at <code>4569</code>, resources <code>common +17</code>/<code>shell +37</code>, and scanner <code>1709/1621/1621/0 -> 1649/1563/1562/1</code>. I18N-1 implementation is now the single NEXT unit, must descend from this docs-only clearance, and must stop at review-ready; I18N-2 and the public selector remain unopened.
 

@@ -9,13 +9,14 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CLEARED FOR IMPLEMENTATION — INDEPENDENT PLAN REVIEW GREEN,
-> 2026-07-20
+> **Status:** IMPLEMENTATION COMPLETE — INDEPENDENT IMPLEMENTATION REVIEW
+> PENDING, 2026-07-20
 >
 > I18N-0 is LIVE COMPLETE through merge-closeout commit `ac57858`. This plan is
-> the single NEXT unit named by the approved app-wide i18n decision. It does not
-> authorize product implementation until independent plan review returns GREEN
-> and a clearance commit is recorded.
+> the single NEXT unit named by the approved app-wide i18n decision. Independent
+> plan review returned GREEN at clearance `85767787`; reviewed product tip
+> `5a76528d` is now frozen for independent implementation review. Merge, I18N-2,
+> and the public selector remain unauthorized.
 
 **Goal:** Localize the shipped application Shell and the generic Drawer and
 BoundedProgress copy it consumes into complete `zh-Hant` and English resources,
@@ -207,11 +208,19 @@ row positions and actual topbar heights in both locales.
 
 This scope amendment adds one named RED-first node to the existing
 `ShellCss.test.ts`: `keeps the topbar primary row wrap-safe for long localized
-labels`. The product delta is exactly one declaration. Runtime acceptance is:
+labels`. The product delta is exactly one declaration.
 
-- `zh-Hant` at `390px` remains one primary-control row;
-- `en` at `390px` wraps the health/work controls onto a second row without
-  clipping or horizontal overflow;
+The real Traditional Chinese `390px` comparison rejected the provisional
+"must remain one flex row" review condition. Under the old `nowrap` rule the
+document did not gain horizontal scroll, but the work button was squeezed to
+approximately `51px` wide and its own content wrapped to `80px` high, making
+the primary bar `92px` high. With the reviewed wrap declaration, the work
+button remains a single `28px`-high control and the primary bar becomes two
+clean rows totaling `80px`. Therefore "no horizontal overflow" was not proof
+that the old narrow layout was coherent. Runtime acceptance is:
+
+- both locales at `390px` place health/work controls on a second row without
+  internally wrapping a control, clipping, or horizontal overflow;
 - both locales remain one row at every canonical viewport at least `768px`
   wide; and
 - any different row distribution or additional CSS is a stop condition.
@@ -420,17 +429,17 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
 | Evidence | Required record | Current state |
 | --- | --- | --- |
-| Plan review | findings, resolution commit, clearance commit | GREEN; assertion-ledger advisory resolved; clearance `857677871faf9777a4a2e294a6b0db3209c1a784` |
-| Branch ancestry | product A/B base, clearance base, worktree path, branch | Product base `ac57858`; `codex/i18n-1-shell-common-ui` at `/tmp/arkscope-i18n-1-shell`, opened from clearance `85767787` |
-| TDD commits | RED command/output and GREEN commit for Tasks 1-6 | Not started; product implementation unauthorized |
-| Resource accounting | exact Common/Shell paths and per-locale leaf counts | Planned `common +17`, `shell +37`; not implemented |
-| Test accounting | baseline/head lists, comm output, per-file additions/removals | Baseline backend `4569`, frontend `73/680`, original focused `10/87`; reviewed focused baseline `11/93`; planned frontend `+15/-0`, backend `+0/-0` |
-| Runtime CSS deviation | RED/GREEN node, exact one-line hunk, both-locale row geometry | Reviewed after English `390px` overflow; implementation not started |
-| Literal ratchet | before/after totals, manifest hashes, exact allowlist/scopes | Baseline confirmed `1709/1621/1621/0`; migration not applied |
-| Immutable gates | backend/API/CSS/desktop/extensions/non-owner diffs | Not run against an implementation tip |
-| Runtime gate | locale/viewport matrix, focus/state/privacy assertions, process cleanup | Not run |
-| Independent review | reviewer commands, findings, reviewed product/docs tips | Not requested |
-| Merge closeout | merge hash, merged-tree reruns, desktop check, next unit | Not authorized |
+| Plan review | findings, resolution commit, clearance commit | GREEN; assertion-ledger advisory resolved; clearance `857677871faf9777a4a2e294a6b0db3209c1a784`. Runtime CSS scope amendment `06c99f98` accepted the wrap fix but corrected the provisional Traditional-Chinese-one-row claim after real geometry disproved it. |
+| Branch ancestry | product A/B base, clearance base, worktree path, branch | Product base `ac57858`; branch `codex/i18n-1-shell-common-ui` at `/tmp/arkscope-i18n-1-shell`; frozen product tip `5a76528dbee8bfe68d7d2651387f4bcf3d1a3856`. |
+| TDD commits | RED command/output and GREEN commit for Tasks 1-6 | Baseline `dc56f098`; resources `f76a98cd`; shared primitives `55b2dc17`; navigation `b9ed9e62`; topbar `53f6e41d`; background work `7ea99e1f`; ratchet `92276489`. Runtime RED was `ShellCss.test.ts` at `1 failed / 6 passed`, missing only `flex-wrap`; GREEN `5a76528d` is `7/7`. |
+| Resource accounting | exact Common/Shell paths and per-locale leaf counts | Exact non-empty parity: `common +17`, `shell +37` in both `zh-Hant` and `en`; resources test GREEN. |
+| Test accounting | baseline/head lists, comm output, per-file additions/removals | Virgin node lists: frontend `680 -> 695`, exact `+15/-0`; distribution `3/1/1/2/1/1/1/1/2/1/1` across the 11 named files, including the single Shell CSS node. Full `74/695`; focused original `10/87`, reviewed baseline `11/93`, final `12/108`. Backend remains exact `4569 -> 4569` by byte identity. |
+| Runtime CSS deviation | RED/GREEN node, exact one-line hunk, both-locale row geometry | `shell.css` is exact `+1/-0`: `.shell-topbar-primary { flex-wrap: wrap; }`. Old zh `390px` nowrap compressed the work button to about `51x80px` and made primary height `92px`; reviewed wrap yields two clean rows, work button `28px` high, primary `80px`. Both locales are one row at `959/960/961/1024/1440`, two rows at `390`, with zero overflow. |
+| Literal ratchet | before/after totals, manifest hashes, exact allowlist/scopes | Exact scanner `1709/1621/1621/0 -> 1649/1563/1562/1`. Final manifest SHA-256: debt `d5453d8daf14dff5673c4a2b2ffa6c82ebf4bacf94fffe3fe1b6057945fbd30e`, allowlist `2367a1e545f5194b1ee438dc5f74d5af57ec8d1c780da90f8fabef2019ee2281`, scopes `c80f3450c25f1dffbb8135c8148b021949b98fd525517610ee60695e658170aa`; second check is read-only and identical. |
+| Immutable gates | backend/API/CSS/desktop/extensions/non-owner diffs | Backend `src/data_sources/tests`, `api.ts`, desktop/extensions, package files, protected surfaces/primitives, and all CSS except the reviewed one-line `shell.css` hunk are byte-identical to `ac57858`. Dynamic-key, selector/autonym, raw-private-field, `window.confirm`, `@media`, and breakpoint-literal scans are zero; `formatElapsed()` body is unchanged. |
+| Runtime gate | locale/viewport matrix, focus/state/privacy assertions, process cleanup | Separate authoritative temporary DBs and fresh browser profiles passed `zh-Hant` + `en` at `1440/1024/961/960/959/390`. Locale first paint, labels, source IDs, Drawer/focus, Developer diagnostics, privacy, font sizes, overlay polarity, nonblank content, and geometry passed. Expected disposable-profile `/profile/universe` 503s were non-critical. Screenshots/JSON are in `/tmp/arkscope-i18n1-runtime.kcCpMA/screens-wrap`; ports `8424/8434/9226` all refuse after cleanup. |
+| Independent review | reviewer commands, findings, reviewed product/docs tips | Not requested; product tip `5a76528d`; evidence-doc tip is the commit containing this ledger. |
+| Merge closeout | merge hash, merged-tree reruns, desktop check, next unit | Not authorized; I18N-2 and public selector remain unopened. |
 
 ---
 
@@ -507,7 +516,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/src/i18n/resources/en/shell.ts`
 - Modify: `apps/arkscope-web/src/i18n/resources.test.ts`
 
-- [ ] **Step 1: Write the failing exact-resource test**
+- [x] **Step 1: Write the failing exact-resource test**
 
   Add the named test to `resources.test.ts`. It creates a fresh instance per
   locale, obtains fixed `common` and `shell` translators, and proves both
@@ -550,7 +559,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   });
   ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run src/i18n/resources.test.ts
@@ -559,7 +568,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Expected: the new assertions fail because the reviewed keys/values do not
   exist. A separate typecheck in Step 5 proves the selectors statically.
 
-- [ ] **Step 3: Extend the terminology authority**
+- [x] **Step 3: Extend the terminology authority**
 
   Add exact canonical rows:
 
@@ -575,7 +584,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Do not copy the full resource inventory into the terminology document.
 
-- [ ] **Step 4: Add the exact resource trees**
+- [x] **Step 4: Add the exact resource trees**
 
   Preserve the existing `i18n.missingTranslation` leaf, then add the exact
   Common inventory. The Traditional Chinese shape is:
@@ -612,7 +621,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   `backgroundWork` trees and all 37 leaves from the inventory. Retain the
   terminology-authority header in all four files.
 
-- [ ] **Step 5: Run GREEN and the generic resource gates**
+- [x] **Step 5: Run GREEN and the generic resource gates**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run src/i18n/resources.test.ts
@@ -621,7 +630,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: `1 file / 7 tests`; exact key parity/non-empty tests remain green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add docs/design/ARKSCOPE_TERMINOLOGY.md \
@@ -640,7 +649,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/src/ui/overlays.test.tsx`
 - Modify: `apps/arkscope-web/src/ui/BoundedProgress.test.tsx`
 
-- [ ] **Step 1: Write the failing English BoundedProgress test**
+- [x] **Step 1: Write the failing English BoundedProgress test**
 
   Import the global i18next instance and add:
 
@@ -669,7 +678,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   });
   ```
 
-- [ ] **Step 2: Write the failing Drawer locale/remount test**
+- [x] **Step 2: Write the failing Drawer locale/remount test**
 
   Import i18next and add:
 
@@ -695,7 +704,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   });
   ```
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -705,7 +714,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Expected: both English assertions fail while all existing focus/state tests
   remain green.
 
-- [ ] **Step 4: Translate Drawer-owned controls**
+- [x] **Step 4: Translate Drawer-owned controls**
 
   In `Drawer`, call `useTranslation("common")` and replace only the three
   labels:
@@ -722,7 +731,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Do not translate `title`, `children`, or `footer` inside Drawer.
 
-- [ ] **Step 5: Translate BoundedProgress-owned messages**
+- [x] **Step 5: Translate BoundedProgress-owned messages**
 
   Keep `formatElapsed`, status mapping, and props unchanged. Use one Common
   translator and explicit static selectors:
@@ -753,7 +762,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   `t(($) => $.actions.stop)` for the button. Do not build a selector from a
   status string.
 
-- [ ] **Step 6: Run GREEN, focus, and type gates**
+- [x] **Step 6: Run GREEN, focus, and type gates**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -763,7 +772,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: existing `22` nodes plus exactly `2` additions, all green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
   ```bash
   git add apps/arkscope-web/src/ui/Drawer.tsx \
@@ -787,7 +796,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/src/App.tsx`
 - Modify: `apps/arkscope-web/src/AppShell.test.tsx`
 
-- [ ] **Step 1: Write RED tests for semantic navigation authority**
+- [x] **Step 1: Write RED tests for semantic navigation authority**
 
   Evolve the existing `publishes the approved four workflow groups in
   canonical order` node so it expects IDs and views, not labels:
@@ -808,7 +817,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   nodes. Assert the complete group and view arrays in both locales, exactly as
   listed in the resource inventory.
 
-- [ ] **Step 2: Write RED component/integration tests**
+- [x] **Step 2: Write RED component/integration tests**
 
   Add the English ShellNavigation node:
 
@@ -830,7 +839,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
      surface node remains mounted while current nav/context become
      `AI Research`.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -842,7 +851,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: missing semantic IDs/helper plus untranslated English UI fail.
 
-- [ ] **Step 4: Remove source-language labels from navigation data**
+- [x] **Step 4: Remove source-language labels from navigation data**
 
   Define:
 
@@ -863,7 +872,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Rebuild `SHELL_NAV_GROUPS` with the exact IDs/views/icons and no `label`
   property. Remove the old `shellViewLabel()` from this file.
 
-- [ ] **Step 5: Add the single typed label seam**
+- [x] **Step 5: Add the single typed label seam**
 
   `shellLabels.ts` contains exhaustive switches and no dynamic key:
 
@@ -899,12 +908,12 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   TypeScript's closed unions provide exhaustiveness; do not add a string-key
   fallback.
 
-- [ ] **Step 6: Wire ShellNavigation**
+- [x] **Step 6: Wire ShellNavigation**
 
   Use `useTranslation("shell")`, `group.id` as key, and the two label helpers.
   Preserve button structure, order, icons, `aria-current`, and callbacks.
 
-- [ ] **Step 7: Wire App-owned labels and context**
+- [x] **Step 7: Wire App-owned labels and context**
 
   Use one Shell translator in `App`:
 
@@ -923,7 +932,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Both persistent and Drawer nav accessible names use the same static selector.
   Do not move selected view/detail/navigation state.
 
-- [ ] **Step 8: Run GREEN and exact structure tests**
+- [x] **Step 8: Run GREEN and exact structure tests**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -936,7 +945,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected additions: shell labels `2`, ShellNavigation `1`, AppShell `2`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
   ```bash
   git add apps/arkscope-web/src/App.tsx \
@@ -958,7 +967,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/src/shell/ShellTopBar.tsx`
 - Modify: `apps/arkscope-web/src/shell/ShellTopBar.test.tsx`
 
-- [ ] **Step 1: Write the failing English/sanitization test**
+- [x] **Step 1: Write the failing English/sanitization test**
 
   Add the named node. Switch to English, render error status with Developer Mode,
   and assert:
@@ -974,7 +983,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   expect(host.textContent).not.toContain("recognizable private sidecar exception");
   ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run src/shell/ShellTopBar.test.tsx
@@ -982,7 +991,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: English health copy fails.
 
-- [ ] **Step 3: Replace topbar literals with static selectors**
+- [x] **Step 3: Replace topbar literals with static selectors**
 
   Call `useTranslation("shell")`. Map the three status kinds explicitly and
   render full diagnostic messages rather than assembling translated fragments:
@@ -997,7 +1006,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   `<span>ArkScope</span>` for the reviewed allowlist. Never interpolate
   `status.message`.
 
-- [ ] **Step 4: Run GREEN and existing node-stability tests**
+- [x] **Step 4: Run GREEN and existing node-stability tests**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run src/shell/ShellTopBar.test.tsx
@@ -1006,7 +1015,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: existing 11 nodes plus exactly 1 addition.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add apps/arkscope-web/src/shell/ShellTopBar.tsx \
@@ -1025,14 +1034,14 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/src/shell/BackgroundWorkIndicator.test.tsx`
 - Modify: `apps/arkscope-web/src/AppShell.test.tsx`
 
-- [ ] **Step 1: Write RED registry semantics**
+- [x] **Step 1: Write RED registry semantics**
 
   Evolve the existing reconciliation node to expect `threadTitle: null` for a
   missing title. Add the named node proving an empty/whitespace title remains
   null, a later source title replaces it, and neither `AI 研究` nor
   `AI Research` appears in serialized registry/session storage.
 
-- [ ] **Step 2: Write RED BackgroundWork English and live-fallback tests**
+- [x] **Step 2: Write RED BackgroundWork English and live-fallback tests**
 
   Add the two named nodes:
 
@@ -1044,13 +1053,13 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
      elements, switch to English, assert `AI 研究 -> AI Research`, generic copy
      changes, and both element identities plus work counts remain unchanged.
 
-- [ ] **Step 3: Write RED App integration for an open work Drawer**
+- [x] **Step 3: Write RED App integration for an open work Drawer**
 
   Seed one running work item, open Background Work in Chinese, switch i18next to
   English, and assert the same dialog remains open with English title/trigger
   while the current Home surface remains mounted.
 
-- [ ] **Step 4: Run RED**
+- [x] **Step 4: Run RED**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -1061,7 +1070,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: captured fallback and untranslated Background Work fail.
 
-- [ ] **Step 5: Make missing title semantic in the registry**
+- [x] **Step 5: Make missing title semantic in the registry**
 
   Change only the internal projection type/seam:
 
@@ -1083,7 +1092,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Let `observeRun` accept `threadTitle?: string | null`. Remove
   `FALLBACK_THREAD_TITLE`. Do not change persisted identity shape or polling.
 
-- [ ] **Step 6: Localize the Background Work presenter**
+- [x] **Step 6: Localize the Background Work presenter**
 
   Use `useTranslation("shell")` in the indicator and progress row. Keep explicit
   status mapping:
@@ -1109,7 +1118,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Pass `t(($) => $.backgroundWork.resultDestination)` as the destination only;
   generic BoundedProgress adds `Result:`/`結果：`.
 
-- [ ] **Step 7: Run GREEN and privacy tests**
+- [x] **Step 7: Run GREEN and privacy tests**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -1122,7 +1131,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Expected additions: research registry `1`, BackgroundWork `2`, AppShell `1`.
   Existing planted private values remain absent.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
   ```bash
   git add apps/arkscope-web/src/AppShell.test.tsx \
@@ -1143,7 +1152,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/scripts/i18n/migrated-scopes.json`
 - Modify: `apps/arkscope-web/src/i18n/foundationBoundaries.test.ts`
 
-- [ ] **Step 1: Write the failing manifest contract test**
+- [x] **Step 1: Write the failing manifest contract test**
 
   Add the named node. Parse all three manifests and assert exact scopes and the
   sole allowlist entry:
@@ -1170,7 +1179,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Also parse each debt signature and assert none belongs to App, `shell/**`,
   Drawer, or BoundedProgress.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run src/i18n/foundationBoundaries.test.ts
@@ -1178,7 +1187,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: scopes/allowlist still show I18N-0 state.
 
-- [ ] **Step 3: Mechanically remove exactly 59 owned debt signatures**
+- [x] **Step 3: Mechanically remove exactly 59 owned debt signatures**
 
   Use a one-off Node transform that parses each signature's first tuple value,
   filters the four exact ownership scopes, sorts no data, asserts removal count
@@ -1195,12 +1204,12 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
     || file === "src/ui/BoundedProgress.tsx";
   ```
 
-- [ ] **Step 4: Add exact scope and allowlist manifests**
+- [x] **Step 4: Add exact scope and allowlist manifests**
 
   Apply the arrays shown in Step 1 verbatim. No second identifier and no
   translatable sentence enters the allowlist.
 
-- [ ] **Step 5: Run GREEN and scanner twice**
+- [x] **Step 5: Run GREEN and scanner twice**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run src/i18n/foundationBoundaries.test.ts
@@ -1230,12 +1239,12 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Hash all three manifests before/after the second check; checks must be
   read-only.
 
-- [ ] **Step 6: Run the exact focused ledger**
+- [x] **Step 6: Run the exact focused ledger**
 
   Run the 12-file list and test set. Require `12 files / 108 tests`, exact
   `+15/-0`, and the distribution in this plan.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
   ```bash
   git add apps/arkscope-web/scripts/i18n/visible-literal-debt.json \
@@ -1254,7 +1263,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `apps/arkscope-web/src/shell/ShellCss.test.ts`
 - Update the implementation ledger in this plan.
 
-- [ ] **Step 0: Implement the reviewed topbar exception RED-first**
+- [x] **Step 0: Implement the reviewed topbar exception RED-first**
 
   Add the named `ShellCss.test.ts` node and require it to fail because
   `.shell-topbar-primary` lacks `flex-wrap: wrap`. Then add exactly that one
@@ -1262,7 +1271,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   nodes. Do not change another selector, declaration, label, minimum width,
   breakpoint, token, or font size.
 
-- [ ] **Step 1: Run exact focused tests**
+- [x] **Step 1: Run exact focused tests**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run \
@@ -1282,7 +1291,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Expected: `12 files / 108 tests`.
 
-- [ ] **Step 2: Run full frontend gates**
+- [x] **Step 2: Run full frontend gates**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run
@@ -1294,13 +1303,13 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   Expected: `74 files / 695 tests`; clean typecheck; successful build with only
   the existing chunk-size warning; exact scanner totals from Task 6.
 
-- [ ] **Step 3: Prove exact node accounting**
+- [x] **Step 3: Prove exact node accounting**
 
   Compare sorted `vitest list` output from virgin archives of `ac57858` and
   product tip, using the same root `node_modules`. Require exact `+15/-0`, no
   rename, and the per-file distribution in the ledger.
 
-- [ ] **Step 4: Prove constructive backend/API/CSS A/B**
+- [x] **Step 4: Prove constructive backend/API/CSS A/B**
 
   Run byte-identity gates against `ac57858`:
 
@@ -1322,7 +1331,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   constructively equal and must not spend ten minutes proving identical trees.
   Backend collect remains `4569`; no backend test is added or removed.
 
-- [ ] **Step 5: Run static/privacy/scope ratchets**
+- [x] **Step 5: Run static/privacy/scope ratchets**
 
   Prove:
 
@@ -1339,7 +1348,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
     fixture value; and
   - all non-owned surfaces and common primitives are byte-identical.
 
-- [ ] **Step 6: Run isolated both-locale browser gate**
+- [x] **Step 6: Run isolated both-locale browser gate**
 
   Use a temporary profile DB and isolated ports (recommended
   API `8424`, Vite `8434`, CDP `9226`). Do not use the production profile,
@@ -1368,15 +1377,15 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   - screenshots and DOM assertions identify locale and viewport.
 
   Also record leaf-control row positions and actual primary/topbar heights.
-  At `390px`, Traditional Chinese must remain one row and English must place
-  health/work controls on a second row. At all canonical widths `>=768px`, both
-  locales must remain one row. Do not turn any measured height delta into a
-  magic acceptance constant.
+  At `390px`, both locales must place health/work controls on a second row and
+  each control must remain internally single-line. At all canonical widths
+  `>=768px`, both locales must remain one row. Do not turn any measured height
+  delta into a magic acceptance constant.
 
   Do not manufacture production data. Remove isolated DBs/profiles/screenshots
   only after evidence is summarized in the ledger.
 
-- [ ] **Step 7: Run no-PG and final worktree checks**
+- [x] **Step 7: Run no-PG and final worktree checks**
 
   ```bash
   python -m src.smoke.pg_unreachable_e2e
@@ -1397,19 +1406,19 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `docs/superpowers/specs/2026-07-20-app-wide-i18n-decision.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Fill the implementation ledger**
+- [x] **Step 1: Fill the implementation ledger**
 
   Record clearance/base/product hashes, every RED/GREEN commit, exact resource
   paths/counts, test comm output, scanner totals/hashes, immutable gates,
   no-PG result, browser matrix, process cleanup, and any reviewed deviation.
 
-- [ ] **Step 2: Mark implementation review-ready, not LIVE**
+- [x] **Step 2: Mark implementation review-ready, not LIVE**
 
   Decision/map must say I18N-1 implementation is complete for independent
   review. I18N-2 remains queued and is not opened. The public selector remains
   absent.
 
-- [ ] **Step 3: Commit evidence docs**
+- [x] **Step 3: Commit evidence docs**
 
   ```bash
   git add docs/superpowers/plans/2026-07-20-i18n-1-shell-common-ui.md \
@@ -1418,7 +1427,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   git commit -m "docs: record i18n shell verification"
   ```
 
-- [ ] **Step 4: Stop for independent implementation review**
+- [x] **Step 4: Stop for independent implementation review**
 
   Do not merge, expose the selector, open I18N-2, or sync Design Kit before
   independent review GREEN and explicit user merge approval.

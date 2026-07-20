@@ -1,11 +1,14 @@
 # ArkScope App-Wide i18n Decision
 
-> **Status: WRITTEN DECISION APPROVED; I18N-0 FOUNDATION LIVE, 2026-07-20.**
+> **Status: WRITTEN DECISION APPROVED; I18N-0 FOUNDATION LIVE; I18N-1
+> IMPLEMENTATION REVIEW-READY, 2026-07-20.**
 > This document chooses the app-wide locale authority, runtime localization
 > mechanism, migration sequence, public-switch gate, and verification contract.
 > Independent written review returned GREEN. I18N-0 subsequently passed its
 > separately reviewed implementation, canonical A/B, and merged-tree closeout.
-> I18N-1 Shell + common UI is the single next unit.
+> I18N-1 Shell + common UI is implemented at frozen product tip `5a76528d`;
+> independent implementation review is the single next gate. I18N-2 and the
+> public selector remain unopened.
 
 ## 1. Purpose and Authority
 
