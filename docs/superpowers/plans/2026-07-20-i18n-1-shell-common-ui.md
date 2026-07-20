@@ -121,9 +121,12 @@ before changing product code.
 21. Locale changes rerender labels without remounting the selected Shell view,
     closing an open navigation/background Drawer, clearing work state, or
     changing focus ownership.
-22. CSS is byte-identical. English must fit the existing nav/topbar/Drawer
-    layout at the canonical six viewports. Font size is never reduced to make
-    copy fit. If a real overflow requires CSS, stop for reviewed scope change.
+22. CSS remains byte-identical except for the reviewed one-line
+    `flex-wrap: wrap` addition to `.shell-topbar-primary` in `shell.css`.
+    English must fit the nav/topbar/Drawer layout at the canonical six
+    viewports. Font size, labels, and minimum control widths are never reduced
+    to make copy fit. Any CSS beyond that exact declaration is a new stop and
+    review condition.
 23. Scanner ownership after this slice is exactly:
     `src/App.tsx`, `src/shell/**`, `src/ui/Drawer.tsx`, and
     `src/ui/BoundedProgress.tsx`, in addition to I18N-0 scopes.
@@ -178,8 +181,40 @@ npx vitest list \
   src/i18n/foundationBoundaries.test.ts
 ```
 
-These ten existing files collect exactly 87 nodes. The final 11-file command in
-Task 7 adds `src/shell/shellLabels.test.ts` only after Task 3 creates it.
+These ten existing files collect exactly 87 nodes. The reviewed runtime
+deviation also brings the existing `src/shell/ShellCss.test.ts` into the
+focused set; it contributes six baseline nodes. The final 12-file command in
+Task 7 contains those 11 existing files plus the new
+`src/shell/shellLabels.test.ts`: `11 files / 93 tests -> 12 files / 108 tests`.
+
+---
+
+## Reviewed Runtime Deviation: Localized Topbar Wrapping
+
+The first English `390x844` browser run found a real horizontal overflow:
+`.shell-topbar-primary` needed approximately `420px` while the viewport was
+`390px`. The complete English `To review 1` label extended beyond the content
+edge; truncating that label, shrinking font size, or reducing reviewed control
+minimums would hide meaning to preserve a single-line layout.
+
+Temporary CDP diagnosis proved that adding exactly `flex-wrap: wrap` to
+`.shell-topbar-primary` removes the overflow while retaining every label and
+existing minimum width. The same stylesheet already uses wrapping for
+`.shell-topbar-diagnostics`, so this is an existing Shell layout pattern rather
+than a new breakpoint or responsive mode. The diagnostic box-height delta is
+not an acceptance constant; the real implementation must record leaf-control
+row positions and actual topbar heights in both locales.
+
+This scope amendment adds one named RED-first node to the existing
+`ShellCss.test.ts`: `keeps the topbar primary row wrap-safe for long localized
+labels`. The product delta is exactly one declaration. Runtime acceptance is:
+
+- `zh-Hant` at `390px` remains one primary-control row;
+- `en` at `390px` wraps the health/work controls onto a second row without
+  clipping or horizontal overflow;
+- both locales remain one row at every canonical viewport at least `768px`
+  wide; and
+- any different row distribution or additional CSS is a stop condition.
 
 ---
 
@@ -286,6 +321,7 @@ change is a plan-review amendment so tests/resources do not drift independently.
 - `apps/arkscope-web/src/shell/ShellTopBar.test.tsx`
 - `apps/arkscope-web/src/shell/BackgroundWorkIndicator.test.tsx`
 - `apps/arkscope-web/src/shell/researchWork.test.tsx`
+- `apps/arkscope-web/src/shell/ShellCss.test.ts`
 - `apps/arkscope-web/src/ui/BoundedProgress.test.tsx`
 - `apps/arkscope-web/src/ui/overlays.test.tsx`
 - `apps/arkscope-web/scripts/i18n/visible-literal-debt.json`
@@ -299,6 +335,11 @@ change is a plan-review amendment so tests/resources do not drift independently.
 - `docs/superpowers/specs/2026-07-20-app-wide-i18n-decision.md`
 - `docs/superpowers/plans/2026-07-20-i18n-1-shell-common-ui.md`
 
+### Modify: reviewed runtime layout exception
+
+- `apps/arkscope-web/src/shell/shell.css` -- add only `flex-wrap: wrap` to
+  `.shell-topbar-primary`
+
 ### Must remain byte-identical to `ac57858`
 
 - all backend `src/**`, `data_sources/**`, and `tests/**`;
@@ -309,7 +350,7 @@ change is a plan-review amendment so tests/resources do not drift independently.
   Ticker Detail, Dashboard/System, and AICard;
 - `ui/Status.tsx`, `ui/Button.tsx`, `ui/ConfirmDialog.tsx`, `ui/DataTable.tsx`,
   `ui/Tabs.tsx`, tokens, and focus/breakpoint hooks;
-- all CSS;
+- all CSS except the exact reviewed one-line `shell.css` declaration;
 - desktop and extension trees; and
 - package manifests and lockfile.
 
@@ -331,14 +372,16 @@ missing-thread-title expectation from captured `AI 研究` to semantic `null`.
 | `src/shell/ShellTopBar.test.tsx` | 1 | `renders English health and developer diagnostic labels without exposing raw errors` |
 | `src/shell/BackgroundWorkIndicator.test.tsx` | 2 | `renders English background-work chrome while preserving source titles`; `updates only fallback copy when locale changes with the drawer open` |
 | `src/shell/researchWork.test.tsx` | 1 | `keeps a missing thread title semantic instead of capturing localized fallback copy` |
+| `src/shell/ShellCss.test.ts` | 1 | `keeps the topbar primary row wrap-safe for long localized labels` |
 | `src/ui/BoundedProgress.test.tsx` | 1 | `renders English generic progress copy while preserving owner-provided values` |
 | `src/ui/overlays.test.tsx` | 1 | `localizes Drawer controls without remounting the open panel` |
 | `src/i18n/foundationBoundaries.test.ts` | 1 | `records the exact I18N-1 migrated scopes and sole ArkScope allowlist` |
 
 Accounting:
 
-- frontend: `73 files / 680 tests -> 74 files / 694 tests`, exactly `+14/-0`;
-- focused owned set: `10 files / 87 tests -> 11 files / 101 tests`;
+- frontend: `73 files / 680 tests -> 74 files / 695 tests`, exactly `+15/-0`;
+- focused owned set: original `10 files / 87 tests`, augmented reviewed
+  baseline `11 files / 93 tests`, final `12 files / 108 tests`;
 - backend: `4569 -> 4569`, exact `+0/-0` by byte identity;
 - resources: `common +17`, `shell +37` per locale, exact key parity;
 - scanner debt: `1621 -> 1562`, exactly `-59` signatures;
@@ -381,7 +424,8 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 | Branch ancestry | product A/B base, clearance base, worktree path, branch | Product base `ac57858`; `codex/i18n-1-shell-common-ui` at `/tmp/arkscope-i18n-1-shell`, opened from clearance `85767787` |
 | TDD commits | RED command/output and GREEN commit for Tasks 1-6 | Not started; product implementation unauthorized |
 | Resource accounting | exact Common/Shell paths and per-locale leaf counts | Planned `common +17`, `shell +37`; not implemented |
-| Test accounting | baseline/head lists, comm output, per-file additions/removals | Baseline backend `4569`, frontend `73/680`, focused `10/87`; planned frontend `+14/-0`, backend `+0/-0` |
+| Test accounting | baseline/head lists, comm output, per-file additions/removals | Baseline backend `4569`, frontend `73/680`, original focused `10/87`; reviewed focused baseline `11/93`; planned frontend `+15/-0`, backend `+0/-0` |
+| Runtime CSS deviation | RED/GREEN node, exact one-line hunk, both-locale row geometry | Reviewed after English `390px` overflow; implementation not started |
 | Literal ratchet | before/after totals, manifest hashes, exact allowlist/scopes | Baseline confirmed `1709/1621/1621/0`; migration not applied |
 | Immutable gates | backend/API/CSS/desktop/extensions/non-owner diffs | Not run against an implementation tip |
 | Runtime gate | locale/viewport matrix, focus/state/privacy assertions, process cleanup | Not run |
@@ -1188,8 +1232,8 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
 - [ ] **Step 6: Run the exact focused ledger**
 
-  Run the 11-file list and test set. Require `11 files / 101 tests`, exact
-  `+14/-0`, and the distribution in this plan.
+  Run the 12-file list and test set. Require `12 files / 108 tests`, exact
+  `+15/-0`, and the distribution in this plan.
 
 - [ ] **Step 7: Commit**
 
@@ -1206,8 +1250,17 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 ## Task 7: Canonical Verification and Both-Locale Runtime Gate
 
 **Files:**
-- Modify no product file unless a reviewed test exposes a defect.
+- Modify: `apps/arkscope-web/src/shell/shell.css`
+- Modify: `apps/arkscope-web/src/shell/ShellCss.test.ts`
 - Update the implementation ledger in this plan.
+
+- [ ] **Step 0: Implement the reviewed topbar exception RED-first**
+
+  Add the named `ShellCss.test.ts` node and require it to fail because
+  `.shell-topbar-primary` lacks `flex-wrap: wrap`. Then add exactly that one
+  declaration to `shell.css` and require the focused CSS file to pass all seven
+  nodes. Do not change another selector, declaration, label, minimum width,
+  breakpoint, token, or font size.
 
 - [ ] **Step 1: Run exact focused tests**
 
@@ -1220,13 +1273,14 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
     src/shell/ShellTopBar.test.tsx \
     src/shell/BackgroundWorkIndicator.test.tsx \
     src/shell/researchWork.test.tsx \
+    src/shell/ShellCss.test.ts \
     src/ui/BoundedProgress.test.tsx \
     src/ui/overlays.test.tsx \
     src/i18n/resources.test.ts \
     src/i18n/foundationBoundaries.test.ts
   ```
 
-  Expected: `11 files / 101 tests`.
+  Expected: `12 files / 108 tests`.
 
 - [ ] **Step 2: Run full frontend gates**
 
@@ -1237,13 +1291,13 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `74 files / 694 tests`; clean typecheck; successful build with only
+  Expected: `74 files / 695 tests`; clean typecheck; successful build with only
   the existing chunk-size warning; exact scanner totals from Task 6.
 
 - [ ] **Step 3: Prove exact node accounting**
 
   Compare sorted `vitest list` output from virgin archives of `ac57858` and
-  product tip, using the same root `node_modules`. Require exact `+14/-0`, no
+  product tip, using the same root `node_modules`. Require exact `+15/-0`, no
   rename, and the per-file distribution in the ledger.
 
 - [ ] **Step 4: Prove constructive backend/API/CSS A/B**
@@ -1254,11 +1308,15 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   git diff --exit-code ac57858 -- src data_sources tests
   git diff --exit-code ac57858 -- apps/arkscope-web/src/api.ts
   git diff --exit-code ac57858 -- apps/arkscope-web/src/styles.css \
-    apps/arkscope-web/src/shell/shell.css \
     apps/arkscope-web/src/ui/primitives.css \
     apps/arkscope-web/src/settings/settings.css
+  git diff ac57858 -- apps/arkscope-web/src/shell/shell.css
   git diff --exit-code ac57858 -- apps/arkscope-desktop extensions
   ```
+
+  The `shell.css` diff must contain exactly the reviewed one-line
+  `flex-wrap: wrap` declaration inside `.shell-topbar-primary`; every other CSS
+  byte remains identical.
 
   Because both backend archives are byte-identical, full pytest A/B is
   constructively equal and must not spend ten minutes proving identical trees.
@@ -1308,6 +1366,12 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
     horizontal overflow, blank panel, or console exception;
   - page/component font sizes match the baseline; and
   - screenshots and DOM assertions identify locale and viewport.
+
+  Also record leaf-control row positions and actual primary/topbar heights.
+  At `390px`, Traditional Chinese must remain one row and English must place
+  health/work controls on a second row. At all canonical widths `>=768px`, both
+  locales must remain one row. Do not turn any measured height delta into a
+  magic acceptance constant.
 
   Do not manufacture production data. Remove isolated DBs/profiles/screenshots
   only after evidence is summarized in the ledger.
@@ -1374,9 +1438,11 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 9. Drawer focus/inline/overlay semantics remain unchanged;
 10. BoundedProgress semantics, formatter output, and domain mapping remain
     unchanged;
-11. exact `+14/-0`, `74/694`, and `11/101` ledgers;
+11. exact `+15/-0`, `74/695`, and `12/108` ledgers, including the named
+    `ShellCss.test.ts` node;
 12. scanner exact `1649/1563/1562/1`, with only ArkScope allowlisted;
-13. backend/API/CSS/non-owned-surface byte identity;
+13. backend/API/non-owned-surface byte identity plus the exact one-line
+    `.shell-topbar-primary` CSS exception;
 14. no selector/autonym/planned locale affordance;
 15. both-locale six-viewport layout/focus/accessible-name evidence; and
 16. no production DB/browser/process mutation.
@@ -1387,7 +1453,9 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
 Stop and return to review if:
 
-1. a CSS, breakpoint, token, layout, IA, or font-size change appears necessary;
+1. any CSS beyond the reviewed `.shell-topbar-primary { flex-wrap: wrap; }`
+   declaration, or any breakpoint, token, IA, or font-size change appears
+   necessary;
 2. a backend/API/DTO/schema/store change appears necessary;
 3. a non-owned surface or primitive must change;
 4. a public locale selector/autonym becomes reachable;
@@ -1404,8 +1472,9 @@ Stop and return to review if:
     or changes source content;
 13. English overflows/clips at any canonical viewport;
 14. raw error/private Research fields enter the Shell;
-15. test collection differs from exact `+14/-0` or any node is renamed/removed;
-16. backend/API/CSS/protected-tree byte identity fails;
+15. test collection differs from exact `+15/-0` or any node is renamed/removed;
+16. backend/API/protected-tree byte identity fails, or the Shell CSS diff is
+    anything other than the reviewed one-line declaration;
 17. no-PG smoke records an attempt; or
 18. verification would require production DB or browser-profile mutation.
 
@@ -1417,7 +1486,7 @@ Only after independent implementation GREEN and explicit user merge approval:
 
 1. restore the main checkout to clean tracked state;
 2. fast-forward merge the reviewed branch;
-3. rerun focused `11/101`, full `74/694`, typecheck, build, scanner, no-PG,
+3. rerun focused `12/108`, full `74/695`, typecheck, build, scanner, no-PG,
    immutable gates, and merged-tree both-locale startup smoke;
 4. restart the normal desktop once and verify the default `zh-Hant` Shell is
    behaviorally unchanged; no production locale write is required;
