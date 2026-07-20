@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import type { ScheduleSourceState } from "./api";
 import { StatusBadge } from "./ui";
 
@@ -10,6 +12,7 @@ export function SourceRunProgress({
   running: boolean;
   progress: ScheduleSourceState["progress"];
 }) {
+  const { t } = useTranslation("settings");
   if (!running) return null;
 
   const known = progress !== null
@@ -24,14 +27,16 @@ export function SourceRunProgress({
 
   return (
     <div className="source-run-progress" data-progress={known ? "known" : "indeterminate"}>
-      <StatusBadge state="running" label="執行中" />
+      <StatusBadge state="running" label={t(($) => $.actions.running)} />
       {known ? (
         <>
-          <div className="source-run-current">{progress.current || "處理中"}</div>
+          <div className="source-run-current">
+            {progress.current || t(($) => $.dataSources.schedule.progress)}
+          </div>
           <div
             className="source-run-track"
             role="progressbar"
-            aria-label={`${sourceLabel}執行進度`}
+            aria-label={t(($) => $.dataSources.schedule.progressAria, { sourceId: sourceLabel })}
             aria-valuemin={0}
             aria-valuemax={progress.total}
             aria-valuenow={boundedDone}

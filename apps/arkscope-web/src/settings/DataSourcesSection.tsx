@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getProvidersConfig,
   getProvidersHealth,
@@ -13,8 +14,10 @@ import {
   type ProviderConfigField,
   type ProviderConfigSetupState,
   type ProviderHealth,
+  type ProviderTestResult,
   type ProvidersHealthResponse,
   type SAExtensionHealthResponse,
+  type ScheduleRunResult,
   type ScheduleSourceState,
 } from "../api";
 import {
@@ -28,7 +31,6 @@ import {
   durableScheduleCommonState,
   providerCommonState,
   saSegmentCommonState,
-  scheduleSkipCommonState,
 } from "../dataSourcesPresentation";
 import {
   dataSourceScheduleLifecycleChanged,
@@ -38,24 +40,23 @@ import {
 import { formatSystemTimestamp } from "../timeDisplay";
 import { ConfirmDialog, StatusBadge } from "../ui";
 import { shortTs } from "./DataStorageSection";
+import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
+import {
+  diagnosticValue,
+  providerClientDomainLabel,
+  providerConfigFieldLabel,
+  providerKeySourceLabel,
+  providerName,
+  providerTestCopy,
+  scheduleOutcomeCopy,
+  scheduleSourceCopy,
+  settingsErrorPresentation,
+} from "./settingsBackendCopy";
+import type { SettingsT } from "./settingsCopy";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
-
-function providerConfigSourceLabel(source: string): string {
-  if (source === "app") return "App";
-  if (source === "env") return "環境變數";
-  if (source === "config/.env") return "config/.env";
-  if (source === "missing") return "未設定";
-  return source;
-}
-
-function compactMessage(value: string, max = 88): string {
-  const text = value.replace(/\s+/g, " ").trim();
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1)}…`;
-}
 
 function shortDate(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : "—";
@@ -95,24 +96,31 @@ function boolSignal(signals: ProviderHealth["signals"] | undefined, key: string)
   return typeof value === "boolean" ? value : null;
 }
 
-function fredProviderDetail(p: ProviderHealth): string | null {
+function fredProviderDetail(p: ProviderHealth, t: SettingsT): string | null {
   if (p.id !== "fred") return null;
   const snap = fredSnapshotFromSignals(p.signals);
   const auto = boolSignal(p.signals, "auto_refresh_enabled");
   const parts: string[] = [];
   if (snap?.available) {
     parts.push(
-      `資料快照可用：${formatCount(snap.series_count)} 序列 · ${formatCount(snap.observation_count)} 觀測值`,
+      t(($) => $.dataSources.fred.snapshotAvailable, {
+        count: snap.series_count ?? 0,
+        value: formatCount(snap.observation_count),
+      }),
     );
   } else {
-    parts.push("尚無資料");
+    parts.push(t(($) => $.dataSources.fred.noData));
   }
-  if (snap?.latest_fetched_at) parts.push(`最後抓取 ${shortDate(snap.latest_fetched_at)}`);
+  if (snap?.latest_fetched_at) {
+    parts.push(t(($) => $.dataSources.fred.latestFetched, {
+      timestamp: shortDate(snap.latest_fetched_at),
+    }));
+  }
   parts.push(auto === true
-    ? "自動刷新已啟用"
+    ? t(($) => $.dataSources.fred.autoEnabled)
     : auto === false
-      ? "自動刷新未啟用"
-      : "自動刷新狀態未知");
+      ? t(($) => $.dataSources.fred.autoDisabled)
+      : t(($) => $.dataSources.fred.autoUnknown));
   return parts.join(" · ");
 }
 
@@ -124,37 +132,50 @@ function fredProviderDetail(p: ProviderHealth): string | null {
 function ibkrClientIdChips(
   domains: NonNullable<ProviderConfigField["client_id_domains"]>,
   draft: string,
+  t: SettingsT,
 ): { preview: boolean; text: string } {
   const s = draft.trim();
   const base = /^\d+$/.test(s) ? Number(s) : null;
   const text = domains
-    .map((d) => `${d.label}=${base !== null ? base + d.offset : d.effective_id ?? "？"}`)
+    .map((d) => `${providerClientDomainLabel(d.domain, t)}=${base !== null ? base + d.offset : d.effective_id ?? "？"}`)
     .join("、");
   return { preview: base !== null, text };
 }
 
-function ProviderHealthState({ provider }: { provider: ProviderHealth }) {
+function ProviderHealthState({ provider, t }: { provider: ProviderHealth; t: SettingsT }) {
   const state = providerCommonState(provider.status);
   return state === null
-    ? <span className="muted tiny">{providerHealthStatusLabel(provider)}</span>
-    : <StatusBadge state={state} label={providerHealthStatusLabel(provider)} />;
+    ? <span className="muted tiny">{providerHealthStatusLabel(provider, t)}</span>
+    : <StatusBadge state={state} label={providerHealthStatusLabel(provider, t)} />;
 }
+
+type DataSourcesOutcome =
+  | { kind: "error"; error: unknown }
+  | { kind: "schedule"; source: string; result: ScheduleRunResult };
+
+type ProviderTestState =
+  | { kind: "running" }
+  | { kind: "result"; result: ProviderTestResult }
+  | { kind: "error"; error: unknown };
 
 export function DataSourcesSection({
   onNavigationGuardChange,
+  developerMode = false,
 }: {
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  developerMode?: boolean;
 }) {
+  const { t } = useTranslation("settings");
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
   const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<DataSourcesOutcome | null>(null);
   const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
-  const [testResults, setTestResults] = useState<Record<string, string>>({});
+  const [testResults, setTestResults] = useState<Record<string, ProviderTestState>>({});
   const [pendingGuardedEdit, setPendingGuardedEdit] = useState<{
     provider: string;
     field: string;
@@ -177,12 +198,12 @@ export function DataSourcesSection({
       dirty,
       busy: navigationBusy,
       reason: navigationBusy
-        ? "資料來源設定更新正在進行。"
+        ? t(($) => $.dataSources.guard.busy)
         : dirty
-          ? "資料來源與排程有未儲存的變更。"
+          ? t(($) => $.dataSources.guard.dirty)
           : null,
     });
-  }, [dirty, navigationBusy, onNavigationGuardChange]);
+  }, [dirty, navigationBusy, onNavigationGuardChange, t]);
 
   useEffect(() => () => {
     onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -224,8 +245,14 @@ export function DataSourcesSection({
       setCfgSetup(rc.value.setup);
     }
     const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
-    setErr(bad.length
-      ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
+    setOutcome(bad.length
+      ? {
+          kind: "error",
+          error: new Error(
+            bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+              .join("; "),
+          ),
+        }
       : null);
   }, [acceptSchedule]);
 
@@ -296,7 +323,7 @@ export function DataSourcesSection({
       await putSchedule(source, { enabled });
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setOutcome({ kind: "error", error: e });
     } finally {
       setBusy("");
     }
@@ -313,7 +340,7 @@ export function DataSourcesSection({
       setDrafts((d) => ({ ...d, [source]: "" }));
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setOutcome({ kind: "error", error: e });
     } finally {
       setBusy("");
     }
@@ -324,10 +351,12 @@ export function DataSourcesSection({
     setBusy(source);
     try {
       const r = await runScheduleNow(source);
-      if (r.status === "skipped") setErr(`${source}: ${r.reason ?? "已在執行"}`);
+      if (r.status === "skipped") {
+        setOutcome({ kind: "schedule", source, result: r });
+      }
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setOutcome({ kind: "error", error: e });
     } finally {
       setBusy("");
     }
@@ -340,7 +369,7 @@ export function DataSourcesSection({
       await importProviderConfigField(provider, field, sourceEnvVar);
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setOutcome({ kind: "error", error: e });
     } finally {
       setBusy("");
     }
@@ -364,7 +393,7 @@ export function DataSourcesSection({
       await load();
       return true;
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setOutcome({ kind: "error", error: e });
       return false;
     } finally {
       setBusy("");
@@ -399,20 +428,18 @@ export function DataSourcesSection({
   async function runTest(provider: string) {
     if (busy) return;
     setBusy(`test.${provider}`);
-    setTestResults((t) => ({ ...t, [provider]: "測試中…" }));
+    setTestResults((results) => ({ ...results, [provider]: { kind: "running" } }));
     try {
       const r = await testProvider(provider);
-      setTestResults((t) => ({
-        ...t,
-        [provider]:
-          r.ok === true
-            ? `✓ ${r.detail}${r.latency_ms != null ? ` · ${r.latency_ms}ms` : ""}`
-            : r.ok === false
-              ? `✗ ${r.detail}`
-              : `— ${r.detail}`,
+      setTestResults((results) => ({
+        ...results,
+        [provider]: { kind: "result", result: r },
       }));
     } catch (e) {
-      setTestResults((t) => ({ ...t, [provider]: `✗ ${e instanceof Error ? e.message : String(e)}` }));
+      setTestResults((results) => ({
+        ...results,
+        [provider]: { kind: "error", error: e },
+      }));
     } finally {
       setBusy("");
     }
@@ -424,7 +451,7 @@ export function DataSourcesSection({
     try {
       setSaExtensionHealth(await getSAExtensionHealth());
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setOutcome({ kind: "error", error: e });
     } finally {
       setBusy("");
     }
@@ -433,41 +460,60 @@ export function DataSourcesSection({
   function renderProviderConfigField(pid: string, f: ProviderConfigField) {
     const draftKey = `${pid}.${f.field}`;
     const draft = keyDrafts[draftKey] ?? "";
+    const fieldLabel = providerConfigFieldLabel(pid, f.field, t);
     const envControlled = f.env_var === "IBKR_CLIENT_ID" && f.effective_source === "env";
     const chips = f.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0
-      ? ibkrClientIdChips(f.client_id_domains!, envControlled ? "" : draft)
+      ? ibkrClientIdChips(f.client_id_domains!, envControlled ? "" : draft, t)
       : null;
     const caption = envControlled
-      ? "各域用戶端 ID（環境變數控制中）："
+      ? t(($) => $.dataSources.providers.config.clientIdsEnvironmentControlled)
       : chips?.preview
-        ? "存檔後 ID："
-        : "各域用戶端 ID：";
+        ? t(($) => $.dataSources.providers.config.clientIdsAfterSave)
+        : t(($) => $.dataSources.providers.config.clientIdsCurrent);
 
     return (
       <div className="provider-config-field" key={draftKey}>
-        <div className="provider-config-field-label">{f.label}</div>
+        <div className="provider-config-field-label">{fieldLabel}</div>
         <div className="provider-config-field-current">
           {f.effective_source === "missing"
-            ? <span className="ds-chip ds-missing_key">未設定</span>
+            ? <span className="ds-chip ds-missing_key">
+                {t(($) => $.dataSources.providers.health.notConfigured)}
+              </span>
             : <>
-                <span className="mono">{f.app_value_set ? f.app_value_masked : "（外部）"}</span>
-                {f.defaulted && <span className="muted tiny"> · 預設</span>}
-                <span className="muted tiny">（{providerConfigSourceLabel(f.effective_source)}）</span>
+                <span className="mono">
+                  {f.app_value_set
+                    ? f.app_value_masked
+                    : <>（{t(($) => $.dataSources.labels.external)}）</>}
+                </span>
+                {f.defaulted && (
+                  <span className="muted tiny">
+                    {" · "}{t(($) => $.dataSources.labels.defaultValue)}
+                  </span>
+                )}
+                <span className="muted tiny">
+                  （{providerKeySourceLabel(f.effective_source, t)}）
+                </span>
                 {f.needs_import && (
                   <button className="btn-ghost tiny"
                     disabled={busy === `import.${pid}.${f.field}`}
                     onClick={() => void importField(pid, f.field, f.import_source)}>
-                    匯入
+                    {t(($) => $.dataSources.providers.config.importValue)}
                   </button>
                 )}
-                {f.needs_import && <span className="muted tiny">建議匯入</span>}
+                {f.needs_import && (
+                  <span className="muted tiny">
+                    {t(($) => $.dataSources.labels.recommendedImport)}
+                  </span>
+                )}
               </>}
         </div>
         <div className="provider-config-field-edit">
           <input
             className="ds-interval ds-keyinput"
             type={f.secret ? "password" : "text"}
-            placeholder={f.secret ? "貼上金鑰…" : f.label}
+            placeholder={f.secret
+              ? t(($) => $.dataSources.providers.config.pasteKey)
+              : fieldLabel}
             value={draft}
             disabled={busy === draftKey}
             onChange={(e) => setKeyDrafts((d) => ({ ...d, [draftKey]: e.target.value }))}
@@ -481,12 +527,12 @@ export function DataSourcesSection({
               className="btn-ghost tiny"
               onClick={() => void saveField(pid, f.field, draft, f)}
             >
-              儲存
+              {t(($) => $.actions.save)}
             </button>
           )}
           {f.app_value_set && (
             <button className="btn-ghost tiny" onClick={() => void saveField(pid, f.field, null, f)}>
-              清除
+              {t(($) => $.actions.clear)}
             </button>
           )}
         </div>
@@ -506,50 +552,34 @@ export function DataSourcesSection({
     if (!row) return "—";
     const ts = shortTs(row.finished_at ?? null);
     if (row.status === "succeeded") return `✓ ${ts}`;
-    if (row.status === "failed") return `✗ ${ts}${row.error ? `（${String(row.error).slice(0, 60)}）` : ""}`;
-    if (row.status === "running") return "執行中…";
+    if (row.status === "failed") return `✗ ${ts}`;
+    if (row.status === "running") return t(($) => $.actions.running);
     return row.status ?? "—";
   }
 
   function renderLastRun(source: string, s: ScheduleSourceState) {
-    const details: Array<{ label: string; value: string; tone?: "bad" | "warn" }> = [];
-    const skippedReason = s.last_result?.status === "skipped" ? s.last_result.reason ?? "已在執行" : null;
-    const alreadyRunningSkip = skippedReason?.includes("already running") ?? false;
-    const skippedSummary = alreadyRunningSkip ? "已有執行中" : compactMessage(skippedReason ?? "");
-    const skipState = scheduleSkipCommonState(skippedReason);
+    const skipped = s.last_result?.status === "skipped";
     const historyState = durableScheduleCommonState(s);
     const durableSkipped = s.durable_state?.last_status === "skipped";
-    if (skippedReason) {
-      details.push({
-        label: alreadyRunningSkip ? "新觸發略過" : "跳過原因",
-        value: skippedReason,
-        tone: "warn",
-      });
-    }
-    const ss = schedulerStateLabel(s.durable_state ?? null);
-    const bodyBacklog = schedulerBodyBacklogPresentation(s.durable_state ?? null);
-    const durableError = s.durable_state?.last_status === "failed" ? s.durable_state.last_error : null;
-    if (durableError) details.push({ label: "失敗訊息", value: durableError, tone: "bad" });
+    const ss = schedulerStateLabel(s.durable_state ?? null, t);
+    const bodyBacklog = schedulerBodyBacklogPresentation(s.durable_state ?? null, t);
 
     return (
       <div className="ds-last-run">
         <div className="ds-last-run-summary">
           <span>{jobOutcome(s.job_name)}</span>
-          {skippedReason && (
-            skipState === null ? (
-              <span className="muted tiny" title={skippedReason}>
-                已跳過：{skippedSummary}
-              </span>
-            ) : (
-              <StatusBadge state={skipState} label="新觸發已略過" />
-            )
+          {skipped && (
+            <StatusBadge
+              state="blocked"
+              label={t(($) => $.dataSources.schedule.triggerSkipped)}
+            />
           )}
           {historyState !== null ? (
             <StatusBadge
               state={historyState}
-              label={`${ss.label}${durableError ? `：${compactMessage(durableError)}` : ""}`}
+              label={ss.label}
             />
-          ) : durableSkipped && !skippedReason ? (
+          ) : durableSkipped && !skipped ? (
             <span className="muted tiny">{ss.label}</span>
           ) : null}
           {ss.needsContinue && (
@@ -557,9 +587,9 @@ export function DataSourcesSection({
               className="btn-ghost"
               disabled={!!busy || s.running}
               onClick={() => void runNow(source)}
-              title="手動補抓上次部分完成剩餘的標的"
+              title={t(($) => $.dataSources.schedule.continue.title)}
             >
-              補抓
+              {t(($) => $.dataSources.schedule.continue.label)}
             </button>
           )}
         </div>
@@ -567,70 +597,130 @@ export function DataSourcesSection({
           <div className={`tiny ${bodyBacklog.tone === "warn" ? "refresh-err" : "muted"}`}>
             {bodyBacklog.label}
             {bodyBacklog.earliestNextRetryAt
-              ? ` · 最早 ${formatSystemTimestamp(bodyBacklog.earliestNextRetryAt)}`
+              ? <>
+                  {" · "}
+                  {t(($) => $.dataSources.schedule.backlog.earliest, {
+                    timestamp: formatSystemTimestamp(bodyBacklog.earliestNextRetryAt),
+                  })}
+                </>
               : ""}
           </div>
-        )}
-        {details.length > 0 && (
-          <details className="ds-last-run-details">
-            <summary>完整訊息</summary>
-            {details.map((d) => (
-              <div className={`ds-last-run-detail ${d.tone === "bad" ? "refresh-err" : ""}`} key={d.label}>
-                <span className="muted tiny">{d.label}</span>
-                <pre>{d.value}</pre>
-              </div>
-            ))}
-          </details>
         )}
       </div>
     );
   }
 
+  function providerTestPresentation(provider: string): string | null {
+    const state = testResults[provider];
+    if (!state) return null;
+    if (state.kind === "running") return t(($) => $.actions.testing);
+    if (state.kind === "error") return t(($) => $.errors.testFailed);
+    const mark = state.result.ok === true ? "✓" : state.result.ok === false ? "✗" : "—";
+    const latency = state.result.latency_ms == null ? null : `${state.result.latency_ms}ms`;
+    return [mark, providerTestCopy(provider, state.result.ok, t), latency]
+      .filter((value): value is string => value !== null)
+      .join(" · ");
+  }
+
+  const outcomePresentation = outcome?.kind === "error"
+    ? settingsErrorPresentation(outcome.error, t)
+    : null;
+  const outcomeMessage = outcome?.kind === "schedule"
+    ? scheduleOutcomeCopy(outcome.source, outcome.result, t)
+    : outcomePresentation?.message ?? null;
+  const jobDiagnostics = Object.values(health?.jobs ?? {}).map((row) => row.error);
+  const providerDiagnostics = (health?.providers ?? []).flatMap((provider) => [
+    provider.detail,
+    provider.last_error,
+    provider.disabled_reason,
+  ]);
+  const configDiagnostics = Object.values(cfg ?? {}).flatMap((entry) =>
+    entry.fields.map((field) => field.guard_reason));
+  const scheduleDiagnostics = Object.values(schedule ?? {}).flatMap((source) => [
+    source.retired_reason,
+    source.last_result?.reason,
+    source.durable_state?.last_error,
+    source.durable_state?.running_stale_reason,
+  ]);
+  const providerTestDiagnostics = Object.values(testResults).map((state) => {
+    if (state.kind === "result") return state.result.detail;
+    if (state.kind === "error") return state.error;
+    return null;
+  });
+  const diagnostics = [
+    outcomePresentation?.diagnostic,
+    outcome?.kind === "schedule" ? outcome.result.reason : null,
+    ...(health?.notes ?? []),
+    ...jobDiagnostics,
+    ...providerDiagnostics,
+    ...(saExtensionHealth?.segments.map((segment) => segment.detail) ?? []),
+    cfgSetup?.reason,
+    ...configDiagnostics,
+    ...scheduleDiagnostics,
+    ...providerTestDiagnostics,
+  ].map((value) => diagnosticValue(developerMode, value));
+
   return (
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>資料來源 · Data Sources</h2>
+          <h2>{t(($) => $.dataSources.section.title)}</h2>
           <p className="muted tiny">
-            集中檢視各資料來源的健康狀態、連線設定、排程與手動執行。
-            每個來源可獨立設定；IBKR 工作會共用 Gateway 鎖以避免重疊。
+            {t(($) => $.dataSources.section.description)}
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>
-          ↻ 重新整理{anyRunning ? "（執行中，自動更新）" : ""}
+          ↻ {t(($) => $.actions.refresh)}
+          {anyRunning
+            ? <>（{t(($) => $.dataSources.schedule.autoRefreshing)}）</>
+            : null}
         </button>
       </div>
 
-      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+      {outcomeMessage && (
+        <div className="errorbox"><p className="muted">{outcomeMessage}</p></div>
+      )}
+      {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}
 
       <div className="settings-panel">
-        <h4 className="detail-section">Provider 健康</h4>
+        <h4 className="detail-section">{t(($) => $.dataSources.providers.health.title)}</h4>
         {!health ? (
-          <p className="muted tiny">loading…</p>
+          <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
         ) : (
           <div className="settings-table-scroll" data-testid="provider-health-scroll">
             <table className="data-table settings-provider-health-table">
               <thead>
-                <tr><th>Provider</th><th>狀態</th><th>金鑰</th><th>最近成功</th><th>最近錯誤</th></tr>
+                <tr>
+                  <th>{t(($) => $.dataSources.headings.provider)}</th>
+                  <th>{t(($) => $.dataSources.headings.status)}</th>
+                  <th>{t(($) => $.dataSources.headings.key)}</th>
+                  <th>{t(($) => $.dataSources.headings.lastSuccess)}</th>
+                  <th>{t(($) => $.dataSources.headings.lastError)}</th>
+                </tr>
               </thead>
               <tbody>
-                {health.providers.map((p) => (
-                  <tr key={p.id}>
-                    <td className="settings-wrap-text">
-                      {p.label}
-                      {fredProviderDetail(p) && (
-                        <div className="muted tiny">{fredProviderDetail(p)}</div>
-                      )}
-                    </td>
-                    <td><ProviderHealthState provider={p} /></td>
-                    <td>
-                      {p.key_source === "not_required" ? "免金鑰" : p.key_source}
-                      {p.key_import_suggested && <span className="muted tiny"> · 建議匯入</span>}
-                    </td>
-                    <td>{shortTs(p.last_success_at)}</td>
-                    <td className="muted settings-wrap-text">{p.last_error ? p.last_error.slice(0, 60) : "—"}</td>
-                  </tr>
-                ))}
+                {health.providers.map((p) => {
+                  const fredDetail = fredProviderDetail(p, t);
+                  return (
+                    <tr key={p.id}>
+                      <td className="settings-wrap-text">
+                        {providerName(p.id, t)}
+                        {fredDetail && <div className="muted tiny">{fredDetail}</div>}
+                      </td>
+                      <td><ProviderHealthState provider={p} t={t} /></td>
+                      <td>
+                        {providerKeySourceLabel(p.key_source, t)}
+                        {p.key_import_suggested && (
+                          <span className="muted tiny">
+                            {" · "}{t(($) => $.dataSources.labels.recommendedImport)}
+                          </span>
+                        )}
+                      </td>
+                      <td>{shortTs(p.last_success_at)}</td>
+                      <td className="muted settings-wrap-text">—</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -640,9 +730,9 @@ export function DataSourcesSection({
       <div className="settings-panel" style={{ marginTop: 16 }}>
         <div className="settings-panel-head">
           <div>
-            <h4 className="detail-section">SA Extension 健康</h4>
+            <h4 className="detail-section">{t(($) => $.dataSources.extension.title)}</h4>
             <p className="muted tiny">
-              檢查瀏覽器 extension、native host、sidecar 回報與資料接收狀態。
+              {t(($) => $.dataSources.extension.description)}
             </p>
           </div>
           <button
@@ -650,32 +740,43 @@ export function DataSourcesSection({
             disabled={busy === "sa.extension-health"}
             onClick={() => void reloadSAExtensionHealth()}
           >
-            重新檢查
+            {t(($) => $.dataSources.extension.recheck)}
           </button>
         </div>
         {!saExtensionHealth ? (
-          <p className="muted tiny">loading…</p>
+          <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
         ) : (
           <>
             <p className="muted tiny">
-              {saExtensionHealth.ok ? "鏈路可用" : "鏈路有中斷"} · {shortTs(saExtensionHealth.generated_at)}
+              {saExtensionHealth.ok
+                ? t(($) => $.dataSources.extension.available)
+                : t(($) => $.dataSources.extension.interrupted)}
+              {" · "}{shortTs(saExtensionHealth.generated_at)}
             </p>
             <div className="settings-table-scroll" data-testid="sa-health-scroll">
               <table className="data-table settings-sa-health-table">
                 <thead>
-                  <tr><th>段落</th><th>狀態</th><th>細節</th></tr>
+                  <tr>
+                    <th>{t(($) => $.dataSources.headings.segment)}</th>
+                    <th>{t(($) => $.dataSources.headings.status)}</th>
+                    <th>{t(($) => $.dataSources.headings.detail)}</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {displaySAExtensionSegments(saExtensionHealth.segments).map((row) => (
+                  {displaySAExtensionSegments(saExtensionHealth.segments, t).map((row) => (
                     <tr key={row.key}>
                       <td>{row.label}</td>
                       <td>
                         <StatusBadge
                           state={saSegmentCommonState(row.tone)}
-                          label={row.tone === "ok" ? "正常" : row.tone === "warn" ? "注意" : "失敗"}
+                          label={row.tone === "ok"
+                            ? t(($) => $.dataSources.states.ok)
+                            : row.tone === "warn"
+                              ? t(($) => $.dataSources.states.warn)
+                              : t(($) => $.dataSources.states.failed)}
                         />
                       </td>
-                      <td className="muted settings-wrap-text">{row.detail}</td>
+                      <td className="muted settings-wrap-text">—</td>
                     </tr>
                   ))}
                 </tbody>
@@ -686,37 +787,47 @@ export function DataSourcesSection({
       </div>
 
       <div className="settings-panel" style={{ marginTop: 16 }}>
-        <h4 className="detail-section">連線與金鑰</h4>
+        <h4 className="detail-section">{t(($) => $.dataSources.providers.config.title)}</h4>
         <p className="muted tiny">
-          來源標示會說明每個值由 App、環境變數或 config/.env 管理。
-          App 內儲存的設定會立即生效；敏感值只顯示遮罩內容。
+          {t(($) => $.dataSources.providers.config.description)}
         </p>
         {cfgSetup?.required && (
           <div className="errorbox">
             <p className="muted">
-              Provider 設定需要修復：{cfgSetup.reason ?? cfgSetup.code ?? "profile DB unavailable"}
+              {t(($) => $.dataSources.providers.config.setupRequired)}
             </p>
           </div>
         )}
         {!cfg ? (
-          <p className="muted tiny">loading…</p>
+          <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
         ) : (
           <div className="settings-table-scroll" data-testid="provider-config-scroll">
           <table className="data-table ds-config settings-provider-config-table">
             <thead>
-              <tr><th>Provider</th><th>欄位</th><th>目前值（來源）</th><th>設定</th><th>連線測試</th></tr>
+              <tr>
+                <th>{t(($) => $.dataSources.headings.provider)}</th>
+                <th>{t(($) => $.dataSources.headings.field)}</th>
+                <th>{t(($) => $.dataSources.headings.currentValueSource)}</th>
+                <th>{t(($) => $.dataSources.headings.setting)}</th>
+                <th>{t(($) => $.dataSources.headings.connectionTest)}</th>
+              </tr>
             </thead>
             <tbody>
               {Object.entries(cfg)
                 .filter(([, c]) => c.fields.length > 0 || c.testable)
                 .map(([pid, c]) => {
-                  const label = health?.providers.find((p) => p.id === pid)?.label ?? pid;
+                  const label = providerName(pid, t);
+                  const testPresentation = providerTestPresentation(pid);
                   if (pid === "ibkr" && c.fields.length > 0) {
                     return (
                       <tr key="ibkr.group">
                         <td>
                           {label}
-                          {c.default_available && <div className="muted tiny">免金鑰 · 預設可用</div>}
+                          {c.default_available && (
+                            <div className="muted tiny">
+                              {t(($) => $.dataSources.providers.config.defaultAvailable)}
+                            </div>
+                          )}
                         </td>
                         <td colSpan={4}>
                           <div data-testid="ibkr-config-group" className="provider-config-group">
@@ -726,14 +837,16 @@ export function DataSourcesSection({
                                 <>
                                   <button className="btn-ghost" disabled={!!busy}
                                     onClick={() => void runTest(pid)}>
-                                    測試
+                                    {t(($) => $.actions.test)}
                                   </button>
-                                  {testResults[pid] && (
-                                    <div className="muted tiny">{testResults[pid]}</div>
+                                  {testPresentation && (
+                                    <div className="muted tiny">{testPresentation}</div>
                                   )}
                                 </>
                               ) : (
-                                <span className="muted tiny">不提供（按次計費）</span>
+                                <span className="muted tiny">
+                                  {t(($) => $.dataSources.providers.config.testUnavailable)}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -748,26 +861,46 @@ export function DataSourcesSection({
                       {i === 0 && (
                         <td rowSpan={rows.length}>
                           {label}
-                          {c.default_available && <div className="muted tiny">免金鑰 · 預設可用</div>}
+                          {c.default_available && (
+                            <div className="muted tiny">
+                              {t(($) => $.dataSources.providers.config.defaultAvailable)}
+                            </div>
+                          )}
                         </td>
                       )}
-                      <td>{f ? f.label : "—"}</td>
+                      <td>{f ? providerConfigFieldLabel(pid, f.field, t) : "—"}</td>
                       <td>
                         {f
                           ? f.effective_source === "missing"
-                            ? <span className="ds-chip ds-missing_key">未設定</span>
+                            ? <span className="ds-chip ds-missing_key">
+                                {t(($) => $.dataSources.providers.health.notConfigured)}
+                              </span>
                             : <>
-                                <span className="mono">{f.app_value_set ? f.app_value_masked : "（外部）"}</span>
-                                {f.defaulted && <span className="muted tiny"> · 預設</span>}
-                                <span className="muted tiny">（{providerConfigSourceLabel(f.effective_source)}）</span>
+                                <span className="mono">
+                                  {f.app_value_set
+                                    ? f.app_value_masked
+                                    : <>（{t(($) => $.dataSources.labels.external)}）</>}
+                                </span>
+                                {f.defaulted && (
+                                  <span className="muted tiny">
+                                    {" · "}{t(($) => $.dataSources.labels.defaultValue)}
+                                  </span>
+                                )}
+                                <span className="muted tiny">
+                                  （{providerKeySourceLabel(f.effective_source, t)}）
+                                </span>
                                 {f.needs_import && (
                                   <button className="btn-ghost tiny"
                                     disabled={busy === `import.${pid}.${f.field}`}
                                     onClick={() => void importField(pid, f.field, f.import_source)}>
-                                    匯入
+                                    {t(($) => $.dataSources.providers.config.importValue)}
                                   </button>
                                 )}
-                                {f.needs_import && <span className="muted tiny">建議匯入</span>}
+                                {f.needs_import && (
+                                  <span className="muted tiny">
+                                    {t(($) => $.dataSources.labels.recommendedImport)}
+                                  </span>
+                                )}
                               </>
                           : "—"}
                       </td>
@@ -777,7 +910,9 @@ export function DataSourcesSection({
                             <input
                               className="ds-interval ds-keyinput"
                               type={f.secret ? "password" : "text"}
-                              placeholder={f.secret ? "貼上金鑰…" : f.label}
+                              placeholder={f.secret
+                                ? t(($) => $.dataSources.providers.config.pasteKey)
+                                : providerConfigFieldLabel(pid, f.field, t)}
                               value={keyDrafts[`${pid}.${f.field}`] ?? ""}
                               disabled={busy === `${pid}.${f.field}`}
                               onChange={(e) =>
@@ -790,13 +925,13 @@ export function DataSourcesSection({
                             {keyDrafts[`${pid}.${f.field}`] && (
                               <button className="btn-ghost tiny"
                                 onClick={() => void saveField(pid, f.field, keyDrafts[`${pid}.${f.field}`], f)}>
-                                儲存
+                                {t(($) => $.actions.save)}
                               </button>
                             )}
                             {f.app_value_set && (
                               <button className="btn-ghost tiny"
                                 onClick={() => void saveField(pid, f.field, null, f)}>
-                                清除
+                                {t(($) => $.actions.clear)}
                               </button>
                             )}
                           </>
@@ -808,14 +943,16 @@ export function DataSourcesSection({
                             <>
                               <button className="btn-ghost" disabled={!!busy}
                                 onClick={() => void runTest(pid)}>
-                                測試
+                                {t(($) => $.actions.test)}
                               </button>
-                              {testResults[pid] && (
-                                <div className="muted tiny">{testResults[pid]}</div>
+                              {testPresentation && (
+                                <div className="muted tiny">{testPresentation}</div>
                               )}
                             </>
                           ) : (
-                            <span className="muted tiny">不提供（按次計費）</span>
+                            <span className="muted tiny">
+                              {t(($) => $.dataSources.providers.config.testUnavailable)}
+                            </span>
                           )}
                         </td>
                       )}
@@ -830,23 +967,34 @@ export function DataSourcesSection({
       </div>
 
       <div className="settings-panel" style={{ marginTop: 16 }}>
-        <h4 className="detail-section">排程（每來源獨立）</h4>
+        <h4 className="detail-section">{t(($) => $.dataSources.schedule.title)}</h4>
         {!schedule ? (
-          <p className="muted tiny">loading…</p>
+          <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
         ) : (
           <div className="settings-table-scroll" data-testid="schedule-scroll">
           <table className="data-table settings-schedule-table">
             <thead>
               <tr>
-                <th>來源</th><th>排程</th><th>間隔（分）</th><th>立即執行</th><th>最近一次</th>
+                <th>{t(($) => $.dataSources.headings.source)}</th>
+                <th>{t(($) => $.dataSources.headings.schedule)}</th>
+                <th>{t(($) => $.dataSources.headings.intervalMinutes)}</th>
+                <th>{t(($) => $.dataSources.headings.runNow)}</th>
+                <th>{t(($) => $.dataSources.headings.lastRun)}</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(schedule).map(([id, s]) => (
-                <tr key={id}>
+              {Object.entries(schedule).map(([id, s]) => {
+                const sourceCopy = scheduleSourceCopy(id, t);
+                return (
+                  <tr key={id}>
                   <td>
-                    {s.label}
-                    {s.retired && <span className="ds-chip ds-disabled">已退役</span>}
+                    {sourceCopy.label}
+                    <div className="muted tiny">{sourceCopy.description}</div>
+                    {s.retired && (
+                      <span className="ds-chip ds-disabled">
+                        {t(($) => $.dataSources.labels.retired)}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <label className="ds-toggle">
@@ -857,7 +1005,9 @@ export function DataSourcesSection({
                         onChange={(e) => void setEnabled(id, e.target.checked)}
                       />
                       <span className={s.enabled ? "tiny" : "muted tiny ds-schedule-disabled"}>
-                        {s.enabled ? "排程開啟" : "排程關閉"}
+                        {s.enabled
+                          ? t(($) => $.dataSources.labels.scheduleEnabled)
+                          : t(($) => $.dataSources.labels.scheduleDisabled)}
                       </span>
                     </label>
                   </td>
@@ -874,14 +1024,14 @@ export function DataSourcesSection({
                     />
                     {drafts[id] && (
                       <button className="btn-ghost tiny" onClick={() => void applyInterval(id)}>
-                        套用
+                        {t(($) => $.actions.apply)}
                       </button>
                     )}
                   </td>
                   <td>
                     {s.running ? (
                       <SourceRunProgress
-                        sourceLabel={s.label}
+                        sourceLabel={sourceCopy.label}
                         running={s.running}
                         progress={s.progress}
                       />
@@ -891,32 +1041,30 @@ export function DataSourcesSection({
                         disabled={!!busy}
                         onClick={() => void runNow(id)}
                       >
-                        ▶ Run
+                        ▶ {t(($) => $.actions.run)}
                       </button>
                     )}
                   </td>
                   <td className="muted tiny ds-last-run-cell settings-wrap-text">
                     {renderLastRun(id, s)}
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           </div>
         )}
         <p className="muted tiny ds-schedule-protection-note" style={{ marginTop: 8 }}>
-          執行保護：同一資料來源與 IBKR 工作同時間只執行一次；若已有工作進行中，
-          新觸發會顯示為已跳過，不會重複抓取。
+          {t(($) => $.dataSources.schedule.guardTitle)}：
+          {t(($) => $.dataSources.schedule.protection)}
         </p>
       </div>
       <ConfirmDialog
         open={pendingGuardedEdit !== null}
-        title="套用受保護的設定？"
-        consequence={
-          pendingGuardedEdit?.fieldMeta.guard_reason
-          ?? "此設定需要確認後才會變更。"
-        }
-        confirmLabel="套用變更"
+        title={t(($) => $.dataSources.providers.config.guardTitle)}
+        consequence={t(($) => $.dataSources.providers.config.guardConsequence)}
+        confirmLabel={t(($) => $.dataSources.providers.config.guardConfirm)}
         tone="primary"
         busy={pendingGuardedEdit !== null && busy === `${pendingGuardedEdit.provider}.${pendingGuardedEdit.field}`}
         onConfirm={() => void confirmGuardedEdit()}

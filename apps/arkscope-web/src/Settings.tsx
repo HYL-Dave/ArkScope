@@ -845,7 +845,12 @@ export function SettingsView({
       );
     }
     if (id === "data_sources") {
-      return <DataSourcesSection onNavigationGuardChange={setDataSourcesGuard} />;
+      return (
+        <DataSourcesSection
+          onNavigationGuardChange={setDataSourcesGuard}
+          developerMode={developerMode}
+        />
+      );
     }
     if (id === "data_storage") return <DataStorageSection />;
     if (id === "news_storage") return <NewsStorageSection />;

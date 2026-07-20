@@ -1,4 +1,6 @@
 import type { SAExtensionHealthSegment } from "./api";
+import { saSegmentLabel } from "./settings/settingsBackendCopy";
+import type { SettingsT } from "./settings/settingsCopy";
 
 const ORDER = [
   "config",
@@ -9,16 +11,6 @@ const ORDER = [
   "telemetry_last",
   "capture_readback",
 ];
-
-const LABELS: Record<string, string> = {
-  config: "設定檔",
-  manifests: "瀏覽器註冊",
-  launcher: "啟動器",
-  host_ping: "主機測試",
-  telemetry_binding: "遙測綁定",
-  telemetry_last: "最近遙測",
-  capture_readback: "資料回讀",
-};
 
 const MARKS: Record<SAExtensionHealthSegment["state"], string> = {
   ok: "✓",
@@ -36,6 +28,7 @@ export interface SAExtensionHealthDisplayRow {
 
 export function displaySAExtensionSegments(
   segments: SAExtensionHealthSegment[],
+  t: SettingsT,
 ): SAExtensionHealthDisplayRow[] {
   const byKey = new Map(segments.map((segment) => [segment.key, segment]));
   const ordered = [
@@ -44,7 +37,7 @@ export function displaySAExtensionSegments(
   ];
   return ordered.map((segment) => ({
     key: segment.key,
-    label: LABELS[segment.key] ?? segment.key,
+    label: saSegmentLabel(segment.key, t),
     mark: MARKS[segment.state] ?? "—",
     tone: segment.state,
     detail: segment.detail,

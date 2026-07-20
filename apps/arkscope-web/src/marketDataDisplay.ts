@@ -6,73 +6,80 @@ import type {
   ScheduleSourceState,
   TradingDayRow,
 } from "./api";
+import {
+  providerHealthCopy,
+  scheduleBodyBacklogCopy,
+} from "./settings/settingsBackendCopy";
+import type { SettingsT } from "./settings/settingsCopy";
 
-export function providerHealthStatusLabel<T extends { status: string; disabled_reason?: string | null }>(p: T): string {
-  const labels: Record<string, string> = {
-    connected: "正常",
-    stale: "過期",
-    maintenance: "維護中",
-    no_signal: "無訊號",
-    not_configured: "未設定",
-    missing_key: "缺金鑰",
-    disabled: "已停用",
-  };
-  return labels[p.status] ?? p.status;
+export function providerHealthStatusLabel<T extends {
+  id: string;
+  status: Parameters<typeof providerHealthCopy>[1];
+}>(p: T, t: SettingsT): string {
+  return providerHealthCopy(p.id, p.status, t).label;
 }
 
-export function marketRoutingLabel(status: MarketDataStatus): string {
-  if (status.routing_enabled) return "本地權威（PG fallback 已退役）";
-  if (status.use_local_market_setting) return "設定已開，待建立資料庫";
-  return "本地權威（legacy flag 未設定；PG fallback 已退役）";
+export function marketRoutingLabel(status: MarketDataStatus, t: SettingsT): string {
+  if (status.routing_enabled) return t(($) => $.dataStorage.routing.localAuthority);
+  if (status.use_local_market_setting) {
+    return t(($) => $.dataStorage.routing.settingEnabledPendingDatabase);
+  }
+  return t(($) => $.dataStorage.routing.localAuthorityLegacyFlagUnset);
 }
 
-export function macroRoutingLabel(status: MacroStatus): string {
+export function macroRoutingLabel(status: MacroStatus, t: SettingsT): string {
   // local_first_active = (toggle OR env). Routing is local the moment it's on — the store
   // factory creates macro_calendar.db on first use and there is NO PG fallback in the local
   // path. So toggle-on is "本地優先" even before the DB is built (queries return empty until
   // ingestion fills it) — NOT a PG fallback.
-  if (!status.local_first_active) return "本地快照讀取可用；自動刷新未啟用";
-  const envNote = status.env_override ? " · env 強制" : "";
+  if (!status.local_first_active) return t(($) => $.macroStorage.routing.snapshotOnly);
+  const envNote = status.env_override ? t(($) => $.macroStorage.routing.envForced) : "";
   return status.exists
-    ? `啟用中（本地${envNote}）`
-    : `啟用中（本地${envNote}）· 待 ingestion 建立`;
+    ? t(($) => $.macroStorage.routing.active, { value: envNote })
+    : t(($) => $.macroStorage.routing.activePending, { value: envNote });
 }
 
-export function newsRoutingLabel(status: NewsStatus): string {
-  if (status.news_hard_local) return newsWriteRouteLabel(status);
+export function newsRoutingLabel(status: NewsStatus, t: SettingsT): string {
+  if (status.news_hard_local) return newsWriteRouteLabel(status, t);
   if (status.env_override) {
     return status.direct_active
-      ? "直寫本地（env 強制開啟）"
-      : "回退 PG 鏡像（env 強制關閉）";
+      ? t(($) => $.newsStorage.routing.directEnvOn)
+      : t(($) => $.newsStorage.routing.pgMirrorEnvOff);
   }
-  if (!status.direct_active) return "回退至 PG 同步／本地鏡像";
-  return status.setting_explicit ? "直寫本地（已設定）" : "直寫本地（預設）";
+  if (!status.direct_active) return t(($) => $.newsStorage.routing.pgSyncLocalMirror);
+  return status.setting_explicit
+    ? t(($) => $.newsStorage.routing.directExplicit)
+    : t(($) => $.newsStorage.routing.directDefault);
 }
 
-export function newsWriteRouteLabel(status: NewsStatus): string {
-  if (status.news_hard_local) return "Normalized SQLite + legacy local projection";
+export function newsWriteRouteLabel(status: NewsStatus, t: SettingsT): string {
+  if (status.news_hard_local) return t(($) => $.newsStorage.routing.write.normalized);
   switch (status.write_route) {
     case "normalized":
-      return "Normalized SQLite + legacy local projection（pre-exit test）";
+      return t(($) => $.newsStorage.routing.write.normalizedPreExit);
     case "legacy_local":
-      return "Legacy local direct writer";
+      return t(($) => $.newsStorage.routing.write.legacyLocal);
     case "legacy_pg":
-      return "Legacy PG sync + local mirror";
+      return t(($) => $.newsStorage.routing.write.legacyPg);
     case "blocked":
-      return "Blocked";
+      return t(($) => $.newsStorage.routing.write.blocked);
     default:
       return status.write_route;
   }
 }
 
-export function newsPostgresRouteLabel(status: NewsStatus): string {
-  if (status.news_hard_local) return "已退出（不可回退到 PG）";
-  return status.pg_news_route_available ? "可用（尚未退出）" : "不可用";
+export function newsPostgresRouteLabel(status: NewsStatus, t: SettingsT): string {
+  if (status.news_hard_local) return t(($) => $.newsStorage.routing.postgres.exited);
+  return status.pg_news_route_available
+    ? t(($) => $.newsStorage.routing.postgres.available)
+    : t(($) => $.newsStorage.routing.postgres.unavailable);
 }
 
-export function newsReadSurfaceLabel(status: NewsStatus): string {
-  if (status.news_hard_local) return "Legacy local compatibility surface (N8b pending)";
-  return status.direct_active ? "Legacy local direct surface" : "Legacy PG mirror surface";
+export function newsReadSurfaceLabel(status: NewsStatus, t: SettingsT): string {
+  if (status.news_hard_local) return t(($) => $.newsStorage.routing.read.compatibility);
+  return status.direct_active
+    ? t(($) => $.newsStorage.routing.read.localDirect)
+    : t(($) => $.newsStorage.routing.read.pgMirror);
 }
 
 // coverage_status → UI label + tone. The backend owns the completeness judgement (Slice A.1);
@@ -80,25 +87,42 @@ export function newsReadSurfaceLabel(status: NewsStatus): string {
 export function coverageStatusLabel(
   row: Pick<TradingDayRow, "coverage_status" | "reason" | "holiday" | "max_observed_bar_count"> &
     Partial<Pick<TradingDayRow, "well_covered" | "covered">>,  // only the 'partial' branch needs these
+  t: SettingsT,
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad" } {
   switch (row.coverage_status) {
     case "non_trading":
       return {
-        label: row.reason === "weekend" ? "週末" : `假日${row.holiday ? `（${row.holiday}）` : ""}`,
+        label: row.reason === "weekend"
+          ? t(($) => $.dataStorage.coverage.status.weekend)
+          : t(($) => $.dataStorage.coverage.status.holiday, { value: row.holiday ?? "" }),
         tone: "muted",
       };
     case "in_progress":
-      return { label: "盤中（未收盤）", tone: "muted" };
+      return { label: t(($) => $.dataStorage.coverage.status.inProgress), tone: "muted" };
     case "missing":
-      return { label: "缺資料", tone: "bad" };
+      return { label: t(($) => $.dataStorage.coverage.status.missing), tone: "bad" };
     case "thin":
-      return { label: `疑似不足（最多 ${row.max_observed_bar_count ?? 0} 根）`, tone: "warn" };
+      return {
+        label: t(($) => $.dataStorage.coverage.status.thin, {
+          value: String(row.max_observed_bar_count ?? 0),
+        }),
+        tone: "warn",
+      };
     case "partial":
-      return { label: `部分覆蓋（${row.well_covered ?? 0}/${row.covered ?? 0} 檔完整）`, tone: "warn" };
+      return {
+        label: t(($) => $.dataStorage.coverage.status.partial, {
+          count: row.well_covered ?? 0,
+          value: row.covered ?? 0,
+        }),
+        tone: "warn",
+      };
     case "complete_like":
-      return { label: "覆蓋完整", tone: "ok" };
+      return { label: t(($) => $.dataStorage.coverage.status.completeLike), tone: "ok" };
     default:
-      return { label: row.coverage_status, tone: "muted" };
+      return {
+        label: t(($) => $.dataStorage.coverage.status.unknown, { value: row.coverage_status }),
+        tone: "muted",
+      };
   }
 }
 
@@ -116,82 +140,38 @@ function positiveCount(value: unknown): number {
   return value;
 }
 
-function backlogCount(value: unknown): number | null {
-  if (value === undefined) return 0;
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) return null;
-  return value;
-}
-
 export interface SchedulerBodyBacklogPresentation {
   label: string;
   tone: "muted" | "warn";
   earliestNextRetryAt: string | null;
 }
 
-const unavailableBodyBacklog = (): SchedulerBodyBacklogPresentation => ({
-  label: "內文待處理狀態暫時無法讀取",
-  tone: "warn",
-  earliestNextRetryAt: null,
-});
-
 export function schedulerBodyBacklogPresentation(
   durable: SchedulerDurablePresentation | null,
+  t: SettingsT,
 ): SchedulerBodyBacklogPresentation | null {
-  const backlog = durable?.last_result?.collect?.body_backlog;
-  if (!backlog) return null;
-  if (backlog.status !== "ok") return unavailableBodyBacklog();
-
-  const due = backlogCount(backlog.due_now);
-  const scheduled = backlogCount(backlog.scheduled_later);
-  const neverAttempted = backlogCount(backlog.never_attempted);
-  const providerNotEntitled = backlogCount(backlog.provider_not_entitled);
-  if (
-    due === null
-    || scheduled === null
-    || neverAttempted === null
-    || providerNotEntitled === null
-    || neverAttempted > due
-  ) {
-    return unavailableBodyBacklog();
-  }
-  if (due === 0 && scheduled === 0 && providerNotEntitled === 0) return null;
-
-  const parts: string[] = [];
-  if (due > 0) {
-    parts.push(
-      neverAttempted > 0
-        ? `${due} 篇目前可處理（其中 ${neverAttempted} 篇尚未嘗試）`
-        : `${due} 篇目前可處理`,
-    );
-  }
-  if (scheduled > 0) parts.push(`${scheduled} 篇已排程稍後重試`);
-  if (providerNotEntitled > 0) {
-    parts.push(
-      `${providerNotEntitled} 篇來源目前未訂閱（標題已保留，開通後自動重試）`,
-    );
-  }
-
-  return {
-    label: `內文佇列：${parts.join(" · ")}`,
-    tone: "muted",
-    earliestNextRetryAt: typeof backlog.earliest_next_retry_at === "string"
-      ? backlog.earliest_next_retry_at
-      : null,
-  };
+  return scheduleBodyBacklogCopy(durable?.last_result ?? null, t);
 }
 
 export function schedulerStateLabel(
   durable: SchedulerDurablePresentation | null,
+  t: SettingsT,
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad"; needsContinue: boolean } {
   const st = durable?.last_status ?? null;
   switch (st) {
     case "succeeded":
-      return { label: "上次成功", tone: "ok", needsContinue: false };
+      return {
+        label: t(($) => $.dataSources.schedule.history.succeeded),
+        tone: "ok",
+        needsContinue: false,
+      };
     case "partial": {
       const actionable = durable?.continuation?.deferred?.length ?? 0;
       if (actionable > 0) {
         return {
-          label: `部分完成（待補抓 ${actionable}）`,
+          label: t(($) => $.dataSources.schedule.history.partialActionable, {
+            count: actionable,
+          }),
           tone: "warn",
           needsContinue: true,
         };
@@ -204,44 +184,73 @@ export function schedulerStateLabel(
         : 0;
       if (tickers > 0 && bodies > 0) {
         return {
-          label: `部分完成（${tickers} 個標的、${bodies} 篇內文待後續處理）`,
+          label: t(($) => $.dataSources.schedule.history.partialTickersAndBodies, {
+            count: tickers,
+            value: bodies,
+          }),
           tone: "warn",
           needsContinue: false,
         };
       }
       if (bodies > 0) {
         return {
-          label: `部分完成（${bodies} 篇內文待後續處理）`,
+          label: t(($) => $.dataSources.schedule.history.partialBodies, { count: bodies }),
           tone: "warn",
           needsContinue: false,
         };
       }
       if (tickers > 0) {
         return {
-          label: `部分完成（${tickers} 個標的待後續處理）`,
+          label: t(($) => $.dataSources.schedule.history.partialTickers, {
+            count: tickers,
+          }),
           tone: "warn",
           needsContinue: false,
         };
       }
       if (observed?.has_cursor === true) {
         return {
-          label: "部分完成（尚有資料待後續處理）",
+          label: t(($) => $.dataSources.schedule.history.partialCursor),
           tone: "warn",
           needsContinue: false,
         };
       }
-      return { label: "部分完成", tone: "warn", needsContinue: false };
+      return {
+        label: t(($) => $.dataSources.schedule.history.partial),
+        tone: "warn",
+        needsContinue: false,
+      };
     }
     case "failed":
-      return { label: "上次失敗", tone: "bad", needsContinue: false };
+      return {
+        label: t(($) => $.dataSources.schedule.history.failed),
+        tone: "bad",
+        needsContinue: false,
+      };
     case "skipped":
-      return { label: "上次已跳過", tone: "muted", needsContinue: false };
+      return {
+        label: t(($) => $.dataSources.schedule.history.skipped),
+        tone: "muted",
+        needsContinue: false,
+      };
     case "running":
       if (durable?.running_stale) {
-        return { label: "執行過久", tone: "warn", needsContinue: false };
+        return {
+          label: t(($) => $.dataSources.schedule.history.runningStale),
+          tone: "warn",
+          needsContinue: false,
+        };
       }
-      return { label: "執行中", tone: "muted", needsContinue: false };
+      return {
+        label: t(($) => $.dataSources.schedule.history.running),
+        tone: "muted",
+        needsContinue: false,
+      };
     default:
-      return { label: "尚未執行", tone: "muted", needsContinue: false };
+      return {
+        label: t(($) => $.dataSources.schedule.history.notRun),
+        tone: "muted",
+        needsContinue: false,
+      };
   }
 }

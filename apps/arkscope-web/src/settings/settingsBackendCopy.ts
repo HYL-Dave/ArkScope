@@ -217,6 +217,25 @@ export function providerConfigFieldLabel(
   return [provider, field].join(".");
 }
 
+export function providerKeySourceLabel(source: string, t: SettingsT): string {
+  switch (source) {
+    case "app":
+      return t(($) => $.dataSources.labels.app);
+    case "env":
+      return t(($) => $.dataSources.labels.environment);
+    case "config/.env":
+      return source;
+    case "missing":
+      return t(($) => $.dataSources.providers.health.notConfigured);
+    case "mixed":
+      return t(($) => $.dataSources.labels.mixedSources);
+    case "not_required":
+      return t(($) => $.dataSources.labels.noKey);
+    default:
+      return source;
+  }
+}
+
 export function providerClientDomainLabel(domain: string, t: SettingsT): string {
   switch (domain) {
     case "manual":
@@ -351,33 +370,35 @@ export function scheduleOutcomeCopy(
   const sourceId = scheduleSourceCopy(source, t).label;
   let outcome: string;
   if (!result) {
-    outcome = t(($) => $.dataSources.schedule.history.notRun, { sourceId });
+    outcome = t(($) => $.dataSources.schedule.history.notRun);
   } else {
     switch (result.status) {
       case "running":
-        outcome = t(($) => $.dataSources.schedule.history.running, { sourceId });
+        outcome = t(($) => $.dataSources.schedule.history.running);
         break;
       case "succeeded":
-        outcome = t(($) => $.dataSources.schedule.history.succeeded, { sourceId });
+        outcome = t(($) => $.dataSources.schedule.history.succeeded);
         break;
       case "partial":
-        outcome = t(($) => $.dataSources.schedule.history.partial, { sourceId });
+        outcome = t(($) => $.dataSources.schedule.history.partial);
         break;
       case "failed":
-        outcome = t(($) => $.dataSources.schedule.history.failed, { sourceId });
+        outcome = t(($) => $.dataSources.schedule.history.failed);
         break;
       case "skipped":
-        outcome = t(($) => $.dataSources.schedule.history.skipped, { sourceId });
+        outcome = t(($) => $.dataSources.schedule.history.skipped);
         break;
       default:
         outcome = t(($) => $.dataSources.schedule.history.unknown, {
-          sourceId,
           value: result.status,
         });
         break;
     }
   }
-  return outcome;
+  return t(($) => $.dataSources.schedule.history.withSource, {
+    sourceId,
+    value: outcome,
+  });
 }
 
 export function saSegmentLabel(key: string, t: SettingsT): string {

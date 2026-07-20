@@ -234,7 +234,7 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 520 Settings leaves per locale", () => {
+  it("contains exactly 605 Settings leaves per locale", () => {
     const expectedSubtreeCounts = {
       actions: 18,
       workspace: 29,
@@ -243,16 +243,16 @@ describe("bundled i18n resources", () => {
       models: 91,
       runtime: 21,
       providers: 104,
-      dataSources: 85,
-      dataStorage: 37,
-      newsStorage: 11,
-      macroStorage: 27,
+      dataSources: 147,
+      dataStorage: 40,
+      newsStorage: 27,
+      macroStorage: 31,
       investor: 53,
     } as const;
 
     for (const locale of ["zh-Hant", "en"] as const) {
       const settings = resources[locale].settings as ResourceTree;
-      expect(flattenResource(settings).size).toBe(520);
+      expect(flattenResource(settings).size).toBe(605);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(1);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(flattenResource(settings[subtree] as ResourceTree).size, `${locale}.${subtree}`)

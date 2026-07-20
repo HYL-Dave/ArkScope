@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getMarketDataStatus,
   getTradingDayCoverage,
@@ -104,6 +105,7 @@ function coverageToneColor(tone: "ok" | "warn" | "muted" | "bad"): string {
 }
 
 function TradingDayCoveragePanel() {
+  const { t } = useTranslation("settings");
   const [cov, setCov] = useState<TradingDayCoverage | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -176,7 +178,7 @@ function TradingDayCoveragePanel() {
             </thead>
             <tbody>
               {cov.days.map((d) => {
-                const cs = coverageStatusLabel(d);
+                const cs = coverageStatusLabel(d, t);
                 const open = expanded === d.date;
                 // in_progress: the session is open, so "missing/partial" is just not-fetched-yet,
                 // not a gap — don't offer an alarming drill-down. Only completed days drill.

@@ -2,13 +2,17 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getModelCatalog,
   getProvidersConfig,
   getProvidersHealth,
+  getSAExtensionHealth,
   getSchedule,
   putProviderConfig,
+  testProvider,
   type ModelCatalog,
   type ModelTask,
   type ProvidersHealthResponse,
@@ -21,12 +25,17 @@ import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigat
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocked = vi.hoisted(() => ({
+  providerHealthDetail: "PLANTED_PROVIDER_HEALTH_DETAIL",
+  providerHealthError: "PLANTED_PROVIDER_HEALTH_ERROR",
+  scheduleStaleReason: "PLANTED_SCHEDULE_STALE_REASON",
+  extensionDetail: "PLANTED_EXTENSION_DETAIL",
+  providerTestDetail: "PLANTED_PROVIDER_TEST_DETAIL",
   providersConfig: {
     providers: {
       polygon: {
         fields: [{
           field: "api_key",
-          label: "API key",
+          label: "PLANTED_CONFIG_API_KEY_LABEL",
           secret: true,
           env_var: "POLYGON_API_KEY",
           app_value_set: false,
@@ -46,7 +55,7 @@ const mocked = vi.hoisted(() => ({
         fields: [
           {
             field: "host",
-            label: "Gateway host",
+            label: "PLANTED_CONFIG_HOST_LABEL",
             secret: false,
             env_var: "IBKR_HOST",
             app_value_set: true,
@@ -61,7 +70,7 @@ const mocked = vi.hoisted(() => ({
           },
           {
             field: "port",
-            label: "Gateway port",
+            label: "PLANTED_CONFIG_PORT_LABEL",
             secret: false,
             env_var: "IBKR_PORT",
             app_value_set: true,
@@ -76,15 +85,15 @@ const mocked = vi.hoisted(() => ({
           },
           {
             field: "client_id",
-            label: "Client ID",
+            label: "PLANTED_CONFIG_CLIENT_ID_LABEL",
             secret: false,
             env_var: "IBKR_CLIENT_ID",
             client_id_domains: [
-              { domain: "manual", label: "基底", offset: 0, effective_id: 1 },
-              { domain: "options", label: "選擇權", offset: 10, effective_id: 11 },
-              { domain: "prices", label: "股價", offset: 20, effective_id: 21 },
-              { domain: "news", label: "新聞", offset: 30, effective_id: 31 },
-              { domain: "iv", label: "IV", offset: 40, effective_id: 41 },
+              { domain: "manual", label: "PLANTED_DOMAIN_MANUAL", offset: 0, effective_id: 1 },
+              { domain: "options", label: "PLANTED_DOMAIN_OPTIONS", offset: 10, effective_id: 11 },
+              { domain: "prices", label: "PLANTED_DOMAIN_PRICES", offset: 20, effective_id: 21 },
+              { domain: "news", label: "PLANTED_DOMAIN_NEWS", offset: 30, effective_id: 31 },
+              { domain: "iv", label: "PLANTED_DOMAIN_IV", offset: 40, effective_id: 41 },
             ],
             app_value_set: true,
             app_value_masked: "1",
@@ -94,14 +103,18 @@ const mocked = vi.hoisted(() => ({
             importable_env_vars: ["IBKR_CLIENT_ID"],
             defaulted: true,
             guarded: true,
-            guard_reason: "Changing IBKR client_id can disturb active Gateway sessions.",
+            guard_reason: "PLANTED_CONFIG_GUARD_REASON",
           },
         ],
         testable: true,
         default_available: false,
       },
     },
-    setup: { required: false, code: null, reason: null },
+    setup: {
+      required: true,
+      code: "provider_config_setup_required",
+      reason: "PLANTED_PROVIDER_SETUP_REASON",
+    },
     env_fallback: { enabled: false, source: "default" },
   },
   longSkipReason:
@@ -131,11 +144,11 @@ const emptyCatalog: ModelCatalog = {
 
 const health: ProvidersHealthResponse = {
   providers: [
-    { id: "polygon", label: "Polygon", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
-    { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: "request_id=provider-health-check-000000000000000000000000000000000000000000000000000000000000000001", detail: "", signals: {}, key_import_suggested: false },
+    { id: "polygon", label: "PLANTED_PROVIDER_POLYGON_LABEL", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
+    { id: "ibkr", label: "PLANTED_PROVIDER_IBKR_LABEL", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: mocked.providerHealthError, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
     {
       id: "fred",
-      label: "FRED",
+      label: "PLANTED_PROVIDER_FRED_LABEL",
       kind: "macro",
       status: "connected",
       enabled: null,
@@ -160,7 +173,7 @@ const health: ProvidersHealthResponse = {
     },
     {
       id: "retired_provider",
-      label: "Retired provider",
+      label: "PLANTED_UNKNOWN_PROVIDER_LABEL",
       kind: "macro",
       status: "disabled",
       enabled: false,
@@ -190,8 +203,8 @@ vi.mock("./api", async (importOriginal) => {
     getSchedule: vi.fn(async () => ({
       sources: {
         polygon_news: {
-          label: "Polygon news",
-          description: "Polygon market-news collector",
+          label: "PLANTED_SCHEDULE_POLYGON_LABEL",
+          description: "PLANTED_SCHEDULE_POLYGON_DESCRIPTION",
           ibkr: false,
           provider_fetch: true,
           source_mode: "direct_local",
@@ -218,12 +231,14 @@ vi.mock("./api", async (importOriginal) => {
             continuation: null,
             last_attempt: "2026-07-04T00:00:00+00:00",
             updated_at: "2026-07-04T00:01:00+00:00",
+            running_stale: false,
+            running_stale_reason: mocked.scheduleStaleReason,
           },
           job_name: "collect.polygon_news",
         },
         ibkr_news: {
-          label: "IBKR 新聞",
-          description: "IBKR market-news collector",
+          label: "PLANTED_SCHEDULE_IBKR_LABEL",
+          description: "PLANTED_SCHEDULE_IBKR_DESCRIPTION",
           ibkr: true,
           provider_fetch: true,
           source_mode: "direct_local",
@@ -317,8 +332,8 @@ vi.mock("./api", async (importOriginal) => {
           job_name: "collect.ibkr_news",
         },
         writer_lock_deferred: {
-          label: "Writer lock deferred",
-          description: "writer lock fixture",
+          label: "PLANTED_UNKNOWN_SCHEDULE_LABEL",
+          description: "PLANTED_UNKNOWN_SCHEDULE_DESCRIPTION",
           ibkr: false,
           provider_fetch: true,
           source_mode: "direct_local",
@@ -344,8 +359,8 @@ vi.mock("./api", async (importOriginal) => {
           job_name: "collect.writer_lock_deferred",
         },
         price_backfill: {
-          label: "價格缺口補抓",
-          description: "IBKR/Polygon → market_data.db DIRECT (no PG)",
+          label: "PLANTED_SCHEDULE_BACKFILL_LABEL",
+          description: "PLANTED_SCHEDULE_BACKFILL_DESCRIPTION",
           ibkr: true,
           provider_fetch: false,
           source_mode: "direct_local",
@@ -373,9 +388,7 @@ vi.mock("./api", async (importOriginal) => {
       segments: [{
         key: "capture_readback",
         state: "warn" as const,
-        detail:
-          "No capture has arrived from the browser extension for the selected account; " +
-          "check the native-host binding and retry the extension health check.",
+        detail: mocked.extensionDetail,
       }],
     })),
     getProvidersConfig: vi.fn(async () => mocked.providersConfig),
@@ -387,7 +400,12 @@ vi.mock("./api", async (importOriginal) => {
       mocked.putCalls.push({ provider, fields, confirmGuarded });
       return mocked.providersConfig.providers[provider as keyof typeof mocked.providersConfig.providers];
     }),
-    testProvider: vi.fn(),
+    testProvider: vi.fn(async (provider: string) => ({
+      provider,
+      ok: false,
+      latency_ms: 17,
+      detail: mocked.providerTestDetail,
+    })),
   };
 });
 
@@ -396,6 +414,10 @@ import { DataSourcesSection } from "./settings/DataSourcesSection";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   if (root) {
@@ -415,17 +437,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function renderDataSources(onNavigationGuardChange?: SettingsNavigationGuardReporter) {
+async function renderDataSources(
+  onNavigationGuardChange?: SettingsNavigationGuardReporter,
+  developerMode = false,
+) {
   window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
     root!.render(onNavigationGuardChange
-      ? React.createElement(DataSourcesSection, { onNavigationGuardChange })
+      ? React.createElement(DataSourcesSection, { onNavigationGuardChange, developerMode })
       : React.createElement(SettingsView, {
           runtime: null,
-          developerMode: false,
+          developerMode,
           onRuntimeChanged: vi.fn(),
         }));
   });
@@ -434,8 +459,10 @@ async function renderDataSources(onNavigationGuardChange?: SettingsNavigationGua
 }
 
 function clearDataSourceReadMocks() {
+  vi.mocked(getModelCatalog).mockClear();
   vi.mocked(getSchedule).mockClear();
   vi.mocked(getProvidersHealth).mockClear();
+  vi.mocked(getSAExtensionHealth).mockClear();
   vi.mocked(getProvidersConfig).mockClear();
 }
 
@@ -501,7 +528,8 @@ describe("Settings provider config authority", () => {
     });
     expect(mocked.putCalls).toHaveLength(0);
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
-    expect(dialog?.textContent).toContain("Changing IBKR client_id can disturb active Gateway sessions.");
+    expect(dialog?.textContent).toContain("此設定需要確認後才會變更。");
+    expect(dialog?.textContent).not.toContain("PLANTED_CONFIG_GUARD_REASON");
     const confirmButton = Array.from(dialog?.querySelectorAll("button") ?? [])
       .find((button) => button.textContent?.trim() === "套用變更");
     if (!confirmButton) throw new Error("missing guarded-edit confirm button");
@@ -615,18 +643,18 @@ describe("Settings provider config authority", () => {
   });
 
   it("keeps long last-run messages out of the schedule row summary", async () => {
-    await renderDataSources();
+    await renderDataSources(undefined, true);
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Polygon news"));
+      node.textContent?.includes("Polygon 新聞"));
     if (!row) throw new Error("missing schedule row");
 
     const summary = row.querySelector(".ds-last-run-summary");
-    expect(summary?.textContent).toContain("已跳過");
+    expect(summary?.textContent).toContain("新觸發已略過");
     expect(summary?.textContent).toContain("上次失敗");
     expect(summary?.textContent).not.toContain(mocked.longSkipReason);
     expect(summary?.textContent).not.toContain(mocked.longDurableError);
 
-    const details = row.querySelector("details.ds-last-run-details");
+    const details = host!.querySelector("details.developer-diagnostics");
     expect(details?.textContent).toContain(mocked.longSkipReason);
     expect(details?.textContent).toContain(mocked.longDurableError);
   });
@@ -642,7 +670,7 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("Run"))).toBe(true);
+      button.textContent?.includes("執行"))).toBe(true);
   });
 
   it("renders succeeded IBKR run and scheduled body backlog as separate facts", async () => {
@@ -670,7 +698,7 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("Run"))).toBe(true);
+      button.textContent?.includes("執行"))).toBe(true);
     expect(row.textContent).not.toContain("provider_article_id");
   });
 
@@ -689,7 +717,7 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("Run"))).toBe(true);
+      button.textContent?.includes("執行"))).toBe(true);
   });
 
   it("renders_known_schedule_progress_without_covering_the_last_run_cell", async () => {
@@ -701,18 +729,18 @@ describe("Settings provider config authority", () => {
     };
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Polygon news"));
+      node.textContent?.includes("Polygon 新聞"));
     if (!row) throw new Error("missing schedule row");
     expect(row.querySelector(".source-run-current")?.textContent).toContain("BRK.B");
     expect(row.querySelector(".source-run-counts")?.textContent).toBe("17 / 149 · 11%");
     expect(row.querySelector("[role='progressbar']")).not.toBeNull();
-    expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("已跳過");
+    expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("新觸發已略過");
   });
 
   it("shows_disabled_provider_and_schedule_states_as_neutral_text", async () => {
     await renderDataSources();
     const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Retired provider"));
+      node.textContent?.includes("retired_provider"));
     if (!providerRow) throw new Error("missing disabled provider row");
     expect(providerRow.textContent).toContain("已停用");
     expect(providerRow.querySelector(".ui-status-badge")).toBeNull();
@@ -727,13 +755,13 @@ describe("Settings provider config authority", () => {
     expect(scheduleCell?.querySelector(".ui-status-badge")).toBeNull();
     expect(scheduleCell?.querySelector(".ds-schedule-disabled")?.textContent).toBe("排程關閉");
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("Run"))).toBe(true);
+      button.textContent?.includes("執行"))).toBe(true);
   });
 
   it("renders_persisted_skipped_history_as_neutral_instead_of_never_run", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Writer lock deferred"));
+      node.textContent?.includes("writer_lock_deferred"));
     if (!row) throw new Error("missing durable skipped row");
     expect(row.textContent).toContain("上次已跳過");
     expect(row.textContent).not.toContain("尚未執行");
@@ -745,8 +773,10 @@ describe("Settings provider config authority", () => {
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("價格缺口補抓"));
     if (!row) throw new Error("missing price_backfill row");
-    expect(row.querySelector("td")?.textContent?.replace(/\s+/g, "").trim())
-      .toBe("價格缺口補抓");
+    expect(row.querySelector("td")?.textContent).toContain("價格缺口補抓");
+    expect(row.querySelector("td")?.textContent).toContain(
+      "依交易日覆蓋缺口補抓價格並直接寫入本機市場資料庫。",
+    );
     expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
     expect(row.textContent).not.toContain("IBKR/Polygon");
     expect(row.textContent).not.toContain("直寫本地");
@@ -765,7 +795,7 @@ describe("Settings provider config authority", () => {
       node.textContent?.includes("FRED"));
     if (!row) throw new Error("missing FRED provider row");
     expect(row.textContent).toContain("正常");
-    expect(row.textContent).toContain("app");
+    expect(row.textContent).toContain("App");
     expect(row.textContent).toContain("資料快照");
     expect(row.textContent).toContain("自動刷新未啟用");
     expect(row.textContent).not.toContain("未啟用抓取");
@@ -838,8 +868,8 @@ describe("Settings provider config authority", () => {
   it("renders IBKR connection settings as one grouped block with derived ids below the client id", async () => {
     await renderDataSources();
     const group = host!.querySelector("[data-testid='ibkr-config-group']");
-    expect(group?.textContent).toContain("Gateway host");
-    expect(group?.textContent).toContain("Gateway port");
+    expect(group?.textContent).toContain("Gateway 主機");
+    expect(group?.textContent).toContain("Gateway 連接埠");
     expect(group?.textContent).toContain("Client ID");
     expect(group?.textContent).toContain("各域用戶端 ID：");
     expect(group?.textContent).toContain("股價=21");
@@ -860,10 +890,10 @@ describe("Settings provider config authority", () => {
   });
 
   it("marks_long_runtime_content_as_wrap_capable", async () => {
-    await renderDataSources();
-    const wrapCells = Array.from(host!.querySelectorAll(".settings-wrap-text"));
-    expect(wrapCells.some((cell) => cell.textContent?.includes("native-host binding"))).toBe(true);
-    expect(wrapCells.some((cell) => cell.textContent?.includes("request_id=provider-health-check"))).toBe(true);
+    await renderDataSources(undefined, true);
+    const diagnostics = host!.querySelector(".developer-diagnostics");
+    expect(diagnostics?.textContent).toContain(mocked.extensionDetail);
+    expect(diagnostics?.textContent).toContain(mocked.providerHealthError);
     expect(host!.querySelector(".ds-last-run-cell.settings-wrap-text")).not.toBeNull();
   });
 
@@ -1031,5 +1061,188 @@ describe("Settings provider config authority", () => {
 
     expect(getSchedule).toHaveBeenCalledTimes(1);
     expect(getProvidersHealth).not.toHaveBeenCalled();
+  });
+
+  it("renders English data-source health config and schedule tables", async () => {
+    await act(async () => { await i18n.changeLanguage("en"); });
+    await renderDataSources();
+
+    expect(host!.textContent).toContain("Data Sources and Schedules");
+    expect(host!.textContent).toContain("Provider Health");
+    expect(host!.textContent).toContain("Connections and Keys");
+    expect(host!.textContent).toContain("SA Extension Health");
+    expect(host!.textContent).toContain("Schedules (per source)");
+    expect(host!.textContent).toContain("IBKR Gateway");
+    expect(host!.textContent).toContain("Gateway host");
+    expect(host!.textContent).toContain("Gateway port");
+    expect(host!.textContent).toContain("Prices=21");
+    expect(host!.textContent).toContain("Polygon News");
+    expect(host!.textContent).toContain(
+      "Write incremental Polygon news to local normalized news data.",
+    );
+    expect(host!.textContent).toContain("Price Gap Backfill");
+    expect(host!.textContent).toContain("writer_lock_deferred");
+    expect(host!.textContent).toContain("No signal");
+    expect(host!.textContent).toContain("No key required");
+    expect(host!.textContent).toContain("Snapshot available: 11 series · 29,571 observations");
+    expect(host!.textContent).toContain("Provider settings need repair.");
+    for (const raw of [
+      "PLANTED_PROVIDER_POLYGON_LABEL",
+      "PLANTED_PROVIDER_IBKR_LABEL",
+      "PLANTED_PROVIDER_FRED_LABEL",
+      "PLANTED_UNKNOWN_PROVIDER_LABEL",
+      "PLANTED_CONFIG_API_KEY_LABEL",
+      "PLANTED_CONFIG_HOST_LABEL",
+      "PLANTED_CONFIG_PORT_LABEL",
+      "PLANTED_CONFIG_CLIENT_ID_LABEL",
+      "PLANTED_DOMAIN_PRICES",
+      "PLANTED_SCHEDULE_POLYGON_LABEL",
+      "PLANTED_SCHEDULE_POLYGON_DESCRIPTION",
+      "PLANTED_SCHEDULE_IBKR_LABEL",
+      "PLANTED_UNKNOWN_SCHEDULE_LABEL",
+      "PLANTED_SCHEDULE_BACKFILL_LABEL",
+    ]) {
+      expect(host!.textContent).not.toContain(raw);
+    }
+    for (const id of [
+      "provider-health-scroll",
+      "sa-health-scroll",
+      "provider-config-scroll",
+      "schedule-scroll",
+    ]) {
+      expect(host!.querySelector(`[data-testid='${id}'] table`)).not.toBeNull();
+    }
+  });
+
+  it("hides planted provider schedule and setup diagnostics in normal mode", async () => {
+    await renderDataSources();
+    const polygonConfigRow = Array.from(
+      host!.querySelectorAll("[data-testid='provider-config-scroll'] tbody tr"),
+    ).find((row) => row.textContent?.includes("Polygon"));
+    const testButton = Array.from(polygonConfigRow?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "測試");
+    if (!testButton) throw new Error("missing Polygon connection test button");
+    await act(async () => {
+      testButton.click();
+      await Promise.resolve();
+    });
+
+    expect(host!.textContent).toContain("Polygon 連線測試失敗。");
+    expect(host!.textContent).toContain("Provider 設定需要修復。");
+    for (const raw of [
+      mocked.providerHealthDetail,
+      mocked.providerHealthError,
+      mocked.extensionDetail,
+      mocked.providerTestDetail,
+      mocked.longSkipReason,
+      mocked.longDurableError,
+      mocked.scheduleStaleReason,
+      mocked.providersConfig.setup.reason,
+      "PLANTED_CONFIG_GUARD_REASON",
+    ]) {
+      expect(host!.textContent).not.toContain(raw);
+    }
+    expect(host!.querySelector(".developer-diagnostics")).toBeNull();
+    expect(host!.querySelector("[aria-live]")).toBeNull();
+  });
+
+  it("reveals the same planted diagnostics only in Developer Mode", async () => {
+    await renderDataSources(undefined, true);
+    const polygonConfigRow = Array.from(
+      host!.querySelectorAll("[data-testid='provider-config-scroll'] tbody tr"),
+    ).find((row) => row.textContent?.includes("Polygon"));
+    const testButton = Array.from(polygonConfigRow?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "測試");
+    if (!testButton) throw new Error("missing Polygon connection test button");
+    await act(async () => {
+      testButton.click();
+      await Promise.resolve();
+    });
+
+    expect(host!.querySelector(".developer-diagnostics")).not.toBeNull();
+    for (const raw of [
+      mocked.providerHealthDetail,
+      mocked.providerHealthError,
+      mocked.extensionDetail,
+      mocked.providerTestDetail,
+      mocked.longSkipReason,
+      mocked.longDurableError,
+      mocked.scheduleStaleReason,
+      mocked.providersConfig.setup.reason,
+      "PLANTED_CONFIG_GUARD_REASON",
+    ]) {
+      expect(host!.textContent).toContain(raw);
+    }
+    expect(host!.querySelector(".developer-diagnostics [aria-live]")).toBeNull();
+  });
+
+  it("switches locale without resetting drafts polling cadence or progress", async () => {
+    vi.useFakeTimers();
+    mocked.scheduleRunning = true;
+    mocked.scheduleProgress = { done: 17, total: 149, current: "BRK.B" };
+    await renderDataSources();
+
+    const interval = host!.querySelector<HTMLInputElement>(
+      "input.ds-interval:not(.ds-keyinput)",
+    );
+    const providerDraft = host!.querySelector<HTMLInputElement>(
+      'input.ds-keyinput[type="password"]',
+    );
+    const progress = host!.querySelector<HTMLElement>("[role='progressbar']");
+    if (!interval || !providerDraft || !progress) throw new Error("missing live Data Sources state");
+    await act(async () => {
+      setInputValue(interval, "777");
+      setInputValue(providerDraft, "planted-provider-secret");
+    });
+    clearDataSourceReadMocks();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    await act(async () => { await i18n.changeLanguage("en"); });
+    for (const read of [
+      getModelCatalog,
+      getSchedule,
+      getProvidersHealth,
+      getSAExtensionHealth,
+      getProvidersConfig,
+    ]) {
+      expect(read).not.toHaveBeenCalled();
+    }
+    expect(host!.querySelector("input.ds-interval:not(.ds-keyinput)")).toBe(interval);
+    expect(host!.querySelector('input.ds-keyinput[type="password"]')).toBe(providerDraft);
+    expect(host!.querySelector("[role='progressbar']")).toBe(progress);
+    expect(interval.value).toBe("777");
+    expect(providerDraft.value).toBe("planted-provider-secret");
+    expect(progress.getAttribute("aria-valuenow")).toBe("17");
+    expect(progress.getAttribute("aria-valuemax")).toBe("149");
+    expect(host!.querySelector(".source-run-counts")?.textContent).toBe("17 / 149 · 11%");
+
+    mocked.scheduleRunning = false;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_999); });
+    expect(getSchedule).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(getSchedule).toHaveBeenCalled();
+    await act(async () => { await Promise.resolve(); });
+    clearDataSourceReadMocks();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    for (const read of [
+      getModelCatalog,
+      getSchedule,
+      getProvidersHealth,
+      getSAExtensionHealth,
+      getProvidersConfig,
+    ]) {
+      expect(read).not.toHaveBeenCalled();
+    }
+    expect(host!.querySelector("input.ds-interval:not(.ds-keyinput)")).toBe(interval);
+    expect(host!.querySelector('input.ds-keyinput[type="password"]')).toBe(providerDraft);
+    expect(interval.value).toBe("777");
+    expect(providerDraft.value).toBe("planted-provider-secret");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(27_999); });
+    expect(getSchedule).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(getSchedule).toHaveBeenCalledTimes(1);
   });
 });

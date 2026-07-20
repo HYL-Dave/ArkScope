@@ -11,6 +11,7 @@ import {
   providerClientDomainLabel,
   providerConfigFieldLabel,
   providerHealthCopy,
+  providerKeySourceLabel,
   providerName,
   providerTestCopy,
   saSegmentLabel,
@@ -87,11 +88,13 @@ describe("Settings backend copy boundary", () => {
       {
         locale: "zh-Hant" as const,
         labels: ["正常", "過期", "維護中", "無訊號", "未設定", "缺少金鑰", "已停用"],
+        sources: ["App", "環境變數", "config/.env", "未設定", "混合來源", "免金鑰"],
         setup: "Provider 設定需要修復。",
       },
       {
         locale: "en" as const,
         labels: ["Connected", "Stale", "Maintenance", "No signal", "Not configured", "Missing key", "Disabled"],
+        sources: ["App", "Environment", "config/.env", "Not configured", "Mixed sources", "No key required"],
         setup: "Provider settings need repair.",
       },
     ];
@@ -101,6 +104,9 @@ describe("Settings backend copy boundary", () => {
       const copies = statuses.map((status) => providerHealthCopy("polygon", status, t));
       expect(copies.map(({ label }) => label)).toEqual(expected.labels);
       expect(copies.every(({ detail }) => detail.includes("Polygon"))).toBe(true);
+      expect(["app", "env", "config/.env", "missing", "mixed", "not_required"]
+        .map((source) => providerKeySourceLabel(source, t)))
+        .toEqual(expected.sources);
       const setup = settingsErrorPresentation(
         new ApiError("planted backend message", "/providers/config", 503, "provider_config_setup_required", "PLANTED_SETUP_DETAIL"),
         t,
@@ -164,21 +170,84 @@ describe("Settings backend copy boundary", () => {
   });
 
   it("maps schedule history without matching an English reason substring", () => {
-    const result: ScheduleRunResult = {
-      source: "polygon_news",
-      status: "skipped",
-      reason: "collector already running: PLANTED_REASON",
-    };
     const cases = [
-      { locale: "zh-Hant" as const, value: "Polygon 新聞：上次已跳過" },
-      { locale: "en" as const, value: "Polygon News: Last run was skipped" },
+      {
+        locale: "zh-Hant" as const,
+        compact: [
+          "尚未執行",
+          "執行中",
+          "上次成功",
+          "部分完成",
+          "上次失敗",
+          "上次已跳過",
+          "上次狀態為 future_status",
+        ],
+        values: [
+          "Polygon 新聞：尚未執行",
+          "Polygon 新聞：執行中",
+          "Polygon 新聞：上次成功",
+          "Polygon 新聞：部分完成",
+          "Polygon 新聞：上次失敗",
+          "Polygon 新聞：上次已跳過",
+          "Polygon 新聞：上次狀態為 future_status",
+        ],
+      },
+      {
+        locale: "en" as const,
+        compact: [
+          "Not run yet",
+          "Running",
+          "Last run succeeded",
+          "Partially completed",
+          "Last run failed",
+          "Last run was skipped",
+          "Last status was future_status",
+        ],
+        values: [
+          "Polygon News: Not run yet",
+          "Polygon News: Running",
+          "Polygon News: Last run succeeded",
+          "Polygon News: Partially completed",
+          "Polygon News: Last run failed",
+          "Polygon News: Last run was skipped",
+          "Polygon News: Last status was future_status",
+        ],
+      },
     ];
 
     for (const expected of cases) {
-      const value = scheduleOutcomeCopy("polygon_news", result, settingsT(expected.locale));
-      expect(value).toBe(expected.value);
-      expect(value).not.toContain("already running");
-      expect(value).not.toContain("PLANTED_REASON");
+      const t = settingsT(expected.locale);
+      const results: Array<ScheduleRunResult | null> = [
+        null,
+        { source: "polygon_news", status: "running" },
+        { source: "polygon_news", status: "succeeded" },
+        { source: "polygon_news", status: "partial" },
+        { source: "polygon_news", status: "failed" },
+        {
+          source: "polygon_news",
+          status: "skipped",
+          reason: "collector already running: PLANTED_REASON",
+        },
+        { source: "polygon_news", status: "future_status" },
+      ];
+      const values = results.map((result) => scheduleOutcomeCopy("polygon_news", result, t));
+      const compact = [
+        t(($) => $.dataSources.schedule.history.notRun),
+        t(($) => $.dataSources.schedule.history.running),
+        t(($) => $.dataSources.schedule.history.succeeded),
+        t(($) => $.dataSources.schedule.history.partial),
+        t(($) => $.dataSources.schedule.history.failed),
+        t(($) => $.dataSources.schedule.history.skipped),
+        t(($) => $.dataSources.schedule.history.unknown, { value: "future_status" }),
+      ];
+      expect(compact).toEqual(expected.compact);
+      expect(compact.map((value) => t(($) => $.dataSources.schedule.history.withSource, {
+        sourceId: scheduleSourceCopy("polygon_news", t).label,
+        value,
+      }))).toEqual(expected.values);
+      expect(values).toEqual(expected.values);
+      expect(values.join(" ")).not.toContain("already running");
+      expect(values.join(" ")).not.toContain("PLANTED_REASON");
     }
   });
 

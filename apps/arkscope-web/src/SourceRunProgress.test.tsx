@@ -2,21 +2,28 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import i18n from "i18next";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SourceRunProgress } from "./SourceRunProgress";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
 
-async function mount(progress: { done: number; total: number; current: string } | null) {
+async function mount(
+  progress: { done: number; total: number; current: string } | null,
+  sourceLabel = "IBKR 即時股價",
+) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
     root!.render(
       <SourceRunProgress
-        sourceLabel="IBKR 即時股價"
+        sourceLabel={sourceLabel}
         running
         progress={progress}
       />,
@@ -24,6 +31,10 @@ async function mount(progress: { done: number; total: number; current: string } 
   });
   return host;
 }
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-Hant");
+});
 
 afterEach(() => {
   if (root) act(() => root!.unmount());
@@ -73,5 +84,25 @@ describe("SourceRunProgress", () => {
       expect(node.querySelector("[role='progressbar']")).toBeNull();
       expect(node.textContent).toContain("執行中");
     }
+  });
+
+  it("renders English progress chrome without changing real progress values", async () => {
+    const node = await mount(
+      { done: 7, total: 10, current: "BRK.B" },
+      "IBKR Prices",
+    );
+    const progress = node.querySelector<HTMLElement>("[role='progressbar']");
+    const fill = node.querySelector<HTMLElement>(".source-run-track-fill");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+
+    expect(node.textContent).toContain("Running...");
+    expect(node.querySelector(".source-run-current")?.textContent).toBe("BRK.B");
+    expect(node.querySelector(".source-run-counts")?.textContent).toBe("7 / 10 · 70%");
+    expect(node.querySelector("[role='progressbar']")).toBe(progress);
+    expect(progress?.getAttribute("aria-label")).toBe("IBKR Prices progress");
+    expect(progress?.getAttribute("aria-valuemax")).toBe("10");
+    expect(progress?.getAttribute("aria-valuenow")).toBe("7");
+    expect(fill?.style.width).toBe("70%");
   });
 });

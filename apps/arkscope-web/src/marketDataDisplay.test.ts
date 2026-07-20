@@ -1,18 +1,46 @@
+// @vitest-environment jsdom
+
+import { createInstance } from "i18next";
 import { describe, expect, it } from "vitest";
 
 import * as marketDataDisplay from "./marketDataDisplay";
 import {
-  coverageStatusLabel,
-  macroRoutingLabel,
-  marketRoutingLabel,
-  newsPostgresRouteLabel,
-  newsReadSurfaceLabel,
-  newsRoutingLabel,
-  newsWriteRouteLabel,
-  providerHealthStatusLabel,
-  schedulerStateLabel,
+  coverageStatusLabel as localizedCoverageStatusLabel,
+  macroRoutingLabel as localizedMacroRoutingLabel,
+  marketRoutingLabel as localizedMarketRoutingLabel,
+  newsPostgresRouteLabel as localizedNewsPostgresRouteLabel,
+  newsReadSurfaceLabel as localizedNewsReadSurfaceLabel,
+  newsRoutingLabel as localizedNewsRoutingLabel,
+  newsWriteRouteLabel as localizedNewsWriteRouteLabel,
+  providerHealthStatusLabel as localizedProviderHealthStatusLabel,
+  schedulerStateLabel as localizedSchedulerStateLabel,
 } from "./marketDataDisplay";
 import type { MacroStatus, MarketDataStatus, NewsStatus } from "./api";
+import { initializeI18n } from "./i18n/resources";
+
+type Locale = "zh-Hant" | "en";
+
+function settingsT(locale: Locale) {
+  const instance = createInstance();
+  initializeI18n(instance, locale);
+  return instance.getFixedT(locale, "settings");
+}
+
+const zhT = settingsT("zh-Hant");
+const coverageStatusLabel = (row: Parameters<typeof localizedCoverageStatusLabel>[0]) =>
+  localizedCoverageStatusLabel(row, zhT);
+const macroRoutingLabel = (value: MacroStatus) => localizedMacroRoutingLabel(value, zhT);
+const marketRoutingLabel = (value: MarketDataStatus) => localizedMarketRoutingLabel(value, zhT);
+const newsPostgresRouteLabel = (value: NewsStatus) => localizedNewsPostgresRouteLabel(value, zhT);
+const newsReadSurfaceLabel = (value: NewsStatus) => localizedNewsReadSurfaceLabel(value, zhT);
+const newsRoutingLabel = (value: NewsStatus) => localizedNewsRoutingLabel(value, zhT);
+const newsWriteRouteLabel = (value: NewsStatus) => localizedNewsWriteRouteLabel(value, zhT);
+const providerHealthStatusLabel = (
+  value: Parameters<typeof localizedProviderHealthStatusLabel>[0] & Record<string, unknown>,
+) => localizedProviderHealthStatusLabel(value, zhT);
+const schedulerStateLabel = (
+  value: Parameters<typeof localizedSchedulerStateLabel>[0],
+) => localizedSchedulerStateLabel(value, zhT);
 
 const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
   market_db: "/tmp/market.db",
@@ -304,7 +332,7 @@ describe("schedulerBodyBacklogPresentation", () => {
     Parameters<typeof marketDataDisplay.schedulerBodyBacklogPresentation>[0]
   >;
   const present = (durable: DurablePresentation) =>
-    marketDataDisplay.schedulerBodyBacklogPresentation(durable);
+    marketDataDisplay.schedulerBodyBacklogPresentation(durable, zhT);
 
   it("keeps a succeeded run successful when bodies are scheduled later", () => {
     const durable: DurablePresentation = {
@@ -496,5 +524,126 @@ describe("providerHealthStatusLabel", () => {
       status: "not_configured",
       disabled_reason: null,
     })).toBe("未設定");
+  });
+});
+
+describe("localized Settings market-data presentations", () => {
+  it("renders Settings market and schedule presentations in both locales", () => {
+    const durable = {
+      last_status: "partial",
+      continuation: { deferred: ["NVDA", "TSLA"] },
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: {
+          status: "partial",
+          body_backlog: {
+            status: "ok" as const,
+            due_now: 4,
+            scheduled_later: 2,
+            never_attempted: 3,
+            earliest_next_retry_at: "2026-07-15T08:00:00Z",
+          },
+        },
+      },
+    };
+    const cases = [
+      {
+        locale: "zh-Hant" as const,
+        market: "本地權威（PG fallback 已退役）",
+        macro: "啟用中（本地 · env 強制）",
+        news: "直寫本地（env 強制開啟）",
+        write: "Normalized SQLite + legacy local projection（pre-exit test）",
+        postgres: "可用（尚未退出）",
+        read: "Legacy local direct surface",
+        coverage: "部分覆蓋（1/148 檔完整）",
+        provider: "已停用",
+        scheduler: "部分完成（待補抓 2）",
+        backlog: "內文佇列：4 篇目前可處理（其中 3 篇尚未嘗試） · 2 篇已排程稍後重試",
+      },
+      {
+        locale: "en" as const,
+        market: "Local authority (PG fallback retired)",
+        macro: "Active (local · forced by environment)",
+        news: "Direct local writes (forced on by environment)",
+        write: "Normalized SQLite + legacy local projection (pre-exit test)",
+        postgres: "Available (not yet exited)",
+        read: "Legacy local direct surface",
+        coverage: "Partial coverage (1/148 complete)",
+        provider: "Disabled",
+        scheduler: "Partially completed (2 remaining)",
+        backlog: "Body queue: 4 available now (3 not yet attempted) · 2 scheduled for a later retry",
+      },
+    ];
+
+    for (const expected of cases) {
+      const t = settingsT(expected.locale);
+      const market = status({ routing_enabled: true });
+      const macro = macroStatus({ local_first_active: true, exists: true, env_override: true });
+      const news = newsStatus({ env_override: true, env_value: true });
+      const preExit = newsStatus({ write_route: "normalized" });
+      expect(localizedMarketRoutingLabel(market, t)).toBe(expected.market);
+      expect(localizedMacroRoutingLabel(macro, t)).toBe(expected.macro);
+      expect(localizedNewsRoutingLabel(news, t)).toBe(expected.news);
+      expect(localizedNewsWriteRouteLabel(preExit, t)).toBe(expected.write);
+      expect(localizedNewsPostgresRouteLabel(preExit, t)).toBe(expected.postgres);
+      expect(localizedNewsReadSurfaceLabel(preExit, t)).toBe(expected.read);
+      expect(localizedCoverageStatusLabel({
+        coverage_status: "partial",
+        reason: "regular_trading_day",
+        holiday: null,
+        max_observed_bar_count: 26,
+        well_covered: 1,
+        covered: 148,
+      }, t)).toEqual({ label: expected.coverage, tone: "warn" });
+      expect(localizedProviderHealthStatusLabel({
+        id: "fred",
+        status: "disabled",
+        disabled_reason: "PLANTED_DISABLED_REASON",
+      }, t)).toBe(expected.provider);
+      expect(localizedSchedulerStateLabel(durable, t)).toEqual({
+        label: expected.scheduler,
+        tone: "warn",
+        needsContinue: true,
+      });
+      expect(marketDataDisplay.schedulerBodyBacklogPresentation(durable, t)).toEqual({
+        label: expected.backlog,
+        tone: "muted",
+        earliestNextRetryAt: "2026-07-15T08:00:00Z",
+      });
+    }
+  });
+
+  it("keeps raw schedule reasons out of semantic status mapping", () => {
+    const cases = [
+      { locale: "zh-Hant" as const, skipped: "上次已跳過", stale: "執行過久" },
+      { locale: "en" as const, skipped: "Last run was skipped", stale: "Running too long" },
+    ];
+
+    for (const expected of cases) {
+      const t = settingsT(expected.locale);
+      const skipped = [
+        "collector already running: PLANTED_REASON",
+        "PLANTED_REASON_WITHOUT_ENGLISH_SENTINEL",
+      ].map((running_stale_reason) => localizedSchedulerStateLabel({
+        last_status: "skipped",
+        continuation: null,
+        running_stale: false,
+        running_stale_reason,
+      }, t));
+      expect(skipped).toEqual([
+        { label: expected.skipped, tone: "muted", needsContinue: false },
+        { label: expected.skipped, tone: "muted", needsContinue: false },
+      ]);
+      const stale = localizedSchedulerStateLabel({
+        last_status: "running",
+        continuation: null,
+        running_stale: true,
+        running_stale_reason: "PLANTED_STALE_REASON",
+      }, t);
+      expect(stale).toEqual({ label: expected.stale, tone: "warn", needsContinue: false });
+      expect(`${skipped.map(({ label }) => label).join(" ")} ${stale.label}`)
+        .not.toContain("PLANTED");
+    }
   });
 });
