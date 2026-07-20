@@ -453,7 +453,7 @@ const settings = {
       app: "App",
       environment: "環境變數",
       mixedSources: "混合來源",
-      external: "外部",
+      external: "（外部）",
       defaultValue: "預設",
       noKey: "免金鑰",
       recommendedImport: "建議匯入",
@@ -530,6 +530,8 @@ const settings = {
       config: {
         title: "連線與金鑰",
         description: "來源標示會說明每個值由 App、環境變數或 config/.env 管理。App 內儲存的設定會立即生效；敏感值只顯示遮罩內容。",
+        sourceValue: "（{{value}}）",
+        clientIdSeparator: "、",
         missing: "Provider 設定不完整。",
         setupRequired: "Provider 設定需要修復。",
         guardTitle: "套用受保護的設定？",
@@ -562,7 +564,7 @@ const settings = {
     },
     schedule: {
       title: "排程（每來源獨立）",
-      autoRefreshing: "執行中，自動更新",
+      autoRefreshing: "（執行中，自動更新）",
       protection: "同一資料來源與 IBKR 工作同時間只執行一次；若已有工作進行中，新觸發會顯示為已跳過，不會重複抓取。",
       triggerSkipped: "新觸發已略過",
       skippedPrefix: "已跳過：{{value}}",
@@ -633,7 +635,7 @@ const settings = {
       },
       progress: "處理中",
       progressAria: "{{sourceId}}執行進度",
-      guardTitle: "執行保護",
+      guardTitle: "執行保護：",
     },
   },
   dataStorage: {

@@ -1,6 +1,5 @@
 import {
   ApiError,
-  type ProviderStatus,
   type ScheduleRunResult,
 } from "../api";
 import type { SettingsT } from "./settingsCopy";
@@ -261,10 +260,10 @@ export function providerClientDomainLabel(domain: string, t: SettingsT): string 
 
 export function providerHealthCopy(
   id: string,
-  status: ProviderStatus,
+  status: string,
   t: SettingsT,
 ): { label: string; detail: string } {
-  let label: string;
+  let label = status;
   switch (status) {
     case "connected":
       label = t(($) => $.dataSources.providers.health.connected);

@@ -138,7 +138,7 @@ function ibkrClientIdChips(
   const base = /^\d+$/.test(s) ? Number(s) : null;
   const text = domains
     .map((d) => `${providerClientDomainLabel(d.domain, t)}=${base !== null ? base + d.offset : d.effective_id ?? "？"}`)
-    .join("、");
+    .join(t(($) => $.dataSources.providers.config.clientIdSeparator));
   return { preview: base !== null, text };
 }
 
@@ -483,7 +483,7 @@ export function DataSourcesSection({
                 <span className="mono">
                   {f.app_value_set
                     ? f.app_value_masked
-                    : <>（{t(($) => $.dataSources.labels.external)}）</>}
+                    : t(($) => $.dataSources.labels.external)}
                 </span>
                 {f.defaulted && (
                   <span className="muted tiny">
@@ -491,7 +491,9 @@ export function DataSourcesSection({
                   </span>
                 )}
                 <span className="muted tiny">
-                  （{providerKeySourceLabel(f.effective_source, t)}）
+                  {t(($) => $.dataSources.providers.config.sourceValue, {
+                    value: providerKeySourceLabel(f.effective_source, t),
+                  })}
                 </span>
                 {f.needs_import && (
                   <button className="btn-ghost tiny"
@@ -672,7 +674,7 @@ export function DataSourcesSection({
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>
           ↻ {t(($) => $.actions.refresh)}
           {anyRunning
-            ? <>（{t(($) => $.dataSources.schedule.autoRefreshing)}）</>
+            ? t(($) => $.dataSources.schedule.autoRefreshing)
             : null}
         </button>
       </div>
@@ -879,7 +881,7 @@ export function DataSourcesSection({
                                 <span className="mono">
                                   {f.app_value_set
                                     ? f.app_value_masked
-                                    : <>（{t(($) => $.dataSources.labels.external)}）</>}
+                                    : t(($) => $.dataSources.labels.external)}
                                 </span>
                                 {f.defaulted && (
                                   <span className="muted tiny">
@@ -887,7 +889,9 @@ export function DataSourcesSection({
                                   </span>
                                 )}
                                 <span className="muted tiny">
-                                  （{providerKeySourceLabel(f.effective_source, t)}）
+                                  {t(($) => $.dataSources.providers.config.sourceValue, {
+                                    value: providerKeySourceLabel(f.effective_source, t),
+                                  })}
                                 </span>
                                 {f.needs_import && (
                                   <button className="btn-ghost tiny"
@@ -1056,7 +1060,7 @@ export function DataSourcesSection({
           </div>
         )}
         <p className="muted tiny ds-schedule-protection-note" style={{ marginTop: 8 }}>
-          {t(($) => $.dataSources.schedule.guardTitle)}：
+          {t(($) => $.dataSources.schedule.guardTitle)}
           {t(($) => $.dataSources.schedule.protection)}
         </p>
       </div>

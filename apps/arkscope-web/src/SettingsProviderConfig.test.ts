@@ -492,27 +492,66 @@ function setInputValue(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function plantPunctuationFixtures(): () => void {
+  const groupedField = mocked.providersConfig.providers.ibkr.fields.find((field) =>
+    field.field === "host") as {
+      app_value_set: boolean;
+      app_value_masked: string | null;
+      effective_source: string;
+    } | undefined;
+  if (!groupedField) throw new Error("missing grouped config field");
+  const previous = {
+    appValueSet: groupedField.app_value_set,
+    appValueMasked: groupedField.app_value_masked,
+    effectiveSource: groupedField.effective_source,
+    scheduleRunning: mocked.scheduleRunning,
+  };
+  groupedField.app_value_set = false;
+  groupedField.app_value_masked = null;
+  groupedField.effective_source = "env";
+  mocked.scheduleRunning = true;
+  return () => {
+    groupedField.app_value_set = previous.appValueSet;
+    groupedField.app_value_masked = previous.appValueMasked;
+    groupedField.effective_source = previous.effectiveSource;
+    mocked.scheduleRunning = previous.scheduleRunning;
+  };
+}
+
 describe("Settings provider config authority", () => {
   it("renders config-file provenance with per-field import", async () => {
-    const source = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");
-    expect(source.match(/providerKeySourceLabel\(f\.effective_source, t\)/g)).toHaveLength(4);
-    expect(source).not.toContain("$.dataSources.providers.health.notConfigured");
+    const restoreFixtures = plantPunctuationFixtures();
+    try {
+      const source = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");
+      expect(source.match(/providerKeySourceLabel\(f\.effective_source, t\)/g)).toHaveLength(4);
+      expect(source).not.toContain("$.dataSources.providers.health.notConfigured");
 
-    await renderDataSources();
-    expect(host!.textContent).toContain("來源標示會說明每個值");
-    expect(host!.textContent).not.toContain("strict DB-first");
-    expect(host!.textContent).toContain("config/.env");
-    expect(host!.textContent).toContain("建議匯入");
-    const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
-      row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
-    if (!polygonRow) throw new Error("missing polygon config row");
-    const importButton = Array.from(polygonRow.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("匯入"));
-    if (!importButton) throw new Error("missing import button");
-    await act(async () => {
-      importButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    });
-    expect(mocked.importCalls).toEqual([{ provider: "polygon", field: "api_key", sourceEnvVar: "POLYGON_API_KEY" }]);
+      await renderDataSources();
+      expect(host!.textContent).toContain("來源標示會說明每個值");
+      expect(host!.textContent).not.toContain("strict DB-first");
+      expect(host!.textContent).toContain("config/.env");
+      expect(host!.textContent).toContain("建議匯入");
+      const groupedConfig = host!.querySelector("[data-testid='ibkr-config-group']");
+      expect(groupedConfig?.textContent).toContain("（外部）（環境變數）");
+      expect(groupedConfig?.textContent).toContain("基底=1、選擇權=11、股價=21、新聞=31、IV=41");
+      const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
+        row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
+      if (!polygonRow) throw new Error("missing polygon config row");
+      expect(polygonRow.textContent).toContain("（外部）（config/.env）");
+      const refreshButton = host!.querySelector(".settings-section-head button");
+      expect(refreshButton?.textContent).toContain("（執行中，自動更新）");
+      expect(host!.querySelector(".ds-schedule-protection-note")?.textContent)
+        .toContain("執行保護：同一資料來源與 IBKR 工作同時間只執行一次");
+      const importButton = Array.from(polygonRow.querySelectorAll("button")).find((button) =>
+        button.textContent?.includes("匯入"));
+      if (!importButton) throw new Error("missing import button");
+      await act(async () => {
+        importButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      });
+      expect(mocked.importCalls).toEqual([{ provider: "polygon", field: "api_key", sourceEnvVar: "POLYGON_API_KEY" }]);
+    } finally {
+      restoreFixtures();
+    }
   });
 
   it("confirms guarded IBKR client id edits", async () => {
@@ -1080,53 +1119,74 @@ describe("Settings provider config authority", () => {
   });
 
   it("renders English data-source health config and schedule tables", async () => {
-    await act(async () => { await i18n.changeLanguage("en"); });
-    await renderDataSources();
+    const restoreFixtures = plantPunctuationFixtures();
+    try {
+      await act(async () => { await i18n.changeLanguage("en"); });
+      await renderDataSources();
 
-    expect(host!.textContent).toContain("Data Sources and Schedules");
-    expect(host!.textContent).toContain("Provider Health");
-    expect(host!.textContent).toContain("Connections and Keys");
-    expect(host!.textContent).toContain("SA Extension Health");
-    expect(host!.textContent).toContain("Schedules (per source)");
-    expect(host!.textContent).toContain("IBKR Gateway");
-    expect(host!.textContent).toContain("Gateway host");
-    expect(host!.textContent).toContain("Gateway port");
-    expect(host!.textContent).toContain("Prices=21");
-    expect(host!.textContent).toContain("Polygon News");
-    expect(host!.textContent).toContain(
-      "Write incremental Polygon news to local normalized news data.",
-    );
-    expect(host!.textContent).toContain("Price Gap Backfill");
-    expect(host!.textContent).toContain("writer_lock_deferred");
-    expect(host!.textContent).toContain("No signal");
-    expect(host!.textContent).toContain("No key required");
-    expect(host!.textContent).toContain("Snapshot available: 11 series · 29,571 observations");
-    expect(host!.textContent).toContain("Provider settings need repair.");
-    for (const raw of [
-      "PLANTED_PROVIDER_POLYGON_LABEL",
-      "PLANTED_PROVIDER_IBKR_LABEL",
-      "PLANTED_PROVIDER_FRED_LABEL",
-      "PLANTED_UNKNOWN_PROVIDER_LABEL",
-      "PLANTED_CONFIG_API_KEY_LABEL",
-      "PLANTED_CONFIG_HOST_LABEL",
-      "PLANTED_CONFIG_PORT_LABEL",
-      "PLANTED_CONFIG_CLIENT_ID_LABEL",
-      "PLANTED_DOMAIN_PRICES",
-      "PLANTED_SCHEDULE_POLYGON_LABEL",
-      "PLANTED_SCHEDULE_POLYGON_DESCRIPTION",
-      "PLANTED_SCHEDULE_IBKR_LABEL",
-      "PLANTED_UNKNOWN_SCHEDULE_LABEL",
-      "PLANTED_SCHEDULE_BACKFILL_LABEL",
-    ]) {
-      expect(host!.textContent).not.toContain(raw);
-    }
-    for (const id of [
-      "provider-health-scroll",
-      "sa-health-scroll",
-      "provider-config-scroll",
-      "schedule-scroll",
-    ]) {
-      expect(host!.querySelector(`[data-testid='${id}'] table`)).not.toBeNull();
+      const dataSourcesHeading = Array.from(host!.querySelectorAll("h2")).find((heading) =>
+        heading.textContent === "Data Sources and Schedules");
+      const dataSourcesRoot = dataSourcesHeading?.parentElement?.parentElement?.parentElement;
+      if (!dataSourcesRoot) throw new Error("missing Data Sources root");
+      expect(host!.textContent).toContain("Data Sources and Schedules");
+      expect(host!.textContent).toContain("Provider Health");
+      expect(host!.textContent).toContain("Connections and Keys");
+      expect(host!.textContent).toContain("SA Extension Health");
+      expect(host!.textContent).toContain("Schedules (per source)");
+      expect(host!.textContent).toContain("IBKR Gateway");
+      expect(host!.textContent).toContain("Gateway host");
+      expect(host!.textContent).toContain("Gateway port");
+      const groupedConfig = host!.querySelector("[data-testid='ibkr-config-group']");
+      expect(groupedConfig?.textContent).toContain("(External) (Environment)");
+      expect(groupedConfig?.textContent)
+        .toContain("Base=1, Options=11, Prices=21, News=31, IV=41");
+      const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
+        row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
+      if (!polygonRow) throw new Error("missing Polygon config row");
+      expect(polygonRow.textContent).toContain("(External) (config/.env)");
+      expect(host!.querySelector(".settings-section-head button")?.textContent)
+        .toContain("Refresh (Running, auto-refreshing)");
+      expect(host!.querySelector(".ds-schedule-protection-note")?.textContent)
+        .toContain("Run protection: A data source or IBKR job runs only once at a time.");
+      expect(host!.textContent).toContain("Polygon News");
+      expect(host!.textContent).toContain(
+        "Write incremental Polygon news to local normalized news data.",
+      );
+      expect(host!.textContent).toContain("Price Gap Backfill");
+      expect(host!.textContent).toContain("writer_lock_deferred");
+      expect(host!.textContent).toContain("No signal");
+      expect(host!.textContent).toContain("No key required");
+      expect(host!.textContent).toContain("Snapshot available: 11 series · 29,571 observations");
+      expect(host!.textContent).toContain("Provider settings need repair.");
+      expect(dataSourcesRoot.textContent).not.toMatch(/[（）：、]/);
+      for (const raw of [
+        "PLANTED_PROVIDER_POLYGON_LABEL",
+        "PLANTED_PROVIDER_IBKR_LABEL",
+        "PLANTED_PROVIDER_FRED_LABEL",
+        "PLANTED_UNKNOWN_PROVIDER_LABEL",
+        "PLANTED_CONFIG_API_KEY_LABEL",
+        "PLANTED_CONFIG_HOST_LABEL",
+        "PLANTED_CONFIG_PORT_LABEL",
+        "PLANTED_CONFIG_CLIENT_ID_LABEL",
+        "PLANTED_DOMAIN_PRICES",
+        "PLANTED_SCHEDULE_POLYGON_LABEL",
+        "PLANTED_SCHEDULE_POLYGON_DESCRIPTION",
+        "PLANTED_SCHEDULE_IBKR_LABEL",
+        "PLANTED_UNKNOWN_SCHEDULE_LABEL",
+        "PLANTED_SCHEDULE_BACKFILL_LABEL",
+      ]) {
+        expect(host!.textContent).not.toContain(raw);
+      }
+      for (const id of [
+        "provider-health-scroll",
+        "sa-health-scroll",
+        "provider-config-scroll",
+        "schedule-scroll",
+      ]) {
+        expect(host!.querySelector(`[data-testid='${id}'] table`)).not.toBeNull();
+      }
+    } finally {
+      restoreFixtures();
     }
   });
 

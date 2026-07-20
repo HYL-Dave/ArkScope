@@ -41,6 +41,7 @@ describe("Data Sources common-state mapping", () => {
       not_configured: providerCommonState("not_configured"),
       missing_key: providerCommonState("missing_key"),
       disabled: providerCommonState("disabled"),
+      future_status: providerCommonState("future_status"),
     }).toEqual({
       connected: "ready",
       stale: "stale",
@@ -49,6 +50,7 @@ describe("Data Sources common-state mapping", () => {
       not_configured: "blocked",
       missing_key: "blocked",
       disabled: null,
+      future_status: null,
     });
   });
 

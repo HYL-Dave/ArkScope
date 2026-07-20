@@ -3,7 +3,7 @@
 import { createInstance } from "i18next";
 import { describe, expect, it } from "vitest";
 
-import { ApiError, type ProviderStatus, type ScheduleRunResult } from "../api";
+import { ApiError, type ScheduleRunResult } from "../api";
 import { initializeI18n } from "../i18n/resources";
 import {
   diagnosticValue,
@@ -81,20 +81,23 @@ describe("Settings backend copy boundary", () => {
   });
 
   it("maps provider health states and setup code in both locales", () => {
-    const statuses: ProviderStatus[] = [
+    const statuses = [
       "connected", "stale", "maintenance", "no_signal", "not_configured", "missing_key", "disabled",
+      "future_status",
     ];
     const cases = [
       {
         locale: "zh-Hant" as const,
-        labels: ["正常", "過期", "維護中", "無訊號", "未設定", "缺少金鑰", "已停用"],
+        labels: ["正常", "過期", "維護中", "無訊號", "未設定", "缺少金鑰", "已停用", "future_status"],
         sources: ["App", "環境變數", "config/.env", "未設定", "混合來源", "免金鑰"],
+        unknownDetail: "Polygon：future_status",
         setup: "Provider 設定需要修復。",
       },
       {
         locale: "en" as const,
-        labels: ["Connected", "Stale", "Maintenance", "No signal", "Not configured", "Missing key", "Disabled"],
+        labels: ["Connected", "Stale", "Maintenance", "No signal", "Not configured", "Missing key", "Disabled", "future_status"],
         sources: ["App", "Environment", "config/.env", "Not configured", "Mixed sources", "No key required"],
+        unknownDetail: "Polygon: future_status",
         setup: "Provider settings need repair.",
       },
     ];
@@ -104,6 +107,10 @@ describe("Settings backend copy boundary", () => {
       const copies = statuses.map((status) => providerHealthCopy("polygon", status, t));
       expect(copies.map(({ label }) => label)).toEqual(expected.labels);
       expect(copies.every(({ detail }) => detail.includes("Polygon"))).toBe(true);
+      expect(copies.at(-1)).toEqual({
+        label: "future_status",
+        detail: expected.unknownDetail,
+      });
       expect(["app", "env", "config/.env", "missing", "mixed", "not_required"]
         .map((source) => providerKeySourceLabel(source, t)))
         .toEqual(expected.sources);

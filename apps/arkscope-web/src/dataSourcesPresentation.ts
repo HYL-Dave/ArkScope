@@ -1,11 +1,10 @@
 import type {
-  ProviderStatus,
   SAExtensionHealthSegment,
   ScheduleSourceState,
 } from "./api";
 import type { CommonUiState } from "./ui";
 
-export function providerCommonState(status: ProviderStatus): CommonUiState | null {
+export function providerCommonState(status: string): CommonUiState | null {
   switch (status) {
     case "connected": return "ready";
     case "stale": return "stale";
@@ -14,6 +13,7 @@ export function providerCommonState(status: ProviderStatus): CommonUiState | nul
     case "not_configured":
     case "missing_key": return "blocked";
     case "disabled": return null;
+    default: return null;
   }
 }
 

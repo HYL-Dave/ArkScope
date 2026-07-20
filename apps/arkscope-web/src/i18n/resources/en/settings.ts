@@ -454,7 +454,7 @@ const settings = {
       app: "App",
       environment: "Environment",
       mixedSources: "Mixed sources",
-      external: "External",
+      external: "(External)",
       defaultValue: "Default",
       noKey: "No key required",
       recommendedImport: "Import recommended",
@@ -531,6 +531,8 @@ const settings = {
       config: {
         title: "Connections and Keys",
         description: "Source labels show whether each value is managed by the App, environment, or config/.env. App-stored settings take effect immediately; sensitive values are shown only in masked form.",
+        sourceValue: " ({{value}})",
+        clientIdSeparator: ", ",
         missing: "Provider configuration is incomplete.",
         setupRequired: "Provider settings need repair.",
         guardTitle: "Apply protected setting?",
@@ -563,7 +565,7 @@ const settings = {
     },
     schedule: {
       title: "Schedules (per source)",
-      autoRefreshing: "Running, auto-refreshing",
+      autoRefreshing: " (Running, auto-refreshing)",
       protection: "A data source or IBKR job runs only once at a time. If work is already in progress, a new trigger is shown as skipped and does not collect duplicate data.",
       triggerSkipped: "New trigger skipped",
       skippedPrefix: "Skipped: {{value}}",
@@ -634,7 +636,7 @@ const settings = {
       },
       progress: "Processing",
       progressAria: "{{sourceId}} progress",
-      guardTitle: "Run protection",
+      guardTitle: "Run protection: ",
     },
   },
   dataStorage: {
