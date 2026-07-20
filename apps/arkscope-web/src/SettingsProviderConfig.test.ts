@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from "node:fs";
+
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -492,6 +494,10 @@ function setInputValue(el: HTMLInputElement, value: string) {
 
 describe("Settings provider config authority", () => {
   it("renders config-file provenance with per-field import", async () => {
+    const source = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");
+    expect(source.match(/providerKeySourceLabel\(f\.effective_source, t\)/g)).toHaveLength(4);
+    expect(source).not.toContain("$.dataSources.providers.health.notConfigured");
+
     await renderDataSources();
     expect(host!.textContent).toContain("來源標示會說明每個值");
     expect(host!.textContent).not.toContain("strict DB-first");
@@ -790,18 +796,28 @@ describe("Settings provider config authority", () => {
   });
 
   it("renders FRED as configured local snapshot with refresh off", async () => {
-    await renderDataSources();
-    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("FRED"));
-    if (!row) throw new Error("missing FRED provider row");
-    expect(row.textContent).toContain("正常");
-    expect(row.textContent).toContain("App");
-    expect(row.textContent).toContain("資料快照");
-    expect(row.textContent).toContain("自動刷新未啟用");
-    expect(row.textContent).not.toContain("未啟用抓取");
-    expect(row.textContent).not.toContain("已停用");
-    expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
-    expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+    const snapshot = health.providers.find((provider) => provider.id === "fred")
+      ?.signals.local_snapshot as { series_count: number | null } | undefined;
+    if (!snapshot) throw new Error("missing FRED snapshot fixture");
+    const originalSeriesCount = snapshot.series_count;
+    snapshot.series_count = null;
+    try {
+      await renderDataSources();
+      const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+        node.textContent?.includes("FRED"));
+      if (!row) throw new Error("missing FRED provider row");
+      expect(row.textContent).toContain("正常");
+      expect(row.textContent).toContain("App");
+      expect(row.textContent).toContain("資料快照可用：— 序列 · 29,571 觀測值");
+      expect(row.textContent).not.toContain("資料快照可用：0 序列");
+      expect(row.textContent).toContain("自動刷新未啟用");
+      expect(row.textContent).not.toContain("未啟用抓取");
+      expect(row.textContent).not.toContain("已停用");
+      expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
+      expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+    } finally {
+      snapshot.series_count = originalSeriesCount;
+    }
   });
 
   it("does_not_request_or_render_the_detailed_fred_snapshot", async () => {

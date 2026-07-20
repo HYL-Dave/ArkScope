@@ -104,7 +104,8 @@ function fredProviderDetail(p: ProviderHealth, t: SettingsT): string | null {
   if (snap?.available) {
     parts.push(
       t(($) => $.dataSources.fred.snapshotAvailable, {
-        count: snap.series_count ?? 0,
+        // i18next reserves `count` as numeric even for this non-plural display key.
+        count: formatCount(snap.series_count) as unknown as number,
         value: formatCount(snap.observation_count),
       }),
     );
@@ -477,7 +478,7 @@ export function DataSourcesSection({
         <div className="provider-config-field-current">
           {f.effective_source === "missing"
             ? <span className="ds-chip ds-missing_key">
-                {t(($) => $.dataSources.providers.health.notConfigured)}
+                {providerKeySourceLabel(f.effective_source, t)}
               </span>
             : <>
                 <span className="mono">
@@ -873,7 +874,7 @@ export function DataSourcesSection({
                         {f
                           ? f.effective_source === "missing"
                             ? <span className="ds-chip ds-missing_key">
-                                {t(($) => $.dataSources.providers.health.notConfigured)}
+                                {providerKeySourceLabel(f.effective_source, t)}
                               </span>
                             : <>
                                 <span className="mono">
