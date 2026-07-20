@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { StatusState } from "../Dashboard";
 import type { NavigationTarget } from "./navigation";
@@ -33,8 +34,9 @@ export function ShellTopBar({
   onNavigate,
   menuControl,
 }: ShellTopBarProps) {
+  const { t } = useTranslation("shell");
   const health = status.kind === "ready"
-    ? <span>Sidecar 已連線</span>
+    ? <span>{t(($) => $.topbar.sidecar.ready)}</span>
     : status.kind === "error"
       ? (
         <button
@@ -42,10 +44,10 @@ export function ShellTopBar({
           className="shell-health-action"
           onClick={() => onNavigate({ kind: "view", view: "System" })}
         >
-          Sidecar 無法連線
+          {t(($) => $.topbar.sidecar.error)}
         </button>
       )
-      : <span>正在連線</span>;
+      : <span>{t(($) => $.topbar.sidecar.loading)}</span>;
 
   return (
     <header className="shell-topbar" data-developer-mode={String(developerMode)}>
@@ -63,13 +65,21 @@ export function ShellTopBar({
         <div
           className="shell-topbar-diagnostics"
           data-testid="shell-diagnostics"
-          aria-label="Developer diagnostics"
+          aria-label={t(($) => $.topbar.developerDiagnostics)}
         >
-          <span>Developer diagnostics</span>
-          <span>API {diagnosticValue(diagnostics.apiBase)}</span>
-          <span>Tools {diagnosticValue(diagnostics.toolsRegistered)}</span>
-          <span>Last status {diagnosticValue(diagnostics.lastStatusAt)}</span>
-          <span>Card model {diagnosticValue(diagnostics.cardModel)}</span>
+          <span>{t(($) => $.topbar.developerDiagnostics)}</span>
+          <span>{t(($) => $.topbar.diagnostics.apiValue, {
+            value: diagnosticValue(diagnostics.apiBase),
+          })}</span>
+          <span>{t(($) => $.topbar.diagnostics.toolsValue, {
+            value: diagnosticValue(diagnostics.toolsRegistered),
+          })}</span>
+          <span>{t(($) => $.topbar.diagnostics.lastStatusValue, {
+            value: diagnosticValue(diagnostics.lastStatusAt),
+          })}</span>
+          <span>{t(($) => $.topbar.diagnostics.cardModelValue, {
+            value: diagnosticValue(diagnostics.cardModel),
+          })}</span>
         </div>
       ) : null}
     </header>

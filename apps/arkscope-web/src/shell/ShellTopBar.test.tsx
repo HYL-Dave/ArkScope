@@ -2,6 +2,7 @@
 import React, { type ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiStatus } from "../api";
@@ -198,5 +199,23 @@ describe("ShellTopBar", () => {
     expect(host.querySelector("[data-testid='shell-identity']")).toBe(identity);
     expect(host.querySelector("[data-testid='shell-context']")).toBe(context);
     expect(host.querySelector("[data-testid='shell-health']")).toBe(health);
+  });
+
+  it("renders English health and developer diagnostic labels without exposing raw errors", async () => {
+    await act(async () => { await i18n.changeLanguage("en"); });
+    const { host } = await renderTopBar({
+      status: { kind: "error", message: "recognizable private sidecar exception" },
+      developerMode: true,
+    });
+    const diagnostics = host.querySelector("[data-testid='shell-diagnostics']");
+
+    expect(host.querySelector("[data-testid='shell-health']")?.textContent)
+      .toContain("Sidecar unavailable");
+    expect(diagnostics?.getAttribute("aria-label")).toBe("Developer diagnostics");
+    expect(diagnostics?.textContent).toContain(`API ${DIAGNOSTICS.apiBase}`);
+    expect(diagnostics?.textContent).toContain("Tools 19");
+    expect(diagnostics?.textContent).toContain(`Last status ${DIAGNOSTICS.lastStatusAt}`);
+    expect(diagnostics?.textContent).toContain(`Card model ${DIAGNOSTICS.cardModel}`);
+    expect(host.textContent).not.toContain("recognizable private sidecar exception");
   });
 });
