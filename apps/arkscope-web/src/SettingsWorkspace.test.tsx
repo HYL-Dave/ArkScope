@@ -320,11 +320,11 @@ describe("Settings workspace", () => {
     );
     await click(transferActions[0]!);
     expect.soft(host!.textContent).toContain(
-      "Imported 2 task routes from the profile file into the profile DB; skipped 1 incomplete or inconsistent route.",
+      "Imported task routes from the profile file into the profile DB. Imported: 2; skipped as incomplete or inconsistent: 1.",
     );
     await click(transferActions[1]!);
     expect.soft(host!.textContent).toContain(
-      "Exported 2 DB task routes to the profile file; cleared 1 stale profile-file route without DB authority.",
+      "Exported DB task routes to the profile file. Exported: 2; cleared as stale without DB authority: 1.",
     );
     await click(buttonWithText("重設卡片生成路由", models));
     expect.soft(host!.textContent).toContain(
@@ -344,7 +344,7 @@ describe("Settings workspace", () => {
     await click(transfer.querySelector("button")!);
     const routeResult = host!.querySelector(".ok-text")!;
     expect.soft(routeResult.textContent).toBe(
-      "已從設定檔匯入 2 筆任務路由到 profile DB；略過 1 筆不完整或不一致的路由。",
+      "已從設定檔匯入任務路由到 profile DB。匯入：2；因不完整或不一致而略過：1。",
     );
     await click(tabWithText("個人化"));
     const search = await setSearch("risk appetite");
@@ -376,7 +376,7 @@ describe("Settings workspace", () => {
     expect(host!.querySelector("h1")?.textContent).toBe("Settings");
     expect(host!.querySelector(".ok-text")).toBe(routeResult);
     expect(routeResult.textContent).toBe(
-      "Imported 2 task routes from the profile file into the profile DB; skipped 1 incomplete or inconsistent route.",
+      "Imported task routes from the profile file into the profile DB. Imported: 2; skipped as incomplete or inconsistent: 1.",
     );
     expect(mocks.getModelCatalog).toHaveBeenCalledTimes(catalogCalls);
   });

@@ -58,11 +58,11 @@ const settings = {
     routes: {
       saved: "Task routes saved to the profile DB (the profile file remains the fallback and import/export mirror).",
       saveFailed: "Could not save task routes.",
-      imported: "Imported {{imported}} task routes from the profile file into the profile DB; skipped {{skipped}} incomplete or inconsistent route.",
+      imported: "Imported task routes from the profile file into the profile DB. Imported: {{count}}; skipped as incomplete or inconsistent: {{value}}.",
       importFailed: "Could not import task routes from the profile file into the profile DB.",
-      exported: "Exported {{exported}} DB task routes to the profile file; cleared {{cleared}} stale profile-file route without DB authority.",
+      exported: "Exported DB task routes to the profile file. Exported: {{count}}; cleared as stale without DB authority: {{value}}.",
       exportFailed: "Could not export DB task routes to the profile file.",
-      reset: "{{task}} was reset to the profile file or built-in fallback.",
+      reset: "{{taskLabel}} was reset to the profile file or built-in fallback.",
     },
   },
   registry: {

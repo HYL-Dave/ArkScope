@@ -57,11 +57,11 @@ const settings = {
     routes: {
       saved: "模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。",
       saveFailed: "無法儲存任務路由。",
-      imported: "已從設定檔匯入 {{imported}} 筆任務路由到 profile DB；略過 {{skipped}} 筆不完整或不一致的路由。",
+      imported: "已從設定檔匯入任務路由到 profile DB。匯入：{{count}}；因不完整或不一致而略過：{{value}}。",
       importFailed: "無法從設定檔匯入任務路由到 profile DB。",
-      exported: "已將 {{exported}} 筆 DB 任務路由匯出到設定檔；清除 {{cleared}} 個無 DB 權威的舊路由。",
+      exported: "已將 DB 任務路由匯出到設定檔。匯出：{{count}}；因無 DB 權威而清除舊路由：{{value}}。",
       exportFailed: "無法將 DB 任務路由匯出到設定檔。",
-      reset: "{{task}} 已重設為設定檔／內建預設。",
+      reset: "{{taskLabel}} 已重設為設定檔／內建預設。",
     },
   },
   registry: {

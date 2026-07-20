@@ -137,8 +137,8 @@ function settingsRouteOutcomePresentation(
       return {
         tone: "ok",
         message: t(($) => $.workspace.routes.imported, {
-          imported: outcome.imported,
-          skipped: outcome.skipped,
+          count: outcome.imported,
+          value: outcome.skipped,
         }),
       };
     case "import_failed":
@@ -147,8 +147,8 @@ function settingsRouteOutcomePresentation(
       return {
         tone: "ok",
         message: t(($) => $.workspace.routes.exported, {
-          exported: outcome.exported,
-          cleared: outcome.cleared,
+          count: outcome.exported,
+          value: outcome.cleared,
         }),
       };
     case "export_failed":
@@ -157,7 +157,7 @@ function settingsRouteOutcomePresentation(
       return {
         tone: "ok",
         message: t(($) => $.workspace.routes.reset, {
-          task: settingsTaskLabel(outcome.task, t),
+          taskLabel: settingsTaskLabel(outcome.task, t),
         }),
       };
     case "reset_failed":
