@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   deleteModelRoute: vi.fn(),
   dataMounts: 0,
   dataUnmounts: 0,
+  investorDeveloperModes: [] as boolean[],
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -45,10 +46,13 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 vi.mock("./InvestorProfilePanel", async () => {
-  const { useState } = await import("react");
+  const { useEffect, useState } = await import("react");
   return {
-    InvestorProfilePanel: () => {
+    InvestorProfilePanel: ({ developerMode }: { developerMode?: boolean }) => {
       const [busy, setBusy] = useState(false);
+      useEffect(() => {
+        mocks.investorDeveloperModes.push(Boolean(developerMode));
+      }, [developerMode]);
       return (
         <div className="investor-profile-panel" aria-busy={busy}>
           <label>
@@ -277,6 +281,7 @@ beforeEach(() => {
   mocks.deleteModelRoute.mockResolvedValue(undefined);
   mocks.dataMounts = 0;
   mocks.dataUnmounts = 0;
+  mocks.investorDeveloperModes.length = 0;
   window.localStorage.clear();
   scrollIntoView.mockReset();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -442,6 +447,11 @@ describe("Settings workspace", () => {
     await flush();
     expect(host!.textContent).toContain("Could not load AI model settings. Refresh the page, or check the connection under System / Health.");
     expect(host!.textContent).not.toContain("PLANTED_SETTINGS_RAW_DIAGNOSTIC");
+
+    dispose();
+    await renderSettings({ developerMode: true });
+    await click(tabWithText("Personalization"));
+    expect(mocks.investorDeveloperModes).toEqual([true]);
   });
 
   it("renders_page_header_tabs_and_only_default_group_anchors", async () => {

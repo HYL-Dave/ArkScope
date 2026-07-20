@@ -2,7 +2,8 @@
 // Read → edit → 產生設定草稿 (POST /draft, no write) → 儲存設定 (PUT, gated).
 // Copy rule: research personalization aid — never financial advice/suitability.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   approveCalibrationProposal,
@@ -19,17 +20,25 @@ import {
   type InvestorProfileResponse,
   type InvestorPreset,
 } from "./api";
-import { mismatchLabel, stanceLabel } from "./personalizationDisplay";
+import { DeveloperDiagnostics } from "./settings/DeveloperDiagnostics";
+import { settingsErrorPresentation } from "./settings/settingsBackendCopy";
+import {
+  settingsInvestorHorizonLabel,
+  settingsInvestorPresetLabel,
+  settingsMismatchLabel,
+  settingsStanceLabel,
+  type SettingsT,
+} from "./settings/settingsCopy";
 import { Button, InlineAlert, StatusBadge } from "./ui";
 
-const PRESETS: Array<{ value: InvestorPreset; label: string }> = [
-  { value: "growth", label: "成長投資人（預設）" },
-  { value: "value", label: "價值" },
-  { value: "momentum", label: "動能" },
-  { value: "income", label: "收益" },
-  { value: "event_driven", label: "事件驅動" },
-  { value: "balanced", label: "均衡" },
-  { value: "custom", label: "自訂" },
+const PRESETS: InvestorPreset[] = [
+  "growth",
+  "value",
+  "momentum",
+  "income",
+  "event_driven",
+  "balanced",
+  "custom",
 ];
 
 const STANCES: AssistantStance[] = [
@@ -41,13 +50,7 @@ const STANCES: AssistantStance[] = [
   "growth_opportunity",
 ];
 
-const HORIZONS: Array<{ value: string; label: string }> = [
-  { value: "intraday", label: "當沖" },
-  { value: "days_weeks", label: "數天〜數週" },
-  { value: "months", label: "數月" },
-  { value: "multi_year", label: "多年" },
-  { value: "mixed", label: "混合" },
-];
+const HORIZONS = ["intraday", "days_weeks", "months", "multi_year", "mixed"];
 
 const EDGES = ["growth", "valuation", "catalyst", "quality", "momentum", "macro", "options", "sentiment"];
 const FLAGS = [
@@ -64,14 +67,60 @@ const FLAGS = [
 
 const SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-export function InvestorProfilePanel() {
+type InvestorOutcome =
+  | "calibration_started"
+  | "calibration_updated"
+  | "proposal_applied"
+  | "proposal_rejected"
+  | "draft_generated"
+  | "saved";
+
+type CalibrationRunResult = "current" | "stale" | "not_started";
+
+function investorOutcomeLabel(outcome: InvestorOutcome, t: SettingsT): string {
+  switch (outcome) {
+    case "calibration_started":
+      return t(($) => $.investor.calibration.started);
+    case "calibration_updated":
+      return t(($) => $.investor.calibration.updated);
+    case "proposal_applied":
+      return t(($) => $.investor.proposal.applied);
+    case "proposal_rejected":
+      return t(($) => $.investor.proposal.rejected);
+    case "draft_generated":
+      return t(($) => $.investor.draft.success);
+    case "saved":
+      return t(($) => $.investor.saveSuccess);
+  }
+}
+
+export function InvestorProfilePanel({ developerMode = false }: { developerMode?: boolean }) {
+  const { t } = useTranslation("settings");
   const [resp, setResp] = useState<InvestorProfileResponse | null>(null);
   const [form, setForm] = useState<InvestorProfile | null>(null);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [err, setErr] = useState<Error | null>(null);
+  const [outcome, setOutcome] = useState<InvestorOutcome | null>(null);
   const [calibration, setCalibration] = useState<CalibrationState | null>(null);
   const [calibrationText, setCalibrationText] = useState("");
+  const calibrationGenerationRef = useRef(0);
+
+  const applyCalibrationState = (
+    state: CalibrationState,
+    generation: number,
+    expectedProfile?: InvestorProfile,
+  ) => {
+    if (calibrationGenerationRef.current !== generation) return false;
+    setCalibration(state);
+    const proposal = state.latest_proposal;
+    if (proposal?.status === "draft") {
+      setForm((cur) => {
+        if (!cur || (expectedProfile && cur !== expectedProfile)) return cur;
+        return { ...cur, ...proposal.profile_patch };
+      });
+    }
+    return true;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -81,45 +130,43 @@ export function InvestorProfilePanel() {
           setResp(r);
           setForm(r.profile);
         }
+        const generation = calibrationGenerationRef.current;
         try {
           const c = await getCalibrationState();
-          if (!cancelled) applyCalibrationState(c);
+          if (!cancelled) applyCalibrationState(c, generation, r.profile);
         } catch {
           // Calibration is advisory. A temporary route failure must not block
           // the base Investor Profile form.
         }
       })
       .catch((e) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setErr(e instanceof Error ? e : new Error(String(e)));
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const errorPresentation = err ? settingsErrorPresentation(err, t) : null;
+
   if (!form) {
     return (
       <div className="investor-profile-panel">
-        <h3>投資人設定</h3>
-        {err ? (
-          <InlineAlert state="failed" title="投資人設定失敗">{err}</InlineAlert>
+        <h3>{t(($) => $.registry.sections.investorProfile.title)}</h3>
+        {errorPresentation ? (
+          <InlineAlert state="failed" title={errorPresentation.message} />
         ) : (
-          <StatusBadge state="loading" label="載入投資人設定" />
+          <StatusBadge state="loading" label={t(($) => $.investor.panel.loading)} />
         )}
+        {developerMode ? (
+          <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
+        ) : null}
       </div>
     );
   }
 
   const set = <K extends keyof InvestorProfile>(key: K, value: InvestorProfile[K]) =>
     setForm({ ...form, [key]: value });
-
-  const applyCalibrationState = (state: CalibrationState) => {
-    setCalibration(state);
-    const proposal = state.latest_proposal;
-    if (proposal?.status === "draft") {
-      setForm((cur) => (cur ? { ...cur, ...proposal.profile_patch } : cur));
-    }
-  };
 
   const toggleIn = (key: "preferred_edge" | "behavioral_flags", item: string) => {
     const cur = form[key];
@@ -141,68 +188,87 @@ export function InvestorProfilePanel() {
     default_stance: form.default_stance,
   });
 
-  const run = async (fn: () => Promise<InvestorProfileResponse>, doneNote: string) => {
+  const run = async (
+    fn: () => Promise<InvestorProfileResponse>,
+    completedOutcome: InvestorOutcome,
+  ) => {
     if (busy) return;
     setBusy(true);
     setErr(null);
-    setNotice(null);
+    setOutcome(null);
     try {
       const r = await fn();
       setResp(r);
       setForm(r.profile);
-      setNotice(doneNote);
+      setOutcome(completedOutcome);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(e instanceof Error ? e : new Error(String(e)));
     } finally {
       setBusy(false);
     }
   };
 
-  const runCalibration = async (fn: () => Promise<CalibrationState>, doneNote: string) => {
-    if (busy) return;
+  const runCalibration = async (
+    fn: () => Promise<CalibrationState>,
+    completedOutcome: InvestorOutcome,
+  ): Promise<CalibrationRunResult> => {
+    if (busy) return "not_started";
+    const generation = ++calibrationGenerationRef.current;
     setBusy(true);
     setErr(null);
-    setNotice(null);
+    setOutcome(null);
     try {
       const r = await fn();
-      applyCalibrationState(r);
-      setNotice(doneNote);
+      if (!applyCalibrationState(r, generation)) return "stale";
+      setOutcome(completedOutcome);
+      return "current";
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      if (calibrationGenerationRef.current === generation) {
+        setErr(e instanceof Error ? e : new Error(String(e)));
+        return "current";
+      }
+      return "stale";
     } finally {
-      setBusy(false);
+      if (calibrationGenerationRef.current === generation) setBusy(false);
     }
   };
 
   const sendCalibration = async () => {
     const text = calibrationText.trim();
     if (!text) return;
-    await runCalibration(
+    const result = await runCalibration(
       () => sendCalibrationMessage({ session_id: calibration?.active_session?.id, content: text }),
-      "校準回覆已更新",
+      "calibration_updated",
     );
-    setCalibrationText("");
+    if (result === "current") setCalibrationText("");
   };
 
   const approveProposal = async () => {
     const proposal = calibration?.latest_proposal;
     if (!proposal || proposal.status !== "draft") return;
     if (busy) return;
+    const generation = ++calibrationGenerationRef.current;
     setBusy(true);
     setErr(null);
-    setNotice(null);
+    setOutcome(null);
     try {
       await approveCalibrationProposal(proposal.id, payload());
       const profileResp = await getInvestorProfile();
-      setResp(profileResp);
-      setForm(profileResp.profile);
+      if (calibrationGenerationRef.current === generation) {
+        setResp(profileResp);
+        setForm(profileResp.profile);
+      }
       const refreshed = await getCalibrationState();
-      applyCalibrationState(refreshed);
-      setNotice("校準提案已套用");
+      if (calibrationGenerationRef.current === generation) {
+        applyCalibrationState(refreshed, generation);
+        setOutcome("proposal_applied");
+      }
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      if (calibrationGenerationRef.current === generation) {
+        setErr(e instanceof Error ? e : new Error(String(e)));
+      }
     } finally {
-      setBusy(false);
+      if (calibrationGenerationRef.current === generation) setBusy(false);
     }
   };
 
@@ -212,22 +278,20 @@ export function InvestorProfilePanel() {
     await runCalibration(async () => {
       await rejectCalibrationProposal(proposal.id);
       return getCalibrationState();
-    }, "校準提案已拒絕");
+    }, "proposal_rejected");
   };
 
   const mismatch = resp?.profile.risk_mismatch ?? form.risk_mismatch;
   const messages = calibration?.messages ?? [];
   const latestProposal = calibration?.latest_proposal?.status === "draft" ? calibration.latest_proposal : null;
   const rationaleEntries = Object.entries(latestProposal?.rationales ?? {});
+  const outcomeLabel = outcome ? investorOutcomeLabel(outcome, t) : null;
 
   return (
     <div className="investor-profile-panel" aria-busy={busy}>
-      <h3>投資人設定</h3>
-      <p className="muted">
-        研究個人化輔助（非投資建議、非適足性評估）。啟用後,助手依你的風險輪廓與所選立場調整
-        分析重點;證據蒐集與反方論點完全不受影響。
-      </p>
-      {busy ? <StatusBadge state="running" label="正在更新投資人設定" /> : null}
+      <h3>{t(($) => $.registry.sections.investorProfile.title)}</h3>
+      <p className="muted">{t(($) => $.investor.panel.description)}</p>
+      {busy ? <StatusBadge state="running" label={t(($) => $.investor.panel.updating)} /> : null}
 
       <label className="ip-toggle">
         <input
@@ -235,33 +299,35 @@ export function InvestorProfilePanel() {
           checked={form.enabled}
           onChange={(e) => set("enabled", e.target.checked)}
         />{" "}
-        啟用個人化(目前生效立場:{stanceLabel(resp?.effective_stance ?? "off")})
+        {t(($) => $.investor.fields.enabledWithStance, {
+          value: settingsStanceLabel(resp?.effective_stance ?? "off", t),
+        })}
       </label>
 
       <div className="ip-grid">
         <label>
-          投資風格
+          {t(($) => $.investor.fields.preset)}
           <select
             value={form.primary_preset}
             onChange={(e) => set("primary_preset", e.target.value as InvestorPreset)}
           >
             {PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
+              <option key={p} value={p}>
+                {settingsInvestorPresetLabel(p, t)}
               </option>
             ))}
           </select>
         </label>
 
         <label>
-          風險意願(1-10)
+          {t(($) => $.investor.fields.riskAppetite)}
           <select
             value={form.risk_appetite ?? ""}
             onChange={(e) =>
               set("risk_appetite", e.target.value === "" ? null : Number(e.target.value))
             }
           >
-            <option value="">未設定</option>
+            <option value="">{t(($) => $.investor.fields.unset)}</option>
             {SCORES.map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -271,14 +337,14 @@ export function InvestorProfilePanel() {
         </label>
 
         <label>
-          風險承受能力(1-10)
+          {t(($) => $.investor.fields.riskCapacity)}
           <select
             value={form.risk_capacity ?? ""}
             onChange={(e) =>
               set("risk_capacity", e.target.value === "" ? null : Number(e.target.value))
             }
           >
-            <option value="">未設定</option>
+            <option value="">{t(($) => $.investor.fields.unset)}</option>
             {SCORES.map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -288,21 +354,21 @@ export function InvestorProfilePanel() {
         </label>
 
         <label>
-          持有週期
+          {t(($) => $.investor.fields.horizon)}
           <select
             value={form.holding_horizon}
             onChange={(e) => set("holding_horizon", e.target.value)}
           >
             {HORIZONS.map((h) => (
-              <option key={h.value} value={h.value}>
-                {h.label}
+              <option key={h} value={h}>
+                {settingsInvestorHorizonLabel(h, t)}
               </option>
             ))}
           </select>
         </label>
 
         <label>
-          可承受回撤 %
+          {t(($) => $.investor.fields.drawdown)}
           <input
             type="number"
             min={1}
@@ -318,7 +384,7 @@ export function InvestorProfilePanel() {
         </label>
 
         <label>
-          單一部位上限 %
+          {t(($) => $.investor.fields.concentration)}
           <input
             type="number"
             min={1}
@@ -334,14 +400,14 @@ export function InvestorProfilePanel() {
         </label>
 
         <label>
-          預設助手立場
+          {t(($) => $.investor.fields.stance)}
           <select
             value={form.default_stance}
             onChange={(e) => set("default_stance", e.target.value as AssistantStance)}
           >
             {STANCES.map((s) => (
               <option key={s} value={s}>
-                {stanceLabel(s)}
+                {settingsStanceLabel(s, t)}
               </option>
             ))}
           </select>
@@ -349,7 +415,7 @@ export function InvestorProfilePanel() {
       </div>
 
       <fieldset>
-        <legend>偏好優勢</legend>
+        <legend>{t(($) => $.investor.fields.edges)}</legend>
         {EDGES.map((edge) => (
           <label key={edge} className="ip-chip">
             <input
@@ -363,7 +429,7 @@ export function InvestorProfilePanel() {
       </fieldset>
 
       <fieldset>
-        <legend>行為傾向(供助手校準,非診斷)</legend>
+        <legend>{t(($) => $.investor.fields.flags)}</legend>
         {FLAGS.map((flag) => (
           <label key={flag} className="ip-chip">
             <input
@@ -377,7 +443,7 @@ export function InvestorProfilePanel() {
       </fieldset>
 
       <label>
-        想避開的(逗號分隔)
+        {t(($) => $.investor.fields.avoidances)}
         <input
           type="text"
           value={form.avoidances.join(", ")}
@@ -394,7 +460,7 @@ export function InvestorProfilePanel() {
       </label>
 
       <label>
-        自由描述(目標、自我觀察、想被怎麼協助)
+        {t(($) => $.investor.fields.notes)}
         <textarea
           value={form.freeform_notes}
           onChange={(e) => set("freeform_notes", e.target.value)}
@@ -402,44 +468,48 @@ export function InvestorProfilePanel() {
       </label>
 
       <section className="ip-calibration">
-        <h4>校準對話</h4>
-        <p className="muted">
-          校準對話只用來整理投資人輪廓,不是投資建議或個股推薦。只有你核准的結構化設定會影響研究;原始對話不會進入研究 prompt。
-        </p>
+        <h4>{t(($) => $.investor.calibration.title)}</h4>
+        <p className="muted">{t(($) => $.investor.calibration.description)}</p>
         <div className="ip-actions">
           <Button
             disabled={busy || Boolean(calibration?.active_session)}
-            onClick={() => void runCalibration(() => startCalibrationSession(false), "校準對話已開始")}
+            onClick={() => void runCalibration(
+              () => startCalibrationSession(false),
+              "calibration_started",
+            )}
           >
-            開始校準對話
+            {t(($) => $.investor.calibration.start)}
           </Button>
         </div>
         {messages.length ? (
           <div className="ip-calibration-log">
             {messages.map((m) => (
               <div key={m.id} className="muted">
-                {m.role === "user" ? "你" : "助手"}:{m.content}
+                {m.role === "user"
+                  ? t(($) => $.investor.calibration.user)
+                  : t(($) => $.investor.calibration.assistant)}:{m.content}
               </div>
             ))}
           </div>
         ) : null}
         <label>
-          校準訊息
+          {t(($) => $.investor.calibration.messageLabel)}
           <textarea
-            aria-label="校準訊息"
+            aria-label={t(($) => $.investor.calibration.messageLabel)}
             value={calibrationText}
             onChange={(e) => setCalibrationText(e.target.value)}
           />
         </label>
         <div className="ip-actions">
           <Button disabled={busy || !calibration?.active_session || !calibrationText.trim()} onClick={() => void sendCalibration()}>
-            送出校準訊息
+            {t(($) => $.investor.calibration.send)}
           </Button>
         </div>
         {latestProposal ? (
           <div className="ip-guardrail">
             <strong>
-              校準提案 <StatusBadge state="partial" label="待核准校準提案" />
+              {t(($) => $.investor.proposal.title)}{" "}
+              <StatusBadge state="partial" label={t(($) => $.investor.proposal.pending)} />
             </strong>
             {rationaleEntries.length ? (
               <ul>
@@ -452,10 +522,10 @@ export function InvestorProfilePanel() {
             ) : null}
             <div className="ip-actions">
               <Button disabled={busy} onClick={() => void approveProposal()}>
-                套用校準提案
+                {t(($) => $.investor.proposal.apply)}
               </Button>
               <Button disabled={busy} onClick={() => void rejectProposal()}>
-                拒絕提案
+                {t(($) => $.investor.proposal.reject)}
               </Button>
             </div>
           </div>
@@ -463,24 +533,35 @@ export function InvestorProfilePanel() {
       </section>
 
       <div className="ip-guardrail">
-        風險意願與風險承受能力:
+        {t(($) => $.investor.fields.riskComparison)}
         <StatusBadge
           state={mismatch === "none" ? "ready" : "partial"}
-          label={mismatchLabel(mismatch)}
+          label={settingsMismatchLabel(mismatch, t)}
         />
       </div>
-      <div className="muted">技能模式:off(技能建議屬後續階段,尚未啟用)</div>
+      <div className="muted">{t(($) => $.investor.fields.skillMode)}</div>
 
       <div className="ip-actions">
-        <Button disabled={busy} onClick={() => void run(() => draftInvestorProfile(payload()), "草稿已產生(未儲存)")}>
-          產生設定草稿
+        <Button disabled={busy} onClick={() => void run(
+          () => draftInvestorProfile(payload()),
+          "draft_generated",
+        )}>
+          {t(($) => $.investor.draft.action)}
         </Button>
-        <Button disabled={busy} onClick={() => void run(() => saveInvestorProfile(payload()), "已儲存")}>
-          儲存設定
+        <Button disabled={busy} onClick={() => void run(
+          () => saveInvestorProfile(payload()),
+          "saved",
+        )}>
+          {t(($) => $.investor.saveAction)}
         </Button>
       </div>
-      {notice ? <InlineAlert state="ready" title={notice} /> : null}
-      {err ? <InlineAlert state="failed" title="投資人設定失敗">{err}</InlineAlert> : null}
+      {outcomeLabel ? <InlineAlert state="ready" title={outcomeLabel} /> : null}
+      {errorPresentation ? (
+        <InlineAlert state="failed" title={errorPresentation.message} />
+      ) : null}
+      {developerMode ? (
+        <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
+      ) : null}
     </div>
   );
 }

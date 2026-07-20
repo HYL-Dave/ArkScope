@@ -149,6 +149,23 @@ describe("bundled i18n resources", () => {
         news: "新聞資料",
         macro: "總經資料",
         investor: "風險意願高於承受能力",
+        investorEnabledWithStance: "啟用個人化(目前生效立場:{{value}})",
+        investorRiskCapacity: "風險承受能力(1-10)",
+        investorAvoidances: "想避開的(逗號分隔)",
+        investorFlags: "行為傾向(供助手校準,非診斷)",
+        investorNotes: "自由描述(目標、自我觀察、想被怎麼協助)",
+        investorDraftSuccess: "草稿已產生(未儲存)",
+        investorPanel: "研究個人化輔助（非投資建議、非適足性評估）。啟用後,助手依你的風險輪廓與所選立場調整分析重點;證據蒐集與反方論點完全不受影響。",
+        investorUpdating: "正在更新投資人設定",
+        investorUnset: "未設定",
+        investorRiskComparison: "風險意願與風險承受能力:",
+        investorSkillMode: "技能模式:off(技能建議屬後續階段,尚未啟用)",
+        calibrationDescription: "校準對話只用來整理投資人輪廓,不是投資建議或個股推薦。只有你核准的結構化設定會影響研究;原始對話不會進入研究 prompt。",
+        calibrationStarted: "校準對話已開始",
+        calibrationUpdated: "校準回覆已更新",
+        proposalPending: "待核准校準提案",
+        proposalApply: "套用校準提案",
+        investorSaveAction: "儲存設定",
         backlog: "內文佇列：待處理",
         earliest: "最早 2026-07-21T03:04:05Z",
         catalogFailure: "無法載入 AI 模型設定。請重新整理，或到 System / Health 檢查連線。",
@@ -177,6 +194,23 @@ describe("bundled i18n resources", () => {
         news: "News Data",
         macro: "Macro Data",
         investor: "Risk appetite above capacity",
+        investorEnabledWithStance: "Enable personalization (current effective stance: {{value}})",
+        investorRiskCapacity: "Risk capacity (1-10)",
+        investorAvoidances: "Avoidances (comma-separated)",
+        investorFlags: "Behavioral tendencies (for calibration, not diagnosis)",
+        investorNotes: "Free-form notes (goals, observations, and preferred assistance)",
+        investorDraftSuccess: "Draft generated (not saved)",
+        investorPanel: "Research personalization aid, not investment advice or a suitability assessment. When enabled, the assistant adjusts its analytical focus based on your risk profile and selected stance; evidence gathering and counterarguments remain completely unaffected.",
+        investorUpdating: "Updating Investor Profile",
+        investorUnset: "Not set",
+        investorRiskComparison: "Risk appetite and risk capacity:",
+        investorSkillMode: "Skill mode: off (skill recommendations are a later phase and are not yet enabled)",
+        calibrationDescription: "Calibration conversations only organize your investor profile; they are not investment advice or individual-stock recommendations. Only structured settings you approve affect research; raw conversation transcripts are not included in research prompts.",
+        calibrationStarted: "Calibration conversation started",
+        calibrationUpdated: "Calibration response updated",
+        proposalPending: "Calibration proposal awaiting approval",
+        proposalApply: "Apply calibration proposal",
+        investorSaveAction: "Save settings",
         backlog: "Body queue: Pending",
         earliest: "Earliest retry: 2026-07-21T03:04:05Z",
         catalogFailure: "Could not load AI model settings. Refresh the page, or check the connection under System / Health.",
@@ -209,6 +243,24 @@ describe("bundled i18n resources", () => {
       expect(t(($) => $.newsStorage.title)).toBe(expected.news);
       expect(t(($) => $.macroStorage.title)).toBe(expected.macro);
       expect(t(($) => $.investor.mismatch.appetiteAboveCapacity)).toBe(expected.investor);
+      const investor = resources[expected.locale].settings.investor;
+      expect.soft(investor.fields.enabledWithStance).toBe(expected.investorEnabledWithStance);
+      expect.soft(investor.fields.riskCapacity).toBe(expected.investorRiskCapacity);
+      expect.soft(investor.fields.avoidances).toBe(expected.investorAvoidances);
+      expect.soft(investor.fields.flags).toBe(expected.investorFlags);
+      expect.soft(investor.fields.notes).toBe(expected.investorNotes);
+      expect.soft(investor.draft.success).toBe(expected.investorDraftSuccess);
+      expect(t(($) => $.investor.panel.description)).toBe(expected.investorPanel);
+      expect(t(($) => $.investor.panel.updating)).toBe(expected.investorUpdating);
+      expect(t(($) => $.investor.fields.unset)).toBe(expected.investorUnset);
+      expect(t(($) => $.investor.fields.riskComparison)).toBe(expected.investorRiskComparison);
+      expect(t(($) => $.investor.fields.skillMode)).toBe(expected.investorSkillMode);
+      expect(t(($) => $.investor.calibration.description)).toBe(expected.calibrationDescription);
+      expect(t(($) => $.investor.calibration.started)).toBe(expected.calibrationStarted);
+      expect(t(($) => $.investor.calibration.updated)).toBe(expected.calibrationUpdated);
+      expect(t(($) => $.investor.proposal.pending)).toBe(expected.proposalPending);
+      expect(t(($) => $.investor.proposal.apply)).toBe(expected.proposalApply);
+      expect(t(($) => $.investor.saveAction)).toBe(expected.investorSaveAction);
       expect(t(($) => $.dataSources.schedule.backlog.queue, { value: expected.locale === "en" ? "Pending" : "待處理" }))
         .toBe(expected.backlog);
       expect(t(($) => $.dataSources.schedule.backlog.earliest, { timestamp: "2026-07-21T03:04:05Z" }))
@@ -234,7 +286,7 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 615 Settings leaves per locale", () => {
+  it("contains exactly 623 Settings leaves per locale", () => {
     const expectedSubtreeCounts = {
       actions: 18,
       workspace: 29,
@@ -247,12 +299,12 @@ describe("bundled i18n resources", () => {
       dataStorage: 48,
       newsStorage: 27,
       macroStorage: 31,
-      investor: 53,
+      investor: 61,
     } as const;
 
     for (const locale of ["zh-Hant", "en"] as const) {
       const settings = resources[locale].settings as ResourceTree;
-      expect(flattenResource(settings).size).toBe(615);
+      expect(flattenResource(settings).size).toBe(623);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(1);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(flattenResource(settings[subtree] as ResourceTree).size, `${locale}.${subtree}`)

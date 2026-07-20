@@ -840,7 +840,7 @@ export function SettingsView({
       const markPotentialDirty = () => setInvestorPotentialDirty(true);
       return (
         <div onInputCapture={markPotentialDirty} onChangeCapture={markPotentialDirty}>
-          <InvestorProfilePanel />
+          <InvestorProfilePanel developerMode={developerMode} />
         </div>
       );
     }
