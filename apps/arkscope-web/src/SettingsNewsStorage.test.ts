@@ -195,6 +195,7 @@ describe("SettingsView news storage copy", () => {
           await i18n.changeLanguage("en");
         });
         section = host!.querySelector('[data-settings-anchor="news_storage"]');
+        if (!section) throw new Error("missing switched News Data section");
         expect(section).toBe(mountedSection);
         expect(getNewsStatus).toHaveBeenCalledOnce();
       }

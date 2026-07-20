@@ -422,6 +422,7 @@ describe("post-PG-exit storage panels", () => {
     );
     expect(dataStorageSource).toContain("$.dataStorage.update.succeeded");
     expect(dataStorageSource).not.toContain('.join(" · ")');
+    expect(dataStorageSource).not.toContain("as unknown as number");
   });
 
   it("keeps corrected single-locale headings without migration narration", async () => {
