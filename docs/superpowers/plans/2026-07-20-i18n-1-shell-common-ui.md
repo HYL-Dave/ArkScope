@@ -9,14 +9,16 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTATION COMPLETE — INDEPENDENT IMPLEMENTATION REVIEW
-> PENDING, 2026-07-20
+> **Status:** LIVE COMPLETE — FAST-FORWARD MERGED TO `master` THROUGH
+> `6542e6e2`, 2026-07-20
 >
 > I18N-0 is LIVE COMPLETE through merge-closeout commit `ac57858`. This plan is
-> the single NEXT unit named by the approved app-wide i18n decision. Independent
-> plan review returned GREEN at clearance `85767787`; reviewed product tip
-> `5a76528d` is now frozen for independent implementation review. Merge, I18N-2,
-> and the public selector remain unauthorized.
+> the completed Shell/common unit named by the approved app-wide i18n decision.
+> Independent plan review returned GREEN at clearance `85767787`; independent
+> implementation review returned GREEN with zero findings at reviewed product
+> tip `5a76528d`. With explicit user approval, `master` fast-forwarded through
+> evidence tip `6542e6e2`. I18N-2 Settings is now the single NEXT unit; the
+> public selector remains absent.
 
 **Goal:** Localize the shipped application Shell and the generic Drawer and
 BoundedProgress copy it consumes into complete `zh-Hant` and English resources,
@@ -438,8 +440,8 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 | Literal ratchet | before/after totals, manifest hashes, exact allowlist/scopes | Exact scanner `1709/1621/1621/0 -> 1649/1563/1562/1`. Final manifest SHA-256: debt `d5453d8daf14dff5673c4a2b2ffa6c82ebf4bacf94fffe3fe1b6057945fbd30e`, allowlist `2367a1e545f5194b1ee438dc5f74d5af57ec8d1c780da90f8fabef2019ee2281`, scopes `c80f3450c25f1dffbb8135c8148b021949b98fd525517610ee60695e658170aa`; second check is read-only and identical. |
 | Immutable gates | backend/API/CSS/desktop/extensions/non-owner diffs | Backend `src/data_sources/tests`, `api.ts`, desktop/extensions, package files, protected surfaces/primitives, and all CSS except the reviewed one-line `shell.css` hunk are byte-identical to `ac57858`. Dynamic-key, selector/autonym, raw-private-field, `window.confirm`, `@media`, and breakpoint-literal scans are zero; `formatElapsed()` body is unchanged. |
 | Runtime gate | locale/viewport matrix, focus/state/privacy assertions, process cleanup | Separate authoritative temporary DBs and fresh browser profiles passed `zh-Hant` + `en` at `1440/1024/961/960/959/390`. Locale first paint, labels, source IDs, Drawer/focus, Developer diagnostics, privacy, font sizes, overlay polarity, nonblank content, and geometry passed. Expected disposable-profile `/profile/universe` 503s were non-critical. Screenshots/JSON are in `/tmp/arkscope-i18n1-runtime.kcCpMA/screens-wrap`; ports `8424/8434/9226` all refuse after cleanup. |
-| Independent review | reviewer commands, findings, reviewed product/docs tips | Not requested; product tip `5a76528d`; evidence-doc tip is the commit containing this ledger. |
-| Merge closeout | merge hash, merged-tree reruns, desktop check, next unit | Not authorized; I18N-2 and public selector remain unopened. |
+| Independent review | reviewer commands, findings, reviewed product/docs tips | GREEN with zero findings. Reviewer virgin archives reproduced frontend `74/695`, exact `+15/-0`, typecheck, build, scanner `1649/1563/1562/1`, immutable gates, the one-line CSS RED/GREEN proof, and a separate 37-check runtime matrix. Product tip `5a76528d`; reviewed evidence tip `6542e6e2`. |
+| Merge closeout | merge hash, merged-tree reruns, desktop check, next unit | `master` fast-forwarded through `6542e6e2`. Fresh merged-tree focused `12/108`, full `74/695`, typecheck, build, scanner `1649/1563/1562/1`, no-PG `ok:true / pg_attempts:[]`, immutable gates, and exact one-line `shell.css` accounting passed. The normal desktop was restarted from merged `master`; one launcher now owns Vite `8430`, Electron, and sidecar `37623`, health and locale requests return `200`, and a captured `1440x900` Shell is correctly `zh-Hant` with no selector. I18N-2 Settings is the single NEXT unit. |
 
 ---
 
@@ -1505,3 +1507,8 @@ Only after independent implementation GREEN and explicit user merge approval:
 7. do not sync Design Kit because this remains partial localization;
 8. update memory/decision log; and
 9. remove the worktree/branch only after closeout evidence is retained.
+
+**Closeout result (2026-07-20):** all nine steps completed. The product merge
+hash is `6542e6e2`; the later docs-only closeout commit records LIVE state. The
+public selector remains absent and Design Kit remains unchanged for this
+partial-localization unit.
