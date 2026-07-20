@@ -9,6 +9,7 @@ import {
   Star,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   SHELL_NAV_GROUPS,
@@ -16,6 +17,7 @@ import {
   type ShellNavIcon,
   type ShellView,
 } from "./navigation";
+import { shellNavGroupLabel, shellViewLabel } from "./shellLabels";
 
 const ICONS: Record<ShellNavIcon, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -39,12 +41,14 @@ export function ShellNavigation({
   onNavigate,
   onAfterNavigate,
 }: ShellNavigationProps) {
+  const { t } = useTranslation("shell");
+
   return (
     <div className="app-shell-nav-groups">
       {SHELL_NAV_GROUPS.map((group) => (
-        <section className="app-shell-nav-group" key={group.label}>
+        <section className="app-shell-nav-group" key={group.id}>
           <div className="app-shell-nav-group-label" data-shell-nav-group>
-            {group.label}
+            {shellNavGroupLabel(group.id, t)}
           </div>
           <div className="app-shell-nav-items">
             {group.items.map((item) => {
@@ -61,7 +65,7 @@ export function ShellNavigation({
                   }}
                 >
                   <Icon size={16} aria-hidden="true" />
-                  <span>{item.label}</span>
+                  <span>{shellViewLabel(item.view, t)}</span>
                 </button>
               );
             })}

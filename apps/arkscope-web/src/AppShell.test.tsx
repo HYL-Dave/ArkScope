@@ -2,6 +2,7 @@
 import React from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiStatus, ResearchRunDTO, RuntimeConfig } from "./api";
@@ -226,6 +227,19 @@ async function click(element: Element) {
   });
 }
 
+function stubMatchMedia(matches: boolean) {
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
+  })));
+}
+
 function button(text: string, scope: ParentNode = host!): HTMLButtonElement {
   const match = Array.from(scope.querySelectorAll("button"))
     .find((candidate) => candidate.textContent?.includes(text));
@@ -248,6 +262,7 @@ afterEach(() => {
   host?.remove();
   host = null;
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("App shell integration", () => {
@@ -343,5 +358,29 @@ describe("App shell integration", () => {
       expect.objectContaining({ id: "observed-from-research" }),
       "Research observer",
     );
+  });
+
+  it("renders English overlay navigation names from the shell namespace", async () => {
+    stubMatchMedia(true);
+    await act(async () => { await i18n.changeLanguage("en"); });
+    const host = await renderApp();
+    const trigger = host.querySelector('[aria-label="Open navigation"]');
+
+    expect(trigger).not.toBeNull();
+    await click(trigger!);
+    const dialog = document.body.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain("Navigation");
+    expect(dialog?.querySelector('nav[aria-label="Primary navigation"]')).not.toBeNull();
+  });
+
+  it("switches locale without losing the selected shell view", async () => {
+    const host = await renderApp();
+    await click(button("AI 研究"));
+    const surface = host.querySelector('[data-testid="research-surface"]');
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(host.querySelector('[data-testid="research-surface"]')).toBe(surface);
+    expect(host.querySelector('[data-testid="shell-context"]')?.textContent).toBe("AI Research");
+    expect(host.querySelector("[aria-current='page']")?.textContent).toContain("AI Research");
   });
 });

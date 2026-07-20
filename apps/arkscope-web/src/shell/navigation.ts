@@ -20,55 +20,48 @@ export type ShellNavIcon =
   | "system"
   | "settings";
 
+export type ShellNavGroupId = "explore" | "research" | "monitor" | "system";
+
 export interface ShellNavItem {
   view: ShellView;
-  label: string;
   icon: ShellNavIcon;
 }
 
 export interface ShellNavGroup {
-  label: string;
+  id: ShellNavGroupId;
   items: readonly ShellNavItem[];
 }
 
 export const SHELL_NAV_GROUPS = [
   {
-    label: "探索",
+    id: "explore",
     items: [
-      { view: "Home", label: "工作台", icon: "dashboard" },
-      { view: "Watchlist", label: "自選股", icon: "watchlist" },
-      { view: "Universe", label: "全部標的", icon: "universe" },
-      { view: "News", label: "新聞·事件", icon: "news" },
+      { view: "Home", icon: "dashboard" },
+      { view: "Watchlist", icon: "watchlist" },
+      { view: "Universe", icon: "universe" },
+      { view: "News", icon: "news" },
     ],
   },
   {
-    label: "研究",
+    id: "research",
     items: [
-      { view: "Research", label: "AI 研究", icon: "research" },
+      { view: "Research", icon: "research" },
     ],
   },
   {
-    label: "追蹤",
+    id: "monitor",
     items: [
-      { view: "Holdings", label: "持倉", icon: "holdings" },
+      { view: "Holdings", icon: "holdings" },
     ],
   },
   {
-    label: "系統",
+    id: "system",
     items: [
-      { view: "System", label: "System / Health", icon: "system" },
-      { view: "Settings", label: "設定", icon: "settings" },
+      { view: "System", icon: "system" },
+      { view: "Settings", icon: "settings" },
     ],
   },
 ] as const satisfies readonly ShellNavGroup[];
-
-export function shellViewLabel(view: ShellView): string {
-  for (const group of SHELL_NAV_GROUPS) {
-    const item = group.items.find((candidate) => candidate.view === view);
-    if (item) return item.label;
-  }
-  throw new Error(`unknown shell view: ${String(view)}`);
-}
 
 export type EnabledSettingsSection = SettingsAnchorId;
 

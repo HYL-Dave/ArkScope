@@ -4,6 +4,7 @@ import { act } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ShellNavigation } from "./ShellNavigation";
@@ -115,5 +116,28 @@ describe("ShellNavigation", () => {
 
     expect(host.textContent).not.toMatch(/研究筆記|告警|Notes|Alerts/);
     expect(host.querySelectorAll("button:disabled")).toHaveLength(0);
+  });
+
+  it("renders the reviewed English navigation without changing structure", async () => {
+    await act(async () => { await i18n.changeLanguage("en"); });
+    const { host } = await renderNavigation();
+
+    expect(Array.from(
+      host.querySelectorAll("[data-shell-nav-group]"),
+      (node) => node.textContent,
+    )).toEqual(["Explore", "Research", "Monitor", "System"]);
+    expect(Array.from(
+      host.querySelectorAll("button"),
+      (node) => node.textContent?.trim(),
+    )).toEqual([
+      "Home",
+      "Watchlist",
+      "Universe",
+      "News",
+      "AI Research",
+      "Holdings",
+      "System / Health",
+      "Settings",
+    ]);
   });
 });

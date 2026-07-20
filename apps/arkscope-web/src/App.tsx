@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HoldingsView } from "./Holdings";
@@ -21,14 +22,15 @@ import { useShellOverlay } from "./ui/useShellOverlay";
 import {
   nextNavigationRequest,
   resolveNavigationTarget,
-  shellViewLabel,
   type NavigationTarget,
   type ResearchNavigationRequest,
   type SettingsNavigationRequest,
   type ShellView,
 } from "./shell/navigation";
+import { shellViewLabel } from "./shell/shellLabels";
 
 export function App() {
+  const { t } = useTranslation("shell");
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
   const [view, setView] = useState<ShellView>("Home");
   const [lastOk, setLastOk] = useState<string | null>(null);
@@ -154,7 +156,7 @@ export function App() {
   return (
     <div className="app-shell" data-shell-overlay={String(shellOverlay)}>
       <ShellTopBar
-        contextLabel={detail?.ticker ?? shellViewLabel(view)}
+        contextLabel={detail?.ticker ?? shellViewLabel(view, t)}
         status={status}
         developerMode={developerMode}
         diagnostics={{
@@ -176,7 +178,7 @@ export function App() {
         menuControl={shellOverlay ? (
           <IconButton
             icon={<Menu size={18} />}
-            label="開啟導覽"
+            label={t(($) => $.navigation.openDrawer)}
             tone="ghost"
             onClick={() => setNavigationOpen(true)}
           />
@@ -185,7 +187,10 @@ export function App() {
 
       <div className="app-shell-layout">
         {!shellOverlay ? (
-          <aside className="app-shell-navigation" aria-label="主要導覽">
+          <aside
+            className="app-shell-navigation"
+            aria-label={t(($) => $.navigation.primaryLabel)}
+          >
             <ShellNavigation currentView={view} onNavigate={navigate} />
           </aside>
         ) : null}
@@ -194,10 +199,13 @@ export function App() {
 
       <Drawer
         open={shellOverlay && navigationOpen}
-        title="導覽"
+        title={t(($) => $.navigation.drawerTitle)}
         onClose={() => setNavigationOpen(false)}
       >
-        <nav className="app-shell-navigation-drawer" aria-label="主要導覽">
+        <nav
+          className="app-shell-navigation-drawer"
+          aria-label={t(($) => $.navigation.primaryLabel)}
+        >
           <ShellNavigation
             currentView={view}
             onNavigate={navigate}

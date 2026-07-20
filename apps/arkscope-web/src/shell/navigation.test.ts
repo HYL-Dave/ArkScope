@@ -10,13 +10,13 @@ import { SETTINGS_ANCHOR_IDS } from "../settings/settingsRegistry";
 describe("shell navigation authority", () => {
   it("publishes the approved four workflow groups in canonical order", () => {
     expect(SHELL_NAV_GROUPS.map((group) => [
-      group.label,
-      group.items.map((item) => [item.view, item.label]),
+      group.id,
+      group.items.map((item) => item.view),
     ])).toEqual([
-      ["探索", [["Home", "工作台"], ["Watchlist", "自選股"], ["Universe", "全部標的"], ["News", "新聞·事件"]]],
-      ["研究", [["Research", "AI 研究"]]],
-      ["追蹤", [["Holdings", "持倉"]]],
-      ["系統", [["System", "System / Health"], ["Settings", "設定"]]],
+      ["explore", ["Home", "Watchlist", "Universe", "News"]],
+      ["research", ["Research"]],
+      ["monitor", ["Holdings"]],
+      ["system", ["System", "Settings"]],
     ]);
   });
 
