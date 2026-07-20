@@ -70,7 +70,7 @@ import {
   readActiveSettingsGroup,
   writeActiveSettingsGroup,
 } from "./settings/settingsPreferences";
-import type { SettingsT } from "./settings/settingsCopy";
+import { settingsTaskLabel, type SettingsT } from "./settings/settingsCopy";
 import {
   Button,
   ConfirmDialog,
@@ -94,7 +94,7 @@ export {
 
 export interface SettingsViewProps {
   runtime: RuntimeConfig | null;
-  developerMode?: boolean;
+  developerMode: boolean;
   onRuntimeChanged: () => Promise<void>;
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "settings_section" }>> | null;
 }
@@ -104,6 +104,68 @@ type SettingsNavigationIntent = {
   anchor: SettingsAnchorId;
   kind: "manual_group" | "exact_anchor";
 };
+
+type SettingsRouteOutcome =
+  | { kind: "save_succeeded" }
+  | { kind: "save_failed" }
+  | { kind: "import_succeeded"; imported: number; skipped: number }
+  | { kind: "import_failed" }
+  | { kind: "export_succeeded"; exported: number; cleared: number }
+  | { kind: "export_failed" }
+  | { kind: "reset_succeeded"; task: ModelTask }
+  | { kind: "reset_failed" };
+
+type SettingsRouteOutcomePresentation = {
+  tone: "ok" | "error";
+  message: string;
+};
+
+function unreachableRouteOutcome(outcome: never): never {
+  throw new Error(`unknown Settings route outcome: ${String(outcome)}`);
+}
+
+function settingsRouteOutcomePresentation(
+  outcome: SettingsRouteOutcome,
+  t: SettingsT,
+): SettingsRouteOutcomePresentation {
+  switch (outcome.kind) {
+    case "save_succeeded":
+      return { tone: "ok", message: t(($) => $.workspace.routes.saved) };
+    case "save_failed":
+      return { tone: "error", message: t(($) => $.workspace.routes.saveFailed) };
+    case "import_succeeded":
+      return {
+        tone: "ok",
+        message: t(($) => $.workspace.routes.imported, {
+          imported: outcome.imported,
+          skipped: outcome.skipped,
+        }),
+      };
+    case "import_failed":
+      return { tone: "error", message: t(($) => $.workspace.routes.importFailed) };
+    case "export_succeeded":
+      return {
+        tone: "ok",
+        message: t(($) => $.workspace.routes.exported, {
+          exported: outcome.exported,
+          cleared: outcome.cleared,
+        }),
+      };
+    case "export_failed":
+      return { tone: "error", message: t(($) => $.workspace.routes.exportFailed) };
+    case "reset_succeeded":
+      return {
+        tone: "ok",
+        message: t(($) => $.workspace.routes.reset, {
+          task: settingsTaskLabel(outcome.task, t),
+        }),
+      };
+    case "reset_failed":
+      return { tone: "error", message: t(($) => $.errors.mutationFailed) };
+    default:
+      return unreachableRouteOutcome(outcome);
+  }
+}
 
 function firstBusyOrDirtyGuard(
   guards: readonly SettingsNavigationGuard[],
@@ -126,7 +188,7 @@ function settingsWorkspaceTabLabel(id: SettingsGroupId, t: SettingsT): string {
 
 export function SettingsView({
   runtime,
-  developerMode = false,
+  developerMode,
   onRuntimeChanged,
   navigationRequest,
 }: SettingsViewProps) {
@@ -138,6 +200,7 @@ export function SettingsView({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [routeOutcome, setRouteOutcome] = useState<SettingsRouteOutcome | null>(null);
   const [activeGroup, setActiveGroup] = useState<SettingsGroupId>(() => readActiveSettingsGroup());
   const [section, setSection] = useState<SettingsAnchorId>(() => firstSettingsAnchor(activeGroup));
   const [directoryQuery, setDirectoryQuery] = useState("");
@@ -327,6 +390,8 @@ export function SettingsView({
   async function save() {
     if (!catalog) return;
     if (routeSaveBlocks.length) {
+      setRouteOutcome(null);
+      setMsg(null);
       setErr(
         routeSaveBlocks
           .map(({ task }) => `${TASK_LABELS[task]}：所選 provider 尚未設定登入`)
@@ -337,6 +402,7 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
       const routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string; effort: string }>> = {};
       for (const task of catalog.tasks) {
@@ -350,9 +416,9 @@ export function SettingsView({
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
       await onRuntimeChanged();
-      setMsg(t(($) => $.workspace.routes.saved));
+      setRouteOutcome({ kind: "save_succeeded" });
     } catch {
-      setErr(t(($) => $.workspace.routes.saveFailed));
+      setRouteOutcome({ kind: "save_failed" });
     } finally {
       setSaving(false);
     }
@@ -362,16 +428,21 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
-      await importModelRoutes();
+      const result = await importModelRoutes();
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
       await onRuntimeChanged();
-      setMsg(t(($) => $.workspace.routes.imported));
+      setRouteOutcome({
+        kind: "import_succeeded",
+        imported: result.imported.length,
+        skipped: result.skipped.length,
+      });
     } catch {
-      setErr(t(($) => $.workspace.routes.importFailed));
+      setRouteOutcome({ kind: "import_failed" });
     } finally {
       setSaving(false);
     }
@@ -381,17 +452,22 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
-      await exportModelRoutes();
+      const result = await exportModelRoutes();
       // the clear branch can drop a task from profile→default, so refresh the badge/draft
       const refreshed = await getModelCatalog();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
       await onRuntimeChanged();
-      setMsg(t(($) => $.workspace.routes.exported));
+      setRouteOutcome({
+        kind: "export_succeeded",
+        exported: result.exported.length,
+        cleared: result.cleared.length,
+      });
     } catch {
-      setErr(t(($) => $.workspace.routes.exportFailed));
+      setRouteOutcome({ kind: "export_failed" });
     } finally {
       setSaving(false);
     }
@@ -403,6 +479,7 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
       await saveResearchRuntime(body);
       await onRuntimeChanged();
@@ -418,6 +495,7 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
       await deleteResearchRuntime();
       await onRuntimeChanged();
@@ -438,6 +516,7 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
       await saveFixedTaskRuntime(body);
       await onRuntimeChanged();
@@ -453,6 +532,7 @@ export function SettingsView({
     setSaving(true);
     setErr(null);
     setMsg(null);
+    setRouteOutcome(null);
     try {
       await deleteFixedTaskRuntime();
       await onRuntimeChanged();
@@ -665,6 +745,7 @@ export function SettingsView({
             onReset={async (task) => {
             setErr(null);
             setMsg(null);
+            setRouteOutcome(null);
             try {
               await deleteModelRoute(task);
               const refreshed = await getModelCatalog();
@@ -672,9 +753,9 @@ export function SettingsView({
               setDraft(fromRoutes(refreshed.routes));
               invalidateTaskTest(task);
               await onRuntimeChanged();
-              setMsg(t(($) => $.workspace.routes.reset));
+              setRouteOutcome({ kind: "reset_succeeded", task });
             } catch {
-              setErr(t(($) => $.errors.mutationFailed));
+              setRouteOutcome({ kind: "reset_failed" });
             }
             }}
           />
@@ -749,13 +830,22 @@ export function SettingsView({
       </div>
     ),
   }));
+  const routeOutcomePresentation = routeOutcome
+    ? settingsRouteOutcomePresentation(routeOutcome, t)
+    : null;
 
   return (
     <main className="main settings-workspace" data-settings-overlay={String(shellOverlay)}>
       <PageHeader title={t(($) => $.workspace.title)} />
 
       {err && <p className="error-text">{err}</p>}
+      {routeOutcomePresentation?.tone === "error" ? (
+        <p className="error-text">{routeOutcomePresentation.message}</p>
+      ) : null}
       {msg && <p className="ok-text">{msg}</p>}
+      {routeOutcomePresentation?.tone === "ok" ? (
+        <p className="ok-text">{routeOutcomePresentation.message}</p>
+      ) : null}
       {blockedNotice ? (
         <InlineAlert state="blocked" title={t(($) => $.workspace.blocked.title)}>
           {blockedNotice}

@@ -133,7 +133,7 @@ vi.mock("./Research", () => ({
 
 vi.mock("./Settings", () => ({
   SettingsView: (props: {
-    developerMode?: boolean;
+    developerMode: boolean;
     navigationRequest?: NavigationRequest | null;
   }) => {
     shellMocks.settingsProps = props as unknown as Record<string, unknown>;

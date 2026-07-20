@@ -160,7 +160,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
     });
     await flush();
 
@@ -231,7 +235,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime, onRuntimeChanged }));
+      root!.render(React.createElement(SettingsView, {
+        runtime,
+        developerMode: false,
+        onRuntimeChanged,
+      }));
     });
     await flush();
 
@@ -271,6 +279,7 @@ describe("Settings model route save gate", () => {
     await act(async () => {
       root!.render(React.createElement(SettingsView, {
         runtime: null,
+        developerMode: false,
         onRuntimeChanged: vi.fn(),
         navigationRequest,
       }));
@@ -291,6 +300,7 @@ describe("Settings model route save gate", () => {
       await act(async () => {
         root!.render(React.createElement(SettingsView, {
           runtime: null,
+          developerMode: false,
           onRuntimeChanged: vi.fn(),
           navigationRequest,
         }));
@@ -320,7 +330,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
     });
     await flush();
 
@@ -338,7 +352,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
     });
     await flush();
 
@@ -356,7 +374,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
     });
     await flush();
 
@@ -382,6 +404,7 @@ describe("Settings model route save gate", () => {
     await act(async () => {
       root!.render(React.createElement(SettingsView, {
         runtime: null,
+        developerMode: false,
         onRuntimeChanged: vi.fn(),
         navigationRequest,
       }));
@@ -400,6 +423,7 @@ describe("Settings model route save gate", () => {
       await act(async () => {
         root!.render(React.createElement(SettingsView, {
           runtime: null,
+          developerMode: false,
           onRuntimeChanged: vi.fn(),
           navigationRequest,
         }));
@@ -429,7 +453,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
     });
     await flush();
 
@@ -486,7 +514,11 @@ describe("Settings model route save gate", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => {
-      root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      root!.render(React.createElement(SettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
     });
     await flush();
     const discover = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))

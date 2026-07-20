@@ -423,7 +423,11 @@ async function renderDataSources(onNavigationGuardChange?: SettingsNavigationGua
   await act(async () => {
     root!.render(onNavigationGuardChange
       ? React.createElement(DataSourcesSection, { onNavigationGuardChange })
-      : React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+      : React.createElement(SettingsView, {
+          runtime: null,
+          developerMode: false,
+          onRuntimeChanged: vi.fn(),
+        }));
   });
   await act(async () => { await Promise.resolve(); });
   await act(async () => { await Promise.resolve(); });

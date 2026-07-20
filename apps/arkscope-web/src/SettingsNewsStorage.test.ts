@@ -86,6 +86,7 @@ async function renderNewsSection() {
   await act(async () => {
     root!.render(React.createElement(SettingsView, {
       runtime: null,
+      developerMode: false,
       onRuntimeChanged: vi.fn(),
     }));
   });

@@ -185,7 +185,11 @@ async function renderSettings() {
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+    root!.render(React.createElement(SettingsView, {
+      runtime: null,
+      developerMode: false,
+      onRuntimeChanged: vi.fn(),
+    }));
   });
   await act(async () => { await Promise.resolve(); });
 }

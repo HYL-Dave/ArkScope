@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   saveModelRoutes: vi.fn(),
   importModelRoutes: vi.fn(),
   exportModelRoutes: vi.fn(),
+  deleteModelRoute: vi.fn(),
   dataMounts: 0,
   dataUnmounts: 0,
 }));
@@ -39,6 +40,7 @@ vi.mock("./api", async (importOriginal) => {
     saveModelRoutes: mocks.saveModelRoutes,
     importModelRoutes: mocks.importModelRoutes,
     exportModelRoutes: mocks.exportModelRoutes,
+    deleteModelRoute: mocks.deleteModelRoute,
   };
 });
 
@@ -112,7 +114,18 @@ vi.mock("./settings/NewsStorageSection", () => ({
   NewsStorageSection: () => <p>新聞資料內容</p>,
 }));
 vi.mock("./settings/ModelRoutingSection", () => ({
-  ModelRoutingSection: () => <p>模型路由內容</p>,
+  ModelRoutingSection: ({
+    onReset,
+  }: {
+    onReset: (task: ModelTask) => Promise<void>;
+  }) => (
+    <div>
+      <p>模型路由內容</p>
+      <button type="button" onClick={() => void onReset("card_synthesis")}>
+        重設卡片生成路由
+      </button>
+    </div>
+  ),
   TASK_LABELS: {
     card_synthesis: "AI 卡片生成",
     card_translation: "卡片翻譯",
@@ -251,9 +264,17 @@ beforeEach(() => {
   mocks.saveModelRoutes.mockReset();
   mocks.saveModelRoutes.mockResolvedValue(undefined);
   mocks.importModelRoutes.mockReset();
-  mocks.importModelRoutes.mockResolvedValue({ imported: [], skipped: [] });
+  mocks.importModelRoutes.mockResolvedValue({
+    imported: ["card_synthesis", "ai_research"],
+    skipped: ["card_translation"],
+  });
   mocks.exportModelRoutes.mockReset();
-  mocks.exportModelRoutes.mockResolvedValue({ exported: [], cleared: [] });
+  mocks.exportModelRoutes.mockResolvedValue({
+    exported: ["card_synthesis", "card_translation"],
+    cleared: ["ai_research"],
+  });
+  mocks.deleteModelRoute.mockReset();
+  mocks.deleteModelRoute.mockResolvedValue(undefined);
   mocks.dataMounts = 0;
   mocks.dataUnmounts = 0;
   window.localStorage.clear();
@@ -292,17 +313,39 @@ describe("Settings workspace", () => {
     const models = host!.querySelector('[data-settings-anchor="models"]')!;
     expect(buttonWithText("Save", models)).not.toBeNull();
     const transfer = models.querySelector("details")!;
-    expect(transfer.querySelector("summary")?.textContent).toBe("Import / Export");
+    const transferActions = Array.from(transfer.querySelectorAll("button"));
     await click(buttonWithText("Save", models));
-    expect(host!.textContent).toContain("Task routes saved.");
-    await click(buttonWithText("Import", transfer));
-    expect(host!.textContent).toContain("Task routes imported.");
-    await click(buttonWithText("Export", transfer));
-    expect(host!.textContent).toContain("Task routes exported.");
+    expect.soft(host!.textContent).toContain(
+      "Task routes saved to the profile DB (the profile file remains the fallback and import/export mirror).",
+    );
+    await click(transferActions[0]!);
+    expect.soft(host!.textContent).toContain(
+      "Imported 2 task routes from the profile file into the profile DB; skipped 1 incomplete or inconsistent route.",
+    );
+    await click(transferActions[1]!);
+    expect.soft(host!.textContent).toContain(
+      "Exported 2 DB task routes to the profile file; cleared 1 stale profile-file route without DB authority.",
+    );
+    await click(buttonWithText("重設卡片生成路由", models));
+    expect.soft(host!.textContent).toContain(
+      "AI Card Synthesis was reset to the profile file or built-in fallback.",
+    );
+    expect.soft(transfer.querySelector("summary")?.textContent)
+      .toBe("Import from profile file / Export to profile file");
+    expect.soft(transferActions.map((button) => button.textContent?.trim())).toEqual([
+      "Import from profile file",
+      "Export to profile file",
+    ]);
   });
 
   it("switches locale without losing active group search disclosure draft or focus", async () => {
     await renderSettings();
+    const transfer = host!.querySelector('[data-settings-anchor="models"] details')!;
+    await click(transfer.querySelector("button")!);
+    const routeResult = host!.querySelector(".ok-text")!;
+    expect.soft(routeResult.textContent).toBe(
+      "已從設定檔匯入 2 筆任務路由到 profile DB；略過 1 筆不完整或不一致的路由。",
+    );
     await click(tabWithText("個人化"));
     const search = await setSearch("risk appetite");
     const tab = tabWithText("個人化");
@@ -331,6 +374,10 @@ describe("Settings workspace", () => {
     expect(tab.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab);
     expect(host!.querySelector("h1")?.textContent).toBe("Settings");
+    expect(host!.querySelector(".ok-text")).toBe(routeResult);
+    expect(routeResult.textContent).toBe(
+      "Imported 2 task routes from the profile file into the profile DB; skipped 1 incomplete or inconsistent route.",
+    );
     expect(mocks.getModelCatalog).toHaveBeenCalledTimes(catalogCalls);
   });
 
@@ -424,8 +471,8 @@ describe("Settings workspace", () => {
     const models = host!.querySelector('[data-settings-anchor="models"]')!;
     const transfer = models.querySelector("details");
     expect(transfer?.open).toBe(false);
-    expect(buttonWithText("匯入", transfer!)).not.toBeNull();
-    expect(buttonWithText("匯出", transfer!)).not.toBeNull();
+    expect(buttonWithText("從設定檔匯入", transfer!)).not.toBeNull();
+    expect(buttonWithText("匯出到設定檔", transfer!)).not.toBeNull();
     expect(host!.querySelectorAll('[data-settings-anchor]:not([data-settings-anchor="models"]) details button'))
       .toHaveLength(0);
   });
