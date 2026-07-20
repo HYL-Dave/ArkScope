@@ -852,8 +852,8 @@ export function SettingsView({
         />
       );
     }
-    if (id === "data_storage") return <DataStorageSection />;
-    if (id === "news_storage") return <NewsStorageSection />;
+    if (id === "data_storage") return <DataStorageSection developerMode={developerMode} />;
+    if (id === "news_storage") return <NewsStorageSection developerMode={developerMode} />;
     return <MacroStorageSection />;
   }
 

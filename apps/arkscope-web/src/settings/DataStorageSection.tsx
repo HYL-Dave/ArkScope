@@ -10,33 +10,56 @@ import {
 } from "../api";
 import { coverageStatusLabel } from "../marketDataDisplay";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
+import { settingsErrorPresentation } from "./settingsBackendCopy";
+import type { SettingsT } from "./settingsCopy";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
 }
-function syncLine(status: MarketDataStatus): string {
+function syncLine(status: MarketDataStatus, t: SettingsT): string {
   const fmt = (m: SyncMeta | null) => {
     if (!m) return "—";
-    if (m.last_error) return `錯誤（${m.last_error.slice(0, 40)}）`;
     if (!Number.isFinite(m.rows_added)) return "—";
     const ts = formatSystemTimestamp(m.last_success);
     return `+${m.rows_added.toLocaleString()} @ ${ts}`;
   };
   const s = status.sync;
-  if (!s.prices && !s.news && !s.iv && !s.fundamentals) return "尚未增量更新";
-  return `價格 ${fmt(s.prices)} · 新聞 ${fmt(s.news)} · IV ${fmt(s.iv)} · 基本面 ${fmt(s.fundamentals)}`;
+  if (!s.prices && !s.news && !s.iv && !s.fundamentals) {
+    return t(($) => $.dataStorage.update.never);
+  }
+  if ([s.prices, s.news, s.iv, s.fundamentals].some((value) => value?.last_error)) {
+    return t(($) => $.dataStorage.update.failed);
+  }
+  return t(($) => $.dataStorage.update.succeeded, {
+    pricesValue: fmt(s.prices),
+    newsValue: fmt(s.news),
+    ivValue: fmt(s.iv),
+    fundamentalsValue: fmt(s.fundamentals),
+  });
 }
 
-export function DataStorageSection() {
+function syncDiagnostics(status: MarketDataStatus): Array<string | null> {
+  const sync = status.sync;
+  return [sync.prices, sync.news, sync.iv, sync.fundamentals]
+    .map((value) => value?.last_error ?? null);
+}
+
+export function DataStorageSection({
+  developerMode = false,
+}: {
+  developerMode?: boolean;
+}) {
+  const { t } = useTranslation("settings");
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<Error | null>(null);
 
   const load = useCallback(async () => {
     try {
       setStatus(await getMarketDataStatus());
       setErr(null);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(e instanceof Error ? e : new Error(String(e)));
     }
   }, []);
   useEffect(() => {
@@ -49,50 +72,81 @@ export function DataStorageSection() {
   const iv = status?.iv;
   const fd = status?.fundamentals;
   const fc = status?.financial_cache;
+  const errorPresentation = err ? settingsErrorPresentation(err, t) : null;
 
   return (
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>市場資料 · Market Data</h2>
-          <p className="muted tiny">
-            顯示價格、新聞、隱含波動率、基本面與財務快取的資料量、最新時間及最近更新。
-            資料抓取由 Data Sources 管理。
-          </p>
+          <h2>{t(($) => $.dataStorage.title)}</h2>
+          <p className="muted tiny">{t(($) => $.dataStorage.description)}</p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()}>↻ 重新整理</button>
+        <button className="btn-ghost" onClick={() => void load()}>
+          ↻ {t(($) => $.actions.refresh)}
+        </button>
       </div>
 
-      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+      {errorPresentation ? (
+        <div className="errorbox"><p className="muted">{errorPresentation.message}</p></div>
+      ) : null}
+      {developerMode ? (
+        <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
+      ) : null}
 
       {!status ? (
-        <p className="muted">載入中…</p>
+        <p className="muted">{t(($) => $.dataStorage.loading)}</p>
       ) : (
         <div className="settings-panel">
           <dl className="ds-kv">
-            <dt>市場資料</dt>
-            <dd>{exists ? "可用" : "尚無資料"}</dd>
-            <dt>價格</dt>
-            <dd>{exists ? `${pr!.row_count.toLocaleString()} 列 · ${pr!.ticker_count} 檔 · 最新 ${pr!.latest_datetime ?? "—"}` : "—"}</dd>
-            <dt>新聞</dt>
-            <dd>{exists ? `${nw!.row_count.toLocaleString()} 篇 · ${nw!.source_count} 來源 · 最新 ${nw!.latest_published ?? "—"}` : "—"}</dd>
-            <dt>IV</dt>
-            <dd>{exists ? `${iv!.row_count.toLocaleString()} 列 · ${iv!.ticker_count} 檔 · 最新 ${iv!.latest_date ?? "—"}` : "—"}</dd>
-            <dt>基本面</dt>
-            <dd>{exists ? `${fd!.row_count.toLocaleString()} 列 · ${fd!.ticker_count} 檔 · 最新 ${fd!.latest_date ?? "—"}` : "—"}</dd>
-            <dt>財務快取</dt>
+            <dt>{t(($) => $.dataStorage.title)}</dt>
+            <dd>{exists
+              ? t(($) => $.dataStorage.available)
+              : t(($) => $.dataStorage.empty)}</dd>
+            <dt>{t(($) => $.dataStorage.labels.prices)}</dt>
+            <dd>{exists ? t(($) => $.dataStorage.summary.prices, {
+              value: pr!.row_count.toLocaleString(),
+              count: pr!.ticker_count,
+              timestamp: pr!.latest_datetime ?? "—",
+            }) : "—"}</dd>
+            <dt>{t(($) => $.dataStorage.labels.news)}</dt>
+            <dd>{exists ? t(($) => $.dataStorage.summary.news, {
+              value: nw!.row_count.toLocaleString(),
+              count: nw!.source_count,
+              timestamp: nw!.latest_published ?? "—",
+            }) : "—"}</dd>
+            <dt>{t(($) => $.dataStorage.labels.iv)}</dt>
+            <dd>{exists ? t(($) => $.dataStorage.summary.iv, {
+              value: iv!.row_count.toLocaleString(),
+              count: iv!.ticker_count,
+              timestamp: iv!.latest_date ?? "—",
+            }) : "—"}</dd>
+            <dt>{t(($) => $.dataStorage.labels.fundamentals)}</dt>
+            <dd>{exists ? t(($) => $.dataStorage.summary.fundamentals, {
+              value: fd!.row_count.toLocaleString(),
+              count: fd!.ticker_count,
+              timestamp: fd!.latest_date ?? "—",
+            }) : "—"}</dd>
+            <dt>{t(($) => $.dataStorage.labels.financialCache)}</dt>
             <dd>
               {exists
-                ? `${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${formatSystemTimestamp(fc!.latest_fetched_at)}`
+                ? t(($) => $.dataStorage.summary.financialCache, {
+                    value: fc!.row_count.toLocaleString(),
+                    count: fc!.valid_count,
+                    expiredCount: fc!.expired_count,
+                    timestamp: formatSystemTimestamp(fc!.latest_fetched_at),
+                  })
                 : "—"}
             </dd>
-            <dt>最近增量更新</dt>
-            <dd>{syncLine(status)}</dd>
+            <dt>{t(($) => $.dataStorage.update.title)}</dt>
+            <dd>{syncLine(status, t)}</dd>
           </dl>
+          {developerMode ? (
+            <DeveloperDiagnostics diagnostics={syncDiagnostics(status)} t={t} />
+          ) : null}
         </div>
       )}
 
-      <TradingDayCoveragePanel />
+      <TradingDayCoveragePanel developerMode={developerMode} />
     </div>
   );
 }
@@ -104,10 +158,10 @@ function coverageToneColor(tone: "ok" | "warn" | "muted" | "bad"): string {
     : tone === "warn" ? "var(--warn, #b8860b)" : "var(--muted, #888)";
 }
 
-function TradingDayCoveragePanel() {
+function TradingDayCoveragePanel({ developerMode }: { developerMode: boolean }) {
   const { t } = useTranslation("settings");
   const [cov, setCov] = useState<TradingDayCoverage | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [lookback, setLookback] = useState(10);
@@ -118,7 +172,7 @@ function TradingDayCoveragePanel() {
       setCov(await getTradingDayCoverage(lookback, "15min"));
       setErr(null);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(e instanceof Error ? e : new Error(String(e)));
     } finally {
       setBusy(false);
     }
@@ -126,21 +180,22 @@ function TradingDayCoveragePanel() {
   useEffect(() => {
     void load();
   }, [load]);
+  const errorPresentation = err ? settingsErrorPresentation(err, t) : null;
 
   return (
     <div style={{ marginTop: 24, borderTop: "1px solid var(--border, #333)", paddingTop: 16 }}>
       <div className="settings-section-head">
         <div>
-          <h2>交易日 / 價格覆蓋 · Trading-day coverage</h2>
+          <h2>{t(($) => $.dataStorage.coverage.title)}</h2>
           <p className="muted tiny">
-            最近 {lookback} 天的 15min 價格覆蓋。每列以 coverage_status 為準：
-            覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日。點開可看缺漏與 partial 標的、以及 provider 錯誤。
-            <strong>唯讀診斷，不會自動補抓</strong>；full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。
+            {t(($) => $.dataStorage.coverage.lookback, { count: lookback })}{" "}
+            {t(($) => $.dataStorage.coverage.description)}{" "}
+            <strong>{t(($) => $.dataStorage.coverage.readOnly)}</strong>
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <label className="muted tiny">
-            天數{" "}
+            {t(($) => $.dataStorage.coverage.lookbackLabel)}{" "}
             <select
               value={lookback}
               disabled={busy}
@@ -151,28 +206,41 @@ function TradingDayCoveragePanel() {
               ))}
             </select>
           </label>
-          <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
+          <button className="btn-ghost" onClick={() => void load()} disabled={busy}>
+            ↻ {t(($) => $.actions.refresh)}
+          </button>
         </div>
       </div>
 
-      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+      {errorPresentation ? (
+        <div className="errorbox"><p className="muted">{errorPresentation.message}</p></div>
+      ) : null}
+      {developerMode ? (
+        <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
+      ) : null}
 
       {!cov ? (
-        <p className="muted">載入中…</p>
+        <p className="muted">{t(($) => $.dataStorage.loading)}</p>
       ) : (
         <div className="settings-panel">
           <p className="muted tiny">
-            universe {cov.universe_count} 檔 · interval {cov.interval} · 產生於 {shortTs(cov.generated_at_et)}
+            {t(($) => $.dataStorage.coverage.drilldown.universe, {
+              count: cov.universe_count,
+            })} ·{" "}
+            {t(($) => $.dataStorage.coverage.drilldown.interval)} {cov.interval} ·{" "}
+            {t(($) => $.dataStorage.update.generatedAt, {
+              timestamp: shortTs(cov.generated_at_et),
+            })}
           </p>
           <table className="ds-table" style={{ width: "100%", marginTop: 8 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left" }}>日期</th>
-                <th style={{ textAlign: "left" }}>狀態</th>
-                <th style={{ textAlign: "right" }}>最多 bars</th>
-                <th style={{ textAlign: "right" }}>覆蓋</th>
-                <th style={{ textAlign: "right" }}>缺</th>
-                <th style={{ textAlign: "right" }}>partial</th>
+                <th style={{ textAlign: "left" }}>{t(($) => $.dataStorage.coverage.headings.date)}</th>
+                <th style={{ textAlign: "left" }}>{t(($) => $.dataStorage.coverage.headings.status)}</th>
+                <th style={{ textAlign: "right" }}>{t(($) => $.dataStorage.coverage.headings.maxBars)}</th>
+                <th style={{ textAlign: "right" }}>{t(($) => $.dataStorage.coverage.headings.covered)}</th>
+                <th style={{ textAlign: "right" }}>{t(($) => $.dataStorage.coverage.headings.missing)}</th>
+                <th style={{ textAlign: "right" }}>{t(($) => $.dataStorage.coverage.drilldown.partial)}</th>
                 <th />
               </tr>
             </thead>
@@ -196,6 +264,8 @@ function TradingDayCoveragePanel() {
                     drillable={drillable}
                     onToggle={() => setExpanded(open ? null : d.date)}
                     providerErrors={cov.provider_errors}
+                    developerMode={developerMode}
+                    t={t}
                   />
                 );
               })}
@@ -208,7 +278,7 @@ function TradingDayCoveragePanel() {
 }
 
 function CoverageRow({
-  row, label, tone, open, drillable, onToggle, providerErrors,
+  row, label, tone, open, drillable, onToggle, providerErrors, developerMode, t,
 }: {
   row: TradingDayRow;
   label: string;
@@ -217,6 +287,8 @@ function CoverageRow({
   drillable: boolean;
   onToggle: () => void;
   providerErrors: TradingDayCoverage["provider_errors"];
+  developerMode: boolean;
+  t: SettingsT;
 }) {
   // Show numeric coverage only for COMPLETED trading days. Non-trading → "—"; in_progress →
   // "—" too (mid-session counts aren't a gap; the status cell already says 盤中).
@@ -245,19 +317,32 @@ function CoverageRow({
           <td colSpan={7} style={{ background: "var(--panel-2, #1a1a1a)", padding: "8px 12px" }}>
             {row.missing_tickers.length > 0 && (
               <p className="tiny" style={{ margin: "0 0 4px" }}>
-                缺（{row.missing_tickers.length}）：{row.missing_tickers.join(", ")}
+                {t(($) => $.dataStorage.coverage.drilldown.missingDetail, {
+                  count: row.missing_tickers.length,
+                  value: row.missing_tickers.join(", "),
+                })}
               </p>
             )}
             {row.partial_tickers.length > 0 && (
               <p className="tiny" style={{ margin: "0 0 4px" }}>
-                partial：{row.partial_tickers.map((p) => `${p.ticker}(${p.bars})`).join(", ")}
+                {t(($) => $.dataStorage.coverage.drilldown.partialDetail, {
+                  value: row.partial_tickers.map((p) => `${p.ticker}(${p.bars})`).join(", "),
+                })}
               </p>
             )}
             {relErrors.length > 0 && (
               <p className="tiny refresh-err" style={{ margin: 0 }}>
-                provider 錯誤：{relErrors.map((e) => `${e.ticker}: ${e.last_error}`).join("；")}
+                {t(($) => $.dataStorage.coverage.drilldown.providerError)}
               </p>
             )}
+            {developerMode ? (
+              <DeveloperDiagnostics
+                diagnostics={relErrors.map((error) => error.last_error
+                  ? `${error.ticker}: ${error.last_error}`
+                  : null)}
+                t={t}
+              />
+            ) : null}
           </td>
         </tr>
       )}

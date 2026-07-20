@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 
 import {
@@ -12,21 +13,44 @@ import {
 import { formatSystemTimestamp } from "../timeDisplay";
 import { Button } from "../ui/Button";
 import { InlineAlert } from "../ui/Status";
+import type { SettingsT } from "./settingsCopy";
 
-const MACRO_TABLE_LABELS: Array<[string, string]> = [
-  ["macro_series", "FRED 序列"],
-  ["macro_observations", "FRED 觀測值"],
-  ["macro_release_dates", "FRED 發布資料"],
-  ["cal_economic_events", "經濟事件"],
-  ["cal_earnings_events", "財報事件"],
-  ["cal_ipo_events", "IPO 事件"],
-];
+const MACRO_TABLE_KEYS = [
+  "macro_series",
+  "macro_observations",
+  "macro_release_dates",
+  "cal_economic_events",
+  "cal_earnings_events",
+  "cal_ipo_events",
+] as const;
 
-function storedCoverage(table: MacroTableStat | undefined): string {
-  if (!table) return "不可用";
-  const count = `${table.row_count.toLocaleString()} 筆已儲存`;
+function macroTableLabel(key: typeof MACRO_TABLE_KEYS[number], t: SettingsT): string {
+  switch (key) {
+    case "macro_series":
+      return t(($) => $.macroStorage.kinds.fredSeries);
+    case "macro_observations":
+      return t(($) => $.macroStorage.kinds.fredObservations);
+    case "macro_release_dates":
+      return t(($) => $.macroStorage.kinds.fredReleases);
+    case "cal_economic_events":
+      return t(($) => $.macroStorage.kinds.economicEvents);
+    case "cal_earnings_events":
+      return t(($) => $.macroStorage.kinds.earningsEvents);
+    case "cal_ipo_events":
+      return t(($) => $.macroStorage.kinds.ipoEvents);
+  }
+}
+
+function storedCoverage(table: MacroTableStat | undefined, t: SettingsT): string {
+  if (!table) return t(($) => $.macroStorage.availability.tableUnavailable);
+  const count = t(($) => $.macroStorage.counts.stored, {
+    value: table.row_count.toLocaleString(),
+  });
   if (table.row_count === 0) return count;
-  return `${count} · 最後抓取 ${formatSystemTimestamp(table.last_fetched_at)}`;
+  return t(($) => $.macroStorage.counts.summary, {
+    value: count,
+    timestamp: formatSystemTimestamp(table.last_fetched_at),
+  });
 }
 
 function snapshotValue(item: MacroSnapshotItem): string {
@@ -36,6 +60,7 @@ function snapshotValue(item: MacroSnapshotItem): string {
 }
 
 export function MacroStorageSection() {
+  const { t } = useTranslation("settings");
   const [status, setStatus] = useState<MacroStatus | null>(null);
   const [snapshot, setSnapshot] = useState<MacroSnapshot | null>(null);
   const [statusUnavailable, setStatusUnavailable] = useState(false);
@@ -91,10 +116,8 @@ export function MacroStorageSection() {
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>總經資料</h2>
-          <p className="muted tiny">
-            查看 FRED 序列快照、儲存量與事件資料覆蓋；排程與 Provider 健康狀態由 Data Sources 管理。
-          </p>
+          <h2>{t(($) => $.macroStorage.title)}</h2>
+          <p className="muted tiny">{t(($) => $.macroStorage.description)}</p>
         </div>
         <Button
           tone="ghost"
@@ -103,37 +126,40 @@ export function MacroStorageSection() {
           aria-busy={loading || undefined}
           onClick={() => void load()}
         >
-          重新整理
+          {t(($) => $.actions.refresh)}
         </Button>
       </div>
 
       {bothTransportLegsUnavailable ? (
-        <InlineAlert state="failed" title="總經資料目前無法載入">
-          請稍後重新整理；既有資料不會被清除。
+        <InlineAlert state="failed" title={t(($) => $.macroStorage.availability.unavailable)}>
+          {t(($) => $.macroStorage.messages.unavailableDetail)}
         </InlineAlert>
       ) : null}
       {oneTransportLegUnavailable ? (
-        <InlineAlert state="partial" title="總經資料只載入了一部分">
-          可用的資料已保留，請稍後重新整理其餘狀態。
+        <InlineAlert state="partial" title={t(($) => $.macroStorage.availability.partial)}>
+          {t(($) => $.macroStorage.messages.partialDetail)}
         </InlineAlert>
       ) : null}
       {domainUnavailable ? (
-        <InlineAlert state="blocked" title="資料庫或必要資料表目前不可用" />
+        <InlineAlert
+          state="blocked"
+          title={t(($) => $.macroStorage.availability.databaseUnavailable)}
+        />
       ) : null}
 
       {status == null && snapshot == null && loading ? (
-        <p className="muted">載入中…</p>
+        <p className="muted">{t(($) => $.macroStorage.loading)}</p>
       ) : null}
 
       {statusAvailable ? (
         <div className="settings-panel">
-          <h3>儲存覆蓋</h3>
+          <h3>{t(($) => $.macroStorage.headings.storedCoverage)}</h3>
           <dl className="ds-kv">
-            {MACRO_TABLE_LABELS.map(([key, label]) => (
+            {MACRO_TABLE_KEYS.map((key) => (
               <FragmentKV
                 key={key}
-                label={label}
-                value={storedCoverage(tables[key])}
+                label={macroTableLabel(key, t)}
+                value={storedCoverage(tables[key], t)}
               />
             ))}
           </dl>
@@ -144,31 +170,39 @@ export function MacroStorageSection() {
         <div className="settings-panel">
           <div className="settings-section-head">
             <div>
-              <h3>FRED 快照</h3>
+              <h3>{t(($) => $.macroStorage.snapshot.title)}</h3>
               <p className="muted tiny">
-                {snapshot.observation_count.toLocaleString()} 筆已儲存
                 {snapshot.latest_fetched_at
-                  ? ` · 最後抓取 ${formatSystemTimestamp(snapshot.latest_fetched_at)}`
-                  : ""}
+                  ? t(($) => $.macroStorage.counts.summary, {
+                      value: t(($) => $.macroStorage.counts.stored, {
+                        value: snapshot.observation_count.toLocaleString(),
+                      }),
+                      timestamp: formatSystemTimestamp(snapshot.latest_fetched_at),
+                    })
+                  : t(($) => $.macroStorage.counts.stored, {
+                      value: snapshot.observation_count.toLocaleString(),
+                    })}
               </p>
             </div>
             <span className="muted tiny">
-              {snapshot.auto_refresh_enabled ? "自動刷新開啟" : "自動刷新關閉"}
+              {snapshot.auto_refresh_enabled
+                ? t(($) => $.macroStorage.snapshot.autoEnabled)
+                : t(($) => $.macroStorage.snapshot.autoDisabled)}
             </span>
           </div>
 
           {snapshot.items.length === 0 ? (
-            <p className="muted">0 筆已儲存</p>
+            <p className="muted">{t(($) => $.macroStorage.counts.zero)}</p>
           ) : (
             <div className="settings-table-scroll" data-testid="fred-snapshot-scroll">
               <table className="ds-table settings-fred-table">
                 <thead>
                   <tr>
-                    <th>Series ID</th>
-                    <th>名稱</th>
-                    <th>最新值</th>
-                    <th>觀測日期</th>
-                    <th>最後抓取</th>
+                    <th>{t(($) => $.macroStorage.headings.seriesId)}</th>
+                    <th>{t(($) => $.macroStorage.headings.name)}</th>
+                    <th>{t(($) => $.macroStorage.headings.latestValue)}</th>
+                    <th>{t(($) => $.macroStorage.headings.observationDate)}</th>
+                    <th>{t(($) => $.macroStorage.headings.lastFetch)}</th>
                   </tr>
                 </thead>
                 <tbody>
