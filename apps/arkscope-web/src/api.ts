@@ -721,30 +721,63 @@ async function fetchWithTimeout(
   }
 }
 
-async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
-  const r = await fetchWithTimeout(path, timeoutMs);
-  if (!r.ok) throw new Error(`${path} returned ${r.status}`);
-  return (await r.json()) as T;
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly path: string,
+    readonly status: number,
+    readonly code: string | null,
+    readonly diagnostic: string | null,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
-async function responseErrorMessage(path: string, r: Response): Promise<string> {
-  let detail = "";
+interface ParsedResponseError {
+  code: string | null;
+  diagnostic: string | null;
+  legacySuffix: string | null;
+}
+
+async function parseResponseError(r: Response): Promise<ParsedResponseError> {
   try {
-    const body = (await r.json()) as { detail?: unknown };
-    if (typeof body.detail === "string" && body.detail.trim()) {
-      detail = `: ${body.detail.trim()}`;
-    } else if (body.detail && typeof body.detail === "object") {
-      // Structured FastAPI details ({code, message, ...}) — surface the human text.
-      const obj = body.detail as { message?: unknown; code?: unknown };
-      const text =
-        (typeof obj.message === "string" && obj.message.trim()) ||
-        (typeof obj.code === "string" && obj.code.trim()) || "";
-      if (text) detail = `: ${text}`;
+    const body = (await r.json()) as unknown;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return { code: null, diagnostic: null, legacySuffix: null };
     }
+    const detail = (body as { detail?: unknown }).detail;
+    if (typeof detail === "string") {
+      const diagnostic = detail.trim() || null;
+      return { code: null, diagnostic, legacySuffix: diagnostic };
+    }
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+      return { code: null, diagnostic: null, legacySuffix: null };
+    }
+    const value = detail as { code?: unknown; message?: unknown };
+    const code = typeof value.code === "string" ? value.code.trim() || null : null;
+    const diagnostic = typeof value.message === "string"
+      ? value.message.trim() || null
+      : null;
+    return { code, diagnostic, legacySuffix: diagnostic ?? code };
   } catch {
-    // Some routes/proxies return non-JSON bodies; the status is still useful.
+    return { code: null, diagnostic: null, legacySuffix: null };
   }
-  return `${path} returned ${r.status}${detail}`;
+}
+
+async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const r = await fetchWithTimeout(path, timeoutMs);
+  if (!r.ok) {
+    const parsed = await parseResponseError(r);
+    throw new ApiError(
+      `${path} returned ${r.status}`,
+      path,
+      r.status,
+      parsed.code,
+      parsed.diagnostic,
+    );
+  }
+  return (await r.json()) as T;
 }
 
 async function sendJSON<T>(
@@ -758,7 +791,17 @@ async function sendJSON<T>(
     headers: body === undefined ? {} : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await responseErrorMessage(path, r));
+  if (!r.ok) {
+    const parsed = await parseResponseError(r);
+    const suffix = parsed.legacySuffix ? `: ${parsed.legacySuffix}` : "";
+    throw new ApiError(
+      `${path} returned ${r.status}${suffix}`,
+      path,
+      r.status,
+      parsed.code,
+      parsed.diagnostic,
+    );
+  }
   if (r.status === 204) return undefined as T;
   return (await r.json()) as T;
 }
