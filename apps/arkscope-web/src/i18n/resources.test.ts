@@ -134,4 +134,78 @@ describe("bundled i18n resources", () => {
         .toBe(expected.running);
     }
   });
+
+  it("resolves the reviewed Settings copy inventory in both locales", () => {
+    const cases = [
+      {
+        locale: "zh-Hant" as const,
+        action: "儲存",
+        workspace: "設定",
+        section: "資料來源與排程",
+        task: "AI 研究",
+        provider: "IBKR Gateway",
+        schedule: "價格缺口補抓",
+        coverage: "交易日 / 價格覆蓋",
+        news: "新聞資料",
+        macro: "總經資料",
+        investor: "風險意願高於承受能力",
+      },
+      {
+        locale: "en" as const,
+        action: "Save",
+        workspace: "Settings",
+        section: "Data Sources and Schedules",
+        task: "AI Research",
+        provider: "IBKR Gateway",
+        schedule: "Price Gap Backfill",
+        coverage: "Trading-day / Price Coverage",
+        news: "News Data",
+        macro: "Macro Data",
+        investor: "Risk appetite above capacity",
+      },
+    ];
+
+    for (const expected of cases) {
+      const instance = createInstance();
+      initializeI18n(instance, expected.locale);
+      const t = instance.getFixedT(expected.locale, "settings");
+      expect(t(($) => $.actions.save)).toBe(expected.action);
+      expect(t(($) => $.workspace.title)).toBe(expected.workspace);
+      expect(t(($) => $.registry.sections.dataSources.title)).toBe(expected.section);
+      expect(t(($) => $.models.tasks.aiResearch.label)).toBe(expected.task);
+      expect(t(($) => $.dataSources.providers.names.ibkr)).toBe(expected.provider);
+      expect(t(($) => $.dataSources.schedule.sources.priceBackfill.label)).toBe(expected.schedule);
+      expect(t(($) => $.dataStorage.coverage.title)).toBe(expected.coverage);
+      expect(t(($) => $.newsStorage.title)).toBe(expected.news);
+      expect(t(($) => $.macroStorage.title)).toBe(expected.macro);
+      expect(t(($) => $.investor.mismatch.appetiteAboveCapacity)).toBe(expected.investor);
+    }
+  });
+
+  it("contains exactly 486 Settings leaves per locale", () => {
+    const expectedSubtreeCounts = {
+      actions: 18,
+      workspace: 27,
+      registry: 30,
+      errors: 13,
+      models: 62,
+      runtime: 20,
+      providers: 104,
+      dataSources: 83,
+      dataStorage: 37,
+      newsStorage: 11,
+      macroStorage: 27,
+      investor: 53,
+    } as const;
+
+    for (const locale of ["zh-Hant", "en"] as const) {
+      const settings = resources[locale].settings as ResourceTree;
+      expect(flattenResource(settings).size).toBe(486);
+      expect(flattenResource(settings.locale as ResourceTree).size).toBe(1);
+      for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
+        expect(flattenResource(settings[subtree] as ResourceTree).size, `${locale}.${subtree}`)
+          .toBe(count);
+      }
+    }
+  });
 });
