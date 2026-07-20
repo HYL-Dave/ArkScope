@@ -269,9 +269,11 @@ therefore defaults to defer until the hypothesis gate exists.
   (`73/680 -> 74/695`), focused is `12/108`, scanner is
   `1649/1563/1562/1`, and the both-locale six-viewport gate is green after one
   reviewed single-line topbar wrap correction. Fresh merged-tree gates and the
-  normal merged-master desktop smoke are green. **I18N-2 Settings, including
-  the currently reachable Investor Profile panel, is the single NEXT planning
-  unit.** The public selector remains absent, and
+  normal merged-master desktop smoke are green. **The I18N-2 Settings plan is
+  WRITTEN and independent plan review is the single NEXT gate.** Its bounded
+  scope includes the currently reachable Investor Profile panel, all nine
+  Settings anchors, and Settings-owned backend-copy mappings. Product
+  implementation and the public selector remain unauthorized, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
@@ -467,6 +469,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-2 SETTINGS PLAN WRITTEN — INDEPENDENT REVIEW PENDING)**: The bounded plan at <code>docs/superpowers/plans/2026-07-20-i18n-2-settings.md</code> localizes the complete reachable Settings workspace, including the current Investor Profile panel, while preserving the three-tab IA, guarded drafts and in-flight work, polling/request semantics, formatter ownership, and selector-last release contract. It introduces exact Settings-only semantic-copy and backend-copy seams, adds typed HTTP error metadata without changing legacy <code>Error.message</code>, and confines raw source diagnostics to Developer Mode. Planned accounting is frontend <code>+83/-0</code> (<code>74/695 -> 77/778</code>), focused <code>32/293 -> 35/376</code>, backend byte-identical at <code>4569</code>, resources <code>settings +486</code> leaves per locale, and scanner <code>1649/1563/1562/1 -> 1029/969/954/15</code> with 22 new migrated scopes. Independent plan review is the single next gate; no feature worktree, product implementation, or public locale selector is authorized yet.
 
 - **2026-07-20 (I18N-1 SHELL + COMMON UI LIVE COMPLETE — I18N-2 SETTINGS NEXT)**: Independent implementation review returned GREEN with zero findings at product tip <code>5a76528d</code>, reproducing exact frontend <code>+15/-0</code>, <code>74/695</code>, typecheck/build, scanner <code>1649/1563/1562/1</code>, the one-line wrap RED/GREEN proof, immutable gates, and a separate 37-check runtime matrix. With explicit user approval, <code>master</code> fast-forwarded through evidence tip <code>6542e6e2</code>. Fresh merged-tree focused <code>12/108</code>, full <code>74/695</code>, typecheck, build, scanner, no-PG <code>ok:true / pg_attempts:[]</code>, byte gates, and exact one-line <code>shell.css</code> accounting passed. The normal desktop was then reduced to one merged-master launcher owning Vite <code>8430</code>, Electron, and sidecar; health/locale requests return <code>200</code> and the captured <code>1440x900</code> Shell is correctly <code>zh-Hant</code> with no selector. I18N-2 Settings, including the current Investor Profile surface, is the single NEXT planning unit; the public selector remains absent.
 
