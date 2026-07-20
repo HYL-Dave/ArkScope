@@ -87,6 +87,13 @@ printed in the interface.
 | Curated or filtered subset | Pool | 池 | Use in compounds such as `標的池`; never use for Research threads. |
 | Daily research list | Watchlist | 自選股 | A working view over profile state. |
 | Broker portfolio surface | Holdings | 持倉 | Distinct from Universe and Watchlist. |
+| Primary work surface | Home | 工作台 | Default Shell destination. |
+| Event/news surface | News | 新聞·事件 | Canonical Shell destination label. |
+| AI research surface | AI Research | AI 研究 | Distinct from the broader Research workflow group. |
+| Shell workflow group | Explore | 探索 | Contains Home, Watchlist, Universe, and News. |
+| Research workflow group | Research | 研究 | Workflow group label, not a thread pool. |
+| Monitoring workflow group | Monitor | 追蹤 | Contains the Holdings surface. |
+| System diagnostics surface | System / Health | System / Health | Preserve the established mixed professional label. |
 | Structured §2 output | AI card | AI 卡片 | Carries per-claim traceability. |
 | Application preferences | Settings | 設定 | Product surface, not System diagnostics. |
 | AI/data service owner | Provider | Provider | Preserve English in Traditional Chinese copy. |

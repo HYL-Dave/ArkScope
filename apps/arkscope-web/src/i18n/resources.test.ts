@@ -99,4 +99,39 @@ describe("bundled i18n resources", () => {
       "Could not save the interface language. The previous setting was restored.",
     );
   });
+
+  it("resolves the reviewed common and shell copy in both locales", () => {
+    const cases = [
+      {
+        locale: "zh-Hant" as const,
+        close: "關閉",
+        result: "結果：AI 研究對話",
+        universe: "全部標的",
+        running: "執行中 2",
+      },
+      {
+        locale: "en" as const,
+        close: "Close",
+        result: "Result: AI Research conversation",
+        universe: "Universe",
+        running: "Running 2",
+      },
+    ];
+
+    for (const expected of cases) {
+      const instance = createInstance();
+      initializeI18n(instance, expected.locale);
+      const commonT = instance.getFixedT(expected.locale, "common");
+      const shellT = instance.getFixedT(expected.locale, "shell");
+      expect(commonT(($) => $.actions.close)).toBe(expected.close);
+      expect(commonT(($) => $.boundedProgress.result, {
+        destination: expected.locale === "en"
+          ? "AI Research conversation"
+          : "AI 研究對話",
+      })).toBe(expected.result);
+      expect(shellT(($) => $.navigation.views.universe)).toBe(expected.universe);
+      expect(shellT(($) => $.backgroundWork.activeCount, { count: 2 }))
+        .toBe(expected.running);
+    }
+  });
 });
