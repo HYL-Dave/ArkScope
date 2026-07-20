@@ -263,8 +263,9 @@ therefore defaults to defer until the hypothesis gate exists.
   through evidence tip `64017f4`.** Independent review completed canonical
   backend A/B at exact `+7/-0`; merged-tree backend `7`, frontend `73/680`,
   typecheck, build, scanner, no-PG, and isolated startup smoke are green.
-  **I18N-1 Shell + common UI is the single NEXT unit**, the public selector
-  remains absent, and
+  **I18N-1 Shell + common UI implementation plan is WRITTEN / INDEPENDENT PLAN
+  REVIEW PENDING and is the single NEXT gate.** Product implementation remains
+  unauthorized until review GREEN; the public selector remains absent, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
@@ -460,6 +461,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-1 SHELL + COMMON UI PLAN WRITTEN — INDEPENDENT REVIEW PENDING)**: The bounded plan at <code>docs/superpowers/plans/2026-07-20-i18n-1-shell-common-ui.md</code> localizes only the shipped Shell plus generic Drawer/BoundedProgress chrome, preserves source content and all formatting owners, and keeps the public locale selector absent. It fixes exact resources at <code>common +17</code> and <code>shell +37</code> leaves per locale, uses one exhaustive static label seam for four navigation groups and eight views, stores missing Research thread titles as semantic nulls rather than captured translations, and promotes App/Shell/Drawer/BoundedProgress into the literal ratchet with ArkScope as the sole stable-identifier allowlist. Planned accounting is frontend <code>+14/-0</code> (<code>73/680 -> 74/694</code>), focused <code>10/87 -> 11/101</code>, backend byte-identical at <code>4569</code>, and scanner <code>1709/1621/1621/0 -> 1649/1563/1562/1</code>. Independent plan review is the single next gate; no implementation branch or product change is authorized yet.
 
 - **2026-07-20 (I18N-0 FOUNDATION LIVE COMPLETE — I18N-1 NEXT)**: Independent implementation review approved product tip <code>69a8ca2</code> and completed canonical virgin backend A/B: collect <code>4562 -> 4569</code>, exact <code>+7/-0</code>, with isolated reruns proving the apparent <code>test_agents</code> differences were pre-existing order-sensitive fixture noise. With user approval, <code>master</code> fast-forwarded through evidence tip <code>64017f4</code>. Merged-tree verification passed backend <code>7</code>, frontend focused <code>8/44</code>, full frontend <code>73/680</code>, typecheck, build, literal scanner, no-PG, and isolated synchronous-first-paint startup smoke at desktop/mobile widths. The normal desktop was concurrently active, so SQLite byte-hash equality was not observable; read-only inspection proved <code>profile_settings.ui_locale</code> remains absent and the isolated profile reported the default without persisting it. I18N-0 adds no selector or translated surface, so Design Kit is unchanged. I18N-1 Shell + common UI is now the single NEXT unit; I18N-2, bilingual-from-birth Slice 5, and later migrations remain queued.
 
