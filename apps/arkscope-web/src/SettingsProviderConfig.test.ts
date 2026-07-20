@@ -492,7 +492,7 @@ function setInputValue(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function plantPunctuationFixtures(): () => void {
+function plantPunctuationFixtures(missingBaseId = false): () => void {
   const groupedField = mocked.providersConfig.providers.ibkr.fields.find((field) =>
     field.field === "host") as {
       app_value_set: boolean;
@@ -500,20 +500,30 @@ function plantPunctuationFixtures(): () => void {
       effective_source: string;
     } | undefined;
   if (!groupedField) throw new Error("missing grouped config field");
+  const clientIdField = mocked.providersConfig.providers.ibkr.fields.find((field) =>
+    field.field === "client_id") as {
+      client_id_domains: Array<{ domain: string; effective_id: number | null }>;
+    } | undefined;
+  const manualDomain = clientIdField?.client_id_domains.find((domain) =>
+    domain.domain === "manual");
+  if (!manualDomain) throw new Error("missing manual client-id domain");
   const previous = {
     appValueSet: groupedField.app_value_set,
     appValueMasked: groupedField.app_value_masked,
     effectiveSource: groupedField.effective_source,
+    manualEffectiveId: manualDomain.effective_id,
     scheduleRunning: mocked.scheduleRunning,
   };
   groupedField.app_value_set = false;
   groupedField.app_value_masked = null;
   groupedField.effective_source = "env";
+  if (missingBaseId) manualDomain.effective_id = null;
   mocked.scheduleRunning = true;
   return () => {
     groupedField.app_value_set = previous.appValueSet;
     groupedField.app_value_masked = previous.appValueMasked;
     groupedField.effective_source = previous.effectiveSource;
+    manualDomain.effective_id = previous.manualEffectiveId;
     mocked.scheduleRunning = previous.scheduleRunning;
   };
 }
@@ -1119,7 +1129,7 @@ describe("Settings provider config authority", () => {
   });
 
   it("renders English data-source health config and schedule tables", async () => {
-    const restoreFixtures = plantPunctuationFixtures();
+    const restoreFixtures = plantPunctuationFixtures(true);
     try {
       await act(async () => { await i18n.changeLanguage("en"); });
       await renderDataSources();
@@ -1139,7 +1149,7 @@ describe("Settings provider config authority", () => {
       const groupedConfig = host!.querySelector("[data-testid='ibkr-config-group']");
       expect(groupedConfig?.textContent).toContain("(External) (Environment)");
       expect(groupedConfig?.textContent)
-        .toContain("Base=1, Options=11, Prices=21, News=31, IV=41");
+        .toContain("Base=—, Options=11, Prices=21, News=31, IV=41");
       const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
         row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
       if (!polygonRow) throw new Error("missing Polygon config row");
@@ -1158,7 +1168,7 @@ describe("Settings provider config authority", () => {
       expect(host!.textContent).toContain("No key required");
       expect(host!.textContent).toContain("Snapshot available: 11 series · 29,571 observations");
       expect(host!.textContent).toContain("Provider settings need repair.");
-      expect(dataSourcesRoot.textContent).not.toMatch(/[（）：、]/);
+      expect(dataSourcesRoot.textContent).not.toMatch(/[（）：、？]/);
       for (const raw of [
         "PLANTED_PROVIDER_POLYGON_LABEL",
         "PLANTED_PROVIDER_IBKR_LABEL",

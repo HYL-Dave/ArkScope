@@ -137,7 +137,7 @@ function ibkrClientIdChips(
   const s = draft.trim();
   const base = /^\d+$/.test(s) ? Number(s) : null;
   const text = domains
-    .map((d) => `${providerClientDomainLabel(d.domain, t)}=${base !== null ? base + d.offset : d.effective_id ?? "？"}`)
+    .map((d) => `${providerClientDomainLabel(d.domain, t)}=${base !== null ? base + d.offset : d.effective_id ?? "—"}`)
     .join(t(($) => $.dataSources.providers.config.clientIdSeparator));
   return { preview: base !== null, text };
 }
