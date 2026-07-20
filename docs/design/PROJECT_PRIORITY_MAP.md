@@ -263,9 +263,9 @@ therefore defaults to defer until the hypothesis gate exists.
   through evidence tip `64017f4`.** Independent review completed canonical
   backend A/B at exact `+7/-0`; merged-tree backend `7`, frontend `73/680`,
   typecheck, build, scanner, no-PG, and isolated startup smoke are green.
-  **I18N-1 Shell + common UI implementation plan is WRITTEN / INDEPENDENT PLAN
-  REVIEW PENDING and is the single NEXT gate.** Product implementation remains
-  unauthorized until review GREEN; the public selector remains absent, and
+  **I18N-1 Shell + common UI implementation plan is REVIEW GREEN / CLEARED,
+  and implementation is the single NEXT gate.** The public selector remains
+  absent, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
@@ -461,6 +461,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-1 PLAN REVIEW GREEN — IMPLEMENTATION CLEARED)**: Independent written review approved the complete I18N-1 plan with no must-fix. The one advisory is resolved in the clearance commit: the assertion-ledger summary now explicitly names all three reviewed evolutions, namely the Background Work result-copy correction, navigation authority labels-to-IDs/views, and missing Research thread title to semantic <code>null</code>. Exact scope and accounting remain unchanged at frontend <code>+14/-0</code> (<code>73/680 -> 74/694</code>), focused <code>10/87 -> 11/101</code>, backend byte-identical at <code>4569</code>, resources <code>common +17</code>/<code>shell +37</code>, and scanner <code>1709/1621/1621/0 -> 1649/1563/1562/1</code>. I18N-1 implementation is now the single NEXT unit, must descend from this docs-only clearance, and must stop at review-ready; I18N-2 and the public selector remain unopened.
 
 - **2026-07-20 (I18N-1 SHELL + COMMON UI PLAN WRITTEN — INDEPENDENT REVIEW PENDING)**: The bounded plan at <code>docs/superpowers/plans/2026-07-20-i18n-1-shell-common-ui.md</code> localizes only the shipped Shell plus generic Drawer/BoundedProgress chrome, preserves source content and all formatting owners, and keeps the public locale selector absent. It fixes exact resources at <code>common +17</code> and <code>shell +37</code> leaves per locale, uses one exhaustive static label seam for four navigation groups and eight views, stores missing Research thread titles as semantic nulls rather than captured translations, and promotes App/Shell/Drawer/BoundedProgress into the literal ratchet with ArkScope as the sole stable-identifier allowlist. Planned accounting is frontend <code>+14/-0</code> (<code>73/680 -> 74/694</code>), focused <code>10/87 -> 11/101</code>, backend byte-identical at <code>4569</code>, and scanner <code>1709/1621/1621/0 -> 1649/1563/1562/1</code>. Independent plan review is the single next gate; no implementation branch or product change is authorized yet.
 

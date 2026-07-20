@@ -9,7 +9,7 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** WRITTEN IMPLEMENTATION PLAN — INDEPENDENT PLAN REVIEW PENDING,
+> **Status:** CLEARED FOR IMPLEMENTATION — INDEPENDENT PLAN REVIEW GREEN,
 > 2026-07-20
 >
 > I18N-0 is LIVE COMPLETE through merge-closeout commit `ac57858`. This plan is
@@ -317,8 +317,10 @@ change is a plan-review amendment so tests/resources do not drift independently.
 
 ## Exact Test Ledger
 
-No existing test node is removed or renamed. Existing Traditional Chinese
-assertions evolve only where the explicit result-destination correction applies.
+No existing test node is removed or renamed. Existing assertions evolve only
+in three reviewed places: the explicit result-destination copy correction;
+Task 3's navigation authority shape from labels to IDs/views; and Task 5's
+missing-thread-title expectation from captured `AI 研究` to semantic `null`.
 
 | File | Added nodes | Exact new node names |
 | --- | ---: | --- |
@@ -375,7 +377,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
 | Evidence | Required record | Current state |
 | --- | --- | --- |
-| Plan review | findings, resolution commit, clearance commit | Independent plan review pending; no clearance commit exists |
+| Plan review | findings, resolution commit, clearance commit | GREEN; the sentence-level assertion-ledger advisory is resolved in the clearance commit; record its resulting hash at Task 8 |
 | Branch ancestry | product A/B base, clearance base, worktree path, branch | Product base fixed at `ac57858`; implementation branch not created |
 | TDD commits | RED command/output and GREEN commit for Tasks 1-6 | Not started; product implementation unauthorized |
 | Resource accounting | exact Common/Shell paths and per-locale leaf counts | Planned `common +17`, `shell +37`; not implemented |
