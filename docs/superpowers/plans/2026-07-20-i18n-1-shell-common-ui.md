@@ -377,12 +377,12 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
 | Evidence | Required record | Current state |
 | --- | --- | --- |
-| Plan review | findings, resolution commit, clearance commit | GREEN; the sentence-level assertion-ledger advisory is resolved in the clearance commit; record its resulting hash at Task 8 |
-| Branch ancestry | product A/B base, clearance base, worktree path, branch | Product base fixed at `ac57858`; implementation branch not created |
+| Plan review | findings, resolution commit, clearance commit | GREEN; assertion-ledger advisory resolved; clearance `857677871faf9777a4a2e294a6b0db3209c1a784` |
+| Branch ancestry | product A/B base, clearance base, worktree path, branch | Product base `ac57858`; `codex/i18n-1-shell-common-ui` at `/tmp/arkscope-i18n-1-shell`, opened from clearance `85767787` |
 | TDD commits | RED command/output and GREEN commit for Tasks 1-6 | Not started; product implementation unauthorized |
 | Resource accounting | exact Common/Shell paths and per-locale leaf counts | Planned `common +17`, `shell +37`; not implemented |
-| Test accounting | baseline/head lists, comm output, per-file additions/removals | Planned frontend `+14/-0`, backend `+0/-0`; not implemented |
-| Literal ratchet | before/after totals, manifest hashes, exact allowlist/scopes | Baseline `1709/1621/1621/0`; migration not applied |
+| Test accounting | baseline/head lists, comm output, per-file additions/removals | Baseline backend `4569`, frontend `73/680`, focused `10/87`; planned frontend `+14/-0`, backend `+0/-0` |
+| Literal ratchet | before/after totals, manifest hashes, exact allowlist/scopes | Baseline confirmed `1709/1621/1621/0`; migration not applied |
 | Immutable gates | backend/API/CSS/desktop/extensions/non-owner diffs | Not run against an implementation tip |
 | Runtime gate | locale/viewport matrix, focus/state/privacy assertions, process cleanup | Not run |
 | Independent review | reviewer commands, findings, reviewed product/docs tips | Not requested |
@@ -396,13 +396,13 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 - Modify: `docs/superpowers/plans/2026-07-20-i18n-1-shell-common-ui.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Apply independent plan-review findings**
+- [x] **Step 1: Apply independent plan-review findings**
 
   Resolve every must-fix in this document. Recompute exact test/resource/
   scanner accounting for any approved change. Do not hide review additions in
   a net total.
 
-- [ ] **Step 2: Mark the plan cleared and commit docs only**
+- [x] **Step 2: Mark the plan cleared and commit docs only**
 
   Change status to `CLEARED FOR IMPLEMENTATION`, synchronize the map, and
   commit:
@@ -415,7 +415,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Record that commit as `PLAN_REVIEW_CLEARANCE_COMMIT` in the ledger.
 
-- [ ] **Step 3: Create an isolated implementation worktree**
+- [x] **Step 3: Create an isolated implementation worktree**
 
   From the clearance commit:
 
@@ -425,7 +425,13 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
 
   Never implement in the user's normal checkout.
 
-- [ ] **Step 4: Re-run and record exact baselines**
+  The initial direct checkout stopped at the known linked-worktree git-crypt
+  boundary before materialization. The clean retry used `--no-checkout`, copied
+  only `.git/git-crypt/keys/default` into linked Git metadata, then populated
+  `HEAD` with `git read-tree -mu HEAD`. No DB, token, browser profile, dirty
+  main-checkout file, or user data was copied.
+
+- [x] **Step 4: Re-run and record exact baselines**
 
   Run:
 
@@ -439,7 +445,7 @@ exact commands, hashes, node IDs, or artifacts with prose summaries.
   `1709/1621/1621/0`. Run the focused list command from Grounded Baseline and
   require the ten existing files to total 87 while the new file is absent.
 
-- [ ] **Step 5: Prove the behavior baseline and dirty-tree boundary**
+- [x] **Step 5: Prove the behavior baseline and dirty-tree boundary**
 
   Record `ac57858` as product baseline. Require a clean implementation worktree
   and a main checkout whose only allowed unrelated change remains user-owned;
