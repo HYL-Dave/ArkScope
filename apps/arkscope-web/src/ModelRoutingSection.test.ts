@@ -637,6 +637,10 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(research.textContent).toContain("Uses subscription quota, not API billing.");
     const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
     expect(translation.textContent).toContain("Adaptive thinking available");
+    const defaultRouteBadge = host!.querySelector(
+      '[data-testid="route-card_synthesis"] .route-source',
+    )!;
+    expect(defaultRouteBadge.getAttribute("title")).toBe("default");
     expect(host!.textContent).not.toContain("BACKEND TASK");
     expect(host!.textContent).not.toContain("BACKEND EFFORT");
   });

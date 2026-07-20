@@ -132,11 +132,18 @@ describe("ProviderSection localization", () => {
       await i18n.changeLanguage("en");
     });
 
+    const currentAnthropic = providerCard("anthropic");
+    const currentDisclosure = currentAnthropic.querySelector<HTMLDetailsElement>("details.cred-setup")!;
+    const currentAlias = currentAnthropic.querySelector<HTMLInputElement>(
+      ".credential-add-box:not(.oauth-import-box) input:not([type='password'])",
+    )!;
+    expect(currentDisclosure).toBe(disclosure);
+    expect(currentAlias).toBe(alias);
     expect(host!.textContent).toContain("Provider Status");
     expect(host!.textContent).toContain("Add an API key or subscription sign-in");
     expect(host!.textContent).toContain("Sign in to ChatGPT");
-    expect(disclosure.open).toBe(true);
-    expect(alias.value).toBe("planted-provider-draft");
+    expect(currentDisclosure.open).toBe(true);
+    expect(currentAlias.value).toBe("planted-provider-draft");
     expect(host!.querySelector('[data-testid="locale-selector"]')).toBeNull();
   });
 
@@ -197,12 +204,19 @@ describe("ProviderSection localization", () => {
 
     await act(async () => { reloginButtons()[0].click(); });
     await waitFor(() => fetchMock.mock.calls.some(([url]) => String(url).includes("/oauth/status")));
-    const select = providerCard("openai").querySelector<HTMLSelectElement>("select")!;
+    const openai = providerCard("openai");
+    const disclosure = openai.querySelector<HTMLDetailsElement>("details.cred-setup")!;
+    const select = openai.querySelector<HTMLSelectElement>("select")!;
     expect(select.value).toBe("local:7");
 
     await act(async () => { await i18n.changeLanguage("en"); });
-    expect(providerCard("openai").querySelector<HTMLDetailsElement>("details.cred-setup")!.open).toBe(true);
-    expect(select.value).toBe("local:7");
+    const currentOpenai = providerCard("openai");
+    const currentDisclosure = currentOpenai.querySelector<HTMLDetailsElement>("details.cred-setup")!;
+    const currentSelect = currentOpenai.querySelector<HTMLSelectElement>("select")!;
+    expect(currentDisclosure).toBe(disclosure);
+    expect(currentSelect).toBe(select);
+    expect(currentDisclosure.open).toBe(true);
+    expect(currentSelect.value).toBe("local:7");
     expect(host!.textContent).toContain("Waiting for browser sign-in...");
 
     await act(async () => {
@@ -214,6 +228,13 @@ describe("ProviderSection localization", () => {
       await Promise.resolve();
     });
     await waitFor(() => onRefresh.mock.calls.length === 1);
+    const completedOpenai = providerCard("openai");
+    const completedDisclosure = completedOpenai.querySelector<HTMLDetailsElement>("details.cred-setup")!;
+    const completedSelect = completedOpenai.querySelector<HTMLSelectElement>("select")!;
+    expect(completedDisclosure).toBe(disclosure);
+    expect(completedSelect).toBe(select);
+    expect(completedDisclosure.open).toBe(true);
+    expect(completedSelect.value).toBe("local:7");
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/oauth/start"))).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/oauth/status"))).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/oauth/cancel"))).toHaveLength(0);

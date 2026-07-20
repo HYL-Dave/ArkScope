@@ -74,9 +74,8 @@ function authModeLabel(authMode: string, t: SettingsT): string {
 }
 
 function providerLabel(provider: ModelProvider, t: SettingsT): string {
-  return provider === "openai"
-    ? t(($) => $.models.providers.openai)
-    : t(($) => $.models.providers.anthropic);
+  if (provider === "openai") return t(($) => $.models.providers.openai);
+  return t(($) => $.models.providers.anthropic);
 }
 
 function modelEntrySuffix(entry: ModelEntryWithReason, t: SettingsT): string | null {
@@ -233,7 +232,8 @@ export function ModelRoutingSection({
                 </div>
                 <span
                   className={`route-source ${routeBadge.tone}`}
-                  aria-label={`${t(($) => $.models.route.authority)} ${routeBadge.label}`}
+                  aria-label={[t(($) => $.models.route.authority), " ", routeBadge.label].join("")}
+                  title={effectiveRoute?.source ?? "default"}
                 >
                   {routeBadge.label}
                 </span>
@@ -350,7 +350,7 @@ export function ModelRoutingSection({
                               value={entry.id}
                               disabled={!!entry.disabledReason}
                             >
-                              {entry.baseLabel}{suffix ? ` · ${suffix}` : ""}
+                              {[entry.baseLabel, suffix ? " · " : "", suffix ?? ""].join("")}
                             </option>
                           );
                         })}

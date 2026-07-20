@@ -214,7 +214,7 @@ export function providerConfigFieldLabel(
       }
       break;
   }
-  return `${provider}.${field}`;
+  return [provider, field].join(".");
 }
 
 export function providerClientDomainLabel(domain: string, t: SettingsT): string {

@@ -643,7 +643,7 @@ export function ProviderSection({
                     <span>{t(($) => $.providers.credential.alias)}</span>
                     <input
                       value={newAlias[provider] ?? ""}
-                      placeholder={`${provider} ${t(($) => $.providers.row.primary)}`}
+                      placeholder={[provider, " ", t(($) => $.providers.row.primary)].join("")}
                       onChange={(e) => setNewAlias((prev) => ({ ...prev, [provider]: e.target.value }))}
                     />
                   </label>
@@ -958,7 +958,7 @@ export function CredentialList({
                       value={aliasDraft}
                       required
                       onChange={(e) => onRenameDraft(cred.id, e.target.value)}
-                      aria-label={`${cred.label} · ${t(($) => $.providers.credential.alias)}`}
+                      aria-label={[cred.label, " · ", t(($) => $.providers.credential.alias)].join("")}
                       placeholder={t(($) => $.providers.credential.alias)}
                     />
                     <button
@@ -976,14 +976,14 @@ export function CredentialList({
                     <input
                       value={accountLabelDraft}
                       placeholder={t(($) => $.providers.credential.accountPurpose)}
-                      aria-label={`${cred.label} · ${t(($) => $.providers.credential.accountPurpose)}`}
+                      aria-label={[cred.label, " · ", t(($) => $.providers.credential.accountPurpose)].join("")}
                       onChange={(e) => onMetadataDraft(cred.id, "account_label", e.target.value)}
                     />
                     {showExpiry && (
                       <input
                         type="date"
                         value={expiresAtDraft}
-                        aria-label={`${cred.label} · ${t(($) => $.providers.credential.expiresOptional)}`}
+                        aria-label={[cred.label, " · ", t(($) => $.providers.credential.expiresOptional)].join("")}
                         title={t(($) => $.providers.credential.expiresOptional)}
                         onChange={(e) => onMetadataDraft(cred.id, "expires_at", e.target.value)}
                       />
@@ -1118,8 +1118,8 @@ function ProbeResultView({
     <div className="probe-result">
       <p className={probe.passed ? "ok-text tiny" : "warn-text tiny"}>
         {probe.passed
-          ? `✓ ${t(($) => $.providers.probe.passed)}`
-          : `✗ ${t(($) => $.providers.probe.failed)}`}
+          ? ["✓ ", t(($) => $.providers.probe.passed)].join("")
+          : ["✗ ", t(($) => $.providers.probe.failed)].join("")}
       </p>
       {note && <p className="probe-note tiny">{note}</p>}
       <ul className="probe-list">

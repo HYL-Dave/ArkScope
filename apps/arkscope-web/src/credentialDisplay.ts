@@ -8,6 +8,12 @@ import type { SettingsT } from "./settings/settingsCopy";
 // Discovery-result badge. `provider_api` is ambiguous at the data layer (OpenAI API
 // AND the ChatGPT backend both report it), so disambiguate by auth_mode; `seed` is
 // the non-live candidate list (claude_code_oauth).
+function discoveryApiProviderLabel(provider: ModelProvider, t: SettingsT): string {
+  return provider === "anthropic"
+    ? t(($) => $.models.providers.anthropic)
+    : t(($) => $.models.providers.openai);
+}
+
 export function discoverySourceLabel(
   provider: ModelProvider,
   authMode: CredentialAuthType | null,
@@ -17,10 +23,8 @@ export function discoverySourceLabel(
   if (modelSource === "seed") return t(($) => $.providers.discovery.seedNotice);
   const source = authMode === "chatgpt_oauth"
     ? t(($) => $.providers.authModes.chatgptOAuth)
-    : provider === "anthropic"
-      ? `${t(($) => $.models.providers.anthropic)} API`
-      : `${t(($) => $.models.providers.openai)} API`;
-  return `${source} · ${t(($) => $.models.catalog.visibleListLoaded)}`;
+    : `${discoveryApiProviderLabel(provider, t)} API`;
+  return [source, " · ", t(($) => $.models.catalog.visibleListLoaded)].join("");
 }
 
 // Provider-card pill: reflect the ACTIVE credential's mode, not "key set/no key"
@@ -115,7 +119,7 @@ export function addApiKeySuccessMessage(
   const state = makeActive
     ? t(($) => $.providers.credential.active)
     : t(($) => $.providers.credential.inactive);
-  return `${provider}: ${state}`;
+  return [provider, ": ", state].join("");
 }
 
 export function discoveryHeaderTitle(authMode: CredentialAuthType | null, t: SettingsT): string {
@@ -131,5 +135,5 @@ export function discoveryResultCredentialLabel(
   const value = credential
     ? `${credential.label} / ${credential.auth_type}`
     : t(($) => $.providers.credential.unnamed);
-  return `${t(($) => $.providers.credential.source)}: ${value}`;
+  return [t(($) => $.providers.credential.source), ": ", value].join("");
 }
