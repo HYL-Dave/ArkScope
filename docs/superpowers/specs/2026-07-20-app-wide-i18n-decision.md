@@ -1,17 +1,17 @@
 # ArkScope App-Wide i18n Decision
 
 > **Status: WRITTEN DECISION APPROVED; I18N-0 FOUNDATION LIVE; I18N-1 SHELL +
-> COMMON UI LIVE; I18N-2 SETTINGS PLAN WRITTEN — INDEPENDENT REVIEW PENDING,
+> COMMON UI LIVE; I18N-2 SETTINGS PLAN REVIEW GREEN — IMPLEMENTATION CLEARED,
 > 2026-07-20.**
 > This document chooses the app-wide locale authority, runtime localization
 > mechanism, migration sequence, public-switch gate, and verification contract.
 > Independent written review returned GREEN. I18N-0 subsequently passed its
 > separately reviewed implementation, canonical A/B, and merged-tree closeout.
 > I18N-1 Shell + common UI passed independent implementation review with zero
-> findings and fast-forward merged through `6542e6e2`. The bounded I18N-2
-> Settings implementation plan is written; independent plan review is the
-> single next gate. Product implementation and the public selector remain
-> unauthorized.
+> findings and fast-forward merged through `6542e6e2`. Independent review
+> approved the bounded I18N-2 Settings plan after its terminology-authority
+> amendment. I18N-2 implementation is the single next unit and must stop at
+> review-ready; the public selector remains unauthorized.
 
 ## 1. Purpose and Authority
 
@@ -477,7 +477,7 @@ the foundation slice, but no incomplete public affordance is rendered.
 | --- | --- | --- | --- |
 | I18N-0 Foundation | dependencies, typed static resources, locale API, synchronous bootstrap/cache, `<html lang>`, test/static tooling | LIVE | absent |
 | I18N-1 Shell + common UI | navigation, topbar, Drawer labels, background-work chrome, shared states/primitives used by Shell | LIVE | absent |
-| I18N-2 Settings | PageHeader, workflow tabs, directory/registry, all reachable Settings sections, Settings backend-copy mappings | PLAN REVIEW | absent |
+| I18N-2 Settings | PageHeader, workflow tabs, directory/registry, all reachable Settings sections, Settings backend-copy mappings | CLEARED | absent |
 | P2.8 Slice 5 | Investor Profile UX, implemented bilingual from birth against the new Settings/runtime contract | queued | absent |
 | I18N-3 Explore | Home, Watchlist, Universe, News, Ticker Detail, AI card, related shared display helpers | queued | absent |
 | I18N-4 Research | workspace, history, evidence, progress/errors, model-selection copy not already owned by Settings | queued | absent |

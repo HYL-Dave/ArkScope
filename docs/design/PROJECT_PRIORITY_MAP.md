@@ -270,10 +270,10 @@ therefore defaults to defer until the hypothesis gate exists.
   `1649/1563/1562/1`, and the both-locale six-viewport gate is green after one
   reviewed single-line topbar wrap correction. Fresh merged-tree gates and the
   normal merged-master desktop smoke are green. **The I18N-2 Settings plan is
-  WRITTEN and independent plan review is the single NEXT gate.** Its bounded
-  scope includes the currently reachable Investor Profile panel, all nine
-  Settings anchors, and Settings-owned backend-copy mappings. Product
-  implementation and the public selector remain unauthorized, and
+  REVIEW GREEN / CLEARED, and implementation is the single NEXT unit.** Its
+  bounded scope includes the currently reachable Investor Profile panel, all
+  nine Settings anchors, and Settings-owned backend-copy mappings. The public
+  selector remains unauthorized, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
@@ -469,6 +469,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-07-20 (I18N-2 SETTINGS PLAN REVIEW GREEN — IMPLEMENTATION CLEARED)**: Independent written review validated every grounded baseline and exact ledger, then identified one real documentation-authority gap: the plan introduced canonical Settings IA and Investor enum translations without scheduling their terminology authority update. Clearance adopts the deduplicated amendment rather than copying the review count literally: 12 previously absent Settings workflow/section/subsection pairs, seven Assistant Stance pairs, and four risk-mismatch pairs now live in <code>ARKSCOPE_TERMINOLOGY.md</code>; already-owned <code>Macro Data</code>, <code>Risk appetite</code>, and <code>Risk capacity</code> are not duplicated. The existing stance/mismatch mapping node is strengthened in place to require zh-Hant byte parity with the byte-identical shared presenter, so planned accounting remains frontend <code>+83/-0</code> (<code>74/695 -> 77/778</code>), focused <code>32/293 -> 35/376</code>, backend <code>4569</code>, resources <code>settings +486</code>, and scanner <code>1029/969/954/15</code>. I18N-2 implementation is the single NEXT unit, must descend from this docs-only clearance, and must stop at independent implementation review; no public locale selector is authorized.
 
 - **2026-07-20 (I18N-2 SETTINGS PLAN WRITTEN — INDEPENDENT REVIEW PENDING)**: The bounded plan at <code>docs/superpowers/plans/2026-07-20-i18n-2-settings.md</code> localizes the complete reachable Settings workspace, including the current Investor Profile panel, while preserving the three-tab IA, guarded drafts and in-flight work, polling/request semantics, formatter ownership, and selector-last release contract. It introduces exact Settings-only semantic-copy and backend-copy seams, adds typed HTTP error metadata without changing legacy <code>Error.message</code>, and confines raw source diagnostics to Developer Mode. Planned accounting is frontend <code>+83/-0</code> (<code>74/695 -> 77/778</code>), focused <code>32/293 -> 35/376</code>, backend byte-identical at <code>4569</code>, resources <code>settings +486</code> leaves per locale, and scanner <code>1649/1563/1562/1 -> 1029/969/954/15</code> with 22 new migrated scopes. Independent plan review is the single next gate; no feature worktree, product implementation, or public locale selector is authorized yet.
 

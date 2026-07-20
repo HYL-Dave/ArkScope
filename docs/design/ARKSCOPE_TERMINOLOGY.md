@@ -2,7 +2,7 @@
 
 > **Status: ADOPTED TERMINOLOGY POLICY; WRITTEN REVIEW APPROVED WITH P2.8
 > SLICE 4.1, 2026-07-19; APP-WIDE I18N AUTONYM ADDENDUM WRITTEN REVIEW
-> APPROVED, 2026-07-20.**
+> APPROVED; I18N-2 SETTINGS TERMINOLOGY ADDENDUM ADOPTED, 2026-07-20.**
 > This is the single repository authority for product-facing English and
 > Traditional Chinese terminology. Other documents link here instead of
 > copying canonical term tables.
@@ -96,6 +96,18 @@ printed in the interface.
 | System diagnostics surface | System / Health | System / Health | Preserve the established mixed professional label. |
 | Structured §2 output | AI card | AI 卡片 | Carries per-claim traceability. |
 | Application preferences | Settings | 設定 | Product surface, not System diagnostics. |
+| Settings workflow group | AI and Models | AI 與模型 | Owns Provider, model-routing, and runtime controls. |
+| Settings workflow group | Personalization | 個人化 | Owns the current Investor Profile surface. |
+| Settings workflow group | Data and Sync | 資料與同步 | Owns data-source, storage, news, and macro controls. |
+| Provider settings section | Provider Sign-in and Credentials | Provider 登入與憑證 | Preserve `Provider` in Traditional Chinese. |
+| Model settings section | Model and Task Routing | 模型與任務路由 | Refers to per-task Provider/model selection. |
+| Fixed-task runtime section | Fixed AI Task Runtime Limits | 固定 AI 任務執行限制 | Covers card synthesis and translation runtime bounds. |
+| Research runtime section | AI Research Runtime Limits | AI 研究執行限制 | Covers AI Research session and run bounds. |
+| Investor settings section | Investor Profile | 投資人設定 | Current profile, calibration, and personalization owner. |
+| Data-source settings section | Data Sources and Schedules | 資料來源與排程 | Operational health, configuration, and schedules. |
+| Market-data settings section | Market Data | 市場資料 | Do not duplicate the English label in zh-Hant. |
+| News-data settings section | News Data | 新聞資料 | Do not use the former bilingual status heading. |
+| Market-data coverage subsection | Trading-day / Price Coverage | 交易日 / 價格覆蓋 | A coverage diagnostic, not a separate Calendar feature. |
 | AI/data service owner | Provider | Provider | Preserve English in Traditional Chinese copy. |
 | Delegated authorization protocol | OAuth | OAuth | Preserve protocol name. |
 | AI acting component | Agent | Agent | Preserve professional AI term unless an owning domain records a narrower term. |
@@ -107,6 +119,17 @@ printed in the interface.
 | Macro data Settings section | Macro Data | 總經資料 | Natural Chinese is precise; do not duplicate `Macro`. |
 | Willingness to accept investment risk | Risk appetite | 風險意願 | Do not use `風險胃納`. |
 | Financial ability to absorb loss | Risk capacity | 風險承受能力 | Distinct from willingness. |
+| Assistant stance: disabled | Off | 關閉 | Profile and stance are not applied. |
+| Assistant stance: objective | Neutral | 中性 | Analysis remains materially unpersonalized. |
+| Assistant stance: user-aligned | Investor-aligned | 對齊投資人 | Follows the investor's preferred style while retaining risks. |
+| Assistant stance: counterbalancing | Complementary | 互補投資人 | Intentionally counters likely blind spots. |
+| Assistant stance: downside-first | Strict risk control | 嚴格風控 | Prioritizes downside, concentration, liquidity, and invalidation. |
+| Assistant stance: valuation-first | Valuation rationalist | 估值理性派 | Emphasizes intrinsic value and margin of safety. |
+| Assistant stance: growth-first | Growth opportunity | 成長機會派 | Emphasizes catalysts, durability, execution, and optionality. |
+| Risk mismatch: none | Aligned | 一致 | Risk appetite and risk capacity do not conflict. |
+| Risk mismatch: appetite higher | Risk appetite above capacity | 風險意願高於承受能力 | Willingness exceeds financial capacity. |
+| Risk mismatch: capacity higher | Risk capacity above appetite | 承受能力高於風險意願 | Financial capacity exceeds stated willingness. |
+| Risk mismatch: unknown | Not assessed | 未評估 | Inputs are insufficient for a mismatch assessment. |
 
 Universe, Pool, Watchlist, and Holdings describe different product concepts even
 when they read from related local profile data. They are not interchangeable
