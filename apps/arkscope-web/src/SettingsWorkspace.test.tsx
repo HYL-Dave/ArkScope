@@ -440,7 +440,7 @@ describe("Settings workspace", () => {
       await Promise.resolve();
     });
     await flush();
-    expect(host!.textContent).toContain("Could not load the model catalog.");
+    expect(host!.textContent).toContain("Could not load AI model settings. Refresh the page, or check the connection under System / Health.");
     expect(host!.textContent).not.toContain("PLANTED_SETTINGS_RAW_DIAGNOSTIC");
   });
 
