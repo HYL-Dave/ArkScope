@@ -439,7 +439,7 @@ const settings = {
       description: "Review data-source health, connection settings, schedules, and manual runs in one place. Configure each source independently; IBKR jobs share a Gateway lock to prevent overlap.",
     },
     fred: {
-      snapshotAvailable: "Snapshot available: {{count}} series · {{value}} observations",
+      snapshotAvailable: "Snapshot available: {{seriesCount}} series · {{value}} observations",
       noData: "No data yet",
       latestFetched: "Last fetched {{timestamp}}",
       autoEnabled: "Automatic refresh enabled",

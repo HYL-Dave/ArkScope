@@ -104,8 +104,7 @@ function fredProviderDetail(p: ProviderHealth, t: SettingsT): string | null {
   if (snap?.available) {
     parts.push(
       t(($) => $.dataSources.fred.snapshotAvailable, {
-        // i18next reserves `count` as numeric even for this non-plural display key.
-        count: formatCount(snap.series_count) as unknown as number,
+        seriesCount: formatCount(snap.series_count),
         value: formatCount(snap.observation_count),
       }),
     );

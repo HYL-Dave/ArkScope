@@ -438,7 +438,7 @@ const settings = {
       description: "集中檢視各資料來源的健康狀態、連線設定、排程與手動執行。每個來源可獨立設定；IBKR 工作會共用 Gateway 鎖以避免重疊。",
     },
     fred: {
-      snapshotAvailable: "資料快照可用：{{count}} 序列 · {{value}} 觀測值",
+      snapshotAvailable: "資料快照可用：{{seriesCount}} 序列 · {{value}} 觀測值",
       noData: "尚無資料",
       latestFetched: "最後抓取 {{timestamp}}",
       autoEnabled: "自動刷新已啟用",
