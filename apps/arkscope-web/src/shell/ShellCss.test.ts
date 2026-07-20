@@ -30,6 +30,12 @@ function hasSelector(name: string): boolean {
 }
 
 describe("responsive application shell CSS", () => {
+  it("keeps the topbar primary row wrap-safe for long localized labels", () => {
+    const primary = shellCss.match(/\.shell-topbar-primary\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(primary).toMatch(/flex-wrap:\s*wrap/);
+  });
+
   it("defines a two-column wide shell and no third rail track", () => {
     const layout = shellCss.match(/\.app-shell-layout\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(layout).toMatch(/grid-template-columns:\s*minmax\([^;]+\)\s+minmax\(0,\s*1fr\)/);
