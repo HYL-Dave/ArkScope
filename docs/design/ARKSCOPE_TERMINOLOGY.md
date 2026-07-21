@@ -2,7 +2,8 @@
 
 > **Status: ADOPTED TERMINOLOGY POLICY; WRITTEN REVIEW APPROVED WITH P2.8
 > SLICE 4.1, 2026-07-19; APP-WIDE I18N AUTONYM ADDENDUM WRITTEN REVIEW
-> APPROVED; I18N-2 SETTINGS TERMINOLOGY ADDENDUM ADOPTED, 2026-07-20.**
+> APPROVED; I18N-2 SETTINGS TERMINOLOGY ADDENDUM ADOPTED, 2026-07-20;
+> P2.8 SLICE 5 WRITTEN ADDENDUM PENDING INDEPENDENT REVIEW, 2026-07-22.**
 > This is the single repository authority for product-facing English and
 > Traditional Chinese terminology. Other documents link here instead of
 > copying canonical term tables.
@@ -130,6 +131,28 @@ printed in the interface.
 | Risk mismatch: appetite higher | Risk appetite above capacity | 風險意願高於承受能力 | Willingness exceeds financial capacity. |
 | Risk mismatch: capacity higher | Risk capacity above appetite | 承受能力高於風險意願 | Financial capacity exceeds stated willingness. |
 | Risk mismatch: unknown | Not assessed | 未評估 | Inputs are insufficient for a mismatch assessment. |
+| Calibration topic: loss response | How you respond to losses | 遇到虧損時怎麼做 | Plain-language topic label; never expose `loss_response`. |
+| Calibration topic: financial capacity | What your finances allow | 資金能承受多少 | Explain Risk capacity without assuming finance vocabulary. |
+| Calibration topic: time horizon | How long you invest | 預計持有多久 | Plain-language topic label. |
+| Calibration topic: concentration | Single-position limit | 單一持股上限 | Do not use bare `Concentration` as the visible topic label. |
+| Calibration topic: avoided risks | Risks you avoid | 不碰哪些風險 | Plain-language topic label. |
+| Calibration topic: behavioral patterns | Behavioral patterns to watch | 容易受哪些行為影響 | Disclosure may explain examples; label remains concise. |
+| Calibration topic: investment approach | Research approaches you prefer | 偏好的研究方法 | Covers profile preset and preferred edge. |
+| Calibration topic: assistant style | How you want AI to work with you | 希望 AI 如何配合 | Covers the closed Assistant Stance set. |
+| Investor workspace mode | Summary | 摘要 | Default and only anchor destination. |
+| Investor workspace mode | Edit Profile | 編輯 Profile | Preserve `Profile` in mixed zh-Hant product copy. |
+| Investor workspace mode | Calibration | 校準 | Guided Investor Profile interview. |
+| Investor workspace mode | Proposal Review | 提案檢視 | Review mode, not a Settings anchor. |
+| Calibration action, no active session | Start Calibration | 開始校準 | State-aware Summary command. |
+| Calibration action, resumable session | Continue Calibration | 繼續校準 | State-aware Summary command. |
+| Proposal action | Review Proposal | 檢視提案 | Exists only for a pending proposal. |
+| Calibration early-exit action | Propose Now | 直接產生提案 | May create only a covered-topic partial proposal. |
+| Proposal acceptance action | Approve Proposal | 核准提案 | Applies only the reviewed partial patch. |
+| Proposal rejection action | Reject Proposal | 拒絕提案 | Records rejection without changing Profile fields. |
+| Investor workspace return action | Back to Summary | 返回摘要 | Returns to a freshly read effective Summary where required. |
+| Unknown calibration topic | Other topic | 其他主題 | Honest compatibility fallback; raw ID is Developer Mode only. |
+| Current personalization disclosure | Current personalization context | 目前的個人化 context | Exact backend source content that would be used now. |
+| Historical run personalization disclosure | Context used for this run | 本次 run 使用的個人化 context | Exact persisted source content; distinct from current settings. |
 
 Universe, Pool, Watchlist, and Holdings describe different product concepts even
 when they read from related local profile data. They are not interchangeable

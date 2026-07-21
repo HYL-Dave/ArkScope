@@ -699,10 +699,17 @@ evidence tip `bfdc32c`; merged-master desktop verification is GREEN.
 
 ### Slice 5: Investor Profile UX
 
-- summary-first information hierarchy;
-- proposal comparison and rationale;
-- qualitative risk labels and scenario anchors;
-- hybrid first-time scenario/dialogue calibration.
+**WRITTEN — INDEPENDENT REVIEW PENDING 2026-07-22.** The bounded authority is
+[`2026-07-22-p2-8-slice-5-investor-profile-workspace-design.md`](2026-07-22-p2-8-slice-5-investor-profile-workspace-design.md).
+
+- summary-first effective-state hierarchy under the existing single anchor;
+- command-driven Edit, guided Calibration, and Proposal Review modes;
+- closed topic-to-field proposal policy with partial-patch and conflict safety;
+- exact current/run-time personalization context transparency; and
+- bilingual-from-birth responsive and state-preservation contracts.
+
+No implementation plan or product edit is authorized until independent written
+review returns GREEN.
 
 ### Slice 6: Notes V1 prerequisite decisions
 
