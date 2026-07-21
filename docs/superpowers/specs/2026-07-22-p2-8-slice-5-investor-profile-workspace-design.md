@@ -8,7 +8,10 @@
 > implementation plan receives independent written review GREEN. Independent
 > full-document review approved this design on 2026-07-22; the sole required
 > clarification, next-topic validation versus display ordering, is incorporated
-> in Sections 4.1, 6.2, and 13.1.
+> in Sections 4.1, 6.2, and 13.1. The implementation-plan review also aligned
+> the per-run null snapshot case in Section 8.3 with queued runs that never
+> reached prompt assembly; this is an honest extension of the same no-snapshot
+> state, not a fabricated legacy backfill.
 
 ## 1. Purpose and Authority
 
@@ -490,7 +493,8 @@ trace and DTO distinguish:
 
 - non-empty string: exact context used for that run;
 - empty string: a new run executed with personalization disabled; and
-- null/missing legacy value: no snapshot exists for a pre-Slice 5 run.
+- null/missing value: no snapshot exists for a pre-Slice 5 run, or for a new
+  queued run that never reached prompt assembly/execution.
 
 Historical runs are never backfilled from current profile state.
 

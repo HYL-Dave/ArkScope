@@ -9,14 +9,18 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** WRITTEN — INDEPENDENT PLAN REVIEW PENDING
+> **Status:** CLEARED FOR IMPLEMENTATION
 >
 > The Slice 5 design received independent full-document GREEN at spec commit
 > `62d59b93`. The required review pin is part of the approved authority:
 > catalog order controls display only, the model may adaptively select only an
 > uncovered catalog topic, and an invalid or already-covered `next_topic_id`
-> leaves coverage/current unchanged while the turn remains retryable. Product
-> implementation is blocked until this plan receives independent written GREEN.
+> leaves coverage/current unchanged while the turn remains retryable.
+> Independent plan review returned GREEN on 2026-07-22 subject to two docs-only
+> alignments now incorporated: the versioned opening prompt is byte-identical
+> across spec/plan resources, and null snapshots include queued runs that never
+> reached prompt assembly. Product implementation may proceed only from the
+> docs-only clearance commit that records these resolutions.
 
 **Goal:** Replace the form-first Investor Profile panel with a bilingual,
 summary-first workspace; add a durable guided-calibration protocol whose
@@ -55,6 +59,26 @@ Vite/Electron, and Playwright/CDP against isolated databases.
 
 If this plan conflicts with an authority above, stop and amend the authority
 before editing product code.
+
+---
+
+## Plan Review Resolution
+
+Independent plan review returned GREEN with two required docs-only
+corrections and no ledger change:
+
+1. **Opening prompt divergence — fixed.** The plan now uses the spec-owned
+   single-question English canonical fallback and pins the exact zh-Hant
+   resource. The rejected longer, compound-question draft is retained only in
+   git history and is not an implementation option.
+2. **Null snapshot coverage — fixed.** The spec now explicitly includes a new
+   queued run that never reached prompt assembly in the honest no-snapshot
+   state. Executed-disabled remains the distinct empty-string state.
+
+The reviewer advisories are already stronger locked decisions: trace and
+context share one prompt-assembly sample, and new Evidence Drawer chrome lives
+only in the `research` namespace. Backend/frontend/resource/scanner ledgers are
+unchanged.
 
 ---
 
@@ -286,9 +310,8 @@ CALIBRATION_TOPIC_IDS = tuple(topic.id for topic in CALIBRATION_TOPICS)
 NEVER_PROPOSABLE_FIELDS = frozenset({"enabled", "freeform_notes", "skill_mode"})
 OPENING_PROMPTS = {
     "loss_response.opening.v1": (
-        "Imagine a holding you still believe in falls 18% in one day without "
-        "a clear change in the business. What would you most likely do next, "
-        "and what information would you need before acting?"
+        "Suppose an important holding falls 18% over a short period while its "
+        "long-term thesis is not clearly broken. What would you usually do?"
     ),
 }
 OPENING_PROMPT_ID = "loss_response.opening.v1"
@@ -666,9 +689,17 @@ Topic labels use the terminology authority exactly:
 | `investment_approach` | Research approaches you prefer | 偏好的研究方法 |
 | `assistant_style` | How you want AI to work with you | 希望 AI 如何配合 |
 
-The localized opening prompt preserves the same scenario meaning, while the
-canonical fallback remains the exact English string in the backend policy.
-Source answers/rationales are never resource values.
+The opening prompt is a golden artifact. Its exact resource values are:
+
+```text
+en: Suppose an important holding falls 18% over a short period while its long-term thesis is not clearly broken. What would you usually do?
+zh-Hant: 假設一個重要持股在短期內下跌 18%，但長期 thesis 尚未明確失效，你通常會怎麼處理？
+```
+
+The English value is byte-identical to the backend canonical fallback; the
+Traditional Chinese value is the exact known-ID frontend resource. Changing
+either wording requires a new append-only prompt ID. Source answers/rationales
+are never resource values.
 
 Add a new `research` namespace with exactly five leaves per locale:
 
@@ -1375,7 +1406,8 @@ collection requires a reviewed ledger amendment.
 
   Use planted profile values and exact expected context bytes. Insert legacy
   rows before additive column migration. Assert three states independently:
-  null legacy, empty new disabled, exact non-empty new active.
+  null legacy/queued-never-started, empty new disabled, exact non-empty new
+  active.
 
 - [ ] **Step 2: Prove RED**
 
