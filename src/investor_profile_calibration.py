@@ -99,13 +99,19 @@ class CalibrationStore:
         assert_calibration_schema_v2(self.db_path)
         self._write_lock = threading.Lock()
 
-    def _connect(self) -> sqlite3.Connection:
-        uri = f"{Path(self.db_path).resolve().as_uri()}?mode=rw"
+    def _connect_with_mode(self, mode: str) -> sqlite3.Connection:
+        uri = f"{Path(self.db_path).resolve().as_uri()}?mode={mode}"
         conn = sqlite3.connect(uri, uri=True, timeout=5.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout = 5000")
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
+    def _connect_read_only(self) -> sqlite3.Connection:
+        return self._connect_with_mode("ro")
+
+    def _connect_writable(self) -> sqlite3.Connection:
+        return self._connect_with_mode("rw")
 
     @staticmethod
     def _session(row: sqlite3.Row) -> CalibrationSession:
@@ -133,21 +139,21 @@ class CalibrationStore:
         )
 
     def get_active_session(self) -> Optional[CalibrationSession]:
-        with self._connect() as conn:
+        with self._connect_read_only() as conn:
             row = conn.execute(
                 "SELECT * FROM investor_profile_calibration_sessions WHERE status = 'active'"
             ).fetchone()
         return self._session(row) if row else None
 
     def get_session(self, session_id: str) -> Optional[CalibrationSession]:
-        with self._connect() as conn:
+        with self._connect_read_only() as conn:
             row = conn.execute(
                 "SELECT * FROM investor_profile_calibration_sessions WHERE id = ?", (session_id,)
             ).fetchone()
         return self._session(row) if row else None
 
     def list_sessions(self, *, limit: int = 20) -> list[CalibrationSession]:
-        with self._connect() as conn:
+        with self._connect_read_only() as conn:
             rows = conn.execute(
                 "SELECT * FROM investor_profile_calibration_sessions "
                 "ORDER BY updated_at DESC, rowid DESC LIMIT ?",
@@ -157,7 +163,7 @@ class CalibrationStore:
 
     def start_session(self, *, supersede_active: bool = False) -> CalibrationSession:
         ts = _now()
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, self._connect_writable() as conn:
             active = conn.execute(
                 "SELECT id FROM investor_profile_calibration_sessions WHERE status = 'active'"
             ).fetchone()
@@ -182,7 +188,7 @@ class CalibrationStore:
 
     def close_session(self, session_id: str) -> CalibrationSession:
         ts = _now()
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, self._connect_writable() as conn:
             conn.execute(
                 "UPDATE investor_profile_calibration_sessions SET status='closed', "
                 "updated_at=?, closed_at=? WHERE id=? AND status='active'",
@@ -206,7 +212,7 @@ class CalibrationStore:
         if sess.status != "active":
             raise ValueError("calibration_session_not_active")
         ts, mid = _now(), str(uuid.uuid4())
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, self._connect_writable() as conn:
             conn.execute(
                 "INSERT INTO investor_profile_calibration_messages "
                 "(id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -220,7 +226,7 @@ class CalibrationStore:
         return self.list_messages(session_id)[-1]
 
     def list_messages(self, session_id: str) -> list[CalibrationMessage]:
-        with self._connect() as conn:
+        with self._connect_read_only() as conn:
             rows = conn.execute(
                 "SELECT * FROM investor_profile_calibration_messages WHERE session_id=? "
                 "ORDER BY created_at ASC, rowid ASC",
@@ -231,7 +237,7 @@ class CalibrationStore:
     def create_proposal(self, *, session_id: str, profile_patch: dict, rationales: dict | None) -> CalibrationProposal:
         patch, raw, rats = normalize_proposal_payload(profile_patch, rationales)
         ts, pid = _now(), str(uuid.uuid4())
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, self._connect_writable() as conn:
             conn.execute(
                 "INSERT INTO investor_profile_calibration_proposals "
                 "(id, session_id, status, profile_patch_json, raw_profile_patch_json, "
@@ -251,14 +257,14 @@ class CalibrationStore:
         return got
 
     def get_proposal(self, proposal_id: str) -> Optional[CalibrationProposal]:
-        with self._connect() as conn:
+        with self._connect_read_only() as conn:
             row = conn.execute(
                 "SELECT * FROM investor_profile_calibration_proposals WHERE id=?", (proposal_id,)
             ).fetchone()
         return self._proposal(row) if row else None
 
     def latest_proposal(self, session_id: str) -> Optional[CalibrationProposal]:
-        with self._connect() as conn:
+        with self._connect_read_only() as conn:
             row = conn.execute(
                 "SELECT * FROM investor_profile_calibration_proposals WHERE session_id=? "
                 "ORDER BY created_at DESC, rowid DESC LIMIT 1",
@@ -273,7 +279,7 @@ class CalibrationStore:
         if proposal.status != "draft":
             raise ValueError("proposal_not_draft")
         ts = _now()
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, self._connect_writable() as conn:
             conn.execute(
                 "UPDATE investor_profile_calibration_proposals SET status='approved', "
                 "approved_at=?, changed_fields_json=? WHERE id=? AND status='draft'",
@@ -291,7 +297,7 @@ class CalibrationStore:
         if proposal.status != "draft":
             raise ValueError("proposal_not_draft")
         ts = _now()
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, self._connect_writable() as conn:
             conn.execute(
                 "UPDATE investor_profile_calibration_proposals SET status='rejected', "
                 "rejected_at=? WHERE id=? AND status='draft'",

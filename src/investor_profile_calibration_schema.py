@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -193,11 +192,60 @@ _V2_INDEX_SQL = {
 }
 
 
-def _normalize_sql(sql: str) -> str:
-    without_optional_clause = re.sub(
-        r"\bIF\s+NOT\s+EXISTS\b", "", sql, flags=re.IGNORECASE
-    )
-    return "".join(without_optional_clause.split()).rstrip(";").lower()
+def _sql_tokens(sql: str) -> tuple[tuple[str, str], ...]:
+    """Tokenize SQL while preserving every quoted token byte-for-byte."""
+    tokens: list[tuple[str, str]] = []
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        if char.isspace():
+            index += 1
+            continue
+
+        if char in ("'", '"', "`", "["):
+            closing = "]" if char == "[" else char
+            end = index + 1
+            while end < len(sql):
+                if sql[end] != closing:
+                    end += 1
+                    continue
+                if end + 1 < len(sql) and sql[end + 1] == closing:
+                    end += 2
+                    continue
+                end += 1
+                break
+            tokens.append(("quoted", sql[index:end]))
+            index = end
+            continue
+
+        if char.isalnum() or char in ("_", "$"):
+            end = index + 1
+            while end < len(sql) and (sql[end].isalnum() or sql[end] in ("_", "$")):
+                end += 1
+            tokens.append(("word", sql[index:end].lower()))
+            index = end
+            continue
+
+        tokens.append(("symbol", char))
+        index += 1
+    return tuple(tokens)
+
+
+def _normalize_sql(sql: str) -> tuple[tuple[str, str], ...]:
+    """Canonicalize insignificant layout without changing quoted tokens."""
+    tokens = _sql_tokens(sql)
+    normalized: list[tuple[str, str]] = []
+    index = 0
+    optional_clause = (("word", "if"), ("word", "not"), ("word", "exists"))
+    while index < len(tokens):
+        if tokens[index : index + 3] == optional_clause:
+            index += 3
+            continue
+        normalized.append(tokens[index])
+        index += 1
+    while normalized and normalized[-1] == ("symbol", ";"):
+        normalized.pop()
+    return tuple(normalized)
 
 
 def _now() -> str:
@@ -208,20 +256,88 @@ def _component_tables(conn: sqlite3.Connection) -> set[str]:
     return {
         str(row[0])
         for row in conn.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name GLOB 'investor_profile_calibration_*'"
+            "SELECT name FROM sqlite_master WHERE type='table'"
         )
+        if str(row[0]).lower().startswith("investor_profile_calibration_")
     }
 
 
-def _component_has_non_table_artifacts(conn: sqlite3.Connection) -> bool:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type IN ('index', 'trigger', 'view') AND "
-        "(name GLOB 'investor_profile_calibration_*' "
-        "OR name GLOB 'idx_calibration_*' "
-        "OR tbl_name GLOB 'investor_profile_calibration_*') LIMIT 1"
-    ).fetchone()
-    return row is not None
+def _uses_component_namespace(name: str) -> bool:
+    lowered = name.lower()
+    return lowered.startswith("investor_profile_calibration_") or lowered.startswith(
+        "idx_calibration_"
+    )
+
+
+def _unquote_identifier(token: str, *, allow_single_quote: bool = False) -> str | None:
+    allowed_quotes = ('"', "`", "[") + (("'",) if allow_single_quote else ())
+    if len(token) < 2 or token[0] not in allowed_quotes:
+        return None
+    closing = "]" if token[0] == "[" else token[0]
+    if token[-1] != closing:
+        return None
+    return token[1:-1].replace(closing * 2, closing)
+
+
+def _sql_mentions_table(sql: str, table_names: set[str]) -> bool:
+    expected = {name.lower() for name in table_names}
+    tokens = _sql_tokens(sql)
+    for index, (kind, value) in enumerate(tokens):
+        if kind == "word" and value in expected:
+            return True
+        if kind == "quoted":
+            identifier = _unquote_identifier(value)
+            if identifier is not None and identifier.lower() in expected:
+                return True
+            previous = tokens[index - 1] if index else None
+            if previous in (("word", "from"), ("word", "join")):
+                identifier = _unquote_identifier(value, allow_single_quote=True)
+                if identifier is not None and identifier.lower() in expected:
+                    return True
+    return False
+
+
+def _has_unexpected_component_artifacts(
+    conn: sqlite3.Connection,
+    *,
+    expected_tables: set[str],
+    expected_indexes: set[str],
+) -> bool:
+    expected_table_names = {name.lower() for name in expected_tables}
+    rows = conn.execute(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master "
+        "WHERE type IN ('table', 'view', 'trigger', 'index')"
+    ).fetchall()
+    for object_type, name, table_name, sql in rows:
+        name = str(name)
+        table_name = str(table_name)
+        tied_to_component = table_name.lower() in expected_table_names
+        view_reads_component = (
+            object_type == "view"
+            and isinstance(sql, str)
+            and _sql_mentions_table(sql, expected_tables)
+        )
+        if not (
+            _uses_component_namespace(name)
+            or _uses_component_namespace(table_name)
+            or tied_to_component
+            or view_reads_component
+        ):
+            continue
+
+        if object_type == "table" and name in expected_tables:
+            continue
+        if object_type == "index":
+            if (
+                name in expected_indexes
+                and table_name in expected_tables
+                and sql is not None
+            ):
+                continue
+            if tied_to_component and sql is None and name.lower().startswith("sqlite_autoindex_"):
+                continue
+        return True
+    return False
 
 
 def _schema_sql(conn: sqlite3.Connection, object_type: str, name: str) -> str | None:
@@ -261,15 +377,6 @@ def _verify_index_sql(
     )
 
 
-def _has_component_triggers(conn: sqlite3.Connection, tables: set[str]) -> bool:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='trigger' "
-        f"AND tbl_name IN ({','.join('?' for _ in tables)}) LIMIT 1",
-        tuple(sorted(tables)),
-    ).fetchone()
-    return row is not None
-
-
 def _marker_is_exact(conn: sqlite3.Connection) -> bool:
     rows = conn.execute(
         f"SELECT id, version, applied_at FROM {_MARKER_TABLE} ORDER BY id"
@@ -293,11 +400,15 @@ def _matches_schema(
     tables = set(expected_tables)
     if _component_tables(conn) != tables:
         return False
+    if _has_unexpected_component_artifacts(
+        conn,
+        expected_tables=tables,
+        expected_indexes=set(expected_indexes),
+    ):
+        return False
     if not _verify_table_sql(conn, expected_tables):
         return False
     if not _verify_index_sql(conn, tables, expected_indexes):
-        return False
-    if _has_component_triggers(conn, tables):
         return False
     return not require_marker or _marker_is_exact(conn)
 
@@ -305,7 +416,11 @@ def _matches_schema(
 def _classify(conn: sqlite3.Connection) -> str:
     tables = _component_tables(conn)
     if not tables:
-        if _component_has_non_table_artifacts(conn):
+        if _has_unexpected_component_artifacts(
+            conn,
+            expected_tables=set(),
+            expected_indexes=set(),
+        ):
             raise CalibrationSchemaMismatch("calibration schema has partial artifacts")
         return "fresh"
     if tables == set(_V1_TABLE_SQL) and _matches_schema(

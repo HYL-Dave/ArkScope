@@ -11,28 +11,28 @@ import pytest
 
 
 V1_SCHEMA = """
-CREATE TABLE investor_profile_calibration_sessions (
+CREATE TABLE IF NOT EXISTS investor_profile_calibration_sessions (
     id          TEXT PRIMARY KEY,
     status      TEXT NOT NULL,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     closed_at   TEXT
 );
-CREATE UNIQUE INDEX idx_calibration_one_active
+CREATE UNIQUE INDEX IF NOT EXISTS idx_calibration_one_active
 ON investor_profile_calibration_sessions(status)
 WHERE status = 'active';
 
-CREATE TABLE investor_profile_calibration_messages (
+CREATE TABLE IF NOT EXISTS investor_profile_calibration_messages (
     id          TEXT PRIMARY KEY,
     session_id  TEXT NOT NULL REFERENCES investor_profile_calibration_sessions(id) ON DELETE CASCADE,
     role        TEXT NOT NULL,
     content     TEXT NOT NULL,
     created_at  TEXT NOT NULL
 );
-CREATE INDEX idx_calibration_messages_session
+CREATE INDEX IF NOT EXISTS idx_calibration_messages_session
 ON investor_profile_calibration_messages(session_id, created_at ASC);
 
-CREATE TABLE investor_profile_calibration_proposals (
+CREATE TABLE IF NOT EXISTS investor_profile_calibration_proposals (
     id                     TEXT PRIMARY KEY,
     session_id             TEXT NOT NULL REFERENCES investor_profile_calibration_sessions(id) ON DELETE CASCADE,
     status                 TEXT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE investor_profile_calibration_proposals (
     approved_at            TEXT,
     rejected_at            TEXT
 );
-CREATE INDEX idx_calibration_proposals_session
+CREATE INDEX IF NOT EXISTS idx_calibration_proposals_session
 ON investor_profile_calibration_proposals(session_id, created_at DESC);
 """
 
@@ -425,7 +425,16 @@ def test_v2_migration_is_idempotent(tmp_path):
 def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
     schema = _schema_module()
 
-    for case in ("wrong_marker", "unknown_column", "unknown_index"):
+    for case in (
+        "wrong_marker",
+        "unknown_column",
+        "unknown_index",
+        "altered_quoted_literal",
+        "extra_namespaced_view",
+        "namespaced_index_on_unrelated_table",
+        "uppercase_component_table",
+        "view_tied_to_component_table",
+    ):
         path = tmp_path / f"{case}.db"
         schema.migrate_calibration_schema(path)
         with _connect(path) as conn:
@@ -436,11 +445,41 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
                     "ALTER TABLE investor_profile_calibration_sessions ADD COLUMN unreviewed TEXT"
                 )
             else:
-                conn.execute(
-                    "CREATE INDEX idx_unreviewed_calibration_status "
-                    "ON investor_profile_calibration_sessions(status, updated_at)"
-                )
+                if case == "unknown_index":
+                    conn.execute(
+                        "CREATE INDEX idx_unreviewed_calibration_status "
+                        "ON investor_profile_calibration_sessions(status, updated_at)"
+                    )
+                elif case == "altered_quoted_literal":
+                    conn.execute("DROP INDEX idx_calibration_one_pending_turn")
+                    conn.execute(
+                        "CREATE UNIQUE INDEX idx_calibration_one_pending_turn "
+                        "ON investor_profile_calibration_turns(session_id) "
+                        "WHERE status = ' pending '"
+                    )
+                elif case == "extra_namespaced_view":
+                    conn.execute(
+                        "CREATE VIEW investor_profile_calibration_unreviewed AS "
+                        "SELECT id FROM investor_profile_calibration_sessions"
+                    )
+                elif case == "namespaced_index_on_unrelated_table":
+                    conn.execute("CREATE TABLE unrelated_index_state (value TEXT)")
+                    conn.execute(
+                        "CREATE INDEX idx_calibration_unrelated_state "
+                        "ON unrelated_index_state(value)"
+                    )
+                elif case == "uppercase_component_table":
+                    conn.execute(
+                        "CREATE TABLE INVESTOR_PROFILE_CALIBRATION_UNREVIEWED "
+                        "(id INTEGER PRIMARY KEY)"
+                    )
+                elif case == "view_tied_to_component_table":
+                    conn.execute(
+                        "CREATE VIEW unrelated_calibration_projection AS "
+                        "SELECT id FROM 'investor_profile_calibration_sessions'"
+                    )
         before = _logical_snapshot(path)
+        before_bytes = path.read_bytes()
 
         with pytest.raises(schema.CalibrationSchemaMismatch):
             schema.migrate_calibration_schema(path)
@@ -448,6 +487,7 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
             schema.assert_calibration_schema_v2(path)
 
         assert _logical_snapshot(path) == before
+        assert path.read_bytes() == before_bytes
 
 
 def test_unmarked_v2_artifacts_fail_closed_without_rebuild(tmp_path):
@@ -509,8 +549,9 @@ def test_statement_failure_rolls_back_to_exact_v1(tmp_path, monkeypatch):
     assert _logical_snapshot(path) == before
 
 
-def test_store_construction_and_status_read_never_create_or_migrate(tmp_path):
+def test_store_construction_and_status_read_never_create_or_migrate(tmp_path, monkeypatch):
     schema = _schema_module()
+    import src.investor_profile_calibration as calibration_module
     from src.investor_profile_calibration import CalibrationStore
 
     missing = tmp_path / "missing-parent" / "missing.db"
@@ -530,7 +571,33 @@ def test_store_construction_and_status_read_never_create_or_migrate(tmp_path):
     schema.migrate_calibration_schema(current)
     current_before = current.read_bytes()
     store = CalibrationStore(current)
+
+    real_connect = sqlite3.connect
+    opened = []
+
+    def recording_connect(database, *args, **kwargs):
+        opened.append((str(database), dict(kwargs)))
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(calibration_module.sqlite3, "connect", recording_connect)
+
     assert store.get_active_session() is None
+    assert store.get_session("missing-session") is None
+    assert store.list_sessions() == []
+    assert store.list_messages("missing-session") == []
+    assert store.get_proposal("missing-proposal") is None
+    assert store.latest_proposal("missing-session") is None
+    assert len(opened) == 6
+    assert all(database.endswith("?mode=ro") for database, _kwargs in opened)
+    assert all(kwargs.get("uri") is True for _database, kwargs in opened)
+
+    with store._connect_read_only() as read_conn:
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            read_conn.execute(
+                "INSERT INTO investor_profile_calibration_sessions "
+                "(id, status, created_at, updated_at) "
+                "VALUES ('read-path-write', 'closed', 'now', 'now')"
+            )
     assert current.read_bytes() == current_before
 
     current.unlink()
