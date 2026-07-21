@@ -1043,19 +1043,19 @@ collection requires a reviewed ledger amendment.
 - Modify: this plan status and implementation ledger only
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Record independent plan review**
+- [x] **Step 1: Record independent plan review**
 
   After written GREEN, change status to `CLEARED FOR IMPLEMENTATION`, record
   every finding/resolution without deleting history, and commit docs only.
   Record that hash as `PLAN_REVIEW_CLEARANCE_COMMIT`.
 
-- [ ] **Step 2: Create an isolated implementation worktree**
+- [x] **Step 2: Create an isolated implementation worktree**
 
   From the clearance commit, use `superpowers:using-git-worktrees` to create
   branch `codex/p2-8-slice-5-investor-profile-workspace`. Do not implement in
   `master`.
 
-- [ ] **Step 3: Record exact baselines before RED**
+- [x] **Step 3: Record exact baselines before RED**
 
   Run:
 
@@ -1079,19 +1079,45 @@ collection requires a reviewed ledger amendment.
   Expected: backend `4569` and focused `167`; frontend `77/778`; scanner
   `1033/973/954/20` and 28 scopes. If any differs, stop and reconcile the plan.
 
-- [ ] **Step 4: Verify immutable baselines and production observation**
+- [x] **Step 4: Verify immutable baselines and production observation**
 
   Record SHA-256 for immutable files/trees. Use SQLite URI read-only mode to
   record calibration aggregate counts and schema columns; do not open a write
   connection and do not pin observed row counts as tests.
 
-- [ ] **Step 5: Commit clearance ledger**
+- [x] **Step 5: Commit clearance ledger**
 
   ```bash
   git add docs/superpowers/plans/2026-07-22-p2-8-slice-5-investor-profile-workspace.md \
     docs/design/PROJECT_PRIORITY_MAP.md
   git commit -m "docs: clear investor profile workspace implementation"
   ```
+
+### Task 0 Execution Record
+
+- `PLAN_REVIEW_CLEARANCE_COMMIT`:
+  `bba7bf601be55f170b15a42eb268043102939608`.
+- Product-behavior A/B base remains `bca064d4`; the intervening commits are
+  docs-only.
+- Implementation branch/worktree:
+  `codex/p2-8-slice-5-investor-profile-workspace` at
+  `/tmp/arkscope-p2-8-slice-5-investor-profile-workspace`.
+- The first direct checkout stopped at the known linked-worktree `git-crypt`
+  smudge boundary. The clean retry used `--no-checkout`, copied only
+  `.git/git-crypt/keys/default` into linked Git metadata with mode `0600`, and
+  populated `HEAD` using `git read-tree -mu HEAD`. No DB, token, browser
+  profile, user data, or main-worktree file was copied.
+- Fresh worktree baselines: backend full collect `4569`, backend focused
+  `10 files / 167`, frontend `77 files / 778 passed`, clean typecheck, build
+  with only the existing chunk warning, and scanner
+  `1033/973/954/20` with 28 scopes. Main and implementation worktrees were
+  clean before the first RED.
+- Immutable-boundary diff against `bca064d4` was empty. A Python SQLite URI
+  `mode=ro` probe (the `sqlite3` CLI is not installed) reconfirmed production
+  v1 as one active session, 12 messages, one approved proposal, zero drafts,
+  and only the original 5/5/10 session/message/proposal columns. The probe
+  closed without a write connection; these observations remain non-constant
+  migration evidence, not tests.
 
 ---
 
