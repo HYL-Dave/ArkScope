@@ -301,7 +301,9 @@ def _compiled_statements_access_component(
 ) -> bool:
     known_tables = {name.lower() for name in _KNOWN_COMPONENT_TABLES}
     accesses_component = False
+    component_error = False
     failed = False
+    successful_compilations = 0
 
     def authorizer(
         action: int,
@@ -337,7 +339,14 @@ def _compiled_statements_access_component(
         probe.execute("PRAGMA query_only = ON")
         probe.set_authorizer(authorizer)
         for statement in statements:
-            probe.execute(statement).fetchall()
+            try:
+                probe.execute(statement).fetchall()
+            except sqlite3.Error as exc:
+                message = str(exc).lower()
+                if any(table_name in message for table_name in known_tables):
+                    component_error = True
+            else:
+                successful_compilations += 1
     except (OSError, RuntimeError, sqlite3.Error, ValueError):
         failed = True
     finally:
@@ -350,7 +359,12 @@ def _compiled_statements_access_component(
                 probe.close()
             except sqlite3.Error:
                 failed = True
-    return accesses_component or failed
+    return (
+        accesses_component
+        or component_error
+        or failed
+        or successful_compilations == 0
+    )
 
 
 def _view_references_component(conn: sqlite3.Connection, view_name: str) -> bool:

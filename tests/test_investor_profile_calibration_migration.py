@@ -426,6 +426,15 @@ def test_v2_migration_is_idempotent(tmp_path):
             "SELECT id /* investor_profile_calibration_sessions */ "
             "FROM unrelated_literal_default"
         )
+        conn.execute(
+            "CREATE VIEW unrelated_insert_view AS "
+            "SELECT id, note FROM unrelated_literal_default"
+        )
+        conn.execute(
+            "CREATE TRIGGER unrelated_insert_view_insert "
+            "INSTEAD OF INSERT ON unrelated_insert_view BEGIN "
+            "INSERT INTO unrelated_literal_default(note) VALUES (NEW.note); END"
+        )
         stored_sql = "\n".join(
             str(row[0])
             for row in conn.execute(
@@ -586,6 +595,18 @@ def test_unmarked_v2_artifacts_fail_closed_without_rebuild(tmp_path):
             "'investor_profile_calibration_sessions'"
         )
     paths.append(comma_literal_view)
+
+    missing_trigger_target = tmp_path / "fresh-missing-trigger-target.db"
+    with _connect(missing_trigger_target) as conn:
+        conn.execute("CREATE TABLE unrelated_trigger_owner (id TEXT)")
+        conn.execute(
+            "CREATE TRIGGER unrelated_missing_target_trigger "
+            "AFTER INSERT ON unrelated_trigger_owner BEGIN "
+            "INSERT INTO investor_profile_calibration_sessions "
+            "(id, status, created_at, updated_at) "
+            "VALUES ('missing-target', 'closed', 'now', 'now'); END"
+        )
+    paths.append(missing_trigger_target)
 
     for path in paths:
         before = _logical_snapshot(path)
