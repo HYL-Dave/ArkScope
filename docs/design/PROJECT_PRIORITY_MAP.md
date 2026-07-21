@@ -269,11 +269,15 @@ therefore defaults to defer until the hypothesis gate exists.
   (`73/680 -> 74/695`), focused is `12/108`, scanner is
   `1649/1563/1562/1`, and the both-locale six-viewport gate is green after one
   reviewed single-line topbar wrap correction. Fresh merged-tree gates and the
-  normal merged-master desktop smoke are green. **The I18N-2 Settings plan is
-  REVIEW GREEN / CLEARED, and implementation is the single NEXT unit.** Its
-  bounded scope includes the currently reachable Investor Profile panel, all
-  nine Settings anchors, and Settings-owned backend-copy mappings. The public
-  selector remains unauthorized, and
+  normal merged-master desktop smoke are green. **The I18N-2 Settings
+  implementation is REVIEW-READY at product tip `9f78a9ff`; independent
+  implementation review is the single NEXT gate.** Exact frontend accounting
+  is `+83/-0` (`74/695 -> 77/778`), focused is `35/376`, scanner is
+  `1033/973/954/20` with 28 migrated scopes, and the isolated both-locale
+  six-viewport matrix is green. Its bounded scope includes the currently
+  reachable Investor Profile panel, all nine Settings anchors, and
+  Settings-owned backend-copy mappings. The public selector remains
+  unauthorized, and
   Slice 5 remains queued behind the Shell + Settings first migration tranche
   and must ship bilingual from birth.
   The first focused irritation slice, **Models Routing UX,
@@ -470,6 +474,7 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-07-21 (I18N-2 SETTINGS IMPLEMENTATION REVIEW-READY — INDEPENDENT REVIEW NEXT)**: Product tip `9f78a9ff` completes the bounded Settings migration without exposing a locale selector. Exact gates are frontend `77 files / 778 passed`, focused `35/376`, node comm `+83/-0`, scanner `1033/973/954/20` with 28 migrated scopes, clean typecheck/build, byte-identical backend/shared presenters/legacy/CSS/desktop/extensions/packages, and no-PG `ok:true` / `pg_attempts:[]`. Decision 65 reconciles the one-signature scanner delta to the reviewed typed-`ApiError` presenter removal; Decisions 66-67 preserve diagnostic ownership, baseline zh-Hant copy, and credential-scoped discovery tests. An isolated scheduler-off matrix passed `zh-Hant` and `en` at 1440/1024/961/960/959/390 with all three groups/nine anchors, one tabpanel, responsive rail/Drawer polarity, cross-language search/focus, zero locale-switch refetch, and Provider/model/Investor/OAuth/ConfirmDialog state and privacy intact. The isolated profile, DBs, browser, screenshots, and harnesses were removed. Merge, LIVE status, selector work, Slice 5, and I18N-3 remain blocked on independent implementation GREEN plus explicit user approval.
 - **2026-07-21 (I18N-2 TASK 8 DECISIONS 62-63 PAPER GREEN — REPAIR RED NEXT)**: Round-two narrow review verified the object-identity plus monotonic calibration-generation contract, exact seven Investor RED node names plus two resource nodes, current Task 6-8 ledger, eight-leaf sufficiency, `investor 61 / settings +622 / 623 total`, unchanged canonical `+83/-0`, and unchanged scanner `1034/974/954/20`. Its only finding was a stale status date; after the one-line sync to `2026-07-21`, readback and `git diff --check` returned PAPER GREEN. Task 8 may now write the exact `4 files / 50 tests`, `9 failed / 41 passed` repair RED; product repair and merge remain blocked.
 - **2026-07-21 (I18N-2 TASK 8 FIRST GREEN REJECTED — DECISIONS 62-63 NARROW REVIEW NEXT)**: Exact initial RED `2 files / 37 tests`, `5 failed / 32 passed` reached a first focused `3/41` GREEN with the four reviewed files only, but independent spec review found real behavior defects hidden by the tests: delayed initial calibration could overwrite a user edit, completed calibration alerts borrowed action labels, the pending proposal badge duplicated its heading, and existing Investor privacy/guidance/unset/running/save semantics were lost. Decisions 62-63 authorize an object-identity guard for edits, a monotonic calibration request generation that makes explicit actions defeat stale initial reads, and exactly eight missing Investor copy leaves. Final resources become `investor 61`, `settings +622 / 623 total`; canonical frontend remains `+83/-0`, scanner remains `1034/974/954/20`, and backend/CSS/shared presenters remain byte-identical. The repair must first reproduce exact `4 files / 50 tests`, `9 failed / 41 passed` at the two resource nodes and seven explicitly named Investor nodes; product repair is blocked until this paper amendment receives independent narrow GREEN.
 - **2026-07-21 (I18N-2 TASK 7 COMPLETE — TASK 8 NEXT)**: Cast-free Decision 61 repair passed exact focused `4 files / 31 tests`, resources `615/dataStorage 48/macroStorage 31`, typecheck, three-owner direct scanner `[]`, `git diff --check`, and the reviewed global `GPT-5.6`-only phase failure. Final product spec review returned GREEN and code-quality review returned APPROVED with no remaining finding. Product commit `7d33cfd3` closes Storage/Macro localization while preserving requests, state, formatters, DOM, CSS, backend, desktop, and extensions. Task 8 current Investor Profile localization is the single NEXT implementation unit; Task 9 still owns the atomic scanner manifest update.
