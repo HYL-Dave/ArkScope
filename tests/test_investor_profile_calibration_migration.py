@@ -434,6 +434,8 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
         "namespaced_index_on_unrelated_table",
         "uppercase_component_table",
         "view_tied_to_component_table",
+        "schema_qualified_single_quoted_view",
+        "unrelated_trigger_writes_component",
     ):
         path = tmp_path / f"{case}.db"
         schema.migrate_calibration_schema(path)
@@ -478,6 +480,20 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
                         "CREATE VIEW unrelated_calibration_projection AS "
                         "SELECT id FROM 'investor_profile_calibration_sessions'"
                     )
+                elif case == "schema_qualified_single_quoted_view":
+                    conn.execute(
+                        "CREATE VIEW qualified_calibration_projection AS "
+                        "SELECT id FROM main.'investor_profile_calibration_sessions'"
+                    )
+                elif case == "unrelated_trigger_writes_component":
+                    conn.execute("CREATE TABLE unrelated_trigger_source (id TEXT)")
+                    conn.execute(
+                        "CREATE TRIGGER inject_calibration_session "
+                        "AFTER INSERT ON unrelated_trigger_source BEGIN "
+                        "INSERT INTO investor_profile_calibration_sessions "
+                        "(id, status, created_at, updated_at) "
+                        "VALUES ('injected-by-trigger', 'closed', 'now', 'now'); END"
+                    )
         before = _logical_snapshot(path)
         before_bytes = path.read_bytes()
 
@@ -488,6 +504,12 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
 
         assert _logical_snapshot(path) == before
         assert path.read_bytes() == before_bytes
+        if case == "unrelated_trigger_writes_component":
+            with _connect(path) as conn:
+                assert conn.execute(
+                    "SELECT COUNT(*) FROM investor_profile_calibration_sessions "
+                    "WHERE id='injected-by-trigger'"
+                ).fetchone()[0] == 0
 
 
 def test_unmarked_v2_artifacts_fail_closed_without_rebuild(tmp_path):
@@ -516,11 +538,21 @@ def test_unmarked_v2_artifacts_fail_closed_without_rebuild(tmp_path):
         )
     paths.append(unknown_v1)
 
+    dangling_view = tmp_path / "fresh-dangling-view.db"
+    with _connect(dangling_view) as conn:
+        conn.execute(
+            "CREATE VIEW dangling_calibration_projection AS "
+            "SELECT id FROM investor_profile_calibration_sessions"
+        )
+    paths.append(dangling_view)
+
     for path in paths:
         before = _logical_snapshot(path)
+        before_bytes = path.read_bytes()
         with pytest.raises(schema.CalibrationSchemaMismatch):
             schema.migrate_calibration_schema(path)
         assert _logical_snapshot(path) == before
+        assert path.read_bytes() == before_bytes
 
 
 def test_statement_failure_rolls_back_to_exact_v1(tmp_path, monkeypatch):

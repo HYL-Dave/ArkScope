@@ -191,6 +191,8 @@ _V2_INDEX_SQL = {
     "idx_calibration_one_pending_turn": _PENDING_TURN_INDEX_SQL,
 }
 
+_KNOWN_COMPONENT_TABLES = frozenset(_V2_TABLE_SQL)
+
 
 def _sql_tokens(sql: str) -> tuple[tuple[str, str], ...]:
     """Tokenize SQL while preserving every quoted token byte-for-byte."""
@@ -289,11 +291,31 @@ def _sql_mentions_table(sql: str, table_names: set[str]) -> bool:
             identifier = _unquote_identifier(value)
             if identifier is not None and identifier.lower() in expected:
                 return True
+            identifier = _unquote_identifier(value, allow_single_quote=True)
+            if identifier is None or identifier.lower() not in expected:
+                continue
             previous = tokens[index - 1] if index else None
-            if previous in (("word", "from"), ("word", "join")):
-                identifier = _unquote_identifier(value, allow_single_quote=True)
-                if identifier is not None and identifier.lower() in expected:
-                    return True
+            if previous in {
+                ("word", "from"),
+                ("word", "into"),
+                ("word", "join"),
+                ("word", "references"),
+                ("word", "update"),
+            }:
+                return True
+            if (
+                previous == ("symbol", ".")
+                and index >= 3
+                and tokens[index - 3]
+                in {
+                    ("word", "from"),
+                    ("word", "into"),
+                    ("word", "join"),
+                    ("word", "references"),
+                    ("word", "update"),
+                }
+            ):
+                return True
     return False
 
 
@@ -304,6 +326,7 @@ def _has_unexpected_component_artifacts(
     expected_indexes: set[str],
 ) -> bool:
     expected_table_names = {name.lower() for name in expected_tables}
+    known_table_names = {name.lower() for name in _KNOWN_COMPONENT_TABLES}
     rows = conn.execute(
         "SELECT type, name, tbl_name, sql FROM sqlite_master "
         "WHERE type IN ('table', 'view', 'trigger', 'index')"
@@ -311,17 +334,17 @@ def _has_unexpected_component_artifacts(
     for object_type, name, table_name, sql in rows:
         name = str(name)
         table_name = str(table_name)
-        tied_to_component = table_name.lower() in expected_table_names
-        view_reads_component = (
-            object_type == "view"
+        tied_to_component = table_name.lower() in known_table_names
+        body_mentions_component = (
+            object_type in {"view", "trigger"}
             and isinstance(sql, str)
-            and _sql_mentions_table(sql, expected_tables)
+            and _sql_mentions_table(sql, set(_KNOWN_COMPONENT_TABLES))
         )
         if not (
             _uses_component_namespace(name)
             or _uses_component_namespace(table_name)
             or tied_to_component
-            or view_reads_component
+            or body_mentions_component
         ):
             continue
 
@@ -334,7 +357,11 @@ def _has_unexpected_component_artifacts(
                 and sql is not None
             ):
                 continue
-            if tied_to_component and sql is None and name.lower().startswith("sqlite_autoindex_"):
+            if (
+                table_name.lower() in expected_table_names
+                and sql is None
+                and name.lower().startswith("sqlite_autoindex_")
+            ):
                 continue
         return True
     return False
