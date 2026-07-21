@@ -411,6 +411,30 @@ def test_v2_migration_is_idempotent(tmp_path):
     schema = _schema_module()
     path = tmp_path / "current.db"
     schema.migrate_calibration_schema(path)
+    with _connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE unrelated_literal_default ("
+            "id INTEGER PRIMARY KEY, note TEXT DEFAULT "
+            "'investor_profile_calibration_sessions')"
+        )
+        conn.execute(
+            'CREATE TABLE unrelated_column_name ('
+            '"investor_profile_calibration_sessions" TEXT)'
+        )
+        conn.execute(
+            "CREATE VIEW unrelated_comment_view AS "
+            "SELECT id /* investor_profile_calibration_sessions */ "
+            "FROM unrelated_literal_default"
+        )
+        stored_sql = "\n".join(
+            str(row[0])
+            for row in conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name LIKE 'unrelated_%' "
+                "ORDER BY name"
+            )
+        )
+    assert stored_sql.count("investor_profile_calibration_sessions") == 3
+
     first_bytes = path.read_bytes()
     first_snapshot = _logical_snapshot(path)
 

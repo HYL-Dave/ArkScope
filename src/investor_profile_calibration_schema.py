@@ -192,6 +192,14 @@ _V2_INDEX_SQL = {
 }
 
 _KNOWN_COMPONENT_TABLES = frozenset(_V2_TABLE_SQL)
+_COMPONENT_ACCESS_ACTIONS = frozenset(
+    {
+        sqlite3.SQLITE_DELETE,
+        sqlite3.SQLITE_INSERT,
+        sqlite3.SQLITE_READ,
+        sqlite3.SQLITE_UPDATE,
+    }
+)
 
 
 def _sql_tokens(sql: str) -> tuple[tuple[str, str], ...]:
@@ -271,25 +279,115 @@ def _uses_component_namespace(name: str) -> bool:
     )
 
 
-def _unquote_identifier(token: str) -> str | None:
-    if len(token) < 2 or token[0] not in ("'", '"', "`", "["):
-        return None
-    closing = "]" if token[0] == "[" else token[0]
-    if token[-1] != closing:
-        return None
-    return token[1:-1].replace(closing * 2, closing)
+def _quote_identifier(identifier: str) -> str:
+    escaped = identifier.replace('"', '""')
+    return f'"{escaped}"'
 
 
-def _sql_mentions_table(sql: str, table_names: set[str]) -> bool:
-    expected = {name.lower() for name in table_names}
-    for kind, value in _sql_tokens(sql):
-        if kind == "word" and value in expected:
+def _table_references_component(conn: sqlite3.Connection, table_name: str) -> bool:
+    try:
+        rows = conn.execute(
+            f"PRAGMA foreign_key_list({_quote_identifier(table_name)})"
+        ).fetchall()
+    except sqlite3.Error:
+        return True
+    known_tables = {name.lower() for name in _KNOWN_COMPONENT_TABLES}
+    return any(str(row[2]).lower() in known_tables for row in rows)
+
+
+def _compiled_statements_access_component(
+    conn: sqlite3.Connection,
+    statements: tuple[str, ...],
+) -> bool:
+    known_tables = {name.lower() for name in _KNOWN_COMPONENT_TABLES}
+    accesses_component = False
+    failed = False
+
+    def authorizer(
+        action: int,
+        target: str | None,
+        _column: str | None,
+        _database: str | None,
+        _source: str | None,
+    ) -> int:
+        nonlocal accesses_component
+        if (
+            action in _COMPONENT_ACCESS_ACTIONS
+            and isinstance(target, str)
+            and target.lower() in known_tables
+        ):
+            accesses_component = True
+        return sqlite3.SQLITE_OK
+
+    probe: sqlite3.Connection | None = None
+    try:
+        database = next(
+            (
+                str(row[2])
+                for row in conn.execute("PRAGMA database_list").fetchall()
+                if str(row[1]).lower() == "main"
+            ),
+            "",
+        )
+        if not database:
             return True
-        if kind == "quoted":
-            identifier = _unquote_identifier(value)
-            if identifier is not None and identifier.lower() in expected:
-                return True
-    return False
+        # Isolate Python 3.10 authorizer cleanup from the caller's connection.
+        uri = f"{Path(database).resolve().as_uri()}?mode=ro"
+        probe = sqlite3.connect(uri, uri=True, timeout=5.0)
+        probe.execute("PRAGMA query_only = ON")
+        probe.set_authorizer(authorizer)
+        for statement in statements:
+            probe.execute(statement).fetchall()
+    except (OSError, RuntimeError, sqlite3.Error, ValueError):
+        failed = True
+    finally:
+        if probe is not None:
+            try:
+                probe.set_authorizer(None)
+            except sqlite3.Error:
+                failed = True
+            try:
+                probe.close()
+            except sqlite3.Error:
+                failed = True
+    return accesses_component or failed
+
+
+def _view_references_component(conn: sqlite3.Connection, view_name: str) -> bool:
+    return _compiled_statements_access_component(
+        conn,
+        (f"SELECT * FROM {_quote_identifier(view_name)} LIMIT 0",),
+    )
+
+
+def _trigger_references_component(
+    conn: sqlite3.Connection,
+    owner_name: str,
+) -> bool:
+    quoted_owner = _quote_identifier(owner_name)
+    try:
+        columns = [
+            str(row[1])
+            for row in conn.execute(f"PRAGMA table_xinfo({quoted_owner})").fetchall()
+            if len(row) < 7 or row[6] == 0
+        ]
+    except sqlite3.Error:
+        return True
+    if not columns:
+        return True
+
+    assignments = ", ".join(
+        f"{_quote_identifier(column)}={_quote_identifier(column)}"
+        for column in columns
+    )
+    return _compiled_statements_access_component(
+        conn,
+        (
+            f"EXPLAIN INSERT INTO {quoted_owner} DEFAULT VALUES",
+            f"EXPLAIN UPDATE {quoted_owner} SET {assignments}",
+            f"EXPLAIN DELETE FROM {quoted_owner}",
+        ),
+    )
 
 
 def _has_unexpected_component_artifacts(
@@ -324,16 +422,19 @@ def _has_unexpected_component_artifacts(
                 continue
 
         tied_to_component = table_name.lower() in known_table_names
-        body_mentions_component = (
-            isinstance(sql, str)
-            and _sql_mentions_table(sql, set(_KNOWN_COMPONENT_TABLES))
-        )
         if (
             _uses_component_namespace(name)
             or _uses_component_namespace(table_name)
             or tied_to_component
-            or body_mentions_component
         ):
+            return True
+        if not isinstance(sql, str):
+            continue
+        if object_type == "table" and _table_references_component(conn, name):
+            return True
+        if object_type == "view" and _view_references_component(conn, name):
+            return True
+        if object_type == "trigger" and _trigger_references_component(conn, table_name):
             return True
     return False
 
