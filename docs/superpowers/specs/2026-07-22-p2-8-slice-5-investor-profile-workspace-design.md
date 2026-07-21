@@ -1,11 +1,14 @@
 # P2.8 Slice 5 Investor Profile Workspace Design
 
-> **Status: WRITTEN — INDEPENDENT REVIEW PENDING**
+> **Status: WRITTEN REVIEW APPROVED — IMPLEMENTATION PLAN NEXT**
 >
 > Written against merged `master` at `bca064d4` on 2026-07-22. This document
 > is the bounded product and data-contract authority for P2.8 Slice 5. It does
-> not authorize implementation or an implementation plan until independent
-> written review returns GREEN.
+> not authorize product implementation until a separate RED-first
+> implementation plan receives independent written review GREEN. Independent
+> full-document review approved this design on 2026-07-22; the sole required
+> clarification, next-topic validation versus display ordering, is incorporated
+> in Sections 4.1, 6.2, and 13.1.
 
 ## 1. Purpose and Authority
 
@@ -242,7 +245,9 @@ The backend owns this ordered catalog and its field policy:
 | `assistant_style` | How you want AI to work with you / 希望 AI 如何配合 | Direct | `default_stance` |
 
 The order above is the only presentation order. The frontend does not sort or
-reorder topics.
+reorder topics. Interview order is adaptive: the model may select the next
+topic only from the still-uncovered catalog set. Catalog order does not turn
+the interview into a fixed script.
 
 ### 4.2 Complete field partition
 
@@ -350,7 +355,9 @@ The model response contains:
 - assistant question or transition text;
 - the addressed topic ID, which must equal the server-selected current topic;
 - whether that addressed topic is now covered;
-- next topic ID when another question is needed;
+- next topic ID when another question is needed; the server accepts it only
+  when it belongs to the catalog and is still uncovered, and only then makes it
+  the new server-selected current topic;
 - optional partial profile patch;
 - proposal rationale; and
 - no free-form authority to add topic IDs or profile fields.
@@ -360,6 +367,10 @@ The UI renders model source text even if a model occasionally asks a compound
 question; prompt QA owns that drift. After the first answer, the prompt asks the
 model to mirror the language of the user's answer for questions and rationale.
 It does not use `ui_locale` as a language signal.
+
+An invalid or already-covered next topic is a catalog-validation failure. The
+turn retains its answer, becomes failed/retryable, and advances neither current
+topic nor coverage.
 
 ### 6.3 Load and race behavior
 
@@ -627,25 +638,27 @@ Tests must prove:
 3. matrix union plus deny-list is an exact disjoint partition of all 13 Body
    fields;
 4. coverage is monotonic and only the asked topic can advance;
-5. partial proposals remain partial through generation, storage, DTO, and
+5. next-topic selection is adaptive only within the uncovered catalog set, and
+   invalid/already-covered choices leave current topic and coverage unchanged;
+6. partial proposals remain partial through generation, storage, DTO, and
    approval;
-6. malicious deny-listed, uncovered, unknown, and extra approval fields cause
+7. malicious deny-listed, uncovered, unknown, and extra approval fields cause
    zero profile writes;
-7. an all-illegal model patch creates no proposal;
-8. scalar and set-valued base comparisons follow Section 7.2;
-9. conflicts remain pending/conflicted and write nothing;
-10. profile merge plus approved state is one rollback-safe transaction;
-11. `turn_id` retries do not duplicate messages;
-12. startup reconciliation marks stale pending turns interrupted/retryable;
-13. no credential uses the existing typed configuration family;
-14. the opening prompt starts with zero Provider calls and survives reload;
-15. post-answer reload reconstructs the model-driven journal;
-16. legacy migration preserves messages/proposals, supersedes only unsupported
+8. an all-illegal model patch creates no proposal;
+9. scalar and set-valued base comparisons follow Section 7.2;
+10. conflicts remain pending/conflicted and write nothing;
+11. profile merge plus approved state is one rollback-safe transaction;
+12. `turn_id` retries do not duplicate messages;
+13. startup reconciliation marks stale pending turns interrupted/retryable;
+14. no credential uses the existing typed configuration family;
+15. the opening prompt starts with zero Provider calls and survives reload;
+16. post-answer reload reconstructs the model-driven journal;
+17. legacy migration preserves messages/proposals, supersedes only unsupported
     active/draft state, and is idempotent;
-17. exact context snapshots distinguish non-empty, empty, and legacy null;
-18. evidence gathering receives no personalization context;
-19. `freeform_notes` never appears in context; and
-20. suggested/applied skills remain truthful and are not fabricated.
+18. exact context snapshots distinguish non-empty, empty, and legacy null;
+19. evidence gathering receives no personalization context;
+20. `freeform_notes` never appears in context; and
+21. suggested/applied skills remain truthful and are not fabricated.
 
 ### 13.2 Frontend and localization
 
@@ -693,4 +706,5 @@ perform repeated paid calls merely to prove retry behavior.
 6. Post-merge closeout updates this status, the canonical shell, terminology,
    priority map, Design Kit, and memory as separate evidence.
 
-Until Step 1 completes, Slice 5 remains written design only.
+Independent written review completed Step 1 on 2026-07-22. Slice 5 remains
+design-only until the separate implementation plan completes Steps 2 and 3.

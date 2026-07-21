@@ -699,7 +699,7 @@ evidence tip `bfdc32c`; merged-master desktop verification is GREEN.
 
 ### Slice 5: Investor Profile UX
 
-**WRITTEN — INDEPENDENT REVIEW PENDING 2026-07-22.** The bounded authority is
+**WRITTEN REVIEW APPROVED — IMPLEMENTATION PLAN NEXT 2026-07-22.** The bounded authority is
 [`2026-07-22-p2-8-slice-5-investor-profile-workspace-design.md`](2026-07-22-p2-8-slice-5-investor-profile-workspace-design.md).
 
 - summary-first effective-state hierarchy under the existing single anchor;
@@ -708,8 +708,9 @@ evidence tip `bfdc32c`; merged-master desktop verification is GREEN.
 - exact current/run-time personalization context transparency; and
 - bilingual-from-birth responsive and state-preservation contracts.
 
-No implementation plan or product edit is authorized until independent written
-review returns GREEN.
+The design review gate is GREEN. Product implementation remains unauthorized
+until a separate RED-first implementation plan receives independent review
+GREEN.
 
 ### Slice 6: Notes V1 prerequisite decisions
 
