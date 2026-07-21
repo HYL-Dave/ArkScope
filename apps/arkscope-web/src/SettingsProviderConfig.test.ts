@@ -709,7 +709,7 @@ describe("Settings provider config authority", () => {
     expect(summary?.textContent).not.toContain(mocked.longSkipReason);
     expect(summary?.textContent).not.toContain(mocked.longDurableError);
 
-    const details = host!.querySelector("details.developer-diagnostics");
+    const details = host!.querySelector('details[data-testid="developer-diagnostics"]');
     expect(details?.textContent).toContain(mocked.longSkipReason);
     expect(details?.textContent).toContain(mocked.longDurableError);
   });
@@ -956,7 +956,7 @@ describe("Settings provider config authority", () => {
 
   it("marks_long_runtime_content_as_wrap_capable", async () => {
     await renderDataSources(undefined, true);
-    const diagnostics = host!.querySelector(".developer-diagnostics");
+    const diagnostics = host!.querySelector('[data-testid="developer-diagnostics"]');
     expect(diagnostics?.textContent).toContain(mocked.extensionDetail);
     expect(diagnostics?.textContent).toContain(mocked.providerHealthError);
     expect(host!.querySelector(".ds-last-run-cell.settings-wrap-text")).not.toBeNull();
@@ -1228,7 +1228,7 @@ describe("Settings provider config authority", () => {
     ]) {
       expect(host!.textContent).not.toContain(raw);
     }
-    expect(host!.querySelector(".developer-diagnostics")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
     expect(host!.querySelector("[aria-live]")).toBeNull();
   });
 
@@ -1245,7 +1245,7 @@ describe("Settings provider config authority", () => {
       await Promise.resolve();
     });
 
-    expect(host!.querySelector(".developer-diagnostics")).not.toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).not.toBeNull();
     for (const raw of [
       mocked.providerHealthDetail,
       mocked.providerHealthError,
@@ -1259,7 +1259,7 @@ describe("Settings provider config authority", () => {
     ]) {
       expect(host!.textContent).toContain(raw);
     }
-    expect(host!.querySelector(".developer-diagnostics [aria-live]")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"] [aria-live]')).toBeNull();
   });
 
   it("switches locale without resetting drafts polling cadence or progress", async () => {

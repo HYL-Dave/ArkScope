@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import zhHantSettings from "./i18n/resources/zh-Hant/settings";
+
 const here = fileURLToPath(new URL(".", import.meta.url));
 const css = readFileSync(resolve(here, "./styles.css"), "utf8");
 
@@ -63,14 +65,14 @@ describe("Settings stabilization CSS contracts", () => {
     expect(rule(".settings-panel-head > .btn-ghost")).toMatch(/white-space:\s*nowrap/);
 
     const normalSections = [
-      sourceSection("function DataStorageSection()", "function NewsStorageSection()"),
-      sourceSection("function NewsStorageSection()", "function TradingDayCoveragePanel()"),
-      sourceSection("function MacroStorageSection()", "function FragmentKV("),
+      sourceSection("function DataStorageSection(", "function NewsStorageSection("),
+      sourceSection("function NewsStorageSection(", "function TradingDayCoveragePanel("),
+      sourceSection("function MacroStorageSection(", "function FragmentKV("),
       sourceSection("function DataSourcesSection({", "export function ModelRoutingSection("),
     ].join("\n");
     expect(normalSections).not.toMatch(
       /PostgreSQL|PG exit|PG mirror|PG fallback|PG 同步|PG 鏡像|SQLite|local authority|local-primary|local-only|本地市場資料庫|本地市場庫|本地路由|本地新聞庫|本地總經庫|本地快照|本地 SA|存本地|market_data\.db|macro_calendar\.db|direct-local|legacy local|legacy config|strict DB-first/,
     );
-    expect(normalSections).toContain("config/.env");
+    expect(zhHantSettings.dataSources.providers.config.description).toContain("config/.env");
   });
 });

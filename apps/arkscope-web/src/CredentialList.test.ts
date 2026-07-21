@@ -163,7 +163,7 @@ describe("CredentialList localization", () => {
     expect(host!.textContent).toContain("planted-probe-observed");
     expect(host!.textContent).toContain("錯誤");
     expect(host!.textContent).toContain("planted-probe-error");
-    expect(host!.querySelector(".developer-diagnostics")?.getAttribute("aria-live")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.getAttribute("aria-live")).toBeNull();
   });
 });
 

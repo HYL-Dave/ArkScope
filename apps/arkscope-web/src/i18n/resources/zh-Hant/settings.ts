@@ -413,7 +413,7 @@ const settings = {
       selectCredential: "選擇 credential…",
       searchLabel: "搜尋模型",
       searchPlaceholder: "依 model ID 或名稱搜尋…",
-      listModels: "列出模型",
+      listModels: "列模型",
       listing: "讀取中…",
       candidates: "查看候選模型",
       modelCount: "{{count}} 個 provider 回傳模型",

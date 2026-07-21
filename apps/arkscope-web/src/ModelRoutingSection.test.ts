@@ -772,7 +772,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(host!.textContent).toContain("PLANTED ROUTE WARNING");
     expect(host!.textContent).toContain("PLANTED MODEL NOTE");
     expect(host!.textContent).toContain("PLANTED TEST WARNING");
-    const diagnostics = Array.from(host!.querySelectorAll(".developer-diagnostics"))
+    const diagnostics = Array.from(host!.querySelectorAll('[data-testid="developer-diagnostics"]'))
       .map((node) => node.textContent)
       .join("\n");
     expect(diagnostics).toContain("PLANTED ROUTE WARNING");

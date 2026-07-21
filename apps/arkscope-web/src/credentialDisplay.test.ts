@@ -104,9 +104,9 @@ describe("expiry date-input conversion", () => {
 describe("discoverButtonLabel", () => {
   it("is 查看候選模型 for the seed-only Claude OAuth, else 列模型", () => {
     expect(discoverButtonLabel("claude_code_oauth", zhT)).toBe("查看候選模型");
-    expect(discoverButtonLabel("chatgpt_oauth", zhT)).toBe("列出模型");
-    expect(discoverButtonLabel("api_key", zhT)).toBe("列出模型");
-    expect(discoverButtonLabel(null, zhT)).toBe("列出模型");
+    expect(discoverButtonLabel("chatgpt_oauth", zhT)).toBe("列模型");
+    expect(discoverButtonLabel("api_key", zhT)).toBe("列模型");
+    expect(discoverButtonLabel(null, zhT)).toBe("列模型");
   });
 });
 
@@ -131,8 +131,8 @@ describe("add API key activation copy", () => {
 
 describe("discovery result header copy", () => {
   it("labels live vs seed discovery by auth mode", () => {
-    expect(discoveryHeaderTitle("api_key", zhT)).toBe("列出模型");
-    expect(discoveryHeaderTitle("chatgpt_oauth", zhT)).toBe("列出模型");
+    expect(discoveryHeaderTitle("api_key", zhT)).toBe("列模型");
+    expect(discoveryHeaderTitle("chatgpt_oauth", zhT)).toBe("列模型");
     expect(discoveryHeaderTitle("claude_code_oauth", zhT)).toBe("查看候選模型");
   });
 
@@ -152,7 +152,7 @@ describe("localized credential presentation", () => {
     expect(credentialAvailabilityText({ available: false, masked: null }, enT)).toBe("Currently unavailable");
     expect(discoverButtonLabel("claude_code_oauth", zhT)).toBe("查看候選模型");
     expect(discoverButtonLabel("claude_code_oauth", enT)).toBe("View candidate models");
-    expect(discoveryHeaderTitle("api_key", zhT)).toBe("列出模型");
+    expect(discoveryHeaderTitle("api_key", zhT)).toBe("列模型");
     expect(discoveryHeaderTitle("api_key", enT)).toBe("List models");
   });
 

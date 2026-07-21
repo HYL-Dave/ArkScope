@@ -498,12 +498,12 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).toContain("partial：MSFT(12)");
     expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).not.toContain(providerDiagnostic);
-    expect(host!.querySelector(".developer-diagnostics")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
 
     dispose();
     await renderSettings(true);
     openCoverageRow();
-    expect(host!.querySelector(".developer-diagnostics")).not.toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).not.toBeNull();
     expect(host!.textContent).toContain(syncDiagnostic);
     expect(host!.textContent).toContain(providerDiagnostic);
     expect(getMarketDataStatus).toHaveBeenCalledTimes(2);

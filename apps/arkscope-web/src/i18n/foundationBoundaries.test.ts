@@ -6,6 +6,101 @@ import { SETTINGS_GROUPS } from "../settings/settingsRegistry";
 
 const projectRoot = resolve(import.meta.dirname, "../..");
 
+const I18N_1_MIGRATED_SCOPES = [
+  "src/i18n/**",
+  "src/main.tsx",
+  "src/App.tsx",
+  "src/shell/**",
+  "src/ui/BoundedProgress.tsx",
+  "src/ui/Drawer.tsx",
+];
+
+const I18N_2_SETTINGS_SCOPES = [
+  "src/InvestorProfilePanel.tsx",
+  "src/Settings.tsx",
+  "src/SourceRunProgress.tsx",
+  "src/chatgptOAuth.ts",
+  "src/credentialDisplay.ts",
+  "src/marketDataDisplay.ts",
+  "src/modelRouteDisplay.ts",
+  "src/saExtensionHealthDisplay.ts",
+  "src/settings/DataSourcesSection.tsx",
+  "src/settings/DataStorageSection.tsx",
+  "src/settings/MacroStorageSection.tsx",
+  "src/settings/ModelRoutingSection.tsx",
+  "src/settings/NewsStorageSection.tsx",
+  "src/settings/ProviderSection.tsx",
+  "src/settings/RuntimeLimitSections.tsx",
+  "src/settings/SettingsDirectory.tsx",
+  "src/settings/SettingsSectionAnchor.tsx",
+  "src/settings/settingsBackendCopy.ts",
+  "src/settings/settingsCopy.ts",
+  "src/settings/settingsNavigationGuard.ts",
+  "src/settings/settingsPreferences.ts",
+  "src/settings/settingsRegistry.ts",
+];
+
+const ARKSCOPE_ALLOWLIST_ENTRY = {
+  file: "src/shell/ShellTopBar.tsx",
+  kind: "jsx_text",
+  literal: "ArkScope",
+  count: 1,
+  classification: "stable_identifier",
+  reason: "ArkScope is the product name and is identical in every locale.",
+};
+
+const SETTINGS_ALLOWLIST_REASON =
+  "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract";
+
+const I18N_2_SETTINGS_ALLOWLIST_ENTRIES = [
+  ["src/credentialDisplay.ts", "presenter_return", "anthropic", 1],
+  ["src/credentialDisplay.ts", "presenter_return", "claude_code_oauth", 2],
+  ["src/settings/settingsCopy.ts", "presenter_return", "GPT-5.6", 1],
+  ["src/marketDataDisplay.ts", "object_property", "weekend", 1],
+  ["src/marketDataDisplay.ts", "presenter_return", "muted", 6],
+  ["src/marketDataDisplay.ts", "presenter_return", "bad", 2],
+  ["src/marketDataDisplay.ts", "presenter_return", "warn", 9],
+  ["src/marketDataDisplay.ts", "presenter_return", "ok", 2],
+  ["src/settings/DataSourcesSection.tsx", "jsx_attribute", "ok", 1],
+  ["src/settings/DataSourcesSection.tsx", "jsx_attribute", "warn", 1],
+  ["src/settings/ModelRoutingSection.tsx", "jsx_attribute", "default", 1],
+  ["src/settings/ModelRoutingSection.tsx", "jsx_attribute", "anthropic", 1],
+  ["src/settings/ModelRoutingSection.tsx", "jsx_attribute", "claude-…", 1],
+  ["src/settings/ModelRoutingSection.tsx", "jsx_attribute", "gpt-…", 1],
+  ["src/settings/ProviderSection.tsx", "jsx_attribute", "openai", 1],
+  ["src/settings/ProviderSection.tsx", "jsx_attribute", "sk-…", 1],
+  ["src/settings/ProviderSection.tsx", "jsx_attribute", "sk-ant-…", 1],
+  ["src/settings/ProviderSection.tsx", "jsx_attribute", "claude_code_oauth", 1],
+  ["src/settings/ProviderSection.tsx", "jsx_attribute", "chatgpt_oauth", 1],
+].map(([file, kind, literal, count]) => ({
+  file,
+  kind,
+  literal,
+  count,
+  classification: "stable_identifier",
+  reason: SETTINGS_ALLOWLIST_REASON,
+}));
+
+const I18N_2_OWNED_DEBT_FILES = new Set([
+  "src/InvestorProfilePanel.tsx",
+  "src/Settings.tsx",
+  "src/SourceRunProgress.tsx",
+  "src/chatgptOAuth.ts",
+  "src/credentialDisplay.ts",
+  "src/marketDataDisplay.ts",
+  "src/modelRouteDisplay.ts",
+  "src/saExtensionHealthDisplay.ts",
+  "src/settings/DataSourcesSection.tsx",
+  "src/settings/DataStorageSection.tsx",
+  "src/settings/MacroStorageSection.tsx",
+  "src/settings/ModelRoutingSection.tsx",
+  "src/settings/NewsStorageSection.tsx",
+  "src/settings/ProviderSection.tsx",
+  "src/settings/RuntimeLimitSections.tsx",
+  "src/settings/SettingsDirectory.tsx",
+  "src/settings/settingsRegistry.ts",
+]);
+
 function read(relativePath: string): string {
   const path = resolve(projectRoot, relativePath);
   return existsSync(path) ? readFileSync(path, "utf8") : "";
@@ -114,22 +209,16 @@ describe("I18N-0 foundation boundaries", () => {
       signatures: Array<{ signature: string }>;
     };
 
-    expect(migrated.scopes).toEqual([
-      "src/i18n/**",
-      "src/main.tsx",
-      "src/App.tsx",
-      "src/shell/**",
-      "src/ui/BoundedProgress.tsx",
-      "src/ui/Drawer.tsx",
-    ]);
-    expect(allowlist.entries).toEqual([{
-      file: "src/shell/ShellTopBar.tsx",
-      kind: "jsx_text",
-      literal: "ArkScope",
-      count: 1,
-      classification: "stable_identifier",
-      reason: "ArkScope is the product name and is identical in every locale.",
-    }]);
+    expect(migrated.scopes.filter((scope) => I18N_1_MIGRATED_SCOPES.includes(scope)))
+      .toEqual(I18N_1_MIGRATED_SCOPES);
+    expect(allowlist.entries.filter(({ file }) => {
+      return typeof file === "string" && (
+        file === "src/App.tsx"
+        || file.startsWith("src/shell/")
+        || file === "src/ui/Drawer.tsx"
+        || file === "src/ui/BoundedProgress.tsx"
+      );
+    })).toEqual([ARKSCOPE_ALLOWLIST_ENTRY]);
 
     const owned = (file: string) => (
       file === "src/App.tsx"
@@ -142,5 +231,89 @@ describe("I18N-0 foundation boundaries", () => {
       return owned(file);
     });
     expect(ownedDebt).toEqual([]);
+  });
+
+  it("records the exact I18N-2 migrated scopes and stable-value allowlist", () => {
+    const migrated = JSON.parse(read("scripts/i18n/migrated-scopes.json")) as {
+      scopes: string[];
+    };
+    const allowlist = JSON.parse(read("scripts/i18n/visible-literal-allowlist.json")) as {
+      entries: Array<Record<string, unknown>>;
+    };
+    const debt = JSON.parse(read("scripts/i18n/visible-literal-debt.json")) as {
+      signatures: Array<{ signature: string }>;
+    };
+
+    expect(migrated.scopes).toEqual([
+      ...I18N_1_MIGRATED_SCOPES,
+      ...I18N_2_SETTINGS_SCOPES,
+    ]);
+    expect(allowlist.entries).toEqual([
+      ARKSCOPE_ALLOWLIST_ENTRY,
+      ...I18N_2_SETTINGS_ALLOWLIST_ENTRIES,
+    ]);
+    expect(new Set(allowlist.entries.map(({ file, kind, literal }) => (
+      JSON.stringify([file, kind, literal])
+    ))).size).toBe(20);
+
+    const ownedDebt = debt.signatures.filter(({ signature }) => {
+      const [file] = JSON.parse(signature) as [string];
+      return I18N_2_OWNED_DEBT_FILES.has(file);
+    });
+    expect(ownedDebt).toEqual([]);
+  });
+
+  it("keeps the public locale selector absent after Settings migration", () => {
+    const publicSurfacePaths = [
+      "src/App.tsx",
+      ...productionFiles("src/shell").map((path) => path.slice(projectRoot.length + 1)),
+      ...I18N_2_SETTINGS_SCOPES,
+    ];
+    const publicSurfaceSource = publicSurfacePaths.map(read).join("\n");
+    const source = [
+      publicSurfaceSource,
+      read("src/main.tsx"),
+      read("src/i18n/LocaleProvider.tsx"),
+    ].join("\n");
+
+    expect(source).not.toMatch(/繁體中文|簡體中文|>\s*English\s*</);
+    expect(publicSurfaceSource).not.toMatch(
+      /(?:Locale|Language)Selector|(?:locale|language)-selector|changeLanguage\s*\(/,
+    );
+    expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual([
+      "ai_models",
+      "personalization",
+      "data_sync",
+    ]);
+  });
+
+  it("forbids dynamic Settings keys and direct normal-mode raw diagnostic sinks", () => {
+    const source = I18N_2_SETTINGS_SCOPES.map(read).join("\n");
+    expect(source).not.toMatch(/\bt\s*\(\s*(?!\(\s*\$\s*\)\s*=>)/);
+
+    const settingsUiSource = [
+      "src/Settings.tsx",
+      "src/InvestorProfilePanel.tsx",
+      "src/SourceRunProgress.tsx",
+      ...I18N_2_SETTINGS_SCOPES.filter((path) => path.endsWith(".tsx")),
+    ].map(read).join("\n");
+    const visibleExpressions = [
+      ...settingsUiSource.matchAll(/\{([^{}\n]+)\}\s*<\//g),
+      ...settingsUiSource.matchAll(/(?:title|label|description|errorMessage)=\{([^{}\n]+)\}/g),
+    ].map((match) => match[1].trim());
+    const rawDiagnosticSinks = visibleExpressions.filter((expression) => {
+      if (/^t\s*\(/.test(expression)) return false;
+      if (/Presentation\.message\b/.test(expression)) return false;
+      return (
+        /\.(?:detail|diagnostic|last_error|lastError|warning|reason|expected|observed|error|message)\b/.test(expression)
+        || /\b(?:err|providerErr|oauthErr|rawDiagnostic)\b/.test(expression)
+      );
+    });
+    expect(rawDiagnosticSinks).toEqual([]);
+
+    const diagnosticsOwner = read("src/settings/DeveloperDiagnostics.tsx");
+    expect(settingsUiSource).not.toContain('data-testid="developer-diagnostics"');
+    expect(diagnosticsOwner).toContain('data-testid="developer-diagnostics"');
+    expect(diagnosticsOwner).toContain("<summary>{t(($) => $.errors.diagnostics.title)}</summary>");
   });
 });

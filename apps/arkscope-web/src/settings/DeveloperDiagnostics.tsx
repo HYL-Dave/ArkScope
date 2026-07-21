@@ -10,7 +10,7 @@ export function DeveloperDiagnostics({
   const visible = diagnostics.filter((value): value is string => !!value);
   if (!visible.length) return null;
   return (
-    <details className="developer-diagnostics">
+    <details data-testid="developer-diagnostics">
       <summary>{t(($) => $.errors.diagnostics.title)}</summary>
       {visible.map((value, index) => (
         <p key={`${index}:${value}`}>

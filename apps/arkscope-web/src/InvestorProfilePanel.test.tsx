@@ -498,7 +498,7 @@ describe("InvestorProfilePanel", () => {
 
     expect.soft(failedDraft.value).toBe("");
     expect(host!.querySelector('[role="alert"]')?.textContent).toBe("要求失敗，請稍後再試。");
-    expect(host!.querySelector(".developer-diagnostics")?.textContent).toContain(sendFailure);
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent).toContain(sendFailure);
 
     dispose();
     const deferredMessages: Array<{
@@ -751,7 +751,7 @@ describe("InvestorProfilePanel", () => {
       .toBe("SOURCE_APPROVED_PROFILE");
     expect.soft(host!.textContent).toContain("互補投資人");
     expect(host!.querySelector('[role="alert"]')?.textContent).toBe("要求失敗，請稍後再試。");
-    expect(host!.querySelector(".developer-diagnostics")?.textContent).toContain(refreshFailure);
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent).toContain(refreshFailure);
 
     const rejectBtn = await buttonByText("拒絕提案");
     await act(async () => { rejectBtn.click(); });
@@ -1153,7 +1153,7 @@ describe("InvestorProfilePanel", () => {
     expect(host!.querySelector('[role="alert"]')?.textContent)
       .toContain("The request failed. Try again later.");
     expect(host!.textContent).not.toContain(diagnostic);
-    expect(host!.querySelector(".developer-diagnostics")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
 
     dispose();
     await mount(true);
@@ -1161,8 +1161,8 @@ describe("InvestorProfilePanel", () => {
 
     expect(host!.querySelector('[role="alert"]')?.textContent)
       .toContain("The request failed. Try again later.");
-    expect(host!.querySelector(".developer-diagnostics")?.textContent)
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent)
       .toContain("Developer diagnostics");
-    expect(host!.querySelector(".developer-diagnostics")?.textContent).toContain(diagnostic);
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent).toContain(diagnostic);
   });
 });

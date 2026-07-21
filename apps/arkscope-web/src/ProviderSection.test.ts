@@ -170,7 +170,7 @@ describe("ProviderSection localization", () => {
     await act(async () => { reloginButtons()[0].click(); });
     await waitFor(() => (host!.textContent ?? "").includes(rawDetail));
     expect(host!.textContent).toContain("開發者診斷");
-    expect(host!.querySelector(".developer-diagnostics")?.getAttribute("aria-live")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.getAttribute("aria-live")).toBeNull();
   });
 
   it("switches locale during OAuth without cancelling or duplicating the flow", async () => {

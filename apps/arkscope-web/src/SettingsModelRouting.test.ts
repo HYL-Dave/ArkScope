@@ -590,7 +590,9 @@ describe("Settings model route save gate", () => {
       }));
     });
     await flush();
-    const discover = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+    const credentialRow = Array.from(host.querySelectorAll<HTMLElement>(".credential-row"))
+      .find((row) => row.textContent?.includes(credential.label))!;
+    const discover = Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "列模型")!;
     await click(discover);
     expect(host.textContent).toContain("gpt-discovered");
@@ -750,7 +752,9 @@ describe("Settings model route save gate", () => {
     });
     await flush();
 
-    const discover = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+    const credentialRow = Array.from(host.querySelectorAll<HTMLElement>(".credential-row"))
+      .find((row) => row.textContent?.includes(credential.label))!;
+    const discover = Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "列模型")!;
     await click(discover);
     const research = host.querySelector('[data-testid="route-ai_research"]')!;

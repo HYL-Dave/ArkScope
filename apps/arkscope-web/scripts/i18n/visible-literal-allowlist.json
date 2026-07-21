@@ -8,6 +8,158 @@
       "count": 1,
       "classification": "stable_identifier",
       "reason": "ArkScope is the product name and is identical in every locale."
+    },
+    {
+      "file": "src/credentialDisplay.ts",
+      "kind": "presenter_return",
+      "literal": "anthropic",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/credentialDisplay.ts",
+      "kind": "presenter_return",
+      "literal": "claude_code_oauth",
+      "count": 2,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/settingsCopy.ts",
+      "kind": "presenter_return",
+      "literal": "GPT-5.6",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/marketDataDisplay.ts",
+      "kind": "object_property",
+      "literal": "weekend",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/marketDataDisplay.ts",
+      "kind": "presenter_return",
+      "literal": "muted",
+      "count": 6,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/marketDataDisplay.ts",
+      "kind": "presenter_return",
+      "literal": "bad",
+      "count": 2,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/marketDataDisplay.ts",
+      "kind": "presenter_return",
+      "literal": "warn",
+      "count": 9,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/marketDataDisplay.ts",
+      "kind": "presenter_return",
+      "literal": "ok",
+      "count": 2,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/DataSourcesSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "ok",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/DataSourcesSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "warn",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ModelRoutingSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "default",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ModelRoutingSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "anthropic",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ModelRoutingSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "claude-…",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ModelRoutingSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "gpt-…",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ProviderSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "openai",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ProviderSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "sk-…",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ProviderSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "sk-ant-…",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ProviderSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "claude_code_oauth",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
+    },
+    {
+      "file": "src/settings/ProviderSection.tsx",
+      "kind": "jsx_attribute",
+      "literal": "chatgpt_oauth",
+      "count": 1,
+      "classification": "stable_identifier",
+      "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
     }
   ]
 }

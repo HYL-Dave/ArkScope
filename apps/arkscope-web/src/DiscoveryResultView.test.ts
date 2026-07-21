@@ -117,7 +117,7 @@ describe("DiscoveryResultView", () => {
       );
     });
 
-    expect(host.textContent).toContain("列出模型");
+    expect(host.textContent).toContain("列模型");
     expect(host.textContent).toContain("ChatGPT 訂閱 · 已取得可見模型清單");
     expect(host.textContent).toContain("來源: TS_Codex / chatgpt_oauth");
 

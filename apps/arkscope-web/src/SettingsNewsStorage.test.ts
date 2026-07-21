@@ -240,11 +240,11 @@ describe("SettingsView news storage copy", () => {
     expect(host!.textContent).toContain("上次失敗");
     expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).not.toContain(providerDiagnostic);
-    expect(host!.querySelector(".developer-diagnostics")).toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
 
     dispose();
     await renderNewsSection(true);
-    expect(host!.querySelector(".developer-diagnostics")).not.toBeNull();
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).not.toBeNull();
     expect(host!.textContent).toContain(syncDiagnostic);
     expect(host!.textContent).toContain(providerDiagnostic);
     expect(getNewsStatus).toHaveBeenCalledTimes(2);
