@@ -469,6 +469,7 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
         "view_tied_to_component_table",
         "schema_qualified_single_quoted_view",
         "unrelated_trigger_writes_component",
+        "ordinary_trigger_masks_component_access",
         "unrelated_table_references_component",
     ):
         path = tmp_path / f"{case}.db"
@@ -527,6 +528,16 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
                         "INSERT INTO investor_profile_calibration_sessions "
                         "(id, status, created_at, updated_at) "
                         "VALUES ('injected-by-trigger', 'closed', 'now', 'now'); END"
+                    )
+                elif case == "ordinary_trigger_masks_component_access":
+                    conn.execute("CREATE TABLE unrelated_masking_owner (id TEXT)")
+                    conn.execute(
+                        "CREATE TRIGGER unrelated_masking_trigger "
+                        "AFTER INSERT ON unrelated_masking_owner BEGIN "
+                        "INSERT INTO missing_unrelated_target(id) VALUES (NEW.id); "
+                        "INSERT INTO investor_profile_calibration_sessions "
+                        "(id, status, created_at, updated_at) "
+                        "VALUES ('masked-target', 'closed', 'now', 'now'); END"
                     )
                 elif case == "unrelated_table_references_component":
                     conn.execute(

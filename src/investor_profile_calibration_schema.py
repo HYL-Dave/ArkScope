@@ -298,8 +298,15 @@ def _table_references_component(conn: sqlite3.Connection, table_name: str) -> bo
 def _compiled_statements_access_component(
     conn: sqlite3.Connection,
     statements: tuple[str, ...],
+    *,
+    unsupported_view_name: str | None = None,
 ) -> bool:
     known_tables = {name.lower() for name in _KNOWN_COMPONENT_TABLES}
+    unsupported_view_error = (
+        f"cannot modify {unsupported_view_name.lower()} because it is a view"
+        if unsupported_view_name is not None
+        else None
+    )
     accesses_component = False
     component_error = False
     failed = False
@@ -345,6 +352,8 @@ def _compiled_statements_access_component(
                 message = str(exc).lower()
                 if any(table_name in message for table_name in known_tables):
                     component_error = True
+                elif message != unsupported_view_error:
+                    failed = True
             else:
                 successful_compilations += 1
     except (OSError, RuntimeError, sqlite3.Error, ValueError):
@@ -380,6 +389,11 @@ def _trigger_references_component(
 ) -> bool:
     quoted_owner = _quote_identifier(owner_name)
     try:
+        owner = conn.execute(
+            "SELECT type FROM sqlite_master "
+            "WHERE name=? AND type IN ('table', 'view')",
+            (owner_name,),
+        ).fetchone()
         columns = [
             str(row[1])
             for row in conn.execute(f"PRAGMA table_xinfo({quoted_owner})").fetchall()
@@ -387,8 +401,9 @@ def _trigger_references_component(
         ]
     except sqlite3.Error:
         return True
-    if not columns:
+    if owner is None or str(owner[0]).lower() not in {"table", "view"} or not columns:
         return True
+    owner_type = str(owner[0]).lower()
 
     assignments = ", ".join(
         f"{_quote_identifier(column)}={_quote_identifier(column)}"
@@ -401,6 +416,7 @@ def _trigger_references_component(
             f"EXPLAIN UPDATE {quoted_owner} SET {assignments}",
             f"EXPLAIN DELETE FROM {quoted_owner}",
         ),
+        unsupported_view_name=owner_name if owner_type == "view" else None,
     )
 
 
