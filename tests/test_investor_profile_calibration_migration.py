@@ -436,6 +436,7 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
         "view_tied_to_component_table",
         "schema_qualified_single_quoted_view",
         "unrelated_trigger_writes_component",
+        "unrelated_table_references_component",
     ):
         path = tmp_path / f"{case}.db"
         schema.migrate_calibration_schema(path)
@@ -494,6 +495,12 @@ def test_marker_schema_mismatch_fails_closed_without_writes(tmp_path):
                         "(id, status, created_at, updated_at) "
                         "VALUES ('injected-by-trigger', 'closed', 'now', 'now'); END"
                     )
+                elif case == "unrelated_table_references_component":
+                    conn.execute(
+                        "CREATE TABLE unrelated_session_links ("
+                        "id TEXT PRIMARY KEY, session_id TEXT REFERENCES "
+                        "investor_profile_calibration_sessions(id))"
+                    )
         before = _logical_snapshot(path)
         before_bytes = path.read_bytes()
 
@@ -545,6 +552,16 @@ def test_unmarked_v2_artifacts_fail_closed_without_rebuild(tmp_path):
             "SELECT id FROM investor_profile_calibration_sessions"
         )
     paths.append(dangling_view)
+
+    comma_literal_view = tmp_path / "fresh-comma-literal-view.db"
+    with _connect(comma_literal_view) as conn:
+        conn.execute("CREATE TABLE unrelated_view_source (id TEXT)")
+        conn.execute(
+            "CREATE VIEW comma_literal_calibration_projection AS "
+            "SELECT unrelated_view_source.id FROM unrelated_view_source, "
+            "'investor_profile_calibration_sessions'"
+        )
+    paths.append(comma_literal_view)
 
     for path in paths:
         before = _logical_snapshot(path)

@@ -271,9 +271,8 @@ def _uses_component_namespace(name: str) -> bool:
     )
 
 
-def _unquote_identifier(token: str, *, allow_single_quote: bool = False) -> str | None:
-    allowed_quotes = ('"', "`", "[") + (("'",) if allow_single_quote else ())
-    if len(token) < 2 or token[0] not in allowed_quotes:
+def _unquote_identifier(token: str) -> str | None:
+    if len(token) < 2 or token[0] not in ("'", '"', "`", "["):
         return None
     closing = "]" if token[0] == "[" else token[0]
     if token[-1] != closing:
@@ -283,38 +282,12 @@ def _unquote_identifier(token: str, *, allow_single_quote: bool = False) -> str 
 
 def _sql_mentions_table(sql: str, table_names: set[str]) -> bool:
     expected = {name.lower() for name in table_names}
-    tokens = _sql_tokens(sql)
-    for index, (kind, value) in enumerate(tokens):
+    for kind, value in _sql_tokens(sql):
         if kind == "word" and value in expected:
             return True
         if kind == "quoted":
             identifier = _unquote_identifier(value)
             if identifier is not None and identifier.lower() in expected:
-                return True
-            identifier = _unquote_identifier(value, allow_single_quote=True)
-            if identifier is None or identifier.lower() not in expected:
-                continue
-            previous = tokens[index - 1] if index else None
-            if previous in {
-                ("word", "from"),
-                ("word", "into"),
-                ("word", "join"),
-                ("word", "references"),
-                ("word", "update"),
-            }:
-                return True
-            if (
-                previous == ("symbol", ".")
-                and index >= 3
-                and tokens[index - 3]
-                in {
-                    ("word", "from"),
-                    ("word", "into"),
-                    ("word", "join"),
-                    ("word", "references"),
-                    ("word", "update"),
-                }
-            ):
                 return True
     return False
 
@@ -334,20 +307,6 @@ def _has_unexpected_component_artifacts(
     for object_type, name, table_name, sql in rows:
         name = str(name)
         table_name = str(table_name)
-        tied_to_component = table_name.lower() in known_table_names
-        body_mentions_component = (
-            object_type in {"view", "trigger"}
-            and isinstance(sql, str)
-            and _sql_mentions_table(sql, set(_KNOWN_COMPONENT_TABLES))
-        )
-        if not (
-            _uses_component_namespace(name)
-            or _uses_component_namespace(table_name)
-            or tied_to_component
-            or body_mentions_component
-        ):
-            continue
-
         if object_type == "table" and name in expected_tables:
             continue
         if object_type == "index":
@@ -363,7 +322,19 @@ def _has_unexpected_component_artifacts(
                 and name.lower().startswith("sqlite_autoindex_")
             ):
                 continue
-        return True
+
+        tied_to_component = table_name.lower() in known_table_names
+        body_mentions_component = (
+            isinstance(sql, str)
+            and _sql_mentions_table(sql, set(_KNOWN_COMPONENT_TABLES))
+        )
+        if (
+            _uses_component_namespace(name)
+            or _uses_component_namespace(table_name)
+            or tied_to_component
+            or body_mentions_component
+        ):
+            return True
     return False
 
 
