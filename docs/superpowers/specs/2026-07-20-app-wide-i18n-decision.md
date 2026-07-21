@@ -1,8 +1,8 @@
 # ArkScope App-Wide i18n Decision
 
 > **Status: WRITTEN DECISION APPROVED; I18N-0 FOUNDATION LIVE; I18N-1 SHELL +
-> COMMON UI LIVE; I18N-2 SETTINGS IMPLEMENTATION REVIEW-READY AT `9f78a9ff` —
-> INDEPENDENT IMPLEMENTATION REVIEW PENDING, 2026-07-21.**
+> COMMON UI LIVE; I18N-2 SETTINGS LIVE COMPLETE AT PRODUCT `9f78a9ff`,
+> FAST-FORWARD MERGED THROUGH `d2195cd0`, 2026-07-21.**
 > This document chooses the app-wide locale authority, runtime localization
 > mechanism, migration sequence, public-switch gate, and verification contract.
 > Independent written review returned GREEN. I18N-0 subsequently passed its
@@ -10,9 +10,10 @@
 > I18N-1 Shell + common UI passed independent implementation review with zero
 > findings and fast-forward merged through `6542e6e2`. Independent review
 > approved the bounded I18N-2 Settings plan after its terminology-authority
-> amendment. I18N-2 implementation is complete and stopped at review-ready;
-> independent implementation review is the sole next gate. The public selector
-> remains unauthorized.
+> amendment. Independent implementation review returned GREEN with zero
+> findings; merged-tree closeout and the normal desktop zh-Hant smoke are
+> green. The public selector remains unauthorized. P2.8 Slice 5 is the single
+> next unit and ships bilingual from birth.
 
 ## 1. Purpose and Authority
 
@@ -478,8 +479,8 @@ the foundation slice, but no incomplete public affordance is rendered.
 | --- | --- | --- | --- |
 | I18N-0 Foundation | dependencies, typed static resources, locale API, synchronous bootstrap/cache, `<html lang>`, test/static tooling | LIVE | absent |
 | I18N-1 Shell + common UI | navigation, topbar, Drawer labels, background-work chrome, shared states/primitives used by Shell | LIVE | absent |
-| I18N-2 Settings | PageHeader, workflow tabs, directory/registry, all reachable Settings sections, Settings backend-copy mappings | REVIEW-READY — product `9f78a9ff`; independent review pending | absent |
-| P2.8 Slice 5 | Investor Profile UX, implemented bilingual from birth against the new Settings/runtime contract | queued | absent |
+| I18N-2 Settings | PageHeader, workflow tabs, directory/registry, all reachable Settings sections, Settings backend-copy mappings | LIVE — product `9f78a9ff`; merged/evidence `d2195cd0` | absent |
+| P2.8 Slice 5 | Investor Profile UX, implemented bilingual from birth against the new Settings/runtime contract | NEXT | absent |
 | I18N-3 Explore | Home, Watchlist, Universe, News, Ticker Detail, AI card, related shared display helpers | queued | absent |
 | I18N-4 Research | workspace, history, evidence, progress/errors, model-selection copy not already owned by Settings | queued | absent |
 | I18N-5 Portfolio + System + residual | Holdings/overview/activity/capture, Dashboard/System, Markdown chrome, remaining reachable shared copy and formatter audit | queued | absent |
@@ -552,6 +553,11 @@ section anchor; the PageHeader is always visible in Settings, so search for
 The selector follows §4.4 optimistic/revert behavior. While its write is in
 flight it prevents a second selection. A failure restores the prior option and
 shows localized error copy without exposing a raw exception.
+
+I18N-6 must invoke `useUiLocale().setLocale()` so the write flows through the
+locale controller and updates `<html lang>`, cache, and profile DB authority as
+one contract. Direct `i18next.changeLanguage()` from the selector is forbidden;
+it bypasses authority and document-language synchronization.
 
 It does not invoke Settings dirty/busy navigation guards because it does not
 change workflow groups. Controlled field values, active tab, search query,
@@ -718,11 +724,10 @@ At decision adoption:
    does not pre-render partial i18n screens.
 4. I18N-6 owns a later Design Kit locale-control and bilingual-state sync after
    the product gate passes.
-5. I18N-0 and I18N-1 are LIVE; I18N-2 Settings is review-ready, and the
-   priority map names its independent implementation review as the sole next
-   gate.
-6. Slice 5 remains queued behind the Shell + Settings first tranche and then
-   ships bilingual from birth.
+5. I18N-0, I18N-1, and I18N-2 Settings are LIVE; the priority map names P2.8
+   Slice 5 as the sole next unit.
+6. Slice 5 now follows the completed Shell + Settings first tranche and ships
+   bilingual from birth.
 
 Each implementation unit receives a separately reviewed plan. This decision
 does not authorize combining all migrations into one branch.
