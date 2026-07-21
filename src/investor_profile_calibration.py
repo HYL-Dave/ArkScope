@@ -17,10 +17,11 @@ from pathlib import Path
 from typing import Optional
 
 from src.investor_profile import normalize_profile_payload
+from src.investor_profile_calibration_schema import assert_calibration_schema_v2
 
 SESSION_STATUSES = ("active", "closed", "superseded")
 MESSAGE_ROLES = ("user", "assistant")
-PROPOSAL_STATUSES = ("draft", "approved", "rejected")
+PROPOSAL_STATUSES = ("draft", "approved", "rejected", "superseded")
 
 
 def _now() -> str:
@@ -66,45 +67,6 @@ class CalibrationProposal:
     rejected_at: Optional[str]
 
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS investor_profile_calibration_sessions (
-    id          TEXT PRIMARY KEY,
-    status      TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL,
-    closed_at   TEXT
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_calibration_one_active
-ON investor_profile_calibration_sessions(status)
-WHERE status = 'active';
-
-CREATE TABLE IF NOT EXISTS investor_profile_calibration_messages (
-    id          TEXT PRIMARY KEY,
-    session_id  TEXT NOT NULL REFERENCES investor_profile_calibration_sessions(id) ON DELETE CASCADE,
-    role        TEXT NOT NULL,
-    content     TEXT NOT NULL,
-    created_at  TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_calibration_messages_session
-ON investor_profile_calibration_messages(session_id, created_at ASC);
-
-CREATE TABLE IF NOT EXISTS investor_profile_calibration_proposals (
-    id                     TEXT PRIMARY KEY,
-    session_id              TEXT NOT NULL REFERENCES investor_profile_calibration_sessions(id) ON DELETE CASCADE,
-    status                  TEXT NOT NULL,
-    profile_patch_json      TEXT NOT NULL,
-    raw_profile_patch_json  TEXT NOT NULL,
-    rationales_json         TEXT NOT NULL,
-    changed_fields_json     TEXT NOT NULL DEFAULT '[]',
-    created_at              TEXT NOT NULL,
-    approved_at             TEXT,
-    rejected_at             TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_calibration_proposals_session
-ON investor_profile_calibration_proposals(session_id, created_at DESC);
-"""
-
-
 def normalize_proposal_payload(profile_patch: dict, rationales: dict | None) -> tuple[dict, dict, dict]:
     if "risk_mismatch" in profile_patch:
         raise ValueError("risk_mismatch is server-derived and cannot be proposed")
@@ -134,25 +96,16 @@ class CalibrationStore:
 
     def __init__(self, db_path: str | Path):
         self.db_path = str(db_path)
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        assert_calibration_schema_v2(self.db_path)
         self._write_lock = threading.Lock()
-        self._ensure_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=5.0)
+        uri = f"{Path(self.db_path).resolve().as_uri()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=5.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout = 5000")
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
-
-    def _ensure_schema(self) -> None:
-        with self._write_lock, self._connect() as conn:
-            try:
-                conn.execute("PRAGMA journal_mode = WAL")
-            except sqlite3.OperationalError:
-                pass
-            conn.executescript(_SCHEMA)
-            conn.commit()
 
     @staticmethod
     def _session(row: sqlite3.Row) -> CalibrationSession:

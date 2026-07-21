@@ -9,11 +9,13 @@ from src.api.routes import investor_profile_calibration as routes
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import CalibrationStore
 from src.investor_profile_calibration_agent import CalibrationAgentResult
+from src.investor_profile_calibration_schema import migrate_calibration_schema
 
 
 @pytest.fixture
 def stores(tmp_path):
     db = tmp_path / "profile_state.db"
+    migrate_calibration_schema(db)
     return CalibrationStore(db), InvestorProfileStore(db)
 
 
@@ -159,6 +161,10 @@ def test_reject_proposal_keeps_profile_unchanged(stores, monkeypatch):
 def test_calibration_router_mounts_on_real_app():
     from src.api.app import create_app
 
+    try:
+        asyncio.get_event_loop_policy().get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
     app = create_app()
     paths = {getattr(route, "path", None) for route in app.routes}
     assert "/profile/investor/calibration" in paths

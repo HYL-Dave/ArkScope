@@ -10,6 +10,7 @@ from src.investor_profile_calibration import (
     CalibrationStore,
     normalize_proposal_payload,
 )
+from src.investor_profile_calibration_schema import migrate_calibration_schema
 from src.investor_profile_calibration_agent import (
     CALIBRATION_SYSTEM_PROMPT,
     CalibrationAgentResult,
@@ -17,8 +18,13 @@ from src.investor_profile_calibration_agent import (
 )
 
 
+def _calibration_store(path):
+    migrate_calibration_schema(path)
+    return CalibrationStore(path)
+
+
 def test_start_session_enforces_single_active_and_explicit_supersede(tmp_path):
-    store = CalibrationStore(tmp_path / "profile_state.db")
+    store = _calibration_store(tmp_path / "profile_state.db")
     first = store.start_session()
     assert first.status == "active"
     assert store.get_active_session().id == first.id
@@ -34,7 +40,7 @@ def test_start_session_enforces_single_active_and_explicit_supersede(tmp_path):
 
 
 def test_messages_are_append_only_and_role_checked(tmp_path):
-    store = CalibrationStore(tmp_path / "profile_state.db")
+    store = _calibration_store(tmp_path / "profile_state.db")
     sess = store.start_session()
     m1 = store.append_message(sess.id, role="user", content="I chase AI stocks.")
     m2 = store.append_message(
@@ -50,7 +56,7 @@ def test_messages_are_append_only_and_role_checked(tmp_path):
 
 def test_create_proposal_is_inert_and_server_derives_mismatch(tmp_path):
     db = tmp_path / "profile_state.db"
-    cstore = CalibrationStore(db)
+    cstore = _calibration_store(db)
     pstore = InvestorProfileStore(db)
     sess = cstore.start_session()
 
@@ -74,7 +80,7 @@ def test_create_proposal_is_inert_and_server_derives_mismatch(tmp_path):
 
 
 def test_reject_and_approve_proposal_status_are_terminal(tmp_path):
-    store = CalibrationStore(tmp_path / "profile_state.db")
+    store = _calibration_store(tmp_path / "profile_state.db")
     sess = store.start_session()
     proposal = store.create_proposal(
         session_id=sess.id,
