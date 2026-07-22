@@ -115,10 +115,36 @@ The split is deliberate: conflict authority and Provider navigation are now
 independent tests instead of one composite node. The RED evidence was `65`
 collected with `5 failed / 60 passed` for the first review correction, followed
 by targeted REDs for response-lost draft reconciliation and stale Summary
-authority. GREEN is Task 7 `66/66`, Task 6-8 focused `112/112`, and full
-frontend `831/831`. The exact final sequential ledger is therefore Task 7
-`+31/-2` and total frontend `+55/-2` (net `+53`); the raw additions and
-retirements must not be collapsed into a net-only claim.
+authority. The historical GREEN checkpoint, now superseded by the fresh-spec
+deviation below, was Task 7 `66/66`, Task 6-8 focused `112/112`, and full
+frontend `831/831`. Its exact sequential ledger was Task 7 `+31/-2` and total
+frontend `+55/-2` (net `+53`); the raw additions and retirements remain part of
+the audit trail and must not be collapsed into a net-only claim.
+
+### Reviewed implementation deviation: fresh-spec authority gaps
+
+Fresh spec review after `8f73e605` found four valid Task 7 behavior gaps:
+initial persisted-pending turns had no Summary refresh path; successful
+approve/reject authority could regress through stale advisory GETs; confirmed
+proposal conflict could regress through a stale non-conflicted draft; and a
+response-lost proposal request could show a ready draft alongside a failure
+alert. The product correction at `a0f70012` was RED-first and changed only the
+Task 7 Panel, Panel test, and Summary files. Task 8, CSS, backend, API,
+resources, and Settings consumer seams remained unchanged.
+
+Relative to `8f73e605`, add exactly these four node IDs:
+
+1. `refreshes an initially persisted pending turn before retrying the same ID`
+2. `keeps successful approve authority across stale advisory GET responses`
+3. `keeps successful reject authority across stale advisory GET responses`
+4. `preserves confirmed conflict across a stale non-conflicted draft`
+
+Remove or rename no node. The existing
+`returns response-lost draft proposals to summary without replaying the mutation`
+node was strengthened in place to exclude the stale failure alert. Initial RED
+was `70` collected with `5 failed / 65 passed`; GREEN is Task 7 `70/70`, Task
+6-8 focused `116/116`, and full frontend `835/835`. The final sequential ledger
+is Task 7 `+35/-2` and total frontend `+59/-2` (net `+57`).
 
 ---
 
@@ -952,11 +978,11 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+55/-2`, net `+53`
+### Frontend: `+59/-2`, net `+57`
 
-Full suite moves `77 files / 778 -> 81 files / 831`. The nine-file focused
+Full suite moves `77 files / 778 -> 81 files / 835`. The nine-file focused
 suite moves the historical `5 existing files / 59` baseline to
-`9 files / 112`.
+`9 files / 116`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -1031,6 +1057,19 @@ Retire exactly:
 This is the RED-first correction for the five reviewed code-quality findings,
 not a net-only restatement of the original Task 7 ledger.
 
+#### Fresh-spec Task 7 authority deviation — add 4, remove 0
+
+Relative to `8f73e605`, add exactly:
+
+1. `refreshes an initially persisted pending turn before retrying the same ID`
+2. `keeps successful approve authority across stale advisory GET responses`
+3. `keeps successful reject authority across stale advisory GET responses`
+4. `preserves confirmed conflict across a stale non-conflicted draft`
+
+Remove or rename no node. Strengthen the existing response-lost draft node in
+place. This is the RED-first correction for the four fresh-spec findings and
+must remain visible as raw `+4/-0` accounting.
+
 #### New frontend files — add 14
 
 - `InvestorProfileApi.test.ts` +5:
@@ -1099,9 +1138,9 @@ allowlist entry is authorized.
 | 4. startup + reconciliation | +2 | 0 | migration/startup ownership |
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
-| 7. workspace UI + Settings guard | 0 | +31/-2 | summary/modes/navigation + reviewed reconciliation/navigation hardening |
+| 7. workspace UI + Settings guard | 0 | +35/-2 | summary/modes/navigation + reviewed reconciliation/navigation/authority hardening |
 | 8. Research context + CSS/ratchet | 0 | +9 | historical transparency/layout |
-| **Total** | **+53/-1** | **+55/-2** | **net backend +52, frontend +53** |
+| **Total** | **+53/-1** | **+59/-2** | **net backend +52, frontend +57** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1645,7 +1684,8 @@ collection requires a reviewed ledger amendment.
   The original tranche adds 20 Panel nodes and three Settings nodes while
   replacing one existing Settings guard node. The reviewed code-quality
   deviation then adds seven Panel nodes plus one Settings node and retires one
-  intermediate composite Panel node. Preserve every baseline node ID. Use
+  intermediate composite Panel node. The fresh-spec authority deviation adds
+  four more Panel nodes and removes none. Preserve every baseline node ID. Use
   deferred promises for profile/calibration/turn/save/approve legs, live DOM
   identity after locale changes, connected focus targets, and planted
   secret-like source values that must not enter guard/dialog copy.
@@ -1657,8 +1697,8 @@ collection requires a reviewed ledger amendment.
     src/SettingsWorkspace.test.tsx
   ```
 
-  Expected final collection: Panel `39`; Settings `27`; total `66`, with raw
-  sequential ledger `+31/-2`.
+  Expected final collection: Panel `43`; Settings `27`; total `70`, with raw
+  sequential ledger `+35/-2`.
 
 - [ ] **Step 3: Split renderers without splitting state ownership**
 
@@ -1701,10 +1741,10 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 9: Run GREEN**
 
-  Expected: exact `66 passed`. Run resource/display/API tests too; expected
-  Task 6-7 owned cumulative is `5 files / 90 passed`. Including the unchanged
+  Expected: exact `70 passed`. Run resource/display/API tests too; expected
+  Task 6-7 owned cumulative is `5 files / 94 passed`. Including the unchanged
   class-coverage and foundation-boundary baselines, the final-suite checkpoint
-  before Task 8 is `7 files / 103 passed`; Task 8 then adds nine nodes.
+  before Task 8 is `7 files / 107 passed`; Task 8 then adds nine nodes.
 
 - [ ] **Step 10: Commit**
 
@@ -1777,7 +1817,7 @@ collection requires a reviewed ledger amendment.
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `9 files / 112 passed`.
+  Expected: `9 files / 116 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -1835,14 +1875,14 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `81 files / 831 passed`; clean typecheck; build succeeds with only
+  Expected: `81 files / 835 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
-  `+55/-2`. Removed IDs must be exactly the three named obsolete nodes across
+  `+59/-2`. Removed IDs must be exactly the three named obsolete nodes across
   the backend and frontend ledgers, including the Task 7 intermediate node
   retired by the reviewed deviation. Existing failure/error/skip/warning
   families must be bidirectionally identical.
@@ -1962,7 +2002,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+55/-2`, and only the three named removals;
+1. exact backend `+53/-1`, frontend `+59/-2`, and only the three named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -2043,7 +2083,7 @@ Only after independent implementation GREEN and explicit user approval:
 5. verify marker 2, `integrity_check`, `foreign_key_check`, preserved message /
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
-6. rerun merged focused `219`, full backend collect `4621`, frontend `81/831`,
+6. rerun merged focused `219`, full backend collect `4621`, frontend `81/835`,
    typecheck, build, scanner, no-PG, resources, immutable gates, and one normal
    desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
