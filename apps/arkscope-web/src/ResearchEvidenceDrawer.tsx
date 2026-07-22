@@ -16,6 +16,22 @@ interface EvidenceRow {
   completion: "complete" | "running" | "recorded";
 }
 
+interface FetchedRunAuthority {
+  runId: string;
+  run: ResearchRunDTO;
+}
+
+function freshestRunDetail(
+  fetchedRun: ResearchRunDTO | null,
+  activeRun: ResearchRunDTO | null,
+): ResearchRunDTO | null {
+  if (!fetchedRun) return activeRun;
+  if (!activeRun) return fetchedRun;
+  return Date.parse(activeRun.updated_at) >= Date.parse(fetchedRun.updated_at)
+    ? activeRun
+    : fetchedRun;
+}
+
 export function researchEvidenceRows(
   message: Message | null,
   activeTrace: readonly TraceRow[],
@@ -116,25 +132,25 @@ export function ResearchEvidenceDrawer({
   // A selected transcript turn owns its exact linkage. Never borrow a newer
   // active/latest run for a legacy message that has no persisted run_id.
   const runId = message ? (message.runId ?? null) : (activeRun?.id ?? null);
-  const [runDetail, setRunDetail] = useState<ResearchRunDTO | null>(null);
+  const [fetchedAuthority, setFetchedAuthority] = useState<FetchedRunAuthority | null>(null);
   const [detailState, setDetailState] = useState<"idle" | "loading" | "ready" | "partial">("idle");
   const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const [diagnosticLoading, setDiagnosticLoading] = useState(false);
 
   useEffect(() => {
     if (!open || !runId) {
-      setRunDetail(null);
+      setFetchedAuthority(null);
       setDetailState("idle");
       setDiagnostic(null);
       return;
     }
     let alive = true;
-    setRunDetail(null);
+    setFetchedAuthority(null);
     setDetailState("loading");
     void getResearchRun(runId)
       .then(({ run }) => {
         if (!alive) return;
-        setRunDetail(run);
+        setFetchedAuthority({ runId, run });
         setDetailState("ready");
       })
       .catch(() => {
@@ -143,11 +159,6 @@ export function ResearchEvidenceDrawer({
       });
     return () => { alive = false; };
   }, [open, runId]);
-
-  useEffect(() => {
-    if (!open || !runId || activeRun?.id !== runId) return;
-    setRunDetail(activeRun);
-  }, [activeRun, open, runId]);
 
   const loadDiagnostics = () => {
     if (!developerMode || !runId || diagnostic != null || diagnosticLoading) return;
@@ -166,12 +177,19 @@ export function ResearchEvidenceDrawer({
       .finally(() => setDiagnosticLoading(false));
   };
 
-  const details = runDetail?.id === runId
-    ? runDetail
-    : (activeRun?.id === runId ? activeRun : null);
+  const fetchedRun = fetchedAuthority?.runId === runId && fetchedAuthority.run.id === runId
+    ? fetchedAuthority.run
+    : null;
+  const activeRunCandidate = activeRun?.id === runId ? activeRun : null;
+  const details = freshestRunDetail(fetchedRun, activeRunCandidate);
   const usage = details?.token_usage ?? message?.token_usage ?? null;
   const personalization = message?.personalization ?? null;
-  const personalizationContext = message?.personalization ?? details?.personalization ?? null;
+  const messagePersonalizationKnown = message != null && message.personalization !== undefined;
+  const detailPersonalizationKnown = details != null && details.personalization !== undefined;
+  const personalizationContext = messagePersonalizationKnown
+    ? (message.personalization ?? null)
+    : (details?.personalization ?? null);
+  const personalizationContextKnown = messagePersonalizationKnown || detailPersonalizationKnown;
   const hasTranscriptDetails = Boolean(details || message);
 
   return (
@@ -248,7 +266,9 @@ export function ResearchEvidenceDrawer({
               ))}
             </dl>
           ) : null}
-          <ResearchPersonalizationContext trace={personalizationContext} />
+          {personalizationContextKnown ? (
+            <ResearchPersonalizationContext trace={personalizationContext} />
+          ) : null}
           {developerMode && runId ? (
             <details
               className="research-diagnostic"

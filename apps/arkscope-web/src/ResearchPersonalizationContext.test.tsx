@@ -59,7 +59,7 @@ function trace(
 }
 
 function message(
-  personalization: PersonalizationTrace | null,
+  personalization: PersonalizationTrace | null | undefined,
   runId = "run-context",
 ): Message {
   return {
@@ -77,6 +77,12 @@ function message(
     personalization,
     runId,
   };
+}
+
+function runDetailValue(label: string): string | null {
+  const row = [...document.querySelectorAll(".research-run-detail-list > div")]
+    .find((candidate) => candidate.querySelector("dt")?.textContent === label);
+  return row?.querySelector("dd")?.textContent ?? null;
 }
 
 function run(
@@ -185,7 +191,7 @@ describe("ResearchPersonalizationContext", () => {
         pinned={false}
         onClose={vi.fn()}
         onPinnedChange={vi.fn()}
-        message={message(null)}
+        message={message(undefined)}
         activeTrace={[]}
         activeRun={fetchedRun}
         developerMode={false}
@@ -193,6 +199,82 @@ describe("ResearchPersonalizationContext", () => {
     );
     expect(document.querySelector(".research-personalization-context-source")?.textContent)
       .toBe("FETCHED_RUN_SOURCE");
+
+    await renderNode(
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(null)}
+        activeTrace={[]}
+        activeRun={fetchedRun}
+        developerMode={false}
+      />,
+    );
+    expect(document.body.textContent).toContain("這筆歷史執行沒有儲存個人化情境。");
+    expect(document.querySelector(".research-personalization-context-source")).toBeNull();
+
+    await renderNode(
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(undefined)}
+        activeTrace={[]}
+        activeRun={run(null, { updated_at: "2026-07-22T00:04:00Z" })}
+        developerMode={false}
+      />,
+    );
+    expect(document.body.textContent).toContain("這筆歷史執行沒有儲存個人化情境。");
+    expect(document.querySelector(".research-personalization-context-source")).toBeNull();
+  });
+
+  it("withholds the no-snapshot claim while matching run detail is loading", async () => {
+    const pendingResponse = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn(() => pendingResponse.promise));
+
+    await renderNode(
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(undefined, "run-loading-context")}
+        activeTrace={[]}
+        activeRun={null}
+        developerMode={false}
+      />,
+    );
+
+    expect(document.body.textContent).toContain("載入執行詳情…");
+    expect(document.body.textContent).not.toContain("這筆歷史執行沒有儲存個人化情境。");
+    expect(document.querySelector(".research-personalization-context")).toBeNull();
+  });
+
+  it("withholds the no-snapshot claim when matching run detail partially fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({ detail: "unavailable" }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    )));
+
+    await renderNode(
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(undefined, "run-partial-context")}
+        activeTrace={[]}
+        activeRun={null}
+        developerMode={false}
+      />,
+    );
+
+    expect(document.body.textContent).toContain("執行詳情只載入了一部分");
+    expect(document.body.textContent).not.toContain("這筆歷史執行沒有儲存個人化情境。");
+    expect(document.querySelector(".research-personalization-context")).toBeNull();
   });
 
   it("never exposes the previous run context while a newly selected run is pending", async () => {
@@ -216,7 +298,7 @@ describe("ResearchPersonalizationContext", () => {
         pinned={false}
         onClose={vi.fn()}
         onPinnedChange={vi.fn()}
-        message={message(null, runId)}
+        message={message(undefined, runId)}
         activeTrace={[]}
         activeRun={null}
         developerMode={false}
@@ -260,6 +342,221 @@ describe("ResearchPersonalizationContext", () => {
     expect(document.querySelector(".research-personalization-context-source")?.textContent)
       .toBe("RUN_B_CONTEXT");
     expect(document.body.textContent).not.toContain("RUN_A_CONTEXT");
+  });
+
+  it("ignores an unresolved prior-run fetch after selecting another run", async () => {
+    const runAResponse = deferred<Response>();
+    const runBResponse = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+      if (url.endsWith("/run-pending-a")) return runAResponse.promise;
+      if (url.endsWith("/run-pending-b")) return runBResponse.promise;
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const drawer = (runId: string) => (
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(undefined, runId)}
+        activeTrace={[]}
+        activeRun={null}
+        developerMode={false}
+      />
+    );
+
+    await renderNode(drawer("run-pending-a"));
+    await renderNode(drawer("run-pending-b"));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      runAResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "STALE_PENDING_A_CONTEXT" }), {
+            id: "run-pending-a",
+          }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+    expect(document.body.textContent).toContain("載入執行詳情…");
+    expect(document.body.textContent).not.toContain("STALE_PENDING_A_CONTEXT");
+
+    await act(async () => {
+      runBResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "CURRENT_PENDING_B_CONTEXT" }), {
+            id: "run-pending-b",
+          }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("CURRENT_PENDING_B_CONTEXT");
+    expect(document.body.textContent).not.toContain("STALE_PENDING_A_CONTEXT");
+  });
+
+  it("keeps the reopened same-run request authoritative over the closed-cycle promise", async () => {
+    const firstResponse = deferred<Response>();
+    const reopenedResponse = deferred<Response>();
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => firstResponse.promise)
+      .mockImplementationOnce(() => reopenedResponse.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const selectedMessage = message(undefined, "run-reopened");
+    const drawer = (open: boolean) => (
+      <ResearchEvidenceDrawer
+        open={open}
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={selectedMessage}
+        activeTrace={[]}
+        activeRun={null}
+        developerMode={false}
+      />
+    );
+
+    await renderNode(drawer(true));
+    await renderNode(drawer(false));
+    await renderNode(drawer(true));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      firstResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "CLOSED_CYCLE_CONTEXT" }), {
+            id: "run-reopened",
+            updated_at: "2026-07-22T00:04:00Z",
+          }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+    expect(document.body.textContent).toContain("載入執行詳情…");
+    expect(document.body.textContent).not.toContain("CLOSED_CYCLE_CONTEXT");
+
+    await act(async () => {
+      reopenedResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "REOPENED_CONTEXT" }), {
+            id: "run-reopened",
+            updated_at: "2026-07-22T00:03:00Z",
+          }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("REOPENED_CONTEXT");
+    expect(document.body.textContent).not.toContain("CLOSED_CYCLE_CONTEXT");
+  });
+
+  it("selects freshest same-run authority and prefers live observation on ties", async () => {
+    const fetchedResponse = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn(() => fetchedResponse.promise));
+    const runId = "run-same-freshness";
+    const drawer = (activeRun: ResearchRunDTO) => (
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(undefined, runId)}
+        activeTrace={[]}
+        activeRun={activeRun}
+        developerMode={false}
+      />
+    );
+    const initialLive = run(trace({ context_snapshot: "INITIAL_LIVE_CONTEXT" }), {
+      id: runId,
+      status: "running",
+      provider: "openai",
+      model: "initial-live-model",
+      completed_at: null,
+      token_usage: { total_tokens: 10 },
+      updated_at: "2026-07-22T00:02:00Z",
+    });
+    const newerLive = run(trace({ context_snapshot: "NEWER_LIVE_CONTEXT" }), {
+      id: runId,
+      status: "running",
+      provider: "anthropic",
+      model: "newer-live-model",
+      completed_at: null,
+      token_usage: { total_tokens: 222 },
+      updated_at: "2026-07-22T00:05:00Z",
+    });
+
+    await renderNode(drawer(initialLive));
+    await renderNode(drawer(newerLive));
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("NEWER_LIVE_CONTEXT");
+    expect(runDetailValue("路線")).toContain("anthropic · newer-live-model");
+    expect(runDetailValue("總 tokens")).toBe("222");
+    expect(runDetailValue("完成")).toBe("—");
+
+    await act(async () => {
+      fetchedResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "OLDER_FETCHED_CONTEXT" }), {
+            id: runId,
+            status: "succeeded",
+            provider: "openai",
+            model: "older-fetched-model",
+            completed_at: "2026-07-22T00:03:00Z",
+            token_usage: { total_tokens: 111 },
+            updated_at: "2026-07-22T00:03:00Z",
+          }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("NEWER_LIVE_CONTEXT");
+    expect(document.body.textContent).not.toContain("OLDER_FETCHED_CONTEXT");
+    expect(runDetailValue("路線")).toContain("anthropic · newer-live-model");
+    expect(runDetailValue("總 tokens")).toBe("222");
+    expect(runDetailValue("完成")).toBe("—");
+
+    const olderLive = run(trace({ context_snapshot: "OLDER_LIVE_CONTEXT" }), {
+      id: runId,
+      status: "running",
+      provider: "anthropic",
+      model: "older-live-model",
+      completed_at: null,
+      token_usage: { total_tokens: 88 },
+      updated_at: "2026-07-22T00:02:00Z",
+    });
+    await renderNode(drawer(olderLive));
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("OLDER_FETCHED_CONTEXT");
+    expect(runDetailValue("路線")).toContain("openai · older-fetched-model");
+    expect(runDetailValue("總 tokens")).toBe("111");
+    expect(runDetailValue("完成")).not.toBe("—");
+
+    const equalTimestampLive = run(trace({ context_snapshot: "EQUAL_LIVE_CONTEXT" }), {
+      id: runId,
+      status: "running",
+      provider: "anthropic",
+      model: "equal-live-model",
+      completed_at: null,
+      token_usage: { total_tokens: 333 },
+      updated_at: "2026-07-22T00:03:00Z",
+    });
+    await renderNode(drawer(equalTimestampLive));
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("EQUAL_LIVE_CONTEXT");
+    expect(runDetailValue("路線")).toContain("anthropic · equal-live-model");
+    expect(runDetailValue("總 tokens")).toBe("333");
+    expect(runDetailValue("完成")).toBe("—");
   });
 
   it("switches locale without changing source context or disclosure state", async () => {
