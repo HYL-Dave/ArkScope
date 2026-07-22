@@ -219,6 +219,39 @@ full frontend `83 files / 849`. The final sequential ledger is Task 7
 remain intentionally recorded and are superseded only for current/final
 expectations.
 
+### Reviewed implementation deviation: correlated completion and profile authority
+
+Quality re-review after `e527263c` identified four remaining Important Task 7
+findings: a new draft could be attributed to the current failed turn without
+matching assistant completion; same-session reads could regress question/topic
+pointers; locally projected approved profiles retained a stale derived
+`risk_mismatch`; and failed or stale Reject advisory reads discarded the usable
+pre-action profile authority.
+
+The RED-first product correction at `093e13e1` changes only the existing Task 7
+Panel and pure merge-helper source/test files. It reuses the reviewed helper
+file map; Task 8, CSS, backend, API, resources, Settings focus handshake,
+routes, persistence, polling, and anchors remain unchanged. Relative to
+`e527263c`, add exactly these five node IDs:
+
+1. `does not correlate an unrelated draft to a failed proposal request`
+2. `withholds derived mismatch until an approved patch is corroborated`
+3. `keeps reject profile authority through failed and stale refreshes until corroborated`
+4. `keeps session pointers when an older same-session snapshot arrives`
+5. `advances same-second session pointers only with semantic forward evidence`
+
+Remove or rename no node. The existing
+`returns response-lost draft proposals to summary without replaying the mutation`
+fixture now carries matching assistant evidence; `proposal mode requires a
+pending proposal and separates coverage from actions` now preserves Summary
+during a failed Reject advisory read; and `applies proposal fields and
+corroborates them without freezing unrelated values` now pins derived mismatch
+as unknown in a client projection. RED was helper `2 failed / 6 passed` and
+Panel `3 failed / 48 passed`. GREEN is Task 7 owned `4 files / 89`, Task 6-8
+focused `11 files / 135`, and full frontend `83 files / 854`. The final
+sequential ledger is Task 7 `+55/-3` and total frontend `+79/-3` (net `+76`).
+All earlier checkpoints remain historical only.
+
 ---
 
 ## Grounded Baseline
@@ -1054,10 +1087,10 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+74/-3`, net `+71`
+### Frontend: `+79/-3`, net `+76`
 
-Full suite moves `77 files / 778 -> 83 files / 849`. The final focused suite
-moves the historical `5 existing files / 59` baseline to `11 files / 130`.
+Full suite moves `77 files / 778 -> 83 files / 854`. The final focused suite
+moves the historical `5 existing files / 59` baseline to `11 files / 135`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -1167,6 +1200,14 @@ The helper and integration suites are new files; no unrelated existing node is
 renamed or removed. This remains raw `+14/-1` accounting, not a net-only `+13`
 claim.
 
+#### Correlated-completion/profile-authority deviation — add 5, remove 0
+
+Relative to `e527263c`, the exact IDs are the five-item canonical list in the
+Plan Review Resolution above. Distribution is Panel `+3/-0` and the existing
+pure `calibrationStateMerge` suite `+2/-0`. No file is added, no existing node
+is retired, and the Task 8-owned product remains byte-identical. This remains
+raw `+5/-0` accounting rather than being folded into the prior deviation.
+
 #### New frontend files — add 14
 
 - `InvestorProfileApi.test.ts` +5:
@@ -1235,9 +1276,9 @@ allowlist entry is authorized.
 | 4. startup + reconciliation | +2 | 0 | migration/startup ownership |
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
-| 7. workspace UI + Settings guard | 0 | +50/-3 | summary/modes/navigation + reviewed monotonic authority/focus hardening |
+| 7. workspace UI + Settings guard | 0 | +55/-3 | summary/modes/navigation + reviewed monotonic authority/profile hardening |
 | 8. Research context + CSS/ratchet | 0 | +9 | historical transparency/layout |
-| **Total** | **+53/-1** | **+74/-3** | **net backend +52, frontend +71** |
+| **Total** | **+53/-1** | **+79/-3** | **net backend +52, frontend +76** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1788,6 +1829,8 @@ collection requires a reviewed ledger amendment.
   four more Panel nodes and removes none. The saved-profile authority deviation
   adds one more Panel node and removes none. The final monotonic-authority/focus
   deviation adds Panel `+5/-1`, helper `+6/-0`, and integration `+3/-0`.
+  The correlated-completion/profile-authority deviation then adds Panel
+  `+3/-0` and helper `+2/-0`, with no new file or retirement.
   Preserve every baseline node ID except the three explicitly retired IDs. Use
   deferred promises for profile/calibration/turn/save/approve legs, live DOM
   identity after locale changes, connected focus targets, and planted
@@ -1802,8 +1845,8 @@ collection requires a reviewed ledger amendment.
     src/settings/investor/calibrationStateMerge.test.ts
   ```
 
-  Expected final collection: Panel `48`; Settings `27`; integration `3`;
-  merge helper `6`; total `4 files / 84`, with raw sequential ledger `+50/-3`.
+  Expected final collection: Panel `51`; Settings `27`; integration `3`;
+  merge helper `8`; total `4 files / 89`, with raw sequential ledger `+55/-3`.
 
 - [ ] **Step 3: Split renderers without splitting state ownership**
 
@@ -1846,10 +1889,10 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 9: Run GREEN**
 
-  Expected: exact `4 files / 84 passed`. Run resource/display/API tests too;
-  expected Task 6-7 owned cumulative is `7 files / 108 passed`. Including the
+  Expected: exact `4 files / 89 passed`. Run resource/display/API tests too;
+  expected Task 6-7 owned cumulative is `7 files / 113 passed`. Including the
   unchanged class-coverage and foundation-boundary baselines, the final-suite
-  checkpoint before Task 8 is `9 files / 121 passed`; Task 8 then adds nine
+  checkpoint before Task 8 is `9 files / 126 passed`; Task 8 then adds nine
   nodes.
 
 - [ ] **Step 10: Commit**
@@ -1926,7 +1969,7 @@ collection requires a reviewed ledger amendment.
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `11 files / 130 passed`.
+  Expected: `11 files / 135 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -1984,14 +2027,14 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `83 files / 849 passed`; clean typecheck; build succeeds with only
+  Expected: `83 files / 854 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
-  `+74/-3`. Removed IDs must be exactly the four named obsolete nodes across
+  `+79/-3`. Removed IDs must be exactly the four named obsolete nodes across
   the backend and frontend ledgers, including both Task 7 intermediate/overclaim
   nodes retired by reviewed deviations. Existing failure/error/skip/warning
   families must be bidirectionally identical.
@@ -2111,7 +2154,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+74/-3`, and only the four named removals;
+1. exact backend `+53/-1`, frontend `+79/-3`, and only the four named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -2147,6 +2190,14 @@ collection requires a reviewed ledger amendment.
     Summary; dirty confirm delays acknowledgement and busy veto rejects it;
 29. Edit, Calibration, and Proposal locale switches each preserve source state,
     disclosure/focus ownership, and perform zero GETs.
+30. response-loss proposal completion requires both new matching assistant
+    evidence for the current turn and a genuinely new draft ID;
+31. same-session pointers advance only by newer ISO time, accepted-turn current
+    question evidence, or strict coverage expansion, while coverage unions;
+32. client-projected approved profiles expose derived mismatch as unassessed
+    until a corroborating backend profile is read; and
+33. Reject keeps pre-action profile values through failed/stale advisory reads,
+    and retry releases them only on corroborating authority.
 
 ---
 
@@ -2203,7 +2254,7 @@ Only after independent implementation GREEN and explicit user approval:
 5. verify marker 2, `integrity_check`, `foreign_key_check`, preserved message /
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
-6. rerun merged focused `219`, full backend collect `4621`, frontend `83/849`,
+6. rerun merged focused `219`, full backend collect `4621`, frontend `83/854`,
    typecheck, build, scanner, no-PG, resources, immutable gates, and one normal
    desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
