@@ -54,6 +54,17 @@ async def lifespan(app: FastAPI):
         provider_config_ready = False
         mark_provider_config_setup_required(str(e))
         logger.warning("data-provider env bridge failed; booting setup-only: %s", e)
+
+    from src.investor_profile_calibration_schema import migrate_calibration_schema
+
+    from .dependencies import (
+        _local_state_db_path,
+        get_investor_calibration_store,
+    )
+
+    migrate_calibration_schema(_local_state_db_path())
+    get_investor_calibration_store().reconcile_interrupted_turns()
+
     try:
         reconcile_interrupted_runtime_state()
     except Exception as e:  # noqa: BLE001 — stale telemetry repair must not block startup

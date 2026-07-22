@@ -71,7 +71,8 @@ def get_investor_calibration_store():
 
     Track A.5 calibration messages and inert proposals live in the same local
     profile DB as the approved investor profile. Raw calibration text is never
-    research history and never a prompt input.
+    research history and never a prompt input. Construction only asserts the
+    startup-owned v2 schema; it never migrates or reconciles state.
     """
     from src.investor_profile_calibration import CalibrationStore
 
