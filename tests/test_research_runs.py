@@ -136,6 +136,56 @@ def test_reconcile_interrupted_marks_orphaned_runs_terminal(stores):
     assert run_store.reconcile_interrupted() == ["r2"]
     assert run_store.list_events("r2")[-1].data["personalization"] == trace
 
+    malformed_traces = {
+        "malformed-json": '{"profile_active":',
+        "non-dict-json": '["profile_active", true]',
+    }
+    for run_id in malformed_traces:
+        thread_store.ensure_thread(id=run_id, title="q")
+        run_store.create_run(
+            id=run_id,
+            thread_id=run_id,
+            question="q",
+            ticker=None,
+            provider="openai",
+            model="gpt-5.4-mini",
+            effort="low",
+            auth_mode="api_key",
+            credential_id=None,
+        )
+    with sqlite3.connect(run_store.db_path) as conn:
+        conn.executemany(
+            "UPDATE research_runs SET personalization_json = ? WHERE id = ?",
+            [(value, run_id) for run_id, value in malformed_traces.items()],
+        )
+        raw_before = dict(
+            conn.execute(
+                "SELECT id, CAST(personalization_json AS BLOB) "
+                "FROM research_runs WHERE id IN (?, ?)",
+                tuple(malformed_traces),
+            ).fetchall()
+        )
+
+    for run_id in malformed_traces:
+        assert run_store.get_run(run_id).personalization is None
+    assert set(run_store.reconcile_interrupted(thread_store=thread_store)) == set(
+        malformed_traces
+    )
+    for run_id in malformed_traces:
+        assert run_store.get_run(run_id).status == "interrupted"
+        assert "personalization" not in run_store.list_events(run_id)[-1].data
+    with sqlite3.connect(run_store.db_path) as conn:
+        raw_after = dict(
+            conn.execute(
+                "SELECT id, CAST(personalization_json AS BLOB) "
+                "FROM research_runs WHERE id IN (?, ?)",
+                tuple(malformed_traces),
+            ).fetchall()
+        )
+    assert raw_after == raw_before == {
+        run_id: value.encode() for run_id, value in malformed_traces.items()
+    }
+
 
 def test_execute_run_records_events_and_persists_assistant(stores):
     from src.research_run_manager import execute_research_run
@@ -263,12 +313,41 @@ def test_run_events_route_replays_after_seq(stores):
         auth_mode="api_key", credential_id="local:3",
     )
     run_store.append_event("r1", "text", {"content": "a"})
-    run_store.append_event("r1", "done", {"answer": "ok"})
+    run_store.append_event(
+        "r1",
+        "done",
+        {
+            "answer": "ok",
+            "personalization": {
+                "profile_active": True,
+                "assistant_stance": "complementary",
+                "skill_mode": "off",
+                "suggested_skills": [],
+                "applied_skills": [],
+                "context_snapshot": "closed context",
+                "freeform_notes": "private note",
+                "credential_id": "nested-secret",
+            },
+        },
+    )
 
     res = r.list_research_run_events("r1", after=1, run_store=run_store)
 
     assert res["run"]["id"] == "r1"
     assert [(e["seq"], e["type"]) for e in res["events"]] == [(2, "done")]
+    assert res["events"][0]["data"] == {
+        "answer": "ok",
+        "personalization": {
+            "profile_active": True,
+            "assistant_stance": "complementary",
+            "skill_mode": "off",
+            "suggested_skills": [],
+            "applied_skills": [],
+            "context_snapshot": "closed context",
+        },
+    }
+    assert "private note" not in str(res["events"])
+    assert "nested-secret" not in str(res["events"])
 
 
 def test_run_events_route_reports_more_events_before_terminal_page(stores):
@@ -1041,16 +1120,38 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
     monkeypatch.setattr(
         personalization_api, "resolve_personalization", observing_resolve
     )
-    provider_call = {}
+    original_claim = run_store.mark_running_with_personalization
+    before_claim = threading.Barrier(2)
+    after_claim = threading.Barrier(2)
+    claim_results = []
+    claim_lock = threading.Lock()
+
+    def coordinated_claim(run_id, personalization):
+        before_claim.wait(timeout=5)
+        claimed = original_claim(run_id, personalization)
+        with claim_lock:
+            claim_results.append(claimed)
+        after_claim.wait(timeout=5)
+        return claimed
+
+    monkeypatch.setattr(
+        run_store, "mark_running_with_personalization", coordinated_claim
+    )
+    provider_calls = []
+    provider_lock = threading.Lock()
 
     async def stream_factory(**kwargs):
         running = run_store.get_run("snapshot-active-run")
-        provider_call.update(
-            status=running.status,
-            started_at=running.started_at,
-            personalization=getattr(running, "personalization", None),
-            kwargs=kwargs,
-        )
+        with provider_lock:
+            provider_calls.append(
+                {
+                    "status": running.status,
+                    "started_at": running.started_at,
+                    "personalization": getattr(running, "personalization", None),
+                    "kwargs": kwargs,
+                }
+            )
+        await asyncio.sleep(0.05)
         profile_store.save({"enabled": False})
         yield AgentEvent(
             EventType.done,
@@ -1063,23 +1164,42 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
             },
         )
 
-    asyncio.run(
-        execute_research_run(
-            run_id="snapshot-active-run",
-            run_store=run_store,
-            thread_store=thread_store,
-            dal=object(),
-            history=[],
-            stream_factory=stream_factory,
+    def execute_worker():
+        asyncio.run(
+            execute_research_run(
+                run_id="snapshot-active-run",
+                run_store=run_store,
+                thread_store=thread_store,
+                dal=object(),
+                history=[],
+                stream_factory=stream_factory,
+            )
         )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(execute_worker) for _ in range(2)]
+        for future in futures:
+            future.result(timeout=5)
+
+    run_store.mark_terminal(
+        "snapshot-active-run",
+        "failed",
+        error="late worker must not overwrite terminal state",
+        error_code="provider_call_failed",
     )
 
-    assert resolution_statuses == ["queued"]
+    assert resolution_statuses == ["queued", "queued"]
+    assert claim_results.count(True) == 1
+    assert claim_results.count(False) == 1
+    assert len(provider_calls) == 1
+    provider_call = provider_calls[0]
     assert provider_call["status"] == "running"
     assert provider_call["started_at"] is not None
     assert provider_call["personalization"] == expected_trace
     assert provider_call["kwargs"]["personalization_context"] == expected_context
     persisted = run_store.get_run("snapshot-active-run")
+    assert persisted.status == "succeeded"
+    assert persisted.error is None
     assert persisted.personalization == expected_trace
     done = [
         event
@@ -1087,7 +1207,12 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
         if event.type == "done"
     ][-1]
     assert done.data["personalization"] == expected_trace
-    assert thread_store.list_messages("snapshot-active")[-1].personalization == expected_trace
+    assert [event.type for event in run_store.list_events("snapshot-active-run")] == [
+        "done"
+    ]
+    messages = thread_store.list_messages("snapshot-active")
+    assert [message.role for message in messages] == ["user", "assistant"]
+    assert messages[-1].personalization == expected_trace
     assert r.get_research_run(
         "snapshot-active-run", run_store=run_store
     )["run"]["personalization"] == expected_trace

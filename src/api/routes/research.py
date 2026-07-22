@@ -103,11 +103,16 @@ def _run_dict(run: ResearchRun | None) -> dict | None:
 
 
 def _event_dict(event: ResearchRunEvent) -> dict:
+    data = dict(event.data)
+    if "personalization" in data:
+        data["personalization"] = _public_personalization(
+            data["personalization"]
+        )
     return {
         "run_id": event.run_id,
         "seq": event.seq,
         "type": event.type,
-        "data": event.data,
+        "data": data,
         "created_at": event.created_at,
     }
 

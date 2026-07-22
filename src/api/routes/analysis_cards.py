@@ -34,7 +34,10 @@ from src.card_synthesis import (
 )
 from src.evidence_packet import gather_evidence
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
-from src.api.personalization import resolve_personalization
+from src.api.personalization import (
+    resolve_personalization,
+    validate_assistant_stance,
+)
 from src.result_card import ResultCard
 from src.tools.data_access import DataAccessLayer
 from src.tools.report_tools import save_report
@@ -105,10 +108,8 @@ def generate_card(
     if provider not in _VALID_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"unknown provider: {provider}")
     model = route.model if provider == route.provider else None
-    # Track A: validate + resolve BEFORE gather_evidence — the context feeds
-    # synthesis ONLY; evidence gathering never sees profile/stance values.
-    personalization_context, personalization = resolve_personalization(body.assistant_stance)
-    _pctx = {"personalization_context": personalization_context} if personalization_context else {}
+    # Validate before evidence work, then sample at the synthesis boundary.
+    validate_assistant_stance(body.assistant_stance)
     runtime = resolve_fixed_task_runtime("card_synthesis")
 
     now = _utcnow()
@@ -129,6 +130,14 @@ def generate_card(
         horizon=body.horizon,
         sa_enabled=sa_enabled,
         **gather_kwargs,
+    )
+    personalization_context, personalization = resolve_personalization(
+        body.assistant_stance
+    )
+    _pctx = (
+        {"personalization_context": personalization_context}
+        if personalization_context
+        else {}
     )
 
     try:

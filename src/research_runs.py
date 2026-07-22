@@ -77,6 +77,16 @@ def _loads(v: Optional[str]):
     return json.loads(v) if v else None
 
 
+def _loads_optional_dict(v: object) -> Optional[dict]:
+    if v is None or v == "" or v == b"":
+        return None
+    try:
+        decoded = json.loads(v)
+    except (json.JSONDecodeError, TypeError, UnicodeDecodeError, RecursionError):
+        return None
+    return decoded if isinstance(decoded, dict) else None
+
+
 @dataclass
 class ResearchRun:
     id: str
@@ -164,7 +174,7 @@ class ResearchRunStore:
             question=r["question"], ticker=r["ticker"], provider=r["provider"],
             model=r["model"], effort=r["effort"],
             assistant_stance=r["assistant_stance"],
-            personalization=_loads(r["personalization_json"]),
+            personalization=_loads_optional_dict(r["personalization_json"]),
             auth_mode=r["auth_mode"],
             credential_id=r["credential_id"], started_at=r["started_at"],
             completed_at=r["completed_at"], error=r["error"],
@@ -420,7 +430,9 @@ class ResearchRunStore:
         ).fetchone()
         if current is None or current["status"] not in tuple(expected_statuses):
             return self._run(current) if current is not None else None
-        persisted_personalization = _loads(current["personalization_json"])
+        persisted_personalization = _loads_optional_dict(
+            current["personalization_json"]
+        )
         if persisted_personalization is not None:
             personalization = persisted_personalization
         terminal = self._mark_terminal_on_connection(
@@ -612,17 +624,18 @@ class ResearchRunStore:
         self,
         run_id: str,
         personalization: dict,
-    ) -> None:
+    ) -> bool:
         """Atomically start a queued run and persist its prompt-assembly trace."""
         ts = _now()
         with self._write_lock, self._connect() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "UPDATE research_runs SET status = 'running', "
                 "started_at = COALESCE(started_at, ?), personalization_json = ?, "
                 "updated_at = ? WHERE id = ? AND status = 'queued'",
                 (ts, json.dumps(personalization), ts, run_id),
             )
             conn.commit()
+        return cur.rowcount == 1
 
     def _mark_terminal_on_connection(
         self,
@@ -633,7 +646,7 @@ class ResearchRunStore:
         error: Optional[str] = None,
         error_code: Optional[str] = None,
         token_usage: Optional[dict] = None,
-        expected_status: Optional[str] = None,
+        expected_status: Optional[str | Sequence[str]] = None,
         now: Optional[str] = None,
     ) -> Optional[ResearchRun]:
         from src.research_errors import require_research_error_code
@@ -642,7 +655,18 @@ class ResearchRunStore:
             raise ValueError(f"invalid terminal status: {status}")
         error_code = require_research_error_code(error_code)
         ts = now or _now()
-        expected_clause = " AND status = ?" if expected_status is not None else ""
+        if expected_status is None:
+            expected_clause = ""
+            expected_values: tuple[str, ...] = ()
+        elif isinstance(expected_status, str):
+            expected_clause = " AND status = ?"
+            expected_values = (expected_status,)
+        else:
+            expected_values = tuple(expected_status)
+            if not expected_values:
+                raise ValueError("expected_status cannot be empty")
+            placeholders = ",".join("?" for _ in expected_values)
+            expected_clause = f" AND status IN ({placeholders})"
         params = [
             status,
             ts,
@@ -652,8 +676,7 @@ class ResearchRunStore:
             json.dumps(token_usage) if token_usage is not None else None,
             run_id,
         ]
-        if expected_status is not None:
-            params.append(expected_status)
+        params.extend(expected_values)
         cur = conn.execute(
             "UPDATE research_runs SET status = ?, completed_at = ?, updated_at = ?, "
             f"error = ?, error_code = ?, token_usage_json = ? WHERE id = ?{expected_clause}",
@@ -684,6 +707,7 @@ class ResearchRunStore:
                 error=error,
                 error_code=error_code,
                 token_usage=token_usage,
+                expected_status=ACTIVE_STATUSES,
             )
             conn.commit()
 
@@ -785,7 +809,9 @@ class ResearchRunStore:
                 ids = [row["id"] for row in rows]
                 for row in rows:
                     event_data = {"error": failure.detail, "code": failure.code}
-                    personalization = _loads(row["personalization_json"])
+                    personalization = _loads_optional_dict(
+                        row["personalization_json"]
+                    )
                     if personalization is not None:
                         event_data["personalization"] = personalization
                     self._mark_terminal_on_connection(

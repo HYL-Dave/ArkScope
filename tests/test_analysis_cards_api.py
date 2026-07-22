@@ -370,13 +370,32 @@ def test_generate_card_profile_off_does_not_change_gather_or_synthesis_context(
 def test_generate_card_enabled_profile_passes_synthesis_context_only(
     store, tmp_path, monkeypatch
 ):
-    _profile(tmp_path, monkeypatch, enabled=True)
+    profile_store = _profile(tmp_path, monkeypatch, enabled=True)
     gather_calls, synth_kw = [], {}
+    profile_reads = []
+    gather_finished = False
     now = "2026-07-22T02:03:04+00:00"
     monkeypatch.setattr(routes, "_utcnow", lambda: now)
+    original_get = profile_store.get
+
+    def observed_get():
+        profile_reads.append(gather_finished)
+        return original_get()
+
+    monkeypatch.setattr(profile_store, "get", observed_get)
 
     def capture_gather(dal, ticker, **kw):
+        nonlocal gather_finished
         gather_calls.append((dal, ticker, kw))
+        profile_store.save(
+            {
+                "risk_appetite": 2,
+                "risk_capacity": 9,
+                "preferred_edge": ["post-gather revisions"],
+                "freeform_notes": "never copy this note",
+            }
+        )
+        gather_finished = True
         return _packet()
 
     def capture_synth(packet, **kw):
@@ -394,6 +413,10 @@ def test_generate_card_enabled_profile_passes_synthesis_context_only(
     )
     ctx = synth_kw["personalization_context"]
     assert "[Assistant Stance]" in ctx and "strict_risk_control" in ctx
+    assert "Risk appetite: 2/10" in ctx
+    assert "Risk appetite: 8/10" not in ctx
+    assert "Preferred edge: post-gather revisions" in ctx
+    assert profile_reads == [True]
     # evidence boundary: gather_evidence never sees profile/stance values
     assert gather_calls == [
         (

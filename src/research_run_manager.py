@@ -85,7 +85,9 @@ async def execute_research_run(
             "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
             "suggested_skills": [], "applied_skills": [], "context_snapshot": "",
         }
-    run_store.mark_running_with_personalization(run_id, personalization)
+    claimed = run_store.mark_running_with_personalization(run_id, personalization)
+    if not claimed:
+        return
     run = run_store.get_run(run_id)
     if run is None or run.status != "running" or run.personalization is None:
         return

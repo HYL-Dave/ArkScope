@@ -13,17 +13,20 @@ from typing import Optional
 from fastapi import HTTPException
 
 
-def resolve_personalization(assistant_stance: Optional[str]) -> tuple[str, dict]:
-    from src.investor_profile import (
-        STANCES,
-        personalization_bundle,
-    )
+def validate_assistant_stance(assistant_stance: Optional[str]) -> None:
+    from src.investor_profile import STANCES
 
     if assistant_stance is not None and assistant_stance not in STANCES:
         raise HTTPException(
             status_code=400,
             detail={"code": "invalid_assistant_stance", "field": "assistant_stance"},
         )
+
+
+def resolve_personalization(assistant_stance: Optional[str]) -> tuple[str, dict]:
+    from src.investor_profile import personalization_bundle
+
+    validate_assistant_stance(assistant_stance)
     from src.api.dependencies import get_investor_profile_store
 
     profile = get_investor_profile_store().get()
