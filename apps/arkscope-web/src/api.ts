@@ -399,6 +399,7 @@ export interface PersonalizationTrace {
   skill_mode: SkillMode;
   suggested_skills: string[];
   applied_skills: string[];
+  context_snapshot?: string | null;
 }
 
 export interface InvestorProfile {
@@ -427,9 +428,24 @@ export interface InvestorProfileResponse {
   context_preview: string;
 }
 
+export type CalibrationTopicId =
+  | "loss_response"
+  | "financial_capacity"
+  | "time_horizon"
+  | "single_position_limit"
+  | "risk_avoidances"
+  | "behavioral_patterns"
+  | "investment_approach"
+  | "assistant_style";
+
 export interface CalibrationSession {
   id: string;
   status: "active" | "closed" | "superseded";
+  interview_version: number | null;
+  covered_topics: string[];
+  current_topic_id: string | null;
+  current_question_message_id: string | null;
+  superseded_reason: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
@@ -440,27 +456,52 @@ export interface CalibrationMessage {
   session_id: string;
   role: "user" | "assistant";
   content: string;
+  turn_id: string | null;
+  topic_id: string | null;
+  prompt_id: string | null;
   created_at: string;
+}
+
+export interface CalibrationTurn {
+  id: string;
+  session_id: string;
+  kind: "answer" | "proposal_request";
+  status: "pending" | "completed" | "failed" | "interrupted";
+  question_message_id: string | null;
+  addressed_topic_id: string | null;
+  next_topic_id: string | null;
+  error_code: string | null;
+  diagnostic: string | null;
+  attempt_count: number;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
 }
 
 export interface CalibrationProposal {
   id: string;
   session_id: string;
-  status: "draft" | "approved" | "rejected";
+  status: "draft" | "approved" | "rejected" | "superseded";
   profile_patch: Partial<InvestorProfile>;
-  raw_profile_patch: Partial<InvestorProfile>;
+  proposed_fields: string[];
+  covered_topics: string[];
   rationales: Record<string, string>;
-  changed_fields: string[];
+  conflict_fields: string[];
   created_at: string;
   approved_at: string | null;
   rejected_at: string | null;
+  conflicted_at: string | null;
+  superseded_at: string | null;
+  superseded_reason: string | null;
 }
 
 export interface CalibrationState {
   active_session: CalibrationSession | null;
   sessions: CalibrationSession[];
   messages: CalibrationMessage[];
+  pending_turn: CalibrationTurn | null;
   latest_proposal: CalibrationProposal | null;
+  topic_catalog: string[];
 }
 
 export function getInvestorProfile(): Promise<InvestorProfileResponse> {
@@ -493,22 +534,53 @@ export function startCalibrationSession(supersede_active = false): Promise<Calib
 }
 
 export function sendCalibrationMessage(body: {
+  turn_id: string;
   session_id?: string;
   content: string;
   provider?: string;
   model?: string;
 }): Promise<CalibrationState> {
-  return sendJSON<CalibrationState>("/profile/investor/calibration/messages", "POST", body, 60_000);
+  return sendJSON<CalibrationState>(
+    "/profile/investor/calibration/messages",
+    "POST",
+    body,
+    60_000,
+  );
+}
+
+export function retryCalibrationTurn(
+  turnId: string,
+  body: { provider?: string; model?: string } = {},
+): Promise<CalibrationState> {
+  return sendJSON<CalibrationState>(
+    `/profile/investor/calibration/turns/${encodeURIComponent(turnId)}/retry`,
+    "POST",
+    body,
+    60_000,
+  );
+}
+
+export function requestCalibrationProposal(body: {
+  turn_id: string;
+  session_id?: string;
+  provider?: string;
+  model?: string;
+}): Promise<CalibrationState> {
+  return sendJSON<CalibrationState>(
+    "/profile/investor/calibration/proposals/request",
+    "POST",
+    body,
+    60_000,
+  );
 }
 
 export function approveCalibrationProposal(
   proposalId: string,
-  profilePatch: Partial<InvestorProfile>,
 ): Promise<{ profile: InvestorProfile; proposal: CalibrationProposal }> {
   return sendJSON(
     `/profile/investor/calibration/proposals/${encodeURIComponent(proposalId)}/approve`,
     "POST",
-    { profile_patch: profilePatch },
+    {},
     20_000,
   );
 }
@@ -862,6 +934,7 @@ export interface ResearchRunDTO {
   model: string;
   effort: string | null;
   assistant_stance?: string | null;
+  personalization?: PersonalizationTrace | null;
   auth_mode: string | null;
   credential_id: string | null;
   started_at: string | null;
