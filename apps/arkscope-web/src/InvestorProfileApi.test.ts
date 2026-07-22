@@ -113,6 +113,14 @@ describe("Investor Profile guided API", () => {
       model: "gpt-test",
     });
     expect(requestBody(fetchMock, 0)).not.toHaveProperty("content");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      detail: { code: "proposal_failed", message: "safe summary", diagnostic: "  sanitized detail  " },
+    }), { status: 409 }));
+    await expect(requestCalibrationProposal({ turn_id: "error-turn" })).rejects.toMatchObject({
+      code: "proposal_failed",
+      diagnostic: "sanitized detail",
+      message: "/profile/investor/calibration/proposals/request returned 409: safe summary",
+    });
   });
 
   it("approves with an empty body and never sends profile_patch", async () => {

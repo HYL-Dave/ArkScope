@@ -831,6 +831,13 @@ async function parseResponseError(r: Response): Promise<ParsedResponseError> {
     const diagnostic = typeof value.message === "string"
       ? value.message.trim() || null
       : null;
+    const rawDiagnostic = (value as { diagnostic?: unknown }).diagnostic;
+    const explicitDiagnostic = typeof rawDiagnostic === "string"
+      ? rawDiagnostic.trim() || null
+      : null;
+    if (explicitDiagnostic) {
+      return { code, diagnostic: explicitDiagnostic, legacySuffix: diagnostic ?? code };
+    }
     return { code, diagnostic, legacySuffix: diagnostic ?? code };
   } catch {
     return { code: null, diagnostic: null, legacySuffix: null };
