@@ -13,6 +13,7 @@ import {
 export interface InvestorProfileProposalReviewProps {
   profile: InvestorProfile;
   proposal: CalibrationProposal;
+  currentValuesCurrent: boolean;
   busy: boolean;
   conflict: boolean;
   headingRef: RefObject<HTMLHeadingElement>;
@@ -26,6 +27,7 @@ export interface InvestorProfileProposalReviewProps {
 export function InvestorProfileProposalReview({
   profile,
   proposal,
+  currentValuesCurrent,
   busy,
   conflict,
   headingRef,
@@ -78,10 +80,12 @@ export function InvestorProfileProposalReview({
           {fields.map(({ field, label }) => (
             <article className="ip-guardrail" key={field}>
               <h5>{label}</h5>
-              <div>
-                <span>{t(($) => $.investor.workspace.proposal.currentValue)}</span>
-                <span>{investorProfileFieldValue(field, profile[field], t)}</span>
-              </div>
+              {currentValuesCurrent ? (
+                <div data-testid="proposal-current-value">
+                  <span>{t(($) => $.investor.workspace.proposal.currentValue)}</span>
+                  <span>{investorProfileFieldValue(field, profile[field], t)}</span>
+                </div>
+              ) : null}
               <div>
                 <span>{t(($) => $.investor.workspace.proposal.proposedValue)}</span>
                 <span>{investorProfileFieldValue(field, proposal.profile_patch[field], t)}</span>

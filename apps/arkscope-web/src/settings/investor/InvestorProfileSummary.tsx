@@ -4,6 +4,8 @@ import type { RefObject } from "react";
 import type { CalibrationState, InvestorProfileResponse } from "../../api";
 import { Button, InlineAlert, StatusBadge } from "../../ui";
 import {
+  settingsInvestorHorizonLabel,
+  settingsInvestorPresetLabel,
   settingsMismatchLabel,
   settingsStanceLabel,
   type SettingsT,
@@ -15,6 +17,7 @@ import {
 
 export interface InvestorProfileSummaryProps {
   response: InvestorProfileResponse;
+  effectiveFactsCurrent: boolean;
   calibration: CalibrationState | null;
   calibrationStatus: "loading" | "ready" | "failed";
   busy: boolean;
@@ -31,6 +34,7 @@ export interface InvestorProfileSummaryProps {
 
 export function InvestorProfileSummary({
   response,
+  effectiveFactsCurrent,
   calibration,
   calibrationStatus,
   busy,
@@ -53,6 +57,21 @@ export function InvestorProfileSummary({
     pendingProposal?.covered_topics ?? [],
     t,
   );
+  const pendingTurnStatus = calibration?.pending_turn?.status ?? null;
+  const calibrationState = pendingTurnStatus === "pending"
+    ? "running"
+    : pendingTurnStatus === "failed" || pendingTurnStatus === "interrupted"
+      ? "interrupted"
+      : activeSession
+        ? "ready"
+        : "empty";
+  const calibrationLabel = pendingTurnStatus === "pending"
+    ? t(($) => $.investor.workspace.calibration.sending)
+    : pendingTurnStatus === "failed" || pendingTurnStatus === "interrupted"
+      ? t(($) => $.investor.workspace.calibration.interrupted)
+      : activeSession
+        ? t(($) => $.investor.workspace.summary.calibrationActive)
+        : t(($) => $.investor.workspace.summary.calibrationIdle);
 
   return (
     <section data-testid="investor-profile-summary">
@@ -68,10 +87,28 @@ export function InvestorProfileSummary({
             ? t(($) => $.investor.workspace.summary.personalizationEnabled)
             : t(($) => $.investor.workspace.summary.personalizationDisabled)}
         />
+        {effectiveFactsCurrent ? (
+          <div>
+            <strong>{t(($) => $.investor.workspace.summary.effectiveStance)}</strong>
+            <div>{settingsStanceLabel(response.effective_stance, t)}</div>
+            <p className="muted">{assistantStanceEffect(response.effective_stance, t)}</p>
+          </div>
+        ) : null}
         <div>
-          <strong>{t(($) => $.investor.workspace.summary.effectiveStance)}</strong>
-          <div>{settingsStanceLabel(response.effective_stance, t)}</div>
-          <p className="muted">{assistantStanceEffect(response.effective_stance, t)}</p>
+          <strong>{t(($) => $.investor.fields.preset)}</strong>
+          <div>{settingsInvestorPresetLabel(profile.primary_preset, t)}</div>
+        </div>
+        <div>
+          <strong>{t(($) => $.investor.fields.horizon)}</strong>
+          <div>{settingsInvestorHorizonLabel(profile.holding_horizon, t)}</div>
+        </div>
+        <div>
+          <strong>{t(($) => $.investor.fields.riskAppetite)}</strong>
+          <div>{profile.risk_appetite ?? t(($) => $.investor.fields.unset)}</div>
+        </div>
+        <div>
+          <strong>{t(($) => $.investor.fields.riskCapacity)}</strong>
+          <div>{profile.risk_capacity ?? t(($) => $.investor.fields.unset)}</div>
         </div>
         <div>
           <strong>{t(($) => $.investor.workspace.summary.riskComparison)}</strong>
@@ -121,11 +158,7 @@ export function InvestorProfileSummary({
         </InlineAlert>
       ) : null}
       {calibrationStatus === "ready" ? (
-        <p className="muted">
-          {activeSession
-            ? t(($) => $.investor.workspace.summary.calibrationActive)
-            : t(($) => $.investor.workspace.summary.calibrationIdle)}
-        </p>
+        <StatusBadge state={calibrationState} label={calibrationLabel} />
       ) : null}
 
       {pendingProposal ? (
@@ -157,7 +190,9 @@ export function InvestorProfileSummary({
         <details data-testid="current-context-disclosure">
           <summary>{t(($) => $.investor.workspace.context.disclosureTitle)}</summary>
           <p>{t(($) => $.investor.workspace.context.explanation)}</p>
-          {!profile.enabled ? (
+          {!effectiveFactsCurrent ? (
+            <p>{t(($) => $.investor.workspace.summary.contextUnavailable)}</p>
+          ) : !profile.enabled ? (
             <p>{t(($) => $.investor.workspace.summary.contextDisabled)}</p>
           ) : response.context_preview ? (
             <>

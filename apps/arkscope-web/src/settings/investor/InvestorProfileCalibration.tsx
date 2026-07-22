@@ -53,6 +53,7 @@ export function InvestorProfileCalibration({
     : null;
   const interrupted = state.pending_turn?.status === "interrupted"
     || state.pending_turn?.status === "failed";
+  const unresolvedTurn = state.pending_turn !== null;
 
   return (
     <section className="ip-calibration">
@@ -140,7 +141,7 @@ export function InvestorProfileCalibration({
           aria-label={t(($) => $.investor.workspace.calibration.answerLabel)}
           placeholder={t(($) => $.investor.workspace.calibration.answerPlaceholder)}
           value={answer}
-          disabled={busy || !session}
+          disabled={busy || unresolvedTurn || !session}
           onChange={(event) => onAnswerChange(event.target.value)}
         />
       </label>
@@ -148,7 +149,7 @@ export function InvestorProfileCalibration({
         <Button
           tone="primary"
           icon={<Send size={16} />}
-          disabled={busy || !session || !answer.trim()}
+          disabled={busy || unresolvedTurn || !session || !answer.trim()}
           onClick={onSend}
         >
           {busy
@@ -157,7 +158,7 @@ export function InvestorProfileCalibration({
         </Button>
         <Button
           icon={<Sparkles size={16} />}
-          disabled={busy || !session}
+          disabled={busy || unresolvedTurn || !session}
           onClick={onRequestProposal}
         >
           {t(($) => $.investor.workspace.actions.requestProposal)}

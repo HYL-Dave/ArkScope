@@ -103,20 +103,22 @@ async function mount(
     onNavigationGuardChange?: (guard: SettingsNavigationGuard) => void;
     onNavigateToProviders?: () => void;
     turnIdFactory?: () => string;
+    strictMode?: boolean;
   } = {},
 ) {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
+  const panel = (
+    <InvestorProfilePanel
+      developerMode={developerMode}
+      onNavigationGuardChange={options.onNavigationGuardChange}
+      onNavigateToProviders={options.onNavigateToProviders}
+      turnIdFactory={options.turnIdFactory}
+    />
+  );
   await act(async () => {
-    root!.render(
-      <InvestorProfilePanel
-        developerMode={developerMode}
-        onNavigationGuardChange={options.onNavigationGuardChange}
-        onNavigateToProviders={options.onNavigateToProviders}
-        turnIdFactory={options.turnIdFactory}
-      />,
-    );
+    root!.render(options.strictMode ? <React.StrictMode>{panel}</React.StrictMode> : panel);
   });
 }
 
@@ -330,12 +332,31 @@ describe("InvestorProfilePanel", () => {
 
 
   it("request_failure_uses_alert_semantics", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      throw new Error("profile request failed");
-    }));
+    let profileGets = 0;
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          if (profileGets === 1) {
+            return new Response(JSON.stringify({ detail: "SOURCE_PROFILE_LOAD_SECRET" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
+        }
+        return undefined;
+      },
+    });
     await mount();
     await flush();
-    expect(host!.querySelector('[role="alert"]')?.textContent).toBe("無法載入投資人設定。");
+    expect(host!.querySelector('[role="alert"]')?.textContent).toContain("無法載入投資人設定。");
+    expect(host!.textContent).not.toContain("SOURCE_PROFILE_LOAD_SECRET");
+
+    await clickButton("重試");
+    expect(profileGets).toBe(2);
+    expect(host!.textContent).toContain("投資人設定摘要");
   });
 
   it("loads_default_disabled_profile", async () => {
@@ -513,6 +534,10 @@ describe("InvestorProfilePanel", () => {
       session_id: "session-1",
       content: "SOURCE_CALIBRATION_ANSWER",
     });
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("A calibration proposal is ready for review");
+    expect(host!.textContent).not.toContain("SOURCE_PROPOSAL_RATIONALE");
+    await clickButton("Review proposal");
     expect(host!.textContent).toContain("Proposal review");
     expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
 
@@ -540,31 +565,13 @@ describe("InvestorProfilePanel", () => {
       send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       await Promise.resolve();
     });
-    expect(pendingTurns).toHaveLength(2);
+    expect(pendingTurns).toHaveLength(1);
 
     await act(async () => {
       pendingTurns[0].resolve(new Response(JSON.stringify(activeCalibration({
         messages: [calibrationMessage({
-          id: "stale-generation",
-          content: "STALE_GENERATION_MESSAGE",
-          prompt_id: null,
-        })],
-      })), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-      await Promise.resolve();
-    });
-    await flush();
-    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
-    expect(answer.value).toBe("SOURCE_GENERATION_DRAFT");
-    expect(host!.textContent).not.toContain("STALE_GENERATION_MESSAGE");
-
-    await act(async () => {
-      pendingTurns[1].resolve(new Response(JSON.stringify(activeCalibration({
-        messages: [calibrationMessage({
-          id: "latest-generation",
-          content: "LATEST_GENERATION_MESSAGE",
+          id: "single-generation",
+          content: "SINGLE_GENERATION_MESSAGE",
           prompt_id: null,
         })],
       })), {
@@ -576,58 +583,35 @@ describe("InvestorProfilePanel", () => {
     await flush();
     expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBeNull();
     expect(answer.value).toBe("");
-    expect(host!.textContent).toContain("LATEST_GENERATION_MESSAGE");
-
-    await setControlValue(answer, "SOURCE_GENERATION_ERROR_DRAFT");
-    await act(async () => {
-      send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      await Promise.resolve();
-    });
-    expect(pendingTurns).toHaveLength(4);
-    await act(async () => {
-      pendingTurns[2].reject(new Error("STALE_GENERATION_ERROR"));
-      await Promise.resolve();
-    });
-    await flush();
-    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
-    expect(answer.value).toBe("SOURCE_GENERATION_ERROR_DRAFT");
-    expect(host!.querySelector('[role="alert"]')).toBeNull();
-    expect(host!.textContent).not.toContain("STALE_GENERATION_ERROR");
-
-    await act(async () => {
-      pendingTurns[3].resolve(new Response(JSON.stringify(activeCalibration({
-        messages: [calibrationMessage({
-          id: "latest-after-stale-error",
-          content: "LATEST_AFTER_STALE_ERROR",
-          prompt_id: null,
-        })],
-      })), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-      await Promise.resolve();
-    });
-    await flush();
-    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBeNull();
-    expect(answer.value).toBe("");
-    expect(host!.textContent).toContain("LATEST_AFTER_STALE_ERROR");
-    expect(host!.textContent).not.toContain("STALE_GENERATION_ERROR");
+    expect(host!.textContent).toContain("SINGLE_GENERATION_MESSAGE");
   });
 
   it("approves_calibration_proposal_through_dedicated_endpoint", async () => {
     await useEnglish();
     const proposal = calibrationProposal();
+    const approvedProfile = populatedResponse().profile;
+    approvedProfile.primary_preset = "income";
+    approvedProfile.risk_capacity = 6;
     let calibrationGets = 0;
+    let profileGets = 0;
     const calls = apiRoutes({
       profile: populatedResponse(),
       calibration: activeCalibration({ latest_proposal: proposal }),
       handle: (call) => {
         if (call.url.includes("/approve")) {
           return {
-            profile: populatedResponse().profile,
+            profile: approvedProfile,
             proposal: { ...proposal, status: "approved" },
           };
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          if (profileGets > 1) {
+            return new Response(JSON.stringify({ detail: "SOURCE_APPROVE_REFRESH_SECRET" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
         }
         if (call.url.endsWith("/profile/investor/calibration")) {
           calibrationGets += 1;
@@ -647,8 +631,35 @@ describe("InvestorProfilePanel", () => {
     expect(approve).toMatchObject({ method: "POST", body: {} });
     expect(approve?.body).not.toHaveProperty("profile_patch");
     expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Income");
+    expect(host!.textContent).toContain("The profile was saved, but the refreshed summary could not be loaded.");
+    expect(host!.textContent).not.toContain("SOURCE_APPROVE_REFRESH_SECRET");
+    expect(host!.textContent).not.toContain("SOURCE_CONTEXT_PREVIEW");
+    expect(host!.textContent).not.toContain("Complementary");
     expect(document.activeElement).toBe(
       host!.querySelector('[data-investor-mode-heading="summary"]'),
+    );
+
+    dispose();
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => call.url.includes("/approve")
+        ? new Response(JSON.stringify({ detail: { code: "provider_call_failed" } }), {
+          status: 502,
+          headers: { "content-type": "application/json" },
+        })
+        : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+    expect(host!.textContent).toContain("Proposal review");
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Could not update the calibration proposal.");
+    expect(host!.textContent).not.toContain(
+      "The profile was saved, but the refreshed summary could not be loaded.",
     );
   });
 
@@ -790,24 +801,53 @@ describe("InvestorProfilePanel", () => {
     expect(text).toContain("Investor Profile summary");
     expect(text).toContain("Personalization enabled");
     expect(text).toContain("Complementary");
+    expect(text).toContain("Investment style");
+    expect(text).toContain("Event-driven");
+    expect(text).toContain("Holding horizon");
+    expect(text).toContain("Multi-year");
+    expect(text).toContain("Risk appetite (1-10)");
+    expect(text).toContain("8");
+    expect(text).toContain("Risk capacity (1-10)");
+    expect(text).toContain("4");
     expect(text).toContain("Risk appetite above capacity");
+    expect(text).toContain("No active guided calibration");
     expect(text).toContain("SOURCE_CONTEXT_PREVIEW");
     expect(host!.querySelector(".ip-grid")).toBeNull();
   });
 
   it("loads profile and calibration independently without inventing empty state", async () => {
     await useEnglish();
-    const profileLeg = deferred<Response>();
-    const calibrationLeg = deferred<Response>();
-    vi.stubGlobal("fetch", vi.fn((url: unknown) => (
-      String(url).endsWith("/profile/investor/calibration")
-        ? calibrationLeg.promise
-        : profileLeg.promise
-    )));
-    await mount();
+    const staleProfile = disabledResponse();
+    staleProfile.context_preview = "STALE_PROFILE_CONTEXT";
+    const latestProfile = populatedResponse();
+    latestProfile.context_preview = "LATEST_PROFILE_CONTEXT";
+    const latestCalibration = activeCalibration({
+      pending_turn: calibrationTurn({ id: "turn-running", status: "pending" }),
+    });
+    const profileLegs = [deferred<Response>(), deferred<Response>()];
+    const calibrationLegs = [deferred<Response>(), deferred<Response>()];
+    let profileCalls = 0;
+    let calibrationCalls = 0;
+    const guards: SettingsNavigationGuard[] = [];
+    vi.stubGlobal("fetch", vi.fn((url: unknown) => {
+      if (String(url).endsWith("/profile/investor/calibration")) {
+        return calibrationLegs[calibrationCalls++].promise;
+      }
+      return profileLegs[profileCalls++].promise;
+    }));
+    await mount(false, {
+      strictMode: true,
+      onNavigationGuardChange: (guard) => guards.push(guard),
+    });
+    expect(profileCalls).toBe(2);
+    expect(calibrationCalls).toBe(2);
 
     await act(async () => {
-      profileLeg.resolve(new Response(JSON.stringify(populatedResponse()), {
+      profileLegs[1].resolve(new Response(JSON.stringify(latestProfile), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      calibrationLegs[1].resolve(new Response(JSON.stringify(latestCalibration), {
         status: 200,
         headers: { "content-type": "application/json" },
       }));
@@ -815,15 +855,33 @@ describe("InvestorProfilePanel", () => {
     });
     await flush();
     expect(host!.textContent).toContain("Investor Profile summary");
-    expect(host!.textContent).not.toContain("No active guided calibration");
+    expect(host!.textContent).toContain("LATEST_PROFILE_CONTEXT");
+    expect(host!.textContent).not.toContain("STALE_PROFILE_CONTEXT");
+    expect(host!.textContent).toContain("Sending");
+    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
+    expect(guards.at(-1)).toEqual({
+      dirty: false,
+      busy: true,
+      reason: "Wait for the current Investor Profile update to finish.",
+    });
+    expect((await buttonByText("Continue Calibration")).disabled).toBe(true);
 
     await act(async () => {
-      calibrationLeg.reject(new Error("SOURCE_CALIBRATION_LOAD_SECRET"));
+      profileLegs[0].resolve(new Response(JSON.stringify(staleProfile), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      calibrationLegs[0].resolve(new Response(JSON.stringify(emptyCalibration()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
       await Promise.resolve();
     });
     await flush();
-    expect(host!.textContent).toContain("Could not load guided calibration.");
-    expect(host!.textContent).not.toContain("SOURCE_CALIBRATION_LOAD_SECRET");
+    expect(host!.textContent).toContain("LATEST_PROFILE_CONTEXT");
+    expect(host!.textContent).not.toContain("STALE_PROFILE_CONTEXT");
+    expect(host!.textContent).not.toContain("No active guided calibration");
+    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
   });
 
   it("defaults and reloads to summary while keeping one registry anchor", async () => {
@@ -876,12 +934,18 @@ describe("InvestorProfilePanel", () => {
 
   it("dirty edit exit uses value-free confirm and cancel restores focus", async () => {
     await useEnglish();
+    const guards: SettingsNavigationGuard[] = [];
     apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
-    await mount();
+    await mount(false, { onNavigationGuardChange: (guard) => guards.push(guard) });
     await flush();
     await clickButton("Edit profile");
     const notes = host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!;
     await setControlValue(notes, "sk-secret-SOURCE_DIRTY_VALUE");
+    expect(guards.at(-1)).toEqual({
+      dirty: true,
+      busy: false,
+      reason: "Your unsaved profile edits will be discarded.",
+    });
     const back = await buttonByText("Back to summary");
     await act(async () => back.click());
     await flush();
@@ -1059,12 +1123,14 @@ describe("InvestorProfilePanel", () => {
 
   it("calibration exit is free and restores command focus", async () => {
     await useEnglish();
+    const guards: SettingsNavigationGuard[] = [];
     apiRoutes({ profile: populatedResponse(), calibration: activeCalibration() });
-    await mount();
+    await mount(false, { onNavigationGuardChange: (guard) => guards.push(guard) });
     await flush();
     const command = await buttonByText("Continue Calibration");
     await act(async () => command.click());
     await flush();
+    expect(guards.at(-1)).toEqual({ dirty: false, busy: false, reason: null });
     expect(document.activeElement).toBe(
       host!.querySelector('[data-investor-mode-heading="calibration"]'),
     );
@@ -1076,6 +1142,8 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("Investor Profile summary");
     expect(command.isConnected).toBe(false);
     expect(document.activeElement).toBe(await buttonByText("Continue Calibration"));
+    dispose();
+    expect(guards.at(-1)).toEqual({ dirty: false, busy: false, reason: null });
   });
 
   it("starts with a localizable fixed question without a provider call", async () => {
@@ -1156,6 +1224,15 @@ describe("InvestorProfilePanel", () => {
         }),
       ],
     });
+    const failed = activeCalibration({
+      pending_turn: calibrationTurn({
+        id: "turn-durable-retry",
+        status: "failed",
+        attempt_count: 2,
+        diagnostic: "SOURCE_FAILED_TURN_DIAGNOSTIC",
+      }),
+      messages: interrupted.messages,
+    });
     const completed = activeCalibration({
       messages: [
         ...interrupted.messages,
@@ -1167,29 +1244,80 @@ describe("InvestorProfilePanel", () => {
         }),
       ],
     });
+    let calibrationGets = 0;
+    let retryAttempts = 0;
     const calls = apiRoutes({
       profile: populatedResponse(),
       calibration: interrupted,
-      handle: (call) => call.url.includes("/turns/turn-durable-retry/retry") ? completed : undefined,
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1 ? interrupted : failed;
+        }
+        if (call.url.includes("/turns/turn-durable-retry/retry")) {
+          retryAttempts += 1;
+          return retryAttempts === 1
+            ? new Response(JSON.stringify({ detail: { code: "calibration_responder_failed" } }), {
+              status: 502,
+              headers: { "content-type": "application/json" },
+            })
+            : completed;
+        }
+        return undefined;
+      },
     });
     await mount();
     await flush();
+    expect(host!.textContent).toContain("This turn was interrupted. Your answer is saved.");
     await clickButton("Continue Calibration");
+    expect((await buttonByText("Send answer")).disabled).toBe(true);
+    expect((await buttonByText("Propose Now")).disabled).toBe(true);
     await clickButton("Retry turn");
 
-    const retry = calls.find((call) => call.url.includes("/turns/turn-durable-retry/retry"));
-    expect(retry?.body).toEqual({});
+    expect(calibrationGets).toBe(2);
+    expect(calls.filter((call) => call.url.includes("/turns/turn-durable-retry/retry")))
+      .toHaveLength(1);
     expect(calls.filter((call) => call.url.endsWith("/calibration/messages"))).toHaveLength(0);
+    expect((await buttonByText("Send answer")).disabled).toBe(true);
+    expect((await buttonByText("Propose Now")).disabled).toBe(true);
+    await clickButton("Retry turn");
+
+    const retries = calls.filter((call) => call.url.includes("/turns/turn-durable-retry/retry"));
+    expect(retries).toHaveLength(2);
+    expect(retries.every((call) => call.body && Object.keys(call.body as object).length === 0))
+      .toBe(true);
     expect((host!.textContent?.match(/SOURCE_SAVED_ANSWER/g) ?? [])).toHaveLength(1);
+    expect(host!.textContent).toContain("SOURCE_RETRY_QUESTION");
   });
 
   it("requests early proposal without synthetic user content", async () => {
     await useEnglish();
+    const failed = activeCalibration({
+      pending_turn: calibrationTurn({
+        id: "turn-propose-now",
+        kind: "proposal_request",
+        status: "failed",
+      }),
+    });
     const proposed = activeCalibration({ latest_proposal: calibrationProposal() });
+    let calibrationGets = 0;
     const calls = apiRoutes({
       profile: populatedResponse(),
       calibration: activeCalibration(),
-      handle: (call) => call.url.endsWith("/calibration/proposals/request") ? proposed : undefined,
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1 ? activeCalibration() : failed;
+        }
+        if (call.url.endsWith("/calibration/proposals/request")) {
+          return new Response(JSON.stringify({ detail: { code: "calibration_responder_failed" } }), {
+            status: 502,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (call.url.includes("/turns/turn-propose-now/retry")) return proposed;
+        return undefined;
+      },
     });
     await mount(false, { turnIdFactory: () => "turn-propose-now" });
     await flush();
@@ -1199,6 +1327,15 @@ describe("InvestorProfilePanel", () => {
     const request = calls.find((call) => call.url.endsWith("/calibration/proposals/request"));
     expect(request?.body).toEqual({ turn_id: "turn-propose-now", session_id: "session-1" });
     expect(request?.body).not.toHaveProperty("content");
+    expect(calibrationGets).toBe(2);
+    expect((await buttonByText("Send answer")).disabled).toBe(true);
+    expect((await buttonByText("Propose Now")).disabled).toBe(true);
+    await clickButton("Retry turn");
+    expect(calls.some((call) => call.url.includes("/turns/turn-propose-now/retry"))).toBe(true);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("A calibration proposal is ready for review");
+    expect(host!.textContent).not.toContain("Proposal review");
+    await clickButton("Review proposal");
     expect(host!.textContent).toContain("Proposal review");
   });
 
@@ -1288,7 +1425,15 @@ describe("InvestorProfilePanel", () => {
     const proposal = calibrationProposal({
       proposed_fields: ["concentration_limit_pct", "risk_capacity"],
     });
+    const approvedProfile = populatedResponse().profile;
+    approvedProfile.primary_preset = "income";
+    approvedProfile.risk_capacity = 6;
+    const refreshedProfile = populatedResponse();
+    refreshedProfile.profile = { ...approvedProfile };
+    refreshedProfile.effective_stance = "strict_risk_control";
+    refreshedProfile.context_preview = "SOURCE_REFRESHED_CONTEXT";
     let calibrationGets = 0;
+    let profileGets = 0;
     const calls = apiRoutes({
       profile: populatedResponse(),
       calibration: activeCalibration({ latest_proposal: proposal }),
@@ -1300,7 +1445,11 @@ describe("InvestorProfilePanel", () => {
             : emptyCalibration();
         }
         if (call.url.includes("/approve")) {
-          return { profile: populatedResponse().profile, proposal: { ...proposal, status: "approved" } };
+          return { profile: approvedProfile, proposal: { ...proposal, status: "approved" } };
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return profileGets === 1 ? populatedResponse() : refreshedProfile;
         }
         return undefined;
       },
@@ -1319,6 +1468,9 @@ describe("InvestorProfilePanel", () => {
     expect(approve?.body).toEqual({});
     expect(approve?.body).not.toHaveProperty("profile_patch");
     expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Income");
+    expect(host!.textContent).toContain("Strict risk control");
+    expect(host!.textContent).toContain("SOURCE_REFRESHED_CONTEXT");
     expect(calls.filter((call) => call.url.endsWith("/profile/investor") && call.method === "GET"))
       .toHaveLength(2);
   });
@@ -1330,6 +1482,9 @@ describe("InvestorProfilePanel", () => {
       conflicted_at: "2026-07-21T01:05:00Z",
     });
     let calibrationGets = 0;
+    let profileGets = 0;
+    const refreshedProfile = populatedResponse();
+    refreshedProfile.profile.risk_capacity = 9;
     apiRoutes({
       profile: populatedResponse(),
       calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
@@ -1348,6 +1503,10 @@ describe("InvestorProfilePanel", () => {
             ? activeCalibration({ latest_proposal: calibrationProposal() })
             : activeCalibration({ latest_proposal: conflictProposal });
         }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return profileGets === 1 ? populatedResponse() : refreshedProfile;
+        }
         return undefined;
       },
     });
@@ -1357,24 +1516,86 @@ describe("InvestorProfilePanel", () => {
     await clickButton("Approve proposal");
     expect(host!.textContent).toContain("Proposal review");
     expect(host!.textContent).toContain("Profile changed since this proposal was created");
+    expect(host!.textContent).toContain("Current9");
+    expect(host!.textContent).not.toContain("Current4");
     expect(host!.textContent).not.toContain("SOURCE_CONFLICT_SECRET");
 
     dispose();
-    const navigate = vi.fn();
+    let failedRefreshProfileGets = 0;
+    let failedRefreshCalibrationGets = 0;
     apiRoutes({
       profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
+      handle: (call) => {
+        if (call.url.includes("/approve")) {
+          return new Response(JSON.stringify({ detail: { code: "proposal_conflict" } }), {
+            status: 409,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          failedRefreshProfileGets += 1;
+          if (failedRefreshProfileGets > 1) {
+            return new Response(JSON.stringify({ detail: "SOURCE_CONFLICT_REFRESH_SECRET" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          failedRefreshCalibrationGets += 1;
+          return failedRefreshCalibrationGets === 1
+            ? activeCalibration({ latest_proposal: calibrationProposal() })
+            : activeCalibration({ latest_proposal: conflictProposal });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+    expect(host!.textContent).toContain("Profile changed since this proposal was created");
+    expect(host!.textContent).toContain(
+      "Could not load the Investor Profile.",
+    );
+    expect(host!.querySelectorAll('[data-testid="proposal-current-value"]')).toHaveLength(0);
+    expect(host!.textContent).not.toContain("SOURCE_CONFLICT_REFRESH_SECRET");
+
+    dispose();
+    const navigate = vi.fn();
+    const failedTurn = activeCalibration({
+      pending_turn: calibrationTurn({
+        id: "turn-provider-missing",
+        status: "failed",
+        error_code: "provider_config_missing",
+      }),
+    });
+    let providerCalibrationGets = 0;
+    const providerCalls = apiRoutes({
+      profile: populatedResponse(),
       calibration: activeCalibration(),
-      handle: (call) => call.url.endsWith("/calibration/messages")
-        ? new Response(JSON.stringify({
-          detail: {
-            code: "provider_config_missing",
-            diagnostic: "sk-proj-SOURCE_PROVIDER_SECRET",
-          },
-        }), {
-          status: 400,
-          headers: { "content-type": "application/json" },
-        })
-        : undefined,
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          providerCalibrationGets += 1;
+          return providerCalibrationGets === 1 ? activeCalibration() : failedTurn;
+        }
+        if (call.url.endsWith("/calibration/messages")) {
+          return new Response(JSON.stringify({
+            detail: {
+              code: "provider_config_missing",
+              diagnostic: "sk-proj-SOURCE_PROVIDER_SECRET",
+            },
+          }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (call.url.includes("/turns/turn-provider-missing/retry")) {
+          return activeCalibration();
+        }
+        return undefined;
+      },
     });
     await mount(false, {
       onNavigateToProviders: navigate,
@@ -1387,9 +1608,17 @@ describe("InvestorProfilePanel", () => {
       "SOURCE_PROVIDER_ANSWER",
     );
     await clickButton("Send answer");
+    expect(providerCalibrationGets).toBe(2);
     expect(host!.textContent).toContain("Configure an AI provider before continuing calibration.");
     expect(host!.textContent).not.toContain("sk-proj-SOURCE_PROVIDER_SECRET");
+    expect((await buttonByText("Send answer")).disabled).toBe(true);
+    expect((await buttonByText("Propose Now")).disabled).toBe(true);
     await clickButton("Provider Sign-in and Credentials");
     expect(navigate).toHaveBeenCalledTimes(1);
+    await clickButton("Retry turn");
+    expect(providerCalls.filter((call) =>
+      call.url.includes("/turns/turn-provider-missing/retry"))).toHaveLength(1);
+    expect(providerCalls.filter((call) => call.url.endsWith("/calibration/messages")))
+      .toHaveLength(1);
   });
 });
