@@ -252,6 +252,25 @@ focused `11 files / 135`, and full frontend `83 files / 854`. The final
 sequential ledger is Task 7 `+55/-3` and total frontend `+79/-3` (net `+76`).
 All earlier checkpoints remain historical only.
 
+### Zero-accounting resolution: Reject status refresh copy
+
+Quality re-review after `d4dc25e4` found one remaining Minor copy defect:
+Reject advisory refresh failures reused the saved-profile `refresh` scope even
+though Reject does not save a profile. The RED-first product correction at
+`8f31214c` adds the semantic `status_refresh` scope, maps it to the existing
+localized `errors.refreshFailed` copy, and preserves the existing read-only
+Retry and profile-authority behavior. Save and Approve retain the distinct
+saved-profile refresh copy. No resource, API, backend, CSS, Task 8, or node
+accounting changes are involved.
+
+The existing `proposal mode requires a pending proposal and separates coverage
+from actions` and `keeps reject profile authority through failed and stale
+refreshes until corroborated` nodes were strengthened in place. RED was Panel
+`49 passed / 2 failed`; GREEN is Panel `51/51`, Task 7 owned `4 files / 89`,
+Task 6-8 focused `11 files / 135`, and full frontend `83 files / 854`. This is
+exactly `+0/-0`; the final sequential ledgers remain Task 7 `+55/-3` and total
+frontend `+79/-3` (net `+76`).
+
 ---
 
 ## Grounded Baseline
