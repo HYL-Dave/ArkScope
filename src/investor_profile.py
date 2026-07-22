@@ -258,6 +258,16 @@ def build_personalization_context(profile: InvestorProfile, override: Optional[s
     return "\n".join(lines)
 
 
+def personalization_bundle(
+    profile: InvestorProfile,
+    override: Optional[str] = None,
+) -> tuple[str, dict]:
+    """Build one prompt context and its closed run trace from one profile sample."""
+    context = build_personalization_context(profile, override)
+    trace = personalization_trace(profile, override)
+    return context, {**trace, "context_snapshot": context}
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS investor_profile (
     id                       TEXT PRIMARY KEY CHECK (id = 'default'),

@@ -60,6 +60,22 @@ class ResearchThreadPatch(BaseModel):
     archived: bool | None = None
 
 
+_PERSONALIZATION_FIELDS = (
+    "profile_active",
+    "assistant_stance",
+    "skill_mode",
+    "suggested_skills",
+    "applied_skills",
+    "context_snapshot",
+)
+
+
+def _public_personalization(value: dict | None) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    return {key: value[key] for key in _PERSONALIZATION_FIELDS if key in value}
+
+
 def _run_dict(run: ResearchRun | None) -> dict | None:
     if run is None:
         return None
@@ -73,6 +89,7 @@ def _run_dict(run: ResearchRun | None) -> dict | None:
         "model": run.model,
         "effort": run.effort,
         "assistant_stance": run.assistant_stance,
+        "personalization": _public_personalization(run.personalization),
         "auth_mode": run.auth_mode,
         "credential_id": run.credential_id,
         "started_at": run.started_at,
@@ -123,7 +140,7 @@ def _message_dict(m: ResearchMessage) -> dict:
         "tools_used": m.tools_used, "tool_calls": m.tool_calls,
         "token_usage": m.token_usage, "tickers": m.tickers,
         "elapsed_seconds": m.elapsed_seconds, "is_error": m.is_error, "created_at": m.created_at,
-        "personalization": m.personalization,
+        "personalization": _public_personalization(m.personalization),
     }
 
 

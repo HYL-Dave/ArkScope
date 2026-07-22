@@ -371,10 +371,12 @@ def test_generate_card_enabled_profile_passes_synthesis_context_only(
     store, tmp_path, monkeypatch
 ):
     _profile(tmp_path, monkeypatch, enabled=True)
-    gather_kw, synth_kw = {}, {}
+    gather_calls, synth_kw = [], {}
+    now = "2026-07-22T02:03:04+00:00"
+    monkeypatch.setattr(routes, "_utcnow", lambda: now)
 
     def capture_gather(dal, ticker, **kw):
-        gather_kw.update(kw)
+        gather_calls.append((dal, ticker, kw))
         return _packet()
 
     def capture_synth(packet, **kw):
@@ -383,19 +385,51 @@ def test_generate_card_enabled_profile_passes_synthesis_context_only(
 
     monkeypatch.setattr(routes, "gather_evidence", capture_gather)
     monkeypatch.setattr(routes, "synthesize_card", capture_synth)
+    dal = object()
     resp = generate_card(
         "AAPL",
         GenerateBody(include_sa=False, assistant_stance="strict_risk_control"),
-        dal=object(),
+        dal=dal,
         store=store,
     )
     ctx = synth_kw["personalization_context"]
     assert "[Assistant Stance]" in ctx and "strict_risk_control" in ctx
     # evidence boundary: gather_evidence never sees profile/stance values
-    assert "personalization_context" not in gather_kw
-    assert "assistant_stance" not in gather_kw
+    assert gather_calls == [
+        (
+            dal,
+            "AAPL",
+            {
+                "now_iso": now,
+                "question": None,
+                "horizon": None,
+                "sa_enabled": False,
+            },
+        )
+    ]
     assert resp["personalization"]["assistant_stance"] == "strict_risk_control"
     assert resp["personalization"]["profile_active"] is True
+    assert resp["personalization"]["context_snapshot"] == ctx
+    assert {
+        "profile_active",
+        "assistant_stance",
+        "skill_mode",
+        "suggested_skills",
+        "applied_skills",
+    } <= set(resp["personalization"]) <= {
+        "profile_active",
+        "assistant_stance",
+        "skill_mode",
+        "suggested_skills",
+        "applied_skills",
+        "context_snapshot",
+    }
+    assert not {
+        "freeform_notes",
+        "credential_id",
+        "risk_appetite",
+        "behavioral_flags",
+    } & set(resp["personalization"])
     assert store.get(resp["run_id"]).personalization == resp["personalization"]
 
 

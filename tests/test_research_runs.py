@@ -111,6 +111,31 @@ def test_reconcile_interrupted_marks_orphaned_runs_terminal(stores):
     assert msgs[-1].is_error is True
     assert "interrupted" in msgs[-1].content
 
+    thread_store.ensure_thread(id="t2", title="q")
+    run_store.create_run(
+        id="r2",
+        thread_id="t2",
+        question="q",
+        ticker=None,
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+        auth_mode="api_key",
+        credential_id=None,
+    )
+    trace = {
+        "profile_active": True,
+        "assistant_stance": "complementary",
+        "skill_mode": "off",
+        "suggested_skills": [],
+        "applied_skills": [],
+        "context_snapshot": "exact context",
+    }
+    run_store.mark_running_with_personalization("r2", trace)
+
+    assert run_store.reconcile_interrupted() == ["r2"]
+    assert run_store.list_events("r2")[-1].data["personalization"] == trace
+
 
 def test_execute_run_records_events_and_persists_assistant(stores):
     from src.research_run_manager import execute_research_run
@@ -580,6 +605,14 @@ def test_unknown_exception_is_typed_redacted_and_bounded(stores):
     assert terminal.data == {
         "error": run.error,
         "code": "provider_call_failed",
+        "personalization": {
+            "profile_active": False,
+            "assistant_stance": "off",
+            "skill_mode": "off",
+            "suggested_skills": [],
+            "applied_skills": [],
+            "context_snapshot": "",
+        },
     }
     assert message.content == run.error
     assert message.error_code == "provider_call_failed"
@@ -959,6 +992,272 @@ def _tracka_profile(tmp_path, monkeypatch, *, enabled):
     return pstore
 
 
+def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_stream(
+    stores, tmp_path, monkeypatch
+):
+    from src.api import personalization as personalization_api
+    from src.investor_profile import build_personalization_context, personalization_trace
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    profile_store = _tracka_profile(tmp_path, monkeypatch, enabled=True)
+    profile_store.save(
+        {
+            "preferred_edge": ["valuation", "earnings revisions"],
+            "behavioral_flags": ["FOMO"],
+        }
+    )
+    thread_store.ensure_thread(id="snapshot-active", title="q")
+    thread_store.append_message(
+        thread_id="snapshot-active", role="user", content="q"
+    )
+    run_store.create_run(
+        id="snapshot-active-run",
+        thread_id="snapshot-active",
+        question="q",
+        ticker=None,
+        provider="anthropic",
+        model="m",
+        effort="high",
+        auth_mode="api_key",
+        credential_id="local:private",
+        assistant_stance="strict_risk_control",
+    )
+    profile = profile_store.get()
+    expected_context = build_personalization_context(
+        profile, override="strict_risk_control"
+    )
+    expected_trace = {
+        **personalization_trace(profile, override="strict_risk_control"),
+        "context_snapshot": expected_context,
+    }
+    original_resolve = personalization_api.resolve_personalization
+    resolution_statuses = []
+
+    def observing_resolve(assistant_stance):
+        resolution_statuses.append(run_store.get_run("snapshot-active-run").status)
+        return original_resolve(assistant_stance)
+
+    monkeypatch.setattr(
+        personalization_api, "resolve_personalization", observing_resolve
+    )
+    provider_call = {}
+
+    async def stream_factory(**kwargs):
+        running = run_store.get_run("snapshot-active-run")
+        provider_call.update(
+            status=running.status,
+            started_at=running.started_at,
+            personalization=getattr(running, "personalization", None),
+            kwargs=kwargs,
+        )
+        profile_store.save({"enabled": False})
+        yield AgentEvent(
+            EventType.done,
+            {
+                "answer": "a",
+                "provider": "anthropic",
+                "model": "m",
+                "tools_used": [],
+                "token_usage": {},
+            },
+        )
+
+    asyncio.run(
+        execute_research_run(
+            run_id="snapshot-active-run",
+            run_store=run_store,
+            thread_store=thread_store,
+            dal=object(),
+            history=[],
+            stream_factory=stream_factory,
+        )
+    )
+
+    assert resolution_statuses == ["queued"]
+    assert provider_call["status"] == "running"
+    assert provider_call["started_at"] is not None
+    assert provider_call["personalization"] == expected_trace
+    assert provider_call["kwargs"]["personalization_context"] == expected_context
+    persisted = run_store.get_run("snapshot-active-run")
+    assert persisted.personalization == expected_trace
+    done = [
+        event
+        for event in run_store.list_events("snapshot-active-run")
+        if event.type == "done"
+    ][-1]
+    assert done.data["personalization"] == expected_trace
+    assert thread_store.list_messages("snapshot-active")[-1].personalization == expected_trace
+    assert r.get_research_run(
+        "snapshot-active-run", run_store=run_store
+    )["run"]["personalization"] == expected_trace
+    assert set(expected_trace) == {
+        "profile_active",
+        "assistant_stance",
+        "skill_mode",
+        "suggested_skills",
+        "applied_skills",
+        "context_snapshot",
+    }
+
+
+def test_research_run_context_snapshot_distinguishes_legacy_null_from_disabled_empty(
+    tmp_path, monkeypatch
+):
+    from src.research_run_manager import execute_research_run
+
+    db = tmp_path / "legacy_research.db"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE research_threads (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                ticker TEXT,
+                provider TEXT,
+                model TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                archived_at TEXT
+            );
+            CREATE TABLE research_runs (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL REFERENCES research_threads(id) ON DELETE CASCADE,
+                status TEXT NOT NULL,
+                question TEXT NOT NULL,
+                ticker TEXT,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                effort TEXT,
+                assistant_stance TEXT,
+                auth_mode TEXT,
+                credential_id TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                error TEXT,
+                error_code TEXT,
+                token_usage_json TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            INSERT INTO research_threads
+                (id, title, created_at, updated_at)
+            VALUES
+                ('legacy-thread', 'Legacy', '2026-07-01T00:00:00+00:00',
+                 '2026-07-01T00:00:00+00:00');
+            INSERT INTO research_runs
+                (id, thread_id, status, question, provider, model,
+                 started_at, completed_at, created_at, updated_at)
+            VALUES
+                ('legacy-run', 'legacy-thread', 'succeeded', 'old q', 'openai', 'old-model',
+                 '2026-07-01T00:01:00+00:00', '2026-07-01T00:02:00+00:00',
+                 '2026-07-01T00:00:00+00:00', '2026-07-01T00:02:00+00:00');
+            """
+        )
+
+    run_store = ResearchRunStore(db)
+    thread_store = ResearchThreadStore(db)
+    legacy = run_store.get_run("legacy-run")
+    assert legacy is not None
+    assert legacy.personalization is None
+
+    thread_store.ensure_thread(id="queued-thread", title="Queued")
+    queued = run_store.create_run(
+        id="queued-run",
+        thread_id="queued-thread",
+        question="queued",
+        ticker=None,
+        provider="anthropic",
+        model="m",
+        effort=None,
+        auth_mode="api_key",
+        credential_id=None,
+    )
+    assert queued.personalization is None
+    assert r.get_research_run("queued-run", run_store=run_store)["run"][
+        "personalization"
+    ] is None
+
+    _tracka_profile(tmp_path, monkeypatch, enabled=False)
+    expected_off = {
+        "profile_active": False,
+        "assistant_stance": "off",
+        "skill_mode": "off",
+        "suggested_skills": [],
+        "applied_skills": [],
+        "context_snapshot": "",
+    }
+
+    async def execute_off(thread_id, run_id):
+        thread_store.ensure_thread(id=thread_id, title=thread_id)
+        thread_store.append_message(thread_id=thread_id, role="user", content="q")
+        run_store.create_run(
+            id=run_id,
+            thread_id=thread_id,
+            question="q",
+            ticker=None,
+            provider="anthropic",
+            model="m",
+            effort=None,
+            auth_mode="api_key",
+            credential_id=None,
+        )
+        observed = []
+
+        async def strict_factory(*, provider, question, model, effort, dal, history):
+            observed.append(run_store.get_run(run_id).personalization)
+            yield AgentEvent(
+                EventType.done,
+                {
+                    "answer": "a",
+                    "provider": provider,
+                    "model": model,
+                    "tools_used": [],
+                    "token_usage": {},
+                },
+            )
+
+        await execute_research_run(
+            run_id=run_id,
+            run_store=run_store,
+            thread_store=thread_store,
+            dal=object(),
+            history=[],
+            stream_factory=strict_factory,
+        )
+        return observed
+
+    disabled_observed = asyncio.run(execute_off("disabled-thread", "disabled-run"))
+    assert disabled_observed == [expected_off]
+    assert run_store.get_run("disabled-run").personalization == expected_off
+    assert run_store.list_events("disabled-run")[-1].data["personalization"] == expected_off
+    assert thread_store.list_messages("disabled-thread")[-1].personalization == expected_off
+
+    monkeypatch.setattr(
+        "src.api.personalization.resolve_personalization",
+        lambda _stance: (_ for _ in ()).throw(RuntimeError("profile unavailable")),
+    )
+    fallback_observed = asyncio.run(execute_off("fallback-thread", "fallback-run"))
+    assert fallback_observed == [expected_off]
+    assert run_store.get_run("fallback-run").personalization == expected_off
+    assert run_store.list_events("fallback-run")[-1].data["personalization"] == expected_off
+    assert thread_store.list_messages("fallback-thread")[-1].personalization == expected_off
+    assert run_store.get_run("legacy-run").personalization is None
+    assert run_store.get_run("queued-run").personalization is None
+
+    with sqlite3.connect(db) as conn:
+        rows = dict(
+            conn.execute(
+                "SELECT id, personalization_json FROM research_runs "
+                "WHERE id IN ('legacy-run', 'queued-run', 'disabled-run', 'fallback-run')"
+            ).fetchall()
+        )
+    assert rows["legacy-run"] is None
+    assert rows["queued-run"] is None
+    assert rows["disabled-run"] is not None
+    assert rows["fallback-run"] is not None
+
+
 def test_create_run_stores_stance_and_rejects_invalid(stores, tmp_path, monkeypatch):
     import asyncio
 
@@ -1085,3 +1384,7 @@ def test_cancelled_run_persists_personalization_trace(stores, tmp_path, monkeypa
     assert last.is_error is True
     assert last.personalization["assistant_stance"] == "complementary"
     assert last.personalization["profile_active"] is True
+    persisted = run_store.get_run("rc").personalization
+    assert persisted["context_snapshot"]
+    assert last.personalization == persisted
+    assert run_store.list_events("rc")[-1].data["personalization"] == persisted

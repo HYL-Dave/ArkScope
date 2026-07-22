@@ -16,8 +16,7 @@ from fastapi import HTTPException
 def resolve_personalization(assistant_stance: Optional[str]) -> tuple[str, dict]:
     from src.investor_profile import (
         STANCES,
-        build_personalization_context,
-        personalization_trace,
+        personalization_bundle,
     )
 
     if assistant_stance is not None and assistant_stance not in STANCES:
@@ -28,6 +27,4 @@ def resolve_personalization(assistant_stance: Optional[str]) -> tuple[str, dict]
     from src.api.dependencies import get_investor_profile_store
 
     profile = get_investor_profile_store().get()
-    context = build_personalization_context(profile, override=assistant_stance)
-    trace = personalization_trace(profile, override=assistant_stance)
-    return context, trace
+    return personalization_bundle(profile, override=assistant_stance)

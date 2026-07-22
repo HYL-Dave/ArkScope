@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
     model            TEXT NOT NULL,
     effort           TEXT,
     assistant_stance TEXT,
+    personalization_json TEXT,
     auth_mode        TEXT,
     credential_id    TEXT,
     started_at       TEXT,
@@ -87,6 +88,7 @@ class ResearchRun:
     model: str
     effort: Optional[str]
     assistant_stance: Optional[str]
+    personalization: Optional[dict]
     auth_mode: Optional[str]
     credential_id: Optional[str]
     started_at: Optional[str]
@@ -144,6 +146,7 @@ class ResearchRunStore:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(research_runs)").fetchall()}
             for column, definition in (
                 ("assistant_stance", "assistant_stance TEXT"),
+                ("personalization_json", "personalization_json TEXT"),
                 ("error_code", "error_code TEXT"),
             ):
                 if column in cols:
@@ -160,7 +163,9 @@ class ResearchRunStore:
             id=r["id"], thread_id=r["thread_id"], status=r["status"],
             question=r["question"], ticker=r["ticker"], provider=r["provider"],
             model=r["model"], effort=r["effort"],
-            assistant_stance=r["assistant_stance"], auth_mode=r["auth_mode"],
+            assistant_stance=r["assistant_stance"],
+            personalization=_loads(r["personalization_json"]),
+            auth_mode=r["auth_mode"],
             credential_id=r["credential_id"], started_at=r["started_at"],
             completed_at=r["completed_at"], error=r["error"],
             error_code=r["error_code"],
@@ -415,6 +420,9 @@ class ResearchRunStore:
         ).fetchone()
         if current is None or current["status"] not in tuple(expected_statuses):
             return self._run(current) if current is not None else None
+        persisted_personalization = _loads(current["personalization_json"])
+        if persisted_personalization is not None:
+            personalization = persisted_personalization
         terminal = self._mark_terminal_on_connection(
             conn,
             run_id,
@@ -430,6 +438,8 @@ class ResearchRunStore:
         normalized_event = dict(event_data or {})
         normalized_event["error"] = error
         normalized_event["code"] = error_code
+        if personalization is not None:
+            normalized_event["personalization"] = dict(personalization)
         self._append_event_on_connection(
             conn,
             run_id,
@@ -598,6 +608,22 @@ class ResearchRunStore:
             )
             conn.commit()
 
+    def mark_running_with_personalization(
+        self,
+        run_id: str,
+        personalization: dict,
+    ) -> None:
+        """Atomically start a queued run and persist its prompt-assembly trace."""
+        ts = _now()
+        with self._write_lock, self._connect() as conn:
+            conn.execute(
+                "UPDATE research_runs SET status = 'running', "
+                "started_at = COALESCE(started_at, ?), personalization_json = ?, "
+                "updated_at = ? WHERE id = ? AND status = 'queued'",
+                (ts, json.dumps(personalization), ts, run_id),
+            )
+            conn.commit()
+
     def _mark_terminal_on_connection(
         self,
         conn: sqlite3.Connection,
@@ -758,6 +784,10 @@ class ResearchRunStore:
                 ).fetchall()
                 ids = [row["id"] for row in rows]
                 for row in rows:
+                    event_data = {"error": failure.detail, "code": failure.code}
+                    personalization = _loads(row["personalization_json"])
+                    if personalization is not None:
+                        event_data["personalization"] = personalization
                     self._mark_terminal_on_connection(
                         conn,
                         row["id"],
@@ -771,7 +801,7 @@ class ResearchRunStore:
                         conn,
                         row["id"],
                         "error",
-                        {"error": failure.detail, "code": failure.code},
+                        event_data,
                         now=ts,
                     )
                 conn.commit()

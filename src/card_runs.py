@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS ai_card_runs (
     status               TEXT NOT NULL DEFAULT 'generated',
     saved_report_id      INTEGER,
     expires_at           TEXT,
-    translations_json    TEXT
+    translations_json    TEXT,
+    personalization_context_snapshot TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_card_runs_ticker ON ai_card_runs(ticker);
@@ -110,6 +111,7 @@ class CardRunStore:
                 ("skill_mode", "TEXT NOT NULL DEFAULT 'off'"),
                 ("suggested_skills_json", "TEXT NOT NULL DEFAULT '[]'"),
                 ("applied_skills_json", "TEXT NOT NULL DEFAULT '[]'"),
+                ("personalization_context_snapshot", "TEXT"),
             ):
                 if _pcol not in cols:
                     try:
@@ -149,6 +151,7 @@ class CardRunStore:
                 "skill_mode": r["skill_mode"],
                 "suggested_skills": json.loads(r["suggested_skills_json"] or "[]"),
                 "applied_skills": json.loads(r["applied_skills_json"] or "[]"),
+                "context_snapshot": r["personalization_context_snapshot"],
             },
         )
 
@@ -181,8 +184,9 @@ class CardRunStore:
                     (ticker, question, horizon, card_type, result_card_json,
                      evidence_packet_json, provider, model, generated_at, as_of, status,
                      profile_active, assistant_stance, skill_mode,
-                     suggested_skills_json, applied_skills_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?, ?, ?, ?, ?)
+                     suggested_skills_json, applied_skills_json,
+                     personalization_context_snapshot)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     t,
@@ -200,6 +204,7 @@ class CardRunStore:
                     p.get("skill_mode") or "off",
                     json.dumps(p.get("suggested_skills") or []),
                     json.dumps(p.get("applied_skills") or []),
+                    p.get("context_snapshot"),
                 ),
             )
             conn.commit()

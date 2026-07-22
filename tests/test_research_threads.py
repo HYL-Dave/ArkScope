@@ -449,3 +449,88 @@ def test_message_personalization_round_trip(tmp_path):
     msgs = store.list_messages("tp")
     assert msgs[0].personalization == trace
     assert msgs[1].personalization is None
+
+
+def test_message_personalization_snapshot_round_trip_and_legacy_null(tmp_path):
+    from dataclasses import replace
+
+    from src.api.routes.research import _message_dict
+    from src.investor_profile import default_profile, personalization_bundle
+
+    db = tmp_path / "legacy_messages.db"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE research_threads (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                ticker TEXT,
+                provider TEXT,
+                model TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                archived_at TEXT
+            );
+            CREATE TABLE research_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                thread_id TEXT NOT NULL REFERENCES research_threads(id) ON DELETE CASCADE,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT '',
+                provider TEXT,
+                model TEXT,
+                effort TEXT,
+                tools_used_json TEXT,
+                tool_calls_json TEXT,
+                token_usage_json TEXT,
+                tickers_json TEXT,
+                elapsed_seconds REAL,
+                is_error INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+            INSERT INTO research_threads
+                (id, title, created_at, updated_at)
+            VALUES
+                ('legacy', 'Legacy', '2026-07-01T00:00:00+00:00',
+                 '2026-07-01T00:00:00+00:00');
+            INSERT INTO research_messages
+                (id, thread_id, role, content, created_at)
+            VALUES
+                (9, 'legacy', 'assistant', 'old answer',
+                 '2026-07-01T00:01:00+00:00');
+            """
+        )
+
+    store = ResearchThreadStore(db)
+    legacy = store.list_messages("legacy")[0]
+    assert legacy.personalization is None
+    assert _message_dict(legacy)["personalization"] is None
+
+    profile = replace(
+        default_profile(),
+        enabled=True,
+        risk_appetite=8,
+        risk_capacity=4,
+        risk_mismatch="appetite_above_capacity",
+        default_stance="complementary",
+    )
+    context, trace = personalization_bundle(profile)
+    active = store.append_message(
+        thread_id="legacy",
+        role="assistant",
+        content="new answer",
+        personalization=trace,
+    )
+
+    assert context
+    assert active.personalization == trace
+    assert store.list_messages("legacy")[-1].personalization == trace
+    assert _message_dict(active)["personalization"] == trace
+    assert trace["context_snapshot"] == context
+    assert set(trace) == {
+        "profile_active",
+        "assistant_stance",
+        "skill_mode",
+        "suggested_skills",
+        "applied_skills",
+        "context_snapshot",
+    }

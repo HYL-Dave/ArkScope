@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 from pydantic import ValidationError
 
@@ -146,8 +148,9 @@ def test_card_run_personalization_defaults_off(tmp_path):
 
     store = CardRunStore(tmp_path / "cards.db")
     run = store.record(ticker="NVDA", result_card={"conclusion": "x"})
-    assert run.personalization == _OFF_TRACE
-    assert store.get(run.id).personalization == _OFF_TRACE
+    expected = {**_OFF_TRACE, "context_snapshot": None}
+    assert run.personalization == expected
+    assert store.get(run.id).personalization == expected
 
 
 def test_card_run_personalization_round_trip(tmp_path):
@@ -162,5 +165,103 @@ def test_card_run_personalization_round_trip(tmp_path):
         "applied_skills": [],
     }
     run = store.record(ticker="NVDA", result_card={"conclusion": "x"}, personalization=trace)
-    assert store.get(run.id).personalization == trace
-    assert store.record(ticker="AMD", result_card={}).personalization == _OFF_TRACE
+    assert store.get(run.id).personalization == {**trace, "context_snapshot": None}
+    assert store.record(ticker="AMD", result_card={}).personalization == {
+        **_OFF_TRACE,
+        "context_snapshot": None,
+    }
+
+
+def test_card_run_context_snapshot_distinguishes_legacy_null_from_new_disabled_empty(
+    tmp_path,
+):
+    db = tmp_path / "legacy_cards.db"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE ai_card_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                question TEXT,
+                horizon TEXT,
+                card_type TEXT NOT NULL DEFAULT 'analysis',
+                result_card_json TEXT NOT NULL,
+                evidence_packet_json TEXT,
+                provider TEXT,
+                model TEXT,
+                generated_at TEXT NOT NULL,
+                as_of TEXT,
+                status TEXT NOT NULL DEFAULT 'generated',
+                saved_report_id INTEGER,
+                expires_at TEXT,
+                translations_json TEXT,
+                profile_active INTEGER NOT NULL DEFAULT 0,
+                assistant_stance TEXT NOT NULL DEFAULT 'off',
+                skill_mode TEXT NOT NULL DEFAULT 'off',
+                suggested_skills_json TEXT NOT NULL DEFAULT '[]',
+                applied_skills_json TEXT NOT NULL DEFAULT '[]'
+            );
+            INSERT INTO ai_card_runs
+                (id, ticker, result_card_json, generated_at)
+            VALUES
+                (7, 'LEGACY', '{}', '2026-07-01T00:00:00+00:00');
+            """
+        )
+
+    store = CardRunStore(db)
+    legacy = store.get(7)
+    assert legacy is not None
+    assert legacy.personalization == {**_OFF_TRACE, "context_snapshot": None}
+
+    disabled_trace = {**_OFF_TRACE, "context_snapshot": ""}
+    disabled = store.record(
+        ticker="DISABLED",
+        result_card={"conclusion": "off"},
+        personalization=disabled_trace,
+    )
+    assert store.get(disabled.id).personalization == disabled_trace
+
+    with sqlite3.connect(db) as conn:
+        rows = conn.execute(
+            "SELECT id, personalization_context_snapshot FROM ai_card_runs ORDER BY id"
+        ).fetchall()
+    assert rows == [(7, None), (disabled.id, "")]
+
+
+def test_card_run_context_snapshot_round_trips_exact_active_prompt_block(tmp_path):
+    from dataclasses import replace
+
+    from src.api.routes.analysis_cards import _summary, get_card
+    from src.investor_profile import build_personalization_context, default_profile
+
+    context = build_personalization_context(
+        replace(
+            default_profile(),
+            enabled=True,
+            risk_appetite=9,
+            risk_capacity=3,
+            risk_mismatch="appetite_above_capacity",
+            default_stance="strict_risk_control",
+        )
+    )
+    trace = {
+        "profile_active": True,
+        "assistant_stance": "strict_risk_control",
+        "skill_mode": "off",
+        "suggested_skills": [],
+        "applied_skills": [],
+        "context_snapshot": context,
+    }
+    store = CardRunStore(tmp_path / "active_cards.db")
+
+    run = store.record(
+        ticker="NVDA",
+        result_card={"conclusion": "bounded"},
+        personalization=trace,
+    )
+
+    persisted = store.get(run.id)
+    assert persisted is not None
+    assert persisted.personalization == trace
+    assert _summary(persisted)["personalization"] == trace
+    assert get_card(run.id, store=store)["personalization"] == trace

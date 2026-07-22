@@ -70,20 +70,8 @@ async def execute_research_run(
 ) -> None:
     """Execute one run and persist both replay events and terminal transcript."""
     run = run_store.get_run(run_id)
-    if run is None:
+    if run is None or run.status != "queued":
         return
-    run_store.mark_running(run_id)
-    run = run_store.get_run(run_id)
-    assert run is not None
-    collected: list[tuple[str, dict]] = []
-    done_data: Optional[dict] = None
-    failure: Optional[ResearchFailure] = None
-    terminal_token_usage: Optional[dict] = None
-    t0 = time.monotonic()
-
-    if stream_factory is None:
-        from src.api.routes.query import _research_provider_stream
-        stream_factory = _research_provider_stream
 
     # Track A: resolve the profile/stance AT EXECUTION (stance was validated at
     # create). Resolution failure degrades to off — the trace must never claim
@@ -95,9 +83,25 @@ async def execute_research_run(
     except Exception:  # noqa: BLE001 — degrade to un-personalized, honestly
         personalization_context, personalization = "", {
             "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
-            "suggested_skills": [], "applied_skills": [],
+            "suggested_skills": [], "applied_skills": [], "context_snapshot": "",
         }
+    run_store.mark_running_with_personalization(run_id, personalization)
+    run = run_store.get_run(run_id)
+    if run is None or run.status != "running" or run.personalization is None:
+        return
+    personalization = run.personalization
+    snapshot = personalization.get("context_snapshot")
+    personalization_context = snapshot if isinstance(snapshot, str) else ""
     _pctx = {"personalization_context": personalization_context} if personalization_context else {}
+    collected: list[tuple[str, dict]] = []
+    done_data: Optional[dict] = None
+    failure: Optional[ResearchFailure] = None
+    terminal_token_usage: Optional[dict] = None
+    t0 = time.monotonic()
+
+    if stream_factory is None:
+        from src.api.routes.query import _research_provider_stream
+        stream_factory = _research_provider_stream
 
     try:
         stream = await _maybe_await(stream_factory(
@@ -146,7 +150,11 @@ async def execute_research_run(
                 run_store.append_event(
                     run_id,
                     "error",
-                    _typed_error_event_data(data, failure),
+                    _typed_error_event_data(
+                        data,
+                        failure,
+                        personalization=personalization,
+                    ),
                 )
                 break
             run_store.append_event(run_id, etype, data)
@@ -180,7 +188,11 @@ async def execute_research_run(
         run_store.append_event(
             run_id,
             "error",
-            {"error": failure.detail, "code": failure.code},
+            {
+                "error": failure.detail,
+                "code": failure.code,
+                "personalization": dict(personalization),
+            },
         )
 
     elapsed = round(time.monotonic() - t0, 3)

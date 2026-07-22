@@ -1874,16 +1874,43 @@ def test_query_stream_enabled_profile_passes_context_and_persists_trace(
     ctx = captured.get("personalization_context", "")
     assert "[Assistant Stance]" in ctx and "complementary" in ctx
     assert "appetite_above_capacity" in ctx
+    assert set(captured) == {
+        "effort",
+        "max_tool_calls",
+        "personalization_context",
+    }
     # done SSE event carries the trace
     import json as _json
 
     done_frames = [f for f in frames if '"done"' in f]
     payload = _json.loads(done_frames[-1].split("data: ", 1)[1])
-    assert payload["data"]["personalization"]["assistant_stance"] == "complementary"
-    assert payload["data"]["personalization"]["profile_active"] is True
+    trace = payload["data"]["personalization"]
+    assert trace["assistant_stance"] == "complementary"
+    assert trace["profile_active"] is True
+    assert trace["context_snapshot"] == ctx
+    assert {
+        "profile_active",
+        "assistant_stance",
+        "skill_mode",
+        "suggested_skills",
+        "applied_skills",
+    } <= set(trace) <= {
+        "profile_active",
+        "assistant_stance",
+        "skill_mode",
+        "suggested_skills",
+        "applied_skills",
+        "context_snapshot",
+    }
+    assert not {
+        "credential_id",
+        "freeform_notes",
+        "risk_appetite",
+        "behavioral_flags",
+    } & set(trace)
     # persisted assistant message carries the same trace
     last = store.list_messages("tpe")[-1]
-    assert last.personalization["assistant_stance"] == "complementary"
+    assert last.personalization == trace
     assert last.personalization["suggested_skills"] == []
 
 
