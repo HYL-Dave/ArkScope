@@ -1,14 +1,15 @@
 # ArkScope I18N-3 Explore Design
 
-> **Status: WRITTEN DESIGN REVIEW GREEN — IMPLEMENTATION PLAN NEXT**
+> **Status: DESIGN REVIEW GREEN — IMPLEMENTATION PLAN WRITTEN,
+> INDEPENDENT PLAN REVIEW NEXT**
 >
 > Written against merged `master` at `c0448213` on 2026-07-23. This document
 > is the bounded product, localization, error-presentation, and verification
 > authority for I18N-3 Explore. Independent full-document review returned
 > GREEN with the required zh-Hant copy-preservation rule incorporated below.
 > It does not authorize product implementation, backend changes, the public
-> locale selector, or any deferred SA extension repair. A separately reviewed
-> RED-first implementation plan remains required.
+> locale selector, or any deferred SA extension repair. The separately written
+> RED-first implementation plan remains blocked on independent review GREEN.
 
 ## 1. Purpose and Authority
 
