@@ -544,6 +544,34 @@ def test_create_guided_proposal_clamps_to_covered_fields_and_records_base_values
     assert row["raw_profile_patch_json"] == "{}"
     assert rejected_secret not in json.dumps(row, ensure_ascii=False)
 
+    uncovered_list_db = tmp_path / "uncovered-malformed-list.db"
+    uncovered_list_store = _calibration_store(uncovered_list_db)
+    InvestorProfileStore(uncovered_list_db)
+    uncovered_list_session = uncovered_list_store.start_session()
+    uncovered_list_store.begin_answer_turn(
+        session_id=uncovered_list_session.id,
+        turn_id="uncovered-malformed-list",
+        answer="Only the covered risk field belongs in this proposal.",
+    )
+    uncovered_completed = uncovered_list_store.complete_turn(
+        "uncovered-malformed-list",
+        result=_result(
+            profile_patch={"risk_appetite": 7, "avoidances": [17]},
+        ),
+    )
+    uncovered_proposal = uncovered_list_store.latest_proposal(
+        uncovered_list_session.id
+    )
+    uncovered_row = _raw_proposal(uncovered_list_db, uncovered_proposal.id)
+    assert uncovered_completed.status == "completed"
+    assert uncovered_completed.error_code is None
+    assert uncovered_proposal.profile_patch == {"risk_appetite": 7}
+    assert uncovered_proposal.proposed_fields == ["risk_appetite"]
+    assert json.loads(uncovered_row["rejected_fields_json"]) == ["avoidances"]
+    assert uncovered_row["raw_profile_patch_json"] == "{}"
+    assert "[17]" not in json.dumps(uncovered_proposal.to_dict(), ensure_ascii=False)
+    assert "[17]" not in json.dumps(uncovered_row, ensure_ascii=False)
+
     invalid_list_cases = (
         (
             "preferred_edge",
@@ -667,24 +695,30 @@ def test_create_guided_proposal_clamps_to_covered_fields_and_records_base_values
             "SELECT name FROM sqlite_master WHERE type='table' AND name='investor_profile'"
         ).fetchone() is None
 
-    malformed_db = tmp_path / "malformed-profile.db"
-    malformed_store = _calibration_store(malformed_db)
-    with sqlite3.connect(malformed_db) as conn:
-        conn.execute("CREATE TABLE investor_profile (id TEXT PRIMARY KEY)")
-    malformed_session = malformed_store.start_session()
-    malformed_store.begin_answer_turn(
-        session_id=malformed_session.id,
-        turn_id="malformed-profile-proposal",
-        answer="A malformed profile table must fail closed.",
+    malformed_tables = (
+        ("lowercase", "CREATE TABLE investor_profile (id TEXT PRIMARY KEY)"),
+        ("uppercase", "CREATE TABLE INVESTOR_PROFILE (id TEXT PRIMARY KEY)"),
     )
-    with pytest.raises(sqlite3.OperationalError):
-        malformed_store.complete_turn(
-            "malformed-profile-proposal",
-            result=_result(profile_patch={"risk_appetite": 6}),
+    for case, ddl in malformed_tables:
+        malformed_db = tmp_path / f"malformed-profile-{case}.db"
+        malformed_store = _calibration_store(malformed_db)
+        with sqlite3.connect(malformed_db) as conn:
+            conn.execute(ddl)
+        malformed_session = malformed_store.start_session()
+        turn_id = f"malformed-profile-proposal-{case}"
+        malformed_store.begin_answer_turn(
+            session_id=malformed_session.id,
+            turn_id=turn_id,
+            answer="A malformed profile table must fail closed.",
         )
-    assert malformed_store.get_turn("malformed-profile-proposal").status == "pending"
-    assert malformed_store.get_session(malformed_session.id).covered_topics == []
-    assert malformed_store.latest_proposal(malformed_session.id) is None
+        with pytest.raises(sqlite3.OperationalError):
+            malformed_store.complete_turn(
+                turn_id,
+                result=_result(profile_patch={"risk_appetite": 6}),
+            )
+        assert malformed_store.get_turn(turn_id).status == "pending"
+        assert malformed_store.get_session(malformed_session.id).covered_topics == []
+        assert malformed_store.latest_proposal(malformed_session.id) is None
 
 
 def test_all_illegal_proposal_fields_create_no_proposal(tmp_path):

@@ -911,7 +911,8 @@ class CalibrationStore:
                     )
                 else:
                     try:
-                        for field in _LIST_CONFLICT_FIELDS:
+                        eligible_fields = set(fields_for_topics(covered_after))
+                        for field in _LIST_CONFLICT_FIELDS & eligible_fields:
                             if field not in raw_patch:
                                 continue
                             values = raw_patch[field]

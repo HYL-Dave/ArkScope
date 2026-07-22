@@ -285,7 +285,8 @@ def _read_profile_on_connection(conn: sqlite3.Connection) -> InvestorProfile:
     """Read the singleton profile without owning connection or transaction state."""
     table_exists = conn.execute(
         "SELECT 1 FROM sqlite_master "
-        "WHERE type='table' AND name='investor_profile'"
+        "WHERE type='table' AND name = ? COLLATE NOCASE",
+        ("investor_profile",),
     ).fetchone()
     if table_exists is None:
         return default_profile()
