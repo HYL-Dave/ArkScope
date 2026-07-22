@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import sqlite3
 import asyncio
+import sqlite3
+from functools import lru_cache
 
 import pytest
 
@@ -39,7 +40,7 @@ def test_lifespan_migrates_calibration_before_scheduler_start(
 
     profile_db = tmp_path / "profile_state.db"
     calls: list[str] = []
-    scenario = {"provider_fails": False, "migration_fails": False}
+    scenario = {"provider_fails": False, "migration_error": None}
 
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
     monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
@@ -53,14 +54,15 @@ def test_lifespan_migrates_calibration_before_scheduler_start(
     def _migrate(db_path):
         calls.append("migrate_calibration")
         assert db_path == str(profile_db)
-        if scenario["migration_fails"]:
-            raise CalibrationSchemaMismatch("calibration schema mismatch")
+        if scenario["migration_error"] is not None:
+            raise scenario["migration_error"]
 
     class CalibrationStore:
         def reconcile_interrupted_turns(self):
             calls.append("reconcile_calibration")
             return 0
 
+    @lru_cache(maxsize=1)
     def _calibration_store():
         calls.append("construct_calibration_store")
         return CalibrationStore()
@@ -116,7 +118,7 @@ def test_lifespan_migrates_calibration_before_scheduler_start(
     try:
         for provider_fails in (False, True):
             calls.clear()
-            scenario.update(provider_fails=provider_fails, migration_fails=False)
+            scenario.update(provider_fails=provider_fails, migration_error=None)
             asyncio.run(_run_lifespan())
 
             assert calls[:5] == [
@@ -137,11 +139,15 @@ def test_lifespan_migrates_calibration_before_scheduler_start(
                     "start_portfolio_scheduler"
                 )
 
-        calls.clear()
-        scenario.update(provider_fails=False, migration_fails=True)
-        with pytest.raises(CalibrationSchemaMismatch, match="schema mismatch"):
-            asyncio.run(_run_lifespan())
-        assert calls == ["apply_provider_env", "migrate_calibration"]
+        for error in (
+            CalibrationSchemaMismatch("calibration schema mismatch"),
+            RuntimeError("calibration migration logic failure"),
+        ):
+            calls.clear()
+            scenario.update(provider_fails=False, migration_error=error)
+            with pytest.raises(type(error), match=str(error)):
+                asyncio.run(_run_lifespan())
+            assert calls == ["apply_provider_env", "migrate_calibration"]
     finally:
         runtime.clear_provider_config_setup_required()
 
@@ -150,43 +156,34 @@ def test_lifespan_reconciles_pending_calibration_turns_before_scheduler_start(
     monkeypatch, tmp_path
 ):
     from src.api.app import create_app, lifespan
+    from src.api.dependencies import get_investor_calibration_store
+    from src.investor_profile_calibration import CalibrationStore
+    from src.investor_profile_calibration_schema import migrate_calibration_schema
 
-    profile_db = tmp_path / "profile_state.db"
-    calls: list[str] = []
+    profile_dbs = (tmp_path / "profile-a.db", tmp_path / "profile-b.db")
+    turn_ids = ("pending-a", "pending-b")
 
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    for db_path, turn_id in zip(profile_dbs, turn_ids):
+        migrate_calibration_schema(db_path)
+        store = CalibrationStore(db_path)
+        session = store.start_session()
+        store.begin_answer_turn(
+            session_id=session.id,
+            turn_id=turn_id,
+            answer=f"Answer for {turn_id}",
+        )
+        assert store.get_turn(turn_id).status == "pending"
+
     monkeypatch.setenv("ARKSCOPE_DISABLE_SCHEDULER", "1")
-    monkeypatch.setattr(
-        "src.data_provider_config.apply_env",
-        lambda store: calls.append("apply_provider_env"),
-    )
+    monkeypatch.setattr("src.data_provider_config.apply_env", lambda store: None)
     monkeypatch.setattr("src.api.dependencies.get_data_provider_store", lambda: object())
     monkeypatch.setattr(
-        "src.investor_profile_calibration_schema.migrate_calibration_schema",
-        lambda db_path: calls.append("migrate_calibration"),
-    )
-
-    class CalibrationStore:
-        def reconcile_interrupted_turns(self):
-            calls.append("reconcile_calibration")
-            return 3
-
-    def _calibration_store():
-        calls.append("construct_calibration_store")
-        return CalibrationStore()
-
-    monkeypatch.setattr(
-        "src.api.dependencies.get_investor_calibration_store",
-        _calibration_store,
-    )
-    monkeypatch.setattr(
         "src.service.data_scheduler.reconcile_interrupted_runtime_state",
-        lambda: calls.append("reconcile_scheduler_telemetry"),
+        lambda: None,
     )
 
     class CaptureService:
         def reconcile_startup(self):
-            calls.append("reconcile_portfolio_capture")
             return []
 
     monkeypatch.setattr(
@@ -213,19 +210,22 @@ def test_lifespan_reconciles_pending_calibration_turns_before_scheduler_start(
         async with lifespan(create_app()):
             await asyncio.sleep(0)
 
-    asyncio.run(_run_lifespan())
+    get_investor_calibration_store.cache_clear()
+    try:
+        for index, (db_path, turn_id) in enumerate(zip(profile_dbs, turn_ids)):
+            monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db_path))
+            asyncio.run(_run_lifespan())
+            assert CalibrationStore(db_path).get_turn(turn_id).status == "interrupted"
+            if index == 0:
+                assert (
+                    CalibrationStore(profile_dbs[1]).get_turn(turn_ids[1]).status
+                    == "pending"
+                )
+    finally:
+        get_investor_calibration_store.cache_clear()
 
-    assert calls == [
-        "apply_provider_env",
-        "migrate_calibration",
-        "construct_calibration_store",
-        "reconcile_calibration",
-        "reconcile_scheduler_telemetry",
-        "reconcile_portfolio_capture",
-    ]
 
-
-def test_profile_db_failure_boots_setup_only(monkeypatch):
+def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
     from src.api.app import create_app, lifespan
     from src.api.routes.health import healthz
     from src.api.routes import providers_config
@@ -238,12 +238,17 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
     async def _scheduler_loop():
         started["scheduler"] = True
 
-    def _fail_apply_env(store):
-        raise sqlite3.OperationalError("profile_state.db readonly")
+    unavailable_db = tmp_path / "profile_state.db"
+    unavailable_db.mkdir()
 
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(unavailable_db))
     monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
-    monkeypatch.setattr("src.data_provider_config.apply_env", _fail_apply_env)
+    monkeypatch.setattr("src.data_provider_config.apply_env", lambda store: None)
     monkeypatch.setattr("src.api.dependencies.get_data_provider_store", lambda: object())
+    monkeypatch.setattr(
+        "src.service.data_scheduler.reconcile_interrupted_runtime_state",
+        lambda: None,
+    )
     monkeypatch.setattr(
         "src.api.dependencies.get_portfolio_capture_service",
         lambda: (_ for _ in ()).throw(
@@ -259,7 +264,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
             cfg = providers_config.providers_config(store=None)
             assert cfg["setup"]["required"] is True
             assert cfg["setup"]["code"] == "provider_config_setup_required"
-            assert "profile_state.db readonly" in cfg["setup"]["reason"]
+            assert "unable to open database file" in cfg["setup"]["reason"]
             assert started["scheduler"] is False
 
     asyncio.run(_run_lifespan())
@@ -267,7 +272,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch):
     cfg = providers_config.providers_config(store=None)
     assert cfg["setup"]["required"] is True
     assert cfg["setup"]["code"] == "provider_config_setup_required"
-    assert "profile_state.db readonly" in cfg["setup"]["reason"]
+    assert "unable to open database file" in cfg["setup"]["reason"]
     assert started["scheduler"] is False
 
 

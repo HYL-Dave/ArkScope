@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -62,8 +63,19 @@ async def lifespan(app: FastAPI):
         get_investor_calibration_store,
     )
 
-    migrate_calibration_schema(_local_state_db_path())
-    get_investor_calibration_store().reconcile_interrupted_turns()
+    profile_db_path = _local_state_db_path()
+    get_investor_calibration_store.cache_clear()
+    try:
+        migrate_calibration_schema(profile_db_path)
+        get_investor_calibration_store().reconcile_interrupted_turns()
+    except (OSError, sqlite3.OperationalError) as e:
+        from src.provider_config_runtime import mark_provider_config_setup_required
+
+        provider_config_ready = False
+        mark_provider_config_setup_required(str(e))
+        logger.warning(
+            "investor calibration startup unavailable; booting setup-only: %s", e
+        )
 
     try:
         reconcile_interrupted_runtime_state()
