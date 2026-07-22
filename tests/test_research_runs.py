@@ -1076,9 +1076,10 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
 ):
     from src.api import personalization as personalization_api
     from src.investor_profile import build_personalization_context, personalization_trace
-    from src.research_run_manager import execute_research_run
+    from src import research_run_manager as run_manager
 
     run_store, thread_store = stores
+    original_execute_research_run = run_manager.execute_research_run
     profile_store = _tracka_profile(tmp_path, monkeypatch, enabled=True)
     profile_store.save(
         {
@@ -1110,6 +1111,147 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
         **personalization_trace(profile, override="strict_risk_control"),
         "context_snapshot": expected_context,
     }
+
+    cancel_thread_id = "snapshot-cancel"
+    cancel_run_id = "snapshot-cancel-run"
+    thread_store.ensure_thread(id=cancel_thread_id, title="q")
+    run_store.create_run(
+        id=cancel_run_id,
+        thread_id=cancel_thread_id,
+        question="q",
+        ticker=None,
+        provider="anthropic",
+        model="m",
+        effort="high",
+        auth_mode="api_key",
+        credential_id="local:private",
+        assistant_stance="strict_risk_control",
+    )
+    thread_store.append_message(
+        thread_id=cancel_thread_id,
+        run_id=cancel_run_id,
+        role="user",
+        content="q",
+    )
+    cancel_provider_calls = []
+
+    async def exercise_task_registry():
+        provider_started = asyncio.Event()
+        provider_release = asyncio.Event()
+        newer_release = asyncio.Event()
+        tasks = []
+
+        async def cancellable_stream(**kwargs):
+            running = run_store.get_run(cancel_run_id)
+            cancel_provider_calls.append(
+                {
+                    "status": running.status,
+                    "personalization": running.personalization,
+                    "kwargs": kwargs,
+                }
+            )
+            provider_started.set()
+            await provider_release.wait()
+            yield AgentEvent(
+                EventType.done,
+                {
+                    "answer": "must not survive cancellation",
+                    "provider": "anthropic",
+                    "model": "m",
+                    "tools_used": [],
+                    "token_usage": {},
+                },
+            )
+
+        async def scheduled_execute(**kwargs):
+            await original_execute_research_run(
+                **kwargs,
+                stream_factory=cancellable_stream,
+            )
+
+        try:
+            with monkeypatch.context() as registry_patch:
+                registry_patch.setattr(
+                    run_manager, "execute_research_run", scheduled_execute
+                )
+                first_task = run_manager.schedule_research_run(
+                    run_id=cancel_run_id,
+                    run_store=run_store,
+                    thread_store=thread_store,
+                    dal=object(),
+                    history=[],
+                )
+                duplicate_task = run_manager.schedule_research_run(
+                    run_id=cancel_run_id,
+                    run_store=run_store,
+                    thread_store=thread_store,
+                    dal=object(),
+                    history=[],
+                )
+                tasks.extend((first_task, duplicate_task))
+                same_active_task = first_task is duplicate_task
+
+                await asyncio.wait_for(provider_started.wait(), timeout=2)
+                if not same_active_task:
+                    await duplicate_task
+                    await asyncio.sleep(0)
+
+                r.cancel_research_run_route(
+                    cancel_run_id,
+                    run_store=run_store,
+                    thread_store=thread_store,
+                )
+
+                newer_task = asyncio.create_task(newer_release.wait())
+                tasks.append(newer_task)
+                run_manager._TASKS[cancel_run_id] = newer_task
+                provider_release.set()
+                unique_scheduled_tasks = list(dict.fromkeys((first_task, duplicate_task)))
+                task_outcomes = await asyncio.gather(
+                    *unique_scheduled_tasks,
+                    return_exceptions=True,
+                )
+                await asyncio.sleep(0)
+                newer_task_preserved = (
+                    run_manager._TASKS.get(cancel_run_id) is newer_task
+                )
+
+                newer_release.set()
+                await newer_task
+                if run_manager._TASKS.get(cancel_run_id) is newer_task:
+                    run_manager._TASKS.pop(cancel_run_id)
+
+                stale_run_id = "snapshot-stale-task"
+                stale_task = asyncio.create_task(asyncio.sleep(0))
+                tasks.append(stale_task)
+                await stale_task
+                run_manager._TASKS[stale_run_id] = stale_task
+                stale_reported_cancellable = run_manager.cancel_research_run(
+                    stale_run_id
+                )
+                stale_task_removed = stale_run_id not in run_manager._TASKS
+        finally:
+            provider_release.set()
+            newer_release.set()
+            for task in set(tasks):
+                if not task.done():
+                    task.cancel()
+            if tasks:
+                await asyncio.gather(*set(tasks), return_exceptions=True)
+            for registry_run_id in (cancel_run_id, "snapshot-stale-task"):
+                registered = run_manager._TASKS.get(registry_run_id)
+                if registered in tasks:
+                    run_manager._TASKS.pop(registry_run_id, None)
+
+        return {
+            "same_active_task": same_active_task,
+            "task_outcomes": task_outcomes,
+            "newer_task_preserved": newer_task_preserved,
+            "stale_reported_cancellable": stale_reported_cancellable,
+            "stale_task_removed": stale_task_removed,
+        }
+
+    registry_result = asyncio.run(exercise_task_registry())
     original_resolve = personalization_api.resolve_personalization
     resolution_statuses = []
 
@@ -1166,7 +1308,7 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
 
     def execute_worker():
         asyncio.run(
-            execute_research_run(
+            original_execute_research_run(
                 run_id="snapshot-active-run",
                 run_store=run_store,
                 thread_store=thread_store,
@@ -1224,6 +1366,36 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
         "applied_skills",
         "context_snapshot",
     }
+    assert registry_result["same_active_task"] is True
+    assert len(registry_result["task_outcomes"]) == 1
+    assert isinstance(registry_result["task_outcomes"][0], asyncio.CancelledError)
+    assert registry_result["newer_task_preserved"] is True
+    assert registry_result["stale_reported_cancellable"] is False
+    assert registry_result["stale_task_removed"] is True
+    assert len(cancel_provider_calls) == 1
+    cancel_provider_call = cancel_provider_calls[0]
+    assert cancel_provider_call["status"] == "running"
+    assert cancel_provider_call["personalization"] == expected_trace
+    assert cancel_provider_call["kwargs"]["personalization_context"] == expected_context
+    cancelled_run = run_store.get_run(cancel_run_id)
+    assert (cancelled_run.status, cancelled_run.error_code) == (
+        "cancelled",
+        "run_cancelled",
+    )
+    cancel_events = run_store.list_events(cancel_run_id)
+    assert [
+        (event.type, event.data.get("code"), event.data.get("personalization"))
+        for event in cancel_events
+    ] == [("error", "run_cancelled", expected_trace)]
+    cancel_messages = thread_store.list_messages(cancel_thread_id)
+    assert [
+        (message.role, message.is_error, message.error_code, message.content)
+        for message in cancel_messages
+    ] == [
+        ("user", False, None, "q"),
+        ("assistant", True, "run_cancelled", "research run cancelled"),
+    ]
+    assert cancel_messages[-1].personalization == expected_trace
 
 
 def test_research_run_context_snapshot_distinguishes_legacy_null_from_disabled_empty(

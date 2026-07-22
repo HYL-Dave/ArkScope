@@ -25,6 +25,11 @@ StreamFactory = Callable[..., AsyncIterator[AgentEvent] | Awaitable[AsyncIterato
 _TASKS: dict[str, asyncio.Task] = {}
 
 
+def _remove_task_if_current(run_id: str, task: asyncio.Task) -> None:
+    if _TASKS.get(run_id) is task:
+        _TASKS.pop(run_id, None)
+
+
 def _etype(event: AgentEvent) -> str:
     return getattr(event.type, "value", event.type)
 
@@ -236,18 +241,26 @@ def schedule_research_run(
     dal: Any,
     history: list[dict],
 ) -> asyncio.Task:
+    current = _TASKS.get(run_id)
+    if current is not None and not current.done():
+        return current
+
     task = asyncio.create_task(execute_research_run(
         run_id=run_id, run_store=run_store, thread_store=thread_store,
         dal=dal, history=history,
     ))
     _TASKS[run_id] = task
-    task.add_done_callback(lambda _t: _TASKS.pop(run_id, None))
+    task.add_done_callback(lambda completed: _remove_task_if_current(run_id, completed))
     return task
 
 
 def cancel_research_run(run_id: str) -> bool:
     task = _TASKS.get(run_id)
-    if task is None:
+    if task is None or task.done():
+        if task is not None:
+            _remove_task_if_current(run_id, task)
         return False
-    task.cancel()
-    return True
+    if task.cancel():
+        return True
+    _remove_task_if_current(run_id, task)
+    return False
