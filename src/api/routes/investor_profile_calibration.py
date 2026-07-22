@@ -148,8 +148,12 @@ def _canonical_messages(messages) -> list[dict]:
     return canonical
 
 
-def _provider_diagnostic(value: object, *, missing_credential: bool = False) -> str:
-    source = "Provider api_key=missing" if missing_credential else value
+def _provider_diagnostic(*, missing_credential: bool = False) -> str:
+    source = (
+        "Provider api_key=missing"
+        if missing_credential
+        else "Provider call failed."
+    )
     return sanitize_research_detail(redact(source))
 
 
@@ -210,7 +214,7 @@ async def _complete_provider_work(
         failed = store.fail_turn(
             work.turn.id,
             error_code="provider_config_missing",
-            diagnostic=_provider_diagnostic(exc, missing_credential=True),
+            diagnostic=_provider_diagnostic(missing_credential=True),
         )
         raise _bad(
             503,
@@ -222,7 +226,7 @@ async def _complete_provider_work(
         failed = store.fail_turn(
             work.turn.id,
             error_code="calibration_responder_failed",
-            diagnostic=_provider_diagnostic(exc),
+            diagnostic=_provider_diagnostic(),
         )
         raise _bad(
             502,

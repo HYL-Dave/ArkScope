@@ -590,8 +590,13 @@ def test_calibration_failure_hides_provider_detail_outside_diagnostic_field(
     cstore, _pstore = stores
     _allow_writes(monkeypatch)
     session = _start(cstore)
-    raw_token = "tok=AbCdEf0123456789Secret"
-    raw_detail = f"upstream rejected request; {raw_token}; response_body=private"
+    planted = (
+        "credential_id=cred-production",
+        "provider response body: BUY ACME",
+        "rejected value: forbidden-field",
+        "tok=AbCdEf0123456789Secret",
+    )
+    raw_detail = "; ".join(planted)
     fail_calls = []
     fail_turn = cstore.fail_turn
 
@@ -630,7 +635,11 @@ def test_calibration_failure_hides_provider_detail_outside_diagnostic_field(
     assert failed.error_code == "calibration_responder_failed"
     assert len(fail_calls) == 1
     assert len(failed.diagnostic) <= 240
-    assert raw_token not in json.dumps(exc.value.detail)
-    assert raw_detail not in json.dumps(public_without_diagnostic)
-    assert "RuntimeError" not in json.dumps(exc.value.detail)
-    assert "[REDACTED]" in failed.diagnostic
+    assert failed.diagnostic == "Provider call failed."
+    exposed = json.dumps(
+        {"turn": failed.to_dict(), "http_detail": exc.value.detail},
+        ensure_ascii=False,
+    )
+    for raw_value in (*planted, raw_detail):
+        assert raw_value not in failed.diagnostic
+        assert raw_value not in exposed

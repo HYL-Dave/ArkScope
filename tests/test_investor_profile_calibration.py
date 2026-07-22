@@ -1163,6 +1163,13 @@ def test_parse_calibration_json_tolerates_model_mismatch_and_discards_its_value(
         "profile_patch": None,
         "rationales": {},
     }
+    for missing_key in base:
+        missing = dict(base)
+        missing.pop(missing_key)
+        with pytest.raises(ValueError):
+            parse_calibration_model_json(json.dumps(missing))
+    with pytest.raises(ValueError):
+        parse_calibration_model_json(json.dumps({**base, "unexpected_key": "denied"}))
     for override in invalid_payloads:
         with pytest.raises(ValueError):
             parse_calibration_model_json(json.dumps({**base, **override}))

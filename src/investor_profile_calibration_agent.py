@@ -13,6 +13,16 @@ _TOPIC_CATALOG = "\n".join(
     f"{index}. {topic.id}: {', '.join(topic.fields)}"
     for index, topic in enumerate(CALIBRATION_TOPICS, start=1)
 )
+_RESULT_KEYS = frozenset(
+    {
+        "assistant_message",
+        "addressed_topic_id",
+        "topic_covered",
+        "next_topic_id",
+        "profile_patch",
+        "rationales",
+    }
+)
 
 CALIBRATION_SYSTEM_PROMPT = (
     """You are ArkScope's Investor Profile calibration assistant.
@@ -111,6 +121,8 @@ def parse_calibration_model_json(raw: str) -> CalibrationAgentResult:
     data = json.loads(raw)
     if not isinstance(data, dict):
         raise ValueError("calibration model output must be a JSON object")
+    if set(data) != _RESULT_KEYS:
+        raise ValueError("calibration model output must contain exactly six result fields")
 
     assistant_message = data.get("assistant_message")
     addressed_topic_id = data.get("addressed_topic_id")
