@@ -61,7 +61,13 @@ type BusyAction =
   | "request_proposal"
   | "approve"
   | "reject";
-type ErrorScope = "profile_load" | "save" | "refresh" | "turn" | "proposal";
+type ErrorScope =
+  | "profile_load"
+  | "save"
+  | "refresh"
+  | "status_refresh"
+  | "turn"
+  | "proposal";
 
 interface OperationError {
   scope: ErrorScope;
@@ -152,6 +158,8 @@ function operationErrorTitle(scope: ErrorScope, t: SettingsT): string {
       return t(($) => $.investor.workspace.errors.save);
     case "refresh":
       return t(($) => $.investor.workspace.errors.refresh);
+    case "status_refresh":
+      return t(($) => $.errors.refreshFailed);
     case "turn":
       return t(($) => $.investor.workspace.errors.turn);
     case "proposal":
@@ -472,7 +480,10 @@ export function InvestorProfilePanel({
   };
 
   const retryProfileLoad = async () => {
-    const retainedRefreshError = operationError?.scope === "refresh" ? operationError : null;
+    const retainedRefreshError = operationError
+      && (operationError.scope === "refresh" || operationError.scope === "status_refresh")
+      ? operationError
+      : null;
     if (!beginAction("profile_load")) return;
     const generation = ++profileGenerationRef.current;
     const hasAuthority = profileAuthorityRef.current !== null && profileResponse !== null;
@@ -491,7 +502,7 @@ export function InvestorProfilePanel({
           setProfileError(null);
           setProfileValuesCurrent(true);
           setEffectiveFactsCurrent(false);
-          setOperationError({ scope: "refresh", error });
+          setOperationError({ scope: retainedRefreshError?.scope ?? "refresh", error });
         } else {
           setProfileStatus("failed");
           setProfileError(error);
@@ -839,7 +850,7 @@ export function InvestorProfilePanel({
       if (profileResult.status === "fulfilled") {
         applyProfileResponse(profileResult.value, profileGeneration);
         setOperationError(profileAuthorityRef.current
-          ? { scope: "refresh", error: PROFILE_AUTHORITY_UNCORROBORATED }
+          ? { scope: "status_refresh", error: PROFILE_AUTHORITY_UNCORROBORATED }
           : null);
         setProposalConflict(false);
         setOutcome("rejected");
@@ -849,7 +860,7 @@ export function InvestorProfilePanel({
         setProfileError(null);
         setProfileValuesCurrent(true);
         setEffectiveFactsCurrent(false);
-        setOperationError({ scope: "refresh", error: profileResult.reason });
+        setOperationError({ scope: "status_refresh", error: profileResult.reason });
         setProposalConflict(false);
         setOutcome("rejected");
         finishToSummary("proposal");
@@ -977,7 +988,7 @@ export function InvestorProfilePanel({
         applyProfileResponse(profileResult.value, profileGeneration);
         if (profileAuthorityRef.current) {
           setOperationError({
-            scope: "refresh",
+            scope: "status_refresh",
             error: PROFILE_AUTHORITY_UNCORROBORATED,
           });
         }
@@ -986,7 +997,7 @@ export function InvestorProfilePanel({
         setProfileError(null);
         setProfileValuesCurrent(true);
         setEffectiveFactsCurrent(false);
-        setOperationError({ scope: "refresh", error: profileResult.reason });
+        setOperationError({ scope: "status_refresh", error: profileResult.reason });
       }
       if (calibrationResult.status === "fulfilled") {
         applyCalibrationState(calibrationResult.value, calibrationGeneration);
@@ -1206,7 +1217,7 @@ export function InvestorProfilePanel({
             <Button size="compact" onClick={onNavigateToProviders}>
               {t(($) => $.registry.sections.providers.title)}
             </Button>
-          ) : operationError.scope === "refresh" ? (
+          ) : operationError.scope === "refresh" || operationError.scope === "status_refresh" ? (
             <Button size="compact" onClick={() => void retryProfileLoad()}>
               {t(($) => $.actions.retry)}
             </Button>

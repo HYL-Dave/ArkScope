@@ -2018,7 +2018,10 @@ describe("InvestorProfilePanel", () => {
       .toHaveLength(2);
     expect(calibrationGets).toBe(2);
     expect(host!.querySelector('[role="alert"]')?.textContent)
-      .toContain("The profile was saved, but the refreshed summary could not be loaded.");
+      .toContain("Could not refresh status.");
+    expect(host!.textContent).not.toContain(
+      "The profile was saved, but the refreshed summary could not be loaded.",
+    );
     expect(host!.textContent).toContain("Investor Profile summary");
     expect(host!.textContent).toContain("Event-driven");
     expect(host!.textContent).not.toContain("Effective AI stance");
@@ -2444,9 +2447,11 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("Investor Profile summary");
     expect(host!.textContent).toContain("Event-driven");
     expect(host!.textContent).not.toContain("Effective AI stance");
-    expect(host!.textContent).toContain(
+    expect(host!.textContent).not.toContain(
       "The profile was saved, but the refreshed summary could not be loaded.",
     );
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Could not refresh status.");
     expect(host!.textContent).not.toContain("SOURCE_REJECT_REFRESH_FAILED");
     await clickButton("Retry");
 
