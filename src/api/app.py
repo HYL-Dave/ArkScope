@@ -20,6 +20,36 @@ from .dependencies import get_dal
 
 logger = logging.getLogger(__name__)
 
+_SQLITE_RESULT_CODE_MASK = 0xFF
+_SQLITE_AVAILABILITY_BASE_CODES = frozenset(
+    {
+        getattr(sqlite3, "SQLITE_BUSY", 5),
+        getattr(sqlite3, "SQLITE_LOCKED", 6),
+        getattr(sqlite3, "SQLITE_READONLY", 8),
+        getattr(sqlite3, "SQLITE_IOERR", 10),
+        getattr(sqlite3, "SQLITE_FULL", 13),
+        getattr(sqlite3, "SQLITE_CANTOPEN", 14),
+    }
+)
+
+
+def _is_profile_db_availability_error(error: BaseException) -> bool:
+    """Classify explicit filesystem/SQLite availability failures only."""
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, OSError):
+            return True
+        if isinstance(current, sqlite3.Error):
+            code = getattr(current, "sqlite_errorcode", None)
+            if isinstance(code, int):
+                base_code = code & _SQLITE_RESULT_CODE_MASK
+                if base_code in _SQLITE_AVAILABILITY_BASE_CODES:
+                    return True
+        current = current.__cause__
+    return False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,7 +98,9 @@ async def lifespan(app: FastAPI):
     try:
         migrate_calibration_schema(profile_db_path)
         get_investor_calibration_store().reconcile_interrupted_turns()
-    except (OSError, sqlite3.OperationalError) as e:
+    except Exception as e:  # noqa: BLE001 — re-raise non-availability failures
+        if not _is_profile_db_availability_error(e):
+            raise
         from src.provider_config_runtime import mark_provider_config_setup_required
 
         provider_config_ready = False

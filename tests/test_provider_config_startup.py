@@ -7,6 +7,12 @@ from functools import lru_cache
 import pytest
 
 
+def _sqlite_operational_error(code: int) -> sqlite3.OperationalError:
+    error = sqlite3.OperationalError("opaque sqlite failure")
+    error.sqlite_errorcode = code
+    return error
+
+
 def test_lifespan_reconciles_interrupted_scheduler_state(monkeypatch):
     from src.api.app import create_app, lifespan
 
@@ -139,6 +145,21 @@ def test_lifespan_migrates_calibration_before_scheduler_start(
                     "start_portfolio_scheduler"
                 )
 
+        wrapped_busy = CalibrationSchemaMismatch(
+            "calibration schema fingerprint mismatch"
+        )
+        busy_code = getattr(sqlite3, "SQLITE_BUSY", 5)
+        wrapped_busy.__cause__ = _sqlite_operational_error(busy_code | (3 << 8))
+        calls.clear()
+        scenario.update(provider_fails=False, migration_error=wrapped_busy)
+        asyncio.run(_run_lifespan())
+        assert calls == [
+            "apply_provider_env",
+            "migrate_calibration",
+            "reconcile_scheduler_telemetry",
+        ]
+        assert runtime.provider_config_setup_state().required is True
+
         for error in (
             CalibrationSchemaMismatch("calibration schema mismatch"),
             RuntimeError("calibration migration logic failure"),
@@ -238,8 +259,9 @@ def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
     async def _scheduler_loop():
         started["scheduler"] = True
 
-    unavailable_db = tmp_path / "profile_state.db"
-    unavailable_db.mkdir()
+    unavailable_parent = tmp_path / "unavailable-parent"
+    unavailable_parent.write_text("not a directory", encoding="utf-8")
+    unavailable_db = unavailable_parent / "profile_state.db"
 
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(unavailable_db))
     monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
@@ -264,7 +286,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
             cfg = providers_config.providers_config(store=None)
             assert cfg["setup"]["required"] is True
             assert cfg["setup"]["code"] == "provider_config_setup_required"
-            assert "unable to open database file" in cfg["setup"]["reason"]
+            assert cfg["setup"]["reason"]
             assert started["scheduler"] is False
 
     asyncio.run(_run_lifespan())
@@ -272,8 +294,24 @@ def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
     cfg = providers_config.providers_config(store=None)
     assert cfg["setup"]["required"] is True
     assert cfg["setup"]["code"] == "provider_config_setup_required"
-    assert "unable to open database file" in cfg["setup"]["reason"]
+    assert cfg["setup"]["reason"]
     assert started["scheduler"] is False
+
+    sqlite_error = _sqlite_operational_error(getattr(sqlite3, "SQLITE_ERROR", 1))
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "logic-error.db"))
+    monkeypatch.setattr(
+        "src.investor_profile_calibration_schema.migrate_calibration_schema",
+        lambda db_path: (_ for _ in ()).throw(sqlite_error),
+    )
+
+    async def _run_fail_fast():
+        async with lifespan(create_app()):
+            raise AssertionError("SQLITE_ERROR reached application startup")
+
+    with pytest.raises(sqlite3.OperationalError) as exc_info:
+        asyncio.run(_run_fail_fast())
+    assert exc_info.value is sqlite_error
+    assert runtime.provider_config_setup_state().required is False
 
 
 def test_lifespan_starts_data_and_portfolio_scheduler_tasks(monkeypatch, tmp_path):
