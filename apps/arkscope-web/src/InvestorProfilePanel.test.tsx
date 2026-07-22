@@ -9,7 +9,18 @@ import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InvestorProfilePanel } from "./InvestorProfilePanel";
-import type { CalibrationProposal, CalibrationState, InvestorProfileResponse } from "./api";
+import type {
+  CalibrationMessage,
+  CalibrationProposal,
+  CalibrationSession,
+  CalibrationState,
+  CalibrationTurn,
+  InvestorProfileResponse,
+} from "./api";
+import type { SettingsNavigationGuard } from "./settings/settingsNavigationGuard";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -86,94 +97,26 @@ const populatedResponse = (): InvestorProfileResponse => {
   return response;
 };
 
-const populatedCalibration = (): CalibrationState => ({
-  active_session: {
-    id: "session-source-1",
-    status: "active",
-    created_at: "2026-07-21T01:00:00Z",
-    updated_at: "2026-07-21T01:01:00Z",
-    closed_at: null,
-  },
-  sessions: [{
-    id: "session-source-1",
-    status: "active",
-    created_at: "2026-07-21T01:00:00Z",
-    updated_at: "2026-07-21T01:01:00Z",
-    closed_at: null,
-  }],
-  messages: [
-    {
-      id: "message-source-user",
-      session_id: "session-source-1",
-      role: "user",
-      content: "SOURCE_USER_MESSAGE",
-      created_at: "2026-07-21T01:00:00Z",
-    },
-    {
-      id: "message-source-assistant",
-      session_id: "session-source-1",
-      role: "assistant",
-      content: "SOURCE_ASSISTANT_MESSAGE",
-      created_at: "2026-07-21T01:01:00Z",
-    },
-  ],
-  latest_proposal: {
-    id: "proposal-source-1",
-    session_id: "session-source-1",
-    status: "draft",
-    profile_patch: {
-      risk_appetite: 9,
-      risk_capacity: 3,
-      risk_mismatch: "appetite_above_capacity",
-      default_stance: "valuation_rationalist",
-    },
-    raw_profile_patch: {
-      risk_appetite: 9,
-      risk_capacity: 3,
-      default_stance: "valuation_rationalist",
-    },
-    rationales: {
-      risk_capacity: "SOURCE_PROPOSAL_RATIONALE",
-    },
-    changed_fields: ["risk_appetite", "risk_capacity", "default_stance"],
-    created_at: "2026-07-21T01:02:00Z",
-    approved_at: null,
-    rejected_at: null,
-  },
-});
-
-type PanelApiResponse =
-  | InvestorProfileResponse
-  | CalibrationState
-  | { profile: InvestorProfileResponse["profile"]; proposal: Partial<CalibrationProposal> }
-  | { proposal: Partial<CalibrationProposal> };
-
-function stubFetch(handler: (url: string, init?: RequestInit) => PanelApiResponse) {
-  const calls: Array<{ url: string; method: string; body: unknown }> = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (url: unknown, init?: RequestInit) => {
-      const u = String(url);
-      calls.push({
-        url: u,
-        method: init?.method ?? "GET",
-        body: init?.body ? JSON.parse(String(init.body)) : null,
-      });
-      return new Response(JSON.stringify(handler(u, init)), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }),
-  );
-  return calls;
-}
-
-async function mount(developerMode = false) {
+async function mount(
+  developerMode = false,
+  options: {
+    onNavigationGuardChange?: (guard: SettingsNavigationGuard) => void;
+    onNavigateToProviders?: () => void;
+    turnIdFactory?: () => string;
+  } = {},
+) {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(<InvestorProfilePanel developerMode={developerMode} />);
+    root!.render(
+      <InvestorProfilePanel
+        developerMode={developerMode}
+        onNavigationGuardChange={options.onNavigationGuardChange}
+        onNavigateToProviders={options.onNavigateToProviders}
+        turnIdFactory={options.turnIdFactory}
+      />,
+    );
   });
 }
 
@@ -194,6 +137,190 @@ async function buttonByText(text: string): Promise<HTMLButtonElement> {
   throw new Error(`button not found: ${text}; text=${host?.textContent ?? ""}`);
 }
 
+function calibrationSession(
+  overrides: Partial<CalibrationSession> = {},
+): CalibrationSession {
+  return {
+    id: "session-1",
+    status: "active",
+    interview_version: 1,
+    covered_topics: [],
+    current_topic_id: "loss_response",
+    current_question_message_id: "question-1",
+    superseded_reason: null,
+    created_at: "2026-07-21T01:00:00Z",
+    updated_at: "2026-07-21T01:01:00Z",
+    closed_at: null,
+    ...overrides,
+  };
+}
+
+function calibrationMessage(
+  overrides: Partial<CalibrationMessage> = {},
+): CalibrationMessage {
+  return {
+    id: "question-1",
+    session_id: "session-1",
+    role: "assistant",
+    content: "CANONICAL_OPENING_SOURCE",
+    turn_id: null,
+    topic_id: "loss_response",
+    prompt_id: "loss_response.opening.v1",
+    created_at: "2026-07-21T01:00:00Z",
+    ...overrides,
+  };
+}
+
+function calibrationTurn(overrides: Partial<CalibrationTurn> = {}): CalibrationTurn {
+  return {
+    id: "turn-source-1",
+    session_id: "session-1",
+    kind: "answer",
+    status: "interrupted",
+    question_message_id: "question-1",
+    addressed_topic_id: "loss_response",
+    next_topic_id: null,
+    error_code: null,
+    diagnostic: null,
+    attempt_count: 1,
+    created_at: "2026-07-21T01:02:00Z",
+    updated_at: "2026-07-21T01:03:00Z",
+    completed_at: null,
+    ...overrides,
+  };
+}
+
+function calibrationProposal(
+  overrides: Partial<CalibrationProposal> = {},
+): CalibrationProposal {
+  return {
+    id: "proposal-1",
+    session_id: "session-1",
+    status: "draft",
+    profile_patch: {
+      risk_capacity: 6,
+      concentration_limit_pct: 18,
+    },
+    proposed_fields: ["risk_capacity", "concentration_limit_pct"],
+    covered_topics: ["financial_capacity", "single_position_limit"],
+    rationales: {
+      risk_capacity: "SOURCE_RISK_CAPACITY_RATIONALE",
+      concentration_limit_pct: "SOURCE_CONCENTRATION_RATIONALE",
+    },
+    conflict_fields: [],
+    created_at: "2026-07-21T01:04:00Z",
+    approved_at: null,
+    rejected_at: null,
+    conflicted_at: null,
+    superseded_at: null,
+    superseded_reason: null,
+    ...overrides,
+  };
+}
+
+function emptyCalibration(overrides: Partial<CalibrationState> = {}): CalibrationState {
+  return {
+    active_session: null,
+    sessions: [],
+    messages: [],
+    pending_turn: null,
+    latest_proposal: null,
+    topic_catalog: [
+      "loss_response",
+      "financial_capacity",
+      "time_horizon",
+      "single_position_limit",
+      "risk_avoidances",
+      "behavioral_patterns",
+      "investment_approach",
+      "assistant_style",
+    ],
+    ...overrides,
+  };
+}
+
+function activeCalibration(overrides: Partial<CalibrationState> = {}): CalibrationState {
+  const active = calibrationSession();
+  return emptyCalibration({
+    active_session: active,
+    sessions: [active],
+    messages: [calibrationMessage()],
+    ...overrides,
+  });
+}
+
+type ApiCall = { url: string; method: string; body: unknown };
+type ApiResult = unknown | Response | undefined;
+
+function apiRoutes(options: {
+  profile?: InvestorProfileResponse;
+  calibration?: CalibrationState;
+  handle?: (call: ApiCall) => ApiResult | Promise<ApiResult>;
+} = {}) {
+  const calls: ApiCall[] = [];
+  const profile = options.profile ?? populatedResponse();
+  const calibration = options.calibration ?? emptyCalibration();
+  vi.stubGlobal("fetch", vi.fn(async (url: unknown, init?: RequestInit) => {
+    const call: ApiCall = {
+      url: String(url),
+      method: init?.method ?? "GET",
+      body: init?.body ? JSON.parse(String(init.body)) : null,
+    };
+    calls.push(call);
+    const handled = await options.handle?.(call);
+    if (handled instanceof Response) return handled;
+    const body = handled ?? (
+      call.url.endsWith("/profile/investor/calibration")
+        ? calibration
+        : profile
+    );
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }));
+  return calls;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function clickButton(text: string) {
+  const button = await buttonByText(text);
+  await act(async () => {
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  });
+  await flush();
+  return button;
+}
+
+async function setControlValue(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
+  const prototype = control instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype
+    : control instanceof HTMLSelectElement
+      ? HTMLSelectElement.prototype
+      : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+  await act(async () => {
+    setter?.call(control, value);
+    control.dispatchEvent(new Event("input", { bubbles: true }));
+    control.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
+async function useEnglish() {
+  await act(async () => {
+    await i18n.changeLanguage("en");
+  });
+}
+
 describe("InvestorProfilePanel", () => {
   it("pending_profile_request_uses_loading_state_not_bare_text", async () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
@@ -201,129 +328,131 @@ describe("InvestorProfilePanel", () => {
     expect(host!.querySelector('[data-state="loading"]')?.textContent).toContain("載入投資人設定");
   });
 
+
   it("request_failure_uses_alert_semantics", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("profile request failed");
     }));
     await mount();
     await flush();
-    expect(host!.querySelector('[role="alert"]')?.textContent).toBe("要求失敗，請稍後再試。");
+    expect(host!.querySelector('[role="alert"]')?.textContent).toBe("無法載入投資人設定。");
   });
 
   it("loads_default_disabled_profile", async () => {
-    const calls = stubFetch(() => disabledResponse());
-    await mount();
-    expect(calls[0].url).toContain("/profile/investor");
-    expect(calls[0].method).toBe("GET");
-    const checkbox = host!.querySelector<HTMLInputElement>("input[type=checkbox]");
-    expect(checkbox?.checked).toBe(false);
-    expect(host!.textContent).toContain("投資人設定");
-    expect(host!.textContent).toContain(
-      "啟用後,助手依你的風險輪廓與所選立場調整分析重點;證據蒐集與反方論點完全不受影響。",
-    );
-    expect(host!.textContent).toContain("技能模式:off(技能建議屬後續階段,尚未啟用)");
-    expect(Array.from(host!.querySelectorAll('option[value=""]'), (option) => option.textContent))
-      .toEqual(["未設定", "未設定"]);
-    for (const expected of [
-      "啟用個人化(目前生效立場:關閉)",
-      "風險承受能力(1-10)",
-      "想避開的(逗號分隔)",
-      "行為傾向(供助手校準,非診斷)",
-      "自由描述(目標、自我觀察、想被怎麼協助)",
-    ]) {
-      expect.soft(host!.textContent).toContain(expected);
-    }
-  });
-
-  it("disabled_profile_shows_effective_off", async () => {
-    stubFetch(() => disabledResponse());
-    await mount();
-    expect(host!.textContent).toContain("關閉"); // effective stance off label
-  });
-
-  it("draft_button_posts_profile_without_saving", async () => {
-    const calls = stubFetch((url) => {
-      const resp = disabledResponse();
-      if (url.endsWith("/draft")) {
-        resp.profile.enabled = true;
-        resp.profile.risk_appetite = 8;
-        resp.profile.risk_capacity = 4;
-        resp.profile.risk_mismatch = "appetite_above_capacity";
-      }
-      return resp;
-    });
-    await mount();
-    const draftBtn = Array.from(host!.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("產生設定草稿"),
-    )!;
-    await act(async () => {
-      draftBtn.click();
-    });
-    const draftCall = calls.find((c) => c.url.endsWith("/profile/investor/draft"));
-    expect(draftCall?.method).toBe("POST");
-    expect(calls.some((c) => c.method === "PUT")).toBe(false);
-    expect(host!.textContent).toContain("風險意願高於承受能力");
-    expect(host!.textContent).toContain("風險意願(1-10)");
-    expect(host!.textContent).toContain("風險意願與風險承受能力:");
-    expect(host!.textContent).not.toContain("風險胃納");
-    expect(host!.querySelector('[data-state="ready"]')?.textContent)
-      .toBe("草稿已產生(未儲存)");
-  });
-
-  it("save_button_puts_profile", async () => {
-    const calls = stubFetch((url, init) => {
-      const resp = disabledResponse();
-      if (init?.method === "PUT") {
-        resp.profile.enabled = true;
-        resp.effective_stance = "complementary";
-        resp.trace.profile_active = true;
-        resp.trace.assistant_stance = "complementary";
-      }
-      return resp;
-    });
-    await mount();
-    const saveBtn = await buttonByText("儲存設定");
-    await act(async () => {
-      saveBtn.click();
-    });
-    const putCall = calls.find((c) => c.method === "PUT");
-    expect(putCall?.url).toContain("/profile/investor");
-    expect(host!.textContent).toContain("互補投資人");
-    expect(host!.querySelector('[data-state="ready"]')?.textContent).toContain("已儲存");
-  });
-
-  it("shows_a_running_state_while_a_profile_mutation_is_pending", async () => {
-    let finishSave: ((response: Response) => void) | null = null;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((url: unknown, init?: RequestInit) => {
-        const target = String(url);
-        if (target.endsWith("/profile/investor") && init?.method === "PUT") {
-          return new Promise<Response>((resolve) => {
-            finishSave = resolve;
-          });
-        }
-        const body = target.endsWith("/profile/investor/calibration")
-          ? { active_session: null, sessions: [], messages: [], latest_proposal: null }
-          : disabledResponse();
-        return Promise.resolve(new Response(JSON.stringify(body), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }));
-      }),
-    );
+    apiRoutes({ profile: disabledResponse(), calibration: emptyCalibration() });
     await mount();
     await flush();
 
-    const saveBtn = await buttonByText("儲存設定");
-    await act(async () => saveBtn.click());
+    expect(host!.textContent).toContain("投資人設定摘要");
+    expect(host!.textContent).toContain("個人化已關閉");
+    expect(host!.textContent).toContain("目前沒有進行中的引導式校準");
+    expect(host!.textContent).toContain("目前未啟用個人化");
+    expect(host!.querySelector(".ip-grid")).toBeNull();
+    expect(await buttonByText("編輯設定")).not.toBeNull();
+    expect(await buttonByText("開始校準")).not.toBeNull();
+  });
+
+  it("disabled_profile_shows_effective_off", async () => {
+    apiRoutes({ profile: disabledResponse(), calibration: emptyCalibration() });
+    await mount();
+    await flush();
+
+    expect(host!.textContent).toContain("目前生效的助手立場");
+    expect(host!.textContent).toContain("關閉");
+    expect(host!.textContent).toContain("助手不會套用投資人設定重點");
+  });
+
+  it("draft_button_posts_profile_without_saving", async () => {
+    await useEnglish();
+    const drafted = populatedResponse();
+    drafted.profile.risk_appetite = 9;
+    drafted.profile.risk_capacity = 3;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => call.url.endsWith("/profile/investor/draft") ? drafted : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await setControlValue(
+      host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!,
+      "SOURCE_DRAFT_INPUT",
+    );
+    await clickButton("Generate draft");
+
+    expect(calls.find((call) => call.url.endsWith("/profile/investor/draft"))).toMatchObject({
+      method: "POST",
+      body: {
+        concentration_limit_pct: 25,
+        preferred_edge: ["growth", "SOURCE_CUSTOM_EDGE"],
+        avoidances: ["SOURCE_AVOID_LEVERAGE", "SOURCE_AVOID_HYPE"],
+        behavioral_flags: ["FOMO", "SOURCE_CUSTOM_FLAG"],
+        freeform_notes: "SOURCE_DRAFT_INPUT",
+      },
+    });
+    expect(calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(host!.textContent).toContain("Edit Investor Profile");
+    expect(host!.querySelector('[data-state="ready"]')?.textContent)
+      .toContain("Draft generated (not saved)");
+  });
+
+  it("save_button_puts_profile", async () => {
+    await useEnglish();
+    const initial = populatedResponse();
+    const refreshed = populatedResponse();
+    refreshed.effective_stance = "valuation_rationalist";
+    let profileGets = 0;
+    const calls = apiRoutes({
+      profile: initial,
+      calibration: emptyCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return profileGets === 1 ? initial : refreshed;
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "PUT") return initial;
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await clickButton("Save profile");
+
+    expect(calls.find((call) => call.method === "PUT")?.url).toContain("/profile/investor");
+    expect(profileGets).toBe(2);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Valuation rationalist");
+    expect(Array.from(host!.querySelectorAll('[data-state="ready"]'))
+      .some((node) => node.textContent?.includes("Saved"))).toBe(true);
+  });
+
+  it("shows_a_running_state_while_a_profile_mutation_is_pending", async () => {
+    await useEnglish();
+    const pendingSave = deferred<Response>();
+    const guards: SettingsNavigationGuard[] = [];
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => call.method === "PUT" ? pendingSave.promise : undefined,
+    });
+    await mount(false, { onNavigationGuardChange: (guard) => guards.push(guard) });
+    await flush();
+    await clickButton("Edit profile");
+    await clickButton("Save profile");
 
     expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
     expect(host!.querySelector('[data-state="running"]')?.textContent)
-      .toBe("正在更新投資人設定");
+      .toBe("Updating Investor Profile");
+    expect(guards.at(-1)).toEqual({
+      dirty: false,
+      busy: true,
+      reason: "Wait for the current Investor Profile update to finish.",
+    });
 
     await act(async () => {
-      finishSave?.(new Response(JSON.stringify(disabledResponse()), {
+      pendingSave.resolve(new Response(JSON.stringify(populatedResponse()), {
         status: 200,
         headers: { "content-type": "application/json" },
       }));
@@ -333,237 +462,94 @@ describe("InvestorProfilePanel", () => {
   });
 
   it("starts_calibration_sends_message_and_shows_proposal_rationale", async () => {
-    let finishInitialCalibration: ((response: Response) => void) | null = null;
-    const session: CalibrationState["active_session"] = {
-      id: "s1",
-      status: "active",
-      created_at: "t",
-      updated_at: "t",
-      closed_at: null,
-    };
-    const actionState: CalibrationState = {
-      active_session: session,
-      sessions: [session!],
-      messages: [],
-      latest_proposal: null,
-    };
-    const proposalState: CalibrationState = {
-      active_session: session,
-      sessions: [session!],
-      messages: [
-        { id: "m1", session_id: "s1", role: "user", content: "I chase AI stocks.", created_at: "t" },
-        { id: "m2", session_id: "s1", role: "assistant", content: "Draft ready.", created_at: "t" },
-      ],
-      latest_proposal: {
-        id: "p1",
-        session_id: "s1",
-        status: "draft",
-        profile_patch: {
-          enabled: true,
-          risk_appetite: 8,
-          risk_capacity: 4,
-          risk_mismatch: "appetite_above_capacity",
-          default_stance: "complementary",
-        },
-        raw_profile_patch: { enabled: true, risk_appetite: 8, risk_capacity: 4, default_stance: "complementary" },
-        rationales: { risk_capacity: "User said 10% drawdown would likely trigger selling." },
-        changed_fields: [],
-        created_at: "t",
-        approved_at: null,
-        rejected_at: null,
+    await useEnglish();
+    const started = activeCalibration();
+    const proposal = calibrationProposal({
+      rationales: {
+        risk_capacity: "SOURCE_PROPOSAL_RATIONALE",
+        concentration_limit_pct: "SOURCE_CONCENTRATION_RATIONALE",
       },
-    };
-    vi.stubGlobal("fetch", vi.fn((url: unknown, init?: RequestInit) => {
-      const target = String(url);
-      const method = init?.method ?? "GET";
-      if (target.endsWith("/profile/investor") && method === "GET") {
-        return Promise.resolve(new Response(JSON.stringify(disabledResponse()), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }));
-      }
-      if (target.endsWith("/profile/investor/calibration") && method === "GET") {
-        return new Promise<Response>((resolveRequest) => {
-          finishInitialCalibration = resolveRequest;
-        });
-      }
-      const body = target.endsWith("/profile/investor/calibration/messages")
-        ? proposalState
-        : actionState;
-      return Promise.resolve(new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-    }));
-    await mount();
+    });
+    const completed = activeCalibration({
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "source-user",
+          role: "user",
+          content: "SOURCE_CALIBRATION_ANSWER",
+          turn_id: "turn-guided-1",
+          prompt_id: null,
+        }),
+        calibrationMessage({
+          id: "source-assistant",
+          content: "SOURCE_ASSISTANT_FOLLOWUP",
+          turn_id: "turn-guided-1",
+          topic_id: "financial_capacity",
+          prompt_id: null,
+        }),
+      ],
+      latest_proposal: proposal,
+    });
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/calibration/sessions")) return started;
+        if (call.url.endsWith("/calibration/messages")) return completed;
+        return undefined;
+      },
+    });
+    await mount(false, { turnIdFactory: () => "turn-guided-1" });
     await flush();
-
-    const startBtn = await buttonByText("開始校準對話");
-    await act(async () => {
-      startBtn.click();
-    });
-    const startOutcome = Array.from(host!.querySelectorAll('[data-state="ready"]'))
-      .map((node) => node.textContent ?? "")
-      .find((text) => text.includes("校準"));
-    const textarea = host!.querySelector<HTMLTextAreaElement>('textarea[aria-label="校準訊息"]')!;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype,
-        "value",
-      )!.set!;
-      setter.call(textarea, "I chase AI stocks.");
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    const sendBtn = await buttonByText("送出校準訊息");
-    await act(async () => {
-      sendBtn.click();
-    });
-    const updatedOutcome = Array.from(host!.querySelectorAll('[data-state="ready"]'))
-      .map((node) => node.textContent ?? "")
-      .find((text) => text.includes("校準"));
-
-    const staleInitial: CalibrationState = {
-      active_session: null,
-      sessions: [],
-      messages: [{
-        id: "stale-initial",
-        session_id: "stale-session",
-        role: "assistant",
-        content: "STALE_INITIAL_CALIBRATION",
-        created_at: "t0",
-      }],
-      latest_proposal: null,
-    };
-    await act(async () => {
-      finishInitialCalibration?.(new Response(JSON.stringify(staleInitial), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-      await Promise.resolve();
-    });
-    await flush();
-
-    expect(startOutcome).toContain("校準對話已開始");
-    expect(updatedOutcome).toContain("校準回覆已更新");
-    expect(host!.textContent).toContain("Draft ready.");
-    expect(host!.textContent).toContain("User said 10% drawdown");
-    expect(host!.textContent).toContain("風險承受能力");
-    expect(host!.textContent).not.toContain("STALE_INITIAL_CALIBRATION");
-    expect(host!.textContent).toContain(
-      "校準對話只用來整理投資人輪廓,不是投資建議或個股推薦。只有你核准的結構化設定會影響研究;原始對話不會進入研究 prompt。",
+    await clickButton("Start Calibration");
+    await setControlValue(
+      host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!,
+      "SOURCE_CALIBRATION_ANSWER",
     );
-    expect(host!.querySelector('[data-state="partial"]')?.textContent).toBe("待核准校準提案");
-    expect(await buttonByText("套用校準提案")).toBeTruthy();
+    await clickButton("Send answer");
+
+    expect(calls.find((call) => call.url.endsWith("/calibration/messages"))?.body).toEqual({
+      turn_id: "turn-guided-1",
+      session_id: "session-1",
+      content: "SOURCE_CALIBRATION_ANSWER",
+    });
+    expect(host!.textContent).toContain("Proposal review");
+    expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
 
     dispose();
-    const sendFailure = "PLANTED_CURRENT_SEND_FAILURE";
-    vi.stubGlobal("fetch", vi.fn(async (url: unknown, init?: RequestInit) => {
-      const target = String(url);
-      const method = init?.method ?? "GET";
-      if (target.endsWith("/profile/investor") && method === "GET") {
-        return new Response(JSON.stringify(disabledResponse()), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      if (target.endsWith("/profile/investor/calibration") && method === "GET") {
-        return new Response(JSON.stringify(actionState), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      if (target.endsWith("/profile/investor/calibration/messages")) {
-        throw new Error(sendFailure);
-      }
-      throw new Error(`unexpected request: ${method} ${target}`);
-    }));
-    await mount(true);
-    await flush();
-    await flush();
-
-    const failedDraft = host!.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="校準訊息"]',
-    )!;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype,
-        "value",
-      )!.set!;
-      setter.call(failedDraft, "SOURCE_FAILED_SEND_DRAFT");
-      failedDraft.dispatchEvent(new Event("input", { bubbles: true }));
+    const pendingTurns: Array<ReturnType<typeof deferred<Response>>> = [];
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration(),
+      handle: (call) => {
+        if (!call.url.endsWith("/calibration/messages")) return undefined;
+        const pending = deferred<Response>();
+        pendingTurns.push(pending);
+        return pending.promise;
+      },
     });
-    const failedSend = await buttonByText("送出校準訊息");
-    await act(async () => { failedSend.click(); });
+    let turnSequence = 0;
+    await mount(false, { turnIdFactory: () => `turn-race-${++turnSequence}` });
     await flush();
-
-    expect.soft(failedDraft.value).toBe("");
-    expect(host!.querySelector('[role="alert"]')?.textContent).toBe("要求失敗，請稍後再試。");
-    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent).toContain(sendFailure);
-
-    dispose();
-    const deferredMessages: Array<{
-      resolve: (response: Response) => void;
-      reject: (error: Error) => void;
-    }> = [];
-    vi.stubGlobal("fetch", vi.fn((url: unknown, init?: RequestInit) => {
-      const target = String(url);
-      const method = init?.method ?? "GET";
-      if (target.endsWith("/profile/investor") && method === "GET") {
-        return Promise.resolve(new Response(JSON.stringify(disabledResponse()), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }));
-      }
-      if (target.endsWith("/profile/investor/calibration") && method === "GET") {
-        return Promise.resolve(new Response(JSON.stringify(actionState), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }));
-      }
-      if (target.endsWith("/profile/investor/calibration/messages")) {
-        return new Promise<Response>((resolveRequest, rejectRequest) => {
-          deferredMessages.push({ resolve: resolveRequest, reject: rejectRequest });
-        });
-      }
-      return Promise.reject(new Error(`unexpected request: ${method} ${target}`));
-    }));
-    await mount(true);
-    await flush();
-    await flush();
-
-    const doubleDraft = host!.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="校準訊息"]',
-    )!;
-    const setDoubleDraft = async (value: string) => {
-      await act(async () => {
-        const setter = Object.getOwnPropertyDescriptor(
-          window.HTMLTextAreaElement.prototype,
-          "value",
-        )!.set!;
-        setter.call(doubleDraft, value);
-        doubleDraft.dispatchEvent(new Event("input", { bubbles: true }));
-      });
-    };
-    await setDoubleDraft("SOURCE_DOUBLE_SEND_SUCCESS");
-    const doubleSend = await buttonByText("送出校準訊息");
+    await clickButton("Continue Calibration");
+    const answer = host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!;
+    await setControlValue(answer, "SOURCE_GENERATION_DRAFT");
+    const send = await buttonByText("Send answer");
     await act(async () => {
-      doubleSend.click();
-      doubleSend.click();
+      send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
     });
-    expect(deferredMessages).toHaveLength(2);
+    expect(pendingTurns).toHaveLength(2);
 
-    const staleSuccess: CalibrationState = {
-      ...actionState,
-      messages: [{
-        id: "stale-double-success",
-        session_id: "s1",
-        role: "assistant",
-        content: "STALE_DOUBLE_SUCCESS",
-        created_at: "t",
-      }],
-    };
     await act(async () => {
-      deferredMessages[0]!.resolve(new Response(JSON.stringify(staleSuccess), {
+      pendingTurns[0].resolve(new Response(JSON.stringify(activeCalibration({
+        messages: [calibrationMessage({
+          id: "stale-generation",
+          content: "STALE_GENERATION_MESSAGE",
+          prompt_id: null,
+        })],
+      })), {
         status: 200,
         headers: { "content-type": "application/json" },
       }));
@@ -571,213 +557,304 @@ describe("InvestorProfilePanel", () => {
     });
     await flush();
     expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
-    expect(doubleDraft.value).toBe("SOURCE_DOUBLE_SEND_SUCCESS");
-    expect(host!.textContent).not.toContain("STALE_DOUBLE_SUCCESS");
-    expect(host!.querySelector('[role="alert"]')).toBeNull();
+    expect(answer.value).toBe("SOURCE_GENERATION_DRAFT");
+    expect(host!.textContent).not.toContain("STALE_GENERATION_MESSAGE");
 
-    const latestSuccess: CalibrationState = {
-      ...actionState,
-      messages: [{
-        id: "latest-double-success",
-        session_id: "s1",
-        role: "assistant",
-        content: "LATEST_DOUBLE_SUCCESS",
-        created_at: "t",
-      }],
-    };
     await act(async () => {
-      deferredMessages[1]!.resolve(new Response(JSON.stringify(latestSuccess), {
+      pendingTurns[1].resolve(new Response(JSON.stringify(activeCalibration({
+        messages: [calibrationMessage({
+          id: "latest-generation",
+          content: "LATEST_GENERATION_MESSAGE",
+          prompt_id: null,
+        })],
+      })), {
         status: 200,
         headers: { "content-type": "application/json" },
       }));
       await Promise.resolve();
     });
     await flush();
-    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("false");
-    expect(doubleDraft.value).toBe("");
-    expect(host!.textContent).toContain("LATEST_DOUBLE_SUCCESS");
-    expect(host!.querySelector('[data-state="ready"]')?.textContent).toBe("校準回覆已更新");
+    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBeNull();
+    expect(answer.value).toBe("");
+    expect(host!.textContent).toContain("LATEST_GENERATION_MESSAGE");
 
-    await setDoubleDraft("SOURCE_DOUBLE_SEND_ERROR");
+    await setControlValue(answer, "SOURCE_GENERATION_ERROR_DRAFT");
     await act(async () => {
-      doubleSend.click();
-      doubleSend.click();
+      send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
     });
-    expect(deferredMessages).toHaveLength(4);
+    expect(pendingTurns).toHaveLength(4);
     await act(async () => {
-      deferredMessages[2]!.reject(new Error("STALE_DOUBLE_ERROR"));
+      pendingTurns[2].reject(new Error("STALE_GENERATION_ERROR"));
       await Promise.resolve();
     });
     await flush();
     expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
-    expect(doubleDraft.value).toBe("SOURCE_DOUBLE_SEND_ERROR");
+    expect(answer.value).toBe("SOURCE_GENERATION_ERROR_DRAFT");
     expect(host!.querySelector('[role="alert"]')).toBeNull();
-    expect(host!.textContent).not.toContain("STALE_DOUBLE_ERROR");
+    expect(host!.textContent).not.toContain("STALE_GENERATION_ERROR");
 
-    const latestAfterStaleError: CalibrationState = {
-      ...actionState,
-      messages: [{
-        id: "latest-after-stale-error",
-        session_id: "s1",
-        role: "assistant",
-        content: "LATEST_AFTER_STALE_ERROR",
-        created_at: "t",
-      }],
-    };
     await act(async () => {
-      deferredMessages[3]!.resolve(new Response(JSON.stringify(latestAfterStaleError), {
+      pendingTurns[3].resolve(new Response(JSON.stringify(activeCalibration({
+        messages: [calibrationMessage({
+          id: "latest-after-stale-error",
+          content: "LATEST_AFTER_STALE_ERROR",
+          prompt_id: null,
+        })],
+      })), {
         status: 200,
         headers: { "content-type": "application/json" },
       }));
       await Promise.resolve();
     });
     await flush();
-    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("false");
-    expect(doubleDraft.value).toBe("");
+    expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBeNull();
+    expect(answer.value).toBe("");
     expect(host!.textContent).toContain("LATEST_AFTER_STALE_ERROR");
-    expect(host!.textContent).not.toContain("STALE_DOUBLE_ERROR");
-    expect(host!.querySelector('[data-state="ready"]')?.textContent).toBe("校準回覆已更新");
+    expect(host!.textContent).not.toContain("STALE_GENERATION_ERROR");
   });
 
   it("approves_calibration_proposal_through_dedicated_endpoint", async () => {
-    const approvedResponse = disabledResponse();
-    approvedResponse.profile = {
-      ...approvedResponse.profile,
-      enabled: true,
-      primary_preset: "income",
-      risk_appetite: 6,
-      risk_capacity: 5,
-      freeform_notes: "SOURCE_APPROVED_PROFILE",
-    };
-    approvedResponse.effective_stance = "complementary";
-    approvedResponse.trace.profile_active = true;
-    approvedResponse.trace.assistant_stance = "complementary";
-    const refreshFailure = "PLANTED_APPROVED_REFRESH_FAILURE";
-    let approved = false;
-    let failedApprovedRefresh = false;
-    const calls = stubFetch((url) => {
-      if (url.includes("/profile/investor/calibration/proposals/p1/approve")) {
-        approved = true;
-        return {
-          profile: approvedResponse.profile,
-          proposal: { id: "p1", status: "approved", approved_at: "t" },
-        };
-      }
-      if (url.includes("/profile/investor/calibration/proposals/p1/reject")) {
-        return { proposal: { id: "p1", status: "rejected", rejected_at: "t" } };
-      }
-      if (url.endsWith("/profile/investor/calibration/sessions")) {
-        return {
-          active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
-          sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
-          messages: [],
-          latest_proposal: null,
-        };
-      }
-      if (url.endsWith("/profile/investor/calibration/messages")) {
-        return {
-          active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
-          sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
-          messages: [
-            { id: "m1", session_id: "s1", role: "user", content: "I chase AI stocks.", created_at: "t" },
-            { id: "m2", session_id: "s1", role: "assistant", content: "Draft ready.", created_at: "t" },
-          ],
-          latest_proposal: {
-            id: "p1",
-            session_id: "s1",
-            status: "draft",
-            profile_patch: { enabled: true, risk_appetite: 8, risk_capacity: 4, default_stance: "complementary" },
-            raw_profile_patch: {},
-            rationales: {},
-            changed_fields: [],
-            created_at: "t",
-            approved_at: null,
-            rejected_at: null,
-          },
-        };
-      }
-      if (url.endsWith("/profile/investor/calibration")) {
-        if (approved && !failedApprovedRefresh) {
-          failedApprovedRefresh = true;
-          throw new Error(refreshFailure);
+    await useEnglish();
+    const proposal = calibrationProposal();
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.includes("/approve")) {
+          return {
+            profile: populatedResponse().profile,
+            proposal: { ...proposal, status: "approved" },
+          };
         }
-        return {
-          active_session: null,
-          sessions: [],
-          messages: [],
-          latest_proposal: null,
-        };
-      }
-      if (url.endsWith("/profile/investor")) {
-        return approved ? approvedResponse : disabledResponse();
-      }
-      return disabledResponse();
+        if (call.url.endsWith("/profile/investor/calibration")) {
+          calibrationGets += 1;
+          return calibrationGets === 1
+            ? activeCalibration({ latest_proposal: proposal })
+            : emptyCalibration();
+        }
+        return undefined;
+      },
     });
-    await mount(true);
+    await mount();
     await flush();
-    await flush();
-    expect(calls.some((c) => c.url.endsWith("/profile/investor/calibration"))).toBe(true);
-    const startBtn = await buttonByText("開始校準對話");
-    await act(async () => {
-      startBtn.click();
-    });
-    const textarea = host!.querySelector<HTMLTextAreaElement>('textarea[aria-label="校準訊息"]')!;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype,
-        "value",
-      )!.set!;
-      setter.call(textarea, "I chase AI stocks.");
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    const sendBtn = await buttonByText("送出校準訊息");
-    await act(async () => {
-      sendBtn.click();
-    });
-    const approveBtn = await buttonByText("套用");
-    await act(async () => {
-      approveBtn.click();
-    });
-    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
 
-    const approve = calls.find((c) => c.url.includes("/proposals/p1/approve"));
-    expect(approve).toBeTruthy();
-    expect(approve?.method).toBe("POST");
-    const approvedSelects = host!.querySelectorAll<HTMLSelectElement>(".ip-grid select");
-    expect.soft(approvedSelects[0]?.value).toBe("income");
-    expect.soft(approvedSelects[1]?.value).toBe("6");
-    expect.soft(approvedSelects[2]?.value).toBe("5");
-    expect.soft(host!.querySelectorAll<HTMLTextAreaElement>("textarea")[0]?.value)
-      .toBe("SOURCE_APPROVED_PROFILE");
-    expect.soft(host!.textContent).toContain("互補投資人");
-    expect(host!.querySelector('[role="alert"]')?.textContent).toBe("要求失敗，請稍後再試。");
-    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent).toContain(refreshFailure);
-
-    const rejectBtn = await buttonByText("拒絕提案");
-    await act(async () => { rejectBtn.click(); });
-    await flush();
-
-    const reject = calls.find((c) => c.url.includes("/proposals/p1/reject"));
-    expect(reject?.method).toBe("POST");
-    expect(host!.querySelector('[data-state="ready"]')?.textContent).toBe("校準提案已拒絕");
-    expect(host!.querySelectorAll<HTMLTextAreaElement>("textarea")[0]?.value)
-      .toBe("SOURCE_APPROVED_PROFILE");
+    const approve = calls.find((call) => call.url.includes("/approve"));
+    expect(approve).toMatchObject({ method: "POST", body: {} });
+    expect(approve?.body).not.toHaveProperty("profile_patch");
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(document.activeElement).toBe(
+      host!.querySelector('[data-investor-mode-heading="summary"]'),
+    );
   });
 
   it("renders every current Investor Profile field in English", async () => {
-    const response = populatedResponse();
-    const calibration = populatedCalibration();
-    stubFetch((url) => url.endsWith("/profile/investor/calibration") ? calibration : response);
-    await act(async () => { await i18n.changeLanguage("en"); });
+    await useEnglish();
+    apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
     await mount();
     await flush();
-    await flush();
+    await clickButton("Edit profile");
 
     const text = host!.textContent ?? "";
     for (const expected of [
-      "Investor Profile",
-      "Research personalization aid, not investment advice or a suitability assessment. When enabled, the assistant adjusts its analytical focus based on your risk profile and selected stance; evidence gathering and counterarguments remain completely unaffected.",
-      "Enable personalization (current effective stance: Complementary)",
+      "Personalization enabled",
+      "Investment style",
+      "Risk appetite (1-10)",
+      "Risk capacity (1-10)",
+      "Holding horizon",
+      "Tolerable drawdown %",
+      "Single-position limit %",
+      "Default assistant stance",
+      "Preferred edges",
+      "Behavioral tendencies (for calibration, not diagnosis)",
+      "Avoidances (comma-separated)",
+      "Free-form notes (goals, observations, and preferred assistance)",
+      "Notes are stored for your reference and currently do not affect AI analysis.",
+      "Skill mode: off",
+      "Generate draft",
+      "Save profile",
+    ]) expect.soft(text).toContain(expected);
+
+    expect(host!.querySelector<HTMLInputElement>('input[name="concentration_limit_pct"]')?.value)
+      .toBe("25");
+    expect(host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')?.value)
+      .toBe("SOURCE_PROFILE_NOTES");
+    expect(host!.querySelectorAll('[data-testid="investor-profile-edit"] fieldset')).toHaveLength(2);
+  });
+
+  it("switches locale without changing draft calibration or proposal state", async () => {
+    await useEnglish();
+    const state = activeCalibration({ latest_proposal: calibrationProposal() });
+    const calls = apiRoutes({ profile: populatedResponse(), calibration: state });
+    await mount();
+    await flush();
+    await clickButton("Continue Calibration");
+    const answer = host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!;
+    await setControlValue(answer, "SOURCE_PENDING_CALIBRATION_DRAFT");
+    const disclosure = host!.querySelector<HTMLDetailsElement>(
+      '[data-testid="calibration-topics-disclosure"]',
+    )!;
+    disclosure.open = true;
+    answer.focus();
+    const getCount = calls.filter((call) => call.method === "GET").length;
+
+    await act(async () => {
+      await i18n.changeLanguage("zh-Hant");
+    });
+    await flush();
+
+    expect(host!.querySelector('textarea[name="calibration_answer"]')).toBe(answer);
+    expect(answer.value).toBe("SOURCE_PENDING_CALIBRATION_DRAFT");
+    expect(host!.querySelector('[data-testid="calibration-topics-disclosure"]')).toBe(disclosure);
+    expect(disclosure.open).toBe(true);
+    expect(document.activeElement).toBe(answer);
+    expect(host!.textContent).toContain("假設一個重要持股在短期內下跌 18%");
+    expect(calls.filter((call) => call.method === "GET").length).toBe(getCount);
+  });
+
+  it("preserves calibration messages rationales and custom values as source content", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal({
+      profile_patch: { preferred_edge: ["SOURCE_CUSTOM_EDGE", "growth"] },
+      proposed_fields: ["preferred_edge"],
+      covered_topics: ["investment_approach"],
+      rationales: { preferred_edge: "SOURCE_PROPOSAL_RATIONALE" },
+    });
+    const state = activeCalibration({
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "source-user-message",
+          role: "user",
+          content: "SOURCE_USER_MESSAGE",
+          turn_id: "turn-source",
+          prompt_id: null,
+        }),
+        calibrationMessage({
+          id: "source-assistant-message",
+          content: "SOURCE_ASSISTANT_MESSAGE",
+          turn_id: "turn-source",
+          prompt_id: null,
+        }),
+      ],
+      latest_proposal: proposal,
+    });
+    apiRoutes({ profile: populatedResponse(), calibration: state });
+    await mount();
+    await flush();
+    await clickButton("Continue Calibration");
+    expect(host!.textContent).toContain("SOURCE_USER_MESSAGE");
+    expect(host!.textContent).toContain("SOURCE_ASSISTANT_MESSAGE");
+    await clickButton("Back to summary");
+    await clickButton("Review proposal");
+
+    expect(host!.textContent).toContain("SOURCE_CUSTOM_EDGE, growth");
+    expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
+    expect(host!.textContent).not.toContain("session-1");
+    expect(host!.textContent).not.toContain("proposal-1");
+  });
+
+  it("hides request diagnostics outside Developer Mode and reveals them inside it", async () => {
+    await useEnglish();
+    const diagnostic = "SOURCE_DIAGNOSTIC_" + "x".repeat(700) + "_TAIL_SECRET";
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error(diagnostic);
+    }));
+    await mount(false);
+    await flush();
+
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Could not load the Investor Profile.");
+    expect(host!.textContent).not.toContain("SOURCE_DIAGNOSTIC");
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
+
+    dispose();
+    await mount(true);
+    await flush();
+
+    const developer = host!.querySelector('[data-testid="developer-diagnostics"]')!;
+    expect(developer.textContent).toContain("SOURCE_DIAGNOSTIC");
+    expect(developer.textContent).not.toContain("TAIL_SECRET");
+  });
+  it("renders summary first with effective stance mismatch and current context", async () => {
+    await useEnglish();
+    apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
+    await mount();
+    await flush();
+
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Investor Profile summary");
+    expect(text).toContain("Personalization enabled");
+    expect(text).toContain("Complementary");
+    expect(text).toContain("Risk appetite above capacity");
+    expect(text).toContain("SOURCE_CONTEXT_PREVIEW");
+    expect(host!.querySelector(".ip-grid")).toBeNull();
+  });
+
+  it("loads profile and calibration independently without inventing empty state", async () => {
+    await useEnglish();
+    const profileLeg = deferred<Response>();
+    const calibrationLeg = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn((url: unknown) => (
+      String(url).endsWith("/profile/investor/calibration")
+        ? calibrationLeg.promise
+        : profileLeg.promise
+    )));
+    await mount();
+
+    await act(async () => {
+      profileLeg.resolve(new Response(JSON.stringify(populatedResponse()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      await Promise.resolve();
+    });
+    await flush();
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).not.toContain("No active guided calibration");
+
+    await act(async () => {
+      calibrationLeg.reject(new Error("SOURCE_CALIBRATION_LOAD_SECRET"));
+      await Promise.resolve();
+    });
+    await flush();
+    expect(host!.textContent).toContain("Could not load guided calibration.");
+    expect(host!.textContent).not.toContain("SOURCE_CALIBRATION_LOAD_SECRET");
+  });
+
+  it("defaults and reloads to summary while keeping one registry anchor", async () => {
+    await useEnglish();
+    const calls = apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
+    await mount();
+    await flush();
+    expect(host!.querySelectorAll(".investor-profile-panel")).toHaveLength(1);
+    expect(host!.textContent).toContain("Investor Profile summary");
+
+    await clickButton("Edit profile");
+    expect(host!.textContent).toContain("Edit Investor Profile");
+    dispose();
+    await mount();
+    await flush();
+
+    expect(host!.querySelectorAll(".investor-profile-panel")).toHaveLength(1);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(calls.filter((call) => call.method === "GET").length).toBe(4);
+  });
+
+  it("enters edit with focus and preserves every profile field", async () => {
+    await useEnglish();
+    apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+
+    const heading = host!.querySelector<HTMLElement>('[data-investor-mode-heading="edit"]');
+    expect(document.activeElement).toBe(heading);
+    for (const label of [
       "Investment style",
       "Risk appetite (1-10)",
       "Risk capacity (1-10)",
@@ -789,380 +866,530 @@ describe("InvestorProfilePanel", () => {
       "Behavioral tendencies (for calibration, not diagnosis)",
       "Free-form notes (goals, observations, and preferred assistance)",
       "Default assistant stance",
-      "Skill mode: off (skill recommendations are a later phase and are not yet enabled)",
-      "Calibration Conversation",
-      "Calibration conversations only organize your investor profile; they are not investment advice or individual-stock recommendations. Only structured settings you approve affect research; raw conversation transcripts are not included in research prompts.",
-      "Start calibration conversation",
-      "Calibration message",
-      "Send calibration message",
-      "Calibration Proposal",
-      "Calibration proposal awaiting approval",
-      "Apply calibration proposal",
-      "Reject proposal",
-      "Generate settings draft",
-      "Save settings",
-      "Risk appetite and risk capacity:",
-      "Risk appetite above capacity",
-    ]) {
-      expect.soft(text).toContain(expected);
-    }
-
-    const optionLabels = Array.from(host!.querySelectorAll("option"), (option) => option.textContent);
-    for (const expected of [
-      "Growth investor (default)",
-      "Value",
-      "Momentum",
-      "Income",
-      "Event-driven",
-      "Balanced",
-      "Custom",
-      "Intraday",
-      "Days to weeks",
-      "Months",
-      "Multi-year",
-      "Mixed",
-      "Neutral",
-      "Investor-aligned",
-      "Complementary",
-      "Strict risk control",
-      "Valuation rationalist",
-      "Growth opportunity",
-    ]) {
-      expect.soft(optionLabels).toContain(expected);
-    }
-    expect.soft(optionLabels.filter((label) => label === "Not set")).toHaveLength(2);
-
-    const proposalHeading = host!.querySelector(".ip-calibration .ip-guardrail strong");
-    expect.soft(proposalHeading?.querySelector('[data-state="partial"]')?.textContent)
-      .toBe("Calibration proposal awaiting approval");
-    expect.soft(proposalHeading?.textContent?.match(/Calibration Proposal/g) ?? []).toHaveLength(1);
-
-    const source = readFileSync(resolve(import.meta.dirname, "InvestorProfilePanel.tsx"), "utf8");
-    for (const helper of [
-      "settingsInvestorPresetLabel",
-      "settingsInvestorHorizonLabel",
-      "settingsStanceLabel",
-      "settingsMismatchLabel",
-    ]) {
-      expect.soft(source).toContain(helper);
-    }
-    expect.soft(source).not.toContain("personalizationDisplay");
-  });
-
-  it("switches locale without changing draft calibration or proposal state", async () => {
-    const response = populatedResponse();
-    const calibration = populatedCalibration();
-    const calls: Array<{ url: string; method: string; body: unknown }> = [];
-    let finishInitialCalibration: ((value: Response) => void) | null = null;
-    let finishDraft: ((value: Response) => void) | null = null;
-    vi.stubGlobal("fetch", vi.fn((url: unknown, init?: RequestInit) => {
-      const target = String(url);
-      calls.push({
-        url: target,
-        method: init?.method ?? "GET",
-        body: init?.body ? JSON.parse(String(init.body)) : null,
-      });
-      if (target.endsWith("/profile/investor/draft")) {
-        return new Promise<Response>((resolveRequest) => {
-          finishDraft = resolveRequest;
-        });
-      }
-      if (target.endsWith("/profile/investor/calibration")) {
-        return new Promise<Response>((resolveRequest) => {
-          finishInitialCalibration = resolveRequest;
-        });
-      }
-      return Promise.resolve(new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-    }));
-
-    await mount();
-    await flush();
-
-    const queryControls = () => {
-      const selects = Array.from(host!.querySelectorAll<HTMLSelectElement>(".ip-grid select"));
-      const numbers = Array.from(
-        host!.querySelectorAll<HTMLInputElement>('.ip-grid input[type="number"]'),
-      );
-      const fieldsets = host!.querySelectorAll("fieldset");
-      return {
-        enabled: host!.querySelector<HTMLInputElement>('.ip-toggle input[type="checkbox"]')!,
-        selects,
-        numbers,
-        edges: Array.from(
-          fieldsets[0]!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
-        ),
-        flags: Array.from(
-          fieldsets[1]!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
-        ),
-        avoidances: host!.querySelector<HTMLInputElement>('input[type="text"]')!,
-        notes: Array.from(host!.querySelectorAll<HTMLTextAreaElement>("textarea"))
-          .find((node) => !node.closest(".ip-calibration"))!,
-        calibrationDraft: host!.querySelector<HTMLTextAreaElement>(".ip-calibration textarea")!,
-      };
-    };
-    const editValue = async (
-      node: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-      value: string,
-    ) => {
-      const prototype = node instanceof window.HTMLSelectElement
-        ? window.HTMLSelectElement.prototype
-        : node instanceof window.HTMLTextAreaElement
-          ? window.HTMLTextAreaElement.prototype
-          : window.HTMLInputElement.prototype;
-      await act(async () => {
-        Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(node, value);
-        node.dispatchEvent(new Event(
-          node instanceof window.HTMLSelectElement ? "change" : "input",
-          { bubbles: true },
-        ));
-      });
-    };
-    const assertEditedControls = (controls: ReturnType<typeof queryControls>) => {
-      expect.soft(controls.enabled.checked).toBe(false);
-      expect.soft(controls.selects.map((node) => node.value)).toEqual([
-        "custom",
-        "6",
-        "7",
-        "days_weeks",
-        "strict_risk_control",
-      ]);
-      expect.soft(controls.numbers.map((node) => node.value)).toEqual(["31", "41"]);
-      expect.soft(controls.edges.map((node) => node.checked)).toEqual([
-        false,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-      ]);
-      expect.soft(controls.flags.map((node) => node.checked)).toEqual([
-        false,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-      ]);
-      expect.soft(controls.avoidances.value)
-        .toBe("SOURCE_DRAFT_AVOIDANCE, SOURCE_SECOND_AVOIDANCE");
-      expect.soft(controls.notes.value).toBe("SOURCE_DRAFT_NOTES");
-      expect.soft(controls.calibrationDraft.value).toBe("SOURCE_PENDING_CALIBRATION_DRAFT");
-    };
-
-    const editedControls = queryControls();
-    await act(async () => { editedControls.enabled.click(); });
-    await editValue(editedControls.selects[0]!, "custom");
-    await editValue(editedControls.selects[1]!, "6");
-    await editValue(editedControls.selects[2]!, "7");
-    await editValue(editedControls.selects[3]!, "days_weeks");
-    await editValue(editedControls.numbers[0]!, "31");
-    await editValue(editedControls.numbers[1]!, "41");
-    await editValue(editedControls.selects[4]!, "strict_risk_control");
-    for (const checkbox of editedControls.edges) {
-      await act(async () => { checkbox.click(); });
-    }
-    for (const checkbox of editedControls.flags) {
-      await act(async () => { checkbox.click(); });
-    }
-    await editValue(
-      editedControls.avoidances,
-      "SOURCE_DRAFT_AVOIDANCE, SOURCE_SECOND_AVOIDANCE",
-    );
-    await editValue(editedControls.notes, "SOURCE_DRAFT_NOTES");
-    await editValue(editedControls.calibrationDraft, "SOURCE_PENDING_CALIBRATION_DRAFT");
-    assertEditedControls(queryControls());
-
-    await act(async () => {
-      finishInitialCalibration?.(new Response(JSON.stringify(calibration), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-      await Promise.resolve();
-    });
-    await flush();
-
-    const afterCalibration = queryControls();
-    assertEditedControls(afterCalibration);
-    expect(host!.textContent).toContain("SOURCE_USER_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_ASSISTANT_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
-
-    const draftButton = await buttonByText("產生設定草稿");
-    await act(async () => { draftButton.click(); });
-    await flush();
-    const requestCount = calls.length;
-    const draftCall = calls.find((call) => call.url.endsWith("/profile/investor/draft"));
-    expect.soft(draftCall?.body).toEqual({
-      enabled: false,
-      primary_preset: "custom",
-      risk_appetite: 6,
-      risk_capacity: 7,
-      holding_horizon: "days_weeks",
-      drawdown_tolerance_pct: 31,
-      concentration_limit_pct: 41,
-      preferred_edge: [
-        "SOURCE_CUSTOM_EDGE",
-        "valuation",
-        "catalyst",
-        "quality",
-        "momentum",
-        "macro",
-        "options",
-        "sentiment",
-      ],
-      avoidances: ["SOURCE_DRAFT_AVOIDANCE", "SOURCE_SECOND_AVOIDANCE"],
-      behavioral_flags: [
-        "SOURCE_CUSTOM_FLAG",
-        "greed",
-        "overconfidence",
-        "panic selling",
-        "loss aversion",
-        "anchoring",
-        "narrative susceptibility",
-        "revenge trading",
-        "under-diversification",
-      ],
-      freeform_notes: "SOURCE_DRAFT_NOTES",
-      default_stance: "strict_risk_control",
-    });
-    expect.soft(draftCall?.body).not.toHaveProperty("context_preview");
-    const panel = host!.querySelector(".investor-profile-panel")!;
-    const beforeSwitch = queryControls();
-    const proposal = host!.querySelector(".ip-calibration .ip-guardrail")!;
-    const messages = Array.from(host!.querySelectorAll(".ip-calibration-log > div"));
-    const rationale = proposal.querySelector("li")!;
-    const running = host!.querySelector('[data-state="running"]')!;
-    expect(panel.getAttribute("aria-busy")).toBe("true");
-
-    await act(async () => { await i18n.changeLanguage("en"); });
-
-    const afterSwitch = queryControls();
-    expect(host!.querySelector(".investor-profile-panel")).toBe(panel);
-    expect(afterSwitch.enabled).toBe(beforeSwitch.enabled);
-    for (const [index, node] of afterSwitch.selects.entries()) {
-      expect(node).toBe(beforeSwitch.selects[index]);
-    }
-    for (const [index, node] of afterSwitch.numbers.entries()) {
-      expect(node).toBe(beforeSwitch.numbers[index]);
-    }
-    for (const [index, node] of afterSwitch.edges.entries()) {
-      expect(node).toBe(beforeSwitch.edges[index]);
-    }
-    for (const [index, node] of afterSwitch.flags.entries()) {
-      expect(node).toBe(beforeSwitch.flags[index]);
-    }
-    expect(afterSwitch.notes).toBe(beforeSwitch.notes);
-    expect(afterSwitch.avoidances).toBe(beforeSwitch.avoidances);
-    expect(afterSwitch.calibrationDraft).toBe(beforeSwitch.calibrationDraft);
-    assertEditedControls(afterSwitch);
-    expect(host!.querySelector('textarea[aria-label="Calibration message"]'))
-      .toBe(beforeSwitch.calibrationDraft);
-    expect(host!.querySelector(".ip-calibration .ip-guardrail")).toBe(proposal);
-    const switchedMessages = Array.from(host!.querySelectorAll(".ip-calibration-log > div"));
-    expect(switchedMessages).toHaveLength(messages.length);
-    for (const [index, node] of switchedMessages.entries()) {
-      expect(node).toBe(messages[index]);
-    }
-    expect(proposal.querySelector("li")).toBe(rationale);
-    expect(switchedMessages.map((node) => node.textContent)).toEqual([
-      "You:SOURCE_USER_MESSAGE",
-      "Assistant:SOURCE_ASSISTANT_MESSAGE",
-    ]);
-    expect(rationale.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
-    expect(panel.getAttribute("aria-busy")).toBe("true");
-    expect(host!.querySelector('[data-state="running"]')).toBe(running);
-    expect(running.textContent).toBe("Updating Investor Profile");
-    const switchedDraftButton = await buttonByText("Generate settings draft");
-    expect(switchedDraftButton).toBe(draftButton);
-    expect(switchedDraftButton.disabled).toBe(true);
-    expect(calls).toHaveLength(requestCount);
-    expect(host!.textContent).toContain("Investor Profile");
-    expect(host!.textContent).toContain("Calibration Proposal");
-    expect(host!.textContent).toContain("SOURCE_USER_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_ASSISTANT_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
-
-    await act(async () => {
-      finishDraft?.(new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
-      await Promise.resolve();
-    });
-    await flush();
-  });
-
-  it("preserves calibration messages rationales and custom values as source content", async () => {
-    const response = populatedResponse();
-    const calibration = populatedCalibration();
-    const calls = stubFetch((url) =>
-      url.endsWith("/profile/investor/calibration") ? calibration : response);
-    await act(async () => { await i18n.changeLanguage("en"); });
-    await mount();
-    await flush();
-    await flush();
-
-    expect(host!.textContent).toContain("You:SOURCE_USER_MESSAGE");
-    expect(host!.textContent).toContain("Assistant:SOURCE_ASSISTANT_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
-    expect(host!.querySelector<HTMLInputElement>('input[type="text"]')?.value)
-      .toBe("SOURCE_AVOID_LEVERAGE, SOURCE_AVOID_HYPE");
-    expect(host!.querySelectorAll<HTMLTextAreaElement>("textarea")[0]?.value)
+      "Skill mode: off",
+    ]) expect.soft(host!.textContent).toContain(label);
+    expect(host!.querySelector<HTMLInputElement>('input[name="concentration_limit_pct"]')?.value)
+      .toBe("25");
+    expect(host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')?.value)
       .toBe("SOURCE_PROFILE_NOTES");
-    const patchedSelects = host!.querySelectorAll<HTMLSelectElement>(".ip-grid select");
-    expect(patchedSelects[1]?.value).toBe("9");
-    expect(patchedSelects[2]?.value).toBe("3");
-    expect(patchedSelects[4]?.value).toBe("valuation_rationalist");
-
-    const draftButton = await buttonByText("Generate settings draft");
-    await act(async () => { draftButton.click(); });
-    await flush();
-    const draftCall = calls.find((call) => call.url.endsWith("/profile/investor/draft"));
-    expect(draftCall?.body).toMatchObject({
-      preferred_edge: ["growth", "SOURCE_CUSTOM_EDGE"],
-      avoidances: ["SOURCE_AVOID_LEVERAGE", "SOURCE_AVOID_HYPE"],
-      behavioral_flags: ["FOMO", "SOURCE_CUSTOM_FLAG"],
-      freeform_notes: "SOURCE_PROFILE_NOTES",
-      risk_appetite: 9,
-      risk_capacity: 3,
-      default_stance: "valuation_rationalist",
-    });
-    expect(draftCall?.body).not.toHaveProperty("context_preview");
-    expect(host!.textContent).toContain("SOURCE_USER_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_ASSISTANT_MESSAGE");
-    expect(host!.textContent).toContain("SOURCE_PROPOSAL_RATIONALE");
   });
 
-  it("hides request diagnostics outside Developer Mode and reveals them inside it", async () => {
-    const diagnostic = "PLANTED_INVESTOR_REQUEST_DIAGNOSTIC";
-    await act(async () => { await i18n.changeLanguage("en"); });
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      throw new Error(diagnostic);
-    }));
-    await mount(false);
+  it("dirty edit exit uses value-free confirm and cancel restores focus", async () => {
+    await useEnglish();
+    apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    const notes = host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!;
+    await setControlValue(notes, "sk-secret-SOURCE_DIRTY_VALUE");
+    const back = await buttonByText("Back to summary");
+    await act(async () => back.click());
     await flush();
 
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog.textContent).toContain("Discard Investor Profile changes?");
+    expect(dialog.textContent).not.toContain("sk-secret-SOURCE_DIRTY_VALUE");
+    const stay = Array.from(dialog.querySelectorAll("button"))
+      .find((button) => button.textContent === "Keep editing")!;
+    await act(async () => stay.click());
+    await flush();
+    expect(document.activeElement).toBe(back);
+    expect(notes.value).toBe("sk-secret-SOURCE_DIRTY_VALUE");
+  });
+
+  it("confirmed edit discard returns to a fresh summary", async () => {
+    await useEnglish();
+    apiRoutes({ profile: populatedResponse(), calibration: emptyCalibration() });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await setControlValue(
+      host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!,
+      "SOURCE_DISCARDED_NOTES",
+    );
+    await clickButton("Back to summary");
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    const discard = Array.from(dialog.querySelectorAll("button"))
+      .find((button) => button.textContent === "Discard changes")!;
+    await act(async () => discard.click());
+    await flush();
+
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).not.toContain("SOURCE_DISCARDED_NOTES");
+    expect(document.activeElement).toBe(await buttonByText("Edit profile"));
+  });
+
+  it("draft save stays in edit without writing or clearing fields", async () => {
+    await useEnglish();
+    const profile = populatedResponse();
+    const calls = apiRoutes({
+      profile,
+      calibration: emptyCalibration(),
+      handle: (call) => call.url.endsWith("/profile/investor/draft") ? profile : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    const notes = host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!;
+    await setControlValue(notes, "SOURCE_DRAFT_NOTES");
+    await clickButton("Generate draft");
+
+    expect(host!.textContent).toContain("Edit Investor Profile");
+    expect(host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')?.value)
+      .toBe("SOURCE_PROFILE_NOTES");
+    expect(calls.find((call) => call.url.endsWith("/draft"))?.body).toMatchObject({
+      concentration_limit_pct: 25,
+      freeform_notes: "SOURCE_DRAFT_NOTES",
+    });
+    expect(calls.some((call) => call.method === "PUT")).toBe(false);
+  });
+
+  it("full save refetches effective profile before summary", async () => {
+    await useEnglish();
+    const initial = populatedResponse();
+    const refreshed = populatedResponse();
+    refreshed.effective_stance = "strict_risk_control";
+    refreshed.profile.default_stance = "strict_risk_control";
+    let profileGets = 0;
+    const calls = apiRoutes({
+      profile: initial,
+      calibration: emptyCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return profileGets === 1 ? initial : refreshed;
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "PUT") return initial;
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await clickButton("Save profile");
+
+    expect(calls.some((call) => call.method === "PUT")).toBe(true);
+    expect(profileGets).toBe(2);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Strict risk control");
+  });
+
+  it("failed post-save refresh stays in edit with an honest error", async () => {
+    await useEnglish();
+    let profileGets = 0;
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          if (profileGets > 1) {
+            return new Response(JSON.stringify({ detail: "SOURCE_REFRESH_SECRET" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await clickButton("Save profile");
+
+    expect(host!.textContent).toContain("Edit Investor Profile");
     expect(host!.querySelector('[role="alert"]')?.textContent)
-      .toContain("The request failed. Try again later.");
-    expect(host!.textContent).not.toContain(diagnostic);
-    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
+      .toContain("The profile was saved, but the refreshed summary could not be loaded.");
+    expect(host!.textContent).not.toContain("SOURCE_REFRESH_SECRET");
+  });
+
+  it("busy save or approve blocks mode change", async () => {
+    await useEnglish();
+    const pendingSave = deferred<Response>();
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => call.method === "PUT" ? pendingSave.promise : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await clickButton("Save profile");
+    await clickButton("Back to summary");
+    expect(host!.textContent).toContain("Edit Investor Profile");
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Wait for the current Investor Profile update to finish.");
+    await act(async () => {
+      pendingSave.resolve(new Response(JSON.stringify(populatedResponse()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      await Promise.resolve();
+    });
+    await flush();
 
     dispose();
-    await mount(true);
+    const pendingApprove = deferred<Response>();
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
+      handle: (call) => call.url.includes("/approve") ? pendingApprove.promise : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+    await clickButton("Back to summary");
+    expect(host!.textContent).toContain("Proposal review");
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Wait for the current Investor Profile update to finish.");
+    await act(async () => {
+      pendingApprove.resolve(new Response(JSON.stringify({
+        profile: populatedResponse().profile,
+        proposal: calibrationProposal({ status: "approved" }),
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      await Promise.resolve();
+    });
+    await flush();
+  });
+
+  it("calibration exit is free and restores command focus", async () => {
+    await useEnglish();
+    apiRoutes({ profile: populatedResponse(), calibration: activeCalibration() });
+    await mount();
+    await flush();
+    const command = await buttonByText("Continue Calibration");
+    await act(async () => command.click());
+    await flush();
+    expect(document.activeElement).toBe(
+      host!.querySelector('[data-investor-mode-heading="calibration"]'),
+    );
+    const answer = host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!;
+    await setControlValue(answer, "SOURCE_UNSENT_CALIBRATION_ANSWER");
+    await clickButton("Back to summary");
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(command.isConnected).toBe(false);
+    expect(document.activeElement).toBe(await buttonByText("Continue Calibration"));
+  });
+
+  it("starts with a localizable fixed question without a provider call", async () => {
+    await useEnglish();
+    const started = activeCalibration();
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => call.url.endsWith("/calibration/sessions") ? started : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Start Calibration");
+
+    expect(host!.textContent).toContain(
+      "Suppose an important holding falls 18% over a short period while its long-term thesis is not clearly broken. What would you usually do?",
+    );
+    expect(calls.filter((call) => call.url.endsWith("/calibration/sessions"))).toHaveLength(1);
+    expect(calls.some((call) => call.url.endsWith("/calibration/messages"))).toBe(false);
+  });
+
+  it("submits source answer with stable turn ID and preserves journal", async () => {
+    await useEnglish();
+    const answered = activeCalibration({
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "answer-1",
+          role: "user",
+          content: "SOURCE_ANSWER_KEEP_BYTES",
+          turn_id: "turn-stable-1",
+          prompt_id: null,
+        }),
+        calibrationMessage({
+          id: "question-2",
+          content: "SOURCE_NEXT_QUESTION",
+          turn_id: "turn-stable-1",
+          topic_id: "financial_capacity",
+          prompt_id: null,
+        }),
+      ],
+    });
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration(),
+      handle: (call) => call.url.endsWith("/calibration/messages") ? answered : undefined,
+    });
+    await mount(false, { turnIdFactory: () => "turn-stable-1" });
+    await flush();
+    await clickButton("Continue Calibration");
+    await setControlValue(
+      host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!,
+      "SOURCE_ANSWER_KEEP_BYTES",
+    );
+    await clickButton("Send answer");
+
+    expect(calls.find((call) => call.url.endsWith("/calibration/messages"))?.body).toEqual({
+      turn_id: "turn-stable-1",
+      session_id: "session-1",
+      content: "SOURCE_ANSWER_KEEP_BYTES",
+    });
+    expect(host!.textContent).toContain("SOURCE_ANSWER_KEEP_BYTES");
+    expect(host!.textContent).toContain("SOURCE_NEXT_QUESTION");
+  });
+
+  it("retries interrupted turn with the same ID without duplicate answer", async () => {
+    await useEnglish();
+    const interrupted = activeCalibration({
+      pending_turn: calibrationTurn({ id: "turn-durable-retry" }),
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "answer-retry",
+          role: "user",
+          content: "SOURCE_SAVED_ANSWER",
+          turn_id: "turn-durable-retry",
+          prompt_id: null,
+        }),
+      ],
+    });
+    const completed = activeCalibration({
+      messages: [
+        ...interrupted.messages,
+        calibrationMessage({
+          id: "question-after-retry",
+          content: "SOURCE_RETRY_QUESTION",
+          turn_id: "turn-durable-retry",
+          prompt_id: null,
+        }),
+      ],
+    });
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: interrupted,
+      handle: (call) => call.url.includes("/turns/turn-durable-retry/retry") ? completed : undefined,
+    });
+    await mount();
+    await flush();
+    await clickButton("Continue Calibration");
+    await clickButton("Retry turn");
+
+    const retry = calls.find((call) => call.url.includes("/turns/turn-durable-retry/retry"));
+    expect(retry?.body).toEqual({});
+    expect(calls.filter((call) => call.url.endsWith("/calibration/messages"))).toHaveLength(0);
+    expect((host!.textContent?.match(/SOURCE_SAVED_ANSWER/g) ?? [])).toHaveLength(1);
+  });
+
+  it("requests early proposal without synthetic user content", async () => {
+    await useEnglish();
+    const proposed = activeCalibration({ latest_proposal: calibrationProposal() });
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration(),
+      handle: (call) => call.url.endsWith("/calibration/proposals/request") ? proposed : undefined,
+    });
+    await mount(false, { turnIdFactory: () => "turn-propose-now" });
+    await flush();
+    await clickButton("Continue Calibration");
+    await clickButton("Propose Now");
+
+    const request = calls.find((call) => call.url.endsWith("/calibration/proposals/request"));
+    expect(request?.body).toEqual({ turn_id: "turn-propose-now", session_id: "session-1" });
+    expect(request?.body).not.toHaveProperty("content");
+    expect(host!.textContent).toContain("Proposal review");
+  });
+
+  it("renders backend-ordered coverage and unknown topic without raw ID", async () => {
+    await useEnglish();
+    const session = calibrationSession({
+      covered_topics: ["time_horizon", "SOURCE_UNKNOWN_TOPIC", "loss_response"],
+      current_topic_id: "SOURCE_UNKNOWN_CURRENT",
+    });
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ active_session: session, sessions: [session] }),
+    });
+    await mount();
+    await flush();
+    await clickButton("Continue Calibration");
+
+    const text = host!.textContent ?? "";
+    const covered = host!.querySelector('[data-testid="calibration-covered-topics"]')?.textContent ?? "";
+    expect(text).toContain("3 of 8 topics covered");
+    expect(covered.indexOf("How long you invest")).toBeLessThan(covered.indexOf("Other topic"));
+    expect(covered.indexOf("Other topic")).toBeLessThan(covered.indexOf("How you respond to losses"));
+    expect(text).not.toContain("SOURCE_UNKNOWN_TOPIC");
+    expect(text).not.toContain("SOURCE_UNKNOWN_CURRENT");
+  });
+
+  it("preserves edit calibration disclosure proposal and focus across locale switch", async () => {
+    await useEnglish();
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    const notes = host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!;
+    await setControlValue(notes, "SOURCE_LOCALE_DRAFT");
+    const disclosure = host!.querySelector<HTMLDetailsElement>('[data-testid="risk-disclosure"]')!;
+    disclosure.open = true;
+    notes.focus();
+    const getCount = calls.filter((call) => call.method === "GET").length;
+
+    await act(async () => {
+      await i18n.changeLanguage("zh-Hant");
+    });
     await flush();
 
-    expect(host!.querySelector('[role="alert"]')?.textContent)
-      .toContain("The request failed. Try again later.");
-    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent)
-      .toContain("Developer diagnostics");
-    expect(host!.querySelector('[data-testid="developer-diagnostics"]')?.textContent).toContain(diagnostic);
+    expect(host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')).toBe(notes);
+    expect(notes.value).toBe("SOURCE_LOCALE_DRAFT");
+    expect(host!.querySelector('[data-testid="risk-disclosure"]')).toBe(disclosure);
+    expect(disclosure.open).toBe(true);
+    expect(document.activeElement).toBe(notes);
+    expect(calls.filter((call) => call.method === "GET").length).toBe(getCount);
+  });
+
+  it("proposal mode requires a pending proposal and separates coverage from actions", async () => {
+    await useEnglish();
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+
+    const coverage = host!.querySelector('[data-testid="proposal-coverage"]')!;
+    const changes = host!.querySelector('[data-testid="proposal-changes"]')!;
+    const actions = host!.querySelector('[data-testid="proposal-actions"]')!;
+    expect(coverage).not.toBeNull();
+    expect(changes).not.toBeNull();
+    expect(actions).not.toBeNull();
+    expect(coverage.contains(actions)).toBe(false);
+    expect(changes.contains(actions)).toBe(false);
+    expect(coverage.textContent).toContain("What your finances allow");
+
+    dispose();
+    apiRoutes({ profile: populatedResponse(), calibration: activeCalibration() });
+    await mount();
+    await flush();
+    expect(Array.from(host!.querySelectorAll("button")).some(
+      (button) => button.textContent === "Review proposal",
+    )).toBe(false);
+  });
+
+  it("renders localized field diffs and source rationales then approves without patch", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal({
+      proposed_fields: ["concentration_limit_pct", "risk_capacity"],
+    });
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1
+            ? activeCalibration({ latest_proposal: proposal })
+            : emptyCalibration();
+        }
+        if (call.url.includes("/approve")) {
+          return { profile: populatedResponse().profile, proposal: { ...proposal, status: "approved" } };
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    const text = host!.textContent ?? "";
+    expect(text.indexOf("Single-position limit %")).toBeLessThan(text.indexOf("Risk capacity (1-10)"));
+    expect(text).toContain("Current25");
+    expect(text).toContain("Proposed18");
+    expect(text).toContain("SOURCE_CONCENTRATION_RATIONALE");
+    await clickButton("Approve proposal");
+
+    const approve = calls.find((call) => call.url.includes("/approve"));
+    expect(approve?.body).toEqual({});
+    expect(approve?.body).not.toHaveProperty("profile_patch");
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(calls.filter((call) => call.url.endsWith("/profile/investor") && call.method === "GET"))
+      .toHaveLength(2);
+  });
+
+  it("keeps conflicted proposal pending and routes missing provider to Providers", async () => {
+    await useEnglish();
+    const conflictProposal = calibrationProposal({
+      conflict_fields: ["risk_capacity"],
+      conflicted_at: "2026-07-21T01:05:00Z",
+    });
+    let calibrationGets = 0;
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
+      handle: (call) => {
+        if (call.url.includes("/approve")) {
+          return new Response(JSON.stringify({
+            detail: { code: "proposal_conflict", diagnostic: "SOURCE_CONFLICT_SECRET" },
+          }), {
+            status: 409,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1
+            ? activeCalibration({ latest_proposal: calibrationProposal() })
+            : activeCalibration({ latest_proposal: conflictProposal });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+    expect(host!.textContent).toContain("Proposal review");
+    expect(host!.textContent).toContain("Profile changed since this proposal was created");
+    expect(host!.textContent).not.toContain("SOURCE_CONFLICT_SECRET");
+
+    dispose();
+    const navigate = vi.fn();
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration(),
+      handle: (call) => call.url.endsWith("/calibration/messages")
+        ? new Response(JSON.stringify({
+          detail: {
+            code: "provider_config_missing",
+            diagnostic: "sk-proj-SOURCE_PROVIDER_SECRET",
+          },
+        }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        })
+        : undefined,
+    });
+    await mount(false, {
+      onNavigateToProviders: navigate,
+      turnIdFactory: () => "turn-provider-missing",
+    });
+    await flush();
+    await clickButton("Continue Calibration");
+    await setControlValue(
+      host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!,
+      "SOURCE_PROVIDER_ANSWER",
+    );
+    await clickButton("Send answer");
+    expect(host!.textContent).toContain("Configure an AI provider before continuing calibration.");
+    expect(host!.textContent).not.toContain("sk-proj-SOURCE_PROVIDER_SECRET");
+    await clickButton("Provider Sign-in and Credentials");
+    expect(navigate).toHaveBeenCalledTimes(1);
   });
 });

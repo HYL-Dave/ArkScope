@@ -255,7 +255,7 @@ export function SettingsView({
   const [fixedRuntimeGuard, setFixedRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [researchRuntimeGuard, setResearchRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [dataSourcesGuard, setDataSourcesGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
-  const [investorPotentialDirty, setInvestorPotentialDirty] = useState(false);
+  const [investorGuard, setInvestorGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const consumedNavigationSequenceRef = useRef(0);
   const directoryTriggerRef = useRef<HTMLButtonElement>(null);
   const aiModelsTabRef = useRef<HTMLButtonElement>(null);
@@ -297,30 +297,14 @@ export function SettingsView({
       ]);
     }
     if (activeGroup === "personalization") {
-      const investorBusy = !!document.querySelector(
-        '[data-settings-anchor="investor_profile"] .investor-profile-panel[aria-busy="true"]',
-      );
-      if (investorBusy) {
-        return {
-          dirty: investorPotentialDirty,
-          busy: true,
-          reason: t(($) => $.workspace.blocked.description),
-        };
-      }
-      return investorPotentialDirty
-        ? {
-            dirty: true,
-            busy: false,
-            reason: t(($) => $.workspace.blocked.description),
-          }
-        : CLEAR_SETTINGS_NAVIGATION_GUARD;
+      return investorGuard;
     }
     return dataSourcesGuard;
   }, [
     activeGroup,
     dataSourcesGuard,
     fixedRuntimeGuard,
-    investorPotentialDirty,
+    investorGuard,
     providerGuard,
     researchRuntimeGuard,
     saving,
@@ -837,11 +821,12 @@ export function SettingsView({
     }
 
     if (id === "investor_profile") {
-      const markPotentialDirty = () => setInvestorPotentialDirty(true);
       return (
-        <div onInputCapture={markPotentialDirty} onChangeCapture={markPotentialDirty}>
-          <InvestorProfilePanel developerMode={developerMode} />
-        </div>
+        <InvestorProfilePanel
+          developerMode={developerMode}
+          onNavigationGuardChange={setInvestorGuard}
+          onNavigateToProviders={() => revealSection("providers")}
+        />
       );
     }
     if (id === "data_sources") {
@@ -965,7 +950,6 @@ export function SettingsView({
           if (!pendingIntent) return;
           const intent = pendingIntent;
           dialogReturnFocusRef.current = tabRefFor(intent.group).current;
-          if (activeGroup === "personalization") setInvestorPotentialDirty(false);
           setPendingIntent(null);
           applySettingsIntent(intent);
         }}

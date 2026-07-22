@@ -1,8 +1,4 @@
-// Track A: Investor Profile + Assistant Stance settings panel (Settings 資料頁).
-// Read → edit → 產生設定草稿 (POST /draft, no write) → 儲存設定 (PUT, gated).
-// Copy rule: research personalization aid — never financial advice/suitability.
-
-import React, { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -11,557 +7,679 @@ import {
   getCalibrationState,
   getInvestorProfile,
   rejectCalibrationProposal,
+  requestCalibrationProposal,
+  retryCalibrationTurn,
   saveInvestorProfile,
   sendCalibrationMessage,
   startCalibrationSession,
-  type AssistantStance,
   type CalibrationState,
   type InvestorProfile,
   type InvestorProfileResponse,
-  type InvestorPreset,
 } from "./api";
 import { DeveloperDiagnostics } from "./settings/DeveloperDiagnostics";
+import { InvestorProfileCalibration } from "./settings/investor/InvestorProfileCalibration";
+import { InvestorProfileEdit } from "./settings/investor/InvestorProfileEdit";
+import { InvestorProfileProposalReview } from "./settings/investor/InvestorProfileProposalReview";
+import { InvestorProfileSummary } from "./settings/investor/InvestorProfileSummary";
+import { CALIBRATION_TOPIC_IDS } from "./settings/investor/investorProfileDisplay";
 import { settingsErrorPresentation } from "./settings/settingsBackendCopy";
+import type { SettingsT } from "./settings/settingsCopy";
 import {
-  settingsInvestorHorizonLabel,
-  settingsInvestorPresetLabel,
-  settingsMismatchLabel,
-  settingsStanceLabel,
-  type SettingsT,
-} from "./settings/settingsCopy";
-import { Button, InlineAlert, StatusBadge } from "./ui";
+  CLEAR_SETTINGS_NAVIGATION_GUARD,
+  type SettingsNavigationGuardReporter,
+} from "./settings/settingsNavigationGuard";
+import { Button, ConfirmDialog, InlineAlert, StatusBadge } from "./ui";
 
-const PRESETS: InvestorPreset[] = [
-  "growth",
-  "value",
-  "momentum",
-  "income",
-  "event_driven",
-  "balanced",
-  "custom",
-];
+export interface InvestorProfilePanelProps {
+  developerMode?: boolean;
+  onNavigationGuardChange?: SettingsNavigationGuardReporter;
+  onNavigateToProviders?: () => void;
+  turnIdFactory?: () => string;
+}
 
-const STANCES: AssistantStance[] = [
-  "neutral",
-  "aligned",
-  "complementary",
-  "strict_risk_control",
-  "valuation_rationalist",
-  "growth_opportunity",
-];
+type InvestorMode = "summary" | "edit" | "calibration" | "proposal";
+type ReturnCommand = "edit" | "calibration" | "proposal";
+type BusyAction =
+  | "draft"
+  | "save"
+  | "calibration_load"
+  | "calibration_start"
+  | "turn"
+  | "retry"
+  | "request_proposal"
+  | "approve"
+  | "reject";
+type ErrorScope = "save" | "refresh" | "turn" | "proposal";
 
-const HORIZONS = ["intraday", "days_weeks", "months", "multi_year", "mixed"];
+interface OperationError {
+  scope: ErrorScope;
+  error: unknown;
+}
 
-const EDGES = ["growth", "valuation", "catalyst", "quality", "momentum", "macro", "options", "sentiment"];
-const FLAGS = [
-  "FOMO",
-  "greed",
-  "overconfidence",
-  "panic selling",
-  "loss aversion",
-  "anchoring",
-  "narrative susceptibility",
-  "revenge trading",
-  "under-diversification",
-];
+function cloneProfile(profile: InvestorProfile): InvestorProfile {
+  return {
+    ...profile,
+    preferred_edge: [...profile.preferred_edge],
+    avoidances: [...profile.avoidances],
+    behavioral_flags: [...profile.behavioral_flags],
+  };
+}
 
-const SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+function profilePayload(profile: InvestorProfile): Partial<InvestorProfile> {
+  return {
+    enabled: profile.enabled,
+    primary_preset: profile.primary_preset,
+    risk_appetite: profile.risk_appetite,
+    risk_capacity: profile.risk_capacity,
+    holding_horizon: profile.holding_horizon,
+    drawdown_tolerance_pct: profile.drawdown_tolerance_pct,
+    concentration_limit_pct: profile.concentration_limit_pct,
+    preferred_edge: [...profile.preferred_edge],
+    avoidances: [...profile.avoidances],
+    behavioral_flags: [...profile.behavioral_flags],
+    freeform_notes: profile.freeform_notes,
+    default_stance: profile.default_stance,
+  };
+}
 
-type InvestorOutcome =
-  | "calibration_started"
-  | "calibration_updated"
-  | "proposal_applied"
-  | "proposal_rejected"
-  | "draft_generated"
-  | "saved";
+function sameEditableProfile(left: InvestorProfile | null, right: InvestorProfile | null): boolean {
+  if (!left || !right) return true;
+  return JSON.stringify(profilePayload(left)) === JSON.stringify(profilePayload(right));
+}
 
-type CalibrationRunResult = "current" | "stale" | "not_started";
+function defaultTurnId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  return `calibration-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
-function investorOutcomeLabel(outcome: InvestorOutcome, t: SettingsT): string {
-  switch (outcome) {
-    case "calibration_started":
-      return t(($) => $.investor.calibration.started);
-    case "calibration_updated":
-      return t(($) => $.investor.calibration.updated);
-    case "proposal_applied":
-      return t(($) => $.investor.proposal.applied);
-    case "proposal_rejected":
-      return t(($) => $.investor.proposal.rejected);
-    case "draft_generated":
-      return t(($) => $.investor.draft.success);
-    case "saved":
-      return t(($) => $.investor.saveSuccess);
+function boundedDiagnostic(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.slice(0, 512);
+}
+
+function operationErrorTitle(scope: ErrorScope, t: SettingsT): string {
+  switch (scope) {
+    case "save":
+      return t(($) => $.investor.workspace.errors.save);
+    case "refresh":
+      return t(($) => $.investor.workspace.errors.refresh);
+    case "turn":
+      return t(($) => $.investor.workspace.errors.turn);
+    case "proposal":
+      return t(($) => $.investor.workspace.errors.proposal);
   }
 }
 
-export function InvestorProfilePanel({ developerMode = false }: { developerMode?: boolean }) {
+export function InvestorProfilePanel({
+  developerMode = false,
+  onNavigationGuardChange,
+  onNavigateToProviders,
+  turnIdFactory = defaultTurnId,
+}: InvestorProfilePanelProps) {
   const { t } = useTranslation("settings");
-  const [resp, setResp] = useState<InvestorProfileResponse | null>(null);
-  const [form, setForm] = useState<InvestorProfile | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<Error | null>(null);
-  const [outcome, setOutcome] = useState<InvestorOutcome | null>(null);
-  const [calibration, setCalibration] = useState<CalibrationState | null>(null);
-  const [calibrationText, setCalibrationText] = useState("");
+  const mountedRef = useRef(false);
   const calibrationGenerationRef = useRef(0);
+  const lastTurnIdRef = useRef<string | null>(null);
 
-  const applyCalibrationState = (
-    state: CalibrationState,
-    generation: number,
-    expectedProfile?: InvestorProfile,
-  ) => {
-    if (calibrationGenerationRef.current !== generation) return false;
+  const [profileStatus, setProfileStatus] = useState<"loading" | "ready" | "failed">("loading");
+  const [profileResponse, setProfileResponse] = useState<InvestorProfileResponse | null>(null);
+  const [profileError, setProfileError] = useState<unknown>(null);
+  const [calibrationStatus, setCalibrationStatus] = useState<"loading" | "ready" | "failed">("loading");
+  const [calibration, setCalibration] = useState<CalibrationState | null>(null);
+  const [calibrationError, setCalibrationError] = useState<unknown>(null);
+  const [mode, setMode] = useState<InvestorMode>("summary");
+  const [draft, setDraft] = useState<InvestorProfile | null>(null);
+  const [baseline, setBaseline] = useState<InvestorProfile | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
+  const [operationError, setOperationError] = useState<OperationError | null>(null);
+  const [proposalConflict, setProposalConflict] = useState(false);
+  const [outcome, setOutcome] = useState<"draft" | "saved" | "approved" | "rejected" | null>(null);
+  const [blockedNotice, setBlockedNotice] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [returnCommand, setReturnCommand] = useState<ReturnCommand>("edit");
+
+  const summaryHeadingRef = useRef<HTMLHeadingElement>(null);
+  const editHeadingRef = useRef<HTMLHeadingElement>(null);
+  const calibrationHeadingRef = useRef<HTMLHeadingElement>(null);
+  const proposalHeadingRef = useRef<HTMLHeadingElement>(null);
+  const editCommandRef = useRef<HTMLButtonElement>(null);
+  const calibrationCommandRef = useRef<HTMLButtonElement>(null);
+  const proposalCommandRef = useRef<HTMLButtonElement>(null);
+  const editBackRef = useRef<HTMLButtonElement>(null);
+  const calibrationBackRef = useRef<HTMLButtonElement>(null);
+  const proposalBackRef = useRef<HTMLButtonElement>(null);
+  const dialogReturnFocusRef = useRef<HTMLElement | null>(null);
+  const modeFocusReadyRef = useRef(false);
+
+  const applyCalibrationState = useCallback((state: CalibrationState, generation: number) => {
+    if (!mountedRef.current || calibrationGenerationRef.current !== generation) return false;
     setCalibration(state);
-    const proposal = state.latest_proposal;
-    if (proposal?.status === "draft") {
-      setForm((cur) => {
-        if (!cur || (expectedProfile && cur !== expectedProfile)) return cur;
-        return { ...cur, ...proposal.profile_patch };
-      });
+    setCalibrationStatus("ready");
+    setCalibrationError(null);
+    if (state.pending_turn) lastTurnIdRef.current = state.pending_turn.id;
+    return true;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const generation = calibrationGenerationRef.current;
+    const profileRequest = getInvestorProfile().then((response) => {
+      if (!mountedRef.current) return;
+      setProfileResponse(response);
+      setDraft(cloneProfile(response.profile));
+      setBaseline(cloneProfile(response.profile));
+      setProfileStatus("ready");
+      setProfileError(null);
+    }).catch((error: unknown) => {
+      if (!mountedRef.current) return;
+      setProfileStatus("failed");
+      setProfileError(error);
+    });
+    const calibrationRequest = getCalibrationState().then((state) => {
+      applyCalibrationState(state, generation);
+    }).catch((error: unknown) => {
+      if (!mountedRef.current || calibrationGenerationRef.current !== generation) return;
+      setCalibrationStatus("failed");
+      setCalibrationError(error);
+    });
+    void Promise.allSettled([profileRequest, calibrationRequest]);
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [applyCalibrationState]);
+
+  const dirty = mode === "edit" && !sameEditableProfile(draft, baseline);
+  const busy = busyAction !== null;
+
+  useEffect(() => {
+    onNavigationGuardChange?.({
+      dirty,
+      busy,
+      reason: busy
+        ? t(($) => $.investor.workspace.guard.busy)
+        : dirty
+          ? t(($) => $.investor.workspace.guard.dirtyDescription)
+          : null,
+    });
+  }, [busy, dirty, onNavigationGuardChange, t]);
+
+  useEffect(() => () => {
+    onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  }, [onNavigationGuardChange]);
+
+  useEffect(() => {
+    if (!modeFocusReadyRef.current) {
+      modeFocusReadyRef.current = true;
+      return;
     }
+    if (mode === "edit") editHeadingRef.current?.focus();
+    if (mode === "calibration") calibrationHeadingRef.current?.focus();
+    if (mode === "proposal") proposalHeadingRef.current?.focus();
+    if (mode === "summary") {
+      const target = returnCommand === "edit"
+        ? editCommandRef.current
+        : returnCommand === "calibration"
+          ? calibrationCommandRef.current
+          : proposalCommandRef.current;
+      (target ?? summaryHeadingRef.current)?.focus();
+    }
+  }, [mode, returnCommand]);
+
+  const pendingProposal = calibration?.latest_proposal?.status === "draft"
+    ? calibration.latest_proposal
+    : null;
+
+  useEffect(() => {
+    if (mode === "proposal" && !pendingProposal && !busy) {
+      setReturnCommand("proposal");
+      setMode("summary");
+    }
+  }, [busy, mode, pendingProposal]);
+
+  const beginAction = (action: BusyAction) => {
+    if (busy) {
+      setBlockedNotice(true);
+      return false;
+    }
+    setBusyAction(action);
+    setOperationError(null);
+    setBlockedNotice(false);
+    setOutcome(null);
     return true;
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    getInvestorProfile()
-      .then(async (r) => {
-        if (!cancelled) {
-          setResp(r);
-          setForm(r.profile);
-        }
-        const generation = calibrationGenerationRef.current;
-        try {
-          const c = await getCalibrationState();
-          if (!cancelled) applyCalibrationState(c, generation, r.profile);
-        } catch {
-          // Calibration is advisory. A temporary route failure must not block
-          // the base Investor Profile form.
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setErr(e instanceof Error ? e : new Error(String(e)));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const errorPresentation = err ? settingsErrorPresentation(err, t) : null;
-
-  if (!form) {
-    return (
-      <div className="investor-profile-panel">
-        <h3>{t(($) => $.registry.sections.investorProfile.title)}</h3>
-        {errorPresentation ? (
-          <InlineAlert state="failed" title={errorPresentation.message} />
-        ) : (
-          <StatusBadge state="loading" label={t(($) => $.investor.panel.loading)} />
-        )}
-        {developerMode ? (
-          <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
-        ) : null}
-      </div>
-    );
-  }
-
-  const set = <K extends keyof InvestorProfile>(key: K, value: InvestorProfile[K]) =>
-    setForm({ ...form, [key]: value });
-
-  const toggleIn = (key: "preferred_edge" | "behavioral_flags", item: string) => {
-    const cur = form[key];
-    set(key, cur.includes(item) ? cur.filter((x) => x !== item) : [...cur, item]);
+  const finishToSummary = (command: ReturnCommand) => {
+    setReturnCommand(command);
+    setMode("summary");
+    setBlockedNotice(false);
   };
 
-  const payload = (): Partial<InvestorProfile> => ({
-    enabled: form.enabled,
-    primary_preset: form.primary_preset,
-    risk_appetite: form.risk_appetite,
-    risk_capacity: form.risk_capacity,
-    holding_horizon: form.holding_horizon,
-    drawdown_tolerance_pct: form.drawdown_tolerance_pct,
-    concentration_limit_pct: form.concentration_limit_pct,
-    preferred_edge: form.preferred_edge,
-    avoidances: form.avoidances,
-    behavioral_flags: form.behavioral_flags,
-    freeform_notes: form.freeform_notes,
-    default_stance: form.default_stance,
-  });
-
-  const run = async (
-    fn: () => Promise<InvestorProfileResponse>,
-    completedOutcome: InvestorOutcome,
-  ) => {
-    if (busy) return;
-    setBusy(true);
-    setErr(null);
-    setOutcome(null);
-    try {
-      const r = await fn();
-      setResp(r);
-      setForm(r.profile);
-      setOutcome(completedOutcome);
-    } catch (e) {
-      setErr(e instanceof Error ? e : new Error(String(e)));
-    } finally {
-      setBusy(false);
+  const requestSummary = (command: ReturnCommand) => {
+    if (busy) {
+      setBlockedNotice(true);
+      return;
     }
+    if (mode === "edit" && dirty) {
+      dialogReturnFocusRef.current = editBackRef.current;
+      setConfirmDiscard(true);
+      return;
+    }
+    finishToSummary(command);
   };
 
-  const runCalibration = async (
-    fn: () => Promise<CalibrationState>,
-    completedOutcome: InvestorOutcome,
-  ): Promise<CalibrationRunResult> => {
-    if (busy) return "not_started";
+  const enterEdit = () => {
+    if (!profileResponse || busy) return;
+    setDraft(cloneProfile(profileResponse.profile));
+    setBaseline(cloneProfile(profileResponse.profile));
+    setReturnCommand("edit");
+    setMode("edit");
+    setOperationError(null);
+    setOutcome(null);
+  };
+
+  const continueCalibration = () => {
+    if (busy || !calibration?.active_session) return;
+    setReturnCommand("calibration");
+    setMode("calibration");
+    setOperationError(null);
+    setOutcome(null);
+  };
+
+  const retryCalibrationLoad = async () => {
+    if (!beginAction("calibration_load")) return;
     const generation = ++calibrationGenerationRef.current;
-    setBusy(true);
-    setErr(null);
-    setOutcome(null);
+    setCalibrationStatus("loading");
     try {
-      const r = await fn();
-      if (!applyCalibrationState(r, generation)) return "stale";
-      setOutcome(completedOutcome);
-      return "current";
-    } catch (e) {
-      if (calibrationGenerationRef.current === generation) {
-        setErr(e instanceof Error ? e : new Error(String(e)));
-        return "current";
+      const state = await getCalibrationState();
+      applyCalibrationState(state, generation);
+    } catch (error) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setCalibrationStatus("failed");
+        setCalibrationError(error);
       }
-      return "stale";
     } finally {
-      if (calibrationGenerationRef.current === generation) setBusy(false);
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
     }
   };
 
-  const sendCalibration = async () => {
-    const text = calibrationText.trim();
-    if (!text) return;
-    const result = await runCalibration(
-      () => sendCalibrationMessage({ session_id: calibration?.active_session?.id, content: text }),
-      "calibration_updated",
-    );
-    if (result === "current") setCalibrationText("");
+  const startCalibration = async () => {
+    if (!beginAction("calibration_start")) return;
+    const generation = ++calibrationGenerationRef.current;
+    try {
+      const state = await startCalibrationSession(false);
+      if (applyCalibrationState(state, generation)) {
+        setReturnCommand("calibration");
+        setMode("calibration");
+      }
+    } catch (error) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setOperationError({ scope: "turn", error });
+      }
+    } finally {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
+    }
+  };
+
+  const runDraft = async () => {
+    if (!draft || !beginAction("draft")) return;
+    try {
+      const response = await draftInvestorProfile(profilePayload(draft));
+      if (!mountedRef.current) return;
+      setDraft(cloneProfile(response.profile));
+      setOutcome("draft");
+    } catch (error) {
+      if (mountedRef.current) setOperationError({ scope: "save", error });
+    } finally {
+      if (mountedRef.current) setBusyAction(null);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!draft || !beginAction("save")) return;
+    try {
+      const saved = await saveInvestorProfile(profilePayload(draft));
+      if (!mountedRef.current) return;
+      setDraft(cloneProfile(saved.profile));
+      setBaseline(cloneProfile(saved.profile));
+      let refreshed: InvestorProfileResponse;
+      try {
+        refreshed = await getInvestorProfile();
+      } catch (error) {
+        if (mountedRef.current) setOperationError({ scope: "refresh", error });
+        return;
+      }
+      if (!mountedRef.current) return;
+      setProfileResponse(refreshed);
+      setDraft(cloneProfile(refreshed.profile));
+      setBaseline(cloneProfile(refreshed.profile));
+      setOutcome("saved");
+      finishToSummary("edit");
+    } catch (error) {
+      if (mountedRef.current) setOperationError({ scope: "save", error });
+    } finally {
+      if (mountedRef.current) setBusyAction(null);
+    }
+  };
+
+  const sendAnswer = async () => {
+    const session = calibration?.active_session;
+    if (!session || !answer.trim() || !beginAction("turn")) return;
+    const generation = ++calibrationGenerationRef.current;
+    const turnId = turnIdFactory();
+    lastTurnIdRef.current = turnId;
+    try {
+      const state = await sendCalibrationMessage({
+        turn_id: turnId,
+        session_id: session.id,
+        content: answer,
+      });
+      if (!applyCalibrationState(state, generation)) return;
+      setAnswer("");
+      if (state.latest_proposal?.status === "draft") {
+        setReturnCommand("proposal");
+        setMode("proposal");
+      }
+    } catch (error) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setOperationError({ scope: "turn", error });
+      }
+    } finally {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
+    }
+  };
+
+  const retryTurn = async () => {
+    const turnId = calibration?.pending_turn?.id ?? lastTurnIdRef.current;
+    if (!turnId || !beginAction("retry")) return;
+    const generation = ++calibrationGenerationRef.current;
+    try {
+      const state = await retryCalibrationTurn(turnId);
+      applyCalibrationState(state, generation);
+    } catch (error) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setOperationError({ scope: "turn", error });
+      }
+    } finally {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
+    }
+  };
+
+  const requestProposal = async () => {
+    const session = calibration?.active_session;
+    if (!session || !beginAction("request_proposal")) return;
+    const generation = ++calibrationGenerationRef.current;
+    const turnId = turnIdFactory();
+    lastTurnIdRef.current = turnId;
+    try {
+      const state = await requestCalibrationProposal({
+        turn_id: turnId,
+        session_id: session.id,
+      });
+      if (applyCalibrationState(state, generation) && state.latest_proposal?.status === "draft") {
+        setReturnCommand("proposal");
+        setMode("proposal");
+      }
+    } catch (error) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setOperationError({ scope: "proposal", error });
+      }
+    } finally {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
+    }
   };
 
   const approveProposal = async () => {
-    const proposal = calibration?.latest_proposal;
-    if (!proposal || proposal.status !== "draft") return;
-    if (busy) return;
+    if (!pendingProposal || !beginAction("approve")) return;
     const generation = ++calibrationGenerationRef.current;
-    setBusy(true);
-    setErr(null);
-    setOutcome(null);
+    setProposalConflict(false);
     try {
-      await approveCalibrationProposal(proposal.id, payload());
-      const profileResp = await getInvestorProfile();
-      if (calibrationGenerationRef.current === generation) {
-        setResp(profileResp);
-        setForm(profileResp.profile);
+      const approved = await approveCalibrationProposal(pendingProposal.id);
+      if (!mountedRef.current || calibrationGenerationRef.current !== generation) return;
+      setCalibration((current) => current
+        ? { ...current, latest_proposal: approved.proposal }
+        : current);
+      const refreshedProfile = await getInvestorProfile();
+      if (!mountedRef.current || calibrationGenerationRef.current !== generation) return;
+      setProfileResponse(refreshedProfile);
+      setDraft(cloneProfile(refreshedProfile.profile));
+      setBaseline(cloneProfile(refreshedProfile.profile));
+      try {
+        const refreshedCalibration = await getCalibrationState();
+        applyCalibrationState(refreshedCalibration, generation);
+      } catch (error) {
+        if (mountedRef.current && calibrationGenerationRef.current === generation) {
+          setCalibrationStatus("failed");
+          setCalibrationError(error);
+        }
       }
-      const refreshed = await getCalibrationState();
-      if (calibrationGenerationRef.current === generation) {
-        applyCalibrationState(refreshed, generation);
-        setOutcome("proposal_applied");
-      }
-    } catch (e) {
-      if (calibrationGenerationRef.current === generation) {
-        setErr(e instanceof Error ? e : new Error(String(e)));
+      setOutcome("approved");
+      finishToSummary("proposal");
+    } catch (error) {
+      if (!mountedRef.current || calibrationGenerationRef.current !== generation) return;
+      const presentation = settingsErrorPresentation(error, t);
+      if (presentation.code === "proposal_conflict") {
+        setProposalConflict(true);
+        setOperationError({ scope: "proposal", error });
+        try {
+          const refreshed = await getCalibrationState();
+          applyCalibrationState(refreshed, generation);
+        } catch {
+          // The typed conflict is still actionable without replacing it with a load error.
+        }
+      } else {
+        setOperationError({ scope: "refresh", error });
       }
     } finally {
-      if (calibrationGenerationRef.current === generation) setBusy(false);
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
     }
   };
 
   const rejectProposal = async () => {
-    const proposal = calibration?.latest_proposal;
-    if (!proposal || proposal.status !== "draft") return;
-    await runCalibration(async () => {
-      await rejectCalibrationProposal(proposal.id);
-      return getCalibrationState();
-    }, "proposal_rejected");
+    if (!pendingProposal || !beginAction("reject")) return;
+    const generation = ++calibrationGenerationRef.current;
+    try {
+      await rejectCalibrationProposal(pendingProposal.id);
+      const refreshed = await getCalibrationState();
+      if (!applyCalibrationState(refreshed, generation)) return;
+      setProposalConflict(false);
+      setOutcome("rejected");
+      finishToSummary("proposal");
+    } catch (error) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setOperationError({ scope: "proposal", error });
+      }
+    } finally {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
+        setBusyAction(null);
+      }
+    }
   };
 
-  const mismatch = resp?.profile.risk_mismatch ?? form.risk_mismatch;
-  const messages = calibration?.messages ?? [];
-  const latestProposal = calibration?.latest_proposal?.status === "draft" ? calibration.latest_proposal : null;
-  const rationaleEntries = Object.entries(latestProposal?.rationales ?? {});
-  const outcomeLabel = outcome ? investorOutcomeLabel(outcome, t) : null;
+  const setDraftField = <K extends keyof InvestorProfile>(key: K, value: InvestorProfile[K]) => {
+    setDraft((current) => current ? { ...current, [key]: value } : current);
+  };
+
+  const profileErrorPresentation = profileError
+    ? settingsErrorPresentation(profileError, t)
+    : null;
+  const calibrationErrorPresentation = calibrationError
+    ? settingsErrorPresentation(calibrationError, t)
+    : null;
+  const operationErrorPresentation = operationError
+    ? settingsErrorPresentation(operationError.error, t)
+    : null;
+  const providerMissing = operationErrorPresentation?.code === "provider_config_missing";
+  const conflictError = operationErrorPresentation?.code === "proposal_conflict";
+
+  const unknownTopicDiagnostics = useMemo(() => {
+    if (!calibration) return [];
+    const known = new Set<string>(CALIBRATION_TOPIC_IDS);
+    const ids = [
+      ...calibration.topic_catalog,
+      ...(calibration.active_session?.covered_topics ?? []),
+      calibration.active_session?.current_topic_id,
+      ...(calibration.latest_proposal?.covered_topics ?? []),
+    ];
+    return [...new Set(ids.filter((id): id is string => Boolean(id) && !known.has(id as string)))];
+  }, [calibration]);
+
+  const diagnostics = [
+    profileErrorPresentation?.diagnostic,
+    calibrationErrorPresentation?.diagnostic,
+    operationErrorPresentation?.diagnostic,
+    calibration?.pending_turn?.diagnostic,
+    ...unknownTopicDiagnostics,
+  ].map(boundedDiagnostic);
+
+  const outcomeLabel = outcome === "draft"
+    ? t(($) => $.investor.draft.success)
+    : outcome === "saved"
+      ? t(($) => $.investor.saveSuccess)
+      : outcome === "approved"
+        ? t(($) => $.investor.workspace.proposal.approved)
+        : outcome === "rejected"
+          ? t(($) => $.investor.workspace.proposal.rejected)
+          : null;
+
+  if (profileStatus !== "ready" || !profileResponse || !draft) {
+    return (
+      <div className="investor-profile-panel">
+        <h3>{t(($) => $.registry.sections.investorProfile.title)}</h3>
+        {profileStatus === "failed" ? (
+          <InlineAlert state="failed" title={t(($) => $.investor.workspace.errors.profileLoad)} />
+        ) : (
+          <StatusBadge state="loading" label={t(($) => $.investor.panel.loading)} />
+        )}
+        {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}
+      </div>
+    );
+  }
 
   return (
-    <div className="investor-profile-panel" aria-busy={busy}>
-      <h3>{t(($) => $.registry.sections.investorProfile.title)}</h3>
-      <p className="muted">{t(($) => $.investor.panel.description)}</p>
-      {busy ? <StatusBadge state="running" label={t(($) => $.investor.panel.updating)} /> : null}
+    <div className="investor-profile-panel" aria-busy={busy || undefined}>
+      {busy ? (
+        <StatusBadge state="running" label={t(($) => $.investor.panel.updating)} />
+      ) : null}
 
-      <label className="ip-toggle">
-        <input
-          type="checkbox"
-          checked={form.enabled}
-          onChange={(e) => set("enabled", e.target.checked)}
-        />{" "}
-        {t(($) => $.investor.fields.enabledWithStance, {
-          value: settingsStanceLabel(resp?.effective_stance ?? "off", t),
-        })}
-      </label>
-
-      <div className="ip-grid">
-        <label>
-          {t(($) => $.investor.fields.preset)}
-          <select
-            value={form.primary_preset}
-            onChange={(e) => set("primary_preset", e.target.value as InvestorPreset)}
-          >
-            {PRESETS.map((p) => (
-              <option key={p} value={p}>
-                {settingsInvestorPresetLabel(p, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          {t(($) => $.investor.fields.riskAppetite)}
-          <select
-            value={form.risk_appetite ?? ""}
-            onChange={(e) =>
-              set("risk_appetite", e.target.value === "" ? null : Number(e.target.value))
-            }
-          >
-            <option value="">{t(($) => $.investor.fields.unset)}</option>
-            {SCORES.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          {t(($) => $.investor.fields.riskCapacity)}
-          <select
-            value={form.risk_capacity ?? ""}
-            onChange={(e) =>
-              set("risk_capacity", e.target.value === "" ? null : Number(e.target.value))
-            }
-          >
-            <option value="">{t(($) => $.investor.fields.unset)}</option>
-            {SCORES.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          {t(($) => $.investor.fields.horizon)}
-          <select
-            value={form.holding_horizon}
-            onChange={(e) => set("holding_horizon", e.target.value)}
-          >
-            {HORIZONS.map((h) => (
-              <option key={h} value={h}>
-                {settingsInvestorHorizonLabel(h, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          {t(($) => $.investor.fields.drawdown)}
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={form.drawdown_tolerance_pct ?? ""}
-            onChange={(e) =>
-              set(
-                "drawdown_tolerance_pct",
-                e.target.value === "" ? null : Number(e.target.value),
-              )
-            }
-          />
-        </label>
-
-        <label>
-          {t(($) => $.investor.fields.concentration)}
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={form.concentration_limit_pct ?? ""}
-            onChange={(e) =>
-              set(
-                "concentration_limit_pct",
-                e.target.value === "" ? null : Number(e.target.value),
-              )
-            }
-          />
-        </label>
-
-        <label>
-          {t(($) => $.investor.fields.stance)}
-          <select
-            value={form.default_stance}
-            onChange={(e) => set("default_stance", e.target.value as AssistantStance)}
-          >
-            {STANCES.map((s) => (
-              <option key={s} value={s}>
-                {settingsStanceLabel(s, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <fieldset>
-        <legend>{t(($) => $.investor.fields.edges)}</legend>
-        {EDGES.map((edge) => (
-          <label key={edge} className="ip-chip">
-            <input
-              type="checkbox"
-              checked={form.preferred_edge.includes(edge)}
-              onChange={() => toggleIn("preferred_edge", edge)}
-            />
-            {edge}
-          </label>
-        ))}
-      </fieldset>
-
-      <fieldset>
-        <legend>{t(($) => $.investor.fields.flags)}</legend>
-        {FLAGS.map((flag) => (
-          <label key={flag} className="ip-chip">
-            <input
-              type="checkbox"
-              checked={form.behavioral_flags.includes(flag)}
-              onChange={() => toggleIn("behavioral_flags", flag)}
-            />
-            {flag}
-          </label>
-        ))}
-      </fieldset>
-
-      <label>
-        {t(($) => $.investor.fields.avoidances)}
-        <input
-          type="text"
-          value={form.avoidances.join(", ")}
-          onChange={(e) =>
-            set(
-              "avoidances",
-              e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            )
-          }
+      {mode === "summary" ? (
+        <InvestorProfileSummary
+          response={profileResponse}
+          calibration={calibration}
+          calibrationStatus={calibrationStatus}
+          busy={busy}
+          headingRef={summaryHeadingRef}
+          editCommandRef={editCommandRef}
+          calibrationCommandRef={calibrationCommandRef}
+          proposalCommandRef={proposalCommandRef}
+          onEdit={enterEdit}
+          onCalibration={() => {
+            if (calibration?.active_session) continueCalibration();
+            else void startCalibration();
+          }}
+          onReviewProposal={() => {
+            if (!pendingProposal || busy) return;
+            setReturnCommand("proposal");
+            setMode("proposal");
+            setOperationError(null);
+            setOutcome(null);
+          }}
+          onRetryCalibration={() => void retryCalibrationLoad()}
+          t={t}
         />
-      </label>
+      ) : null}
 
-      <label>
-        {t(($) => $.investor.fields.notes)}
-        <textarea
-          value={form.freeform_notes}
-          onChange={(e) => set("freeform_notes", e.target.value)}
+      {mode === "edit" ? (
+        <InvestorProfileEdit
+          profile={draft}
+          busy={busy}
+          headingRef={editHeadingRef}
+          backButtonRef={editBackRef}
+          onChange={setDraftField}
+          onDraft={() => void runDraft()}
+          onSave={() => void saveProfile()}
+          onBack={() => requestSummary("edit")}
+          t={t}
         />
-      </label>
+      ) : null}
 
-      <section className="ip-calibration">
-        <h4>{t(($) => $.investor.calibration.title)}</h4>
-        <p className="muted">{t(($) => $.investor.calibration.description)}</p>
-        <div className="ip-actions">
-          <Button
-            disabled={busy || Boolean(calibration?.active_session)}
-            onClick={() => void runCalibration(
-              () => startCalibrationSession(false),
-              "calibration_started",
-            )}
-          >
-            {t(($) => $.investor.calibration.start)}
-          </Button>
-        </div>
-        {messages.length ? (
-          <div className="ip-calibration-log">
-            {messages.map((m) => (
-              <div key={m.id} className="muted">
-                {m.role === "user"
-                  ? t(($) => $.investor.calibration.user)
-                  : t(($) => $.investor.calibration.assistant)}:{m.content}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <label>
-          {t(($) => $.investor.calibration.messageLabel)}
-          <textarea
-            aria-label={t(($) => $.investor.calibration.messageLabel)}
-            value={calibrationText}
-            onChange={(e) => setCalibrationText(e.target.value)}
-          />
-        </label>
-        <div className="ip-actions">
-          <Button disabled={busy || !calibration?.active_session || !calibrationText.trim()} onClick={() => void sendCalibration()}>
-            {t(($) => $.investor.calibration.send)}
-          </Button>
-        </div>
-        {latestProposal ? (
-          <div className="ip-guardrail">
-            <strong>
-              {t(($) => $.investor.proposal.title)}{" "}
-              <StatusBadge state="partial" label={t(($) => $.investor.proposal.pending)} />
-            </strong>
-            {rationaleEntries.length ? (
-              <ul>
-                {rationaleEntries.map(([field, rationale]) => (
-                  <li key={field}>
-                    {field}:{rationale}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <div className="ip-actions">
-              <Button disabled={busy} onClick={() => void approveProposal()}>
-                {t(($) => $.investor.proposal.apply)}
-              </Button>
-              <Button disabled={busy} onClick={() => void rejectProposal()}>
-                {t(($) => $.investor.proposal.reject)}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <div className="ip-guardrail">
-        {t(($) => $.investor.fields.riskComparison)}
-        <StatusBadge
-          state={mismatch === "none" ? "ready" : "partial"}
-          label={settingsMismatchLabel(mismatch, t)}
+      {mode === "calibration" && calibration ? (
+        <InvestorProfileCalibration
+          state={calibration}
+          answer={answer}
+          busy={busy}
+          headingRef={calibrationHeadingRef}
+          backButtonRef={calibrationBackRef}
+          onAnswerChange={setAnswer}
+          onSend={() => void sendAnswer()}
+          onRetry={() => void retryTurn()}
+          onRequestProposal={() => void requestProposal()}
+          onBack={() => requestSummary("calibration")}
+          t={t}
         />
-      </div>
-      <div className="muted">{t(($) => $.investor.fields.skillMode)}</div>
+      ) : null}
 
-      <div className="ip-actions">
-        <Button disabled={busy} onClick={() => void run(
-          () => draftInvestorProfile(payload()),
-          "draft_generated",
-        )}>
-          {t(($) => $.investor.draft.action)}
-        </Button>
-        <Button disabled={busy} onClick={() => void run(
-          () => saveInvestorProfile(payload()),
-          "saved",
-        )}>
-          {t(($) => $.investor.saveAction)}
-        </Button>
-      </div>
+      {mode === "proposal" && pendingProposal ? (
+        <InvestorProfileProposalReview
+          profile={profileResponse.profile}
+          proposal={pendingProposal}
+          busy={busy}
+          conflict={proposalConflict}
+          headingRef={proposalHeadingRef}
+          backButtonRef={proposalBackRef}
+          onApprove={() => void approveProposal()}
+          onReject={() => void rejectProposal()}
+          onBack={() => requestSummary("proposal")}
+          t={t}
+        />
+      ) : null}
+
+      {blockedNotice ? (
+        <InlineAlert state="blocked" title={t(($) => $.investor.workspace.guard.busy)} />
+      ) : null}
       {outcomeLabel ? <InlineAlert state="ready" title={outcomeLabel} /> : null}
-      {errorPresentation ? (
-        <InlineAlert state="failed" title={errorPresentation.message} />
+      {operationError && !conflictError ? (
+        <InlineAlert
+          state="failed"
+          title={providerMissing
+            ? t(($) => $.investor.workspace.calibration.noCredential)
+            : operationErrorTitle(operationError.scope, t)}
+          action={providerMissing && onNavigateToProviders ? (
+            <Button size="compact" onClick={onNavigateToProviders}>
+              {t(($) => $.registry.sections.providers.title)}
+            </Button>
+          ) : undefined}
+        />
       ) : null}
-      {developerMode ? (
-        <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
-      ) : null}
+      {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}
+
+      <ConfirmDialog
+        open={confirmDiscard}
+        title={t(($) => $.investor.workspace.guard.dirtyTitle)}
+        consequence={t(($) => $.investor.workspace.guard.dirtyDescription)}
+        confirmLabel={t(($) => $.investor.workspace.guard.discard)}
+        cancelLabel={t(($) => $.investor.workspace.guard.stay)}
+        returnFocusRef={dialogReturnFocusRef}
+        fallbackFocusRef={editCommandRef}
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          setDraft(cloneProfile(baseline ?? profileResponse.profile));
+          finishToSummary("edit");
+        }}
+      />
     </div>
   );
 }

@@ -48,11 +48,22 @@ vi.mock("./api", async (importOriginal) => {
 vi.mock("./InvestorProfilePanel", async () => {
   const { useEffect, useState } = await import("react");
   return {
-    InvestorProfilePanel: ({ developerMode }: { developerMode?: boolean }) => {
+    InvestorProfilePanel: ({
+      developerMode,
+      onNavigationGuardChange,
+      onNavigateToProviders,
+    }: {
+      developerMode?: boolean;
+      onNavigationGuardChange?: SettingsNavigationGuardReporter;
+      onNavigateToProviders?: () => void;
+    }) => {
       const [busy, setBusy] = useState(false);
       useEffect(() => {
         mocks.investorDeveloperModes.push(Boolean(developerMode));
       }, [developerMode]);
+      useEffect(() => () => {
+        onNavigationGuardChange?.({ dirty: false, busy: false, reason: null });
+      }, [onNavigationGuardChange]);
       return (
         <div className="investor-profile-panel" aria-busy={busy}>
           <label>
@@ -63,7 +74,34 @@ vi.mock("./InvestorProfilePanel", async () => {
             <summary>投資人草稿詳細資料</summary>
             <p>草稿內容</p>
           </details>
-          <button type="button" onClick={() => setBusy(true)}>開始儲存投資人設定</button>
+          <button
+            type="button"
+            onClick={() => onNavigationGuardChange?.({
+              dirty: true,
+              busy: false,
+              reason: "投資人編輯有尚未儲存的設定。SOURCE_GUARD_SECRET",
+            })}
+          >標記投資人編輯草稿</button>
+          <button
+            type="button"
+            onClick={() => {
+              setBusy(true);
+              onNavigationGuardChange?.({
+                dirty: false,
+                busy: true,
+                reason: "請等待目前的投資人設定更新完成。",
+              });
+            }}
+          >開始儲存投資人設定</button>
+          <button
+            type="button"
+            onClick={() => onNavigationGuardChange?.({
+              dirty: false,
+              busy: false,
+              reason: null,
+            })}
+          >開啟投資人校準</button>
+          <button type="button" onClick={onNavigateToProviders}>設定 AI Provider</button>
         </div>
       );
     },
@@ -672,26 +710,45 @@ describe("Settings workspace", () => {
     expect(document.activeElement).toBe(tabWithText("AI 與模型"));
   });
 
-  it("investor_profile_guard_blocks_busy_and_confirms_potential_draft_without_modifying_panel", async () => {
+  it("investor profile guard uses the panel reporter for dirty edit and busy mutation", async () => {
     window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
     await renderSettings();
-    const input = host!.querySelector<HTMLInputElement>('input[aria-label="投資目標"]')!;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    await act(async () => {
-      setter?.call(input, "保守成長");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await click(buttonWithText("標記投資人編輯草稿", host!));
 
     await click(tabWithText("資料與同步"));
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("要離開這個設定區段嗎");
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("SOURCE_GUARD_SECRET");
     await click(buttonWithText("留在此處", document.querySelector('[role="dialog"]')!));
 
     await click(buttonWithText("開始儲存投資人設定", host!));
     await click(tabWithText("資料與同步"));
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.querySelector('[role="alert"]')?.textContent)
-      .toContain("目前有未儲存的變更或進行中的工作");
+      .toContain("請等待目前的投資人設定更新完成。");
     expect(tabWithText("個人化").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("calibration mode leaves Personalization without discard confirmation", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
+    await renderSettings();
+    await click(buttonWithText("開啟投資人校準", host!));
+
+    await click(tabWithText("資料與同步"));
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(tabWithText("資料與同步").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("investor provider action reveals the Providers anchor and restores focus", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
+    await renderSettings();
+
+    await click(buttonWithText("設定 AI Provider", host!));
+
+    expect(tabWithText("AI 與模型").getAttribute("aria-selected")).toBe("true");
+    const providers = host!.querySelector<HTMLElement>('[data-settings-anchor="providers"]');
+    expect(providers).not.toBeNull();
+    expect(document.activeElement).toBe(providers);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 });
