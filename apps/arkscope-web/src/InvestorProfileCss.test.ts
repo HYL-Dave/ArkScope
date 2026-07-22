@@ -91,6 +91,46 @@ describe("Investor Profile workspace CSS", () => {
     expect(rule(".research-personalization-context-source")).toMatch(/overflow-wrap:\s*anywhere/);
   });
 
+  it("keeps the Summary current-context source intrinsically wrap-safe", () => {
+    const contextSource = rule(
+      '.investor-profile-panel [data-testid="current-context-disclosure"] pre',
+    );
+
+    expect(contextSource).toMatch(/min-width:\s*0/);
+    expect(contextSource).toMatch(/max-width:\s*100%/);
+    expect(contextSource).toMatch(/white-space:\s*pre-wrap/);
+    expect(contextSource).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it("keeps the Calibration current question intrinsically wrap-safe", () => {
+    const currentQuestion = rule(
+      ".investor-profile-panel > .ip-calibration > section blockquote",
+    );
+
+    expect(currentQuestion).toMatch(/min-width:\s*0/);
+    expect(currentQuestion).toMatch(/max-width:\s*100%/);
+    expect(currentQuestion).toMatch(/white-space:\s*pre-wrap/);
+    expect(currentQuestion).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it("targets Edit labels and toggle through the split-renderer root only", () => {
+    const editLabel = rule(
+      '.investor-profile-panel > [data-testid="investor-profile-edit"] > label',
+    );
+    const editToggle = rule(
+      '.investor-profile-panel > [data-testid="investor-profile-edit"] > .ip-toggle',
+    );
+
+    expect(editLabel).toMatch(/display:\s*grid/);
+    expect(editLabel).toMatch(/color:\s*var\(--muted\)/);
+    expect(editToggle).toMatch(/display:\s*flex/);
+    expect(editToggle).toMatch(/align-items:\s*center/);
+    expect(primitiveCss).not.toMatch(
+      /\.investor-profile-panel\s*>\s*label(?=\s*[,{}])/,
+    );
+    expect(primitiveCss).not.toMatch(/\.investor-profile-panel\s*>\s*\.ip-toggle\b/);
+  });
+
   it("adds no media query breakpoint or nested-card selector", () => {
     const additionStart = primitiveCss.indexOf(".investor-profile-panel > section");
     expect(additionStart).toBeGreaterThanOrEqual(0);

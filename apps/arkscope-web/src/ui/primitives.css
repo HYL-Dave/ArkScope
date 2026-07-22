@@ -218,10 +218,10 @@
 
 .investor-profile-panel { display: grid; gap: var(--space-4); min-width: 0; }
 .investor-profile-panel h3, .investor-profile-panel h4 { margin: 0; letter-spacing: 0; }
-.investor-profile-panel > label,
 .ip-grid > label,
-.ip-calibration > label { display: grid; gap: var(--space-1); color: var(--muted); }
-.investor-profile-panel > .ip-toggle { display: flex; align-items: center; gap: var(--space-2); }
+.ip-calibration > label,
+.investor-profile-panel > [data-testid="investor-profile-edit"] > label { display: grid; gap: var(--space-1); color: var(--muted); }
+.investor-profile-panel > [data-testid="investor-profile-edit"] > .ip-toggle { display: flex; align-items: center; gap: var(--space-2); }
 .ip-toggle input { margin: 0; }
 .investor-profile-panel input[type="text"],
 .investor-profile-panel input[type="number"],
@@ -296,6 +296,19 @@
 }
 .investor-profile-panel [data-testid="proposal-changes"] .ip-guardrail > div:nth-of-type(n + 3) {
   grid-column: 1 / -1;
+}
+.investor-profile-panel [data-testid="current-context-disclosure"] pre {
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.investor-profile-panel > .ip-calibration > section blockquote {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .research-personalization-context {
   min-width: 0;

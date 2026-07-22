@@ -166,7 +166,9 @@ export function ResearchEvidenceDrawer({
       .finally(() => setDiagnosticLoading(false));
   };
 
-  const details = runDetail ?? (activeRun?.id === runId ? activeRun : null);
+  const details = runDetail?.id === runId
+    ? runDetail
+    : (activeRun?.id === runId ? activeRun : null);
   const usage = details?.token_usage ?? message?.token_usage ?? null;
   const personalization = message?.personalization ?? null;
   const personalizationContext = message?.personalization ?? details?.personalization ?? null;

@@ -2,6 +2,7 @@
 import React, { type ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +37,14 @@ async function renderTrace(value: PersonalizationTrace | null) {
   return renderNode(<ResearchPersonalizationContext trace={value} />);
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 function trace(
   overrides: Partial<PersonalizationTrace> = {},
 ): PersonalizationTrace {
@@ -49,7 +58,10 @@ function trace(
   };
 }
 
-function message(personalization: PersonalizationTrace | null): Message {
+function message(
+  personalization: PersonalizationTrace | null,
+  runId = "run-context",
+): Message {
   return {
     role: "assistant",
     content: "Saved answer",
@@ -63,11 +75,14 @@ function message(personalization: PersonalizationTrace | null): Message {
     elapsed_seconds: 2,
     created_at: "2026-07-22T00:03:00Z",
     personalization,
-    runId: "run-context",
+    runId,
   };
 }
 
-function run(personalization: PersonalizationTrace | null): ResearchRunDTO {
+function run(
+  personalization: PersonalizationTrace | null,
+  overrides: Partial<ResearchRunDTO> = {},
+): ResearchRunDTO {
   return {
     id: "run-context",
     thread_id: "thread-context",
@@ -86,6 +101,7 @@ function run(personalization: PersonalizationTrace | null): ResearchRunDTO {
     token_usage: null,
     created_at: "2026-07-22T00:00:00Z",
     updated_at: "2026-07-22T00:02:00Z",
+    ...overrides,
   };
 }
 
@@ -177,6 +193,73 @@ describe("ResearchPersonalizationContext", () => {
     );
     expect(document.querySelector(".research-personalization-context-source")?.textContent)
       .toBe("FETCHED_RUN_SOURCE");
+  });
+
+  it("never exposes the previous run context while a newly selected run is pending", async () => {
+    const runAResponse = deferred<Response>();
+    const runBResponse = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+      if (url.endsWith("/run-a")) return runAResponse.promise;
+      if (url.endsWith("/run-b")) return runBResponse.promise;
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const drawer = (runId: string) => (
+      <ResearchEvidenceDrawer
+        open
+        pinned={false}
+        onClose={vi.fn()}
+        onPinnedChange={vi.fn()}
+        message={message(null, runId)}
+        activeTrace={[]}
+        activeRun={null}
+        developerMode={false}
+      />
+    );
+
+    await renderNode(drawer("run-a"));
+    await act(async () => {
+      runAResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "RUN_A_CONTEXT" }), { id: "run-a" }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("RUN_A_CONTEXT");
+
+    act(() => {
+      flushSync(() => {
+        root!.render(drawer("run-b"));
+      });
+      expect(document.body.textContent).not.toContain("RUN_A_CONTEXT");
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(document.body.textContent).not.toContain("RUN_A_CONTEXT");
+    expect(document.body.textContent).not.toContain("RUN_B_CONTEXT");
+
+    await act(async () => {
+      runBResponse.resolve(new Response(
+        JSON.stringify({
+          run: run(trace({ context_snapshot: "RUN_B_CONTEXT" }), { id: "run-b" }),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    });
+    expect(document.querySelector(".research-personalization-context-source")?.textContent)
+      .toBe("RUN_B_CONTEXT");
+    expect(document.body.textContent).not.toContain("RUN_A_CONTEXT");
   });
 
   it("switches locale without changing source context or disclosure state", async () => {
