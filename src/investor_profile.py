@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -280,11 +281,79 @@ CREATE TABLE IF NOT EXISTS investor_profile (
 """
 
 
+def _read_profile_on_connection(conn: sqlite3.Connection) -> InvestorProfile:
+    """Read the singleton profile without owning connection or transaction state."""
+    row = conn.execute(
+        "SELECT enabled, primary_preset, risk_appetite, risk_capacity, "
+        "risk_mismatch, holding_horizon, drawdown_tolerance_pct, "
+        "concentration_limit_pct, preferred_edge_json, avoidances_json, "
+        "behavioral_flags_json, freeform_notes, default_stance, skill_mode, "
+        "last_reviewed_at, updated_at FROM investor_profile WHERE id = 'default'"
+    ).fetchone()
+    if row is None:
+        return default_profile()
+    return InvestorProfile(
+        enabled=bool(row[0]),
+        primary_preset=row[1],
+        risk_appetite=row[2],
+        risk_capacity=row[3],
+        risk_mismatch=row[4],
+        holding_horizon=row[5],
+        drawdown_tolerance_pct=row[6],
+        concentration_limit_pct=row[7],
+        preferred_edge=json.loads(row[8]),
+        avoidances=json.loads(row[9]),
+        behavioral_flags=json.loads(row[10]),
+        freeform_notes=row[11],
+        default_stance=row[12],
+        skill_mode=row[13],
+        last_reviewed_at=row[14],
+        updated_at=row[15],
+    )
+
+
+def _write_profile_on_connection(
+    conn: sqlite3.Connection,
+    profile: InvestorProfile,
+) -> None:
+    """Write an already-normalized profile on a caller-owned transaction."""
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO investor_profile (
+            id, enabled, primary_preset, risk_appetite, risk_capacity,
+            risk_mismatch, holding_horizon, drawdown_tolerance_pct,
+            concentration_limit_pct, preferred_edge_json, avoidances_json,
+            behavioral_flags_json, freeform_notes, default_stance,
+            skill_mode, last_reviewed_at, updated_at
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(profile.enabled),
+            profile.primary_preset,
+            profile.risk_appetite,
+            profile.risk_capacity,
+            profile.risk_mismatch,
+            profile.holding_horizon,
+            profile.drawdown_tolerance_pct,
+            profile.concentration_limit_pct,
+            json.dumps(profile.preferred_edge, ensure_ascii=False),
+            json.dumps(profile.avoidances, ensure_ascii=False),
+            json.dumps(profile.behavioral_flags, ensure_ascii=False),
+            profile.freeform_notes,
+            profile.default_stance,
+            profile.skill_mode,
+            profile.last_reviewed_at,
+            profile.updated_at,
+        ),
+    )
+
+
 class InvestorProfileStore:
     """Singleton investor profile persisted in local profile_state.db."""
 
     def __init__(self, db_path: str | Path):
         self._db_path = Path(db_path)
+        self._write_lock = threading.Lock()
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
@@ -301,29 +370,7 @@ class InvestorProfileStore:
 
     def get(self) -> InvestorProfile:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM investor_profile WHERE id = 'default'"
-            ).fetchone()
-        if row is None:
-            return default_profile()
-        return InvestorProfile(
-            enabled=bool(row["enabled"]),
-            primary_preset=row["primary_preset"],
-            risk_appetite=row["risk_appetite"],
-            risk_capacity=row["risk_capacity"],
-            risk_mismatch=row["risk_mismatch"],
-            holding_horizon=row["holding_horizon"],
-            drawdown_tolerance_pct=row["drawdown_tolerance_pct"],
-            concentration_limit_pct=row["concentration_limit_pct"],
-            preferred_edge=json.loads(row["preferred_edge_json"]),
-            avoidances=json.loads(row["avoidances_json"]),
-            behavioral_flags=json.loads(row["behavioral_flags_json"]),
-            freeform_notes=row["freeform_notes"],
-            default_stance=row["default_stance"],
-            skill_mode=row["skill_mode"],
-            last_reviewed_at=row["last_reviewed_at"],
-            updated_at=row["updated_at"],
-        )
+            return _read_profile_on_connection(conn)
 
     def draft(self, payload: dict) -> InvestorProfile:
         """Normalize payload without writing it."""
@@ -331,38 +378,19 @@ class InvestorProfileStore:
 
     def save(self, payload: dict) -> InvestorProfile:
         """Normalize and upsert the singleton profile."""
-        profile = normalize_profile_payload(payload, existing=self.get())
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        profile = replace(profile, last_reviewed_at=now, updated_at=now)
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO investor_profile (
-                    id, enabled, primary_preset, risk_appetite, risk_capacity,
-                    risk_mismatch, holding_horizon, drawdown_tolerance_pct,
-                    concentration_limit_pct, preferred_edge_json, avoidances_json,
-                    behavioral_flags_json, freeform_notes, default_stance,
-                    skill_mode, last_reviewed_at, updated_at
-                ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    int(profile.enabled),
-                    profile.primary_preset,
-                    profile.risk_appetite,
-                    profile.risk_capacity,
-                    profile.risk_mismatch,
-                    profile.holding_horizon,
-                    profile.drawdown_tolerance_pct,
-                    profile.concentration_limit_pct,
-                    json.dumps(profile.preferred_edge, ensure_ascii=False),
-                    json.dumps(profile.avoidances, ensure_ascii=False),
-                    json.dumps(profile.behavioral_flags, ensure_ascii=False),
-                    profile.freeform_notes,
-                    profile.default_stance,
-                    profile.skill_mode,
-                    profile.last_reviewed_at,
-                    profile.updated_at,
-                ),
-            )
-            conn.commit()
+        with self._write_lock:
+            conn = self._connect()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                current = _read_profile_on_connection(conn)
+                profile = normalize_profile_payload(payload, existing=current)
+                now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                profile = replace(profile, last_reviewed_at=now, updated_at=now)
+                _write_profile_on_connection(conn, profile)
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
         return profile
