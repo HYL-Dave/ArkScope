@@ -170,6 +170,55 @@ the Summary rendered stale `Income` instead of saved `Growth`. GREEN is Task 7
 `71/71`, Task 6-8 focused `117/117`, and full frontend `836/836`. The final
 sequential ledger is Task 7 `+36/-2` and total frontend `+60/-2` (net `+58`).
 
+### Reviewed implementation deviation: monotonic workspace authority and focus ownership
+
+Final Task 7 code-quality review after `d4f4e9bd` identified five Important and
+two Minor findings: operation errors survived proven same-turn completion;
+pre-existing drafts could impersonate the current mutation; independently read
+calibration state could regress same-session journal, coverage, turn, proposal,
+or conflict authority; ambiguous terminal proposal reconciliation could pair an
+approved outcome with a stale profile; same-group exact-anchor focus could race
+the Panel's Summary commit; reject advisory results needed one joint
+mounted/generation check; and locale-switch coverage overclaimed modes it did
+not exercise.
+
+The RED-first product correction at `e41f337e` changes only the reviewed Task 7
+frontend ownership. It adds a pure `calibrationStateMerge` helper plus focused
+tests and a real `SettingsView` + `InvestorProfilePanel` integration suite.
+Task 8, CSS, backend, API, resources, routes, persistence, polling, and anchors
+remain unchanged. Relative to `d4f4e9bd`, add exactly these fourteen node IDs:
+
+1. `does not treat an existing draft as a new proposal or erase same-session evidence`
+2. `preserves edit draft disclosure and focus across locale switch`
+3. `preserves calibration source content disclosure answer and focus across locale switch`
+4. `preserves proposal source rationale and focus across locale switch`
+5. `keeps the approved proposal patch when ambiguous reconciliation reads a stale profile`
+6. `merges same-session messages by stable ID and keeps coverage monotonic`
+7. `does not regress pending-turn terminal evidence across mixed snapshots`
+8. `preserves clean conflict and terminal proposal authority`
+9. `resets on session replacement and accepts explicitly observed new authorities`
+10. `recognizes only new matching assistant completion and genuinely new drafts`
+11. `applies proposal fields and corroborates them without freezing unrelated values`
+12. `focuses the investor anchor only after clean real-panel modes commit Summary`
+13. `waits for dirty discard before acknowledging and focusing the investor anchor`
+14. `keeps a busy real panel in place and does not transfer exact-anchor focus`
+
+Retire exactly this overclaiming node ID:
+
+- `preserves edit calibration disclosure proposal and focus across locale switch`
+
+The existing `retries interrupted turn with the same ID without duplicate
+answer` and `resets exact-anchor requests to summary while honoring dirty and
+busy guards` nodes are strengthened in place. RED evidence was: helper module
+absence followed by `5 failed / 1 passed`; helper edge hardening `2 failed / 4
+passed`; Panel behavior `3 failed / 45 passed`; Panel Summary acknowledgement
+`1 failed / 47 passed`; and real Settings integration `1 failed / 2 passed`.
+GREEN is Task 7 owned `4 files / 84`, Task 6-8 focused `11 files / 130`, and
+full frontend `83 files / 849`. The final sequential ledger is Task 7
+`+50/-3` and total frontend `+74/-3` (net `+71`). Historical checkpoints above
+remain intentionally recorded and are superseded only for current/final
+expectations.
+
 ---
 
 ## Grounded Baseline
@@ -851,7 +900,10 @@ test-node accounting and scanner counts remain unchanged.
 - `apps/arkscope-web/src/settings/investor/InvestorProfileProposalReview.tsx`
 - `apps/arkscope-web/src/settings/investor/investorProfileDisplay.ts`
 - `apps/arkscope-web/src/settings/investor/investorProfileDisplay.test.ts`
+- `apps/arkscope-web/src/settings/investor/calibrationStateMerge.ts`
+- `apps/arkscope-web/src/settings/investor/calibrationStateMerge.test.ts`
 - `apps/arkscope-web/src/InvestorProfileApi.test.ts`
+- `apps/arkscope-web/src/SettingsInvestorProfileIntegration.test.tsx`
 - `apps/arkscope-web/src/ResearchPersonalizationContext.tsx`
 - `apps/arkscope-web/src/ResearchPersonalizationContext.test.tsx`
 - `apps/arkscope-web/src/InvestorProfileCss.test.ts`
@@ -1002,11 +1054,10 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+60/-2`, net `+58`
+### Frontend: `+74/-3`, net `+71`
 
-Full suite moves `77 files / 778 -> 81 files / 836`. The nine-file focused
-suite moves the historical `5 existing files / 59` baseline to
-`9 files / 117`.
+Full suite moves `77 files / 778 -> 83 files / 849`. The final focused suite
+moves the historical `5 existing files / 59` baseline to `11 files / 130`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -1105,6 +1156,17 @@ place to distinguish saved profile authority from derived effective facts.
 This is the RED-first correction for the remaining High and must remain visible
 as raw `+1/-0` accounting.
 
+#### Monotonic-authority/focus deviation — add 14, remove 1
+
+Relative to `d4f4e9bd`, the exact IDs are the fourteen-item canonical list in
+the Plan Review Resolution above. Distribution is Panel `+5/-1`, pure
+`calibrationStateMerge` `+6/-0`, and real Settings/Panel integration `+3/-0`.
+Retire only
+`preserves edit calibration disclosure proposal and focus across locale switch`.
+The helper and integration suites are new files; no unrelated existing node is
+renamed or removed. This remains raw `+14/-1` accounting, not a net-only `+13`
+claim.
+
 #### New frontend files — add 14
 
 - `InvestorProfileApi.test.ts` +5:
@@ -1173,9 +1235,9 @@ allowlist entry is authorized.
 | 4. startup + reconciliation | +2 | 0 | migration/startup ownership |
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
-| 7. workspace UI + Settings guard | 0 | +36/-2 | summary/modes/navigation + reviewed reconciliation/navigation/authority hardening |
+| 7. workspace UI + Settings guard | 0 | +50/-3 | summary/modes/navigation + reviewed monotonic authority/focus hardening |
 | 8. Research context + CSS/ratchet | 0 | +9 | historical transparency/layout |
-| **Total** | **+53/-1** | **+60/-2** | **net backend +52, frontend +58** |
+| **Total** | **+53/-1** | **+74/-3** | **net backend +52, frontend +71** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1709,6 +1771,9 @@ collection requires a reviewed ledger amendment.
 - Create: `apps/arkscope-web/src/settings/investor/InvestorProfileEdit.tsx`
 - Create: `apps/arkscope-web/src/settings/investor/InvestorProfileCalibration.tsx`
 - Create: `apps/arkscope-web/src/settings/investor/InvestorProfileProposalReview.tsx`
+- Create (reviewed deviation): `apps/arkscope-web/src/settings/investor/calibrationStateMerge.ts`
+- Create (reviewed deviation): `apps/arkscope-web/src/settings/investor/calibrationStateMerge.test.ts`
+- Create (reviewed deviation): `apps/arkscope-web/src/SettingsInvestorProfileIntegration.test.tsx`
 - Modify: `apps/arkscope-web/src/InvestorProfilePanel.tsx`
 - Modify: `apps/arkscope-web/src/InvestorProfilePanel.test.tsx`
 - Modify: `apps/arkscope-web/src/Settings.tsx`
@@ -1721,7 +1786,9 @@ collection requires a reviewed ledger amendment.
   deviation then adds seven Panel nodes plus one Settings node and retires one
   intermediate composite Panel node. The fresh-spec authority deviation adds
   four more Panel nodes and removes none. The saved-profile authority deviation
-  adds one more Panel node and removes none. Preserve every baseline node ID. Use
+  adds one more Panel node and removes none. The final monotonic-authority/focus
+  deviation adds Panel `+5/-1`, helper `+6/-0`, and integration `+3/-0`.
+  Preserve every baseline node ID except the three explicitly retired IDs. Use
   deferred promises for profile/calibration/turn/save/approve legs, live DOM
   identity after locale changes, connected focus targets, and planted
   secret-like source values that must not enter guard/dialog copy.
@@ -1730,11 +1797,13 @@ collection requires a reviewed ledger amendment.
 
   ```bash
   npm test -- --run src/InvestorProfilePanel.test.tsx \
-    src/SettingsWorkspace.test.tsx
+    src/SettingsWorkspace.test.tsx \
+    src/SettingsInvestorProfileIntegration.test.tsx \
+    src/settings/investor/calibrationStateMerge.test.ts
   ```
 
-  Expected final collection: Panel `44`; Settings `27`; total `71`, with raw
-  sequential ledger `+36/-2`.
+  Expected final collection: Panel `48`; Settings `27`; integration `3`;
+  merge helper `6`; total `4 files / 84`, with raw sequential ledger `+50/-3`.
 
 - [ ] **Step 3: Split renderers without splitting state ownership**
 
@@ -1777,10 +1846,11 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 9: Run GREEN**
 
-  Expected: exact `71 passed`. Run resource/display/API tests too; expected
-  Task 6-7 owned cumulative is `5 files / 95 passed`. Including the unchanged
-  class-coverage and foundation-boundary baselines, the final-suite checkpoint
-  before Task 8 is `7 files / 108 passed`; Task 8 then adds nine nodes.
+  Expected: exact `4 files / 84 passed`. Run resource/display/API tests too;
+  expected Task 6-7 owned cumulative is `7 files / 108 passed`. Including the
+  unchanged class-coverage and foundation-boundary baselines, the final-suite
+  checkpoint before Task 8 is `9 files / 121 passed`; Task 8 then adds nine
+  nodes.
 
 - [ ] **Step 10: Commit**
 
@@ -1789,6 +1859,7 @@ collection requires a reviewed ledger amendment.
     apps/arkscope-web/src/InvestorProfilePanel.test.tsx \
     apps/arkscope-web/src/Settings.tsx \
     apps/arkscope-web/src/SettingsWorkspace.test.tsx \
+    apps/arkscope-web/src/SettingsInvestorProfileIntegration.test.tsx \
     apps/arkscope-web/src/settings/investor
   git commit -m "feat: rebuild investor profile workspace"
   ```
@@ -1844,16 +1915,18 @@ collection requires a reviewed ledger amendment.
   npm test -- --run \
     src/InvestorProfilePanel.test.tsx \
     src/SettingsWorkspace.test.tsx \
+    src/SettingsInvestorProfileIntegration.test.tsx \
     src/i18n/resources.test.ts \
     src/ui/classCoverage.test.ts \
     src/i18n/foundationBoundaries.test.ts \
     src/settings/investor/investorProfileDisplay.test.ts \
+    src/settings/investor/calibrationStateMerge.test.ts \
     src/InvestorProfileApi.test.ts \
     src/ResearchPersonalizationContext.test.tsx \
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `9 files / 117 passed`.
+  Expected: `11 files / 130 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -1911,16 +1984,16 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `81 files / 836 passed`; clean typecheck; build succeeds with only
+  Expected: `83 files / 849 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
-  `+60/-2`. Removed IDs must be exactly the three named obsolete nodes across
-  the backend and frontend ledgers, including the Task 7 intermediate node
-  retired by the reviewed deviation. Existing failure/error/skip/warning
+  `+74/-3`. Removed IDs must be exactly the four named obsolete nodes across
+  the backend and frontend ledgers, including both Task 7 intermediate/overclaim
+  nodes retired by reviewed deviations. Existing failure/error/skip/warning
   families must be bidirectionally identical.
 
 - [ ] **Step 4: Run copied-production migration proof**
@@ -2038,7 +2111,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+60/-2`, and only the three named removals;
+1. exact backend `+53/-1`, frontend `+74/-3`, and only the four named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -2063,6 +2136,17 @@ collection requires a reviewed ledger amendment.
 22. six-viewports x two locales, no overlap/overflow, state/focus preservation;
 23. immutable evidence/tools/shared-presenters/other Settings/desktop/extensions;
 24. copied production DB only before merge and no production write during review.
+25. same-session calibration merge is append-only/monotonic and resets only on
+    observed session replacement;
+26. turn/proposal response-loss completion requires new matching semantic
+    evidence relative to the pre-action baseline;
+27. ambiguous approved terminals preserve the proposal patch until a profile
+    GET corroborates every proposed field, while reject keeps pre-action profile
+    authority;
+28. same-group exact-anchor focus transfers only after the real Panel commits
+    Summary; dirty confirm delays acknowledgement and busy veto rejects it;
+29. Edit, Calibration, and Proposal locale switches each preserve source state,
+    disclosure/focus ownership, and perform zero GETs.
 
 ---
 
@@ -2119,7 +2203,7 @@ Only after independent implementation GREEN and explicit user approval:
 5. verify marker 2, `integrity_check`, `foreign_key_check`, preserved message /
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
-6. rerun merged focused `219`, full backend collect `4621`, frontend `81/836`,
+6. rerun merged focused `219`, full backend collect `4621`, frontend `83/849`,
    typecheck, build, scanner, no-PG, resources, immutable gates, and one normal
    desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
