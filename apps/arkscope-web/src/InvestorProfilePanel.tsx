@@ -121,7 +121,8 @@ export function InvestorProfilePanel({
 }: InvestorProfilePanelProps) {
   const { t } = useTranslation("settings");
   const mountedRef = useRef(false);
-  const requestGenerationRef = useRef(0);
+  const profileGenerationRef = useRef(0);
+  const calibrationGenerationRef = useRef(0);
   const actionInFlightRef = useRef(false);
 
   const [profileStatus, setProfileStatus] = useState<"loading" | "ready" | "failed">("loading");
@@ -158,7 +159,7 @@ export function InvestorProfilePanel({
   const modeFocusReadyRef = useRef(false);
 
   const applyProfileResponse = useCallback((response: InvestorProfileResponse, generation: number) => {
-    if (!mountedRef.current || requestGenerationRef.current !== generation) return false;
+    if (!mountedRef.current || profileGenerationRef.current !== generation) return false;
     setProfileResponse(response);
     setDraft(cloneProfile(response.profile));
     setBaseline(cloneProfile(response.profile));
@@ -170,7 +171,7 @@ export function InvestorProfilePanel({
   }, []);
 
   const applyCalibrationState = useCallback((state: CalibrationState, generation: number) => {
-    if (!mountedRef.current || requestGenerationRef.current !== generation) return false;
+    if (!mountedRef.current || calibrationGenerationRef.current !== generation) return false;
     setCalibration(state);
     setCalibrationStatus("ready");
     setCalibrationError(null);
@@ -179,18 +180,19 @@ export function InvestorProfilePanel({
 
   useEffect(() => {
     mountedRef.current = true;
-    const generation = ++requestGenerationRef.current;
+    const profileGeneration = ++profileGenerationRef.current;
+    const calibrationGeneration = ++calibrationGenerationRef.current;
     const profileRequest = getInvestorProfile().then((response) => {
-      applyProfileResponse(response, generation);
+      applyProfileResponse(response, profileGeneration);
     }).catch((error: unknown) => {
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+      if (!mountedRef.current || profileGenerationRef.current !== profileGeneration) return;
       setProfileStatus("failed");
       setProfileError(error);
     });
     const calibrationRequest = getCalibrationState().then((state) => {
-      applyCalibrationState(state, generation);
+      applyCalibrationState(state, calibrationGeneration);
     }).catch((error: unknown) => {
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+      if (!mountedRef.current || calibrationGenerationRef.current !== calibrationGeneration) return;
       setCalibrationStatus("failed");
       setCalibrationError(error);
     });
@@ -278,19 +280,21 @@ export function InvestorProfilePanel({
     turnId: string,
     clearAnswerWhenCompleted = false,
   ) => {
-    if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+    if (!mountedRef.current || calibrationGenerationRef.current !== generation) return;
     setOperationError({ scope, error });
     try {
       const state = await getCalibrationState();
       if (!applyCalibrationState(state, generation)) return;
       const sameTurnCompleted = state.pending_turn === null
-        && state.messages.some((message) => message.turn_id === turnId);
+        && state.messages.some((message) => (
+          message.turn_id === turnId && message.role === "assistant"
+        ));
       if (clearAnswerWhenCompleted && sameTurnCompleted) {
         setAnswer("");
         setOperationError(null);
       }
     } catch (loadError) {
-      if (mountedRef.current && requestGenerationRef.current === generation) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
         setCalibrationStatus("failed");
         setCalibrationError(loadError);
       }
@@ -299,19 +303,19 @@ export function InvestorProfilePanel({
 
   const retryProfileLoad = async () => {
     if (!beginAction("profile_load")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++profileGenerationRef.current;
     setProfileStatus("loading");
     setProfileError(null);
     try {
       const response = await getInvestorProfile();
       applyProfileResponse(response, generation);
     } catch (error) {
-      if (mountedRef.current && requestGenerationRef.current === generation) {
+      if (mountedRef.current && profileGenerationRef.current === generation) {
         setProfileStatus("failed");
         setProfileError(error);
       }
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && profileGenerationRef.current === generation) finishAction();
     }
   };
 
@@ -354,24 +358,24 @@ export function InvestorProfilePanel({
 
   const retryCalibrationLoad = async () => {
     if (!beginAction("calibration_load")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++calibrationGenerationRef.current;
     setCalibrationStatus("loading");
     try {
       const state = await getCalibrationState();
       applyCalibrationState(state, generation);
     } catch (error) {
-      if (mountedRef.current && requestGenerationRef.current === generation) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
         setCalibrationStatus("failed");
         setCalibrationError(error);
       }
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
   };
 
   const startCalibration = async () => {
     if (!beginAction("calibration_start")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++calibrationGenerationRef.current;
     try {
       const state = await startCalibrationSession(false);
       if (applyCalibrationState(state, generation)) {
@@ -379,11 +383,11 @@ export function InvestorProfilePanel({
         setMode("calibration");
       }
     } catch (error) {
-      if (mountedRef.current && requestGenerationRef.current === generation) {
+      if (mountedRef.current && calibrationGenerationRef.current === generation) {
         setOperationError({ scope: "turn", error });
       }
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
   };
 
@@ -403,17 +407,17 @@ export function InvestorProfilePanel({
 
   const saveProfile = async () => {
     if (!draft || !beginAction("save")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++profileGenerationRef.current;
     try {
       const saved = await saveInvestorProfile(profilePayload(draft));
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+      if (!mountedRef.current || profileGenerationRef.current !== generation) return;
       setDraft(cloneProfile(saved.profile));
       setBaseline(cloneProfile(saved.profile));
       let refreshed: InvestorProfileResponse;
       try {
         refreshed = await getInvestorProfile();
       } catch (error) {
-        if (mountedRef.current && requestGenerationRef.current === generation) {
+        if (mountedRef.current && profileGenerationRef.current === generation) {
           setOperationError({ scope: "refresh", error });
         }
         return;
@@ -422,18 +426,18 @@ export function InvestorProfilePanel({
       setOutcome("saved");
       finishToSummary("edit");
     } catch (error) {
-      if (mountedRef.current && requestGenerationRef.current === generation) {
+      if (mountedRef.current && profileGenerationRef.current === generation) {
         setOperationError({ scope: "save", error });
       }
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && profileGenerationRef.current === generation) finishAction();
     }
   };
 
   const sendAnswer = async () => {
     const session = calibration?.active_session;
     if (!session || calibration?.pending_turn || !answer.trim() || !beginAction("turn")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++calibrationGenerationRef.current;
     const turnId = turnIdFactory();
     try {
       const state = await sendCalibrationMessage({
@@ -449,14 +453,14 @@ export function InvestorProfilePanel({
     } catch (error) {
       await reloadCalibrationAfterFailure(generation, "turn", error, turnId, true);
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
   };
 
   const retryTurn = async () => {
     const turnId = calibration?.pending_turn?.id;
     if (!turnId || !beginAction("retry")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++calibrationGenerationRef.current;
     try {
       const state = await retryCalibrationTurn(turnId);
       if (applyCalibrationState(state, generation) && state.latest_proposal?.status === "draft") {
@@ -465,14 +469,14 @@ export function InvestorProfilePanel({
     } catch (error) {
       await reloadCalibrationAfterFailure(generation, "turn", error, turnId);
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
   };
 
   const requestProposal = async () => {
     const session = calibration?.active_session;
     if (!session || calibration?.pending_turn || !beginAction("request_proposal")) return;
-    const generation = ++requestGenerationRef.current;
+    const generation = ++calibrationGenerationRef.current;
     const turnId = turnIdFactory();
     try {
       const state = await requestCalibrationProposal({
@@ -485,17 +489,22 @@ export function InvestorProfilePanel({
     } catch (error) {
       await reloadCalibrationAfterFailure(generation, "proposal", error, turnId);
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
   };
 
   const approveProposal = async () => {
     if (!pendingProposal || !beginAction("approve")) return;
-    const generation = ++requestGenerationRef.current;
+    const profileGeneration = ++profileGenerationRef.current;
+    const calibrationGeneration = ++calibrationGenerationRef.current;
     setProposalConflict(false);
     try {
       const approved = await approveCalibrationProposal(pendingProposal.id);
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+      if (
+        !mountedRef.current
+        || profileGenerationRef.current !== profileGeneration
+        || calibrationGenerationRef.current !== calibrationGeneration
+      ) return;
       setProfileResponse((current) => current
         ? { ...current, profile: cloneProfile(approved.profile) }
         : current);
@@ -512,20 +521,26 @@ export function InvestorProfilePanel({
         getInvestorProfile(),
         getCalibrationState(),
       ]);
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
       if (profileResult.status === "fulfilled") {
-        applyProfileResponse(profileResult.value, generation);
-      } else {
+        applyProfileResponse(profileResult.value, profileGeneration);
+      } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
         setOperationError({ scope: "refresh", error: profileResult.reason });
       }
       if (calibrationResult.status === "fulfilled") {
-        applyCalibrationState(calibrationResult.value, generation);
-      } else {
+        applyCalibrationState(calibrationResult.value, calibrationGeneration);
+      } else if (
+        mountedRef.current
+        && calibrationGenerationRef.current === calibrationGeneration
+      ) {
         setCalibrationStatus("failed");
         setCalibrationError(calibrationResult.reason);
       }
     } catch (error) {
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+      if (
+        !mountedRef.current
+        || profileGenerationRef.current !== profileGeneration
+        || calibrationGenerationRef.current !== calibrationGeneration
+      ) return;
       const presentation = settingsErrorPresentation(error, t);
       if (presentation.code === "proposal_conflict") {
         setProposalConflict(true);
@@ -536,15 +551,17 @@ export function InvestorProfilePanel({
           getInvestorProfile(),
           getCalibrationState(),
         ]);
-        if (!mountedRef.current || requestGenerationRef.current !== generation) return;
         if (profileResult.status === "fulfilled") {
-          applyProfileResponse(profileResult.value, generation);
-        } else {
+          applyProfileResponse(profileResult.value, profileGeneration);
+        } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
           setOperationError({ scope: "profile_load", error: profileResult.reason });
         }
         if (calibrationResult.status === "fulfilled") {
-          applyCalibrationState(calibrationResult.value, generation);
-        } else {
+          applyCalibrationState(calibrationResult.value, calibrationGeneration);
+        } else if (
+          mountedRef.current
+          && calibrationGenerationRef.current === calibrationGeneration
+        ) {
           setCalibrationStatus("failed");
           setCalibrationError(calibrationResult.reason);
         }
@@ -552,32 +569,48 @@ export function InvestorProfilePanel({
         setOperationError({ scope: "proposal", error });
       }
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (
+        mountedRef.current
+        && profileGenerationRef.current === profileGeneration
+        && calibrationGenerationRef.current === calibrationGeneration
+      ) finishAction();
     }
   };
 
   const rejectProposal = async () => {
     if (!pendingProposal || !beginAction("reject")) return;
-    const generation = ++requestGenerationRef.current;
+    const profileGeneration = ++profileGenerationRef.current;
+    const calibrationGeneration = ++calibrationGenerationRef.current;
     try {
       const rejected = await rejectCalibrationProposal(pendingProposal.id);
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
+      if (
+        !mountedRef.current
+        || profileGenerationRef.current !== profileGeneration
+        || calibrationGenerationRef.current !== calibrationGeneration
+      ) return;
       setCalibration((current) => current
         ? { ...current, latest_proposal: rejected.proposal }
         : current);
+      setProfileStatus("loading");
+      setProfileError(null);
+      setProfileValuesCurrent(false);
+      setEffectiveFactsCurrent(false);
       const [profileResult, calibrationResult] = await Promise.allSettled([
         getInvestorProfile(),
         getCalibrationState(),
       ]);
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return;
       if (profileResult.status === "fulfilled") {
-        applyProfileResponse(profileResult.value, generation);
-      } else {
-        setOperationError({ scope: "refresh", error: profileResult.reason });
+        applyProfileResponse(profileResult.value, profileGeneration);
+      } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
+        setProfileStatus("failed");
+        setProfileError(profileResult.reason);
       }
       if (calibrationResult.status === "fulfilled") {
-        applyCalibrationState(calibrationResult.value, generation);
-      } else {
+        applyCalibrationState(calibrationResult.value, calibrationGeneration);
+      } else if (
+        mountedRef.current
+        && calibrationGenerationRef.current === calibrationGeneration
+      ) {
         setCalibrationStatus("failed");
         setCalibrationError(calibrationResult.reason);
       }
@@ -585,11 +618,19 @@ export function InvestorProfilePanel({
       setOutcome("rejected");
       finishToSummary("proposal");
     } catch (error) {
-      if (mountedRef.current && requestGenerationRef.current === generation) {
+      if (
+        mountedRef.current
+        && profileGenerationRef.current === profileGeneration
+        && calibrationGenerationRef.current === calibrationGeneration
+      ) {
         setOperationError({ scope: "proposal", error });
       }
     } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) finishAction();
+      if (
+        mountedRef.current
+        && profileGenerationRef.current === profileGeneration
+        && calibrationGenerationRef.current === calibrationGeneration
+      ) finishAction();
     }
   };
 

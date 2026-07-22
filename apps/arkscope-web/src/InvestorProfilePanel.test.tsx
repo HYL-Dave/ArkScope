@@ -332,11 +332,15 @@ describe("InvestorProfilePanel", () => {
 
 
   it("request_failure_uses_alert_semantics", async () => {
+    const calibrationLeg = deferred<Response>();
     let profileGets = 0;
     apiRoutes({
       profile: populatedResponse(),
       calibration: emptyCalibration(),
       handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          return calibrationLeg.promise;
+        }
         if (call.url.endsWith("/profile/investor") && call.method === "GET") {
           profileGets += 1;
           if (profileGets === 1) {
@@ -357,6 +361,15 @@ describe("InvestorProfilePanel", () => {
     await clickButton("重試");
     expect(profileGets).toBe(2);
     expect(host!.textContent).toContain("投資人設定摘要");
+    await act(async () => {
+      calibrationLeg.resolve(new Response(JSON.stringify(emptyCalibration()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      await Promise.resolve();
+    });
+    await flush();
+    expect(host!.textContent).toContain("目前沒有進行中的引導式校準");
   });
 
   it("loads_default_disabled_profile", async () => {
@@ -882,6 +895,41 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).not.toContain("STALE_PROFILE_CONTEXT");
     expect(host!.textContent).not.toContain("No active guided calibration");
     expect(host!.querySelector(".investor-profile-panel")?.getAttribute("aria-busy")).toBe("true");
+
+    dispose();
+    const calibrationAfterSave = deferred<Response>();
+    let savedProfileGets = 0;
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: emptyCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          return calibrationAfterSave.promise;
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          savedProfileGets += 1;
+          const response = populatedResponse();
+          if (savedProfileGets > 1) response.context_preview = "SOURCE_PROFILE_AFTER_SAVE";
+          return response;
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Edit profile");
+    await clickButton("Save profile");
+    expect(host!.textContent).toContain("SOURCE_PROFILE_AFTER_SAVE");
+
+    await act(async () => {
+      calibrationAfterSave.resolve(new Response(JSON.stringify(emptyCalibration()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+      await Promise.resolve();
+    });
+    await flush();
+    expect(host!.textContent).toContain("No active guided calibration");
   });
 
   it("defaults and reloads to summary while keeping one registry anchor", async () => {
@@ -1209,9 +1257,21 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("SOURCE_NEXT_QUESTION");
 
     dispose();
-    const reconciled = activeCalibration({
+    const userOnly = activeCalibration({
       messages: [
         calibrationMessage(),
+        calibrationMessage({
+          id: "answer-before-provider",
+          role: "user",
+          content: "SOURCE_USER_ONLY_ANSWER",
+          turn_id: "turn-user-only",
+          prompt_id: null,
+        }),
+      ],
+    });
+    const reconciled = activeCalibration({
+      messages: [
+        ...userOnly.messages,
         calibrationMessage({
           id: "answer-after-lost-response",
           role: "user",
@@ -1250,8 +1310,9 @@ describe("InvestorProfilePanel", () => {
       handle: (call) => {
         if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
           calibrationGets += 1;
-          if (calibrationGets === 2) return reconciled;
-          if (calibrationGets === 3) return persistedFailed;
+          if (calibrationGets === 2) return userOnly;
+          if (calibrationGets === 3) return reconciled;
+          if (calibrationGets === 4) return persistedFailed;
         }
         if (call.url.endsWith("/calibration/messages")) {
           return new Response(JSON.stringify({ detail: { code: "calibration_responder_failed" } }), {
@@ -1262,11 +1323,17 @@ describe("InvestorProfilePanel", () => {
         return undefined;
       },
     });
-    const turnIds = ["turn-response-lost", "turn-response-failed"];
+    const turnIds = ["turn-user-only", "turn-response-lost", "turn-response-failed"];
     await mount(false, { turnIdFactory: () => turnIds.shift() ?? "unexpected-turn" });
     await flush();
     await clickButton("Continue Calibration");
     const answer = host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!;
+    await setControlValue(answer, "SOURCE_USER_ONLY_ANSWER");
+    await clickButton("Send answer");
+
+    expect(answer.value).toBe("SOURCE_USER_ONLY_ANSWER");
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Could not complete this calibration turn.");
     await setControlValue(answer, "SOURCE_RESPONSE_LOST_ANSWER");
     await clickButton("Send answer");
 
@@ -1279,6 +1346,11 @@ describe("InvestorProfilePanel", () => {
     expect((await buttonByText("Send answer")).disabled).toBe(true);
     expect(reconciledCalls.filter((call) => call.url.endsWith("/calibration/messages"))
       .map((call) => call.body)).toEqual([
+      {
+        turn_id: "turn-user-only",
+        session_id: "session-1",
+        content: "SOURCE_USER_ONLY_ANSWER",
+      },
       {
         turn_id: "turn-response-lost",
         session_id: "session-1",
@@ -1495,7 +1567,14 @@ describe("InvestorProfilePanel", () => {
       handle: (call) => {
         if (call.url.endsWith("/profile/investor") && call.method === "GET") {
           profileGets += 1;
-          return profileGets === 1 ? initialProfile : refreshedProfile;
+          if (profileGets === 1) return initialProfile;
+          if (profileGets === 2) {
+            return new Response(JSON.stringify({ detail: "SOURCE_REJECT_REFRESH_SECRET" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
+          return refreshedProfile;
         }
         if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
           calibrationGets += 1;
@@ -1526,6 +1605,15 @@ describe("InvestorProfilePanel", () => {
     await clickButton("Reject proposal");
     expect(calls.filter((call) => call.url.endsWith("/profile/investor") && call.method === "GET"))
       .toHaveLength(2);
+    expect(calibrationGets).toBe(2);
+    expect(host!.querySelector('[role="alert"]')?.textContent)
+      .toContain("Could not load the Investor Profile.");
+    expect(host!.textContent).not.toContain("Investor Profile summary");
+    expect(host!.textContent).not.toContain("SOURCE_REJECT_REFRESH_SECRET");
+
+    await clickButton("Retry");
+    expect(calls.filter((call) => call.url.endsWith("/profile/investor") && call.method === "GET"))
+      .toHaveLength(3);
     expect(host!.textContent).toContain("Investor Profile summary");
     expect(host!.textContent).toContain("Income");
     expect(host!.textContent).toContain("Strict risk control");
