@@ -1,13 +1,14 @@
 # ArkScope I18N-3 Explore Design
 
-> **Status: WRITTEN — INDEPENDENT REVIEW PENDING**
+> **Status: WRITTEN DESIGN REVIEW GREEN — IMPLEMENTATION PLAN NEXT**
 >
 > Written against merged `master` at `c0448213` on 2026-07-23. This document
 > is the bounded product, localization, error-presentation, and verification
-> authority for I18N-3 Explore. It does not authorize product implementation,
-> backend changes, the public locale selector, or any deferred SA extension
-> repair. A separately reviewed RED-first implementation plan is required
-> after independent full-document review returns GREEN.
+> authority for I18N-3 Explore. Independent full-document review returned
+> GREEN with the required zh-Hant copy-preservation rule incorporated below.
+> It does not authorize product implementation, backend changes, the public
+> locale selector, or any deferred SA extension repair. A separately reviewed
+> RED-first implementation plan remains required.
 
 ## 1. Purpose and Authority
 
@@ -145,6 +146,13 @@ Application-owned chrome includes:
 
 Both locale values are static TS resources. Keys are semantic and statically
 selected. Dynamic translation-key construction remains forbidden.
+
+Existing rendered zh-Hant chrome moves into resources byte-for-byte by
+default. Every zh-Hant wording change, including terminology alignment and
+removal of a translated-plus-English duplicate, must be individually named in
+the implementation plan's copy ledger. When preserving a legacy literal would
+conflict with the terminology authority, the terminology authority wins and
+the reviewed ledger records the exact before/after pair.
 
 ### 3.2 Source and generated content remains original
 
@@ -560,6 +568,11 @@ Watchlist localizes list controls, empty states, table headings, priority
 labels, action tooltips, archive/membership explanations, and outcome/error
 chrome. It does not translate custom list names, symbol-search results, ticker
 symbols, tag values, Provider consensus payloads, or stored notes.
+
+The legacy priority action title is one reviewed copy correction:
+`設定優先級` becomes `設定優先順序`, consistent with the terminology authority.
+All other current zh-Hant Watchlist chrome follows the byte-preserving default
+unless the implementation plan names another exact correction.
 
 Changing locale preserves selection, sorting, all drafts, search results,
 optimistic state, and current focus. It does not replay any mutation or reload

@@ -4,7 +4,7 @@
 > COMMON UI LIVE; I18N-2 SETTINGS LIVE COMPLETE AT PRODUCT `9f78a9ff`,
 > FAST-FORWARD MERGED THROUGH `d2195cd0`; P2.8 SLICE 5 LIVE COMPLETE AT
 > PRODUCT `b214e1fc`, FAST-FORWARD MERGED THROUGH `de8485be`; I18N-3 EXPLORE
-> DESIGN WRITTEN — INDEPENDENT REVIEW PENDING, 2026-07-23.**
+> DESIGN REVIEW GREEN — IMPLEMENTATION PLAN NEXT, 2026-07-23.**
 > This document chooses the app-wide locale authority, runtime localization
 > mechanism, migration sequence, public-switch gate, and verification contract.
 > Independent written review returned GREEN. I18N-0 subsequently passed its
@@ -17,8 +17,8 @@
 > green. P2.8 Slice 5 then shipped bilingual from birth, passed independent
 > implementation review, and completed its production schema migration. The
 > public selector remains unauthorized. I18N-3 Explore is the single active
-> design-review unit; implementation planning remains blocked until its
-> independent full-document review returns GREEN.
+> planning unit; product implementation remains blocked until its RED-first
+> plan receives independent review GREEN.
 
 ## 1. Purpose and Authority
 
@@ -486,7 +486,7 @@ the foundation slice, but no incomplete public affordance is rendered.
 | I18N-1 Shell + common UI | navigation, topbar, Drawer labels, background-work chrome, shared states/primitives used by Shell | LIVE | absent |
 | I18N-2 Settings | PageHeader, workflow tabs, directory/registry, all reachable Settings sections, Settings backend-copy mappings | LIVE — product `9f78a9ff`; merged/evidence `d2195cd0` | absent |
 | P2.8 Slice 5 | Investor Profile UX, implemented bilingual from birth against the new Settings/runtime contract | LIVE — product `b214e1fc`; merged/evidence `de8485be` | absent |
-| I18N-3 Explore | Home, Watchlist, Universe, News, Ticker Detail, AI card, related shared display helpers | DESIGN WRITTEN — INDEPENDENT REVIEW PENDING | absent |
+| I18N-3 Explore | Home, Watchlist, Universe, News, Ticker Detail, AI card, related shared display helpers | DESIGN REVIEW GREEN — IMPLEMENTATION PLAN NEXT | absent |
 | I18N-4 Research | workspace, history, evidence, progress/errors, model-selection copy not already owned by Settings | queued | absent |
 | I18N-5 Portfolio + System + residual | Holdings/overview/activity/capture, Dashboard/System, Markdown chrome, remaining reachable shared copy and formatter audit | queued | absent |
 | I18N-6 Release | full coverage/audit, both-locale visual matrix, selector in Settings PageHeader, docs/Design Kit release sync | queued | visible |
@@ -494,7 +494,7 @@ the foundation slice, but no incomplete public affordance is rendered.
 I18N-0 through I18N-2 are the first migration tranche and remain separately
 reviewed units; they are not one high-churn branch. Slice 5 followed that
 tranche and shipped its redesigned content bilingual from birth. I18N-3 is now
-the sole active design-review unit. The priority map names only the next unit
+the sole active planning unit. The priority map names only the next unit
 at each closeout; this table does not authorize parallel branches or dual
 `NEXT` entries.
 
@@ -731,8 +731,8 @@ At decision adoption:
 4. I18N-6 owns a later Design Kit locale-control and bilingual-state sync after
    the product gate passes.
 5. I18N-0, I18N-1, I18N-2 Settings, and P2.8 Slice 5 are LIVE.
-6. I18N-3 Explore is the sole active design-review unit; its written design
-   must receive independent GREEN before an implementation plan opens.
+6. I18N-3 Explore is the sole active planning unit; its product implementation
+   must wait for independent RED-first plan review GREEN.
 
 Each implementation unit receives a separately reviewed plan. This decision
 does not authorize combining all migrations into one branch.
