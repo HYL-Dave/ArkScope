@@ -11,6 +11,7 @@ import logging
 import os
 import sqlite3
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,33 +21,44 @@ from .dependencies import get_dal
 
 logger = logging.getLogger(__name__)
 
-_SQLITE_RESULT_CODE_MASK = 0xFF
-_SQLITE_AVAILABILITY_BASE_CODES = frozenset(
-    {
-        getattr(sqlite3, "SQLITE_BUSY", 5),
-        getattr(sqlite3, "SQLITE_LOCKED", 6),
-        getattr(sqlite3, "SQLITE_READONLY", 8),
-        getattr(sqlite3, "SQLITE_IOERR", 10),
-        getattr(sqlite3, "SQLITE_FULL", 13),
-        getattr(sqlite3, "SQLITE_CANTOPEN", 14),
-    }
-)
+def _profile_db_accepts_write_lock(db_path: str) -> bool:
+    """Probe file availability without creating or changing the profile DB."""
+    connection: sqlite3.Connection | None = None
+    try:
+        uri = f"{Path(db_path).resolve().as_uri()}?mode=rw"
+        connection = sqlite3.connect(
+            uri,
+            uri=True,
+            timeout=0.1,
+            isolation_level=None,
+        )
+        connection.execute("BEGIN IMMEDIATE")
+        connection.rollback()
+        return True
+    except (OSError, sqlite3.OperationalError):
+        return False
+    finally:
+        if connection is not None:
+            if connection.in_transaction:
+                try:
+                    connection.rollback()
+                except sqlite3.Error:
+                    pass
+            connection.close()
 
 
-def _is_profile_db_availability_error(error: BaseException) -> bool:
-    """Classify explicit filesystem/SQLite availability failures only."""
+def _is_profile_db_availability_error(
+    error: BaseException, db_path: str
+) -> bool:
+    """Classify explicit filesystem failures or failed DB write-lock probes."""
     seen: set[int] = set()
     current: BaseException | None = error
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         if isinstance(current, OSError):
             return True
-        if isinstance(current, sqlite3.Error):
-            code = getattr(current, "sqlite_errorcode", None)
-            if isinstance(code, int):
-                base_code = code & _SQLITE_RESULT_CODE_MASK
-                if base_code in _SQLITE_AVAILABILITY_BASE_CODES:
-                    return True
+        if isinstance(current, sqlite3.OperationalError):
+            return not _profile_db_accepts_write_lock(db_path)
         current = current.__cause__
     return False
 
@@ -99,7 +111,7 @@ async def lifespan(app: FastAPI):
         migrate_calibration_schema(profile_db_path)
         get_investor_calibration_store().reconcile_interrupted_turns()
     except Exception as e:  # noqa: BLE001 — re-raise non-availability failures
-        if not _is_profile_db_availability_error(e):
+        if not _is_profile_db_availability_error(e, profile_db_path):
             raise
         from src.provider_config_runtime import mark_provider_config_setup_required
 

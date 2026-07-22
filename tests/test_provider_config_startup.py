@@ -7,12 +7,6 @@ from functools import lru_cache
 import pytest
 
 
-def _sqlite_operational_error(code: int) -> sqlite3.OperationalError:
-    error = sqlite3.OperationalError("opaque sqlite failure")
-    error.sqlite_errorcode = code
-    return error
-
-
 def test_lifespan_reconciles_interrupted_scheduler_state(monkeypatch):
     from src.api.app import create_app, lifespan
 
@@ -145,20 +139,28 @@ def test_lifespan_migrates_calibration_before_scheduler_start(
                     "start_portfolio_scheduler"
                 )
 
-        wrapped_busy = CalibrationSchemaMismatch(
-            "calibration schema fingerprint mismatch"
-        )
-        busy_code = getattr(sqlite3, "SQLITE_BUSY", 5)
-        wrapped_busy.__cause__ = _sqlite_operational_error(busy_code | (3 << 8))
-        calls.clear()
-        scenario.update(provider_fails=False, migration_error=wrapped_busy)
-        asyncio.run(_run_lifespan())
-        assert calls == [
-            "apply_provider_env",
-            "migrate_calibration",
-            "reconcile_scheduler_telemetry",
-        ]
-        assert runtime.provider_config_setup_state().required is True
+        sqlite3.connect(profile_db).close()
+        lock_connection = sqlite3.connect(profile_db, isolation_level=None)
+        lock_connection.execute("BEGIN IMMEDIATE")
+        try:
+            wrapped_busy = CalibrationSchemaMismatch(
+                "calibration schema fingerprint mismatch"
+            )
+            wrapped_busy.__cause__ = sqlite3.OperationalError(
+                "opaque sqlite failure"
+            )
+            calls.clear()
+            scenario.update(provider_fails=False, migration_error=wrapped_busy)
+            asyncio.run(_run_lifespan())
+            assert calls == [
+                "apply_provider_env",
+                "migrate_calibration",
+                "reconcile_scheduler_telemetry",
+            ]
+            assert runtime.provider_config_setup_state().required is True
+        finally:
+            lock_connection.rollback()
+            lock_connection.close()
 
         for error in (
             CalibrationSchemaMismatch("calibration schema mismatch"),
@@ -252,6 +254,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
     from src.api.routes import providers_config
     import src.api.routes.portfolio_capture  # noqa: F401
     import src.provider_config_runtime as runtime
+    from src.investor_profile_calibration_schema import migrate_calibration_schema
 
     runtime.clear_provider_config_setup_required()
     started = {"scheduler": False}
@@ -297,8 +300,11 @@ def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
     assert cfg["setup"]["reason"]
     assert started["scheduler"] is False
 
-    sqlite_error = _sqlite_operational_error(getattr(sqlite3, "SQLITE_ERROR", 1))
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "logic-error.db"))
+    healthy_db = tmp_path / "logic-error.db"
+    migrate_calibration_schema(healthy_db)
+    healthy_bytes = healthy_db.read_bytes()
+    sqlite_error = sqlite3.OperationalError("opaque sqlite failure")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(healthy_db))
     monkeypatch.setattr(
         "src.investor_profile_calibration_schema.migrate_calibration_schema",
         lambda db_path: (_ for _ in ()).throw(sqlite_error),
@@ -311,6 +317,7 @@ def test_profile_db_failure_boots_setup_only(monkeypatch, tmp_path):
     with pytest.raises(sqlite3.OperationalError) as exc_info:
         asyncio.run(_run_fail_fast())
     assert exc_info.value is sqlite_error
+    assert healthy_db.read_bytes() == healthy_bytes
     assert runtime.provider_config_setup_state().required is False
 
 
