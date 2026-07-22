@@ -1488,6 +1488,76 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("SOURCE_AMBIGUOUS_RETRY_COMPLETED");
   });
 
+  it("refreshes an initially persisted pending turn before retrying the same ID", async () => {
+    await useEnglish();
+    const pending = activeCalibration({
+      pending_turn: calibrationTurn({
+        id: "turn-initial-pending",
+        status: "pending",
+      }),
+    });
+    const failed = activeCalibration({
+      pending_turn: calibrationTurn({
+        id: "turn-initial-pending",
+        status: "failed",
+      }),
+    });
+    const completed = activeCalibration({
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "question-after-initial-pending",
+          content: "SOURCE_INITIAL_PENDING_COMPLETED",
+          turn_id: "turn-initial-pending",
+          prompt_id: null,
+        }),
+      ],
+    });
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: pending,
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          if (calibrationGets === 1) return pending;
+          if (calibrationGets === 2) {
+            return new Response(JSON.stringify({ detail: "SOURCE_INITIAL_PENDING_REFRESH" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
+          return failed;
+        }
+        if (call.url.includes("/turns/turn-initial-pending/retry")) return completed;
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+
+    expect(host!.textContent).toContain("Sending");
+    expect((await buttonByText("Edit profile")).disabled).toBe(true);
+    await clickButton("Refresh");
+
+    expect(calibrationGets).toBe(2);
+    expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+    expect(host!.textContent).toContain("Could not load guided calibration.");
+    expect(host!.textContent).toContain("Sending");
+    expect(host!.textContent).not.toContain("SOURCE_INITIAL_PENDING_REFRESH");
+    await clickButton("Retry");
+
+    expect(calibrationGets).toBe(3);
+    expect(host!.textContent).toContain("This turn was interrupted. Your answer is saved.");
+    await clickButton("Continue Calibration");
+    await clickButton("Retry turn");
+
+    expect(calls.filter((call) => call.url.includes("/turns/turn-initial-pending/retry")))
+      .toHaveLength(1);
+    expect(calls.filter((call) => call.url.endsWith("/calibration/messages"))).toHaveLength(0);
+    expect(host!.textContent).toContain("SOURCE_INITIAL_PENDING_COMPLETED");
+  });
+
   it("retries interrupted turn with the same ID without duplicate answer", async () => {
     await useEnglish();
     const interrupted = activeCalibration({
@@ -1646,6 +1716,7 @@ describe("InvestorProfilePanel", () => {
 
     expect(host!.textContent).toContain("Investor Profile summary");
     expect(host!.textContent).toContain("A calibration proposal is ready for review");
+    expect(host!.textContent).not.toContain("Could not update the calibration proposal.");
     expect(host!.textContent).not.toContain("SOURCE_PROPOSAL_RESPONSE_LOST");
     expect(calls.filter((call) => call.url.endsWith("/calibration/proposals/request")))
       .toHaveLength(1);
@@ -1888,6 +1959,93 @@ describe("InvestorProfilePanel", () => {
     expect(rejectCalls.filter((call) => call.url.includes("/reject"))).toHaveLength(1);
   });
 
+  it("keeps successful approve authority across stale advisory GET responses", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal();
+    const approvedProposal = calibrationProposal({
+      status: "approved",
+      approved_at: "2026-07-21T01:08:00Z",
+    });
+    const approvedProfile = populatedResponse().profile;
+    approvedProfile.primary_preset = "income";
+    approvedProfile.risk_capacity = 6;
+    let profileGets = 0;
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.includes("/approve")) {
+          return { profile: approvedProfile, proposal: approvedProposal };
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return populatedResponse();
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return activeCalibration({ latest_proposal: proposal });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+
+    expect(profileGets).toBe(2);
+    expect(calibrationGets).toBe(2);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Calibration proposal approved");
+    expect(host!.textContent).toContain("Income");
+    expect(host!.textContent).not.toContain("Event-driven");
+    expect(host!.textContent).not.toContain("Complementary");
+    expect(host!.querySelector('[data-testid="summary-pending-proposal"]')).toBeNull();
+    expect(calls.filter((call) => call.url.includes("/approve"))).toHaveLength(1);
+  });
+
+  it("keeps successful reject authority across stale advisory GET responses", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal();
+    const rejectedProposal = calibrationProposal({
+      status: "rejected",
+      rejected_at: "2026-07-21T01:09:00Z",
+    });
+    const staleProfile = disabledResponse();
+    let profileGets = 0;
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.includes("/reject")) return { proposal: rejectedProposal };
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return profileGets === 1 ? populatedResponse() : staleProfile;
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return activeCalibration({ latest_proposal: proposal });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Reject proposal");
+
+    expect(profileGets).toBe(2);
+    expect(calibrationGets).toBe(2);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Calibration proposal rejected");
+    expect(host!.textContent).toContain("Event-driven");
+    expect(host!.textContent).not.toContain("Personalization disabled");
+    expect(host!.querySelector('[data-testid="summary-pending-proposal"]')).toBeNull();
+    expect(calls.filter((call) => call.url.includes("/reject"))).toHaveLength(1);
+  });
+
   it("renders localized field diffs and source rationales then approves without patch", async () => {
     await useEnglish();
     const proposal = calibrationProposal({
@@ -2031,6 +2189,42 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).not.toContain("Profile changed since this proposal was created");
     expect(host!.querySelectorAll('[data-testid="proposal-current-value"]')).toHaveLength(0);
     expect(host!.textContent).not.toContain("SOURCE_CONFLICT_REFRESH_SECRET");
+  });
+
+  it("preserves confirmed conflict across a stale non-conflicted draft", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal();
+    let calibrationGets = 0;
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.includes("/approve")) {
+          return new Response(JSON.stringify({
+            detail: { code: "proposal_conflict", diagnostic: "SOURCE_CONFIRMED_CONFLICT" },
+          }), {
+            status: 409,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return activeCalibration({ latest_proposal: proposal });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+
+    expect(calibrationGets).toBe(2);
+    expect(host!.textContent).toContain("Proposal review");
+    expect(host!.textContent).toContain("Profile changed since this proposal was created");
+    expect(host!.textContent).not.toContain("SOURCE_CONFIRMED_CONFLICT");
+    expect((await buttonByText("Approve proposal")).disabled).toBe(true);
+    expect((await buttonByText("Reject proposal")).disabled).toBe(false);
   });
 
   it("routes calibration provider recovery to the Providers anchor", async () => {

@@ -21,6 +21,7 @@ export interface InvestorProfileSummaryProps {
   calibration: CalibrationState | null;
   calibrationStatus: "loading" | "ready" | "failed";
   busy: boolean;
+  refreshing: boolean;
   headingRef: RefObject<HTMLHeadingElement>;
   editCommandRef: RefObject<HTMLButtonElement>;
   calibrationCommandRef: RefObject<HTMLButtonElement>;
@@ -38,6 +39,7 @@ export function InvestorProfileSummary({
   calibration,
   calibrationStatus,
   busy,
+  refreshing,
   headingRef,
   editCommandRef,
   calibrationCommandRef,
@@ -73,6 +75,8 @@ export function InvestorProfileSummary({
       : activeSession
         ? t(($) => $.investor.workspace.summary.calibrationActive)
         : t(($) => $.investor.workspace.summary.calibrationIdle);
+  const showCalibrationState = calibrationStatus === "ready"
+    || (calibrationStatus === "failed" && pendingTurnStatus === "pending");
 
   return (
     <section data-testid="investor-profile-summary">
@@ -151,15 +155,27 @@ export function InvestorProfileSummary({
           <Button
             size="compact"
             icon={<RotateCw size={15} />}
-            disabled={busy}
+            disabled={refreshing}
             onClick={onRetryCalibration}
           >
             {t(($) => $.investor.workspace.calibration.retry)}
           </Button>
         </InlineAlert>
       ) : null}
-      {calibrationStatus === "ready" ? (
-        <StatusBadge state={calibrationState} label={calibrationLabel} />
+      {showCalibrationState ? (
+        <>
+          <StatusBadge state={calibrationState} label={calibrationLabel} />
+          {calibrationStatus === "ready" && pendingTurnStatus === "pending" ? (
+            <Button
+              size="compact"
+              icon={<RotateCw size={15} />}
+              disabled={refreshing}
+              onClick={onRetryCalibration}
+            >
+              {t(($) => $.actions.refresh)}
+            </Button>
+          ) : null}
+        </>
       ) : null}
 
       {pendingProposal ? (
