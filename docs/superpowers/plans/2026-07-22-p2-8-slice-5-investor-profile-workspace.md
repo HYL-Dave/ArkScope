@@ -144,7 +144,31 @@ Remove or rename no node. The existing
 node was strengthened in place to exclude the stale failure alert. Initial RED
 was `70` collected with `5 failed / 65 passed`; GREEN is Task 7 `70/70`, Task
 6-8 focused `116/116`, and full frontend `835/835`. The final sequential ledger
-is Task 7 `+35/-2` and total frontend `+59/-2` (net `+57`).
+at that checkpoint was Task 7 `+35/-2` and total frontend `+59/-2` (net `+57`);
+the saved-profile authority deviation below supersedes those totals.
+
+### Reviewed implementation deviation: saved-profile authority after terminal outcomes
+
+Spec re-review after `2026d4c8` found one remaining High in the Task 7 profile
+authority flow. Approve/reject reconciliation could intentionally retain a
+terminal mutation authority across a stale advisory GET, but a later full
+profile save did not replace that authority. A post-save GET equal to the old
+terminal authority could therefore be accepted as fresh and overwrite the
+profile just returned by the successful PUT.
+
+The RED-first product correction at `7aa5d214` changes only
+`InvestorProfilePanel.tsx` and its test. Relative to the preceding product
+state, add exactly this one node ID:
+
+1. `keeps a later full save authoritative after approved stale reconciliation`
+
+Remove or rename no node. The existing
+`full save refetches effective profile before summary` fixture was strengthened
+in place so the advisory GET keeps the saved profile byte-equivalent while
+changing only derived effective facts. Targeted RED was `1 failed / 43 skipped`:
+the Summary rendered stale `Income` instead of saved `Growth`. GREEN is Task 7
+`71/71`, Task 6-8 focused `117/117`, and full frontend `836/836`. The final
+sequential ledger is Task 7 `+36/-2` and total frontend `+60/-2` (net `+58`).
 
 ---
 
@@ -978,11 +1002,11 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+59/-2`, net `+57`
+### Frontend: `+60/-2`, net `+58`
 
-Full suite moves `77 files / 778 -> 81 files / 835`. The nine-file focused
+Full suite moves `77 files / 778 -> 81 files / 836`. The nine-file focused
 suite moves the historical `5 existing files / 59` baseline to
-`9 files / 116`.
+`9 files / 117`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -1070,6 +1094,17 @@ Remove or rename no node. Strengthen the existing response-lost draft node in
 place. This is the RED-first correction for the four fresh-spec findings and
 must remain visible as raw `+4/-0` accounting.
 
+#### Saved-profile Task 7 authority deviation — add 1, remove 0
+
+Relative to the product state below `2026d4c8`, add exactly:
+
+1. `keeps a later full save authoritative after approved stale reconciliation`
+
+Remove or rename no node. Strengthen the existing full-save refresh fixture in
+place to distinguish saved profile authority from derived effective facts.
+This is the RED-first correction for the remaining High and must remain visible
+as raw `+1/-0` accounting.
+
 #### New frontend files — add 14
 
 - `InvestorProfileApi.test.ts` +5:
@@ -1138,9 +1173,9 @@ allowlist entry is authorized.
 | 4. startup + reconciliation | +2 | 0 | migration/startup ownership |
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
-| 7. workspace UI + Settings guard | 0 | +35/-2 | summary/modes/navigation + reviewed reconciliation/navigation/authority hardening |
+| 7. workspace UI + Settings guard | 0 | +36/-2 | summary/modes/navigation + reviewed reconciliation/navigation/authority hardening |
 | 8. Research context + CSS/ratchet | 0 | +9 | historical transparency/layout |
-| **Total** | **+53/-1** | **+59/-2** | **net backend +52, frontend +57** |
+| **Total** | **+53/-1** | **+60/-2** | **net backend +52, frontend +58** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1685,7 +1720,8 @@ collection requires a reviewed ledger amendment.
   replacing one existing Settings guard node. The reviewed code-quality
   deviation then adds seven Panel nodes plus one Settings node and retires one
   intermediate composite Panel node. The fresh-spec authority deviation adds
-  four more Panel nodes and removes none. Preserve every baseline node ID. Use
+  four more Panel nodes and removes none. The saved-profile authority deviation
+  adds one more Panel node and removes none. Preserve every baseline node ID. Use
   deferred promises for profile/calibration/turn/save/approve legs, live DOM
   identity after locale changes, connected focus targets, and planted
   secret-like source values that must not enter guard/dialog copy.
@@ -1697,8 +1733,8 @@ collection requires a reviewed ledger amendment.
     src/SettingsWorkspace.test.tsx
   ```
 
-  Expected final collection: Panel `43`; Settings `27`; total `70`, with raw
-  sequential ledger `+35/-2`.
+  Expected final collection: Panel `44`; Settings `27`; total `71`, with raw
+  sequential ledger `+36/-2`.
 
 - [ ] **Step 3: Split renderers without splitting state ownership**
 
@@ -1741,10 +1777,10 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 9: Run GREEN**
 
-  Expected: exact `70 passed`. Run resource/display/API tests too; expected
-  Task 6-7 owned cumulative is `5 files / 94 passed`. Including the unchanged
+  Expected: exact `71 passed`. Run resource/display/API tests too; expected
+  Task 6-7 owned cumulative is `5 files / 95 passed`. Including the unchanged
   class-coverage and foundation-boundary baselines, the final-suite checkpoint
-  before Task 8 is `7 files / 107 passed`; Task 8 then adds nine nodes.
+  before Task 8 is `7 files / 108 passed`; Task 8 then adds nine nodes.
 
 - [ ] **Step 10: Commit**
 
@@ -1817,7 +1853,7 @@ collection requires a reviewed ledger amendment.
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `9 files / 116 passed`.
+  Expected: `9 files / 117 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -1875,14 +1911,14 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `81 files / 835 passed`; clean typecheck; build succeeds with only
+  Expected: `81 files / 836 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
-  `+59/-2`. Removed IDs must be exactly the three named obsolete nodes across
+  `+60/-2`. Removed IDs must be exactly the three named obsolete nodes across
   the backend and frontend ledgers, including the Task 7 intermediate node
   retired by the reviewed deviation. Existing failure/error/skip/warning
   families must be bidirectionally identical.
@@ -2002,7 +2038,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+59/-2`, and only the three named removals;
+1. exact backend `+53/-1`, frontend `+60/-2`, and only the three named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -2083,7 +2119,7 @@ Only after independent implementation GREEN and explicit user approval:
 5. verify marker 2, `integrity_check`, `foreign_key_check`, preserved message /
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
-6. rerun merged focused `219`, full backend collect `4621`, frontend `81/835`,
+6. rerun merged focused `219`, full backend collect `4621`, frontend `81/836`,
    typecheck, build, scanner, no-PG, resources, immutable gates, and one normal
    desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
