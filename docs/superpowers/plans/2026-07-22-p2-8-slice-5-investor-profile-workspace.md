@@ -9,7 +9,7 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** IMPLEMENTED — INDEPENDENT IMPLEMENTATION REVIEW PENDING
+> **Status:** LIVE COMPLETE — MERGED AND PRODUCTION MIGRATED 2026-07-22
 >
 > The Slice 5 design received independent full-document GREEN at spec commit
 > `62d59b93`. The required review pin is part of the approved authority:
@@ -23,10 +23,12 @@
 > docs-only clearance commit that records these resolutions.
 >
 > Product implementation is complete at `b214e1fc`; the docs-only pre-evidence
-> tip is `d5836d7e`. Canonical verification and isolated live gates are recorded
-> under Task 9. The branch is intentionally not merged, production calibration
-> schema remains unmigrated, and the normal desktop was not restarted pending
-> independent implementation review.
+> tip is `d5836d7e`, and review-ready evidence tip is `de8485be`. Independent
+> implementation review returned GREEN with zero blocking findings. After
+> explicit user approval, `master` fast-forwarded from `bba7bf60` through
+> `de8485be`, merged code migrated production calibration schema v1 to v2, and
+> the normal desktop restarted for a zh-Hant Summary smoke. Task 9 records the
+> branch evidence; the Post-Review section records merged-production closeout.
 
 **Goal:** Replace the form-first Investor Profile panel with a bilingual,
 summary-first workspace; add a durable guided-calibration protocol whose
@@ -2477,3 +2479,44 @@ Only after independent implementation GREEN and explicit user approval:
 8. keep the retained backup until the user confirms normal operation;
 9. remove implementation worktree/branch and temporary artifacts; and
 10. choose the next priority-map unit only after merged-master closeout.
+
+### Execution record — 2026-07-22
+
+- Independent implementation review returned GREEN for product `b214e1fc` and
+  evidence tip `de8485be`; the user explicitly approved the fast-forward merge
+  and production v1-to-v2 migration after all normal writers were stopped.
+- Before migration, a retained `0600` SQLite online backup was written to
+  `data/backups/profile_state-v1-pre-investor-profile-v2-20260722T143200Z.db`
+  (SHA-256 `09afc65ad34f78b35c8e329300eccad6962f3edd792e72abdf9d9f18667a446a`).
+  Its manifest and the migration manifest remain beside it. The source logical
+  baseline was `1 active / 12 messages / 1 approved proposal / 0 turns`, with
+  ordered message digest
+  `e25a45fe5036a70178958ca0c466093c1884815390530d98042f8d7a0e284cb2`
+  and terminal-proposal digest
+  `66250fafcc46f57eaf71dd0a145a29502093358d1f9f4c34029dd14293923b78`.
+- `master` fast-forwarded from `bba7bf60` through `de8485be`. The first cutover
+  harness invocation failed on its own import path before importing migration
+  code or writing the database; production SHA and absent marker were rechecked
+  before retrying with the repository root on `sys.path`. Merged code then
+  completed the migration. Marker `(1, 2)`, `integrity_check=ok`, zero foreign
+  key violations, preserved counts/digests, legacy active-to-superseded status,
+  and zero inferred session/proposal state were verified.
+- Fresh merged-master verification passed backend focused `219`, backend
+  collect `4621`, frontend focused `11 files / 144 tests`, frontend full
+  `83 files / 863 tests`, typecheck, production build, scanner exact
+  `1033/973/954/20` with 30 scopes, no-PG `ok:true` / `pg_attempts:[]`, and the
+  reviewed immutable-byte gate.
+- The normal desktop restarted from merged `master` at
+  `http://127.0.0.1:8430/`. Both Investor Profile endpoints returned 200, and
+  the zh-Hant Summary rendered the effective state, mismatch warning, commands,
+  calibration state, and current-context disclosure without a visible error.
+  A post-startup read-only probe reconfirmed marker 2, integrity/FK cleanliness,
+  preserved counts/digests, supersession, and zero inferred state.
+- The retained backup is intentionally kept until the user confirms normal
+  operation. The two non-blocking reviewer observations remain backlog items:
+  normalize Anthropic calibration `stop_reason: "refusal"` to the established
+  typed refusal family, and reconsider the hard-coded
+  `claude-sonnet-4-6` calibration fallback when calibration gains a registry.
+- With this closeout complete, `I18N-3 Explore` is the sole next priority-map
+  unit. This record does not authorize its product implementation before its
+  own reviewed plan.

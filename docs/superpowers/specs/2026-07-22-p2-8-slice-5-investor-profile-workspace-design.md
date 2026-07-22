@@ -1,17 +1,19 @@
 # P2.8 Slice 5 Investor Profile Workspace Design
 
-> **Status: WRITTEN REVIEW APPROVED — IMPLEMENTATION PLAN NEXT**
+> **Status: LIVE COMPLETE — MERGED 2026-07-22**
 >
 > Written against merged `master` at `bca064d4` on 2026-07-22. This document
 > is the bounded product and data-contract authority for P2.8 Slice 5. It does
-> not authorize product implementation until a separate RED-first
-> implementation plan receives independent written review GREEN. Independent
-> full-document review approved this design on 2026-07-22; the sole required
-> clarification, next-topic validation versus display ordering, is incorporated
-> in Sections 4.1, 6.2, and 13.1. The implementation-plan review also aligned
-> the per-run null snapshot case in Section 8.3 with queued runs that never
-> reached prompt assembly; this is an honest extension of the same no-snapshot
-> state, not a fabricated legacy backfill.
+> not authorize later scope beyond the reviewed implementation. Independent
+> full-document, implementation-plan, and implementation review all returned
+> GREEN. Reviewed product tip `b214e1fc` fast-forward merged through evidence
+> tip `de8485be`; after explicit user approval, merged code migrated production
+> calibration schema v1 to v2 behind a retained `0600` online backup. Merged
+> canonical gates and the normal zh-Hant desktop Summary smoke passed. The sole
+> design-review clarification, next-topic validation versus display ordering,
+> remains incorporated in Sections 4.1, 6.2, and 13.1, and Section 8.3 retains
+> the reviewed no-snapshot semantics for queued runs that never reached prompt
+> assembly.
 
 ## 1. Purpose and Authority
 
@@ -710,5 +712,8 @@ perform repeated paid calls merely to prove retry behavior.
 6. Post-merge closeout updates this status, the canonical shell, terminology,
    priority map, Design Kit, and memory as separate evidence.
 
-Independent written review completed Step 1 on 2026-07-22. Slice 5 remains
-design-only until the separate implementation plan completes Steps 2 and 3.
+All six delivery steps completed on 2026-07-22. Production now carries
+calibration schema marker `(1, 2)`; integrity and foreign-key checks are clean,
+legacy unsupported active state was superseded without inferred coverage, and
+the retained pre-migration backup remains available until normal operation is
+confirmed.

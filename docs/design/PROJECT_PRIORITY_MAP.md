@@ -281,17 +281,18 @@ therefore defaults to defer until the hypothesis gate exists.
   `profile_settings.ui_locale`. Its bounded scope includes the currently
   reachable Investor Profile panel, all nine Settings anchors, and
   Settings-owned backend-copy mappings. The public selector remains
-  unauthorized. **P2.8 Slice 5 is IMPLEMENTED / INDEPENDENT IMPLEMENTATION
-  REVIEW PENDING at product tip `b214e1fc`.** Exact review-ready evidence is
-  backend `+53/-1` to collect `4621` and focused `219`; frontend sequential
-  `+88/-3` to `83 files / 863 tests`; scanner `1033/973/954/20` with 30
-  scopes; copied-production migration, no-lock/rollback, no-PG, one bounded
-  Provider turn, Research/Card snapshot transparency, and the both-locale
-  six-viewport matrix are green. The branch remains deliberately unmerged,
-  production calibration schema remains v1, and the normal desktop has not
-  been restarted. Independent implementation review is the sole next gate;
-  merge, production migration, and LIVE status remain blocked. I18N-6 must route the eventual selector through
-  the locale controller rather than direct `i18next.changeLanguage()`.
+  unauthorized. **P2.8 Slice 5 is LIVE COMPLETE at reviewed product tip
+  `b214e1fc`, fast-forward merged through evidence tip `de8485be`.** Independent
+  implementation review returned GREEN. Exact accounting is backend `+53/-1`
+  to collect `4621` and focused `219`; frontend sequential `+88/-3` to
+  `83 files / 863 tests`; scanner `1033/973/954/20` with 30 scopes. After a
+  retained `0600` online backup and explicit user approval, merged code migrated
+  production calibration schema v1 to v2 with marker 2, clean integrity/FK,
+  preserved message/terminal-proposal digests, legacy active-state
+  supersession, and zero inferred coverage/base state. Fresh merged-tree gates
+  and the normal zh-Hant desktop Summary smoke are green. **I18N-3 Explore is
+  the sole NEXT unit.** I18N-6 must route the eventual selector through the
+  locale controller rather than direct `i18next.changeLanguage()`.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
 - **Authority correction (Sol, verified)**: `DESKTOP_APP_VISION_DRAFT.md` header itself says **"DRAFT — NOT a spec"** and parts are stale (written pre-Holdings). It is the *intent* source for triage — NOT implementation authority. The P2.8 phase-1 spec becomes the implementation authority.
@@ -486,6 +487,7 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-07-22 (P2.8 SLICE 5 LIVE COMPLETE — I18N-3 EXPLORE NEXT)**: Independent implementation review returned GREEN for product `b214e1fc` / evidence tip `de8485be`, and the user explicitly approved integration and production migration. `master` fast-forwarded from `bba7bf60` through `de8485be`. A retained `0600` online backup (`profile_state-v1-pre-investor-profile-v2-20260722T143200Z.db`, SHA-256 `09afc65ad34f78b35c8e329300eccad6962f3edd792e72abdf9d9f18667a446a`) preceded merged-code-only calibration v1-to-v2 migration. Production now reports marker `(1,2)`, `integrity_check=ok`, zero FK violations, preserved `12` messages / `1` approved proposal and exact ordered digests, the unsupported legacy active session honestly superseded, and zero inferred coverage/base state. Fresh merged-master gates passed backend focused `219` / collect `4621`, frontend focused `11/144` / full `83/863`, typecheck/build, scanner `1033/973/954/20` with 30 scopes, no-PG `ok:true` / `pg_attempts:[]`, and immutable boundaries. The normal desktop restarted from merged master and rendered the zh-Hant Investor Profile Summary cleanly with both profile endpoints returning 200; a post-startup read-only probe reconfirmed migration invariants. The backup remains retained pending user confirmation. Two non-blocking backlog observations remain: normalize Anthropic calibration `stop_reason: "refusal"` into the established typed refusal family, and revisit the hard-coded `claude-sonnet-4-6` fallback when calibration gains a registry. I18N-3 Explore is the sole NEXT unit; I18N-6 remains the selector-release owner.
 - **2026-07-22 (P2.8 SLICE 5 IMPLEMENTATION REVIEW-READY — INDEPENDENT REVIEW NEXT)**: Product tip `b214e1fc` completes the bilingual summary-first Investor Profile workspace, durable adaptive calibration, covered-field-only proposal approval, and exact current/per-run personalization transparency. Canonical virgin A/B is exact: backend collect `4569 -> 4621` with `+53/-1`, identical existing `49 failed / 74 skipped / 7 errors / 18 warnings`, and head `4491 passed`; frontend `77/778 -> 83/863` with sequential `+88/-3`. Focused backend is `219`; typecheck/build and scanner `1033/973/954/20` with 30 scopes are green. A `0600` copied-production migration preserved ordered message/terminal digests, produced marker 2 with integrity/FK clean, inferred zero legacy coverage, and was idempotent; transaction probes proved no SQLite write lock across Provider await and atomic profile/proposal rollback. No-PG returned `ok:true` / `pg_attempts:[]`; a 67-check `zh-Hant`/`en` six-viewport matrix, one bounded isolated Provider turn, and fake-backed Research/Card null/empty/exact snapshot proof passed. All temporary DBs, profiles, screenshots, ports, and processes were cleaned. The branch is unmerged, production schema is not migrated, normal desktop is untouched, and Slice 5 remains blocked on independent implementation GREEN plus explicit user approval.
 - **2026-07-22 (P2.8 SLICE 5 IMPLEMENTATION PLAN REVIEW GREEN — IMPLEMENTATION CLEARED)**: Independent review approved the RED-first plan after two required docs-only authority alignments. The versioned opening prompt now uses the spec-owned single-question wording byte-for-byte in backend canonical English and the exact zh-Hant resource; the rejected longer plan draft is not an implementation option. Per-run null snapshot semantics now cover both pre-Slice-5 history and new queued runs that never reach prompt assembly, while executed-disabled runs remain the distinct empty-string state. No test/resource/scanner ledger changed. Slice 5 remains the sole NEXT unit and may proceed from the docs-only clearance commit; implementation must stop at independent implementation review-ready before merge or production migration.
 - **2026-07-22 (P2.8 SLICE 5 IMPLEMENTATION PLAN WRITTEN — INDEPENDENT PLAN REVIEW NEXT)**: The RED-first implementation plan at `docs/superpowers/plans/2026-07-22-p2-8-slice-5-investor-profile-workspace.md` grounds the approved design against backend `4569` / focused `167`, frontend `77 files / 778 tests`, Settings resources `623`, and scanner `1033/973/954/20` with 28 scopes. Its exact ledger is backend `+53/-1` to `4621`, frontend `+47/-1` to `81 files / 824 tests`, Settings `712` leaves, new Research namespace `5` leaves, and scanner counts unchanged with 30 scopes. The plan makes calibration schema v2 an explicit startup phase, keeps Provider waits outside SQLite locks, clamps partial proposals through the backend topic policy, samples stance trace and exact context together at prompt assembly, and assigns Evidence Drawer chrome to the `research` namespace. Slice 5 remains the sole NEXT unit; product implementation is blocked until independent plan review returns GREEN.
