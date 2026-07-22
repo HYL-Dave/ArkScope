@@ -45,6 +45,9 @@ TURN_STATUSES = ("pending", "completed", "failed", "interrupted")
 PROPOSAL_STATUSES = ("draft", "approved", "rejected", "superseded")
 INTERVIEW_VERSION = 2
 MAX_DIAGNOSTIC_LENGTH = 240
+_SESSION_SUPERSEDED_DIAGNOSTIC = (
+    "Calibration session was superseded before Provider completion."
+)
 
 _PROPOSABLE_FIELD_ORDER = tuple(
     field for topic in CALIBRATION_TOPICS for field in topic.fields
@@ -399,6 +402,12 @@ class CalibrationStore:
             if active and not supersede_active:
                 raise ValueError("calibration_session_active")
             if active:
+                conn.execute(
+                    "UPDATE investor_profile_calibration_turns SET status='failed', "
+                    "error_code='calibration_session_superseded', diagnostic=?, "
+                    "updated_at=? WHERE session_id=? AND status='pending'",
+                    (_SESSION_SUPERSEDED_DIAGNOSTIC, ts, active["id"]),
+                )
                 conn.execute(
                     "UPDATE investor_profile_calibration_sessions SET status='superseded', "
                     "updated_at=?, closed_at=?, superseded_reason=? WHERE id=?",
@@ -763,6 +772,8 @@ class CalibrationStore:
                 raise ValueError("calibration_turn_not_found")
             if row["status"] in {"pending", "completed"}:
                 return self._work_on_connection(conn, row, call_provider=False)
+            if row["error_code"] == "calibration_session_superseded":
+                raise ValueError("calibration_turn_not_retryable")
             if row["status"] not in {"failed", "interrupted"}:
                 raise ValueError("calibration_turn_not_retryable")
             session = self._require_guided_session(conn, row["session_id"])
@@ -842,6 +853,7 @@ class CalibrationStore:
             next_topic_id = self._result_member(result, "next_topic_id")
             raw_patch = self._result_member(result, "profile_patch")
             raw_rationales = self._result_member(result, "rationales", {})
+            rationales_source: Mapping[str, Any] = {}
 
             if surfaced_error is None:
                 try:
@@ -880,16 +892,33 @@ class CalibrationStore:
                         "Addressed or next topic failed backend catalog validation.",
                     )
 
-            if surfaced_error is None and raw_patch is not None:
-                if not isinstance(raw_patch, Mapping) or not isinstance(
-                    raw_rationales or {}, Mapping
-                ):
+            if surfaced_error is None:
+                if raw_rationales is None:
+                    rationales_source = {}
+                elif isinstance(raw_rationales, Mapping):
+                    rationales_source = raw_rationales
+                else:
                     surfaced_error = CalibrationOperationError(
                         "calibration_result_validation_failed",
-                        "Proposal patch and rationales must be objects.",
+                        "Proposal rationales must be an object or null.",
+                    )
+
+            if surfaced_error is None and raw_patch is not None:
+                if not isinstance(raw_patch, Mapping):
+                    surfaced_error = CalibrationOperationError(
+                        "calibration_result_validation_failed",
+                        "Proposal patch must be an object or null.",
                     )
                 else:
                     try:
+                        for field in _LIST_CONFLICT_FIELDS:
+                            if field not in raw_patch:
+                                continue
+                            values = raw_patch[field]
+                            if not isinstance(values, list) or any(
+                                not isinstance(value, str) for value in values
+                            ):
+                                raise ValueError("invalid calibration proposal list")
                         current_profile = _read_profile_on_connection(conn)
                         patch, rejected_fields = clamp_proposal_patch(
                             raw_patch,
@@ -916,7 +945,7 @@ class CalibrationStore:
                             else:
                                 rationales: dict[str, str] = {}
                                 for field in patch:
-                                    value = (raw_rationales or {}).get(field)
+                                    value = rationales_source.get(field)
                                     if value is not None:
                                         if not isinstance(value, str):
                                             surfaced_error = CalibrationOperationError(

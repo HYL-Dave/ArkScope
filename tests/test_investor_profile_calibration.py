@@ -69,11 +69,57 @@ def test_start_session_enforces_single_active_and_explicit_supersede(tmp_path):
     with pytest.raises(ValueError, match="calibration_session_active"):
         store.start_session()
 
+    store.begin_answer_turn(
+        session_id=first.id,
+        turn_id="completed-before-supersede",
+        answer="Finish this turn before replacing the session.",
+    )
+    completed_before = store.complete_turn(
+        "completed-before-supersede",
+        result=_result(next_topic_id="financial_capacity"),
+    )
+    pending_answer = "This in-flight answer belongs only to the old session."
+    store.begin_answer_turn(
+        session_id=first.id,
+        turn_id="pending-at-supersede",
+        answer=pending_answer,
+    )
+    first_before = store.get_session(first.id)
+    messages_before = store.list_messages(first.id)
+
     second = store.start_session(supersede_active=True)
     assert second.status == "active"
-    assert store.get_session(first.id).status == "superseded"
+    first_after = store.get_session(first.id)
+    assert first_after.status == "superseded"
+    assert first_after.covered_topics == first_before.covered_topics == ["loss_response"]
+    assert first_after.current_topic_id == first_before.current_topic_id == "financial_capacity"
+    assert first_after.current_question_message_id == first_before.current_question_message_id
     assert store.get_active_session().id == second.id
     assert [s.id for s in store.list_sessions()] == [second.id, first.id]
+
+    pending = store.get_turn("pending-at-supersede")
+    assert pending.status == "failed"
+    assert pending.error_code == "calibration_session_superseded"
+    assert pending.diagnostic == "Calibration session was superseded before Provider completion."
+    assert len(pending.diagnostic) <= 240
+    assert pending_answer not in pending.diagnostic
+    assert store.get_pending_turn(first.id) is None
+    assert store.get_turn(completed_before.id).to_dict() == completed_before.to_dict()
+
+    with pytest.raises(ValueError, match="calibration_turn_not_retryable"):
+        store.retry_turn("pending-at-supersede")
+    with pytest.raises(ValueError, match="calibration_turn_retry_required"):
+        store.complete_turn(
+            "pending-at-supersede",
+            result=_result(
+                addressed_topic_id="financial_capacity",
+                next_topic_id="time_horizon",
+            ),
+        )
+    assert store.get_session(first.id).to_dict() == first_after.to_dict()
+    assert [message.to_dict() for message in store.list_messages(first.id)] == [
+        message.to_dict() for message in messages_before
+    ]
 
 
 def test_messages_are_append_only_and_role_checked(tmp_path):
@@ -259,6 +305,44 @@ def test_complete_turn_rejects_wrong_addressed_topic_without_advancing(tmp_path)
     assert [message.role for message in messages] == ["assistant", "user"]
     assert messages[-1].content == "This source answer must remain persisted."
     assert store.latest_proposal(session.id) is None
+
+    secret = "non-mapping rationale value must not survive"
+    rationale_cases = (
+        ("empty-list-rationales", {"risk_appetite": 7}, []),
+        ("list-rationales-without-patch", None, [{"secret": secret}]),
+    )
+    for case, profile_patch, rationales in rationale_cases:
+        case_db = tmp_path / case / "profile_state.db"
+        case_store = _calibration_store(case_db)
+        InvestorProfileStore(case_db)
+        case_session = case_store.start_session()
+        turn_id = f"{case}-turn"
+        case_store.begin_answer_turn(
+            session_id=case_session.id,
+            turn_id=turn_id,
+            answer="Validate rationale structure before changing session state.",
+        )
+
+        with pytest.raises(ValueError, match="calibration_result_validation_failed"):
+            case_store.complete_turn(
+                turn_id,
+                result=_result(profile_patch=profile_patch, rationales=rationales),
+            )
+
+        invalid = case_store.get_turn(turn_id)
+        unchanged = case_store.get_session(case_session.id)
+        assert invalid.status == "failed"
+        assert invalid.error_code == "calibration_result_validation_failed"
+        assert len(invalid.diagnostic) <= 240
+        assert unchanged.covered_topics == []
+        assert unchanged.current_topic_id == "loss_response"
+        assert unchanged.current_question_message_id == case_session.current_question_message_id
+        assert case_store.latest_proposal(case_session.id) is None
+        assert [message.role for message in case_store.list_messages(case_session.id)] == [
+            "assistant",
+            "user",
+        ]
+        assert secret not in invalid.diagnostic
 
 
 def test_complete_turn_rejects_unknown_or_covered_next_topic_without_advancing(tmp_path):
@@ -459,6 +543,148 @@ def test_create_guided_proposal_clamps_to_covered_fields_and_records_base_values
     )
     assert row["raw_profile_patch_json"] == "{}"
     assert rejected_secret not in json.dumps(row, ensure_ascii=False)
+
+    invalid_list_cases = (
+        (
+            "preferred_edge",
+            "investment_approach",
+            [{"secret": "nested preferred-edge secret"}],
+            "nested preferred-edge secret",
+        ),
+        ("avoidances", "risk_avoidances", [17], None),
+        (
+            "behavioral_flags",
+            "behavioral_patterns",
+            ["anchoring", {"secret": "nested behavioral-flags secret"}],
+            "nested behavioral-flags secret",
+        ),
+    )
+    for field, topic_id, invalid_value, secret_marker in invalid_list_cases:
+        invalid_db = tmp_path / f"invalid-{field}.db"
+        invalid_store = _calibration_store(invalid_db)
+        InvestorProfileStore(invalid_db)
+        invalid_session = invalid_store.start_session()
+        invalid_store.begin_answer_turn(
+            session_id=invalid_session.id,
+            turn_id=f"advance-{field}",
+            answer="Advance to the list-backed calibration topic.",
+        )
+        invalid_store.complete_turn(
+            f"advance-{field}",
+            result=_result(next_topic_id=topic_id),
+        )
+        invalid_store.begin_answer_turn(
+            session_id=invalid_session.id,
+            turn_id=f"invalid-{field}",
+            answer="Reject malformed structured proposal values.",
+        )
+
+        with pytest.raises(ValueError, match="calibration_proposal_validation_failed"):
+            invalid_store.complete_turn(
+                f"invalid-{field}",
+                result=_result(
+                    addressed_topic_id=topic_id,
+                    next_topic_id="financial_capacity",
+                    profile_patch={field: invalid_value},
+                ),
+            )
+
+        invalid_turn = invalid_store.get_turn(f"invalid-{field}")
+        invalid_session_state = invalid_store.get_session(invalid_session.id)
+        invalid_messages = invalid_store.list_messages(invalid_session.id)
+        assert invalid_turn.status == "failed"
+        assert invalid_turn.error_code == "calibration_proposal_validation_failed"
+        assert len(invalid_turn.diagnostic) <= 240
+        assert str(invalid_value) not in invalid_turn.diagnostic
+        assert invalid_session_state.covered_topics == ["loss_response"]
+        assert invalid_session_state.current_topic_id == topic_id
+        assert invalid_store.latest_proposal(invalid_session.id) is None
+        assert [message.role for message in invalid_messages] == [
+            "assistant",
+            "user",
+            "assistant",
+            "user",
+        ]
+        exposed = {
+            "session": invalid_session_state.to_dict(),
+            "turn": invalid_turn.to_dict(),
+            "messages": [message.to_dict() for message in invalid_messages],
+        }
+        with sqlite3.connect(invalid_db) as conn:
+            conn.row_factory = sqlite3.Row
+            persisted = {
+                "turn": dict(
+                    conn.execute(
+                        "SELECT * FROM investor_profile_calibration_turns WHERE id=?",
+                        (invalid_turn.id,),
+                    ).fetchone()
+                ),
+                "proposal_count": conn.execute(
+                    "SELECT COUNT(*) FROM investor_profile_calibration_proposals "
+                    "WHERE session_id=?",
+                    (invalid_session.id,),
+                ).fetchone()[0],
+            }
+        assert persisted["proposal_count"] == 0
+        if secret_marker is not None:
+            assert secret_marker not in json.dumps(exposed, ensure_ascii=False)
+            assert secret_marker not in json.dumps(persisted, ensure_ascii=False)
+
+    calibration_only_db = tmp_path / "calibration-only.db"
+    migrate_calibration_schema(calibration_only_db)
+    calibration_only_store = CalibrationStore(calibration_only_db)
+    calibration_only_session = calibration_only_store.start_session()
+    calibration_only_store.begin_answer_turn(
+        session_id=calibration_only_session.id,
+        turn_id="calibration-only-proposal",
+        answer="Use default profile values as this proposal's exact base.",
+    )
+    calibration_only_completed = calibration_only_store.complete_turn(
+        "calibration-only-proposal",
+        result=_result(
+            profile_patch={
+                "risk_appetite": "6",
+                "drawdown_tolerance_pct": "18",
+            },
+        ),
+    )
+    calibration_only_proposal = calibration_only_store.latest_proposal(
+        calibration_only_session.id
+    )
+    calibration_only_row = _raw_proposal(
+        calibration_only_db, calibration_only_proposal.id
+    )
+    assert calibration_only_completed.status == "completed"
+    assert calibration_only_proposal.profile_patch == {
+        "risk_appetite": 6,
+        "drawdown_tolerance_pct": 18.0,
+    }
+    assert calibration_only_row["base_values_json"] == (
+        '{"risk_appetite":null,"drawdown_tolerance_pct":null}'
+    )
+    with sqlite3.connect(calibration_only_db) as conn:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='investor_profile'"
+        ).fetchone() is None
+
+    malformed_db = tmp_path / "malformed-profile.db"
+    malformed_store = _calibration_store(malformed_db)
+    with sqlite3.connect(malformed_db) as conn:
+        conn.execute("CREATE TABLE investor_profile (id TEXT PRIMARY KEY)")
+    malformed_session = malformed_store.start_session()
+    malformed_store.begin_answer_turn(
+        session_id=malformed_session.id,
+        turn_id="malformed-profile-proposal",
+        answer="A malformed profile table must fail closed.",
+    )
+    with pytest.raises(sqlite3.OperationalError):
+        malformed_store.complete_turn(
+            "malformed-profile-proposal",
+            result=_result(profile_patch={"risk_appetite": 6}),
+        )
+    assert malformed_store.get_turn("malformed-profile-proposal").status == "pending"
+    assert malformed_store.get_session(malformed_session.id).covered_topics == []
+    assert malformed_store.latest_proposal(malformed_session.id) is None
 
 
 def test_all_illegal_proposal_fields_create_no_proposal(tmp_path):
