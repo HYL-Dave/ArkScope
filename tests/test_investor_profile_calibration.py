@@ -7,6 +7,7 @@ from dataclasses import FrozenInstanceError, asdict, dataclass
 
 import pytest
 
+import src.investor_profile_calibration_agent as calibration_agent
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import (
     CalibrationStore,
@@ -18,7 +19,12 @@ from src.investor_profile_calibration_agent import (
     CalibrationAgentResult,
     parse_calibration_model_json,
 )
-from src.investor_profile_calibration_policy import OPENING_PROMPT_ID, OPENING_PROMPTS
+from src.investor_profile_calibration_policy import (
+    CALIBRATION_TOPICS,
+    CALIBRATION_TOPIC_IDS,
+    OPENING_PROMPT_ID,
+    OPENING_PROMPTS,
+)
 
 
 def _calibration_store(path):
@@ -1044,7 +1050,19 @@ def test_calibration_prompt_forbids_research_advice_and_tools():
     assert "do not give investment advice" in p
     assert "do not recommend securities" in p
     assert "no market data" in p
-    assert "profile proposal" in p
+    assert "no tool" in p
+    assert "never mention backend topic ids" in p
+    assert "profile_patch" in p
+
+    runtime_prompt = calibration_agent.build_calibration_system_prompt(
+        current_topic_id="time_horizon",
+        covered_topics=("loss_response", "financial_capacity"),
+        request_proposal=True,
+    )
+    assert 'current_topic_id: "time_horizon"' in runtime_prompt
+    assert 'covered_topic_ids: ["loss_response","financial_capacity"]' in runtime_prompt
+    assert "request_proposal: true" in runtime_prompt
+    assert "ui_locale" not in runtime_prompt
 
 
 def test_calibration_prompt_pins_every_enum_value():
@@ -1056,62 +1074,108 @@ def test_calibration_prompt_pins_every_enum_value():
     for value in (*HOLDING_HORIZONS, *PRESETS, *STANCES):
         assert value in CALIBRATION_SYSTEM_PROMPT, value
 
+    catalog_lines = [
+        f"{index}. {topic.id}: {', '.join(topic.fields)}"
+        for index, topic in enumerate(CALIBRATION_TOPICS, start=1)
+    ]
+    positions = [CALIBRATION_SYSTEM_PROMPT.index(line) for line in catalog_lines]
+    assert positions == sorted(positions)
+    assert tuple(topic.id for topic in CALIBRATION_TOPICS) == CALIBRATION_TOPIC_IDS
+
 
 def test_parse_calibration_json_strips_model_supplied_risk_mismatch():
-    """Live 2026-07-10: gpt-5.4-mini emitted risk_mismatch despite the prompt ban,
-    failing the whole turn. The responder strips it (server re-derives anyway);
-    the API-level rejection for direct callers is unchanged."""
+    """Historical node ID retained: the parser now preserves the partial payload
+    so the covered-topic policy, not the model adapter, owns denied-field clamp."""
     result = parse_calibration_model_json(
         json.dumps(
             {
                 "assistant_message": "draft ready",
-                "proposal": {
-                    "profile_patch": {
-                        "risk_appetite": 7,
-                        "risk_mismatch": "appetite_above_capacity",
-                    },
-                    "rationales": {},
+                "addressed_topic_id": "loss_response",
+                "topic_covered": True,
+                "next_topic_id": "financial_capacity",
+                "profile_patch": {
+                    "risk_appetite": "7",
+                    "risk_mismatch": "appetite_above_capacity",
+                    "enabled": True,
                 },
+                "rationales": {"risk_appetite": "Exact source rationale."},
             }
         )
     )
-    assert result.profile_patch is not None
-    assert "risk_mismatch" not in result.profile_patch
-    assert result.profile_patch["risk_appetite"] == 7
+    assert result == CalibrationAgentResult(
+        assistant_message="draft ready",
+        addressed_topic_id="loss_response",
+        topic_covered=True,
+        next_topic_id="financial_capacity",
+        profile_patch={
+            "risk_appetite": "7",
+            "risk_mismatch": "appetite_above_capacity",
+            "enabled": True,
+        },
+        rationales={"risk_appetite": "Exact source rationale."},
+    )
 
 
 def test_parse_calibration_json_followup_without_proposal():
     result = parse_calibration_model_json(
-        '{"assistant_message":"What drawdown would make you sell?","proposal":null}'
+        '{"assistant_message":"What drawdown would make you sell?",'
+        '"addressed_topic_id":"loss_response","topic_covered":false,'
+        '"next_topic_id":"loss_response","profile_patch":null,"rationales":{}}'
     )
     assert result == CalibrationAgentResult(
         assistant_message="What drawdown would make you sell?",
+        addressed_topic_id="loss_response",
+        topic_covered=False,
+        next_topic_id="loss_response",
         profile_patch=None,
         rationales={},
     )
 
 
 def test_parse_calibration_json_tolerates_model_mismatch_and_discards_its_value():
-    """Contract updated by live verification 2026-07-10: a model-supplied
-    risk_mismatch no longer fails the turn — parse discards the model's value and
-    the server derives the real one on save (direct API callers are still hard-
-    rejected: see test_normalize_proposal_rejects_agent_supplied_mismatch)."""
+    """Historical node ID retained: structural parsing accepts catalog values for
+    the store to validate, while rejecting non-JSON-contract field types."""
     result = parse_calibration_model_json(
-        '{"assistant_message":"Draft ready","proposal":{"profile_patch":'
-        '{"risk_appetite":8,"risk_capacity":4,"risk_mismatch":"none"},"rationales":{}}}'
+        '{"assistant_message":"  Exact model text.  ",'
+        '"addressed_topic_id":"loss_response","topic_covered":true,'
+        '"next_topic_id":"model_invented_topic","profile_patch":'
+        '{"risk_appetite":8,"risk_capacity":4,"risk_mismatch":"none"},"rationales":{}}'
     )
-    assert result.profile_patch is not None
-    assert "risk_mismatch" not in result.profile_patch
+    assert result.assistant_message == "  Exact model text.  "
+    assert result.next_topic_id == "model_invented_topic"
+    assert result.profile_patch["risk_mismatch"] == "none"
     assert result.profile_patch["risk_appetite"] == 8
+
+    invalid_payloads = (
+        {"assistant_message": 7},
+        {"addressed_topic_id": None},
+        {"topic_covered": 1},
+        {"next_topic_id": 5},
+        {"profile_patch": []},
+        {"rationales": []},
+        {"rationales": {"risk_appetite": 7}},
+    )
+    base = {
+        "assistant_message": "Question",
+        "addressed_topic_id": "loss_response",
+        "topic_covered": True,
+        "next_topic_id": None,
+        "profile_patch": None,
+        "rationales": {},
+    }
+    for override in invalid_payloads:
+        with pytest.raises(ValueError):
+            parse_calibration_model_json(json.dumps({**base, **override}))
 
 
 def test_parse_calibration_json_with_default_stance_proposal():
     result = parse_calibration_model_json(
-        '{"assistant_message":"Draft ready","proposal":{"profile_patch":'
-        '{"enabled":true,"risk_appetite":8,"risk_capacity":4,"default_stance":"complementary"},'
-        '"rationales":{"default_stance":"User asked to be challenged."}}}'
+        '{"assistant_message":"Draft ready","addressed_topic_id":"assistant_style",'
+        '"topic_covered":true,"next_topic_id":null,"profile_patch":'
+        '{"enabled":true,"default_stance":"complementary"},'
+        '"rationales":{"default_stance":"User asked to be challenged."}}'
     )
-    assert result.profile_patch["default_stance"] == "complementary"
+    assert result.profile_patch == {"enabled": True, "default_stance": "complementary"}
     assert result.rationales["default_stance"] == "User asked to be challenged."
 
 
@@ -1129,12 +1193,19 @@ def test_responder_request_contains_no_tool_or_market_language(monkeypatch):
                 "input_messages": input_messages,
             }
         )
-        return '{"assistant_message":"What is your maximum tolerable drawdown?","proposal":null}'
+        return (
+            '{"assistant_message":"What is your maximum tolerable drawdown?",'
+            '"addressed_topic_id":"loss_response","topic_covered":false,'
+            '"next_topic_id":"loss_response","profile_patch":null,"rationales":{}}'
+        )
 
     monkeypatch.setattr(mod, "_call_calibration_llm", fake_call)
     result = asyncio.run(
         mod.live_calibration_responder(
             messages=[{"role": "user", "content": "I want growth."}],
+            current_topic_id="loss_response",
+            covered_topics=(),
+            request_proposal=False,
             provider="openai",
             model="gpt-5.4-mini",
         )
@@ -1142,4 +1213,10 @@ def test_responder_request_contains_no_tool_or_market_language(monkeypatch):
     assert result.assistant_message.startswith("What")
     blob = captured["instructions"].lower()
     assert "no market data" in blob
+    assert 'current_topic_id: "loss_response"' in captured["instructions"]
+    assert "covered_topic_ids: []" in captured["instructions"]
+    assert "request_proposal: false" in captured["instructions"]
+    assert captured["input_messages"] == [
+        {"role": "user", "content": "I want growth."}
+    ]
     assert "tool" not in captured
