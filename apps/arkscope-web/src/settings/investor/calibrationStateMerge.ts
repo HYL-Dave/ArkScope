@@ -32,12 +32,64 @@ function appendUnique(values: readonly string[], incoming: readonly string[]): s
   return merged;
 }
 
+interface SessionMergeContext {
+  messages: readonly CalibrationMessage[];
+  acceptIncomingTurnId?: string;
+}
+
+function sessionIsTerminal(session: CalibrationSession): boolean {
+  return session.status === "closed" || session.status === "superseded";
+}
+
+function isStrictTopicSuperset(
+  incoming: readonly string[],
+  previous: readonly string[],
+): boolean {
+  const incomingTopics = new Set(incoming);
+  const previousTopics = new Set(previous);
+  return incomingTopics.size > previousTopics.size
+    && [...previousTopics].every((topic) => incomingTopics.has(topic));
+}
+
+function hasAcceptedCurrentQuestionEvidence(
+  session: CalibrationSession,
+  context: SessionMergeContext,
+): boolean {
+  if (!context.acceptIncomingTurnId || !session.current_question_message_id) return false;
+  return context.messages.some((item) => (
+    item.id === session.current_question_message_id
+    && item.role === "assistant"
+    && item.turn_id === context.acceptIncomingTurnId
+  ));
+}
+
 function mergeSession(
   previous: CalibrationSession,
   incoming: CalibrationSession,
+  context: SessionMergeContext,
 ): CalibrationSession {
-  const previousTerminal = previous.status === "closed" || previous.status === "superseded";
-  const next = previousTerminal && incoming.status === "active" ? previous : incoming;
+  const previousTerminal = sessionIsTerminal(previous);
+  const incomingTerminal = sessionIsTerminal(incoming);
+  let next: CalibrationSession;
+  if (previousTerminal !== incomingTerminal) {
+    next = incomingTerminal ? incoming : previous;
+  } else if (incoming.updated_at > previous.updated_at) {
+    next = incoming;
+  } else if (incoming.updated_at < previous.updated_at) {
+    next = previous;
+  } else {
+    const pointersMoveForward = isStrictTopicSuperset(
+      incoming.covered_topics,
+      previous.covered_topics,
+    ) || hasAcceptedCurrentQuestionEvidence(incoming, context);
+    next = pointersMoveForward
+      ? incoming
+      : {
+          ...incoming,
+          current_topic_id: previous.current_topic_id,
+          current_question_message_id: previous.current_question_message_id,
+        };
+  }
   return {
     ...next,
     covered_topics: appendUnique(previous.covered_topics, incoming.covered_topics),
@@ -47,12 +99,13 @@ function mergeSession(
 function mergeSessions(
   previous: readonly CalibrationSession[],
   incoming: readonly CalibrationSession[],
+  context: SessionMergeContext,
 ): CalibrationSession[] {
   const previousById = new Map(previous.map((item) => [item.id, item]));
   const merged = incoming.map((item) => {
     const existing = previousById.get(item.id);
     previousById.delete(item.id);
-    return existing ? mergeSession(existing, item) : item;
+    return existing ? mergeSession(existing, item, context) : item;
   });
   for (const item of previous) {
     if (previousById.has(item.id)) merged.push(item);
@@ -141,14 +194,18 @@ export function mergeCalibrationState(
   ) return incoming;
 
   const messages = mergeMessages(previous.messages, incoming.messages);
+  const sessionMergeContext: SessionMergeContext = {
+    messages,
+    acceptIncomingTurnId: options.acceptIncomingTurnId,
+  };
   const activeSession = previous.active_session && incoming.active_session
     && previous.active_session.id === incoming.active_session.id
-    ? mergeSession(previous.active_session, incoming.active_session)
+    ? mergeSession(previous.active_session, incoming.active_session, sessionMergeContext)
     : incoming.active_session;
   return {
     ...incoming,
     active_session: activeSession,
-    sessions: mergeSessions(previous.sessions, incoming.sessions),
+    sessions: mergeSessions(previous.sessions, incoming.sessions, sessionMergeContext),
     messages,
     pending_turn: mergePendingTurn(
       previous.pending_turn,
@@ -194,6 +251,7 @@ export function applyProposalPatch(
 ): InvestorProfile {
   const next = {
     ...current,
+    risk_mismatch: "unclear" as const,
     preferred_edge: [...current.preferred_edge],
     avoidances: [...current.avoidances],
     behavioral_flags: [...current.behavioral_flags],

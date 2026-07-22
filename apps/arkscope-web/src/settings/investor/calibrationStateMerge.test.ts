@@ -153,6 +153,94 @@ describe("calibrationStateMerge", () => {
     expect(merged.sessions[0]?.covered_topics).toEqual(merged.active_session?.covered_topics);
   });
 
+  it("keeps session pointers when an older same-session snapshot arrives", () => {
+    const previousSession = session({
+      covered_topics: ["loss_response"],
+      current_topic_id: "time_horizon",
+      current_question_message_id: "question-current",
+      updated_at: "2026-07-21T01:03:00Z",
+    });
+    const incomingSession = session({
+      covered_topics: ["financial_capacity"],
+      current_topic_id: "financial_capacity",
+      current_question_message_id: "question-stale",
+      updated_at: "2026-07-21T01:02:00Z",
+    });
+
+    const merged = mergeCalibrationState(
+      state({ active_session: previousSession, sessions: [previousSession] }),
+      state({ active_session: incomingSession, sessions: [incomingSession] }),
+    );
+
+    expect(merged.active_session).toMatchObject({
+      current_topic_id: "time_horizon",
+      current_question_message_id: "question-current",
+      updated_at: "2026-07-21T01:03:00Z",
+      covered_topics: ["loss_response", "financial_capacity"],
+    });
+    expect(merged.sessions[0]).toMatchObject({
+      current_topic_id: "time_horizon",
+      current_question_message_id: "question-current",
+    });
+  });
+
+  it("advances same-second session pointers only with semantic forward evidence", () => {
+    const previousSession = session({
+      covered_topics: ["loss_response"],
+      current_topic_id: "loss_response",
+      current_question_message_id: "question-1",
+      updated_at: "2026-07-21T01:03:00Z",
+    });
+    const incomingSession = session({
+      covered_topics: ["loss_response"],
+      current_topic_id: "financial_capacity",
+      current_question_message_id: "question-2",
+      updated_at: "2026-07-21T01:03:00Z",
+    });
+    const incoming = state({
+      active_session: incomingSession,
+      sessions: [incomingSession],
+      messages: [
+        message(),
+        message({ id: "question-2", turn_id: "turn-2", topic_id: "financial_capacity" }),
+      ],
+    });
+
+    const unaccepted = mergeCalibrationState(
+      state({ active_session: previousSession, sessions: [previousSession] }),
+      incoming,
+    );
+    expect(unaccepted.active_session).toMatchObject({
+      current_topic_id: "loss_response",
+      current_question_message_id: "question-1",
+    });
+
+    const accepted = mergeCalibrationState(
+      state({ active_session: previousSession, sessions: [previousSession] }),
+      incoming,
+      { acceptIncomingTurnId: "turn-2" },
+    );
+    expect(accepted.active_session).toMatchObject({
+      current_topic_id: "financial_capacity",
+      current_question_message_id: "question-2",
+    });
+
+    const expandedSession = session({
+      covered_topics: ["loss_response", "financial_capacity"],
+      current_topic_id: "time_horizon",
+      current_question_message_id: "question-3",
+      updated_at: "2026-07-21T01:03:00Z",
+    });
+    const expanded = mergeCalibrationState(
+      state({ active_session: previousSession, sessions: [previousSession] }),
+      state({ active_session: expandedSession, sessions: [expandedSession] }),
+    );
+    expect(expanded.active_session).toMatchObject({
+      current_topic_id: "time_horizon",
+      current_question_message_id: "question-3",
+    });
+  });
+
   it("does not regress pending-turn terminal evidence across mixed snapshots", () => {
     const cases = [
       { previous: turn({ status: "failed" }), incoming: turn(), expected: "failed" },
@@ -279,6 +367,7 @@ describe("calibrationStateMerge", () => {
     expect(expected.risk_capacity).toBe(6);
     expect(expected.preferred_edge).toEqual(["quality", "growth"]);
     expect(expected.primary_preset).toBe("event_driven");
+    expect(expected.risk_mismatch).toBe("unclear");
     expect(profileCorroboratesProposalPatch(
       profile({
         primary_preset: "income",

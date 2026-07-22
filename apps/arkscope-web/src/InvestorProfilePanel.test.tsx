@@ -1707,7 +1707,17 @@ describe("InvestorProfilePanel", () => {
 
   it("returns response-lost draft proposals to summary without replaying the mutation", async () => {
     await useEnglish();
-    const proposed = activeCalibration({ latest_proposal: calibrationProposal() });
+    const proposed = activeCalibration({
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "proposal-response-lost-assistant",
+          turn_id: "turn-proposal-response-lost",
+          prompt_id: null,
+        }),
+      ],
+      latest_proposal: calibrationProposal(),
+    });
     let calibrationGets = 0;
     const calls = apiRoutes({
       profile: populatedResponse(),
@@ -1735,6 +1745,50 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("A calibration proposal is ready for review");
     expect(host!.textContent).not.toContain("Could not update the calibration proposal.");
     expect(host!.textContent).not.toContain("SOURCE_PROPOSAL_RESPONSE_LOST");
+    expect(calls.filter((call) => call.url.endsWith("/calibration/proposals/request")))
+      .toHaveLength(1);
+  });
+
+  it("does not correlate an unrelated draft to a failed proposal request", async () => {
+    await useEnglish();
+    const unrelated = activeCalibration({
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "unrelated-draft-assistant",
+          turn_id: "turn-unrelated",
+          prompt_id: null,
+        }),
+      ],
+      latest_proposal: calibrationProposal({ id: "proposal-unrelated" }),
+    });
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration(),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1 ? activeCalibration() : unrelated;
+        }
+        if (call.url.endsWith("/calibration/proposals/request")) {
+          return new Response(JSON.stringify({ detail: "SOURCE_UNRELATED_DRAFT_FAILURE" }), {
+            status: 504,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return undefined;
+      },
+    });
+    await mount(false, { turnIdFactory: () => "turn-current-request" });
+    await flush();
+    await clickButton("Continue Calibration");
+    await clickButton("Propose Now");
+
+    expect(host!.textContent).toContain("Guided calibration");
+    expect(host!.textContent).toContain("Could not update the calibration proposal.");
+    expect(host!.textContent).not.toContain("Investor Profile summary");
+    expect(host!.textContent).not.toContain("SOURCE_UNRELATED_DRAFT_FAILURE");
     expect(calls.filter((call) => call.url.endsWith("/calibration/proposals/request")))
       .toHaveLength(1);
   });
@@ -1908,7 +1962,6 @@ describe("InvestorProfilePanel", () => {
     await useEnglish();
     const initialProfile = populatedResponse();
     const refreshedProfile = populatedResponse();
-    refreshedProfile.profile.primary_preset = "income";
     refreshedProfile.effective_stance = "strict_risk_control";
     refreshedProfile.context_preview = "SOURCE_REJECT_REFRESHED_CONTEXT";
     const proposal = calibrationProposal();
@@ -1965,15 +2018,17 @@ describe("InvestorProfilePanel", () => {
       .toHaveLength(2);
     expect(calibrationGets).toBe(2);
     expect(host!.querySelector('[role="alert"]')?.textContent)
-      .toContain("Could not load the Investor Profile.");
-    expect(host!.textContent).not.toContain("Investor Profile summary");
+      .toContain("The profile was saved, but the refreshed summary could not be loaded.");
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Event-driven");
+    expect(host!.textContent).not.toContain("Effective AI stance");
     expect(host!.textContent).not.toContain("SOURCE_REJECT_REFRESH_SECRET");
 
     await clickButton("Retry");
     expect(calls.filter((call) => call.url.endsWith("/profile/investor") && call.method === "GET"))
       .toHaveLength(3);
     expect(host!.textContent).toContain("Investor Profile summary");
-    expect(host!.textContent).toContain("Income");
+    expect(host!.textContent).toContain("Event-driven");
     expect(host!.textContent).toContain("Strict risk control");
     expect(host!.textContent).toContain("SOURCE_REJECT_REFRESHED_CONTEXT");
 
@@ -2143,6 +2198,65 @@ describe("InvestorProfilePanel", () => {
     expect(calls.filter((call) => call.url.includes("/approve"))).toHaveLength(1);
   });
 
+  it("withholds derived mismatch until an approved patch is corroborated", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal({
+      profile_patch: { risk_appetite: 2, risk_capacity: 8 },
+      proposed_fields: ["risk_appetite", "risk_capacity"],
+    });
+    const approvedProposal = calibrationProposal({
+      ...proposal,
+      status: "approved",
+      approved_at: "2026-07-21T01:07:00Z",
+    });
+    const corroborated = populatedResponse();
+    corroborated.profile.risk_appetite = 2;
+    corroborated.profile.risk_capacity = 8;
+    corroborated.profile.risk_mismatch = "capacity_above_appetite";
+    corroborated.effective_stance = "strict_risk_control";
+    let profileGets = 0;
+    let calibrationGets = 0;
+    apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return profileGets < 3 ? populatedResponse() : corroborated;
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1
+            ? activeCalibration({ latest_proposal: proposal })
+            : activeCalibration({ latest_proposal: approvedProposal });
+        }
+        if (call.url.includes("/approve")) {
+          return new Response(JSON.stringify({ detail: "SOURCE_APPROVE_RESPONSE_LOST" }), {
+            status: 504,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+
+    expect(host!.textContent).toContain("Risk appetite (1-10)2");
+    expect(host!.textContent).toContain("Risk capacity (1-10)8");
+    expect(host!.textContent).toContain("Not assessed");
+    expect(host!.textContent).not.toContain("Risk appetite above capacity");
+    expect(host!.textContent).not.toContain("Risk capacity above appetite");
+    await clickButton("Retry");
+
+    expect(profileGets).toBe(3);
+    expect(host!.textContent).toContain("Risk capacity above appetite");
+    expect(host!.textContent).not.toContain("Not assessed");
+    expect(host!.textContent).toContain("Strict risk control");
+  });
+
   it("keeps successful approve authority across stale advisory GET responses", async () => {
     await useEnglish();
     const proposal = calibrationProposal();
@@ -2280,6 +2394,72 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("Event-driven");
     expect(host!.textContent).not.toContain("Personalization disabled");
     expect(host!.querySelector('[data-testid="summary-pending-proposal"]')).toBeNull();
+    expect(calls.filter((call) => call.url.includes("/reject"))).toHaveLength(1);
+  });
+
+  it("keeps reject profile authority through failed and stale refreshes until corroborated", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal();
+    const rejectedProposal = calibrationProposal({
+      status: "rejected",
+      rejected_at: "2026-07-21T01:09:00Z",
+    });
+    const staleProfile = disabledResponse();
+    const corroborated = populatedResponse();
+    corroborated.effective_stance = "strict_risk_control";
+    corroborated.context_preview = "SOURCE_REJECT_CORROBORATED_CONTEXT";
+    let profileGets = 0;
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.includes("/reject")) return { proposal: rejectedProposal };
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          if (profileGets === 1) return populatedResponse();
+          if (profileGets === 2) {
+            return new Response(JSON.stringify({ detail: "SOURCE_REJECT_REFRESH_FAILED" }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            });
+          }
+          if (profileGets === 3) return staleProfile;
+          return corroborated;
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1
+            ? activeCalibration({ latest_proposal: proposal })
+            : activeCalibration({ latest_proposal: rejectedProposal });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Reject proposal");
+
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Event-driven");
+    expect(host!.textContent).not.toContain("Effective AI stance");
+    expect(host!.textContent).toContain(
+      "The profile was saved, but the refreshed summary could not be loaded.",
+    );
+    expect(host!.textContent).not.toContain("SOURCE_REJECT_REFRESH_FAILED");
+    await clickButton("Retry");
+
+    expect(profileGets).toBe(3);
+    expect(host!.textContent).toContain("Event-driven");
+    expect(host!.textContent).not.toContain("Personalization disabled");
+    expect(host!.textContent).not.toContain("Effective AI stance");
+    await clickButton("Retry");
+
+    expect(profileGets).toBe(4);
+    expect(host!.textContent).toContain("Event-driven");
+    expect(host!.textContent).toContain("Strict risk control");
+    expect(host!.textContent).toContain("SOURCE_REJECT_CORROBORATED_CONTEXT");
     expect(calls.filter((call) => call.url.includes("/reject"))).toHaveLength(1);
   });
 

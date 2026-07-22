@@ -78,6 +78,8 @@ interface CalibrationOperationBaseline {
   priorAssistantMessageIds: ReadonlySet<string>;
 }
 
+const PROFILE_AUTHORITY_UNCORROBORATED = new Error("profile_authority_not_corroborated");
+
 function cloneProfile(profile: InvestorProfile): InvestorProfile {
   return {
     ...profile,
@@ -171,6 +173,7 @@ export function InvestorProfilePanel({
   const calibrationGenerationRef = useRef(0);
   const actionInFlightRef = useRef(false);
   const profileAuthorityRef = useRef<InvestorProfile | null>(null);
+  const profileAuthorityProposalRef = useRef<CalibrationProposal | null>(null);
   const proposalAuthorityRef = useRef<ProposalAuthority | null>(null);
   const calibrationRef = useRef<CalibrationState | null>(null);
   const consumedSummaryRequestSequenceRef = useRef(0);
@@ -213,7 +216,15 @@ export function InvestorProfilePanel({
   const applyProfileResponse = useCallback((response: InvestorProfileResponse, generation: number) => {
     if (!mountedRef.current || profileGenerationRef.current !== generation) return false;
     const authority = profileAuthorityRef.current;
-    if (authority && !sameProfileSnapshot(response.profile, authority)) {
+    const authorityProposal = profileAuthorityProposalRef.current;
+    const authorityCorroborated = authority && (
+      sameProfileSnapshot(response.profile, authority)
+      || Boolean(
+        authorityProposal
+        && profileCorroboratesProposalPatch(response.profile, authorityProposal),
+      )
+    );
+    if (authority && !authorityCorroborated) {
       setProfileStatus("ready");
       setProfileError(null);
       setProfileValuesCurrent(true);
@@ -221,6 +232,7 @@ export function InvestorProfilePanel({
       return true;
     }
     profileAuthorityRef.current = null;
+    profileAuthorityProposalRef.current = null;
     setProfileResponse(response);
     setDraft(cloneProfile(response.profile));
     setBaseline(cloneProfile(response.profile));
@@ -231,9 +243,13 @@ export function InvestorProfilePanel({
     return true;
   }, []);
 
-  const installProfileAuthority = useCallback((profile: InvestorProfile) => {
+  const installProfileAuthority = useCallback((
+    profile: InvestorProfile,
+    proposal: CalibrationProposal | null = null,
+  ) => {
     const authority = cloneProfile(profile);
     profileAuthorityRef.current = authority;
+    profileAuthorityProposalRef.current = proposal;
     setProfileResponse((current) => current
       ? { ...current, profile: cloneProfile(authority) }
       : current);
@@ -439,7 +455,8 @@ export function InvestorProfilePanel({
         if (clearAnswerWhenCompleted) setAnswer("");
       }
       if (
-        newDraft
+        sameTurnCompleted
+        && newDraft
         && appliedState.latest_proposal?.status === "draft"
         && appliedState.latest_proposal.id !== priorProposalId
       ) {
@@ -455,18 +472,30 @@ export function InvestorProfilePanel({
   };
 
   const retryProfileLoad = async () => {
+    const retainedRefreshError = operationError?.scope === "refresh" ? operationError : null;
     if (!beginAction("profile_load")) return;
     const generation = ++profileGenerationRef.current;
-    profileAuthorityRef.current = null;
-    setProfileStatus("loading");
+    const hasAuthority = profileAuthorityRef.current !== null && profileResponse !== null;
+    if (!hasAuthority) setProfileStatus("loading");
     setProfileError(null);
     try {
       const response = await getInvestorProfile();
-      applyProfileResponse(response, generation);
+      if (!applyProfileResponse(response, generation)) return;
+      if (profileAuthorityRef.current && retainedRefreshError) {
+        setOperationError(retainedRefreshError);
+      }
     } catch (error) {
       if (mountedRef.current && profileGenerationRef.current === generation) {
-        setProfileStatus("failed");
-        setProfileError(error);
+        if (profileAuthorityRef.current && profileResponse) {
+          setProfileStatus("ready");
+          setProfileError(null);
+          setProfileValuesCurrent(true);
+          setEffectiveFactsCurrent(false);
+          setOperationError({ scope: "refresh", error });
+        } else {
+          setProfileStatus("failed");
+          setProfileError(error);
+        }
       }
     } finally {
       if (mountedRef.current && profileGenerationRef.current === generation) finishAction();
@@ -609,6 +638,7 @@ export function InvestorProfilePanel({
       if (!mountedRef.current || profileGenerationRef.current !== generation) return;
       const savedProfile = cloneProfile(saved.profile);
       profileAuthorityRef.current = savedProfile;
+      profileAuthorityProposalRef.current = null;
       setProfileResponse((current) => ({
         ...(current ?? saved),
         profile: cloneProfile(savedProfile),
@@ -785,19 +815,22 @@ export function InvestorProfilePanel({
       : null;
     if (matchingTerminal?.status === "approved") {
       const expectedProfile = applyProposalPatch(preActionProfile, proposal);
-      installProfileAuthority(expectedProfile);
+      installProfileAuthority(expectedProfile, proposal);
       if (
         profileResult.status === "fulfilled"
         && profileCorroboratesProposalPatch(profileResult.value.profile, proposal)
       ) {
-        profileAuthorityRef.current = null;
         applyProfileResponse(profileResult.value, profileGeneration);
       } else if (profileResult.status === "rejected") {
         setOperationError({ scope: "refresh", error: profileResult.reason });
+      } else {
+        setOperationError({
+          scope: "refresh",
+          error: PROFILE_AUTHORITY_UNCORROBORATED,
+        });
       }
       setProposalConflict(false);
       setOutcome("approved");
-      if (profileResult.status === "fulfilled") setOperationError(null);
       finishToSummary("proposal");
       return;
     }
@@ -805,13 +838,21 @@ export function InvestorProfilePanel({
       installProfileAuthority(preActionProfile);
       if (profileResult.status === "fulfilled") {
         applyProfileResponse(profileResult.value, profileGeneration);
-        setOperationError(null);
+        setOperationError(profileAuthorityRef.current
+          ? { scope: "refresh", error: PROFILE_AUTHORITY_UNCORROBORATED }
+          : null);
         setProposalConflict(false);
         setOutcome("rejected");
         finishToSummary("proposal");
       } else {
-        setProfileStatus("failed");
-        setProfileError(profileResult.reason);
+        setProfileStatus("ready");
+        setProfileError(null);
+        setProfileValuesCurrent(true);
+        setEffectiveFactsCurrent(false);
+        setOperationError({ scope: "refresh", error: profileResult.reason });
+        setProposalConflict(false);
+        setOutcome("rejected");
+        finishToSummary("proposal");
       }
       return;
     }
@@ -862,6 +903,12 @@ export function InvestorProfilePanel({
       ) return;
       if (profileResult.status === "fulfilled") {
         applyProfileResponse(profileResult.value, profileGeneration);
+        if (profileAuthorityRef.current) {
+          setOperationError({
+            scope: "refresh",
+            error: PROFILE_AUTHORITY_UNCORROBORATED,
+          });
+        }
       } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
         setOperationError({ scope: "refresh", error: profileResult.reason });
       }
@@ -913,9 +960,9 @@ export function InvestorProfilePanel({
       ) return;
       installProfileAuthority(preActionProfile);
       installProposalAuthority(rejected.proposal, "terminal");
-      setProfileStatus("loading");
+      setProfileStatus("ready");
       setProfileError(null);
-      setProfileValuesCurrent(false);
+      setProfileValuesCurrent(true);
       setEffectiveFactsCurrent(false);
       const [profileResult, calibrationResult] = await Promise.allSettled([
         getInvestorProfile(),
@@ -928,9 +975,18 @@ export function InvestorProfilePanel({
       ) return;
       if (profileResult.status === "fulfilled") {
         applyProfileResponse(profileResult.value, profileGeneration);
+        if (profileAuthorityRef.current) {
+          setOperationError({
+            scope: "refresh",
+            error: PROFILE_AUTHORITY_UNCORROBORATED,
+          });
+        }
       } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
-        setProfileStatus("failed");
-        setProfileError(profileResult.reason);
+        setProfileStatus("ready");
+        setProfileError(null);
+        setProfileValuesCurrent(true);
+        setEffectiveFactsCurrent(false);
+        setOperationError({ scope: "refresh", error: profileResult.reason });
       }
       if (calibrationResult.status === "fulfilled") {
         applyCalibrationState(calibrationResult.value, calibrationGeneration);
@@ -1149,6 +1205,10 @@ export function InvestorProfilePanel({
           action={providerMissing && onNavigateToProviders ? (
             <Button size="compact" onClick={onNavigateToProviders}>
               {t(($) => $.registry.sections.providers.title)}
+            </Button>
+          ) : operationError.scope === "refresh" ? (
+            <Button size="compact" onClick={() => void retryProfileLoad()}>
+              {t(($) => $.actions.retry)}
             </Button>
           ) : undefined}
         />
