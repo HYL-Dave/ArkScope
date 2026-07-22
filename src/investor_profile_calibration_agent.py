@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from dataclasses import dataclass
 from typing import Protocol
 
+from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.investor_profile_calibration_policy import CALIBRATION_TOPICS
 
 _TOPIC_CATALOG = "\n".join(
@@ -87,6 +89,10 @@ class CalibrationAgentResult:
     rationales: dict[str, str]
 
 
+class CalibrationResultParseError(ValueError):
+    """Structured calibration output failed the owned JSON contract."""
+
+
 class CalibrationResponder(Protocol):
     async def __call__(
         self,
@@ -118,11 +124,20 @@ def build_calibration_system_prompt(
 
 
 def parse_calibration_model_json(raw: str) -> CalibrationAgentResult:
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+        raise CalibrationResultParseError(
+            "calibration model output is not valid JSON"
+        ) from None
     if not isinstance(data, dict):
-        raise ValueError("calibration model output must be a JSON object")
+        raise CalibrationResultParseError(
+            "calibration model output must be a JSON object"
+        )
     if set(data) != _RESULT_KEYS:
-        raise ValueError("calibration model output must contain exactly six result fields")
+        raise CalibrationResultParseError(
+            "calibration model output must contain exactly six result fields"
+        )
 
     assistant_message = data.get("assistant_message")
     addressed_topic_id = data.get("addressed_topic_id")
@@ -132,20 +147,20 @@ def parse_calibration_model_json(raw: str) -> CalibrationAgentResult:
     rationales = data.get("rationales")
 
     if not isinstance(assistant_message, str) or not assistant_message.strip():
-        raise ValueError("assistant_message is required")
+        raise CalibrationResultParseError("assistant_message is required")
     if not isinstance(addressed_topic_id, str):
-        raise ValueError("addressed_topic_id must be a string")
+        raise CalibrationResultParseError("addressed_topic_id must be a string")
     if type(topic_covered) is not bool:
-        raise ValueError("topic_covered must be a boolean")
+        raise CalibrationResultParseError("topic_covered must be a boolean")
     if next_topic_id is not None and not isinstance(next_topic_id, str):
-        raise ValueError("next_topic_id must be a string or null")
+        raise CalibrationResultParseError("next_topic_id must be a string or null")
     if profile_patch is not None and not isinstance(profile_patch, dict):
-        raise ValueError("profile_patch must be an object or null")
+        raise CalibrationResultParseError("profile_patch must be an object or null")
     if not isinstance(rationales, dict) or any(
         not isinstance(key, str) or not isinstance(value, str)
         for key, value in rationales.items()
     ):
-        raise ValueError("rationales must be an object of strings")
+        raise CalibrationResultParseError("rationales must be an object of strings")
 
     return CalibrationAgentResult(
         assistant_message=assistant_message,
@@ -202,18 +217,33 @@ async def _call_calibration_llm(
 
     if provider == "openai":
         auth = resolve_live_auth("openai")
+        if auth.source == "env_fallback" and not os.environ.get(
+            "OPENAI_API_KEY", ""
+        ).strip():
+            raise MissingCredentialError("OpenAI API key is not configured")
         if auth.source == "oauth_driver_unwired":
             from src.auth_drivers.factory import build_driver
             from src.auth_drivers.protocol import LLMRequest
             from src.auth_drivers.token_store import get_token_store
             from src.model_credentials import CredentialStore
 
+            token_store = get_token_store()
+            token_record = token_store.load(
+                provider="openai",
+                auth_mode="chatgpt_oauth",
+                credential_id=auth.credential_id,
+            )
+            access_token = getattr(token_record, "access_token", None)
+            if not isinstance(access_token, str) or not access_token.strip():
+                raise MissingCredentialError(
+                    "ChatGPT OAuth access token is not configured"
+                )
             cred = CredentialStore().get(auth.credential_id)
             driver = build_driver(
                 provider="openai",
                 auth_mode="chatgpt_oauth",
                 credential=cred,
-                token_store=get_token_store(),
+                token_store=token_store,
                 registry=None,
                 dal=None,
             )
@@ -246,6 +276,10 @@ async def _call_calibration_llm(
         auth = resolve_live_auth("anthropic")
         if auth.source == "oauth_driver_unwired":
             raise RuntimeError("claude_code_oauth calibration no-tool path is not wired")
+        if auth.source == "env_fallback" and not os.environ.get(
+            "ANTHROPIC_API_KEY", ""
+        ).strip():
+            raise MissingCredentialError("Anthropic API key is not configured")
 
         from src.auth_drivers.live_resolver import live_anthropic_client
 

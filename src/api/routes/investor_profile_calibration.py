@@ -19,6 +19,7 @@ from src.investor_profile_calibration import (
     ProviderWork,
 )
 from src.investor_profile_calibration_agent import (
+    CalibrationResultParseError,
     live_calibration_responder as default_calibration_responder,
     unavailable_responder,
 )
@@ -115,22 +116,40 @@ def _bad(
     return HTTPException(status_code=status, detail=detail)
 
 
-def _latest_retryable_turn(store: CalibrationStore, session_id: str):
-    turns = store.list_turns(session_id)
-    if not turns or turns[-1].status not in {"pending", "failed", "interrupted"}:
+def _latest_retryable_turn(store: CalibrationStore, session):
+    if session is None or session.status != "active":
         return None
-    return turns[-1]
+    for turn in reversed(store.list_turns(session.id)):
+        if (
+            turn.status in {"pending", "failed", "interrupted"}
+            and turn.question_message_id == session.current_question_message_id
+            and turn.addressed_topic_id == session.current_topic_id
+        ):
+            return turn
+    return None
 
 
 def _state(store: CalibrationStore, session_id: str | None = None) -> dict:
     active = store.get_active_session()
-    sid = session_id or (active.id if active else None)
+    sessions = store.list_sessions()
+    if session_id is not None:
+        sid = session_id
+        selected_session = store.get_session(session_id)
+    elif active is not None:
+        sid = active.id
+        selected_session = active
+    elif sessions:
+        selected_session = sessions[0]
+        sid = selected_session.id
+    else:
+        sid = None
+        selected_session = None
     messages = store.list_messages(sid) if sid else []
-    pending_turn = _latest_retryable_turn(store, sid) if sid else None
+    pending_turn = _latest_retryable_turn(store, selected_session)
     proposal = store.latest_proposal(sid) if sid else None
     return {
         "active_session": _session(active),
-        "sessions": [_session(session) for session in store.list_sessions()],
+        "sessions": [_session(session) for session in sessions],
         "messages": [_message(message) for message in messages],
         "pending_turn": _turn(pending_turn),
         "latest_proposal": _proposal(proposal),
@@ -155,6 +174,12 @@ def _provider_diagnostic(*, missing_credential: bool = False) -> str:
         else "Provider call failed."
     )
     return sanitize_research_detail(redact(source))
+
+
+def _result_validation_diagnostic() -> str:
+    return sanitize_research_detail(
+        redact("Calibration result failed structured validation.")
+    )
 
 
 def _turn_input_error(exc: ValueError) -> HTTPException:
@@ -210,6 +235,18 @@ async def _complete_provider_work(
             provider=work.provider,
             model=work.model,
         )
+    except CalibrationResultParseError as exc:
+        failed = store.fail_turn(
+            work.turn.id,
+            error_code="calibration_result_validation_failed",
+            diagnostic=_result_validation_diagnostic(),
+        )
+        raise _bad(
+            400,
+            "calibration_result_validation_failed",
+            "Calibration response failed validation. Retry this turn.",
+            diagnostic=failed.diagnostic,
+        ) from exc
     except MissingCredentialError as exc:
         failed = store.fail_turn(
             work.turn.id,

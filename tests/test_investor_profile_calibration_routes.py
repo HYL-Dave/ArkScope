@@ -9,8 +9,8 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+import src.investor_profile_calibration_agent as calibration_agent
 from src.api.routes import investor_profile_calibration as routes
-from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import CalibrationStore
 from src.investor_profile_calibration_policy import (
@@ -422,12 +422,33 @@ def test_retry_interrupted_turn_reuses_answer_and_turn_id(stores, monkeypatch):
     answer_message_id = next(
         message.id for message in work.messages if message.role == "user"
     )
-    assert cstore.reconcile_interrupted_turns() == 1
+    cstore.fail_turn(
+        "interrupted-turn",
+        error_code="calibration_responder_failed",
+        diagnostic="Provider call failed.",
+    )
+    newer_answer = "This newer failed answer must become stale after advancement."
+    cstore.begin_answer_turn(
+        session_id=session["id"],
+        turn_id="newer-failed-turn",
+        answer=newer_answer,
+    )
+    cstore.fail_turn(
+        "newer-failed-turn",
+        error_code="calibration_responder_failed",
+        diagnostic="Provider call failed.",
+    )
+    assert cstore.get_turn("interrupted-turn").status == "failed"
+    assert cstore.get_turn("newer-failed-turn").status == "failed"
+    assert routes.get_calibration_state(store=cstore)["pending_turn"]["id"] == (
+        "newer-failed-turn"
+    )
 
     async def fake_responder(
         *, messages, current_topic_id, covered_topics, request_proposal, provider, model
     ):
-        assert messages[-1] == {"role": "user", "content": answer}
+        assert {"role": "user", "content": answer} in messages
+        assert {"role": "user", "content": newer_answer} in messages
         assert provider == "anthropic"
         assert model == "retry-model"
         return _result()
@@ -442,17 +463,24 @@ def test_retry_interrupted_turn_reuses_answer_and_turn_id(stores, monkeypatch):
     )
 
     retried = cstore.get_turn("interrupted-turn")
+    stale = cstore.get_turn("newer-failed-turn")
     user_messages = [
         message
         for message in cstore.list_messages(session["id"])
         if message.role == "user"
     ]
+    plain_state = routes.get_calibration_state(store=cstore)
     assert retried.status == "completed"
     assert retried.attempt_count == 2
+    assert stale.status == "failed"
     assert state["pending_turn"] is None
-    assert [(message.id, message.turn_id, message.content) for message in user_messages] == [
-        (answer_message_id, "interrupted-turn", answer)
+    assert plain_state["pending_turn"] is None
+    assert plain_state["active_session"]["current_topic_id"] == "financial_capacity"
+    assert [(message.turn_id, message.content) for message in user_messages] == [
+        ("interrupted-turn", answer),
+        ("newer-failed-turn", newer_answer),
     ]
+    assert user_messages[0].id == answer_message_id
 
 
 def test_request_proposal_uses_dedicated_route_without_fake_user_message(
@@ -480,15 +508,16 @@ def test_request_proposal_uses_dedicated_route_without_fake_user_message(
         return _result(
             assistant_message="I prepared the supported part of your profile.",
             addressed_topic_id="financial_capacity",
-            topic_covered=False,
+            topic_covered=True,
             next_topic_id=None,
             profile_patch={
+                "risk_appetite": 8,
                 "risk_capacity": 9,
                 "enabled": True,
                 "risk_mismatch": "none",
                 "unknown_field": "denied proposal value",
             },
-            rationales={"risk_capacity": "Unsupported source rationale."},
+            rationales={"risk_appetite": "Supported source rationale."},
         )
 
     monkeypatch.setattr(routes, "_default_responder", fake_responder)
@@ -508,8 +537,15 @@ def test_request_proposal_uses_dedicated_route_without_fake_user_message(
         message.id for message in cstore.list_messages(session.id) if message.role == "user"
     ]
     assert user_ids_after == user_ids_before
-    assert state["latest_proposal"] is None
+    assert state["active_session"] is None
+    assert state["latest_proposal"]["profile_patch"] == {"risk_appetite": 8}
     assert "denied proposal value" not in json.dumps(state)
+
+    reloaded = routes.get_calibration_state(store=cstore)
+    assert reloaded["active_session"] is None
+    assert reloaded["sessions"][0]["id"] == session.id
+    assert reloaded["messages"] == state["messages"]
+    assert reloaded["latest_proposal"] == state["latest_proposal"]
 
 
 def test_approve_schema_rejects_client_profile_patch():
@@ -548,40 +584,97 @@ def test_approve_conflict_returns_409_and_keeps_pending_proposal(stores, monkeyp
 def test_missing_provider_configuration_uses_existing_typed_error_family(
     stores, monkeypatch
 ):
+    from src.auth_drivers import factory, live_resolver, token_store
+
     cstore, _pstore = stores
     _allow_writes(monkeypatch)
     session = _start(cstore)
-    raw_token = "sk-proj-AbCdEf0123456789Secret"
+    monkeypatch.setattr(
+        routes, "_default_responder", calibration_agent.live_calibration_responder
+    )
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
-    async def missing_responder(**kwargs):
-        raise MissingCredentialError(
-            f"credential_id=cred-production api_key={raw_token} is missing"
+    resolution = {"source": "env_fallback", "credential_id": None}
+
+    def fake_resolve(provider):
+        return live_resolver.LiveAuthResolution(
+            provider=provider,
+            source=resolution["source"],
+            credential_id=resolution["credential_id"],
         )
 
-    monkeypatch.setattr(routes, "_default_responder", missing_responder)
-    with pytest.raises(HTTPException) as exc:
+    def forbidden_provider_call(*args, **kwargs):
+        raise AssertionError("credential absence must be detected before provider setup")
+
+    monkeypatch.setattr(live_resolver, "resolve_live_auth", fake_resolve)
+    monkeypatch.setattr(live_resolver, "live_openai_client", forbidden_provider_call)
+    monkeypatch.setattr(live_resolver, "live_anthropic_client", forbidden_provider_call)
+    monkeypatch.setattr(factory, "build_driver", forbidden_provider_call)
+
+    failures = []
+    cases = [
+        ("openai", "missing-openai-env", "Keep the OpenAI answer."),
+        ("anthropic", "missing-anthropic-env", "Keep the Anthropic answer."),
+    ]
+    for provider, turn_id, answer in cases:
+        with pytest.raises(HTTPException) as caught:
+            asyncio.run(
+                routes.send_calibration_message(
+                    routes.CalibrationMessageBody(
+                        session_id=session["id"],
+                        turn_id=turn_id,
+                        content=answer,
+                        provider=provider,
+                    ),
+                    store=cstore,
+                )
+            )
+        failures.append((turn_id, answer, caught.value))
+
+    token_loads = []
+
+    class EmptyTokenStore:
+        def load(self, **kwargs):
+            token_loads.append(kwargs)
+            return None
+
+    resolution.update(source="oauth_driver_unwired", credential_id="local:71")
+    monkeypatch.setattr(token_store, "get_token_store", lambda: EmptyTokenStore())
+    with pytest.raises(HTTPException) as caught:
         asyncio.run(
             routes.send_calibration_message(
                 routes.CalibrationMessageBody(
                     session_id=session["id"],
-                    turn_id="missing-config",
-                    content="Keep my answer despite missing configuration.",
+                    turn_id="missing-oauth-token",
+                    content="Keep the OAuth answer.",
+                    provider="openai",
                 ),
                 store=cstore,
             )
         )
+    failures.append(("missing-oauth-token", "Keep the OAuth answer.", caught.value))
 
-    failed = cstore.get_turn("missing-config")
-    assert exc.value.status_code == 503
-    assert exc.value.detail["code"] == "provider_config_missing"
-    assert exc.value.detail["message"] == (
-        "Configure an AI provider before retrying this calibration turn."
-    )
-    assert exc.value.detail["diagnostic"] == failed.diagnostic
-    assert failed.error_code == "provider_config_missing"
-    assert raw_token not in json.dumps(exc.value.detail)
-    assert "cred-production" not in json.dumps(exc.value.detail)
-    assert "[REDACTED]" in failed.diagnostic
+    journal = cstore.list_messages(session["id"])
+    for turn_id, answer, error in failures:
+        failed = cstore.get_turn(turn_id)
+        assert error.status_code == 503
+        assert error.detail["code"] == "provider_config_missing"
+        assert error.detail["message"] == (
+            "Configure an AI provider before retrying this calibration turn."
+        )
+        assert error.detail["diagnostic"] == failed.diagnostic
+        assert failed.error_code == "provider_config_missing"
+        assert "[REDACTED]" in failed.diagnostic
+        assert any(message.content == answer for message in journal)
+        assert "local:71" not in json.dumps(error.detail)
+    assert token_loads == [
+        {
+            "provider": "openai",
+            "auth_mode": "chatgpt_oauth",
+            "credential_id": "local:71",
+        }
+    ]
 
 
 def test_calibration_failure_hides_provider_detail_outside_diagnostic_field(
@@ -643,3 +736,65 @@ def test_calibration_failure_hides_provider_detail_outside_diagnostic_field(
     for raw_value in (*planted, raw_detail):
         assert raw_value not in failed.diagnostic
         assert raw_value not in exposed
+
+    raw_model_body = json.dumps(
+        {
+            "assistant_message": raw_detail,
+            "addressed_topic_id": "loss_response",
+            "topic_covered": "not-a-boolean",
+            "next_topic_id": None,
+            "profile_patch": None,
+            "rationales": {},
+        }
+    )
+
+    async def malformed_provider_result(**kwargs):
+        assert kwargs["input_messages"][-1] == {
+            "role": "user",
+            "content": "Preserve this malformed-result answer.",
+        }
+        return raw_model_body
+
+    monkeypatch.setattr(
+        calibration_agent, "_call_calibration_llm", malformed_provider_result
+    )
+    monkeypatch.setattr(
+        routes, "_default_responder", calibration_agent.live_calibration_responder
+    )
+    calls_before = len(fail_calls)
+    with pytest.raises(HTTPException) as parse_exc:
+        asyncio.run(
+            routes.send_calibration_message(
+                routes.CalibrationMessageBody(
+                    session_id=session["id"],
+                    turn_id="malformed-result",
+                    content="Preserve this malformed-result answer.",
+                    provider="openai",
+                ),
+                store=cstore,
+            )
+        )
+
+    malformed = cstore.get_turn("malformed-result")
+    assert parse_exc.value.status_code == 400
+    assert parse_exc.value.detail["code"] == "calibration_result_validation_failed"
+    assert parse_exc.value.detail["message"] == (
+        "Calibration response failed validation. Retry this turn."
+    )
+    assert parse_exc.value.detail["diagnostic"] == malformed.diagnostic
+    assert malformed.error_code == "calibration_result_validation_failed"
+    assert malformed.diagnostic == "Calibration result failed structured validation."
+    assert len(fail_calls) == calls_before + 1
+    assert any(
+        message.role == "user"
+        and message.turn_id == "malformed-result"
+        and message.content == "Preserve this malformed-result answer."
+        for message in cstore.list_messages(session["id"])
+    )
+    parse_exposed = json.dumps(
+        {"turn": malformed.to_dict(), "http_detail": parse_exc.value.detail},
+        ensure_ascii=False,
+    )
+    assert raw_model_body not in parse_exposed
+    for raw_value in planted:
+        assert raw_value not in parse_exposed

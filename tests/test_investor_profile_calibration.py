@@ -17,6 +17,7 @@ from src.investor_profile_calibration_schema import migrate_calibration_schema
 from src.investor_profile_calibration_agent import (
     CALIBRATION_SYSTEM_PROMPT,
     CalibrationAgentResult,
+    CalibrationResultParseError,
     parse_calibration_model_json,
 )
 from src.investor_profile_calibration_policy import (
@@ -1163,16 +1164,23 @@ def test_parse_calibration_json_tolerates_model_mismatch_and_discards_its_value(
         "profile_patch": None,
         "rationales": {},
     }
+
+    def assert_parse_failure(payload):
+        with pytest.raises(CalibrationResultParseError) as exc:
+            parse_calibration_model_json(payload)
+        return exc.value
+
+    assert issubclass(CalibrationResultParseError, ValueError)
+    raw_model_body = '{"assistant_message":"private model response"'
+    decode_error = assert_parse_failure(raw_model_body)
+    assert "private model response" not in str(decode_error)
     for missing_key in base:
         missing = dict(base)
         missing.pop(missing_key)
-        with pytest.raises(ValueError):
-            parse_calibration_model_json(json.dumps(missing))
-    with pytest.raises(ValueError):
-        parse_calibration_model_json(json.dumps({**base, "unexpected_key": "denied"}))
+        assert_parse_failure(json.dumps(missing))
+    assert_parse_failure(json.dumps({**base, "unexpected_key": "denied"}))
     for override in invalid_payloads:
-        with pytest.raises(ValueError):
-            parse_calibration_model_json(json.dumps({**base, **override}))
+        assert_parse_failure(json.dumps({**base, **override}))
 
 
 def test_parse_calibration_json_with_default_stance_proposal():
