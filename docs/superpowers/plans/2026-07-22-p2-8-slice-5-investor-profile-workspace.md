@@ -9,7 +9,7 @@
 > superpowers:verification-before-completion before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** CLEARED FOR IMPLEMENTATION
+> **Status:** IMPLEMENTED — INDEPENDENT IMPLEMENTATION REVIEW PENDING
 >
 > The Slice 5 design received independent full-document GREEN at spec commit
 > `62d59b93`. The required review pin is part of the approved authority:
@@ -21,6 +21,12 @@
 > across spec/plan resources, and null snapshots include queued runs that never
 > reached prompt assembly. Product implementation may proceed only from the
 > docs-only clearance commit that records these resolutions.
+>
+> Product implementation is complete at `b214e1fc`; the docs-only pre-evidence
+> tip is `d5836d7e`. Canonical verification and isolated live gates are recorded
+> under Task 9. The branch is intentionally not merged, production calibration
+> schema remains unmigrated, and the normal desktop was not restarted pending
+> independent implementation review.
 
 **Goal:** Replace the form-first Investor Profile panel with a bilingual,
 summary-first workspace; add a durable guided-calibration protocol whose
@@ -2109,7 +2115,7 @@ collection requires a reviewed ledger amendment.
 **Files:**
 - Modify only evidence sections in this plan after commands complete
 
-- [ ] **Step 1: Run backend focused and full collection**
+- [x] **Step 1: Run backend focused and full collection**
 
   ```bash
   pytest tests/test_investor_profile_calibration_policy.py \
@@ -2129,7 +2135,7 @@ collection requires a reviewed ledger amendment.
 
   Expected: `12 files / 219 passed`; full collect `4621`.
 
-- [ ] **Step 2: Run frontend canonical gates**
+- [x] **Step 2: Run frontend canonical gates**
 
   ```bash
   npm test --workspace apps/arkscope-web -- --run
@@ -2141,7 +2147,7 @@ collection requires a reviewed ledger amendment.
   Expected: `83 files / 863 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
-- [ ] **Step 3: Prove exact node accounting with virgin archives**
+- [x] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
@@ -2150,7 +2156,7 @@ collection requires a reviewed ledger amendment.
   nodes retired by reviewed deviations. Existing failure/error/skip/warning
   families must be bidirectionally identical.
 
-- [ ] **Step 4: Run copied-production migration proof**
+- [x] **Step 4: Run copied-production migration proof**
 
   Use SQLite online backup to a `0600` temp file. On the copy only:
 
@@ -2166,14 +2172,14 @@ collection requires a reviewed ledger amendment.
 
   Production DB remains read-only and unchanged.
 
-- [ ] **Step 5: Run atomicity and no-lock Provider probe**
+- [x] **Step 5: Run atomicity and no-lock Provider probe**
 
   Instrument SQLite transactions and a blocking fake responder. Require first
   transaction committed before Provider starts, no write lock during await,
   second transaction after response, and rollback of both profile/proposal on
   injected approval failure.
 
-- [ ] **Step 6: Run static boundaries**
+- [x] **Step 6: Run static boundaries**
 
   Require zero hits for:
 
@@ -2188,13 +2194,13 @@ collection requires a reviewed ledger amendment.
   new literal allowlist/debt entries
   ```
 
-- [ ] **Step 7: Run no-PG smoke**
+- [x] **Step 7: Run no-PG smoke**
 
   Use the repository's existing isolated no-PG harness and require
   `ok:true` plus `pg_attempts:[]`. Calibration migration/state, current Summary,
   and run snapshot reads must be local SQLite only.
 
-- [ ] **Step 8: Run bilingual six-viewport browser matrix**
+- [x] **Step 8: Run bilingual six-viewport browser matrix**
 
   Use scheduler-off sidecar, temp DB, isolated Vite/CDP ports, and both bundled
   locales at `1440x900`, `1024x768`, `961x768`, `960x768`, `959x768`, and
@@ -2203,7 +2209,7 @@ collection requires a reviewed ledger amendment.
   dirty/busy guards, independent load failure, unknown topic, conflict,
   disclosure state, and in-place locale preservation.
 
-- [ ] **Step 9: Run one bounded Provider live turn on an isolated DB copy**
+- [x] **Step 9: Run one bounded Provider live turn on an isolated DB copy**
 
   Start branch sidecar against an online backup on a separate port with
   scheduler disabled and ephemeral API token. Start guided calibration (zero
@@ -2213,18 +2219,117 @@ collection requires a reviewed ledger amendment.
   unavailable, record typed `provider_config_missing` or responder failure and
   keep unit/fake-backed Provider completion as the implementation proof.
 
-- [ ] **Step 10: Verify Research/Card transparency in the isolated profile**
+- [x] **Step 10: Verify Research/Card transparency in the isolated profile**
 
   Create one new disabled trace and one enabled fake-backed run/card. Verify
   null legacy, empty disabled, and exact active snapshot in API and Drawer;
   current Summary context may differ and is labelled separately. Verify
   EvidencePacket and tool inputs are byte-identical to base fixtures.
 
-- [ ] **Step 11: Clean all temporary processes/artifacts**
+- [x] **Step 11: Clean all temporary processes/artifacts**
 
   Stop isolated sidecar/Vite/browser, remove temp DBs/profiles/screenshots only
-  after evidence is summarized, confirm ports closed, and verify production DB,
-  normal browser profile, and main checkout digests unchanged.
+  after evidence is summarized, confirm ports closed, and verify that no gate
+  wrote production calibration state, the normal browser profile, or the main
+  checkout. Record unrelated whole-file drift of a live production DB instead
+  of claiming global byte stability.
+
+### Task 9 Execution Record
+
+- Product behavior tip is `b214e1fc07c49f29c85606a1962528991b0d2a52`.
+  Backend focused verification passed `219`; full collection is `4621`.
+  Frontend canonical verification passed `83 files / 863 tests`, typecheck,
+  production build (only the existing chunk-size warning), and literal scanner
+  `1033/973/954/20` with 30 migrated scopes.
+- Virgin canonical A/B from `bca064d4` to `b214e1fc` reconciled backend node
+  collection exactly `+53/-1`. Full outcomes were base
+  `4439 passed / 49 failed / 74 skipped / 7 errors / 18 warnings` and head
+  `4491 passed / 49 failed / 74 skipped / 7 errors / 18 warnings`; failure,
+  error, skip, and warning identities were bidirectionally equal. Frontend
+  sequential accounting was exactly `+88/-3` from `77/778` to `83/863`.
+  Endpoint comm was `+86/-1`; witness commits `e826ba85` and `d4f4e9bd`
+  account for the two reviewed add-then-retire nodes. Added-node SHA-256 values
+  are backend `5544d1f146713f54b728ac29ea3f3174f6f20da1c282e288d5b8407f4cf72aa3`
+  and frontend sequential
+  `a28e8d01993ce74dc2eb60ab6e4d21e5f76ebadcdd1231580ccd3295d1d091f0`;
+  the four exact removals hash to
+  `1f6507955bd16657d52c184c09c4533c4ba707f750af2833320f9c599d8aa36b`.
+  Both virgin sides used the same dependency mount and symmetric offline
+  sandbox; this avoided the managed environment's unrelated subprocess/TestClient
+  restrictions without changing either archive.
+- A `0600` SQLite online backup of production v1 preserved the observed
+  `1 active session / 12 messages / 1 approved proposal / 0 drafts` baseline.
+  Ordered message and terminal-proposal digests were respectively
+  `e25a45fe...84cb2` and `66250faf...3b78`. Migration produced marker `(1,2)`,
+  `integrity_check=ok`, zero FK violations, exact reviewed columns/indexes,
+  and superseded the legacy active session with
+  `legacy_guided_protocol_unavailable`; every inferred coverage/base/interview
+  counter remained zero. A second run was byte/logically idempotent (file
+  `7409d39c...99976e`, logical `a3ff6b0b...1a5f9a`). On a separate synthetic
+  v1 copy only the seeded draft was superseded; approved/terminal rows and
+  digests were unchanged.
+- Transaction instrumentation observed
+  `pre-call commit -> fake Provider entered -> separate reader saw pending intent
+  -> mutex -> external BEGIN IMMEDIATE committed -> fake Provider returned
+  -> post-call commit`. No SQLite write lock crossed the Provider await. An
+  injected approval failure observed the new value inside the transaction and
+  then rolled back both profile and proposal to byte-identical pre-call
+  digests.
+- Static gates found zero policy/agent DAL, tool, evidence, locale, or resource
+  imports; zero client/server approval patch surface; zero `freeform_notes` in
+  personalization construction; byte-identical evidence gathering; zero
+  dynamic i18n keys, locale branches, normal-mode raw IDs, nested tablists,
+  `aria-live`, `window.confirm`, media queries, or breakpoint literals in the
+  added production lines. Focused static tests passed `17`; the frontend
+  boundary tranche passed `11 files / 144 tests`. Scanner manifest SHA-256 is
+  debt `2139f2131dc4bd0bbdc3df1574e2d69416214825467cf07e0b1e054f497fa631`,
+  allowlist `3b397a21ab7f8a1cd37819ae55d892e26f1946dc3c791aebf28d2eba2577c212`,
+  and migrated scopes
+  `77869efda4935c68a3049cf5af6be110a999b6d98168e859f546f993ad8985fe`.
+  The complete immutable-boundary Git-object manifest is identical on base and
+  product at SHA-256
+  `d11a6bdff47046e47da698d5cffbb28af59c97a753f32037ee33c556c5e62fe1`.
+- Isolated no-PG smoke passed 24 checks with `ok:true` and `pg_attempts:[]`;
+  calibration migration/state, current Summary, Research, and Card snapshots
+  all used the temporary `profile_state.db`.
+- The isolated bilingual browser matrix passed 67 checks across `zh-Hant` and
+  `en` at `1440x900`, `1024x768`, `961x768`, `960x768`, `959x768`, and
+  `390x844`. Summary/Edit/Calibration/Proposal Review all rendered with one
+  Investor anchor, one Settings tablist, and one tabpanel; complete fields,
+  dirty/busy/focus guards, disclosure and locale preservation, unknown-topic
+  fallback, conflicted proposal behavior, source-byte preservation, and zero
+  document/right-edge overflow all held. The intentionally injected independent
+  calibration failure left Summary usable. Isolated-profile universe `503`
+  responses were the expected missing-source condition and unrelated to this
+  slice; browser exceptions were empty. Screenshots were inspected before
+  cleanup.
+- One and only one bounded live Provider turn ran against the isolated backup.
+  Starting the session created one deterministic opening question with zero
+  Provider calls. The single submitted answer made one Provider attempt and
+  returned HTTP 200, persisted one user message plus the assistant continuation,
+  covered one known topic, selected a valid current topic, and left a draft
+  proposal unapproved. No retry or approval was issued.
+- Research/Card transparency used fake-backed runs only. Legacy snapshots were
+  `null`; disabled snapshots were exact empty strings (SHA-256
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`);
+  enabled Research and Card assembly/DB/API/event/message projections were the
+  same 580-byte block (SHA-256
+  `e381996d2c2d764f34c919b5b8a67e7cb9fc334b90a3ccf2d435a202c032ace6`).
+  Current Summary remained a separately labelled 598-byte preview
+  (`cf3c5979452c373164064e42b64b7fc03f6776ae5077c0c6e9921fc7decbafce`).
+  Backend transparency tests passed `21`, Drawer tests `12`, and the focused
+  current-Summary node passed. Two gather inputs remained 130-byte identical
+  fixtures (`88aee685...f8b5b`), and two EvidencePackets remained 589-byte
+  identical fixtures (`a62ae714...b87a3`); no paid Provider was called.
+- All isolated sidecar, Vite, browser, and worker processes were stopped;
+  ports `8428`, `8438`, and `9228` had no matching process. All
+  `/tmp/arkscope-s5-*` and `/tmp/arkscope_s5_*` DBs, profiles, screenshots, and
+  harnesses were removed. The implementation and main worktrees were clean,
+  and no normal browser profile was opened. Over the long parallel verification
+  window a normal external process changed the whole production DB file hash;
+  calibration aggregates and ordered calibration digests stayed unchanged and
+  every Slice 5 probe used read-only connections. This record therefore claims
+  no Slice 5 production write, not global byte stability of a live database.
 
 ---
 
@@ -2234,19 +2339,19 @@ collection requires a reviewed ledger amendment.
 - Modify: this plan
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Fill the evidence ledger**
+- [x] **Step 1: Fill the evidence ledger**
 
   Record product tip, exact tests/collections, node comms, scanner hashes,
   copied-DB migration proof, atomicity/lock evidence, no-PG result, bilingual
   viewport matrix, bounded live result, immutable hashes, and cleanup PIDs/ports.
 
-- [ ] **Step 2: Mark review-ready, not LIVE**
+- [x] **Step 2: Mark review-ready, not LIVE**
 
   Set status to `IMPLEMENTED — INDEPENDENT IMPLEMENTATION REVIEW PENDING` and
   update the priority map. Do not merge, migrate production, restart normal
   desktop, or mark Slice 5 LIVE.
 
-- [ ] **Step 3: Run final docs/diff checks and commit evidence**
+- [x] **Step 3: Run final docs/diff checks and commit evidence**
 
   ```bash
   git diff --check
@@ -2256,7 +2361,7 @@ collection requires a reviewed ledger amendment.
   git commit -m "docs: record investor workspace verification"
   ```
 
-- [ ] **Step 4: Request independent implementation review**
+- [x] **Step 4: Request independent implementation review**
 
   Reviewer reruns canonical A/B, copied-DB migration, exact ledgers, static
   boundaries, and the bilingual interaction matrix. Stop here.

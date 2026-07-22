@@ -281,11 +281,16 @@ therefore defaults to defer until the hypothesis gate exists.
   `profile_settings.ui_locale`. Its bounded scope includes the currently
   reachable Investor Profile panel, all nine Settings anchors, and
   Settings-owned backend-copy mappings. The public selector remains
-  unauthorized. **P2.8 Slice 5 remains the single NEXT unit; its bounded design
-  is WRITTEN REVIEW APPROVED / IMPLEMENTATION PLAN NEXT at
-  `docs/superpowers/specs/2026-07-22-p2-8-slice-5-investor-profile-workspace-design.md`.**
-  It must ship bilingual from birth; product implementation remains blocked
-  until the RED-first plan receives independent review GREEN. I18N-6 must route the eventual selector through
+  unauthorized. **P2.8 Slice 5 is IMPLEMENTED / INDEPENDENT IMPLEMENTATION
+  REVIEW PENDING at product tip `b214e1fc`.** Exact review-ready evidence is
+  backend `+53/-1` to collect `4621` and focused `219`; frontend sequential
+  `+88/-3` to `83 files / 863 tests`; scanner `1033/973/954/20` with 30
+  scopes; copied-production migration, no-lock/rollback, no-PG, one bounded
+  Provider turn, Research/Card snapshot transparency, and the both-locale
+  six-viewport matrix are green. The branch remains deliberately unmerged,
+  production calibration schema remains v1, and the normal desktop has not
+  been restarted. Independent implementation review is the sole next gate;
+  merge, production migration, and LIVE status remain blocked. I18N-6 must route the eventual selector through
   the locale controller rather than direct `i18next.changeLanguage()`.
   The first focused irritation slice, **Models Routing UX,
   is LIVE COMPLETE 2026-07-12 (merged through `2fb1c4f`)**.
@@ -481,6 +486,7 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-07-22 (P2.8 SLICE 5 IMPLEMENTATION REVIEW-READY — INDEPENDENT REVIEW NEXT)**: Product tip `b214e1fc` completes the bilingual summary-first Investor Profile workspace, durable adaptive calibration, covered-field-only proposal approval, and exact current/per-run personalization transparency. Canonical virgin A/B is exact: backend collect `4569 -> 4621` with `+53/-1`, identical existing `49 failed / 74 skipped / 7 errors / 18 warnings`, and head `4491 passed`; frontend `77/778 -> 83/863` with sequential `+88/-3`. Focused backend is `219`; typecheck/build and scanner `1033/973/954/20` with 30 scopes are green. A `0600` copied-production migration preserved ordered message/terminal digests, produced marker 2 with integrity/FK clean, inferred zero legacy coverage, and was idempotent; transaction probes proved no SQLite write lock across Provider await and atomic profile/proposal rollback. No-PG returned `ok:true` / `pg_attempts:[]`; a 67-check `zh-Hant`/`en` six-viewport matrix, one bounded isolated Provider turn, and fake-backed Research/Card null/empty/exact snapshot proof passed. All temporary DBs, profiles, screenshots, ports, and processes were cleaned. The branch is unmerged, production schema is not migrated, normal desktop is untouched, and Slice 5 remains blocked on independent implementation GREEN plus explicit user approval.
 - **2026-07-22 (P2.8 SLICE 5 IMPLEMENTATION PLAN REVIEW GREEN — IMPLEMENTATION CLEARED)**: Independent review approved the RED-first plan after two required docs-only authority alignments. The versioned opening prompt now uses the spec-owned single-question wording byte-for-byte in backend canonical English and the exact zh-Hant resource; the rejected longer plan draft is not an implementation option. Per-run null snapshot semantics now cover both pre-Slice-5 history and new queued runs that never reach prompt assembly, while executed-disabled runs remain the distinct empty-string state. No test/resource/scanner ledger changed. Slice 5 remains the sole NEXT unit and may proceed from the docs-only clearance commit; implementation must stop at independent implementation review-ready before merge or production migration.
 - **2026-07-22 (P2.8 SLICE 5 IMPLEMENTATION PLAN WRITTEN — INDEPENDENT PLAN REVIEW NEXT)**: The RED-first implementation plan at `docs/superpowers/plans/2026-07-22-p2-8-slice-5-investor-profile-workspace.md` grounds the approved design against backend `4569` / focused `167`, frontend `77 files / 778 tests`, Settings resources `623`, and scanner `1033/973/954/20` with 28 scopes. Its exact ledger is backend `+53/-1` to `4621`, frontend `+47/-1` to `81 files / 824 tests`, Settings `712` leaves, new Research namespace `5` leaves, and scanner counts unchanged with 30 scopes. The plan makes calibration schema v2 an explicit startup phase, keeps Provider waits outside SQLite locks, clamps partial proposals through the backend topic policy, samples stance trace and exact context together at prompt assembly, and assigns Evidence Drawer chrome to the `research` namespace. Slice 5 remains the sole NEXT unit; product implementation is blocked until independent plan review returns GREEN.
 - **2026-07-22 (P2.8 SLICE 5 DESIGN REVIEW GREEN — IMPLEMENTATION PLAN NEXT)**: Independent full-document review approved the 696-line Investor Profile workspace design with one required clarification and two plan advisories. The required pin is now part of the authority: catalog order controls display only, interview order is adaptive within the still-uncovered set, and a model-selected next topic becomes server current only after catalog membership and uncovered-state validation; failure leaves coverage/current unchanged and the turn retryable. The implementation plan must align stance trace and exact context snapshot sampling at prompt assembly, and must place new Evidence Drawer chrome in a `research` resource namespace rather than `settings.*`. Slice 5 remains the sole NEXT unit; product implementation is blocked until the RED-first plan receives independent review GREEN.
