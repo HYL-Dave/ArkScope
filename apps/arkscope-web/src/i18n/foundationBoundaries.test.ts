@@ -40,6 +40,11 @@ const I18N_2_SETTINGS_SCOPES = [
   "src/settings/settingsRegistry.ts",
 ];
 
+const SLICE_5_MIGRATED_SCOPES = [
+  "src/settings/investor/**",
+  "src/ResearchPersonalizationContext.tsx",
+];
+
 const ARKSCOPE_ALLOWLIST_ENTRY = {
   file: "src/shell/ShellTopBar.tsx",
   kind: "jsx_text",
@@ -116,6 +121,23 @@ function productionFiles(relativePath: string): string[] {
     if (!entry.name.match(/\.tsx?$/) || entry.name.includes(".test.")) return [];
     return [child];
   });
+}
+
+function productionScopeFiles(scope: string): string[] {
+  if (!scope.endsWith("/**")) return [scope];
+  return productionFiles(scope.slice(0, -3))
+    .map((path) => path.slice(projectRoot.length + 1));
+}
+
+const migratedSettingsFiles = [
+  ...I18N_2_SETTINGS_SCOPES,
+  ...SLICE_5_MIGRATED_SCOPES,
+].flatMap(productionScopeFiles);
+
+function ownsSettingsDebt(file: string): boolean {
+  return I18N_2_OWNED_DEBT_FILES.has(file)
+    || file === "src/ResearchPersonalizationContext.tsx"
+    || file.startsWith("src/settings/investor/");
 }
 
 describe("I18N-0 foundation boundaries", () => {
@@ -247,7 +269,9 @@ describe("I18N-0 foundation boundaries", () => {
     expect(migrated.scopes).toEqual([
       ...I18N_1_MIGRATED_SCOPES,
       ...I18N_2_SETTINGS_SCOPES,
+      ...SLICE_5_MIGRATED_SCOPES,
     ]);
+    expect(migrated.scopes).toHaveLength(30);
     expect(allowlist.entries).toEqual([
       ARKSCOPE_ALLOWLIST_ENTRY,
       ...I18N_2_SETTINGS_ALLOWLIST_ENTRIES,
@@ -258,7 +282,7 @@ describe("I18N-0 foundation boundaries", () => {
 
     const ownedDebt = debt.signatures.filter(({ signature }) => {
       const [file] = JSON.parse(signature) as [string];
-      return I18N_2_OWNED_DEBT_FILES.has(file);
+      return ownsSettingsDebt(file);
     });
     expect(ownedDebt).toEqual([]);
   });
@@ -267,7 +291,7 @@ describe("I18N-0 foundation boundaries", () => {
     const publicSurfacePaths = [
       "src/App.tsx",
       ...productionFiles("src/shell").map((path) => path.slice(projectRoot.length + 1)),
-      ...I18N_2_SETTINGS_SCOPES,
+      ...migratedSettingsFiles,
     ];
     const publicSurfaceSource = publicSurfacePaths.map(read).join("\n");
     const source = [
@@ -288,14 +312,14 @@ describe("I18N-0 foundation boundaries", () => {
   });
 
   it("forbids dynamic Settings keys and direct normal-mode raw diagnostic sinks", () => {
-    const source = I18N_2_SETTINGS_SCOPES.map(read).join("\n");
+    const source = migratedSettingsFiles.map(read).join("\n");
     expect(source).not.toMatch(/\bt\s*\(\s*(?!\(\s*\$\s*\)\s*=>)/);
 
     const settingsUiSource = [
       "src/Settings.tsx",
       "src/InvestorProfilePanel.tsx",
       "src/SourceRunProgress.tsx",
-      ...I18N_2_SETTINGS_SCOPES.filter((path) => path.endsWith(".tsx")),
+      ...migratedSettingsFiles.filter((path) => path.endsWith(".tsx")),
     ].map(read).join("\n");
     const visibleExpressions = [
       ...settingsUiSource.matchAll(/\{([^{}\n]+)\}\s*<\//g),

@@ -28,6 +28,8 @@
     "src/settings/settingsCopy.ts",
     "src/settings/settingsNavigationGuard.ts",
     "src/settings/settingsPreferences.ts",
-    "src/settings/settingsRegistry.ts"
+    "src/settings/settingsRegistry.ts",
+    "src/settings/investor/**",
+    "src/ResearchPersonalizationContext.tsx"
   ]
 }

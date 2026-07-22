@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type RefObject } from "react";
 import { getResearchRun, getResearchRunEvents, type ResearchRunDTO } from "./api";
 import { MODEL_UX_LABELS } from "./modelRoutingUx";
 import { stanceLabel } from "./personalizationDisplay";
+import { ResearchPersonalizationContext } from "./ResearchPersonalizationContext";
 import { sanitizeResearchDiagnostic } from "./researchErrors";
 import type { Message, ToolTraceRow, TraceRow } from "./researchReducer";
 import { formatSystemTimestamp } from "./timeDisplay";
@@ -168,6 +169,7 @@ export function ResearchEvidenceDrawer({
   const details = runDetail ?? (activeRun?.id === runId ? activeRun : null);
   const usage = details?.token_usage ?? message?.token_usage ?? null;
   const personalization = message?.personalization ?? null;
+  const personalizationContext = message?.personalization ?? details?.personalization ?? null;
   const hasTranscriptDetails = Boolean(details || message);
 
   return (
@@ -244,6 +246,7 @@ export function ResearchEvidenceDrawer({
               ))}
             </dl>
           ) : null}
+          <ResearchPersonalizationContext trace={personalizationContext} />
           {developerMode && runId ? (
             <details
               className="research-diagnostic"

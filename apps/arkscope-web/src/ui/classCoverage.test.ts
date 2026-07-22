@@ -27,6 +27,7 @@ const settingsSources = [
   readFileSync(resolve(here, "../Settings.tsx"), "utf8"),
   ...tsxSources(resolve(here, "../settings")),
 ].join("\n");
+const investorSources = tsxSources(resolve(here, "../settings/investor")).join("\n");
 
 function literalClasses(source: string): string[] {
   return Array.from(source.matchAll(/className="([^"]+)"/g))
@@ -46,7 +47,9 @@ describe("migrated component class coverage", () => {
   ])("defines every literal class used by %s", (name, path) => {
     const source = [
       readFileSync(path, "utf8"),
-      name === "Holdings" ? settingsSources : "",
+      name === "Holdings"
+        ? settingsSources
+        : name === "InvestorProfilePanel" ? investorSources : "",
     ].join("\n");
     const classes = [...new Set(literalClasses(source))];
     const missing = classes.filter((name) => !hasSelector(name)).sort();

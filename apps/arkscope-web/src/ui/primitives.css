@@ -244,10 +244,71 @@
 .ip-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-3); }
 .investor-profile-panel fieldset { margin: 0; padding: var(--space-3) 0 0; border: 0; border-top: 1px solid var(--border); }
 .investor-profile-panel legend { padding: 0; margin-bottom: var(--space-2); color: var(--fg); font-weight: 600; }
-.ip-chip { display: inline-flex; align-items: center; gap: var(--space-1-5); margin: 0 var(--space-2) var(--space-2) 0; padding: 3px 8px; border: 1px solid var(--border); border-radius: var(--radius-pill); color: var(--muted); }
+.ip-chip { max-width: 100%; display: inline-flex; align-items: center; gap: var(--space-1-5); margin: 0 var(--space-2) var(--space-2) 0; padding: 3px 8px; border: 1px solid var(--border); border-radius: var(--radius-pill); color: var(--muted); white-space: normal; overflow-wrap: anywhere; }
 .ip-chip input { margin: 0; }
 .ip-calibration { display: grid; gap: var(--space-3); padding: var(--space-4) 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.ip-calibration-log { display: grid; gap: var(--space-2); max-height: 240px; overflow: auto; padding-left: var(--space-3); border-left: 2px solid var(--border); }
-.ip-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ip-calibration-log { min-width: 0; display: grid; gap: var(--space-2); max-height: 240px; overflow: auto; overscroll-behavior: contain; padding-left: var(--space-3); border-left: 2px solid var(--border); overflow-wrap: anywhere; }
+.ip-actions { min-width: 0; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .ip-guardrail { min-width: 0; display: flex; align-items: flex-start; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-2) 0; color: var(--muted); overflow-wrap: anywhere; }
 .ip-guardrail ul { min-width: 0; flex: 1 1 240px; margin: 0; padding-left: var(--space-5); }
+
+.investor-profile-panel > section {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.investor-profile-panel [data-investor-mode-heading] {
+  min-height: var(--control-height-default);
+  display: flex;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.ip-actions .ui-button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.investor-profile-panel [data-testid="summary-pending-proposal"] > .ip-actions {
+  flex-basis: 100%;
+}
+.investor-profile-panel [data-testid="proposal-changes"] > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-3);
+}
+.investor-profile-panel [data-testid="proposal-changes"] .ip-guardrail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  align-content: start;
+}
+.investor-profile-panel [data-testid="proposal-changes"] .ip-guardrail h5 {
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.investor-profile-panel [data-testid="proposal-changes"] .ip-guardrail > div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+.investor-profile-panel [data-testid="proposal-changes"] .ip-guardrail > div:nth-of-type(n + 3) {
+  grid-column: 1 / -1;
+}
+.research-personalization-context {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.research-personalization-context summary {
+  overflow-wrap: anywhere;
+}
+.research-personalization-context-source {
+  max-width: 100%;
+  margin: var(--space-2) 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
