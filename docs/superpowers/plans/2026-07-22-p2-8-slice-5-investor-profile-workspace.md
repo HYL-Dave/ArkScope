@@ -297,10 +297,50 @@ unchanged. Relative to `2ab92add`, add exactly these four node IDs:
 
 Remove or rename no node. Targeted baseline was `2 files / 9 passed`; exact
 RED was `4 failed / 9 passed`; targeted GREEN is `2 files / 13 passed`.
-Task 8 is now raw `+13/-0`, final focused is `11 files / 139`, full frontend is
-`83 files / 858`, and the final frontend sequential ledger is `+83/-3` (net
-`+80`). Resources, migrated scopes, literal classes, debt, and allowlist remain
-unchanged; scanner output remains exact `1033/973/954/20` with 30 scopes.
+At this first Task 8 correction checkpoint, Task 8 was raw `+13/-0`, focused
+was `11 files / 139`, full frontend was `83 files / 858`, and the frontend
+sequential ledger was `+83/-3` (net `+80`). Resources, migrated scopes, literal
+classes, debt, and allowlist remained unchanged; scanner output remained exact
+`1033/973/954/20` with 30 scopes.
+
+### Reviewed quality deviation: Task 8 run authority and snapshot knowledge
+
+Quality review after `dede2492` confirmed two Medium findings and one Low
+coverage gap. Fetch and `activeRun` still wrote one state slot, so an older
+same-run response could overwrite a newer live observation. The Drawer also
+collapsed an absent trace into semantic null while matching detail was loading
+or had partially failed. Finally, effect cancellation lacked explicit tests for
+an unresolved A response after selecting B and for close/reopen of the same
+run.
+
+The RED-first product correction at `b214e1fc` changes only
+`ResearchEvidenceDrawer.tsx` and `ResearchPersonalizationContext.test.tsx`.
+Fetched authority is now keyed by requested run ID, `activeRun` remains a
+separate ID-matched candidate, and the whole DTO is selected by ISO
+`updated_at`; the live observation wins equal timestamps. Selected-message
+personalization remains first authority, but `undefined` now means unknown
+while explicit null remains the honest no-snapshot state. No copy, resource,
+API, backend, Task 7, component type, or CSS file changes.
+
+Relative to `dede2492`, add exactly these five node IDs:
+
+1. `selects freshest same-run authority and prefers live observation on ties`
+2. `withholds the no-snapshot claim while matching run detail is loading`
+3. `withholds the no-snapshot claim when matching run detail partially fails`
+4. `ignores an unresolved prior-run fetch after selecting another run`
+5. `keeps the reopened same-run request authoritative over the closed-cycle promise`
+
+Remove or rename no node. The existing
+`distinguishes run context from current Settings context` node is strengthened
+in place to distinguish absent message trace, explicit message null, and
+matching live-run explicit null. Task 8 baseline was `2 files / 13 passed`.
+Same-run RED was `1 failed / 7 passed`; null-knowledge RED was
+`3 failed / 7 passed`; the two cleanup-order nodes were GREEN characterization
+coverage. Final Task 8 is `2 files / 18`, final focused is `11 files / 144`,
+full frontend is `83 files / 863`, and the final frontend sequential ledger is
+`+88/-3` (net `+85`). Scanner output remains exact `1033/973/954/20` with 30
+scopes; resources, class/literal scopes, debt, allowlist, and CSS remain
+unchanged.
 
 ---
 
@@ -1137,10 +1177,10 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+83/-3`, net `+80`
+### Frontend: `+88/-3`, net `+85`
 
-Full suite moves `77 files / 778 -> 83 files / 858`. The final focused suite
-moves the historical `5 existing files / 59` baseline to `11 files / 139`.
+Full suite moves `77 files / 778 -> 83 files / 863`. The final focused suite
+moves the historical `5 existing files / 59` baseline to `11 files / 144`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -1258,7 +1298,7 @@ pure `calibrationStateMerge` suite `+2/-0`. No file is added, no existing node
 is retired, and the Task 8-owned product remains byte-identical. This remains
 raw `+5/-0` accounting rather than being folded into the prior deviation.
 
-#### New frontend files — add 18
+#### New frontend files — add 23
 
 - `InvestorProfileApi.test.ts` +5:
   `serializes guided start and turn contracts with stable IDs`,
@@ -1266,14 +1306,19 @@ raw `+5/-0` accounting rather than being folded into the prior deviation.
   `requests an early proposal on the dedicated route`,
   `approves with an empty body and never sends profile_patch`,
   `exposes run personalization snapshot without credential identity`.
-- `ResearchPersonalizationContext.test.tsx` +7:
+- `ResearchPersonalizationContext.test.tsx` +12:
   `renders legacy null as no snapshot`,
   `renders empty snapshot as disabled`,
   `renders active exact source text byte for byte`,
   `distinguishes run context from current Settings context`,
   `switches locale without changing source context or disclosure state`,
   `maps closed stance effect copy without deriving it from context text`,
-  `never exposes the previous run context while a newly selected run is pending`.
+  `never exposes the previous run context while a newly selected run is pending`,
+  `selects freshest same-run authority and prefers live observation on ties`,
+  `withholds the no-snapshot claim while matching run detail is loading`,
+  `withholds the no-snapshot claim when matching run detail partially fails`,
+  `ignores an unresolved prior-run fetch after selecting another run`,
+  `keeps the reopened same-run request authoritative over the closed-cycle promise`.
 - `InvestorProfileCss.test.ts` +6:
   `defines every Slice 5 Investor class`,
   `uses responsive intrinsic grids and wrap-safe command rows`,
@@ -1331,8 +1376,8 @@ allowlist entry is authorized.
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
 | 7. workspace UI + Settings guard | 0 | +55/-3 | summary/modes/navigation + reviewed monotonic authority/profile hardening |
-| 8. Research context + CSS/ratchet | 0 | +13 | historical transparency/layout + reviewed run-switch/wrap/DOM diagnostics |
-| **Total** | **+53/-1** | **+83/-3** | **net backend +52, frontend +80** |
+| 8. Research context + CSS/ratchet | 0 | +18 | historical transparency/layout + reviewed run authority/snapshot/CSS diagnostics |
+| **Total** | **+53/-1** | **+88/-3** | **net backend +52, frontend +85** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1947,7 +1992,8 @@ collection requires a reviewed ledger amendment.
   expected Task 6-7 owned cumulative is `7 files / 113 passed`. Including the
   unchanged class-coverage and foundation-boundary baselines, the final-suite
   checkpoint before Task 8 is `9 files / 126 passed`; Task 8 then adds the
-  original nine nodes plus four reviewed diagnostic nodes.
+  original nine nodes, four first-review diagnostic nodes, and five
+  quality-review authority/cleanup nodes.
 
 - [ ] **Step 10: Commit**
 
@@ -1982,19 +2028,25 @@ collection requires a reviewed ledger amendment.
   not screenshots or arbitrary pixel values. The reviewed deviation preserves
   those nine and adds one deferred run-switch Research node plus three
   separately named CSS diagnostic nodes for Summary wrap, Calibration wrap,
-  and the split-renderer Edit selector contract.
+  and the split-renderer Edit selector contract. The quality deviation adds
+  five further Research nodes for same-run freshness, loading/partial snapshot
+  knowledge, cross-run stale completion, and close/reopen stale completion.
 
 - [ ] **Step 2: Prove RED**
 
   Original expected RED: `9` new failures with existing class coverage green.
   Reviewed correction baseline: `9 passed`; exact correction RED:
-  `4 failed / 9 passed`.
+  `4 failed / 9 passed`. Quality correction baseline: `13 passed`; same-run
+  RED: `1 failed / 7 passed`; null-knowledge RED: `3 failed / 7 passed`; the
+  two cleanup additions were GREEN characterization coverage.
 
 - [ ] **Step 3: Implement the Research component and Drawer wire**
 
-  Keep new copy in `research` namespace. Prefer selected-message trace, then
-  exact fetched run trace. Render source context byte-exact. Do not modify
-  existing Drawer strings or migrate its debt.
+  Keep new copy in `research` namespace. Prefer known selected-message trace,
+  then the freshest ID-matched fetched/live run candidate by ISO `updated_at`,
+  with live winning ties. Do not turn unknown loading/partial state into
+  semantic null. Render source context byte-exact. Do not modify existing
+  Drawer strings or migrate its debt.
 
 - [ ] **Step 4: Add restrained workspace CSS**
 
@@ -2028,7 +2080,7 @@ collection requires a reviewed ledger amendment.
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `11 files / 139 passed`.
+  Expected: `11 files / 144 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -2086,14 +2138,14 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `83 files / 858 passed`; clean typecheck; build succeeds with only
+  Expected: `83 files / 863 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
-  `+83/-3`. Removed IDs must be exactly the four named obsolete nodes across
+  `+88/-3`. Removed IDs must be exactly the four named obsolete nodes across
   the backend and frontend ledgers, including both Task 7 intermediate/overclaim
   nodes retired by reviewed deviations. Existing failure/error/skip/warning
   families must be bidirectionally identical.
@@ -2213,7 +2265,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+83/-3`, and only the four named removals;
+1. exact backend `+53/-1`, frontend `+88/-3`, and only the four named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -2314,7 +2366,7 @@ Only after independent implementation GREEN and explicit user approval:
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
 6. rerun merged backend focused `219`, full backend collect `4621`, frontend
-   focused `11/139`, frontend full `83/858`, typecheck, build, scanner, no-PG,
+   focused `11/144`, frontend full `83/863`, typecheck, build, scanner, no-PG,
    resources, immutable gates, and one normal desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
 8. keep the retained backup until the user confirms normal operation;
