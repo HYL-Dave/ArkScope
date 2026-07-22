@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
   dataMounts: 0,
   dataUnmounts: 0,
   investorDeveloperModes: [] as boolean[],
+  investorSummaryRequests: [] as number[],
+  investorMounts: 0,
+  investorUnmounts: 0,
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -52,15 +55,26 @@ vi.mock("./InvestorProfilePanel", async () => {
       developerMode,
       onNavigationGuardChange,
       onNavigateToProviders,
+      summaryRequestSequence,
     }: {
       developerMode?: boolean;
       onNavigationGuardChange?: SettingsNavigationGuardReporter;
       onNavigateToProviders?: () => void;
+      summaryRequestSequence?: number;
     }) => {
       const [busy, setBusy] = useState(false);
       useEffect(() => {
         mocks.investorDeveloperModes.push(Boolean(developerMode));
       }, [developerMode]);
+      useEffect(() => {
+        mocks.investorSummaryRequests.push(summaryRequestSequence ?? 0);
+      }, [summaryRequestSequence]);
+      useEffect(() => {
+        mocks.investorMounts += 1;
+        return () => {
+          mocks.investorUnmounts += 1;
+        };
+      }, []);
       useEffect(() => () => {
         onNavigationGuardChange?.({ dirty: false, busy: false, reason: null });
       }, [onNavigationGuardChange]);
@@ -261,6 +275,20 @@ async function renderSettings(options: {
   await flush();
 }
 
+async function rerenderSettings(navigationRequest: SettingsNavigationRequest) {
+  await act(async () => {
+    root!.render(
+      <SettingsView
+        runtime={null}
+        developerMode={false}
+        onRuntimeChanged={vi.fn(async () => undefined)}
+        navigationRequest={navigationRequest}
+      />,
+    );
+  });
+  await flush();
+}
+
 function dispose() {
   if (root) act(() => root!.unmount());
   root = null;
@@ -320,6 +348,9 @@ beforeEach(() => {
   mocks.dataMounts = 0;
   mocks.dataUnmounts = 0;
   mocks.investorDeveloperModes.length = 0;
+  mocks.investorSummaryRequests.length = 0;
+  mocks.investorMounts = 0;
+  mocks.investorUnmounts = 0;
   window.localStorage.clear();
   scrollIntoView.mockReset();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -670,6 +701,27 @@ describe("Settings workspace", () => {
 
     expect(tabWithText("資料與同步").getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(host!.querySelector('[data-settings-anchor="data_storage"]'));
+  });
+
+  it("signals same-group investor summary requests from search and external navigation", async () => {
+    window.localStorage.setItem("arkscope.settings.activeGroup.v1", "personalization");
+    await renderSettings();
+    expect(mocks.investorSummaryRequests).toEqual([0]);
+    expect(mocks.investorMounts).toBe(1);
+
+    await setSearch("投資人");
+    await click(buttonWithText("投資人設定", host!.querySelector('nav[aria-label="設定目錄"]')!));
+    expect(mocks.investorSummaryRequests.at(-1)).toBe(1);
+    expect(mocks.investorMounts).toBe(1);
+    expect(mocks.investorUnmounts).toBe(0);
+
+    await rerenderSettings({
+      sequence: 91,
+      target: { kind: "settings_section", section: "investor_profile" },
+    });
+    expect(mocks.investorSummaryRequests.at(-1)).toBe(2);
+    expect(mocks.investorMounts).toBe(1);
+    expect(mocks.investorUnmounts).toBe(0);
   });
 
   it("unmounts_data_sources_polling_when_leaving_data_sync", async () => {

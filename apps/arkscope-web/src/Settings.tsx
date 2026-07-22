@@ -256,6 +256,7 @@ export function SettingsView({
   const [researchRuntimeGuard, setResearchRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [dataSourcesGuard, setDataSourcesGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [investorGuard, setInvestorGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [investorSummaryRequestSequence, setInvestorSummaryRequestSequence] = useState(0);
   const consumedNavigationSequenceRef = useRef(0);
   const directoryTriggerRef = useRef<HTMLButtonElement>(null);
   const aiModelsTabRef = useRef<HTMLButtonElement>(null);
@@ -273,6 +274,9 @@ export function SettingsView({
   }, []);
 
   const applySettingsIntent = useCallback((intent: SettingsNavigationIntent) => {
+    if (intent.kind === "exact_anchor" && intent.anchor === "investor_profile") {
+      setInvestorSummaryRequestSequence((current) => current + 1);
+    }
     setActiveGroup(intent.group);
     writeActiveSettingsGroup(intent.group);
     setSection(intent.anchor);
@@ -826,6 +830,7 @@ export function SettingsView({
           developerMode={developerMode}
           onNavigationGuardChange={setInvestorGuard}
           onNavigateToProviders={() => revealSection("providers")}
+          summaryRequestSequence={investorSummaryRequestSequence}
         />
       );
     }

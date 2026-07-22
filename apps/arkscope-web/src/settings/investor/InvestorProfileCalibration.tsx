@@ -20,11 +20,14 @@ export interface InvestorProfileCalibrationProps {
   state: CalibrationState;
   answer: string;
   busy: boolean;
+  authorityConfirmed: boolean;
+  refreshing: boolean;
   headingRef: RefObject<HTMLHeadingElement>;
   backButtonRef: RefObject<HTMLButtonElement>;
   onAnswerChange: (value: string) => void;
   onSend: () => void;
   onRetry: () => void;
+  onRefreshStatus: () => void;
   onRequestProposal: () => void;
   onBack: () => void;
   t: SettingsT;
@@ -34,11 +37,14 @@ export function InvestorProfileCalibration({
   state,
   answer,
   busy,
+  authorityConfirmed,
+  refreshing,
   headingRef,
   backButtonRef,
   onAnswerChange,
   onSend,
   onRetry,
+  onRefreshStatus,
   onRequestProposal,
   onBack,
   t,
@@ -54,6 +60,7 @@ export function InvestorProfileCalibration({
   const interrupted = state.pending_turn?.status === "interrupted"
     || state.pending_turn?.status === "failed";
   const unresolvedTurn = state.pending_turn !== null;
+  const mutationDisabled = busy || !authorityConfirmed;
 
   return (
     <section className="ip-calibration">
@@ -78,6 +85,16 @@ export function InvestorProfileCalibration({
           total: state.topic_catalog.length,
         })}
       />
+      {state.pending_turn?.status === "pending" ? (
+        <Button
+          size="compact"
+          icon={<RotateCw size={15} />}
+          disabled={refreshing}
+          onClick={onRefreshStatus}
+        >
+          {t(($) => $.actions.refresh)}
+        </Button>
+      ) : null}
 
       <section>
         <h4>{t(($) => $.investor.workspace.calibration.current)}</h4>
@@ -126,7 +143,7 @@ export function InvestorProfileCalibration({
           <Button
             size="compact"
             icon={<RotateCw size={15} />}
-            disabled={busy}
+            disabled={mutationDisabled}
             onClick={onRetry}
           >
             {t(($) => $.investor.workspace.calibration.retry)}
@@ -141,7 +158,7 @@ export function InvestorProfileCalibration({
           aria-label={t(($) => $.investor.workspace.calibration.answerLabel)}
           placeholder={t(($) => $.investor.workspace.calibration.answerPlaceholder)}
           value={answer}
-          disabled={busy || unresolvedTurn || !session}
+          disabled={mutationDisabled || unresolvedTurn || !session}
           onChange={(event) => onAnswerChange(event.target.value)}
         />
       </label>
@@ -149,7 +166,7 @@ export function InvestorProfileCalibration({
         <Button
           tone="primary"
           icon={<Send size={16} />}
-          disabled={busy || unresolvedTurn || !session || !answer.trim()}
+          disabled={mutationDisabled || unresolvedTurn || !session || !answer.trim()}
           onClick={onSend}
         >
           {busy
@@ -158,7 +175,7 @@ export function InvestorProfileCalibration({
         </Button>
         <Button
           icon={<Sparkles size={16} />}
-          disabled={busy || unresolvedTurn || !session}
+          disabled={mutationDisabled || unresolvedTurn || !session}
           onClick={onRequestProposal}
         >
           {t(($) => $.investor.workspace.actions.requestProposal)}

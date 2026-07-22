@@ -106,6 +106,7 @@ export function InvestorProfileProposalReview({
           tone="primary"
           icon={<Check size={16} />}
           busy={busy}
+          disabled={busy || hasConflict}
           onClick={onApprove}
         >
           {t(($) => $.investor.workspace.actions.approve)}

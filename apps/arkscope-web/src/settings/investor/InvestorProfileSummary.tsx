@@ -50,7 +50,8 @@ export function InvestorProfileSummary({
 }: InvestorProfileSummaryProps) {
   const { profile } = response;
   const activeSession = calibration?.active_session ?? null;
-  const pendingProposal = calibration?.latest_proposal?.status === "draft"
+  const pendingProposal = calibrationStatus === "ready"
+    && calibration?.latest_proposal?.status === "draft"
     ? calibration.latest_proposal
     : null;
   const coveredTopics = orderedCalibrationTopicDisplays(
