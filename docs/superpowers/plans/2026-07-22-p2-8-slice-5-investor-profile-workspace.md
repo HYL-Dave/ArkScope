@@ -77,8 +77,48 @@ corrections and no ledger change:
 
 The reviewer advisories are already stronger locked decisions: trace and
 context share one prompt-assembly sample, and new Evidence Drawer chrome lives
-only in the `research` namespace. Backend/frontend/resource/scanner ledgers are
-unchanged.
+only in the `research` namespace. At plan clearance the
+backend/frontend/resource/scanner ledgers were unchanged. The later reviewed
+implementation deviation below supersedes only the frontend accounting.
+
+### Reviewed implementation deviation: Task 7 code-quality findings
+
+After Task 7 reached `e826ba85`, final code-quality review identified five
+behavior findings: ambiguous turn/proposal POST reconciliation, ambiguous
+approve/reject response-loss reconciliation, same-group exact-anchor summary
+refresh with dirty/busy guards, conflict-state approval authority, and test
+maintainability for those independent contracts. The correction was performed
+RED-first without touching Task 8, CSS, backend, API, or resource files.
+
+Historical reviewed-plan accounting (retained intentionally and superseded by
+this deviation) was Task 7 `+23/-1` with `59` focused nodes, the Task 6-7
+checkpoint `96`, the Task 8 final focused suite `105`, full frontend `824`, and
+total frontend `+47/-1` (net `+46`).
+
+Relative to `e826ba85`, the reviewed correction adds exactly these eight node
+IDs:
+
+1. `resets exact-anchor requests to summary while honoring dirty and busy guards`
+2. `reconciles lost turn responses only from matching assistant evidence`
+3. `blocks ambiguous turns until manual status refresh resolves authority`
+4. `returns response-lost draft proposals to summary without replaying the mutation`
+5. `reconciles ambiguous approve and reject outcomes from read-only authority`
+6. `keeps conflicted proposal pending with approval disabled`
+7. `routes calibration provider recovery to the Providers anchor`
+8. `signals same-group investor summary requests from search and external navigation`
+
+It retires exactly this one intermediate node ID:
+
+- `keeps conflicted proposal pending and routes missing provider to Providers`
+
+The split is deliberate: conflict authority and Provider navigation are now
+independent tests instead of one composite node. The RED evidence was `65`
+collected with `5 failed / 60 passed` for the first review correction, followed
+by targeted REDs for response-lost draft reconciliation and stale Summary
+authority. GREEN is Task 7 `66/66`, Task 6-8 focused `112/112`, and full
+frontend `831/831`. The exact final sequential ledger is therefore Task 7
+`+31/-2` and total frontend `+55/-2` (net `+53`); the raw additions and
+retirements must not be collapsed into a net-only claim.
 
 ---
 
@@ -124,7 +164,8 @@ Grounded defects and seams:
 ### Frontend
 
 - Full suite: `77 files / 778 tests`.
-- Focused baseline used by this plan: `5 files / 59 tests`:
+- Focused historical pre-Slice-5 baseline used by this plan (not the Task 7
+  final expectation): `5 files / 59 tests`:
   `InvestorProfilePanel.test.tsx` 13,
   `SettingsWorkspace.test.tsx` 24,
   `i18n/resources.test.ts` 9,
@@ -911,10 +952,11 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+47/-1`, net `+46`
+### Frontend: `+55/-2`, net `+53`
 
-Full suite moves `77 files / 778 -> 81 files / 824`. The nine-file focused
-suite moves `5 existing files / 59 -> 9 files / 105`.
+Full suite moves `77 files / 778 -> 81 files / 831`. The nine-file focused
+suite moves the historical `5 existing files / 59` baseline to
+`9 files / 112`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -927,7 +969,7 @@ suite moves `5 existing files / 59 -> 9 files / 105`.
 7. `maps all seven stance effects in both locales`
 8. `preserves backend topic and proposed-field order without sorting`
 
-#### `InvestorProfilePanel.test.tsx` — add 20
+#### Original reviewed `InvestorProfilePanel.test.tsx` tranche — add 20
 
 1. `renders summary first with effective stance mismatch and current context`
 2. `loads profile and calibration independently without inventing empty state`
@@ -950,6 +992,9 @@ suite moves `5 existing files / 59 -> 9 files / 105`.
 19. `renders localized field diffs and source rationales then approves without patch`
 20. `keeps conflicted proposal pending and routes missing provider to Providers`
 
+Node 20 above is retained as historical reviewed accounting and is retired by
+the code-quality deviation below.
+
 The existing 13 nodes retain their IDs and evolve to the new summary/mode
 structure. Source-content, Developer diagnostics, generation guard, loading,
 and full field coverage assertions must not weaken.
@@ -965,6 +1010,26 @@ Add exactly:
 1. `investor profile guard uses the panel reporter for dirty edit and busy mutation`
 2. `calibration mode leaves Personalization without discard confirmation`
 3. `investor provider action reveals the Providers anchor and restores focus`
+
+#### Reviewed Task 7 code-quality deviation — add 8, retire 1
+
+Relative to `e826ba85`, add exactly:
+
+1. `resets exact-anchor requests to summary while honoring dirty and busy guards`
+2. `reconciles lost turn responses only from matching assistant evidence`
+3. `blocks ambiguous turns until manual status refresh resolves authority`
+4. `returns response-lost draft proposals to summary without replaying the mutation`
+5. `reconciles ambiguous approve and reject outcomes from read-only authority`
+6. `keeps conflicted proposal pending with approval disabled`
+7. `routes calibration provider recovery to the Providers anchor`
+8. `signals same-group investor summary requests from search and external navigation`
+
+Retire exactly:
+
+- `keeps conflicted proposal pending and routes missing provider to Providers`
+
+This is the RED-first correction for the five reviewed code-quality findings,
+not a net-only restatement of the original Task 7 ledger.
 
 #### New frontend files — add 14
 
@@ -1034,9 +1099,9 @@ allowlist entry is authorized.
 | 4. startup + reconciliation | +2 | 0 | migration/startup ownership |
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
-| 7. workspace UI + Settings guard | 0 | +23/-1 | summary/modes/navigation |
+| 7. workspace UI + Settings guard | 0 | +31/-2 | summary/modes/navigation + reviewed reconciliation/navigation hardening |
 | 8. Research context + CSS/ratchet | 0 | +9 | historical transparency/layout |
-| **Total** | **+53/-1** | **+47/-1** | **net backend +52, frontend +46** |
+| **Total** | **+53/-1** | **+55/-2** | **net backend +52, frontend +53** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1575,12 +1640,15 @@ collection requires a reviewed ledger amendment.
 - Modify: `apps/arkscope-web/src/Settings.tsx`
 - Modify: `apps/arkscope-web/src/SettingsWorkspace.test.tsx`
 
-- [ ] **Step 1: Add 20 panel nodes and replace the one Settings guard node**
+- [ ] **Step 1: Add the reviewed Task 7 nodes and retire obsolete composites**
 
-  Add three Settings nodes. Preserve all existing node IDs. Use deferred
-  promises for profile/calibration/turn/save/approve legs, live DOM identity
-  after locale changes, connected focus targets, and planted secret-like source
-  values that must not enter guard/dialog copy.
+  The original tranche adds 20 Panel nodes and three Settings nodes while
+  replacing one existing Settings guard node. The reviewed code-quality
+  deviation then adds seven Panel nodes plus one Settings node and retires one
+  intermediate composite Panel node. Preserve every baseline node ID. Use
+  deferred promises for profile/calibration/turn/save/approve legs, live DOM
+  identity after locale changes, connected focus targets, and planted
+  secret-like source values that must not enter guard/dialog copy.
 
 - [ ] **Step 2: Prove exact RED collection**
 
@@ -1589,8 +1657,8 @@ collection requires a reviewed ledger amendment.
     src/SettingsWorkspace.test.tsx
   ```
 
-  Expected collection: Panel `33`; Settings `26`; total `59`, with raw ledger
-  `+23/-1`.
+  Expected final collection: Panel `39`; Settings `27`; total `66`, with raw
+  sequential ledger `+31/-2`.
 
 - [ ] **Step 3: Split renderers without splitting state ownership**
 
@@ -1633,10 +1701,10 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 9: Run GREEN**
 
-  Expected: exact `59 passed`. Run resource/display/API tests too; expected
-  Task 6-7 owned cumulative is `5 files / 83 passed`. Including the unchanged
+  Expected: exact `66 passed`. Run resource/display/API tests too; expected
+  Task 6-7 owned cumulative is `5 files / 90 passed`. Including the unchanged
   class-coverage and foundation-boundary baselines, the final-suite checkpoint
-  before Task 8 is `7 files / 96 passed`; Task 8 then adds nine nodes.
+  before Task 8 is `7 files / 103 passed`; Task 8 then adds nine nodes.
 
 - [ ] **Step 10: Commit**
 
@@ -1709,7 +1777,7 @@ collection requires a reviewed ledger amendment.
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `9 files / 105 passed`.
+  Expected: `9 files / 112 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -1767,14 +1835,16 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `81 files / 824 passed`; clean typecheck; build succeeds with only
+  Expected: `81 files / 831 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
-  Backend node comm must be `+53/-1`; frontend comm `+47/-1`. Removed IDs must
-  be exactly the two named obsolete nodes. Existing failure/error/skip/warning
+  Backend node comm must be `+53/-1`; frontend sequential ledger must be
+  `+55/-2`. Removed IDs must be exactly the three named obsolete nodes across
+  the backend and frontend ledgers, including the Task 7 intermediate node
+  retired by the reviewed deviation. Existing failure/error/skip/warning
   families must be bidirectionally identical.
 
 - [ ] **Step 4: Run copied-production migration proof**
@@ -1892,7 +1962,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+47/-1`, and only the two named removals;
+1. exact backend `+53/-1`, frontend `+55/-2`, and only the three named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -1973,7 +2043,7 @@ Only after independent implementation GREEN and explicit user approval:
 5. verify marker 2, `integrity_check`, `foreign_key_check`, preserved message /
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
-6. rerun merged focused `219`, full backend collect `4621`, frontend `81/824`,
+6. rerun merged focused `219`, full backend collect `4621`, frontend `81/831`,
    typecheck, build, scanner, no-PG, resources, immutable gates, and one normal
    desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
