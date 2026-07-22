@@ -645,7 +645,7 @@ It never rebuilds context from current profile or translates the source block.
 
 ## Exact Resource Contract
 
-Settings starts at `623` leaves. Add exactly `94` leaves under
+Settings starts at `623` leaves. Add exactly `95` leaves under
 `investor.workspace.*` and remove exactly these five obsolete leaves:
 
 ```text
@@ -656,9 +656,9 @@ investor.calibration.messageLabel
 investor.calibration.send
 ```
 
-Final Settings count is `623 + 94 - 5 = 712` leaves per locale.
+Final Settings count is `623 + 95 - 5 = 713` leaves per locale.
 
-The 94 additions are fixed by subtree:
+The 95 additions are fixed by subtree:
 
 | Subtree | Count | Keys / semantics |
 |---|---:|---|
@@ -672,7 +672,7 @@ The 94 additions are fixed by subtree:
 | `notes` | 1 | `nonCausalHelp` |
 | `disclosures` | 4 | `riskTitle`, `riskBody`, `topicsTitle`, `topicsBody` |
 | `effects` | 7 | one exact leaf for every Assistant Stance including `off` |
-| `topics` | 16 | `label` and `description` for each of the eight topic IDs |
+| `topics` | 17 | `label` and `description` for each of the eight topic IDs, plus localized `other` fallback |
 | `prompts` | 1 | `lossResponseOpeningV1` |
 | `errors` | 6 | `profileLoad`, `calibrationLoad`, `save`, `refresh`, `turn`, `proposal` |
 
@@ -711,9 +711,18 @@ personalization.disabled
 personalization.unavailable
 ```
 
-Settings net leaf growth is `+89`; Research growth is `+5`; total bundled net
-growth is exactly `+94` per locale. Locale namespace/key sets remain equal and
+Settings net leaf growth is `+90`; Research growth is `+5`; total bundled net
+growth is exactly `+95` per locale. Locale namespace/key sets remain equal and
 all leaves remain non-empty.
+
+### Reviewed implementation-plan correction: unknown-topic copy
+
+The frontend contract requires unknown topic IDs to render localized
+`Other topic / 其他主題` while keeping the raw ID Developer-only. The original
+94-leaf inventory omitted an owning key and no existing key has that semantic
+meaning. Before Task 6 implementation, the inventory was corrected by adding
+`investor.workspace.topics.other`. This changes resource counts only; frontend
+test-node accounting and scanner counts remain unchanged.
 
 ---
 
@@ -980,7 +989,7 @@ Add exactly:
 #### Existing i18n tests — add 2
 
 - `resolves the Slice 5 Investor workspace copy in both locales`
-- `contains exactly 712 Settings leaves and 5 Research leaves per locale`
+- `contains exactly 713 Settings leaves and 5 Research leaves per locale`
 
 `classCoverage.test.ts` and `foundationBoundaries.test.ts` evolve in place;
 they add no node.
@@ -1520,7 +1529,7 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 3: Add exact resources**
 
-  Implement the 94-add/5-remove Settings contract and new five-leaf Research
+  Implement the 95-add/5-remove Settings contract and new five-leaf Research
   namespace in both locales. Register bundled static namespace in
   `resources.ts`; no loader/Suspense/dynamic import.
 
@@ -1538,7 +1547,7 @@ collection requires a reviewed ledger amendment.
 
 - [ ] **Step 6: Run GREEN and resource counts**
 
-  Expected: `24 passed`, Settings `712`, Research `5`, recursive locale keys
+  Expected: `24 passed`, Settings `713`, Research `5`, recursive locale keys
   equal, no empty leaf, no dynamic key.
 
 - [ ] **Step 7: Commit**
@@ -1902,7 +1911,7 @@ collection requires a reviewed ledger amendment.
 17. unknown topic counts honestly without normal-mode raw ID;
 18. source answer/rationale/context byte preservation and notes non-causality;
 19. Proposal Review content, conflict retention, focus, and command spacing;
-20. exact resources `settings 712 / research 5`, scanner unchanged at
+20. exact resources `settings 713 / research 5`, scanner unchanged at
     `1033/973/954/20`, 30 scopes, no allowlist/debt change;
 21. Evidence Drawer new copy belongs only to `research` namespace;
 22. six-viewports x two locales, no overlap/overflow, state/focus preservation;
@@ -1933,7 +1942,7 @@ Stop and return to review if:
 14. Calibration exit must be treated as dirty or Edit guard remains heuristic;
 15. frontend must duplicate topic-to-field policy;
 16. source content must be translated or reconstructed;
-17. resource counts differ from `Settings 712 / Research 5`, keys differ, or
+17. resource counts differ from `Settings 713 / Research 5`, keys differ, or
     leaves are empty;
 18. scanner differs from `1033/973/954/20`, requires a new allowlist/debt entry,
     or migrated scopes differ from 30;
