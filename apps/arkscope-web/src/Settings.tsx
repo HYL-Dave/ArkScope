@@ -257,7 +257,10 @@ export function SettingsView({
   const [dataSourcesGuard, setDataSourcesGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [investorGuard, setInvestorGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [investorSummaryRequestSequence, setInvestorSummaryRequestSequence] = useState(0);
+  const [investorPendingRevealSequence, setInvestorPendingRevealSequence] = useState<number | null>(null);
   const consumedNavigationSequenceRef = useRef(0);
+  const investorSummarySequenceRef = useRef(0);
+  const investorPendingRevealSequenceRef = useRef<number | null>(null);
   const directoryTriggerRef = useRef<HTMLButtonElement>(null);
   const aiModelsTabRef = useRef<HTMLButtonElement>(null);
   const personalizationTabRef = useRef<HTMLButtonElement>(null);
@@ -275,7 +278,14 @@ export function SettingsView({
 
   const applySettingsIntent = useCallback((intent: SettingsNavigationIntent) => {
     if (intent.kind === "exact_anchor" && intent.anchor === "investor_profile") {
-      setInvestorSummaryRequestSequence((current) => current + 1);
+      const sequence = investorSummarySequenceRef.current + 1;
+      investorSummarySequenceRef.current = sequence;
+      investorPendingRevealSequenceRef.current = sequence;
+      setInvestorSummaryRequestSequence(sequence);
+      setInvestorPendingRevealSequence(sequence);
+    } else {
+      investorPendingRevealSequenceRef.current = null;
+      setInvestorPendingRevealSequence(null);
     }
     setActiveGroup(intent.group);
     writeActiveSettingsGroup(intent.group);
@@ -344,8 +354,23 @@ export function SettingsView({
     kind: "exact_anchor",
   }), [requestSettingsNavigation]);
 
+  const handleInvestorSummaryRequest = useCallback((
+    sequence: number,
+    committed: boolean,
+  ) => {
+    if (investorPendingRevealSequenceRef.current !== sequence) return;
+    investorPendingRevealSequenceRef.current = null;
+    setInvestorPendingRevealSequence(null);
+    if (!committed) {
+      setPendingReveal((current) => current === "investor_profile" ? null : current);
+    }
+  }, []);
+
   useEffect(() => {
     if (!pendingReveal) return undefined;
+    if (pendingReveal === "investor_profile" && investorPendingRevealSequence !== null) {
+      return undefined;
+    }
     if (settingsGroupFor(pendingReveal).id !== activeGroup) return;
     const anchor = document.querySelector<HTMLElement>(
       `[data-settings-anchor="${pendingReveal}"]`,
@@ -354,7 +379,7 @@ export function SettingsView({
     anchor.scrollIntoView({ block: "start" });
     anchor.focus({ preventScroll: true });
     setPendingReveal((current) => (current === pendingReveal ? null : current));
-  }, [activeGroup, pendingReveal]);
+  }, [activeGroup, investorPendingRevealSequence, pendingReveal]);
 
   useEffect(() => {
     if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
@@ -831,6 +856,7 @@ export function SettingsView({
           onNavigationGuardChange={setInvestorGuard}
           onNavigateToProviders={() => revealSection("providers")}
           summaryRequestSequence={investorSummaryRequestSequence}
+          onSummaryRequestHandled={handleInvestorSummaryRequest}
         />
       );
     }

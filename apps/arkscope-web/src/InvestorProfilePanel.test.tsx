@@ -105,6 +105,7 @@ async function mount(
     turnIdFactory?: () => string;
     strictMode?: boolean;
     summaryRequestSequence?: number;
+    onSummaryRequestHandled?: (sequence: number, committed: boolean) => void;
   } = {},
 ) {
   host = document.createElement("div");
@@ -117,6 +118,7 @@ async function mount(
       onNavigateToProviders={options.onNavigateToProviders}
       turnIdFactory={options.turnIdFactory}
       summaryRequestSequence={options.summaryRequestSequence}
+      onSummaryRequestHandled={options.onSummaryRequestHandled}
     />
   );
   await act(async () => {
@@ -124,9 +126,17 @@ async function mount(
   });
 }
 
-async function rerenderPanel(summaryRequestSequence: number) {
+async function rerenderPanel(
+  summaryRequestSequence: number,
+  onSummaryRequestHandled?: (sequence: number, committed: boolean) => void,
+) {
   await act(async () => {
-    root!.render(<InvestorProfilePanel summaryRequestSequence={summaryRequestSequence} />);
+    root!.render(
+      <InvestorProfilePanel
+        summaryRequestSequence={summaryRequestSequence}
+        onSummaryRequestHandled={onSummaryRequestHandled}
+      />,
+    );
   });
   await flush();
 }
@@ -962,19 +972,21 @@ describe("InvestorProfilePanel", () => {
 
   it("resets exact-anchor requests to summary while honoring dirty and busy guards", async () => {
     await useEnglish();
+    const handled = vi.fn();
     const pendingSave = deferred<Response>();
     const calls = apiRoutes({
       profile: populatedResponse(),
       calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
       handle: (call) => call.method === "PUT" ? pendingSave.promise : undefined,
     });
-    await mount(false, { summaryRequestSequence: 0 });
+    await mount(false, { summaryRequestSequence: 0, onSummaryRequestHandled: handled });
     await flush();
     const initialGetCount = calls.filter((call) => call.method === "GET").length;
 
     await clickButton("Continue Calibration");
-    await rerenderPanel(1);
+    await rerenderPanel(1, handled);
     expect(host!.textContent).toContain("Investor Profile summary");
+    expect(handled).toHaveBeenCalledWith(1, true);
     expect(calls.filter((call) => call.method === "GET")).toHaveLength(initialGetCount);
 
     await clickButton("Edit profile");
@@ -982,26 +994,30 @@ describe("InvestorProfilePanel", () => {
       host!.querySelector<HTMLTextAreaElement>('textarea[name="freeform_notes"]')!,
       "SOURCE_EXTERNAL_DIRTY_VALUE",
     );
-    await rerenderPanel(2);
+    await rerenderPanel(2, handled);
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(dialog.textContent).toContain("Discard Investor Profile changes?");
     expect(dialog.textContent).not.toContain("SOURCE_EXTERNAL_DIRTY_VALUE");
+    expect(handled).not.toHaveBeenCalledWith(2, expect.anything());
     const discard = Array.from(dialog.querySelectorAll("button"))
       .find((button) => button.textContent === "Discard changes")!;
     await act(async () => discard.click());
     await flush();
     expect(host!.textContent).toContain("Investor Profile summary");
+    expect(handled).toHaveBeenCalledWith(2, true);
 
     await clickButton("Review proposal");
-    await rerenderPanel(3);
+    await rerenderPanel(3, handled);
     expect(host!.textContent).toContain("Investor Profile summary");
+    expect(handled).toHaveBeenCalledWith(3, true);
 
     await clickButton("Edit profile");
     await clickButton("Save profile");
-    await rerenderPanel(4);
+    await rerenderPanel(4, handled);
     expect(host!.textContent).toContain("Edit Investor Profile");
     expect(host!.querySelector('[role="alert"]')?.textContent)
       .toContain("Wait for the current Investor Profile update to finish.");
+    expect(handled).toHaveBeenCalledWith(4, false);
 
     await act(async () => {
       pendingSave.resolve(new Response(JSON.stringify(populatedResponse()), {
@@ -1600,16 +1616,16 @@ describe("InvestorProfilePanel", () => {
       handle: (call) => {
         if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
           calibrationGets += 1;
-          return calibrationGets === 1 ? interrupted : failed;
+          if (calibrationGets === 1) return interrupted;
+          if (calibrationGets === 2) return failed;
+          return completed;
         }
         if (call.url.includes("/turns/turn-durable-retry/retry")) {
           retryAttempts += 1;
-          return retryAttempts === 1
-            ? new Response(JSON.stringify({ detail: { code: "calibration_responder_failed" } }), {
-              status: 502,
-              headers: { "content-type": "application/json" },
-            })
-            : completed;
+          return new Response(JSON.stringify({ detail: { code: "calibration_responder_failed" } }), {
+            status: 502,
+            headers: { "content-type": "application/json" },
+          });
         }
         return undefined;
       },
@@ -1634,8 +1650,10 @@ describe("InvestorProfilePanel", () => {
     expect(retries).toHaveLength(2);
     expect(retries.every((call) => call.body && Object.keys(call.body as object).length === 0))
       .toBe(true);
+    expect(calibrationGets).toBe(3);
     expect((host!.textContent?.match(/SOURCE_SAVED_ANSWER/g) ?? [])).toHaveLength(1);
     expect(host!.textContent).toContain("SOURCE_RETRY_QUESTION");
+    expect(host!.textContent).not.toContain("Could not complete this calibration turn.");
   });
 
   it("requests early proposal without synthetic user content", async () => {
@@ -1721,6 +1739,58 @@ describe("InvestorProfilePanel", () => {
       .toHaveLength(1);
   });
 
+  it("does not treat an existing draft as a new proposal or erase same-session evidence", async () => {
+    await useEnglish();
+    const existingProposal = calibrationProposal({ id: "proposal-existing" });
+    const richSession = calibrationSession({ covered_topics: ["time_horizon"] });
+    const richState = activeCalibration({
+      active_session: richSession,
+      sessions: [richSession],
+      messages: [
+        calibrationMessage(),
+        calibrationMessage({
+          id: "existing-journal-answer",
+          role: "user",
+          content: "SOURCE_EXISTING_JOURNAL",
+          turn_id: "turn-existing",
+          prompt_id: null,
+        }),
+      ],
+      latest_proposal: existingProposal,
+    });
+    const staleState = activeCalibration({ latest_proposal: existingProposal });
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: richState,
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1 ? richState : staleState;
+        }
+        if (call.url.endsWith("/calibration/proposals/request")) {
+          return new Response(JSON.stringify({ detail: "SOURCE_NEW_PROPOSAL_FAILED" }), {
+            status: 504,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return undefined;
+      },
+    });
+    await mount(false, { turnIdFactory: () => "turn-new-proposal" });
+    await flush();
+    await clickButton("Continue Calibration");
+    await clickButton("Propose Now");
+
+    expect(host!.textContent).toContain("Guided calibration");
+    expect(host!.textContent).toContain("SOURCE_EXISTING_JOURNAL");
+    expect(host!.textContent).toContain("How long you invest");
+    expect(host!.textContent).toContain("Could not update the calibration proposal.");
+    expect(host!.textContent).not.toContain("Investor Profile summary");
+    expect(calls.filter((call) => call.url.endsWith("/calibration/proposals/request")))
+      .toHaveLength(1);
+  });
+
   it("renders backend-ordered coverage and unknown topic without raw ID", async () => {
     await useEnglish();
     const session = calibrationSession({
@@ -1744,7 +1814,7 @@ describe("InvestorProfilePanel", () => {
     expect(text).not.toContain("SOURCE_UNKNOWN_CURRENT");
   });
 
-  it("preserves edit calibration disclosure proposal and focus across locale switch", async () => {
+  it("preserves edit draft disclosure and focus across locale switch", async () => {
     await useEnglish();
     const calls = apiRoutes({
       profile: populatedResponse(),
@@ -1770,6 +1840,67 @@ describe("InvestorProfilePanel", () => {
     expect(host!.querySelector('[data-testid="risk-disclosure"]')).toBe(disclosure);
     expect(disclosure.open).toBe(true);
     expect(document.activeElement).toBe(notes);
+    expect(calls.filter((call) => call.method === "GET").length).toBe(getCount);
+  });
+
+  it("preserves calibration source content disclosure answer and focus across locale switch", async () => {
+    await useEnglish();
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration(),
+    });
+    await mount();
+    await flush();
+    await clickButton("Continue Calibration");
+    const answer = host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]')!;
+    await setControlValue(answer, "SOURCE_LOCALE_CALIBRATION_ANSWER");
+    const disclosure = host!.querySelector<HTMLDetailsElement>(
+      '[data-testid="calibration-topics-disclosure"]',
+    )!;
+    disclosure.open = true;
+    answer.focus();
+    const getCount = calls.filter((call) => call.method === "GET").length;
+
+    await act(async () => {
+      await i18n.changeLanguage("zh-Hant");
+    });
+    await flush();
+
+    expect(host!.querySelector<HTMLTextAreaElement>('textarea[name="calibration_answer"]'))
+      .toBe(answer);
+    expect(answer.value).toBe("SOURCE_LOCALE_CALIBRATION_ANSWER");
+    expect(host!.querySelector('[data-testid="calibration-topics-disclosure"]')).toBe(disclosure);
+    expect(disclosure.open).toBe(true);
+    expect(host!.textContent).toContain("SOURCE_LOCALE_CALIBRATION_ANSWER");
+    expect(document.activeElement).toBe(answer);
+    expect(calls.filter((call) => call.method === "GET").length).toBe(getCount);
+  });
+
+  it("preserves proposal source rationale and focus across locale switch", async () => {
+    await useEnglish();
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: calibrationProposal() }),
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    const review = host!.querySelector<HTMLElement>(
+      '[data-testid="investor-profile-proposal-review"]',
+    )!;
+    const reject = await buttonByText("Reject proposal");
+    reject.focus();
+    const getCount = calls.filter((call) => call.method === "GET").length;
+
+    await act(async () => {
+      await i18n.changeLanguage("zh-Hant");
+    });
+    await flush();
+
+    expect(host!.querySelector('[data-testid="investor-profile-proposal-review"]')).toBe(review);
+    expect(host!.textContent).toContain("SOURCE_RISK_CAPACITY_RATIONALE");
+    expect(host!.textContent).toContain("SOURCE_CONCENTRATION_RATIONALE");
+    expect(document.activeElement).toBe(reject);
     expect(calls.filter((call) => call.method === "GET").length).toBe(getCount);
   });
 
@@ -1864,6 +1995,8 @@ describe("InvestorProfilePanel", () => {
     });
     const approvedProfile = populatedResponse();
     approvedProfile.profile.primary_preset = "income";
+    approvedProfile.profile.risk_capacity = 6;
+    approvedProfile.profile.concentration_limit_pct = 18;
     approvedProfile.effective_stance = "strict_risk_control";
     let approveProfileGets = 0;
     let approveCalibrationGets = 0;
@@ -1956,6 +2089,58 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).toContain("Proposal review");
     expect((await buttonByText("Reject proposal")).disabled).toBe(false);
     expect(rejectCalls.filter((call) => call.url.includes("/reject"))).toHaveLength(1);
+  });
+
+  it("keeps the approved proposal patch when ambiguous reconciliation reads a stale profile", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal({
+      profile_patch: { risk_capacity: 6 },
+      proposed_fields: ["risk_capacity"],
+    });
+    const approvedProposal = calibrationProposal({
+      ...proposal,
+      status: "approved",
+      approved_at: "2026-07-21T01:07:00Z",
+    });
+    let profileGets = 0;
+    let calibrationGets = 0;
+    const calls = apiRoutes({
+      profile: populatedResponse(),
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          return populatedResponse();
+        }
+        if (call.url.endsWith("/profile/investor/calibration") && call.method === "GET") {
+          calibrationGets += 1;
+          return calibrationGets === 1
+            ? activeCalibration({ latest_proposal: proposal })
+            : activeCalibration({ latest_proposal: approvedProposal });
+        }
+        if (call.url.includes("/approve")) {
+          return new Response(JSON.stringify({ detail: "SOURCE_APPROVE_RESPONSE_LOST" }), {
+            status: 504,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+
+    expect(profileGets).toBe(2);
+    expect(calibrationGets).toBe(2);
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Calibration proposal approved");
+    expect(host!.textContent).toContain("Risk capacity (1-10)6");
+    expect(host!.textContent).not.toContain("Risk capacity (1-10)4");
+    expect(host!.textContent).not.toContain("Effective AI stance");
+    expect(host!.textContent).not.toContain("SOURCE_APPROVE_RESPONSE_LOST");
+    expect(calls.filter((call) => call.url.includes("/approve"))).toHaveLength(1);
   });
 
   it("keeps successful approve authority across stale advisory GET responses", async () => {

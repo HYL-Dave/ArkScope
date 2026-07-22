@@ -56,11 +56,13 @@ vi.mock("./InvestorProfilePanel", async () => {
       onNavigationGuardChange,
       onNavigateToProviders,
       summaryRequestSequence,
+      onSummaryRequestHandled,
     }: {
       developerMode?: boolean;
       onNavigationGuardChange?: SettingsNavigationGuardReporter;
       onNavigateToProviders?: () => void;
       summaryRequestSequence?: number;
+      onSummaryRequestHandled?: (sequence: number, committed: boolean) => void;
     }) => {
       const [busy, setBusy] = useState(false);
       useEffect(() => {
@@ -68,7 +70,8 @@ vi.mock("./InvestorProfilePanel", async () => {
       }, [developerMode]);
       useEffect(() => {
         mocks.investorSummaryRequests.push(summaryRequestSequence ?? 0);
-      }, [summaryRequestSequence]);
+        if (summaryRequestSequence) onSummaryRequestHandled?.(summaryRequestSequence, true);
+      }, [onSummaryRequestHandled, summaryRequestSequence]);
       useEffect(() => {
         mocks.investorMounts += 1;
         return () => {

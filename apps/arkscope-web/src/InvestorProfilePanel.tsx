@@ -22,6 +22,14 @@ import { InvestorProfileCalibration } from "./settings/investor/InvestorProfileC
 import { InvestorProfileEdit } from "./settings/investor/InvestorProfileEdit";
 import { InvestorProfileProposalReview } from "./settings/investor/InvestorProfileProposalReview";
 import { InvestorProfileSummary } from "./settings/investor/InvestorProfileSummary";
+import {
+  applyProposalPatch,
+  hasNewAssistantCompletion,
+  isNewDraftProposal,
+  mergeCalibrationState,
+  profileCorroboratesProposalPatch,
+  type CalibrationStateMergeOptions,
+} from "./settings/investor/calibrationStateMerge";
 import { CALIBRATION_TOPIC_IDS } from "./settings/investor/investorProfileDisplay";
 import { settingsErrorPresentation } from "./settings/settingsBackendCopy";
 import type { SettingsT } from "./settings/settingsCopy";
@@ -36,6 +44,7 @@ export interface InvestorProfilePanelProps {
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   onNavigateToProviders?: () => void;
   summaryRequestSequence?: number;
+  onSummaryRequestHandled?: (sequence: number, committed: boolean) => void;
   turnIdFactory?: () => string;
 }
 
@@ -62,6 +71,11 @@ interface OperationError {
 interface ProposalAuthority {
   kind: "terminal" | "conflict";
   proposal: CalibrationProposal;
+}
+
+interface CalibrationOperationBaseline {
+  priorProposalId: string | null;
+  priorAssistantMessageIds: ReadonlySet<string>;
 }
 
 function cloneProfile(profile: InvestorProfile): InvestorProfile {
@@ -115,6 +129,19 @@ function boundedDiagnostic(value: string | null | undefined): string | null {
   return value.slice(0, 512);
 }
 
+function calibrationOperationBaseline(
+  state: CalibrationState | null,
+): CalibrationOperationBaseline {
+  return {
+    priorProposalId: state?.latest_proposal?.id ?? null,
+    priorAssistantMessageIds: new Set(
+      state?.messages
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.id) ?? [],
+    ),
+  };
+}
+
 function operationErrorTitle(scope: ErrorScope, t: SettingsT): string {
   switch (scope) {
     case "profile_load":
@@ -135,6 +162,7 @@ export function InvestorProfilePanel({
   onNavigationGuardChange,
   onNavigateToProviders,
   summaryRequestSequence = 0,
+  onSummaryRequestHandled,
   turnIdFactory = defaultTurnId,
 }: InvestorProfilePanelProps) {
   const { t } = useTranslation("settings");
@@ -144,7 +172,9 @@ export function InvestorProfilePanel({
   const actionInFlightRef = useRef(false);
   const profileAuthorityRef = useRef<InvestorProfile | null>(null);
   const proposalAuthorityRef = useRef<ProposalAuthority | null>(null);
-  const consumedSummaryRequestSequenceRef = useRef(summaryRequestSequence);
+  const calibrationRef = useRef<CalibrationState | null>(null);
+  const consumedSummaryRequestSequenceRef = useRef(0);
+  const pendingSummaryAckRef = useRef<number | null>(null);
 
   const [profileStatus, setProfileStatus] = useState<"loading" | "ready" | "failed">("loading");
   const [profileResponse, setProfileResponse] = useState<InvestorProfileResponse | null>(null);
@@ -165,6 +195,7 @@ export function InvestorProfilePanel({
   const [blockedNotice, setBlockedNotice] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [returnCommand, setReturnCommand] = useState<ReturnCommand>("edit");
+  const [summaryCommitSequence, setSummaryCommitSequence] = useState<number | null>(null);
 
   const summaryHeadingRef = useRef<HTMLHeadingElement>(null);
   const editHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -200,14 +231,46 @@ export function InvestorProfilePanel({
     return true;
   }, []);
 
-  const applyCalibrationState = useCallback((state: CalibrationState, generation: number) => {
+  const installProfileAuthority = useCallback((profile: InvestorProfile) => {
+    const authority = cloneProfile(profile);
+    profileAuthorityRef.current = authority;
+    setProfileResponse((current) => current
+      ? { ...current, profile: cloneProfile(authority) }
+      : current);
+    setDraft(cloneProfile(authority));
+    setBaseline(cloneProfile(authority));
+    setProfileStatus("ready");
+    setProfileError(null);
+    setProfileValuesCurrent(true);
+    setEffectiveFactsCurrent(false);
+  }, []);
+
+  const installProposalAuthority = useCallback((
+    proposal: CalibrationProposal,
+    kind: ProposalAuthority["kind"],
+  ) => {
+    proposalAuthorityRef.current = { kind, proposal };
+    const current = calibrationRef.current;
+    if (current) {
+      const next = { ...current, latest_proposal: proposal };
+      calibrationRef.current = next;
+      setCalibration(next);
+    }
+  }, []);
+
+  const applyCalibrationState = useCallback((
+    state: CalibrationState,
+    generation: number,
+    options: CalibrationStateMergeOptions = {},
+  ) => {
     if (!mountedRef.current || calibrationGenerationRef.current !== generation) return null;
-    let latestProposal = state.latest_proposal;
+    const mergedState = mergeCalibrationState(calibrationRef.current, state, options);
+    let latestProposal = mergedState.latest_proposal;
     let authority = proposalAuthorityRef.current;
     if (
       authority
-      && state.active_session
-      && state.active_session.id !== authority.proposal.session_id
+      && mergedState.active_session
+      && mergedState.active_session.id !== authority.proposal.session_id
     ) {
       authority = null;
     }
@@ -229,9 +292,10 @@ export function InvestorProfilePanel({
       authority = observedProposalAuthority(latestProposal);
     }
     proposalAuthorityRef.current = authority;
-    const nextState = latestProposal === state.latest_proposal
-      ? state
-      : { ...state, latest_proposal: latestProposal };
+    const nextState = latestProposal === mergedState.latest_proposal
+      ? mergedState
+      : { ...mergedState, latest_proposal: latestProposal };
+    calibrationRef.current = nextState;
     setProposalConflict(Boolean(
       latestProposal?.status === "draft"
       && (
@@ -299,6 +363,7 @@ export function InvestorProfilePanel({
     if (mode === "calibration") calibrationHeadingRef.current?.focus();
     if (mode === "proposal") proposalHeadingRef.current?.focus();
     if (mode === "summary") {
+      if (pendingSummaryAckRef.current !== null) return;
       const target = returnCommand === "edit"
         ? editCommandRef.current
         : returnCommand === "calibration"
@@ -307,6 +372,14 @@ export function InvestorProfilePanel({
       (target ?? summaryHeadingRef.current)?.focus();
     }
   }, [mode, returnCommand]);
+
+  useEffect(() => {
+    if (mode !== "summary" || summaryCommitSequence === null) return;
+    if (pendingSummaryAckRef.current !== summaryCommitSequence) return;
+    pendingSummaryAckRef.current = null;
+    setSummaryCommitSequence(null);
+    onSummaryRequestHandled?.(summaryCommitSequence, true);
+  }, [mode, onSummaryRequestHandled, summaryCommitSequence]);
 
   const pendingProposal = calibration?.latest_proposal?.status === "draft"
     ? calibration.latest_proposal
@@ -345,23 +418,31 @@ export function InvestorProfilePanel({
     scope: Extract<ErrorScope, "turn" | "proposal">,
     error: unknown,
     turnId: string,
+    priorProposalId: string | null,
+    priorAssistantMessageIds: ReadonlySet<string>,
     clearAnswerWhenCompleted = false,
   ) => {
     if (!mountedRef.current || calibrationGenerationRef.current !== generation) return;
     setOperationError({ scope, error });
     try {
       const state = await getCalibrationState();
-      const appliedState = applyCalibrationState(state, generation);
+      const newDraft = isNewDraftProposal(state, priorProposalId);
+      const appliedState = applyCalibrationState(state, generation, {
+        acceptIncomingTurnId: state.pending_turn?.id === turnId ? turnId : undefined,
+        acceptIncomingProposalId: newDraft ? state.latest_proposal?.id : undefined,
+      });
       if (!appliedState) return;
       const sameTurnCompleted = appliedState.pending_turn === null
-        && appliedState.messages.some((message) => (
-          message.turn_id === turnId && message.role === "assistant"
-        ));
-      if (clearAnswerWhenCompleted && sameTurnCompleted) {
-        setAnswer("");
+        && hasNewAssistantCompletion(appliedState, turnId, priorAssistantMessageIds);
+      if (sameTurnCompleted) {
         setOperationError(null);
+        if (clearAnswerWhenCompleted) setAnswer("");
       }
-      if (appliedState.latest_proposal?.status === "draft") {
+      if (
+        newDraft
+        && appliedState.latest_proposal?.status === "draft"
+        && appliedState.latest_proposal.id !== priorProposalId
+      ) {
         setOperationError(null);
         finishToSummary("proposal");
       }
@@ -398,17 +479,18 @@ export function InvestorProfilePanel({
     setBlockedNotice(false);
   };
 
-  const requestSummary = (command: ReturnCommand) => {
+  const requestSummary = (command: ReturnCommand): "blocked" | "confirming" | "committed" => {
     if (busy) {
       setBlockedNotice(true);
-      return;
+      return "blocked";
     }
     if (mode === "edit" && dirty) {
       dialogReturnFocusRef.current = editBackRef.current;
       setConfirmDiscard(true);
-      return;
+      return "confirming";
     }
     finishToSummary(command);
+    return "committed";
   };
 
   const settleProposalAuthority = (
@@ -433,13 +515,20 @@ export function InvestorProfilePanel({
   useEffect(() => {
     if (summaryRequestSequence <= consumedSummaryRequestSequenceRef.current) return;
     consumedSummaryRequestSequenceRef.current = summaryRequestSequence;
+    pendingSummaryAckRef.current = summaryRequestSequence;
     const command = mode === "edit"
       ? "edit"
       : mode === "proposal"
         ? "proposal"
         : "calibration";
-    requestSummary(command);
-  }, [summaryRequestSequence]);
+    const result = requestSummary(command);
+    if (result === "committed") {
+      setSummaryCommitSequence(summaryRequestSequence);
+    } else if (result === "blocked") {
+      pendingSummaryAckRef.current = null;
+      onSummaryRequestHandled?.(summaryRequestSequence, false);
+    }
+  }, [onSummaryRequestHandled, summaryRequestSequence]);
 
   const enterEdit = () => {
     if (!profileResponse || busy) return;
@@ -554,20 +643,33 @@ export function InvestorProfilePanel({
     if (!session || calibration?.pending_turn || !answer.trim() || !beginAction("turn")) return;
     const generation = ++calibrationGenerationRef.current;
     const turnId = turnIdFactory();
+    const baselineEvidence = calibrationOperationBaseline(calibrationRef.current);
     try {
       const state = await sendCalibrationMessage({
         turn_id: turnId,
         session_id: session.id,
         content: answer,
       });
-      const appliedState = applyCalibrationState(state, generation);
+      const newDraft = isNewDraftProposal(state, baselineEvidence.priorProposalId);
+      const appliedState = applyCalibrationState(state, generation, {
+        acceptIncomingTurnId: turnId,
+        acceptIncomingProposalId: newDraft ? state.latest_proposal?.id : undefined,
+      });
       if (!appliedState) return;
       setAnswer("");
-      if (appliedState.latest_proposal?.status === "draft") {
+      if (newDraft && appliedState.latest_proposal?.status === "draft") {
         finishToSummary("proposal");
       }
     } catch (error) {
-      await reloadCalibrationAfterFailure(generation, "turn", error, turnId, true);
+      await reloadCalibrationAfterFailure(
+        generation,
+        "turn",
+        error,
+        turnId,
+        baselineEvidence.priorProposalId,
+        baselineEvidence.priorAssistantMessageIds,
+        true,
+      );
     } finally {
       if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
@@ -577,14 +679,26 @@ export function InvestorProfilePanel({
     const turnId = calibration?.pending_turn?.id;
     if (!turnId || !beginAction("retry")) return;
     const generation = ++calibrationGenerationRef.current;
+    const baselineEvidence = calibrationOperationBaseline(calibrationRef.current);
     try {
       const state = await retryCalibrationTurn(turnId);
-      const appliedState = applyCalibrationState(state, generation);
-      if (appliedState?.latest_proposal?.status === "draft") {
+      const newDraft = isNewDraftProposal(state, baselineEvidence.priorProposalId);
+      const appliedState = applyCalibrationState(state, generation, {
+        acceptIncomingTurnId: turnId,
+        acceptIncomingProposalId: newDraft ? state.latest_proposal?.id : undefined,
+      });
+      if (newDraft && appliedState?.latest_proposal?.status === "draft") {
         finishToSummary("proposal");
       }
     } catch (error) {
-      await reloadCalibrationAfterFailure(generation, "turn", error, turnId);
+      await reloadCalibrationAfterFailure(
+        generation,
+        "turn",
+        error,
+        turnId,
+        baselineEvidence.priorProposalId,
+        baselineEvidence.priorAssistantMessageIds,
+      );
     } finally {
       if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
@@ -595,17 +709,29 @@ export function InvestorProfilePanel({
     if (!session || calibration?.pending_turn || !beginAction("request_proposal")) return;
     const generation = ++calibrationGenerationRef.current;
     const turnId = turnIdFactory();
+    const baselineEvidence = calibrationOperationBaseline(calibrationRef.current);
     try {
       const state = await requestCalibrationProposal({
         turn_id: turnId,
         session_id: session.id,
       });
-      const appliedState = applyCalibrationState(state, generation);
-      if (appliedState?.latest_proposal?.status === "draft") {
+      const newDraft = isNewDraftProposal(state, baselineEvidence.priorProposalId);
+      const appliedState = applyCalibrationState(state, generation, {
+        acceptIncomingTurnId: turnId,
+        acceptIncomingProposalId: newDraft ? state.latest_proposal?.id : undefined,
+      });
+      if (newDraft && appliedState?.latest_proposal?.status === "draft") {
         finishToSummary("proposal");
       }
     } catch (error) {
-      await reloadCalibrationAfterFailure(generation, "proposal", error, turnId);
+      await reloadCalibrationAfterFailure(
+        generation,
+        "proposal",
+        error,
+        turnId,
+        baselineEvidence.priorProposalId,
+        baselineEvidence.priorAssistantMessageIds,
+      );
     } finally {
       if (mountedRef.current && calibrationGenerationRef.current === generation) finishAction();
     }
@@ -614,7 +740,8 @@ export function InvestorProfilePanel({
   const reconcileProposalMutationFailure = async (
     profileGeneration: number,
     calibrationGeneration: number,
-    proposalId: string,
+    proposal: CalibrationProposal,
+    preActionProfile: InvestorProfile,
     error: unknown,
     conflict: boolean,
   ) => {
@@ -624,8 +751,8 @@ export function InvestorProfilePanel({
       || calibrationGenerationRef.current !== calibrationGeneration
     ) return;
     setOperationError({ scope: "proposal", error });
-    if (conflict && pendingProposal?.id === proposalId) {
-      proposalAuthorityRef.current = { kind: "conflict", proposal: pendingProposal };
+    if (conflict) {
+      installProposalAuthority(proposal, "conflict");
       setProposalConflict(true);
     }
     setProfileStatus("loading");
@@ -643,56 +770,96 @@ export function InvestorProfilePanel({
       || profileGenerationRef.current !== profileGeneration
       || calibrationGenerationRef.current !== calibrationGeneration
     ) return;
+    let appliedState: CalibrationState | null = null;
+    if (calibrationResult.status === "fulfilled") {
+      appliedState = applyCalibrationState(calibrationResult.value, calibrationGeneration);
+    } else {
+      setCalibrationStatus("failed");
+      setCalibrationError(calibrationResult.reason);
+    }
+
+    const observedProposal = appliedState?.latest_proposal;
+    const matchingTerminal = observedProposal?.id === proposal.id
+      && observedProposal.status !== "draft"
+      ? observedProposal
+      : null;
+    if (matchingTerminal?.status === "approved") {
+      const expectedProfile = applyProposalPatch(preActionProfile, proposal);
+      installProfileAuthority(expectedProfile);
+      if (
+        profileResult.status === "fulfilled"
+        && profileCorroboratesProposalPatch(profileResult.value.profile, proposal)
+      ) {
+        profileAuthorityRef.current = null;
+        applyProfileResponse(profileResult.value, profileGeneration);
+      } else if (profileResult.status === "rejected") {
+        setOperationError({ scope: "refresh", error: profileResult.reason });
+      }
+      setProposalConflict(false);
+      setOutcome("approved");
+      if (profileResult.status === "fulfilled") setOperationError(null);
+      finishToSummary("proposal");
+      return;
+    }
+    if (matchingTerminal?.status === "rejected") {
+      installProfileAuthority(preActionProfile);
+      if (profileResult.status === "fulfilled") {
+        applyProfileResponse(profileResult.value, profileGeneration);
+        setOperationError(null);
+        setProposalConflict(false);
+        setOutcome("rejected");
+        finishToSummary("proposal");
+      } else {
+        setProfileStatus("failed");
+        setProfileError(profileResult.reason);
+      }
+      return;
+    }
+
     if (profileResult.status === "fulfilled") {
       applyProfileResponse(profileResult.value, profileGeneration);
     } else {
       setProfileStatus("failed");
       setProfileError(profileResult.reason);
     }
-    if (calibrationResult.status === "fulfilled") {
-      const appliedState = applyCalibrationState(calibrationResult.value, calibrationGeneration);
-      if (appliedState) settleProposalAuthority(appliedState, proposalId);
-    } else {
-      setCalibrationStatus("failed");
-      setCalibrationError(calibrationResult.reason);
+    if (observedProposal?.id === proposal.id && observedProposal.status === "draft") {
+      setMode("proposal");
     }
   };
 
   const approveProposal = async () => {
     if (
       !pendingProposal
+      || !profileResponse
       || proposalConflict
       || pendingProposal.conflict_fields.length > 0
       || !beginAction("approve")
     ) return;
+    const proposal = pendingProposal;
+    const preActionProfile = cloneProfile(profileResponse.profile);
     const profileGeneration = ++profileGenerationRef.current;
     const calibrationGeneration = ++calibrationGenerationRef.current;
     setProposalConflict(false);
     try {
-      const approved = await approveCalibrationProposal(pendingProposal.id);
+      const approved = await approveCalibrationProposal(proposal.id);
       if (
         !mountedRef.current
         || profileGenerationRef.current !== profileGeneration
         || calibrationGenerationRef.current !== calibrationGeneration
       ) return;
-      profileAuthorityRef.current = cloneProfile(approved.profile);
-      proposalAuthorityRef.current = { kind: "terminal", proposal: approved.proposal };
-      setProfileResponse((current) => current
-        ? { ...current, profile: cloneProfile(approved.profile) }
-        : current);
-      setDraft(cloneProfile(approved.profile));
-      setBaseline(cloneProfile(approved.profile));
-      setProfileValuesCurrent(true);
-      setEffectiveFactsCurrent(false);
-      setCalibration((current) => current
-        ? { ...current, latest_proposal: approved.proposal }
-        : current);
+      installProfileAuthority(approved.profile);
+      installProposalAuthority(approved.proposal, "terminal");
       setOutcome("approved");
       finishToSummary("proposal");
       const [profileResult, calibrationResult] = await Promise.allSettled([
         getInvestorProfile(),
         getCalibrationState(),
       ]);
+      if (
+        !mountedRef.current
+        || profileGenerationRef.current !== profileGeneration
+        || calibrationGenerationRef.current !== calibrationGeneration
+      ) return;
       if (profileResult.status === "fulfilled") {
         applyProfileResponse(profileResult.value, profileGeneration);
       } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
@@ -717,7 +884,8 @@ export function InvestorProfilePanel({
       await reconcileProposalMutationFailure(
         profileGeneration,
         calibrationGeneration,
-        pendingProposal.id,
+        proposal,
+        preActionProfile,
         error,
         presentation.code === "proposal_conflict",
       );
@@ -732,20 +900,19 @@ export function InvestorProfilePanel({
 
   const rejectProposal = async () => {
     if (!pendingProposal || !profileResponse || !beginAction("reject")) return;
+    const proposal = pendingProposal;
+    const preActionProfile = cloneProfile(profileResponse.profile);
     const profileGeneration = ++profileGenerationRef.current;
     const calibrationGeneration = ++calibrationGenerationRef.current;
     try {
-      const rejected = await rejectCalibrationProposal(pendingProposal.id);
+      const rejected = await rejectCalibrationProposal(proposal.id);
       if (
         !mountedRef.current
         || profileGenerationRef.current !== profileGeneration
         || calibrationGenerationRef.current !== calibrationGeneration
       ) return;
-      profileAuthorityRef.current = cloneProfile(profileResponse.profile);
-      proposalAuthorityRef.current = { kind: "terminal", proposal: rejected.proposal };
-      setCalibration((current) => current
-        ? { ...current, latest_proposal: rejected.proposal }
-        : current);
+      installProfileAuthority(preActionProfile);
+      installProposalAuthority(rejected.proposal, "terminal");
       setProfileStatus("loading");
       setProfileError(null);
       setProfileValuesCurrent(false);
@@ -754,6 +921,11 @@ export function InvestorProfilePanel({
         getInvestorProfile(),
         getCalibrationState(),
       ]);
+      if (
+        !mountedRef.current
+        || profileGenerationRef.current !== profileGeneration
+        || calibrationGenerationRef.current !== calibrationGeneration
+      ) return;
       if (profileResult.status === "fulfilled") {
         applyProfileResponse(profileResult.value, profileGeneration);
       } else if (mountedRef.current && profileGenerationRef.current === profileGeneration) {
@@ -781,7 +953,8 @@ export function InvestorProfilePanel({
         await reconcileProposalMutationFailure(
           profileGeneration,
           calibrationGeneration,
-          pendingProposal.id,
+          proposal,
+          preActionProfile,
           error,
           false,
         );
@@ -990,11 +1163,21 @@ export function InvestorProfilePanel({
         cancelLabel={t(($) => $.investor.workspace.guard.stay)}
         returnFocusRef={dialogReturnFocusRef}
         fallbackFocusRef={editCommandRef}
-        onCancel={() => setConfirmDiscard(false)}
+        onCancel={() => {
+          setConfirmDiscard(false);
+          if (pendingSummaryAckRef.current !== null) {
+            const sequence = pendingSummaryAckRef.current;
+            pendingSummaryAckRef.current = null;
+            onSummaryRequestHandled?.(sequence, false);
+          }
+        }}
         onConfirm={() => {
           setConfirmDiscard(false);
           setDraft(cloneProfile(baseline ?? profileResponse.profile));
           finishToSummary("edit");
+          if (pendingSummaryAckRef.current !== null) {
+            setSummaryCommitSequence(pendingSummaryAckRef.current);
+          }
         }}
       />
     </div>
