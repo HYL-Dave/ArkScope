@@ -1123,7 +1123,6 @@ describe("InvestorProfilePanel", () => {
     const initial = populatedResponse();
     const refreshed = populatedResponse();
     refreshed.effective_stance = "strict_risk_control";
-    refreshed.profile.default_stance = "strict_risk_control";
     let profileGets = 0;
     const calls = apiRoutes({
       profile: initial,
@@ -2003,6 +2002,59 @@ describe("InvestorProfilePanel", () => {
     expect(host!.textContent).not.toContain("Complementary");
     expect(host!.querySelector('[data-testid="summary-pending-proposal"]')).toBeNull();
     expect(calls.filter((call) => call.url.includes("/approve"))).toHaveLength(1);
+  });
+
+  it("keeps a later full save authoritative after approved stale reconciliation", async () => {
+    await useEnglish();
+    const proposal = calibrationProposal();
+    const approvedProposal = calibrationProposal({
+      status: "approved",
+      approved_at: "2026-07-21T01:08:00Z",
+    });
+    const initial = populatedResponse();
+    const approved = populatedResponse();
+    approved.profile.primary_preset = "income";
+    const saved = populatedResponse();
+    saved.profile.primary_preset = "growth";
+    let profileGets = 0;
+    const calls = apiRoutes({
+      profile: initial,
+      calibration: activeCalibration({ latest_proposal: proposal }),
+      handle: (call) => {
+        if (call.url.includes("/approve")) {
+          return { profile: approved.profile, proposal: approvedProposal };
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "PUT") {
+          return saved;
+        }
+        if (call.url.endsWith("/profile/investor") && call.method === "GET") {
+          profileGets += 1;
+          if (profileGets <= 2) return initial;
+          return approved;
+        }
+        return undefined;
+      },
+    });
+    await mount();
+    await flush();
+    await clickButton("Review proposal");
+    await clickButton("Approve proposal");
+
+    expect(host!.textContent).toContain("Income");
+    await clickButton("Edit profile");
+    await setControlValue(
+      host!.querySelector<HTMLSelectElement>('select[name="primary_preset"]')!,
+      "growth",
+    );
+    await clickButton("Save profile");
+
+    expect(profileGets).toBe(3);
+    expect(calls.find((call) => call.method === "PUT")?.body).toMatchObject({
+      primary_preset: "growth",
+    });
+    expect(host!.textContent).toContain("Investor Profile summary");
+    expect(host!.textContent).toContain("Growth");
+    expect(host!.textContent).not.toContain("Income");
   });
 
   it("keeps successful reject authority across stale advisory GET responses", async () => {

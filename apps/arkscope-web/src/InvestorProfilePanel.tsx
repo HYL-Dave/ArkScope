@@ -518,8 +518,16 @@ export function InvestorProfilePanel({
     try {
       const saved = await saveInvestorProfile(profilePayload(draft));
       if (!mountedRef.current || profileGenerationRef.current !== generation) return;
-      setDraft(cloneProfile(saved.profile));
-      setBaseline(cloneProfile(saved.profile));
+      const savedProfile = cloneProfile(saved.profile);
+      profileAuthorityRef.current = savedProfile;
+      setProfileResponse((current) => ({
+        ...(current ?? saved),
+        profile: cloneProfile(savedProfile),
+      }));
+      setDraft(cloneProfile(savedProfile));
+      setBaseline(cloneProfile(savedProfile));
+      setProfileValuesCurrent(true);
+      setEffectiveFactsCurrent(false);
       let refreshed: InvestorProfileResponse;
       try {
         refreshed = await getInvestorProfile();
