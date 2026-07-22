@@ -3,7 +3,9 @@
 > **Status: ADOPTED TERMINOLOGY POLICY; WRITTEN REVIEW APPROVED WITH P2.8
 > SLICE 4.1, 2026-07-19; APP-WIDE I18N AUTONYM ADDENDUM WRITTEN REVIEW
 > APPROVED; I18N-2 SETTINGS TERMINOLOGY ADDENDUM ADOPTED, 2026-07-20;
-> P2.8 SLICE 5 TERMINOLOGY ADDENDUM WRITTEN REVIEW APPROVED, 2026-07-22.**
+> P2.8 SLICE 5 TERMINOLOGY ADDENDUM WRITTEN REVIEW APPROVED, 2026-07-22;
+> I18N-3 EXPLORE TERMINOLOGY ADDENDUM WRITTEN — INDEPENDENT REVIEW PENDING,
+> 2026-07-23.**
 > This is the single repository authority for product-facing English and
 > Traditional Chinese terminology. Other documents link here instead of
 > copying canonical term tables.
@@ -96,6 +98,18 @@ printed in the interface.
 | Monitoring workflow group | Monitor | 追蹤 | Contains the Holdings surface. |
 | System diagnostics surface | System / Health | System / Health | Preserve the established mixed professional label. |
 | Structured §2 output | AI card | AI 卡片 | Carries per-claim traceability. |
+| Tag classification facet | Category | 類別 | System-owned facet label; tag values remain source/user content. |
+| Tag thematic facet | Theme | 主題 | System-owned facet label; do not translate the stored value. |
+| Tag origin facet | Provenance | 來源依據 | Describes why a tag exists; distinct from its source identifier. |
+| Provider taxonomy level | Industry | Industry | Preserve the professional taxonomy label so it is not conflated with Sector. |
+| Provider taxonomy level | Sector | Sector | Preserve the professional taxonomy label so it is not conflated with Industry. |
+| Non-editable classification | Read-only | 唯讀 | State label only; editability remains data-driven. |
+| User work ordering | Priority | 優先順序 | Avoid the less natural `優先級` in product chrome. |
+| Priority values | High / Medium / Low | 高 / 中 / 低 | Display labels only; persisted IDs remain `high/medium/low`. |
+| Aggregated analyst view | Consensus | 共識 | Source values remain unchanged. |
+| News body availability | Full content / Headline only | 有內文 / 僅標題 | Availability axis; unknown remains a distinct state. |
+| Recoverable news body state | Content pending | 內文待處理 | Use only when a real retrieval path exists. |
+| Terminal news body state | Source does not provide full text | 來源未提供內文 | Does not imply a future retry. |
 | Application preferences | Settings | 設定 | Product surface, not System diagnostics. |
 | Settings workflow group | AI and Models | AI 與模型 | Owns Provider, model-routing, and runtime controls. |
 | Settings workflow group | Personalization | 個人化 | Owns the current Investor Profile surface. |
