@@ -248,8 +248,9 @@ during a failed Reject advisory read; and `applies proposal fields and
 corroborates them without freezing unrelated values` now pins derived mismatch
 as unknown in a client projection. RED was helper `2 failed / 6 passed` and
 Panel `3 failed / 48 passed`. GREEN is Task 7 owned `4 files / 89`, Task 6-8
-focused `11 files / 135`, and full frontend `83 files / 854`. The final
-sequential ledger is Task 7 `+55/-3` and total frontend `+79/-3` (net `+76`).
+focused `11 files / 135`, and full frontend `83 files / 854`. The Task 7
+checkpoint sequential ledger is Task 7 `+55/-3` and total frontend `+79/-3`
+(net `+76`).
 All earlier checkpoints remain historical only.
 
 ### Zero-accounting resolution: Reject status refresh copy
@@ -268,8 +269,38 @@ from actions` and `keeps reject profile authority through failed and stale
 refreshes until corroborated` nodes were strengthened in place. RED was Panel
 `49 passed / 2 failed`; GREEN is Panel `51/51`, Task 7 owned `4 files / 89`,
 Task 6-8 focused `11 files / 135`, and full frontend `83 files / 854`. This is
-exactly `+0/-0`; the final sequential ledgers remain Task 7 `+55/-3` and total
-frontend `+79/-3` (net `+76`).
+exactly `+0/-0`; the Task 7 checkpoint ledgers remain Task 7 `+55/-3` and
+total frontend `+79/-3` (net `+76`).
+
+### Reviewed implementation deviation: Task 8 run-switch and split-renderer CSS gaps
+
+Fresh Task 8 spec review after `2ab92add` found one High Drawer race and three
+CSS contract gaps. An unkeyed fetched run could render run A details and
+personalization during the synchronous commit from run A to run B; Summary's
+exact current-context source and Calibration's current question lacked
+intrinsic wrap containment; and the original label/toggle selectors still
+assumed the pre-split direct-child DOM rather than the final Edit renderer.
+
+The RED-first product correction at `4c614e53` changes only
+`ResearchEvidenceDrawer.tsx`, `ResearchPersonalizationContext.test.tsx`,
+`InvestorProfileCss.test.ts`, and `ui/primitives.css`. It strictly guards
+fetched detail by the selected `runId`, retains the existing ID-checked
+`activeRun` fallback and selected-message personalization priority, adds
+source-byte-preserving wrap rules, and targets labels/toggle only through the
+actual Edit renderer root. The original six Research and three CSS nodes remain
+unchanged. Relative to `2ab92add`, add exactly these four node IDs:
+
+1. `never exposes the previous run context while a newly selected run is pending`
+2. `keeps the Summary current-context source intrinsically wrap-safe`
+3. `keeps the Calibration current question intrinsically wrap-safe`
+4. `targets Edit labels and toggle through the split-renderer root only`
+
+Remove or rename no node. Targeted baseline was `2 files / 9 passed`; exact
+RED was `4 failed / 9 passed`; targeted GREEN is `2 files / 13 passed`.
+Task 8 is now raw `+13/-0`, final focused is `11 files / 139`, full frontend is
+`83 files / 858`, and the final frontend sequential ledger is `+83/-3` (net
+`+80`). Resources, migrated scopes, literal classes, debt, and allowlist remain
+unchanged; scanner output remains exact `1033/973/954/20` with 30 scopes.
 
 ---
 
@@ -1106,10 +1137,10 @@ Existing analysis-card and Research route nodes evolve in place to assert the
 additive snapshot DTO and no evidence/tool drift. No other backend node may be
 removed or renamed.
 
-### Frontend: `+79/-3`, net `+76`
+### Frontend: `+83/-3`, net `+80`
 
-Full suite moves `77 files / 778 -> 83 files / 854`. The final focused suite
-moves the historical `5 existing files / 59` baseline to `11 files / 135`.
+Full suite moves `77 files / 778 -> 83 files / 858`. The final focused suite
+moves the historical `5 existing files / 59` baseline to `11 files / 139`.
 
 #### New `investorProfileDisplay.test.ts` — add 8
 
@@ -1227,7 +1258,7 @@ pure `calibrationStateMerge` suite `+2/-0`. No file is added, no existing node
 is retired, and the Task 8-owned product remains byte-identical. This remains
 raw `+5/-0` accounting rather than being folded into the prior deviation.
 
-#### New frontend files — add 14
+#### New frontend files — add 18
 
 - `InvestorProfileApi.test.ts` +5:
   `serializes guided start and turn contracts with stable IDs`,
@@ -1235,17 +1266,21 @@ raw `+5/-0` accounting rather than being folded into the prior deviation.
   `requests an early proposal on the dedicated route`,
   `approves with an empty body and never sends profile_patch`,
   `exposes run personalization snapshot without credential identity`.
-- `ResearchPersonalizationContext.test.tsx` +6:
+- `ResearchPersonalizationContext.test.tsx` +7:
   `renders legacy null as no snapshot`,
   `renders empty snapshot as disabled`,
   `renders active exact source text byte for byte`,
   `distinguishes run context from current Settings context`,
   `switches locale without changing source context or disclosure state`,
-  `maps closed stance effect copy without deriving it from context text`.
-- `InvestorProfileCss.test.ts` +3:
+  `maps closed stance effect copy without deriving it from context text`,
+  `never exposes the previous run context while a newly selected run is pending`.
+- `InvestorProfileCss.test.ts` +6:
   `defines every Slice 5 Investor class`,
   `uses responsive intrinsic grids and wrap-safe command rows`,
-  `adds no media query breakpoint or nested-card selector`.
+  `adds no media query breakpoint or nested-card selector`,
+  `keeps the Summary current-context source intrinsically wrap-safe`,
+  `keeps the Calibration current question intrinsically wrap-safe`,
+  `targets Edit labels and toggle through the split-renderer root only`.
 
 #### Existing i18n tests — add 2
 
@@ -1296,8 +1331,8 @@ allowlist entry is authorized.
 | 5. prompt snapshots | +6 | 0 | current/run transparency data |
 | 6. resources + display/API seams | 0 | +15 | bilingual closed mappings |
 | 7. workspace UI + Settings guard | 0 | +55/-3 | summary/modes/navigation + reviewed monotonic authority/profile hardening |
-| 8. Research context + CSS/ratchet | 0 | +9 | historical transparency/layout |
-| **Total** | **+53/-1** | **+79/-3** | **net backend +52, frontend +76** |
+| 8. Research context + CSS/ratchet | 0 | +13 | historical transparency/layout + reviewed run-switch/wrap/DOM diagnostics |
+| **Total** | **+53/-1** | **+83/-3** | **net backend +52, frontend +80** |
 
 Every task ends with focused GREEN, `git diff --check`, a bounded diff review,
 and a commit. If exact collection changes, stop and amend this plan before
@@ -1911,8 +1946,8 @@ collection requires a reviewed ledger amendment.
   Expected: exact `4 files / 89 passed`. Run resource/display/API tests too;
   expected Task 6-7 owned cumulative is `7 files / 113 passed`. Including the
   unchanged class-coverage and foundation-boundary baselines, the final-suite
-  checkpoint before Task 8 is `9 files / 126 passed`; Task 8 then adds nine
-  nodes.
+  checkpoint before Task 8 is `9 files / 126 passed`; Task 8 then adds the
+  original nine nodes plus four reviewed diagnostic nodes.
 
 - [ ] **Step 10: Commit**
 
@@ -1944,11 +1979,16 @@ collection requires a reviewed ledger amendment.
 
   Use null/empty/non-empty traces, source text containing non-English content,
   locale changes, and closed stance IDs. CSS tests inspect rules structurally,
-  not screenshots or arbitrary pixel values.
+  not screenshots or arbitrary pixel values. The reviewed deviation preserves
+  those nine and adds one deferred run-switch Research node plus three
+  separately named CSS diagnostic nodes for Summary wrap, Calibration wrap,
+  and the split-renderer Edit selector contract.
 
 - [ ] **Step 2: Prove RED**
 
-  Expected: `9` new failures, existing class coverage green.
+  Original expected RED: `9` new failures with existing class coverage green.
+  Reviewed correction baseline: `9 passed`; exact correction RED:
+  `4 failed / 9 passed`.
 
 - [ ] **Step 3: Implement the Research component and Drawer wire**
 
@@ -1988,7 +2028,7 @@ collection requires a reviewed ledger amendment.
     src/InvestorProfileCss.test.ts
   ```
 
-  Expected: `11 files / 135 passed`.
+  Expected: `11 files / 139 passed`.
 
 - [ ] **Step 7: Run scanner GREEN**
 
@@ -2046,14 +2086,14 @@ collection requires a reviewed ledger amendment.
   npm run check:i18n-literals --workspace apps/arkscope-web
   ```
 
-  Expected: `83 files / 854 passed`; clean typecheck; build succeeds with only
+  Expected: `83 files / 858 passed`; clean typecheck; build succeeds with only
   the existing chunk-size warning; scanner exact.
 
 - [ ] **Step 3: Prove exact node accounting with virgin archives**
 
   Use archives of `bca064d4` and product tip with the same root `node_modules`.
   Backend node comm must be `+53/-1`; frontend sequential ledger must be
-  `+79/-3`. Removed IDs must be exactly the four named obsolete nodes across
+  `+83/-3`. Removed IDs must be exactly the four named obsolete nodes across
   the backend and frontend ledgers, including both Task 7 intermediate/overclaim
   nodes retired by reviewed deviations. Existing failure/error/skip/warning
   families must be bidirectionally identical.
@@ -2173,7 +2213,7 @@ collection requires a reviewed ledger amendment.
 
 ## Independent Reviewer Focus
 
-1. exact backend `+53/-1`, frontend `+79/-3`, and only the four named removals;
+1. exact backend `+53/-1`, frontend `+83/-3`, and only the four named removals;
 2. policy matrix and deny list exactly partition `InvestorProfileBody`;
 3. model-selected next topic is catalog-valid and uncovered before commit;
 4. catalog order is display only and adaptive interview order is preserved;
@@ -2273,9 +2313,9 @@ Only after independent implementation GREEN and explicit user approval:
 5. verify marker 2, `integrity_check`, `foreign_key_check`, preserved message /
    terminal proposal digests, legacy active/draft supersession, and no inferred
    coverage/base values;
-6. rerun merged focused `219`, full backend collect `4621`, frontend `83/854`,
-   typecheck, build, scanner, no-PG, resources, immutable gates, and one normal
-   desktop Summary smoke;
+6. rerun merged backend focused `219`, full backend collect `4621`, frontend
+   focused `11/139`, frontend full `83/858`, typecheck, build, scanner, no-PG,
+   resources, immutable gates, and one normal desktop Summary smoke;
 7. mark spec/plan/map LIVE with merge/evidence hashes;
 8. keep the retained backup until the user confirms normal operation;
 9. remove implementation worktree/branch and temporary artifacts; and
