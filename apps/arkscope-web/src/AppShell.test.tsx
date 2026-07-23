@@ -9,10 +9,19 @@ import type { ApiStatus, ResearchRunDTO, RuntimeConfig } from "./api";
 import type { NavigationRequest, NavigationTarget } from "./shell/navigation";
 import type { ResearchWorkItem, ResearchWorkState } from "./shell/researchWork";
 
+type ExploreCapabilityProps = {
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+};
+
 const shellMocks = vi.hoisted(() => ({
   statusError: null as Error | null,
   work: null as ResearchWorkState | null,
   homeProps: null as Record<string, unknown> | null,
+  watchlistProps: null as Record<string, unknown> | null,
+  universeProps: null as Record<string, unknown> | null,
+  newsProps: null as Record<string, unknown> | null,
+  tickerDetailProps: null as Record<string, unknown> | null,
   researchProps: null as Record<string, unknown> | null,
   settingsProps: null as Record<string, unknown> | null,
   settingsRequests: [] as NavigationRequest[],
@@ -91,7 +100,7 @@ vi.mock("./Home", () => ({
   HomeView: (props: {
     onOpenTicker: (ticker: string) => void;
     onNavigate: (view: "Home" | "Watchlist" | "System") => void;
-  }) => {
+  } & Partial<ExploreCapabilityProps>) => {
     shellMocks.homeProps = props as unknown as Record<string, unknown>;
     return (
       <main data-testid="home-surface">
@@ -147,17 +156,51 @@ vi.mock("./Settings", () => ({
 }));
 
 vi.mock("./TickerDetail", () => ({
-  TickerDetailView: (props: { ticker: string; onBack: () => void }) => (
-    <main data-testid="ticker-detail">
-      Ticker {props.ticker}
-      <button type="button" onClick={props.onBack}>Back</button>
-    </main>
-  ),
+  TickerDetailView: (props: {
+    ticker: string;
+    onBack: () => void;
+  } & Partial<ExploreCapabilityProps>) => {
+    shellMocks.tickerDetailProps = props as unknown as Record<string, unknown>;
+    return (
+      <main data-testid="ticker-detail">
+        Ticker {props.ticker}
+        <button type="button" onClick={props.onBack}>Back</button>
+      </main>
+    );
+  },
 }));
 
-vi.mock("./Watchlist", () => ({ WatchlistView: () => <main>Watchlist surface</main> }));
-vi.mock("./Universe", () => ({ UniverseView: () => <main>Universe surface</main> }));
-vi.mock("./News", () => ({ NewsView: () => <main>News surface</main> }));
+vi.mock("./Watchlist", () => ({
+  WatchlistView: (props: Partial<ExploreCapabilityProps>) => {
+    shellMocks.watchlistProps = props as Record<string, unknown>;
+    return <main data-testid="watchlist-surface">Watchlist surface</main>;
+  },
+}));
+vi.mock("./Universe", () => ({
+  UniverseView: (props: Partial<ExploreCapabilityProps>) => {
+    shellMocks.universeProps = props as Record<string, unknown>;
+    return (
+      <main data-testid="universe-surface">
+        Universe surface
+        <button
+          type="button"
+          onClick={() => props.onNavigateTarget?.({
+            kind: "settings_section",
+            section: "data_sources",
+          })}
+        >
+          Recover data sources
+        </button>
+      </main>
+    );
+  },
+}));
+vi.mock("./News", () => ({
+  NewsView: (props: Partial<ExploreCapabilityProps>) => {
+    shellMocks.newsProps = props as Record<string, unknown>;
+    return <main data-testid="news-surface">News surface</main>;
+  },
+}));
 vi.mock("./Holdings", () => ({ HoldingsView: () => <main>Holdings surface</main> }));
 
 import { App } from "./App";
@@ -256,6 +299,10 @@ beforeEach(() => {
   shellMocks.statusError = null;
   shellMocks.work = emptyWork();
   shellMocks.homeProps = null;
+  shellMocks.watchlistProps = null;
+  shellMocks.universeProps = null;
+  shellMocks.newsProps = null;
+  shellMocks.tickerDetailProps = null;
   shellMocks.researchProps = null;
   shellMocks.settingsProps = null;
   shellMocks.settingsRequests = [];
@@ -426,5 +473,81 @@ describe("App shell integration", () => {
     expect(document.activeElement).toBe(focusedControl);
     expect(dialog?.textContent).toContain("Background work");
     expect(trigger.textContent).toContain("Running 1");
+  });
+
+  it("passes Developer Mode and the shared navigation dispatcher to Explore surfaces", async () => {
+    const host = await renderApp();
+    await click(button("System / Health"));
+    const developerMode = host.querySelector<HTMLInputElement>(
+      '#developer-mode-heading + label input[type="checkbox"]',
+    );
+    await act(async () => {
+      developerMode!.click();
+      await Promise.resolve();
+    });
+
+    await click(button("工作台"));
+    const homeProps = shellMocks.homeProps!;
+    const dispatcher = homeProps.onNavigateTarget;
+    expect(dispatcher).toEqual(expect.any(Function));
+    expect(homeProps.onNavigate).not.toBe(dispatcher);
+
+    await click(button("自選股"));
+    await click(button("全部標的"));
+    await click(button("新聞·事件"));
+    await act(async () => {
+      (dispatcher as (target: NavigationTarget) => void)({ kind: "ticker", ticker: "CAPS" });
+      await Promise.resolve();
+    });
+
+    for (const props of [
+      homeProps,
+      shellMocks.watchlistProps!,
+      shellMocks.universeProps!,
+      shellMocks.newsProps!,
+      shellMocks.tickerDetailProps!,
+    ]) {
+      expect(props.developerMode).toBe(true);
+      expect(props.onNavigateTarget).toBe(dispatcher);
+    }
+  });
+
+  it("routes an Explore recovery action through the exact existing Settings anchor", async () => {
+    await renderApp();
+    const homeDispatcher = shellMocks.homeProps?.onNavigateTarget;
+    await click(button("全部標的"));
+
+    expect(shellMocks.universeProps?.onNavigateTarget).toBe(homeDispatcher);
+    expect(homeDispatcher).toEqual(expect.any(Function));
+    await click(button("Recover data sources"));
+
+    expect(shellMocks.settingsRequests).toHaveLength(1);
+    expect(shellMocks.settingsRequests[0]?.target).toEqual({
+      kind: "settings_section",
+      section: "data_sources",
+    });
+  });
+
+  it("switches locale without replacing the active Explore surface or detail ticker", async () => {
+    const host = await renderApp();
+    await click(button("全部標的"));
+    const universe = host.querySelector('[data-testid="universe-surface"]');
+    const dispatcher = shellMocks.universeProps?.onNavigateTarget;
+
+    expect(dispatcher).toEqual(expect.any(Function));
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(host.querySelector('[data-testid="universe-surface"]')).toBe(universe);
+
+    await act(async () => {
+      (dispatcher as (target: NavigationTarget) => void)({ kind: "ticker", ticker: "BRK.B" });
+      await Promise.resolve();
+    });
+    const detail = host.querySelector('[data-testid="ticker-detail"]');
+    expect(detail?.textContent).toContain("Ticker BRK.B");
+    expect(shellMocks.tickerDetailProps?.ticker).toBe("BRK.B");
+
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    expect(host.querySelector('[data-testid="ticker-detail"]')).toBe(detail);
+    expect(shellMocks.tickerDetailProps?.ticker).toBe("BRK.B");
   });
 });

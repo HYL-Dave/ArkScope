@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
@@ -29,6 +29,11 @@ import {
 } from "./shell/navigation";
 import { shellViewLabel } from "./shell/shellLabels";
 
+type ExploreSurfaceCapabilities = {
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+};
+
 export function App() {
   const { t } = useTranslation("shell");
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
@@ -54,6 +59,11 @@ export function App() {
     if (resolved.research) setResearchNavigation(resolved.research);
     if (resolved.settings) setSettingsNavigation(resolved.settings);
   }, []);
+
+  const exploreCapabilities = useMemo<ExploreSurfaceCapabilities>(() => ({
+    developerMode,
+    onNavigateTarget: navigate,
+  }), [developerMode, navigate]);
 
   const refresh = useCallback(async () => {
     try {
@@ -102,6 +112,7 @@ export function App() {
 
   const selectedSurface = detail ? (
     <TickerDetailView
+      {...exploreCapabilities}
       key={detail.ticker}
       ticker={detail.ticker}
       onBack={() => setDetail(null)}
@@ -109,17 +120,27 @@ export function App() {
     />
   ) : view === "Home" ? (
     <HomeView
+      {...exploreCapabilities}
       status={status}
       onNavigate={(next) => navigate({ kind: "view", view: next })}
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
       runtime={runtime}
     />
   ) : view === "Watchlist" ? (
-    <WatchlistView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
+    <WatchlistView
+      {...exploreCapabilities}
+      onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+    />
   ) : view === "Universe" ? (
-    <UniverseView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
+    <UniverseView
+      {...exploreCapabilities}
+      onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+    />
   ) : view === "News" ? (
-    <NewsView onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })} />
+    <NewsView
+      {...exploreCapabilities}
+      onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+    />
   ) : view === "Research" ? (
     <ResearchView
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
