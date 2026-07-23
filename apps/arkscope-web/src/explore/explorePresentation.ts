@@ -409,7 +409,7 @@ const TRACE_DETAIL = [
   /\bfile\s+\S+\s+line\s+[0-9]+\s+in\b/i,
 ];
 const SQL_DETAIL = [
-  /\b(?:sqlite|sqlstate|psycopg|postgres|operationalerror|integrityerror|database\s+(?:error|exception))\b/i,
+  /\b(?:sqlite|sqlstate|sql\s+(?:error|exception)|psycopg|postgres|operationalerror|integrityerror|database\s+(?:error|exception))\b/i,
   /\bsyntax error\b/i,
   /\b(?:relation|column|table|constraint)\s+["']?[A-Za-z0-9_.-]+["']?\s+does not exist\b/i,
   /\bduplicate key value violates unique constraint\b/i,
@@ -421,6 +421,7 @@ const SQL_DETAIL = [
 ];
 const HOST_OR_IP_DETAIL = [
   /\blocalhost(?::[0-9]{1,5})?\b/i,
+  /\b(?=[a-z0-9-]*[a-z])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?):[0-9]{1,5}\b/i,
   /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/,
   /(?:^|[\s[(])(?:[A-Fa-f0-9]{0,4}:){2,}[A-Fa-f0-9]{0,4}(?:$|[\s\])])/,
   /\b(?:[a-z0-9](?:[a-z0-9-]{0,62})\.)+[a-z]{2,63}\b/i,
