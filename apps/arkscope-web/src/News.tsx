@@ -145,6 +145,7 @@ export function NewsView({
           value={mode}
           onChange={(e) => setMode(e.target.value as Mode)}
           title={t(($) => $.news.sourceLabel)}
+          aria-label={t(($) => $.news.modeLabel)}
         >
           <option value="market">{t(($) => $.news.marketNewsTitle)}</option>
           <option value="sa">{t(($) => $.news.seekingAlpha)}</option>
@@ -178,6 +179,7 @@ export function NewsView({
             value={source}
             onChange={(e) => setSource(e.target.value)}
             title={t(($) => $.news.sourceLabel)}
+            aria-label={t(($) => $.news.marketProviderLabel)}
           >
             {SOURCE_OPTIONS.map((sourceOption) => (
               <option key={sourceOption} value={sourceOption}>
@@ -209,7 +211,11 @@ export function NewsView({
             )}
           </select>
         )}
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          aria-label={t(($) => $.news.dayWindowLabel)}
+        >
           {DAY_OPTIONS.map((dayOption) => (
             <option key={dayOption} value={dayOption}>
               {dayOption} {t(($) => $.news.daysSuffix)}
@@ -448,7 +454,7 @@ function SAFeedBody({
                   key={ticker}
                   className="news-ticker-chip"
                   onClick={() => onOpenTicker(ticker)}
-                  title={t(($) => $.news.openTickerChip, { ticker })}
+                  title={t(($) => $.news.openTicker, { ticker })}
                 >
                   {ticker}
                 </button>
@@ -500,6 +506,7 @@ function saFilterTypeLabel(type: (typeof SA_TYPE_OPTIONS)[number], t: ExploreT):
 }
 
 function saRuntimeTypeLabel(type: string, t: ExploreT): string {
-  if (type === "article") return t(($) => $.news.analysisArticleRuntime);
-  return t(($) => $.news.marketNewsRuntime);
+  if (type === "article") return t(($) => $.news.analysisArticle);
+  if (type === "market_news") return t(($) => $.news.marketNewsType);
+  return type;
 }

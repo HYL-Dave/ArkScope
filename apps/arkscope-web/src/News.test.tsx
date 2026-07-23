@@ -126,7 +126,7 @@ const saFeed: SAFeedResponse = {
   available: true,
   days: 7,
   query: null,
-  total: 1,
+  total: 2,
   items: [
     {
       type: "article",
@@ -141,9 +141,23 @@ const saFeed: SAFeedResponse = {
       comments_count: 1234,
       detail_route: null,
     },
+    {
+      // Exercise a forward-compatible runtime ID beyond the current DTO union.
+      type: "transcript" as unknown as SAFeedResponse["items"][number]["type"],
+      id: "sa-2",
+      title: "SOURCE transcript / 保留",
+      tickers: ["RAW"],
+      published_at: "2026-07-17T02:00:00Z",
+      url: null,
+      source: "seeking_alpha",
+      snippet: "SOURCE transcript snippet / 原文",
+      has_detail: false,
+      comments_count: 0,
+      detail_route: null,
+    },
   ],
-  by_type: { article: 1 },
-  by_day: { "2026-07-17": 1 },
+  by_type: { article: 1, transcript: 1 },
+  by_day: { "2026-07-17": 2 },
   empty_reason: null,
 };
 
@@ -464,6 +478,10 @@ describe("News content availability", () => {
     await change(mode, "sa");
     await waitForText(SA_TITLE);
 
+    expect(host!.querySelector(".news-stats")?.textContent).toContain("· transcript 1");
+    expect(Array.from(host!.querySelectorAll(".list-chip")).map((chip) => chip.textContent))
+      .toEqual(["分析文章", "transcript"]);
+
     const type = selectWithOption("article");
     await change(type, "article");
     await waitForText(SA_TITLE);
@@ -490,7 +508,8 @@ describe("News content availability", () => {
     expect(type.value).toBe("article");
     expect(host!.querySelector(".news-item")).toBe(article);
     expect(host!.querySelector('select[title="Content state"]')).toBeNull();
-    expect(host!.querySelector(".list-chip")?.textContent).toBe("Analysis article");
+    expect(Array.from(host!.querySelectorAll(".list-chip")).map((chip) => chip.textContent))
+      .toEqual(["Analysis article", "transcript"]);
     expect(host!.textContent).toContain(SA_TITLE);
     expect(host!.textContent).toContain(SA_SNIPPET);
     expect(host!.querySelector(".news-meta")?.textContent).toBe("SA · 💬 1,234 · Original ↗");
@@ -513,16 +532,22 @@ describe("News localization", () => {
     expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
       "Local news store (score-free) · Search terms use AND",
     );
-    expect(modeSelect().title).toBe("Source");
-    expect(modeSelect().querySelector('option[value="market"]')?.textContent).toBe("Market News");
-    expect(sourceSelect().title).toBe("Source");
-    expect(sourceSelect().querySelector('option[value="auto"]')?.textContent).toBe("All sources");
+    const mode = modeSelect();
+    const provider = sourceSelect();
+    const dayWindow = selectWithOption("365");
+    expect(mode.title).toBe("Source");
+    expect(mode.getAttribute("aria-label")).toBe("News source");
+    expect(mode.querySelector('option[value="market"]')?.textContent).toBe("Market News");
+    expect(provider.title).toBe("Source");
+    expect(provider.getAttribute("aria-label")).toBe("Market News provider");
+    expect(provider.querySelector('option[value="auto"]')?.textContent).toBe("All sources");
+    expect(dayWindow.getAttribute("aria-label")).toBe("Time window");
     expect(contentSelect().title).toBe("Content state");
     expect(host!.querySelector<HTMLInputElement>(".news-search")?.placeholder)
       .toBe("Search titles/summaries (Enter)");
     expect(host!.querySelector<HTMLInputElement>(".news-ticker")?.placeholder)
       .toBe("Ticker (Enter)");
-    expect(Array.from(selectWithOption("365").options).map((option) => option.textContent))
+    expect(Array.from(dayWindow.options).map((option) => option.textContent))
       .toEqual(["7 days", "30 days", "90 days", "365 days"]);
     expect(host!.querySelector(".news-stats")?.textContent).toContain("Total 4 articles");
     expect(host!.querySelector(".news-stats")?.textContent).toContain("ibkr 2");

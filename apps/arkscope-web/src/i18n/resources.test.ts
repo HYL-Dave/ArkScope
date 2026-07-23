@@ -83,11 +83,17 @@ describe("bundled i18n resources", () => {
         marketSearchSummary: "· 搜尋「{{query}}」（按相關性排序，標題加權）",
         seekingAlphaSearchSummary: "· 搜尋「{{query}}」",
         loadMoreProgress: "載入更多（{{visible}}/{{total}}）",
+        modeLabel: "新聞來源",
+        marketProviderLabel: "市場新聞 Provider",
+        dayWindowLabel: "時間範圍",
       },
       en: {
         marketSearchSummary: "· Search “{{query}}” (sorted by relevance with title weighting)",
         seekingAlphaSearchSummary: "· Search “{{query}}”",
         loadMoreProgress: "Load more ({{visible}}/{{total}})",
+        modeLabel: "News source",
+        marketProviderLabel: "Market News provider",
+        dayWindowLabel: "Time window",
       },
     } as const;
 
@@ -122,6 +128,9 @@ describe("bundled i18n resources", () => {
         "news.marketSearchSummary",
         "news.seekingAlphaSearchSummary",
         "news.loadMoreProgress",
+        "news.modeLabel",
+        "news.marketProviderLabel",
+        "news.dayWindowLabel",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
       }
@@ -144,6 +153,9 @@ describe("bundled i18n resources", () => {
         "news.searchPrefix",
         "news.searchSuffix",
         "news.loadMore",
+        "news.openTickerChip",
+        "news.analysisArticleRuntime",
+        "news.marketNewsRuntime",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(false);
       }
