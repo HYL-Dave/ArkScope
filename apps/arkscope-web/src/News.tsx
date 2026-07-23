@@ -464,7 +464,7 @@ function SAFeedBody({
                 {t(($) => $.news.saShort)}
                 {item.comments_count > 0 ? (
                   <> {t(($) => $.news.commentCount, {
-                    count: item.comments_count,
+                    formattedCount: item.comments_count.toLocaleString(),
                   })}</>
                 ) : null}
                 {item.url ? <> {t(($) => $.news.originalArticle)}</> : null}

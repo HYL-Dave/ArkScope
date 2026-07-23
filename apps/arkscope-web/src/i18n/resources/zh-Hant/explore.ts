@@ -213,7 +213,7 @@ const explore = {
     searchLabel: "搜尋標題／摘要（Enter）",
     openTicker: "開啟 {{ticker}}",
     openTickerChip: "開啟 {{ticker}}",
-    commentCount: "· 💬 {{count}}",
+    commentCount: "· 💬 {{formattedCount}}",
     originalArticle: "· 原文 ↗",
     publisher: "{{publisher}} ·",
     seekingAlphaDescription: "Seeking Alpha 文章＋市場新聞（本地 sa_capture.db）",

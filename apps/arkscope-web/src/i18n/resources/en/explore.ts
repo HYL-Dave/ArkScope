@@ -213,7 +213,7 @@ const explore = {
     searchLabel: "Search titles/summaries (Enter)",
     openTicker: "Open {{ticker}}",
     openTickerChip: "Open {{ticker}}",
-    commentCount: "· 💬 {{count}}",
+    commentCount: "· 💬 {{formattedCount}}",
     originalArticle: "· Original ↗",
     publisher: "{{publisher}} ·",
     seekingAlphaDescription: "Seeking Alpha articles and Market News (local sa_capture.db)",

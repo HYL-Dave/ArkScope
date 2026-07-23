@@ -138,7 +138,7 @@ const saFeed: SAFeedResponse = {
       source: "seeking_alpha",
       snippet: SA_SNIPPET,
       has_detail: true,
-      comments_count: 3,
+      comments_count: 1234,
       detail_route: null,
     },
   ],
@@ -464,6 +464,10 @@ describe("News content availability", () => {
     await change(mode, "sa");
     await waitForText(SA_TITLE);
 
+    const type = selectWithOption("article");
+    await change(type, "article");
+    await waitForText(SA_TITLE);
+
     expect(host!.querySelector('select[title="內文狀態"]')).toBeNull();
     expect(host!.textContent).not.toContain("僅標題 · 內文待處理");
     expect(host!.textContent).not.toContain("來源未提供內文");
@@ -473,19 +477,23 @@ describe("News content availability", () => {
     expect(apiMocks.getSAFeed).toHaveBeenCalled();
     expect(apiMocks.getSAFeed).toHaveBeenLastCalledWith(expect.objectContaining({
       q: "sa source query",
+      item_type: "article",
     }));
     expect(apiMocks.getSAFeed.mock.calls.at(-1)?.[0]).not.toHaveProperty("content");
+    expect(host!.querySelector(".news-meta")?.textContent).toBe("SA · 💬 1,234 · 原文 ↗");
 
     const article = host!.querySelector(".news-item");
     const before = requestCounts();
     await switchLocale("en");
     expect(modeSelect()).toBe(mode);
+    expect(selectWithOption("article")).toBe(type);
+    expect(type.value).toBe("article");
     expect(host!.querySelector(".news-item")).toBe(article);
     expect(host!.querySelector('select[title="Content state"]')).toBeNull();
     expect(host!.querySelector(".list-chip")?.textContent).toBe("Analysis article");
     expect(host!.textContent).toContain(SA_TITLE);
     expect(host!.textContent).toContain(SA_SNIPPET);
-    expect(host!.textContent).toContain("SA · 💬 3 · Original ↗");
+    expect(host!.querySelector(".news-meta")?.textContent).toBe("SA · 💬 1,234 · Original ↗");
     expect(host!.querySelector(".news-stats")?.textContent).toContain("· Search “sa source query”");
     expect(host!.querySelector(".news-stats")?.textContent)
       .not.toContain("sorted by relevance with title weighting");
@@ -615,14 +623,33 @@ describe("News localization", () => {
     unmountNews();
     apiMocks.getNewsFeed.mockReset()
       .mockResolvedValueOnce(marketFeed({ items: [marketRows[2]], total: 2 }))
-      .mockRejectedValueOnce(structuredError("more_fixture_failed", "/news/feed?offset=50"));
+      .mockRejectedValueOnce(structuredError("more_fixture_failed", "/news/feed?offset=50"))
+      .mockResolvedValueOnce(marketFeed({ items: [marketRows[1]], total: 2 }));
     await mount();
     await waitForText("Terminal headline");
+    const terminalItem = host!.querySelector(".news-item");
     await click(buttonByText("載入更多"));
     await waitForText("無法載入更多新聞。");
+    const failedPageRequest = apiMocks.getNewsFeed.mock.calls.at(-1)?.[0];
+    expect(failedPageRequest).toEqual({
+      q: undefined,
+      ticker: undefined,
+      source: "auto",
+      content: "all",
+      days: 7,
+      limit: 50,
+      offset: 50,
+    });
     expect(host!.textContent).toContain("Terminal headline");
     expect(host!.innerHTML).not.toContain(RAW_ERROR);
     expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+    await click(buttonByText("重試"));
+    await waitForText("Retryable headline");
+    expect(apiMocks.getNewsFeed.mock.calls.at(-1)?.[0]).toEqual(failedPageRequest);
+    expect(apiMocks.getNewsFeed).toHaveBeenCalledTimes(3);
+    expect(host!.querySelector(".news-item")).toBe(terminalItem);
+    expect(host!.textContent).toContain("Terminal headline");
+    expect(host!.textContent).toContain("Retryable headline");
 
     unmountNews();
     apiMocks.getNewsFeed.mockReset().mockResolvedValue(marketFeed());
