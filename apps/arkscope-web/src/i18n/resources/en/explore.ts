@@ -85,7 +85,10 @@ const explore = {
   },
   watchlist: {
     listSummary: "{{kind}} · {{count}} active",
-    noteCount: "{{count}} note(s)",
+    noteCount: {
+      one: "{{count}} note",
+      other: "{{count}} notes",
+    },
     allListsDescription: "Union of active tickers in custom lists created in ArkScope; the full inventory is under Universe",
     archiveGlobal: "Archive (global)",
     change7d: "Chg 7d",
@@ -112,7 +115,10 @@ const explore = {
     setDefaultList: "Set as the default list when opening Watchlist",
     loadFailed: "Load failed; refresh to retry",
     archivedCount: "· {{count}} archived",
-    customListCount: "· {{count}} custom lists",
+    customListCount: {
+      one: "· {{count}} custom list",
+      other: "· {{count}} custom lists",
+    },
     asOf: "· as of {{value}}",
     universeCount: "· Universe {{count}}",
     emptyListWithArchivedHint: "This list has no tickers yet — use the search above to add one (or try Show archived).",
@@ -141,7 +147,10 @@ const explore = {
     tracked: "Tracked",
     firstList: "Create your first custom ArkScope list. Legacy settings imports and the tier inventory remain under Universe and are not added to Watchlist automatically.",
     searching: "Searching…",
-    filesSuffix: "files",
+    renderedTickerCount: {
+      one: "{{count}} ticker",
+      other: "{{count}} tickers",
+    },
     noSummary: "No summary",
     noMatches: "No catalog matches (exact/prefix matching, not fuzzy).",
     title: "Watchlist",
@@ -150,10 +159,16 @@ const explore = {
     allListsRuntime: "All lists",
     deleteConfirmation: "Delete the list “{{listName}}”?\n\nThis removes only the list and its membership relationships. It does not delete the tickers or any market data, and the tickers remain in other lists.",
     consensusRatingsSummary: "Strong buy {{strongBuy}} · Buy {{buy}} · Hold {{hold}} · Sell {{sell}} · Strong sell {{strongSell}}",
-    consensusAnalystSummary: "{{total}} analysts · Updated {{when}}",
+    consensusAnalystSummary: {
+      one: "{{total}} analyst · Updated {{when}}",
+      other: "{{total}} analysts · Updated {{when}}",
+    },
   },
   universe: {
-    noteCount: "{{count}} note(s)",
+    noteCount: {
+      one: "{{count}} note",
+      other: "{{count}} notes",
+    },
     filterBy: "Filter by {{label}}",
     noMarketSummary: "No market summary",
     hideTicker: "Remove from Universe (delisted/duplicate symbol)",
@@ -176,7 +191,10 @@ const explore = {
     title: "Universe",
     description: "The inventory comes from Universe settings and is unaffected by list membership. “Import classifications” seeds classification tags (category / theme / provenance) from existing settings and removes legacy settings lists. It is safe to repeat and does not overwrite user-defined tags. Use tags for classifications and lists for working sets shared with Watchlist.",
     allListsCount: "All lists ({{count}})",
-    summaryCounts: "{{total}} files · {{summarized}} with summary · {{withoutSummary}} without summary",
+    summaryCounts: {
+      one: "{{total}} file · {{summarized}} with summary · {{withoutSummary}} without summary",
+      other: "{{total}} files · {{summarized}} with summary · {{withoutSummary}} without summary",
+    },
     clearCategory: "Clear classification ✕",
     noSummary: "No summary",
     loading: "Loading…",

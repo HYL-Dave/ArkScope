@@ -159,6 +159,15 @@ const UNIVERSE: UniverseResponse = {
   ],
 };
 
+const SINGULAR_UNIVERSE: UniverseResponse = {
+  ...UNIVERSE,
+  total: 1,
+  shown: 1,
+  archived_count: 0,
+  summarized: 1,
+  rows: [{ ...UNIVERSE.rows[0], note_count: 1 }],
+};
+
 const CONSENSUS: ConsensusSummary = {
   ticker: SOURCE_TICKER,
   rating: "Strong Buy",
@@ -363,8 +372,32 @@ describe("Watchlist localization", () => {
     expect(host!.querySelector("th.wl-consensus")?.textContent?.trim()).toBe("共識");
     expect(host!.querySelector(`.tagchip[title*="${SOURCE_TAG_SOURCE}"]`)).not.toBeNull();
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 筆筆記");
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      `${SOURCE_LIST} · 2 檔`,
+    );
     expect(host!.innerHTML).not.toContain("設定優先級");
     expect(text).not.toContain("Chg 7d");
+
+    await click(buttonByText("全部清單"));
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      "全部清單 · 2 檔 · 2 個自訂清單",
+    );
+    await click(buttonByText("顯示已封存"));
+    expect(rowForTicker("ARCH.SRC").querySelector<HTMLElement>(".note-dot")?.title).toBe("1 筆筆記");
+
+    unmountWatchlist();
+    apiMocks.getProfileLists.mockResolvedValueOnce({ lists: [LISTS[0]] });
+    apiMocks.getUniverse.mockResolvedValueOnce(SINGULAR_UNIVERSE);
+    await mountWatchlist();
+    await waitForText(SOURCE_TICKER);
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      `${SOURCE_LIST} · 1 檔`,
+    );
+    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("1 筆筆記");
+    await click(buttonByText("全部清單"));
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      "全部清單 · 1 檔 · 1 個自訂清單",
+    );
 
     unmountWatchlist();
     apiMocks.getUniverse.mockResolvedValueOnce({ ...UNIVERSE, rows: [] });
@@ -401,11 +434,35 @@ describe("Watchlist localization", () => {
       SOURCE_TAG_VALUE,
     ]) expect(text).toContain(expected);
     expect(host!.querySelector("th.wl-consensus")?.textContent?.trim()).toBe("Consensus");
-    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 note(s)");
+    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 notes");
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      `${SOURCE_LIST} · 2 tickers`,
+    );
     expect(host!.querySelector(`.tagchip[title*="${SOURCE_TAG_SOURCE}"]`)?.textContent).toBe(
       SOURCE_TAG_VALUE,
     );
     expect(text).not.toContain("Source list");
+
+    await click(buttonByText("All lists"));
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      "All lists · 2 tickers · 2 custom lists",
+    );
+    await click(buttonByText("Show archived"));
+    expect(rowForTicker("ARCH.SRC").querySelector<HTMLElement>(".note-dot")?.title).toBe("1 note");
+
+    unmountWatchlist();
+    apiMocks.getProfileLists.mockResolvedValueOnce({ lists: [LISTS[0]] });
+    apiMocks.getUniverse.mockResolvedValueOnce(SINGULAR_UNIVERSE);
+    await mountWatchlist();
+    await waitForText(SOURCE_TICKER);
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      `${SOURCE_LIST} · 1 ticker`,
+    );
+    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("1 note");
+    await click(buttonByText("All lists"));
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toContain(
+      "All lists · 1 ticker · 1 custom list",
+    );
 
     unmountWatchlist();
     apiMocks.getUniverse.mockResolvedValueOnce({ ...UNIVERSE, rows: [] });
@@ -711,6 +768,23 @@ describe("Watchlist localization", () => {
     expect(consensus.title).not.toContain("SOURCE_FET(cached)");
     expect(rowForTicker("AAA.US").querySelector<HTMLElement>(".wl-consensus span")?.title).toBe(
       "Analyst data-source error; refresh to retry",
+    );
+
+    unmountWatchlist();
+    apiMocks.getUniverse.mockReset().mockResolvedValue(SINGULAR_UNIVERSE);
+    apiMocks.getConsensus.mockReset().mockImplementation((ticker: string) => (
+      Promise.resolve({ ...CONSENSUS, ticker, total: 1 })
+    ));
+    await mountWatchlist();
+    await waitForText("Strong Buy");
+    const singularConsensus = rowForTicker(SOURCE_TICKER)
+      .querySelector<HTMLElement>(".consensus-tag")!;
+    expect(singularConsensus.title).toBe(
+      "Strong buy 7 · Buy 4 · Hold 3 · Sell 1 · Strong sell 0\n1 analyst · Updated SOURCE_FET (cached)",
+    );
+    await switchLocale("zh-Hant");
+    expect(singularConsensus.title).toBe(
+      "強力買進 7 · 買進 4 · 持有 3 · 賣出 1 · 強力賣出 0\n共 1 位分析師 · 更新 SOURCE_FET（快取）",
     );
   });
 

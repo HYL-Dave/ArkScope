@@ -168,11 +168,17 @@ export function UniverseView({
         <h2 className="surface-title">{t(($) => $.universe.title)}</h2>
         {meta && (
           <span className="muted">
-            {t(($) => $.universe.summaryCounts, {
-              total: meta.total,
-              summarized: meta.summarized,
-              withoutSummary: meta.total - meta.summarized,
-            })}
+            {meta.total === 1
+              ? t(($) => $.universe.summaryCounts.one, {
+                total: meta.total,
+                summarized: meta.summarized,
+                withoutSummary: meta.total - meta.summarized,
+              })
+              : t(($) => $.universe.summaryCounts.other, {
+                total: meta.total,
+                summarized: meta.summarized,
+                withoutSummary: meta.total - meta.summarized,
+              })}
             {meta.archived > 0 && (
               <> {t(($) => $.universe.archivedCount, { count: meta.archived })}</>
             )}
@@ -285,7 +291,9 @@ export function UniverseView({
                     {r.note_count > 0 && (
                       <span
                         className="note-dot"
-                        title={t(($) => $.universe.noteCount, { count: r.note_count })}
+                        title={r.note_count === 1
+                          ? t(($) => $.universe.noteCount.one, { count: r.note_count })
+                          : t(($) => $.universe.noteCount.other, { count: r.note_count })}
                       >
                         ✎{r.note_count}
                       </span>

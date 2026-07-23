@@ -85,7 +85,10 @@ const explore = {
   },
   watchlist: {
     listSummary: "{{kind}} · {{count}} 個有效標的",
-    noteCount: "{{count}} 筆筆記",
+    noteCount: {
+      one: "{{count}} 筆筆記",
+      other: "{{count}} 筆筆記",
+    },
     allListsDescription: "ArkScope 內建立的自訂清單中有效標的的聯集；完整清冊在「全部標的」",
     archiveGlobal: "全域封存",
     change7d: "7 日漲跌",
@@ -112,7 +115,10 @@ const explore = {
     setDefaultList: "設為進入自選股的預設清單",
     loadFailed: "載入失敗，重新整理可重試",
     archivedCount: "· {{count}} 已封存",
-    customListCount: "· {{count}} 個自訂清單",
+    customListCount: {
+      one: "· {{count}} 個自訂清單",
+      other: "· {{count}} 個自訂清單",
+    },
     asOf: "· 截至 {{value}}",
     universeCount: "· 全部標的 {{count}}",
     emptyListWithArchivedHint: "這個清單還沒有標的 — 用上方搜尋加入（或試試顯示已封存）。",
@@ -141,7 +147,10 @@ const explore = {
     tracked: "已追蹤",
     firstList: "建立你的第一個 ArkScope 自訂清單；舊設定匯入與 tier 清冊會留在「全部標的」，不會自動填入自選股。",
     searching: "搜尋中…",
-    filesSuffix: "檔",
+    renderedTickerCount: {
+      one: "{{count}} 檔",
+      other: "{{count}} 檔",
+    },
     noSummary: "無摘要",
     noMatches: "目錄無相符（精確/前綴比對，非模糊）。",
     title: "自選股",
@@ -150,10 +159,16 @@ const explore = {
     allListsRuntime: "全部清單",
     deleteConfirmation: "刪除清單「{{listName}}」？\n\n只移除這個清單與其成員關係 —— 不會刪除標的本身或任何市場資料，標的仍保留在其他清單中。",
     consensusRatingsSummary: "強力買進 {{strongBuy}} · 買進 {{buy}} · 持有 {{hold}} · 賣出 {{sell}} · 強力賣出 {{strongSell}}",
-    consensusAnalystSummary: "共 {{total}} 位分析師 · 更新 {{when}}",
+    consensusAnalystSummary: {
+      one: "共 {{total}} 位分析師 · 更新 {{when}}",
+      other: "共 {{total}} 位分析師 · 更新 {{when}}",
+    },
   },
   universe: {
-    noteCount: "{{count}} 筆記",
+    noteCount: {
+      one: "{{count}} 筆記",
+      other: "{{count}} 筆記",
+    },
     filterBy: "依 {{label}} 篩選",
     noMarketSummary: "尚無市場摘要",
     hideTicker: "從全部標的移除（已下市/重複代號）",
@@ -176,7 +191,10 @@ const explore = {
     title: "全部標的",
     description: "庫存來自全部標的設定（不受清單增減影響）。「匯入分類」會從既有設定種入分類標籤（類別 / 主題 / 來源），並移除舊的設定清單；可重複執行，使用者自訂的標籤不會被覆蓋。分類用標籤管理，清單只放你的工作清單（與「自選股」同一組）。",
     allListsCount: "所有清單（{{count}}）",
-    summaryCounts: "{{total}} 檔 · {{summarized}} 有摘要 · {{withoutSummary}} 無摘要",
+    summaryCounts: {
+      one: "{{total}} 檔 · {{summarized}} 有摘要 · {{withoutSummary}} 無摘要",
+      other: "{{total}} 檔 · {{summarized}} 有摘要 · {{withoutSummary}} 無摘要",
+    },
     clearCategory: "清除分類 ✕",
     noSummary: "無摘要",
     loading: "載入中…",

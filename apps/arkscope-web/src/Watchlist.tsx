@@ -428,9 +428,13 @@ export function WatchlistView({
       <div className="surface-head">
         <h2 className="surface-title">{t(($) => $.watchlist.title)}</h2>
         <span className="muted">
-          {title} · {rows.length} {t(($) => $.watchlist.filesSuffix)}
+          {title} · {rows.length === 1
+            ? t(($) => $.watchlist.renderedTickerCount.one, { count: rows.length })
+            : t(($) => $.watchlist.renderedTickerCount.other, { count: rows.length })}
           {selectedList === null && (
-            <> {t(($) => $.watchlist.customListCount, { count: railLists.length })}</>
+            <> {railLists.length === 1
+              ? t(($) => $.watchlist.customListCount.one, { count: railLists.length })
+              : t(($) => $.watchlist.customListCount.other, { count: railLists.length })}</>
           )}
           {selectedList === null && universeCount !== null && (
             <> {t(($) => $.watchlist.universeCount, { count: universeCount })}</>
@@ -631,7 +635,9 @@ export function WatchlistView({
                         {r.note_count > 0 && (
                           <span
                             className="note-dot"
-                            title={t(($) => $.watchlist.noteCount, { count: r.note_count })}
+                            title={r.note_count === 1
+                              ? t(($) => $.watchlist.noteCount.one, { count: r.note_count })
+                              : t(($) => $.watchlist.noteCount.other, { count: r.note_count })}
                           >
                             ✎{r.note_count}
                           </span>
@@ -788,16 +794,16 @@ function renderConsensus(c: ConsensusCell | undefined, t: ExploreT) {
   const cn = d.counts || {};
   const when = d.fetched_at ? d.fetched_at.slice(0, 10) : "—";
   const votes = `${cn.strongBuy ?? 0}/${cn.buy ?? 0}/${cn.hold ?? 0}/${cn.sell ?? 0}/${cn.strongSell ?? 0}`;
+  const analystSummary = d.total === 1
+    ? t(($) => $.watchlist.consensusAnalystSummary.one, { total: d.total, when })
+    : t(($) => $.watchlist.consensusAnalystSummary.other, { total: d.total, when });
   const tip = `${t(($) => $.watchlist.consensusRatingsSummary, {
     strongBuy: cn.strongBuy ?? 0,
     buy: cn.buy ?? 0,
     hold: cn.hold ?? 0,
     sell: cn.sell ?? 0,
     strongSell: cn.strongSell ?? 0,
-  })}\n${t(($) => $.watchlist.consensusAnalystSummary, {
-    total: d.total,
-    when,
-  })}${d.status === "cached" ? t(($) => $.watchlist.cached) : ""}`;
+  })}\n${analystSummary}${d.status === "cached" ? t(($) => $.watchlist.cached) : ""}`;
   return (
     <span className={`consensus-tag ${_CONSENSUS_CLASS[d.rating] ?? "muted"}`} title={tip}>
       <span>{d.rating}</span>

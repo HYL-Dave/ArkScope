@@ -131,6 +131,15 @@ const UNIVERSE: UniverseResponse = {
   ],
 };
 
+const SINGULAR_UNIVERSE: UniverseResponse = {
+  ...UNIVERSE,
+  total: 1,
+  shown: 1,
+  archived_count: 0,
+  summarized: 1,
+  rows: [{ ...UNIVERSE.rows[0], note_count: 1 }],
+};
+
 const IMPORT_RESULT: ImportResult = {
   lists_removed: 3,
   tags: { tags_added: 7 },
@@ -313,7 +322,17 @@ describe("Universe localization", () => {
     expect(selectWithOption(SOURCE_CATEGORY).querySelector('option[value=""]')?.textContent)
       .toBe("類別（全部）");
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 筆記");
+    expect(rowForTicker("ARCH.SRC").querySelector<HTMLElement>(".note-dot")?.title).toBe("1 筆記");
     expect(text).not.toContain("全部標的 · Universe");
+
+    unmountUniverse();
+    apiMocks.getUniverse.mockResolvedValueOnce(SINGULAR_UNIVERSE);
+    await mountUniverse();
+    await waitForText(SOURCE_TICKER);
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
+      "1 檔 · 1 有摘要 · 0 無摘要",
+    );
+    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("1 筆記");
   });
 
   it("renders English Universe chrome while preserving tickers tags and lists", async () => {
@@ -343,9 +362,20 @@ describe("Universe localization", () => {
     expect(host!.querySelector(".universe-select option")?.textContent).toBe("All lists (2)");
     expect(selectWithOption(SOURCE_CATEGORY).querySelector('option[value=""]')?.textContent)
       .toBe("Category (All)");
+    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 notes");
+    expect(rowForTicker("ARCH.SRC").querySelector<HTMLElement>(".note-dot")?.title).toBe("1 note");
     expect(text).not.toContain("files · 2 With summary");
     expect(text).not.toContain("Category(All)");
     expect(text).not.toContain("Source list");
+
+    unmountUniverse();
+    apiMocks.getUniverse.mockResolvedValueOnce(SINGULAR_UNIVERSE);
+    await mountUniverse();
+    await waitForText(SOURCE_TICKER);
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
+      "1 file · 1 with summary · 0 without summary",
+    );
+    expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("1 note");
   });
 
   it("renders active-universe failure with the exact Data Sources recovery target", async () => {
@@ -486,18 +516,38 @@ describe("Universe localization", () => {
     await change(list, SOURCE_LIST);
     await change(category, SOURCE_CATEGORY);
     const busyButton = rowForTicker(SOURCE_TICKER).querySelector<HTMLButtonElement>(".rowx")!;
-    await click(busyButton);
-    expect(busyButton.disabled).toBe(true);
-    const beforeSwitch = requestCounts();
+    const beforeOutcomeSwitch = requestCounts();
 
     await switchLocale("en");
+    expect(host!.textContent).toContain(
+      "Import complete: Classification tags added: 7 · Legacy lists removed: 3.",
+    );
+    expect(host!.querySelector<HTMLInputElement>(".universe-filters input")).toBe(query);
+    expect(selectWithOption(SOURCE_LIST)).toBe(list);
+    expect(selectWithOption(SOURCE_CATEGORY)).toBe(category);
+    expect(query.value).toBe("src");
+    expect(list.value).toBe(SOURCE_LIST);
+    expect(category.value).toBe(SOURCE_CATEGORY);
+    expect(rowForTicker(SOURCE_TICKER).querySelector(".rowx")).toBe(busyButton);
+    expect(busyButton.disabled).toBe(false);
+    expect(requestCounts()).toEqual(beforeOutcomeSwitch);
+
+    await click(busyButton);
+    expect(busyButton.disabled).toBe(true);
+    expect(host!.textContent).not.toContain("Import complete: Classification tags added: 7");
+    const beforeBusySwitch = requestCounts();
+
+    await switchLocale("zh-Hant");
+    expect(host!.querySelector<HTMLInputElement>(".universe-filters input")).toBe(query);
+    expect(selectWithOption(SOURCE_LIST)).toBe(list);
+    expect(selectWithOption(SOURCE_CATEGORY)).toBe(category);
     expect(query.value).toBe("src");
     expect(list.value).toBe(SOURCE_LIST);
     expect(category.value).toBe(SOURCE_CATEGORY);
     expect(rowForTicker(SOURCE_TICKER).querySelector(".rowx")).toBe(busyButton);
     expect(busyButton.disabled).toBe(true);
-    expect(host!.textContent).not.toContain("Import complete: Classification tags added: 7");
-    expect(requestCounts()).toEqual(beforeSwitch);
+    expect(host!.querySelector(".universe-importmsg")).toBeNull();
+    expect(requestCounts()).toEqual(beforeBusySwitch);
 
     await act(async () => hiddenRequest.resolve({ ticker: SOURCE_TICKER, hidden: true }));
     await flush();

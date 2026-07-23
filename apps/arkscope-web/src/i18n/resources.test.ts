@@ -33,12 +33,50 @@ describe("bundled i18n resources", () => {
     const expectedSubtreeCounts = {
       errors: 50,
       home: 23,
-      watchlist: 67,
-      universe: 33,
+      watchlist: 71,
+      universe: 35,
       news: 43,
       tickerDetail: 68,
       aiCard: 62,
       tags: 7,
+    } as const;
+    const expectedCountCopy = {
+      "zh-Hant": {
+        watchlist: {
+          renderedTickerCount: { one: "{{count}} 檔", other: "{{count}} 檔" },
+          customListCount: { one: "· {{count}} 個自訂清單", other: "· {{count}} 個自訂清單" },
+          noteCount: { one: "{{count}} 筆筆記", other: "{{count}} 筆筆記" },
+          consensusAnalystSummary: {
+            one: "共 {{total}} 位分析師 · 更新 {{when}}",
+            other: "共 {{total}} 位分析師 · 更新 {{when}}",
+          },
+        },
+        universe: {
+          noteCount: { one: "{{count}} 筆記", other: "{{count}} 筆記" },
+          summaryCounts: {
+            one: "{{total}} 檔 · {{summarized}} 有摘要 · {{withoutSummary}} 無摘要",
+            other: "{{total}} 檔 · {{summarized}} 有摘要 · {{withoutSummary}} 無摘要",
+          },
+        },
+      },
+      en: {
+        watchlist: {
+          renderedTickerCount: { one: "{{count}} ticker", other: "{{count}} tickers" },
+          customListCount: { one: "· {{count}} custom list", other: "· {{count}} custom lists" },
+          noteCount: { one: "{{count}} note", other: "{{count}} notes" },
+          consensusAnalystSummary: {
+            one: "{{total}} analyst · Updated {{when}}",
+            other: "{{total}} analysts · Updated {{when}}",
+          },
+        },
+        universe: {
+          noteCount: { one: "{{count}} note", other: "{{count}} notes" },
+          summaryCounts: {
+            one: "{{total}} file · {{summarized}} with summary · {{withoutSummary}} without summary",
+            other: "{{total}} files · {{summarized}} with summary · {{withoutSummary}} without summary",
+          },
+        },
+      },
     } as const;
 
     expect(resourceNamespaces).toContain("explore");
@@ -47,7 +85,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(353);
+      expect(flattened.size, `${locale}.explore`).toBe(359);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -55,9 +93,19 @@ describe("bundled i18n resources", () => {
         "watchlist.emptyActiveListWithArchivedHint",
         "watchlist.emptyActiveListWithoutArchivedHint",
         "watchlist.consensusRatingsSummary",
-        "watchlist.consensusAnalystSummary",
+        "watchlist.renderedTickerCount.one",
+        "watchlist.renderedTickerCount.other",
+        "watchlist.customListCount.one",
+        "watchlist.customListCount.other",
+        "watchlist.noteCount.one",
+        "watchlist.noteCount.other",
+        "watchlist.consensusAnalystSummary.one",
+        "watchlist.consensusAnalystSummary.other",
         "universe.allListsCount",
-        "universe.summaryCounts",
+        "universe.noteCount.one",
+        "universe.noteCount.other",
+        "universe.summaryCounts.one",
+        "universe.summaryCounts.other",
         "universe.importSummarySeparator",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
@@ -69,12 +117,19 @@ describe("bundled i18n resources", () => {
         "watchlist.emptyActiveList",
         "watchlist.consensusBuySummary",
         "watchlist.consensusSellSummary",
+        "watchlist.filesSuffix",
+        "watchlist.customListCount",
+        "watchlist.noteCount",
+        "watchlist.consensusAnalystSummary",
         "universe.allListsPrefix",
         "universe.filesSeparator",
+        "universe.noteCount",
+        "universe.summaryCounts",
         "universe.withSummary",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(false);
       }
+      expect.soft(explore, `${locale}.explore count copy`).toMatchObject(expectedCountCopy[locale]);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(
           flattenResource((explore as ResourceTree)[subtree] as ResourceTree).size,
@@ -397,12 +452,12 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 702 Settings 32 Common 5 Research and 353 Explore leaves per locale", () => {
+  it("contains exactly 702 Settings 32 Common 5 Research and 359 Explore leaves per locale", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       expect.soft(flattenResource(resources[locale].settings as ResourceTree).size, `${locale}.settings`)
         .toBe(702);
       const localeResources = resources[locale] as Record<string, unknown>;
-      const expectedCounts = { common: 32, research: 5, explore: 353 } as const;
+      const expectedCounts = { common: 32, research: 5, explore: 359 } as const;
       for (const [namespace, count] of Object.entries(expectedCounts)) {
         const resource = localeResources[namespace];
         expect.soft(resource, `${locale}.${namespace}`).toBeDefined();
