@@ -424,7 +424,7 @@ afterEach(async () => {
 });
 
 describe("Research workspace contracts", () => {
-  it("relocalizes shared personalization labels without replacing Research state", async () => {
+  it("reactively localizes shared stance and trace without remounting Research", async () => {
     await i18n.changeLanguage("zh-Hant");
     const enabledProfile: InvestorProfileResponse = {
       ...PROFILE,
@@ -442,13 +442,20 @@ describe("Research workspace contracts", () => {
         applied_skills: ["source-applied-skill"],
       },
     };
-    const saved = message("Saved source answer", {
+    const savedApplied = message("Saved applied source answer", {
       personalization: enabledProfile.trace,
+    });
+    const savedSuggested = message("Saved suggested source answer", {
+      personalization: {
+        ...enabledProfile.trace,
+        suggested_skills: ["source-suggested-skill"],
+        applied_skills: [],
+      },
     });
     const fetchMock = stubFetch({
       profile: enabledProfile,
       threads: [thread("thread-personalization", "Personalization research")],
-      messages: { "thread-personalization": [saved] },
+      messages: { "thread-personalization": [savedApplied, savedSuggested] },
     });
     vi.stubGlobal("fetch", fetchMock);
     window.sessionStorage.setItem(
@@ -462,11 +469,16 @@ describe("Research workspace contracts", () => {
     await setSelect(stanceSelect, "growth_opportunity");
     await setTextarea("Keep this Research draft");
     const question = host!.querySelector("textarea") as HTMLTextAreaElement;
-    const bubble = host!.querySelector(".research-bubble.assistant")!;
-    const model = bubble.querySelector(".research-model")!;
+    const [appliedBubble, suggestedBubble] = [
+      ...host!.querySelectorAll(".research-bubble.assistant"),
+    ];
+    const model = appliedBubble.querySelector(".research-model")!;
     const requestCount = fetchMock.mock.calls.length;
-    expect(bubble.textContent).toContain(
+    expect(appliedBubble.textContent).toContain(
       "立場：互補投資人　套用技能：source-applied-skill",
+    );
+    expect(suggestedBubble.textContent).toContain(
+      "立場：互補投資人　建議技能：source-suggested-skill",
     );
 
     await act(async () => {
@@ -479,16 +491,23 @@ describe("Research workspace contracts", () => {
     expect(stanceSelect.selectedOptions[0]?.textContent).toBe("Growth opportunity");
     expect(host!.querySelector("textarea")).toBe(question);
     expect(question.value).toBe("Keep this Research draft");
-    expect(host!.querySelector(".research-bubble.assistant")).toBe(bubble);
-    expect(bubble.querySelector(".research-model")).toBe(model);
+    const relocalizedBubbles = [
+      ...host!.querySelectorAll(".research-bubble.assistant"),
+    ];
+    expect(relocalizedBubbles[0]).toBe(appliedBubble);
+    expect(relocalizedBubbles[1]).toBe(suggestedBubble);
+    expect(appliedBubble.querySelector(".research-model")).toBe(model);
     expect(model.textContent).toBe("openai/gpt-5.6-luna · high");
-    expect(bubble.textContent).toContain(
+    expect(appliedBubble.textContent).toContain(
       "Stance: Complementary　Applied skills: source-applied-skill",
+    );
+    expect(suggestedBubble.textContent).toContain(
+      "Stance: Complementary　Suggested skills: source-suggested-skill",
     );
     expect(fetchMock).toHaveBeenCalledTimes(requestCount);
   });
 
-  it("relocalizes the Evidence Drawer trace without changing source model values", async () => {
+  it("keeps surrounding Research chrome and source model values unchanged", async () => {
     await i18n.changeLanguage("zh-Hant");
     const personalization = {
       profile_active: true,
@@ -532,8 +551,6 @@ describe("Research workspace contracts", () => {
     expect(routeValue.textContent).toBe("openai · gpt-5.6-luna · high");
     expect(row("套用技能")?.querySelector("dd")).toBe(skillValue);
     expect(skillValue.textContent).toBe("source-applied-skill");
-    expect(personalization.suggested_skills).toEqual(["source-suggested-skill"]);
-    expect(personalization.applied_skills).toEqual(["source-applied-skill"]);
   });
 
   it("1. exposes New research, History, and Evidence in PageHeader without fixed side columns", async () => {
