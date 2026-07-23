@@ -13,6 +13,13 @@ import { useTranslation } from "react-i18next";
 
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace, type RuntimeConfig } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
+import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
+import {
+  captureExploreError,
+  type ExploreErrorState,
+  type ExploreT,
+} from "./explore/explorePresentation";
+import type { NavigationTarget } from "./shell/navigation";
 import {
   generateCard,
   getCard,
@@ -28,10 +35,15 @@ import {
 export function AICardTab({
   ticker,
   runtime,
+  developerMode,
+  onNavigateTarget,
 }: {
   ticker: string;
   runtime?: RuntimeConfig | null;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
 }) {
+  const { t } = useTranslation("explore");
   const { t: commonT } = useTranslation("common");
   const [recent, setRecent] = useState<CardSummary[] | null>(null);
   const [card, setCard] = useState<ResultCard | null>(null);
@@ -41,7 +53,10 @@ export function AICardTab({
   const [saving, setSaving] = useState(false);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [recentErr, setRecentErr] = useState<ExploreErrorState | null>(null);
+  const [profileErr, setProfileErr] = useState<ExploreErrorState | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
+  const [failedOpenRunId, setFailedOpenRunId] = useState<number | null>(null);
   // Track A: opt-in stance override for card synthesis + trace of the run shown.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [cardStance, setCardStance] = useState<AssistantStance>("off");
@@ -58,32 +73,44 @@ export function AICardTab({
   // remounting this component per ticker (Watchlist keys TickerDetail by
   // ticker), NOT from this token.
   const reqRef = useRef(0);
+  const profileReqRef = useRef(0);
 
   const loadRecent = useCallback(async () => {
     const id = reqRef.current;
     try {
       const d = await getCards(ticker, 10);
-      if (id === reqRef.current) setRecent(d.cards);
+      if (id === reqRef.current) {
+        setRecent(d.cards);
+        setRecentErr(null);
+      }
     } catch (e) {
-      if (id === reqRef.current) setErr(e instanceof Error ? e.message : String(e));
+      if (id === reqRef.current) {
+        setRecentErr(captureExploreError("card_load_recent", e));
+      }
     }
   }, [ticker]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getInvestorProfile()
-      .then((r) => {
-        if (cancelled) return;
-        setInvestorProfile(r);
-        if (r.profile.enabled) setCardStance(r.profile.default_stance);
-      })
-      .catch(() => {
-        /* personalization optional — failed load = feature off */
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadInvestorProfile = useCallback(async () => {
+    const id = ++profileReqRef.current;
+    try {
+      const response = await getInvestorProfile();
+      if (id !== profileReqRef.current) return;
+      setInvestorProfile(response);
+      setProfileErr(null);
+      if (response.profile.enabled) setCardStance(response.profile.default_stance);
+    } catch (e) {
+      if (id === profileReqRef.current) {
+        setProfileErr(captureExploreError("card_load_investor_profile", e));
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    void loadInvestorProfile();
+    return () => {
+      profileReqRef.current += 1;
+    };
+  }, [loadInvestorProfile]);
 
   useEffect(() => {
     reqRef.current++; // invalidate any in-flight response from a prior ticker
@@ -95,6 +122,7 @@ export function AICardTab({
     setSaving(false);
     setBusy(false);
     setErr(null);
+    setRecentErr(null);
     setRecent(null);
     void loadRecent();
   }, [ticker, loadRecent]);
@@ -124,7 +152,7 @@ export function AICardTab({
       setRunId(r.run_id);
       void loadRecent();
     } catch (e) {
-      if (id === reqRef.current) setErr(e instanceof Error ? e.message : String(e));
+      if (id === reqRef.current) setErr(captureExploreError("card_generate", e));
     } finally {
       if (id === reqRef.current) setBusy(false);
     }
@@ -133,6 +161,7 @@ export function AICardTab({
   async function openCard(rid: number) {
     const id = ++reqRef.current;
     setErr(null);
+    setFailedOpenRunId(rid);
     try {
       const d = await getCard(rid);
       if (id !== reqRef.current) return;
@@ -142,19 +171,20 @@ export function AICardTab({
       setRunId(d.run_id);
       setSaved(d.status === "saved");
     } catch (e) {
-      if (id === reqRef.current) setErr(e instanceof Error ? e.message : String(e));
+      if (id === reqRef.current) setErr(captureExploreError("card_open", e));
     }
   }
 
   async function save() {
     if (runId == null || saved || saving) return;
     setSaving(true);
+    setErr(null);
     try {
       await saveCard(runId);
       setSaved(true);
       void loadRecent();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("card_save", e));
     } finally {
       setSaving(false);
     }
@@ -167,12 +197,22 @@ export function AICardTab({
     void loadRecent();
   }
 
+  function retryAction() {
+    if (err?.operation === "card_open" && failedOpenRunId !== null) {
+      void openCard(failedOpenRunId);
+    } else if (err?.operation === "card_save") {
+      void save();
+    } else {
+      void generate();
+    }
+  }
+
   return (
     <div className="aicard">
       <div className="aicard-actions">
         <input
           className="aicard-q"
-          placeholder={`針對 ${ticker} 的問題（可留空）…`}
+          placeholder={t(($) => $.aiCard.questionPlaceholder, { ticker })}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={busy}
@@ -181,25 +221,32 @@ export function AICardTab({
           }}
         />
         <button className="btn-ghost" onClick={() => void generate()} disabled={busy}>
-          {busy ? "產生中…" : "✨ 產生卡片"}
+          {busy ? t(($) => $.aiCard.generating) : t(($) => $.aiCard.generate)}
         </button>
-        <button className="btn-ghost" onClick={() => setShowAdv((v) => !v)} disabled={busy} title="新聞範圍">
-          {showAdv ? "▴ 進階" : "▾ 進階"}
+        <button
+          className="btn-ghost"
+          onClick={() => setShowAdv((v) => !v)}
+          disabled={busy}
+          title={t(($) => $.aiCard.newsRange)}
+        >
+          {showAdv
+            ? t(($) => $.aiCard.advancedExpanded)
+            : t(($) => $.aiCard.advancedCollapsed)}
         </button>
       </div>
       {showAdv && (
         <div className="aicard-adv">
-          <label>新聞回看
+          <label>{t(($) => $.aiCard.newsLookback)}
             <input type="number" min={1} max={90} value={newsDays} disabled={busy}
-              onChange={(e) => setNewsDays(clampInt(e.target.value, 1, 90, 21))} /> 天
+              onChange={(e) => setNewsDays(clampInt(e.target.value, 1, 90, 21))} /> {t(($) => $.aiCard.daysSuffix)}
           </label>
-          <label>最多採用
+          <label>{t(($) => $.aiCard.maximumUsed)}
             <input type="number" min={1} max={50} value={maxNews} disabled={busy}
-              onChange={(e) => setMaxNews(clampInt(e.target.value, 1, 50, 12))} /> 篇（最近期）
+              onChange={(e) => setMaxNews(clampInt(e.target.value, 1, 50, 12))} /> {t(($) => $.aiCard.recentArticlesSuffix)}
           </label>
-          <span className="muted tiny">預設 21 天 / 12 篇；不會用上全部保留的新聞。</span>
+          <span className="muted tiny">{t(($) => $.aiCard.defaultNewsRange)}</span>
           {investorProfile?.profile.enabled && (
-            <label>立場
+            <label>{t(($) => $.aiCard.stance)}
               <select value={cardStance} disabled={busy}
                 onChange={(e) => setCardStance(e.target.value as AssistantStance)}>
                 {(["off", "neutral", "aligned", "complementary", "strict_risk_control", "valuation_rationalist", "growth_opportunity"] as AssistantStance[]).map((s) => (
@@ -210,8 +257,34 @@ export function AICardTab({
           )}
         </div>
       )}
-      {busy && <p className="muted tiny">蒐集客觀證據 + 合成卡片，單檔約 1–2 分鐘…</p>}
-      {err && <p className="refresh-err tiny">{err}</p>}
+      {busy && <p className="muted tiny">{t(($) => $.aiCard.generationProgress)}</p>}
+      {recentErr && (
+        <ExploreErrorNotice
+          state={recentErr}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.aiCard.retry)}
+          onRetry={() => void loadRecent()}
+          onNavigate={onNavigateTarget}
+        />
+      )}
+      {profileErr && (
+        <ExploreErrorNotice
+          state={profileErr}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.aiCard.retry)}
+          onRetry={() => void loadInvestorProfile()}
+          onNavigate={onNavigateTarget}
+        />
+      )}
+      {err && (
+        <ExploreErrorNotice
+          state={err}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.aiCard.retry)}
+          onRetry={retryAction}
+          onNavigate={onNavigateTarget}
+        />
+      )}
 
       {lastTrace && traceSummary(lastTrace, commonT) && (
         <p className="muted tiny">{traceSummary(lastTrace, commonT)}</p>
@@ -225,26 +298,30 @@ export function AICardTab({
           saved={saved}
           saving={saving}
           runtime={runtime}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
           onSave={() => void save()}
           onBack={backToList}
         />
       ) : (
         !busy && (
           <>
-            <h4 className="detail-section">最近卡片</h4>
+            <h4 className="detail-section">{t(($) => $.aiCard.recentCards)}</h4>
             {recent === null ? (
-              <p className="muted tiny">loading…</p>
+              !recentErr ? <p className="muted tiny">{t(($) => $.aiCard.loadingLower)}</p> : null
             ) : recent.length === 0 ? (
-              <p className="muted tiny">尚無卡片。按上方「產生卡片」建立第一張。</p>
+              <p className="muted tiny">{t(($) => $.aiCard.emptyCards)}</p>
             ) : (
               <ul className="aicard-recent">
                 {recent.map((c) => (
                   <li key={c.run_id} onClick={() => void openCard(c.run_id)}>
                     <span className={`conf conf-${c.confidence_level ?? "na"}`}>
-                      {(c.confidence_level ?? "—").toUpperCase()}
+                      {confidenceLabel(c.confidence_level, t)}
                     </span>
                     <span className="aicard-recent-concl">{c.conclusion ?? "—"}</span>
-                    {c.status === "saved" && <span className="saved-star" title="saved as report">★</span>}
+                    {c.status === "saved" && (
+                      <span className="saved-star" title={t(($) => $.aiCard.savedAsReport)}>★</span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -265,9 +342,11 @@ export function CardView({
   saved,
   saving,
   runtime,
+  developerMode,
+  onNavigateTarget,
   onSave,
   onBack,
-  backLabel = "← 卡片列表",
+  backLabel,
 }: {
   card: ResultCard;
   runId?: number | null;
@@ -275,10 +354,13 @@ export function CardView({
   saved: boolean;
   saving?: boolean;
   runtime?: RuntimeConfig | null;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
   onSave: () => void;
   onBack?: () => void;
   backLabel?: string;
 }) {
+  const { t } = useTranslation("explore");
   const tr = card.traceability;
   const evidenceById = new Map(
     (evidencePacket?.items ?? []).map((item) => [item.evidence_id, item]),
@@ -296,7 +378,7 @@ export function CardView({
   const [lang, setLang] = useState<"en" | "zh">("en");
   const [zh, setZh] = useState<ResultCard | null>(null);
   const [translating, setTranslating] = useState(false);
-  const [tErr, setTErr] = useState<string | null>(null);
+  const [tErr, setTErr] = useState<ExploreErrorState | null>(null);
   const shown = lang === "zh" && zh ? zh : card;
 
   async function toZh() {
@@ -312,7 +394,7 @@ export function CardView({
       setZh(r.card);
       setLang("zh");
     } catch (e) {
-      setTErr(e instanceof Error ? e.message : String(e));
+      setTErr(captureExploreError("card_translate", e));
     } finally {
       setTranslating(false);
     }
@@ -323,7 +405,7 @@ export function CardView({
       <div className="cardview-head">
         {onBack && (
           <button className="btn-ghost" onClick={onBack}>
-            {backLabel}
+            {backLabel ?? t(($) => $.aiCard.backToCards)}
           </button>
         )}
         {runId != null && (
@@ -333,44 +415,72 @@ export function CardView({
               onClick={() => setLang("en")}
               disabled={translating}
             >
-              EN
+              {t(($) => $.aiCard.english)}
             </button>
             <button
               className={`btn-ghost ${lang === "zh" ? "on" : ""}`}
               onClick={() => void toZh()}
               disabled={translating}
             >
-              {translating ? "翻譯中…" : "繁中"}
+              {translating
+                ? t(($) => $.aiCard.translating)
+                : t(($) => $.aiCard.traditionalChinese)}
             </button>
           </span>
         )}
         <span className="spacer" />
-        <span className={`conf conf-${card.confidence_level}`}>{card.confidence_level.toUpperCase()}</span>
+        <span className={`conf conf-${card.confidence_level}`}>
+          {confidenceLabel(card.confidence_level, t)}
+        </span>
         <button className="btn-ghost" onClick={onSave} disabled={saved || saving}>
-          {saved ? "✓ 已存報告" : saving ? "存檔中…" : "存成報告"}
+          {saved
+            ? t(($) => $.aiCard.savedReport)
+            : saving
+              ? t(($) => $.aiCard.saving)
+              : t(($) => $.aiCard.saveAsReport)}
         </button>
       </div>
-      {tErr && <p className="refresh-err tiny">翻譯失敗：{tErr}</p>}
-
-      {shown.question && <p className="cardview-q muted tiny">Q：{shown.question}</p>}
-      <p className="cardview-concl">{shown.conclusion}</p>
-      {shown.confidence_rationale && (
-        <p className="muted tiny">可信度說明：{shown.confidence_rationale}</p>
+      {tErr && (
+        <ExploreErrorNotice
+          state={tErr}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.aiCard.retry)}
+          onRetry={() => void toZh()}
+          onNavigate={onNavigateTarget}
+        />
       )}
 
-      <Section title="主要理由" items={shown.primary_reasons} />
-      <Section title="反方理由" items={shown.counter_thesis} counter />
-      <Section title="失效條件" items={shown.invalidation_conditions} />
-      <Section title="觸發條件" items={shown.trigger_conditions} />
-      <Section title="關鍵假設" items={shown.key_assumptions} />
-      <Section title="風險" items={shown.risks} />
-      <Section title="觀察清單" items={shown.watch_list} />
-      {shown.market_narrative && <Para title="市場敘事" text={shown.market_narrative} />}
-      {shown.divergence && <Para title="與共識分歧" text={shown.divergence} />}
+      {shown.question && (
+        <p className="cardview-q muted tiny">
+          {t(($) => $.aiCard.questionPrefix)}{shown.question}
+        </p>
+      )}
+      <p className="cardview-concl">{shown.conclusion}</p>
+      {shown.confidence_rationale && (
+        <p className="muted tiny">
+          {t(($) => $.aiCard.confidenceExplanation)} {shown.confidence_rationale}
+        </p>
+      )}
+
+      <Section title={t(($) => $.aiCard.primaryReasons)} items={shown.primary_reasons} />
+      <Section title={t(($) => $.aiCard.counterReasons)} items={shown.counter_thesis} counter />
+      <Section title={t(($) => $.aiCard.invalidationConditions)} items={shown.invalidation_conditions} />
+      <Section title={t(($) => $.aiCard.triggers)} items={shown.trigger_conditions} />
+      <Section title={t(($) => $.aiCard.keyAssumptions)} items={shown.key_assumptions} />
+      <Section title={t(($) => $.aiCard.risks)} items={shown.risks} />
+      <Section title={t(($) => $.aiCard.watchlist)} items={shown.watch_list} />
+      {shown.market_narrative && (
+        <Para title={t(($) => $.aiCard.marketNarrative)} text={shown.market_narrative} />
+      )}
+      {shown.divergence && (
+        <Para title={t(($) => $.aiCard.consensusDivergence)} text={shown.divergence} />
+      )}
 
       <details className="cardview-trace">
         <summary>
-          資料來源 · 可追溯性（{tr.data_sources.length} 源 · {tr.claims.length} 引用）
+          {t(($) => $.aiCard.traceabilityPrefix)}
+          {tr.data_sources.length} {t(($) => $.aiCard.sourcesSeparator)} {tr.claims.length}
+          {t(($) => $.aiCard.citationsSuffix)}
         </summary>
         <ul className="trace-sources">
           {tr.data_sources.map((s, i) => (
@@ -382,7 +492,9 @@ export function CardView({
         </ul>
         {tr.claims.length > 0 && (
           <div className="trace-claims-wrap">
-            <div className="muted tiny trace-claims-h">每條主張的引用（claim → evidence_id）</div>
+            <div className="muted tiny trace-claims-h">
+              {t(($) => $.aiCard.claimCitations)}
+            </div>
             <ul className="trace-claims">
               {tr.claims.map((c, i) => (
                 <li key={i}>
@@ -398,10 +510,13 @@ export function CardView({
         {evidencePacket && (
           <div className="trace-evidence-wrap">
             <div className="muted tiny trace-claims-h">
-              引用證據摘要（{shownEvidence.length || evidencePacket.items.length} / {evidencePacket.items.length}）
+              {t(($) => $.aiCard.evidenceSummary, {
+                shown: shownEvidence.length || evidencePacket.items.length,
+                total: evidencePacket.items.length,
+              })}
             </div>
             {shownEvidence.length === 0 ? (
-              <p className="muted tiny">此卡片沒有可對應的 evidence item。</p>
+              <p className="muted tiny">{t(($) => $.aiCard.noEvidenceItem)}</p>
             ) : (
               <ul className="trace-evidence">
                 {shownEvidence.map((item) => (
@@ -412,12 +527,16 @@ export function CardView({
                       <span className="muted tiny">{item.source_type}</span>
                     </div>
                     <div className="muted tiny">
-                      {item.as_of ? `as-of ${item.as_of}` : "as-of —"}
-                      {item.freshness ? ` · ${item.freshness}` : ""}
-                      {item.is_real_time ? " · realtime" : ""}
+                      {item.as_of
+                        ? t(($) => $.aiCard.asOf, { value: item.as_of })
+                        : t(($) => $.aiCard.asOfMissing)}
+                      {item.freshness ? (
+                        <span> {t(($) => $.aiCard.freshnessSuffix, { freshness: item.freshness })}</span>
+                      ) : null}
+                      {item.is_real_time ? <span> {t(($) => $.aiCard.realtime)}</span> : null}
                     </div>
                     {item.note && <div className="muted tiny">{item.note}</div>}
-                    <div className="evidence-data tiny">{summarizeEvidenceData(item.data)}</div>
+                    <div className="evidence-data tiny">{summarizeEvidenceData(item.data, t)}</div>
                   </li>
                 ))}
               </ul>
@@ -425,11 +544,16 @@ export function CardView({
           </div>
         )}
         <div className="muted tiny">
-          completeness — news {yn(tr.completeness.news)} · fundamentals {yn(tr.completeness.fundamentals)} ·
-          technicals {yn(tr.completeness.technicals)}
-          {tr.completeness.note ? ` · ${tr.completeness.note}` : ""}
+          {t(($) => $.aiCard.newsCompleteness)} {yn(tr.completeness.news)} {" "}
+          {t(($) => $.aiCard.fundamentalsSuffix)} {yn(tr.completeness.fundamentals)} {" "}
+          {t(($) => $.aiCard.technicalsSuffix)} {yn(tr.completeness.technicals)}
+          {tr.completeness.note ? (
+            <span> {t(($) => $.aiCard.completenessNote, { note: tr.completeness.note })}</span>
+          ) : null}
         </div>
-        <div className="muted tiny">single-model inference: {yn(tr.is_single_model_inference)}</div>
+        <div className="muted tiny">
+          {t(($) => $.aiCard.singleModelInference)} {yn(tr.is_single_model_inference)}
+        </div>
       </details>
     </div>
   );
@@ -443,17 +567,22 @@ export function CardModal({
   onClose,
   onChanged,
   runtime,
+  developerMode,
+  onNavigateTarget,
 }: {
   runId: number;
   onClose: () => void;
   onChanged?: () => void;
   runtime?: RuntimeConfig | null;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
 }) {
+  const { t } = useTranslation("explore");
   const [card, setCard] = useState<ResultCard | null>(null);
   const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [reload, setReload] = useState(0);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -487,7 +616,7 @@ export function CardModal({
         }
       })
       .catch((e) => {
-        if (alive) setErr(e instanceof Error ? e.message : String(e));
+        if (alive) setErr(captureExploreError("card_open", e));
       });
     return () => {
       alive = false;
@@ -497,14 +626,23 @@ export function CardModal({
   async function save() {
     if (saving || saved) return;
     setSaving(true);
+    setErr(null);
     try {
       await saveCard(runId);
       setSaved(true);
       onChanged?.();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("card_save", e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  function retry() {
+    if (err?.operation === "card_save") {
+      void save();
+    } else {
+      setReload((x) => x + 1);
     }
   }
 
@@ -514,24 +652,33 @@ export function CardModal({
         className="modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label={card ? `${card.ticker} AI 卡片` : "AI 卡片"}
+        aria-label={card
+          ? t(($) => $.aiCard.tickerCardLabel, { ticker: card.ticker })
+          : t(($) => $.aiCard.cardLabel)}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
-          <span className="strong">{card ? `${card.ticker} · AI 卡片` : "AI 卡片"}</span>
+          <span className="strong">
+            {card
+              ? t(($) => $.aiCard.cardTitle, { ticker: card.ticker })
+              : t(($) => $.aiCard.cardTitleFallback)}
+          </span>
           <span className="spacer" />
-          <button ref={closeBtnRef} className="btn-ghost" onClick={onClose}>✕ 關閉</button>
+          <button ref={closeBtnRef} className="btn-ghost" onClick={onClose}>
+            {t(($) => $.aiCard.close)}
+          </button>
         </div>
-        {err && <p className="refresh-err tiny">{err}</p>}
-        {!card && err ? (
-          <div>
-            <p className="muted">卡片載入失敗。</p>
-            <button className="btn-ghost" onClick={() => setReload((x) => x + 1)}>
-              重試
-            </button>
-          </div>
-        ) : !card ? (
-          <p className="muted">載入中…</p>
+        {err && (
+          <ExploreErrorNotice
+            state={err}
+            developerMode={developerMode}
+            retryLabel={t(($) => $.aiCard.retry)}
+            onRetry={retry}
+            onNavigate={onNavigateTarget}
+          />
+        )}
+        {!card ? (
+          !err ? <p className="muted">{t(($) => $.aiCard.loading)}</p> : null
         ) : (
           <CardView
             key={runId}
@@ -541,6 +688,8 @@ export function CardModal({
             saved={saved}
             saving={saving}
             runtime={runtime}
+            developerMode={developerMode}
+            onNavigateTarget={onNavigateTarget}
             onSave={() => void save()}
           />
         )}
@@ -586,17 +735,30 @@ function unique(xs: string[]): string[] {
   return Array.from(new Set(xs.filter(Boolean)));
 }
 
-function summarizeEvidenceData(data: Record<string, unknown>): string {
-  const entries = Object.entries(data).slice(0, 6);
-  if (entries.length === 0) return "no structured payload";
-  return entries.map(([key, value]) => `${key}: ${summarizeValue(value)}`).join(" · ");
+function confidenceLabel(level: CardSummary["confidence_level"], t: ExploreT): string {
+  switch (level) {
+    case "high":
+      return t(($) => $.aiCard.confidenceHigh);
+    case "medium":
+      return t(($) => $.aiCard.confidenceMedium);
+    case "low":
+      return t(($) => $.aiCard.confidenceLow);
+    default:
+      return level ?? "—";
+  }
 }
 
-function summarizeValue(value: unknown): string {
+function summarizeEvidenceData(data: Record<string, unknown>, t: ExploreT): string {
+  const entries = Object.entries(data).slice(0, 6);
+  if (entries.length === 0) return t(($) => $.aiCard.noStructuredPayload);
+  return entries.map(([key, value]) => `${key}: ${summarizeValue(value, t)}`).join(" · ");
+}
+
+function summarizeValue(value: unknown, t: ExploreT): string {
   if (value == null) return "—";
   if (typeof value === "string") return clip(value);
   if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) return `[${value.length} items]`;
+  if (Array.isArray(value)) return t(($) => $.aiCard.itemCount, { count: value.length });
   if (typeof value === "object") {
     const keys = Object.keys(value as Record<string, unknown>);
     return `{${keys.slice(0, 4).join(", ")}${keys.length > 4 ? ", …" : ""}}`;

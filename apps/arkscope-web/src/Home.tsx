@@ -208,6 +208,8 @@ export function HomeView({
           onClose={closeCard}
           onChanged={() => void load()}
           runtime={runtime}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
         />
       )}
     </>

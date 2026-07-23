@@ -96,6 +96,28 @@ describe("bundled i18n resources", () => {
         dayWindowLabel: "Time window",
       },
     } as const;
+    const expectedTask7Copy = {
+      "zh-Hant": {
+        tickerDetail: {
+          ivHistorySummary: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
+          statementSummary: "{{title}}（{{count}} 期）",
+          retry: "重試",
+        },
+        aiCard: {
+          evidenceSummary: "引用證據摘要（{{shown}} / {{total}}）",
+        },
+      },
+      en: {
+        tickerDetail: {
+          ivHistorySummary: "IV history (latest {{count}} rows · Source {{source}})",
+          statementSummary: "{{title}} ({{count}} periods)",
+          retry: "Retry",
+        },
+        aiCard: {
+          evidenceSummary: "Evidence citation summary ({{shown}} / {{total}})",
+        },
+      },
+    } as const;
 
     expect(resourceNamespaces).toContain("explore");
     for (const locale of ["zh-Hant", "en"] as const) {
@@ -131,6 +153,10 @@ describe("bundled i18n resources", () => {
         "news.modeLabel",
         "news.marketProviderLabel",
         "news.dayWindowLabel",
+        "tickerDetail.ivHistorySummary",
+        "tickerDetail.statementSummary",
+        "tickerDetail.retry",
+        "aiCard.evidenceSummary",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
       }
@@ -156,12 +182,18 @@ describe("bundled i18n resources", () => {
         "news.openTickerChip",
         "news.analysisArticleRuntime",
         "news.marketNewsRuntime",
+        "tickerDetail.ivHistoryPrefix",
+        "tickerDetail.rowsSource",
+        "tickerDetail.periodsSuffix",
+        "aiCard.evidenceSummaryPrefix",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(false);
       }
       expect.soft(explore, `${locale}.explore count copy`).toMatchObject(expectedCountCopy[locale]);
       expect.soft((explore as ResourceTree).news, `${locale}.explore news copy`)
         .toMatchObject(expectedNewsCopy[locale]);
+      expect.soft(explore, `${locale}.explore Task 7 copy`)
+        .toMatchObject(expectedTask7Copy[locale]);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(
           flattenResource((explore as ResourceTree)[subtree] as ResourceTree).size,

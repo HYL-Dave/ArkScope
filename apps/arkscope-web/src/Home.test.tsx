@@ -261,6 +261,15 @@ function workspaceError(code = "workspace_fixture_failed") {
   });
 }
 
+function cardError() {
+  return Object.assign(new Error(UNSAFE_MESSAGE), {
+    status: 503,
+    code: "provider_config_missing",
+    path: "/analysis/cards/701?token=private-source-value#raw-fragment",
+    diagnostic: "request timed out after 12s",
+  });
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -599,10 +608,34 @@ describe("Home localization", () => {
   });
 
   it("keeps an open Card modal and source Card identity across locale switch", async () => {
-    await mountHome();
+    const onNavigateTarget = vi.fn();
+    apiMocks.getCard.mockRejectedValueOnce(cardError());
+    await mountHome({ developerMode: true, onNavigateTarget });
     const cardRow = host!.querySelector<HTMLElement>(".card-row");
     expect(cardRow).not.toBeNull();
     await click(cardRow!);
+    await flush();
+
+    const failedDialog = host!.querySelector<HTMLElement>('[role="dialog"]');
+    const alert = failedDialog!.querySelector<HTMLElement>('[role="alert"]');
+    expect(alert?.querySelector(".ui-status-badge")?.textContent).toBe("無法開啟 AI 卡片。");
+    expect(Array.from(alert!.querySelectorAll('[aria-label="開發者診斷"] dl > div')).map((row) => [
+      row.querySelector("dt")?.textContent,
+      row.querySelector("dd")?.textContent,
+    ])).toEqual([
+      ["狀態", "503"],
+      ["代碼", "provider_config_missing"],
+      ["路徑", "/analysis/cards/{run_id}"],
+      ["細節", "request timed out after 12s"],
+    ]);
+    expect(alert!.textContent).not.toContain(UNSAFE_MESSAGE);
+    expect(alert!.textContent).not.toContain("private-source-value");
+    await click(buttonByText("前往 Provider 登入與憑證", alert!));
+    expect(onNavigateTarget).toHaveBeenCalledWith({
+      kind: "settings_section",
+      section: "providers",
+    });
+    await click(buttonByText("重試", alert!));
     await waitForText("SOURCE DETAIL PRIMARY REASON");
 
     const dialog = host!.querySelector<HTMLElement>('[role="dialog"]');
@@ -625,7 +658,7 @@ describe("Home localization", () => {
     expect(buttonByText("EN", dialog!)).toBe(modalControl);
     expect(document.activeElement).toBe(modalControl);
     expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
-    expect(dialog!.getAttribute("aria-label")).toBe(`${SOURCE_TICKER} AI 卡片`);
+    expect(dialog!.getAttribute("aria-label")).toBe(`${SOURCE_TICKER} AI Card`);
     expect(host!.querySelector(".card-row")).toBe(cardRow);
     expect(cardRow!.textContent).toContain(SOURCE_CARD_CONCLUSION);
     expect(apiMocks.getCard).toHaveBeenCalledWith(701);
@@ -636,7 +669,7 @@ describe("Home localization", () => {
       getUniverse: 1,
       getProfileLists: 1,
       getCards: 1,
-      getCard: 1,
+      getCard: 2,
       translateCard: 1,
     });
   });

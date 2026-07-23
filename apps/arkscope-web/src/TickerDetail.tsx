@@ -34,6 +34,13 @@ import {
   type TickerAggregate,
 } from "./api";
 import { AICardTab } from "./AICard";
+import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
+import {
+  captureExploreError,
+  type ExploreErrorState,
+  type ExploreT,
+} from "./explore/explorePresentation";
+import type { NavigationTarget } from "./shell/navigation";
 import { tagClass, tagKey, tagTitle } from "./tags";
 
 type Tab = "overview" | "data" | "notes" | "ai";
@@ -42,14 +49,19 @@ export function TickerDetailView({
   ticker,
   onBack,
   runtime,
+  developerMode,
+  onNavigateTarget,
 }: {
   ticker: string;
   onBack: () => void;
   runtime?: RuntimeConfig | null;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
 }) {
+  const { t } = useTranslation("explore");
   const [tab, setTab] = useState<Tab>("overview");
   const [state, setState] = useState<TickerAggregate | null>(null);
-  const [stateErr, setStateErr] = useState<string | null>(null);
+  const [stateErr, setStateErr] = useState<ExploreErrorState | null>(null);
 
   const refreshState = useCallback(async () => {
     try {
@@ -57,7 +69,7 @@ export function TickerDetailView({
       setState(d);
       setStateErr(null);
     } catch (e) {
-      setStateErr(e instanceof Error ? e.message : String(e));
+      setStateErr(captureExploreError("ticker_load_state", e));
     }
   }, [ticker]);
 
@@ -70,10 +82,14 @@ export function TickerDetailView({
   return (
     <main className="main detail-full">
       <div className="detailpage-head">
-        <button className="btn-ghost" onClick={onBack}>← 自選股</button>
+        <button className="btn-ghost" onClick={onBack}>
+          {t(($) => $.tickerDetail.backToWatchlist)}
+        </button>
         <span className="mono strong detailpage-ticker">{ticker}</span>
         {state?.priority && <span className={`badge p-${state.priority}`}>{state.priority}</span>}
-        {state?.archived && <span className="tag-archived">archived</span>}
+        {state?.archived && (
+          <span className="tag-archived">{t(($) => $.tickerDetail.archived)}</span>
+        )}
         {state?.lists && state.lists.length > 0 && (
           <span className="chips">
             {state.lists.map((l) => (
@@ -81,37 +97,73 @@ export function TickerDetailView({
             ))}
           </span>
         )}
-        {stateErr && <span className="refresh-err tiny">{stateErr}</span>}
       </div>
 
+      {stateErr && (
+        <ExploreErrorNotice
+          state={stateErr}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.tickerDetail.retry)}
+          onRetry={() => void refreshState()}
+          onNavigate={onNavigateTarget}
+        />
+      )}
+
       {state && (
-        <TagManager ticker={ticker} tags={state.tags ?? []} onChanged={() => void refreshState()} />
+        <TagManager
+          ticker={ticker}
+          tags={state.tags ?? []}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
+          onChanged={() => void refreshState()}
+        />
       )}
 
       <div className="detail-tabs">
         <button type="button" className={`tab ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>
-          總覽
+          {t(($) => $.tickerDetail.overview)}
         </button>
         <button type="button" className={`tab ${tab === "data" ? "active" : ""}`} onClick={() => setTab("data")}>
-          數據
+          {t(($) => $.tickerDetail.data)}
         </button>
         <button type="button" className={`tab ${tab === "notes" ? "active" : ""}`} onClick={() => setTab("notes")}>
-          筆記{state && state.note_count > 0 ? `（${state.note_count}）` : ""}
+          {t(($) => $.tickerDetail.notes)}
+          {state && state.note_count > 0
+            ? t(($) => $.tickerDetail.noteCount, { count: state.note_count })
+            : ""}
         </button>
         <button type="button" className={`tab ${tab === "ai" ? "active" : ""}`} onClick={() => setTab("ai")}>
-          AI 卡片
+          {t(($) => $.tickerDetail.aiCard)}
         </button>
       </div>
 
       {tab === "overview" ? (
-        <OverviewTab ticker={ticker} />
+        <OverviewTab
+          ticker={ticker}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
+        />
       ) : tab === "data" ? (
-        <DataTab ticker={ticker} />
+        <DataTab
+          ticker={ticker}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
+        />
       ) : tab === "notes" ? (
-        <NotesTab ticker={ticker} onChanged={refreshState} />
+        <NotesTab
+          ticker={ticker}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
+          onChanged={refreshState}
+        />
       ) : (
         <div className="detail-ai-wrap">
-          <AICardTab ticker={ticker} runtime={runtime} />
+          <AICardTab
+            ticker={ticker}
+            runtime={runtime}
+            developerMode={developerMode}
+            onNavigateTarget={onNavigateTarget}
+          />
         </div>
       )}
     </main>
@@ -123,10 +175,20 @@ const PRICE_WINDOW_LABEL: Record<number, string> = {
   5: "5D", 7: "7D", 30: "30D", 90: "90D", 365: "1Y", 3650: "Max",
 };
 
-function OverviewTab({ ticker }: { ticker: string }) {
+function OverviewTab({
+  ticker,
+  developerMode,
+  onNavigateTarget,
+}: {
+  ticker: string;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+}) {
+  const { t } = useTranslation("explore");
   const [pc, setPc] = useState<PriceChange | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [days, setDays] = useState<number>(30);
+  const [reload, setReload] = useState(0);
 
   // Refetch when ticker OR the selected window changes; drop stale responses.
   useEffect(() => {
@@ -138,19 +200,21 @@ function OverviewTab({ ticker }: { ticker: string }) {
         const d = await getPriceChange(ticker, days);
         if (alive) setPc(d);
       } catch (e) {
-        if (alive) setErr(e instanceof Error ? e.message : String(e));
+        if (alive) setErr(captureExploreError("ticker_load_price", e));
       }
     })();
     return () => {
       alive = false;
     };
-  }, [ticker, days]);
+  }, [ticker, days, reload]);
 
   return (
     <div className="detail-grid">
       <section className="detail-col">
         <div className="detail-pricehead">
-          <h4 className="detail-section">Price ({PRICE_WINDOW_LABEL[days]})</h4>
+          <h4 className="detail-section">
+            {t(($) => $.tickerDetail.pricePrefix)}{PRICE_WINDOW_LABEL[days]})
+          </h4>
           <span className="price-windows">
             {PRICE_WINDOWS.map((d) => (
               <button
@@ -163,8 +227,16 @@ function OverviewTab({ ticker }: { ticker: string }) {
             ))}
           </span>
         </div>
-        {err && <p className="muted tiny">price detail unavailable: {err}</p>}
-        {!err && !pc && <p className="muted tiny">loading…</p>}
+        {err && (
+          <ExploreErrorNotice
+            state={err}
+            developerMode={developerMode}
+            retryLabel={t(($) => $.tickerDetail.retry)}
+            onRetry={() => setReload((current) => current + 1)}
+            onNavigate={onNavigateTarget}
+          />
+        )}
+        {!err && !pc && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
         {pc && (
           <dl className="kv">
             <Kv k="Latest close" v={fmtNum(pc.latest_close)} />
@@ -180,11 +252,11 @@ function OverviewTab({ ticker }: { ticker: string }) {
       </section>
 
       <section className="detail-col">
-        <h4 className="detail-section">圖表（price / volume）</h4>
+        <h4 className="detail-section">{t(($) => $.tickerDetail.chartTitle)}</h4>
         <div className="chart-placeholder">
-          <span className="muted">圖表元件規劃中</span>
+          <span className="muted">{t(($) => $.tickerDetail.chartPlanned)}</span>
           <span className="muted tiny">
-            price / volume / range / 多窗報酬 — 之後接 IBKR 即時與歷史 OHLCV
+            {t(($) => $.tickerDetail.chartDescription)}
           </span>
         </div>
       </section>
@@ -195,14 +267,31 @@ function OverviewTab({ ticker }: { ticker: string }) {
 // 數據 tab: IV + fundamentals, read-only (re-calls the endpoints — no provider
 // fetch). All reads go through the DAL, so they hit the local market DB when
 // routing is on and fall back to PG otherwise.
-function DataTab({ ticker }: { ticker: string }) {
+const DATA_OPERATIONS = [
+  "ticker_load_iv",
+  "ticker_load_iv_history",
+  "ticker_load_fundamentals",
+  "ticker_load_market_status",
+  "ticker_load_coverage",
+] as const;
+
+function DataTab({
+  ticker,
+  developerMode,
+  onNavigateTarget,
+}: {
+  ticker: string;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+}) {
+  const { t } = useTranslation("explore");
   const [iv, setIv] = useState<IVAnalysis | null>(null);
   const [ivHist, setIvHist] = useState<IVHistoryResult | null>(null);
   const [fund, setFund] = useState<FundamentalsResult | null>(null);
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
   const [coverage, setCoverage] = useState<MarketDataCoverage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [errs, setErrs] = useState<string[]>([]);
+  const [errs, setErrs] = useState<ExploreErrorState[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -221,11 +310,10 @@ function DataTab({ ticker }: { ticker: string }) {
     setFund(rFund.status === "fulfilled" ? rFund.value : null);
     setStatus(rStatus.status === "fulfilled" ? rStatus.value : null);
     setCoverage(rCov.status === "fulfilled" ? rCov.value : null);
-    const labels = ["IV", "IV 歷史", "基本面", "狀態", "覆蓋"];
     setErrs(
       results.flatMap((r, i) =>
         r.status === "rejected"
-          ? [`${labels[i]}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`]
+          ? [captureExploreError(DATA_OPERATIONS[i]!, r.reason)]
           : [],
       ),
     );
@@ -239,37 +327,62 @@ function DataTab({ ticker }: { ticker: string }) {
   const routingLabel = !status
     ? "—"
     : status.routing_enabled
-      ? "啟用中（本地優先，缺資料回 PG）"
+      ? t(($) => $.tickerDetail.localPreferred)
       : status.use_local_market_setting
-        ? "設定已開，待建立本地庫（目前用 PG）"
-        : "關閉（使用 PG）";
+        ? t(($) => $.tickerDetail.localPending)
+        : t(($) => $.tickerDetail.localDisabled);
   const recentHist = ivHist ? ivHist.points.slice(-30).reverse() : []; // newest first, cap 30
 
   return (
     <div className="detail-data">
       <section className="detail-col">
         <div className="detail-pricehead">
-          <h4 className="detail-section">資料來源 / 新鮮度</h4>
+          <h4 className="detail-section">{t(($) => $.tickerDetail.sourceFreshness)}</h4>
           <button className="btn-ghost" onClick={() => void load()} disabled={loading}>
-            {loading ? "讀取中…" : "↻ 重新整理"}
+            {loading
+              ? t(($) => $.tickerDetail.reading)
+              : t(($) => $.tickerDetail.refresh)}
           </button>
         </div>
         <dl className="kv">
-          <Kv k="本地市場資料" v={routingLabel} />
-          <Kv k="IV · 本次來源" v={sourceLabel(iv?.source_path)} />
-          <Kv k="IV · 本地覆蓋" v={coverage ? (coverage.iv ? "有" : "無") : "—"} />
-          <Kv k="基本面 · 本次來源" v={sourceLabel(fund?.source_path)} />
-          <Kv k="基本面 · 本地覆蓋" v={coverage ? (coverage.fundamentals ? "有" : "無") : "—"} />
+          <Kv k={t(($) => $.tickerDetail.localMarketData)} v={routingLabel} />
+          <Kv k={t(($) => $.tickerDetail.ivCurrentSource)} v={sourceLabel(iv?.source_path, t)} />
+          <Kv
+            k={t(($) => $.tickerDetail.ivLocalCoverage)}
+            v={coverage ? coverageLabel(coverage.iv, t) : "—"}
+          />
+          <Kv
+            k={t(($) => $.tickerDetail.fundamentalsCurrentSource)}
+            v={sourceLabel(fund?.source_path, t)}
+          />
+          <Kv
+            k={t(($) => $.tickerDetail.fundamentalsLocalCoverage)}
+            v={coverage ? coverageLabel(coverage.fundamentals, t) : "—"}
+          />
         </dl>
         <p className="muted tiny">
-          「本次來源」= 此次讀取的真實來源（本地命中 / PG 回退 / PG / 無）；「本地覆蓋」= 本地市場庫是否存有此標的的列。
+          {t(($) => $.tickerDetail.sourceExplanation)}
         </p>
-        {errs.length > 0 && <p className="muted tiny">部分資料無法載入：{errs.join("；")}</p>}
+        {errs.map((error) => (
+          <ExploreErrorNotice
+            key={error.operation}
+            state={error}
+            developerMode={developerMode}
+            retryLabel={t(($) => $.tickerDetail.retry)}
+            onRetry={() => void load()}
+            onNavigate={onNavigateTarget}
+          />
+        ))}
       </section>
 
       <section className="detail-col">
-        <h4 className="detail-section">隱含波動率 IV{iv?.signal ? ` · ${iv.signal}` : ""}</h4>
-        {loading && !iv && <p className="muted tiny">loading…</p>}
+        <h4 className="detail-section">
+          {t(($) => $.tickerDetail.impliedVolatility)}
+          {iv?.signal ? (
+            <span> {t(($) => $.tickerDetail.ivSignalSuffix, { signal: iv.signal })}</span>
+          ) : null}
+        </h4>
+        {loading && !iv && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
         {iv && (
           <dl className="kv">
             <Kv k="Current ATM IV" v={fmtNum(iv.current_iv)} />
@@ -284,10 +397,22 @@ function DataTab({ ticker }: { ticker: string }) {
         {recentHist.length > 0 && (
           <details className="detail-raw">
             {/* the history table is its own request → label it with its OWN source */}
-            <summary>IV 歷史（最近 {recentHist.length} 筆 · 來源 {sourceLabel(ivHist?.source_path)}）</summary>
+            <summary>
+              {t(($) => $.tickerDetail.ivHistorySummary, {
+                count: recentHist.length,
+                source: sourceLabel(ivHist?.source_path, t),
+              })}
+            </summary>
             <table className="data-table">
               <thead>
-                <tr><th>日期</th><th>ATM IV</th><th>HV30</th><th>VRP</th><th>Spot</th><th>Quotes</th></tr>
+                <tr>
+                  <th>{t(($) => $.tickerDetail.date)}</th>
+                  <th>{t(($) => $.tickerDetail.atmIv)}</th>
+                  <th>{t(($) => $.tickerDetail.hv30)}</th>
+                  <th>{t(($) => $.tickerDetail.vrp)}</th>
+                  <th>{t(($) => $.tickerDetail.spot)}</th>
+                  <th>{t(($) => $.tickerDetail.quotes)}</th>
+                </tr>
               </thead>
               <tbody>
                 {recentHist.map((p) => (
@@ -304,14 +429,19 @@ function DataTab({ ticker }: { ticker: string }) {
             </table>
           </details>
         )}
-        {!loading && iv && iv.history_days === 0 && <p className="muted tiny">無 IV 資料。</p>}
+        {!loading && iv && iv.history_days === 0 && (
+          <p className="muted tiny">{t(($) => $.tickerDetail.noIv)}</p>
+        )}
       </section>
 
       <section className="detail-col">
         <h4 className="detail-section">
-          基本面{fund && fund.data_source !== "none" ? ` · ${fund.data_source}` : ""}
+          {t(($) => $.tickerDetail.fundamentals)}
+          {fund && fund.data_source !== "none" ? (
+            <span> {t(($) => $.tickerDetail.dataSourceSuffix, { source: fund.data_source })}</span>
+          ) : null}
         </h4>
-        {loading && !fund && <p className="muted tiny">loading…</p>}
+        {loading && !fund && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
         {fund && (
           <>
             <dl className="kv">
@@ -336,18 +466,29 @@ function DataTab({ ticker }: { ticker: string }) {
               <Kv k="Cash & equiv." v={fmtNum(fund.cash_and_equivalents)} />
               <Kv k="Total debt" v={fmtNum(fund.total_debt)} />
             </dl>
-            <StatementsBlock title="Income statements" rows={fund.income_statements} />
-            <StatementsBlock title="Balance sheet" rows={fund.balance_sheet} />
-            <StatementsBlock title="Cash flow" rows={fund.cash_flow_statements} />
+            <StatementsBlock
+              title={t(($) => $.tickerDetail.incomeStatements)}
+              rows={fund.income_statements}
+            />
+            <StatementsBlock
+              title={t(($) => $.tickerDetail.balanceSheet)}
+              rows={fund.balance_sheet}
+            />
+            <StatementsBlock
+              title={t(($) => $.tickerDetail.cashFlow)}
+              rows={fund.cash_flow_statements}
+            />
             {fund.snapshot && Object.keys(fund.snapshot).length > 0 && (
               <details className="detail-raw">
-                <summary>Raw snapshot</summary>
+                <summary>{t(($) => $.tickerDetail.rawSnapshot)}</summary>
                 <pre className="raw-json">{JSON.stringify(fund.snapshot, null, 2)}</pre>
               </details>
             )}
           </>
         )}
-        {!loading && fund && fund.data_source === "none" && <p className="muted tiny">無基本面資料。</p>}
+        {!loading && fund && fund.data_source === "none" && (
+          <p className="muted tiny">{t(($) => $.tickerDetail.noFundamentals)}</p>
+        )}
       </section>
     </div>
   );
@@ -356,15 +497,16 @@ function DataTab({ ticker }: { ticker: string }) {
 // One financial-statement type rendered as metric-rows × period-columns (newest
 // first). Collapsed by default; null/empty → nothing.
 function StatementsBlock({ title, rows }: { title: string; rows: FinancialStatement[] | null }) {
+  const { t } = useTranslation("explore");
   if (!rows || rows.length === 0) return null;
   const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.data))));
   return (
     <details className="detail-raw">
-      <summary>{title}（{rows.length} 期）</summary>
+      <summary>{t(($) => $.tickerDetail.statementSummary, { title, count: rows.length })}</summary>
       <table className="data-table">
         <thead>
           <tr>
-            <th>指標</th>
+            <th>{t(($) => $.tickerDetail.indicator)}</th>
             {rows.map((r) => <th key={r.report_period}>{r.fiscal_period ?? r.report_period}</th>)}
           </tr>
         </thead>
@@ -381,18 +523,31 @@ function StatementsBlock({ title, rows }: { title: string; rows: FinancialStatem
   );
 }
 
-function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => void }) {
+function NotesTab({
+  ticker,
+  developerMode,
+  onNavigateTarget,
+  onChanged,
+}: {
+  ticker: string;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+  onChanged?: () => void;
+}) {
+  const { t } = useTranslation("explore");
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
+  const [failedDeleteId, setFailedDeleteId] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       const d = await getNotes(ticker);
       setNotes(d.notes);
+      setErr(null);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("ticker_load_notes", e));
     }
   }, [ticker]);
 
@@ -413,7 +568,7 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
       await refresh();
       onChanged?.();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("ticker_add_note", e));
     } finally {
       setBusy(false);
     }
@@ -422,14 +577,26 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
   async function remove(id: number) {
     setBusy(true);
     setErr(null);
+    setFailedDeleteId(id);
     try {
       await deleteNote(ticker, id);
       await refresh();
       onChanged?.();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("ticker_delete_note", e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function retry() {
+    if (!err) return;
+    if (err.operation === "ticker_add_note") {
+      void submit();
+    } else if (err.operation === "ticker_delete_note" && failedDeleteId !== null) {
+      void remove(failedDeleteId);
+    } else {
+      void refresh();
     }
   }
 
@@ -437,7 +604,7 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
     <div className="notes detail-notes">
       <textarea
         className="note-input"
-        placeholder={`Add a note on ${ticker}…`}
+        placeholder={t(($) => $.tickerDetail.notePlaceholder, { ticker })}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
@@ -446,15 +613,25 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
         rows={3}
       />
       <div className="note-actions">
-        <span className="muted tiny">⌘/Ctrl+Enter to save</span>
+        <span className="muted tiny">{t(($) => $.tickerDetail.saveShortcut)}</span>
         <button type="button" disabled={busy || !draft.trim()} onClick={() => void submit()}>
-          Add note
+          {t(($) => $.tickerDetail.addNote)}
         </button>
       </div>
-      {err && <p className="refresh-err tiny">{err}</p>}
+      {err && (
+        <ExploreErrorNotice
+          state={err}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.tickerDetail.retry)}
+          onRetry={retry}
+          onNavigate={onNavigateTarget}
+        />
+      )}
 
-      {notes === null && !err && <p className="muted tiny">loading…</p>}
-      {notes && notes.length === 0 && <p className="muted tiny">No notes yet.</p>}
+      {notes === null && !err && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
+      {notes && notes.length === 0 && (
+        <p className="muted tiny">{t(($) => $.tickerDetail.noNotes)}</p>
+      )}
       {notes && notes.length > 0 && (
         <ul className="note-list">
           {notes.map((n) => (
@@ -466,7 +643,7 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
                   type="button"
                   className="note-del"
                   disabled={busy}
-                  title="Delete note"
+                  title={t(($) => $.tickerDetail.deleteNote)}
                   onClick={() => void remove(n.id)}
                 >
                   ✕
@@ -485,10 +662,14 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
 function TagManager({
   ticker,
   tags,
+  developerMode,
+  onNavigateTarget,
   onChanged,
 }: {
   ticker: string;
   tags: TagRef[];
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
   onChanged: () => void;
 }) {
   const { t } = useTranslation("explore");
@@ -496,13 +677,16 @@ function TagManager({
   const [facet, setFacet] = useState("theme"); // user tags: theme or category
   const [catalog, setCatalog] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [catalogErr, setCatalogErr] = useState<ExploreErrorState | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
+  const [failedTag, setFailedTag] = useState<TagRef | null>(null);
 
   const loadCatalog = useCallback(async () => {
     try {
       setCatalog((await getTagCatalog()).catalog);
-    } catch {
-      /* picker just falls back to free-text */
+      setCatalogErr(null);
+    } catch (e) {
+      setCatalogErr(captureExploreError("ticker_load_tag_catalog", e));
     }
   }, []);
   useEffect(() => {
@@ -520,7 +704,7 @@ function TagManager({
       onChanged();
       void loadCatalog(); // a new value becomes pickable next time
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("ticker_add_tag", e));
     } finally {
       setBusy(false);
     }
@@ -530,13 +714,22 @@ function TagManager({
     if (busy) return;
     setBusy(true);
     setErr(null);
+    setFailedTag(t);
     try {
       await removeTickerTag(ticker, t.value, t.facet, t.source);
       onChanged();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("ticker_remove_tag", e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function retryMutation() {
+    if (err?.operation === "ticker_remove_tag" && failedTag) {
+      void remove(failedTag);
+    } else {
+      void add();
     }
   }
 
@@ -551,7 +744,7 @@ function TagManager({
               <button
                 type="button"
                 className="tagchip-x"
-                title="移除標籤"
+                title={t(($) => $.tickerDetail.removeTag)}
                 disabled={busy}
                 onClick={() => void remove(tag)}
               >
@@ -560,17 +753,24 @@ function TagManager({
             )}
           </span>
         ))}
-        {tags.length === 0 && <span className="muted tiny">尚無標籤</span>}
+        {tags.length === 0 && (
+          <span className="muted tiny">{t(($) => $.tickerDetail.noTags)}</span>
+        )}
       </span>
       <span className="tag-add">
-        <select value={facet} disabled={busy} onChange={(e) => setFacet(e.target.value)} title="標籤類型">
-          <option value="theme">主題</option>
-          <option value="category">板塊/類別</option>
-          <option value="provenance">來源</option>
+        <select
+          value={facet}
+          disabled={busy}
+          onChange={(e) => setFacet(e.target.value)}
+          title={t(($) => $.tickerDetail.tagTypeLabel)}
+        >
+          <option value="theme">{t(($) => $.tickerDetail.theme)}</option>
+          <option value="category">{t(($) => $.tickerDetail.sectorCategory)}</option>
+          <option value="provenance">{t(($) => $.tickerDetail.source)}</option>
         </select>
         <input
           list={listId}
-          placeholder="＋標籤（可挑現有或新建）"
+          placeholder={t(($) => $.tickerDetail.tagInputPlaceholder)}
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
@@ -584,10 +784,27 @@ function TagManager({
           ))}
         </datalist>
         <button className="btn-ghost tiny" disabled={busy || !draft.trim()} onClick={() => void add()}>
-          新增
+          {t(($) => $.tickerDetail.add)}
         </button>
       </span>
-      {err && <span className="refresh-err tiny">{err}</span>}
+      {catalogErr && (
+        <ExploreErrorNotice
+          state={catalogErr}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.tickerDetail.retry)}
+          onRetry={() => void loadCatalog()}
+          onNavigate={onNavigateTarget}
+        />
+      )}
+      {err && (
+        <ExploreErrorNotice
+          state={err}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.tickerDetail.retry)}
+          onRetry={retryMutation}
+          onNavigate={onNavigateTarget}
+        />
+      )}
     </div>
   );
 }
@@ -606,15 +823,20 @@ function Kv({ k, v, cls }: { k: string; v: string; cls?: string }) {
 function fmtNum(v: number | null): string {
   return v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
-function sourceLabel(s: SourcePath | undefined): string {
+function sourceLabel(s: SourcePath | string | undefined, t: ExploreT): string {
   switch (s) {
-    case "local": return "本地";
-    case "pg_fallback": return "PG（本地缺→回退）";
-    case "pg": return "PG";
-    case "file": return "本地檔案";
-    case "none": return "無資料";
-    default: return "—";
+    case "local": return t(($) => $.tickerDetail.sourceLocal);
+    case "pg_fallback": return t(($) => $.tickerDetail.sourcePgFallback);
+    case "pg": return t(($) => $.tickerDetail.sourcePg);
+    case "file": return t(($) => $.tickerDetail.sourceLocalFile);
+    case "none": return t(($) => $.tickerDetail.sourceNone);
+    default: return s === undefined ? "—" : String(s);
   }
+}
+function coverageLabel(covered: boolean, t: ExploreT): string {
+  return covered
+    ? t(($) => $.tickerDetail.yes)
+    : t(($) => $.tickerDetail.no);
 }
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
