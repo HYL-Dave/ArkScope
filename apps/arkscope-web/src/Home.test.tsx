@@ -612,6 +612,9 @@ describe("Home localization", () => {
     await click(buttonByText("繁中", dialog!));
     await waitForText(TRANSLATED_CONCLUSION);
     expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
+    const modalControl = buttonByText("EN", dialog!);
+    modalControl.focus();
+    expect(document.activeElement).toBe(modalControl);
     const before = requestCounts();
 
     await switchLocale("en");
@@ -619,6 +622,8 @@ describe("Home localization", () => {
     expect(host!.textContent).toContain("Watchlist activity");
     expect(host!.querySelector('[role="dialog"]')).toBe(dialog);
     expect(dialog!.querySelector(".cardview")).toBe(cardView);
+    expect(buttonByText("EN", dialog!)).toBe(modalControl);
+    expect(document.activeElement).toBe(modalControl);
     expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
     expect(dialog!.getAttribute("aria-label")).toBe(`${SOURCE_TICKER} AI 卡片`);
     expect(host!.querySelector(".card-row")).toBe(cardRow);

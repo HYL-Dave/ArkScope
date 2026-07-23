@@ -50,6 +50,7 @@ export function HomeView({
   const [cards, setCards] = useState<CardSummary[] | null>(null);
   const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [openCardId, setOpenCardId] = useState<number | null>(null);
+  const closeCard = useCallback(() => setOpenCardId(null), []);
 
   const load = useCallback(async () => {
     try {
@@ -204,7 +205,7 @@ export function HomeView({
       {openCardId != null && (
         <CardModal
           runId={openCardId}
-          onClose={() => setOpenCardId(null)}
+          onClose={closeCard}
           onChanged={() => void load()}
           runtime={runtime}
         />
