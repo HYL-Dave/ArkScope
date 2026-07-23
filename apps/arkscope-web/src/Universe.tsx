@@ -68,6 +68,11 @@ export function UniverseView({
     void load();
   }, [load]);
 
+  const refresh = useCallback(async () => {
+    setFeedback(null);
+    await load();
+  }, [load]);
+
   async function runImport() {
     if (importing) return;
     setImporting(true);
@@ -92,6 +97,7 @@ export function UniverseView({
     if (busyTicker) return;
     // No restore UI (per the model decision), so confirm before suppressing.
     if (!window.confirm(t(($) => $.universe.hideConfirmation, { ticker }))) return;
+    setFeedback(null);
     setBusyTicker(ticker);
     try {
       await setTickerHidden(ticker, true);
@@ -149,7 +155,7 @@ export function UniverseView({
       state={state}
       developerMode={developerMode}
       retryLabel={t(($) => $.universe.refresh)}
-      onRetry={() => void load()}
+      onRetry={() => void refresh()}
       onNavigate={state.code === "active_universe_unavailable"
         ? onNavigateTarget
         : undefined}
@@ -162,9 +168,11 @@ export function UniverseView({
         <h2 className="surface-title">{t(($) => $.universe.title)}</h2>
         {meta && (
           <span className="muted">
-            {meta.total} {t(($) => $.universe.filesSeparator)} {meta.summarized}{" "}
-            {t(($) => $.universe.withSummary)} {meta.total - meta.summarized}{" "}
-            {t(($) => $.universe.noSummary)}
+            {t(($) => $.universe.summaryCounts, {
+              total: meta.total,
+              summarized: meta.summarized,
+              withoutSummary: meta.total - meta.summarized,
+            })}
             {meta.archived > 0 && (
               <> {t(($) => $.universe.archivedCount, { count: meta.archived })}</>
             )}
@@ -176,7 +184,7 @@ export function UniverseView({
             ? t(($) => $.universe.importing)
             : t(($) => $.universe.importCategories)}
         </button>
-        <button className="btn-ghost" onClick={() => void load()}>
+        <button className="btn-ghost" onClick={() => void refresh()}>
           {t(($) => $.universe.refresh)}
         </button>
       </div>

@@ -306,7 +306,12 @@ describe("Universe localization", () => {
     ]) expect(text).toContain(expected);
     expect(text).toContain("庫存來自全部標的設定");
     expect(text).toContain("既有設定種入分類標籤（類別 / 主題 / 來源）");
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
+      "3 檔 · 2 有摘要 · 1 無摘要 · 1 已封存",
+    );
     expect(host!.querySelector(".universe-select option")?.textContent).toBe("所有清單（2）");
+    expect(selectWithOption(SOURCE_CATEGORY).querySelector('option[value=""]')?.textContent)
+      .toBe("類別（全部）");
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 筆記");
     expect(text).not.toContain("全部標的 · Universe");
   });
@@ -332,7 +337,14 @@ describe("Universe localization", () => {
       UNKNOWN_VALUE,
     ]) expect(text).toContain(expected);
     expect(host!.querySelector(`.tagchip[title*="${UNKNOWN_SOURCE}"]`)?.textContent).toBe(UNKNOWN_VALUE);
+    expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
+      "3 files · 2 with summary · 1 without summary · 1 archived",
+    );
     expect(host!.querySelector(".universe-select option")?.textContent).toBe("All lists (2)");
+    expect(selectWithOption(SOURCE_CATEGORY).querySelector('option[value=""]')?.textContent)
+      .toBe("Category (All)");
+    expect(text).not.toContain("files · 2 With summary");
+    expect(text).not.toContain("Category(All)");
     expect(text).not.toContain("Source list");
   });
 
@@ -384,6 +396,11 @@ describe("Universe localization", () => {
     await switchLocale("zh-Hant");
     expect(host!.textContent).toContain("匯入完成：新增 7 個分類標籤、移除 3 個舊清單。");
     expect(apiMocks.importUniverse).toHaveBeenCalledTimes(1);
+
+    await click(Array.from(host!.querySelectorAll<HTMLButtonElement>(".surface-head button"))
+      .find((button) => button.textContent?.includes("重新整理"))!);
+    expect(host!.querySelector(".universe-importmsg")).toBeNull();
+    expect(apiMocks.importUniverse).toHaveBeenCalledTimes(1);
   });
 
   it("preserves the groups-unavailable import warning without source-tag translation", async () => {
@@ -416,12 +433,19 @@ describe("Universe localization", () => {
     expect(host!.querySelector("[aria-label='開發者診斷']")).toBeNull();
     expect(host!.innerHTML).not.toContain(RAW_ERROR);
     expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+
+    await click(host!.querySelector<HTMLButtonElement>("[role='alert'] button")!);
+    expect(host!.querySelector("[role='alert']")).toBeNull();
+    expect(apiMocks.importUniverse).toHaveBeenCalledTimes(1);
   });
 
   it("preserves hide confirmation and renders hide failure by operation", async () => {
-    apiMocks.setTickerHidden.mockReset().mockRejectedValue(
-      structuredError("hide_fixture_failed", `/profile/tickers/${SOURCE_TICKER}/hidden`),
-    );
+    const hideRequest = deferred<{ ticker: string; hidden: boolean }>();
+    apiMocks.setTickerHidden.mockReset()
+      .mockRejectedValueOnce(
+        structuredError("hide_fixture_failed", `/profile/tickers/${SOURCE_TICKER}/hidden`),
+      )
+      .mockReturnValueOnce(hideRequest.promise);
     await mountUniverse();
     await waitForText(SOURCE_TICKER);
     await click(rowForTicker(SOURCE_TICKER).querySelector(".rowx")!);
@@ -433,6 +457,18 @@ describe("Universe localization", () => {
     expect(apiMocks.setTickerHidden).toHaveBeenCalledWith(SOURCE_TICKER, true);
     expect(host!.innerHTML).not.toContain(RAW_ERROR);
     expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+
+    const hideButton = rowForTicker(SOURCE_TICKER).querySelector<HTMLButtonElement>(".rowx")!;
+    await click(hideButton);
+    expect(host!.querySelector("[role='alert']")).toBeNull();
+    expect(hideButton.disabled).toBe(true);
+    expect(apiMocks.setTickerHidden).toHaveBeenCalledTimes(2);
+    await switchLocale("en");
+    expect(apiMocks.setTickerHidden).toHaveBeenCalledTimes(2);
+    await act(async () => hideRequest.resolve({ ticker: SOURCE_TICKER, hidden: true }));
+    await flush();
+    expect(host!.querySelector("[role='alert']")).toBeNull();
+    expect(apiMocks.setTickerHidden).toHaveBeenCalledTimes(2);
   });
 
   it("switches locale without clearing query list facets outcome or busy ticker", async () => {
@@ -460,7 +496,7 @@ describe("Universe localization", () => {
     expect(category.value).toBe(SOURCE_CATEGORY);
     expect(rowForTicker(SOURCE_TICKER).querySelector(".rowx")).toBe(busyButton);
     expect(busyButton.disabled).toBe(true);
-    expect(host!.textContent).toContain("Import complete: Classification tags added: 7");
+    expect(host!.textContent).not.toContain("Import complete: Classification tags added: 7");
     expect(requestCounts()).toEqual(beforeSwitch);
 
     await act(async () => hiddenRequest.resolve({ ticker: SOURCE_TICKER, hidden: true }));

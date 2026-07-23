@@ -239,6 +239,13 @@ async function change(select: HTMLSelectElement, value: string) {
   await flush();
 }
 
+async function pressKey(element: Element, key: string) {
+  await act(async () => {
+    element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  });
+  await flush();
+}
+
 async function switchLocale(locale: "zh-Hant" | "en") {
   await act(async () => {
     await i18n.changeLanguage(locale);
@@ -353,6 +360,7 @@ describe("Watchlist localization", () => {
       "低",
     ]) expect(text).toContain(expected);
     expect(host!.querySelector('th[title="Finnhub 分析師共識（每日快取）"]')).not.toBeNull();
+    expect(host!.querySelector("th.wl-consensus")?.textContent?.trim()).toBe("共識");
     expect(host!.querySelector(`.tagchip[title*="${SOURCE_TAG_SOURCE}"]`)).not.toBeNull();
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 筆筆記");
     expect(host!.innerHTML).not.toContain("設定優先級");
@@ -392,6 +400,7 @@ describe("Watchlist localization", () => {
       SOURCE_TICKER,
       SOURCE_TAG_VALUE,
     ]) expect(text).toContain(expected);
+    expect(host!.querySelector("th.wl-consensus")?.textContent?.trim()).toBe("Consensus");
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 note(s)");
     expect(host!.querySelector(`.tagchip[title*="${SOURCE_TAG_SOURCE}"]`)?.textContent).toBe(
       SOURCE_TAG_VALUE,
@@ -437,47 +446,100 @@ describe("Watchlist localization", () => {
   });
 
   it("renders visible Watchlist failures by operation without raw detail", async () => {
+    const expectSafeFailure = async (message: string) => {
+      await waitForText(message);
+      expect(host!.innerHTML).not.toContain(RAW_ERROR);
+      expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+    };
+    const remount = async () => {
+      unmountWatchlist();
+      apiMocks.getUniverse.mockReset().mockResolvedValue(UNIVERSE);
+      await mountWatchlist();
+      await waitForText(SOURCE_TICKER);
+    };
+    const sourceRail = () => Array.from(host!.querySelectorAll<HTMLElement>(".wl-railitem"))
+      .find((item) => item.textContent?.includes(SOURCE_LIST))!;
+
     apiMocks.getUniverse.mockReset().mockRejectedValue(structuredError());
     await mountWatchlist();
-    await waitForText("無法載入全部標的。");
-    expect(host!.innerHTML).not.toContain(RAW_ERROR);
-    expect(host!.innerHTML).not.toContain("sk-private");
+    await expectSafeFailure("無法載入全部標的。");
 
-    unmountWatchlist();
-    apiMocks.getUniverse.mockReset().mockResolvedValue(UNIVERSE);
-    apiMocks.setArchived.mockReset().mockRejectedValue(
-      structuredError("archive_fixture_failed", `/profile/tickers/${SOURCE_TICKER}/archive`),
+    await remount();
+    apiMocks.createList.mockReset().mockRejectedValue(
+      structuredError("create_fixture_failed", "/profile/lists"),
     );
-    await mountWatchlist();
-    await waitForText(SOURCE_TICKER);
-    const actions = rowForTicker(SOURCE_TICKER).querySelectorAll<HTMLButtonElement>(".rowactions button");
-    await click(actions[actions.length - 1]!);
-    await waitForText("無法更新標的封存狀態。");
-    expect(host!.innerHTML).not.toContain(RAW_ERROR);
-    expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+    await click(host!.querySelector(".wl-railadd")!);
+    const createInput = host!.querySelector<HTMLInputElement>(".wl-railedit input")!;
+    await setInput(createInput, "FAIL CREATE");
+    await click(createInput.parentElement!.querySelector("button")!);
+    await expectSafeFailure("無法建立清單。");
+    expect(apiMocks.createList).toHaveBeenCalledWith("FAIL CREATE", "custom");
 
-    unmountWatchlist();
+    await remount();
+    apiMocks.renameList.mockReset().mockRejectedValue(
+      structuredError("rename_fixture_failed", "/profile/lists/101"),
+    );
+    await click(Array.from(sourceRail().querySelectorAll("button"))
+      .find((button) => button.textContent === "✎")!);
+    const renameInput = host!.querySelector<HTMLInputElement>(".wl-railedit input")!;
+    await setInput(renameInput, "FAIL RENAME");
+    await click(renameInput.parentElement!.querySelector("button")!);
+    await expectSafeFailure("無法重新命名清單。");
+    expect(apiMocks.renameList).toHaveBeenCalledWith(101, "FAIL RENAME");
+
+    await remount();
     const confirmDelete = vi.fn(() => true);
     window.confirm = confirmDelete;
-    apiMocks.setArchived.mockReset().mockResolvedValue({ ticker: SOURCE_TICKER, archived: true });
     apiMocks.deleteList.mockReset().mockRejectedValue(
       structuredError("delete_fixture_failed", "/profile/lists/101?token=private#fragment"),
     );
-    await mountWatchlist();
-    await waitForText(SOURCE_TICKER);
-    const sourceRail = Array.from(host!.querySelectorAll<HTMLElement>(".wl-railitem"))
-      .find((item) => item.textContent?.includes(SOURCE_LIST))!;
-    await click(sourceRail.querySelector<HTMLButtonElement>('button[title="刪除清單"]')!);
-    await waitForText("無法刪除清單。");
+    await click(sourceRail().querySelector<HTMLButtonElement>('button[title="刪除清單"]')!);
+    await expectSafeFailure("無法刪除清單。");
     expect(confirmDelete).toHaveBeenCalledWith(
       `刪除清單「${SOURCE_LIST}」？\n\n只移除這個清單與其成員關係 —— 不會刪除標的本身或任何市場資料，標的仍保留在其他清單中。`,
     );
     expect(apiMocks.deleteList).toHaveBeenCalledWith(101);
-    expect(host!.innerHTML).not.toContain(RAW_ERROR);
-    expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
     await switchLocale("en");
     expect(host!.textContent).toContain("Could not delete the list.");
-    expect(host!.innerHTML).not.toContain(RAW_ERROR);
+
+    await switchLocale("zh-Hant");
+    await remount();
+    apiMocks.addMember.mockReset().mockRejectedValue(
+      structuredError("add_fixture_failed", "/profile/lists/101/members"),
+    );
+    const addInput = host!.querySelector<HTMLInputElement>(".wl-addbox input")!;
+    await setInput(addInput, "ADD.FAIL");
+    await pressKey(addInput, "Enter");
+    await expectSafeFailure("無法將標的加入清單。");
+    expect(apiMocks.addMember).toHaveBeenCalledWith(101, "ADD.FAIL");
+
+    await remount();
+    apiMocks.removeMember.mockReset().mockRejectedValue(
+      structuredError("remove_fixture_failed", `/profile/lists/101/members/${SOURCE_TICKER}`),
+    );
+    let actions = rowForTicker(SOURCE_TICKER)
+      .querySelectorAll<HTMLButtonElement>(".rowactions button");
+    await click(actions[1]!);
+    await expectSafeFailure("無法從清單移除標的。");
+    expect(apiMocks.removeMember).toHaveBeenCalledWith(101, SOURCE_TICKER);
+
+    await remount();
+    apiMocks.setArchived.mockReset().mockRejectedValue(
+      structuredError("archive_fixture_failed", `/profile/tickers/${SOURCE_TICKER}/archive`),
+    );
+    actions = rowForTicker(SOURCE_TICKER)
+      .querySelectorAll<HTMLButtonElement>(".rowactions button");
+    await click(actions[actions.length - 1]!);
+    await expectSafeFailure("無法更新標的封存狀態。");
+    expect(apiMocks.setArchived).toHaveBeenCalledWith(SOURCE_TICKER, true);
+
+    await remount();
+    apiMocks.setPriority.mockReset().mockRejectedValue(
+      structuredError("priority_fixture_failed", `/profile/tickers/${SOURCE_TICKER}/priority`),
+    );
+    await change(rowForTicker(SOURCE_TICKER).querySelector<HTMLSelectElement>(".prio-select")!, "high");
+    await expectSafeFailure("無法更新標的優先順序。");
+    expect(apiMocks.setPriority).toHaveBeenCalledWith(SOURCE_TICKER, "high");
   });
 
   it("preserves selected list archived filter and sort across locale switch", async () => {
@@ -530,6 +592,9 @@ describe("Watchlist localization", () => {
 
   it("keeps optimistic priority work in flight and renders completion in the active locale", async () => {
     const priorityRequest = deferred<{ ticker: string; priority: string | null }>();
+    apiMocks.getUniverse.mockReset()
+      .mockResolvedValueOnce(UNIVERSE)
+      .mockRejectedValueOnce(structuredError("rollback_load_failed", "/profile/universe"));
     apiMocks.setPriority.mockReset().mockReturnValue(priorityRequest.promise);
     await mountWatchlist();
     await waitForText(SOURCE_TICKER);
@@ -543,11 +608,18 @@ describe("Watchlist localization", () => {
     await switchLocale("en");
     expect(priority.value).toBe("high");
     expect(priority.selectedOptions[0]?.textContent).toBe("high");
-    await act(async () => priorityRequest.resolve({ ticker: SOURCE_TICKER, priority: "high" }));
+    await act(async () => priorityRequest.reject(
+      structuredError("priority_fixture_failed", `/profile/tickers/${SOURCE_TICKER}/priority`),
+    ));
     await flush();
     expect(apiMocks.setPriority).toHaveBeenCalledWith(SOURCE_TICKER, "high");
-    expect(apiMocks.getUniverse).toHaveBeenCalledTimes(1);
-    expect(host!.textContent).toContain("Watchlist");
+    expect(apiMocks.setPriority).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getUniverse).toHaveBeenCalledTimes(2);
+    expect(host!.querySelector("[role='alert']")?.textContent).toContain(
+      "Could not update the ticker's priority.",
+    );
+    expect(host!.textContent).not.toContain("Could not load the Universe.");
+    expect(buttonByText("Refresh").disabled).toBe(false);
   });
 
   it("does not replay list membership archive or priority mutations on locale switch", async () => {
@@ -634,8 +706,9 @@ describe("Watchlist localization", () => {
     expect(consensus.textContent).toContain("Strong Buy");
     expect(consensus.textContent).toContain("7/4/3/1/0");
     expect(consensus.title).toBe(
-      "Strong buy 7 · Buy 4 · Hold 3 · Sell 1 · Strong sell 0\n15 analysts · Updated SOURCE_FET(cached)",
+      "Strong buy 7 · Buy 4 · Hold 3 · Sell 1 · Strong sell 0\n15 analysts · Updated SOURCE_FET (cached)",
     );
+    expect(consensus.title).not.toContain("SOURCE_FET(cached)");
     expect(rowForTicker("AAA.US").querySelector<HTMLElement>(".wl-consensus span")?.title).toBe(
       "Analyst data-source error; refresh to retry",
     );

@@ -51,6 +51,10 @@ type ConsensusCell =
   | { state: "loading" }
   | { state: "err" }
   | { state: "ok"; data: ConsensusSummary };
+type UniverseLoadOptions = {
+  clearError?: boolean;
+  reportError?: boolean;
+};
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
@@ -138,7 +142,10 @@ export function WatchlistView({
     }
   }, [defaultListId]);
 
-  const loadUniverse = useCallback(async (clearError = true) => {
+  const loadUniverse = useCallback(async ({
+    clearError = true,
+    reportError = true,
+  }: UniverseLoadOptions = {}) => {
     const id = ++universeReq.current;
     setRefreshing(true);
     if (clearError) setErr(null);
@@ -146,7 +153,7 @@ export function WatchlistView({
       const u = await getUniverse(true);
       if (id === universeReq.current) setUniverse({ rows: u.rows, asOf: u.as_of });
     } catch (e) {
-      if (id === universeReq.current) {
+      if (id === universeReq.current && reportError) {
         setErr(captureExploreError("watchlist_load_universe", e));
       }
     } finally {
@@ -344,7 +351,7 @@ export function WatchlistView({
         if (priority === null) void loadUniverse();
       } catch (e) {
         setErr(captureExploreError("watchlist_set_priority", e));
-        void loadUniverse(false); // revert to server truth without hiding the mutation failure
+        void loadUniverse({ clearError: false, reportError: false });
       }
     },
     [loadUniverse],
