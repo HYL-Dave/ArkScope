@@ -4,6 +4,7 @@
 // evidence, and the §2 AI card — which the 320px side panel could not.
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   addNote,
   addTickerTag,
@@ -490,6 +491,7 @@ function TagManager({
   tags: TagRef[];
   onChanged: () => void;
 }) {
+  const { t } = useTranslation("explore");
   const [draft, setDraft] = useState("");
   const [facet, setFacet] = useState("theme"); // user tags: theme or category
   const [catalog, setCatalog] = useState<Record<string, string[]>>({});
@@ -542,16 +544,16 @@ function TagManager({
   return (
     <div className="detail-tags">
       <span className="chips tagchips">
-        {tags.map((t) => (
-          <span key={tagKey(t)} className={tagClass(t)} title={tagTitle(t)}>
-            {t.value}
-            {isEditableTag(t) && (
+        {tags.map((tag) => (
+          <span key={tagKey(tag)} className={tagClass(tag)} title={tagTitle(tag, t)}>
+            {tag.value}
+            {isEditableTag(tag) && (
               <button
                 type="button"
                 className="tagchip-x"
                 title="移除標籤"
                 disabled={busy}
-                onClick={() => void remove(t)}
+                onClick={() => void remove(tag)}
               >
                 ×
               </button>

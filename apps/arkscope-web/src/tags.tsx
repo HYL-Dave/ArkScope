@@ -5,32 +5,22 @@
 // given a distinct accent. Only editable tags (user/legacy) get a remove
 // affordance — provenance/provider/system are read-only external facts.
 
-import i18n from "i18next";
-import { useTranslation } from "react-i18next";
-
 import { isEditableTag, type TagRef } from "./api";
 import type { ExploreT } from "./explore/explorePresentation";
 
 type KnownTagFacet = "category" | "theme" | "provenance" | "industry" | "sector";
 
-// Tasks 5/7 will pass translators from the remaining direct helper callers.
-// Until then, their compatibility path still resolves copy from Explore resources.
-function activeExploreT(): ExploreT {
-  return i18n.getFixedT(null, "explore");
-}
-
 // Facet axes used for the filter dropdowns, in display order. Industry/sector
-// (provider-sourced) join later (slice 3); unknown facets fall through. Getter-backed
-// labels keep Universe resource-owned until its Task 5 translator migration.
-export const TAG_FACETS: { facet: KnownTagFacet; readonly label: string }[] = [
-  { facet: "category", get label() { return facetLabel("category"); } },
-  { facet: "theme", get label() { return facetLabel("theme"); } },
-  { facet: "provenance", get label() { return facetLabel("provenance"); } },
-  { facet: "industry", get label() { return facetLabel("industry"); } },
-  { facet: "sector", get label() { return facetLabel("sector"); } },
-];
+// (provider-sourced) join later (slice 3); unknown facets fall through.
+export const TAG_FACETS: readonly { facet: KnownTagFacet }[] = [
+  { facet: "category" },
+  { facet: "theme" },
+  { facet: "provenance" },
+  { facet: "industry" },
+  { facet: "sector" },
+] as const;
 
-export function facetLabel(facet: string, t: ExploreT = activeExploreT()): string {
+export function facetLabel(facet: string, t: ExploreT): string {
   switch (facet) {
     case "category":
       return t(($) => $.tags.category);
@@ -65,7 +55,7 @@ export function tagClass(t: TagRef): string {
   }
 }
 
-export function tagTitle(tag: TagRef, t: ExploreT = activeExploreT()): string {
+export function tagTitle(tag: TagRef, t: ExploreT): string {
   const readOnly = isEditableTag(tag) ? "" : ` ${t(($) => $.tags.readOnlySuffix)}`;
   return t(($) => $.tags.compositeTitle, {
     facet: facetLabel(tag.facet, t),
@@ -80,16 +70,23 @@ export function tagKey(t: TagRef): string {
 }
 
 // Read-only chip row for table cells. Caps the count with a "+N" overflow.
-export function TagChips({ tags, max = 5 }: { tags?: TagRef[]; max?: number }) {
-  const { t: translate } = useTranslation("explore");
+export function TagChips({
+  tags,
+  t,
+  max = 5,
+}: {
+  tags?: TagRef[];
+  t: ExploreT;
+  max?: number;
+}) {
   if (!tags || tags.length === 0) return null;
   const shown = tags.slice(0, max);
   const extra = tags.length - shown.length;
   return (
     <span className="chips tagchips">
-      {shown.map((t) => (
-        <span key={tagKey(t)} className={tagClass(t)} title={tagTitle(t, translate)}>
-          {t.value}
+      {shown.map((tag) => (
+        <span key={tagKey(tag)} className={tagClass(tag)} title={tagTitle(tag, t)}>
+          {tag.value}
         </span>
       ))}
       {extra > 0 && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   addMember,
   createList,
@@ -61,6 +62,7 @@ function universeToTab(r: UniverseRow): TabRow {
 }
 
 export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
+  const { t } = useTranslation("explore");
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null); // null = all custom lists
   const [defaultListId, setDefaultListId] = useState<number | null>(null);
@@ -555,7 +557,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                           <option value="low">low</option>
                         </select>
                       </td>
-                      <td><TagChips tags={r.tags} max={4} /></td>
+                      <td><TagChips tags={r.tags} t={t} max={4} /></td>
                       <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
                         <span className="rowactions">
                           <button type="button" title="Open detail" onClick={() => onOpenTicker(r.ticker)}>↗</button>

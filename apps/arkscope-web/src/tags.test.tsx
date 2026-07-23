@@ -3,7 +3,7 @@ import React from "react";
 import { act } from "react";
 import { createInstance, type i18n } from "i18next";
 import { createRoot } from "react-dom/client";
-import { I18nextProvider } from "react-i18next";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { TagRef } from "./api";
@@ -31,6 +31,11 @@ function exploreT(locale: Locale): ExploreT {
   return instanceFor(locale).getFixedT(locale, "explore");
 }
 
+function Harness({ tags }: { tags: TagRef[] }) {
+  const { t } = useTranslation("explore");
+  return <TagChips tags={tags} t={t} />;
+}
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
@@ -41,7 +46,7 @@ function renderTags(instance: i18n, tags: TagRef[]) {
   act(() => {
     root!.render(
       <I18nextProvider i18n={instance}>
-        <TagChips tags={tags} />
+        <Harness tags={tags} />
       </I18nextProvider>,
     );
   });
@@ -61,6 +66,14 @@ describe("Explore tags", () => {
       "zh-Hant": ["類別", "主題", "來源依據", "Industry", "Sector"],
       en: ["Category", "Theme", "Provenance", "Industry", "Sector"],
     } as const;
+
+    expect(TAG_FACETS).toEqual([
+      { facet: "category" },
+      { facet: "theme" },
+      { facet: "provenance" },
+      { facet: "industry" },
+      { facet: "sector" },
+    ]);
 
     for (const locale of ["zh-Hant", "en"] as const) {
       const t = exploreT(locale);

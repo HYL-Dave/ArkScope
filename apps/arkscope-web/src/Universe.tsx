@@ -6,6 +6,7 @@
 // in 自選股; this is inventory.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getProfileLists,
   getUniverse,
@@ -14,9 +15,10 @@ import {
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
-import { TAG_FACETS, TagChips } from "./tags";
+import { TAG_FACETS, TagChips, facetLabel } from "./tags";
 
 export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
+  const { t } = useTranslation("explore");
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [meta, setMeta] = useState<{ total: number; summarized: number; archived: number } | null>(null);
@@ -159,8 +161,9 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 <option key={l} value={l}>{l}</option>
               ))}
             </select>
-            {TAG_FACETS.map((f) =>
-              tagValues[f.facet].length > 0 ? (
+            {TAG_FACETS.map((facet) => {
+              const f = { ...facet, label: facetLabel(facet.facet, t) };
+              return tagValues[f.facet].length > 0 ? (
                 <select
                   key={f.facet}
                   className="universe-select"
@@ -173,8 +176,8 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                     <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
-              ) : null,
-            )}
+              ) : null;
+            })}
             {activeTagFilters > 0 && (
               <button className="btn-ghost tiny" onClick={() => setTagFilters({})} title="清除分類篩選">
                 清除分類 ✕
@@ -221,7 +224,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                       {r.lists.length > 4 && <span className="muted tiny">+{r.lists.length - 4}</span>}
                     </span>
                   </td>
-                  <td><TagChips tags={r.tags} /></td>
+                  <td><TagChips tags={r.tags} t={t} /></td>
                   <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
