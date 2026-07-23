@@ -78,6 +78,18 @@ describe("bundled i18n resources", () => {
         },
       },
     } as const;
+    const expectedNewsCopy = {
+      "zh-Hant": {
+        marketSearchSummary: "· 搜尋「{{query}}」（按相關性排序，標題加權）",
+        seekingAlphaSearchSummary: "· 搜尋「{{query}}」",
+        loadMoreProgress: "載入更多（{{visible}}/{{total}}）",
+      },
+      en: {
+        marketSearchSummary: "· Search “{{query}}” (sorted by relevance with title weighting)",
+        seekingAlphaSearchSummary: "· Search “{{query}}”",
+        loadMoreProgress: "Load more ({{visible}}/{{total}})",
+      },
+    } as const;
 
     expect(resourceNamespaces).toContain("explore");
     for (const locale of ["zh-Hant", "en"] as const) {
@@ -107,6 +119,9 @@ describe("bundled i18n resources", () => {
         "universe.summaryCounts.one",
         "universe.summaryCounts.other",
         "universe.importSummarySeparator",
+        "news.marketSearchSummary",
+        "news.seekingAlphaSearchSummary",
+        "news.loadMoreProgress",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
       }
@@ -126,10 +141,15 @@ describe("bundled i18n resources", () => {
         "universe.noteCount",
         "universe.summaryCounts",
         "universe.withSummary",
+        "news.searchPrefix",
+        "news.searchSuffix",
+        "news.loadMore",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(false);
       }
       expect.soft(explore, `${locale}.explore count copy`).toMatchObject(expectedCountCopy[locale]);
+      expect.soft((explore as ResourceTree).news, `${locale}.explore news copy`)
+        .toMatchObject(expectedNewsCopy[locale]);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(
           flattenResource((explore as ResourceTree)[subtree] as ResourceTree).size,
