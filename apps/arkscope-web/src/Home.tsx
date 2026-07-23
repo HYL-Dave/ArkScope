@@ -6,6 +6,7 @@
 // per-ticker detail (Watchlist → AI summary), surfaced back here as recent cards.
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getCards,
   getProfileLists,
@@ -18,6 +19,12 @@ import {
 import { allActiveRows, customListNameSet } from "./watchlist-derive";
 import type { StatusState } from "./Dashboard";
 import { CardModal } from "./AICard";
+import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
+import {
+  captureExploreError,
+  type ExploreErrorState,
+} from "./explore/explorePresentation";
+import type { NavigationTarget } from "./shell/navigation";
 
 type NavTarget = "Home" | "Watchlist" | "System";
 
@@ -26,17 +33,22 @@ export function HomeView({
   onNavigate,
   onOpenTicker,
   runtime,
+  developerMode,
+  onNavigateTarget,
 }: {
   status: StatusState;
   onNavigate: (view: NavTarget) => void;
   onOpenTicker: (ticker: string) => void;
   runtime?: RuntimeConfig | null;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
 }) {
+  const { t } = useTranslation("explore");
   const [active, setActive] = useState<UniverseRow[] | null>(null);
   const [asOf, setAsOf] = useState<string | null>(null);
   const [archivedCount, setArchivedCount] = useState(0);
   const [cards, setCards] = useState<CardSummary[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [openCardId, setOpenCardId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -59,7 +71,7 @@ export function HomeView({
       setCards(c.cards);
       setErr(null);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("home_load_workspace", e));
     }
   }, []);
 
@@ -78,39 +90,68 @@ export function HomeView({
       <main className="main">
         <div className="home">
           <section className="home-overview">
-            <OvTile label="自選股" value={active ? rows.length : "—"}
-              sub={active ? `共 ${rows.length + archivedCount} · ${archivedCount} 已封存` : "loading…"} />
-            <OvTile label="告警" value="—" sub="尚未啟用" />
-            <OvTile label="資料來源" value={dsCount ?? "—"}
-              sub={status.kind === "ready" ? `${status.status.tools_registered} tools` : "—"} />
-            <OvTile label="資料時間" value={asOf ? fmtDate(asOf) : "—"} sub="watchlist as-of" />
+            <OvTile
+              label={t(($) => $.home.watchlistLabel)}
+              value={active ? rows.length : "—"}
+              sub={active
+                ? t(($) => $.home.rowArchiveSummary, {
+                    count: rows.length + archivedCount,
+                    archivedCount,
+                  })
+                : t(($) => $.home.loading)}
+            />
+            <OvTile
+              label={t(($) => $.home.alertLabel)}
+              value="—"
+              sub={t(($) => $.home.unavailable)}
+            />
+            <OvTile
+              label={t(($) => $.home.dataSource)}
+              value={dsCount ?? "—"}
+              sub={status.kind === "ready"
+                ? t(($) => $.home.toolCount, { count: status.status.tools_registered })
+                : "—"}
+            />
+            <OvTile
+              label={t(($) => $.home.dataAsOf)}
+              value={asOf ? fmtDate(asOf) : "—"}
+              sub={t(($) => $.home.watchlistAsOf)}
+            />
           </section>
 
           {err && (
-            <div className="refresh-err">
-              無法載入工作台資料：{err}{" "}
-              <button className="btn-ghost" onClick={() => void load()}>重試</button>
-            </div>
+            <ExploreErrorNotice
+              state={err}
+              developerMode={developerMode}
+              retryLabel={t(($) => $.home.retry)}
+              onRetry={() => void load()}
+              onNavigate={onNavigateTarget}
+            />
           )}
 
           <section className="home-block">
             <div className="home-block-head">
-              <h2>自選股動態 <span className="muted tiny">top movers · 7d</span></h2>
-              <button className="btn-ghost" onClick={() => onNavigate("Watchlist")}>查看全部 →</button>
+              <h2>
+                {t(($) => $.home.watchlistActivity)}{" "}
+                <span className="muted tiny">{t(($) => $.home.topMovers)}</span>
+              </h2>
+              <button className="btn-ghost" onClick={() => onNavigate("Watchlist")}>
+                {t(($) => $.home.viewAll)}
+              </button>
             </div>
             {active === null ? (
-              <p className="muted">載入中…</p>
+              <p className="muted">{t(($) => $.home.loading)}</p>
             ) : rows.length === 0 ? (
-              <p className="muted">尚無自選股。到「自選股」建立清單並加入標的。</p>
+              <p className="muted">{t(($) => $.home.emptyWatchlist)}</p>
             ) : (
               <table className="home-table">
                 <thead>
                   <tr>
-                    <th>Ticker</th>
-                    <th className="num">Close</th>
-                    <th className="num">7d %</th>
-                    <th className="num">News</th>
-                    <th>Priority</th>
+                    <th>{t(($) => $.home.ticker)}</th>
+                    <th className="num">{t(($) => $.home.close)}</th>
+                    <th className="num">{t(($) => $.home.change7d)}</th>
+                    <th className="num">{t(($) => $.home.news)}</th>
+                    <th>{t(($) => $.home.priority)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -130,13 +171,18 @@ export function HomeView({
 
           <section className="home-block">
             <div className="home-block-head">
-              <h2>最近 AI 卡片 <span className="muted tiny">recent research cards</span></h2>
-              <button className="btn-ghost" onClick={() => onNavigate("Watchlist")}>到自選股產生 →</button>
+              <h2>
+                {t(($) => $.home.recentAiCards)}{" "}
+                <span className="muted tiny">{t(($) => $.home.recentResearchCards)}</span>
+              </h2>
+              <button className="btn-ghost" onClick={() => onNavigate("Watchlist")}>
+                {t(($) => $.home.generateInWatchlist)}
+              </button>
             </div>
             {cards === null ? (
-              <p className="muted">載入中…</p>
+              <p className="muted">{t(($) => $.home.loading)}</p>
             ) : cards.length === 0 ? (
-              <p className="muted">尚無 AI 卡片。在自選股詳情頁產生第一張研究卡片。</p>
+              <p className="muted">{t(($) => $.home.emptyCards)}</p>
             ) : (
               <ul className="card-list">
                 {cards.map((c) => (
