@@ -29,11 +29,43 @@ function hasSelector(name: string): boolean {
   return new RegExp(`\\.${escaped}(?=[\\s.{:#,>+~\\[])`).test(allCss);
 }
 
+function cssBlock(sourceText: string, marker: string): string {
+  const markerAt = sourceText.indexOf(marker);
+  const openAt = markerAt < 0 ? -1 : sourceText.indexOf("{", markerAt);
+  if (openAt < 0) return "";
+  let depth = 0;
+  for (let index = openAt; index < sourceText.length; index += 1) {
+    if (sourceText[index] === "{") depth += 1;
+    if (sourceText[index] !== "}") continue;
+    depth -= 1;
+    if (depth === 0) return sourceText.slice(openAt + 1, index);
+  }
+  return "";
+}
+
 describe("responsive application shell CSS", () => {
   it("keeps the topbar primary row wrap-safe for long localized labels", () => {
     const primary = shellCss.match(/\.shell-topbar-primary\s*\{([^}]*)\}/)?.[1] ?? "";
 
     expect(primary).toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it("stacks narrow surface chrome before localized copy collapses", () => {
+    const narrow = cssBlock(legacyCss, "@media (max-width: 760px)");
+    const surfaceHead = cssBlock(narrow, ".surface-head");
+    const surfaceMeta = cssBlock(narrow, ".surface-head > .muted");
+    const surfaceSpacer = cssBlock(narrow, ".surface-head > .spacer");
+    const inlineAlert = cssBlock(narrow, ".main .ui-inline-alert");
+    const inlineActionRules = Array.from(
+      narrow.matchAll(/\.main \.ui-inline-alert > \.ui-inline-alert-action\s*\{([^}]*)\}/g),
+      (match) => match[1] ?? "",
+    );
+
+    expect(surfaceHead).toMatch(/flex-wrap:\s*wrap/);
+    expect(surfaceMeta).toMatch(/flex:\s*1\s+1\s+180px/);
+    expect(surfaceSpacer).toMatch(/display:\s*none/);
+    expect(inlineAlert).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    expect(inlineActionRules.some((rule) => /flex-wrap:\s*wrap/.test(rule))).toBe(true);
   });
 
   it("defines a two-column wide shell and no third rail track", () => {
