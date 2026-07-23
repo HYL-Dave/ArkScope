@@ -79,18 +79,19 @@ export function AICardTab({
   // remounting this component per ticker (Watchlist keys TickerDetail by
   // ticker), NOT from this token.
   const reqRef = useRef(0);
+  const recentReqRef = useRef(0);
   const profileReqRef = useRef(0);
 
   const loadRecent = useCallback(async () => {
-    const id = reqRef.current;
+    const id = ++recentReqRef.current;
     try {
       const d = await getCards(ticker, 10);
-      if (id === reqRef.current) {
+      if (id === recentReqRef.current) {
         setRecent(d.cards);
         setRecentErr(null);
       }
     } catch (e) {
-      if (id === reqRef.current) {
+      if (id === recentReqRef.current) {
         setRecentErr(captureExploreError("card_load_recent", e));
       }
     }
@@ -132,6 +133,9 @@ export function AICardTab({
     setRecentErr(null);
     setRecent(null);
     void loadRecent();
+    return () => {
+      recentReqRef.current += 1;
+    };
   }, [ticker, loadRecent]);
 
   async function generate() {
@@ -264,11 +268,15 @@ export function AICardTab({
         <div className="aicard-adv">
           <label>{t(($) => $.aiCard.newsLookback)}
             <input type="number" min={1} max={90} value={newsDays} disabled={busy}
-              onChange={(e) => setNewsDays(clampInt(e.target.value, 1, 90, 21))} /> {t(($) => $.aiCard.daysSuffix)}
+              onChange={(e) => setNewsDays(clampInt(e.target.value, 1, 90, 21))} /> {newsDays === 1
+                ? t(($) => $.aiCard.daysSuffix.one)
+                : t(($) => $.aiCard.daysSuffix.other)}
           </label>
           <label>{t(($) => $.aiCard.maximumUsed)}
             <input type="number" min={1} max={50} value={maxNews} disabled={busy}
-              onChange={(e) => setMaxNews(clampInt(e.target.value, 1, 50, 12))} /> {t(($) => $.aiCard.recentArticlesSuffix)}
+              onChange={(e) => setMaxNews(clampInt(e.target.value, 1, 50, 12))} /> {maxNews === 1
+                ? t(($) => $.aiCard.recentArticlesSuffix.one)
+                : t(($) => $.aiCard.recentArticlesSuffix.other)}
           </label>
           <span className="muted tiny">{t(($) => $.aiCard.defaultNewsRange)}</span>
           {investorProfile?.profile.enabled && (
@@ -505,8 +513,14 @@ export function CardView({
       <details className="cardview-trace">
         <summary>
           {t(($) => $.aiCard.traceabilityPrefix)}
-          {tr.data_sources.length} {t(($) => $.aiCard.sourcesSeparator)} {tr.claims.length}
-          {t(($) => $.aiCard.citationsSuffix)}
+          {tr.data_sources.length}{" "}
+          {tr.data_sources.length === 1
+            ? t(($) => $.aiCard.sourcesSeparator.one)
+            : t(($) => $.aiCard.sourcesSeparator.other)}{" "}
+          {tr.claims.length}{" "}
+          {tr.claims.length === 1
+            ? t(($) => $.aiCard.citationsSuffix.one)
+            : t(($) => $.aiCard.citationsSuffix.other)}
         </summary>
         <ul className="trace-sources">
           {tr.data_sources.map((s, i) => (
@@ -761,7 +775,7 @@ function unique(xs: string[]): string[] {
   return Array.from(new Set(xs.filter(Boolean)));
 }
 
-function confidenceLabel(level: CardSummary["confidence_level"], t: ExploreT): string {
+export function confidenceLabel(level: CardSummary["confidence_level"], t: ExploreT): string {
   switch (level) {
     case "high":
       return t(($) => $.aiCard.confidenceHigh);
@@ -784,7 +798,11 @@ function summarizeValue(value: unknown, t: ExploreT): string {
   if (value == null) return "—";
   if (typeof value === "string") return clip(value);
   if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) return t(($) => $.aiCard.itemCount, { count: value.length });
+  if (Array.isArray(value)) {
+    return value.length === 1
+      ? t(($) => $.aiCard.itemCount.one, { count: value.length })
+      : t(($) => $.aiCard.itemCount.other, { count: value.length });
+  }
   if (typeof value === "object") {
     const keys = Object.keys(value as Record<string, unknown>);
     return `{${keys.slice(0, 4).join(", ")}${keys.length > 4 ? ", …" : ""}}`;

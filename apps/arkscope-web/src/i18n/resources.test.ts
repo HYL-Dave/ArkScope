@@ -36,8 +36,8 @@ describe("bundled i18n resources", () => {
       watchlist: 71,
       universe: 35,
       news: 43,
-      tickerDetail: 103,
-      aiCard: 62,
+      tickerDetail: 105,
+      aiCard: 67,
       tags: 7,
     } as const;
     const expectedCountCopy = {
@@ -99,8 +99,14 @@ describe("bundled i18n resources", () => {
     const expectedTask7Copy = {
       "zh-Hant": {
         tickerDetail: {
-          ivHistorySummary: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
-          statementSummary: "{{title}}（{{count}} 期）",
+          ivHistorySummary: {
+            one: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
+            other: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
+          },
+          statementSummary: {
+            one: "{{title}}（{{count}} 期）",
+            other: "{{title}}（{{count}} 期）",
+          },
           retry: "重試",
           kvLabels: {
             latestClose: "最新收盤價",
@@ -142,12 +148,23 @@ describe("bundled i18n resources", () => {
         },
         aiCard: {
           evidenceSummary: "引用證據摘要（{{shown}} / {{total}}）",
+          daysSuffix: { one: "天", other: "天" },
+          recentArticlesSuffix: { one: "篇（最近期）", other: "篇（最近期）" },
+          sourcesSeparator: { one: "源 ·", other: "源 ·" },
+          citationsSuffix: { one: "引用）", other: "引用）" },
+          itemCount: { one: "[{{count}} 項]", other: "[{{count}} 項]" },
         },
       },
       en: {
         tickerDetail: {
-          ivHistorySummary: "IV history (latest {{count}} rows · Source {{source}})",
-          statementSummary: "{{title}} ({{count}} periods)",
+          ivHistorySummary: {
+            one: "IV history (latest {{count}} row · Source {{source}})",
+            other: "IV history (latest {{count}} rows · Source {{source}})",
+          },
+          statementSummary: {
+            one: "{{title}} ({{count}} period)",
+            other: "{{title}} ({{count}} periods)",
+          },
           retry: "Retry",
           kvLabels: {
             latestClose: "Latest close",
@@ -189,6 +206,14 @@ describe("bundled i18n resources", () => {
         },
         aiCard: {
           evidenceSummary: "Evidence citation summary ({{shown}} / {{total}})",
+          daysSuffix: { one: "day", other: "days" },
+          recentArticlesSuffix: {
+            one: "article (most recent)",
+            other: "articles (most recent)",
+          },
+          sourcesSeparator: { one: "source ·", other: "sources ·" },
+          citationsSuffix: { one: "citation)", other: "citations)" },
+          itemCount: { one: "[{{count}} item]", other: "[{{count}} items]" },
         },
       },
     } as const;
@@ -199,7 +224,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(394);
+      expect(flattened.size, `${locale}.explore`).toBe(401);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -227,10 +252,22 @@ describe("bundled i18n resources", () => {
         "news.modeLabel",
         "news.marketProviderLabel",
         "news.dayWindowLabel",
-        "tickerDetail.ivHistorySummary",
-        "tickerDetail.statementSummary",
+        "tickerDetail.ivHistorySummary.one",
+        "tickerDetail.ivHistorySummary.other",
+        "tickerDetail.statementSummary.one",
+        "tickerDetail.statementSummary.other",
         "tickerDetail.retry",
         "aiCard.evidenceSummary",
+        "aiCard.daysSuffix.one",
+        "aiCard.daysSuffix.other",
+        "aiCard.recentArticlesSuffix.one",
+        "aiCard.recentArticlesSuffix.other",
+        "aiCard.sourcesSeparator.one",
+        "aiCard.sourcesSeparator.other",
+        "aiCard.citationsSuffix.one",
+        "aiCard.citationsSuffix.other",
+        "aiCard.itemCount.one",
+        "aiCard.itemCount.other",
       ]) {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
       }
@@ -590,12 +627,12 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 702 Settings 32 Common 5 Research and 359 Explore leaves per locale", () => {
+  it("contains exactly 702 Settings 32 Common 5 Research and 401 Explore leaves per locale", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       expect.soft(flattenResource(resources[locale].settings as ResourceTree).size, `${locale}.settings`)
         .toBe(702);
       const localeResources = resources[locale] as Record<string, unknown>;
-      const expectedCounts = { common: 32, research: 5, explore: 394 } as const;
+      const expectedCounts = { common: 32, research: 5, explore: 401 } as const;
       for (const [namespace, count] of Object.entries(expectedCounts)) {
         const resource = localeResources[namespace];
         expect.soft(resource, `${locale}.${namespace}`).toBeDefined();

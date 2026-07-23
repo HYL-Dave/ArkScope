@@ -3,7 +3,7 @@
 // is the detail. Gives real room for the price/volume chart (reserved area),
 // evidence, and the §2 AI card — which the 320px side panel could not.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   addNote,
@@ -62,14 +62,19 @@ export function TickerDetailView({
   const [tab, setTab] = useState<Tab>("overview");
   const [state, setState] = useState<TickerAggregate | null>(null);
   const [stateErr, setStateErr] = useState<ExploreErrorState | null>(null);
+  const stateRequestSeqRef = useRef(0);
 
   const refreshState = useCallback(async () => {
+    const requestSeq = ++stateRequestSeqRef.current;
     try {
       const d = await getTickerState(ticker);
+      if (requestSeq !== stateRequestSeqRef.current) return;
       setState(d);
       setStateErr(null);
     } catch (e) {
-      setStateErr(captureExploreError("ticker_load_state", e));
+      if (requestSeq === stateRequestSeqRef.current) {
+        setStateErr(captureExploreError("ticker_load_state", e));
+      }
     }
   }, [ticker]);
 
@@ -77,6 +82,9 @@ export function TickerDetailView({
     setState(null);
     setStateErr(null);
     void refreshState();
+    return () => {
+      stateRequestSeqRef.current += 1;
+    };
   }, [refreshState]);
 
   return (
@@ -408,10 +416,15 @@ function DataTab({
           <details className="detail-raw">
             {/* the history table is its own request → label it with its OWN source */}
             <summary>
-              {t(($) => $.tickerDetail.ivHistorySummary, {
-                count: recentHist.length,
-                source: sourceLabel(ivHist?.source_path, t),
-              })}
+              {recentHist.length === 1
+                ? t(($) => $.tickerDetail.ivHistorySummary.one, {
+                    count: recentHist.length,
+                    source: sourceLabel(ivHist?.source_path, t),
+                  })
+                : t(($) => $.tickerDetail.ivHistorySummary.other, {
+                    count: recentHist.length,
+                    source: sourceLabel(ivHist?.source_path, t),
+                  })}
             </summary>
             <table className="data-table">
               <thead>
@@ -542,7 +555,11 @@ function StatementsBlock({ title, rows }: { title: string; rows: FinancialStatem
   const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.data))));
   return (
     <details className="detail-raw">
-      <summary>{t(($) => $.tickerDetail.statementSummary, { title, count: rows.length })}</summary>
+      <summary>
+        {rows.length === 1
+          ? t(($) => $.tickerDetail.statementSummary.one, { title, count: rows.length })
+          : t(($) => $.tickerDetail.statementSummary.other, { title, count: rows.length })}
+      </summary>
       <table className="data-table">
         <thead>
           <tr>
@@ -586,14 +603,19 @@ function NotesTab({
   const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [failedAddPayload, setFailedAddPayload] = useState<NoteAddPayload | null>(null);
   const [failedDeleteId, setFailedDeleteId] = useState<number | null>(null);
+  const notesRequestSeqRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const requestSeq = ++notesRequestSeqRef.current;
     try {
       const d = await getNotes(ticker);
+      if (requestSeq !== notesRequestSeqRef.current) return;
       setNotes(d.notes);
       setErr(null);
     } catch (e) {
-      setErr(captureExploreError("ticker_load_notes", e));
+      if (requestSeq === notesRequestSeqRef.current) {
+        setErr(captureExploreError("ticker_load_notes", e));
+      }
     }
   }, [ticker]);
 
@@ -602,6 +624,9 @@ function NotesTab({
     setErr(null);
     setFailedAddPayload(null);
     void refresh();
+    return () => {
+      notesRequestSeqRef.current += 1;
+    };
   }, [refresh]);
 
   async function submit(retryPayload?: NoteAddPayload) {
@@ -737,18 +762,27 @@ function TagManager({
   const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [failedAddPayload, setFailedAddPayload] = useState<TagAddPayload | null>(null);
   const [failedTag, setFailedTag] = useState<TagRef | null>(null);
+  const catalogRequestSeqRef = useRef(0);
 
   const loadCatalog = useCallback(async () => {
+    const requestSeq = ++catalogRequestSeqRef.current;
     try {
-      setCatalog((await getTagCatalog()).catalog);
+      const response = await getTagCatalog();
+      if (requestSeq !== catalogRequestSeqRef.current) return;
+      setCatalog(response.catalog);
       setCatalogErr(null);
     } catch (e) {
-      setCatalogErr(captureExploreError("ticker_load_tag_catalog", e));
+      if (requestSeq === catalogRequestSeqRef.current) {
+        setCatalogErr(captureExploreError("ticker_load_tag_catalog", e));
+      }
     }
   }, []);
   useEffect(() => {
     void loadCatalog();
-  }, [loadCatalog]);
+    return () => {
+      catalogRequestSeqRef.current += 1;
+    };
+  }, [loadCatalog, ticker]);
 
   async function add(retryPayload?: TagAddPayload) {
     const payload = retryPayload ?? { ticker, value: draft.trim(), facet };

@@ -162,6 +162,7 @@ const EVIDENCE: EvidencePacket = {
       data: {
         SOURCE_DATA_KEY: "SOURCE DATA VALUE / 原值",
         SOURCE_ARRAY: ["A", "B", "C"],
+        SOURCE_SINGLE_ARRAY: ["ONLY"],
       },
       note: SOURCE_NOTE,
     },
@@ -407,6 +408,13 @@ describe("AI Card localization", () => {
   it("renders reviewed zh-Hant Card chrome and generated content byte for byte", async () => {
     await mountTab();
     expect(host!.querySelector(".saved-star")?.getAttribute("title")).toBe("已存為報告");
+    await click(buttonByText("進階"));
+    const numbers = host!.querySelectorAll<HTMLInputElement>('.aicard-adv input[type="number"]');
+    const advancedLabels = host!.querySelectorAll<HTMLElement>(".aicard-adv label");
+    expect(numbers[0]!.value).toBe("21");
+    expect(advancedLabels[0]!.textContent).toBe("新聞回看 天");
+    expect(numbers[1]!.value).toBe("12");
+    expect(advancedLabels[1]!.textContent).toBe("最多採用 篇（最近期）");
 
     const question = host!.querySelector<HTMLInputElement>(".aicard-q")!;
     await setValue(question, SOURCE_QUESTION);
@@ -450,6 +458,7 @@ describe("AI Card localization", () => {
     expect(confidence?.textContent).toBe(`可信度說明：${SOURCE_RATIONALE}`);
     expect(trace.querySelector("summary")?.textContent)
       .toBe("資料來源 · 可追溯性（1 源 · 1 引用）");
+    expect(trace.textContent).toContain("[1 項]");
     expect(completeness?.textContent).toBe(
       `完整度 — 新聞 ✓ · 基本面 — · 技術面 ✓ · ${SOURCE_COMPLETENESS_NOTE}`,
     );
@@ -468,6 +477,16 @@ describe("AI Card localization", () => {
     expect(host!.textContent).toContain("Recent Cards");
     expect(host!.textContent).toContain(SOURCE_CONCLUSION);
     expect(host!.querySelector(".saved-star")?.getAttribute("title")).toBe("saved as report");
+
+    await click(buttonByText("Advanced"));
+    const numbers = host!.querySelectorAll<HTMLInputElement>('.aicard-adv input[type="number"]');
+    const advancedLabels = host!.querySelectorAll<HTMLElement>(".aicard-adv label");
+    await setValue(numbers[0]!, "1");
+    await setValue(numbers[1]!, "1");
+    expect(numbers[0]!.value).toBe("1");
+    expect(advancedLabels[0]!.textContent).toBe("News lookback day");
+    expect(numbers[1]!.value).toBe("1");
+    expect(advancedLabels[1]!.textContent).toBe("Use at most article (most recent)");
 
     await click(buttonByText("Generate Card"));
     await waitForText(SOURCE_REASON);
@@ -492,13 +511,22 @@ describe("AI Card localization", () => {
     ]) {
       expect(text).toContain(expected);
     }
+    expect(host!.querySelector(".cardview-trace summary")?.textContent)
+      .toBe("Data sources · Traceability (1 source · 1 citation)");
+    expect(host!.querySelector(".cardview-trace")?.textContent).toContain("[1 item]");
     expect(apiMocks.translateCard).not.toHaveBeenCalled();
   });
 
   it("maps recent Card and Investor Profile load failures separately", async () => {
-    apiMocks.getCards.mockRejectedValueOnce(
-      structuredError("recent_cards_failed", "/analysis/cards?limit=10"),
-    );
+    const olderRetry = deferred<{ cards: CardSummary[] }>();
+    const newerRetry = deferred<{ cards: CardSummary[] }>();
+    apiMocks.getCards.mockReset()
+      .mockRejectedValueOnce(
+        structuredError("recent_cards_failed", "/analysis/cards?limit=10"),
+      )
+      .mockReturnValueOnce(olderRetry.promise)
+      .mockReturnValueOnce(newerRetry.promise)
+      .mockResolvedValue({ cards: RECENT });
     apiMocks.getInvestorProfile.mockRejectedValueOnce(
       structuredError("investor_profile_failed", "/profile/investor"),
     );
@@ -513,6 +541,29 @@ describe("AI Card localization", () => {
     expect(host!.textContent).not.toContain(RAW_ERROR);
     expect(apiMocks.getCards).toHaveBeenCalledWith(TICKER, 10);
     expect(apiMocks.getInvestorProfile).toHaveBeenCalledTimes(1);
+
+    const recentAlert = Array.from(host!.querySelectorAll<HTMLElement>('[role="alert"]'))
+      .find((node) => node.querySelector(".ui-status-badge")?.textContent
+        === "無法載入最近卡片。")!;
+    await click(buttonByText("重試", recentAlert));
+    await waitForCalls(apiMocks.getCards, 2);
+    await click(buttonByText("重試", recentAlert));
+    await waitForCalls(apiMocks.getCards, 3);
+    await act(async () => {
+      newerRetry.resolve({ cards: RECENT_B });
+      await newerRetry.promise;
+    });
+    await waitForText(SOURCE_CONCLUSION_B);
+    await act(async () => {
+      olderRetry.reject(structuredError("stale_recent_cards_failure"));
+      await olderRetry.promise.catch(() => undefined);
+    });
+    await flush();
+
+    expect(host!.textContent).toContain(SOURCE_CONCLUSION_B);
+    expect(Array.from(host!.querySelectorAll("[role=alert] .ui-status-badge"))
+      .map((node) => node.textContent)).toEqual(["無法載入投資人設定。"]);
+    expect(apiMocks.getCards).toHaveBeenCalledTimes(3);
   });
 
   it("maps generation failure without changing question or advanced controls", async () => {
@@ -781,6 +832,7 @@ describe("AI Card localization", () => {
       "as-of SOURCE_EVIDENCE_AS_OF",
       "· realtime",
       "[3 items]",
+      "[1 item]",
       SOURCE_CLAIM,
       SOURCE_EVIDENCE_ID,
       SOURCE_PROVIDER,

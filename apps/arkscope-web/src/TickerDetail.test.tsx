@@ -58,6 +58,9 @@ const SOURCE_NOTE_BODY = "SOURCE NOTE / 原文 <keep>";
 const SOURCE_SIGNAL = "SOURCE_SIGNAL_V9";
 const SOURCE_FUNDAMENTAL_PROVIDER = "provider/source-fundamentals";
 const SOURCE_ROW = "SOURCE Revenue / 營收 <keep>";
+const SOURCE_NEWER_STATE_LIST = "SOURCE NEWER STATE LIST / 保留";
+const SOURCE_NEWER_NOTE_BODY = "SOURCE NEWER NOTE READ / 保留";
+const SOURCE_NEWER_TAG_VALUE = "SOURCE NEWER TAG CATALOG / 保留";
 const UNKNOWN_SOURCE_PATH = "future_source_v9";
 const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/ticker";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
@@ -292,6 +295,16 @@ function structuredError(
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 async function flush(delay = 0) {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, delay));
@@ -466,6 +479,10 @@ describe("Ticker Detail localization", () => {
     await click(buttonByText("數據"));
     await waitForText(SOURCE_ROW);
     expectKvLabels(ZH_DATA_KV_LABELS);
+    expect(host!.textContent).toContain("IV 歷史（最近 1 筆 · 來源 本地檔案）");
+    expect(host!.textContent).toContain("損益表（1 期）");
+    expect(host!.textContent).toContain("資產負債表（1 期）");
+    expect(host!.textContent).toContain("現金流量表（1 期）");
     expect(host!.textContent).toContain(SOURCE_FUNDAMENTAL_PROVIDER);
     expect(host!.textContent).toContain(SOURCE_SIGNAL);
     expect(host!.querySelector("img")).toBeNull();
@@ -515,6 +532,10 @@ describe("Ticker Detail localization", () => {
       "Income statements",
       "Balance sheet",
       "Cash flow",
+      "IV history (latest 1 row · Source Local file)",
+      "Income statements (1 period)",
+      "Balance sheet (1 period)",
+      "Cash flow (1 period)",
       SOURCE_ROW,
       "SOURCE Total assets / 資產",
       "SOURCE Free cash flow / 現金",
@@ -527,16 +548,42 @@ describe("Ticker Detail localization", () => {
   });
 
   it("renders ticker-state failure by operation without raw detail", async () => {
-    apiMocks.getTickerState.mockRejectedValueOnce(structuredError());
+    const olderRetry = deferred<TickerAggregate>();
+    const newerRetry = deferred<TickerAggregate>();
+    apiMocks.getTickerState.mockReset()
+      .mockRejectedValueOnce(structuredError())
+      .mockReturnValueOnce(olderRetry.promise)
+      .mockReturnValueOnce(newerRetry.promise)
+      .mockResolvedValue(STATE);
     await mountTicker();
     await waitForCalls(apiMocks.getTickerState, 1);
 
-    const alert = host!.querySelector('[role="alert"]');
+    const alert = host!.querySelector<HTMLElement>('[role="alert"]')!;
     expect(alert?.querySelector(".ui-status-badge")?.textContent).toBe("無法載入標的詳情。");
     expect(alert?.textContent).toContain("重試");
     expect(host!.textContent).not.toContain(RAW_ERROR);
     expect(host!.textContent).not.toContain("sk-private");
     expect(host!.textContent).toContain(TICKER);
+
+    await click(buttonByText("重試", alert));
+    await waitForCalls(apiMocks.getTickerState, 2);
+    await click(buttonByText("重試", alert));
+    await waitForCalls(apiMocks.getTickerState, 3);
+    await act(async () => {
+      newerRetry.resolve({ ...STATE, lists: [SOURCE_NEWER_STATE_LIST] });
+      await newerRetry.promise;
+    });
+    await waitForText(SOURCE_NEWER_STATE_LIST);
+    await act(async () => {
+      olderRetry.reject(structuredError("stale_ticker_state_failure"));
+      await olderRetry.promise.catch(() => undefined);
+    });
+    await flush();
+
+    expect(host!.textContent).toContain(SOURCE_NEWER_STATE_LIST);
+    expect(Array.from(host!.querySelectorAll("[role=alert] .ui-status-badge"))
+      .map((node) => node.textContent)).not.toContain("無法載入標的詳情。");
+    expect(apiMocks.getTickerState).toHaveBeenCalledTimes(3);
   });
 
   it("renders price failure independently from successful detail state", async () => {
@@ -642,9 +689,15 @@ describe("Ticker Detail localization", () => {
   });
 
   it("preserves note draft and maps note load add and delete failures separately", async () => {
-    apiMocks.getNotes.mockRejectedValueOnce(
-      structuredError("notes_load_failed", `/profile/tickers/${TICKER}/notes`),
-    );
+    const olderRetry = deferred<{ ticker: string; notes: Note[] }>();
+    const newerRetry = deferred<{ ticker: string; notes: Note[] }>();
+    apiMocks.getNotes.mockReset()
+      .mockRejectedValueOnce(
+        structuredError("notes_load_failed", `/profile/tickers/${TICKER}/notes`),
+      )
+      .mockReturnValueOnce(olderRetry.promise)
+      .mockReturnValueOnce(newerRetry.promise)
+      .mockResolvedValue({ ticker: TICKER, notes: NOTES });
     await mountTicker();
     await click(buttonByText("筆記"));
     await waitForCalls(apiMocks.getNotes, 1);
@@ -655,7 +708,25 @@ describe("Ticker Detail localization", () => {
     await setInput(draft, "SOURCE NOTE DRAFT / 保留");
     await click(buttonByText("重試"));
     await waitForCalls(apiMocks.getNotes, 2);
-    expect(host!.textContent).toContain(SOURCE_NOTE_BODY);
+    await click(buttonByText("重試"));
+    await waitForCalls(apiMocks.getNotes, 3);
+    await act(async () => {
+      newerRetry.resolve({
+        ticker: TICKER,
+        notes: [{ ...NOTES[0]!, body: SOURCE_NEWER_NOTE_BODY }],
+      });
+      await newerRetry.promise;
+    });
+    await waitForText(SOURCE_NEWER_NOTE_BODY);
+    await act(async () => {
+      olderRetry.reject(structuredError("stale_notes_load_failure"));
+      await olderRetry.promise.catch(() => undefined);
+    });
+    await flush();
+
+    expect(host!.textContent).toContain(SOURCE_NEWER_NOTE_BODY);
+    expect(Array.from(host!.querySelectorAll("[role=alert] .ui-status-badge"))
+      .map((node) => node.textContent)).not.toContain("無法載入筆記。");
     expect(draft.value).toBe("SOURCE NOTE DRAFT / 保留");
 
     apiMocks.addNote.mockRejectedValueOnce(
@@ -691,9 +762,17 @@ describe("Ticker Detail localization", () => {
   });
 
   it("preserves tag draft and maps catalog add and remove failures separately", async () => {
-    apiMocks.getTagCatalog.mockRejectedValueOnce(
-      structuredError("tag_catalog_failed", "/profile/tags/catalog"),
-    );
+    const olderRetry = deferred<{ catalog: Record<string, string[]> }>();
+    const newerRetry = deferred<{ catalog: Record<string, string[]> }>();
+    apiMocks.getTagCatalog.mockReset()
+      .mockRejectedValueOnce(
+        structuredError("tag_catalog_failed", "/profile/tags/catalog"),
+      )
+      .mockReturnValueOnce(olderRetry.promise)
+      .mockReturnValueOnce(newerRetry.promise)
+      .mockResolvedValue({
+        catalog: { theme: [SOURCE_TAG_VALUE], category: ["SOURCE CATEGORY"] },
+      });
     await mountTicker();
     await waitForCalls(apiMocks.getTagCatalog, 1);
     expect(host!.querySelector('[role="alert"] .ui-status-badge')?.textContent)
@@ -703,6 +782,22 @@ describe("Ticker Detail localization", () => {
     await setInput(input, "SOURCE TAG DRAFT / 保留");
     await click(buttonByText("重試"));
     await waitForCalls(apiMocks.getTagCatalog, 2);
+    await click(buttonByText("重試"));
+    await waitForCalls(apiMocks.getTagCatalog, 3);
+    await act(async () => {
+      newerRetry.resolve({ catalog: { theme: [SOURCE_NEWER_TAG_VALUE] } });
+      await newerRetry.promise;
+    });
+    await flush();
+    await act(async () => {
+      olderRetry.reject(structuredError("stale_tag_catalog_failure"));
+      await olderRetry.promise.catch(() => undefined);
+    });
+    await flush();
+
+    expect(host!.querySelector(`datalist option[value="${SOURCE_NEWER_TAG_VALUE}"]`)).not.toBeNull();
+    expect(Array.from(host!.querySelectorAll("[role=alert] .ui-status-badge"))
+      .map((node) => node.textContent)).not.toContain("無法載入標籤目錄。");
     expect(input.value).toBe("SOURCE TAG DRAFT / 保留");
 
     apiMocks.addTickerTag.mockRejectedValueOnce(

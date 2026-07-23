@@ -46,6 +46,7 @@ const SOURCE_LIST = '原始清單 <img src="x" onerror="source-leak">';
 const SOURCE_TICKER = "SOURCE.TW";
 const SOURCE_CARD_CONCLUSION = 'SOURCE CARD <script>alert("source")</script> CONCLUSION';
 const SOURCE_CARD_TIMESTAMP = "SOURCE_CARD_TIMESTAMP_NOT_A_DATE";
+const UNKNOWN_CONFIDENCE = "future_confidence_v9";
 const SOURCE_AS_OF = "SOURCE_WATCHLIST_AS_OF_NOT_A_DATE";
 const UNSAFE_MESSAGE = "RAW backend workspace failure: postgres://admin:secret@10.0.0.8/private";
 const UNSAFE_DIAGNOSTIC = "Authorization: Bearer sk-live-secret\nTraceback /srv/private.py:42";
@@ -161,20 +162,29 @@ const UNIVERSE: UniverseResponse = {
   ],
 };
 
+const CARD_SUMMARY: CardSummary = {
+  run_id: 701,
+  ticker: SOURCE_TICKER,
+  question: "SOURCE QUESTION <keep>",
+  horizon: "source-horizon-id",
+  card_type: "source-card-type",
+  status: "completed-source-state",
+  provider: "provider/source-id",
+  model: "model/source-id",
+  generated_at: SOURCE_CARD_TIMESTAMP,
+  saved_report_id: null,
+  conclusion: SOURCE_CARD_CONCLUSION,
+  confidence_level: "high",
+};
+
 const CARDS: CardSummary[] = [
+  CARD_SUMMARY,
+  { ...CARD_SUMMARY, run_id: 702, confidence_level: "medium" },
+  { ...CARD_SUMMARY, run_id: 703, confidence_level: "low" },
   {
-    run_id: 701,
-    ticker: SOURCE_TICKER,
-    question: "SOURCE QUESTION <keep>",
-    horizon: "source-horizon-id",
-    card_type: "source-card-type",
-    status: "completed-source-state",
-    provider: "provider/source-id",
-    model: "model/source-id",
-    generated_at: SOURCE_CARD_TIMESTAMP,
-    saved_report_id: null,
-    conclusion: SOURCE_CARD_CONCLUSION,
-    confidence_level: "high",
+    ...CARD_SUMMARY,
+    run_id: 704,
+    confidence_level: UNKNOWN_CONFIDENCE as CardSummary["confidence_level"],
   },
 ];
 
@@ -443,6 +453,8 @@ describe("Home localization", () => {
 
     expect(Array.from(host!.querySelectorAll(".home-table th")).map((cell) => cell.textContent))
       .toEqual(["Ticker", "收盤價", "7 日漲跌", "新聞", "優先順序"]);
+    expect(Array.from(host!.querySelectorAll(".card-row .conf")).map((node) => node.textContent))
+      .toEqual(["高", "中", "低", UNKNOWN_CONFIDENCE]);
     const moverRows = Array.from(host!.querySelectorAll<HTMLTableRowElement>(".home-table tbody tr"));
     expect(moverRows.map((row) => row.querySelector("td")?.textContent)).toEqual([
       SOURCE_TICKER,
@@ -484,6 +496,8 @@ describe("Home localization", () => {
     }
     expect(Array.from(host!.querySelectorAll(".home-table th")).map((cell) => cell.textContent))
       .toEqual(["Ticker", "Close", "7d change", "News", "Priority"]);
+    expect(Array.from(host!.querySelectorAll(".card-row .conf")).map((node) => node.textContent))
+      .toEqual(["High", "Medium", "Low", UNKNOWN_CONFIDENCE]);
     expect(text).not.toContain("來源卡片結論");
     expectWorkspaceRequestShape(1);
     expectRequestCounts({ getUniverse: 1, getProfileLists: 1, getCards: 1 });
@@ -584,9 +598,12 @@ describe("Home localization", () => {
     const tickerCell = Array.from(host!.querySelectorAll(".home-table td"))
       .find((cell) => cell.textContent === SOURCE_TICKER);
     const cardRow = host!.querySelector<HTMLElement>(".card-row");
+    const confidenceNodes = Array.from(host!.querySelectorAll<HTMLElement>(".card-row .conf"));
     expect(main).not.toBeNull();
     expect(tickerCell).toBeDefined();
     expect(cardRow).not.toBeNull();
+    expect(confidenceNodes.map((node) => node.textContent))
+      .toEqual(["高", "中", "低", UNKNOWN_CONFIDENCE]);
     main!.scrollTop = 223;
     viewAll.focus();
     expect(document.activeElement).toBe(viewAll);
@@ -602,6 +619,10 @@ describe("Home localization", () => {
     expect(Array.from(host!.querySelectorAll(".home-table td"))
       .find((cell) => cell.textContent === SOURCE_TICKER)).toBe(tickerCell);
     expect(host!.querySelector(".card-row")).toBe(cardRow);
+    expect(Array.from(host!.querySelectorAll<HTMLElement>(".card-row .conf")))
+      .toEqual(confidenceNodes);
+    expect(confidenceNodes.map((node) => node.textContent))
+      .toEqual(["High", "Medium", "Low", UNKNOWN_CONFIDENCE]);
     expect(requestCounts()).toEqual(before);
     expectWorkspaceRequestShape(1);
     expectRequestCounts({ getUniverse: 1, getProfileLists: 1, getCards: 1 });

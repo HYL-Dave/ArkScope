@@ -18,7 +18,7 @@ import {
 } from "./api";
 import { allActiveRows, customListNameSet } from "./watchlist-derive";
 import type { StatusState } from "./Dashboard";
-import { CardModal } from "./AICard";
+import { CardModal, confidenceLabel } from "./AICard";
 import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
 import {
   captureExploreError,
@@ -190,7 +190,7 @@ export function HomeView({
                   <li key={c.run_id} className="card-row" onClick={() => setOpenCardId(c.run_id)}>
                     <span className="card-ticker">{c.ticker}</span>
                     <span className={`conf conf-${c.confidence_level ?? "na"}`}>
-                      {(c.confidence_level ?? "—").toUpperCase()}
+                      {confidenceLabel(c.confidence_level, t)}
                     </span>
                     <span className="card-concl">{c.conclusion ?? "—"}</span>
                     <span className="card-time muted tiny">{fmtDate(c.generated_at)}</span>
