@@ -14,6 +14,7 @@ export const EXPLORE_OPERATIONS = [
   "watchlist_load_consensus",
   "watchlist_create_list",
   "watchlist_rename_list",
+  "watchlist_delete_list",
   "watchlist_set_default_list",
   "watchlist_add_member",
   "watchlist_remove_member",
@@ -108,6 +109,7 @@ const OPERATION_PRESENTERS = {
   watchlist_load_consensus: (t) => t(($) => $.errors.operations.watchlistLoadConsensus),
   watchlist_create_list: (t) => t(($) => $.errors.operations.watchlistCreateList),
   watchlist_rename_list: (t) => t(($) => $.errors.operations.watchlistRenameList),
+  watchlist_delete_list: (t) => t(($) => $.errors.operations.watchlistDeleteList),
   watchlist_set_default_list: (t) => t(($) => $.errors.operations.watchlistSetDefaultList),
   watchlist_add_member: (t) => t(($) => $.errors.operations.watchlistAddMember),
   watchlist_remove_member: (t) => t(($) => $.errors.operations.watchlistRemoveMember),
@@ -287,6 +289,7 @@ const ROUTES_BY_OPERATION = {
   watchlist_load_consensus: [routes.consensus],
   watchlist_create_list: [routes.profileLists],
   watchlist_rename_list: [routes.profileList],
+  watchlist_delete_list: [routes.profileList],
   watchlist_set_default_list: [routes.defaultWatchlist],
   watchlist_add_member: [routes.profileListMembers],
   watchlist_remove_member: [routes.profileListMember],
@@ -539,7 +542,9 @@ export function presentUniverseImportOutcome(
     summaryItems.push(t(($) => $.universe.listsRemoved, { count: outcome.listsRemoved }));
   }
   return {
-    title: t(($) => $.universe.importSucceeded, { summary: summaryItems.join(" · ") }),
+    title: t(($) => $.universe.importSucceeded, {
+      summary: summaryItems.join(t(($) => $.universe.importSummarySeparator)),
+    }),
     summaryItems,
     warning: outcome.groupsAvailable ? null : t(($) => $.universe.themeUnavailable),
   };

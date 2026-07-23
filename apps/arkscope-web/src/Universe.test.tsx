@@ -382,7 +382,7 @@ describe("Universe localization", () => {
     expect(apiMocks.importUniverse).toHaveBeenCalledWith({});
 
     await switchLocale("zh-Hant");
-    expect(host!.textContent).toContain("匯入完成：新增 7 個分類標籤 · 移除 3 個舊清單。");
+    expect(host!.textContent).toContain("匯入完成：新增 7 個分類標籤、移除 3 個舊清單。");
     expect(apiMocks.importUniverse).toHaveBeenCalledTimes(1);
   });
 

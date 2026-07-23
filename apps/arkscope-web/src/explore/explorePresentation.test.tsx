@@ -19,6 +19,7 @@ const OPERATIONS = [
   "watchlist_load_consensus",
   "watchlist_create_list",
   "watchlist_rename_list",
+  "watchlist_delete_list",
   "watchlist_set_default_list",
   "watchlist_add_member",
   "watchlist_remove_member",
@@ -191,6 +192,10 @@ const EXPECTED_TITLES: Record<Operation, Record<Locale, string>> = {
     "zh-Hant": "無法重新命名清單。",
     en: "Could not rename the list.",
   },
+  watchlist_delete_list: {
+    "zh-Hant": "無法刪除清單。",
+    en: "Could not delete the list.",
+  },
   watchlist_set_default_list: {
     "zh-Hant": "無法更新預設清單。",
     en: "Could not update the default list.",
@@ -333,7 +338,11 @@ const ROUTE_CASES: ReadonlyArray<{
       "universe_load",
     ],
   },
-  { path: "/profile/lists/41", expected: "/profile/lists/{list_id}", allowedOperations: ["watchlist_rename_list"] },
+  {
+    path: "/profile/lists/41?token=private#fragment",
+    expected: "/profile/lists/{list_id}",
+    allowedOperations: ["watchlist_rename_list", "watchlist_delete_list"],
+  },
   { path: "/profile/lists/41/members", expected: "/profile/lists/{list_id}/members", allowedOperations: ["watchlist_add_member"] },
   { path: "/profile/lists/41/members/BRK.B", expected: "/profile/lists/{list_id}/members/{ticker}", allowedOperations: ["watchlist_remove_member"] },
   {
@@ -432,7 +441,7 @@ describe("Explore presentation boundary", () => {
     const presentation = await loadPresentation();
 
     expect(presentation.EXPLORE_OPERATIONS).toEqual(OPERATIONS);
-    expect(new Set(presentation.EXPLORE_OPERATIONS)).toHaveProperty("size", 39);
+    expect(new Set(presentation.EXPLORE_OPERATIONS)).toHaveProperty("size", 40);
     for (const locale of ["zh-Hant", "en"] as const) {
       const t = exploreT(locale);
       for (const operation of OPERATIONS) {
@@ -861,7 +870,7 @@ describe("Explore presentation boundary", () => {
     const { presentUniverseImportOutcome } = await loadPresentation();
     const expected = {
       "zh-Hant": {
-        title: "匯入完成：新增 4 個分類標籤 · 移除 2 個舊清單。",
+        title: "匯入完成：新增 4 個分類標籤、移除 2 個舊清單。",
         summaryItems: ["新增 4 個分類標籤", "移除 2 個舊清單"],
         warning: null,
       },

@@ -31,10 +31,10 @@ function flattenResource(tree: ResourceTree, prefix = ""): Map<string, string> {
 describe("bundled i18n resources", () => {
   it("contains the exact Explore subtree inventory in both locales", () => {
     const expectedSubtreeCounts = {
-      errors: 49,
+      errors: 50,
       home: 23,
       watchlist: 67,
-      universe: 33,
+      universe: 34,
       news: 43,
       tickerDetail: 68,
       aiCard: 62,
@@ -46,7 +46,32 @@ describe("bundled i18n resources", () => {
       const explore = (resources[locale] as Record<string, unknown>).explore;
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
-      expect(flattenResource(explore as ResourceTree).size, `${locale}.explore`).toBe(352);
+      const flattened = flattenResource(explore as ResourceTree);
+      expect(flattened.size, `${locale}.explore`).toBe(354);
+      for (const path of [
+        "errors.operations.watchlistDeleteList",
+        "watchlist.emptyListWithArchivedHint",
+        "watchlist.emptyListWithoutArchivedHint",
+        "watchlist.emptyActiveListWithArchivedHint",
+        "watchlist.emptyActiveListWithoutArchivedHint",
+        "watchlist.consensusRatingsSummary",
+        "watchlist.consensusAnalystSummary",
+        "universe.allListsCount",
+        "universe.importSummarySeparator",
+      ]) {
+        expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
+      }
+      for (const path of [
+        "watchlist.emptyList",
+        "watchlist.maybeTryArchived",
+        "watchlist.tryArchived",
+        "watchlist.emptyActiveList",
+        "watchlist.consensusBuySummary",
+        "watchlist.consensusSellSummary",
+        "universe.allListsPrefix",
+      ]) {
+        expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(false);
+      }
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         expect(
           flattenResource((explore as ResourceTree)[subtree] as ResourceTree).size,
@@ -369,12 +394,12 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 702 Settings 32 Common 5 Research and 352 Explore leaves per locale", () => {
+  it("contains exactly 702 Settings 32 Common 5 Research and 354 Explore leaves per locale", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       expect.soft(flattenResource(resources[locale].settings as ResourceTree).size, `${locale}.settings`)
         .toBe(702);
       const localeResources = resources[locale] as Record<string, unknown>;
-      const expectedCounts = { common: 32, research: 5, explore: 352 } as const;
+      const expectedCounts = { common: 32, research: 5, explore: 354 } as const;
       for (const [namespace, count] of Object.entries(expectedCounts)) {
         const resource = localeResources[namespace];
         expect.soft(resource, `${locale}.${namespace}`).toBeDefined();

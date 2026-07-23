@@ -77,9 +77,7 @@ export function WatchlistView({
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
 }) {
-  const { t, i18n } = useTranslation("explore");
-  const sentenceSeparator = i18n.resolvedLanguage === "en" ? " " : "";
-  const sentenceEnd = i18n.resolvedLanguage === "en" ? "." : "。";
+  const { t } = useTranslation("explore");
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null); // null = all custom lists
   const [defaultListId, setDefaultListId] = useState<number | null>(null);
@@ -392,7 +390,7 @@ export function WatchlistView({
       if (selectedId === li.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (e) {
-      setErr(captureExploreError("watchlist_remove_member", e));
+      setErr(captureExploreError("watchlist_delete_list", e));
     }
   }
 
@@ -587,8 +585,6 @@ export function WatchlistView({
               hasLists={railLists.length > 0}
               showArchived={showArchived}
               onCreate={() => setCreating(true)}
-              sentenceSeparator={sentenceSeparator}
-              sentenceEnd={sentenceEnd}
               t={t}
             />
           ) : (
@@ -702,26 +698,20 @@ function EmptyState({
   hasLists,
   showArchived,
   onCreate,
-  sentenceSeparator,
-  sentenceEnd,
   t,
 }: {
   selectedList: WatchlistSummary | null;
   hasLists: boolean;
   showArchived: boolean;
   onCreate: () => void;
-  sentenceSeparator: string;
-  sentenceEnd: string;
   t: ExploreT;
 }) {
   if (selectedList) {
     return (
       <p className="muted tiny">
-        {t(($) => $.watchlist.emptyList)}
-        {showArchived ? null : (
-          <>{sentenceSeparator}{t(($) => $.watchlist.maybeTryArchived)}</>
-        )}
-        {sentenceEnd}
+        {showArchived
+          ? t(($) => $.watchlist.emptyListWithoutArchivedHint)
+          : t(($) => $.watchlist.emptyListWithArchivedHint)}
       </p>
     );
   }
@@ -740,11 +730,9 @@ function EmptyState({
   }
   return (
     <p className="muted tiny">
-      {t(($) => $.watchlist.emptyActiveList)}
-      {showArchived ? null : (
-        <>{sentenceSeparator}{t(($) => $.watchlist.tryArchived)}</>
-      )}
-      {sentenceEnd}
+      {showArchived
+        ? t(($) => $.watchlist.emptyActiveListWithoutArchivedHint)
+        : t(($) => $.watchlist.emptyActiveListWithArchivedHint)}
     </p>
   );
 }
@@ -793,13 +781,13 @@ function renderConsensus(c: ConsensusCell | undefined, t: ExploreT) {
   const cn = d.counts || {};
   const when = d.fetched_at ? d.fetched_at.slice(0, 10) : "—";
   const votes = `${cn.strongBuy ?? 0}/${cn.buy ?? 0}/${cn.hold ?? 0}/${cn.sell ?? 0}/${cn.strongSell ?? 0}`;
-  const tip = `${t(($) => $.watchlist.consensusBuySummary, {
+  const tip = `${t(($) => $.watchlist.consensusRatingsSummary, {
     strongBuy: cn.strongBuy ?? 0,
     buy: cn.buy ?? 0,
     hold: cn.hold ?? 0,
-  })}\n${t(($) => $.watchlist.consensusSellSummary, {
     sell: cn.sell ?? 0,
     strongSell: cn.strongSell ?? 0,
+  })}\n${t(($) => $.watchlist.consensusAnalystSummary, {
     total: d.total,
     when,
   })}${d.status === "cached" ? t(($) => $.watchlist.cached) : ""}`;

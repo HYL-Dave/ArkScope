@@ -40,8 +40,7 @@ export function UniverseView({
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
 }) {
-  const { t, i18n } = useTranslation("explore");
-  const allListsClosing = i18n.resolvedLanguage === "en" ? ")" : "）";
+  const { t } = useTranslation("explore");
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [meta, setMeta] = useState<{ total: number; summarized: number; archived: number } | null>(null);
@@ -211,9 +210,7 @@ export function UniverseView({
               onChange={(e) => setListFilter(e.target.value)}
             >
               <option value="__all__">
-                {t(($) => $.universe.allListsPrefix)}
-                {customListNames.length}
-                {allListsClosing}
+                {t(($) => $.universe.allListsCount, { count: customListNames.length })}
               </option>
               {customListNames.map((l) => (
                 <option key={l} value={l}>{l}</option>

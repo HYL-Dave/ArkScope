@@ -365,6 +365,12 @@ describe("Watchlist localization", () => {
     expect(host!.textContent).toContain(
       "這個清單還沒有標的 — 用上方搜尋加入（或試試顯示已封存）。",
     );
+    await click(buttonByText("顯示已封存"));
+    expect(host!.textContent).toContain("這個清單還沒有標的 — 用上方搜尋加入。");
+    await click(buttonByText("全部清單"));
+    expect(host!.textContent).toContain("你的清單目前沒有有效標的。");
+    await click(buttonByText("已封存"));
+    expect(host!.textContent).toContain("你的清單目前沒有有效標的（試試顯示已封存）。");
   });
 
   it("renders English Watchlist chrome without translating custom lists tags or tickers", async () => {
@@ -399,6 +405,12 @@ describe("Watchlist localization", () => {
     expect(host!.textContent).toContain(
       "This list has no tickers yet — use the search above to add one (or try Show archived).",
     );
+    await click(buttonByText("Show archived"));
+    expect(host!.textContent).toContain("This list has no tickers yet — use the search above to add one.");
+    await click(buttonByText("All lists"));
+    expect(host!.textContent).toContain("Your list has no active tickers.");
+    await click(buttonByText("Archived"));
+    expect(host!.textContent).toContain("Your list has no active tickers (try Show archived).");
   });
 
   it("preserves list Universe consensus loading and degraded trigger semantics", async () => {
@@ -443,6 +455,29 @@ describe("Watchlist localization", () => {
     await waitForText("無法更新標的封存狀態。");
     expect(host!.innerHTML).not.toContain(RAW_ERROR);
     expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+
+    unmountWatchlist();
+    const confirmDelete = vi.fn(() => true);
+    window.confirm = confirmDelete;
+    apiMocks.setArchived.mockReset().mockResolvedValue({ ticker: SOURCE_TICKER, archived: true });
+    apiMocks.deleteList.mockReset().mockRejectedValue(
+      structuredError("delete_fixture_failed", "/profile/lists/101?token=private#fragment"),
+    );
+    await mountWatchlist();
+    await waitForText(SOURCE_TICKER);
+    const sourceRail = Array.from(host!.querySelectorAll<HTMLElement>(".wl-railitem"))
+      .find((item) => item.textContent?.includes(SOURCE_LIST))!;
+    await click(sourceRail.querySelector<HTMLButtonElement>('button[title="刪除清單"]')!);
+    await waitForText("無法刪除清單。");
+    expect(confirmDelete).toHaveBeenCalledWith(
+      `刪除清單「${SOURCE_LIST}」？\n\n只移除這個清單與其成員關係 —— 不會刪除標的本身或任何市場資料，標的仍保留在其他清單中。`,
+    );
+    expect(apiMocks.deleteList).toHaveBeenCalledWith(101);
+    expect(host!.innerHTML).not.toContain(RAW_ERROR);
+    expect(host!.innerHTML).not.toContain(RAW_DIAGNOSTIC);
+    await switchLocale("en");
+    expect(host!.textContent).toContain("Could not delete the list.");
+    expect(host!.innerHTML).not.toContain(RAW_ERROR);
   });
 
   it("preserves selected list archived filter and sort across locale switch", async () => {
@@ -585,7 +620,9 @@ describe("Watchlist localization", () => {
     const consensus = rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".consensus-tag")!;
     expect(consensus.textContent).toContain("Strong Buy");
     expect(consensus.textContent).toContain("7/4/3/1/0");
-    expect(consensus.title).toContain("強力買進 7");
+    expect(consensus.title).toBe(
+      "強力買進 7 · 買進 4 · 持有 3 · 賣出 1 · 強力賣出 0\n共 15 位分析師 · 更新 SOURCE_FET（快取）",
+    );
     expect(consensus.title).toContain("SOURCE_FET");
     expect(consensus.title).toContain("（快取）");
     expect(rowForTicker("AAA.US").querySelector<HTMLElement>(".wl-consensus span")?.title).toBe(
@@ -596,8 +633,9 @@ describe("Watchlist localization", () => {
     await switchLocale("en");
     expect(consensus.textContent).toContain("Strong Buy");
     expect(consensus.textContent).toContain("7/4/3/1/0");
-    expect(consensus.title).toContain("Strong buy 7");
-    expect(consensus.title).toContain("(cached)");
+    expect(consensus.title).toBe(
+      "Strong buy 7 · Buy 4 · Hold 3 · Sell 1 · Strong sell 0\n15 analysts · Updated SOURCE_FET(cached)",
+    );
     expect(rowForTicker("AAA.US").querySelector<HTMLElement>(".wl-consensus span")?.title).toBe(
       "Analyst data-source error; refresh to retry",
     );
