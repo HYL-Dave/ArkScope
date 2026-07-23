@@ -401,17 +401,26 @@ const SECRET_DETAIL = [
 const TRACE_DETAIL = [
   /\btraceback\b/i,
   /\bstack\s*trace\b/i,
+  /\b(?:stack|trace)\s+frame\b/i,
   /\bmost recent call last\b/i,
   /\bat\s+[A-Za-z_$][\w.$]*\s*\(/,
+  /\bat\s+(?:async\s+)?[A-Za-z_$][\w.$]*(?:\s+\[as\s+[^\]]+\])?(?:\s|$)/,
+  /\bframe\s+#?[0-9]+\s+in\b/i,
+  /\bfile\s+\S+\s+line\s+[0-9]+\s+in\b/i,
 ];
 const SQL_DETAIL = [
   /\b(?:sqlite|sqlstate|psycopg|postgres|operationalerror|integrityerror|database\s+(?:error|exception))\b/i,
+  /\bsyntax error\b/i,
+  /\b(?:relation|column|table|constraint)\s+["']?[A-Za-z0-9_.-]+["']?\s+does not exist\b/i,
+  /\bduplicate key value violates unique constraint\b/i,
+  /\bno such (?:table|column)\b/i,
   /\bselect\b.+\bfrom\b/i,
   /\binsert\s+into\b/i,
   /\bupdate\s+\w+\s+set\b/i,
   /\bdelete\s+from\b/i,
 ];
 const HOST_OR_IP_DETAIL = [
+  /\blocalhost(?::[0-9]{1,5})?\b/i,
   /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/,
   /(?:^|[\s[(])(?:[A-Fa-f0-9]{0,4}:){2,}[A-Fa-f0-9]{0,4}(?:$|[\s\])])/,
   /\b(?:[a-z0-9](?:[a-z0-9-]{0,62})\.)+[a-z]{2,63}\b/i,
@@ -425,7 +434,7 @@ export function safeDiagnosticDetail(value: unknown): string | null {
     || value !== value.trim()
     || !/^[\x20-\x7e]+$/.test(value)
     || /[\\/@=<>]/.test(value)
-    || /&(?:[a-z]+|#[0-9]+);/i.test(value)
+    || /&(?:[a-z][a-z0-9]+|#(?:[0-9]+|x[0-9a-f]+));/i.test(value)
     || SECRET_DETAIL.some((pattern) => pattern.test(value))
     || TRACE_DETAIL.some((pattern) => pattern.test(value))
     || SQL_DETAIL.some((pattern) => pattern.test(value))
@@ -481,7 +490,7 @@ const RECOVERY_TARGETS = {
 export function recoveryTargetForExploreError(
   state: ExploreErrorState,
 ): ExploreSettingsTarget | null {
-  if (!state.code || !(state.code in RECOVERY_TARGETS)) return null;
+  if (!state.code || !Object.hasOwn(RECOVERY_TARGETS, state.code)) return null;
   return RECOVERY_TARGETS[state.code as keyof typeof RECOVERY_TARGETS];
 }
 

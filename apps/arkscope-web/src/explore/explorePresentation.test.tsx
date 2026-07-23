@@ -625,6 +625,17 @@ describe("Explore presentation boundary", () => {
       "stack trace at fetchMarketData",
       "sqlite3.OperationalError: no such table: news_items",
       "SELECT secret FROM credentials",
+      "syntax error at or near FROM",
+      "relation accounts does not exist",
+      "column user_id does not exist",
+      "duplicate key value violates unique constraint accounts_pkey",
+      "localhost:5432 refused the connection",
+      "localhost refused the connection",
+      "at async fetchMarketData",
+      "at fetchMarketData [as loadMarketData]",
+      "frame #12 in fetchMarketData",
+      "File worker_py line 42 in fetch_data",
+      "Trace frame: fetchMarketData",
       "/home/alice/arkscope/app.py:42",
       "C:\\Users\\alice\\ArkScope\\config.json",
       "../private/config.json",
@@ -633,13 +644,16 @@ describe("Explore presentation boundary", () => {
       "10.0.0.8 refused the connection",
       "[2001:db8::1] refused the connection",
       "<script>alert('secret')</script>",
+      "unsafe &lt;script&gt;",
+      "unsafe &#60;script&#62;",
+      "unsafe &#x3c;script&#x3e;",
       "unsafe\u0000detail",
       "first line\nsecond line",
       "a".repeat(161),
     ];
 
     for (const detail of unsafeDetails) {
-      expect(safeDiagnosticDetail(detail), detail).toBeNull();
+      expect.soft(safeDiagnosticDetail(detail), detail).toBeNull();
     }
   });
 
@@ -663,6 +677,13 @@ describe("Explore presentation boundary", () => {
         diagnostic: "active_universe_unavailable",
       });
       expect(recoveryTargetForExploreError(state)).toBeNull();
+    }
+
+    for (const code of ["constructor", "toString", "__proto__"]) {
+      expect(recoveryTargetForExploreError({
+        ...emptyState("universe_load"),
+        code,
+      })).toBeNull();
     }
   });
 
