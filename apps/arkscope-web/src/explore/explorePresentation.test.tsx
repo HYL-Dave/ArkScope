@@ -1,12 +1,13 @@
 /** @vitest-environment jsdom */
-import React, { act, type ComponentType, type ReactNode } from "react";
+import React, { act, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 import { createInstance, type TFunction } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { initializeI18n } from "../i18n/resources";
 import type { NavigationTarget } from "../shell/navigation";
+import type { ExploreErrorNoticeProps } from "./ExploreErrorNotice";
 
 const OPERATIONS = [
   "home_load_workspace",
@@ -55,13 +56,13 @@ type Locale = "zh-Hant" | "en";
 type SettingsTarget = Extract<NavigationTarget, { kind: "settings_section" }>;
 
 interface ExploreErrorState {
-  operation: Operation;
-  category: "http" | "network" | "unknown";
-  status: number | null;
-  code: string | null;
-  routeTemplate: string | null;
-  developerDetail: string | null;
-  detailOmitted: boolean;
+  readonly operation: Operation;
+  readonly category: "http" | "network" | "unknown";
+  readonly status: number | null;
+  readonly code: string | null;
+  readonly routeTemplate: string | null;
+  readonly developerDetail: string | null;
+  readonly detailOmitted: boolean;
 }
 
 interface DiagnosticRow {
@@ -118,7 +119,7 @@ interface NoticeModule {
   ExploreErrorNotice: ComponentType<{
     state: ExploreErrorState;
     developerMode: boolean;
-    retryLabel: ReactNode;
+    retryLabel: string;
     onRetry: () => void;
     onNavigate?: (target: NavigationTarget) => void;
   }>;
@@ -313,55 +314,71 @@ const EXPECTED_TITLES: Record<Operation, Record<Locale, string>> = {
 };
 
 const ROUTE_CASES: ReadonlyArray<{
-  operation: Operation;
   path: string;
   expected: string;
+  allowedOperations: readonly Operation[];
 }> = [
-  { operation: "home_load_workspace", path: "/profile/universe?include_archived=true", expected: "/profile/universe" },
-  { operation: "home_load_workspace", path: "/profile/lists?include_archived=false", expected: "/profile/lists" },
-  { operation: "home_load_workspace", path: "/analysis/cards?limit=8", expected: "/analysis/cards" },
-  { operation: "home_open_card", path: "/analysis/cards/72", expected: "/analysis/cards/{run_id}" },
-  { operation: "home_save_card", path: "/analysis/cards/72/save", expected: "/analysis/cards/{run_id}/save" },
-  { operation: "watchlist_load_lists", path: "/profile/lists?include_archived=false", expected: "/profile/lists" },
-  { operation: "watchlist_load_lists", path: "/profile/settings/default-watchlist", expected: "/profile/settings/default-watchlist" },
-  { operation: "watchlist_load_universe", path: "/profile/universe?include_archived=true", expected: "/profile/universe" },
-  { operation: "watchlist_search_symbols", path: "/symbols/search?q=private-query&limit=8", expected: "/symbols/search" },
-  { operation: "watchlist_load_consensus", path: "/analysis/consensus/AAPL", expected: "/analysis/consensus/{ticker}" },
-  { operation: "watchlist_create_list", path: "/profile/lists", expected: "/profile/lists" },
-  { operation: "watchlist_rename_list", path: "/profile/lists/41", expected: "/profile/lists/{list_id}" },
-  { operation: "watchlist_set_default_list", path: "/profile/settings/default-watchlist", expected: "/profile/settings/default-watchlist" },
-  { operation: "watchlist_add_member", path: "/profile/lists/41/members", expected: "/profile/lists/{list_id}/members" },
-  { operation: "watchlist_remove_member", path: "/profile/lists/41/members/BRK.B", expected: "/profile/lists/{list_id}/members/{ticker}" },
-  { operation: "watchlist_set_archived", path: "/profile/tickers/AAPL/archive", expected: "/profile/tickers/{ticker}/archive" },
-  { operation: "watchlist_set_priority", path: "/profile/tickers/AAPL/priority", expected: "/profile/tickers/{ticker}/priority" },
-  { operation: "universe_load", path: "/profile/universe?include_archived=true", expected: "/profile/universe" },
-  { operation: "universe_load", path: "/profile/lists?include_archived=false", expected: "/profile/lists" },
-  { operation: "universe_import", path: "/profile/import-universe", expected: "/profile/import-universe" },
-  { operation: "universe_hide_ticker", path: "/profile/tickers/AAPL/hidden", expected: "/profile/tickers/{ticker}/hidden" },
-  { operation: "news_load_market", path: "/news/feed?ticker=AAPL#private", expected: "/news/feed" },
-  { operation: "news_load_seeking_alpha", path: "/sa/feed?search=private-query", expected: "/sa/feed" },
-  { operation: "news_load_seeking_alpha", path: "/sa/extension-health", expected: "/sa/extension-health" },
-  { operation: "news_load_more", path: "/news/feed?cursor=private-cursor", expected: "/news/feed" },
-  { operation: "news_load_more", path: "/sa/feed?offset=80", expected: "/sa/feed" },
-  { operation: "ticker_load_state", path: "/profile/tickers/AAPL/state", expected: "/profile/tickers/{ticker}/state" },
-  { operation: "ticker_load_price", path: "/prices/AAPL/change?days=30", expected: "/prices/{ticker}/change" },
-  { operation: "ticker_load_iv", path: "/options/AAPL", expected: "/options/{ticker}" },
-  { operation: "ticker_load_iv_history", path: "/options/AAPL/history", expected: "/options/{ticker}/history" },
-  { operation: "ticker_load_fundamentals", path: "/fundamentals/AAPL?stored=true", expected: "/fundamentals/{ticker}" },
-  { operation: "ticker_load_market_status", path: "/market-data/status", expected: "/market-data/status" },
-  { operation: "ticker_load_coverage", path: "/market-data/coverage/AAPL", expected: "/market-data/coverage/{ticker}" },
-  { operation: "ticker_load_notes", path: "/profile/tickers/AAPL/notes", expected: "/profile/tickers/{ticker}/notes" },
-  { operation: "ticker_load_tag_catalog", path: "/profile/tags/catalog", expected: "/profile/tags/catalog" },
-  { operation: "ticker_add_note", path: "/profile/tickers/AAPL/notes", expected: "/profile/tickers/{ticker}/notes" },
-  { operation: "ticker_delete_note", path: "/profile/tickers/AAPL/notes/91", expected: "/profile/tickers/{ticker}/notes/{note_id}" },
-  { operation: "ticker_add_tag", path: "/profile/tickers/AAPL/tags", expected: "/profile/tickers/{ticker}/tags" },
-  { operation: "ticker_remove_tag", path: "/profile/tickers/AAPL/tags?value=private-tag", expected: "/profile/tickers/{ticker}/tags" },
-  { operation: "card_load_recent", path: "/analysis/cards?ticker=AAPL", expected: "/analysis/cards" },
-  { operation: "card_open", path: "/analysis/cards/72", expected: "/analysis/cards/{run_id}" },
-  { operation: "card_load_investor_profile", path: "/profile/investor", expected: "/profile/investor" },
-  { operation: "card_generate", path: "/analysis/card/AAPL", expected: "/analysis/card/{ticker}" },
-  { operation: "card_save", path: "/analysis/cards/72/save", expected: "/analysis/cards/{run_id}/save" },
-  { operation: "card_translate", path: "/analysis/cards/72/translate", expected: "/analysis/cards/{run_id}/translate" },
+  {
+    path: "/profile/universe?include_archived=true",
+    expected: "/profile/universe",
+    allowedOperations: ["home_load_workspace", "watchlist_load_universe", "universe_load"],
+  },
+  {
+    path: "/profile/lists?include_archived=false",
+    expected: "/profile/lists",
+    allowedOperations: [
+      "home_load_workspace",
+      "watchlist_load_lists",
+      "watchlist_create_list",
+      "universe_load",
+    ],
+  },
+  { path: "/profile/lists/41", expected: "/profile/lists/{list_id}", allowedOperations: ["watchlist_rename_list"] },
+  { path: "/profile/lists/41/members", expected: "/profile/lists/{list_id}/members", allowedOperations: ["watchlist_add_member"] },
+  { path: "/profile/lists/41/members/BRK.B", expected: "/profile/lists/{list_id}/members/{ticker}", allowedOperations: ["watchlist_remove_member"] },
+  {
+    path: "/profile/settings/default-watchlist",
+    expected: "/profile/settings/default-watchlist",
+    allowedOperations: ["watchlist_load_lists", "watchlist_set_default_list"],
+  },
+  { path: "/profile/import-universe", expected: "/profile/import-universe", allowedOperations: ["universe_import"] },
+  { path: "/profile/tickers/AAPL/state", expected: "/profile/tickers/{ticker}/state", allowedOperations: ["ticker_load_state"] },
+  { path: "/profile/tickers/AAPL/archive", expected: "/profile/tickers/{ticker}/archive", allowedOperations: ["watchlist_set_archived"] },
+  { path: "/profile/tickers/AAPL/priority", expected: "/profile/tickers/{ticker}/priority", allowedOperations: ["watchlist_set_priority"] },
+  { path: "/profile/tickers/AAPL/hidden", expected: "/profile/tickers/{ticker}/hidden", allowedOperations: ["universe_hide_ticker"] },
+  {
+    path: "/profile/tickers/AAPL/notes",
+    expected: "/profile/tickers/{ticker}/notes",
+    allowedOperations: ["ticker_load_notes", "ticker_add_note"],
+  },
+  { path: "/profile/tickers/AAPL/notes/91", expected: "/profile/tickers/{ticker}/notes/{note_id}", allowedOperations: ["ticker_delete_note"] },
+  {
+    path: "/profile/tickers/AAPL/tags?value=private-tag",
+    expected: "/profile/tickers/{ticker}/tags",
+    allowedOperations: ["ticker_add_tag", "ticker_remove_tag"],
+  },
+  { path: "/profile/tags/catalog", expected: "/profile/tags/catalog", allowedOperations: ["ticker_load_tag_catalog"] },
+  { path: "/profile/investor", expected: "/profile/investor", allowedOperations: ["card_load_investor_profile"] },
+  { path: "/symbols/search?q=private-query&limit=8", expected: "/symbols/search", allowedOperations: ["watchlist_search_symbols"] },
+  { path: "/analysis/consensus/AAPL", expected: "/analysis/consensus/{ticker}", allowedOperations: ["watchlist_load_consensus"] },
+  {
+    path: "/analysis/cards?limit=8&ticker=AAPL",
+    expected: "/analysis/cards",
+    allowedOperations: ["home_load_workspace", "card_load_recent"],
+  },
+  { path: "/analysis/cards/72", expected: "/analysis/cards/{run_id}", allowedOperations: ["home_open_card", "card_open"] },
+  { path: "/analysis/card/AAPL", expected: "/analysis/card/{ticker}", allowedOperations: ["card_generate"] },
+  { path: "/analysis/cards/72/save", expected: "/analysis/cards/{run_id}/save", allowedOperations: ["home_save_card", "card_save"] },
+  { path: "/analysis/cards/72/translate", expected: "/analysis/cards/{run_id}/translate", allowedOperations: ["card_translate"] },
+  { path: "/prices/AAPL/change?days=30", expected: "/prices/{ticker}/change", allowedOperations: ["ticker_load_price"] },
+  { path: "/options/AAPL", expected: "/options/{ticker}", allowedOperations: ["ticker_load_iv"] },
+  { path: "/options/AAPL/history", expected: "/options/{ticker}/history", allowedOperations: ["ticker_load_iv_history"] },
+  { path: "/fundamentals/AAPL?stored=true", expected: "/fundamentals/{ticker}", allowedOperations: ["ticker_load_fundamentals"] },
+  { path: "/market-data/status", expected: "/market-data/status", allowedOperations: ["ticker_load_market_status"] },
+  { path: "/market-data/coverage/AAPL", expected: "/market-data/coverage/{ticker}", allowedOperations: ["ticker_load_coverage"] },
+  { path: "/news/feed?ticker=AAPL#private", expected: "/news/feed", allowedOperations: ["news_load_market", "news_load_more"] },
+  { path: "/sa/feed?search=private-query", expected: "/sa/feed", allowedOperations: ["news_load_seeking_alpha", "news_load_more"] },
+  { path: "/sa/extension-health", expected: "/sa/extension-health", allowedOperations: ["news_load_seeking_alpha"] },
 ];
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -372,7 +389,7 @@ async function mountNotice(
   props: {
     state: ExploreErrorState;
     developerMode: boolean;
-    retryLabel: ReactNode;
+    retryLabel: string;
     onRetry: () => void;
     onNavigate?: (target: NavigationTarget) => void;
   },
@@ -396,6 +413,11 @@ async function click(button: HTMLButtonElement) {
   await act(async () => {
     button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
+}
+
+function buttonByName(name: string): HTMLButtonElement | null {
+  return Array.from(host!.querySelectorAll("button"))
+    .find((button) => button.textContent?.trim() === name) ?? null;
 }
 
 afterEach(() => {
@@ -510,6 +532,33 @@ describe("Explore presentation boundary", () => {
       ...network,
       category: "unknown",
     });
+
+    const inherited = Object.create({
+      status: 503,
+      path: "/news/feed",
+      code: "provider_config_missing",
+      diagnostic: "upstream temporarily unavailable",
+    });
+    expect(captureExploreError("news_load_market", inherited)).toEqual({
+      ...network,
+      category: "unknown",
+    });
+
+    let accessorReads = 0;
+    const accessorOnly = Object.defineProperties({}, Object.fromEntries(
+      ["status", "path", "code", "diagnostic"].map((field) => [field, {
+        get() {
+          accessorReads += 1;
+          throw new Error(`accessor ${field} was invoked`);
+        },
+      }]),
+    ));
+    expect(() => captureExploreError("news_load_market", accessorOnly)).not.toThrow();
+    expect(captureExploreError("news_load_market", accessorOnly)).toEqual({
+      ...network,
+      category: "unknown",
+    });
+    expect(accessorReads).toBe(0);
   });
 
   it("accepts only bounded integer status and stable error codes", async () => {
@@ -552,20 +601,20 @@ describe("Explore presentation boundary", () => {
   it("maps only reviewed queryless API route templates", async () => {
     const { captureExploreError } = await loadPresentation();
 
-    for (const { operation, path, expected } of ROUTE_CASES) {
-      const routeTemplate = captureExploreError(operation, { path }).routeTemplate;
-      expect(routeTemplate, `${operation}: ${path}`).toBe(expected);
-      expect(routeTemplate).not.toMatch(/[?#]/);
-      expect(routeTemplate).not.toContain("AAPL");
-      expect(routeTemplate).not.toContain("BRK.B");
-      expect(routeTemplate).not.toContain("72");
-      expect(routeTemplate).not.toContain("private");
+    for (const { path, expected, allowedOperations } of ROUTE_CASES) {
+      for (const operation of OPERATIONS) {
+        const routeTemplate = captureExploreError(operation, { path }).routeTemplate;
+        const expectedForOperation = allowedOperations.includes(operation) ? expected : null;
+        expect.soft(routeTemplate, `${operation}: ${path}`).toBe(expectedForOperation);
+        if (routeTemplate) {
+          expect(routeTemplate).not.toMatch(/[?#]/);
+          expect(routeTemplate).not.toContain("AAPL");
+          expect(routeTemplate).not.toContain("BRK.B");
+          expect(routeTemplate).not.toContain("72");
+          expect(routeTemplate).not.toContain("private");
+        }
+      }
     }
-
-    expect(captureExploreError("home_load_workspace", { path: "/sa/feed" }).routeTemplate)
-      .toBeNull();
-    expect(captureExploreError("ticker_load_notes", { path: "/profile/tags/catalog" }).routeTemplate)
-      .toBeNull();
   });
 
   it("omits invalid dynamic absolute and over-limit API paths", async () => {
@@ -597,10 +646,12 @@ describe("Explore presentation boundary", () => {
     const { safeDiagnosticDetail } = await loadPresentation();
     const safeDetails = [
       "upstream temporarily unavailable",
+      "request timed out after 1s",
       "request timed out after 8s",
+      "request timed out after 999s",
       "provider returned retryable status (temporary).",
       "queue worker-2 unavailable; retry later",
-      "a".repeat(160),
+      "queue worker-999999 unavailable; retry later",
     ];
 
     for (const detail of safeDetails) {
@@ -611,13 +662,30 @@ describe("Explore presentation boundary", () => {
     expect(safeDiagnosticDetail(503)).toBeNull();
     expect(safeDiagnosticDetail(" leading whitespace")).toBeNull();
     expect(safeDiagnosticDetail("trailing whitespace ")).toBeNull();
+    for (const nearMiss of [
+      "Upstream temporarily unavailable",
+      "upstream temporarily unavailable.",
+      "request timed out after 0s",
+      "request timed out after 08s",
+      "request timed out after 1000s",
+      "request timed out after 8.5s",
+      "provider returned retryable status (permanent).",
+      "queue worker-alpha unavailable; retry later",
+      "queue worker-000002 unavailable; retry later",
+      "queue worker-1000000 unavailable; retry later",
+      "a".repeat(160),
+    ]) {
+      expect.soft(safeDiagnosticDetail(nearMiss), nearMiss).toBeNull();
+    }
   });
 
   it("rejects secrets tracebacks SQL paths URLs IP HTML controls and long detail", async () => {
     const { safeDiagnosticDetail } = await loadPresentation();
     const unsafeDetails = [
       "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.secret.signature",
+      "Authorization: Basic dXNlcjpwYXNz",
       "api_key=super-secret-value",
+      "token: opaque",
       "token: ghp_0123456789abcdefghijklmnop",
       "sk-proj-0123456789abcdef",
       "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature",
@@ -626,6 +694,9 @@ describe("Explore presentation boundary", () => {
       "sqlite3.OperationalError: no such table: news_items",
       "SELECT secret FROM credentials",
       "SQL error: statement failed",
+      "ORA-00942: table or view does not exist",
+      "SequelizeDatabaseError: relation accounts does not exist",
+      "SQLSTATE[42P01]: undefined table",
       "syntax error at or near FROM",
       "relation accounts does not exist",
       "column user_id does not exist",
@@ -641,10 +712,13 @@ describe("Explore presentation boundary", () => {
       "/home/alice/arkscope/app.py:42",
       "C:\\Users\\alice\\ArkScope\\config.json",
       "../private/config.json",
+      "%2Fhome%2Falice%2Fprivate.env",
       "https://api.example.test/private?token=secret",
       "api.internal.example unavailable",
       "10.0.0.8 refused the connection",
       "[2001:db8::1] refused the connection",
+      "2026-07-23T09:00:00Z status 503 upstream unavailable",
+      "status 503 upstream temporarily unavailable",
       "<script>alert('secret')</script>",
       "unsafe &lt;script&gt;",
       "unsafe &#60;script&#62;",
@@ -690,9 +764,11 @@ describe("Explore presentation boundary", () => {
   });
 
   it("renders normal mode without diagnostic detail", async () => {
+    expectTypeOf<ExploreErrorNoticeProps["retryLabel"]>().toEqualTypeOf<string>();
     const { captureExploreError } = await loadPresentation();
     const onRetry = vi.fn();
     const onNavigate = vi.fn();
+    const retryLabel = exploreT("en")(($) => $.universe.refresh);
     const state = captureExploreError("universe_load", {
       status: 503,
       path: "/profile/universe?private=query",
@@ -703,14 +779,14 @@ describe("Explore presentation boundary", () => {
     await mountNotice("en", {
       state,
       developerMode: false,
-      retryLabel: <span>Retry Universe load</span>,
+      retryLabel,
       onRetry,
       onNavigate,
     });
 
     expect(host!.querySelector('[role="alert"]')).not.toBeNull();
     expect(host!.textContent).toContain("Could not load the Universe.");
-    expect(host!.textContent).toContain("Retry Universe load");
+    expect(host!.textContent).toContain(retryLabel);
     expect(host!.textContent).toContain("Go to Data Sources and Schedules");
     expect(host!.textContent).not.toContain("Developer diagnostics");
     expect(host!.textContent).not.toContain("503");
@@ -719,9 +795,12 @@ describe("Explore presentation boundary", () => {
     expect(host!.textContent).not.toContain("must-not-render");
     expect(host!.textContent).not.toContain("Unsafe diagnostic detail was omitted.");
 
-    const buttons = Array.from(host!.querySelectorAll("button"));
-    await click(buttons.find((button) => button.textContent?.includes("Retry Universe load"))!);
-    await click(buttons.find((button) => button.textContent?.includes("Go to Data Sources"))!);
+    const retryButton = buttonByName(retryLabel);
+    const recoveryButton = buttonByName("Go to Data Sources and Schedules");
+    expect(retryButton).not.toBeNull();
+    expect(recoveryButton).not.toBeNull();
+    await click(retryButton!);
+    await click(recoveryButton!);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith({
       kind: "settings_section",
@@ -730,13 +809,34 @@ describe("Explore presentation boundary", () => {
   });
 
   it("renders Developer Mode with safe metadata and an omitted-detail state", async () => {
-    const { captureExploreError } = await loadPresentation();
-    const state = captureExploreError("universe_load", {
+    const { captureExploreError, presentExploreError } = await loadPresentation();
+    const captured = captureExploreError("universe_load", {
       status: 503,
       path: "/profile/universe?private=query#fragment",
       code: "active_universe_unavailable",
       diagnostic: "Bearer must-not-render",
     });
+    const state: ExploreErrorState = {
+      ...captured,
+      routeTemplate: "/profile/universe?token=presenter-secret",
+      developerDetail: "token: presenter-secret",
+      detailOmitted: false,
+    };
+    const forgedPresentation = presentExploreError({
+      ...emptyState("news_load_market"),
+      status: 700,
+      code: "UPPER_CASE",
+      routeTemplate: "/profile/universe",
+      developerDetail: "token: forged-secret",
+    }, exploreT("en"));
+
+    expect(forgedPresentation.diagnostics.status).toBeNull();
+    expect(forgedPresentation.diagnostics.code).toBeNull();
+    expect(forgedPresentation.diagnostics.path).toBeNull();
+    expect(forgedPresentation.diagnostics.detail).toBeNull();
+    expect(forgedPresentation.diagnostics.detailOmitted)
+      .toBe("Unsafe diagnostic detail was omitted.");
+    expect(forgedPresentation.recovery).toBeNull();
 
     await mountNotice("en", {
       state,
@@ -750,10 +850,11 @@ describe("Explore presentation boundary", () => {
     expect(host!.textContent).toContain("503");
     expect(host!.textContent).toContain("Code");
     expect(host!.textContent).toContain("active_universe_unavailable");
-    expect(host!.textContent).toContain("Path");
-    expect(host!.textContent).toContain("/profile/universe");
     expect(host!.textContent).toContain("Unsafe diagnostic detail was omitted.");
     expect(host!.textContent).not.toContain("must-not-render");
+    expect(host!.textContent).not.toContain("Path");
+    expect(host!.textContent).not.toContain("/profile/universe");
+    expect(host!.textContent).not.toContain("presenter-secret");
   });
 
   it("renders structured Universe outcomes in both locales without captured copy", async () => {
@@ -765,8 +866,8 @@ describe("Explore presentation boundary", () => {
         warning: null,
       },
       en: {
-        title: "Import complete: Added 4 classification tags · Removed 2 legacy lists.",
-        summaryItems: ["Added 4 classification tags", "Removed 2 legacy lists"],
+        title: "Import complete: Classification tags added: 4 · Legacy lists removed: 2.",
+        summaryItems: ["Classification tags added: 4", "Legacy lists removed: 2"],
         warning: null,
       },
     } as const;
@@ -784,15 +885,15 @@ describe("Explore presentation boundary", () => {
     const outcomeWithCapturedCopy = {
       kind: "universe_import_succeeded",
       tagsAdded: 1,
-      listsRemoved: 0,
+      listsRemoved: 1,
       groupsAvailable: false,
       sourceTagName: "PRIVATE THEME FROM SERVER",
       capturedSentence: "PRIVATE IMPORT COMPLETE COPY",
     } as UniverseImportOutcome;
     const result = presentUniverseImportOutcome(outcomeWithCapturedCopy, exploreT("en"));
     expect(result).toEqual({
-      title: "Import complete: Added 1 classification tags.",
-      summaryItems: ["Added 1 classification tags"],
+      title: "Import complete: Classification tags added: 1 · Legacy lists removed: 1.",
+      summaryItems: ["Classification tags added: 1", "Legacy lists removed: 1"],
       warning: "⚠ The theme source is temporarily unavailable, so theme tags were skipped.",
     });
     expect(JSON.stringify(result)).not.toContain("PRIVATE");

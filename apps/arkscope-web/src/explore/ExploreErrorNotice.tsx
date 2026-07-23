@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { NavigationTarget } from "../shell/navigation";
@@ -12,7 +11,7 @@ import {
 export type ExploreErrorNoticeProps = {
   state: ExploreErrorState;
   developerMode: boolean;
-  retryLabel: ReactNode;
+  retryLabel: string;
   onRetry: () => void;
   onNavigate?: (target: NavigationTarget) => void;
 };

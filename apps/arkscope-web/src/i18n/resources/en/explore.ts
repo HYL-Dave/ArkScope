@@ -183,8 +183,8 @@ const explore = {
     themeUnavailable: "⚠ The theme source is temporarily unavailable, so theme tags were skipped.",
     importSucceeded: "Import complete: {{summary}}.",
     hideConfirmation: "Remove {{ticker}} from Universe? (For delisted or duplicate symbols)",
-    tagsAdded: "Added {{count}} classification tags",
-    listsRemoved: "Removed {{count}} legacy lists",
+    tagsAdded: "Classification tags added: {{count}}",
+    listsRemoved: "Legacy lists removed: {{count}}",
   },
   news: {
     saTypeLabel: "SA type",

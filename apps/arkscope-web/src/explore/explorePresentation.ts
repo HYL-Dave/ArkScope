@@ -49,13 +49,13 @@ export const EXPLORE_OPERATIONS = [
 export type ExploreOperation = (typeof EXPLORE_OPERATIONS)[number];
 
 export type ExploreErrorState = {
-  operation: ExploreOperation;
-  category: "http" | "network" | "unknown";
-  status: number | null;
-  code: string | null;
-  routeTemplate: string | null;
-  developerDetail: string | null;
-  detailOmitted: boolean;
+  readonly operation: ExploreOperation;
+  readonly category: "http" | "network" | "unknown";
+  readonly status: number | null;
+  readonly code: string | null;
+  readonly routeTemplate: string | null;
+  readonly developerDetail: string | null;
+  readonly detailOmitted: boolean;
 };
 
 export type ExploreSettingsTarget = Extract<
@@ -324,12 +324,13 @@ const MAX_ERROR_CODE_LENGTH = 64;
 const MAX_API_PATH_LENGTH = 160;
 const MAX_DIAGNOSTIC_DETAIL_LENGTH = 160;
 
-function readStructuredField(value: unknown, field: string): unknown {
+function readOwnDataProperty(value: unknown, field: string): unknown {
   if ((typeof value !== "object" || value === null) && typeof value !== "function") {
     return undefined;
   }
   try {
-    return Reflect.get(value, field);
+    const descriptor = Object.getOwnPropertyDescriptor(value, field);
+    return descriptor && "value" in descriptor ? descriptor.value : undefined;
   } catch {
     return undefined;
   }
@@ -392,71 +393,37 @@ function reviewedRouteTemplate(
     ?.template ?? null;
 }
 
-const SECRET_DETAIL = [
-  /\b(?:authorization|bearer|api[ _-]?key|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|password|passwd|credential|private[ _-]?key)\b/i,
-  /\b(?:sk-(?:proj-)?|gh[pousr]_)[A-Za-z0-9_-]{8,}\b/,
-  /\bAKIA[A-Z0-9]{12,}\b/,
-  /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\b/,
-];
-const TRACE_DETAIL = [
-  /\btraceback\b/i,
-  /\bstack\s*trace\b/i,
-  /\b(?:stack|trace)\s+frame\b/i,
-  /\bmost recent call last\b/i,
-  /\bat\s+[A-Za-z_$][\w.$]*\s*\(/,
-  /\bat\s+(?:async\s+)?[A-Za-z_$][\w.$]*(?:\s+\[as\s+[^\]]+\])?(?:\s|$)/,
-  /\bframe\s+#?[0-9]+\s+in\b/i,
-  /\bfile\s+\S+\s+line\s+[0-9]+\s+in\b/i,
-];
-const SQL_DETAIL = [
-  /\b(?:sqlite|sqlstate|sql\s+(?:error|exception)|psycopg|postgres|operationalerror|integrityerror|database\s+(?:error|exception))\b/i,
-  /\bsyntax error\b/i,
-  /\b(?:relation|column|table|constraint)\s+["']?[A-Za-z0-9_.-]+["']?\s+does not exist\b/i,
-  /\bduplicate key value violates unique constraint\b/i,
-  /\bno such (?:table|column)\b/i,
-  /\bselect\b.+\bfrom\b/i,
-  /\binsert\s+into\b/i,
-  /\bupdate\s+\w+\s+set\b/i,
-  /\bdelete\s+from\b/i,
-];
-const HOST_OR_IP_DETAIL = [
-  /\blocalhost(?::[0-9]{1,5})?\b/i,
-  /\b(?=[a-z0-9-]*[a-z])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?):[0-9]{1,5}\b/i,
-  /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/,
-  /(?:^|[\s[(])(?:[A-Fa-f0-9]{0,4}:){2,}[A-Fa-f0-9]{0,4}(?:$|[\s\])])/,
-  /\b(?:[a-z0-9](?:[a-z0-9-]{0,62})\.)+[a-z]{2,63}\b/i,
-];
+const SAFE_DIAGNOSTIC_DETAIL_PATTERNS = [
+  /^upstream temporarily unavailable$/,
+  /^request timed out after [1-9][0-9]{0,2}s$/,
+  /^provider returned retryable status \(temporary\)\.$/,
+  /^queue worker-[1-9][0-9]{0,5} unavailable; retry later$/,
+] as const;
 
 export function safeDiagnosticDetail(value: unknown): string | null {
   if (
     typeof value !== "string"
     || value.length === 0
     || value.length > MAX_DIAGNOSTIC_DETAIL_LENGTH
-    || value !== value.trim()
-    || !/^[\x20-\x7e]+$/.test(value)
-    || /[\\/@=<>]/.test(value)
-    || /&(?:[a-z][a-z0-9]+|#(?:[0-9]+|x[0-9a-f]+));/i.test(value)
-    || SECRET_DETAIL.some((pattern) => pattern.test(value))
-    || TRACE_DETAIL.some((pattern) => pattern.test(value))
-    || SQL_DETAIL.some((pattern) => pattern.test(value))
-    || HOST_OR_IP_DETAIL.some((pattern) => pattern.test(value))
   ) {
     return null;
   }
-  return value;
+  return SAFE_DIAGNOSTIC_DETAIL_PATTERNS.some((pattern) => pattern.test(value))
+    ? value
+    : null;
 }
 
 export function captureExploreError(
   operation: ExploreOperation,
   value: unknown,
 ): ExploreErrorState {
-  const status = normalizedStatus(readStructuredField(value, "status"));
-  const code = normalizedCode(readStructuredField(value, "code"));
+  const status = normalizedStatus(readOwnDataProperty(value, "status"));
+  const code = normalizedCode(readOwnDataProperty(value, "code"));
   const routeTemplate = reviewedRouteTemplate(
     operation,
-    readStructuredField(value, "path"),
+    readOwnDataProperty(value, "path"),
   );
-  const diagnostic = readStructuredField(value, "diagnostic");
+  const diagnostic = readOwnDataProperty(value, "diagnostic");
   const developerDetail = safeDiagnosticDetail(diagnostic);
   const detailOmitted = diagnostic !== null
     && diagnostic !== undefined
@@ -491,8 +458,9 @@ const RECOVERY_TARGETS = {
 export function recoveryTargetForExploreError(
   state: ExploreErrorState,
 ): ExploreSettingsTarget | null {
-  if (!state.code || !Object.hasOwn(RECOVERY_TARGETS, state.code)) return null;
-  return RECOVERY_TARGETS[state.code as keyof typeof RECOVERY_TARGETS];
+  const code = normalizedCode(state.code);
+  if (!code || !Object.hasOwn(RECOVERY_TARGETS, code)) return null;
+  return RECOVERY_TARGETS[code as keyof typeof RECOVERY_TARGETS];
 }
 
 function recoveryActionCopy(target: ExploreSettingsTarget, t: ExploreT): string {
@@ -505,6 +473,16 @@ export function presentExploreError(
   state: ExploreErrorState,
   t: ExploreT,
 ): ExploreErrorPresentation {
+  const status = normalizedStatus(state.status);
+  const code = normalizedCode(state.code);
+  const routeTemplate = typeof state.routeTemplate === "string"
+    && ROUTES_BY_OPERATION[state.operation]
+      .some((route) => route.template === state.routeTemplate)
+    ? state.routeTemplate
+    : null;
+  const developerDetail = safeDiagnosticDetail(state.developerDetail);
+  const detailOmitted = state.detailOmitted
+    || (state.developerDetail !== null && developerDetail === null);
   const recoveryTarget = recoveryTargetForExploreError(state);
   const recovery = recoveryTarget
     ? {
@@ -518,31 +496,31 @@ export function presentExploreError(
     title: OPERATION_PRESENTERS[state.operation](t),
     diagnostics: {
       title: t(($) => $.errors.diagnostics.title),
-      status: state.status === null
+      status: status === null
         ? null
         : {
             label: t(($) => $.errors.diagnostics.status),
-            value: String(state.status),
+            value: String(status),
           },
-      code: state.code === null
+      code: code === null
         ? null
         : {
             label: t(($) => $.errors.diagnostics.code),
-            value: state.code,
+            value: code,
           },
-      path: state.routeTemplate === null
+      path: routeTemplate === null
         ? null
         : {
             label: t(($) => $.errors.diagnostics.path),
-            value: state.routeTemplate,
+            value: routeTemplate,
           },
-      detail: state.developerDetail === null
+      detail: developerDetail === null
         ? null
         : {
             label: t(($) => $.errors.diagnostics.detail),
-            value: state.developerDetail,
+            value: developerDetail,
           },
-      detailOmitted: state.detailOmitted
+      detailOmitted: detailOmitted
         ? t(($) => $.errors.diagnostics.detailOmitted)
         : null,
     },
