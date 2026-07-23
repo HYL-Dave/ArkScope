@@ -36,7 +36,7 @@ describe("bundled i18n resources", () => {
       watchlist: 71,
       universe: 35,
       news: 43,
-      tickerDetail: 68,
+      tickerDetail: 103,
       aiCard: 62,
       tags: 7,
     } as const;
@@ -102,6 +102,43 @@ describe("bundled i18n resources", () => {
           ivHistorySummary: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
           statementSummary: "{{title}}（{{count}} 期）",
           retry: "重試",
+          kvLabels: {
+            latestClose: "最新收盤價",
+            changePercent: "漲跌幅",
+            periodHigh: "區間高點",
+            periodLow: "區間低點",
+            rangePercent: "區間振幅",
+            volume: "成交量",
+            bars: "K 線筆數",
+            dates: "日期範圍",
+            currentAtmIv: "目前 ATM IV",
+            hv30d: "HV 30d",
+            vrp: "VRP (IV−HV)",
+            ivRank: "IV rank",
+            ivPercentile: "IV percentile",
+            spot: "Spot",
+            historyDays: "歷史天數",
+            snapshotDate: "快照日期",
+            marketCap: "市值",
+            pe: "P/E",
+            forwardPe: "Forward P/E",
+            ps: "P/S",
+            pb: "P/B",
+            roe: "ROE",
+            roa: "ROA",
+            debtToEquity: "D/E",
+            currentRatio: "流動比率",
+            grossMargin: "毛利率",
+            operatingMargin: "營業利益率",
+            netMargin: "淨利率",
+            revenueGrowth: "營收成長",
+            earningsGrowth: "獲利成長",
+            dividendYield: "股息殖利率",
+            beta: "Beta",
+            freeCashFlow: "自由現金流",
+            cashAndEquivalents: "現金及約當現金",
+            totalDebt: "總債務",
+          },
         },
         aiCard: {
           evidenceSummary: "引用證據摘要（{{shown}} / {{total}}）",
@@ -112,6 +149,43 @@ describe("bundled i18n resources", () => {
           ivHistorySummary: "IV history (latest {{count}} rows · Source {{source}})",
           statementSummary: "{{title}} ({{count}} periods)",
           retry: "Retry",
+          kvLabels: {
+            latestClose: "Latest close",
+            changePercent: "Change %",
+            periodHigh: "Period high",
+            periodLow: "Period low",
+            rangePercent: "Range %",
+            volume: "Volume",
+            bars: "Bars",
+            dates: "Dates",
+            currentAtmIv: "Current ATM IV",
+            hv30d: "HV 30d",
+            vrp: "VRP (IV−HV)",
+            ivRank: "IV rank",
+            ivPercentile: "IV percentile",
+            spot: "Spot",
+            historyDays: "History days",
+            snapshotDate: "Snapshot date",
+            marketCap: "Market cap",
+            pe: "P/E",
+            forwardPe: "Forward P/E",
+            ps: "P/S",
+            pb: "P/B",
+            roe: "ROE",
+            roa: "ROA",
+            debtToEquity: "D/E",
+            currentRatio: "Current ratio",
+            grossMargin: "Gross margin",
+            operatingMargin: "Operating margin",
+            netMargin: "Net margin",
+            revenueGrowth: "Revenue growth",
+            earningsGrowth: "Earnings growth",
+            dividendYield: "Dividend yield",
+            beta: "Beta",
+            freeCashFlow: "Free cash flow",
+            cashAndEquivalents: "Cash & equiv.",
+            totalDebt: "Total debt",
+          },
         },
         aiCard: {
           evidenceSummary: "Evidence citation summary ({{shown}} / {{total}})",
@@ -125,7 +199,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(359);
+      expect(flattened.size, `${locale}.explore`).toBe(394);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -521,7 +595,7 @@ describe("bundled i18n resources", () => {
       expect.soft(flattenResource(resources[locale].settings as ResourceTree).size, `${locale}.settings`)
         .toBe(702);
       const localeResources = resources[locale] as Record<string, unknown>;
-      const expectedCounts = { common: 32, research: 5, explore: 359 } as const;
+      const expectedCounts = { common: 32, research: 5, explore: 394 } as const;
       for (const [namespace, count] of Object.entries(expectedCounts)) {
         const resource = localeResources[namespace];
         expect.soft(resource, `${locale}.${namespace}`).toBeDefined();

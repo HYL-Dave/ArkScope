@@ -239,14 +239,21 @@ function OverviewTab({
         {!err && !pc && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
         {pc && (
           <dl className="kv">
-            <Kv k="Latest close" v={fmtNum(pc.latest_close)} />
-            <Kv k="Change %" v={fmtPct(pc.change_pct)} cls={changeClass(pc.change_pct)} />
-            <Kv k="Period high" v={fmtNum(pc.period_high)} />
-            <Kv k="Period low" v={fmtNum(pc.period_low)} />
-            <Kv k="Range %" v={fmtRangePct(pc.high_low_range_pct)} />
-            <Kv k="Volume" v={fmtNum(pc.total_volume)} />
-            <Kv k="Bars" v={String(pc.bar_count)} />
-            <Kv k="Dates" v={pc.date_range} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.latestClose)} v={fmtNum(pc.latest_close)} />
+            <Kv
+              k={t(($) => $.tickerDetail.kvLabels.changePercent)}
+              v={fmtPct(pc.change_pct)}
+              cls={changeClass(pc.change_pct)}
+            />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.periodHigh)} v={fmtNum(pc.period_high)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.periodLow)} v={fmtNum(pc.period_low)} />
+            <Kv
+              k={t(($) => $.tickerDetail.kvLabels.rangePercent)}
+              v={fmtRangePct(pc.high_low_range_pct)}
+            />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.volume)} v={fmtNum(pc.total_volume)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.bars)} v={String(pc.bar_count)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.dates)} v={pc.date_range} />
           </dl>
         )}
       </section>
@@ -385,13 +392,16 @@ function DataTab({
         {loading && !iv && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
         {iv && (
           <dl className="kv">
-            <Kv k="Current ATM IV" v={fmtNum(iv.current_iv)} />
-            <Kv k="HV 30d" v={fmtNum(iv.hv_30d)} />
-            <Kv k="VRP (IV−HV)" v={fmtNum(iv.vrp)} />
-            <Kv k="IV rank" v={fmtNum(iv.iv_rank)} />
-            <Kv k="IV percentile" v={fmtNum(iv.iv_percentile)} />
-            <Kv k="Spot" v={fmtNum(iv.spot_price)} />
-            <Kv k="History days" v={String(iv.history_days)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.currentAtmIv)} v={fmtNum(iv.current_iv)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.hv30d)} v={fmtNum(iv.hv_30d)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.vrp)} v={fmtNum(iv.vrp)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.ivRank)} v={fmtNum(iv.iv_rank)} />
+            <Kv
+              k={t(($) => $.tickerDetail.kvLabels.ivPercentile)}
+              v={fmtNum(iv.iv_percentile)}
+            />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.spot)} v={fmtNum(iv.spot_price)} />
+            <Kv k={t(($) => $.tickerDetail.kvLabels.historyDays)} v={String(iv.history_days)} />
           </dl>
         )}
         {recentHist.length > 0 && (
@@ -445,26 +455,56 @@ function DataTab({
         {fund && (
           <>
             <dl className="kv">
-              <Kv k="Snapshot date" v={fund.snapshot_date ?? "—"} />
-              <Kv k="Market cap" v={fmtNum(fund.market_cap)} />
-              <Kv k="P/E" v={fmtNum(fund.pe_ratio)} />
-              <Kv k="Forward P/E" v={fmtNum(fund.forward_pe)} />
-              <Kv k="P/S" v={fmtNum(fund.ps_ratio)} />
-              <Kv k="P/B" v={fmtNum(fund.pb_ratio)} />
-              <Kv k="ROE" v={fmtNum(fund.roe)} />
-              <Kv k="ROA" v={fmtNum(fund.roa)} />
-              <Kv k="D/E" v={fmtNum(fund.debt_to_equity)} />
-              <Kv k="Current ratio" v={fmtNum(fund.current_ratio)} />
-              <Kv k="Gross margin" v={fmtNum(fund.gross_margin)} />
-              <Kv k="Operating margin" v={fmtNum(fund.operating_margin)} />
-              <Kv k="Net margin" v={fmtNum(fund.net_margin)} />
-              <Kv k="Revenue growth" v={fmtNum(fund.revenue_growth)} />
-              <Kv k="Earnings growth" v={fmtNum(fund.earnings_growth)} />
-              <Kv k="Dividend yield" v={fmtNum(fund.dividend_yield)} />
-              <Kv k="Beta" v={fmtNum(fund.beta)} />
-              <Kv k="Free cash flow" v={fmtNum(fund.free_cash_flow)} />
-              <Kv k="Cash & equiv." v={fmtNum(fund.cash_and_equivalents)} />
-              <Kv k="Total debt" v={fmtNum(fund.total_debt)} />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.snapshotDate)}
+                v={fund.snapshot_date ?? "—"}
+              />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.marketCap)} v={fmtNum(fund.market_cap)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.pe)} v={fmtNum(fund.pe_ratio)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.forwardPe)} v={fmtNum(fund.forward_pe)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.ps)} v={fmtNum(fund.ps_ratio)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.pb)} v={fmtNum(fund.pb_ratio)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.roe)} v={fmtNum(fund.roe)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.roa)} v={fmtNum(fund.roa)} />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.debtToEquity)}
+                v={fmtNum(fund.debt_to_equity)}
+              />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.currentRatio)}
+                v={fmtNum(fund.current_ratio)}
+              />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.grossMargin)}
+                v={fmtNum(fund.gross_margin)}
+              />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.operatingMargin)}
+                v={fmtNum(fund.operating_margin)}
+              />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.netMargin)} v={fmtNum(fund.net_margin)} />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.revenueGrowth)}
+                v={fmtNum(fund.revenue_growth)}
+              />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.earningsGrowth)}
+                v={fmtNum(fund.earnings_growth)}
+              />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.dividendYield)}
+                v={fmtNum(fund.dividend_yield)}
+              />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.beta)} v={fmtNum(fund.beta)} />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.freeCashFlow)}
+                v={fmtNum(fund.free_cash_flow)}
+              />
+              <Kv
+                k={t(($) => $.tickerDetail.kvLabels.cashAndEquivalents)}
+                v={fmtNum(fund.cash_and_equivalents)}
+              />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.totalDebt)} v={fmtNum(fund.total_debt)} />
             </dl>
             <StatementsBlock
               title={t(($) => $.tickerDetail.incomeStatements)}
@@ -523,6 +563,11 @@ function StatementsBlock({ title, rows }: { title: string; rows: FinancialStatem
   );
 }
 
+type NoteAddPayload = {
+  ticker: string;
+  body: string;
+};
+
 function NotesTab({
   ticker,
   developerMode,
@@ -539,6 +584,7 @@ function NotesTab({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<ExploreErrorState | null>(null);
+  const [failedAddPayload, setFailedAddPayload] = useState<NoteAddPayload | null>(null);
   const [failedDeleteId, setFailedDeleteId] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
@@ -554,20 +600,23 @@ function NotesTab({
   useEffect(() => {
     setNotes(null);
     setErr(null);
+    setFailedAddPayload(null);
     void refresh();
   }, [refresh]);
 
-  async function submit() {
-    const body = draft.trim();
-    if (!body || busy) return;
+  async function submit(retryPayload?: NoteAddPayload) {
+    const payload = retryPayload ?? { ticker, body: draft.trim() };
+    if (!payload.body || busy) return;
     setBusy(true);
     setErr(null);
+    setFailedAddPayload(null);
     try {
-      await addNote(ticker, body);
-      setDraft("");
+      await addNote(payload.ticker, payload.body);
+      setDraft((current) => current.trim() === payload.body ? "" : current);
       await refresh();
       onChanged?.();
     } catch (e) {
+      setFailedAddPayload(payload);
       setErr(captureExploreError("ticker_add_note", e));
     } finally {
       setBusy(false);
@@ -577,6 +626,7 @@ function NotesTab({
   async function remove(id: number) {
     setBusy(true);
     setErr(null);
+    setFailedAddPayload(null);
     setFailedDeleteId(id);
     try {
       await deleteNote(ticker, id);
@@ -591,8 +641,8 @@ function NotesTab({
 
   function retry() {
     if (!err) return;
-    if (err.operation === "ticker_add_note") {
-      void submit();
+    if (err.operation === "ticker_add_note" && failedAddPayload) {
+      void submit(failedAddPayload);
     } else if (err.operation === "ticker_delete_note" && failedDeleteId !== null) {
       void remove(failedDeleteId);
     } else {
@@ -659,6 +709,12 @@ function NotesTab({
 
 // Tag management surface. config:* tags render read-only (owned by import);
 // only source="user" tags get a × remove. A small "＋標籤" input adds user tags.
+type TagAddPayload = {
+  ticker: string;
+  value: string;
+  facet: string;
+};
+
 function TagManager({
   ticker,
   tags,
@@ -679,6 +735,7 @@ function TagManager({
   const [busy, setBusy] = useState(false);
   const [catalogErr, setCatalogErr] = useState<ExploreErrorState | null>(null);
   const [err, setErr] = useState<ExploreErrorState | null>(null);
+  const [failedAddPayload, setFailedAddPayload] = useState<TagAddPayload | null>(null);
   const [failedTag, setFailedTag] = useState<TagRef | null>(null);
 
   const loadCatalog = useCallback(async () => {
@@ -693,17 +750,21 @@ function TagManager({
     void loadCatalog();
   }, [loadCatalog]);
 
-  async function add() {
-    const value = draft.trim();
-    if (!value || busy) return;
+  async function add(retryPayload?: TagAddPayload) {
+    const payload = retryPayload ?? { ticker, value: draft.trim(), facet };
+    if (!payload.value || busy) return;
     setBusy(true);
     setErr(null);
+    setFailedAddPayload(null);
     try {
-      await addTickerTag(ticker, value, facet); // user tag on the chosen facet
-      setDraft("");
+      await addTickerTag(payload.ticker, payload.value, payload.facet);
+      setDraft((current) => (
+        current.trim() === payload.value && facet === payload.facet ? "" : current
+      ));
       onChanged();
       void loadCatalog(); // a new value becomes pickable next time
     } catch (e) {
+      setFailedAddPayload(payload);
       setErr(captureExploreError("ticker_add_tag", e));
     } finally {
       setBusy(false);
@@ -714,6 +775,7 @@ function TagManager({
     if (busy) return;
     setBusy(true);
     setErr(null);
+    setFailedAddPayload(null);
     setFailedTag(t);
     try {
       await removeTickerTag(ticker, t.value, t.facet, t.source);
@@ -728,8 +790,8 @@ function TagManager({
   function retryMutation() {
     if (err?.operation === "ticker_remove_tag" && failedTag) {
       void remove(failedTag);
-    } else {
-      void add();
+    } else if (err?.operation === "ticker_add_tag" && failedAddPayload) {
+      void add(failedAddPayload);
     }
   }
 

@@ -36,6 +36,7 @@ import { AICardTab, CardModal, CardView } from "./AICard";
 
 const TICKER = "CARD.SRC";
 const RUN_ID = 8801;
+const RUN_ID_B = 8802;
 const SOURCE_QUESTION = "SOURCE QUESTION / 原文 <keep>";
 const SOURCE_CONCLUSION = "SOURCE CONCLUSION / 結論 <keep>";
 const SOURCE_REASON = "SOURCE PRIMARY REASON / 原文";
@@ -56,6 +57,7 @@ const SOURCE_NOTE = "SOURCE EVIDENCE NOTE / 原文";
 const SOURCE_FRESHNESS = "SOURCE freshness/raw";
 const SOURCE_COMPLETENESS_NOTE = "SOURCE COMPLETENESS NOTE / 原文";
 const TRANSLATED_CONCLUSION = "TRANSLATED CONCLUSION / 翻譯結果";
+const SOURCE_CONCLUSION_B = "SOURCE CARD B CONCLUSION / 原文";
 const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/cards";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 
@@ -188,6 +190,13 @@ const CARD_DETAIL: CardDetail = {
   saved_report_id: null,
 };
 
+const SOURCE_CARD_B = card({ conclusion: SOURCE_CONCLUSION_B });
+const CARD_DETAIL_B: CardDetail = {
+  ...CARD_DETAIL,
+  run_id: RUN_ID_B,
+  card: SOURCE_CARD_B,
+};
+
 const RECENT: CardSummary[] = [
   {
     run_id: RUN_ID,
@@ -205,6 +214,21 @@ const RECENT: CardSummary[] = [
     personalization: TRACE,
   },
 ];
+
+const RECENT_B: CardSummary[] = [{
+  ...RECENT[0]!,
+  run_id: RUN_ID_B,
+  status: "source-completed-state",
+  saved_report_id: null,
+  conclusion: SOURCE_CONCLUSION_B,
+}];
+
+const TRANSLATION_RESULT = {
+  run_id: RUN_ID,
+  lang: "zh-Hant" as const,
+  card: TRANSLATED_CARD,
+  cached: false,
+};
 
 type RequestName = keyof typeof apiMocks;
 
@@ -372,12 +396,7 @@ beforeEach(async () => {
     status: "saved",
     saved_report_id: 9901,
   });
-  apiMocks.translateCard.mockReset().mockResolvedValue({
-    run_id: RUN_ID,
-    lang: "zh-Hant",
-    card: TRANSLATED_CARD,
-    cached: false,
-  });
+  apiMocks.translateCard.mockReset().mockResolvedValue(TRANSLATION_RESULT);
 });
 
 afterEach(() => {
@@ -423,6 +442,17 @@ describe("AI Card localization", () => {
     ]) {
       expect(text).toContain(expected);
     }
+    const confidence = Array.from(host!.querySelectorAll<HTMLElement>(".cardview p"))
+      .find((node) => node.textContent?.startsWith("可信度說明："));
+    const trace = host!.querySelector<HTMLDetailsElement>(".cardview-trace")!;
+    const completeness = Array.from(trace.querySelectorAll<HTMLElement>("div.muted.tiny"))
+      .find((node) => node.textContent?.startsWith("完整度 — 新聞"));
+    expect(confidence?.textContent).toBe(`可信度說明：${SOURCE_RATIONALE}`);
+    expect(trace.querySelector("summary")?.textContent)
+      .toBe("資料來源 · 可追溯性（1 源 · 1 引用）");
+    expect(completeness?.textContent).toBe(
+      `完整度 — 新聞 ✓ · 基本面 — · 技術面 ✓ · ${SOURCE_COMPLETENESS_NOTE}`,
+    );
     expect(apiMocks.generateCard).toHaveBeenCalledWith(TICKER, {
       question: SOURCE_QUESTION,
       provider: "anthropic",
@@ -513,25 +543,91 @@ describe("AI Card localization", () => {
   });
 
   it("maps save failure without changing Card identity", async () => {
+    async function openCardBWhileSavePending(pendingSave: ReturnType<typeof deferred>) {
+      apiMocks.saveCard.mockReset().mockReturnValueOnce(pendingSave.promise);
+      await mountTab();
+      await click(buttonByText("產生卡片"));
+      await waitForText(SOURCE_CONCLUSION);
+      await waitForCalls(apiMocks.getCards, 2);
+      await click(buttonByText("存成報告"));
+      await waitForCalls(apiMocks.saveCard, 1);
+
+      apiMocks.getCards.mockResolvedValue({ cards: RECENT_B });
+      await click(buttonByText("卡片列表"));
+      await waitForCalls(apiMocks.getCards, 3);
+      await waitForText(SOURCE_CONCLUSION_B);
+      apiMocks.getCard.mockResolvedValueOnce(CARD_DETAIL_B);
+      await click(host!.querySelector<HTMLLIElement>(".aicard-recent li")!);
+      await waitForCalls(apiMocks.getCard, 1);
+      await waitForText(SOURCE_CONCLUSION_B);
+      return {
+        cardNode: host!.querySelector<HTMLElement>(".cardview")!,
+        conclusionNode: host!.querySelector<HTMLElement>(".cardview-concl")!,
+        saveButton: Array.from(
+          host!.querySelectorAll<HTMLButtonElement>(".cardview-head > button"),
+        ).at(-1)!,
+      };
+    }
+
+    const pendingSuccess = deferred<Awaited<ReturnType<typeof apiMocks.saveCard>>>();
+    const successCardB = await openCardBWhileSavePending(pendingSuccess);
+    const recentCallsBeforeSuccess = apiMocks.getCards.mock.calls.length;
+    await act(async () => {
+      pendingSuccess.resolve({ run_id: RUN_ID, status: "saved", saved_report_id: 9901 });
+      await pendingSuccess.promise;
+    });
+    await flush();
+
+    expect(host!.querySelector(".cardview")).toBe(successCardB.cardNode);
+    expect(host!.querySelector(".cardview-concl")).toBe(successCardB.conclusionNode);
+    expect(successCardB.conclusionNode.textContent).toBe(SOURCE_CONCLUSION_B);
+    expect(successCardB.saveButton.textContent).toBe("存成報告");
+    expect(successCardB.saveButton.disabled).toBe(false);
+    expect(apiMocks.getCards).toHaveBeenCalledTimes(recentCallsBeforeSuccess);
+
+    unmountCard();
+    apiMocks.getCards.mockReset().mockResolvedValue({ cards: RECENT });
+    apiMocks.getInvestorProfile.mockReset().mockResolvedValue(PROFILE);
+    apiMocks.generateCard.mockReset().mockResolvedValue(GENERATE_RESULT);
+    apiMocks.getCard.mockReset().mockResolvedValue(CARD_DETAIL);
+
+    const pendingFailure = deferred<Awaited<ReturnType<typeof apiMocks.saveCard>>>();
+    const failureCardB = await openCardBWhileSavePending(pendingFailure);
+    await act(async () => {
+      pendingFailure.reject(structuredError("stale_card_a_save", `/analysis/cards/${RUN_ID}/save`));
+      await pendingFailure.promise.catch(() => undefined);
+    });
+    await flush();
+
+    expect(host!.querySelector('[role="alert"]')).toBeNull();
+    expect(host!.querySelector(".cardview")).toBe(failureCardB.cardNode);
+    expect(failureCardB.conclusionNode.textContent).toBe(SOURCE_CONCLUSION_B);
+    expect(failureCardB.saveButton.disabled).toBe(false);
+
     apiMocks.saveCard.mockRejectedValueOnce(
-      structuredError("card_save_failed", `/analysis/cards/${RUN_ID}/save`),
+      structuredError("card_b_save_failed", `/analysis/cards/${RUN_ID_B}/save`),
     );
-    await mountTab();
-    await click(buttonByText("產生卡片"));
-    await waitForText(SOURCE_CONCLUSION);
-    const cardNode = host!.querySelector<HTMLElement>(".cardview")!;
-    const conclusionNode = host!.querySelector<HTMLElement>(".cardview-concl")!;
-
-    await click(buttonByText("存成報告"));
-    await waitForCalls(apiMocks.saveCard, 1);
-
-    expect(host!.querySelector('[role="alert"] .ui-status-badge')?.textContent)
+    await click(failureCardB.saveButton);
+    await waitForCalls(apiMocks.saveCard, 2);
+    const alert = host!.querySelector<HTMLElement>('[role="alert"]')!;
+    expect(alert.querySelector(".ui-status-badge")?.textContent)
       .toBe("無法將卡片存成報告。");
-    expect(host!.querySelector(".cardview")).toBe(cardNode);
-    expect(host!.querySelector(".cardview-concl")).toBe(conclusionNode);
-    expect(conclusionNode.textContent).toBe(SOURCE_CONCLUSION);
-    expect(apiMocks.saveCard).toHaveBeenCalledWith(RUN_ID);
+    expect(host!.querySelector(".cardview")).toBe(failureCardB.cardNode);
+    expect(failureCardB.conclusionNode.textContent).toBe(SOURCE_CONCLUSION_B);
     expect(host!.textContent).not.toContain(RAW_ERROR);
+
+    apiMocks.saveCard.mockResolvedValueOnce({
+      run_id: RUN_ID_B,
+      status: "saved",
+      saved_report_id: 9902,
+    });
+    await click(buttonByText("重試", alert));
+    await waitForCalls(apiMocks.saveCard, 3);
+    expect(apiMocks.saveCard.mock.calls).toEqual([
+      [RUN_ID],
+      [RUN_ID_B],
+      [RUN_ID_B],
+    ]);
   });
 
   it("maps open-Card failure and preserves modal focus recovery", async () => {
@@ -607,20 +703,38 @@ describe("AI Card localization", () => {
   });
 
   it("preserves a translated Card node and sends no second request on locale switch", async () => {
+    const pending = deferred<typeof TRANSLATION_RESULT>();
+    apiMocks.translateCard.mockReturnValueOnce(pending.promise);
     await mountCardView();
-    await click(buttonByText("繁中"));
-    await waitForText(TRANSLATED_CONCLUSION);
     const cardNode = host!.querySelector<HTMLElement>(".cardview")!;
     const conclusionNode = host!.querySelector<HTMLElement>(".cardview-concl")!;
     const zhButton = buttonByText("繁中");
     zhButton.focus();
+    await click(zhButton);
+    await waitForCalls(apiMocks.translateCard, 1);
+    expect(zhButton.textContent).toBe("翻譯中…");
+    expect(conclusionNode.textContent).toBe(SOURCE_CONCLUSION);
 
     await switchLocale("en");
 
     expect(host!.querySelector(".cardview")).toBe(cardNode);
     expect(host!.querySelector(".cardview-concl")).toBe(conclusionNode);
+    expect(conclusionNode.textContent).toBe(SOURCE_CONCLUSION);
+    expect(zhButton.textContent).toBe("Translating…");
+    expect(zhButton.disabled).toBe(true);
+    expect(document.activeElement).toBe(zhButton);
+    expect(apiMocks.translateCard).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pending.resolve(TRANSLATION_RESULT);
+      await pending.promise;
+    });
+    await waitForText(TRANSLATED_CONCLUSION);
+
+    expect(host!.querySelector(".cardview")).toBe(cardNode);
+    expect(host!.querySelector(".cardview-concl")).toBe(conclusionNode);
     expect(conclusionNode.textContent).toBe(TRANSLATED_CONCLUSION);
-    expect(buttonByText("繁中")).toBe(zhButton);
+    expect(zhButton.textContent).toBe("繁中");
     expect(zhButton.classList.contains("on")).toBe(true);
     expect(document.activeElement).toBe(zhButton);
     expect(host!.textContent).toContain("Save as report");

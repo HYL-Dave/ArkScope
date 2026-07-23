@@ -32,6 +32,11 @@ import {
   type ResultCard,
 } from "./api";
 
+type CardSaveAttempt = {
+  runId: number;
+  requestId: number;
+};
+
 export function AICardTab({
   ticker,
   runtime,
@@ -57,6 +62,7 @@ export function AICardTab({
   const [profileErr, setProfileErr] = useState<ExploreErrorState | null>(null);
   const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [failedOpenRunId, setFailedOpenRunId] = useState<number | null>(null);
+  const [failedSaveAttempt, setFailedSaveAttempt] = useState<CardSaveAttempt | null>(null);
   // Track A: opt-in stance override for card synthesis + trace of the run shown.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [cardStance, setCardStance] = useState<AssistantStance>("off");
@@ -122,6 +128,7 @@ export function AICardTab({
     setSaving(false);
     setBusy(false);
     setErr(null);
+    setFailedSaveAttempt(null);
     setRecentErr(null);
     setRecent(null);
     void loadRecent();
@@ -131,7 +138,9 @@ export function AICardTab({
     if (busy) return;
     const id = ++reqRef.current;
     setBusy(true);
+    setSaving(false);
     setErr(null);
+    setFailedSaveAttempt(null);
     setCard(null);
     setEvidencePacket(null);
     setRunId(null);
@@ -160,7 +169,9 @@ export function AICardTab({
 
   async function openCard(rid: number) {
     const id = ++reqRef.current;
+    setSaving(false);
     setErr(null);
+    setFailedSaveAttempt(null);
     setFailedOpenRunId(rid);
     try {
       const d = await getCard(rid);
@@ -175,33 +186,48 @@ export function AICardTab({
     }
   }
 
-  async function save() {
-    if (runId == null || saved || saving) return;
+  async function save(retryAttempt?: CardSaveAttempt) {
+    const attempt = retryAttempt ?? (
+      runId == null ? null : { runId, requestId: reqRef.current }
+    );
+    if (!attempt || attempt.requestId !== reqRef.current || saved || saving) return;
     setSaving(true);
     setErr(null);
+    setFailedSaveAttempt(null);
     try {
-      await saveCard(runId);
+      await saveCard(attempt.runId);
+      if (attempt.requestId !== reqRef.current) return;
       setSaved(true);
       void loadRecent();
     } catch (e) {
+      if (attempt.requestId !== reqRef.current) return;
+      setFailedSaveAttempt(attempt);
       setErr(captureExploreError("card_save", e));
     } finally {
-      setSaving(false);
+      if (attempt.requestId === reqRef.current) setSaving(false);
     }
   }
 
   function backToList() {
+    reqRef.current += 1;
     setCard(null);
     setEvidencePacket(null);
     setRunId(null);
+    setSaved(false);
+    setSaving(false);
+    setErr(null);
+    setFailedSaveAttempt(null);
     void loadRecent();
   }
 
   function retryAction() {
     if (err?.operation === "card_open" && failedOpenRunId !== null) {
       void openCard(failedOpenRunId);
-    } else if (err?.operation === "card_save") {
-      void save();
+    } else if (
+      err?.operation === "card_save"
+      && failedSaveAttempt?.requestId === reqRef.current
+    ) {
+      void save(failedSaveAttempt);
     } else {
       void generate();
     }
@@ -458,7 +484,7 @@ export function CardView({
       <p className="cardview-concl">{shown.conclusion}</p>
       {shown.confidence_rationale && (
         <p className="muted tiny">
-          {t(($) => $.aiCard.confidenceExplanation)} {shown.confidence_rationale}
+          {t(($) => $.aiCard.confidenceExplanation)}{shown.confidence_rationale}
         </p>
       )}
 
@@ -544,11 +570,11 @@ export function CardView({
           </div>
         )}
         <div className="muted tiny">
-          {t(($) => $.aiCard.newsCompleteness)} {yn(tr.completeness.news)} {" "}
-          {t(($) => $.aiCard.fundamentalsSuffix)} {yn(tr.completeness.fundamentals)} {" "}
-          {t(($) => $.aiCard.technicalsSuffix)} {yn(tr.completeness.technicals)}
+          {t(($) => $.aiCard.newsCompleteness)}{" "}{yn(tr.completeness.news)}{" "}
+          {t(($) => $.aiCard.fundamentalsSuffix)}{" "}{yn(tr.completeness.fundamentals)}{" "}
+          {t(($) => $.aiCard.technicalsSuffix)}{" "}{yn(tr.completeness.technicals)}
           {tr.completeness.note ? (
-            <span> {t(($) => $.aiCard.completenessNote, { note: tr.completeness.note })}</span>
+            <span>{" "}{t(($) => $.aiCard.completenessNote, { note: tr.completeness.note })}</span>
           ) : null}
         </div>
         <div className="muted tiny">

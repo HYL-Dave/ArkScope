@@ -62,6 +62,85 @@ const UNKNOWN_SOURCE_PATH = "future_source_v9";
 const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/ticker";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 
+const ZH_OVERVIEW_KV_LABELS = [
+  "最新收盤價",
+  "漲跌幅",
+  "區間高點",
+  "區間低點",
+  "區間振幅",
+  "成交量",
+  "K 線筆數",
+  "日期範圍",
+] as const;
+const EN_OVERVIEW_KV_LABELS = [
+  "Latest close",
+  "Change %",
+  "Period high",
+  "Period low",
+  "Range %",
+  "Volume",
+  "Bars",
+  "Dates",
+] as const;
+const ZH_DATA_KV_LABELS = [
+  "目前 ATM IV",
+  "HV 30d",
+  "VRP (IV−HV)",
+  "IV rank",
+  "IV percentile",
+  "Spot",
+  "歷史天數",
+  "快照日期",
+  "市值",
+  "P/E",
+  "Forward P/E",
+  "P/S",
+  "P/B",
+  "ROE",
+  "ROA",
+  "D/E",
+  "流動比率",
+  "毛利率",
+  "營業利益率",
+  "淨利率",
+  "營收成長",
+  "獲利成長",
+  "股息殖利率",
+  "Beta",
+  "自由現金流",
+  "現金及約當現金",
+  "總債務",
+] as const;
+const EN_DATA_KV_LABELS = [
+  "Current ATM IV",
+  "HV 30d",
+  "VRP (IV−HV)",
+  "IV rank",
+  "IV percentile",
+  "Spot",
+  "History days",
+  "Snapshot date",
+  "Market cap",
+  "P/E",
+  "Forward P/E",
+  "P/S",
+  "P/B",
+  "ROE",
+  "ROA",
+  "D/E",
+  "Current ratio",
+  "Gross margin",
+  "Operating margin",
+  "Net margin",
+  "Revenue growth",
+  "Earnings growth",
+  "Dividend yield",
+  "Beta",
+  "Free cash flow",
+  "Cash & equiv.",
+  "Total debt",
+] as const;
+
 const USER_TAG: TagRef = {
   facet: "theme",
   value: SOURCE_TAG_VALUE,
@@ -257,6 +336,24 @@ async function setInput(input: HTMLInputElement | HTMLTextAreaElement, value: st
   await flush();
 }
 
+async function setSelect(select: HTMLSelectElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, value);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await flush();
+}
+
+function kvLabelNodes(): HTMLElement[] {
+  return Array.from(host!.querySelectorAll<HTMLElement>(".kv dt"));
+}
+
+function expectKvLabels(expected: readonly string[]) {
+  expect(kvLabelNodes().map((node) => node.textContent)).toEqual(
+    expect.arrayContaining([...expected]),
+  );
+}
+
 function buttonByText(text: string, scope: ParentNode = host!): HTMLButtonElement {
   const match = Array.from(scope.querySelectorAll<HTMLButtonElement>("button"))
     .find((button) => button.textContent?.includes(text));
@@ -344,7 +441,7 @@ describe("Ticker Detail localization", () => {
     await mountTicker();
     await waitForText(SOURCE_DATE_RANGE);
 
-    const text = host!.textContent ?? "";
+    const overviewText = host!.textContent ?? "";
     for (const expected of [
       "← 自選股",
       "已封存",
@@ -362,18 +459,48 @@ describe("Ticker Detail localization", () => {
       "source-priority/raw",
       SOURCE_DATE_RANGE,
     ]) {
-      expect(text).toContain(expected);
+      expect(overviewText).toContain(expected);
     }
+    expect(kvLabelNodes().map((node) => node.textContent)).toEqual(ZH_OVERVIEW_KV_LABELS);
+
+    await click(buttonByText("數據"));
+    await waitForText(SOURCE_ROW);
+    expectKvLabels(ZH_DATA_KV_LABELS);
+    expect(host!.textContent).toContain(SOURCE_FUNDAMENTAL_PROVIDER);
+    expect(host!.textContent).toContain(SOURCE_SIGNAL);
     expect(host!.querySelector("img")).toBeNull();
     expect(apiMocks.getTickerState).toHaveBeenCalledWith(TICKER);
     expect(apiMocks.getPriceChange).toHaveBeenCalledWith(TICKER, 30);
   });
 
   it("renders English ticker chrome without translating financial statement rows", async () => {
-    await switchLocale("en");
     await mountTicker();
-    await click(host!.querySelectorAll<HTMLButtonElement>(".detail-tabs button")[1]!);
+    await waitForText(SOURCE_DATE_RANGE);
+    const overviewNodes = kvLabelNodes();
+    expect(overviewNodes.map((node) => node.textContent)).toEqual(ZH_OVERVIEW_KV_LABELS);
+    const beforeOverviewSwitch = requestCounts();
+
+    await switchLocale("en");
+    expect(kvLabelNodes().every((node, index) => node === overviewNodes[index])).toBe(true);
+    expect(overviewNodes.map((node) => node.textContent)).toEqual(EN_OVERVIEW_KV_LABELS);
+    expect(requestCounts()).toEqual(beforeOverviewSwitch);
+
+    await click(buttonByText("Data"));
     await waitForText(SOURCE_ROW);
+    const dataNodes = kvLabelNodes().slice(-EN_DATA_KV_LABELS.length);
+    expect(dataNodes.map((node) => node.textContent)).toEqual(EN_DATA_KV_LABELS);
+    const beforeDataSwitch = requestCounts();
+
+    await switchLocale("zh-Hant");
+    expect(kvLabelNodes().slice(-ZH_DATA_KV_LABELS.length)
+      .every((node, index) => node === dataNodes[index])).toBe(true);
+    expect(dataNodes.map((node) => node.textContent)).toEqual(ZH_DATA_KV_LABELS);
+
+    await switchLocale("en");
+    expect(kvLabelNodes().slice(-EN_DATA_KV_LABELS.length)
+      .every((node, index) => node === dataNodes[index])).toBe(true);
+    expect(dataNodes.map((node) => node.textContent)).toEqual(EN_DATA_KV_LABELS);
+    expect(requestCounts()).toEqual(beforeDataSwitch);
 
     const text = host!.textContent ?? "";
     for (const expected of [
@@ -541,6 +668,15 @@ describe("Ticker Detail localization", () => {
     expect(draft.value).toBe("SOURCE NOTE DRAFT / 保留");
     expect(apiMocks.addNote).toHaveBeenCalledWith(TICKER, "SOURCE NOTE DRAFT / 保留");
 
+    await setInput(draft, "SOURCE NEWER NOTE EDIT / 保留");
+    await click(buttonByText("重試"));
+    await waitForCalls(apiMocks.addNote, 2);
+    expect(apiMocks.addNote.mock.calls).toEqual([
+      [TICKER, "SOURCE NOTE DRAFT / 保留"],
+      [TICKER, "SOURCE NOTE DRAFT / 保留"],
+    ]);
+    expect(draft.value).toBe("SOURCE NEWER NOTE EDIT / 保留");
+
     apiMocks.deleteNote.mockRejectedValueOnce(
       structuredError("note_delete_failed", `/profile/tickers/${TICKER}/notes/71`),
     );
@@ -549,7 +685,7 @@ describe("Ticker Detail localization", () => {
     await waitForCalls(apiMocks.deleteNote, 1);
     expect(host!.querySelector('[role="alert"] .ui-status-badge')?.textContent)
       .toBe("無法刪除筆記。");
-    expect(draft.value).toBe("SOURCE NOTE DRAFT / 保留");
+    expect(draft.value).toBe("SOURCE NEWER NOTE EDIT / 保留");
     expect(apiMocks.deleteNote).toHaveBeenCalledWith(TICKER, 71);
     expect(host!.textContent).not.toContain(RAW_ERROR);
   });
@@ -579,6 +715,18 @@ describe("Ticker Detail localization", () => {
     expect(input.value).toBe("SOURCE TAG DRAFT / 保留");
     expect(apiMocks.addTickerTag).toHaveBeenCalledWith(TICKER, "SOURCE TAG DRAFT / 保留", "theme");
 
+    const facet = host!.querySelector<HTMLSelectElement>(".tag-add select")!;
+    await setInput(input, "SOURCE NEWER TAG EDIT / 保留");
+    await setSelect(facet, "category");
+    await click(buttonByText("重試"));
+    await waitForCalls(apiMocks.addTickerTag, 2);
+    expect(apiMocks.addTickerTag.mock.calls).toEqual([
+      [TICKER, "SOURCE TAG DRAFT / 保留", "theme"],
+      [TICKER, "SOURCE TAG DRAFT / 保留", "theme"],
+    ]);
+    expect(input.value).toBe("SOURCE NEWER TAG EDIT / 保留");
+    expect(facet.value).toBe("category");
+
     apiMocks.removeTickerTag.mockRejectedValueOnce(
       structuredError("tag_remove_failed", `/profile/tickers/${TICKER}/tags?value=private`),
     );
@@ -586,7 +734,8 @@ describe("Ticker Detail localization", () => {
     await waitForCalls(apiMocks.removeTickerTag, 1);
     expect(host!.querySelector('[role="alert"] .ui-status-badge')?.textContent)
       .toBe("無法移除標籤。");
-    expect(input.value).toBe("SOURCE TAG DRAFT / 保留");
+    expect(input.value).toBe("SOURCE NEWER TAG EDIT / 保留");
+    expect(facet.value).toBe("category");
     expect(apiMocks.removeTickerTag).toHaveBeenCalledWith(
       TICKER,
       USER_TAG.value,
