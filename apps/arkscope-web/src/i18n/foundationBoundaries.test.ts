@@ -45,6 +45,18 @@ const SLICE_5_MIGRATED_SCOPES = [
   "src/ResearchPersonalizationContext.tsx",
 ];
 
+const I18N_3_EXPLORE_SCOPES = [
+  "src/Home.tsx",
+  "src/Watchlist.tsx",
+  "src/Universe.tsx",
+  "src/News.tsx",
+  "src/TickerDetail.tsx",
+  "src/AICard.tsx",
+  "src/tags.tsx",
+  "src/personalizationDisplay.ts",
+  "src/explore/**",
+];
+
 const ARKSCOPE_ALLOWLIST_ENTRY = {
   file: "src/shell/ShellTopBar.tsx",
   kind: "jsx_text",
@@ -138,6 +150,14 @@ function ownsSettingsDebt(file: string): boolean {
   return I18N_2_OWNED_DEBT_FILES.has(file)
     || file === "src/ResearchPersonalizationContext.tsx"
     || file.startsWith("src/settings/investor/");
+}
+
+function ownsExploreDebt(file: string): boolean {
+  return I18N_3_EXPLORE_SCOPES.some((scope) => {
+    if (!scope.endsWith("/**")) return file === scope;
+    const prefix = scope.slice(0, -3);
+    return file === prefix || file.startsWith(`${prefix}/`);
+  });
 }
 
 describe("I18N-0 foundation boundaries", () => {
@@ -270,8 +290,9 @@ describe("I18N-0 foundation boundaries", () => {
       ...I18N_1_MIGRATED_SCOPES,
       ...I18N_2_SETTINGS_SCOPES,
       ...SLICE_5_MIGRATED_SCOPES,
+      ...I18N_3_EXPLORE_SCOPES,
     ]);
-    expect(migrated.scopes).toHaveLength(30);
+    expect(migrated.scopes).toHaveLength(39);
     expect(allowlist.entries).toEqual([
       ARKSCOPE_ALLOWLIST_ENTRY,
       ...I18N_2_SETTINGS_ALLOWLIST_ENTRIES,
@@ -282,7 +303,7 @@ describe("I18N-0 foundation boundaries", () => {
 
     const ownedDebt = debt.signatures.filter(({ signature }) => {
       const [file] = JSON.parse(signature) as [string];
-      return ownsSettingsDebt(file);
+      return ownsSettingsDebt(file) || ownsExploreDebt(file);
     });
     expect(ownedDebt).toEqual([]);
   });

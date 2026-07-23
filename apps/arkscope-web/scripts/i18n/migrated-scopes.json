@@ -30,6 +30,15 @@
     "src/settings/settingsPreferences.ts",
     "src/settings/settingsRegistry.ts",
     "src/settings/investor/**",
-    "src/ResearchPersonalizationContext.tsx"
+    "src/ResearchPersonalizationContext.tsx",
+    "src/Home.tsx",
+    "src/Watchlist.tsx",
+    "src/Universe.tsx",
+    "src/News.tsx",
+    "src/TickerDetail.tsx",
+    "src/AICard.tsx",
+    "src/tags.tsx",
+    "src/personalizationDisplay.ts",
+    "src/explore/**"
   ]
 }
