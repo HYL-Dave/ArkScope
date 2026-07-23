@@ -72,8 +72,8 @@ describe("bundled i18n resources", () => {
         universe: {
           noteCount: { one: "{{count}} note", other: "{{count}} notes" },
           summaryCounts: {
-            one: "{{total}} file · {{summarized}} with summary · {{withoutSummary}} without summary",
-            other: "{{total}} files · {{summarized}} with summary · {{withoutSummary}} without summary",
+            one: "{{total}} ticker · {{summarized}} with summary · {{withoutSummary}} without summary",
+            other: "{{total}} tickers · {{summarized}} with summary · {{withoutSummary}} without summary",
           },
         },
       },

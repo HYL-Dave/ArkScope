@@ -357,14 +357,14 @@ describe("Universe localization", () => {
     ]) expect(text).toContain(expected);
     expect(host!.querySelector(`.tagchip[title*="${UNKNOWN_SOURCE}"]`)?.textContent).toBe(UNKNOWN_VALUE);
     expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
-      "3 files · 2 with summary · 1 without summary · 1 archived",
+      "3 tickers · 2 with summary · 1 without summary · 1 archived",
     );
     expect(host!.querySelector(".universe-select option")?.textContent).toBe("All lists (2)");
     expect(selectWithOption(SOURCE_CATEGORY).querySelector('option[value=""]')?.textContent)
       .toBe("Category (All)");
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("2 notes");
     expect(rowForTicker("ARCH.SRC").querySelector<HTMLElement>(".note-dot")?.title).toBe("1 note");
-    expect(text).not.toContain("files · 2 With summary");
+    expect(text).not.toContain("files · 2 with summary");
     expect(text).not.toContain("Category(All)");
     expect(text).not.toContain("Source list");
 
@@ -373,7 +373,7 @@ describe("Universe localization", () => {
     await mountUniverse();
     await waitForText(SOURCE_TICKER);
     expect(host!.querySelector(".surface-head .muted")?.textContent).toBe(
-      "1 file · 1 with summary · 0 without summary",
+      "1 ticker · 1 with summary · 0 without summary",
     );
     expect(rowForTicker(SOURCE_TICKER).querySelector<HTMLElement>(".note-dot")?.title).toBe("1 note");
   });

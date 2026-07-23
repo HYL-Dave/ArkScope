@@ -192,8 +192,8 @@ const explore = {
     description: "The inventory comes from Universe settings and is unaffected by list membership. “Import classifications” seeds classification tags (category / theme / provenance) from existing settings and removes legacy settings lists. It is safe to repeat and does not overwrite user-defined tags. Use tags for classifications and lists for working sets shared with Watchlist.",
     allListsCount: "All lists ({{count}})",
     summaryCounts: {
-      one: "{{total}} file · {{summarized}} with summary · {{withoutSummary}} without summary",
-      other: "{{total}} files · {{summarized}} with summary · {{withoutSummary}} without summary",
+      one: "{{total}} ticker · {{summarized}} with summary · {{withoutSummary}} without summary",
+      other: "{{total}} tickers · {{summarized}} with summary · {{withoutSummary}} without summary",
     },
     clearCategory: "Clear classification ✕",
     noSummary: "No summary",
