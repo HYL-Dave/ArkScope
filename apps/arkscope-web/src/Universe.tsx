@@ -15,20 +15,43 @@ import {
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
+import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
+import {
+  captureExploreError,
+  presentUniverseImportOutcome,
+  type ExploreErrorState,
+  type UniverseImportOutcome,
+} from "./explore/explorePresentation";
+import type { NavigationTarget } from "./shell/navigation";
 import { TAG_FACETS, TagChips, facetLabel } from "./tags";
 
-export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
-  const { t } = useTranslation("explore");
+type UniverseFeedback = UniverseImportOutcome | ExploreErrorState;
+
+function isImportOutcome(value: UniverseFeedback): value is UniverseImportOutcome {
+  return "kind" in value && value.kind === "universe_import_succeeded";
+}
+
+export function UniverseView({
+  onOpenTicker,
+  developerMode,
+  onNavigateTarget,
+}: {
+  onOpenTicker: (ticker: string) => void;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+}) {
+  const { t, i18n } = useTranslation("explore");
+  const allListsClosing = i18n.resolvedLanguage === "en" ? ")" : "）";
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [meta, setMeta] = useState<{ total: number; summarized: number; archived: number } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [query, setQuery] = useState("");
   const [listFilter, setListFilter] = useState<string>("__all__");
   const [tagFilters, setTagFilters] = useState<Record<string, string>>({}); // facet -> value ("" = all)
   const [importing, setImporting] = useState(false);
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
-  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<UniverseFeedback | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -38,7 +61,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       setLists(l.lists);
       setMeta({ total: u.total, summarized: u.summarized, archived: u.archived_count });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(captureExploreError("universe_load", e));
     }
   }, []);
 
@@ -49,17 +72,18 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   async function runImport() {
     if (importing) return;
     setImporting(true);
-    setImportMsg(null);
+    setFeedback(null);
     try {
       const r = await importUniverse({});
-      const bits = [`新增 ${r.tags.tags_added} 個分類標籤`];
-      if (r.lists_removed > 0) bits.push(`移除 ${r.lists_removed} 個舊清單`);
-      let msg = `匯入完成：${bits.join("、")}。`;
-      if (!r.groups_ok) msg += " ⚠ 主題來源暫時無法連線，已略過 theme 標籤。";
-      setImportMsg(msg);
+      setFeedback({
+        kind: "universe_import_succeeded",
+        tagsAdded: r.tags.tags_added,
+        listsRemoved: r.lists_removed,
+        groupsAvailable: r.groups_ok,
+      });
       await load();
     } catch (e) {
-      setImportMsg(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
+      setFeedback(captureExploreError("universe_import", e));
     } finally {
       setImporting(false);
     }
@@ -68,13 +92,13 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   async function removeFromUniverse(ticker: string) {
     if (busyTicker) return;
     // No restore UI (per the model decision), so confirm before suppressing.
-    if (!window.confirm(`從「全部標的」移除 ${ticker}？（用於已下市/重複的代號）`)) return;
+    if (!window.confirm(t(($) => $.universe.hideConfirmation, { ticker }))) return;
     setBusyTicker(ticker);
     try {
       await setTickerHidden(ticker, true);
       await load();
     } catch (e) {
-      setImportMsg(`移除失敗：${e instanceof Error ? e.message : String(e)}`);
+      setFeedback(captureExploreError("universe_hide_ticker", e));
     } finally {
       setBusyTicker(null);
     }
@@ -116,38 +140,68 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     () => Object.values(tagFilters).filter(Boolean).length,
     [tagFilters],
   );
+  const importPresentation = feedback && isImportOutcome(feedback)
+    ? presentUniverseImportOutcome(feedback, t)
+    : null;
+  const feedbackError = feedback && !isImportOutcome(feedback) ? feedback : null;
+
+  const errorNotice = (state: ExploreErrorState) => (
+    <ExploreErrorNotice
+      state={state}
+      developerMode={developerMode}
+      retryLabel={t(($) => $.universe.refresh)}
+      onRetry={() => void load()}
+      onNavigate={state.code === "active_universe_unavailable"
+        ? onNavigateTarget
+        : undefined}
+    />
+  );
 
   return (
     <main className="main">
       <div className="surface-head">
-        <h2 className="surface-title">全部標的 · Universe</h2>
+        <h2 className="surface-title">{t(($) => $.universe.title)}</h2>
         {meta && (
           <span className="muted">
-            {meta.total} 檔 · {meta.summarized} 有摘要 · {meta.total - meta.summarized} 無摘要
-            {meta.archived > 0 && ` · ${meta.archived} 已封存`}
+            {meta.total} {t(($) => $.universe.filesSeparator)} {meta.summarized}{" "}
+            {t(($) => $.universe.withSummary)} {meta.total - meta.summarized}{" "}
+            {t(($) => $.universe.noSummary)}
+            {meta.archived > 0 && (
+              <> {t(($) => $.universe.archivedCount, { count: meta.archived })}</>
+            )}
           </span>
         )}
         <span className="spacer" />
         <button className="btn-ghost" onClick={() => void runImport()} disabled={importing}>
-          {importing ? "匯入中…" : "⤓ 匯入分類"}
+          {importing
+            ? t(($) => $.universe.importing)
+            : t(($) => $.universe.importCategories)}
         </button>
-        <button className="btn-ghost" onClick={() => void load()}>↻ Refresh</button>
+        <button className="btn-ghost" onClick={() => void load()}>
+          {t(($) => $.universe.refresh)}
+        </button>
       </div>
 
       <p className="muted tiny universe-hint">
-        庫存來自 active universe 設定（不受清單增減影響）。「匯入分類」會從 config 種入分類標籤
-        （category / theme / 來源），並移除舊的 config 清單；可重複執行，使用者自訂的標籤不會被覆蓋。
-        分類用標籤管理，清單只放你的工作清單（與「自選股」同一組）。
+        {t(($) => $.universe.description)}
       </p>
-      {importMsg && <p className="tiny universe-importmsg">{importMsg}</p>}
-      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+      {importPresentation && (
+        <p className="tiny universe-importmsg">
+          {importPresentation.title}
+          {importPresentation.warning ? (
+            <>{" "}{importPresentation.warning}</>
+          ) : null}
+        </p>
+      )}
+      {feedbackError && errorNotice(feedbackError)}
+      {err && errorNotice(err)}
 
       {rows && (
         <>
           <div className="universe-filters">
             <input
               className="aicard-q"
-              placeholder="搜尋 ticker…"
+              placeholder={t(($) => $.universe.searchPlaceholder)}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -156,7 +210,11 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
               value={listFilter}
               onChange={(e) => setListFilter(e.target.value)}
             >
-              <option value="__all__">所有清單（{customListNames.length}）</option>
+              <option value="__all__">
+                {t(($) => $.universe.allListsPrefix)}
+                {customListNames.length}
+                {allListsClosing}
+              </option>
               {customListNames.map((l) => (
                 <option key={l} value={l}>{l}</option>
               ))}
@@ -169,9 +227,9 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                   className="universe-select"
                   value={tagFilters[f.facet] ?? ""}
                   onChange={(e) => setTagFilters((prev) => ({ ...prev, [f.facet]: e.target.value }))}
-                  title={`依 ${f.label} 篩選`}
+                  title={t(($) => $.universe.filterBy, { label: f.label })}
                 >
-                  <option value="">{f.label}（全部）</option>
+                  <option value="">{f.label}{t(($) => $.universe.all)}</option>
                   {tagValues[f.facet].map((v) => (
                     <option key={v} value={v}>{v}</option>
                   ))}
@@ -179,8 +237,12 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
               ) : null;
             })}
             {activeTagFilters > 0 && (
-              <button className="btn-ghost tiny" onClick={() => setTagFilters({})} title="清除分類篩選">
-                清除分類 ✕
+              <button
+                className="btn-ghost tiny"
+                onClick={() => setTagFilters({})}
+                title={t(($) => $.universe.clearFacetFilters)}
+              >
+                {t(($) => $.universe.clearCategory)}
               </button>
             )}
             <span className="muted tiny">{filtered.length} / {rows.length}</span>
@@ -189,12 +251,12 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           <table className="wl universe-table">
             <thead>
               <tr>
-                <th>Ticker</th>
-                <th className="num">Close</th>
-                <th className="num">7d %</th>
-                <th className="num">News</th>
-                <th>Lists</th>
-                <th>Tags</th>
+                <th>{t(($) => $.universe.ticker)}</th>
+                <th className="num">{t(($) => $.universe.close)}</th>
+                <th className="num">{t(($) => $.universe.change7d)}</th>
+                <th className="num">{t(($) => $.universe.news)}</th>
+                <th>{t(($) => $.universe.lists)}</th>
+                <th>{t(($) => $.universe.tags)}</th>
                 <th></th>
               </tr>
             </thead>
@@ -207,9 +269,22 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 >
                   <td className="mono strong">
                     {r.ticker}
-                    {!r.has_summary && <span className="tag-nosum" title="尚無市場摘要">無摘要</span>}
-                    {r.archived && <span className="tag-archived">archived</span>}
-                    {r.note_count > 0 && <span className="note-dot" title={`${r.note_count} note(s)`}>✎{r.note_count}</span>}
+                    {!r.has_summary && (
+                      <span className="tag-nosum" title={t(($) => $.universe.noMarketSummary)}>
+                        {t(($) => $.universe.noSummary)}
+                      </span>
+                    )}
+                    {r.archived && (
+                      <span className="tag-archived">{t(($) => $.universe.archived)}</span>
+                    )}
+                    {r.note_count > 0 && (
+                      <span
+                        className="note-dot"
+                        title={t(($) => $.universe.noteCount, { count: r.note_count })}
+                      >
+                        ✎{r.note_count}
+                      </span>
+                    )}
                   </td>
                   <td className="num">{r.has_summary ? fmtNum(r.latest_close) : "—"}</td>
                   <td className={`num ${changeClass(r.change_7d_pct)}`}>
@@ -229,7 +304,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                     <button
                       type="button"
                       className="rowx"
-                      title="從全部標的移除（已下市/重複代號）"
+                      title={t(($) => $.universe.hideTicker)}
                       disabled={busyTicker === r.ticker}
                       onClick={() => void removeFromUniverse(r.ticker)}
                     >
@@ -242,12 +317,14 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           </table>
           {filtered.length === 0 && (
             <p className="muted tiny">
-              {rows.length === 0 ? "尚無標的。按「匯入分類」從現有設定種入。" : "沒有符合的標的。"}
+              {rows.length === 0
+                ? t(($) => $.universe.emptyUniverse)
+                : t(($) => $.universe.noMatches)}
             </p>
           )}
         </>
       )}
-      {!rows && !err && <p className="muted">載入中…</p>}
+      {!rows && !err && <p className="muted">{t(($) => $.universe.loading)}</p>}
     </main>
   );
 }

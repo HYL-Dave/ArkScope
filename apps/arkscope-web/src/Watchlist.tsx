@@ -20,6 +20,13 @@ import {
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
+import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
+import {
+  captureExploreError,
+  type ExploreErrorState,
+  type ExploreT,
+} from "./explore/explorePresentation";
+import type { NavigationTarget } from "./shell/navigation";
 import { TagChips } from "./tags";
 
 // One normalized row the table renders. The single source is the universe
@@ -61,8 +68,18 @@ function universeToTab(r: UniverseRow): TabRow {
   };
 }
 
-export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
-  const { t } = useTranslation("explore");
+export function WatchlistView({
+  onOpenTicker,
+  developerMode,
+  onNavigateTarget,
+}: {
+  onOpenTicker: (ticker: string) => void;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
+}) {
+  const { t, i18n } = useTranslation("explore");
+  const sentenceSeparator = i18n.resolvedLanguage === "en" ? " " : "";
+  const sentenceEnd = i18n.resolvedLanguage === "en" ? "." : "。";
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null); // null = all custom lists
   const [defaultListId, setDefaultListId] = useState<number | null>(null);
@@ -71,7 +88,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   const [sortKey, setSortKey] = useState<SortKey>("change_7d_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
 
   // Single cached source: the universe (all imported tickers + their membership
@@ -123,15 +140,17 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     }
   }, [defaultListId]);
 
-  const loadUniverse = useCallback(async () => {
+  const loadUniverse = useCallback(async (clearError = true) => {
     const id = ++universeReq.current;
     setRefreshing(true);
-    setErr(null);
+    if (clearError) setErr(null);
     try {
       const u = await getUniverse(true);
       if (id === universeReq.current) setUniverse({ rows: u.rows, asOf: u.as_of });
     } catch (e) {
-      if (id === universeReq.current) setErr(e instanceof Error ? e.message : String(e));
+      if (id === universeReq.current) {
+        setErr(captureExploreError("watchlist_load_universe", e));
+      }
     } finally {
       if (id === universeReq.current) setRefreshing(false);
     }
@@ -289,7 +308,9 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
       try {
         await setArchived(row.ticker, !row.archived); // GLOBAL archive (all lists)
         await reloadAfterMutation();
-      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+      } catch (e) {
+        setErr(captureExploreError("watchlist_set_archived", e));
+      }
       finally { setBusyTicker(null); }
     },
     [reloadAfterMutation],
@@ -303,7 +324,9 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
       try {
         await removeMember(selectedList.id, row.ticker); // THIS list only
         await reloadAfterMutation();
-      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+      } catch (e) {
+        setErr(captureExploreError("watchlist_remove_member", e));
+      }
       finally { setBusyTicker(null); }
     },
     [selectedList, reloadAfterMutation],
@@ -322,8 +345,8 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
         // reconcile now to the server's effective value.
         if (priority === null) void loadUniverse();
       } catch (e) {
-        setErr(e instanceof Error ? e.message : String(e));
-        void loadUniverse(); // revert to server truth on failure
+        setErr(captureExploreError("watchlist_set_priority", e));
+        void loadUniverse(false); // revert to server truth without hiding the mutation failure
       }
     },
     [loadUniverse],
@@ -342,7 +365,9 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
       setNewName("");
       await loadLists();
       setSelectedId(li.id);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) {
+      setErr(captureExploreError("watchlist_create_list", e));
+    }
   }
 
   async function submitRename(id: number) {
@@ -353,20 +378,22 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
       await renameList(id, name);
       setRenamingId(null);
       await reloadAfterMutation(); // membership names in cached rows update too
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) {
+      setErr(captureExploreError("watchlist_rename_list", e));
+    }
   }
 
   async function onDeleteList(li: WatchlistSummary) {
-    const ok = window.confirm(
-      `刪除清單「${li.name}」？\n\n只移除這個清單與其成員關係 —— 不會刪除標的本身或任何市場資料，標的仍保留在其他清單中。`,
-    );
+    const ok = window.confirm(t(($) => $.watchlist.deleteConfirmation, { listName: li.name }));
     if (!ok) return;
     setErr(null);
     try {
       await deleteList(li.id);
       if (selectedId === li.id) setSelectedId(null);
       await reloadAfterMutation();
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) {
+      setErr(captureExploreError("watchlist_remove_member", e));
+    }
   }
 
   async function onAddSymbol(ticker: string) {
@@ -378,44 +405,68 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
       setAddQuery("");
       setAddResults(null);
       await reloadAfterMutation();
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    } catch (e) {
+      setErr(captureExploreError("watchlist_add_member", e));
+    }
     finally { setAddBusy(false); }
   }
 
   const thProps = { sortKey, sortDir, toggleSort };
-  const title = selectedList === null ? "全部清單" : selectedList.name;
+  const title = selectedList === null
+    ? t(($) => $.watchlist.allListsRuntime)
+    : selectedList.name;
   const universeCount = universe?.rows.length ?? null;
   const normQuery = addQuery.trim().toUpperCase();
 
   return (
     <main className="main">
       <div className="surface-head">
-        <h2 className="surface-title">自選股</h2>
+        <h2 className="surface-title">{t(($) => $.watchlist.title)}</h2>
         <span className="muted">
-          {title} · {rows.length} 檔
-          {selectedList === null && ` · ${railLists.length} 個自訂清單`}
-          {selectedList === null && universeCount !== null && ` · 全部標的 ${universeCount}`}
-          {archivedCount > 0 && ` · ${archivedCount} archived`}
-          {asOf && ` · as of ${asOf}`}
+          {title} · {rows.length} {t(($) => $.watchlist.filesSuffix)}
+          {selectedList === null && (
+            <> {t(($) => $.watchlist.customListCount, { count: railLists.length })}</>
+          )}
+          {selectedList === null && universeCount !== null && (
+            <> {t(($) => $.watchlist.universeCount, { count: universeCount })}</>
+          )}
+          {archivedCount > 0 && (
+            <> {t(($) => $.watchlist.archivedCount, { count: archivedCount })}</>
+          )}
+          {asOf && <> {t(($) => $.watchlist.asOf, { value: asOf })}</>}
         </span>
         <span className="spacer" />
-        {err && <span className="refresh-err" title={err}>error</span>}
+        {err && <span className="refresh-err">{t(($) => $.watchlist.error)}</span>}
         <button className={`btn-ghost ${showArchived ? "on" : ""}`} onClick={() => setShowArchived((v) => !v)}>
-          {showArchived ? "✓ Archived" : "Show archived"}
+          {showArchived
+            ? t(($) => $.watchlist.archivedBadge)
+            : t(($) => $.watchlist.showArchived)}
         </button>
         <button className="btn-ghost" onClick={() => void reloadAfterMutation()} disabled={refreshing}>
-          {refreshing ? "↻ …" : "↻ Refresh"}
+          {refreshing ? "↻ …" : t(($) => $.watchlist.refresh)}
         </button>
       </div>
+
+      {err && (
+        <ExploreErrorNotice
+          state={err}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.watchlist.refresh)}
+          onRetry={() => void reloadAfterMutation()}
+          onNavigate={err.code === "active_universe_unavailable"
+            ? onNavigateTarget
+            : undefined}
+        />
+      )}
 
       <div className="wl-layout">
         <aside className="wl-rail">
           <button
             className={`wl-railitem ${selectedId === null ? "active" : ""}`}
             onClick={() => setSelectedId(null)}
-            title="app 內建立的自訂清單中 active 標的的聯集；完整 inventory 在「全部標的」"
+            title={t(($) => $.watchlist.allListsDescription)}
           >
-            全部清單
+            {t(($) => $.watchlist.allLists)}
           </button>
           {railLists.map((li) =>
             renamingId === li.id ? (
@@ -435,18 +486,27 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
               </div>
             ) : (
               <div key={li.id} className={`wl-railitem ${selectedId === li.id ? "active" : ""}`}>
-                <button className="wl-railname" onClick={() => setSelectedId(li.id)} title={`${li.kind} · ${li.active_count} active`}>
+                <button
+                  className="wl-railname"
+                  onClick={() => setSelectedId(li.id)}
+                  title={t(($) => $.watchlist.listSummary, {
+                    kind: li.kind,
+                    count: li.active_count,
+                  })}
+                >
                   {li.name} <span className="wl-railcount">{li.active_count}</span>
                 </button>
                 <button
                   className={`wl-railbtn wl-raildefault ${defaultListId === li.id ? "on" : ""}`}
-                  title={defaultListId === li.id ? "目前的預設清單（點擊取消）" : "設為進入自選股的預設清單"}
+                  title={defaultListId === li.id
+                    ? t(($) => $.watchlist.currentDefaultList)
+                    : t(($) => $.watchlist.setDefaultList)}
                   onClick={() => void onSetDefault(li.id)}
                 >
                   {defaultListId === li.id ? "★" : "☆"}
                 </button>
-                <button className="wl-railbtn" title="改名" onClick={() => { setRenamingId(li.id); setRenameName(li.name); }}>✎</button>
-                <button className="wl-railbtn" title="刪除清單" onClick={() => void onDeleteList(li)}>🗑</button>
+                <button className="wl-railbtn" title={t(($) => $.watchlist.rename)} onClick={() => { setRenamingId(li.id); setRenameName(li.name); }}>✎</button>
+                <button className="wl-railbtn" title={t(($) => $.watchlist.deleteList)} onClick={() => void onDeleteList(li)}>🗑</button>
               </div>
             ),
           )}
@@ -455,7 +515,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
               <input
                 className="wl-railinput"
                 autoFocus
-                placeholder="清單名稱…"
+                placeholder={t(($) => $.watchlist.listNamePlaceholder)}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
@@ -467,7 +527,9 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
               <button className="wl-railbtn" onClick={() => { setCreating(false); setNewName(""); }}>✕</button>
             </div>
           ) : (
-            <button className="wl-railadd" onClick={() => setCreating(true)}>＋ 新增清單</button>
+            <button className="wl-railadd" onClick={() => setCreating(true)}>
+              {t(($) => $.watchlist.addList)}
+            </button>
           )}
         </aside>
 
@@ -476,7 +538,9 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
             <div className="wl-addbox">
               <input
                 className="aicard-q"
-                placeholder={`加入標的到「${selectedList.name}」… 輸入代號或公司名（Enter 直接加入）`}
+                placeholder={t(($) => $.watchlist.addMemberPlaceholder, {
+                  listName: selectedList.name,
+                })}
                 value={addQuery}
                 onChange={(e) => setAddQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && normQuery) void onAddSymbol(normQuery); }}
@@ -485,21 +549,28 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
               {addQuery.trim() && (
                 <div className="wl-addresults">
                   {addResults === null ? (
-                    <div className="muted tiny wl-addhint">搜尋中…</div>
+                    <div className="muted tiny wl-addhint">
+                      {t(($) => $.watchlist.searching)}
+                    </div>
                   ) : (
                     <>
                       {addResults.map((h) => (
                         <button key={h.ticker} className="wl-addrow" disabled={addBusy} onClick={() => void onAddSymbol(h.ticker)}>
                           <span className="mono strong">{h.ticker}</span>
                           <span className="wl-addname">{h.name}</span>
-                          {h.tracked && <span className="muted tiny">已追蹤</span>}
+                          {h.tracked && (
+                            <span className="muted tiny">{t(($) => $.watchlist.tracked)}</span>
+                          )}
                         </button>
                       ))}
                       {addResults.length === 0 && (
-                        <div className="muted tiny wl-addhint">目錄無相符（精確/前綴比對，非模糊）。</div>
+                        <div className="muted tiny wl-addhint">
+                          {t(($) => $.watchlist.noMatches)}
+                        </div>
                       )}
                       <button className="wl-addrow wl-adddirect" disabled={addBusy} onClick={() => void onAddSymbol(normQuery)}>
-                        ＋ 直接加入代號 <span className="mono strong">{normQuery}</span>
+                        {t(($) => $.watchlist.directAddTicker)}{" "}
+                        <span className="mono strong">{normQuery}</span>
                       </button>
                     </>
                   )}
@@ -509,22 +580,32 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
           )}
 
           {isLoading ? (
-            <p className="muted">Loading…</p>
+            <p className="muted">{t(($) => $.watchlist.loading)}</p>
           ) : sorted.length === 0 ? (
-            <EmptyState selectedList={selectedList} hasLists={railLists.length > 0} showArchived={showArchived} onCreate={() => setCreating(true)} />
+            <EmptyState
+              selectedList={selectedList}
+              hasLists={railLists.length > 0}
+              showArchived={showArchived}
+              onCreate={() => setCreating(true)}
+              sentenceSeparator={sentenceSeparator}
+              sentenceEnd={sentenceEnd}
+              t={t}
+            />
           ) : (
             <>
               <table className="wl">
                 <thead>
                   <tr>
-                    <Th k="ticker" label="Ticker" {...thProps} />
-                    <Th k="latest_close" label="Price" num {...thProps} />
-                    <Th k="change_7d_pct" label="Chg 7d" num {...thProps} />
-                    <Th k="news_count_7d" label="News" num {...thProps} />
-                    <th className="wl-consensus" title="Finnhub analyst consensus (daily-cached)">Consensus</th>
-                    <Th k="priority" label="Priority" {...thProps} />
-                    <th>Tags</th>
-                    <th className="wl-actions">Actions</th>
+                    <Th k="ticker" label={t(($) => $.watchlist.ticker)} {...thProps} />
+                    <Th k="latest_close" label={t(($) => $.watchlist.price)} num {...thProps} />
+                    <Th k="change_7d_pct" label={t(($) => $.watchlist.change7d)} num {...thProps} />
+                    <Th k="news_count_7d" label={t(($) => $.watchlist.news)} num {...thProps} />
+                    <th className="wl-consensus" title={t(($) => $.watchlist.consensusTitle)}>
+                      {t(($) => $.watchlist.consensus)}
+                    </th>
+                    <Th k="priority" label={t(($) => $.watchlist.priority)} {...thProps} />
+                    <th>{t(($) => $.watchlist.tags)}</th>
+                    <th className="wl-actions">{t(($) => $.watchlist.actions)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -536,37 +617,64 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                     >
                       <td className="mono strong">
                         {r.ticker}
-                        {!r.has_summary && <span className="tag-nosum" title="尚無市場摘要">無摘要</span>}
-                        {r.archived && <span className="tag-archived">archived</span>}
-                        {r.note_count > 0 && <span className="note-dot" title={`${r.note_count} note(s)`}>✎{r.note_count}</span>}
+                        {!r.has_summary && (
+                          <span className="tag-nosum" title={t(($) => $.watchlist.noMarketSummary)}>
+                            {t(($) => $.watchlist.noSummary)}
+                          </span>
+                        )}
+                        {r.archived && (
+                          <span className="tag-archived">{t(($) => $.watchlist.archived)}</span>
+                        )}
+                        {r.note_count > 0 && (
+                          <span
+                            className="note-dot"
+                            title={t(($) => $.watchlist.noteCount, { count: r.note_count })}
+                          >
+                            ✎{r.note_count}
+                          </span>
+                        )}
                       </td>
                       <td className="num">{fmtNum(r.latest_close)}</td>
                       <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
                       <td className="num">{r.news_count_7d}</td>
-                      <td className="wl-consensus">{renderConsensus(consensus[r.ticker])}</td>
+                      <td className="wl-consensus">{renderConsensus(consensus[r.ticker], t)}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <select
                           className={`prio-select p-${r.priority || "none"}`}
                           value={r.priority}
                           onChange={(e) => void onSetPriority(r.ticker, (e.target.value || null) as Priority | null)}
-                          title="設定優先級"
+                          title={t(($) => $.watchlist.setPriority)}
                         >
                           <option value="">—</option>
-                          <option value="high">high</option>
-                          <option value="medium">medium</option>
-                          <option value="low">low</option>
+                          <option value="high">{t(($) => $.watchlist.high)}</option>
+                          <option value="medium">{t(($) => $.watchlist.medium)}</option>
+                          <option value="low">{t(($) => $.watchlist.low)}</option>
                         </select>
                       </td>
                       <td><TagChips tags={r.tags} t={t} max={4} /></td>
                       <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
                         <span className="rowactions">
-                          <button type="button" title="Open detail" onClick={() => onOpenTicker(r.ticker)}>↗</button>
+                          <button type="button" title={t(($) => $.watchlist.openDetail)} onClick={() => onOpenTicker(r.ticker)}>↗</button>
                           {selectedList && (
-                            <button type="button" title={`從「${selectedList.name}」移除`} disabled={busyTicker === r.ticker} onClick={() => void onRemoveFromList(r)}>
+                            <button
+                              type="button"
+                              title={t(($) => $.watchlist.removeFromList, {
+                                listName: selectedList.name,
+                              })}
+                              disabled={busyTicker === r.ticker}
+                              onClick={() => void onRemoveFromList(r)}
+                            >
                               {busyTicker === r.ticker ? "…" : "✕"}
                             </button>
                           )}
-                          <button type="button" title={r.archived ? "Restore (global)" : "Archive (global)"} disabled={busyTicker === r.ticker} onClick={() => void onArchiveToggle(r)}>
+                          <button
+                            type="button"
+                            title={r.archived
+                              ? t(($) => $.watchlist.restoreGlobal)
+                              : t(($) => $.watchlist.archiveGlobal)}
+                            disabled={busyTicker === r.ticker}
+                            onClick={() => void onArchiveToggle(r)}
+                          >
                             {busyTicker === r.ticker ? "…" : r.archived ? "↩" : "🗄"}
                           </button>
                         </span>
@@ -576,8 +684,10 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                 </tbody>
               </table>
               <p className="muted tiny">
-                ↗ 開詳情 · {selectedList ? "✕ 從此清單移除 · " : ""}🗄 全域封存（所有清單）· Priority 下拉可設定。
-                {selectedList === null && " 「全部清單」= app 內自訂清單中 active 標的的聯集；舊設定匯入與完整 inventory 在「全部標的」。新增請到清單裡加。"}
+                {t(($) => $.watchlist.openDetailAction)}{" "}
+                {selectedList ? <>{t(($) => $.watchlist.removeFromListAction)} </> : ""}
+                {t(($) => $.watchlist.globalArchiveHint)}
+                {selectedList === null && <> {t(($) => $.watchlist.allListsExplanation)}</>}
               </p>
             </>
           )}
@@ -592,27 +702,51 @@ function EmptyState({
   hasLists,
   showArchived,
   onCreate,
+  sentenceSeparator,
+  sentenceEnd,
+  t,
 }: {
   selectedList: WatchlistSummary | null;
   hasLists: boolean;
   showArchived: boolean;
   onCreate: () => void;
+  sentenceSeparator: string;
+  sentenceEnd: string;
+  t: ExploreT;
 }) {
   if (selectedList) {
-    return <p className="muted tiny">這個清單還沒有標的 — 用上方搜尋加入{showArchived ? "" : "（或試試 Show archived）"}。</p>;
+    return (
+      <p className="muted tiny">
+        {t(($) => $.watchlist.emptyList)}
+        {showArchived ? null : (
+          <>{sentenceSeparator}{t(($) => $.watchlist.maybeTryArchived)}</>
+        )}
+        {sentenceEnd}
+      </p>
+    );
   }
   if (!hasLists) {
     return (
       <div className="wl-empty">
-        <p className="muted">還沒有任何清單。</p>
+        <p className="muted">{t(($) => $.watchlist.noLists)}</p>
         <p className="muted tiny">
-          建立你的第一個 app 自訂清單；舊設定匯入與 tier inventory 會留在「全部標的」，不會自動填入自選股。
+          {t(($) => $.watchlist.firstList)}
         </p>
-        <button className="btn-ghost" onClick={onCreate}>＋ 新增清單</button>
+        <button className="btn-ghost" onClick={onCreate}>
+          {t(($) => $.watchlist.addList)}
+        </button>
       </div>
     );
   }
-  return <p className="muted tiny">你的清單目前沒有 active 標的{showArchived ? "" : "（試試 Show archived）"}。</p>;
+  return (
+    <p className="muted tiny">
+      {t(($) => $.watchlist.emptyActiveList)}
+      {showArchived ? null : (
+        <>{sentenceSeparator}{t(($) => $.watchlist.tryArchived)}</>
+      )}
+      {sentenceEnd}
+    </p>
+  );
 }
 
 function Th({ k, label, num, sortKey, sortDir, toggleSort }: {
@@ -639,28 +773,36 @@ function sortRows(rows: TabRow[], key: SortKey, dir: SortDir): TabRow[] {
 const _CONSENSUS_CLASS: Record<string, string> = {
   "Strong Buy": "up", "Buy": "up", "Hold": "muted", "Sell": "down", "Strong Sell": "down",
 };
-function renderConsensus(c: ConsensusCell | undefined) {
+function renderConsensus(c: ConsensusCell | undefined, t: ExploreT) {
   if (!c || c.state === "loading") return <span className="muted tiny">…</span>;
-  if (c.state === "err") return <span className="muted tiny" title="載入失敗，重新整理可重試">⚠</span>;
+  if (c.state === "err") {
+    return <span className="muted tiny" title={t(($) => $.watchlist.loadFailed)}>⚠</span>;
+  }
   const d = c.data;
   // Distinguish missing-key / provider-error / no-coverage (gpt-5.5) — not all "—".
   if (d.status === "missing_key")
-    return <span className="muted tiny" title="未設定 FINNHUB_API_KEY">🔑</span>;
+    return <span className="muted tiny" title={t(($) => $.watchlist.missingFinnhubKey)}>🔑</span>;
   if (d.status === "rate_limited")
-    return <span className="muted tiny" title="Finnhub rate limit；稍後重新整理可重試">⏳</span>;
+    return <span className="muted tiny" title={t(($) => $.watchlist.finnhubRateLimit)}>⏳</span>;
   if (d.status === "provider_error")
-    return <span className="muted tiny" title={d.message || "分析師資料來源錯誤；重新整理可重試"}>⚠</span>;
+    return <span className="muted tiny" title={t(($) => $.watchlist.analystSourceError)}>⚠</span>;
   if (d.status === "no_data")
-    return <span className="muted tiny" title="暫無資料或資料來源暫時失敗；重新整理可重試">—</span>;
+    return <span className="muted tiny" title={t(($) => $.watchlist.temporaryNoData)}>—</span>;
   if (!d.rating)
-    return <span className="muted tiny" title="無分析師覆蓋">—</span>;
+    return <span className="muted tiny" title={t(($) => $.watchlist.noAnalystCoverage)}>—</span>;
   const cn = d.counts || {};
   const when = d.fetched_at ? d.fetched_at.slice(0, 10) : "—";
   const votes = `${cn.strongBuy ?? 0}/${cn.buy ?? 0}/${cn.hold ?? 0}/${cn.sell ?? 0}/${cn.strongSell ?? 0}`;
-  const tip =
-    `強力買進 ${cn.strongBuy ?? 0} · 買進 ${cn.buy ?? 0} · 持有 ${cn.hold ?? 0} · ` +
-    `賣出 ${cn.sell ?? 0} · 強力賣出 ${cn.strongSell ?? 0}\n共 ${d.total} 位分析師 · 更新 ${when}` +
-    (d.status === "cached" ? "（快取）" : "");
+  const tip = `${t(($) => $.watchlist.consensusBuySummary, {
+    strongBuy: cn.strongBuy ?? 0,
+    buy: cn.buy ?? 0,
+    hold: cn.hold ?? 0,
+  })}\n${t(($) => $.watchlist.consensusSellSummary, {
+    sell: cn.sell ?? 0,
+    strongSell: cn.strongSell ?? 0,
+    total: d.total,
+    when,
+  })}${d.status === "cached" ? t(($) => $.watchlist.cached) : ""}`;
   return (
     <span className={`consensus-tag ${_CONSENSUS_CLASS[d.rating] ?? "muted"}`} title={tip}>
       <span>{d.rating}</span>
