@@ -12,7 +12,7 @@ import type {
   ModelTask,
   TaskRoute,
 } from "../api";
-import { initializeI18n } from "../i18n/resources";
+import { initializeI18n, resources } from "../i18n/resources";
 import { mismatchLabel, stanceLabel } from "../personalizationDisplay";
 import type { SettingsAnchorId, SettingsGroupId } from "./settingsRegistry";
 import {
@@ -21,11 +21,9 @@ import {
   settingsGroupLabel,
   settingsInvestorHorizonLabel,
   settingsInvestorPresetLabel,
-  settingsMismatchLabel,
   settingsRouteSourceLabel,
   settingsSearchValues,
   settingsSectionCopy,
-  settingsStanceLabel,
   settingsTaskLabel,
   settingsThinkingLabel,
 } from "./settingsCopy";
@@ -36,6 +34,12 @@ function settingsT(locale: Locale) {
   const instance = createInstance();
   initializeI18n(instance, locale);
   return instance.getFixedT(locale, "settings");
+}
+
+function commonT(locale: Locale) {
+  const instance = createInstance();
+  initializeI18n(instance, locale);
+  return instance.getFixedT(locale, "common");
 }
 
 // Frozen from settingsRegistry.ts at the reviewed pre-I18N-2 baseline 707a5705.
@@ -368,18 +372,30 @@ describe("Settings static copy authority", () => {
       "Not assessed",
     ];
 
-    const zhT = settingsT("zh-Hant");
-    expect(stances.map((id) => settingsStanceLabel(id, zhT))).toEqual(stances.map(stanceLabel));
-    expect(mismatches.map((id) => settingsMismatchLabel(id, zhT))).toEqual(mismatches.map(mismatchLabel));
+    const zhT = commonT("zh-Hant");
+    expect(stances.map((id) => stanceLabel(id, zhT))).toEqual([
+      "關閉", "中性", "對齊投資人", "互補投資人", "嚴格風控", "估值理性派", "成長機會派",
+    ]);
+    expect(mismatches.map((id) => mismatchLabel(id, zhT))).toEqual([
+      "一致", "風險意願高於承受能力", "承受能力高於風險意願", "未評估",
+    ]);
 
-    const enT = settingsT("en");
-    expect(stances.map((id) => settingsStanceLabel(id, enT))).toEqual(enStances);
-    expect(mismatches.map((id) => settingsMismatchLabel(id, enT))).toEqual(enMismatches);
-    expect(settingsStanceLabel("future_stance" as AssistantStance, enT)).toBe("future_stance");
-    expect(settingsMismatchLabel(
+    const enT = commonT("en");
+    expect.soft(stances.map((id) => stanceLabel(id, enT))).toEqual(enStances);
+    expect.soft(mismatches.map((id) => mismatchLabel(id, enT))).toEqual(enMismatches);
+    expect.soft(stanceLabel("future_stance" as AssistantStance, enT)).toBe("future_stance");
+    expect.soft(mismatchLabel(
       "future_mismatch" as InvestorProfile["risk_mismatch"],
       enT,
     )).toBe("future_mismatch");
+
+    for (const locale of ["zh-Hant", "en"] as const) {
+      const investor = resources[locale].settings.investor as Record<string, unknown>;
+      expect.soft(investor.stances, `${locale}.settings.investor.stances`).toBeUndefined();
+      expect.soft(investor.mismatch, `${locale}.settings.investor.mismatch`).toBeUndefined();
+    }
+    const source = readFileSync(resolve(import.meta.dirname, "settingsCopy.ts"), "utf8");
+    expect.soft(source).not.toMatch(/settingsStanceLabel|settingsMismatchLabel/);
   });
 
   it("contains no dynamic translation key or source value", () => {
@@ -413,8 +429,6 @@ describe("Settings static copy authority", () => {
       "settingsRouteSourceLabel",
       "settingsInvestorPresetLabel",
       "settingsInvestorHorizonLabel",
-      "settingsStanceLabel",
-      "settingsMismatchLabel",
     ]);
   });
 });

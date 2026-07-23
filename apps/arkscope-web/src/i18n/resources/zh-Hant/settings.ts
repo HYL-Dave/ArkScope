@@ -987,21 +987,6 @@ const settings = {
       multiYear: "多年",
       mixed: "混合",
     },
-    stances: {
-      off: "關閉",
-      neutral: "中性",
-      aligned: "對齊投資人",
-      complementary: "互補投資人",
-      strictRiskControl: "嚴格風控",
-      valuationRationalist: "估值理性派",
-      growthOpportunity: "成長機會派",
-    },
-    mismatch: {
-      none: "一致",
-      appetiteAboveCapacity: "風險意願高於承受能力",
-      capacityAboveAppetite: "承受能力高於風險意願",
-      unclear: "未評估",
-    },
   },
 } as const;
 

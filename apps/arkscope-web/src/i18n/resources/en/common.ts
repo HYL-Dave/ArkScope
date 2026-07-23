@@ -24,6 +24,28 @@ const common = {
     cancellationUnavailable: "Cannot be cancelled here",
     result: "Result: {{destination}}",
   },
+  personalization: {
+    stances: {
+      off: "Off",
+      neutral: "Neutral",
+      aligned: "Investor-aligned",
+      complementary: "Complementary",
+      strictRiskControl: "Strict risk control",
+      valuationRationalist: "Valuation rationalist",
+      growthOpportunity: "Growth opportunity",
+    },
+    mismatch: {
+      none: "Aligned",
+      appetiteAboveCapacity: "Risk appetite above capacity",
+      capacityAboveAppetite: "Risk capacity above appetite",
+      unclear: "Not assessed",
+    },
+    trace: {
+      stance: "Stance: {{stance}}",
+      appliedSkills: "Applied skills: {{skills}}",
+      suggestedSkills: "Suggested skills: {{skills}}",
+    },
+  },
 } as const;
 
 export default common;

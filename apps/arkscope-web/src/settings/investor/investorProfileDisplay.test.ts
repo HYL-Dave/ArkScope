@@ -7,6 +7,7 @@ import type { AssistantStance } from "../../api";
 import { initializeI18n } from "../../i18n/resources";
 
 type SettingsT = TFunction<"settings">;
+type CommonT = TFunction<"common">;
 
 interface TopicDisplay {
   id: string;
@@ -31,7 +32,12 @@ interface DisplayModule {
     t: SettingsT,
   ) => string;
   investorProfileFieldLabel: (field: string, t: SettingsT) => string;
-  investorProfileFieldValue: (field: string, value: unknown, t: SettingsT) => string;
+  investorProfileFieldValue: (
+    field: string,
+    value: unknown,
+    settingsT: SettingsT,
+    commonT: CommonT,
+  ) => string;
   assistantStanceEffect: (stance: AssistantStance, t: SettingsT) => string;
   orderedCalibrationTopicDisplays: (
     topicIds: readonly string[],
@@ -53,6 +59,12 @@ function settingsT(locale: "zh-Hant" | "en"): SettingsT {
   const instance = createInstance();
   initializeI18n(instance, locale);
   return instance.getFixedT(locale, "settings");
+}
+
+function commonT(locale: "zh-Hant" | "en"): CommonT {
+  const instance = createInstance();
+  initializeI18n(instance, locale);
+  return instance.getFixedT(locale, "common");
 }
 
 describe("investor profile display mappings", () => {
@@ -195,18 +207,25 @@ describe("investor profile display mappings", () => {
 
     for (const locale of ["zh-Hant", "en"] as const) {
       const t = settingsT(locale);
-      expect(display.investorProfileFieldValue("risk_appetite", 7, t)).toBe("7");
-      expect(display.investorProfileFieldValue("preferred_edge", ["quality", "cash flow"], t))
+      const sharedT = commonT(locale);
+      expect(display.investorProfileFieldValue("risk_appetite", 7, t, sharedT)).toBe("7");
+      expect(display.investorProfileFieldValue("preferred_edge", ["quality", "cash flow"], t, sharedT))
         .toBe("quality, cash flow");
-      expect(display.investorProfileFieldValue("avoidances", ["leverage", "binary events"], t))
+      expect(display.investorProfileFieldValue("avoidances", ["leverage", "binary events"], t, sharedT))
         .toBe("leverage, binary events");
     }
 
-    expect(display.investorProfileFieldValue("primary_preset", "growth", settingsT("en")))
+    expect(display.investorProfileFieldValue(
+      "primary_preset", "growth", settingsT("en"), commonT("zh-Hant"),
+    ))
       .toBe("Growth investor (default)");
-    expect(display.investorProfileFieldValue("holding_horizon", "months", settingsT("zh-Hant")))
+    expect(display.investorProfileFieldValue(
+      "holding_horizon", "months", settingsT("zh-Hant"), commonT("en"),
+    ))
       .toBe("數月");
-    expect(display.investorProfileFieldValue("default_stance", "complementary", settingsT("en")))
+    expect(display.investorProfileFieldValue(
+      "default_stance", "complementary", settingsT("zh-Hant"), commonT("en"),
+    ))
       .toBe("Complementary");
   });
 

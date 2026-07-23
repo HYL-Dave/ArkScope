@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { FileSearch, History, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   cancelResearchRun, createResearchRun,
@@ -172,6 +173,7 @@ export function ResearchView({
   developerMode = false,
   onNavigate,
 }: ResearchViewProps) {
+  const { t: commonT } = useTranslation("common");
   const [state, dispatch] = useReducer(reduce, initialState);
   const [question, setQuestion] = useState("");
   const [tickerInput, setTickerInput] = useState("");
@@ -1059,7 +1061,7 @@ export function ResearchView({
                         立場
                         <select value={runStance} onChange={(e) => setRunStance(e.target.value as AssistantStance)} disabled={!!state.pending}>
                           {(["off", "neutral", "aligned", "complementary", "strict_risk_control", "valuation_rationalist", "growth_opportunity"] as AssistantStance[]).map((s) => (
-                            <option key={s} value={s}>{stanceLabel(s)}</option>
+                            <option key={s} value={s}>{stanceLabel(s, commonT)}</option>
                           ))}
                         </select>
                       </label>
@@ -1150,6 +1152,7 @@ function Bubble({
   canRetry?: boolean;
   onRetry?: () => void;
 }) {
+  const { t: commonT } = useTranslation("common");
   const error = m.role === "assistant" && (m.isError || m.maxTurns)
     ? presentResearchError({
         code: m.errorCode ?? (m.maxTurns ? "tool_limit_reached" : null),
@@ -1157,6 +1160,7 @@ function Bubble({
         developerMode,
       })
     : null;
+  const personalizationSummary = traceSummary(m.personalization, commonT);
   const cls = `research-bubble ${m.role}${error ? ` ${error.state}` : ""}`;
   return (
     <div className={cls} data-state={error?.state}>
@@ -1165,7 +1169,7 @@ function Bubble({
           {m.model && <span className="research-model">{m.provider}/{m.model}{m.effort && m.effort !== "default" ? ` · ${m.effort}` : ""}</span>}
           {m.maxTurns && <span className="research-maxturns"> · 已達工具呼叫上限</span>}
           {typeof m.elapsed_seconds === "number" && <span> · {m.elapsed_seconds.toFixed(1)}s</span>}
-          {traceSummary(m.personalization) && <span> · {traceSummary(m.personalization)}</span>}
+          {personalizationSummary && <span> · {personalizationSummary}</span>}
         </div>
       )}
       <div className="research-bubble-body">

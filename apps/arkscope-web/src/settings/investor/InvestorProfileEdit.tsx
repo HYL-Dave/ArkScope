@@ -1,13 +1,13 @@
 import { ArrowLeft, FileText, Save } from "lucide-react";
 import type { RefObject } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AssistantStance, InvestorProfile, InvestorPreset } from "../../api";
+import { mismatchLabel, stanceLabel } from "../../personalizationDisplay";
 import { Button, StatusBadge } from "../../ui";
 import {
   settingsInvestorHorizonLabel,
   settingsInvestorPresetLabel,
-  settingsMismatchLabel,
-  settingsStanceLabel,
   type SettingsT,
 } from "../settingsCopy";
 
@@ -68,6 +68,7 @@ export function InvestorProfileEdit({
   onBack,
   t,
 }: InvestorProfileEditProps) {
+  const { t: commonT } = useTranslation("common");
   const toggle = (key: "preferred_edge" | "behavioral_flags", item: string) => {
     const values = profile[key];
     onChange(key, values.includes(item)
@@ -199,7 +200,7 @@ export function InvestorProfileEdit({
             onChange={(event) => onChange("default_stance", event.target.value as AssistantStance)}
           >
             {STANCES.map((stance) => (
-              <option key={stance} value={stance}>{settingsStanceLabel(stance, t)}</option>
+              <option key={stance} value={stance}>{stanceLabel(stance, commonT)}</option>
             ))}
           </select>
         </label>
@@ -269,7 +270,7 @@ export function InvestorProfileEdit({
         {t(($) => $.investor.workspace.summary.riskComparison)}
         <StatusBadge
           state={profile.risk_mismatch === "none" ? "ready" : "partial"}
-          label={settingsMismatchLabel(profile.risk_mismatch, t)}
+          label={mismatchLabel(profile.risk_mismatch, commonT)}
         />
       </div>
       <div className="muted">{t(($) => $.investor.fields.skillMode)}</div>

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { createInstance } from "i18next";
 import { describe, expect, it } from "vitest";
 
@@ -26,6 +29,52 @@ function flattenResource(tree: ResourceTree, prefix = ""): Map<string, string> {
 }
 
 describe("bundled i18n resources", () => {
+  it("contains the exact Explore subtree inventory in both locales", () => {
+    const expectedSubtreeCounts = {
+      errors: 49,
+      home: 23,
+      watchlist: 67,
+      universe: 33,
+      news: 43,
+      tickerDetail: 68,
+      aiCard: 62,
+      tags: 7,
+    } as const;
+
+    expect(resourceNamespaces).toContain("explore");
+    for (const locale of ["zh-Hant", "en"] as const) {
+      const explore = (resources[locale] as Record<string, unknown>).explore;
+      expect.soft(explore, `${locale}.explore`).toBeDefined();
+      if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
+      expect(flattenResource(explore as ResourceTree).size, `${locale}.explore`).toBe(352);
+      for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
+        expect(
+          flattenResource((explore as ResourceTree)[subtree] as ResourceTree).size,
+          `${locale}.explore.${subtree}`,
+        ).toBe(count);
+      }
+    }
+  });
+
+  it("keeps Explore resources statically bundled and free of source values", () => {
+    const root = resolve(import.meta.dirname, "resources");
+    const resourceSource = readFileSync(resolve(import.meta.dirname, "resources.ts"), "utf8");
+    const paths = [
+      resolve(root, "zh-Hant/explore.ts"),
+      resolve(root, "en/explore.ts"),
+    ];
+
+    expect(resourceSource).not.toMatch(/import\s*\(|fetch\s*\(/);
+    for (const path of paths) {
+      expect.soft(existsSync(path), path).toBe(true);
+      if (!existsSync(path)) continue;
+      const source = readFileSync(path, "utf8");
+      expect(source).not.toMatch(/NVDA|gpt-[\w.-]+|sk-(?:ant-)?[\w-]+|https?:\/\//i);
+      expect(source).not.toMatch(/\[[^\]]+\]\s*:/);
+      expect(source).not.toMatch(/import\s*\(|fetch\s*\(/);
+    }
+  });
+
   it("keeps locale namespace and recursive key paths identical", () => {
     const zhNamespaces = Object.keys(resources["zh-Hant"]).sort();
     const enNamespaces = Object.keys(resources.en).sort();
@@ -227,6 +276,7 @@ describe("bundled i18n resources", () => {
       const instance = createInstance();
       initializeI18n(instance, expected.locale);
       const t = instance.getFixedT(expected.locale, "settings");
+      const commonT = instance.getFixedT(expected.locale, "common");
       expect(t(($) => $.actions.save)).toBe(expected.action);
       expect(t(($) => $.workspace.title)).toBe(expected.workspace);
       expect(t(($) => $.registry.sections.dataSources.title)).toBe(expected.section);
@@ -236,8 +286,11 @@ describe("bundled i18n resources", () => {
       expect(t(($) => $.dataStorage.coverage.title)).toBe(expected.coverage);
       expect(t(($) => $.newsStorage.title)).toBe(expected.news);
       expect(t(($) => $.macroStorage.title)).toBe(expected.macro);
-      expect(t(($) => $.investor.mismatch.appetiteAboveCapacity)).toBe(expected.investor);
+      expect.soft(commonT(($) => $.personalization.mismatch.appetiteAboveCapacity))
+        .toBe(expected.investor);
       const investor = resources[expected.locale].settings.investor;
+      expect.soft((investor as Record<string, unknown>).stances).toBeUndefined();
+      expect.soft((investor as Record<string, unknown>).mismatch).toBeUndefined();
       expect.soft(investor.fields.riskCapacity).toBe(expected.investorRiskCapacity);
       expect.soft(investor.fields.avoidances).toBe(expected.investorAvoidances);
       expect.soft(investor.fields.flags).toBe(expected.investorFlags);
@@ -316,19 +369,24 @@ describe("bundled i18n resources", () => {
     }
   });
 
-  it("contains exactly 713 Settings leaves and 5 Research leaves per locale", () => {
+  it("contains exactly 702 Settings 32 Common 5 Research and 352 Explore leaves per locale", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       expect.soft(flattenResource(resources[locale].settings as ResourceTree).size, `${locale}.settings`)
-        .toBe(713);
-      const research = (resources[locale] as Record<string, unknown>).research;
-      expect.soft(research, `${locale}.research`).toBeDefined();
-      if (research && typeof research === "object" && !Array.isArray(research)) {
-        expect(flattenResource(research as ResourceTree).size, `${locale}.research`).toBe(5);
+        .toBe(702);
+      const localeResources = resources[locale] as Record<string, unknown>;
+      const expectedCounts = { common: 32, research: 5, explore: 352 } as const;
+      for (const [namespace, count] of Object.entries(expectedCounts)) {
+        const resource = localeResources[namespace];
+        expect.soft(resource, `${locale}.${namespace}`).toBeDefined();
+        if (resource && typeof resource === "object" && !Array.isArray(resource)) {
+          expect(flattenResource(resource as ResourceTree).size, `${locale}.${namespace}`)
+            .toBe(count);
+        }
       }
     }
   });
 
-  it("contains exactly 623 Settings leaves per locale", () => {
+  it("contains exactly 612 pre-Slice-5 Settings leaves per locale", () => {
     const expectedSubtreeCounts = {
       actions: 18,
       workspace: 29,
@@ -341,7 +399,7 @@ describe("bundled i18n resources", () => {
       dataStorage: 48,
       newsStorage: 27,
       macroStorage: 31,
-      investor: 151,
+      investor: 140,
     } as const;
 
     for (const locale of ["zh-Hant", "en"] as const) {
@@ -349,7 +407,7 @@ describe("bundled i18n resources", () => {
       const workspaceCount = flattenResource(
         (settings.investor as ResourceTree).workspace as ResourceTree,
       ).size;
-      expect(flattenResource(settings).size - workspaceCount + 5).toBe(623);
+      expect(flattenResource(settings).size - workspaceCount + 5).toBe(612);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(1);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

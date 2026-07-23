@@ -988,21 +988,6 @@ const settings = {
       multiYear: "Multi-year",
       mixed: "Mixed",
     },
-    stances: {
-      off: "Off",
-      neutral: "Neutral",
-      aligned: "Investor-aligned",
-      complementary: "Complementary",
-      strictRiskControl: "Strict risk control",
-      valuationRationalist: "Valuation rationalist",
-      growthOpportunity: "Growth opportunity",
-    },
-    mismatch: {
-      none: "Aligned",
-      appetiteAboveCapacity: "Risk appetite above capacity",
-      capacityAboveAppetite: "Risk capacity above appetite",
-      unclear: "Not assessed",
-    },
   },
 } as const;
 

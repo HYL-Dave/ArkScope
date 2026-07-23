@@ -1,9 +1,7 @@
 import type { TFunction } from "i18next";
 
 import type {
-  AssistantStance,
   InvestorPreset,
-  InvestorProfile,
   ModelProvider,
   ModelTask,
   TaskRoute,
@@ -296,44 +294,5 @@ export function settingsInvestorHorizonLabel(id: string, t: SettingsT): string {
       return t(($) => $.investor.horizons.mixed);
     default:
       return id;
-  }
-}
-
-export function settingsStanceLabel(id: AssistantStance, t: SettingsT): string {
-  switch (id) {
-    case "off":
-      return t(($) => $.investor.stances.off);
-    case "neutral":
-      return t(($) => $.investor.stances.neutral);
-    case "aligned":
-      return t(($) => $.investor.stances.aligned);
-    case "complementary":
-      return t(($) => $.investor.stances.complementary);
-    case "strict_risk_control":
-      return t(($) => $.investor.stances.strictRiskControl);
-    case "valuation_rationalist":
-      return t(($) => $.investor.stances.valuationRationalist);
-    case "growth_opportunity":
-      return t(($) => $.investor.stances.growthOpportunity);
-    default:
-      return stableUnknown(id);
-  }
-}
-
-export function settingsMismatchLabel(
-  id: InvestorProfile["risk_mismatch"],
-  t: SettingsT,
-): string {
-  switch (id) {
-    case "none":
-      return t(($) => $.investor.mismatch.none);
-    case "appetite_above_capacity":
-      return t(($) => $.investor.mismatch.appetiteAboveCapacity);
-    case "capacity_above_appetite":
-      return t(($) => $.investor.mismatch.capacityAboveAppetite);
-    case "unclear":
-      return t(($) => $.investor.mismatch.unclear);
-    default:
-      return stableUnknown(id);
   }
 }

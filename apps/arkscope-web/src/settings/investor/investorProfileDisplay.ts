@@ -1,8 +1,8 @@
 import type { AssistantStance, CalibrationTopicId, InvestorPreset } from "../../api";
+import { stanceLabel, type CommonT } from "../../personalizationDisplay";
 import {
   settingsInvestorHorizonLabel,
   settingsInvestorPresetLabel,
-  settingsStanceLabel,
   type SettingsT,
 } from "../settingsCopy";
 
@@ -169,23 +169,24 @@ function sourceValue(value: unknown, t: SettingsT): string {
 export function investorProfileFieldValue(
   field: ProposableInvestorProfileField,
   value: unknown,
-  t: SettingsT,
+  settingsT: SettingsT,
+  commonT: CommonT,
 ): string {
   switch (field) {
     case "primary_preset":
       return typeof value === "string"
-        ? settingsInvestorPresetLabel(value as InvestorPreset, t)
-        : sourceValue(value, t);
+        ? settingsInvestorPresetLabel(value as InvestorPreset, settingsT)
+        : sourceValue(value, settingsT);
     case "holding_horizon":
       return typeof value === "string"
-        ? settingsInvestorHorizonLabel(value, t)
-        : sourceValue(value, t);
+        ? settingsInvestorHorizonLabel(value, settingsT)
+        : sourceValue(value, settingsT);
     case "default_stance":
       return typeof value === "string"
-        ? settingsStanceLabel(value as AssistantStance, t)
-        : sourceValue(value, t);
+        ? stanceLabel(value as AssistantStance, commonT)
+        : sourceValue(value, settingsT);
     default:
-      return sourceValue(value, t);
+      return sourceValue(value, settingsT);
   }
 }
 

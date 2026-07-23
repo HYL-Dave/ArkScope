@@ -1,13 +1,13 @@
 import { ClipboardCheck, MessageSquareText, Pencil, RotateCw } from "lucide-react";
 import type { RefObject } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CalibrationState, InvestorProfileResponse } from "../../api";
+import { mismatchLabel, stanceLabel } from "../../personalizationDisplay";
 import { Button, InlineAlert, StatusBadge } from "../../ui";
 import {
   settingsInvestorHorizonLabel,
   settingsInvestorPresetLabel,
-  settingsMismatchLabel,
-  settingsStanceLabel,
   type SettingsT,
 } from "../settingsCopy";
 import {
@@ -50,6 +50,7 @@ export function InvestorProfileSummary({
   onRetryCalibration,
   t,
 }: InvestorProfileSummaryProps) {
+  const { t: commonT } = useTranslation("common");
   const { profile } = response;
   const activeSession = calibration?.active_session ?? null;
   const pendingProposal = calibrationStatus === "ready"
@@ -95,7 +96,7 @@ export function InvestorProfileSummary({
         {effectiveFactsCurrent ? (
           <div>
             <strong>{t(($) => $.investor.workspace.summary.effectiveStance)}</strong>
-            <div>{settingsStanceLabel(response.effective_stance, t)}</div>
+            <div>{stanceLabel(response.effective_stance, commonT)}</div>
             <p className="muted">{assistantStanceEffect(response.effective_stance, t)}</p>
           </div>
         ) : null}
@@ -119,7 +120,7 @@ export function InvestorProfileSummary({
           <strong>{t(($) => $.investor.workspace.summary.riskComparison)}</strong>
           <StatusBadge
             state={profile.risk_mismatch === "none" ? "ready" : "partial"}
-            label={settingsMismatchLabel(profile.risk_mismatch, t)}
+            label={mismatchLabel(profile.risk_mismatch, commonT)}
           />
         </div>
       </div>

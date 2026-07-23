@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useTranslation } from "react-i18next";
 
 import { getResearchRun, getResearchRunEvents, type ResearchRunDTO } from "./api";
 import { MODEL_UX_LABELS } from "./modelRoutingUx";
@@ -124,6 +125,7 @@ export function ResearchEvidenceDrawer({
   activeRun: ResearchRunDTO | null;
   developerMode: boolean;
 }) {
+  const { t: commonT } = useTranslation("common");
   const evidence = useMemo(
     () => researchEvidenceRows(message, activeTrace),
     [activeTrace, message],
@@ -253,7 +255,7 @@ export function ResearchEvidenceDrawer({
               {!details && message?.created_at ? <div><dt>回合保存</dt><dd>{formatSystemTimestamp(message.created_at)}</dd></div> : null}
               {message?.elapsed_seconds != null ? <div><dt>模型耗時</dt><dd>{message.elapsed_seconds.toFixed(1)}s</dd></div> : null}
               {personalization?.profile_active && personalization.assistant_stance !== "off" ? (
-                <div><dt>立場</dt><dd>{stanceLabel(personalization.assistant_stance)}</dd></div>
+                <div><dt>立場</dt><dd>{stanceLabel(personalization.assistant_stance, commonT)}</dd></div>
               ) : null}
               {personalization?.applied_skills?.length ? (
                 <div><dt>套用技能</dt><dd>{personalization.applied_skills.join("、")}</dd></div>

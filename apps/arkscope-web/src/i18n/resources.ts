@@ -2,16 +2,24 @@ import type { i18n } from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import enCommon from "./resources/en/common";
+import enExplore from "./resources/en/explore";
 import enResearch from "./resources/en/research";
 import enSettings from "./resources/en/settings";
 import enShell from "./resources/en/shell";
 import zhHantCommon from "./resources/zh-Hant/common";
+import zhHantExplore from "./resources/zh-Hant/explore";
 import zhHantResearch from "./resources/zh-Hant/research";
 import zhHantSettings from "./resources/zh-Hant/settings";
 import zhHantShell from "./resources/zh-Hant/shell";
 
 export const defaultNamespace = "common" as const;
-export const resourceNamespaces = ["common", "shell", "settings", "research"] as const;
+export const resourceNamespaces = [
+  "common",
+  "shell",
+  "settings",
+  "research",
+  "explore",
+] as const;
 
 export const resources = {
   "zh-Hant": {
@@ -19,12 +27,14 @@ export const resources = {
     shell: zhHantShell,
     settings: zhHantSettings,
     research: zhHantResearch,
+    explore: zhHantExplore,
   },
   en: {
     common: enCommon,
     shell: enShell,
     settings: enSettings,
     research: enResearch,
+    explore: enExplore,
   },
 } as const;
 

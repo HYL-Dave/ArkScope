@@ -1,5 +1,6 @@
 import { ArrowLeft, Check, X } from "lucide-react";
 import type { RefObject } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CalibrationProposal, InvestorProfile } from "../../api";
 import { Button, InlineAlert } from "../../ui";
@@ -37,6 +38,7 @@ export function InvestorProfileProposalReview({
   onBack,
   t,
 }: InvestorProfileProposalReviewProps) {
+  const { t: commonT } = useTranslation("common");
   const topics = orderedCalibrationTopicDisplays(proposal.covered_topics, t);
   const fields = orderedInvestorProfileFieldDisplays(proposal.proposed_fields, t);
   const hasConflict = conflict || proposal.conflict_fields.length > 0;
@@ -83,12 +85,17 @@ export function InvestorProfileProposalReview({
               {currentValuesCurrent ? (
                 <div data-testid="proposal-current-value">
                   <span>{t(($) => $.investor.workspace.proposal.currentValue)}</span>
-                  <span>{investorProfileFieldValue(field, profile[field], t)}</span>
+                  <span>{investorProfileFieldValue(field, profile[field], t, commonT)}</span>
                 </div>
               ) : null}
               <div>
                 <span>{t(($) => $.investor.workspace.proposal.proposedValue)}</span>
-                <span>{investorProfileFieldValue(field, proposal.profile_patch[field], t)}</span>
+                <span>{investorProfileFieldValue(
+                  field,
+                  proposal.profile_patch[field],
+                  t,
+                  commonT,
+                )}</span>
               </div>
               {proposal.rationales[field] ? (
                 <div>

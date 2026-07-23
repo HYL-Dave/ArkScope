@@ -9,6 +9,7 @@
 // CardView / CardModal are exported so Home can read a card in place.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace, type RuntimeConfig } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
@@ -31,6 +32,7 @@ export function AICardTab({
   ticker: string;
   runtime?: RuntimeConfig | null;
 }) {
+  const { t: commonT } = useTranslation("common");
   const [recent, setRecent] = useState<CardSummary[] | null>(null);
   const [card, setCard] = useState<ResultCard | null>(null);
   const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
@@ -201,7 +203,7 @@ export function AICardTab({
               <select value={cardStance} disabled={busy}
                 onChange={(e) => setCardStance(e.target.value as AssistantStance)}>
                 {(["off", "neutral", "aligned", "complementary", "strict_risk_control", "valuation_rationalist", "growth_opportunity"] as AssistantStance[]).map((s) => (
-                  <option key={s} value={s}>{stanceLabel(s)}</option>
+                  <option key={s} value={s}>{stanceLabel(s, commonT)}</option>
                 ))}
               </select>
             </label>
@@ -211,8 +213,8 @@ export function AICardTab({
       {busy && <p className="muted tiny">蒐集客觀證據 + 合成卡片，單檔約 1–2 分鐘…</p>}
       {err && <p className="refresh-err tiny">{err}</p>}
 
-      {lastTrace && traceSummary(lastTrace) && (
-        <p className="muted tiny">{traceSummary(lastTrace)}</p>
+      {lastTrace && traceSummary(lastTrace, commonT) && (
+        <p className="muted tiny">{traceSummary(lastTrace, commonT)}</p>
       )}
       {card ? (
         <CardView

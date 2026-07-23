@@ -2,6 +2,7 @@
 import React, { type ComponentProps, type ComponentType } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -193,6 +194,7 @@ function json(value: unknown, status = 200): Response {
 
 type FetchOptions = {
   catalog?: ModelCatalog;
+  profile?: InvestorProfileResponse;
   threads?: ResearchThreadDTO[];
   messages?: Record<string, ResearchMessageDTO[]>;
   selections?: Record<string, unknown>;
@@ -223,7 +225,7 @@ function stubFetch(options: FetchOptions = {}) {
       });
     }
     if (url.pathname === "/config/model-catalog") return json(cat);
-    if (url.pathname === "/profile/investor") return json(PROFILE);
+    if (url.pathname === "/profile/investor") return json(options.profile ?? PROFILE);
     if (url.pathname === "/research/threads" && method === "GET") {
       return json({ threads, total: threads.length, limit: 50, offset: 0 });
     }
@@ -412,15 +414,128 @@ async function setSelect(element: HTMLSelectElement, value: string) {
   await flush();
 }
 
-afterEach(() => {
+afterEach(async () => {
   unmount();
   window.localStorage.clear();
   window.sessionStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  await i18n.changeLanguage("zh-Hant");
 });
 
 describe("Research workspace contracts", () => {
+  it("relocalizes shared personalization labels without replacing Research state", async () => {
+    await i18n.changeLanguage("zh-Hant");
+    const enabledProfile: InvestorProfileResponse = {
+      ...PROFILE,
+      profile: {
+        ...PROFILE.profile,
+        enabled: true,
+        default_stance: "complementary",
+      },
+      effective_stance: "complementary",
+      trace: {
+        profile_active: true,
+        assistant_stance: "complementary",
+        skill_mode: "suggest_only",
+        suggested_skills: ["source-suggested-skill"],
+        applied_skills: ["source-applied-skill"],
+      },
+    };
+    const saved = message("Saved source answer", {
+      personalization: enabledProfile.trace,
+    });
+    const fetchMock = stubFetch({
+      profile: enabledProfile,
+      threads: [thread("thread-personalization", "Personalization research")],
+      messages: { "thread-personalization": [saved] },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem(
+      "arkscope.aiResearch.activeThreadId",
+      "thread-personalization",
+    );
+    await mountResearch();
+    await vi.waitFor(() => expect(select("立場")).not.toBeNull());
+
+    const stanceSelect = select("立場")!;
+    await setSelect(stanceSelect, "growth_opportunity");
+    await setTextarea("Keep this Research draft");
+    const question = host!.querySelector("textarea") as HTMLTextAreaElement;
+    const bubble = host!.querySelector(".research-bubble.assistant")!;
+    const model = bubble.querySelector(".research-model")!;
+    const requestCount = fetchMock.mock.calls.length;
+    expect(bubble.textContent).toContain(
+      "立場：互補投資人　套用技能：source-applied-skill",
+    );
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+    await flush();
+
+    expect(select("立場")).toBe(stanceSelect);
+    expect(stanceSelect.value).toBe("growth_opportunity");
+    expect(stanceSelect.selectedOptions[0]?.textContent).toBe("Growth opportunity");
+    expect(host!.querySelector("textarea")).toBe(question);
+    expect(question.value).toBe("Keep this Research draft");
+    expect(host!.querySelector(".research-bubble.assistant")).toBe(bubble);
+    expect(bubble.querySelector(".research-model")).toBe(model);
+    expect(model.textContent).toBe("openai/gpt-5.6-luna · high");
+    expect(bubble.textContent).toContain(
+      "Stance: Complementary　Applied skills: source-applied-skill",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(requestCount);
+  });
+
+  it("relocalizes the Evidence Drawer trace without changing source model values", async () => {
+    await i18n.changeLanguage("zh-Hant");
+    const personalization = {
+      profile_active: true,
+      assistant_stance: "complementary" as const,
+      skill_mode: "suggest_only" as const,
+      suggested_skills: ["source-suggested-skill"],
+      applied_skills: ["source-applied-skill"],
+    };
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread("thread-evidence-trace", "Evidence trace")],
+      messages: {
+        "thread-evidence-trace": [message("Source model answer", {
+          personalization,
+        })],
+      },
+    }));
+    window.sessionStorage.setItem(
+      "arkscope.aiResearch.activeThreadId",
+      "thread-evidence-trace",
+    );
+    await mountResearch();
+    await click(button("查看證據")!);
+
+    const row = (label: string) => [...document.querySelectorAll(".research-run-detail-list > div")]
+      .find((candidate) => candidate.querySelector("dt")?.textContent === label);
+    const stanceValue = row("立場")?.querySelector("dd")!;
+    const routeValue = row("路線")?.querySelector("dd")!;
+    const skillValue = row("套用技能")?.querySelector("dd")!;
+    expect(stanceValue.textContent).toBe("互補投資人");
+    expect(routeValue.textContent).toBe("openai · gpt-5.6-luna · high");
+    expect(skillValue.textContent).toBe("source-applied-skill");
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+    await flush();
+
+    expect(row("立場")?.querySelector("dd")).toBe(stanceValue);
+    expect(stanceValue.textContent).toBe("Complementary");
+    expect(row("路線")?.querySelector("dd")).toBe(routeValue);
+    expect(routeValue.textContent).toBe("openai · gpt-5.6-luna · high");
+    expect(row("套用技能")?.querySelector("dd")).toBe(skillValue);
+    expect(skillValue.textContent).toBe("source-applied-skill");
+    expect(personalization.suggested_skills).toEqual(["source-suggested-skill"]);
+    expect(personalization.applied_skills).toEqual(["source-applied-skill"]);
+  });
+
   it("1. exposes New research, History, and Evidence in PageHeader without fixed side columns", async () => {
     vi.stubGlobal("fetch", stubFetch());
     await mountResearch();
