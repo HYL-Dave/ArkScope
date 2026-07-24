@@ -1,16 +1,17 @@
 # ArkScope I18N-3 Explore Design
 
-> **Status: DESIGN REVIEW GREEN — IMPLEMENTATION PLAN REVIEW GREEN,
-> IMPLEMENTATION CLEARED**
+> **Status: LIVE COMPLETE — REVIEWED PRODUCT `be89a9b5`, FAST-FORWARD MERGED
+> THROUGH `eb4dee7b` ON 2026-07-24**
 >
 > Written against merged `master` at `c0448213` on 2026-07-23. This document
 > is the bounded product, localization, error-presentation, and verification
 > authority for I18N-3 Explore. Independent full-document review returned
 > GREEN with the required zh-Hant copy-preservation rule incorporated below.
 > It does not authorize backend changes, the public locale selector, or any
-> deferred SA extension repair. The separately reviewed RED-first plan now
-> authorizes bounded implementation from its docs-only clearance commit; merge
-> remains blocked on independent implementation review and explicit approval.
+> deferred SA extension repair. The separately reviewed RED-first plan was
+> implemented, independently reviewed GREEN with zero findings, explicitly
+> approved, and fast-forward merged. Merged-tree canonical gates and the
+> normal zh-Hant desktop smoke are green; I18N-4 Research is next.
 
 ## 1. Purpose and Authority
 
