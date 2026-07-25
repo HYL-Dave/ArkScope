@@ -45,16 +45,16 @@ def test_installer_host_script_path_exists(script_name, pattern):
     )
 
 
-def test_firefox_installer_copies_every_popup_script_dependency():
-    popup_html = (EXT_DIR / "popup.html").read_text(encoding="utf-8")
+def test_firefox_installer_delegates_to_atomic_dependency_closure_builder_before_registration():
     installer = (EXT_DIR / "install_firefox.sh").read_text(encoding="utf-8")
-    popup_scripts = re.findall(r'<script src="([^"]+\.js)"></script>', popup_html)
+    build_call = (
+        '"$PYTHON_PATH" "$SCRIPT_DIR/build_firefox.py" '
+        '--source "$SCRIPT_DIR" --output "$BUILD_DIR"'
+    )
 
-    assert popup_scripts
-    for script_name in popup_scripts:
-        expected_copy = (
-            f'cp "$SCRIPT_DIR/{script_name}" "$BUILD_DIR/{script_name}"'
-        )
-        assert expected_copy in installer, (
-            f"Firefox installer does not copy popup dependency {script_name}"
-        )
+    assert build_call in installer
+    assert installer.index(build_call) < installer.index('mkdir -p "$LAUNCHER_DIR"')
+    assert installer.index(build_call) < installer.index('mkdir -p "$MANIFEST_DIR"')
+    assert not re.search(r'^\s*cp\s+"\$SCRIPT_DIR/[^\n]+\$BUILD_DIR', installer, re.M)
+    assert "scrape*.js" not in installer
+    assert 'rm -rf "$BUILD_DIR"' not in installer

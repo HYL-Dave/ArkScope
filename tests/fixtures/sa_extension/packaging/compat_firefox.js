@@ -1,0 +1,1 @@
+globalThis.chrome = globalThis.browser;

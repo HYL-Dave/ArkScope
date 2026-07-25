@@ -59,6 +59,8 @@ else
     fi
 fi
 
+"$PYTHON_PATH" "$SCRIPT_DIR/build_firefox.py" --source "$SCRIPT_DIR" --output "$BUILD_DIR"
+
 mkdir -p "$LAUNCHER_DIR" "$CONFIG_DIR"
 cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
 chmod +x "$LAUNCHER_PATH"
@@ -82,24 +84,6 @@ Path(config_path).write_text(
     encoding="utf-8",
 )
 PY
-
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-
-cp "$SCRIPT_DIR/manifest.firefox.json" "$BUILD_DIR/manifest.json"
-cp "$SCRIPT_DIR/background.js" "$BUILD_DIR/background.js"
-cp "$SCRIPT_DIR/compat_firefox.js" "$BUILD_DIR/compat_firefox.js"
-cp "$SCRIPT_DIR/reconciliation_ui.js" "$BUILD_DIR/reconciliation_ui.js"
-cp "$SCRIPT_DIR/popup.js" "$BUILD_DIR/popup.js"
-cp "$SCRIPT_DIR/popup.html" "$BUILD_DIR/popup.html"
-cp "$SCRIPT_DIR"/scrape*.js "$BUILD_DIR/"
-
-sed -i 's#<script src="popup.js"></script>#<script src="compat_firefox.js"></script>\
-  <script src="popup.js"></script>#' "$BUILD_DIR/popup.html"
-if ! grep -q 'compat_firefox.js' "$BUILD_DIR/popup.html"; then
-    echo "ERROR: Failed to inject compat_firefox.js into generated popup.html"
-    exit 1
-fi
 
 mkdir -p "$MANIFEST_DIR"
 cat > "$NATIVE_MANIFEST_PATH" << EOF
