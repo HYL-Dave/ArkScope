@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: INDEPENDENT IMPLEMENTATION REVIEW GREEN - MERGE APPROVED**
+> **Status: POST-MERGE CONTRAST REPAIR IMPLEMENTED - INDEPENDENT REVIEW PENDING**
 >
 > The design passed independent review and its required disclosure amendment
 > plus all three advisories are incorporated through `9da1a9c9`. A later
@@ -1764,7 +1764,7 @@ or execute historical repair. Report the review-ready tip and exact commands.
 - Modify `extensions/sa_alpha_picks/popup_action_catalog.js`
 - Modify this plan and the design/evidence/priority/roadmap closeout records
 
-- [ ] **Step 1: RED - expose browser-computed contrast evidence**
+- [x] **Step 1: RED - expose browser-computed contrast evidence**
 
 Add one `contrast_audit` fixture scenario. It must open every `<details>`,
 remove `hidden` only inside the disposable fixture DOM, provide text for the
@@ -1779,7 +1779,7 @@ whose fill does not distinguish it from its surrounding surface to have a
 boundary `>=3.0`. Disabled buttons are reported separately and must retain a
 readable label even though WCAG exempts inactive controls.
 
-- [ ] **Step 2: Verify RED for the grounded failures**
+- [x] **Step 2: Verify RED for the grounded failures**
 
 Run:
 
@@ -1792,7 +1792,7 @@ resolved-window hint, partial status, `reviewRecoveryScopeBtn`, `manualBtn`,
 and the normal action boundary. The three recovery descendants and Retry must
 not appear in the failure list.
 
-- [ ] **Step 3: GREEN - repair the single CSS owner**
+- [x] **Step 3: GREEN - repair the single CSS owner**
 
 In `popup.html`:
 
@@ -1810,7 +1810,7 @@ In `popup_action_catalog.js`/`popup.html`, add exactly one shared disclosure
 note stating that scans may activate and scroll Seeking Alpha tabs and that
 switching tabs in the same browser during a run is unsupported.
 
-- [ ] **Step 4: Verify GREEN and mutation sensitivity**
+- [x] **Step 4: Verify GREEN and mutation sensitivity**
 
 Run the new node and the focused pair. In disposable copies, independently
 restore one legacy ID background, remove the review-control variant, restore
@@ -1819,7 +1819,7 @@ value. Every mutation must make the contrast node RED for the expected owner.
 
 Expected focused result: `23 passed` (`+1/-0`).
 
-- [ ] **Step 5: Run Chrome and Firefox visual gates**
+- [x] **Step 5: Run Chrome and Firefox visual gates**
 
 Load Chrome from source and Firefox from a fresh deterministic artifact. Open
 all disclosures and drive conditional controls visible. Verify computed

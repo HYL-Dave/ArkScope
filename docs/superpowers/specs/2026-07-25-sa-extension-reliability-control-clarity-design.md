@@ -1,6 +1,6 @@
 # ArkScope SA Extension Reliability and Control-Clarity Design
 
-> **Status: INDEPENDENT REVIEW GREEN - PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
+> **Status: POST-MERGE CONTRAST REPAIR IMPLEMENTED - INDEPENDENT REVIEW PENDING**
 >
 > Written against clean `master` at `38178f65` on 2026-07-25. This document
 > is the design authority for the bounded Seeking Alpha browser-extension
