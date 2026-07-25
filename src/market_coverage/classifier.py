@@ -74,6 +74,8 @@ class SlotCoverageClassifier:
             raise TypeError("calendar_day must be CalendarDay")
         if not isinstance(calendar_health, CalendarHealthAssessment):
             raise TypeError("calendar_health must be CalendarHealthAssessment")
+        if calendar_health.market_date != calendar_day.market_date:
+            raise ValueError("calendar health date does not match calendar day")
         now_at_utc = _as_utc(now_et, field_name="now_et")
         canonical_universe = self._canonical_universe(universe)
         observation_rows = tuple(observations)

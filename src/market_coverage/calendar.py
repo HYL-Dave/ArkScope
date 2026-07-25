@@ -188,6 +188,7 @@ class CalendarHealthComposer:
             if forward_horizon < _MINIMUM_HEALTHY_FORWARD_MONTHS:
                 reason_codes.append(CalendarHealthReason.FIXTURE_HORIZON_LOW)
             return CalendarHealthAssessment(
+                market_date=requested_day,
                 status=CalendarHealth.DEGRADED,
                 reason_codes=tuple(reason_codes),
                 date_classifiable=False,
@@ -197,6 +198,7 @@ class CalendarHealthComposer:
 
         if resolution.availability is CalendarAvailability.UNAVAILABLE:
             return CalendarHealthAssessment(
+                market_date=requested_day,
                 status=CalendarHealth.UNAVAILABLE,
                 reason_codes=(CalendarHealthReason.CALENDAR_UNAVAILABLE,),
                 date_classifiable=False,
@@ -209,6 +211,7 @@ class CalendarHealthComposer:
             reason_codes.append(CalendarHealthReason.FIXTURE_HORIZON_LOW)
 
         return CalendarHealthAssessment(
+            market_date=requested_day,
             status=CalendarHealth.DEGRADED if reason_codes else CalendarHealth.OK,
             reason_codes=tuple(reason_codes),
             date_classifiable=date_classifiable,

@@ -100,6 +100,7 @@ def _classify(
     if calendar_health is None:
         if day.availability.value == "unavailable":
             calendar_health = api.CalendarHealthAssessment(
+                market_date=day.market_date,
                 status=api.CalendarHealth.UNAVAILABLE,
                 reason_codes=(api.CalendarHealthReason.CALENDAR_UNAVAILABLE,),
                 date_classifiable=False,
@@ -108,6 +109,7 @@ def _classify(
             )
         else:
             calendar_health = api.CalendarHealthAssessment(
+                market_date=day.market_date,
                 status=api.CalendarHealth.OK,
                 reason_codes=(),
                 date_classifiable=True,
@@ -193,6 +195,15 @@ def test_precedence_calendar_unavailable_is_unknown():
     assert unreviewed.observed_ticker_count is None
     assert unreviewed.ticker_coverages is None
     assert unreviewed.unmatched_rth_row_count is None
+    with pytest.raises(ValueError, match="does not match"):
+        _classify(
+            api,
+            day=regular_day,
+            universe=("AAA",),
+            observations=observations,
+            now_et=datetime(2026, 7, 24, 16, 30, tzinfo=EASTERN),
+            calendar_health=unreviewed_health,
+        )
 
 
 def test_precedence_reviewed_closed_day_is_non_trading():
@@ -517,6 +528,21 @@ def test_completed_day_count_equations_hold():
         replace(
             result,
             market_date=datetime(2026, 7, 24, tzinfo=UTC),
+        )
+    with pytest.raises(TypeError, match="observation timestamp"):
+        api.RthObservation(ticker="AAA", observed_at="2026-07-24T13:30:00Z")
+    with pytest.raises(TypeError, match="slot start"):
+        replace(
+            result.ticker_coverages[0].slots[0],
+            start_at_utc="2026-07-24T13:30:00Z",
+        )
+    with pytest.raises(TypeError, match="now_et"):
+        _classify(
+            api,
+            day=day,
+            universe=("AAA",),
+            observations=observations,
+            now_et="2026-07-24T16:30:00-04:00",
         )
 
 

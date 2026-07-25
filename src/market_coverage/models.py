@@ -433,6 +433,7 @@ class CalendarDay:
 
 @dataclass(frozen=True)
 class CalendarHealthAssessment:
+    market_date: date
     status: CalendarHealth
     reason_codes: tuple[CalendarHealthReason, ...]
     date_classifiable: bool
@@ -440,6 +441,8 @@ class CalendarHealthAssessment:
     forward_horizon_months: int
 
     def __post_init__(self) -> None:
+        if type(self.market_date) is not date:
+            raise TypeError("market_date must be a date")
         if self.forward_horizon_months < 0:
             raise ValueError("forward_horizon_months cannot be negative")
 
