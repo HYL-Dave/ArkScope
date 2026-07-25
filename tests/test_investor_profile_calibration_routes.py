@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 import src.investor_profile_calibration_agent as calibration_agent
+from src.anthropic_refusal import AnthropicRefusalError
 from src.api.routes import investor_profile_calibration as routes
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import CalibrationStore
@@ -158,6 +159,61 @@ def test_send_message_wraps_responder_runtime_failure(stores, monkeypatch):
 
     assert exc.value.status_code == 502
     assert exc.value.detail["code"] == "calibration_responder_failed"
+
+
+def test_calibration_refusal_records_model_refusal_instead_of_generic_failure(
+    stores,
+    monkeypatch,
+):
+    cstore, _pstore = stores
+    _allow_writes(monkeypatch)
+    session = _start(cstore)
+    calls = 0
+
+    async def refusing_responder(**kwargs):
+        nonlocal calls
+        calls += 1
+        raise AnthropicRefusalError(
+            "private-model-name",
+            {"category": "private-category", "explanation": "private-detail"},
+        )
+
+    monkeypatch.setattr(routes, "_default_responder", refusing_responder)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            routes.send_calibration_message(
+                routes.CalibrationMessageBody(
+                    session_id=session["id"],
+                    turn_id="model-refusal",
+                    content="Keep this answer for an explicit retry.",
+                    provider="anthropic",
+                ),
+                store=cstore,
+            )
+        )
+
+    failed = cstore.get_turn("model-refusal")
+    state = routes.get_calibration_state(store=cstore)
+    assert calls == 1
+    assert exc.value.status_code == 502
+    assert exc.value.detail == {
+        "code": "model_refusal",
+        "message": "The model declined this calibration turn.",
+        "diagnostic": "Model refused calibration request.",
+    }
+    assert failed.status == "failed"
+    assert failed.error_code == "model_refusal"
+    assert failed.diagnostic == "Model refused calibration request."
+    assert state["pending_turn"]["id"] == "model-refusal"
+    assert state["pending_turn"]["attempt_count"] == 1
+    exposed = json.dumps(
+        {"turn": failed.to_dict(), "http_detail": exc.value.detail},
+        ensure_ascii=False,
+    )
+    assert "private-model-name" not in exposed
+    assert "private-category" not in exposed
+    assert "private-detail" not in exposed
 
 
 def test_approve_proposal_uses_existing_profile_save_and_records_provenance(

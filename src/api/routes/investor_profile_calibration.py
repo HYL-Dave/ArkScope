@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from src.anthropic_refusal import AnthropicRefusalError
 from src.api.dependencies import get_investor_calibration_store, get_investor_profile_store
 from src.api.permissions import require_profile_state_write
 from src.auth_drivers.api_key_drivers import MissingCredentialError
@@ -182,6 +183,10 @@ def _result_validation_diagnostic() -> str:
     )
 
 
+def _model_refusal_diagnostic() -> str:
+    return sanitize_research_detail(redact("Model refused calibration request."))
+
+
 def _turn_input_error(exc: ValueError) -> HTTPException:
     code = str(exc)
     if code == "calibration_session_not_found":
@@ -245,6 +250,18 @@ async def _complete_provider_work(
             400,
             "calibration_result_validation_failed",
             "Calibration response failed validation. Retry this turn.",
+            diagnostic=failed.diagnostic,
+        ) from exc
+    except AnthropicRefusalError as exc:
+        failed = store.fail_turn(
+            work.turn.id,
+            error_code="model_refusal",
+            diagnostic=_model_refusal_diagnostic(),
+        )
+        raise _bad(
+            502,
+            "model_refusal",
+            "The model declined this calibration turn.",
             diagnostic=failed.diagnostic,
         ) from exc
     except MissingCredentialError as exc:
