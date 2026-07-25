@@ -212,7 +212,7 @@ def test_unreadable_market_db_is_typed_unavailable(tmp_path):
             "ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
         )
         conn.execute(
-            "INSERT INTO provider_sync_meta VALUES ('', '15min', 'error', 'now')"
+            "INSERT INTO provider_sync_meta VALUES ('AAA', '15min', '', 'now')"
         )
         conn.commit()
     finally:
@@ -256,6 +256,18 @@ def test_readable_empty_prices_table_is_ok(tmp_path):
     path = tmp_path / "empty-market.db"
     session = _est_session(date(2026, 1, 5))
     _create_market_db(path)
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            "CREATE TABLE provider_sync_meta ("
+            "ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO provider_sync_meta VALUES ('AAA', '1d', '', 'now')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
     result = _read(api, path, session)
 
@@ -304,7 +316,7 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
             ("AAA", utc_date_boundary_row),
             ("AAA", second.open_at_utc),
         ),
-        raw_rows=(("AAA", "2026-01-05 09:45:00-05:00"),),
+        raw_rows=(("\tAAA\t", "\r\n2026-01-05 09:45:00-05:00\v\f"),),
     )
     statements: list[str] = []
     real_connect = sqlite3.connect
@@ -335,6 +347,8 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
     ]
     assert len(prices_queries) == 1
     assert "substr(" not in prices_queries[0].lower()
+    assert "trim(ticker," in prices_queries[0].lower()
+    assert prices_queries[0].lower().count("trim(datetime,") == 2
 
 
 def test_reader_excludes_extended_hours_rows(tmp_path):
@@ -398,13 +412,13 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path):
     _create_market_db(
         path,
         rows=(
-            ("brk b", session.open_at_utc),
-            (" brk.b ", session.open_at_utc),
+            ("\tbrk b\t", session.open_at_utc),
+            ("\tbrk.b\t", session.open_at_utc),
             ("UNRELATED", session.open_at_utc),
         ),
-        aliases=((" BrK.B ", " brk b "),),
+        aliases=(("\tBrK.B\t", "\tbrk b\t"),),
         provider_issues=(
-            (" brk.b ", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
+            ("\tbrk.b\t", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
         ),
     )
 

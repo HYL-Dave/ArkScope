@@ -24,6 +24,8 @@ _TICKER_ALIAS_COLUMNS = frozenset({"alias", "canonical"})
 _PROVIDER_SYNC_COLUMNS = frozenset(
     {"ticker", "interval", "last_error", "updated_at"}
 )
+# SQLite TRIM's second argument is a character set; keep Python and SQL aligned.
+_ASCII_WHITESPACE = " \t\n\r\v\f"
 
 
 class _StoredDatabaseError(Exception):
@@ -76,7 +78,7 @@ def _table_columns(
 def _normalize_ticker(value: object, *, field_name: str) -> str:
     if not isinstance(value, str):
         raise TypeError(f"{field_name} must be a string")
-    normalized = value.strip().upper()
+    normalized = value.strip(_ASCII_WHITESPACE).upper()
     if not normalized:
         raise ValueError(f"{field_name} must be non-empty")
     return normalized
@@ -137,6 +139,22 @@ def _canonical_universe(
     return tuple(canonical)
 
 
+def _stored_ticker_scope(
+    aliases: dict[str, str],
+    canonical_universe: set[str],
+) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            canonical_universe
+            | {
+                alias
+                for alias, canonical in aliases.items()
+                if canonical in canonical_universe
+            }
+        )
+    )
+
+
 def _open_sessions(sessions: Sequence[CalendarDay]) -> tuple[CalendarDay, ...]:
     if isinstance(sessions, (str, bytes)):
         raise TypeError("sessions must be a sequence of CalendarDay values")
@@ -173,7 +191,7 @@ def _open_sessions(sessions: Sequence[CalendarDay]) -> tuple[CalendarDay, ...]:
 def _parse_stored_timestamp(value: object) -> datetime:
     if not isinstance(value, str):
         raise _StoredDatabaseError("stored price datetime must be a string")
-    serialized = value.strip()
+    serialized = value.strip(_ASCII_WHITESPACE)
     if serialized.endswith(("Z", "z")):
         serialized = f"{serialized[:-1]}+00:00"
     elif (
@@ -208,21 +226,28 @@ def _read_provider_errors(
     if not _PROVIDER_SYNC_COLUMNS <= columns:
         raise _StoredDatabaseError("provider_sync_meta schema is incompatible")
 
+    stored_tickers = _stored_ticker_scope(aliases, canonical_universe)
+    placeholders = ", ".join("?" for _ in stored_tickers)
     issues: list[ProviderSyncIssue] = []
     for raw_ticker, raw_interval, raw_error, raw_updated_at in conn.execute(
         "SELECT ticker, interval, last_error, updated_at "
-        "FROM provider_sync_meta"
+        "FROM provider_sync_meta "
+        "WHERE interval = ? AND last_error IS NOT NULL "
+        f"AND UPPER(TRIM(ticker, ?)) IN ({placeholders})",
+        (interval, _ASCII_WHITESPACE, *stored_tickers),
     ):
         ticker = _normalize_stored_ticker(
             raw_ticker,
             field_name="provider issue ticker",
         )
         if not isinstance(raw_interval, str) or (
-            not raw_interval or raw_interval != raw_interval.strip()
+            not raw_interval
+            or raw_interval != raw_interval.strip(_ASCII_WHITESPACE)
         ):
             raise _StoredDatabaseError("provider issue interval is malformed")
         if raw_error is not None and (
-            not isinstance(raw_error, str) or not raw_error.strip()
+            not isinstance(raw_error, str)
+            or not raw_error.strip(_ASCII_WHITESPACE)
         ):
             raise _StoredDatabaseError("provider issue last_error is malformed")
         if raw_updated_at is not None and not isinstance(raw_updated_at, str):
@@ -237,7 +262,7 @@ def _read_provider_errors(
             ProviderSyncIssue(
                 ticker=ticker,
                 interval=raw_interval,
-                last_error=raw_error.strip(),
+                last_error=raw_error.strip(_ASCII_WHITESPACE),
                 updated_at=raw_updated_at,
             )
         )
@@ -271,9 +296,7 @@ def _read_session_observations(
         return ()
 
     canonical_set = set(canonical_universe)
-    stored_tickers = canonical_set | {
-        alias for alias, canonical in aliases.items() if canonical in canonical_set
-    }
+    stored_tickers = _stored_ticker_scope(aliases, canonical_set)
     placeholders = ", ".join("?" for _ in stored_tickers)
     earliest_open = sessions[0].open_at_utc
     latest_close = sessions[-1].close_at_utc
@@ -283,13 +306,16 @@ def _read_session_observations(
     upper_bound = (latest_close.date() + timedelta(days=2)).isoformat()
     query = (
         "SELECT ticker, datetime FROM prices "
-        f"WHERE interval = ? AND UPPER(TRIM(ticker)) IN ({placeholders}) "
-        "AND datetime >= ? AND datetime < ?"
+        f"WHERE interval = ? AND UPPER(TRIM(ticker, ?)) IN ({placeholders}) "
+        "AND TRIM(datetime, ?) >= ? AND TRIM(datetime, ?) < ?"
     )
     parameters = (
         interval,
-        *sorted(stored_tickers),
+        _ASCII_WHITESPACE,
+        *stored_tickers,
+        _ASCII_WHITESPACE,
         lower_bound,
+        _ASCII_WHITESPACE,
         upper_bound,
     )
 
@@ -346,7 +372,7 @@ class RthObservationReader:
     ) -> ObservationReadResult:
         if not isinstance(interval, str):
             raise TypeError("interval must be a string")
-        if not interval or interval != interval.strip():
+        if not interval or interval != interval.strip(_ASCII_WHITESPACE):
             raise ValueError("interval must be a non-empty database interval")
         session_windows = _open_sessions(sessions)
 
