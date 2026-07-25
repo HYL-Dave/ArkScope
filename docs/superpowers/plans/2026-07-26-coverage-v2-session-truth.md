@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN REVIEW GREEN - CLEARANCE RECORDING**
+> **Status: PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
 
 **Goal:** Replace maximum-relative market-data coverage with an offline,
 read-only XNYS/RTH slot-grid truth model, expose its closed semantic states in
@@ -86,7 +86,9 @@ review prose alone:
 
 The final node/resource targets do not move. The backend comm composition does:
 it is `+68/-37`, net `+31`, rather than `+69/-38`. The exact clearance commit
-is recorded in a following docs-only commit before product edits begin.
+containing all reviewed amendments is
+`PLAN_REVIEW_CLEARANCE_COMMIT=f6cbcb6e2343c14cd185e0f7e766ce98e77cc8db`.
+The following docs-only pointer commit changes no authority or product bytes.
 
 ## Locked Implementation Decisions
 
