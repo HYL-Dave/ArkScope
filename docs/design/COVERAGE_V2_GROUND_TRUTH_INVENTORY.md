@@ -1,6 +1,6 @@
 # Coverage v2 Ground-Truth Inventory
 
-> **Status:** WRITTEN - INDEPENDENT REVIEW PENDING
+> **Status:** REVIEW GREEN - DESIGN DECISIONS NEXT
 > **Observed:** 2026-07-25
 > **Code base:** `f019f9faf31c25ff8d71f29d97fe5945bf992d94`
 > **Purpose:** Evidence-only pre-spec inventory. This document does not select a
@@ -242,10 +242,12 @@ instants and interval size; they must not become independent calendar facts.
 | 2026-07-24 | 148 x 26; LCID x 58; QBTS x 63 | day max 63; 149 tickers reported partial |
 
 On 2026-07-24, AAPL and GOOG span 13:30-19:45 UTC (26 starts), while LCID and
-QBTS span 08:00-23:45 UTC. The `64` witness is exactly a 16-hour, 15-minute
-grid, consistent with Massive's documented 04:00-20:00 ET coverage. Counts of
-58 and 63 are also consistent with its documented rule that no eligible trade
-means no aggregate for that interval.
+QBTS span 08:00-23:45 UTC. QBTS stores 63 rows across that 64-slot span, so even
+the ticker setting that day's maximum is missing one interval relative to its
+own observed time range. The separate 2026-07-02 GOOG witness stores all 64
+rows from 08:00 through 23:45 UTC. Both shapes are consistent with Massive's
+documented 04:00-20:00 ET coverage and its rule that an interval with no
+eligible trade produces no aggregate.
 
 The current status output illustrates the contradiction:
 
@@ -446,8 +448,9 @@ explicit reviewed reason:
    `14`, nor `20` is an independent calendar constant.
 2. 2025-01-09 is non-trading; the known 2025/2026 early-close dates carry their
    real close instants.
-3. A 64-row extended-hours ticker cannot redefine the expected RTH count for
-   the rest of the universe.
+3. Neither the 64-row GOOG witness on 2026-07-02 nor the 63-row QBTS maximum on
+   2026-07-24 can redefine the expected RTH count for the rest of the universe;
+   the latter is itself one row short of its 64-slot observed span.
 4. A uniformly truncated day and the one-full-outlier truncation shape remain
    visibly incomplete.
 5. Massive fallback rows are either bounded to or filtered through the
@@ -526,10 +529,19 @@ The reviewed probe must use a temporary environment and print the installed
 version, session open/close, and the derived half-open interval count. It must
 not add a project dependency before the spec selects an authority.
 
-## 11. Review Gate
+## 11. Independent Review Resolution
 
-The next action is independent written review of this inventory. Review should
-focus on:
+Independent written review returned GREEN with zero substantive findings. Its
+one precision question was the apparent `63`/`64` mismatch. A read-only replay
+confirmed that the numbers belong to different dated witnesses:
+
+- 2026-07-02 GOOG: 64 stored rows, 08:00-23:45 UTC;
+- 2026-07-24 QBTS: 63 stored rows over the same endpoint span.
+
+Sections 4.3 and 9 now name both witnesses explicitly. This resolves the
+document ambiguity without changing either production observation.
+
+The review covered:
 
 - whether the three-layer problem statement matches the code and data;
 - whether any viable runtime authority candidate is missing;
@@ -540,5 +552,8 @@ focus on:
 - whether the inventory is sufficient to open a separately reviewed Coverage
   v2 design spec.
 
-Until that review returns GREEN, no Coverage v2 spec, implementation plan,
-dependency change, schema change, or product code change is authorized.
+The inventory is now cleared as the evidence basis for a separately reviewed
+Coverage v2 design spec. It still does not adopt a runtime authority, RTH
+policy, dependency, schema change, provider behavior, or repair scope by
+itself. Product code and implementation planning remain unauthorized until the
+design decisions in section 8 are resolved and that spec receives review.
