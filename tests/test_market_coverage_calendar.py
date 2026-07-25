@@ -224,6 +224,14 @@ def test_calendar_health_is_ok_for_reviewed_dates_and_healthy_horizon():
     ):
         with pytest.raises(ValueError):
             replace(result, **changes)
+    for changes in (
+        {"reason_codes": []},
+        {"date_classifiable": 1},
+        {"reviewed_through": datetime(2027, 12, 31, tzinfo=timezone.utc)},
+        {"forward_horizon_months": 6.0},
+    ):
+        with pytest.raises(TypeError):
+            replace(result, **changes)
 
 
 def test_low_horizon_is_degraded_without_erasing_reviewed_history():

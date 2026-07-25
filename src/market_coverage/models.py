@@ -443,6 +443,26 @@ class CalendarHealthAssessment:
     def __post_init__(self) -> None:
         if type(self.market_date) is not date:
             raise TypeError("market_date must be a date")
+        if not isinstance(self.status, CalendarHealth):
+            raise TypeError("status must be CalendarHealth")
+        if not isinstance(self.reason_codes, tuple):
+            raise TypeError("reason_codes must be an immutable tuple")
+        if any(
+            not isinstance(reason, CalendarHealthReason)
+            for reason in self.reason_codes
+        ):
+            raise TypeError("reason_codes must contain CalendarHealthReason values")
+        if len(self.reason_codes) != len(set(self.reason_codes)):
+            raise ValueError("reason_codes must be unique")
+        if type(self.date_classifiable) is not bool:
+            raise TypeError("date_classifiable must be bool")
+        if type(self.reviewed_through) is not date:
+            raise TypeError("reviewed_through must be a date")
+        if (
+            not isinstance(self.forward_horizon_months, int)
+            or isinstance(self.forward_horizon_months, bool)
+        ):
+            raise TypeError("forward_horizon_months must be an integer")
         if self.forward_horizon_months < 0:
             raise ValueError("forward_horizon_months cannot be negative")
 

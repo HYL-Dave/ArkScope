@@ -89,6 +89,14 @@ class SlotCoverageClassifier:
                 CalendarHealthReason.CALENDAR_UNAVAILABLE
                 in calendar_health.reason_codes
             ):
+                if (
+                    calendar_day.availability
+                    is not CalendarAvailability.UNAVAILABLE
+                    or calendar_day.kind is not CalendarDayKind.UNKNOWN
+                ):
+                    raise ValueError(
+                        "calendar_unavailable health requires an unavailable day"
+                    )
                 reason = CoverageDayReason.CALENDAR_UNAVAILABLE
             else:
                 raise ValueError(

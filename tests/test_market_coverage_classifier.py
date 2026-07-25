@@ -163,6 +163,23 @@ def test_precedence_calendar_unavailable_is_unknown():
         result.status = api.CoverageDayStatus.COMPLETE
     with pytest.raises(ValueError):
         replace(result, status=api.CoverageDayStatus.COMPLETE)
+    contradictory_health = api.CalendarHealthAssessment(
+        market_date=regular_day.market_date,
+        status=api.CalendarHealth.UNAVAILABLE,
+        reason_codes=(api.CalendarHealthReason.CALENDAR_UNAVAILABLE,),
+        date_classifiable=False,
+        reviewed_through=date(2027, 12, 31),
+        forward_horizon_months=12,
+    )
+    with pytest.raises(ValueError, match="requires an unavailable day"):
+        _classify(
+            api,
+            day=regular_day,
+            universe=("AAA",),
+            observations=observations,
+            now_et=datetime(2026, 7, 24, 16, 30, tzinfo=EASTERN),
+            calendar_health=contradictory_health,
+        )
 
     from src.market_coverage.calendar import (
         CalendarHealthComposer,
