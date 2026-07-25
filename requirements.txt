@@ -1,6 +1,15 @@
 openai
-pandas
-numpy
+# Coverage v2 calendar solution
+exchange-calendars==4.13.2
+numpy==1.26.4
+pandas==2.3.1
+pyluach==2.3.0
+toolz==1.1.0
+tzdata==2025.2
+korean-lunar-calendar==0.4.0
+python-dateutil==2.9.0.post0
+pytz==2025.2
+six==1.17.0
 gymnasium
 torch
 scipy

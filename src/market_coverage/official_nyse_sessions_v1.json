@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "calendar": "XNYS",
+  "reviewed_from": "2025-01-01",
+  "reviewed_through": "2027-12-31",
+  "metadata": {
+    "sources": [
+      {
+        "url": "https://www.nyse.com/trade/hours-calendars"
+      },
+      {
+        "url": "https://www.nyse.com/publicdocs/ICE_NYSE_2025_Yearly_Trading_Calendar.pdf"
+      },
+      {
+        "url": "https://www.nyse.com/publicdocs/nyse/markets/american-options/rule-interpretations/2025/National_Day_of_Mourning_20250102.pdf"
+      }
+    ]
+  },
+  "ordinary_session": {
+    "date": "2026-07-24",
+    "open_et": "09:30",
+    "close_et": "16:00"
+  },
+  "early_closes": [
+    {
+      "date": "2025-07-03",
+      "close_et": "13:00"
+    },
+    {
+      "date": "2025-11-28",
+      "close_et": "13:00"
+    },
+    {
+      "date": "2025-12-24",
+      "close_et": "13:00"
+    },
+    {
+      "date": "2026-11-27",
+      "close_et": "13:00"
+    },
+    {
+      "date": "2026-12-24",
+      "close_et": "13:00"
+    },
+    {
+      "date": "2027-11-26",
+      "close_et": "13:00"
+    }
+  ],
+  "extraordinary_closures": [
+    "2025-01-09"
+  ]
+}
