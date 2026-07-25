@@ -1089,7 +1089,7 @@ Resolved Task 3 product tip:
 - Modify `tests/test_provider_health.py`
 - Modify the six web files and four web tests listed in File Map
 
-- [ ] **Step 1: Add ten backend RED nodes**
+- [x] **Step 1: Add ten backend RED nodes**
 
 `tests/test_sa_extension_health.py`:
 
@@ -1116,7 +1116,12 @@ test_sa_provider_uses_derived_complete_success_and_latest_attempt_separately
 test_sa_provider_ignores_legacy_and_skipped_success_rows
 ```
 
-- [ ] **Step 2: Add frontend RED accounting**
+Observed: the three backend owner suites were exactly `11 failed / 58 passed`
+before product edits. The ten new nodes plus the evolved structured-summary
+owner failed on generic-success/raw-detail behavior; unrelated nodes remained
+green.
+
+- [x] **Step 2: Add frontend RED accounting**
 
 Rename the one obsolete raw-detail-preservation node to its named successor.
 Add four further `saExtensionHealthDisplay` nodes covering localized counts,
@@ -1124,24 +1129,28 @@ unknown-code fail-closed behavior, bounded Developer code, and repair state.
 Add three `SettingsProviderConfig` mounted nodes covering normal-mode zero raw
 detail, Developer stable-code-only output, and a localized degraded row.
 
-- [ ] **Step 3: Implement structured summaries and health projections**
+Observed: the presenter plus mounted Settings suites were exactly
+`9 failed / 34 passed` before frontend product edits. The named successor and
+seven new nodes failed for the absent structured presentation contract.
+
+- [x] **Step 3: Implement structured summaries and health projections**
 
 One store summary returns latest attempt plus latest structured
 derived-complete timestamp. `sa_market_news_health` and `provider_health` use
 that same result. Do not duplicate row interpretation.
 
-- [ ] **Step 4: Implement the additive API/presenter contract**
+- [x] **Step 4: Implement the additive API/presenter contract**
 
 Existing setup segments remain compatible. Telemetry and repair segments omit
 raw `detail`. Unknown segment keys remain visible as stable identifiers, but
 unknown condition copy is generic and localized.
 
-- [ ] **Step 5: Add exactly 13 resource leaves and evolve counts**
+- [x] **Step 5: Add exactly 13 resource leaves and evolve counts**
 
 Both locale key sets must remain equal/nonempty. Settings becomes `694`, total
 `1794`. No popup English is added to app resources.
 
-- [ ] **Step 6: Verify focused backend/frontend and i18n gates**
+- [x] **Step 6: Verify focused backend/frontend and i18n gates**
 
 ```bash
 pytest -q tests/test_sa_extension_health.py \
@@ -1161,7 +1170,20 @@ npm run check:i18n-literals
 Expected: frontend `4 files / 69` nodes; resources `694/1794`; scanner remains
 `36/20/0/20` because all copy lives in resources.
 
-- [ ] **Step 7: Commit**
+Observed: canonical backend collection is `4677`, the 12-file focused set is
+`294/294`, and sorted node-list SHA-256 values are
+`ec699e992433f5c2cabe612e5f609fad1ca64ae88915034bb8e56aa2bfcd7de9`
+and `d35c5155ed480f3495567ce172bc00b391b6e69d4768526d288d2b738a679a47`.
+Frontend is exactly `95 files / 1063 passed`; the four-file focused set is
+`69/69`, with sorted relative node-list SHA-256 values
+`a93c02bc28d1924f23f7895338d723e968dcb389a494ff0e0f993e4c092019d4`
+and `5c3859c3c7db7fe90c13f3c46d49610eae64986ef0b89e558246ee0cf13c6cdf`.
+TypeScript, resource parity/nonempty (`694/1794`), and scanner
+`36/20/0/20` all pass. The full-suite diagnostic-sink ratchet caught a
+presenter output initially named `detail`; renaming that reviewed output to
+`copy` removed the ambiguous raw-detail sink without changing node accounting.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/service/sa_extension_health.py \
@@ -1183,6 +1205,11 @@ git commit -m "feat: surface structured SA extension degradation"
 
 Check staged paths before committing. Do not stage unrelated generated or
 user files.
+
+Resolved Task 4 product tip:
+`1e52ed4e391d42ff9421b42308ba14a6fad15ed6`. The post-commit Firefox
+dependency-closure build succeeds and contains exactly the same 14 reviewed
+runtime files.
 
 ---
 
