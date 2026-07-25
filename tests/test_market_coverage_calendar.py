@@ -225,6 +225,9 @@ def test_calendar_health_is_ok_for_reviewed_dates_and_healthy_horizon():
         with pytest.raises(ValueError):
             replace(result, **changes)
     for changes in (
+        {"market_date": datetime(2026, 7, 24, tzinfo=timezone.utc)},
+        {"status": "ok"},
+        {"reason_codes": ("fixture_horizon_low",)},
         {"reason_codes": []},
         {"date_classifiable": 1},
         {"reviewed_through": datetime(2027, 12, 31, tzinfo=timezone.utc)},
@@ -232,6 +235,15 @@ def test_calendar_health_is_ok_for_reviewed_dates_and_healthy_horizon():
     ):
         with pytest.raises(TypeError):
             replace(result, **changes)
+    with pytest.raises(ValueError, match="unique"):
+        replace(
+            result,
+            status=CalendarHealth.DEGRADED,
+            reason_codes=(
+                CalendarHealthReason.FIXTURE_HORIZON_LOW,
+                CalendarHealthReason.FIXTURE_HORIZON_LOW,
+            ),
+        )
 
 
 def test_low_horizon_is_degraded_without_erasing_reviewed_history():
