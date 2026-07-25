@@ -2204,6 +2204,12 @@ def test_legacy_unproven_gap_manual_continuation_is_rejected_without_worker(
     assert audit[0]["status"] == "failed"
     assert audit[0]["result"]["reason_code"] == "legacy_unproven_gap"
 
+    retry = ds.run_source("price_backfill", trigger_source="api")
+
+    assert retry["status"] == "succeeded"
+    assert retry["reason_code"] == "coverage_truth_read_only"
+    assert ds._state_store().get("price_backfill")["continuation"] is None
+
 
 def test_legacy_unproven_gap_scheduler_continuation_is_rejected_without_worker(
     monkeypatch, tmp_path
