@@ -35,6 +35,7 @@ from src.tools.backends.db_backend import (
     _plan_comment_duplicate_cleanup,
     _prepare_comments_for_upsert,
 )
+from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
 from src.tools.registry import create_default_registry
 
 
@@ -903,6 +904,41 @@ class TestGetDetailFileMerge:
 
 
 class TestDataAccessMarketNews:
+    @staticmethod
+    def _recovery_dal(tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            DatabaseBackend,
+            "_get_conn",
+            lambda _self: (_ for _ in ()).throw(AssertionError("PG touched")),
+        )
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = SACaptureDatabaseBackend(
+            "postgresql://fake:fake@127.0.0.1:9/fake",
+            sa_db=str(tmp_path / "sa_capture.db"),
+        )
+        return dal
+
+    @staticmethod
+    def _insert_recovery_news(dal, news_id, published_at, *, body=None):
+        dal._backend.upsert_sa_market_news(
+            [
+                {
+                    "news_id": news_id,
+                    "url": f"https://seekingalpha.com/news/{news_id}",
+                    "title": f"Licensed title {news_id}",
+                    "published_at": published_at,
+                    "published_text": None,
+                    "tickers": [],
+                    "category": None,
+                    "summary": "Licensed summary",
+                    "comments_count": 0,
+                    "raw_data": {"private": "source"},
+                }
+            ]
+        )
+        if body is not None:
+            assert dal.save_sa_market_news_detail(news_id, body) is True
+
     def test_save_sa_market_news_normalizes_items(self):
         """Market-news persistence normalizes IDs, tickers, and comment counts."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
@@ -1050,6 +1086,154 @@ class TestDataAccessMarketNews:
         dal._backend.save_sa_market_news_detail.assert_called_once_with(
             "123", "# Headline\n\nBody"
         )
+
+    def test_market_news_rows_by_exact_ids_ignore_age_and_return_only_manifest_fields(
+        self, tmp_path, monkeypatch
+    ):
+        dal = self._recovery_dal(tmp_path, monkeypatch)
+        self._insert_recovery_news(
+            dal, "very-old", "2020-01-01T00:00:00+00:00"
+        )
+        self._insert_recovery_news(
+            dal, "recent", "2026-07-25T00:00:00+00:00", body="# Saved"
+        )
+
+        rows = dal.get_sa_market_news_recovery_rows(
+            ["recent", "very-old", "not-present"]
+        )
+
+        assert [row["news_id"] for row in rows] == ["recent", "very-old"]
+        assert rows[0] == {
+            "news_id": "recent",
+            "pathname": "/news/recent",
+            "published_at": "2026-07-25T00:00:00+00:00",
+            "body_present": True,
+        }
+        assert set().union(*(row.keys() for row in rows)) == {
+            "news_id",
+            "pathname",
+            "published_at",
+            "body_present",
+        }
+
+    def test_market_news_body_presence_readback_is_exact_for_frozen_ids(
+        self, tmp_path, monkeypatch
+    ):
+        dal = self._recovery_dal(tmp_path, monkeypatch)
+        self._insert_recovery_news(
+            dal, "empty", "2026-07-25T00:00:00+00:00"
+        )
+        self._insert_recovery_news(
+            dal, "saved", "2026-07-25T01:00:00+00:00", body="# Body"
+        )
+
+        result = dal.get_sa_market_news_body_presence(
+            ["missing", "saved", "empty"]
+        )
+
+        assert result == {"empty": False, "saved": True}
+
+    def test_market_news_missing_detail_interval_uses_inclusive_canonical_bounds(
+        self, tmp_path, monkeypatch
+    ):
+        dal = self._recovery_dal(tmp_path, monkeypatch)
+        for news_id, published_at in (
+            ("before", "2026-07-24T23:59:59+00:00"),
+            ("start", "2026-07-25T00:00:00+00:00"),
+            ("middle", "2026-07-25T06:00:00+00:00"),
+            ("end", "2026-07-25T12:00:00+00:00"),
+            ("after", "2026-07-25T12:00:01+00:00"),
+        ):
+            self._insert_recovery_news(dal, news_id, published_at)
+        self._insert_recovery_news(
+            dal, "already-saved", "2026-07-25T06:30:00+00:00", body="# Body"
+        )
+
+        rows = dal.get_sa_market_news_missing_detail_interval(
+            "2026-07-25T00:00:00+00:00",
+            "2026-07-25T12:00:00+00:00",
+        )
+
+        assert [row["news_id"] for row in rows] == ["end", "middle", "start"]
+
+    def test_recovery_queries_and_job_history_never_expose_titles_bodies_full_urls_or_target_paths(
+        self, tmp_path, monkeypatch
+    ):
+        from src.api.routes.jobs import project_job_run_for_public_history
+
+        dal = self._recovery_dal(tmp_path, monkeypatch)
+        self._insert_recovery_news(
+            dal,
+            "opaque-id",
+            "2026-07-25T00:00:00+00:00",
+            body="# Licensed body",
+        )
+        rows = dal.get_sa_market_news_recovery_rows(["opaque-id"])
+        projected = project_job_run_for_public_history(
+            {
+                "id": 7,
+                "job_name": "sa_market_news_repair",
+                "status": "running",
+                "trigger_source": "extension",
+                "payload": {
+                    "manifest_hash": "a" * 64,
+                    "manifest": {
+                        "kind": "recorded_failures",
+                        "targets": [
+                            {
+                                **rows[0],
+                                "title": "Licensed title",
+                                "body": "Licensed body",
+                                "url": "https://seekingalpha.com/news/opaque-id?secret=1",
+                            }
+                        ],
+                    },
+                },
+                "result": {"lifecycle_state": "running", "counts": {}},
+                "message": None,
+                "error": None,
+                "started_at": "2026-07-25T00:00:00+00:00",
+                "finished_at": None,
+                "duration_ms": None,
+                "created_at": "2026-07-25T00:00:00+00:00",
+                "updated_at": "2026-07-25T00:00:00+00:00",
+            }
+        )
+        encoded = json.dumps({"rows": rows, "projected": projected})
+
+        assert "Licensed title" not in encoded
+        assert "Licensed body" not in encoded
+        assert "https://" not in encoded
+        assert "/news/opaque-id" not in json.dumps(projected)
+        assert projected["payload"] == {
+            "kind": "recorded_failures",
+            "manifest_hash_prefix": "aaaaaaaaaaaa",
+            "target_count": 1,
+        }
+
+    def test_market_news_recovery_queries_fail_closed_when_local_db_is_unavailable(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(
+            DatabaseBackend,
+            "_get_conn",
+            lambda _self: (_ for _ in ()).throw(AssertionError("PG touched")),
+        )
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = SACaptureDatabaseBackend(
+            "postgresql://fake:fake@127.0.0.1:9/fake",
+            sa_db=str(tmp_path / "missing" / "sa_capture.db"),
+        )
+
+        with pytest.raises(RuntimeError, match="sa_market_news_recovery_unavailable"):
+            dal.get_sa_market_news_recovery_rows(["n1"])
+        with pytest.raises(RuntimeError, match="sa_market_news_recovery_unavailable"):
+            dal.get_sa_market_news_body_presence(["n1"])
+        with pytest.raises(RuntimeError, match="sa_market_news_recovery_unavailable"):
+            dal.get_sa_market_news_missing_detail_interval(
+                "2026-07-24T00:00:00+00:00",
+                "2026-07-25T00:00:00+00:00",
+            )
 
 
 # ============================================================

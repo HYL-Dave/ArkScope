@@ -1,15 +1,21 @@
-"""Seeking Alpha read-only routes."""
+"""Seeking Alpha reads plus fixed, sidecar-owned Market News repair routes."""
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.agents.config import get_agent_config
 from src.api.dependencies import get_dal
 from src.service.sa_extension_health import collect_sa_extension_health
 from src.service.sa_market_news_health import compute_market_news_health
+from src.service.job_runs_store import get_job_runs_store
+from src.sa.market_news_recovery import (
+    MarketNewsRecoveryError,
+    MarketNewsRecoveryService,
+)
 from src.tools.sa_tools import (
     _DISABLED_MSG,
     get_sa_alpha_picks,
@@ -21,6 +27,68 @@ from src.tools.sa_tools import (
 )
 
 router = APIRouter(prefix="/sa", tags=["seeking-alpha"])
+
+
+class _RecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class MarketNewsRecoveryPreviewRequest(_RecoveryRequest):
+    kind: Literal["recorded_failures", "incident_window"]
+    source_run_ids: Optional[List[int]] = None
+
+
+class MarketNewsRecoveryStartRequest(_RecoveryRequest):
+    manifest: Dict[str, Any]
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class MarketNewsRecoveryStateRequest(_RecoveryRequest):
+    run_id: Optional[int] = Field(default=None, ge=1)
+
+
+class MarketNewsRecoveryCheckpointRequest(_RecoveryRequest):
+    run_id: int = Field(ge=1)
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    news_id: str = Field(min_length=1, max_length=240)
+    attempt_id: str = Field(min_length=1, max_length=160)
+    state: Literal[
+        "repaired", "already_present", "unavailable_at_source", "failed_retryable"
+    ]
+    reason_code: str = Field(min_length=1, max_length=64)
+    attempt_count: int = Field(default=1, ge=0)
+    evidence_code: Optional[str] = Field(default=None, max_length=64)
+
+
+class MarketNewsRecoveryFinalizeRequest(_RecoveryRequest):
+    run_id: int = Field(ge=1)
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    discovery: Optional[Dict[str, Any]] = None
+
+
+class MarketNewsRecoveryCancelRequest(_RecoveryRequest):
+    run_id: int = Field(ge=1)
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+def _recovery_service(dal: Any) -> MarketNewsRecoveryService:
+    return MarketNewsRecoveryService(dal, get_job_runs_store(dal))
+
+
+def _recovery_error(exc: MarketNewsRecoveryError) -> HTTPException:
+    if exc.code == "repair_not_found":
+        status = 404
+    elif exc.code in {
+        "repair_not_running",
+        "checkpoint_conflict",
+        "target_not_in_manifest",
+    }:
+        status = 409
+    elif exc.code == "recovery_data_unavailable":
+        status = 503
+    else:
+        status = 400
+    return HTTPException(status_code=status, detail={"code": exc.code})
 
 
 def _unwrap_sa_result(result: dict) -> dict:
@@ -163,3 +231,99 @@ def sa_extension_health(dal=Depends(get_dal)):
                 "message": str(exc),
             },
         ) from exc
+
+
+@router.post("/market-news-recovery/preview")
+def market_news_recovery_preview(
+    request: MarketNewsRecoveryPreviewRequest,
+    dal=Depends(get_dal),
+):
+    """Build a read-only, immutable repair manifest preview."""
+
+    try:
+        service = _recovery_service(dal)
+        if request.kind == "incident_window":
+            if request.source_run_ids is not None:
+                raise MarketNewsRecoveryError("manifest_invalid")
+            return service.preview_incident()
+        return service.preview_recorded_failures(source_run_ids=request.source_run_ids)
+    except MarketNewsRecoveryError as exc:
+        raise _recovery_error(exc) from exc
+
+
+@router.post("/market-news-recovery/start")
+def market_news_recovery_start(
+    request: MarketNewsRecoveryStartRequest,
+    dal=Depends(get_dal),
+):
+    """Atomically start one repair or return the actual running manifest."""
+
+    try:
+        return _recovery_service(dal).start(request.manifest, request.manifest_hash)
+    except MarketNewsRecoveryError as exc:
+        raise _recovery_error(exc) from exc
+
+
+@router.post("/market-news-recovery/state")
+def market_news_recovery_state(
+    request: MarketNewsRecoveryStateRequest,
+    dal=Depends(get_dal),
+):
+    """Return the full machine contract only on the fixed repair route."""
+
+    try:
+        return _recovery_service(dal).state(request.run_id)
+    except MarketNewsRecoveryError as exc:
+        raise _recovery_error(exc) from exc
+
+
+@router.post("/market-news-recovery/checkpoint")
+def market_news_recovery_checkpoint(
+    request: MarketNewsRecoveryCheckpointRequest,
+    dal=Depends(get_dal),
+):
+    """Merge one idempotent item attempt into durable repair progress."""
+
+    try:
+        return _recovery_service(dal).checkpoint(
+            request.run_id,
+            request.manifest_hash,
+            news_id=request.news_id,
+            attempt_id=request.attempt_id,
+            state=request.state,
+            reason_code=request.reason_code,
+            attempt_count=request.attempt_count,
+            evidence_code=request.evidence_code,
+        )
+    except MarketNewsRecoveryError as exc:
+        raise _recovery_error(exc) from exc
+
+
+@router.post("/market-news-recovery/finalize")
+def market_news_recovery_finalize(
+    request: MarketNewsRecoveryFinalizeRequest,
+    dal=Depends(get_dal),
+):
+    """Reconcile body presence and derive the only terminal repair truth."""
+
+    try:
+        return _recovery_service(dal).finalize(
+            request.run_id,
+            request.manifest_hash,
+            discovery=request.discovery,
+        )
+    except MarketNewsRecoveryError as exc:
+        raise _recovery_error(exc) from exc
+
+
+@router.post("/market-news-recovery/cancel")
+def market_news_recovery_cancel(
+    request: MarketNewsRecoveryCancelRequest,
+    dal=Depends(get_dal),
+):
+    """Explicitly cancel one repair while retaining its immutable audit manifest."""
+
+    try:
+        return _recovery_service(dal).cancel(request.run_id, request.manifest_hash)
+    except MarketNewsRecoveryError as exc:
+        raise _recovery_error(exc) from exc

@@ -1062,6 +1062,26 @@ class DataAccessLayer:
             return []
         return self._backend.query_sa_market_news_recent_ids(limit=limit)
 
+    def get_sa_market_news_recovery_rows(self, news_ids: List[str]) -> List[Dict]:
+        """Return the exact, privacy-minimal rows used to freeze repair targets."""
+        if not isinstance(self._backend, DatabaseBackend):
+            raise RuntimeError("sa_market_news_recovery_unavailable")
+        return self._backend.query_sa_market_news_recovery_rows(news_ids)
+
+    def get_sa_market_news_body_presence(self, news_ids: List[str]) -> Dict[str, bool]:
+        """Read body presence for frozen repair IDs without an age predicate."""
+        if not isinstance(self._backend, DatabaseBackend):
+            raise RuntimeError("sa_market_news_recovery_unavailable")
+        return self._backend.query_sa_market_news_body_presence(news_ids)
+
+    def get_sa_market_news_missing_detail_interval(
+        self, start_at: str, end_at: str
+    ) -> List[Dict]:
+        """Return missing-detail rows in an inclusive recovery interval."""
+        if not isinstance(self._backend, DatabaseBackend):
+            raise RuntimeError("sa_market_news_recovery_unavailable")
+        return self._backend.query_sa_market_news_missing_detail_interval(start_at, end_at)
+
     def save_sa_market_news_detail(self, news_id: str, body_markdown: str) -> bool:
         """Persist a single market-news body Markdown payload."""
         if not isinstance(self._backend, DatabaseBackend):

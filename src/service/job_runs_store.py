@@ -15,9 +15,9 @@ Design contract:
     empty results so callers can degrade to process-local state.
   - **FileBackend is a no-op**: when the DAL is on FileBackend the store
     reports ``is_available() == False`` and methods return early.
-  - **No same-name concurrency control**: per the priority-map decision,
-    a job can be started while a previous run is still ``running``.
-    Each call records a new row.
+  - **No general same-name concurrency control**: ordinary jobs may overlap.
+    The audited ``sa_market_news_repair`` domain is the explicit exception and
+    uses one ``BEGIN IMMEDIATE`` start-or-return-running transaction.
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ _VALID_STATUSES = frozenset({"running", "succeeded", "failed"})
 USE_LOCAL_JOB_RUNS_KEY = "use_local_job_runs"
 ENV_USE_LOCAL_JOB_RUNS = "ARKSCOPE_USE_LOCAL_JOB_RUNS"
 _EXTENSION_EVENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+_MARKET_NEWS_REPAIR_JOB_NAME = "sa_market_news_repair"
 
 _SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS job_runs (
@@ -100,6 +101,28 @@ def _json_load(value: Any) -> Any:
         return json.loads(value)
     except (TypeError, ValueError):
         return value
+
+
+def _canonical_repair_manifest_hash(manifest: Any) -> str:
+    if not isinstance(manifest, dict):
+        raise ValueError("manifest_invalid")
+    return __import__("hashlib").sha256(
+        json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _validate_repair_payload(payload: Any, expected_hash: str) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("manifest_invalid")
+    manifest = payload.get("manifest")
+    stored_hash = payload.get("manifest_hash")
+    if (
+        not _EXTENSION_EVENT_HASH_RE.fullmatch(str(expected_hash or ""))
+        or stored_hash != expected_hash
+        or _canonical_repair_manifest_hash(manifest) != expected_hash
+    ):
+        raise ValueError("manifest_invalid")
+    return payload
 
 
 class JobRunsStore:
@@ -638,6 +661,276 @@ class JobRunsLocalStore:
             run_id = int(cur.lastrowid)
             conn.commit()
             return run_id
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def start_market_news_repair(
+        self, *, manifest: Dict[str, Any], manifest_hash: str
+    ) -> Dict[str, Any]:
+        """Atomically create one repair or return the actual running manifest."""
+
+        fingerprint = str(manifest_hash or "").lower()
+        if _canonical_repair_manifest_hash(manifest) != fingerprint:
+            raise ValueError("manifest_invalid")
+        payload = {"manifest": manifest, "manifest_hash": fingerprint}
+        now = _now_iso()
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute(
+                """
+                SELECT id, job_name, status, trigger_source, payload, result,
+                       message, error, started_at, finished_at, duration_ms,
+                       created_at, updated_at
+                FROM job_runs
+                WHERE job_name=? AND status='running'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (_MARKET_NEWS_REPAIR_JOB_NAME,),
+            ).fetchone()
+            if existing is not None:
+                row = _serialize_local_row(dict(existing))
+                _validate_repair_payload(
+                    row.get("payload"), row.get("payload", {}).get("manifest_hash", "")
+                )
+                conn.commit()
+                return {"created": False, "run": row}
+
+            initial_result = {
+                "schema_version": 1,
+                "lifecycle_state": "running",
+                "manifest_hash": fingerprint,
+                "progress": {"attempts": []},
+                "resumable": True,
+            }
+            cur = conn.execute(
+                """
+                INSERT INTO job_runs (
+                    job_name, status, trigger_source, payload, result, message,
+                    error, started_at, created_at, updated_at
+                )
+                VALUES (?, 'running', 'extension', ?, ?, 'running', NULL, ?, ?, ?)
+                """,
+                (
+                    _MARKET_NEWS_REPAIR_JOB_NAME,
+                    _json_dumps(payload),
+                    _json_or_none(initial_result),
+                    now,
+                    now,
+                    now,
+                ),
+            )
+            run_id = int(cur.lastrowid)
+            row = conn.execute(
+                """
+                SELECT id, job_name, status, trigger_source, payload, result,
+                       message, error, started_at, finished_at, duration_ms,
+                       created_at, updated_at
+                FROM job_runs WHERE id=?
+                """,
+                (run_id,),
+            ).fetchone()
+            conn.commit()
+            return {"created": True, "run": _serialize_local_row(dict(row))}
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def get_market_news_repair(self, run_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """Return one full repair machine row for the fixed repair API only."""
+
+        with self._connect() as conn:
+            if run_id is None:
+                row = conn.execute(
+                    """
+                    SELECT id, job_name, status, trigger_source, payload, result,
+                           message, error, started_at, finished_at, duration_ms,
+                           created_at, updated_at
+                    FROM job_runs WHERE job_name=?
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (_MARKET_NEWS_REPAIR_JOB_NAME,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT id, job_name, status, trigger_source, payload, result,
+                           message, error, started_at, finished_at, duration_ms,
+                           created_at, updated_at
+                    FROM job_runs WHERE job_name=? AND id=?
+                    """,
+                    (_MARKET_NEWS_REPAIR_JOB_NAME, int(run_id)),
+                ).fetchone()
+        return _serialize_local_row(dict(row)) if row is not None else None
+
+    def checkpoint_market_news_repair(
+        self,
+        *,
+        run_id: int,
+        manifest_hash: str,
+        attempt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Merge one idempotent `(news_id, attempt_id)` repair checkpoint."""
+
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            raw = conn.execute(
+                "SELECT * FROM job_runs WHERE id=? AND job_name=?",
+                (int(run_id), _MARKET_NEWS_REPAIR_JOB_NAME),
+            ).fetchone()
+            if raw is None:
+                raise ValueError("repair_not_found")
+            row = _serialize_local_row(dict(raw))
+            payload = _validate_repair_payload(row["payload"], manifest_hash)
+            if row["status"] != "running":
+                raise ValueError("repair_not_running")
+            target_ids = {
+                item.get("news_id")
+                for item in payload["manifest"].get("targets", [])
+                if isinstance(item, dict)
+            }
+            if attempt.get("news_id") not in target_ids:
+                raise ValueError("target_not_in_manifest")
+
+            result = row.get("result") if isinstance(row.get("result"), dict) else {}
+            progress = result.get("progress") if isinstance(result.get("progress"), dict) else {}
+            attempts = progress.get("attempts") if isinstance(progress.get("attempts"), list) else []
+            identity = (attempt.get("news_id"), attempt.get("attempt_id"))
+            for existing in attempts:
+                if (existing.get("news_id"), existing.get("attempt_id")) != identity:
+                    continue
+                if existing != attempt:
+                    raise ValueError("checkpoint_conflict")
+                conn.commit()
+                return row
+
+            next_attempts = [*attempts, attempt]
+            next_attempts.sort(key=lambda value: (value["news_id"], value["attempt_id"]))
+            next_result = {
+                "schema_version": 1,
+                "lifecycle_state": "running",
+                "manifest_hash": manifest_hash,
+                "progress": {"attempts": next_attempts},
+                "resumable": True,
+            }
+            now = _now_iso()
+            conn.execute(
+                "UPDATE job_runs SET result=?, message='running', updated_at=? WHERE id=?",
+                (_json_or_none(next_result), now, int(run_id)),
+            )
+            updated = conn.execute("SELECT * FROM job_runs WHERE id=?", (int(run_id),)).fetchone()
+            conn.commit()
+            return _serialize_local_row(dict(updated))
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def mark_market_news_repair_interrupted(
+        self, *, run_id: int, manifest_hash: str
+    ) -> Dict[str, Any]:
+        """Mark a stale running repair resumable without terminalizing its row."""
+
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            raw = conn.execute(
+                "SELECT * FROM job_runs WHERE id=? AND job_name=?",
+                (int(run_id), _MARKET_NEWS_REPAIR_JOB_NAME),
+            ).fetchone()
+            if raw is None:
+                raise ValueError("repair_not_found")
+            row = _serialize_local_row(dict(raw))
+            _validate_repair_payload(row["payload"], manifest_hash)
+            if row["status"] != "running":
+                raise ValueError("repair_not_running")
+            result = row.get("result") if isinstance(row.get("result"), dict) else {}
+            next_result = {
+                **result,
+                "schema_version": 1,
+                "lifecycle_state": "interrupted",
+                "manifest_hash": manifest_hash,
+                "resumable": True,
+                "progress": result.get("progress", {"attempts": []}),
+            }
+            now = _now_iso()
+            conn.execute(
+                "UPDATE job_runs SET result=?, message='interrupted', updated_at=? WHERE id=?",
+                (_json_or_none(next_result), now, int(run_id)),
+            )
+            updated = conn.execute("SELECT * FROM job_runs WHERE id=?", (int(run_id),)).fetchone()
+            conn.commit()
+            return _serialize_local_row(dict(updated))
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def finish_market_news_repair(
+        self,
+        *,
+        run_id: int,
+        manifest_hash: str,
+        status: str,
+        result: Dict[str, Any],
+        error_code: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Atomically terminalize one repair, with result-hash idempotence."""
+
+        if status not in {"succeeded", "failed"}:
+            raise ValueError("invalid_repair_status")
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            raw = conn.execute(
+                "SELECT * FROM job_runs WHERE id=? AND job_name=?",
+                (int(run_id), _MARKET_NEWS_REPAIR_JOB_NAME),
+            ).fetchone()
+            if raw is None:
+                raise ValueError("repair_not_found")
+            row = _serialize_local_row(dict(raw))
+            _validate_repair_payload(row["payload"], manifest_hash)
+            if row["status"] != "running":
+                existing_hash = (
+                    row.get("result", {}).get("result_hash")
+                    if isinstance(row.get("result"), dict)
+                    else None
+                )
+                if existing_hash == result.get("result_hash"):
+                    conn.commit()
+                    return row
+                raise ValueError("repair_not_running")
+            now = _now_iso()
+            conn.execute(
+                """
+                UPDATE job_runs
+                SET status=?, result=?, message=?, error=?, finished_at=?,
+                    duration_ms=CAST((julianday(?) - julianday(started_at)) * 86400000 AS INTEGER),
+                    updated_at=?
+                WHERE id=?
+                """,
+                (
+                    status,
+                    _json_or_none(result),
+                    str(result.get("derived_outcome") or result.get("lifecycle_state") or ""),
+                    error_code,
+                    now,
+                    now,
+                    now,
+                    int(run_id),
+                ),
+            )
+            updated = conn.execute("SELECT * FROM job_runs WHERE id=?", (int(run_id),)).fetchone()
+            conn.commit()
+            return _serialize_local_row(dict(updated))
         except Exception:
             conn.rollback()
             raise

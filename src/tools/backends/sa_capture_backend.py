@@ -53,7 +53,9 @@ import logging
 import re
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import unquote, urlsplit
 
 from ... import sa_capture_store as store
 from ... import sa_article_reconciliation_store as reconciliation_store
@@ -78,6 +80,27 @@ _COMMENT_TERMINAL_STOP_REASON = "stable_bottom"
 _COMMENT_TERMINAL_BOTTOM_ROUNDS = 5
 _COMMENT_FULL_MISS_LIMIT = 2
 _COMMENT_TERMINAL_REASON = "provider_bottom_unbridged"
+
+
+def _market_news_recovery_pathname(value: Any) -> str:
+    """Reduce a stored SA URL to the only pathname admitted to repair manifests."""
+
+    parsed = urlsplit(str(value or ""))
+    path = parsed.path
+    decoded = unquote(path).replace("\\", "/")
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != "seekingalpha.com"
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or not path.startswith("/news/")
+        or "//" in path
+        or any(part in {".", ".."} for part in decoded.split("/"))
+    ):
+        raise ValueError("invalid_market_news_recovery_path")
+    return path
 
 
 def _regexp(pattern: str, value: Optional[str]) -> int:
@@ -160,6 +183,13 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
 
     def _sa_read(self) -> sqlite3.Connection:
         return store.connect(self._sa_db, read_only=True)
+
+    def _sa_recovery_read(self) -> sqlite3.Connection:
+        """Recovery cannot treat a missing capture DB as a verified empty set."""
+
+        if not Path(self._sa_db).is_file():
+            raise RuntimeError("sa_market_news_recovery_unavailable")
+        return self._sa_read()
 
     # ================================================================
     # Alpha Picks refresh (atomic per-tab)
@@ -704,6 +734,113 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
             return []
         finally:
             conn.close()
+
+    def query_sa_market_news_recovery_rows(self, news_ids: list[str]) -> list[dict]:
+        """Exact frozen-target projection with no age predicate or licensed copy."""
+
+        ordered_ids = list(dict.fromkeys(str(value) for value in news_ids if str(value)))
+        if not ordered_ids:
+            return []
+        placeholders = ",".join("?" for _ in ordered_ids)
+        try:
+            conn = self._sa_recovery_read()
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT news_id, url, COALESCE(published_at, fetched_at) AS published_at,
+                           CASE WHEN body_markdown IS NOT NULL
+                                      AND trim(body_markdown) <> '' THEN 1 ELSE 0 END
+                               AS body_present
+                    FROM sa_market_news
+                    WHERE news_id IN ({placeholders})
+                    """,
+                    tuple(ordered_ids),
+                ).fetchall()
+            finally:
+                conn.close()
+            by_id = {str(row["news_id"]): row for row in rows}
+            return [
+                {
+                    "news_id": news_id,
+                    "pathname": _market_news_recovery_pathname(by_id[news_id]["url"]),
+                    "published_at": by_id[news_id]["published_at"],
+                    "body_present": bool(by_id[news_id]["body_present"]),
+                }
+                for news_id in ordered_ids
+                if news_id in by_id
+            ]
+        except Exception as exc:
+            logger.error("Failed to query exact Market News repair rows: %s", exc)
+            raise RuntimeError("sa_market_news_recovery_unavailable") from exc
+
+    def query_sa_market_news_body_presence(self, news_ids: list[str]) -> dict[str, bool]:
+        """Read final body presence for exactly the frozen target IDs."""
+
+        ordered_ids = list(dict.fromkeys(str(value) for value in news_ids if str(value)))
+        if not ordered_ids:
+            return {}
+        placeholders = ",".join("?" for _ in ordered_ids)
+        try:
+            conn = self._sa_recovery_read()
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT news_id,
+                           CASE WHEN body_markdown IS NOT NULL
+                                      AND trim(body_markdown) <> '' THEN 1 ELSE 0 END
+                               AS body_present
+                    FROM sa_market_news
+                    WHERE news_id IN ({placeholders})
+                    """,
+                    tuple(ordered_ids),
+                ).fetchall()
+            finally:
+                conn.close()
+            values = {str(row["news_id"]): bool(row["body_present"]) for row in rows}
+            return {news_id: values[news_id] for news_id in sorted(values)}
+        except Exception as exc:
+            logger.error("Failed to read Market News repair body state: %s", exc)
+            raise RuntimeError("sa_market_news_recovery_unavailable") from exc
+
+    def query_sa_market_news_missing_detail_interval(
+        self, start_at: str, end_at: str
+    ) -> list[dict]:
+        """Missing-body rows inside the inclusive canonical incident interval."""
+
+        start = store.canon_ts(start_at)
+        end = store.canon_ts(end_at)
+        if start is None or end is None or start > end:
+            raise ValueError("invalid_market_news_recovery_interval")
+        try:
+            conn = self._sa_recovery_read()
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT news_id, url, COALESCE(published_at, fetched_at) AS published_at
+                    FROM sa_market_news
+                    WHERE COALESCE(published_at, fetched_at) >= ?
+                      AND COALESCE(published_at, fetched_at) <= ?
+                      AND (body_markdown IS NULL OR trim(body_markdown) = '')
+                    ORDER BY COALESCE(published_at, fetched_at) DESC, id DESC
+                    """,
+                    (start, end),
+                ).fetchall()
+            finally:
+                conn.close()
+            return [
+                {
+                    "news_id": str(row["news_id"]),
+                    "pathname": _market_news_recovery_pathname(row["url"]),
+                    "published_at": row["published_at"],
+                    "body_present": False,
+                }
+                for row in rows
+            ]
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.error("Failed to query Market News recovery interval: %s", exc)
+            raise RuntimeError("sa_market_news_recovery_unavailable") from exc
 
     def invalidate_dirty_sa_market_news_detail(self) -> int:
         """Drop cached market-news bodies matching known chrome noise. The PG

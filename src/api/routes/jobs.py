@@ -22,6 +22,41 @@ from src.service.jobs import (
 )
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+_MARKET_NEWS_REPAIR_JOB_NAME = "sa_market_news_repair"
+
+
+def project_job_run_for_public_history(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove frozen target descriptors from generic repair history surfaces."""
+
+    if row.get("job_name") != _MARKET_NEWS_REPAIR_JOB_NAME:
+        return row
+    projected = dict(row)
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    manifest = payload.get("manifest") if isinstance(payload.get("manifest"), dict) else {}
+    fingerprint = str(payload.get("manifest_hash") or "")
+    result = row.get("result") if isinstance(row.get("result"), dict) else {}
+    projected["payload"] = {
+        "kind": manifest.get("kind"),
+        "manifest_hash_prefix": fingerprint[:12] or None,
+        "target_count": len(manifest.get("targets") or []),
+    }
+    projected["result"] = {
+        "lifecycle_state": result.get("lifecycle_state"),
+        "derived_outcome": result.get("derived_outcome"),
+        "reason_code": result.get("reason_code"),
+        "counts": result.get("counts") if isinstance(result.get("counts"), dict) else {},
+        "manifest_hash_prefix": fingerprint[:12] or None,
+    }
+    projected["message"] = result.get("derived_outcome") or result.get(
+        "lifecycle_state"
+    )
+    projected["error"] = (
+        row.get("error")
+        if row.get("error")
+        in {"repair_retryable", "operator_cancelled", "manifest_invalid"}
+        else None
+    )
+    return projected
 
 
 class JobStatusItem(BaseModel):
@@ -141,6 +176,27 @@ class ExtensionJobRecordResponse(BaseModel):
 def jobs_status(dal=Depends(get_dal)):
     """List available jobs plus last known process-local execution state."""
     jobs = list_jobs_status(dal)
+    repair = get_job_runs_store(dal).get_market_news_repair()
+    if repair is not None:
+        public = project_job_run_for_public_history(repair)
+        jobs = [job for job in jobs if job.get("name") != _MARKET_NEWS_REPAIR_JOB_NAME]
+        jobs.append(
+            {
+                "name": _MARKET_NEWS_REPAIR_JOB_NAME,
+                "description": "Audited Seeking Alpha Market News detail repair",
+                "source": "chrome_extension",
+                "runnable_via_api": False,
+                "enabled": True,
+                "availability_reason": None,
+                "default_params": {},
+                "watchlist_ticker_count": 0,
+                "last_status": public["status"],
+                "last_started_at": public["started_at"],
+                "last_finished_at": public["finished_at"],
+                "last_message": public["message"],
+                "last_result": public["result"],
+            }
+        )
     return JobsStatusResponse(count=len(jobs), jobs=jobs)
 
 
@@ -185,7 +241,10 @@ def jobs_history(
     or the DAL is on FileBackend, returns an empty list with count=0.
     """
     store = get_job_runs_store(dal)
-    rows = store.list_runs(job_name=name, limit=limit, offset=offset)
+    rows = [
+        project_job_run_for_public_history(row)
+        for row in store.list_runs(job_name=name, limit=limit, offset=offset)
+    ]
     return JobsHistoryResponse(
         count=len(rows),
         limit=limit,
