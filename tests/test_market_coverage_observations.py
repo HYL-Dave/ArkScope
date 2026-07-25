@@ -75,6 +75,7 @@ def _create_market_db(
     path: Path,
     *,
     rows: tuple[tuple[str, datetime], ...] = (),
+    raw_rows: tuple[tuple[str, str], ...] = (),
     aliases: tuple[tuple[str, str], ...] = (),
     provider_issues: tuple[tuple[str, str, str, str], ...] = (),
 ) -> None:
@@ -86,6 +87,12 @@ def _create_market_db(
             "(ticker, datetime, interval, open, high, low, close, volume) "
             "VALUES (?, ?, '15min', 1, 1, 1, 1, 1)",
             ((ticker, _stored_timestamp(observed_at)) for ticker, observed_at in rows),
+        )
+        conn.executemany(
+            "INSERT INTO prices "
+            "(ticker, datetime, interval, open, high, low, close, volume) "
+            "VALUES (?, ?, '15min', 1, 1, 1, 1, 1)",
+            raw_rows,
         )
         if aliases:
             conn.execute(
@@ -121,6 +128,21 @@ def _read(api: SimpleNamespace, path: Path, *sessions: CalendarDay):
     )
 
 
+def _assert_market_unreadable(
+    api: SimpleNamespace,
+    path: Path,
+    session: CalendarDay,
+) -> None:
+    result = _read(api, path, session)
+    assert result.health.status is api.ObservationHealth.UNAVAILABLE
+    assert (
+        result.health.reason_code
+        is api.ObservationHealthReason.MARKET_DB_UNREADABLE
+    )
+    assert result.sessions == ()
+    assert result.provider_errors == ()
+
+
 def _database_proof(path: Path) -> dict[str, object]:
     stat = path.stat()
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
@@ -153,19 +175,58 @@ def test_missing_market_db_is_typed_unavailable(tmp_path):
 
 def test_unreadable_market_db_is_typed_unavailable(tmp_path):
     api = _api()
+    session = _est_session(date(2026, 1, 5))
     path = tmp_path / "unreadable-market.db"
     original = b"this is not a sqlite database"
     path.write_bytes(original)
 
-    result = _read(api, path, _est_session(date(2026, 1, 5)))
-
-    assert result.health.status is api.ObservationHealth.UNAVAILABLE
-    assert (
-        result.health.reason_code
-        is api.ObservationHealthReason.MARKET_DB_UNREADABLE
-    )
-    assert result.sessions == ()
+    _assert_market_unreadable(api, path, session)
     assert path.read_bytes() == original
+
+    malformed_timestamp_path = tmp_path / "malformed-timestamp.db"
+    _create_market_db(
+        malformed_timestamp_path,
+        raw_rows=(("AAA", "2026-01-05T15:not-a-time+0000"),),
+    )
+    _assert_market_unreadable(api, malformed_timestamp_path, session)
+
+    incompatible_provider_path = tmp_path / "incompatible-provider-meta.db"
+    _create_market_db(incompatible_provider_path)
+    conn = sqlite3.connect(incompatible_provider_path)
+    try:
+        conn.execute(
+            "CREATE TABLE provider_sync_meta "
+            "(ticker TEXT, interval TEXT, last_error TEXT)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _assert_market_unreadable(api, incompatible_provider_path, session)
+
+    malformed_provider_path = tmp_path / "malformed-provider-meta.db"
+    _create_market_db(malformed_provider_path)
+    conn = sqlite3.connect(malformed_provider_path)
+    try:
+        conn.execute(
+            "CREATE TABLE provider_sync_meta ("
+            "ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO provider_sync_meta VALUES ('', '15min', 'error', 'now')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _assert_market_unreadable(api, malformed_provider_path, session)
+
+    valid_path = tmp_path / "caller-error.db"
+    _create_market_db(valid_path)
+    with pytest.raises(ValueError, match="universe ticker"):
+        api.RthObservationReader(valid_path).read(
+            universe=("",),
+            sessions=(session,),
+            interval="15min",
+        )
 
 
 def test_missing_prices_schema_is_typed_unavailable(tmp_path):
@@ -243,6 +304,7 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
             ("AAA", utc_date_boundary_row),
             ("AAA", second.open_at_utc),
         ),
+        raw_rows=(("AAA", "2026-01-05 09:45:00-05:00"),),
     )
     statements: list[str] = []
     real_connect = sqlite3.connect
@@ -258,7 +320,10 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
 
     assert tuple(
         row.observed_at for row in result.observations_for(first.market_date)
-    ) == (first.open_at_utc,)
+    ) == (
+        first.open_at_utc,
+        datetime(2026, 1, 5, 14, 45, tzinfo=UTC),
+    )
     assert tuple(
         row.observed_at for row in result.observations_for(second.market_date)
     ) == (second.open_at_utc,)
@@ -333,13 +398,13 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path):
     _create_market_db(
         path,
         rows=(
-            ("BRK B", session.open_at_utc),
-            ("BRK.B", session.open_at_utc),
+            ("brk b", session.open_at_utc),
+            (" brk.b ", session.open_at_utc),
             ("UNRELATED", session.open_at_utc),
         ),
-        aliases=(("BRK.B", "BRK B"),),
+        aliases=((" BrK.B ", " brk b "),),
         provider_issues=(
-            ("BRK.B", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
+            (" brk.b ", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
         ),
     )
 
@@ -359,14 +424,57 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path):
     assert result.provider_errors[0].ticker == "BRK B"
     assert result.provider_errors[0].last_error == "contract unavailable"
 
+    incompatible_alias_path = tmp_path / "incompatible-aliases.db"
+    _create_market_db(incompatible_alias_path)
+    conn = sqlite3.connect(incompatible_alias_path)
+    try:
+        conn.execute("CREATE TABLE ticker_aliases (alias TEXT)")
+        conn.commit()
+    finally:
+        conn.close()
+    _assert_market_unreadable(api, incompatible_alias_path, session)
 
-def test_query_only_rejects_accidental_writes(tmp_path):
+    malformed_alias_path = tmp_path / "malformed-aliases.db"
+    _create_market_db(malformed_alias_path, aliases=(("", "AAA"),))
+    _assert_market_unreadable(api, malformed_alias_path, session)
+
+    colliding_alias_path = tmp_path / "colliding-aliases.db"
+    _create_market_db(colliding_alias_path)
+    conn = sqlite3.connect(colliding_alias_path)
+    try:
+        conn.execute("CREATE TABLE ticker_aliases (alias TEXT, canonical TEXT)")
+        conn.executemany(
+            "INSERT INTO ticker_aliases VALUES (?, ?)",
+            ((" alias ", "AAA"), ("ALIAS", "BBB")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _assert_market_unreadable(api, colliding_alias_path, session)
+
+
+def test_query_only_rejects_accidental_writes(tmp_path, monkeypatch):
     api = _api()
     path = tmp_path / "market.db"
     _create_market_db(path)
+    real_connect = sqlite3.connect
+    connect_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def recording_connect(*args, **kwargs):
+        connect_calls.append((args, kwargs))
+        return real_connect(*args, **kwargs)
+
+    monkeypatch.setattr(api.module.sqlite3, "connect", recording_connect)
 
     conn = api.open_read_only_market_db(path)
     try:
+        assert len(connect_calls) == 1
+        connect_args, connect_kwargs = connect_calls[0]
+        assert len(connect_args) == 1
+        assert isinstance(connect_args[0], str)
+        assert connect_args[0].startswith("file:")
+        assert "mode=ro" in connect_args[0]
+        assert connect_kwargs.get("uri") is True
         assert conn.execute("PRAGMA query_only").fetchone() == (1,)
         with pytest.raises(sqlite3.OperationalError, match="readonly"):
             conn.execute("CREATE TEMP TABLE accidental_write (value TEXT)")

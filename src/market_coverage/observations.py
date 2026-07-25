@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections.abc import Sequence
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
 
@@ -24,6 +24,10 @@ _TICKER_ALIAS_COLUMNS = frozenset({"alias", "canonical"})
 _PROVIDER_SYNC_COLUMNS = frozenset(
     {"ticker", "interval", "last_error", "updated_at"}
 )
+
+
+class _StoredDatabaseError(Exception):
+    pass
 
 
 def _open_read_only_market_db(path: str | Path) -> sqlite3.Connection:
@@ -78,23 +82,37 @@ def _normalize_ticker(value: object, *, field_name: str) -> str:
     return normalized
 
 
+def _normalize_stored_ticker(value: object, *, field_name: str) -> str:
+    try:
+        return _normalize_ticker(value, field_name=field_name)
+    except (TypeError, ValueError) as exc:
+        raise _StoredDatabaseError(str(exc)) from exc
+
+
 def _load_aliases(conn: sqlite3.Connection) -> dict[str, str]:
     columns = _table_columns(conn, "ticker_aliases")
-    if columns is None or not _TICKER_ALIAS_COLUMNS <= columns:
+    if columns is None:
         return {}
+    if not _TICKER_ALIAS_COLUMNS <= columns:
+        raise _StoredDatabaseError("ticker_aliases schema is incompatible")
 
     aliases: dict[str, str] = {}
     for raw_alias, raw_canonical in conn.execute(
         "SELECT alias, canonical FROM ticker_aliases"
     ):
-        try:
-            alias = _normalize_ticker(raw_alias, field_name="stored ticker alias")
-            canonical = _normalize_ticker(
-                raw_canonical,
-                field_name="stored canonical ticker",
+        alias = _normalize_stored_ticker(
+            raw_alias,
+            field_name="stored ticker alias",
+        )
+        canonical = _normalize_stored_ticker(
+            raw_canonical,
+            field_name="stored canonical ticker",
+        )
+        existing = aliases.get(alias)
+        if existing is not None and existing != canonical:
+            raise _StoredDatabaseError(
+                f"normalized ticker alias collision: {alias}"
             )
-        except (TypeError, ValueError):
-            continue
         aliases[alias] = canonical
     return aliases
 
@@ -154,7 +172,7 @@ def _open_sessions(sessions: Sequence[CalendarDay]) -> tuple[CalendarDay, ...]:
 
 def _parse_stored_timestamp(value: object) -> datetime:
     if not isinstance(value, str):
-        raise TypeError("stored price datetime must be a string")
+        raise _StoredDatabaseError("stored price datetime must be a string")
     serialized = value.strip()
     if serialized.endswith(("Z", "z")):
         serialized = f"{serialized[:-1]}+00:00"
@@ -167,9 +185,13 @@ def _parse_stored_timestamp(value: object) -> datetime:
     try:
         parsed = datetime.fromisoformat(serialized)
     except ValueError as exc:
-        raise ValueError(f"invalid stored price datetime: {value!r}") from exc
+        raise _StoredDatabaseError(
+            f"invalid stored price datetime: {value!r}"
+        ) from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("stored price datetime must be timezone-aware")
+        raise _StoredDatabaseError(
+            "stored price datetime must be timezone-aware"
+        )
     return parsed.astimezone(timezone.utc)
 
 
@@ -181,38 +203,42 @@ def _read_provider_errors(
     canonical_universe: set[str],
 ) -> tuple[ProviderSyncIssue, ...]:
     columns = _table_columns(conn, "provider_sync_meta")
-    if columns is None or not _PROVIDER_SYNC_COLUMNS <= columns:
+    if columns is None:
         return ()
+    if not _PROVIDER_SYNC_COLUMNS <= columns:
+        raise _StoredDatabaseError("provider_sync_meta schema is incompatible")
 
     issues: list[ProviderSyncIssue] = []
     for raw_ticker, raw_interval, raw_error, raw_updated_at in conn.execute(
         "SELECT ticker, interval, last_error, updated_at "
-        "FROM provider_sync_meta "
-        "WHERE interval = ? AND last_error IS NOT NULL",
-        (interval,),
+        "FROM provider_sync_meta"
     ):
-        try:
-            ticker = _normalize_ticker(
-                raw_ticker,
-                field_name="provider issue ticker",
-            )
-        except (TypeError, ValueError):
+        ticker = _normalize_stored_ticker(
+            raw_ticker,
+            field_name="provider issue ticker",
+        )
+        if not isinstance(raw_interval, str) or (
+            not raw_interval or raw_interval != raw_interval.strip()
+        ):
+            raise _StoredDatabaseError("provider issue interval is malformed")
+        if raw_error is not None and (
+            not isinstance(raw_error, str) or not raw_error.strip()
+        ):
+            raise _StoredDatabaseError("provider issue last_error is malformed")
+        if raw_updated_at is not None and not isinstance(raw_updated_at, str):
+            raise _StoredDatabaseError("provider issue updated_at is malformed")
+
+        if raw_interval != interval or raw_error is None:
             continue
         ticker = aliases.get(ticker, ticker)
         if ticker not in canonical_universe:
             continue
-        if not isinstance(raw_error, str) or not raw_error.strip():
-            continue
-        issue_interval = str(raw_interval).strip()
-        if not issue_interval:
-            continue
-        updated_at = None if raw_updated_at is None else str(raw_updated_at)
         issues.append(
             ProviderSyncIssue(
                 ticker=ticker,
-                interval=issue_interval,
+                interval=raw_interval,
                 last_error=raw_error.strip(),
-                updated_at=updated_at,
+                updated_at=raw_updated_at,
             )
         )
 
@@ -253,11 +279,11 @@ def _read_session_observations(
     latest_close = sessions[-1].close_at_utc
     assert earliest_open is not None
     assert latest_close is not None
-    lower_bound = earliest_open.strftime("%Y-%m-%dT%H:%M:%S")
-    upper_bound = latest_close.strftime("%Y-%m-%dT%H:%M:%S")
+    lower_bound = (earliest_open.date() - timedelta(days=1)).isoformat()
+    upper_bound = (latest_close.date() + timedelta(days=2)).isoformat()
     query = (
         "SELECT ticker, datetime FROM prices "
-        f"WHERE interval = ? AND ticker IN ({placeholders}) "
+        f"WHERE interval = ? AND UPPER(TRIM(ticker)) IN ({placeholders}) "
         "AND datetime >= ? AND datetime < ?"
     )
     parameters = (
@@ -270,7 +296,10 @@ def _read_session_observations(
     opens = tuple(session.open_at_utc for session in sessions)
     assert all(open_at is not None for open_at in opens)
     for raw_ticker, raw_timestamp in conn.execute(query, parameters):
-        ticker = _normalize_ticker(raw_ticker, field_name="stored price ticker")
+        ticker = _normalize_stored_ticker(
+            raw_ticker,
+            field_name="stored price ticker",
+        )
         ticker = aliases.get(ticker, ticker)
         if ticker not in canonical_set:
             continue
@@ -362,7 +391,7 @@ class RthObservationReader:
                 aliases=aliases,
                 canonical_universe=canonical_universe,
             )
-        except sqlite3.Error:
+        except (sqlite3.Error, _StoredDatabaseError):
             return _unavailable(ObservationHealthReason.MARKET_DB_UNREADABLE)
         finally:
             conn.close()
