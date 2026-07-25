@@ -192,9 +192,18 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             notes.append(f"sa_refresh_meta failed: {e}")
 
     jobs: Dict[str, Any] = {}
+    sa_extension_summary: Dict[str, Any] = {}
     try:
         from src.service.job_runs_store import get_job_runs_store
-        jobs = get_job_runs_store(dal).latest_runs_by_name() or {}
+        job_store = get_job_runs_store(dal)
+        jobs = job_store.latest_runs_by_name() or {}
+        structured = job_store.structured_extension_summary_by_name(
+            ["sa_market_news_refresh"]
+        )
+        if structured is None:
+            notes.append("structured extension job_runs summary unavailable")
+        else:
+            sa_extension_summary = structured
     except Exception as e:
         notes.append(f"job_runs failed: {e}")
 
@@ -423,9 +432,38 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             sa_ok = False
             sa_error = sa_error or meta.get("last_error")
     mn = jobs.get("sa_market_news_refresh") or {}
-    mn_fin = _to_dt(mn.get("finished_at"))
-    if mn.get("status") == "succeeded" and mn_fin and (sa_success is None or mn_fin > sa_success):
-        sa_success = mn_fin
+    structured_mn = sa_extension_summary.get("sa_market_news_refresh") or {}
+    mn_attempt = structured_mn.get("latest_attempt") or {}
+    mn_complete = structured_mn.get("latest_derived_complete") or {}
+    mn_attempt_at = _to_dt(mn_attempt.get("finished_at")) or _to_dt(
+        mn_attempt.get("started_at")
+    )
+    mn_complete_at = _to_dt(mn_complete.get("finished_at")) or _to_dt(
+        mn_complete.get("started_at")
+    )
+    if mn_attempt_at and (sa_attempt is None or mn_attempt_at > sa_attempt):
+        sa_attempt = mn_attempt_at
+    if mn_complete_at and (sa_success is None or mn_complete_at > sa_success):
+        sa_success = mn_complete_at
+    mn_attempt_result = (
+        mn_attempt.get("result")
+        if isinstance(mn_attempt.get("result"), dict)
+        else {}
+    )
+    mn_outcome = mn_attempt_result.get("derived_outcome")
+    if mn_outcome in {"degraded", "failed"}:
+        sa_ok = False
+        sa_error = sa_error or f"market_news_extension_{mn_outcome}"
+    extension_signal = {
+        "latest_attempt_run_id": mn_attempt.get("id"),
+        "latest_attempt_outcome": mn_outcome,
+        "latest_attempt_counts": (
+            mn_attempt_result.get("counts")
+            if isinstance(mn_attempt_result.get("counts"), dict)
+            else {}
+        ),
+        "latest_complete_run_id": mn_complete.get("id"),
+    }
     _add(
         "seeking_alpha", "Seeking Alpha (extension)", "capture",
         {"present": True, "source": "not_required", "vars": []},
@@ -433,7 +471,11 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         last_error=sa_error if not sa_ok else None,
         detail=f"capture last success {_iso(sa_success) or '—'}"
                + ("" if sa_ok else " · last refresh FAILED"),
-        signals={"refresh_meta": sa_meta, "market_news_job": bool(mn)},
+        signals={
+            "refresh_meta": sa_meta,
+            "market_news_job": bool(mn),
+            "market_news_extension": extension_signal,
+        },
     )
 
     return {

@@ -21,6 +21,23 @@ from src.sa_capture_store import resolve_sa_db_path
 from src.service.job_runs_store import get_job_runs_store
 
 HOST_ID = "com.mindfulrl.sa_alpha_picks"
+_SYNC_JOB_NAMES = ("sa_alpha_picks_refresh", "sa_market_news_refresh")
+_REPAIR_JOB_NAME = "sa_market_news_repair"
+_SAFE_COUNT_KEYS = frozenset(
+    {
+        "phase_complete",
+        "phase_failed",
+        "phase_skipped",
+        "item_total",
+        "attempted",
+        "repaired",
+        "already_present",
+        "unavailable_at_source",
+        "failed_retryable",
+        "metadata_present",
+        "metadata_missing",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -54,8 +71,17 @@ def default_paths() -> SAExtensionHealthPaths:
     )
 
 
-def _seg(key: str, state: str, detail: str) -> dict[str, str]:
-    return {"key": key, "state": state, "detail": detail}
+def _seg(
+    key: str,
+    state: str,
+    detail: Optional[str] = None,
+    **fields: Any,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {"key": key, "state": state}
+    if detail is not None:
+        out["detail"] = detail
+    out.update({name: value for name, value in fields.items() if value is not None})
+    return out
 
 
 def _load_json(path: Path) -> tuple[Optional[dict[str, Any]], Optional[str]]:
@@ -164,19 +190,136 @@ def _row_ts(row: Mapping[str, Any]) -> str:
     return str(row.get("finished_at") or row.get("started_at") or row.get("updated_at") or "")
 
 
-def _telemetry_last_segment(job_store: Any) -> dict[str, str]:
+def _row_sort_key(row: Mapping[str, Any]) -> tuple[str, int]:
+    run_id = row.get("id")
+    safe_id = run_id if isinstance(run_id, int) and not isinstance(run_id, bool) else 0
+    return _row_ts(row), safe_id
+
+
+def _safe_counts(value: Any) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(key): count
+        for key, count in value.items()
+        if key in _SAFE_COUNT_KEYS
+        and isinstance(count, int)
+        and not isinstance(count, bool)
+        and count >= 0
+    }
+
+
+def _run_fields(row: Mapping[str, Any], *, counts: Any = None) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    run_id = row.get("id")
+    if isinstance(run_id, int) and not isinstance(run_id, bool):
+        fields["run_id"] = run_id
+    occurred_at = _row_ts(row)
+    if occurred_at:
+        fields["occurred_at"] = occurred_at
+    safe_counts = _safe_counts(counts)
+    if safe_counts:
+        fields["counts"] = safe_counts
+    return fields
+
+
+def _latest_attempt(summary: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
+    candidates = []
+    for item in summary.values():
+        if not isinstance(item, Mapping):
+            continue
+        row = item.get("latest_attempt")
+        if isinstance(row, Mapping):
+            candidates.append(row)
+    if not candidates:
+        return None
+    return max(candidates, key=_row_sort_key)
+
+
+def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
     try:
-        rows = job_store.list_runs(trigger_source="extension", limit=200)
-    except Exception as exc:
-        return _seg("telemetry_last", "fail", f"讀取 extension telemetry 失敗: {exc}")
-    rows = [row for row in rows if row.get("status") in {"succeeded", "failed"}]
-    if not rows:
-        return _seg("telemetry_last", "warn", "尚未有第一次 extension telemetry")
-    latest = max(rows, key=_row_ts)
+        summary = job_store.structured_extension_summary_by_name(list(_SYNC_JOB_NAMES))
+    except Exception:
+        summary = None
+    if summary is None:
+        return _seg("telemetry_last", "fail", code="telemetry_unavailable")
+
+    latest = _latest_attempt(summary)
+    if latest is None:
+        try:
+            legacy_rows = [
+                row
+                for row in job_store.list_runs(trigger_source="extension", limit=200)
+                if row.get("job_name") in _SYNC_JOB_NAMES
+            ]
+        except Exception:
+            return _seg("telemetry_last", "fail", code="telemetry_unavailable")
+        if legacy_rows:
+            legacy = max(legacy_rows, key=_row_sort_key)
+            return _seg(
+                "telemetry_last",
+                "warn",
+                code="legacy_unverified",
+                **_run_fields(legacy),
+            )
+        return _seg("telemetry_last", "warn", code="telemetry_not_recorded")
+
+    result = latest.get("result") if isinstance(latest.get("result"), Mapping) else {}
+    outcome = result.get("derived_outcome")
+    counts = _safe_counts(result.get("counts"))
+    if outcome == "complete":
+        state, code = "ok", "capture_complete"
+    elif outcome == "skipped":
+        state, code = "warn", "capture_skipped"
+    elif counts.get("failed_retryable", 0) > 0:
+        state, code = "fail", "detail_failures_recorded"
+    else:
+        state, code = "fail", "capture_failed"
     return _seg(
         "telemetry_last",
-        "ok",
-        f"{latest.get('job_name')} {latest.get('status')} @ {_row_ts(latest)}",
+        state,
+        code=code,
+        **_run_fields(latest, counts=counts),
+    )
+
+
+def _manifest_hash_prefix(payload: Any) -> Optional[str]:
+    if not isinstance(payload, Mapping):
+        return None
+    value = payload.get("manifest_hash")
+    if not isinstance(value, str) or len(value) != 64:
+        return None
+    lowered = value.lower()
+    if any(char not in "0123456789abcdef" for char in lowered):
+        return None
+    return lowered[:12]
+
+
+def _repair_segment(job_store: Any) -> Optional[dict[str, Any]]:
+    try:
+        rows = job_store.list_runs(job_name=_REPAIR_JOB_NAME, limit=1)
+    except Exception:
+        return _seg("market_news_repair", "fail", code="telemetry_unavailable")
+    if not rows:
+        return None
+
+    row = rows[0]
+    result = row.get("result") if isinstance(row.get("result"), Mapping) else {}
+    counts = _safe_counts(result.get("counts"))
+    if row.get("status") == "running":
+        state, code = "warn", "repair_active"
+    elif row.get("status") == "succeeded" and result.get("derived_outcome") == "complete":
+        state, code = "ok", "repair_complete"
+    elif counts.get("failed_retryable", 0) > 0:
+        state, code = "fail", "repair_retryable"
+    else:
+        state, code = "fail", "capture_failed"
+    return _seg(
+        "market_news_repair",
+        state,
+        code=code,
+        manifest_hash_prefix=_manifest_hash_prefix(row.get("payload")),
+        **_run_fields(row, counts=counts),
     )
 
 
@@ -209,15 +352,18 @@ def collect_sa_extension_health(
         job_store = get_job_runs_store(dal)
 
     config_segment, cfg = _config_segment(paths)
-    segments = [
+    segments: list[dict[str, Any]] = [
         config_segment,
         _manifest_segment(paths),
         _launcher_segment(paths),
         _host_ping_segment(paths, spawn_ping),
         _telemetry_binding_segment(cfg, env),
         _telemetry_last_segment(job_store),
-        _capture_readback_segment(paths),
     ]
+    repair_segment = _repair_segment(job_store)
+    if repair_segment is not None:
+        segments.append(repair_segment)
+    segments.append(_capture_readback_segment(paths))
     return {
         "ok": all(segment["state"] != "fail" for segment in segments),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

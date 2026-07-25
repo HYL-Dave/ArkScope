@@ -255,6 +255,114 @@ def test_sa_capture_error_and_success_merge():
     assert "FAILED" in p["detail"]
 
 
+def test_sa_provider_uses_derived_complete_success_and_latest_attempt_separately(monkeypatch):
+    complete = {
+        "id": 301,
+        "status": "succeeded",
+        "started_at": "2026-06-10T08:00:00+00:00",
+        "finished_at": "2026-06-10T08:01:00+00:00",
+        "result": {
+            "derived_outcome": "complete",
+            "healthy_anchor_eligible": True,
+            "counts": {"failed_retryable": 0},
+        },
+    }
+    degraded = {
+        "id": 302,
+        "status": "failed",
+        "started_at": "2026-06-10T10:00:00+00:00",
+        "finished_at": "2026-06-10T10:01:00+00:00",
+        "result": {
+            "derived_outcome": "degraded",
+            "healthy_anchor_eligible": False,
+            "counts": {"failed_retryable": 4},
+        },
+    }
+
+    class _Store:
+        def latest_runs_by_name(self):
+            return {"sa_market_news_refresh": degraded}
+
+        def structured_extension_summary_by_name(self, job_names):
+            assert job_names == ["sa_market_news_refresh"]
+            return {
+                "sa_market_news_refresh": {
+                    "latest_attempt": degraded,
+                    "latest_derived_complete": complete,
+                }
+            }
+
+    monkeypatch.setattr(
+        "src.service.job_runs_store.get_job_runs_store",
+        lambda dal: _Store(),
+    )
+
+    p = _by_id(
+        compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY),
+        "seeking_alpha",
+    )
+
+    assert p["last_success_at"] == "2026-06-10T08:01:00+00:00"
+    assert p["last_attempt_at"] == "2026-06-10T10:01:00+00:00"
+    assert p["last_error"] == "market_news_extension_degraded"
+    assert "FAILED" in p["detail"]
+    assert p["signals"]["market_news_extension"] == {
+        "latest_attempt_run_id": 302,
+        "latest_attempt_outcome": "degraded",
+        "latest_attempt_counts": {"failed_retryable": 4},
+        "latest_complete_run_id": 301,
+    }
+
+
+def test_sa_provider_ignores_legacy_and_skipped_success_rows(monkeypatch):
+    legacy = {
+        "id": 311,
+        "status": "succeeded",
+        "started_at": "2026-06-10T09:00:00+00:00",
+        "finished_at": "2026-06-10T09:01:00+00:00",
+        "payload": {},
+        "result": {"detail_failed": 18},
+    }
+    skipped = {
+        "id": 312,
+        "status": "succeeded",
+        "started_at": "2026-06-10T10:00:00+00:00",
+        "finished_at": "2026-06-10T10:01:00+00:00",
+        "result": {
+            "derived_outcome": "skipped",
+            "healthy_anchor_eligible": False,
+            "counts": {},
+        },
+    }
+
+    class _Store:
+        def latest_runs_by_name(self):
+            return {"sa_market_news_refresh": legacy}
+
+        def structured_extension_summary_by_name(self, job_names):
+            return {
+                "sa_market_news_refresh": {
+                    "latest_attempt": skipped,
+                    "latest_derived_complete": None,
+                }
+            }
+
+    monkeypatch.setattr(
+        "src.service.job_runs_store.get_job_runs_store",
+        lambda dal: _Store(),
+    )
+
+    p = _by_id(
+        compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY),
+        "seeking_alpha",
+    )
+
+    assert p["last_success_at"] is None
+    assert p["last_attempt_at"] == "2026-06-10T10:01:00+00:00"
+    assert p["status"] == "no_signal"
+    assert p["signals"]["market_news_extension"]["latest_attempt_outcome"] == "skipped"
+
+
 def test_section_failure_degrades_not_raises():
     dal = _FakeDAL(_FakeBackend(stats=RuntimeError("PG down")))
     out = compute_provider_health(dal, now=_WEDNESDAY)

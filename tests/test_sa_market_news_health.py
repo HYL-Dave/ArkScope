@@ -30,6 +30,7 @@ from src.service.sa_market_news_health import (
     SEVERITY_WARNING,
     _is_us_market_hours,
     _query_extension_run,
+    _run_health_query,
     compute_market_news_health,
     evaluate_health,
 )
@@ -366,12 +367,20 @@ class TestOrchestrator:
 
     def test_extension_run_uses_job_runs_store_factory(self, monkeypatch):
         class _Store:
-            def run_summary_by_name(self, job_names):
+            def structured_extension_summary_by_name(self, job_names):
                 assert job_names == ["sa_market_news_refresh"]
                 return {
                     "sa_market_news_refresh": {
-                        "last_success_at": "2026-03-11T14:20:00+00:00",
-                        "last_any_at": "2026-03-11T14:20:00+00:00",
+                        "latest_attempt": {
+                            "id": 8,
+                            "finished_at": "2026-03-11T14:20:00+00:00",
+                            "result": {"derived_outcome": "complete"},
+                        },
+                        "latest_derived_complete": {
+                            "id": 8,
+                            "finished_at": "2026-03-11T14:20:00+00:00",
+                            "result": {"derived_outcome": "complete"},
+                        },
                     }
                 }
 
@@ -380,7 +389,9 @@ class TestOrchestrator:
             lambda dal: _Store(),
         )
 
-        assert _query_extension_run(SimpleNamespace()) == "2026-03-11T14:20:00+00:00"
+        result = _query_extension_run(SimpleNamespace())
+        assert result["latest_attempt"]["id"] == 8
+        assert result["latest_derived_complete"]["id"] == 8
 
     def test_orchestrator_passes_now_to_query_and_evaluation(self, monkeypatch):
         captured = {}
@@ -401,6 +412,155 @@ class TestOrchestrator:
         report = compute_market_news_health(dal, now=WEEKDAY_MARKET_HOURS_UTC)
         assert captured["now"] == WEEKDAY_MARKET_HOURS_UTC
         assert report["ok"] is True
+
+
+def _extension_row(run_id, outcome, finished_at, *, healthy=False):
+    return {
+        "id": run_id,
+        "status": "succeeded" if outcome == "complete" else "failed",
+        "started_at": finished_at,
+        "finished_at": finished_at,
+        "result": {
+            "derived_outcome": outcome,
+            "healthy_anchor_eligible": healthy,
+            "counts": {"failed_retryable": 2} if outcome == "degraded" else {},
+        },
+    }
+
+
+def _install_extension_summary(monkeypatch, value):
+    class _Store:
+        def structured_extension_summary_by_name(self, job_names):
+            assert job_names == ["sa_market_news_refresh"]
+            return value
+
+    monkeypatch.setattr(
+        "src.service.job_runs_store.get_job_runs_store",
+        lambda dal: _Store(),
+    )
+
+
+def _capture_stats():
+    return {
+        "last_fetched_at": "2026-03-11T14:10:00+00:00",
+        "last_published_at": "2026-03-11T14:00:00+00:00",
+        "rows_24h_fetched": 20,
+        "items_24h_published": 18,
+        "items_7d": 80,
+        "detail_present_7d": 76,
+    }
+
+
+def test_latest_derived_complete_sync_is_the_only_extension_success_anchor(monkeypatch):
+    complete = _extension_row(
+        71,
+        "complete",
+        "2026-03-11T12:00:00+00:00",
+        healthy=True,
+    )
+    degraded = _extension_row(72, "degraded", "2026-03-11T14:20:00+00:00")
+    _install_extension_summary(
+        monkeypatch,
+        {
+            "sa_market_news_refresh": {
+                "latest_attempt": degraded,
+                "latest_derived_complete": complete,
+            }
+        },
+    )
+
+    summary = _query_extension_run(SimpleNamespace())
+
+    assert summary["latest_derived_complete"]["id"] == 71
+    assert summary["latest_attempt"]["id"] == 72
+
+
+def test_later_degraded_run_updates_attempt_without_advancing_success(monkeypatch):
+    complete = _extension_row(
+        81,
+        "complete",
+        "2026-03-11T12:00:00+00:00",
+        healthy=True,
+    )
+    degraded = _extension_row(82, "degraded", "2026-03-11T14:20:00+00:00")
+    _install_extension_summary(
+        monkeypatch,
+        {
+            "sa_market_news_refresh": {
+                "latest_attempt": degraded,
+                "latest_derived_complete": complete,
+            }
+        },
+    )
+    monkeypatch.setattr(
+        "src.service.sa_market_news_health._query_capture_stats_local",
+        lambda _path, *, now: _capture_stats(),
+    )
+
+    stats = _run_health_query(
+        SimpleNamespace(),
+        SimpleNamespace(_sa_db="unused.db"),
+        now=WEEKDAY_MARKET_HOURS_UTC,
+    )
+
+    assert stats["extension_last_success_at"] == "2026-03-11T12:00:00+00:00"
+    assert stats["extension_last_attempt_at"] == "2026-03-11T14:20:00+00:00"
+    assert stats["extension_last_outcome"] == "degraded"
+    report = evaluate_health(stats, now=WEEKDAY_MARKET_HOURS_UTC, thresholds=DEFAULT_THRESHOLDS)
+    assert report["freshness"]["extension_last_success_at"] == "2026-03-11T12:00:00+00:00"
+    assert report["freshness"]["extension_last_attempt_at"] == "2026-03-11T14:20:00+00:00"
+    assert report["severity"] == SEVERITY_WARNING
+    assert "extension_latest_attempt_degraded" in {
+        reason["code"] for reason in report["reasons"]
+    }
+
+
+def test_skipped_and_legacy_succeeded_rows_do_not_advance_success(monkeypatch):
+    skipped = _extension_row(91, "skipped", "2026-03-11T14:20:00+00:00")
+    skipped["status"] = "succeeded"
+    _install_extension_summary(
+        monkeypatch,
+        {
+            "sa_market_news_refresh": {
+                "latest_attempt": skipped,
+                "latest_derived_complete": None,
+            }
+        },
+    )
+    monkeypatch.setattr(
+        "src.service.sa_market_news_health._query_capture_stats_local",
+        lambda _path, *, now: _capture_stats(),
+    )
+
+    stats = _run_health_query(
+        SimpleNamespace(),
+        SimpleNamespace(_sa_db="unused.db"),
+        now=WEEKDAY_MARKET_HOURS_UTC,
+    )
+
+    assert stats["extension_last_success_at"] is None
+    assert stats["extension_last_attempt_at"] == "2026-03-11T14:20:00+00:00"
+    assert stats["extension_last_outcome"] == "skipped"
+
+
+def test_structured_summary_outage_degrades_without_hiding_capture_stats(monkeypatch):
+    _install_extension_summary(monkeypatch, None)
+    capture = _capture_stats()
+    monkeypatch.setattr(
+        "src.service.sa_market_news_health._query_capture_stats_local",
+        lambda _path, *, now: dict(capture),
+    )
+
+    stats = _run_health_query(
+        SimpleNamespace(),
+        SimpleNamespace(_sa_db="unused.db"),
+        now=WEEKDAY_MARKET_HOURS_UTC,
+    )
+
+    assert stats["last_fetched_at"] == capture["last_fetched_at"]
+    assert stats["items_7d"] == capture["items_7d"]
+    assert stats["extension_last_success_at"] is None
+    assert stats["pipeline_signal_unavailable"] is True
 
 
 # ---------------------------------------------------------------------------

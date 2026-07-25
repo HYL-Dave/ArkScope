@@ -650,13 +650,18 @@ export function DataSourcesSection({
     if (state.kind === "error") return state.error;
     return null;
   });
+  const saExtensionRows = displaySAExtensionSegments(
+    saExtensionHealth?.segments ?? [],
+    t,
+    developerMode,
+  );
   const diagnostics = [
     outcomePresentation?.diagnostic,
     outcome?.kind === "schedule" ? outcome.result.reason : null,
     ...(health?.notes ?? []),
     ...jobDiagnostics,
     ...providerDiagnostics,
-    ...(saExtensionHealth?.segments.map((segment) => segment.detail) ?? []),
+    ...saExtensionRows.map((row) => row.diagnostic),
     cfgSetup?.reason,
     ...configDiagnostics,
     ...scheduleDiagnostics,
@@ -766,7 +771,7 @@ export function DataSourcesSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {displaySAExtensionSegments(saExtensionHealth.segments, t).map((row) => (
+                  {saExtensionRows.map((row) => (
                     <tr key={row.key}>
                       <td>{row.label}</td>
                       <td>
@@ -779,7 +784,9 @@ export function DataSourcesSection({
                               : t(($) => $.dataSources.states.failed)}
                         />
                       </td>
-                      <td className="muted settings-wrap-text">—</td>
+                      <td className="muted settings-wrap-text">
+                        {row.showDetail ? row.copy : "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

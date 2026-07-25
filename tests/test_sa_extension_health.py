@@ -54,17 +54,58 @@ def _make_paths(tmp_path: Path, *, api_base: str = "http://127.0.0.1:45678", api
 
 
 class _FakeJobStore:
-    def __init__(self, rows):
+    def __init__(self, rows, *, summary=None):
         self.rows = rows
+        self.summary = {} if summary is None else summary
         self.calls = []
+        self.summary_calls = []
 
     def list_runs(self, **kwargs):
         self.calls.append(kwargs)
         rows = self.rows
+        job_name = kwargs.get("job_name")
+        if job_name:
+            rows = [row for row in rows if row.get("job_name") == job_name]
         trigger = kwargs.get("trigger_source")
         if trigger:
             rows = [row for row in rows if row.get("trigger_source") == trigger]
         return rows[: kwargs.get("limit", len(rows))]
+
+    def structured_extension_summary_by_name(self, job_names):
+        self.summary_calls.append(job_names)
+        return self.summary
+
+
+def _structured_row(
+    *,
+    run_id: int,
+    job_name: str,
+    outcome: str,
+    finished_at: str,
+    counts: dict | None = None,
+    status: str | None = None,
+    healthy: bool | None = None,
+) -> dict:
+    return {
+        "id": run_id,
+        "job_name": job_name,
+        "status": status or ("succeeded" if outcome == "complete" else "failed"),
+        "trigger_source": "extension",
+        "started_at": finished_at,
+        "finished_at": finished_at,
+        "payload": {
+            "extension_event": {
+                "client_event_id": f"event-{run_id}",
+                "event_hash": str(run_id).zfill(64),
+            }
+        },
+        "result": {
+            "schema_version": 1,
+            "derived_outcome": outcome,
+            "healthy_anchor_eligible": outcome == "complete" if healthy is None else healthy,
+            "counts": counts or {},
+        },
+    }
 
 
 def _segment(report: dict, key: str) -> dict:
@@ -75,27 +116,21 @@ def test_health_reports_all_segments_and_latest_extension_slug_row(tmp_path):
     from src.service.sa_extension_health import collect_sa_extension_health
 
     paths = _make_paths(tmp_path)
-    rows = [
-        {
-            "job_name": "sa_market_news_refresh",
-            "status": "succeeded",
-            "trigger_source": "extension",
-            "finished_at": "2026-07-05T16:05:00+00:00",
+    latest = _structured_row(
+        run_id=17,
+        job_name="sa_alpha_picks_refresh",
+        outcome="complete",
+        finished_at="2026-07-06T02:12:00+00:00",
+    )
+    store = _FakeJobStore(
+        [],
+        summary={
+            "sa_alpha_picks_refresh": {
+                "latest_attempt": latest,
+                "latest_derived_complete": latest,
+            }
         },
-        {
-            "job_name": "sa_extension:alpha_picks_quick",
-            "status": "succeeded",
-            "trigger_source": "extension",
-            "finished_at": "2026-07-06T02:12:00+00:00",
-        },
-        {
-            "job_name": "collect.polygon_news",
-            "status": "succeeded",
-            "trigger_source": "api",
-            "finished_at": "2026-07-06T03:00:00+00:00",
-        },
-    ]
-    store = _FakeJobStore(rows)
+    )
     with connect(str(paths.sa_db_path)) as conn:
         conn.execute(
             """
@@ -136,9 +171,11 @@ def test_health_reports_all_segments_and_latest_extension_slug_row(tmp_path):
     ]
     assert report["ok"] is True
     assert _segment(report, "telemetry_last")["state"] == "ok"
-    assert "sa_extension:alpha_picks_quick" in _segment(report, "telemetry_last")["detail"]
+    assert _segment(report, "telemetry_last")["code"] == "capture_complete"
+    assert _segment(report, "telemetry_last")["run_id"] == 17
+    assert "detail" not in _segment(report, "telemetry_last")
     assert _segment(report, "capture_readback")["state"] == "ok"
-    assert store.calls and store.calls[0]["trigger_source"] == "extension"
+    assert store.summary_calls == [["sa_alpha_picks_refresh", "sa_market_news_refresh"]]
 
 
 def test_fresh_install_has_warn_for_missing_history_not_fail(tmp_path):
@@ -183,6 +220,179 @@ def test_config_failure_does_not_hide_other_segments(tmp_path):
     assert _segment(report, "config")["state"] == "fail"
     assert _segment(report, "host_ping")["state"] == "ok"
     assert _segment(report, "telemetry_last")["state"] == "warn"
+
+
+def test_latest_structured_degraded_run_reports_stable_code_and_counts(tmp_path):
+    from src.service.sa_extension_health import collect_sa_extension_health
+
+    paths = _make_paths(tmp_path)
+    degraded = _structured_row(
+        run_id=31,
+        job_name="sa_market_news_refresh",
+        outcome="degraded",
+        finished_at="2026-07-25T03:00:00+00:00",
+        counts={"item_total": 18, "failed_retryable": 18},
+    )
+    report = collect_sa_extension_health(
+        paths=paths,
+        env={},
+        job_store=_FakeJobStore(
+            [],
+            summary={
+                "sa_market_news_refresh": {
+                    "latest_attempt": degraded,
+                    "latest_derived_complete": None,
+                }
+            },
+        ),
+        spawn_ping=lambda _paths: {"status": "ok"},
+    )
+
+    telemetry = _segment(report, "telemetry_last")
+    assert telemetry == {
+        "key": "telemetry_last",
+        "state": "fail",
+        "code": "detail_failures_recorded",
+        "counts": {"item_total": 18, "failed_retryable": 18},
+        "run_id": 31,
+        "occurred_at": "2026-07-25T03:00:00+00:00",
+    }
+    assert report["ok"] is False
+
+
+def test_legacy_succeeded_run_is_unverified_not_healthy(tmp_path):
+    from src.service.sa_extension_health import collect_sa_extension_health
+
+    paths = _make_paths(tmp_path)
+    legacy = {
+        "id": 41,
+        "job_name": "sa_market_news_refresh",
+        "status": "succeeded",
+        "trigger_source": "extension",
+        "finished_at": "2026-07-20T01:00:00+00:00",
+        "payload": {},
+        "result": {"detail_failed": 18},
+    }
+    report = collect_sa_extension_health(
+        paths=paths,
+        env={},
+        job_store=_FakeJobStore([legacy], summary={}),
+        spawn_ping=lambda _paths: {"status": "ok"},
+    )
+
+    telemetry = _segment(report, "telemetry_last")
+    assert telemetry["state"] == "warn"
+    assert telemetry["code"] == "legacy_unverified"
+    assert telemetry["run_id"] == 41
+    assert "detail" not in telemetry
+
+
+def test_repair_segment_reports_active_and_terminal_structured_state(tmp_path):
+    from src.service.sa_extension_health import collect_sa_extension_health
+
+    paths = _make_paths(tmp_path)
+    active_store = _FakeJobStore(
+        [{
+            "id": 51,
+            "job_name": "sa_market_news_repair",
+            "status": "running",
+            "trigger_source": "extension",
+            "started_at": "2026-07-25T04:00:00+00:00",
+            "payload": {"manifest_hash": "a" * 64},
+            "result": None,
+        }]
+    )
+    active = collect_sa_extension_health(
+        paths=paths,
+        env={},
+        job_store=active_store,
+        spawn_ping=lambda _paths: {"status": "ok"},
+    )
+    assert _segment(active, "market_news_repair") == {
+        "key": "market_news_repair",
+        "state": "warn",
+        "code": "repair_active",
+        "run_id": 51,
+        "manifest_hash_prefix": "aaaaaaaaaaaa",
+        "occurred_at": "2026-07-25T04:00:00+00:00",
+    }
+
+    terminal_store = _FakeJobStore(
+        [{
+            "id": 52,
+            "job_name": "sa_market_news_repair",
+            "status": "failed",
+            "trigger_source": "extension",
+            "started_at": "2026-07-25T04:00:00+00:00",
+            "finished_at": "2026-07-25T04:05:00+00:00",
+            "payload": {"manifest_hash": "b" * 64},
+            "result": {
+                "derived_outcome": "degraded",
+                "counts": {"repaired": 6, "failed_retryable": 2},
+            },
+        }]
+    )
+    terminal = collect_sa_extension_health(
+        paths=paths,
+        env={},
+        job_store=terminal_store,
+        spawn_ping=lambda _paths: {"status": "ok"},
+    )
+    repair = _segment(terminal, "market_news_repair")
+    assert repair["state"] == "fail"
+    assert repair["code"] == "repair_retryable"
+    assert repair["counts"] == {"repaired": 6, "failed_retryable": 2}
+    assert repair["run_id"] == 52
+
+
+def test_new_telemetry_segments_never_expose_raw_backend_detail(tmp_path):
+    from src.service.sa_extension_health import collect_sa_extension_health
+
+    paths = _make_paths(tmp_path)
+    planted = "PLANTED_RAW_TRACEBACK /home/operator/.secrets/token"
+    degraded = _structured_row(
+        run_id=61,
+        job_name="sa_market_news_refresh",
+        outcome="failed",
+        finished_at="2026-07-25T05:00:00+00:00",
+    )
+    degraded["error"] = planted
+    degraded["message"] = planted
+    report = collect_sa_extension_health(
+        paths=paths,
+        env={},
+        job_store=_FakeJobStore(
+            [{
+                "id": 62,
+                "job_name": "sa_market_news_repair",
+                "status": "failed",
+                "trigger_source": "extension",
+                "started_at": "2026-07-25T05:00:00+00:00",
+                "finished_at": "2026-07-25T05:01:00+00:00",
+                "payload": {"manifest_hash": "c" * 64, "detail": planted},
+                "result": {"derived_outcome": "degraded", "counts": {"failed_retryable": 1}},
+                "error": planted,
+                "message": planted,
+            }],
+            summary={
+                "sa_market_news_refresh": {
+                    "latest_attempt": degraded,
+                    "latest_derived_complete": None,
+                }
+            },
+        ),
+        spawn_ping=lambda _paths: {"status": "ok"},
+    )
+
+    serialized = json.dumps(
+        [
+            _segment(report, "telemetry_last"),
+            _segment(report, "market_news_repair"),
+        ]
+    )
+    assert planted not in serialized
+    assert "detail" not in _segment(report, "telemetry_last")
+    assert "detail" not in _segment(report, "market_news_repair")
 
 
 def test_run_host_ping_uses_real_native_host_protocol(tmp_path, monkeypatch):

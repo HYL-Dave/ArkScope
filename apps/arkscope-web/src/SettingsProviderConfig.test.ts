@@ -1263,6 +1263,72 @@ describe("Settings provider config authority", () => {
     expect(host!.querySelector('[data-testid="developer-diagnostics"] [aria-live]')).toBeNull();
   });
 
+  it("keeps structured SA telemetry raw detail out of normal mode", async () => {
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      ok: false,
+      generated_at: "2026-07-25T03:00:00+00:00",
+      segments: [{
+        key: "telemetry_last",
+        state: "fail",
+        code: "detail_failures_recorded",
+        counts: { failed_retryable: 18, item_total: 18 },
+        run_id: 16417,
+        occurred_at: "2026-07-25T03:00:00+00:00",
+        detail: "PLANTED_RAW_EXTENSION_TRACEBACK",
+      }],
+    });
+
+    await renderDataSources(undefined, false);
+
+    expect(host!.textContent).toContain("已記錄 18 筆可重試的詳情失敗");
+    expect(host!.textContent).not.toContain("PLANTED_RAW_EXTENSION_TRACEBACK");
+    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
+  });
+
+  it("shows only the stable SA health code in Developer Mode", async () => {
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      ok: false,
+      generated_at: "2026-07-25T03:00:00+00:00",
+      segments: [{
+        key: "telemetry_last",
+        state: "fail",
+        code: "detail_failures_recorded",
+        counts: { failed_retryable: 3, item_total: 3 },
+        detail: "PLANTED_RAW_EXTENSION_SECRET",
+      }],
+    });
+
+    await renderDataSources(undefined, true);
+
+    const diagnostics = host!.querySelector('[data-testid="developer-diagnostics"]');
+    expect(diagnostics?.textContent).toContain("開發者代碼：detail_failures_recorded");
+    expect(host!.textContent).not.toContain("PLANTED_RAW_EXTENSION_SECRET");
+  });
+
+  it("renders a localized degraded SA health row in English", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      ok: false,
+      generated_at: "2026-07-25T03:00:00+00:00",
+      segments: [{
+        key: "market_news_repair",
+        state: "fail",
+        code: "repair_retryable",
+        counts: { repaired: 6, failed_retryable: 2 },
+        run_id: 52,
+        manifest_hash_prefix: "123456abcdef",
+      }],
+    });
+
+    await renderDataSources(undefined, false);
+
+    expect(host!.textContent).toContain("market_news_repair");
+    expect(host!.textContent).toContain(
+      "2 items remain retryable · Manifest 123456abcdef",
+    );
+    expect(host!.textContent).toContain("Failed");
+  });
+
   it("switches locale without resetting drafts polling cadence or progress", async () => {
     vi.useFakeTimers();
     mocked.scheduleRunning = true;

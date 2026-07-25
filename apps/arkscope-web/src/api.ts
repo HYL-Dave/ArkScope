@@ -2545,7 +2545,12 @@ export function getSAFeed(params: {
 export interface SAExtensionHealthSegment {
   key: string;
   state: "ok" | "warn" | "fail";
-  detail: string;
+  detail?: string | null;
+  code?: string | null;
+  counts?: Record<string, number> | null;
+  run_id?: number | null;
+  manifest_hash_prefix?: string | null;
+  occurred_at?: string | null;
 }
 
 export interface SAExtensionHealthResponse {

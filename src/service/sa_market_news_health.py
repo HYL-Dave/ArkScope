@@ -155,6 +155,9 @@ def evaluate_health(
     last_fetched_at = _coerce_dt(stats.get("last_fetched_at"))
     last_published_at = _coerce_dt(stats.get("last_published_at"))
     extension_last_success_at = _coerce_dt(stats.get("extension_last_success_at"))
+    extension_last_attempt_at = _coerce_dt(stats.get("extension_last_attempt_at"))
+    extension_last_outcome = stats.get("extension_last_outcome")
+    extension_last_counts = stats.get("extension_last_counts")
     # 3d health split: set only when the job_runs signal is unreachable;
     # capture-side stats remain independently usable.
     pipeline_signal_degraded = bool(stats.get("pipeline_signal_unavailable"))
@@ -215,6 +218,15 @@ def evaluate_health(
             "freshness degraded to capture-side fetched_at only.",
         ))
 
+    extension_attempt_status = SEVERITY_OK
+    if extension_last_outcome in {"degraded", "failed"}:
+        extension_attempt_status = SEVERITY_WARNING
+        reasons.append(_Reason(
+            SEVERITY_WARNING,
+            "extension_latest_attempt_degraded",
+            "The latest structured extension attempt was not complete.",
+        ))
+
     freshness_block = {
         "last_fetched_at": _iso(last_fetched_at),
         "last_fetch_age_seconds": last_fetch_age_seconds,
@@ -225,6 +237,9 @@ def evaluate_health(
         "extension_last_success_at": _iso(extension_last_success_at),
         "extension_last_success_age_seconds": extension_last_success_age_seconds,
         "extension_last_success_age_human": _humanize_seconds(extension_last_success_age_seconds),
+        "extension_last_attempt_at": _iso(extension_last_attempt_at),
+        "extension_last_outcome": extension_last_outcome,
+        "extension_last_counts": extension_last_counts if isinstance(extension_last_counts, dict) else {},
         "pipeline_age_seconds": pipeline_age_seconds,
         "pipeline_signal": pipeline_signal,
         "last_fetch_status": last_fetch_status,
@@ -308,6 +323,7 @@ def evaluate_health(
             last_fetch_status,
             items_24h_status,
             detail_status,
+            extension_attempt_status,
             SEVERITY_WARNING if pipeline_signal_degraded else SEVERITY_OK,
         ),
         key=lambda s: _SEVERITY_RANK[s],
@@ -373,7 +389,20 @@ def _run_health_query(dal: Any, backend: Any, *, now: datetime) -> Dict[str, Any
     """
     out = _query_capture_stats_local(backend._sa_db, now=now)
     try:
-        out["extension_last_success_at"] = _query_extension_run(dal)
+        extension = _query_extension_run(dal)
+        latest_attempt = extension.get("latest_attempt")
+        latest_complete = extension.get("latest_derived_complete")
+        attempt_result = (
+            latest_attempt.get("result")
+            if isinstance(latest_attempt, dict)
+            and isinstance(latest_attempt.get("result"), dict)
+            else {}
+        )
+        out["extension_last_success_at"] = _extension_row_ts(latest_complete)
+        out["extension_last_attempt_at"] = _extension_row_ts(latest_attempt)
+        out["extension_last_outcome"] = attempt_result.get("derived_outcome")
+        counts = attempt_result.get("counts")
+        out["extension_last_counts"] = counts if isinstance(counts, dict) else {}
     except Exception as exc:
         logger.warning(
             "sa_market_news health: extension_last_success_at lookup failed "
@@ -381,6 +410,9 @@ def _run_health_query(dal: Any, backend: Any, *, now: datetime) -> Dict[str, Any
             exc,
         )
         out["extension_last_success_at"] = None
+        out["extension_last_attempt_at"] = None
+        out["extension_last_outcome"] = None
+        out["extension_last_counts"] = {}
         out["pipeline_signal_unavailable"] = True
     return out
 
@@ -402,13 +434,24 @@ def _query_capture_stats_local(sa_db: str, *, now: datetime) -> Dict[str, Any]:
 
 
 def _query_extension_run(dal: Any) -> Any:
-    """Latest succeeded extension run from the active job_runs store."""
+    """Latest structured attempt and derived-complete extension run."""
     from src.service.job_runs_store import get_job_runs_store
 
-    summary = get_job_runs_store(dal).run_summary_by_name([EXTENSION_JOB_NAME])
+    summary = get_job_runs_store(dal).structured_extension_summary_by_name(
+        [EXTENSION_JOB_NAME]
+    )
     if summary is None:
         raise RuntimeError("job_runs unavailable")
-    return (summary.get(EXTENSION_JOB_NAME) or {}).get("last_success_at")
+    return summary.get(EXTENSION_JOB_NAME) or {
+        "latest_attempt": None,
+        "latest_derived_complete": None,
+    }
+
+
+def _extension_row_ts(row: Any) -> Any:
+    if not isinstance(row, dict):
+        return None
+    return row.get("finished_at") or row.get("started_at")
 
 
 def _db_unavailable_report(
@@ -437,6 +480,9 @@ def _db_unavailable_report(
             "extension_last_success_at": None,
             "extension_last_success_age_seconds": None,
             "extension_last_success_age_human": None,
+            "extension_last_attempt_at": None,
+            "extension_last_outcome": None,
+            "extension_last_counts": {},
             "pipeline_age_seconds": None,
             "pipeline_signal": None,
             "last_fetch_status": SEVERITY_CRITICAL,

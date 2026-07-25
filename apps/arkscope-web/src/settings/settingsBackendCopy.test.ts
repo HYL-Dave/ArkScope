@@ -340,11 +340,11 @@ describe("Settings backend copy boundary", () => {
 
   it("maps every SA Extension segment key", () => {
     const keys = [
-      "config", "manifests", "launcher", "host_ping", "telemetry_binding", "telemetry_last", "capture_readback",
+      "config", "manifests", "launcher", "host_ping", "telemetry_binding", "telemetry_last", "market_news_repair", "capture_readback",
     ];
     const cases = [
-      { locale: "zh-Hant" as const, labels: ["設定檔", "瀏覽器註冊", "啟動器", "主機測試", "遙測綁定", "最近遙測", "資料回讀"] },
-      { locale: "en" as const, labels: ["Configuration", "Browser registration", "Launcher", "Host ping", "Telemetry binding", "Latest telemetry", "Capture readback"] },
+      { locale: "zh-Hant" as const, labels: ["設定檔", "瀏覽器註冊", "啟動器", "主機測試", "遙測綁定", "最近遙測", "market_news_repair", "資料回讀"] },
+      { locale: "en" as const, labels: ["Configuration", "Browser registration", "Launcher", "Host ping", "Telemetry binding", "Latest telemetry", "market_news_repair", "Capture readback"] },
     ];
 
     for (const expected of cases) {
