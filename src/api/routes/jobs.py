@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dependencies import get_dal
+from src.sa.extension_run_protocol import ProtocolError, derive_run_result
 from src.service.job_runs_store import get_job_runs_store
 from src.service.jobs import (
     JobDisabledError,
@@ -116,16 +120,12 @@ class JobsHistoryResponse(BaseModel):
 class ExtensionJobRecordRequest(BaseModel):
     """Completed SA extension job telemetry submitted by the sidecar-owned endpoint."""
 
-    job_name: str
-    status: Literal["succeeded", "failed"]
+    model_config = ConfigDict(extra="forbid")
+
+    client_event_id: str = Field(min_length=1, max_length=160)
     started_at: str
-    finished_at: Optional[str] = None
-    trigger_source: str = "extension"
-    payload: Dict[str, Any] = Field(default_factory=dict)
-    result: Optional[Dict[str, Any]] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
-    duration_ms: Optional[int] = None
+    finished_at: str
+    result: Dict[str, Any]
 
 
 class ExtensionJobRecordResponse(BaseModel):
@@ -204,26 +204,77 @@ def record_extension_job(
     The endpoint owns app-state writes so SA native hosts do not open
     ``profile_state.db`` directly.
     """
+    try:
+        client_event_id = request.client_event_id.strip()
+        started = _extension_timestamp(request.started_at)
+        finished = _extension_timestamp(request.finished_at)
+        if not client_event_id or started is None or finished is None or finished < started:
+            raise ValueError("invalid_extension_event")
+        result = derive_run_result(request.result)
+        event_document = {
+            "client_event_id": client_event_id,
+            "started_at": started.isoformat(timespec="milliseconds"),
+            "finished_at": finished.isoformat(timespec="milliseconds"),
+            "result": result,
+        }
+        event_hash = hashlib.sha256(
+            json.dumps(
+                event_document,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        duration_ms = max(0, int((finished - started).total_seconds() * 1000))
+    except ProtocolError as exc:
+        return ExtensionJobRecordResponse(
+            status="error", persisted=False, error_code=exc.code
+        )
+    except (TypeError, ValueError):
+        return ExtensionJobRecordResponse(
+            status="error", persisted=False, error_code="invalid_extension_event"
+        )
+
     store = get_job_runs_store(dal)
     try:
-        run_id = store.record_completed_run(
-            request.job_name,
-            status=request.status,
-            started_at=request.started_at,
-            finished_at=request.finished_at,
-            trigger_source=request.trigger_source,
-            payload=request.payload,
-            result=request.result,
-            message=request.message,
-            error=request.error,
-            duration_ms=request.duration_ms,
+        run_id = store.record_extension_event_once(
+            client_event_id=client_event_id,
+            event_hash=event_hash,
+            job_name=result["job_name"],
+            status=result["db_status"],
+            started_at=event_document["started_at"],
+            finished_at=event_document["finished_at"],
+            result=result,
+            duration_ms=duration_ms,
         )
-    except ValueError:
+    except ValueError as exc:
+        code = str(exc)
         return ExtensionJobRecordResponse(
-            status="error", persisted=False, error_code="invalid_job_record"
+            status="error",
+            persisted=False,
+            error_code=(
+                code
+                if code in {"event_conflict", "invalid_extension_event"}
+                else "invalid_extension_event"
+            ),
+        )
+    except Exception:
+        return ExtensionJobRecordResponse(
+            status="error",
+            persisted=False,
+            error_code="extension_persistence_unavailable",
         )
     return ExtensionJobRecordResponse(
         status="ok",
         run_id=run_id,
         persisted=run_id is not None,
     )
+
+
+def _extension_timestamp(value: str) -> Optional[datetime]:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)

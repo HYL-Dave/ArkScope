@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +45,7 @@ except Exception:  # pragma: no cover - import failure not expected in service e
 _VALID_STATUSES = frozenset({"running", "succeeded", "failed"})
 USE_LOCAL_JOB_RUNS_KEY = "use_local_job_runs"
 ENV_USE_LOCAL_JOB_RUNS = "ARKSCOPE_USE_LOCAL_JOB_RUNS"
+_EXTENSION_EVENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 _SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS job_runs (
@@ -549,6 +551,99 @@ class JobRunsLocalStore:
             )
             return None
 
+    def record_extension_event_once(
+        self,
+        *,
+        client_event_id: str,
+        event_hash: str,
+        job_name: str,
+        status: str,
+        started_at: Any,
+        finished_at: Any,
+        result: Dict[str, Any],
+        duration_ms: Optional[int],
+    ) -> int:
+        """Atomically deduplicate and persist one structured extension event."""
+
+        event_id = str(client_event_id or "").strip()
+        fingerprint = str(event_hash or "").strip().lower()
+        if (
+            not event_id
+            or not _EXTENSION_EVENT_HASH_RE.fullmatch(fingerprint)
+            or status not in {"succeeded", "failed"}
+            or not isinstance(result, dict)
+            or result.get("job_name") != job_name
+            or result.get("db_status") != status
+        ):
+            raise ValueError("invalid_extension_event")
+        started = _to_iso(started_at)
+        finished = _to_iso(finished_at)
+        if not started or not finished:
+            raise ValueError("invalid_extension_event")
+
+        identity = {
+            "client_event_id": event_id,
+            "event_hash": fingerprint,
+        }
+        now = _now_iso()
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                """
+                SELECT id, payload
+                FROM job_runs
+                WHERE trigger_source = 'extension'
+                ORDER BY id DESC
+                """
+            ).fetchall()
+            for row in rows:
+                payload = _json_load(row["payload"])
+                existing = (
+                    payload.get("extension_event")
+                    if isinstance(payload, dict)
+                    else None
+                )
+                if not isinstance(existing, dict):
+                    continue
+                if existing.get("client_event_id") != event_id:
+                    continue
+                if existing.get("event_hash") != fingerprint:
+                    raise ValueError("event_conflict")
+                conn.commit()
+                return int(row["id"])
+
+            cur = conn.execute(
+                """
+                INSERT INTO job_runs (
+                    job_name, status, trigger_source, payload, result,
+                    message, error, started_at, finished_at, duration_ms,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, 'extension', ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                """,
+                (
+                    job_name,
+                    status,
+                    _json_dumps({"extension_event": identity}),
+                    _json_or_none(result),
+                    str(result.get("derived_outcome") or ""),
+                    started,
+                    finished,
+                    duration_ms,
+                    now,
+                    now,
+                ),
+            )
+            run_id = int(cur.lastrowid)
+            conn.commit()
+            return run_id
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def list_runs(
         self,
         *,
@@ -637,6 +732,58 @@ class JobRunsLocalStore:
             }
         except Exception as exc:
             logger.warning("JobRunsLocalStore.run_summary_by_name failed: %s", exc)
+            return None
+
+    def structured_extension_summary_by_name(
+        self, job_names: List[str]
+    ) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Return latest structured attempt and derived-complete run by capture time."""
+
+        names = [str(name) for name in job_names if str(name)]
+        if not names:
+            return {}
+        placeholders = ",".join("?" for _ in names)
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT id, job_name, status, trigger_source, payload, result,
+                           message, error, started_at, finished_at, duration_ms,
+                           created_at, updated_at
+                    FROM job_runs
+                    WHERE trigger_source = 'extension'
+                      AND job_name IN ({placeholders})
+                    ORDER BY started_at DESC, id DESC
+                    """,
+                    names,
+                ).fetchall()
+            summary: Dict[str, Dict[str, Any]] = {}
+            for raw_row in rows:
+                row = _serialize_local_row(dict(raw_row))
+                identity = row.get("payload", {}).get("extension_event")
+                result = row.get("result")
+                if not isinstance(identity, dict) or not isinstance(result, dict):
+                    continue
+                if not identity.get("client_event_id") or not identity.get("event_hash"):
+                    continue
+                item = summary.setdefault(
+                    row["job_name"],
+                    {"latest_attempt": None, "latest_derived_complete": None},
+                )
+                if item["latest_attempt"] is None:
+                    item["latest_attempt"] = row
+                if (
+                    item["latest_derived_complete"] is None
+                    and result.get("derived_outcome") == "complete"
+                    and result.get("healthy_anchor_eligible") is True
+                ):
+                    item["latest_derived_complete"] = row
+            return summary
+        except Exception as exc:
+            logger.warning(
+                "JobRunsLocalStore.structured_extension_summary_by_name failed: %s",
+                exc,
+            )
             return None
 
 

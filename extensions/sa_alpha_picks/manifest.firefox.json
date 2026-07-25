@@ -17,6 +17,7 @@
     "scripts": [
       "compat_firefox.js",
       "extension_run_protocol.js",
+      "extension_telemetry.js",
       "background.js"
     ]
   },

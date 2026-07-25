@@ -6,6 +6,9 @@
 if (typeof SAExtensionRunProtocol === "undefined" && typeof importScripts === "function") {
   importScripts("extension_run_protocol.js");
 }
+if (typeof SAExtensionTelemetry === "undefined" && typeof importScripts === "function") {
+  importScripts("extension_telemetry.js");
+}
 
 const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
 const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
@@ -71,6 +74,64 @@ const MARKET_NEWS_DETAIL_TOTAL_LIMITS = {
   backfill: 80,
   manual: 20,
 };
+
+function createExtensionTelemetryEventId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
+    var bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    var hex = Array.from(bytes, function (value) {
+      return value.toString(16).padStart(2, "0");
+    }).join("");
+    return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16),
+      hex.slice(16, 20), hex.slice(20)].join("-");
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (char) {
+    var value = Math.floor(Math.random() * 16);
+    return (char === "x" ? value : ((value & 3) | 8)).toString(16);
+  });
+}
+
+function deliverExtensionTelemetry(record) {
+  return new Promise(function (resolve, reject) {
+    var settled = false;
+    var settle = function (callback, value) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(value);
+    };
+    var timer = setTimeout(function () {
+      settle(reject, new Error("telemetry_timeout"));
+    }, 2000);
+    chrome.runtime.sendNativeMessage(
+      NATIVE_HOST,
+      Object.assign({action: "record_extension_job"}, record),
+      function (response) {
+        if (chrome.runtime.lastError) {
+          settle(reject, new Error("native_host_unavailable"));
+          return;
+        }
+        settle(resolve, response || {
+          status: "error",
+          persisted: false,
+          error_code: "invalid_native_response",
+        });
+      }
+    );
+  });
+}
+
+var extensionTelemetryController = SAExtensionTelemetry.createController({
+  storage: chrome.storage.local,
+  now: Date.now,
+  uuid: createExtensionTelemetryEventId,
+  deliver: deliverExtensionTelemetry,
+});
 const COLLECTOR_TABS_STORAGE_KEY = "saCollectorTabs";
 const COLLECTOR_TAB_STALE_MS = 10 * 60 * 1000;
 const DEFAULT_TAB_LOAD_TIMEOUT_MS = 30 * 1000;
@@ -443,10 +504,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     var mode = msg.mode || "quick";
     enqueueSaSyncJob({
       displayName: "Alpha Picks " + mode,
-      canonicalName: "sa_alpha_picks_refresh",
       operation: "alpha_picks_sync",
       mode: mode,
-      payload: { mode: mode, trigger: "manual" },
     }, function () {
       return doRefresh(mode, { trigger: "manual" });
     }).then(sendResponse);
@@ -455,10 +514,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "manual_fetch") {
     enqueueSaSyncJob({
       displayName: "Manual fetch",
-      canonicalName: "sa_extension:manual_fetch",
       operation: "alpha_picks_manual_fetch",
       mode: "manual",
-      payload: { trigger: "manual", item_count: (msg.items || []).length },
     }, function () {
       return doManualFetch(msg.items || []);
     }).then(sendResponse);
@@ -468,10 +525,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     var mnMode = msg.mode || "quick";
     enqueueSaSyncJob({
       displayName: "Market News " + mnMode,
-      canonicalName: "sa_market_news_refresh",
       operation: "market_news_sync",
       mode: mnMode,
-      payload: { mode: mnMode, trigger: "manual" },
     }, function () {
       return doMarketNewsRefresh(mnMode, { trigger: "manual" });
     }).then(sendResponse);
@@ -486,7 +541,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.action === "ensure_auto_sync_alarms") {
-    ensureAutoSyncAlarms().then(sendResponse);
+    extensionTelemetryController.flush("popup_open").then(function () {
+      return ensureAutoSyncAlarms();
+    }).then(sendResponse);
     return true;
   }
 });
@@ -499,6 +556,7 @@ chrome.runtime.onInstalled.addListener(function () {
 chrome.runtime.onStartup.addListener(function () {
   cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
   syncAllAutoSyncAlarms();
+  extensionTelemetryController.flush("startup");
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
@@ -509,10 +567,8 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name === ALPHA_PICKS_AUTO_SYNC_ALARM) {
     enqueueAutoSaSyncJob("alphaPicks", {
       displayName: "Alpha Picks quick auto-sync",
-      canonicalName: "sa_alpha_picks_refresh",
       operation: "alpha_picks_sync",
       mode: "quick",
-      payload: { mode: "quick", trigger: "alarm" },
     }, function () {
       return doRefresh("quick", { trigger: "alarm" });
     });
@@ -521,10 +577,8 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name === MARKET_NEWS_AUTO_SYNC_ALARM) {
     enqueueAutoSaSyncJob("marketNews", {
       displayName: "Market News quick auto-sync",
-      canonicalName: "sa_market_news_refresh",
       operation: "market_news_sync",
       mode: "quick",
-      payload: { mode: "quick", trigger: "alarm" },
     }, async function () {
       if (!(await shouldRunMarketNewsAutoSync())) {
         return { status: "skipped", reason: "not_due" };
@@ -539,33 +593,27 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
 });
 
 function enqueueSaSyncJob(opts, jobFn) {
-  // opts may be a string (display name only, slug fallback) or
-  // { displayName, canonicalName, payload }. Canonical names match
-  // _JOB_DEFINITIONS keys (sa_alpha_picks_refresh / sa_market_news_refresh)
-  // so /jobs/status sees extension runs in the same row.
+  // The server derives the durable job identity from operation + mode.
   if (typeof opts === "string") {
     opts = { displayName: opts };
   }
   opts = opts || {};
   var displayName = opts.displayName || "unnamed";
-  var canonicalName = opts.canonicalName || null;
   var operation = opts.operation || null;
   var mode = opts.mode || null;
-  var extraPayload = opts.payload || null;
 
   var run = saSyncJobChain.catch(function () {}).then(async function () {
+    await extensionTelemetryController.flush("next_job");
     if (saSyncJobInFlight) {
       sendProgress("Queued: " + displayName);
     }
     saSyncJobInFlight = true;
     var startedAt = new Date().toISOString();
     var capturedResult = null;
-    var capturedError = null;
     try {
       capturedResult = attachExtensionRunProtocol(operation, mode, await jobFn());
       return capturedResult;
     } catch (err) {
-      capturedError = (err && err.message) ? err.message : String(err);
       if (!capturedResult && operation) {
         capturedResult = {
           extension_run: buildFailedExtensionProtocolResult(operation, mode),
@@ -575,14 +623,10 @@ function enqueueSaSyncJob(opts, jobFn) {
     } finally {
       saSyncJobInFlight = false;
       try {
-        await recordExtensionJobAsync({
-          displayName: displayName,
-          canonicalName: canonicalName,
-          extraPayload: extraPayload,
-          startedAt: startedAt,
-          finishedAt: new Date().toISOString(),
-          result: capturedResult,
-          error: capturedError,
+        await extensionTelemetryController.submit({
+          started_at: startedAt,
+          finished_at: new Date().toISOString(),
+          result: capturedResult && capturedResult.extension_run,
         });
       } catch (_) {
         // Recording must never break the actual sync flow.
@@ -591,97 +635,6 @@ function enqueueSaSyncJob(opts, jobFn) {
   });
   saSyncJobChain = run.catch(function () {});
   return run;
-}
-
-function slugifyExtensionJobName(name) {
-  var slug = String(name || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return "sa_extension:" + (slug || "unnamed");
-}
-
-function classifyExtensionJobOutcome(result, errorText) {
-  var structured = result && result.extension_run;
-  if (structured && (structured.db_status === "succeeded" || structured.db_status === "failed")) {
-    return {
-      status: structured.db_status,
-      error: null,
-      message: structured.derived_outcome === "skipped" ? "skipped" : null,
-    };
-  }
-  if (errorText) {
-    return { status: "failed", error: errorText, message: null };
-  }
-  if (!result || typeof result !== "object") {
-    return { status: "succeeded", error: null, message: null };
-  }
-  if (result.status === "error") {
-    return {
-      status: "failed",
-      error: result.error || "error",
-      message: null,
-    };
-  }
-  if (result.status === "busy" || result.status === "skipped") {
-    return {
-      status: "succeeded",
-      error: null,
-      message: result.status + (result.reason ? ": " + result.reason : ""),
-    };
-  }
-  return { status: "succeeded", error: null, message: null };
-}
-
-var EXTENSION_JOB_RECORD_TIMEOUT_MS = 2000;
-
-function recordExtensionJobAsync(opts) {
-  return new Promise(function (resolve) {
-    var settled = false;
-    var settle = function (value) {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-    var timer = setTimeout(function () {
-      settle({ ok: false, error: "record_timeout" });
-    }, EXTENSION_JOB_RECORD_TIMEOUT_MS);
-
-    try {
-      var outcome = classifyExtensionJobOutcome(opts.result, opts.error);
-      var payload = Object.assign({ display_name: opts.displayName }, opts.extraPayload || {});
-      var resultPayload = opts.result && opts.result.extension_run
-        ? opts.result.extension_run
-        : ((opts.result && typeof opts.result === "object") ? opts.result : null);
-      // Canonical name preferred so /jobs/status merges by job_runs.job_name
-      // against _JOB_DEFINITIONS; slug fallback keeps non-canonical flows
-      // (e.g. doManualFetch) observable in /jobs/history.
-      var jobName = opts.canonicalName || slugifyExtensionJobName(opts.displayName);
-      var msg = {
-        action: "record_extension_job",
-        job_name: jobName,
-        status: outcome.status,
-        started_at: opts.startedAt,
-        finished_at: opts.finishedAt,
-        message: outcome.message,
-        error: outcome.error,
-        payload: payload,
-        result: resultPayload,
-        trigger_source: "extension",
-      };
-      chrome.runtime.sendNativeMessage(NATIVE_HOST, msg, function (response) {
-        clearTimeout(timer);
-        if (chrome.runtime.lastError) {
-          settle({ ok: false, error: chrome.runtime.lastError.message });
-        } else {
-          settle({ ok: true, response: response });
-        }
-      });
-    } catch (err) {
-      clearTimeout(timer);
-      settle({ ok: false, error: (err && err.message) || String(err) });
-    }
-  });
 }
 
 function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {

@@ -27,6 +27,15 @@ sys.path.insert(0, PROJECT_ROOT)
 
 logger = logging.getLogger(__name__)
 
+_MARKET_NEWS_RECOVERY_PATHS = {
+    "market_news_recovery_preview": "/sa/market-news-recovery/preview",
+    "market_news_recovery_start": "/sa/market-news-recovery/start",
+    "market_news_recovery_state": "/sa/market-news-recovery/state",
+    "market_news_recovery_checkpoint": "/sa/market-news-recovery/checkpoint",
+    "market_news_recovery_finalize": "/sa/market-news-recovery/finalize",
+    "market_news_recovery_cancel": "/sa/market-news-recovery/cancel",
+}
+
 
 def _init_script_runtime():
     """Script-mode side effects — only when executed as the native host.
@@ -76,6 +85,12 @@ def handle_message(msg):
             "telemetry_target": base,
             "telemetry_source": source,
         }
+    if action == "get_extension_action_limits":
+        return _handle_get_extension_action_limits()
+    if action == "record_extension_job":
+        return _handle_record_extension_job(None, msg)
+    if action in _MARKET_NEWS_RECOVERY_PATHS:
+        return _handle_market_news_recovery_action(action, msg)
 
     from src.tools.data_access import DataAccessLayer
 
@@ -140,9 +155,6 @@ def handle_message(msg):
 
     elif action == "reject_reconciliation_candidate":
         return _handle_reject_reconciliation_candidate(dal, msg)
-
-    elif action == "record_extension_job":
-        return _handle_record_extension_job(dal, msg)
 
     return {"status": "error", "error": f"unknown action: {action}"}
 
@@ -900,59 +912,80 @@ def _handle_reject_reconciliation_candidate(dal, msg):
 
 
 def _handle_record_extension_job(dal, msg):
-    """Best-effort record of an extension-managed sync via the sidecar.
+    """Forward one strict structured event without accepting DB-owned fields."""
 
-    The extension only contacts native messaging *after* a sync flow
-    finishes, so we land directly in the terminal state with the
-    extension's own start/finish timestamps. The native host must not
-    write app-state DB files directly (LOCK #9), so it POSTs to the
-    sidecar and silently degrades if unavailable.
-    """
-    job_name = msg.get("job_name") or ""
-    status = msg.get("status") or ""
-    if status not in ("succeeded", "failed"):
-        return {"status": "error", "error": f"invalid job status: {status!r}"}
-    if not job_name:
-        return {"status": "error", "error": "job_name required"}
-
-    if _parse_iso_dt(msg.get("started_at")) is None:
-        return {"status": "error", "error": "valid started_at required"}
-
-    payload = msg.get("payload") or {}
+    caller_owned_fields = {
+        "status",
+        "job_name",
+        "payload",
+        "message",
+        "error",
+        "duration_ms",
+        "trigger_source",
+    }
+    if any(field in msg for field in caller_owned_fields):
+        return _extension_record_reply(
+            status="error", error_code="caller_status_forbidden"
+        )
+    allowed_fields = {
+        "action",
+        "client_event_id",
+        "started_at",
+        "finished_at",
+        "result",
+    }
+    if set(msg) - allowed_fields:
+        return _extension_record_reply(
+            status="error", error_code="invalid_extension_event"
+        )
+    client_event_id = str(msg.get("client_event_id") or "").strip()
+    started = _parse_iso_dt(msg.get("started_at"))
+    finished = _parse_iso_dt(msg.get("finished_at"))
     result = msg.get("result")
-    message_text = msg.get("message")
-    error_text = msg.get("error")
-    duration_ms = msg.get("duration_ms")
-    if duration_ms is not None:
-        try:
-            duration_ms = int(duration_ms)
-        except (TypeError, ValueError):
-            duration_ms = None
-    trigger_source = msg.get("trigger_source") or "extension"
+    if (
+        not client_event_id
+        or len(client_event_id) > 160
+        or started is None
+        or finished is None
+        or finished < started
+        or not isinstance(result, dict)
+    ):
+        return _extension_record_reply(
+            status="error", error_code="invalid_extension_event"
+        )
 
     sidecar_payload = {
-        "job_name": job_name,
-        "status": status,
+        "client_event_id": client_event_id,
         "started_at": msg.get("started_at"),
         "finished_at": msg.get("finished_at"),
-        "trigger_source": trigger_source,
-        "payload": payload if isinstance(payload, dict) else {"value": payload},
-        "result": result if isinstance(result, dict) else None,
-        "message": message_text,
-        "error": error_text,
-        "duration_ms": duration_ms,
+        "result": result,
     }
     try:
         response = _post_extension_job_to_sidecar(sidecar_payload)
+        persisted = response.get("persisted") is True
+        run_id = response.get("run_id")
+        if persisted and not isinstance(run_id, int):
+            return _extension_record_reply(
+                status="error", error_code="invalid_sidecar_response"
+            )
+        response_status = "ok" if response.get("status") == "ok" else "error"
+        error_code = response.get("error_code")
+        if not isinstance(error_code, str) or not re.fullmatch(
+            r"[a-z][a-z0-9_]{0,63}", error_code
+        ):
+            error_code = None if persisted else "sidecar_rejected"
         logger.info(
-            "record_extension_job: name=%s status=%s run_id=%s duration_ms=%s",
-            job_name, status, response.get("run_id"), duration_ms,
+            "record_extension_job: event=%s persisted=%s run_id=%s",
+            client_event_id,
+            persisted,
+            run_id,
         )
-        return {
-            "status": "ok",
-            "run_id": response.get("run_id"),
-            "persisted": bool(response.get("persisted")),
-        }
+        return _extension_record_reply(
+            status=response_status,
+            persisted=persisted,
+            run_id=run_id if persisted else None,
+            error_code=error_code,
+        )
     except Exception as e:
         logger.error(
             "record_extension_job sidecar post failed target=%s source=%s: %s",
@@ -960,7 +993,64 @@ def _handle_record_extension_job(dal, msg):
             getattr(e, "source", None),
             e,
         )
-        return {"status": "ok", "run_id": None, "persisted": False}
+        return _extension_record_reply(
+            status="ok", error_code="sidecar_unavailable"
+        )
+
+
+def _extension_record_reply(
+    *, status, persisted=False, run_id=None, error_code=None
+):
+    return {
+        "status": status,
+        "persisted": bool(persisted),
+        "run_id": run_id if isinstance(run_id, int) else None,
+        "error_code": error_code,
+    }
+
+
+def _positive_config_int(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _handle_get_extension_action_limits():
+    try:
+        from src.agents.config import get_agent_config
+
+        config = get_agent_config()
+        full = _positive_config_int(
+            getattr(config, "sa_comments_backfill_per_full_scan", None)
+        )
+        deep = _positive_config_int(
+            getattr(config, "sa_comments_backfill_per_backfill_scan", None)
+        )
+    except Exception:
+        full = None
+        deep = None
+    return {
+        "status": "ok",
+        "limits": {
+            "alpha_picks_full_comment_recovery_batch": full,
+            "alpha_picks_deep_comment_recovery_batch": deep,
+        },
+    }
+
+
+def _handle_market_news_recovery_action(action, msg):
+    path = _MARKET_NEWS_RECOVERY_PATHS[action]
+    payload = {
+        key: value
+        for key, value in msg.items()
+        if key not in {"action", "path"}
+    }
+    try:
+        response = _post_recovery_action_to_sidecar(path, payload)
+        return response if isinstance(response, dict) else {
+            "status": "error",
+            "error_code": "invalid_sidecar_response",
+        }
+    except Exception:
+        return {"status": "error", "error_code": "sidecar_unavailable"}
 
 
 class _SidecarPostError(RuntimeError):
@@ -1017,12 +1107,12 @@ def _connection_refused(exc):
     return isinstance(exc, OSError) and getattr(exc, "errno", None) in (111, 61)
 
 
-def _post_extension_job_once(payload, *, base, token, source):
+def _post_sidecar_json_once(path, payload, *, base, token, source):
     headers = {"Content-Type": "application/json"}
     if token:
         headers["x-arkscope-token"] = token
     req = urllib.request.Request(
-        f"{base}/jobs/extension-record",
+        f"{base}{path}",
         data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="POST",
@@ -1036,6 +1126,16 @@ def _post_extension_job_once(payload, *, base, token, source):
         raise _SidecarPostError(str(exc), target=base, source=source) from exc
 
 
+def _post_extension_job_once(payload, *, base, token, source):
+    return _post_sidecar_json_once(
+        "/jobs/extension-record",
+        payload,
+        base=base,
+        token=token,
+        source=source,
+    )
+
+
 def _post_extension_job_to_sidecar(payload):
     base, token, source = _resolve_sidecar_target()
     try:
@@ -1044,6 +1144,25 @@ def _post_extension_job_to_sidecar(payload):
         if source == "config" and _connection_refused(exc.__cause__):
             fallback_base, fallback_token, fallback_source = _default_sidecar_target()
             return _post_extension_job_once(
+                payload,
+                base=fallback_base,
+                token=fallback_token,
+                source=fallback_source,
+            )
+        raise
+
+
+def _post_recovery_action_to_sidecar(path, payload):
+    base, token, source = _resolve_sidecar_target()
+    try:
+        return _post_sidecar_json_once(
+            path, payload, base=base, token=token, source=source
+        )
+    except _SidecarPostError as exc:
+        if source == "config" and _connection_refused(exc.__cause__):
+            fallback_base, fallback_token, fallback_source = _default_sidecar_target()
+            return _post_sidecar_json_once(
+                path,
                 payload,
                 base=fallback_base,
                 token=fallback_token,

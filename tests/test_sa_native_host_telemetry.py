@@ -6,10 +6,31 @@ import subprocess
 import sys
 import urllib.error
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import src.sa_native_host as host
+
+
+_RUN_OUTCOMES = (
+    Path(__file__).parent / "fixtures" / "sa_extension" / "run_outcomes.json"
+)
+
+
+def _extension_event(event_id: str) -> dict:
+    fixture = json.loads(_RUN_OUTCOMES.read_text(encoding="utf-8"))
+    result = next(
+        entry["input"]
+        for entry in fixture["protocol_cases"]
+        if entry["name"] == "complete_market_sync"
+    )
+    return {
+        "client_event_id": event_id,
+        "started_at": "2026-07-25T01:00:00Z",
+        "finished_at": "2026-07-25T01:00:30Z",
+        "result": result,
+    }
 
 
 def test_import_has_no_script_side_effects(tmp_path):
@@ -201,3 +222,111 @@ def test_ping_does_not_construct_dal(monkeypatch, tmp_path):
     assert result["status"] == "ok"
     assert result["telemetry_target"] == "http://127.0.0.1:8420"
     assert result["telemetry_source"] == "default"
+
+
+def test_native_host_rejects_extension_record_with_caller_status(monkeypatch):
+    monkeypatch.setattr(
+        host,
+        "_post_extension_job_to_sidecar",
+        lambda _payload: (_ for _ in ()).throw(
+            AssertionError("caller-owned status must not reach the sidecar")
+        ),
+    )
+
+    result = host._handle_record_extension_job(
+        None,
+        {**_extension_event("evt-caller-status"), "status": "succeeded"},
+    )
+
+    assert result == {
+        "status": "error",
+        "persisted": False,
+        "run_id": None,
+        "error_code": "caller_status_forbidden",
+    }
+
+
+def test_native_host_projects_numeric_action_limits_without_faking_defaults(
+    monkeypatch,
+):
+    config = SimpleNamespace(
+        sa_comments_backfill_per_full_scan=17,
+        sa_comments_backfill_per_backfill_scan="not-a-number",
+    )
+    monkeypatch.setattr("src.agents.config.get_agent_config", lambda: config)
+
+    result = host.handle_message({"action": "get_extension_action_limits"})
+
+    assert result == {
+        "status": "ok",
+        "limits": {
+            "alpha_picks_full_comment_recovery_batch": 17,
+            "alpha_picks_deep_comment_recovery_batch": None,
+        },
+    }
+
+
+def test_native_host_routes_recovery_actions_only_to_fixed_sidecar_paths(
+    monkeypatch,
+):
+    calls: list[tuple[str, dict]] = []
+
+    def fake_post(path, payload):
+        calls.append((path, payload))
+        return {"status": "ok", "path_seen": path}
+
+    monkeypatch.setattr(host, "_post_recovery_action_to_sidecar", fake_post)
+
+    preview = host.handle_message(
+        {
+            "action": "market_news_recovery_preview",
+            "path": "/attacker-controlled",
+            "kind": "recorded",
+        }
+    )
+    cancel = host.handle_message(
+        {
+            "action": "market_news_recovery_cancel",
+            "path": "/attacker-controlled",
+            "run_id": 41,
+        }
+    )
+
+    assert preview["path_seen"] == "/sa/market-news-recovery/preview"
+    assert cancel["path_seen"] == "/sa/market-news-recovery/cancel"
+    assert calls == [
+        (
+            "/sa/market-news-recovery/preview",
+            {"kind": "recorded"},
+        ),
+        (
+            "/sa/market-news-recovery/cancel",
+            {"run_id": 41},
+        ),
+    ]
+
+
+def test_native_host_returns_typed_sidecar_rejection_without_raw_detail(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        host,
+        "_post_extension_job_to_sidecar",
+        lambda _payload: {
+            "status": "error",
+            "persisted": False,
+            "run_id": None,
+            "error_code": "event_conflict",
+            "detail": "/home/user/private.db sqlite3 traceback",
+        },
+    )
+
+    result = host._handle_record_extension_job(None, _extension_event("evt-rejected"))
+
+    assert result == {
+        "status": "error",
+        "persisted": False,
+        "run_id": None,
+        "error_code": "event_conflict",
+    }
+    assert "private.db" not in json.dumps(result)

@@ -26,7 +26,7 @@ function protocolFixtureResults() {
 
 function backgroundFixtureResults() {
   const imports = [];
-  let protocolBeforeMessageRegistration = false;
+  let dependenciesBeforeMessageRegistration = false;
   const context = vm.createContext({
     console,
     URL,
@@ -36,7 +36,8 @@ function backgroundFixtureResults() {
       runtime: {
         onMessage: {
           addListener() {
-            protocolBeforeMessageRegistration = !!context.SAExtensionRunProtocol;
+            dependenciesBeforeMessageRegistration = !!context.SAExtensionRunProtocol
+              && !!context.SAExtensionTelemetry;
           },
         },
         onInstalled: {addListener() {}},
@@ -62,7 +63,7 @@ function backgroundFixtureResults() {
 
   return {
     imports,
-    protocol_before_message_registration: protocolBeforeMessageRegistration,
+    dependencies_before_message_registration: dependenciesBeforeMessageRegistration,
     alpha: fixture.background_cases.alpha.map((entry) => ({
       name: entry.name,
       result: context.buildAlphaPicksProtocolResult(entry.mode, entry.legacy_result),

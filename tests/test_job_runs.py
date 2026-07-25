@@ -62,6 +62,34 @@ def _mock_cursor(conn, *, fetchone=None, fetchall=None, rowcount=1):
     return cur
 
 
+_SA_RUN_OUTCOMES = (
+    Path(__file__).parent / "fixtures" / "sa_extension" / "run_outcomes.json"
+)
+
+
+def _extension_protocol_case(name: str) -> dict:
+    fixture = json.loads(_SA_RUN_OUTCOMES.read_text(encoding="utf-8"))
+    for entry in fixture["protocol_cases"]:
+        if entry["name"] == name:
+            return json.loads(json.dumps(entry["input"]))
+    raise AssertionError(f"unknown SA extension protocol case: {name}")
+
+
+def _extension_event(
+    event_id: str,
+    case: str = "complete_market_sync",
+    *,
+    started_at: str = "2026-07-25T01:00:00Z",
+    finished_at: str = "2026-07-25T01:00:30Z",
+) -> dict:
+    return {
+        "client_event_id": event_id,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "result": _extension_protocol_case(case),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Availability gating
 # ---------------------------------------------------------------------------
@@ -827,29 +855,259 @@ def test_extension_record_endpoint_records_via_store_factory(monkeypatch):
     from src.api.routes import jobs as jobs_route
 
     fake_store = MagicMock()
-    fake_store.record_completed_run.return_value = 345
+    fake_store.record_extension_event_once.return_value = 345
     monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
 
     req = jobs_route.ExtensionJobRecordRequest(
-        job_name="sa_extension:market_news_quick",
-        status="succeeded",
+        client_event_id="evt-factory",
         started_at="2026-04-25T12:00:00Z",
         finished_at="2026-04-25T12:00:30Z",
-        duration_ms=30000,
-        payload={"display_name": "Market News quick"},
-        result={"saved": 17},
-        message="ok",
-        trigger_source="extension",
+        result=_extension_protocol_case("complete_market_sync"),
     )
     response = jobs_route.record_extension_job(req, dal=MagicMock())
 
     assert response.status == "ok"
     assert response.run_id == 345
-    fake_store.record_completed_run.assert_called_once()
-    kwargs = fake_store.record_completed_run.call_args.kwargs
-    assert kwargs["payload"] == {"display_name": "Market News quick"}
-    assert kwargs["result"] == {"saved": 17}
+    fake_store.record_extension_event_once.assert_called_once()
+    kwargs = fake_store.record_extension_event_once.call_args.kwargs
+    assert kwargs["client_event_id"] == "evt-factory"
+    assert kwargs["job_name"] == "sa_market_news_refresh"
+    assert kwargs["status"] == "succeeded"
     assert kwargs["duration_ms"] == 30000
+
+
+def test_local_store_records_client_event_once_inside_immediate_transaction(
+    tmp_path, monkeypatch
+):
+    from src.sa.extension_run_protocol import derive_run_result
+
+    store = JobRunsLocalStore(tmp_path / "profile_state.db")
+    statements: list[str] = []
+    connect = store._connect
+
+    def traced_connect():
+        conn = connect()
+        conn.set_trace_callback(statements.append)
+        return conn
+
+    monkeypatch.setattr(store, "_connect", traced_connect)
+    run_id = store.record_extension_event_once(
+        client_event_id="evt-immediate",
+        event_hash="a" * 64,
+        job_name="sa_market_news_refresh",
+        status="succeeded",
+        started_at="2026-07-25T01:00:00Z",
+        finished_at="2026-07-25T01:00:30Z",
+        result=derive_run_result(_extension_protocol_case("complete_market_sync")),
+        duration_ms=30000,
+    )
+
+    assert isinstance(run_id, int)
+    assert any(statement == "BEGIN IMMEDIATE" for statement in statements)
+    rows = store.list_runs(limit=10)
+    assert len(rows) == 1
+    assert rows[0]["payload"]["extension_event"] == {
+        "client_event_id": "evt-immediate",
+        "event_hash": "a" * 64,
+    }
+
+
+def test_local_store_duplicate_event_returns_existing_run_id(tmp_path):
+    from src.sa.extension_run_protocol import derive_run_result
+
+    store = JobRunsLocalStore(tmp_path / "profile_state.db")
+    kwargs = {
+        "client_event_id": "evt-duplicate",
+        "event_hash": "b" * 64,
+        "job_name": "sa_market_news_refresh",
+        "status": "succeeded",
+        "started_at": "2026-07-25T01:00:00Z",
+        "finished_at": "2026-07-25T01:00:30Z",
+        "result": derive_run_result(
+            _extension_protocol_case("complete_market_sync")
+        ),
+        "duration_ms": 30000,
+    }
+
+    first = store.record_extension_event_once(**kwargs)
+    second = store.record_extension_event_once(**kwargs)
+
+    assert second == first
+    assert len(store.list_runs(limit=10)) == 1
+
+
+def test_local_store_rejects_event_id_reuse_with_different_hash(tmp_path):
+    from src.sa.extension_run_protocol import derive_run_result
+
+    store = JobRunsLocalStore(tmp_path / "profile_state.db")
+    common = {
+        "client_event_id": "evt-conflict",
+        "job_name": "sa_market_news_refresh",
+        "status": "succeeded",
+        "started_at": "2026-07-25T01:00:00Z",
+        "finished_at": "2026-07-25T01:00:30Z",
+        "result": derive_run_result(
+            _extension_protocol_case("complete_market_sync")
+        ),
+        "duration_ms": 30000,
+    }
+    first = store.record_extension_event_once(event_hash="c" * 64, **common)
+
+    with pytest.raises(ValueError, match="event_conflict"):
+        store.record_extension_event_once(event_hash="d" * 64, **common)
+
+    assert [row["id"] for row in store.list_runs(limit=10)] == [first]
+
+
+def test_local_store_rolls_back_invalid_event_without_partial_row(tmp_path):
+    from src.sa.extension_run_protocol import derive_run_result
+
+    store = JobRunsLocalStore(tmp_path / "profile_state.db")
+    with pytest.raises(ValueError, match="invalid_extension_event"):
+        store.record_extension_event_once(
+            client_event_id="evt-invalid",
+            event_hash="not-a-sha256",
+            job_name="sa_market_news_refresh",
+            status="succeeded",
+            started_at="2026-07-25T01:00:00Z",
+            finished_at="2026-07-25T01:00:30Z",
+            result=derive_run_result(
+                _extension_protocol_case("complete_market_sync")
+            ),
+            duration_ms=30000,
+        )
+
+    assert store.list_runs(limit=10) == []
+
+
+def test_extension_record_endpoint_derives_complete_status(monkeypatch):
+    from src.api.routes import jobs as jobs_route
+
+    fake_store = MagicMock()
+    fake_store.record_extension_event_once.return_value = 401
+    monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
+    request = jobs_route.ExtensionJobRecordRequest(
+        **_extension_event("evt-complete")
+    )
+
+    response = jobs_route.record_extension_job(request, dal=MagicMock())
+
+    assert response.persisted is True
+    assert fake_store.record_extension_event_once.call_args.kwargs["status"] == (
+        "succeeded"
+    )
+    assert fake_store.record_extension_event_once.call_args.kwargs["result"][
+        "derived_outcome"
+    ] == "complete"
+
+
+def test_extension_record_endpoint_maps_degraded_to_failed(monkeypatch):
+    from src.api.routes import jobs as jobs_route
+
+    fake_store = MagicMock()
+    fake_store.record_extension_event_once.return_value = 402
+    monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
+    request = jobs_route.ExtensionJobRecordRequest(
+        **_extension_event(
+            "evt-degraded", "top_level_ok_with_retryable_details"
+        )
+    )
+
+    jobs_route.record_extension_job(request, dal=MagicMock())
+
+    kwargs = fake_store.record_extension_event_once.call_args.kwargs
+    assert kwargs["status"] == "failed"
+    assert kwargs["result"]["derived_outcome"] == "degraded"
+
+
+def test_extension_record_endpoint_maps_skipped_to_typed_succeeded(monkeypatch):
+    from src.api.routes import jobs as jobs_route
+
+    fake_store = MagicMock()
+    fake_store.record_extension_event_once.return_value = 403
+    monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
+    request = jobs_route.ExtensionJobRecordRequest(
+        **_extension_event("evt-skipped", "skipped_not_due")
+    )
+
+    jobs_route.record_extension_job(request, dal=MagicMock())
+
+    kwargs = fake_store.record_extension_event_once.call_args.kwargs
+    assert kwargs["status"] == "succeeded"
+    assert kwargs["result"]["derived_outcome"] == "skipped"
+    assert kwargs["result"]["phases"]["list_navigation"] == {
+        "state": "skipped",
+        "reason_code": "not_due",
+    }
+
+
+def test_extension_record_endpoint_rejects_invalid_protocol_or_reason(monkeypatch):
+    from src.api.routes import jobs as jobs_route
+
+    fake_store = MagicMock()
+    monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
+    invalid = _extension_event("evt-invalid-protocol")
+    invalid["result"]["phases"]["detail_fetch"] = {
+        "state": "failed",
+        "reason_code": "raw provider text",
+    }
+    request = jobs_route.ExtensionJobRecordRequest(**invalid)
+
+    response = jobs_route.record_extension_job(request, dal=MagicMock())
+
+    assert response.status == "error"
+    assert response.persisted is False
+    assert response.error_code == "protocol_invalid"
+    fake_store.record_extension_event_once.assert_not_called()
+
+
+def test_structured_extension_summary_separates_latest_attempt_from_latest_complete(
+    tmp_path,
+):
+    from src.sa.extension_run_protocol import derive_run_result
+
+    store = JobRunsLocalStore(tmp_path / "profile_state.db")
+    newer_degraded = derive_run_result(
+        _extension_protocol_case("top_level_ok_with_retryable_details")
+    )
+    older_complete = derive_run_result(
+        _extension_protocol_case("complete_market_sync")
+    )
+    store.record_extension_event_once(
+        client_event_id="evt-newer-degraded",
+        event_hash="e" * 64,
+        job_name="sa_market_news_refresh",
+        status="failed",
+        started_at="2026-07-25T02:00:00Z",
+        finished_at="2026-07-25T02:00:30Z",
+        result=newer_degraded,
+        duration_ms=30000,
+    )
+    store.record_extension_event_once(
+        client_event_id="evt-older-complete",
+        event_hash="f" * 64,
+        job_name="sa_market_news_refresh",
+        status="succeeded",
+        started_at="2026-07-25T01:00:00Z",
+        finished_at="2026-07-25T01:00:30Z",
+        result=older_complete,
+        duration_ms=30000,
+    )
+
+    summary = store.structured_extension_summary_by_name(
+        ["sa_market_news_refresh"]
+    )["sa_market_news_refresh"]
+
+    assert summary["latest_attempt"]["payload"]["extension_event"][
+        "client_event_id"
+    ] == "evt-newer-degraded"
+    assert summary["latest_attempt"]["result"]["derived_outcome"] == "degraded"
+    assert summary["latest_derived_complete"]["payload"]["extension_event"][
+        "client_event_id"
+    ] == "evt-older-complete"
+    assert summary["latest_derived_complete"]["result"][
+        "healthy_anchor_eligible"
+    ] is True
 
 
 def test_native_host_record_extension_job_posts_to_sidecar(monkeypatch):
@@ -862,28 +1120,17 @@ def test_native_host_record_extension_job_posts_to_sidecar(monkeypatch):
         return {"status": "ok", "run_id": 99, "persisted": True}
 
     monkeypatch.setattr("src.sa_native_host._post_extension_job_to_sidecar", fake_post)
-    msg = {
-        "job_name": "sa_extension:market_news_quick",
-        "status": "succeeded",
-        "started_at": "2026-04-25T12:00:00Z",
-        "finished_at": "2026-04-25T12:00:30Z",
-        "duration_ms": 30000,
-        "payload": {"display_name": "Market News quick"},
-        "result": {"saved": 17},
-        "message": "ok",
-        "trigger_source": "extension",
-    }
+    msg = _extension_event(
+        "evt-native",
+        started_at="2026-04-25T12:00:00Z",
+        finished_at="2026-04-25T12:00:30Z",
+    )
     result = _handle_record_extension_job(MagicMock(), msg)
 
     assert result["status"] == "ok"
     assert result["run_id"] == 99
     assert result["persisted"] is True
-    assert calls == [
-        {
-            **msg,
-            "error": None,
-        }
-    ]
+    assert calls == [msg]
 
 
 def test_native_host_record_extension_job_degrades_when_sidecar_unreachable(monkeypatch):
@@ -893,12 +1140,12 @@ def test_native_host_record_extension_job_degrades_when_sidecar_unreachable(monk
         raise OSError("sidecar down")
 
     monkeypatch.setattr("src.sa_native_host._post_extension_job_to_sidecar", fake_post)
-    msg = {
-        "job_name": "sa_extension:alpha_picks_quick",
-        "status": "failed",
-        "started_at": "2026-04-25T12:00:00Z",
-        "error": "paywall: Subscribe to unlock",
-    }
+    msg = _extension_event(
+        "evt-sidecar-down",
+        "top_level_ok_with_retryable_details",
+        started_at="2026-04-25T12:00:00Z",
+        finished_at="2026-04-25T12:00:30Z",
+    )
     result = _handle_record_extension_job(MagicMock(), msg)
 
     assert result["status"] == "ok"
@@ -906,25 +1153,30 @@ def test_native_host_record_extension_job_degrades_when_sidecar_unreachable(monk
     assert result["run_id"] is None
 
 
-def test_record_extension_job_rejects_invalid_status():
-    from src.sa_native_host import _handle_record_extension_job
+def test_record_extension_job_rejects_caller_supplied_status():
+    from pydantic import ValidationError
+    from src.api.routes.jobs import ExtensionJobRecordRequest
 
-    result = _handle_record_extension_job(
-        MagicMock(),
-        {"job_name": "x", "status": "running", "started_at": "2026-04-25T12:00:00Z"},
-    )
-    assert result["status"] == "error"
-    assert "invalid" in result["error"].lower()
+    with pytest.raises(ValidationError):
+        ExtensionJobRecordRequest(
+            **_extension_event("evt-forbidden-status"),
+            status="succeeded",
+        )
 
 
 def test_record_extension_job_rejects_missing_started_at():
     from src.sa_native_host import _handle_record_extension_job
 
     result = _handle_record_extension_job(
-        MagicMock(), {"job_name": "x", "status": "succeeded"}
+        MagicMock(),
+        {
+            "client_event_id": "evt-missing-start",
+            "finished_at": "2026-04-25T12:00:30Z",
+            "result": _extension_protocol_case("complete_market_sync"),
+        },
     )
     assert result["status"] == "error"
-    assert "started_at" in result["error"]
+    assert result["error_code"] == "invalid_extension_event"
 
 
 def test_record_extension_job_rejects_missing_job_name():
@@ -932,10 +1184,15 @@ def test_record_extension_job_rejects_missing_job_name():
 
     result = _handle_record_extension_job(
         MagicMock(),
-        {"job_name": "", "status": "succeeded", "started_at": "2026-04-25T12:00:00Z"},
+        {
+            "client_event_id": "",
+            "started_at": "2026-04-25T12:00:00Z",
+            "finished_at": "2026-04-25T12:00:30Z",
+            "result": _extension_protocol_case("complete_market_sync"),
+        },
     )
     assert result["status"] == "error"
-    assert "job_name" in result["error"]
+    assert result["error_code"] == "invalid_extension_event"
 
 
 def test_record_extension_job_dispatched_via_handle_message():
@@ -944,9 +1201,7 @@ def test_record_extension_job_dispatched_via_handle_message():
 
     msg = {
         "action": "record_extension_job",
-        "job_name": "sa_extension:market_news_quick",
-        "status": "succeeded",
-        "started_at": "2026-04-25T12:00:00Z",
+        **_extension_event("evt-dispatch"),
     }
     with patch.object(
         sa_native_host, "_handle_record_extension_job",
