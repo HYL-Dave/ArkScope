@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   getMarketDataStatus,
   getTradingDayCoverage,
@@ -12,11 +13,14 @@ import {
   coverageCalendarHealthLabels,
   coverageDataQualityPresentation,
   coverageDayReasonLabel,
+  coverageMarketScopeLabel,
   coverageObservationHealthLabel,
+  coverageSessionLabel,
   coverageStatusLabel,
   coverageTickerFactsPresentation,
 } from "../marketDataDisplay";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { Button } from "../ui/Button";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { settingsErrorPresentation } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
@@ -50,6 +54,15 @@ function syncDiagnostics(status: MarketDataStatus): Array<string | null> {
   const sync = status.sync;
   return [sync.prices, sync.news, sync.iv, sync.fundamentals]
     .map((value) => value?.last_error ?? null);
+}
+
+function coverageDeveloperDiagnostics(coverage: TradingDayCoverage): string[] {
+  return [
+    ...coverage.provider_errors.map((issue) => `${issue.ticker}: ${issue.last_error}`),
+    ...coverage.days.flatMap((day) => day.unknown_tickers.length > 0
+      ? [`${day.date}: ${day.unknown_tickers.join(", ")}`]
+      : []),
+  ];
 }
 
 export function DataStorageSection({
@@ -249,9 +262,9 @@ function TradingDayCoveragePanel({ developerMode }: { developerMode: boolean }) 
             <dt>{t(($) => $.dataStorage.coverage.facts.interval)}</dt>
             <dd>{" "}{cov.interval}</dd>
             <dt>{t(($) => $.dataStorage.coverage.facts.marketScope)}</dt>
-            <dd>{" "}{t(($) => $.dataStorage.coverage.facts.marketScopeValue)}</dd>
+            <dd>{" "}{coverageMarketScopeLabel(cov.market_scope, t)}</dd>
             <dt>{t(($) => $.dataStorage.coverage.facts.session)}</dt>
-            <dd>{" "}{t(($) => $.dataStorage.coverage.facts.sessionValue)}</dd>
+            <dd>{" "}{coverageSessionLabel(cov.coverage_session, t)}</dd>
             <dt>{t(($) => $.dataStorage.coverage.facts.reviewedThrough)}</dt>
             <dd>{" "}{cov.calendar_health.reviewed_through}</dd>
             <dt>{t(($) => $.dataStorage.coverage.facts.horizonMonths)}</dt>
@@ -288,8 +301,7 @@ function TradingDayCoveragePanel({ developerMode }: { developerMode: boolean }) 
           ) : null}
           {developerMode ? (
             <DeveloperDiagnostics
-              diagnostics={cov.provider_errors.map((issue) =>
-                `${issue.ticker}: ${issue.last_error}`)}
+              diagnostics={coverageDeveloperDiagnostics(cov)}
               t={t}
             />
           ) : null}
@@ -354,6 +366,7 @@ function CoverageRow({
   const reasonLabel = coverageDayReasonLabel(row.status_reason_code, t);
   const tickerFacts = coverageTickerFactsPresentation(row, t);
   const quality = coverageDataQualityPresentation(row, 0, t);
+  const detailId = `coverage-details-${row.date}`;
   const sessionWindow = developerMode
     && row.session_open_at_utc !== null
     && row.session_close_at_utc !== null
@@ -364,11 +377,21 @@ function CoverageRow({
     : null;
   return (
     <>
-      <tr
-        onClick={drillable ? onToggle : undefined}
-        style={{ cursor: drillable ? "pointer" : "default" }}
-      >
-        <td>{row.date}{drillable ? (open ? " ▾" : " ▸") : ""}</td>
+      <tr>
+        <td>
+          {drillable ? (
+            <Button
+              tone="ghost"
+              size="compact"
+              icon={open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              aria-expanded={open}
+              aria-controls={detailId}
+              onClick={onToggle}
+            >
+              {row.date}
+            </Button>
+          ) : row.date}
+        </td>
         <td>
           <span style={{ color: coverageToneColor(tone) }}>{label}</span>
           {reasonLabel ? <div className="muted tiny">{reasonLabel}</div> : null}
@@ -380,7 +403,11 @@ function CoverageRow({
       </tr>
       {open && drillable && (
         <tr>
-          <td colSpan={6} style={{ background: "var(--panel-2, #1a1a1a)", padding: "8px 12px" }}>
+          <td
+            id={detailId}
+            colSpan={6}
+            style={{ background: "var(--panel-2, #1a1a1a)", padding: "8px 12px" }}
+          >
             {tickerFacts.partialTitle ? (
               <div style={{ marginBottom: 8 }}>
                 <p className="tiny" style={{ margin: "0 0 4px" }}>

@@ -275,6 +275,12 @@ describe("coverageStatusLabel", () => {
   });
 
   it("maps calendar and observation health without parsing diagnostics", () => {
+    const marketScopeLabel = displayFunction<(value: string, t: typeof zhT) => string>(
+      "coverageMarketScopeLabel",
+    );
+    const coverageSessionLabel = displayFunction<(value: string, t: typeof zhT) => string>(
+      "coverageSessionLabel",
+    );
     const calendarLabels = displayFunction<(
       health: { status: string; reason_codes: string[] },
       t: typeof zhT,
@@ -283,6 +289,15 @@ describe("coverageStatusLabel", () => {
       health: { status: string; reason_code: string | null },
       t: typeof zhT,
     ) => string | null>("coverageObservationHealthLabel");
+
+    expect(marketScopeLabel("us_listed_equity_proxy", zhT)).toBe("美國上市股票代理範圍");
+    expect(marketScopeLabel("us_listed_equity_proxy", settingsT("en")))
+      .toBe("US-listed equity proxy");
+    expect(coverageSessionLabel("rth", zhT)).toBe("正規交易時段（RTH）");
+    expect(coverageSessionLabel("rth", settingsT("en")))
+      .toBe("Regular trading hours (RTH)");
+    expect(marketScopeLabel("future_scope", settingsT("en"))).toBe("Unable to determine");
+    expect(coverageSessionLabel("future_session", zhT)).toBe("無法判定");
 
     expect(calendarLabels({
       status: "degraded",
@@ -308,15 +323,23 @@ describe("coverageStatusLabel", () => {
       unknownDetail: string | null;
     }>("coverageTickerFactsPresentation");
 
-    expect(facts(row({
+    const enFacts = facts(row({
       partial_tickers: [{ ticker: "MSFT", observed_slot_count: 12, expected_slot_count: 26 }],
-      unknown_tickers: ["AAPL"],
-    }), settingsT("en"))).toEqual({
+      unknown_tickers: ["PLANTED_UNKNOWN_A", "PLANTED_UNKNOWN_B"],
+    }), settingsT("en"));
+    expect(enFacts).toEqual({
       partialTitle: "Partially observed tickers",
       partialDetails: ["MSFT: 12/26 slots"],
       unknownTitle: "Unresolved tickers",
-      unknownDetail: "1 tickers: AAPL",
+      unknownDetail: "2",
     });
+    expect(JSON.stringify(enFacts)).not.toContain("PLANTED_UNKNOWN");
+
+    const zhFacts = facts(row({
+      unknown_tickers: ["PLANTED_UNKNOWN_A", "PLANTED_UNKNOWN_B"],
+    }), zhT);
+    expect(zhFacts.unknownDetail).toBe("2");
+    expect(JSON.stringify(zhFacts)).not.toContain("PLANTED_UNKNOWN");
   });
 
   it("renders unmatched RTH rows as a separate data-quality warning", () => {

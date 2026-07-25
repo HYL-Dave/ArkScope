@@ -318,6 +318,7 @@ describe("post-PG-exit storage panels", () => {
   });
 
   it("renders English market data and storage outcomes", async () => {
+    const rawUnknownTicker = "PLANTED_LOCALE_UNKNOWN";
     const localePut = vi.fn(async (locale: "zh-Hant" | "en") => ({
       locale,
       source: "stored" as const,
@@ -383,7 +384,7 @@ describe("post-PG-exit storage panels", () => {
           observed_slot_count: 12,
           expected_slot_count: 26,
         }],
-        unknown_tickers: ["AAPL"],
+        unknown_tickers: [rawUnknownTicker],
         unmatched_rth_row_count: 0,
       }],
     };
@@ -410,8 +411,11 @@ describe("post-PG-exit storage panels", () => {
       mountedStorage.querySelectorAll<HTMLTableRowElement>("tbody tr"),
     ).find((row) => row.textContent?.includes("2026-07-18"));
     if (!mountedCoverageRow) throw new Error("missing mounted coverage row");
-    act(() => mountedCoverageRow.click());
+    const mountedCoverageToggle = mountedCoverageRow.querySelector<HTMLButtonElement>("button");
+    if (!mountedCoverageToggle) throw new Error("missing mounted coverage disclosure");
+    act(() => mountedCoverageToggle.click());
     expect(mountedStorage.textContent).toContain("部分觀測標的");
+    expect(mountedStorage.textContent).not.toContain(rawUnknownTicker);
     lookback.focus();
     expect(document.activeElement).toBe(lookback);
     expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);
@@ -482,10 +486,13 @@ describe("post-PG-exit storage panels", () => {
       .find((row) => row.textContent?.includes("2026-07-18"));
     if (!coverageRow) throw new Error("missing English coverage row");
     expect(coverageRow).toBe(mountedCoverageRow);
+    expect(coverageRow.querySelector("button")).toBe(mountedCoverageToggle);
     expect(storage.textContent).toContain("Partially observed tickers");
     expect(storage.textContent).toContain("MSFT: 12/26 slots");
     expect(storage.textContent).toContain("Unresolved tickers");
-    expect(storage.textContent).toContain("1 tickers: AAPL");
+    expect(Array.from(storage.querySelectorAll("tbody p"), (node) => node.textContent))
+      .toContain("1");
+    expect(storage.textContent).not.toContain(rawUnknownTicker);
     const switchedLookback = storage.querySelector<HTMLSelectElement>("select");
     expect(switchedLookback).toBe(lookback);
     expect(switchedLookback?.value).toBe("30");
@@ -524,6 +531,7 @@ describe("post-PG-exit storage panels", () => {
   it("hides storage provider errors outside Developer Mode", async () => {
     const syncDiagnostic = "RAW_MARKET_SYNC_DETAIL";
     const providerDiagnostic = "RAW_COVERAGE_PROVIDER_DETAIL";
+    const unknownTickers = ["PLANTED_UNKNOWN_A", "PLANTED_UNKNOWN_B"];
     mocked.marketStatus = {
       ...marketStatus,
       sync: {
@@ -554,9 +562,9 @@ describe("post-PG-exit storage panels", () => {
         observed_ticker_count: null,
         complete_ticker_count: null,
         partial_ticker_count: null,
-        unknown_ticker_count: null,
+        unknown_ticker_count: unknownTickers.length,
         partial_tickers: [],
-        unknown_tickers: [],
+        unknown_tickers: unknownTickers,
         unmatched_rth_row_count: null,
       }],
       provider_errors: [{
@@ -574,11 +582,20 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).toContain("供應商問題：1");
     expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).not.toContain(providerDiagnostic);
+    for (const ticker of unknownTickers) expect(host!.textContent).not.toContain(ticker);
     expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
 
     dispose();
     await renderSettings(true);
-    expect(host!.querySelector('[data-testid="developer-diagnostics"]')).not.toBeNull();
+    const diagnosticsOwners = Array.from(
+      host!.querySelectorAll<HTMLElement>('[data-testid="developer-diagnostics"]'),
+    );
+    const coverageDiagnostics = diagnosticsOwners.find((owner) =>
+      owner.textContent?.includes(providerDiagnostic));
+    expect(coverageDiagnostics).toBeDefined();
+    expect(coverageDiagnostics?.textContent).toContain(
+      `2026-07-18: ${unknownTickers.join(", ")}`,
+    );
     expect(host!.textContent).toContain(syncDiagnostic);
     expect(host!.textContent).toContain(providerDiagnostic);
     expect(getMarketDataStatus).toHaveBeenCalledTimes(2);
@@ -633,6 +650,7 @@ describe("post-PG-exit storage panels", () => {
 
   it("keeps unmatched rows and provider issues separate from coverage state", async () => {
     const rawProviderDetail = "PLANTED_PROVIDER_DETAIL";
+    const rawUnknownTickers = ["PLANTED_DAY_UNKNOWN_A", "PLANTED_DAY_UNKNOWN_B"];
     mocked.coverage = {
       version: 2,
       market_scope: "us_listed_equity_proxy",
@@ -667,7 +685,7 @@ describe("post-PG-exit storage panels", () => {
             observed_slot_count: 12,
             expected_slot_count: 26,
           }],
-          unknown_tickers: ["AAPL"],
+          unknown_tickers: [rawUnknownTickers[0]],
           unmatched_rth_row_count: 2,
         },
         {
@@ -684,7 +702,7 @@ describe("post-PG-exit storage panels", () => {
           partial_ticker_count: 0,
           unknown_ticker_count: 1,
           partial_tickers: [],
-          unknown_tickers: ["NVDA"],
+          unknown_tickers: [rawUnknownTickers[1]],
           unmatched_rth_row_count: 0,
         },
       ],
@@ -705,13 +723,30 @@ describe("post-PG-exit storage panels", () => {
     if (!dayRow) throw new Error("missing Coverage v2 day row");
     expect(dayRow.textContent).toContain("部分");
     expect(storage!.textContent).toContain("部分標的未能判定");
-    act(() => dayRow.click());
+    const disclosure = dayRow.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    if (!disclosure) throw new Error("missing Coverage v2 disclosure button");
+    expect(disclosure.type).toBe("button");
+    expect(disclosure.tabIndex).toBe(0);
+    disclosure.focus();
+    expect(document.activeElement).toBe(disclosure);
+    const detailId = disclosure.getAttribute("aria-controls");
+    expect(detailId).toBeTruthy();
+    act(() => disclosure.click());
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+    const detail = document.getElementById(detailId!);
+    expect(detail).not.toBeNull();
     expect(storage!.textContent).toContain("部分觀測標的");
     expect(storage!.textContent).toContain("MSFT：12/26 格");
     expect(storage!.textContent).toContain("未能判定的標的");
-    expect(storage!.textContent).toContain("AAPL");
+    expect(Array.from(detail!.querySelectorAll("p"), (node) => node.textContent)).toContain("1");
+    for (const ticker of rawUnknownTickers) {
+      expect(storage!.textContent).not.toContain(ticker);
+    }
     expect(storage!.textContent).toContain("格線外的正規交易時段資料列：2");
     expect(storage!.textContent).toContain("供應商問題：1");
     expect(storage!.textContent).not.toContain(rawProviderDetail);
+    act(() => disclosure.click());
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+    expect(document.getElementById(detailId!)).toBeNull();
   });
 });

@@ -707,7 +707,7 @@ const settings = {
         partialTitle: "部分觀測標的",
         partialDetail: "{{ticker}}：{{observed}}/{{expected}} 格",
         unknownTitle: "未能判定的標的",
-        unknownDetail: "{{count}} 檔：{{value}}",
+        unknownDetail: "{{count}}",
         unmatched: "格線外的正規交易時段資料列：{{count}}",
         providerIssues: "供應商問題：{{count}}",
         sessionWindow: "交易時段：{{open}} - {{close}}",

@@ -708,7 +708,7 @@ const settings = {
         partialTitle: "Partially observed tickers",
         partialDetail: "{{ticker}}: {{observed}}/{{expected}} slots",
         unknownTitle: "Unresolved tickers",
-        unknownDetail: "{{count}} tickers: {{value}}",
+        unknownDetail: "{{count}}",
         unmatched: "Unmatched RTH rows: {{count}}",
         providerIssues: "Provider issues: {{count}}",
         sessionWindow: "Session window: {{open}} - {{close}}",

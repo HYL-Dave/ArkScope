@@ -4,7 +4,9 @@ import type {
   CoverageCalendarHealth,
   CoverageDayReason,
   CoverageObservationHealth,
+  CoverageSession,
   MacroStatus,
+  MarketScope,
   MarketDataStatus,
   NewsStatus,
   ObservationHealthReason,
@@ -93,6 +95,26 @@ function unreachableCoverageValue(value: never): void {
 
 function unavailableCoverageLabel(t: SettingsT): string {
   return t(($) => $.dataStorage.coverage.status.unavailable);
+}
+
+export function coverageMarketScopeLabel(value: MarketScope, t: SettingsT): string {
+  switch (value) {
+    case "us_listed_equity_proxy":
+      return t(($) => $.dataStorage.coverage.facts.marketScopeValue);
+    default:
+      unreachableCoverageValue(value);
+      return unavailableCoverageLabel(t);
+  }
+}
+
+export function coverageSessionLabel(value: CoverageSession, t: SettingsT): string {
+  switch (value) {
+    case "rth":
+      return t(($) => $.dataStorage.coverage.facts.sessionValue);
+    default:
+      unreachableCoverageValue(value);
+      return unavailableCoverageLabel(t);
+  }
 }
 
 const WEEKEND_CLOSURE_REASON = {
@@ -258,7 +280,6 @@ export function coverageTickerFactsPresentation(
     unknownDetail: hasUnknown
       ? t(($) => $.dataStorage.coverage.drilldown.unknownDetail, {
         count: row.unknown_tickers.length,
-        value: row.unknown_tickers.join(", "),
       })
       : null,
   };

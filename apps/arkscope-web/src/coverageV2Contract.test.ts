@@ -146,8 +146,16 @@ describe("Coverage v2 contract", () => {
       resolve(import.meta.dirname, "./marketDataDisplay.ts"),
       "utf8",
     );
+    const storageSource = readFileSync(
+      resolve(import.meta.dirname, "./settings/DataStorageSection.tsx"),
+      "utf8",
+    );
     expect(displaySource).toContain("function unreachableCoverageValue(value: never): void");
+    expect(displaySource).toContain("export function coverageMarketScopeLabel");
+    expect(displaySource).toContain("export function coverageSessionLabel");
     expect(displaySource).not.toMatch(/coverage_status\.(?:startsWith|includes)/);
     expect(displaySource).not.toMatch(/status_reason_code\.(?:startsWith|includes)/);
+    expect(storageSource).toContain("coverageMarketScopeLabel(cov.market_scope, t)");
+    expect(storageSource).toContain("coverageSessionLabel(cov.coverage_session, t)");
   });
 });
