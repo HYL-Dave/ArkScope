@@ -167,6 +167,31 @@ Each entry records:
   reviewed subset. Do not bulk-revert resources.
 - `closure_evidence`: none.
 
+### EIR-004 - Distinguish a calibration model refusal from a retryable outage
+
+- `status`: `open`
+- `observed_at`: `2026-07-25`
+- `impact`: Calibration now preserves the durable typed `model_refusal`
+  outcome, but the UI presents it with the same generic turn-failure title as
+  transient responder errors. That can imply that repeating the unchanged
+  request is useful even when the model deterministically declined it.
+- `evidence`:
+  - `src/api/routes/investor_profile_calibration.py` now returns HTTP `502`,
+    stores `model_refusal`, and exposes only a fixed safe diagnostic; the named
+    contract is
+    `test_calibration_refusal_records_model_refusal_instead_of_generic_failure`;
+  - `apps/arkscope-web/src/InvestorProfilePanel.tsx:153-164` maps every
+    `ErrorScope` value of `turn` to
+    `investor.workspace.errors.turn` without inspecting the typed code;
+  - the only rendered copy is the generic string at
+    `apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:921` and
+    `apps/arkscope-web/src/i18n/resources/en/settings.ts:922`.
+- `owner`: next Investor Profile-owned UI slice.
+- `next_action`: define refusal-specific localized guidance and the retry or
+  answer-edit action it permits, then add a named mounted UI contract. Do not
+  expose raw model name, stop details, or Provider prose.
+- `closure_evidence`: none.
+
 ## 5. Seed Triage: Items Not Opened
 
 These observations were considered while creating the register and are not

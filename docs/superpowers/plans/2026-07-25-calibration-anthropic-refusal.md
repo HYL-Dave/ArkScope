@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** REVIEW GREEN - IMPLEMENTATION CLEARED
+**Status:** IMPLEMENTED - INDEPENDENT REVIEW PENDING
 
 **Goal:** Make the Investor Profile calibration Anthropic seam classify
 HTTP-200 `stop_reason="refusal"` as the existing typed `model_refusal` failure
@@ -145,7 +145,7 @@ Change plan status to `REVIEW GREEN - IMPLEMENTATION CLEARED`, add the review
 resolution, update the newest priority-map entry, and commit docs only. Record:
 
 ```text
-PLAN_REVIEW_CLEARANCE_COMMIT=<40-character commit>
+PLAN_REVIEW_CLEARANCE_COMMIT=d19d964218dcc84bdd8aa908e27b577c8f079fdd
 ```
 
 Do not edit product code before this commit exists.
@@ -156,7 +156,7 @@ Do not edit product code before this commit exists.
 - Modify: `tests/test_investor_profile_calibration.py`
 - Modify: `src/investor_profile_calibration_agent.py`
 
-- [ ] **Step 1: Add the direct RED test**
+- [x] **Step 1: Add the direct RED test**
 
 Add imports:
 
@@ -204,7 +204,7 @@ def test_anthropic_calibration_raises_structured_refusal_before_text_extraction(
     create.assert_called_once()
 ```
 
-- [ ] **Step 2: Prove the test is RED for the intended reason**
+- [x] **Step 2: Prove the test is RED for the intended reason**
 
 Run:
 
@@ -217,7 +217,7 @@ Expected before implementation: `FAILED` because no
 `AnthropicRefusalError` is raised. A credential/config failure or JSON parser
 failure is the wrong RED and triggers a stop.
 
-- [ ] **Step 3: Add the minimal response-seam branch**
+- [x] **Step 3: Add the minimal response-seam branch**
 
 At module imports:
 
@@ -236,7 +236,7 @@ return _message_text_anthropic(resp)
 
 Do not wrap this in a generic catch and do not add retry logic.
 
-- [ ] **Step 4: Run the direct and shared refusal tests**
+- [x] **Step 4: Run the direct and shared refusal tests**
 
 ```bash
 pytest -q \
@@ -249,7 +249,7 @@ pytest -q \
 
 Expected: all selected nodes pass.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add src/investor_profile_calibration_agent.py \
@@ -263,7 +263,7 @@ git commit -m "fix: detect calibration model refusals"
 - Modify: `tests/test_investor_profile_calibration_routes.py`
 - Modify: `src/api/routes/investor_profile_calibration.py`
 
-- [ ] **Step 1: Add the route RED test**
+- [x] **Step 1: Add the route RED test**
 
 Import the existing type:
 
@@ -330,7 +330,7 @@ def test_calibration_refusal_records_model_refusal_instead_of_generic_failure(
     assert "private-detail" not in exposed
 ```
 
-- [ ] **Step 2: Prove the test is RED for the intended reason**
+- [x] **Step 2: Prove the test is RED for the intended reason**
 
 ```bash
 pytest -q \
@@ -341,7 +341,7 @@ Expected before route implementation: `FAILED` because the generic handler
 returns and persists `calibration_responder_failed`. A setup, permission, or
 store failure is the wrong RED.
 
-- [ ] **Step 3: Add the narrow typed catch**
+- [x] **Step 3: Add the narrow typed catch**
 
 Import `AnthropicRefusalError` from `src.anthropic_refusal`. Add a fixed
 diagnostic helper beside the existing diagnostic helpers:
@@ -374,7 +374,7 @@ except AnthropicRefusalError as exc:
 The catch order is load-bearing. The typed error must not reach the generic
 handler.
 
-- [ ] **Step 4: Run route regressions**
+- [x] **Step 4: Run route regressions**
 
 ```bash
 pytest -q \
@@ -387,7 +387,7 @@ pytest -q \
 Expected: all pass. The three existing generic/parse/privacy contracts must not
 change.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add src/api/routes/investor_profile_calibration.py \
@@ -403,7 +403,7 @@ git commit -m "fix: preserve typed calibration refusals"
 - Modify: `docs/superpowers/plans/2026-07-25-calibration-anthropic-refusal.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Prove the exact node ledger**
+- [x] **Step 1: Prove the exact node ledger**
 
 ```bash
 pytest --collect-only -q | tail -1
@@ -415,7 +415,7 @@ pytest --collect-only -q \
 Expected: full `4713`; focused `48`. Normalize base/head node IDs and require
 exact `+2/-0` with only the two IDs in section 1.
 
-- [ ] **Step 2: Run the focused behavior suite**
+- [x] **Step 2: Run the focused behavior suite**
 
 ```bash
 pytest -q \
@@ -425,7 +425,7 @@ pytest -q \
 
 Expected: `48 passed`.
 
-- [ ] **Step 3: Run equal-environment virgin full A/B**
+- [x] **Step 3: Run equal-environment virgin full A/B**
 
 Create clean archives of `PLAN_REVIEW_CLEARANCE_COMMIT` and implementation
 tip, mount the same repository `node_modules` into both, and give both the same
@@ -444,7 +444,7 @@ Required result:
 Absolute historical failure counts are environment observations, not expected
 constants. Record both archive environments and normalized ID hashes.
 
-- [ ] **Step 4: Run boundary gates**
+- [x] **Step 4: Run boundary gates**
 
 ```bash
 python -m src.smoke.pg_unreachable_e2e
@@ -467,7 +467,7 @@ passes. Inspect the two authorized product diffs and require only:
 - one shared-helper import plus one refusal branch in the calibration agent;
 - one typed import, one fixed diagnostic helper, and one catch in the route.
 
-- [ ] **Step 5: Write evidence and stop at review-ready**
+- [x] **Step 5: Write evidence and stop at review-ready**
 
 Record RED output, GREEN output, exact node lists/hashes, full A/B, no-PG,
 byte gates, and diff census in the evidence packet. Change plan status to
