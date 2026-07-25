@@ -1,6 +1,6 @@
 # ArkScope SA Extension Reliability and Control-Clarity Design
 
-> **Status: POST-MERGE CONTRAST REPAIR IMPLEMENTED - INDEPENDENT REVIEW PENDING**
+> **Status: POST-MERGE CONTRAST REPAIR REVIEW GREEN - MERGE APPROVED**
 >
 > Written against clean `master` at `38178f65` on 2026-07-25. This document
 > is the design authority for the bounded Seeking Alpha browser-extension
@@ -97,6 +97,14 @@ protocol, database, or web-app behavior. `#b45309` on `#fff3e0` is accepted at
 The gate gap itself is part of closeout evidence: the original visual matrix
 checked geometry and visible labels but did not expand hidden states or audit
 contrast.
+
+The constant regression node runs in jsdom as a fast ratchet; it is not a
+claim that jsdom implements the browser CSS cascade exactly. Real Chrome
+computed-style contrast is the paired release authority for popup CSS changes.
+If a future rule uses CSS that jsdom cannot resolve faithfully, the Chrome
+result controls and the ratchet must be amended or the release stops; the
+browser confirmation must not be removed merely because the jsdom node is
+green.
 
 ## 1. Purpose and Authority
 

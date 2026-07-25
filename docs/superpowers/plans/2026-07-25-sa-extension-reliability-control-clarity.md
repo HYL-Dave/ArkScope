@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: POST-MERGE CONTRAST REPAIR IMPLEMENTED - INDEPENDENT REVIEW PENDING**
+> **Status: POST-MERGE CONTRAST REPAIR REVIEW GREEN - MERGE APPROVED**
 >
 > The design passed independent review and its required disclosure amendment
 > plus all three advisories are incorporated through `9da1a9c9`. A later
