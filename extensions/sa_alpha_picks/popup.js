@@ -1,7 +1,8 @@
-// popup.js — Three-mode refresh: Quick + Full Scan + Deep Backfill
+// popup.js — bounded Alpha Picks and Market News controls
 
 var statusEl = document.getElementById("status");
 var marketNewsStatusEl = document.getElementById("marketNewsStatus");
+var lastRunStatusEl = document.getElementById("lastRunStatus");
 var quickBtn = document.getElementById("quickBtn");
 var fullBtn = document.getElementById("fullBtn");
 var backfillBtn = document.getElementById("backfillBtn");
@@ -12,6 +13,16 @@ var alphaPicksAutoSyncInterval = document.getElementById("alphaPicksAutoSyncInte
 var marketNewsAutoSyncToggle = document.getElementById("marketNewsAutoSyncToggle");
 var marketNewsAutoSyncInterval = document.getElementById("marketNewsAutoSyncInterval");
 var marketNewsAutoSyncResolvedEl = document.getElementById("marketNewsAutoSyncResolved");
+var actionHelpBody = document.querySelector("#actionHelp tbody");
+var marketNewsRecoveryStatusEl = document.getElementById("marketNewsRecoveryStatus");
+var marketNewsRecoveryPreviewEl = document.getElementById("marketNewsRecoveryPreview");
+var reviewRecoveryScopeBtn = document.getElementById("reviewRecoveryScopeBtn");
+var retryRecordedFailuresBtn = document.getElementById("retryRecordedFailuresBtn");
+var marketNewsRecoveryAdvanced = document.getElementById("marketNewsRecoveryAdvanced");
+var incidentRecoveryBtn = document.getElementById("incidentRecoveryBtn");
+var resumeRecoveryBtn = document.getElementById("resumeRecoveryBtn");
+var cancelRecoveryBtn = document.getElementById("cancelRecoveryBtn");
+var recoveryConfirmationEl = document.getElementById("recoveryConfirmation");
 var progressEl = document.getElementById("progress");
 var reconciliationQueueEl = document.getElementById("reconciliationQueue");
 var reconciliationErrorEl = document.getElementById("reconciliationError");
@@ -23,6 +34,12 @@ var lastReconciliationQueue = null;
 var ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL = "30";
 var MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL = "60";
 var MARKET_NEWS_AUTO_SYNC_AUTO_VALUE = "auto";
+var EXTENSION_LAST_RUN_STORAGE_KEY = "arkscope.sa.lastRun.v1";
+var recoveryPreviews = {
+  recorded_failures: null,
+  incident_window: null,
+};
+var activeRecoveryState = null;
 var MARKET_NEWS_AUTO_SYNC_WINDOWS_ET = {
   weekday: [
     { start: 0, end: 4 * 60, interval: 15 },
@@ -46,6 +63,9 @@ var MARKET_NEWS_AUTO_SYNC_WINDOWS_ET = {
   ],
 };
 
+// Labels and accessible descriptions are available before native limits resolve.
+renderActionCatalog({ status: "loading", limits: {} });
+
 // Load last refresh state + restore manual input
 chrome.storage.local.get([
   "lastRefresh",
@@ -54,7 +74,8 @@ chrome.storage.local.get([
   "alphaPicksAutoSyncEnabled",
   "alphaPicksAutoSyncIntervalMinutes",
   "marketNewsAutoSyncEnabled",
-  "marketNewsAutoSyncIntervalMinutes"
+  "marketNewsAutoSyncIntervalMinutes",
+  EXTENSION_LAST_RUN_STORAGE_KEY
 ], function (data) {
   if (data.manualDraft) {
     manualInput.value = data.manualDraft;
@@ -68,6 +89,8 @@ chrome.storage.local.get([
   renderMarketNewsAutoSyncResolved();
   renderStatus(data.lastRefresh);
   renderMarketNewsStatus(data.lastMarketNewsRefresh);
+  renderStructuredLastRun(data[EXTENSION_LAST_RUN_STORAGE_KEY]);
+  initializePopupActionsAndRecovery();
   loadReconciliationQueue();
   chrome.runtime.sendMessage({ action: "ensure_auto_sync_alarms" }, function () {
     if (chrome.runtime.lastError) {
@@ -99,6 +122,51 @@ marketNewsBtn.addEventListener("click", function () {
 
 marketNewsCatchupBtn.addEventListener("click", function () {
   startMarketNewsRefresh("catchup");
+});
+
+retryRecordedFailuresBtn.addEventListener("click", function () {
+  var preview = recoveryPreviews.recorded_failures;
+  if (!preview || preview.can_start !== true || !(preview.target_count > 0)) return;
+  startMarketNewsRecovery("recorded_failures", preview);
+});
+
+reviewRecoveryScopeBtn.addEventListener("click", function () {
+  marketNewsRecoveryAdvanced.open = true;
+  incidentRecoveryBtn.focus();
+});
+
+incidentRecoveryBtn.addEventListener("click", function () {
+  var preview = recoveryPreviews.incident_window;
+  if (!preview || preview.can_start !== true) return;
+  renderRecoveryConfirmation(preview);
+});
+
+resumeRecoveryBtn.addEventListener("click", function () {
+  if (!activeRecoveryState || activeRecoveryState.status !== "running") return;
+  runRecoveryMessage({
+    action: "market_news_recovery_resume",
+    run_id: activeRecoveryState.run_id,
+    manifest_hash: activeRecoveryState.manifest_hash,
+  });
+});
+
+cancelRecoveryBtn.addEventListener("click", function () {
+  if (!activeRecoveryState || activeRecoveryState.status !== "running") return;
+  setRecoveryControlsDisabled(true);
+  sendRuntimeMessage({
+    action: "market_news_recovery_cancel",
+    run_id: activeRecoveryState.run_id,
+    manifest_hash: activeRecoveryState.manifest_hash,
+  }).then(function (result) {
+    setRecoveryControlsDisabled(false);
+    if (result && result.status !== "error") renderRecoveryState(result, true);
+  });
+});
+
+recoveryConfirmationEl.addEventListener("keydown", function (event) {
+  if (event.key !== "Escape" || recoveryConfirmationEl.hidden) return;
+  event.preventDefault();
+  closeRecoveryConfirmation();
 });
 
 alphaPicksAutoSyncToggle.addEventListener("change", function () {
@@ -215,6 +283,384 @@ function startMarketNewsRefresh(mode) {
       renderMarketNewsStatus(data.lastMarketNewsRefresh);
     });
   });
+}
+
+function sendRuntimeMessage(payload) {
+  return new Promise(function (resolve) {
+    chrome.runtime.sendMessage(payload, function (result) {
+      if (chrome.runtime.lastError) {
+        resolve({ status: "error", error_code: "extension_runtime_unavailable" });
+        return;
+      }
+      resolve(result || { status: "error", error_code: "empty_extension_response" });
+    });
+  });
+}
+
+function initializePopupActionsAndRecovery() {
+  sendRuntimeMessage({ action: "get_extension_action_limits" })
+    .then(renderActionCatalog);
+  Promise.all([
+    sendRuntimeMessage({
+      action: "market_news_recovery_preview",
+      kind: "recorded_failures",
+    }),
+    sendRuntimeMessage({
+      action: "market_news_recovery_preview",
+      kind: "incident_window",
+    }),
+    sendRuntimeMessage({ action: "market_news_recovery_state" }),
+  ]).then(function (values) {
+    recoveryPreviews.recorded_failures = normalizeRecoveryPreview(
+      "recorded_failures", values[0]
+    );
+    recoveryPreviews.incident_window = normalizeRecoveryPreview(
+      "incident_window", values[1]
+    );
+    renderRecoveryEntryPoints();
+    if (values[2] && values[2].status !== "error") {
+      renderRecoveryState(values[2], false);
+    }
+  });
+}
+
+function renderActionCatalog(response) {
+  var catalog = SAExtensionPopupActions.buildCatalog(response || {});
+  var byId = {};
+  catalog.forEach(function (action) {
+    byId[action.id] = action;
+    var button = document.querySelector('[data-action-id="' + action.id + '"]');
+    var description = document.getElementById("action-description-" + action.id);
+    if (!button || !description) return;
+    button.textContent = action.label;
+    button.setAttribute("aria-describedby", description.id);
+    description.textContent = action.description;
+  });
+
+  actionHelpBody.replaceChildren();
+  catalog.forEach(function (action) {
+    var row = document.createElement("tr");
+    row.dataset.actionId = action.id;
+    [action.label, action.scope, action.whenToUse, action.nonGuarantee].forEach(
+      function (value) {
+        var cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      }
+    );
+    actionHelpBody.appendChild(row);
+  });
+}
+
+function normalizeRecoveryPreview(kind, value) {
+  if (!value || typeof value !== "object" || value.status === "error") {
+    return {
+      status: "error",
+      kind: kind,
+      can_start: false,
+      target_count: 0,
+      error_code: value && value.error_code,
+    };
+  }
+  return value;
+}
+
+function renderRecoveryEntryPoints() {
+  var recorded = recoveryPreviews.recorded_failures;
+  var incident = recoveryPreviews.incident_window;
+  var retryCount = recorded && Number.isInteger(recorded.target_count)
+    ? recorded.target_count
+    : 0;
+  retryRecordedFailuresBtn.hidden = !(
+    recorded && recorded.can_start === true && retryCount > 0
+  );
+  retryRecordedFailuresBtn.textContent = "Retry Recorded Failures (" + retryCount + ")";
+
+  var incidentAvailable = !!(incident && incident.can_start === true);
+  incidentRecoveryBtn.hidden = !incidentAvailable;
+  incidentRecoveryBtn.disabled = !incidentAvailable;
+  renderIncidentRecoveryPreview(incident);
+  var beyondRoutine = isBeyondRoutineCatchup(incident);
+  reviewRecoveryScopeBtn.hidden = !beyondRoutine;
+  if (!activeRecoveryState) {
+    if (recorded && recorded.status === "error" && incident && incident.status === "error") {
+      setRecoveryStatus(
+        "error",
+        "Recovery state is unavailable. Open ArkScope System health for details.",
+        false
+      );
+    } else if (retryCount > 0) {
+      var retryText = retryCount + " recorded IDs; no time-window cutoff. " +
+        "Retry only those known detail failures.";
+      if (beyondRoutine) retryText += " " + formatRecoveryGapStatus(incident);
+      setRecoveryStatus("partial", retryText, false);
+    } else if (incidentAvailable) {
+      setRecoveryStatus(
+        "partial",
+        beyondRoutine
+          ? formatRecoveryGapStatus(incident)
+          : "A bounded incident-recovery interval is available.",
+        false
+      );
+    } else {
+      setRecoveryStatus("empty", "No recovery work found.", false);
+    }
+  }
+
+  if (beyondRoutine) {
+    marketNewsRecoveryAdvanced.open = true;
+    incidentRecoveryBtn.focus();
+  }
+}
+
+function setRecoveryStatus(className, message, actionableFailure) {
+  marketNewsRecoveryStatusEl.className = className;
+  marketNewsRecoveryStatusEl.setAttribute("role", actionableFailure ? "alert" : "status");
+  marketNewsRecoveryStatusEl.textContent = message;
+}
+
+function isBeyondRoutineCatchup(preview) {
+  var interval = preview && preview.manifest && preview.manifest.interval;
+  if (!preview || preview.can_start !== true || !interval) return false;
+  var start = Date.parse(interval.start_at);
+  var end = Date.parse(interval.end_at);
+  return Number.isFinite(start) && Number.isFinite(end) && end - start > 24 * 60 * 60 * 1000;
+}
+
+function formatRecoveryUtc(value) {
+  var date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "unknown time";
+  return date.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+}
+
+function formatRecoveryDuration(interval) {
+  var start = Date.parse(interval && interval.start_at);
+  var end = Date.parse(interval && interval.end_at);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return "unknown duration";
+  }
+  var totalMinutes = Math.floor((end - start) / 60000);
+  var hours = Math.floor(totalMinutes / 60);
+  var minutes = totalMinutes % 60;
+  return hours + "h " + minutes + "m";
+}
+
+function formatRecoveryGapStatus(preview) {
+  var interval = preview && preview.manifest && preview.manifest.interval;
+  if (!interval) return "A bounded incident-recovery interval is available.";
+  return "Detected gap: " + formatRecoveryUtc(interval.start_at) + " to " +
+    formatRecoveryUtc(interval.end_at) + " (" + formatRecoveryDuration(interval) + "). " +
+    "Review recovery scope before starting.";
+}
+
+function renderIncidentRecoveryPreview(preview) {
+  if (!marketNewsRecoveryPreviewEl) return;
+  var interval = preview && preview.manifest && preview.manifest.interval;
+  if (!preview || preview.status === "error") {
+    marketNewsRecoveryPreviewEl.textContent =
+      "Incident-recovery preview is unavailable. No work has started.";
+    return;
+  }
+  if (preview.can_start !== true || !interval) {
+    marketNewsRecoveryPreviewEl.textContent =
+      "No incident-recovery scope is currently available.";
+    return;
+  }
+  var targetCount = Number.isInteger(preview.target_count) ? preview.target_count : 0;
+  var maxRounds = preview.discovery && Number.isInteger(
+    preview.discovery.max_list_scroll_rounds
+  ) ? preview.discovery.max_list_scroll_rounds : "an unavailable number of";
+  var anchorText = interval.anchor_verified === true
+    ? "The start is anchored to the latest derived-complete Market News run."
+    : "No verified healthy anchor exists; the preview is capped and may omit older gaps.";
+  marketNewsRecoveryPreviewEl.textContent = "Attempt recovery: " +
+    formatRecoveryUtc(interval.start_at) + " to " + formatRecoveryUtc(interval.end_at) +
+    " (" + formatRecoveryDuration(interval) + "). " + targetCount +
+    " known detail IDs. Missing metadata cannot be counted before discovery. " +
+    "Metadata rediscovery is bounded to " + maxRounds + " list rounds. " + anchorText;
+}
+
+function renderRecoveryConfirmation(preview) {
+  var interval = preview && preview.manifest && preview.manifest.interval;
+  if (!interval) return;
+  recoveryConfirmationEl.replaceChildren();
+  recoveryConfirmationEl.hidden = false;
+  recoveryConfirmationEl.setAttribute("role", "group");
+  recoveryConfirmationEl.setAttribute("aria-label", "Confirm bounded Market News recovery");
+
+  var message = document.createElement("p");
+  var targetCount = Number.isInteger(preview.target_count) ? preview.target_count : 0;
+  var maxRounds = preview.discovery && Number.isInteger(
+    preview.discovery.max_list_scroll_rounds
+  ) ? preview.discovery.max_list_scroll_rounds : 60;
+  message.textContent = "Attempt " + formatRecoveryUtc(interval.start_at) + " to " +
+    formatRecoveryUtc(interval.end_at) + ". This run has " + targetCount +
+    " known detail IDs and also performs metadata discovery, with up to " +
+    maxRounds + " list rounds. It does not guarantee that the source can expose the full interval.";
+
+  var actions = document.createElement("div");
+  actions.className = "recovery-actions";
+  var confirmButton = document.createElement("button");
+  confirmButton.type = "button";
+  confirmButton.dataset.action = "confirm-recovery";
+  confirmButton.textContent = "Start bounded recovery";
+  var cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.textContent = "Cancel";
+  actions.append(confirmButton, cancelButton);
+  recoveryConfirmationEl.append(message, actions);
+
+  cancelButton.addEventListener("click", function () {
+    closeRecoveryConfirmation();
+  });
+  confirmButton.addEventListener("click", function () {
+    recoveryConfirmationEl.hidden = true;
+    startMarketNewsRecovery("incident_window", preview);
+  });
+  confirmButton.focus();
+}
+
+function closeRecoveryConfirmation() {
+  recoveryConfirmationEl.hidden = true;
+  recoveryConfirmationEl.replaceChildren();
+  incidentRecoveryBtn.focus();
+}
+
+function startMarketNewsRecovery(kind, preview) {
+  if (!preview || preview.can_start !== true) return Promise.resolve(null);
+  return runRecoveryMessage({
+    action: "market_news_recovery_start",
+    kind: kind,
+    manifest: preview.manifest,
+    manifest_hash: preview.manifest_hash,
+  });
+}
+
+function setRecoveryControlsDisabled(disabled) {
+  [quickBtn, fullBtn, backfillBtn, marketNewsBtn, marketNewsCatchupBtn,
+    retryRecordedFailuresBtn, incidentRecoveryBtn, resumeRecoveryBtn, cancelRecoveryBtn]
+    .forEach(function (button) {
+      if (button) button.disabled = disabled;
+    });
+}
+
+function runRecoveryMessage(payload) {
+  setRecoveryControlsDisabled(true);
+  setRecoveryStatus(
+    "partial",
+    "Recovery is running. Closing this popup does not cancel it.",
+    false
+  );
+  return sendRuntimeMessage(payload).then(function (result) {
+    setRecoveryControlsDisabled(false);
+    if (result && result.status !== "error") {
+      renderRecoveryState(result, true);
+    } else {
+      setRecoveryStatus(
+        "error",
+        "Recovery could not start. Check ArkScope System health and try again.",
+        true
+      );
+    }
+    return result;
+  });
+}
+
+function renderRecoveryState(state, announceActionable) {
+  activeRecoveryState = state && typeof state === "object" ? state : null;
+  if (!activeRecoveryState) return;
+  var hash = typeof activeRecoveryState.manifest_hash === "string"
+    ? activeRecoveryState.manifest_hash.slice(0, 12)
+    : "unknown";
+  var runId = Number.isInteger(activeRecoveryState.run_id)
+    ? activeRecoveryState.run_id
+    : "unknown";
+  var isRunning = activeRecoveryState.status === "running";
+  resumeRecoveryBtn.hidden = !isRunning;
+  cancelRecoveryBtn.hidden = !isRunning;
+  if (isRunning) {
+    marketNewsRecoveryAdvanced.open = true;
+    reviewRecoveryScopeBtn.hidden = true;
+    setRecoveryStatus(
+      "partial",
+      "Run " + runId + " (manifest " + hash +
+        ") is resumable. Each pass attempts at most 80 details.",
+      false
+    );
+    return;
+  }
+  var counts = activeRecoveryState.counts || {};
+  var retryable = Number.isInteger(counts.failed_retryable) ? counts.failed_retryable : 0;
+  reviewRecoveryScopeBtn.hidden = true;
+  setRecoveryStatus(
+    retryable > 0 ? "partial" : "success",
+    "Run " + runId + " (manifest " + hash +
+      ") finished: " + (counts.repaired || 0) + " repaired, " +
+      (counts.already_present || 0) + " already present, " +
+      (counts.unavailable_at_source || 0) + " unavailable at source, " +
+      retryable + " retryable.",
+    retryable > 0 && announceActionable === true
+  );
+}
+
+function renderStructuredLastRun(summary, announceActionable) {
+  if (!lastRunStatusEl) return;
+  if (!summary || typeof summary !== "object") {
+    lastRunStatusEl.className = "empty";
+    lastRunStatusEl.setAttribute("role", "status");
+    lastRunStatusEl.textContent = "No audited extension run yet.";
+    return;
+  }
+  var outcome = SAExtensionPopupActions.outcomeLabel(summary.derived_outcome);
+  var operation = summary.operation === "market_news_sync"
+    ? "Market News"
+    : summary.operation === "alpha_picks_sync"
+      ? "Alpha Picks"
+      : "Extension";
+  var mode = typeof summary.mode === "string" && summary.mode
+    ? " (" + summary.mode + ")"
+    : "";
+  var counts = summary.counts || {};
+  var phaseComplete = Number.isInteger(counts.phase_complete) ? counts.phase_complete : 0;
+  var phaseFailed = Number.isInteger(counts.phase_failed) ? counts.phase_failed : 0;
+  var phaseSkipped = Number.isInteger(counts.phase_skipped) ? counts.phase_skipped : 0;
+  var phaseTotal = phaseComplete + phaseFailed + phaseSkipped;
+  var itemTotal = Number.isInteger(counts.item_total) ? counts.item_total : 0;
+  var failures = Number.isInteger(counts.failed_retryable)
+    ? counts.failed_retryable
+    : Number.isInteger(counts.detail_failed)
+      ? counts.detail_failed
+      : 0;
+  var pieces = [operation + mode + ": " + outcome + "."];
+  if (summary.finished_at) pieces.push(formatRecoveryUtc(summary.finished_at) + ".");
+  if (phaseTotal > 0) {
+    pieces.push(phaseComplete + "/" + phaseTotal + " phases complete.");
+  }
+  if (itemTotal > 0) {
+    pieces.push(itemTotal + " item" + (itemTotal === 1 ? "" : "s") + ".");
+  }
+  if (failures > 0) {
+    pieces.push(failures + " detail failure" + (failures === 1 ? "" : "s") + " recorded.");
+  }
+  if (summary.audit_state) {
+    var audit = SAExtensionPopupActions.auditLabel(summary.audit_state);
+    if (summary.audit_reason_code) {
+      audit += ": " + SAExtensionPopupActions.reasonLabel(summary.audit_reason_code);
+    }
+    pieces.push(audit + ".");
+  }
+  lastRunStatusEl.className = summary.derived_outcome === "complete"
+    ? "success"
+    : summary.derived_outcome === "failed"
+      ? "error"
+      : "partial";
+  var isActionable = summary.derived_outcome === "failed" ||
+    summary.derived_outcome === "degraded" || summary.audit_state === "unavailable";
+  lastRunStatusEl.setAttribute(
+    "role",
+    announceActionable === true && isActionable ? "alert" : "status"
+  );
+  lastRunStatusEl.textContent = pieces.join(" ");
 }
 
 function updateAlphaPicksAutoSyncSetting(payload, onDone) {
@@ -536,6 +982,9 @@ chrome.storage.onChanged.addListener(function (changes, areaName) {
   if (changes.lastMarketNewsRefresh) {
     renderMarketNewsStatus(changes.lastMarketNewsRefresh.newValue);
   }
+  if (changes[EXTENSION_LAST_RUN_STORAGE_KEY]) {
+    renderStructuredLastRun(changes[EXTENSION_LAST_RUN_STORAGE_KEY].newValue, true);
+  }
 });
 
 function renderMarketNewsStatus(lastMarketNewsRefresh) {
@@ -562,7 +1011,8 @@ function renderMarketNewsStatus(lastMarketNewsRefresh) {
     marketNewsStatusEl.textContent = "Market News" + modeLabel + ": " + (result.saved || 0) + " saved / " + (result.count || 0) + " scraped" + detailSuffix + " (" + timeStr + ")";
   } else {
     marketNewsStatusEl.className = "error";
-    marketNewsStatusEl.textContent = "Market News" + modeLabel + " failed: " + (result.error || "unknown") + " (" + timeStr + ")";
+    marketNewsStatusEl.textContent = "Market News" + modeLabel +
+      " needs attention (" + timeStr + "). See the audited run status below.";
   }
 }
 
@@ -600,19 +1050,20 @@ function renderStatus(lastRefresh) {
     var ok = currentOk ? "current" : "closed";
     var fail = currentOk ? "closed" : "current";
     var okCount = (currentOk ? current : closed).count;
-    var failError = (currentOk ? closed : current).error || "unknown";
     statusEl.append(
       document.createTextNode("Partial refresh: " + timeStr + modeLabel),
       document.createElement("br"),
-      document.createTextNode(ok + ": " + okCount + " picks | " + fail + ": failed (" + failError + ")")
+      document.createTextNode(
+        ok + ": " + okCount + " picks | " + fail +
+        ": needs attention. See the audited run status below."
+      )
     );
   } else if (current || closed) {
     statusEl.className = "error";
-    var error = (current && current.error) || (closed && closed.error) || "unknown";
     statusEl.append(
       document.createTextNode("Failed: " + timeStr),
       document.createElement("br"),
-      document.createTextNode(error)
+      document.createTextNode("Alpha Picks refresh needs attention. See the audited run status below.")
     );
   } else {
     statusEl.className = "empty";
@@ -626,7 +1077,7 @@ function renderStatus(lastRefresh) {
     if (details.error) {
       statusEl.append(
         document.createElement("br"),
-        document.createTextNode("Articles: error (" + details.error + ")")
+        document.createTextNode("Articles: needs attention. See the audited run status below.")
       );
     } else {
       var parts = [];

@@ -234,54 +234,240 @@
       margin-top: 6px;
       background: #ef6c00;
     }
+    body {
+      width: 360px;
+      margin: 0;
+      color: #252525;
+      background: #fff;
+    }
+    h2 {
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+    h3 {
+      margin: 12px 0 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      color: #666;
+    }
+    #status,
+    #marketNewsStatus,
+    #lastRunStatus,
+    #marketNewsRecoveryStatus {
+      box-sizing: border-box;
+      margin: 6px 0;
+      padding: 7px 8px;
+      border-left: 3px solid #c7c7c7;
+      background: #f6f6f6;
+      font-size: 11px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    #marketNewsStatus.success,
+    #lastRunStatus.success,
+    #marketNewsRecoveryStatus.success { border-left-color: #2e7d32; }
+    #marketNewsStatus.partial,
+    #lastRunStatus.partial,
+    #marketNewsRecoveryStatus.partial { border-left-color: #ef6c00; }
+    #marketNewsStatus.error,
+    #lastRunStatus.error,
+    #marketNewsRecoveryStatus.error { border-left-color: #c62828; }
+    .action-group {
+      border-top: 1px solid #e4e4e4;
+      padding-top: 2px;
+    }
+    .action-control {
+      margin-bottom: 6px;
+    }
+    .action-button {
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+      border: 1px solid #b9c6d4;
+      border-radius: 4px;
+      background: #fff;
+      color: #174b72;
+      font-weight: 600;
+      text-align: left;
+      line-height: 1.25;
+    }
+    .action-button:hover:not(:disabled),
+    .action-button:focus-visible {
+      border-color: #1976d2;
+      background: #eef6fc;
+      outline: none;
+    }
+    .action-description {
+      display: none;
+      margin: 4px 2px 2px;
+      color: #606060;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .action-control:hover .action-description,
+    .action-control:focus-within .action-description {
+      display: block;
+    }
+    .section-note {
+      margin: 4px 0 8px;
+      color: #666;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    #actionHelp,
+    #marketNewsRecoveryAdvanced {
+      margin-top: 10px;
+      color: #555;
+      font-size: 11px;
+    }
+    #actionHelp summary,
+    #marketNewsRecoveryAdvanced summary {
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+    }
+    .action-scope-table {
+      width: 100%;
+      margin-top: 7px;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .action-scope-table th,
+    .action-scope-table td {
+      padding: 5px 4px;
+      border: 1px solid #ddd;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+    .action-scope-table th {
+      background: #f4f4f4;
+      text-align: left;
+    }
+    .action-scope-table th:first-child,
+    .action-scope-table td:first-child { width: 18%; }
+    .recovery-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 7px;
+    }
+    .recovery-actions button,
+    #retryRecordedFailuresBtn {
+      flex: 0 1 auto;
+      min-height: 32px;
+      padding: 7px 9px;
+      border-radius: 4px;
+      background: #315f7d;
+      font-size: 11px;
+    }
+    .recovery-confirmation {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid #e2b36f;
+      background: #fff8e8;
+      color: #6c490b;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <h2>SA Alpha Picks</h2>
-  <div id="status" class="empty">No data yet. Click a button below.</div>
-  <div id="marketNewsStatus" class="empty">Market News: not synced yet.</div>
-  <div class="btn-row">
-    <button id="quickBtn">Quick Refresh</button>
-    <button id="fullBtn">Full Scan</button>
-  </div>
-  <div class="btn-row">
-    <button id="backfillBtn">Deep Backfill</button>
-    <button id="marketNewsBtn">News Quick</button>
-  </div>
-  <div class="btn-row">
-    <button id="marketNewsCatchupBtn">News Catchup</button>
-  </div>
-  <div class="toggle-row">
-    <label for="alphaPicksAutoSyncToggle">
-      <span>Auto-sync Alpha Picks</span>
-      <small>Runs quick refresh on the selected interval when enabled</small>
-    </label>
-    <div class="toggle-controls">
-      <select id="alphaPicksAutoSyncInterval">
-        <option value="15">15 min</option>
-        <option value="30">30 min</option>
-        <option value="60">60 min</option>
-      </select>
-      <input id="alphaPicksAutoSyncToggle" type="checkbox">
+  <div id="status" class="empty" role="status">No data yet. Click a button below.</div>
+  <div id="marketNewsStatus" class="empty" role="status">Market News: not synced yet.</div>
+  <div id="lastRunStatus" class="empty" role="status">No audited extension run yet.</div>
+
+  <section class="action-group" data-action-group="alpha-picks">
+    <h3>Alpha Picks</h3>
+    <div class="action-control">
+      <button id="quickBtn" class="action-button" type="button" data-action-id="quick"></button>
+      <p id="action-description-quick" class="action-description"></p>
     </div>
-  </div>
-  <div class="toggle-row">
-    <label for="marketNewsAutoSyncToggle">
-      <span>Auto-sync Market News</span>
-      <small>Auto uses observed ET publish-density windows, not a fixed market-hours rule</small>
-    </label>
-    <div class="toggle-controls">
-      <select id="marketNewsAutoSyncInterval">
-        <option value="auto">Auto</option>
-        <option value="5">5 min</option>
-        <option value="15">15 min</option>
-        <option value="60">60 min</option>
-      </select>
-      <input id="marketNewsAutoSyncToggle" type="checkbox">
+    <div class="action-control">
+      <button id="fullBtn" class="action-button" type="button" data-action-id="full"></button>
+      <p id="action-description-full" class="action-description"></p>
     </div>
-  </div>
-  <div id="marketNewsAutoSyncResolved" class="btn-hint" style="margin-top: -4px; margin-bottom: 8px;"></div>
-  <div class="btn-hint">Quick: recent updates &nbsp;|&nbsp; Full: balanced scan &nbsp;|&nbsp; Backfill: overnight comments &nbsp;|&nbsp; News Catchup: latest + backlog</div>
+    <div class="action-control">
+      <button id="backfillBtn" class="action-button" type="button" data-action-id="backfill"></button>
+      <p id="action-description-backfill" class="action-description"></p>
+    </div>
+    <div class="toggle-row">
+      <label for="alphaPicksAutoSyncToggle">
+        <span>Auto-sync Alpha Picks</span>
+        <small>Runs quick refresh on the selected interval when enabled</small>
+      </label>
+      <div class="toggle-controls">
+        <select id="alphaPicksAutoSyncInterval">
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60">60 min</option>
+        </select>
+        <input id="alphaPicksAutoSyncToggle" type="checkbox">
+      </div>
+    </div>
+  </section>
+
+  <section class="action-group" data-action-group="market-news">
+    <h3>Market News</h3>
+    <div class="action-control">
+      <button id="marketNewsBtn" class="action-button" type="button" data-action-id="market-news"></button>
+      <p id="action-description-market-news" class="action-description"></p>
+    </div>
+    <div class="action-control">
+      <button id="marketNewsCatchupBtn" class="action-button" type="button" data-action-id="market-news-catchup"></button>
+      <p id="action-description-market-news-catchup" class="action-description"></p>
+    </div>
+    <div class="toggle-row">
+      <label for="marketNewsAutoSyncToggle">
+        <span>Auto-sync Market News</span>
+        <small>Auto uses observed ET publish-density windows, not a fixed market-hours rule</small>
+      </label>
+      <div class="toggle-controls">
+        <select id="marketNewsAutoSyncInterval">
+          <option value="auto">Auto</option>
+          <option value="5">5 min</option>
+          <option value="15">15 min</option>
+          <option value="60">60 min</option>
+        </select>
+        <input id="marketNewsAutoSyncToggle" type="checkbox">
+      </div>
+    </div>
+    <div id="marketNewsAutoSyncResolved" class="btn-hint" style="margin-top: -4px; margin-bottom: 8px;"></div>
+  </section>
+
+  <details id="actionHelp">
+    <summary>What these actions do</summary>
+    <table class="action-scope-table">
+      <thead>
+        <tr><th>Action</th><th>Scope</th><th>Use when</th><th>Does not guarantee</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </details>
+
+  <section aria-labelledby="marketNewsRecoveryHeading">
+    <h3 id="marketNewsRecoveryHeading">Market News recovery</h3>
+    <div id="marketNewsRecoveryStatus" class="empty" role="status">Checking recorded repair state...</div>
+    <button id="reviewRecoveryScopeBtn" type="button" hidden>Review recovery scope</button>
+    <button id="retryRecordedFailuresBtn" type="button" hidden>Retry Recorded Failures</button>
+    <details id="marketNewsRecoveryAdvanced">
+      <summary>Advanced recovery tools</summary>
+      <p class="section-note">Use incident recovery only after a gap longer than the routine 24-hour catch-up window.</p>
+      <p id="marketNewsRecoveryPreview" class="section-note">No incident-recovery scope is currently available.</p>
+      <div class="recovery-actions">
+        <button id="incidentRecoveryBtn" type="button">Recover Missed News</button>
+        <button id="resumeRecoveryBtn" type="button" hidden>Resume Active Repair</button>
+        <button id="cancelRecoveryBtn" type="button" hidden>Cancel Active Repair</button>
+      </div>
+      <div id="recoveryConfirmation" class="recovery-confirmation" hidden></div>
+    </details>
+  </section>
   <div id="progress"></div>
   <section id="reconciliationSection">
     <div class="reconciliation-heading">Article link review</div>
@@ -295,6 +481,7 @@
       <button id="manualBtn">Fetch and review</button>
     </details>
   </section>
+  <script src="popup_action_catalog.js"></script>
   <script src="reconciliation_ui.js"></script>
   <script src="popup.js"></script>
 </body>

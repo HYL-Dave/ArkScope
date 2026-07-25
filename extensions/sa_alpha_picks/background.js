@@ -74,6 +74,17 @@ const MARKET_NEWS_DETAIL_TOTAL_LIMITS = {
   backfill: 80,
   manual: 20,
 };
+const MARKET_NEWS_INCIDENT_RECOVERY_MAX_HOURS = 168;
+const MARKET_NEWS_INCIDENT_MAX_LIST_SCROLL_ROUNDS = 60;
+const MARKET_NEWS_INCIDENT_MAX_LIST_ELAPSED_MS = 600000;
+const MARKET_NEWS_INCIDENT_STABLE_ROUNDS = 5;
+const MARKET_NEWS_REPAIR_DETAIL_ATTEMPTS_PER_PASS = 80;
+const MARKET_NEWS_ROUTINE_CATCHUP_HOURS = 24;
+const ALPHA_PICKS_ARTICLE_LIST_ROUNDS = Object.freeze({
+  quick: 5,
+  full: 200,
+  backfill: 200,
+});
 
 function createExtensionTelemetryEventId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
@@ -532,6 +543,45 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }).then(sendResponse);
     return true;
   }
+  if (msg.action === "get_extension_action_limits") {
+    getExtensionActionLimits().then(sendResponse);
+    return true;
+  }
+  if (msg.action === "market_news_recovery_preview") {
+    sendMarketNewsRecoveryNative("market_news_recovery_preview", {
+      kind: msg.kind,
+      source_run_ids: Array.isArray(msg.source_run_ids) ? msg.source_run_ids : undefined,
+    }).then(sendResponse);
+    return true;
+  }
+  if (msg.action === "market_news_recovery_state") {
+    sendMarketNewsRecoveryNative("market_news_recovery_state", {
+      run_id: Number.isInteger(msg.run_id) ? msg.run_id : undefined,
+    }).then(sendResponse);
+    return true;
+  }
+  if (msg.action === "market_news_recovery_start") {
+    enqueueMarketNewsRecovery({
+      kind: msg.kind,
+      manifest: msg.manifest,
+      manifest_hash: msg.manifest_hash,
+    }).then(sendResponse);
+    return true;
+  }
+  if (msg.action === "market_news_recovery_resume") {
+    enqueueMarketNewsRecovery({
+      run_id: msg.run_id,
+      manifest_hash: msg.manifest_hash,
+    }).then(sendResponse);
+    return true;
+  }
+  if (msg.action === "market_news_recovery_cancel") {
+    sendMarketNewsRecoveryNative("market_news_recovery_cancel", {
+      run_id: msg.run_id,
+      manifest_hash: msg.manifest_hash,
+    }).then(sendResponse);
+    return true;
+  }
   if (msg.action === "set_alpha_picks_auto_sync") {
     setAlphaPicksAutoSyncEnabled(!!msg.enabled, msg.interval_minutes).then(sendResponse);
     return true;
@@ -649,6 +699,363 @@ function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
       saAutoJobPending[jobKey] = false;
     }
   });
+}
+
+async function getExtensionActionLimits() {
+  var configured = await sendNativeMessage2({ action: "get_extension_action_limits" });
+  var configuredLimits = configured && configured.status === "ok" && configured.limits
+    ? configured.limits
+    : {};
+
+  function alphaLimits(mode) {
+    var comments = COMMENT_SCROLL_PROFILES[mode];
+    return {
+      article_list_rounds: ALPHA_PICKS_ARTICLE_LIST_ROUNDS[mode],
+      detail_enrichment_limit: RECONCILIATION_ENRICHMENT_LIMITS[mode],
+      comment_scroll_rounds: comments.maxScrolls,
+      comment_scroll_ms: comments.maxDurationMs,
+      comment_stable_rounds: comments.staleRounds,
+      configured_comment_recovery_batch: mode === "full"
+        ? configuredLimits.alpha_picks_full_comment_recovery_batch
+        : mode === "backfill"
+          ? configuredLimits.alpha_picks_deep_comment_recovery_batch
+          : 0,
+    };
+  }
+
+  return {
+    status: "ok",
+    limits: {
+      alpha_picks: {
+        quick: alphaLimits("quick"),
+        full: alphaLimits("full"),
+        backfill: alphaLimits("backfill"),
+      },
+      market_news: {
+        quick: {
+          list_rounds: MARKET_NEWS_PROFILES.quick.listScrolls,
+          detail_attempts: MARKET_NEWS_DETAIL_TOTAL_LIMITS.quick,
+        },
+        catchup: {
+          list_rounds: MARKET_NEWS_PROFILES.catchup.listScrolls,
+          current_detail_attempts: MARKET_NEWS_DETAIL_CURRENT_LIMITS.catchup,
+          backlog_detail_attempts: MARKET_NEWS_DETAIL_BACKFILL_LIMITS.catchup,
+          total_detail_attempts: MARKET_NEWS_DETAIL_TOTAL_LIMITS.catchup,
+          window_hours: MARKET_NEWS_ROUTINE_CATCHUP_HOURS,
+        },
+      },
+      recovery: {
+        max_window_hours: MARKET_NEWS_INCIDENT_RECOVERY_MAX_HOURS,
+        max_list_rounds: MARKET_NEWS_INCIDENT_MAX_LIST_SCROLL_ROUNDS,
+        max_elapsed_ms: MARKET_NEWS_INCIDENT_MAX_LIST_ELAPSED_MS,
+        stable_rounds: MARKET_NEWS_INCIDENT_STABLE_ROUNDS,
+        detail_attempts_per_pass: MARKET_NEWS_REPAIR_DETAIL_ATTEMPTS_PER_PASS,
+      },
+    },
+  };
+}
+
+function sendMarketNewsRecoveryNative(action, payload) {
+  var message = { action: action };
+  Object.keys(payload || {}).forEach(function (key) {
+    if (payload[key] !== undefined) message[key] = payload[key];
+  });
+  return sendNativeMessage2(message);
+}
+
+function enqueueMarketNewsRecovery(request) {
+  var run = saSyncJobChain.catch(function () {}).then(async function () {
+    await extensionTelemetryController.flush("next_job");
+    saSyncJobInFlight = true;
+    marketNewsRefreshInFlight = true;
+    try {
+      return await executeMarketNewsRecovery(request || {});
+    } catch (error) {
+      return {
+        status: "error",
+        error_code: "recovery_runtime_failed",
+      };
+    } finally {
+      marketNewsRefreshInFlight = false;
+      saSyncJobInFlight = false;
+    }
+  });
+  saSyncJobChain = run.catch(function () {});
+  return run;
+}
+
+function latestRecoveryAttempts(state) {
+  var attempts = state && state.progress && Array.isArray(state.progress.attempts)
+    ? state.progress.attempts
+    : [];
+  var byId = {};
+  attempts.forEach(function (attempt) {
+    if (!attempt || typeof attempt.news_id !== "string") return;
+    var current = byId[attempt.news_id];
+    if (!current || Number(attempt.attempt_count || 0) >= Number(current.attempt_count || 0)) {
+      byId[attempt.news_id] = attempt;
+    }
+  });
+  return byId;
+}
+
+function targetNeedsAttempt(target, latest) {
+  if (!target || target.body_present === true) return false;
+  return !latest[target.news_id];
+}
+
+async function executeMarketNewsRecovery(request) {
+  var state;
+  if (Number.isInteger(request.run_id)) {
+    state = await sendMarketNewsRecoveryNative("market_news_recovery_state", {
+      run_id: request.run_id,
+    });
+    if (
+      !state || state.status === "error" ||
+      state.manifest_hash !== request.manifest_hash
+    ) {
+      return { status: "error", error_code: "manifest_invalid" };
+    }
+  } else {
+    state = await sendMarketNewsRecoveryNative("market_news_recovery_start", {
+      manifest: request.manifest,
+      manifest_hash: request.manifest_hash,
+    });
+  }
+  if (!state || state.status === "error" || state.status !== "running") return state;
+
+  var manifest = state.manifest;
+  if (!manifest || !Array.isArray(manifest.targets)) {
+    return { status: "error", error_code: "manifest_invalid" };
+  }
+  var latest = latestRecoveryAttempts(state);
+  var pendingTargets = manifest.targets.filter(function (target) {
+    return targetNeedsAttempt(target, latest);
+  });
+  var attemptTargets = pendingTargets.slice(0, MARKET_NEWS_REPAIR_DETAIL_ATTEMPTS_PER_PASS);
+  var remainingBudget = MARKET_NEWS_REPAIR_DETAIL_ATTEMPTS_PER_PASS;
+  var tabId = null;
+  var discovery = null;
+
+  try {
+    if (attemptTargets.length > 0 || manifest.kind === "incident_window") {
+      await cleanupCollectorTabs({ force: true });
+      var initialUrl = attemptTargets.length > 0
+        ? "https://seekingalpha.com" + attemptTargets[0].pathname
+        : SA_MARKET_NEWS_URL;
+      var tab = await chrome.tabs.create({ url: initialUrl, active: false });
+      tabId = tab.id;
+      await registerCollectorTab(tabId, "market_news_recovery");
+    }
+
+    for (var index = 0; index < attemptTargets.length; index++) {
+      var target = attemptTargets[index];
+      var previous = latest[target.news_id];
+      var attemptCount = Number(previous && previous.attempt_count || 0) + 1;
+      var outcome = await recoverMarketNewsTarget(tabId, target);
+      var attemptId = "repair-" + state.run_id + "-" + attemptCount + "-" + index;
+      state = await sendMarketNewsRecoveryNative("market_news_recovery_checkpoint", {
+        run_id: state.run_id,
+        manifest_hash: state.manifest_hash,
+        news_id: target.news_id,
+        attempt_id: attemptId,
+        state: outcome.state,
+        reason_code: outcome.reason_code,
+        evidence_code: outcome.evidence_code || null,
+        attempt_count: attemptCount,
+      });
+      if (!state || state.status === "error") return state;
+      remainingBudget--;
+    }
+
+    if (manifest.kind === "incident_window") {
+      discovery = await discoverMarketNewsIncident(tabId, manifest, remainingBudget);
+    }
+
+    if (pendingTargets.length > attemptTargets.length) {
+      return await sendMarketNewsRecoveryNative("market_news_recovery_state", {
+        run_id: state.run_id,
+      });
+    }
+    return await sendMarketNewsRecoveryNative("market_news_recovery_finalize", {
+      run_id: state.run_id,
+      manifest_hash: state.manifest_hash,
+      discovery: discovery,
+    });
+  } finally {
+    if (tabId) {
+      await safeRemoveTab(tabId);
+      await unregisterCollectorTab(tabId);
+    }
+  }
+}
+
+async function recoverMarketNewsTarget(tabId, target) {
+  var url = "https://seekingalpha.com" + target.pathname;
+  try {
+    await withTimeout(
+      chrome.tabs.update(tabId, { url: url, active: false }),
+      MARKET_NEWS_DETAIL_TAB_LOAD_TIMEOUT_MS,
+      "market news recovery navigation timeout"
+    );
+    await waitForTabLoad(tabId, MARKET_NEWS_DETAIL_TAB_LOAD_TIMEOUT_MS, target.pathname);
+    await installMarketNewsPageGuards(tabId);
+    var fetched = await withTimeout(
+      fetchMarketNewsDetailWithRetry(
+        tabId,
+        { news_id: target.news_id, url: url },
+        getMarketNewsProfile("backfill")
+      ),
+      MARKET_NEWS_DETAIL_ITEM_TIMEOUT_MS,
+      "market news recovery detail timeout"
+    );
+    if (fetched && fetched.ok) {
+      return { state: "repaired", reason_code: "body_saved", evidence_code: null };
+    }
+    if (fetched && fetched.state === "unavailable_at_source") {
+      return fetched;
+    }
+    return {
+      state: "failed_retryable",
+      reason_code: stableExtensionReason(
+        fetched && fetched.reason_code,
+        EXTENSION_ITEM_RETRYABLE_REASONS,
+        "unknown_failure"
+      ),
+      evidence_code: null,
+    };
+  } catch (_) {
+    return {
+      state: "failed_retryable",
+      reason_code: "unknown_failure",
+      evidence_code: null,
+    };
+  }
+}
+
+function oldestPublishedAt(items) {
+  var oldest = null;
+  (items || []).forEach(function (item) {
+    var value = Date.parse(item && item.published_at);
+    if (Number.isFinite(value) && (oldest === null || value < oldest)) oldest = value;
+  });
+  return oldest;
+}
+
+async function discoverMarketNewsIncident(tabId, manifest, detailBudget) {
+  var interval = manifest.interval;
+  var intervalStart = Date.parse(interval.start_at);
+  var intervalEnd = Date.parse(interval.end_at);
+  var startedAt = Date.now();
+  var knownIds = await getMarketNewsRecentIds(1000);
+  var knownSet = new Set(knownIds);
+  var discoveredSet = new Set();
+  var discoveredItems = [];
+  var detailSaved = 0;
+  var stableRounds = 0;
+  var previousCount = 0;
+  var oldestObserved = null;
+  var reachedStart = false;
+  var stopReason = "round_limit";
+
+  await chrome.tabs.update(tabId, { url: SA_MARKET_NEWS_URL, active: true });
+  await waitForMarketNewsPageLoad(tabId);
+  var ready = await waitForMarketNewsReady(tabId);
+  if (!ready.ok) {
+    return {
+      newly_discovered_metadata_count: 0,
+      newly_discovered_detail_saved_count: 0,
+      reached_interval_start: false,
+      stop_reason: "interrupted",
+      unresolved_interval: { start_at: interval.start_at, end_at: interval.end_at },
+    };
+  }
+
+  for (var round = 0; round < MARKET_NEWS_INCIDENT_MAX_LIST_SCROLL_ROUNDS; round++) {
+    if (Date.now() - startedAt >= MARKET_NEWS_INCIDENT_MAX_LIST_ELAPSED_MS) {
+      stopReason = "elapsed_limit";
+      break;
+    }
+    var items = await injectMarketNewsScraper(tabId);
+    if (!Array.isArray(items)) items = [];
+    items.forEach(function (item) {
+      if (!item || !item.news_id || knownSet.has(item.news_id) || discoveredSet.has(item.news_id)) {
+        return;
+      }
+      discoveredSet.add(item.news_id);
+      discoveredItems.push(item);
+    });
+    var roundOldest = oldestPublishedAt(items);
+    if (roundOldest !== null && (oldestObserved === null || roundOldest < oldestObserved)) {
+      oldestObserved = roundOldest;
+    }
+    if (oldestObserved !== null && oldestObserved <= intervalStart) {
+      reachedStart = true;
+      stopReason = "window_start_reached";
+      break;
+    }
+
+    var scroll = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: function () {
+        var root = document.scrollingElement || document.documentElement;
+        var before = root ? root.scrollHeight : 0;
+        window.scrollBy(0, window.innerHeight);
+        var after = root ? root.scrollHeight : before;
+        var atBottom = !!root && root.scrollTop + window.innerHeight >= root.scrollHeight - 2;
+        return { before: before, after: after, at_bottom: atBottom };
+      },
+    });
+    await sleep(randomBetween(
+      MARKET_NEWS_PROFILES.backfill.listScrollSettleMinMs,
+      MARKET_NEWS_PROFILES.backfill.listScrollSettleMaxMs
+    ));
+    var scrollEvidence = scroll[0] && scroll[0].result || {};
+    if (items.length <= previousCount) stableRounds++;
+    else stableRounds = 0;
+    previousCount = items.length;
+    if (stableRounds >= MARKET_NEWS_INCIDENT_STABLE_ROUNDS) {
+      stopReason = scrollEvidence.at_bottom ? "source_bottom" : "stable_no_growth";
+      break;
+    }
+  }
+
+  if (discoveredItems.length > 0) {
+    var metadataSave = await sendNativeMessage2({
+      action: "save_market_news",
+      items: discoveredItems,
+      detail_current_limit: 0,
+      detail_backfill_limit: 0,
+    });
+    if (!metadataSave || metadataSave.status !== "ok") {
+      throw new Error("metadata_save_failed");
+    }
+  }
+
+  for (var index = 0; index < discoveredItems.length && detailBudget > 0; index++) {
+    var item = discoveredItems[index];
+    var outcome = await recoverMarketNewsTarget(tabId, {
+      news_id: item.news_id,
+      pathname: new URL(item.url).pathname,
+      body_present: false,
+    });
+    detailBudget--;
+    if (outcome.state === "repaired") detailSaved++;
+  }
+
+  var unresolvedEnd = oldestObserved === null
+    ? intervalEnd
+    : Math.min(intervalEnd, Math.max(intervalStart, oldestObserved));
+  return {
+    newly_discovered_metadata_count: discoveredItems.length,
+    newly_discovered_detail_saved_count: detailSaved,
+    reached_interval_start: reachedStart,
+    stop_reason: stopReason,
+    unresolved_interval: reachedStart ? null : {
+      start_at: new Date(intervalStart).toISOString(),
+      end_at: new Date(unresolvedEnd).toISOString(),
+    },
+  };
 }
 
 // --- Main refresh flow ---
@@ -1761,10 +2168,10 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     sendProgress(mode === "backfill"
       ? "Deep backfill: loading all articles..."
       : "Full scan: loading all articles...");
-    await scrollToLoadAll(tabId, 200);
+    await scrollToLoadAll(tabId, ALPHA_PICKS_ARTICLE_LIST_ROUNDS[mode]);
   } else {
     sendProgress("Loading recent articles...");
-    await scrollToLoadAll(tabId, 5);
+    await scrollToLoadAll(tabId, ALPHA_PICKS_ARTICLE_LIST_ROUNDS.quick);
   }
   await chrome.tabs.update(tabId, { active: false });
 
@@ -1792,7 +2199,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     scrollMode = "full";
     await chrome.tabs.update(tabId, { active: true });
     await sleep(500);
-    await scrollToLoadAll(tabId, 200);
+    await scrollToLoadAll(tabId, ALPHA_PICKS_ARTICLE_LIST_ROUNDS.full);
     await chrome.tabs.update(tabId, { active: false });
     // Re-scrape after full scroll
     articleList = await injectArticlesListScraper(tabId);
@@ -2315,6 +2722,19 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
         if (location.href.includes("/login") || location.href.includes("/sign_in")) {
           return { status: "login_redirect" };
         }
+        var navigation = typeof performance !== "undefined" &&
+          typeof performance.getEntriesByType === "function"
+          ? performance.getEntriesByType("navigation")[0]
+          : null;
+        var responseStatus = navigation && Number(navigation.responseStatus);
+        if (responseStatus === 404 || responseStatus === 410) {
+          return { status: "source_unavailable", response_status: responseStatus };
+        }
+        if (document.querySelector(
+          '[data-test-id="content-removed"], [data-testid="content-removed"]'
+        )) {
+          return { status: "source_removed" };
+        }
         var text = document.body ? document.body.innerText : "";
         for (var i = 0; i < paywallMarkers.length; i++) {
           if (text.includes(paywallMarkers[i])) {
@@ -2333,6 +2753,22 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
     var check = results[0] && results[0].result;
     if (!check || check.status === "login_redirect") {
       return { ok: false, error: "Session expired", reason_code: "login_required" };
+    }
+    if (check.status === "source_unavailable") {
+      return {
+        ok: false,
+        unavailable_at_source: true,
+        reason_code: check.response_status === 410 ? "source_http_410" : "source_http_404",
+        evidence_code: check.response_status === 410 ? "http_410" : "http_404",
+      };
+    }
+    if (check.status === "source_removed") {
+      return {
+        ok: false,
+        unavailable_at_source: true,
+        reason_code: "source_removed_marker",
+        evidence_code: "source_removed",
+      };
     }
     if (check.status === "paywall") {
       return {
@@ -2364,6 +2800,14 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
 
     var detailReady = await waitForMarketNewsDetailReady(tabId);
     if (!detailReady.ok) {
+      if (detailReady.unavailable_at_source === true) {
+        return {
+          ok: false,
+          state: "unavailable_at_source",
+          reason_code: detailReady.reason_code,
+          evidence_code: detailReady.evidence_code,
+        };
+      }
       lastReasonCode = stableExtensionReason(
         detailReady.reason_code,
         EXTENSION_ITEM_RETRYABLE_REASONS,

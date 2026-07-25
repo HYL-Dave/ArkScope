@@ -505,17 +505,39 @@ class TestHealthSplit:
         assert report["detail_health"]["rows_with_detail_7d"] == 2  # n1 + n3
 
     def test_local_with_pg_up_uses_extension_signal(self, local_backend, pg_calls):
+        from src.sa.extension_run_protocol import derive_run_result
         from src.service.job_runs_store import get_job_runs_store
         from src.service.sa_market_news_health import compute_market_news_health
 
         recent = datetime.now(timezone.utc) - timedelta(minutes=10)
         dal = SimpleNamespace(_backend=local_backend)
-        get_job_runs_store(dal).record_completed_run(
-            "sa_market_news_refresh",
+        result = derive_run_result(
+            {
+                "schema_version": 1,
+                "operation": "market_news_sync",
+                "mode": "quick",
+                "phases": {
+                    name: {"state": "complete", "reason_code": None}
+                    for name in (
+                        "list_navigation",
+                        "list_scrape",
+                        "metadata_save",
+                        "detail_fetch",
+                        "capture_readback",
+                    )
+                },
+                "item_outcomes": [],
+            }
+        )
+        get_job_runs_store(dal).record_extension_event_once(
+            client_event_id="local-health-complete",
+            event_hash="a" * 64,
+            job_name="sa_market_news_refresh",
             status="succeeded",
             started_at=recent,
             finished_at=recent,
-            trigger_source="extension",
+            result=result,
+            duration_ms=0,
         )
 
         report = compute_market_news_health(dal)

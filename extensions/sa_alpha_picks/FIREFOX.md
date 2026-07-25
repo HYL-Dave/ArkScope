@@ -35,7 +35,7 @@ Then in Firefox:
 2. Click `Load Temporary Add-on...`.
 3. Select `extensions/sa_alpha_picks/build/firefox/manifest.json`.
 4. Sign in to Seeking Alpha in Firefox.
-5. Run `Quick Refresh` from the extension popup.
+5. Run `Quick Update` from the extension popup.
 
 Important: do not select files from `extensions/sa_alpha_picks/` directly.
 That directory is the Chrome build and its `manifest.json` uses

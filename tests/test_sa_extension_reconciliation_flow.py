@@ -12,6 +12,7 @@ BACKGROUND = ROOT / "extensions" / "sa_alpha_picks" / "background.js"
 
 _NODE_RUNNER = r"""
 const fs = require("node:fs");
+const path = require("node:path");
 const vm = require("node:vm");
 const source = fs.readFileSync(process.argv[1], "utf8");
 const body = Buffer.from(process.argv[2], "base64").toString("utf8");
@@ -31,16 +32,29 @@ const context = {
       onInstalled: listener,
       onStartup: listener,
       sendMessage() { return Promise.resolve(); },
-      sendNativeMessage() {},
+      sendNativeMessage(_host, _message, callback) {
+        if (callback) callback({ status: "ok", persisted: true });
+      },
       lastError: null,
     },
     alarms: { onAlarm: listener },
     tabs: {},
     scripting: {},
-    storage: { local: {} },
+    storage: {
+      local: {
+        async get() { return {}; },
+        async set() {},
+      },
+    },
   },
 };
 vm.createContext(context);
+context.importScripts = function (...names) {
+  for (const name of names) {
+    const dependency = path.join(path.dirname(process.argv[1]), name);
+    vm.runInContext(fs.readFileSync(dependency, "utf8"), context, { filename: dependency });
+  }
+};
 vm.runInContext(source, context);
 Promise.resolve(vm.runInContext("(async function () {" + body + "})()", context))
   .then((value) => process.stdout.write(JSON.stringify(value)))

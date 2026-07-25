@@ -12,6 +12,7 @@ EXTENSION = ROOT / "extensions" / "sa_alpha_picks"
 UI = EXTENSION / "reconciliation_ui.js"
 POPUP_HTML = EXTENSION / "popup.html"
 POPUP_JS = EXTENSION / "popup.js"
+POPUP_ACTION_CATALOG = EXTENSION / "popup_action_catalog.js"
 
 
 _NODE_RUNNER = r"""
@@ -251,6 +252,6 @@ def test_unresolved_queue_does_not_prefill_legacy_ticker_url_lines():
 def test_reconciliation_surface_copy_remains_english():
     production_copy = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in (POPUP_HTML, UI, POPUP_JS)
+        for path in (POPUP_HTML, UI, POPUP_JS, POPUP_ACTION_CATALOG)
     )
     assert re.search(r"[\u3400-\u9fff]", production_copy) is None
