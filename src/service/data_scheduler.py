@@ -92,11 +92,9 @@ class SourceDef:
     # code, with zero logic duplication. IBKR sources deliberately STAY subprocess:
     # process isolation is a feature there (ib_insync asyncio + client-id hygiene).
     adapter: Optional[tuple] = None
-    # v1.3: gap-aware planning. When True, the adapter run computes scope from the
-    # trading-day coverage diagnostic (planner) instead of the full universe — bounded
-    # tickers + a window that reaches the oldest gap; a budget-bounded run finishes
-    # `partial` with a saved continuation. Today only price_backfill.
-    gap_planned: bool = False
+    # Coverage v2 is diagnostic-only: this historical source ID keeps locking and
+    # telemetry, but cannot derive repair work from unknown observations.
+    coverage_repair_disabled: bool = False
     # Direct-local prices worker: run through a sanitized subprocess so ib_insync
     # stays out of scheduler worker threads.
     prices_worker: bool = False
@@ -169,15 +167,13 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "price_backfill", "價格缺口補抓",
-            None, ibkr=True, universe_tickers=True, default_interval_min=360,
-            gap_planned=True,   # v1.3: planner decides scope from coverage, not the full universe
-            prices_worker=True, writes_market_db=True,
-            source_mode="direct_local",
-            write_target="market_data.db",
-            source_badges=("IBKR/Polygon", "直寫本地", "缺口補抓"),
-            description="IBKR/Polygon → market_data.db DIRECT (no PG); fills missing "
-                        "trading-day gaps for the active universe. sync_flag=None → no PG "
-                        "sync AND no _local_refresh (it writes the local DB itself).",
+            None, default_interval_min=360,
+            coverage_repair_disabled=True,
+            source_mode="coverage_read_only",
+            write_target="none",
+            description="Coverage-derived repair is disabled: Coverage v2 reports "
+                        "unknown observations, not proven actionable gaps. The source ID "
+                        "remains for historical telemetry.",
         ),
     )
 }
@@ -236,7 +232,6 @@ _SOURCE_PROVIDER_CONFIG = {
     "finnhub_news": "finnhub",
     "ibkr_news": "ibkr",
     "ibkr_prices": "ibkr",
-    "price_backfill": "ibkr",
 }
 
 
@@ -302,9 +297,6 @@ def _state_store():
     return _SCHED_STATE
 
 
-# v1.3 gap-aware price_backfill budget (env/profile-overridable later; bounded defaults now).
-_BACKFILL_MAX_TICKERS = 30
-_BACKFILL_MAX_DAYS = 30
 _NORMALIZED_NEWS_MAX_ARTICLES = 50_000
 _NORMALIZED_NEWS_MAX_BODY_FETCHES = 50_000
 _SANITIZED_WORKER_COUNT_KEYS = (
@@ -415,30 +407,6 @@ def _writer_continuation_from_pending(continuation: Optional[Dict[str, Any]]):
         deferred_body_ids=tuple(normalized["deferred_body_ids"]),
         cursor=normalized["cursor"],
     )
-
-
-def _plan_price_backfill_scope(scope, *, today=None, now_et=None):
-    """Gap-aware scope for price_backfill: read local trading-day coverage and plan a bounded
-    (tickers, lookback_days) set. GATE 1: coverage is queried with lookback_days =
-    _BACKFILL_MAX_DAYS (== the planner's max_days), so every SELECTED gap is reachable by the
-    executor's window top-up. GATE 2: coverage['provider_errors'] (LC-style unresolvable tickers)
-    feed exclude_tickers, so they never re-enter scheduled work. Read-only (planner is pure).
-    ``today``/``now_et`` are passed through to the coverage oracle (default: real now)."""
-    from src.market_data_direct import summarize_trading_day_coverage
-    from src.scheduler_planner import plan_price_backfill
-
-    cov = summarize_trading_day_coverage(scope, interval="15min",
-                                         lookback_days=_BACKFILL_MAX_DAYS,
-                                         today=today, now_et=now_et)
-    days = cov.get("days") or []
-    today_iso = days[0]["date"] if days else None  # newest day in the window = planner reference
-    exclude = {e["ticker"]: (e.get("last_error") or "provider error")
-               for e in cov.get("provider_errors", [])}
-    if today_iso is None:
-        from src.scheduler_planner import BackfillPlan
-        return BackfillPlan(tickers=[], lookback_days=0)
-    return plan_price_backfill(cov, today=today_iso, max_tickers=_BACKFILL_MAX_TICKERS,
-                               max_days=_BACKFILL_MAX_DAYS, exclude_tickers=exclude)
 
 
 def _pending_continuation(source: str):
@@ -931,19 +899,20 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             "status": "failed",
             "error": _N9_RETIRED_SOURCES[source],
         })
-    from src.provider_config_runtime import provider_config_setup_state
+    if not d.coverage_repair_disabled:
+        from src.provider_config_runtime import provider_config_setup_state
 
-    setup_state = provider_config_setup_state()
-    if setup_state.required:
-        return _record_result({
-            "source": source,
-            "status": "failed",
-            "error": setup_state.reason or "provider config setup required",
-            "code": setup_state.code,
-        })
-    missing_config = _provider_config_missing_for_source(source)
-    if missing_config is not None:
-        return _record_result(missing_config)
+        setup_state = provider_config_setup_state()
+        if setup_state.required:
+            return _record_result({
+                "source": source,
+                "status": "failed",
+                "error": setup_state.reason or "provider config setup required",
+                "code": setup_state.code,
+            })
+        missing_config = _provider_config_missing_for_source(source)
+        if missing_config is not None:
+            return _record_result(missing_config)
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
@@ -964,7 +933,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     # (which would mask the durable 'partial'). Used by attended skip-gates (scheduler) and
     # manual-continue branches (api/cli consume saved deferred work).
     pending_cont = _pending_continuation(source) if (
-        d.gap_planned or d.news_direct_source is not None
+        d.coverage_repair_disabled or d.news_direct_source is not None
     ) else None
     news_route = None
     try:
@@ -972,12 +941,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             from src.news_normalized.routing import NewsWriteMode
 
             news_route = _read_news_write_route_for_scheduler()
-        # v1.3 attended (decision 4): a prior `partial` left deferred scope → the SCHEDULER does
-        # NOT auto-resume; it skips until a MANUAL trigger (api/cli) processes the continuation.
-        # Skip-only gate (before record_attempt → doesn't touch durable state, per v1.2a).
-        if d.gap_planned and trigger_source == "scheduler" and pending_cont:
-            return _record_result({"source": source, "status": "skipped",
-                                   "reason": "partial pending manual continue"})
         normalized_pending_cont = (
             _normalized_news_continuation(pending_cont)
             if d.news_direct_source is not None
@@ -1027,14 +990,23 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         result: Dict[str, Any] = {"source": source}
         ok = True
         error: Optional[str] = None
-        plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
         writer_continuation = None
         writer_partial = False
         preserve_continuation_on_failure = None
         try:
             collected = False
             local_news_writer = False
-            if d.news_direct_source is not None:
+            if d.coverage_repair_disabled:
+                result["collect"] = {"planned": 0}
+                if pending_cont is not None:
+                    result.update({
+                        "code": "legacy_unproven_gap",
+                        "reason_code": "legacy_unproven_gap",
+                    })
+                    raise RuntimeError("legacy_unproven_gap")
+                result["reason_code"] = "coverage_truth_read_only"
+                collected = True
+            elif d.news_direct_source is not None:
                 if news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
                 if news_route.mode == NewsWriteMode.LEGACY_PG:
@@ -1055,7 +1027,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     and d.news_direct_source != "ibkr"
                 )
 
-            if news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
+            if d.coverage_repair_disabled:
+                pass
+            elif news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
                 pending_writer_continuation = (
                     pending_cont if trigger_source != "scheduler" else None
                 )
@@ -1134,101 +1108,37 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         source, done, total, current))
                 collected = True
             elif d.prices_worker:
-                if d.gap_planned:
-                    scope = tickers if tickers is not None else _resolve_price_scope()
-                    if not scope:
-                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
-                    pending = pending_cont if trigger_source != "scheduler" else None
-                    if pending:
-                        from src.scheduler_planner import BackfillPlan
-
-                        deferred = list(pending["deferred"])
-                        batch, remainder = (deferred[:_BACKFILL_MAX_TICKERS],
-                                            deferred[_BACKFILL_MAX_TICKERS:])
-                        plan = BackfillPlan(
-                            tickers=batch,
-                            lookback_days=int(pending.get("lookback_days") or _BACKFILL_MAX_DAYS),
-                            deferred=remainder,
-                            candidate_count=len(deferred),
+                scope = tickers if tickers is not None else _resolve_price_scope()
+                if not scope:
+                    raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                result["ticker_count"] = len(scope)
+                argv = [
+                    sys.executable,
+                    "-m",
+                    "src.prices_runtime",
+                    "--source",
+                    source,
+                    "--tickers",
+                    ",".join(scope),
+                    "--provider",
+                    "ibkr",
+                    "--gateway-lock-held",
+                ]
+                step = _run_sanitized_prices_worker_subprocess(argv)
+                result["collect"] = step["payload"]
+                if step["returncode"] != 0:
+                    reason = _prices_worker_retryable_skip_reason(step["payload"])
+                    if reason is not None:
+                        result.update({
+                            "status": "skipped",
+                            "reason": reason,
+                            "skip_kind": "skipped_lock_busy",
+                        })
+                    else:
+                        raise RuntimeError(
+                            _sanitized_prices_worker_failure_message(step["payload"])
                         )
-                        result["resumed_continuation"] = True
-                    else:
-                        plan = _plan_price_backfill_scope(scope)
-                    result["plan"] = {
-                        "tickers": plan.tickers,
-                        "lookback_days": plan.lookback_days,
-                        "candidate_count": plan.candidate_count,
-                        "deferred": plan.deferred,
-                        "excluded": plan.excluded,
-                    }
-                    if not plan.tickers:
-                        result["collect"] = {"planned": 0, "note": "no fillable gaps"}
-                        collected = True
-                    else:
-                        worker_tickers = plan.tickers
-                        lookback_days = plan.lookback_days
-                        result["ticker_count"] = len(worker_tickers)
-                        argv = [
-                            sys.executable,
-                            "-m",
-                            "src.prices_runtime",
-                            "--source",
-                            source,
-                            "--tickers",
-                            ",".join(worker_tickers),
-                            "--lookback-days",
-                            str(lookback_days),
-                            "--provider",
-                            "ibkr",
-                            "--gateway-lock-held",
-                        ]
-                        step = _run_sanitized_prices_worker_subprocess(argv)
-                        result["collect"] = step["payload"]
-                        if step["returncode"] != 0:
-                            reason = _prices_worker_retryable_skip_reason(step["payload"])
-                            if reason is not None:
-                                result.update({
-                                    "status": "skipped",
-                                    "reason": reason,
-                                    "skip_kind": "skipped_lock_busy",
-                                })
-                            else:
-                                raise RuntimeError(
-                                    _sanitized_prices_worker_failure_message(step["payload"])
-                                )
-                        collected = True
-                else:
-                    scope = tickers if tickers is not None else _resolve_price_scope()
-                    if not scope:
-                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
-                    result["ticker_count"] = len(scope)
-                    argv = [
-                        sys.executable,
-                        "-m",
-                        "src.prices_runtime",
-                        "--source",
-                        source,
-                        "--tickers",
-                        ",".join(scope),
-                        "--provider",
-                        "ibkr",
-                        "--gateway-lock-held",
-                    ]
-                    step = _run_sanitized_prices_worker_subprocess(argv)
-                    result["collect"] = step["payload"]
-                    if step["returncode"] != 0:
-                        reason = _prices_worker_retryable_skip_reason(step["payload"])
-                        if reason is not None:
-                            result.update({
-                                "status": "skipped",
-                                "reason": reason,
-                                "skip_kind": "skipped_lock_busy",
-                            })
-                        else:
-                            raise RuntimeError(
-                                _sanitized_prices_worker_failure_message(step["payload"])
-                            )
-                    collected = True
+                collected = True
             elif d.adapter is not None:
                 # In-process provider adapter (import-safe collector module);
                 # resolved lazily so tests can monkeypatch the module function and
@@ -1241,59 +1151,21 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     "progress_cb": lambda done, total, current: _set_progress(
                         source, done, total, current),
                 }
-                if d.gap_planned:
-                    # v1.3: planner decides SCOPE from coverage (bounded tickers + window that
-                    # reaches the oldest gap), not the full universe. Gates 1+2 in the helper.
+                if d.universe_tickers:
                     scope = tickers if tickers is not None else _resolve_price_scope()
                     if not scope:
-                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
-                    # v1.3a: a MANUAL trigger with a pending partial CONSUMES the saved deferred
-                    # scope (batch-by-batch), NOT a fresh re-plan — so the saved remainder is
-                    # guaranteed to be serviced (the 'manual continue covers the saved remainder'
-                    # contract). It carries the unprocessed remainder forward as the next partial;
-                    # once the saved backlog is drained, normal coverage planning resumes.
-                    pending = pending_cont if trigger_source != "scheduler" else None
-                    if pending:
-                        from src.scheduler_planner import BackfillPlan
-                        deferred = list(pending["deferred"])
-                        batch, remainder = (deferred[:_BACKFILL_MAX_TICKERS],
-                                            deferred[_BACKFILL_MAX_TICKERS:])
-                        plan = BackfillPlan(
-                            tickers=batch,
-                            lookback_days=int(pending.get("lookback_days") or _BACKFILL_MAX_DAYS),
-                            deferred=remainder, candidate_count=len(deferred))
-                        result["resumed_continuation"] = True
-                    else:
-                        plan = _plan_price_backfill_scope(scope)
-                    result["plan"] = {"tickers": plan.tickers, "lookback_days": plan.lookback_days,
-                                      "candidate_count": plan.candidate_count,
-                                      "deferred": plan.deferred, "excluded": plan.excluded}
-                    if not plan.tickers:
-                        result["collect"] = {"planned": 0, "note": "no fillable gaps"}
-                        collected = True   # nothing to do is a success, not a fetch
-                    else:
-                        kwargs["tickers_arg"] = ",".join(plan.tickers)
-                        kwargs["lookback_days"] = plan.lookback_days
-                        kwargs["acquire_gateway_lock"] = False  # scheduler holds the Gateway lock
-                        result["ticker_count"] = len(plan.tickers)
-                        result["collect"] = fn(**kwargs)
-                        collected = True
-                else:
-                    if d.universe_tickers:
-                        scope = tickers if tickers is not None else _resolve_price_scope()
-                        if not scope:
-                            # No implicit collector universe remains: an empty
-                            # scope must fail rather than collect something else.
-                            raise RuntimeError(
-                                "active-universe scope empty/unavailable (profile DB)")
-                        kwargs["tickers_arg"] = ",".join(scope)
-                        result["ticker_count"] = len(scope)
-                    if d.ibkr:
-                        # run_source ALREADY holds the shared Gateway lock — tell the IBKR adapter
-                        # NOT to re-acquire it (non-reentrant; would self-deadlock).
-                        kwargs["acquire_gateway_lock"] = False
-                    result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
-                    collected = True
+                        # No implicit collector universe remains: an empty
+                        # scope must fail rather than collect something else.
+                        raise RuntimeError(
+                            "active-universe scope empty/unavailable (profile DB)")
+                    kwargs["tickers_arg"] = ",".join(scope)
+                    result["ticker_count"] = len(scope)
+                if d.ibkr:
+                    # run_source ALREADY holds the shared Gateway lock — tell the IBKR adapter
+                    # NOT to re-acquire it (non-reentrant; would self-deadlock).
+                    kwargs["acquire_gateway_lock"] = False
+                result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
+                collected = True
             if collected and d.sync_flag and not skip_sync and not local_news_writer:
                 raise RuntimeError(
                     f"retired PG mirror sync requested for {source} ({d.sync_flag}); "
@@ -1304,6 +1176,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
                 # mirror refresh would pull nothing; do not touch PG or the local DB.
                 result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
+            elif d.coverage_repair_disabled:
+                result["local_refresh"] = {"skipped": "coverage truth is read-only"}
             elif local_news_writer or d.prices_worker or (d.adapter is not None and d.sync_flag is None):
                 # DIRECT local writers already wrote market_data.db themselves — a PG→local mirror
                 # would be pointless and could re-pull stale PG news/prices.
@@ -1340,11 +1214,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             continuation = writer_continuation
             if continuation is not None:
                 result["continuation"] = continuation
-        elif ok and plan is not None and plan.deferred:
-            result["status"] = "partial"
-            continuation = {"deferred": plan.deferred, "lookback_days": plan.lookback_days,
-                            "candidate_count": plan.candidate_count}
-            result["continuation"] = continuation
         else:
             result["status"] = "succeeded" if ok else "failed"
             if not ok and preserve_continuation_on_failure is not None:
@@ -1610,9 +1479,12 @@ def status_snapshot() -> Dict[str, Any]:
             "description": d.description,
             "ibkr": d.ibkr,
             "provider_fetch": (
-                d.adapter is not None
-                or d.news_direct_source is not None
-                or d.prices_worker
+                not d.coverage_repair_disabled
+                and (
+                    d.adapter is not None
+                    or d.news_direct_source is not None
+                    or d.prices_worker
+                )
             ),
             "source_mode": d.source_mode,
             "write_target": d.write_target,
@@ -1628,7 +1500,6 @@ def status_snapshot() -> Dict[str, Any]:
             # last run_source outcome INCLUDING skips (skips write no job_runs row;
             # without this a cross-process "CLI is running it" skip is invisible)
             "last_result": last_results.get(source),
-            "gap_planned": d.gap_planned,   # v1.4: this source uses planner scope + partial/補抓
             # v1.4 durable state (survives restart): {last_status, last_error, continuation,
             # last_result, last_attempt, updated_at}. last_status 'partial' → needs manual 補抓;
             # 'skipped' is transient (not persisted here → absent unless a real run set it).
