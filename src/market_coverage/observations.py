@@ -143,25 +143,28 @@ def _load_aliases(conn: sqlite3.Connection) -> _TickerAliasIndex:
         raw_rows.append((raw_alias, raw_canonical, alias, canonical))
 
     resolved: dict[str, str] = {}
-    visiting: set[str] = set()
+    for start in sorted(set(direct_targets) | set(direct_targets.values())):
+        if start in resolved:
+            continue
 
-    def resolve(ticker: str) -> str:
-        existing = resolved.get(ticker)
-        if existing is not None:
-            return existing
-        if ticker in visiting:
-            raise _StoredDatabaseError(
-                f"ticker alias cycle includes: {ticker}"
-            )
-        visiting.add(ticker)
-        target = direct_targets.get(ticker)
-        final = ticker if target is None else resolve(target)
-        visiting.remove(ticker)
-        resolved[ticker] = final
-        return final
+        path: list[str] = []
+        positions: dict[str, int] = {}
+        current = start
+        while current not in resolved:
+            if current in positions:
+                raise _StoredDatabaseError(
+                    f"ticker alias cycle includes: {current}"
+                )
+            positions[current] = len(path)
+            path.append(current)
+            target = direct_targets.get(current)
+            if target is None:
+                break
+            current = target
 
-    for ticker in sorted(set(direct_targets) | set(direct_targets.values())):
-        resolve(ticker)
+        final = resolved.get(current, current)
+        for ticker in path:
+            resolved[ticker] = final
 
     raw_candidates: dict[str, set[str]] = {}
     for raw_alias, raw_canonical, alias, canonical in raw_rows:
@@ -171,7 +174,7 @@ def _load_aliases(conn: sqlite3.Connection) -> _TickerAliasIndex:
                 f"ticker alias resolution conflict: {alias}"
             )
         raw_candidates.setdefault(final, set()).update(
-            (raw_alias, raw_canonical)
+            (raw_alias, raw_canonical, alias, canonical)
         )
 
     return _TickerAliasIndex(

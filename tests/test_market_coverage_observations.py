@@ -447,12 +447,14 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
         rows=(
             ("\tbrk b\t", session.open_at_utc),
             ("\tBrK.B\t", session.open_at_utc),
+            ("BRK.B", session.open_at_utc),
             ("BRK B", session.open_at_utc),
             ("UNRELATED", session.open_at_utc),
         ),
         aliases=(("\tBrK.B\t", "\tbrk b\t"),),
         provider_issues=(
             ("\tBrK.B\t", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
+            ("BRK.B", "15min", "normalized alias", "2026-01-07T00:00:00Z"),
         ),
     )
     statements: list[str] = []
@@ -473,15 +475,26 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
     monkeypatch.setattr(api.module.sqlite3, "connect", real_connect)
 
     rows = result.observations_for(session.market_date)
-    assert tuple(row.ticker for row in rows) == ("BRK B", "BRK B", "BRK B")
+    assert tuple(row.ticker for row in rows) == (
+        "BRK B",
+        "BRK B",
+        "BRK B",
+        "BRK B",
+    )
     assert tuple(row.observed_at for row in rows) == (
         session.open_at_utc,
         session.open_at_utc,
         session.open_at_utc,
+        session.open_at_utc,
     )
-    assert len(result.provider_errors) == 1
-    assert result.provider_errors[0].ticker == "BRK B"
-    assert result.provider_errors[0].last_error == "contract unavailable"
+    assert tuple(issue.ticker for issue in result.provider_errors) == (
+        "BRK B",
+        "BRK B",
+    )
+    assert {issue.last_error for issue in result.provider_errors} == {
+        "contract unavailable",
+        "normalized alias",
+    }
     provider_queries = [
         statement
         for statement in statements
@@ -515,6 +528,36 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
     assert tuple(issue.ticker for issue in chain_result.provider_errors) == (
         "NEW",
     )
+
+    long_chain_path = tmp_path / "long-alias-chain.db"
+    link_count = 1050
+    long_chain = tuple(
+        (f"CHAIN{index:04d}", f"CHAIN{index + 1:04d}")
+        for index in range(link_count)
+    )
+    chain_head = long_chain[0][0]
+    chain_terminal = long_chain[-1][1]
+    _create_market_db(
+        long_chain_path,
+        rows=((chain_head, session.open_at_utc),),
+        aliases=long_chain,
+        provider_issues=(
+            (chain_head, "15min", "long chain", "2026-01-06T00:00:00Z"),
+        ),
+    )
+    long_chain_result = api.RthObservationReader(long_chain_path).read(
+        universe=(chain_head,),
+        sessions=(session,),
+        interval="15min",
+    )
+    assert long_chain_result.health.status is api.ObservationHealth.OK
+    assert tuple(
+        row.ticker
+        for row in long_chain_result.observations_for(session.market_date)
+    ) == (chain_terminal,)
+    assert tuple(
+        issue.ticker for issue in long_chain_result.provider_errors
+    ) == (chain_terminal,)
 
     incompatible_alias_path = tmp_path / "incompatible-aliases.db"
     _create_market_db(incompatible_alias_path)
