@@ -16,6 +16,7 @@
   "background": {
     "scripts": [
       "compat_firefox.js",
+      "extension_run_protocol.js",
       "background.js"
     ]
   },

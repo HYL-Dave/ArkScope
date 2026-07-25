@@ -1,0 +1,321 @@
+{
+  "protocol_cases": [
+    {
+      "name": "complete_market_sync",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_sync",
+        "mode": "quick",
+        "phases": {
+          "list_navigation": {"state": "complete", "reason_code": null},
+          "list_scrape": {"state": "complete", "reason_code": null},
+          "metadata_save": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "complete", "reason_code": null},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": true, "derived_outcome": "complete", "db_status": "succeeded", "healthy_anchor_eligible": true}
+    },
+    {
+      "name": "top_level_ok_with_retryable_details",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_sync",
+        "mode": "quick",
+        "phases": {
+          "list_navigation": {"state": "complete", "reason_code": null},
+          "list_scrape": {"state": "complete", "reason_code": null},
+          "metadata_save": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "failed", "reason_code": "detail_timeout"},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [
+          {"news_id": "opaque-001", "state": "failed_retryable", "reason_code": "detail_timeout", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-002", "state": "failed_retryable", "reason_code": "access_restricted", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-003", "state": "failed_retryable", "reason_code": "login_required", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-004", "state": "failed_retryable", "reason_code": "modal_blocked", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-005", "state": "failed_retryable", "reason_code": "dom_not_ready", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-006", "state": "failed_retryable", "reason_code": "parser_empty", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-007", "state": "failed_retryable", "reason_code": "native_host_unavailable", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-008", "state": "failed_retryable", "reason_code": "detail_save_failed", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-009", "state": "failed_retryable", "reason_code": "extension_dependency_missing", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-010", "state": "failed_retryable", "reason_code": "interrupted", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-011", "state": "failed_retryable", "reason_code": "unknown_failure", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-012", "state": "failed_retryable", "reason_code": "navigation_timeout", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-013", "state": "failed_retryable", "reason_code": "detail_timeout", "attempt_count": 2, "evidence_code": null},
+          {"news_id": "opaque-014", "state": "failed_retryable", "reason_code": "access_restricted", "attempt_count": 2, "evidence_code": null},
+          {"news_id": "opaque-015", "state": "failed_retryable", "reason_code": "login_required", "attempt_count": 2, "evidence_code": null},
+          {"news_id": "opaque-016", "state": "failed_retryable", "reason_code": "modal_blocked", "attempt_count": 2, "evidence_code": null},
+          {"news_id": "opaque-017", "state": "failed_retryable", "reason_code": "dom_not_ready", "attempt_count": 2, "evidence_code": null},
+          {"news_id": "opaque-018", "state": "failed_retryable", "reason_code": "parser_empty", "attempt_count": 2, "evidence_code": null}
+        ]
+      },
+      "expected": {"ok": true, "derived_outcome": "degraded", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "fatal_list_navigation",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_sync",
+        "mode": "full",
+        "phases": {
+          "list_navigation": {"state": "failed", "reason_code": "navigation_timeout"},
+          "list_scrape": {"state": "skipped", "reason_code": "operator_cancelled"},
+          "metadata_save": {"state": "skipped", "reason_code": "operator_cancelled"},
+          "detail_fetch": {"state": "skipped", "reason_code": "operator_cancelled"},
+          "capture_readback": {"state": "skipped", "reason_code": "operator_cancelled"}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": true, "derived_outcome": "failed", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "fatal_metadata_save",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_sync",
+        "mode": "catchup",
+        "phases": {
+          "list_navigation": {"state": "complete", "reason_code": null},
+          "list_scrape": {"state": "complete", "reason_code": null},
+          "metadata_save": {"state": "failed", "reason_code": "detail_save_failed"},
+          "detail_fetch": {"state": "skipped", "reason_code": "operator_cancelled"},
+          "capture_readback": {"state": "skipped", "reason_code": "operator_cancelled"}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": true, "derived_outcome": "failed", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "alpha_detail_failure",
+      "input": {
+        "schema_version": 1,
+        "operation": "alpha_picks_sync",
+        "mode": "full",
+        "phases": {
+          "current_picks": {"state": "complete", "reason_code": null},
+          "closed_picks": {"state": "complete", "reason_code": null},
+          "article_details": {"state": "failed", "reason_code": "detail_save_failed"},
+          "reconciliation": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": true, "derived_outcome": "degraded", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "alpha_reconciliation_failure",
+      "input": {
+        "schema_version": 1,
+        "operation": "alpha_picks_sync",
+        "mode": "backfill",
+        "phases": {
+          "current_picks": {"state": "complete", "reason_code": null},
+          "closed_picks": {"state": "complete", "reason_code": null},
+          "article_details": {"state": "complete", "reason_code": null},
+          "reconciliation": {"state": "failed", "reason_code": "reconciliation_failed"}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": true, "derived_outcome": "degraded", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "skipped_not_due",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_sync",
+        "mode": "quick",
+        "phases": {
+          "list_navigation": {"state": "skipped", "reason_code": "not_due"},
+          "list_scrape": {"state": "skipped", "reason_code": "not_due"},
+          "metadata_save": {"state": "skipped", "reason_code": "not_due"},
+          "detail_fetch": {"state": "skipped", "reason_code": "not_due"},
+          "capture_readback": {"state": "skipped", "reason_code": "not_due"}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": true, "derived_outcome": "skipped", "db_status": "succeeded", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "partial_repair",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_retry_recorded",
+        "mode": "recorded",
+        "phases": {
+          "manifest": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "failed", "reason_code": "detail_timeout"},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [
+          {"news_id": "opaque-010", "state": "repaired", "reason_code": "body_saved", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-011", "state": "failed_retryable", "reason_code": "modal_blocked", "attempt_count": 1, "evidence_code": null}
+        ]
+      },
+      "expected": {"ok": true, "derived_outcome": "degraded", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "explicit_source_unavailable",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_retry_recorded",
+        "mode": "recorded",
+        "phases": {
+          "manifest": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "complete", "reason_code": null},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [
+          {"news_id": "opaque-020", "state": "unavailable_at_source", "reason_code": "source_http_404", "attempt_count": 1, "evidence_code": "http_404"},
+          {"news_id": "opaque-021", "state": "unavailable_at_source", "reason_code": "source_http_410", "attempt_count": 1, "evidence_code": "http_410"},
+          {"news_id": "opaque-022", "state": "unavailable_at_source", "reason_code": "source_removed_marker", "attempt_count": 1, "evidence_code": "source_removed"}
+        ]
+      },
+      "expected": {"ok": true, "derived_outcome": "complete", "db_status": "succeeded", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "access_restrictions_remain_retryable",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_incident_recovery",
+        "mode": "incident",
+        "phases": {
+          "manifest": {"state": "complete", "reason_code": null},
+          "metadata_rediscovery": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "failed", "reason_code": "access_restricted"},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [
+          {"news_id": "opaque-030", "state": "failed_retryable", "reason_code": "access_restricted", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-031", "state": "failed_retryable", "reason_code": "login_required", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-032", "state": "failed_retryable", "reason_code": "modal_blocked", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-033", "state": "failed_retryable", "reason_code": "dom_not_ready", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-034", "state": "failed_retryable", "reason_code": "parser_empty", "attempt_count": 1, "evidence_code": null}
+        ]
+      },
+      "expected": {"ok": true, "derived_outcome": "degraded", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "interrupted_after_save",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_retry_recorded",
+        "mode": "recorded",
+        "phases": {
+          "manifest": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "failed", "reason_code": "interrupted"},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [
+          {"news_id": "opaque-040", "state": "repaired", "reason_code": "body_present_during_run", "attempt_count": 1, "evidence_code": null},
+          {"news_id": "opaque-041", "state": "failed_retryable", "reason_code": "interrupted", "attempt_count": 1, "evidence_code": null}
+        ]
+      },
+      "expected": {"ok": true, "derived_outcome": "degraded", "db_status": "failed", "healthy_anchor_eligible": false}
+    },
+    {
+      "name": "invalid_unavailable_paywall_pair",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_retry_recorded",
+        "mode": "recorded",
+        "phases": {
+          "manifest": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "complete", "reason_code": null},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [
+          {"news_id": "opaque-050", "state": "unavailable_at_source", "reason_code": "access_restricted", "attempt_count": 1, "evidence_code": null}
+        ]
+      },
+      "expected": {"ok": false, "error_code": "incompatible_state_reason"}
+    },
+    {
+      "name": "unknown_reason",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_retry_recorded",
+        "mode": "recorded",
+        "phases": {
+          "manifest": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "failed", "reason_code": "provider_said_no"},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": []
+      },
+      "expected": {"ok": false, "error_code": "protocol_invalid"}
+    },
+    {
+      "name": "declared_count_mismatch",
+      "input": {
+        "schema_version": 1,
+        "operation": "market_news_sync",
+        "mode": "quick",
+        "phases": {
+          "list_navigation": {"state": "complete", "reason_code": null},
+          "list_scrape": {"state": "complete", "reason_code": null},
+          "metadata_save": {"state": "complete", "reason_code": null},
+          "detail_fetch": {"state": "complete", "reason_code": null},
+          "capture_readback": {"state": "complete", "reason_code": null}
+        },
+        "item_outcomes": [],
+        "counts": {"phase_complete": 4, "phase_failed": 0, "phase_skipped": 0, "item_total": 0, "repaired": 0, "already_present": 0, "unavailable_at_source": 0, "failed_retryable": 0}
+      },
+      "expected": {"ok": false, "error_code": "count_mismatch"}
+    },
+    {
+      "name": "legacy_unstructured_success",
+      "input": {"status": "succeeded", "detail_failed": 0},
+      "expected": {"ok": false, "error_code": "legacy_unstructured"}
+    }
+  ],
+  "background_cases": {
+    "alpha": [
+      {
+        "name": "nested_detail_and_reconciliation_failures",
+        "mode": "full",
+        "legacy_result": {
+          "current": {"status": "ok"},
+          "closed": {"status": "ok"},
+          "details": {"fetched": 3, "failed": 2, "reconciliation_failed": 1}
+        }
+      }
+    ],
+    "market": [
+      {
+        "name": "exact_failed_ids_and_reasons",
+        "mode": "quick",
+        "legacy_result": {
+          "status": "ok",
+          "saved": 4,
+          "count": 4,
+          "detail_fetched": 2,
+          "detail_failed": 2,
+          "detail_failures": [
+            {"news_id": "opaque-bg-1", "reason_code": "access_restricted"},
+            {"news_id": "opaque-bg-2", "reason_code": "detail_timeout"}
+          ]
+        }
+      },
+      {
+        "name": "unknown_top_level_status_fails_closed",
+        "mode": "quick",
+        "legacy_result": {
+          "status": "mystery"
+        }
+      }
+    ]
+  },
+  "outbox_cases": [
+    {"name": "telemetry_post_failure", "event_id": "evt-post-failure", "delivery": "unavailable"},
+    {"name": "duplicate_retry", "event_id": "evt-duplicate", "attempts": 2}
+  ],
+  "recovery_cases": [
+    {"name": "interruption_after_partial_save", "saved_ids": ["opaque-r-1"], "unresolved_ids": ["opaque-r-2"]},
+    {"name": "zero_recorded_ids_no_discovery_scope", "known_ids": [], "interval": null},
+    {"name": "zero_known_ids_with_discovery_scope", "known_ids": [], "interval": ["2026-07-19T00:00:00Z", "2026-07-20T06:00:00Z"]},
+    {"name": "admitted_discovery_finds_zero_metadata", "discovered": 0, "reached_start": true},
+    {"name": "interval_older_than_168_hours", "hours": 240},
+    {"name": "scanner_cannot_reach_requested_start", "reached_start": false}
+  ]
+}

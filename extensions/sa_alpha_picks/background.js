@@ -3,6 +3,10 @@
 
 "use strict";
 
+if (typeof SAExtensionRunProtocol === "undefined" && typeof importScripts === "function") {
+  importScripts("extension_run_protocol.js");
+}
+
 const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
 const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
 const SA_ARTICLES_URL = "https://seekingalpha.com/alpha-picks/articles";
@@ -201,6 +205,237 @@ var saAutoJobPending = {
   marketNews: false,
 };
 
+var EXTENSION_ITEM_RETRYABLE_REASONS = [
+  "access_restricted",
+  "login_required",
+  "modal_blocked",
+  "navigation_timeout",
+  "detail_timeout",
+  "dom_not_ready",
+  "parser_empty",
+  "native_host_unavailable",
+  "detail_save_failed",
+  "extension_dependency_missing",
+  "interrupted",
+  "unknown_failure",
+];
+
+var EXTENSION_PHASE_FAILURE_REASONS = SAExtensionRunProtocol.REASON_CODES.filter(function (reason) {
+  return [
+    "body_saved",
+    "body_present_at_freeze",
+    "body_present_during_run",
+    "source_http_404",
+    "source_http_410",
+    "source_removed_marker",
+    "not_due",
+    "already_pending",
+    "operator_cancelled",
+    "telemetry_unavailable",
+  ].indexOf(reason) === -1;
+});
+
+function extensionPhase(state, reasonCode) {
+  return { state: state, reason_code: reasonCode == null ? null : reasonCode };
+}
+
+function stableExtensionReason(reasonCode, allowed, fallback) {
+  return allowed.indexOf(reasonCode) === -1 ? fallback : reasonCode;
+}
+
+function legacyResultIsOk(value) {
+  return !!value && typeof value === "object" && (value.status === "ok" || value.ok === true);
+}
+
+function skippedProtocolPhases(operation, reasonCode) {
+  var contract = SAExtensionRunProtocol.OPERATION_CONTRACTS[operation];
+  var phases = {};
+  contract.phases.forEach(function (name) {
+    phases[name] = extensionPhase("skipped", reasonCode);
+  });
+  return phases;
+}
+
+function failedProtocolPhases(operation, failedPhase, reasonCode) {
+  var contract = SAExtensionRunProtocol.OPERATION_CONTRACTS[operation];
+  var failedIndex = contract.phases.indexOf(failedPhase);
+  if (failedIndex < 0) failedIndex = 0;
+  var phases = {};
+  contract.phases.forEach(function (name, index) {
+    if (index < failedIndex) phases[name] = extensionPhase("complete", null);
+    else if (index === failedIndex) phases[name] = extensionPhase("failed", reasonCode);
+    else phases[name] = extensionPhase("skipped", "operator_cancelled");
+  });
+  return phases;
+}
+
+function buildAlphaPicksProtocolResult(mode, legacyResult) {
+  legacyResult = legacyResult || {};
+  var details = legacyResult.details || {};
+  var currentOk = legacyResultIsOk(legacyResult.current);
+  var closedOk = legacyResultIsOk(legacyResult.closed);
+  var detailFailed = Number(details.failed || 0) > 0 || !!details.error;
+  var detailReason = details.error
+    ? stableExtensionReason(details.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "article_metadata_failed")
+    : stableExtensionReason(details.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "detail_save_failed");
+  var reconciliationFailed = Number(details.reconciliation_failed || 0) > 0;
+
+  return SAExtensionRunProtocol.deriveRunResult({
+    schema_version: 1,
+    operation: "alpha_picks_sync",
+    mode: mode,
+    phases: {
+      current_picks: currentOk
+        ? extensionPhase("complete", null)
+        : extensionPhase("failed", "current_scope_failed"),
+      closed_picks: closedOk
+        ? extensionPhase("complete", null)
+        : extensionPhase("failed", "closed_scope_failed"),
+      article_details: detailFailed
+        ? extensionPhase("failed", detailReason)
+        : extensionPhase("complete", null),
+      reconciliation: reconciliationFailed
+        ? extensionPhase("failed", "reconciliation_failed")
+        : extensionPhase("complete", null),
+    },
+    item_outcomes: [],
+  });
+}
+
+function buildAlphaPicksManualProtocolResult(legacyResult) {
+  legacyResult = legacyResult || {};
+  var failed = Number(legacyResult.failed || 0) > 0 || legacyResult.status === "error";
+  var reconciliationFailed = Number(legacyResult.reconciliation_failed || 0) > 0;
+  return SAExtensionRunProtocol.deriveRunResult({
+    schema_version: 1,
+    operation: "alpha_picks_manual_fetch",
+    mode: "manual",
+    phases: {
+      manual_fetch: failed
+        ? extensionPhase("failed", "article_detail_failed")
+        : extensionPhase("complete", null),
+      reconciliation: reconciliationFailed
+        ? extensionPhase("failed", "reconciliation_failed")
+        : extensionPhase("complete", null),
+    },
+    item_outcomes: [],
+  });
+}
+
+function marketNewsFailureReason(result, fallback) {
+  return stableExtensionReason(
+    result && result.reason_code,
+    EXTENSION_PHASE_FAILURE_REASONS,
+    fallback
+  );
+}
+
+function buildMarketNewsProtocolResult(mode, legacyResult) {
+  legacyResult = legacyResult || {};
+  var operation = "market_news_sync";
+  var phases;
+  var detailFailures = Array.isArray(legacyResult.detail_failures)
+    ? legacyResult.detail_failures
+    : [];
+  var itemOutcomes = detailFailures.map(function (failure) {
+    return {
+      news_id: String(failure && failure.news_id || ""),
+      state: "failed_retryable",
+      reason_code: stableExtensionReason(
+        failure && failure.reason_code,
+        EXTENSION_ITEM_RETRYABLE_REASONS,
+        "unknown_failure"
+      ),
+      attempt_count: Number.isInteger(failure && failure.attempt_count)
+        && failure.attempt_count > 0 ? failure.attempt_count : 1,
+      evidence_code: null,
+    };
+  });
+
+  if (legacyResult.status === "skipped" || legacyResult.status === "busy") {
+    var skippedReason = legacyResult.status === "busy" || legacyResult.reason === "already_pending"
+      ? "already_pending"
+      : (legacyResult.reason === "not_due" ? "not_due" : "operator_cancelled");
+    phases = skippedProtocolPhases(operation, skippedReason);
+    itemOutcomes = [];
+  } else if (legacyResult.status === "error") {
+    var failurePhase = legacyResult.failure_phase || "list_navigation";
+    var fallbackByPhase = {
+      list_navigation: "list_navigation_failed",
+      list_scrape: "list_scrape_failed",
+      metadata_save: "metadata_save_failed",
+      detail_fetch: "detail_queue_failed",
+      capture_readback: "capture_readback_failed",
+    };
+    phases = failedProtocolPhases(
+      operation,
+      failurePhase,
+      marketNewsFailureReason(legacyResult, fallbackByPhase[failurePhase] || "unknown_failure")
+    );
+    itemOutcomes = [];
+  } else if (legacyResult.status !== "ok") {
+    phases = failedProtocolPhases(
+      operation,
+      "list_navigation",
+      "protocol_invalid"
+    );
+    itemOutcomes = [];
+  } else {
+    var hasDetailFailures = Number(legacyResult.detail_failed || 0) > 0
+      || itemOutcomes.length > 0;
+    var detailReason = itemOutcomes.length > 0
+      ? itemOutcomes[0].reason_code
+      : marketNewsFailureReason(legacyResult, "detail_queue_failed");
+    phases = {
+      list_navigation: extensionPhase("complete", null),
+      list_scrape: extensionPhase("complete", null),
+      metadata_save: extensionPhase("complete", null),
+      detail_fetch: hasDetailFailures
+        ? extensionPhase("failed", detailReason)
+        : extensionPhase("complete", null),
+      capture_readback: legacyResult.capture_readback_failed
+        ? extensionPhase("failed", "capture_readback_failed")
+        : extensionPhase("complete", null),
+    };
+  }
+
+  return SAExtensionRunProtocol.deriveRunResult({
+    schema_version: 1,
+    operation: operation,
+    mode: mode,
+    phases: phases,
+    item_outcomes: itemOutcomes,
+  });
+}
+
+function buildFailedExtensionProtocolResult(operation, mode) {
+  var contract = SAExtensionRunProtocol.OPERATION_CONTRACTS[operation];
+  if (!contract) return null;
+  return SAExtensionRunProtocol.deriveRunResult({
+    schema_version: 1,
+    operation: operation,
+    mode: mode,
+    phases: failedProtocolPhases(operation, contract.phases[0], "unknown_failure"),
+    item_outcomes: [],
+  });
+}
+
+function attachExtensionRunProtocol(operation, mode, legacyResult) {
+  if (!operation) return legacyResult;
+  var result = legacyResult && typeof legacyResult === "object" ? legacyResult : {};
+  var structured;
+  if (operation === "alpha_picks_sync") {
+    structured = buildAlphaPicksProtocolResult(mode, result);
+  } else if (operation === "alpha_picks_manual_fetch") {
+    structured = buildAlphaPicksManualProtocolResult(result);
+  } else if (operation === "market_news_sync") {
+    structured = buildMarketNewsProtocolResult(mode, result);
+  } else {
+    throw new Error("unsupported extension operation");
+  }
+  return Object.assign({}, result, { extension_run: structured });
+}
+
 // --- Message listener (from popup) ---
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -209,6 +444,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     enqueueSaSyncJob({
       displayName: "Alpha Picks " + mode,
       canonicalName: "sa_alpha_picks_refresh",
+      operation: "alpha_picks_sync",
+      mode: mode,
       payload: { mode: mode, trigger: "manual" },
     }, function () {
       return doRefresh(mode, { trigger: "manual" });
@@ -218,8 +455,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "manual_fetch") {
     enqueueSaSyncJob({
       displayName: "Manual fetch",
-      // No canonical mapping — doManualFetch is per-item, not a full
-      // refresh. Slugified name keeps it observable via /jobs/history.
+      canonicalName: "sa_extension:manual_fetch",
+      operation: "alpha_picks_manual_fetch",
+      mode: "manual",
       payload: { trigger: "manual", item_count: (msg.items || []).length },
     }, function () {
       return doManualFetch(msg.items || []);
@@ -231,6 +469,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     enqueueSaSyncJob({
       displayName: "Market News " + mnMode,
       canonicalName: "sa_market_news_refresh",
+      operation: "market_news_sync",
+      mode: mnMode,
       payload: { mode: mnMode, trigger: "manual" },
     }, function () {
       return doMarketNewsRefresh(mnMode, { trigger: "manual" });
@@ -270,6 +510,8 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     enqueueAutoSaSyncJob("alphaPicks", {
       displayName: "Alpha Picks quick auto-sync",
       canonicalName: "sa_alpha_picks_refresh",
+      operation: "alpha_picks_sync",
+      mode: "quick",
       payload: { mode: "quick", trigger: "alarm" },
     }, function () {
       return doRefresh("quick", { trigger: "alarm" });
@@ -280,6 +522,8 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     enqueueAutoSaSyncJob("marketNews", {
       displayName: "Market News quick auto-sync",
       canonicalName: "sa_market_news_refresh",
+      operation: "market_news_sync",
+      mode: "quick",
       payload: { mode: "quick", trigger: "alarm" },
     }, async function () {
       if (!(await shouldRunMarketNewsAutoSync())) {
@@ -305,6 +549,8 @@ function enqueueSaSyncJob(opts, jobFn) {
   opts = opts || {};
   var displayName = opts.displayName || "unnamed";
   var canonicalName = opts.canonicalName || null;
+  var operation = opts.operation || null;
+  var mode = opts.mode || null;
   var extraPayload = opts.payload || null;
 
   var run = saSyncJobChain.catch(function () {}).then(async function () {
@@ -316,10 +562,15 @@ function enqueueSaSyncJob(opts, jobFn) {
     var capturedResult = null;
     var capturedError = null;
     try {
-      capturedResult = await jobFn();
+      capturedResult = attachExtensionRunProtocol(operation, mode, await jobFn());
       return capturedResult;
     } catch (err) {
       capturedError = (err && err.message) ? err.message : String(err);
+      if (!capturedResult && operation) {
+        capturedResult = {
+          extension_run: buildFailedExtensionProtocolResult(operation, mode),
+        };
+      }
       throw err;
     } finally {
       saSyncJobInFlight = false;
@@ -351,6 +602,14 @@ function slugifyExtensionJobName(name) {
 }
 
 function classifyExtensionJobOutcome(result, errorText) {
+  var structured = result && result.extension_run;
+  if (structured && (structured.db_status === "succeeded" || structured.db_status === "failed")) {
+    return {
+      status: structured.db_status,
+      error: null,
+      message: structured.derived_outcome === "skipped" ? "skipped" : null,
+    };
+  }
   if (errorText) {
     return { status: "failed", error: errorText, message: null };
   }
@@ -391,7 +650,9 @@ function recordExtensionJobAsync(opts) {
     try {
       var outcome = classifyExtensionJobOutcome(opts.result, opts.error);
       var payload = Object.assign({ display_name: opts.displayName }, opts.extraPayload || {});
-      var resultPayload = (opts.result && typeof opts.result === "object") ? opts.result : null;
+      var resultPayload = opts.result && opts.result.extension_run
+        ? opts.result.extension_run
+        : ((opts.result && typeof opts.result === "object") ? opts.result : null);
       // Canonical name preferred so /jobs/status merges by job_runs.job_name
       // against _JOB_DEFINITIONS; slug fallback keeps non-canonical flows
       // (e.g. doManualFetch) observable in /jobs/history.
@@ -528,6 +789,7 @@ async function doMarketNewsRefresh(mode, options) {
   const batchTs = new Date().toISOString();
   var profile = getMarketNewsProfile(mode);
   var tabId = null;
+  var activePhase = "list_navigation";
   try {
     await cleanupCollectorTabs({ force: true });
     sendProgress("Opening market news page...");
@@ -539,11 +801,19 @@ async function doMarketNewsRefresh(mode, options) {
     sendProgress("Waiting for market news...");
     var ready = await waitForMarketNewsReady(tabId);
     if (!ready.ok) {
-      var failure = { status: "error", error: ready.error, saved: 0, count: 0 };
+      var failure = {
+        status: "error",
+        error: ready.error,
+        failure_phase: "list_navigation",
+        reason_code: ready.reason_code || "list_navigation_failed",
+        saved: 0,
+        count: 0,
+      };
       await saveMarketNewsState(batchTs, mode, failure);
       return failure;
     }
 
+    activePhase = "list_scrape";
     await chrome.tabs.update(tabId, { active: true });
     await sleep(randomBetween(profile.listStartMinMs, profile.listStartMaxMs));
     var knownNewsIds = await getMarketNewsRecentIds(profile.recentKnownIdsLimit);
@@ -554,6 +824,7 @@ async function doMarketNewsRefresh(mode, options) {
     var items = await injectMarketNewsScraper(tabId);
     if (!Array.isArray(items)) items = [];
 
+    activePhase = "metadata_save";
     sendProgress("Saving " + items.length + " market-news item(s)...");
     var detailCurrentLimit = getMarketNewsDetailCurrentLimit(mode);
     var detailBackfillLimit = getMarketNewsDetailBackfillLimit(mode);
@@ -564,10 +835,17 @@ async function doMarketNewsRefresh(mode, options) {
       detail_backfill_limit: detailBackfillLimit,
     });
     if (!result || result.status !== "ok") {
-      result = { status: "error", error: (result && result.error) || "save_market_news failed", saved: 0 };
+      result = {
+        status: "error",
+        error: (result && result.error) || "save_market_news failed",
+        failure_phase: "metadata_save",
+        reason_code: "metadata_save_failed",
+        saved: 0,
+      };
     }
     result.count = items.length;
 
+    activePhase = "detail_fetch";
     var needDetail = buildMarketNewsDetailQueue(result, mode);
     var detailFetched = 0;
     var detailFailed = 0;
@@ -602,6 +880,11 @@ async function doMarketNewsRefresh(mode, options) {
           detailFailed++;
           detailFailures.push({
             news_id: item.news_id,
+            reason_code: stableExtensionReason(
+              saveDetail && saveDetail.reason_code,
+              EXTENSION_ITEM_RETRYABLE_REASONS,
+              "unknown_failure"
+            ),
             error: (saveDetail && saveDetail.error) || "detail_not_saved",
           });
         }
@@ -609,6 +892,7 @@ async function doMarketNewsRefresh(mode, options) {
         detailFailed++;
         detailFailures.push({
           news_id: item.news_id,
+          reason_code: "unknown_failure",
           error: (err && err.message) || String(err || "detail_error"),
         });
       }
@@ -622,13 +906,23 @@ async function doMarketNewsRefresh(mode, options) {
       result.detail_failures = detailFailures;
     }
     result.trigger = options.trigger || "manual";
+    activePhase = "capture_readback";
     await saveMarketNewsState(batchTs, mode, result);
     sendProgress("Market news done!");
     return result;
   } catch (err) {
+    var reasonByPhase = {
+      list_navigation: "list_navigation_failed",
+      list_scrape: "list_scrape_failed",
+      metadata_save: "metadata_save_failed",
+      detail_fetch: "detail_queue_failed",
+      capture_readback: "capture_readback_failed",
+    };
     var errorResult = {
       status: "error",
       error: err.message || String(err),
+      failure_phase: activePhase,
+      reason_code: reasonByPhase[activePhase] || "unknown_failure",
       saved: 0,
       count: 0,
       trigger: options.trigger || "manual",
@@ -2045,11 +2339,17 @@ async function waitForMarketNewsReady(tabId, timeoutMs) {
       },
     });
     var check = results[0] && results[0].result;
-    if (!check || check.status === "login_redirect") return { ok: false, error: "Session expired" };
+    if (!check || check.status === "login_redirect") {
+      return { ok: false, error: "Session expired", reason_code: "login_required" };
+    }
     if (check.status === "ready") return { ok: true, count: check.count };
     await sleep(500);
   }
-  return { ok: false, error: "Timeout waiting for market news" };
+  return {
+    ok: false,
+    error: "Timeout waiting for market news",
+    reason_code: "navigation_timeout",
+  };
 }
 
 async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
@@ -2079,18 +2379,27 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
     });
     var check = results[0] && results[0].result;
     if (!check || check.status === "login_redirect") {
-      return { ok: false, error: "Session expired" };
+      return { ok: false, error: "Session expired", reason_code: "login_required" };
     }
     if (check.status === "paywall") {
-      return { ok: false, error: "Paywall: " + check.marker };
+      return {
+        ok: false,
+        error: "Paywall: " + check.marker,
+        reason_code: "access_restricted",
+      };
     }
     if (check.status === "ready") return { ok: true };
     await sleep(500);
   }
-  return { ok: false, error: "Timeout waiting for market news detail" };
+  return {
+    ok: false,
+    error: "Timeout waiting for market news detail",
+    reason_code: "detail_timeout",
+  };
 }
 
 async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
+  var lastReasonCode = "unknown_failure";
   for (var attempt = 0; attempt < 2; attempt++) {
     if (attempt > 0) {
       sendProgress("Retrying news detail: " + item.news_id);
@@ -2102,6 +2411,11 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
 
     var detailReady = await waitForMarketNewsDetailReady(tabId);
     if (!detailReady.ok) {
+      lastReasonCode = stableExtensionReason(
+        detailReady.reason_code,
+        EXTENSION_ITEM_RETRYABLE_REASONS,
+        "unknown_failure"
+      );
       continue;
     }
 
@@ -2112,11 +2426,13 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
 
     var detail = await injectDetailScraper(tabId);
     if (!detail || detail.error) {
+      lastReasonCode = "parser_empty";
       continue;
     }
 
     var report = formatDetailReport(detail);
     if (!report || report.trim().length < 40) {
+      lastReasonCode = "parser_empty";
       continue;
     }
 
@@ -2128,8 +2444,9 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
     if (saveDetail && saveDetail.ok) {
       return { ok: true };
     }
+    lastReasonCode = "detail_save_failed";
   }
-  return { ok: false };
+  return { ok: false, reason_code: lastReasonCode };
 }
 
 async function installMarketNewsPageGuards(tabId) {

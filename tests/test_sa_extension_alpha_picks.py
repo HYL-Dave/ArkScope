@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND = ROOT / "extensions" / "sa_alpha_picks" / "background.js"
 SCRAPER = ROOT / "extensions" / "sa_alpha_picks" / "scrape.js"
 RUNNER = ROOT / "tests" / "js" / "run_sa_extension_fixture.mjs"
+PROTOCOL_RUNNER = ROOT / "tests" / "js" / "run_sa_extension_protocol_fixture.mjs"
+PROTOCOL_FIXTURE = ROOT / "tests" / "fixtures" / "sa_extension" / "run_outcomes.json"
+PROTOCOL = ROOT / "extensions" / "sa_alpha_picks" / "extension_run_protocol.js"
 FIXTURES = ROOT / "tests" / "fixtures" / "sa_alpha_picks"
 
 
@@ -31,6 +34,68 @@ def _run_scraper(fixture: Path, url: str, *, check: bool = True):
         text=True,
     )
     return json.loads(completed.stdout) if check else completed
+
+
+def _run_background_protocol():
+    completed = subprocess.run(
+        ["node", str(PROTOCOL_RUNNER), str(PROTOCOL_FIXTURE), str(PROTOCOL), str(BACKGROUND)],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(completed.stdout)
+
+
+def test_background_loads_required_runtime_dependencies_before_registering_jobs():
+    result = _run_background_protocol()
+    manifest = json.loads(
+        (ROOT / "extensions" / "sa_alpha_picks" / "manifest.firefox.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert result["imports"] == ["extension_run_protocol.js"]
+    assert result["protocol_before_message_registration"] is True
+    assert manifest["background"]["scripts"][:3] == [
+        "compat_firefox.js",
+        "extension_run_protocol.js",
+        "background.js",
+    ]
+
+
+def test_alpha_adapter_carries_nested_detail_and_reconciliation_failures_into_phases():
+    result = _run_background_protocol()["alpha"][0]["result"]
+
+    assert result["derived_outcome"] == "degraded"
+    assert result["phases"]["article_details"] == {
+        "state": "failed",
+        "reason_code": "detail_save_failed",
+    }
+    assert result["phases"]["reconciliation"] == {
+        "state": "failed",
+        "reason_code": "reconciliation_failed",
+    }
+
+
+def test_market_adapter_preserves_exact_failed_ids_and_stable_reason_codes():
+    market_results = _run_background_protocol()["market"]
+    result = market_results[0]["result"]
+
+    assert result["derived_outcome"] == "degraded"
+    assert [item["news_id"] for item in result["item_outcomes"]] == [
+        "opaque-bg-1",
+        "opaque-bg-2",
+    ]
+    assert [item["reason_code"] for item in result["item_outcomes"]] == [
+        "access_restricted",
+        "detail_timeout",
+    ]
+    assert market_results[1]["result"]["derived_outcome"] == "failed"
+    assert market_results[1]["result"]["phases"]["list_navigation"] == {
+        "state": "failed",
+        "reason_code": "protocol_invalid",
+    }
 
 
 def test_alpha_picks_flow_waits_for_dom_readiness_not_tab_complete():
