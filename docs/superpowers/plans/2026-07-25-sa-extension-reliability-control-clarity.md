@@ -1226,7 +1226,7 @@ runtime files.
 - Create `tests/test_sa_market_news_recovery.py`
 - Modify `tests/test_sa_tools.py`
 
-- [ ] **Step 1: Add sixteen RED domain nodes**
+- [x] **Step 1: Add sixteen RED domain nodes**
 
 ```text
 test_manifest_json_and_hash_are_canonical_and_order_independent
@@ -1252,7 +1252,7 @@ manifests. There is still only one running row; a competing request receives
 the already-running run ID and its actual immutable manifest, never a response
 that relabels it as the newly requested scope.
 
-- [ ] **Step 2: Add five RED DAL/backend nodes**
+- [x] **Step 2: Add five RED DAL/backend nodes**
 
 ```text
 test_market_news_rows_by_exact_ids_ignore_age_and_return_only_manifest_fields
@@ -1262,26 +1262,26 @@ test_recovery_queries_and_job_history_never_expose_titles_bodies_full_urls_or_ta
 test_market_news_recovery_queries_fail_closed_when_local_db_is_unavailable
 ```
 
-- [ ] **Step 3: Implement read-only preview queries**
+- [x] **Step 3: Implement read-only preview queries**
 
 Use bound SQL parameters and SQLite read-only connections. Return only opaque
 ID, canonical pathname, published timestamp, and body-presence bit. Existing
 routine candidate query and 24-hour predicate remain unchanged.
 
-- [ ] **Step 4: Implement manifest service**
+- [x] **Step 4: Implement manifest service**
 
 Recorded failure target extraction may read legacy `detail_failures[].news_id`
 only as target evidence. It may not use legacy `error` to assign state/reason.
 Incident preview reads the structured complete anchor and returns actual
 interval plus separate discovery descriptor.
 
-- [ ] **Step 5: Implement atomic repair store operations**
+- [x] **Step 5: Implement atomic repair store operations**
 
 The running result may hold checkpoint progress. Immutable manifest remains in
 payload. Verify payload hash before every progress/final call. Never overwrite
 or re-freeze baseline fields.
 
-- [ ] **Step 6: Add fixed sidecar routes and native actions**
+- [x] **Step 6: Add fixed sidecar routes and native actions**
 
 Use explicit request models for preview, start, state, checkpoint, finalize,
 and cancel. The native host maps action names to these exact routes; extension
@@ -1290,7 +1290,7 @@ must project repair rows to count/state/run/hash-prefix metadata and omit exact
 target descriptors; fixed repair state/execution routes retain the full
 machine contract.
 
-- [ ] **Step 7: Verify GREEN on synthetic DBs**
+- [x] **Step 7: Verify GREEN on synthetic DBs**
 
 ```bash
 pytest -q tests/test_sa_market_news_recovery.py tests/test_sa_tools.py \
@@ -1299,7 +1299,18 @@ pytest -q tests/test_sa_market_news_recovery.py tests/test_sa_tools.py \
 
 Expected new recovery `16/16`; `test_sa_tools.py` `102/102`.
 
-- [ ] **Step 8: Commit**
+Observed: recovery is `16/16`; `test_sa_tools.py` is `102/102`; the four-file
+Task 5 execution set is `195/195`. Backend collection is exactly `4698`, and
+the 13-file checkpoint collection is exactly `315`. Their sorted node-list
+SHA-256 values are
+`d7c35ad0fae96f6f0e4fd0211fdc9a1bdd8e51eeb63d616587f435dabff2f284`
+and
+`3f1b0a608ab2037c403e57eddb53c31dca47e10ef47977d2c10b6e1594375b48`.
+The full-suite diagnostic run retained the existing bare-data failure family
+and identified twelve earlier Task 3/4 harness/legacy-anchor assertions for
+in-place evolution before final canonical A/B; no Task 5 node failed.
+
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/sa/market_news_recovery.py src/service/job_runs_store.py \
@@ -1309,6 +1320,9 @@ git add src/sa/market_news_recovery.py src/service/job_runs_store.py \
   tests/test_job_runs.py tests/test_sa_native_host_telemetry.py
 git commit -m "feat: add audited resumable Market News repair"
 ```
+
+Resolved Task 5 product tip:
+`8b20e608765d2ef134a6249a2ebf0bccd400361f`.
 
 ---
 
