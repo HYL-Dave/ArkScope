@@ -1,6 +1,6 @@
 # ArkScope Coverage v2 Session-Truth Design
 
-> **Status: WRITTEN - INDEPENDENT REVIEW PENDING**
+> **Status: REVIEW GREEN - IMPLEMENTATION PLAN NEXT**
 >
 > Written against clean design branch tip `7a8548fa` on 2026-07-26. This
 > document converts the reviewed evidence in
@@ -8,6 +8,19 @@
 > into the product and engineering authority for Coverage v2. It authorizes
 > neither implementation nor dependency changes until a separate RED-first
 > implementation plan receives independent GREEN.
+
+## Review Resolution (2026-07-26)
+
+Independent full-document review returned GREEN with zero findings. The design
+is cleared as the authority for a RED-first implementation plan.
+
+One plan-level accounting reminder is adopted: the new Settings coverage
+states require new bilingual resource leaves. The implementation plan must
+state the exact per-locale resource delta, evolve the existing
+`resources.test.ts` inventory-count node in place, and preserve that node's ID.
+The reviewed pre-implementation baseline is Settings `694` leaves and total
+`1794` leaves per locale; implementation must rederive those counts before
+product edits rather than treating this paragraph as a substitute for Task 0.
 
 ## 1. Purpose And Authority
 
