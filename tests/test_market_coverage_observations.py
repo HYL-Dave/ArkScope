@@ -505,6 +505,48 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
     assert "upper(" not in provider_queries[0].lower()
     assert "trim(" not in provider_queries[0].lower()
 
+    nbsp = "\u00a0"
+    nbsp_alias = f"{nbsp}BrK.B{nbsp}"
+    nbsp_canonical = f"{nbsp}brk b{nbsp}"
+    nbsp_path = tmp_path / "nbsp-alias.db"
+    _create_market_db(
+        nbsp_path,
+        rows=(
+            (nbsp_alias, session.open_at_utc),
+            (nbsp_canonical, session.open_at_utc),
+        ),
+        aliases=((nbsp_alias, nbsp_canonical),),
+        provider_issues=(
+            (
+                nbsp_alias,
+                "15min",
+                f"stale contract{nbsp}",
+                "2026-01-06T00:00:00Z",
+            ),
+        ),
+    )
+    nbsp_result = api.RthObservationReader(nbsp_path).read(
+        universe=(f"{nbsp}BRK B{nbsp}",),
+        sessions=(session,),
+        interval="15min",
+    )
+    assert tuple(
+        row.ticker for row in nbsp_result.observations_for(session.market_date)
+    ) == ("BRK B", "BRK B")
+    assert tuple(issue.ticker for issue in nbsp_result.provider_errors) == (
+        "BRK B",
+    )
+    assert nbsp_result.provider_errors[0].last_error == "stale contract"
+
+    nbsp_timestamp_path = tmp_path / "nbsp-timestamp.db"
+    _create_market_db(
+        nbsp_timestamp_path,
+        raw_rows=(
+            ("AAA", f"{_stored_timestamp(session.open_at_utc)}{nbsp}"),
+        ),
+    )
+    _assert_market_unreadable(api, nbsp_timestamp_path, session)
+
     chain_path = tmp_path / "alias-chain.db"
     _create_market_db(
         chain_path,

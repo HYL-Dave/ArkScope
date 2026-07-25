@@ -25,7 +25,6 @@ _TICKER_ALIAS_COLUMNS = frozenset({"alias", "canonical"})
 _PROVIDER_SYNC_COLUMNS = frozenset(
     {"ticker", "interval", "last_error", "updated_at"}
 )
-_ASCII_WHITESPACE = " \t\n\r\v\f"
 _STORED_UTC_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S+0000"
 
 
@@ -99,7 +98,7 @@ def _table_columns(
 def _normalize_ticker(value: object, *, field_name: str) -> str:
     if not isinstance(value, str):
         raise TypeError(f"{field_name} must be a string")
-    normalized = value.strip(_ASCII_WHITESPACE).upper()
+    normalized = value.strip().upper()
     if not normalized:
         raise ValueError(f"{field_name} must be non-empty")
     return normalized
@@ -284,12 +283,12 @@ def _read_provider_errors(
         )
         if not isinstance(raw_interval, str) or (
             not raw_interval
-            or raw_interval != raw_interval.strip(_ASCII_WHITESPACE)
+            or raw_interval != raw_interval.strip()
         ):
             raise _StoredDatabaseError("provider issue interval is malformed")
         if raw_error is not None and (
             not isinstance(raw_error, str)
-            or not raw_error.strip(_ASCII_WHITESPACE)
+            or not raw_error.strip()
         ):
             raise _StoredDatabaseError("provider issue last_error is malformed")
         if raw_updated_at is not None and not isinstance(raw_updated_at, str):
@@ -304,7 +303,7 @@ def _read_provider_errors(
             ProviderSyncIssue(
                 ticker=ticker,
                 interval=raw_interval,
-                last_error=raw_error.strip(_ASCII_WHITESPACE),
+                last_error=raw_error.strip(),
                 updated_at=raw_updated_at,
             )
         )
@@ -411,7 +410,7 @@ class RthObservationReader:
     ) -> ObservationReadResult:
         if not isinstance(interval, str):
             raise TypeError("interval must be a string")
-        if not interval or interval != interval.strip(_ASCII_WHITESPACE):
+        if not interval or interval != interval.strip():
             raise ValueError("interval must be a non-empty database interval")
         session_windows = _open_sessions(sessions)
 
