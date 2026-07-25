@@ -268,27 +268,28 @@ def test_service_dedupes_aliases_and_orders_requested_window(tmp_path):
     )
     path = tmp_path / "market.db"
     _create_market_db(path, rows=rows, aliases=(("BRK.B", "BRK B"),))
-    calendar = _Calendar(sessions)
-    clock = _Clock(datetime(2026, 7, 10, 17, 0, tzinfo=EASTERN))
+    for universe in (("BRK.B",), ("BRK.B", "BRK B")):
+        calendar = _Calendar(sessions)
+        clock = _Clock(datetime(2026, 7, 10, 17, 0, tzinfo=EASTERN))
 
-    result = _coverage(
-        path,
-        calendar=calendar,
-        clock=clock,
-        universe=("BRK B", "BRK B"),
-    )
+        result = _coverage(
+            path,
+            calendar=calendar,
+            clock=clock,
+            universe=universe,
+        )
 
-    assert clock.calls == 1
-    assert calendar.requested_days == [newest, oldest]
-    assert result["universe_count"] == 1
-    assert [item["date"] for item in result["days"]] == [
-        newest.isoformat(),
-        oldest.isoformat(),
-    ]
-    assert [item["coverage_status"] for item in result["days"]] == [
-        "complete",
-        "complete",
-    ]
+        assert clock.calls == 1
+        assert calendar.requested_days == [newest, oldest]
+        assert result["universe_count"] == 1
+        assert [item["date"] for item in result["days"]] == [
+            newest.isoformat(),
+            oldest.isoformat(),
+        ]
+        assert [item["coverage_status"] for item in result["days"]] == [
+            "complete",
+            "complete",
+        ]
 
 
 def test_service_emits_exact_v2_contract_without_retired_fields(tmp_path):

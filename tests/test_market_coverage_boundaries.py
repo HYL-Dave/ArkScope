@@ -166,6 +166,7 @@ def test_coverage_enum_consumers_use_exact_exhaustive_matching():
     route = ROOT / "src" / "api" / "routes" / "market_data.py"
     forbidden_methods = {"startswith", "endswith", "find", "search", "match"}
     offenders: list[str] = []
+    exhaustive_guards: list[str] = []
 
     for path in _python_sources(route):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -180,6 +181,30 @@ def test_coverage_enum_consumers_use_exact_exhaustive_matching():
                     offenders.append(
                         f"{path.relative_to(ROOT)}:{node.lineno}: {node.func.attr}"
                     )
+            if isinstance(node, ast.Match):
+                for case in node.cases:
+                    pattern = case.pattern
+                    if not (
+                        isinstance(pattern, ast.MatchAs)
+                        and pattern.pattern is None
+                        and pattern.name is not None
+                    ):
+                        continue
+                    calls = (
+                        child
+                        for statement in case.body
+                        for child in ast.walk(statement)
+                        if isinstance(child, ast.Call)
+                    )
+                    if any(
+                        isinstance(call.func, ast.Name)
+                        and call.func.id == "assert_never"
+                        and len(call.args) == 1
+                        and isinstance(call.args[0], ast.Name)
+                        and call.args[0].id == pattern.name
+                        for call in calls
+                    ):
+                        exhaustive_guards.append(str(path.relative_to(ROOT)))
             if isinstance(node, ast.Compare):
                 values = (node.left, *node.comparators)
                 has_semantic_value = any(
@@ -197,3 +222,4 @@ def test_coverage_enum_consumers_use_exact_exhaustive_matching():
                     )
 
     assert not offenders, offenders
+    assert "src/market_coverage/service.py" in exhaustive_guards

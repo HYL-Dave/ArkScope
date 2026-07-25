@@ -5,6 +5,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from typing_extensions import assert_never
+
 from .calendar import (
     CalendarHealthComposer,
     OfficialSessionFixtures,
@@ -86,9 +88,21 @@ def _compose_calendar_health(
     if any(item.forward_horizon_months != forward_horizon for item in assessments):
         raise ValueError("calendar assessments disagree on forward horizon")
 
-    if any(item.status is CalendarHealth.UNAVAILABLE for item in assessments):
+    statuses: set[CalendarHealth] = set()
+    for assessment in assessments:
+        match assessment.status:
+            case CalendarHealth.OK:
+                statuses.add(CalendarHealth.OK)
+            case CalendarHealth.DEGRADED:
+                statuses.add(CalendarHealth.DEGRADED)
+            case CalendarHealth.UNAVAILABLE:
+                statuses.add(CalendarHealth.UNAVAILABLE)
+            case unexpected:
+                assert_never(unexpected)
+
+    if CalendarHealth.UNAVAILABLE in statuses:
         status = CalendarHealth.UNAVAILABLE
-    elif any(item.status is CalendarHealth.DEGRADED for item in assessments):
+    elif CalendarHealth.DEGRADED in statuses:
         status = CalendarHealth.DEGRADED
     else:
         status = CalendarHealth.OK
@@ -257,6 +271,7 @@ class TradingDayCoverageService:
             sessions=readable_sessions,
             interval=interval,
         )
+        canonical_universe = observation_result.canonical_universe
         days = self._classify_days(
             calendar_days=calendar_days,
             calendar_health=calendar_health,

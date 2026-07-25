@@ -495,6 +495,20 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
         "contract unavailable",
         "normalized alias",
     }
+    with pytest.raises(ValueError, match="session observations.*canonical_universe"):
+        type(result)(
+            health=result.health,
+            canonical_universe=("AAA",),
+            sessions=result.sessions,
+            provider_errors=(),
+        )
+    with pytest.raises(ValueError, match="provider issues.*canonical_universe"):
+        type(result)(
+            health=result.health,
+            canonical_universe=("AAA",),
+            sessions=(),
+            provider_errors=result.provider_errors,
+        )
     provider_queries = [
         statement
         for statement in statements

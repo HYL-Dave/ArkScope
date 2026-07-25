@@ -65,12 +65,17 @@ def _open_read_only_market_db(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
-def _unavailable(reason: ObservationHealthReason) -> ObservationReadResult:
+def _unavailable(
+    reason: ObservationHealthReason,
+    *,
+    canonical_universe: tuple[str, ...],
+) -> ObservationReadResult:
     return ObservationReadResult(
         health=ObservationHealthAssessment(
             status=ObservationHealth.UNAVAILABLE,
             reason_code=reason,
         ),
+        canonical_universe=canonical_universe,
         sessions=(),
         provider_errors=(),
     )
@@ -412,22 +417,38 @@ class RthObservationReader:
             raise TypeError("interval must be a string")
         if not interval or interval != interval.strip():
             raise ValueError("interval must be a non-empty database interval")
+        requested_universe = _canonical_universe(
+            universe,
+            _TickerAliasIndex({}, {}),
+        )
         session_windows = _open_sessions(sessions)
 
         try:
             path_exists = self._db_path.exists()
             path_is_file = self._db_path.is_file()
         except OSError:
-            return _unavailable(ObservationHealthReason.MARKET_DB_UNREADABLE)
+            return _unavailable(
+                ObservationHealthReason.MARKET_DB_UNREADABLE,
+                canonical_universe=requested_universe,
+            )
         if not path_exists:
-            return _unavailable(ObservationHealthReason.MARKET_DB_MISSING)
+            return _unavailable(
+                ObservationHealthReason.MARKET_DB_MISSING,
+                canonical_universe=requested_universe,
+            )
         if not path_is_file:
-            return _unavailable(ObservationHealthReason.MARKET_DB_UNREADABLE)
+            return _unavailable(
+                ObservationHealthReason.MARKET_DB_UNREADABLE,
+                canonical_universe=requested_universe,
+            )
 
         try:
             conn = _open_read_only_market_db(self._db_path)
         except (OSError, sqlite3.Error):
-            return _unavailable(ObservationHealthReason.MARKET_DB_UNREADABLE)
+            return _unavailable(
+                ObservationHealthReason.MARKET_DB_UNREADABLE,
+                canonical_universe=requested_universe,
+            )
 
         try:
             price_columns = _table_columns(conn, "prices")
@@ -436,11 +457,12 @@ class RthObservationReader:
                 or not _REQUIRED_PRICE_COLUMNS <= price_columns
             ):
                 return _unavailable(
-                    ObservationHealthReason.PRICES_SCHEMA_MISSING
+                    ObservationHealthReason.PRICES_SCHEMA_MISSING,
+                    canonical_universe=requested_universe,
                 )
 
             aliases = _load_aliases(conn)
-            canonical_universe = _canonical_universe(universe, aliases)
+            canonical_universe = _canonical_universe(requested_universe, aliases)
             canonical_set = set(canonical_universe)
             provider_errors = _read_provider_errors(
                 conn,
@@ -456,7 +478,10 @@ class RthObservationReader:
                 canonical_universe=canonical_universe,
             )
         except (sqlite3.Error, _StoredDatabaseError):
-            return _unavailable(ObservationHealthReason.MARKET_DB_UNREADABLE)
+            return _unavailable(
+                ObservationHealthReason.MARKET_DB_UNREADABLE,
+                canonical_universe=requested_universe,
+            )
         finally:
             conn.close()
 
@@ -465,6 +490,7 @@ class RthObservationReader:
                 status=ObservationHealth.OK,
                 reason_code=None,
             ),
+            canonical_universe=canonical_universe,
             sessions=observations,
             provider_errors=provider_errors,
         )

@@ -239,12 +239,25 @@ class RthSessionObservations:
 @dataclass(frozen=True)
 class ObservationReadResult:
     health: ObservationHealthAssessment
+    canonical_universe: tuple[str, ...]
     sessions: tuple[RthSessionObservations, ...]
     provider_errors: tuple[ProviderSyncIssue, ...]
 
     def __post_init__(self) -> None:
         if not isinstance(self.health, ObservationHealthAssessment):
             raise TypeError("health must be ObservationHealthAssessment")
+        if not isinstance(self.canonical_universe, tuple):
+            raise TypeError("canonical_universe must be an immutable tuple")
+        if not self.canonical_universe or any(
+            not isinstance(ticker, str)
+            or not ticker
+            or ticker != ticker.strip()
+            or ticker != ticker.upper()
+            for ticker in self.canonical_universe
+        ):
+            raise ValueError("canonical_universe must contain canonical ticker IDs")
+        if len(self.canonical_universe) != len(set(self.canonical_universe)):
+            raise ValueError("canonical_universe must contain unique ticker IDs")
         if not isinstance(self.sessions, tuple):
             raise TypeError("sessions must be an immutable tuple")
         if any(
@@ -264,6 +277,19 @@ class ObservationReadResult:
             for issue in self.provider_errors
         ):
             raise TypeError("provider_errors must contain ProviderSyncIssue values")
+        canonical_set = set(self.canonical_universe)
+        observation_tickers = {
+            observation.ticker
+            for session in self.sessions
+            for observation in session.observations
+        }
+        if not observation_tickers <= canonical_set:
+            raise ValueError(
+                "session observations must belong to canonical_universe"
+            )
+        provider_tickers = {issue.ticker for issue in self.provider_errors}
+        if not provider_tickers <= canonical_set:
+            raise ValueError("provider issues must belong to canonical_universe")
         if self.health.status is ObservationHealth.UNAVAILABLE and (
             self.sessions or self.provider_errors
         ):
