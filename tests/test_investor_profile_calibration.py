@@ -4,10 +4,13 @@ import asyncio
 import json
 import sqlite3
 from dataclasses import FrozenInstanceError, asdict, dataclass
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 import src.investor_profile_calibration_agent as calibration_agent
+from src.anthropic_refusal import AnthropicRefusalError
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import (
     CalibrationStore,
@@ -1082,6 +1085,40 @@ def test_calibration_prompt_pins_every_enum_value():
     positions = [CALIBRATION_SYSTEM_PROMPT.index(line) for line in catalog_lines]
     assert positions == sorted(positions)
     assert tuple(topic.id for topic in CALIBRATION_TOPICS) == CALIBRATION_TOPIC_IDS
+
+
+def test_anthropic_calibration_raises_structured_refusal_before_text_extraction(
+    monkeypatch,
+):
+    import src.auth_drivers.live_resolver as live_resolver
+
+    response = SimpleNamespace(
+        stop_reason="refusal",
+        stop_details=None,
+        content=[SimpleNamespace(text='{"assistant_message":"must not parse"}')],
+    )
+    create = Mock(return_value=response)
+    client = SimpleNamespace(messages=SimpleNamespace(create=create))
+    monkeypatch.setattr(
+        live_resolver,
+        "resolve_live_auth",
+        lambda provider: SimpleNamespace(source="api_key", credential_id=None),
+    )
+    monkeypatch.setattr(live_resolver, "live_anthropic_client", lambda: client)
+
+    with pytest.raises(AnthropicRefusalError) as exc:
+        asyncio.run(
+            calibration_agent._call_calibration_llm(
+                provider="anthropic",
+                model="claude-sonnet-5",
+                instructions="Return JSON.",
+                input_messages=[{"role": "user", "content": "Calibrate me."}],
+            )
+        )
+
+    assert exc.value.model == "claude-sonnet-5"
+    assert exc.value.stop_details == {}
+    create.assert_called_once()
 
 
 def test_parse_calibration_json_strips_model_supplied_risk_mismatch():

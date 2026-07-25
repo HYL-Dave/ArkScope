@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass
 from typing import Protocol
 
+from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.investor_profile_calibration_policy import CALIBRATION_TOPICS
 
@@ -291,6 +292,10 @@ async def _call_calibration_llm(
                 system=instructions,
                 messages=input_messages,
             )
+            if is_refusal(resp):
+                raise AnthropicRefusalError(
+                    model, getattr(resp, "stop_details", None)
+                )
             return _message_text_anthropic(resp)
 
         return await asyncio.to_thread(_call)
