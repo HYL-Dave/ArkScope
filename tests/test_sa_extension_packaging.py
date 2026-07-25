@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,12 @@ def _load_builder():
     spec = importlib.util.spec_from_file_location("sa_firefox_builder", BUILDER_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous_dont_write_bytecode
     return module
 
 
@@ -40,6 +46,7 @@ def _tree_bytes(path: Path) -> dict[str, bytes]:
 
 def test_dependency_graph_closes_manifest_html_imports_and_injected_scripts(tmp_path):
     builder = _load_builder()
+    assert not (EXT_DIR / "__pycache__").exists()
     source = _copy_fixture(tmp_path)
 
     graph = builder.discover_dependency_graph(source)
