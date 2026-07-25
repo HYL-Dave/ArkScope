@@ -299,12 +299,14 @@ detail repair separately from metadata rediscovery, and never claims complete
 historical coverage. Arbitrary date ranges and generic lifetime backfill remain
 out of scope.
 
-The corresponding RED-first implementation plan is written at
+The corresponding RED-first implementation plan is at
 `docs/superpowers/plans/2026-07-25-sa-extension-reliability-control-clarity.md`.
-Independent full-plan review is GREEN and its required baseline correction
-plus two grounding advisories are resolved. Isolated product implementation is
-cleared; merge, extension installation, and production repair remain blocked
-on their later review and approval gates.
+Implementation is review-ready at product tip `c85f4bed`: packaging closure,
+derived structured outcomes, durable degraded observability, resumable repair,
+five honest popup controls, copied-DB proofs, Chrome/native lifecycle, Firefox
+exact-artifact accessibility, and localized web-health matrices are complete.
+Independent implementation review is the sole next gate. Merge, extension
+installation, and production repair remain blocked on later explicit approval.
 
 Supporting analysis/tooling now lives in:
 

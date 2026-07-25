@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: CLEARED FOR IMPLEMENTATION - REVIEW-READY HANDOFF REQUIRED**
+> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
 >
 > The design passed independent review and its required disclosure amendment
 > plus all three advisories are incorporated through `9da1a9c9`. A later
@@ -1457,7 +1457,7 @@ Resolved Task 6 product tip:
 - Create/update the redacted evidence ledger
 - No product changes unless a failed gate triggers reviewed deviation
 
-- [ ] **Step 1: Prove exact node accounting**
+- [x] **Step 1: Prove exact node accounting**
 
 Collect base and tip in clean virgin archives with the same Python/Node
 dependencies. Normalize and `comm` the lists.
@@ -1474,7 +1474,7 @@ frontend focused: 4 files / 69
 Every removed ID must be one of the three named removals in Exact Test
 Accounting.
 
-- [ ] **Step 2: Run canonical focused suites**
+- [x] **Step 2: Run canonical focused suites**
 
 ```bash
 pytest -q \
@@ -1503,7 +1503,7 @@ npx vitest run \
 
 Expected: backend `327/327`; frontend `69/69`.
 
-- [ ] **Step 3: Run full suites and build gates**
+- [x] **Step 3: Run full suites and build gates**
 
 ```bash
 cd /mnt/md0/PycharmProjects/ArkScope-sa-extension-reliability
@@ -1519,13 +1519,13 @@ Expected collections `4710` and `95/1063`; scanner `36/20/0/20` and
 unchanged manifest hashes. Record any pre-existing environment failures by
 canonical A/B failure-set equivalence; do not relabel them passing.
 
-- [ ] **Step 4: Prove packaging closure after all extension edits**
+- [x] **Step 4: Prove packaging closure after all extension edits**
 
 Rebuild twice into empty temporary directories. Exact file lists and file
 hashes must match. Delete one copied source dependency in a disposable tree
 and prove build failure leaves an existing output byte-identical.
 
-- [ ] **Step 5: Prove byte-identical boundaries**
+- [x] **Step 5: Prove byte-identical boundaries**
 
 Run the fixed-base gates below:
 
@@ -1575,7 +1575,7 @@ named in `docs/design/I18N_FORMATTER_INVENTORY.md` against `c49a2417`; record
 the exact resolved path list and hashes in evidence. No other scraper,
 continuity transition, routine-cadence/budget, or formatter hunk is allowed.
 
-- [ ] **Step 6: Create two isolated 0600 backup pairs**
+- [x] **Step 6: Create two isolated 0600 backup pairs**
 
 Use `sqlite3.Connection.backup()` to create pair A and pair B, each containing
 one production-snapshot `profile_state.db` and one production-snapshot
@@ -1583,7 +1583,7 @@ one production-snapshot `profile_state.db` and one production-snapshot
 Do not stop or write production for this probe. Record pre-probe production
 size/mtime/integrity and verify them unchanged afterward.
 
-- [ ] **Step 7: Run copied-DB preview and state-machine proof**
+- [x] **Step 7: Run copied-DB preview and state-machine proof**
 
 On snapshot pair A, run read-only recorded-failure and incident previews twice.
 Require the same hash/counts and no pair-A DB changes. On snapshot pair B, use
@@ -1602,7 +1602,7 @@ synthetic fake IDs only to prove:
 
 Do not execute browser repair against production IDs during this task.
 
-- [ ] **Step 8: Record the fresh historical preview privately**
+- [x] **Step 8: Record the fresh historical preview privately**
 
 Evidence may state run count, unique ID count, current body-present/missing
 counts, interval, and manifest hash. Ordinary committed evidence must replace
@@ -1616,20 +1616,20 @@ Any unexplained drift is a stop condition.
 **Files:**
 - Evidence ledger only unless a reviewed deviation is required
 
-- [ ] **Step 1: Start an isolated sidecar**
+- [x] **Step 1: Start an isolated sidecar**
 
 Use copied DBs, `ARKSCOPE_PROFILE_DB`, `ARKSCOPE_SA_DB`, scheduler disabled,
 and unused ports. Point a temporary native-host config at that sidecar. Never
 overwrite the user's production native config; restore/remove the temporary
 path after the gate.
 
-- [ ] **Step 2: Load fresh artifacts**
+- [x] **Step 2: Load fresh artifacts**
 
 Load Chrome from the source graph and Firefox from a newly generated artifact.
 Do not reuse the manually repaired old Firefox build. Verify every expected
 runtime file is present before loading.
 
-- [ ] **Step 3: Run outcome/telemetry lifecycle**
+- [x] **Step 3: Run outcome/telemetry lifecycle**
 
 Prove:
 
@@ -1642,7 +1642,7 @@ Prove:
    captured run itself was complete; and
 7. outbox count/age eviction is visible in a synthetic fixture, not production.
 
-- [ ] **Step 4: Run popup interaction matrix**
+- [x] **Step 4: Run popup interaction matrix**
 
 In both browsers, verify five controls, 3+2 grouping, hover/focus descriptions,
 inline table, contextual Retry, Advanced disclosure, confirmation, resume,
@@ -1650,21 +1650,21 @@ tab order, and no DevTools requirement. Use element-level clipping census at
 the shipped popup width; exclude visually hidden nodes and intentional masked
 values only.
 
-- [ ] **Step 5: Run bounded recovery probes on synthetic targets**
+- [x] **Step 5: Run bounded recovery probes on synthetic targets**
 
 Use fake fixture-backed pages or a bounded test responder, never licensed
 committed content. Prove exact-ID no-age retry, 30-hour actual interval, >168h
 cap, separate metadata discovery, zero-known-ID discovery, reached-start and
 unresolved interval evidence, close/reopen resume, and shared mutex.
 
-- [ ] **Step 6: Run localized web health matrix**
+- [x] **Step 6: Run localized web health matrix**
 
 At `390`, `760`, `960`, and `1440` in `zh-Hant` and `en`, render complete,
 degraded, unknown-code, active-repair, retryable-repair, and telemetry-unseen
 states. Require zero raw planted detail in normal mode, only a validated stable
 code in Developer Mode, and no document or element-level text clipping.
 
-- [ ] **Step 7: Clean the isolated environment**
+- [x] **Step 7: Clean the isolated environment**
 
 Stop sidecar/browser test profiles, remove temporary native config and DB
 copies containing licensed data, and verify all test ports refuse connections.
@@ -1679,7 +1679,7 @@ Do not remove retained production backups created later during approved repair.
 - Modify this plan status
 - Modify priority map/roadmap status to review-ready, not LIVE
 
-- [ ] **Step 1: Write the evidence ledger**
+- [x] **Step 1: Write the evidence ledger**
 
 Include:
 
@@ -1696,7 +1696,7 @@ Include:
 - protected-boundary diffs; and
 - commands, exit codes, and honest environmental limitations.
 
-- [ ] **Step 2: Run final cleanliness checks**
+- [x] **Step 2: Run final cleanliness checks**
 
 ```bash
 git diff --check
@@ -1714,7 +1714,7 @@ Expected: no legacy contradictory status path, no glob/destructive installer
 assembly, and no duplicate help/confirmation mechanisms. Review every hit;
 comments/fixtures are not silently ignored.
 
-- [ ] **Step 3: Commit evidence/status**
+- [x] **Step 3: Commit evidence/status**
 
 ```bash
 git add docs/superpowers/evidence/2026-07-25-sa-extension-reliability-control-clarity.md \
@@ -1723,7 +1723,7 @@ git add docs/superpowers/evidence/2026-07-25-sa-extension-reliability-control-cl
 git commit -m "docs: record SA extension reliability evidence"
 ```
 
-- [ ] **Step 4: Stop at independent implementation review**
+- [x] **Step 4: Stop at independent implementation review**
 
 Do not merge, install into production browsers, write production telemetry,
 or execute historical repair. Report the review-ready tip and exact commands.
