@@ -41,8 +41,293 @@ class CalendarHealthReason(str, Enum):
     CALENDAR_UNAVAILABLE = "calendar_unavailable"
 
 
+class SlotCoverageStatus(str, Enum):
+    OBSERVED = "observed"
+    UNKNOWN = "unknown"
+
+
+class TickerCoverageStatus(str, Enum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    UNKNOWN = "unknown"
+
+
+class CoverageDayStatus(str, Enum):
+    UNKNOWN = "unknown"
+    NON_TRADING = "non_trading"
+    IN_PROGRESS = "in_progress"
+    PARTIAL = "partial"
+    INDETERMINATE_TICKERS = "indeterminate_tickers"
+    COMPLETE = "complete"
+
+
+class CoverageDayReason(str, Enum):
+    CALENDAR_UNAVAILABLE = "calendar_unavailable"
+    DATE_UNREVIEWED = "date_unreviewed"
+    OBSERVATION_UNAVAILABLE = "observation_unavailable"
+    NO_OBSERVATIONS = "no_observations"
+
+
 def _is_timezone_aware(value: datetime) -> bool:
     return value.tzinfo is not None and value.utcoffset() is not None
+
+
+def _require_utc(value: datetime, *, field_name: str) -> None:
+    if not _is_timezone_aware(value):
+        raise ValueError(f"{field_name} must be timezone-aware")
+    if value.utcoffset() != timedelta(0):
+        raise ValueError(f"{field_name} must have zero UTC offset")
+
+
+@dataclass(frozen=True)
+class RthObservation:
+    ticker: str
+    observed_at: datetime
+
+    def __post_init__(self) -> None:
+        if not self.ticker or self.ticker != self.ticker.strip():
+            raise ValueError("observation ticker must be a non-empty canonical ID")
+        if not _is_timezone_aware(self.observed_at):
+            raise ValueError("observation timestamp must be timezone-aware")
+
+
+@dataclass(frozen=True)
+class SlotCoverage:
+    start_at_utc: datetime
+    status: SlotCoverageStatus
+
+    def __post_init__(self) -> None:
+        _require_utc(self.start_at_utc, field_name="slot start")
+        if not isinstance(self.status, SlotCoverageStatus):
+            raise TypeError("slot status must be SlotCoverageStatus")
+
+
+@dataclass(frozen=True)
+class TickerCoverage:
+    ticker: str
+    slots: tuple[SlotCoverage, ...]
+
+    def __post_init__(self) -> None:
+        if not self.ticker or self.ticker != self.ticker.strip():
+            raise ValueError("ticker must be a non-empty canonical ID")
+        if not isinstance(self.slots, tuple) or not self.slots:
+            raise ValueError("ticker coverage requires a non-empty slot tuple")
+        if any(not isinstance(slot, SlotCoverage) for slot in self.slots):
+            raise TypeError("ticker slots must contain SlotCoverage values")
+
+        starts = tuple(slot.start_at_utc for slot in self.slots)
+        if starts != tuple(sorted(starts)) or len(starts) != len(set(starts)):
+            raise ValueError("ticker slots must have unique ordered starts")
+
+    @property
+    def expected_slot_count(self) -> int:
+        return len(self.slots)
+
+    @property
+    def observed_slot_count(self) -> int:
+        return sum(
+            slot.status is SlotCoverageStatus.OBSERVED for slot in self.slots
+        )
+
+    @property
+    def status(self) -> TickerCoverageStatus:
+        if self.observed_slot_count == self.expected_slot_count:
+            return TickerCoverageStatus.COMPLETE
+        if self.observed_slot_count > 0:
+            return TickerCoverageStatus.PARTIAL
+        return TickerCoverageStatus.UNKNOWN
+
+
+@dataclass(frozen=True)
+class DayCoverage:
+    market_date: date
+    status: CoverageDayStatus
+    reason_code: CoverageDayReason | None
+    expected_slot_starts: tuple[datetime, ...] | None
+    ticker_coverages: tuple[TickerCoverage, ...] | None
+    unmatched_rth_row_count: int | None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.market_date, date):
+            raise TypeError("market_date must be a date")
+        if not isinstance(self.status, CoverageDayStatus):
+            raise TypeError("day status must be CoverageDayStatus")
+        if self.reason_code is not None and not isinstance(
+            self.reason_code,
+            CoverageDayReason,
+        ):
+            raise TypeError("day reason must be CoverageDayReason")
+
+        self._validate_expected_slots()
+        self._validate_ticker_coverages()
+
+        if self.status is CoverageDayStatus.NON_TRADING:
+            self._require_absent_classification()
+            if self.reason_code is not None:
+                raise ValueError("non-trading coverage cannot carry a reason")
+            return
+
+        if self.status is CoverageDayStatus.IN_PROGRESS:
+            if self.expected_slot_starts is None:
+                raise ValueError("in-progress coverage requires expected slots")
+            if self.ticker_coverages is not None:
+                raise ValueError("in-progress coverage cannot classify tickers")
+            if self.unmatched_rth_row_count is not None:
+                raise ValueError("in-progress coverage cannot count unmatched rows")
+            if self.reason_code is not None:
+                raise ValueError("in-progress coverage cannot carry a reason")
+            return
+
+        if self.status is CoverageDayStatus.UNKNOWN and self.ticker_coverages is None:
+            self._require_absent_classification()
+            if self.reason_code not in {
+                CoverageDayReason.CALENDAR_UNAVAILABLE,
+                CoverageDayReason.DATE_UNREVIEWED,
+                CoverageDayReason.OBSERVATION_UNAVAILABLE,
+            }:
+                raise ValueError("unclassifiable coverage requires a typed reason")
+            return
+
+        self._validate_completed_classification()
+
+    def _validate_expected_slots(self) -> None:
+        if self.expected_slot_starts is None:
+            return
+        if (
+            not isinstance(self.expected_slot_starts, tuple)
+            or not self.expected_slot_starts
+        ):
+            raise ValueError("expected slots must be a non-empty tuple")
+        for start in self.expected_slot_starts:
+            _require_utc(start, field_name="expected slot start")
+        if self.expected_slot_starts != tuple(sorted(self.expected_slot_starts)):
+            raise ValueError("expected slot starts must be ordered")
+        if len(self.expected_slot_starts) != len(set(self.expected_slot_starts)):
+            raise ValueError("expected slot starts must be unique")
+
+    def _validate_ticker_coverages(self) -> None:
+        if self.ticker_coverages is None:
+            return
+        if not isinstance(self.ticker_coverages, tuple) or not self.ticker_coverages:
+            raise ValueError("completed coverage requires ticker classifications")
+        if any(
+            not isinstance(ticker, TickerCoverage)
+            for ticker in self.ticker_coverages
+        ):
+            raise TypeError("ticker_coverages must contain TickerCoverage values")
+
+        ticker_ids = tuple(ticker.ticker for ticker in self.ticker_coverages)
+        if len(ticker_ids) != len(set(ticker_ids)):
+            raise ValueError("ticker classifications must be unique")
+        if self.expected_slot_starts is None:
+            raise ValueError("ticker classifications require expected slots")
+        for ticker in self.ticker_coverages:
+            starts = tuple(slot.start_at_utc for slot in ticker.slots)
+            if starts != self.expected_slot_starts:
+                raise ValueError("every ticker must use the day's expected slots")
+
+    def _require_absent_classification(self) -> None:
+        if self.expected_slot_starts is not None:
+            raise ValueError("unclassifiable coverage cannot carry expected slots")
+        if self.ticker_coverages is not None:
+            raise ValueError("unclassifiable coverage cannot classify tickers")
+        if self.unmatched_rth_row_count is not None:
+            raise ValueError("unclassifiable coverage cannot count unmatched rows")
+
+    def _validate_completed_classification(self) -> None:
+        if self.expected_slot_starts is None or self.ticker_coverages is None:
+            raise ValueError("completed-session coverage requires slot facts")
+        if (
+            not isinstance(self.unmatched_rth_row_count, int)
+            or isinstance(self.unmatched_rth_row_count, bool)
+            or self.unmatched_rth_row_count < 0
+        ):
+            raise ValueError("unmatched_rth_row_count must be a non-negative integer")
+
+        observed_count = self.observed_ticker_count
+        partial_count = self.partial_ticker_count
+        unknown_count = self.unknown_ticker_count
+        assert observed_count is not None
+        assert partial_count is not None
+        assert unknown_count is not None
+
+        if observed_count == 0:
+            derived_status = CoverageDayStatus.UNKNOWN
+            derived_reason = CoverageDayReason.NO_OBSERVATIONS
+        elif partial_count > 0:
+            derived_status = CoverageDayStatus.PARTIAL
+            derived_reason = None
+        elif unknown_count > 0:
+            derived_status = CoverageDayStatus.INDETERMINATE_TICKERS
+            derived_reason = None
+        else:
+            derived_status = CoverageDayStatus.COMPLETE
+            derived_reason = None
+
+        if self.status is not derived_status or self.reason_code is not derived_reason:
+            raise ValueError("day status and reason must match ticker slot facts")
+
+    @property
+    def expected_slot_count(self) -> int | None:
+        if self.expected_slot_starts is None:
+            return None
+        return len(self.expected_slot_starts)
+
+    @property
+    def observed_ticker_count(self) -> int | None:
+        if self.ticker_coverages is None:
+            return None
+        return sum(
+            ticker.status is not TickerCoverageStatus.UNKNOWN
+            for ticker in self.ticker_coverages
+        )
+
+    @property
+    def complete_ticker_count(self) -> int | None:
+        if self.ticker_coverages is None:
+            return None
+        return sum(
+            ticker.status is TickerCoverageStatus.COMPLETE
+            for ticker in self.ticker_coverages
+        )
+
+    @property
+    def partial_ticker_count(self) -> int | None:
+        if self.ticker_coverages is None:
+            return None
+        return sum(
+            ticker.status is TickerCoverageStatus.PARTIAL
+            for ticker in self.ticker_coverages
+        )
+
+    @property
+    def unknown_ticker_count(self) -> int | None:
+        if self.ticker_coverages is None:
+            return None
+        return sum(
+            ticker.status is TickerCoverageStatus.UNKNOWN
+            for ticker in self.ticker_coverages
+        )
+
+    @property
+    def partial_tickers(self) -> tuple[TickerCoverage, ...]:
+        if self.ticker_coverages is None:
+            return ()
+        return tuple(
+            ticker
+            for ticker in self.ticker_coverages
+            if ticker.status is TickerCoverageStatus.PARTIAL
+        )
+
+    @property
+    def unknown_tickers(self) -> tuple[str, ...]:
+        if self.ticker_coverages is None:
+            return ()
+        return tuple(
+            ticker.ticker
+            for ticker in self.ticker_coverages
+            if ticker.status is TickerCoverageStatus.UNKNOWN
+        )
 
 
 @dataclass(frozen=True)
