@@ -1,6 +1,6 @@
 # Engineering Issue Register
 
-> **Status**: WRITTEN - INDEPENDENT REVIEW PENDING
+> **Status**: ADOPTED - INDEPENDENT REVIEW GREEN 2026-07-25
 > **Created**: 2026-07-25
 > **Purpose**: Single owner for small, evidenced engineering debt that does not
 > yet justify a dedicated workstream in `PROJECT_PRIORITY_MAP.md`.
@@ -176,7 +176,7 @@ duplicate entries:
 |---|---|
 | jsdom popup contrast gate must remain paired with real Chrome computed styles | Permanent release rule already recorded in `2026-07-25-sa-extension-reliability-control-clarity-design.md:101-107`. |
 | Partial-status `#b45309` on `#fff3e0` measured `4.58:1` | Dated accepted boundary already recorded in the same spec at lines 98-99; changing either color must rerun its gate. |
-| Seven allegedly identical zh/en technical strings | Not admitted. An exact key census and intent classification are still missing; equal technical identifiers may be deliberate. |
+| Identical zh/en resource values | Not admitted. A fresh recursive resource comparison reproduces `160` identical leaves. The review additionally reported `24` multi-word non-CJK leaves and proposed `2` aria, `6` routing, and `5` runtime candidates, but that exact key ledger and its classification rule are not persisted in the repo and therefore are not independently reproducible yet. Equal identifiers and professional terms may be deliberate. Persist and review the exact candidate keys before opening an issue; none of these counts is an acceptance constant. |
 | SA evidence used different absolute full-suite summaries | Resolved and documented in the evidence packet and priority-map decision log; no open repair remains. |
 | Coverage v2 blunt 15-minute threshold | Formal queued workstream, not a small issue. `PROJECT_PRIORITY_MAP.md` is its owner. |
 | Calibration Anthropic refusal seam | Existing-contract violation promoted directly to the dedicated micro-slice plan; it never enters this register. |

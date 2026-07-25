@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** WRITTEN - INDEPENDENT PLAN REVIEW PENDING
+**Status:** REVIEW GREEN - IMPLEMENTATION CLEARED
 
 **Goal:** Make the Investor Profile calibration Anthropic seam classify
 HTTP-200 `stop_reason="refusal"` as the existing typed `model_refusal` failure
@@ -108,13 +108,30 @@ required:
 7. either RED test fails for a reason other than the missing typed-refusal
    branch or missing route classification.
 
+## 3.1 Independent Review Resolution
+
+Independent review returned GREEN for both the register and this plan on
+2026-07-25. It reproduced full `4711`, focused `46 collected / 46 passed`, the
+three existing refusal seams, the shared stop-reason-only helper contract, the
+two distinct RED locations, exact `+2/-0` arithmetic, and every protected
+boundary.
+
+One advisory is accepted with a timing constraint: the current Investor
+Profile UI renders every turn failure with the same localized title, so a
+future refusal-aware recovery explanation is genuine UX debt. It is not added
+to the register before implementation because `model_refusal` is not yet a
+calibration route outcome and the register admits only reproducible current
+facts. Task 3 adds the entry after this slice makes the unused typed code real;
+the owning trigger is the next Investor Profile-owned UI slice. This plan's
+frontend stop condition remains unchanged.
+
 ## 4. Task 0: Review Clearance
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-25-calibration-anthropic-refusal.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Receive independent plan review**
+- [x] **Step 1: Receive independent plan review**
 
 The reviewer must confirm the two RED sites are distinct:
 
@@ -122,7 +139,7 @@ The reviewer must confirm the two RED sites are distinct:
 2. typed exception -> durable/API `model_refusal` rather than generic or parse
    failure.
 
-- [ ] **Step 2: Record clearance**
+- [x] **Step 2: Record clearance**
 
 Change plan status to `REVIEW GREEN - IMPLEMENTATION CLEARED`, add the review
 resolution, update the newest priority-map entry, and commit docs only. Record:
@@ -382,6 +399,7 @@ git commit -m "fix: preserve typed calibration refusals"
 
 **Files:**
 - Create: `docs/superpowers/evidence/2026-07-25-calibration-anthropic-refusal.md`
+- Modify: `docs/design/ENGINEERING_ISSUE_REGISTER.md`
 - Modify: `docs/superpowers/plans/2026-07-25-calibration-anthropic-refusal.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
@@ -454,7 +472,15 @@ passes. Inspect the two authorized product diffs and require only:
 Record RED output, GREEN output, exact node lists/hashes, full A/B, no-PG,
 byte gates, and diff census in the evidence packet. Change plan status to
 `IMPLEMENTED - INDEPENDENT REVIEW PENDING`, update the newest priority-map
-entry, and commit docs only.
+entry, and add one evidenced register entry for the remaining UX debt:
+
+- calibration now emits durable `model_refusal`;
+- `InvestorProfilePanel.tsx` still maps every `turn` failure to the single
+  `investor.workspace.errors.turn` title;
+- owner/trigger is the next Investor Profile-owned UI slice;
+- no frontend implementation is authorized by that entry.
+
+Then commit docs only.
 
 Do not merge. Independent implementation review must reproduce both RED seams,
 the `+2/-0` ledger, privacy assertions, and the absence of fallback/retry.
