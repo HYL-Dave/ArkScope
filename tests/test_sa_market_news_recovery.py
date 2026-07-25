@@ -144,6 +144,16 @@ def test_recorded_failure_preview_has_no_age_cutoff_and_does_not_classify_legacy
         },
         finished_at="2025-01-02T00:00:00+00:00",
     )
+    for index in range(201):
+        later = NOW + timedelta(seconds=index)
+        assert store.record_completed_run(
+            "sa_market_news_refresh",
+            status="succeeded",
+            trigger_source="extension",
+            started_at=later,
+            finished_at=later,
+            result={"status": "skipped", "reason": "not_due"},
+        ) is not None
 
     preview = service.preview_recorded_failures(source_run_ids=[run_id])
 

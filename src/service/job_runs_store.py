@@ -975,6 +975,41 @@ class JobRunsLocalStore:
             logger.warning("JobRunsLocalStore.list_runs failed: %s", exc)
             return []
 
+    def get_runs_by_ids(
+        self, *, job_name: str, run_ids: List[int]
+    ) -> List[Dict[str, Any]]:
+        """Read exact historical runs without coupling identity to pagination."""
+
+        ids = sorted({int(value) for value in run_ids if int(value) > 0})
+        if not ids:
+            return []
+        try:
+            found: List[sqlite3.Row] = []
+            with self._connect() as conn:
+                for start in range(0, len(ids), 500):
+                    chunk = ids[start : start + 500]
+                    placeholders = ",".join("?" for _ in chunk)
+                    found.extend(
+                        conn.execute(
+                            f"""
+                            SELECT id, job_name, status, trigger_source, payload, result,
+                                   message, error, started_at, finished_at, duration_ms,
+                                   created_at, updated_at
+                            FROM job_runs
+                            WHERE job_name=? AND id IN ({placeholders})
+                            """,
+                            (job_name, *chunk),
+                        ).fetchall()
+                    )
+            found.sort(
+                key=lambda row: (str(row["started_at"]), int(row["id"])),
+                reverse=True,
+            )
+            return [_serialize_local_row(dict(row)) for row in found]
+        except Exception as exc:
+            logger.warning("JobRunsLocalStore.get_runs_by_ids failed: %s", exc)
+            return []
+
     def latest_runs_by_name(self) -> Dict[str, Dict[str, Any]]:
         try:
             with self._connect() as conn:

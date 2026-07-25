@@ -378,13 +378,10 @@ class MarketNewsRecoveryService:
         source = "reviewed_historical_runs" if explicit else "latest_structured_retryable"
         if explicit:
             wanted = set(requested_ids)
-            source_rows = [
-                row
-                for row in self.job_store.list_runs(
-                    job_name=MARKET_NEWS_SYNC_JOB_NAME, limit=200
-                )
-                if row.get("id") in wanted
-            ]
+            source_rows = self.job_store.get_runs_by_ids(
+                job_name=MARKET_NEWS_SYNC_JOB_NAME,
+                run_ids=requested_ids,
+            )
             if {int(row["id"]) for row in source_rows} != wanted:
                 _fail("source_run_not_found")
         else:
