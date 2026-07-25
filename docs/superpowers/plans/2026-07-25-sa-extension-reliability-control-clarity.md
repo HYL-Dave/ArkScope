@@ -18,9 +18,10 @@
 > one required baseline correction and two grounding advisories are resolved
 > below with no product or test-accounting change. The docs-only commit that
 > contains this resolution is resolved with `git rev-parse HEAD` as
-> `PLAN_REVIEW_CLEARANCE_COMMIT` before worktree creation and recorded in the
-> first implementation evidence commit. Merge, extension installation, and
-> production repair remain separately unauthorized.
+> `PLAN_REVIEW_CLEARANCE_COMMIT=7d4f11164861aa0a50cc7771fef7388577f4da0b`.
+> The isolated implementation worktree records that authority below. Merge,
+> extension installation, and production repair remain separately
+> unauthorized.
 
 **Goal:** Make the Seeking Alpha browser extension impossible to package with
 missing runtime dependencies, make partial capture failures durably visible,
@@ -645,20 +646,20 @@ are reconciled in a reviewed docs commit. Net totals may not hide removals.
 - Modify `docs/design/PROJECT_PRIORITY_MAP.md`
 - Modify `docs/design/SA_EXTENSION_ROADMAP.md`
 
-- [ ] **Step 1: Receive independent full-plan review**
+- [x] **Step 1: Receive independent full-plan review**
 
 Do not begin product work on a conditional or partial review. Incorporate
 required findings in docs, rerun grounding affected by them, and obtain final
 GREEN.
 
-- [ ] **Step 2: Record clearance**
+- [x] **Step 2: Record clearance**
 
 Set this plan to `CLEARED FOR IMPLEMENTATION - REVIEW-READY HANDOFF REQUIRED`,
 set the design authority to `PLAN REVIEW GREEN - IMPLEMENTATION CLEARED`,
 commit docs only, and record the 40-character hash as
 `PLAN_REVIEW_CLEARANCE_COMMIT`.
 
-- [ ] **Step 3: Create an isolated worktree**
+- [x] **Step 3: Create an isolated worktree**
 
 ```bash
 git status --short
@@ -672,18 +673,47 @@ Expected: clean worktree at the clearance commit. Mount the same existing root
 `node_modules` into any virgin A/B archive used later; do not run an unreviewed
 dependency update.
 
-- [ ] **Step 4: Reproduce baseline counts and hashes**
+Resolved implementation authority:
+
+- `PLAN_REVIEW_CLEARANCE_COMMIT`:
+  `7d4f11164861aa0a50cc7771fef7388577f4da0b`;
+- branch/worktree: `codex/sa-extension-reliability` at
+  `/mnt/md0/PycharmProjects/ArkScope-sa-extension-reliability`;
+- the initial direct checkout stopped at the known linked-worktree
+  `git-crypt` smudge boundary. The clean retry used `--no-checkout`, copied
+  only `.git/git-crypt/keys/default` with mode `0600`, then populated `HEAD`
+  with `git read-tree -mu HEAD`. The protected evaluation document reads
+  `47,608` bytes. No database, browser profile, token, or user-owned file was
+  copied;
+- the existing root `node_modules` is linked into the worktree; no dependency
+  installation or lockfile change occurred.
+
+- [x] **Step 4: Reproduce baseline counts and hashes**
 
 Run the commands under Grounded Baseline. Preserve normalized node lists under
 `/tmp`; do not commit them. Expected counts/hashes must match exactly.
 
-- [ ] **Step 5: Capture protected-boundary hashes**
+Reproduced in the isolated worktree: backend `4621` with
+`488eeaab65ffad32bd098dbc4b1df0eb3ed3b62feabfe3a62b1a76324d960a17`,
+backend focused `238` with
+`ca36c2cc8616982fa8dd2c2f386743751691de6bd4f9bf52134229d830740de8`
+and `238 passed`; frontend `95/1056` with
+`5f9a1624b31a47dc9b786f57fa5de77eca86dde269c68ada3787d7210b05fd13`,
+frontend focused `4/62` with
+`025e871755c356f0be89089e92d0241d06b335af52ae8a2ca0f66e06b187f643`
+and `62 passed`.
+
+- [x] **Step 5: Capture protected-boundary hashes**
 
 Record SHA-256 or `git diff --exit-code` anchors for schema files, protected
 scrapers, continuity owners, CSS, desktop, package manifests/lockfiles, agent
 and research owners. This is evidence, not a permission to modify them.
 
-- [ ] **Step 6: Commit status only**
+All fixed-base `git diff --exit-code c49a2417` gates in Task 8 Step 5 pass at
+baseline. The explicit audit set (`scrape_detail.js`, the Market News helper
+owners, and `DataSourcesSection.tsx`) is also empty before product edits.
+
+- [x] **Step 6: Commit status only**
 
 ```bash
 git add docs/superpowers/plans/2026-07-25-sa-extension-reliability-control-clarity.md \
