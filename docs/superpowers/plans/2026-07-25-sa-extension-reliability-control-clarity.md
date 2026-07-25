@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
+> **Status: INDEPENDENT IMPLEMENTATION REVIEW GREEN - MERGE APPROVED**
 >
 > The design passed independent review and its required disclosure amendment
 > plus all three advisories are incorporated through `9da1a9c9`. A later

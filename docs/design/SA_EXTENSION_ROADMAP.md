@@ -301,12 +301,13 @@ out of scope.
 
 The corresponding RED-first implementation plan is at
 `docs/superpowers/plans/2026-07-25-sa-extension-reliability-control-clarity.md`.
-Implementation is review-ready at product tip `c85f4bed`: packaging closure,
-derived structured outcomes, durable degraded observability, resumable repair,
-five honest popup controls, copied-DB proofs, Chrome/native lifecycle, Firefox
-exact-artifact accessibility, and localized web-health matrices are complete.
-Independent implementation review is the sole next gate. Merge, extension
-installation, and production repair remain blocked on later explicit approval.
+Independent implementation review is GREEN at product tip `c85f4bed` with zero
+required changes: packaging closure, derived structured outcomes, durable
+degraded observability, resumable repair, five honest popup controls,
+copied-DB proofs, Chrome/native lifecycle, Firefox exact-artifact accessibility,
+and localized web-health matrices are complete. Fast-forward merge and
+merged-tree deployment verification are approved. Historical repair remains
+blocked on a fresh installed-build preview and exact-manifest approval.
 
 Supporting analysis/tooling now lives in:
 
