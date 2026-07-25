@@ -838,7 +838,7 @@ and `46fcc1766e2e8301e75b7ce5cdb7089d5d98e81955a916f1f84c0e9c72f2a300`.
 - Create `tests/test_sa_extension_run_protocol.py`
 - Modify `tests/test_sa_extension_alpha_picks.py`
 
-- [ ] **Step 1: Add twelve RED protocol nodes**
+- [x] **Step 1: Add twelve RED protocol nodes**
 
 ```text
 test_js_and_python_protocol_results_match_the_shared_fixture_corpus
@@ -858,7 +858,13 @@ test_legacy_unstructured_success_and_raw_prose_are_not_protocol_truth
 The fixture must include every adversarial case from design Section 11.2.
 Expected RED: missing modules and parity runner.
 
-- [ ] **Step 2: Add three RED background integration nodes**
+Observed: the combined protocol/background run was exactly `15 failed / 5
+passed`; every new node failed because the protocol modules or real adapters
+were absent, while all five existing Alpha Picks nodes remained green. The
+top-level `ok` incident fixture contains exactly `18` opaque retryable item
+outcomes.
+
+- [x] **Step 2: Add three RED background integration nodes**
 
 ```text
 test_background_loads_required_runtime_dependencies_before_registering_jobs
@@ -869,25 +875,25 @@ test_market_adapter_preserves_exact_failed_ids_and_stable_reason_codes
 These may use a narrow Node VM with mocked `chrome`, but must execute real
 product adapter functions rather than search for words only.
 
-- [ ] **Step 3: Implement pure derivation and validation in both languages**
+- [x] **Step 3: Implement pure derivation and validation in both languages**
 
 Do not parse English error strings in Python. Browser catch sites map known
 conditions to stable codes. Unknown exceptions become `unknown_failure` and
 raw text stays out of the canonical result/outbox.
 
-- [ ] **Step 4: Adapt existing Alpha and Market results**
+- [x] **Step 4: Adapt existing Alpha and Market results**
 
 Keep legacy capture fields needed by current popup/storage only as temporary
 source input. The new structured result is the telemetry and health contract.
 `detail_failed > 0`, `details.failed > 0`, failed current/closed scope, or
 failed reconciliation must not be complete.
 
-- [ ] **Step 5: Wire scripts through both manifests and rebuild**
+- [x] **Step 5: Wire scripts through both manifests and rebuild**
 
 Chrome uses a literal guarded `importScripts`; Firefox lists protocol before
 `background.js`. The Task 1 builder must include every new file without edits.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
 
 ```bash
 pytest -q tests/test_sa_extension_run_protocol.py \
@@ -897,7 +903,19 @@ pytest -q tests/test_sa_extension_run_protocol.py \
 
 Expected: protocol `12/12`, Alpha `8/8`, packaging `10/10`.
 
-- [ ] **Step 7: Commit**
+Observed: protocol `12/12`, Alpha `8/8`, and packaging `10/10` pass. One
+in-place adapter hardening then proved that an unknown legacy Market status
+was incorrectly complete (`1 failed`); the explicit fail-closed branch made
+the same node green without changing the ledger. Backend collection is
+`4646` with sorted node-list SHA-256
+`8d0a838196e2cd5552844963ce270985bcb169c3ad096df375d48ead7a78c8f1`;
+focused collection/run is `263/263` with SHA-256
+`00b1d9ed399b898f1821dac7f1039cc6b41359ae578864acb94bbb726f651366`.
+Two independent real Firefox builds were byte-identical, each with exactly
+`13` files; normalized artifact hash-list SHA-256 is
+`f34e12aa153b054735ca133fcb918d682e4d52b9cd6a5481d39aecd5cd719522`.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add extensions/sa_alpha_picks/extension_run_protocol.js \
@@ -910,6 +928,9 @@ git add extensions/sa_alpha_picks/extension_run_protocol.js \
   tests/test_sa_extension_alpha_picks.py
 git commit -m "feat: derive SA extension outcomes from structured truth"
 ```
+
+Resolved Task 2 product tip:
+`46bce5886b7d466bcc0d0cd3f21d522a4ca41619`.
 
 ---
 
