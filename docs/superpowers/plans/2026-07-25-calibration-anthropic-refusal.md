@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** IMPLEMENTED - INDEPENDENT REVIEW PENDING
+**Status:** LIVE COMPLETE - MERGED 2026-07-25
 
 **Goal:** Make the Investor Profile calibration Anthropic seam classify
 HTTP-200 `stop_reason="refusal"` as the existing typed `model_refusal` failure
@@ -482,5 +482,25 @@ entry, and add one evidenced register entry for the remaining UX debt:
 
 Then commit docs only.
 
-Do not merge. Independent implementation review must reproduce both RED seams,
-the `+2/-0` ledger, privacy assertions, and the absence of fallback/retry.
+At review-ready, do not merge. Independent implementation review must
+reproduce both RED seams, the `+2/-0` ledger, privacy assertions, and the
+absence of fallback/retry.
+
+## Post-Review Closeout
+
+Independent implementation review returned GREEN with zero findings. `master`
+then fast-forwarded through reviewed evidence tip
+`8e73dba45127adf5ef8bbfdbceda45c775d7a295`.
+
+Fresh merged-tree verification reproduced:
+
+- focused calibration suites: `48 passed`;
+- backend collection: `4713` nodes;
+- no-PG smoke: `ok:true` with `pg_attempts:[]`.
+
+No production database, Provider, prompt, frontend, or schema interaction was
+performed during merge or closeout. EIR-004 remains open for the deliberately
+separate frontend refusal-copy debt. The next map-owned action is a
+ground-truth inventory for Coverage v2's per-day expected-session-length
+authority; no authority source, full-day count, early-close count, or Coverage
+v2 implementation is approved by this closeout.
