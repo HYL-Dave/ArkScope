@@ -7,6 +7,8 @@ from .models import (
     CalendarAvailability,
     CalendarDay,
     CalendarDayKind,
+    CalendarHealthAssessment,
+    CalendarHealthReason,
     CoverageDayReason,
     CoverageDayStatus,
     DayCoverage,
@@ -26,6 +28,8 @@ def _is_timezone_aware(value: datetime) -> bool:
 
 
 def _as_utc(value: datetime, *, field_name: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise TypeError(f"{field_name} must be a datetime")
     if not _is_timezone_aware(value):
         raise ValueError(f"{field_name} must be timezone-aware")
     return value.astimezone(timezone.utc)
@@ -60,7 +64,7 @@ class SlotCoverageClassifier:
         self,
         *,
         calendar_day: CalendarDay,
-        calendar_classifiable: bool,
+        calendar_health: CalendarHealthAssessment,
         universe: Sequence[str],
         observations: Iterable[RthObservation],
         interval: timedelta,
@@ -68,24 +72,26 @@ class SlotCoverageClassifier:
     ) -> DayCoverage:
         if not isinstance(calendar_day, CalendarDay):
             raise TypeError("calendar_day must be CalendarDay")
-        if not isinstance(calendar_classifiable, bool):
-            raise TypeError("calendar_classifiable must be bool")
+        if not isinstance(calendar_health, CalendarHealthAssessment):
+            raise TypeError("calendar_health must be CalendarHealthAssessment")
         now_at_utc = _as_utc(now_et, field_name="now_et")
         canonical_universe = self._canonical_universe(universe)
         observation_rows = tuple(observations)
         if any(not isinstance(row, RthObservation) for row in observation_rows):
             raise TypeError("observations must contain RthObservation values")
 
-        if (
-            not calendar_classifiable
-            or calendar_day.availability is CalendarAvailability.UNAVAILABLE
-            or calendar_day.kind is CalendarDayKind.UNKNOWN
-        ):
-            reason = (
-                CoverageDayReason.CALENDAR_UNAVAILABLE
-                if calendar_day.availability is CalendarAvailability.UNAVAILABLE
-                else CoverageDayReason.DATE_UNREVIEWED
-            )
+        if not calendar_health.date_classifiable:
+            if CalendarHealthReason.DATE_UNREVIEWED in calendar_health.reason_codes:
+                reason = CoverageDayReason.DATE_UNREVIEWED
+            elif (
+                CalendarHealthReason.CALENDAR_UNAVAILABLE
+                in calendar_health.reason_codes
+            ):
+                reason = CoverageDayReason.CALENDAR_UNAVAILABLE
+            else:
+                raise ValueError(
+                    "unclassifiable calendar health requires a supported reason"
+                )
             return DayCoverage(
                 market_date=calendar_day.market_date,
                 status=CoverageDayStatus.UNKNOWN,
@@ -93,6 +99,14 @@ class SlotCoverageClassifier:
                 expected_slot_starts=None,
                 ticker_coverages=None,
                 unmatched_rth_row_count=None,
+            )
+
+        if (
+            calendar_day.availability is CalendarAvailability.UNAVAILABLE
+            or calendar_day.kind is CalendarDayKind.UNKNOWN
+        ):
+            raise ValueError(
+                "classifiable calendar health cannot accompany an unavailable day"
             )
 
         if calendar_day.kind is CalendarDayKind.CLOSED:
@@ -168,6 +182,8 @@ class SlotCoverageClassifier:
 
     @staticmethod
     def _canonical_universe(universe: Sequence[str]) -> tuple[str, ...]:
+        if isinstance(universe, (str, bytes)):
+            raise TypeError("universe must be a sequence of ticker strings")
         canonical: list[str] = []
         seen: set[str] = set()
         for ticker in universe:

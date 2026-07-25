@@ -73,6 +73,8 @@ def _is_timezone_aware(value: datetime) -> bool:
 
 
 def _require_utc(value: datetime, *, field_name: str) -> None:
+    if not isinstance(value, datetime):
+        raise TypeError(f"{field_name} must be a datetime")
     if not _is_timezone_aware(value):
         raise ValueError(f"{field_name} must be timezone-aware")
     if value.utcoffset() != timedelta(0):
@@ -85,8 +87,12 @@ class RthObservation:
     observed_at: datetime
 
     def __post_init__(self) -> None:
+        if not isinstance(self.ticker, str):
+            raise TypeError("observation ticker must be a string")
         if not self.ticker or self.ticker != self.ticker.strip():
             raise ValueError("observation ticker must be a non-empty canonical ID")
+        if not isinstance(self.observed_at, datetime):
+            raise TypeError("observation timestamp must be a datetime")
         if not _is_timezone_aware(self.observed_at):
             raise ValueError("observation timestamp must be timezone-aware")
 
@@ -108,6 +114,8 @@ class TickerCoverage:
     slots: tuple[SlotCoverage, ...]
 
     def __post_init__(self) -> None:
+        if not isinstance(self.ticker, str):
+            raise TypeError("ticker must be a string")
         if not self.ticker or self.ticker != self.ticker.strip():
             raise ValueError("ticker must be a non-empty canonical ID")
         if not isinstance(self.slots, tuple) or not self.slots:
@@ -148,7 +156,7 @@ class DayCoverage:
     unmatched_rth_row_count: int | None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.market_date, date):
+        if type(self.market_date) is not date:
             raise TypeError("market_date must be a date")
         if not isinstance(self.status, CoverageDayStatus):
             raise TypeError("day status must be CoverageDayStatus")

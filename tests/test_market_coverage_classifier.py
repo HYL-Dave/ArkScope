@@ -21,6 +21,9 @@ def _api() -> SimpleNamespace:
         expected_slot_starts,
     )
     from src.market_coverage.models import (
+        CalendarHealth,
+        CalendarHealthAssessment,
+        CalendarHealthReason,
         CoverageDayReason,
         CoverageDayStatus,
         RthObservation,
@@ -32,6 +35,9 @@ def _api() -> SimpleNamespace:
         CoverageDayReason=CoverageDayReason,
         CoverageDayStatus=CoverageDayStatus,
         RthObservation=RthObservation,
+        CalendarHealth=CalendarHealth,
+        CalendarHealthAssessment=CalendarHealthAssessment,
+        CalendarHealthReason=CalendarHealthReason,
         SlotCoverageClassifier=SlotCoverageClassifier,
         SlotCoverageStatus=SlotCoverageStatus,
         TickerCoverageStatus=TickerCoverageStatus,
@@ -88,12 +94,29 @@ def _classify(
     universe: tuple[str, ...],
     observations: tuple[object, ...] = (),
     now_et: datetime,
-    calendar_classifiable: bool = True,
+    calendar_health=None,
     interval: timedelta = INTERVAL,
 ):
+    if calendar_health is None:
+        if day.availability.value == "unavailable":
+            calendar_health = api.CalendarHealthAssessment(
+                status=api.CalendarHealth.UNAVAILABLE,
+                reason_codes=(api.CalendarHealthReason.CALENDAR_UNAVAILABLE,),
+                date_classifiable=False,
+                reviewed_through=date(2027, 12, 31),
+                forward_horizon_months=12,
+            )
+        else:
+            calendar_health = api.CalendarHealthAssessment(
+                status=api.CalendarHealth.OK,
+                reason_codes=(),
+                date_classifiable=True,
+                reviewed_through=date(2027, 12, 31),
+                forward_horizon_months=12,
+            )
     return api.SlotCoverageClassifier().classify(
         calendar_day=day,
-        calendar_classifiable=calendar_classifiable,
+        calendar_health=calendar_health,
         universe=universe,
         observations=observations,
         interval=interval,
@@ -139,13 +162,29 @@ def test_precedence_calendar_unavailable_is_unknown():
     with pytest.raises(ValueError):
         replace(result, status=api.CoverageDayStatus.COMPLETE)
 
+    from src.market_coverage.calendar import (
+        CalendarHealthComposer,
+        OfficialSessionFixtures,
+        XnysCalendarAdapter,
+    )
+
+    unreviewed_day = date(2024, 12, 31)
+    fixtures = OfficialSessionFixtures()
+    unreviewed_resolution = XnysCalendarAdapter(fixtures=fixtures).session(
+        unreviewed_day
+    )
+    unreviewed_health = CalendarHealthComposer(fixtures=fixtures).compose(
+        requested_day=unreviewed_day,
+        as_of=date(2026, 7, 26),
+        resolution=unreviewed_resolution,
+    )
     unreviewed = _classify(
         api,
-        day=regular_day,
+        day=unreviewed_resolution,
         universe=("AAA",),
         observations=observations,
         now_et=datetime(2026, 7, 24, 16, 30, tzinfo=EASTERN),
-        calendar_classifiable=False,
+        calendar_health=unreviewed_health,
     )
 
     assert unreviewed.status is api.CoverageDayStatus.UNKNOWN
@@ -462,6 +501,23 @@ def test_completed_day_count_equations_hold():
         replace(result, status=api.CoverageDayStatus.COMPLETE)
     with pytest.raises(ValueError, match="non-negative"):
         replace(result, unmatched_rth_row_count=-1)
+    with pytest.raises(TypeError, match="sequence"):
+        _classify(
+            api,
+            day=day,
+            universe="AAA",
+            observations=observations,
+            now_et=datetime(2026, 7, 24, 16, 30, tzinfo=EASTERN),
+        )
+    with pytest.raises(TypeError, match="string"):
+        api.RthObservation(ticker=b"AAA", observed_at=starts[0])
+    with pytest.raises(TypeError, match="string"):
+        replace(result.ticker_coverages[0], ticker=b"AAA")
+    with pytest.raises(TypeError, match="market_date"):
+        replace(
+            result,
+            market_date=datetime(2026, 7, 24, tzinfo=UTC),
+        )
 
 
 def test_in_window_off_grid_row_is_counted():
