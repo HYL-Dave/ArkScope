@@ -139,6 +139,22 @@ def test_precedence_calendar_unavailable_is_unknown():
     with pytest.raises(ValueError):
         replace(result, status=api.CoverageDayStatus.COMPLETE)
 
+    unreviewed = _classify(
+        api,
+        day=regular_day,
+        universe=("AAA",),
+        observations=observations,
+        now_et=datetime(2026, 7, 24, 16, 30, tzinfo=EASTERN),
+        calendar_classifiable=False,
+    )
+
+    assert unreviewed.status is api.CoverageDayStatus.UNKNOWN
+    assert unreviewed.reason_code is api.CoverageDayReason.DATE_UNREVIEWED
+    assert unreviewed.expected_slot_count is None
+    assert unreviewed.observed_ticker_count is None
+    assert unreviewed.ticker_coverages is None
+    assert unreviewed.unmatched_rth_row_count is None
+
 
 def test_precedence_reviewed_closed_day_is_non_trading():
     api = _api()
