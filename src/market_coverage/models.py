@@ -24,6 +24,17 @@ class CalendarHealth(str, Enum):
     UNAVAILABLE = "unavailable"
 
 
+class ObservationHealth(str, Enum):
+    OK = "ok"
+    UNAVAILABLE = "unavailable"
+
+
+class ObservationHealthReason(str, Enum):
+    MARKET_DB_MISSING = "market_db_missing"
+    MARKET_DB_UNREADABLE = "market_db_unreadable"
+    PRICES_SCHEMA_MISSING = "prices_schema_missing"
+
+
 class CalendarDayKind(str, Enum):
     OPEN = "open"
     CLOSED = "closed"
@@ -95,6 +106,114 @@ class RthObservation:
             raise TypeError("observation timestamp must be a datetime")
         if not _is_timezone_aware(self.observed_at):
             raise ValueError("observation timestamp must be timezone-aware")
+
+
+@dataclass(frozen=True)
+class ObservationHealthAssessment:
+    status: ObservationHealth
+    reason_code: ObservationHealthReason | None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.status, ObservationHealth):
+            raise TypeError("observation health status must be ObservationHealth")
+        if self.reason_code is not None and not isinstance(
+            self.reason_code,
+            ObservationHealthReason,
+        ):
+            raise TypeError(
+                "observation health reason must be ObservationHealthReason"
+            )
+        if self.status is ObservationHealth.OK:
+            if self.reason_code is not None:
+                raise ValueError("ok observation health cannot carry a reason")
+            return
+        if self.status is ObservationHealth.UNAVAILABLE:
+            if self.reason_code is None:
+                raise ValueError("unavailable observation health requires a reason")
+            return
+        raise ValueError(f"unsupported observation health status: {self.status!r}")
+
+
+@dataclass(frozen=True)
+class ProviderSyncIssue:
+    ticker: str
+    interval: str
+    last_error: str
+    updated_at: str | None
+
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("ticker", self.ticker),
+            ("interval", self.interval),
+            ("last_error", self.last_error),
+        ):
+            if not isinstance(value, str):
+                raise TypeError(f"provider issue {field_name} must be a string")
+            if not value or value != value.strip():
+                raise ValueError(
+                    f"provider issue {field_name} must be a non-empty value"
+                )
+        if self.updated_at is not None and not isinstance(self.updated_at, str):
+            raise TypeError("provider issue updated_at must be a string or None")
+
+
+@dataclass(frozen=True)
+class RthSessionObservations:
+    market_date: date
+    observations: tuple[RthObservation, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.market_date) is not date:
+            raise TypeError("observation session market_date must be a date")
+        if not isinstance(self.observations, tuple):
+            raise TypeError("session observations must be an immutable tuple")
+        if any(
+            not isinstance(observation, RthObservation)
+            for observation in self.observations
+        ):
+            raise TypeError("session observations must contain RthObservation values")
+
+
+@dataclass(frozen=True)
+class ObservationReadResult:
+    health: ObservationHealthAssessment
+    sessions: tuple[RthSessionObservations, ...]
+    provider_errors: tuple[ProviderSyncIssue, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.health, ObservationHealthAssessment):
+            raise TypeError("health must be ObservationHealthAssessment")
+        if not isinstance(self.sessions, tuple):
+            raise TypeError("sessions must be an immutable tuple")
+        if any(
+            not isinstance(session, RthSessionObservations)
+            for session in self.sessions
+        ):
+            raise TypeError("sessions must contain RthSessionObservations values")
+        market_dates = tuple(session.market_date for session in self.sessions)
+        if market_dates != tuple(sorted(market_dates)):
+            raise ValueError("observation sessions must be ordered by market date")
+        if len(market_dates) != len(set(market_dates)):
+            raise ValueError("observation sessions must have unique market dates")
+        if not isinstance(self.provider_errors, tuple):
+            raise TypeError("provider_errors must be an immutable tuple")
+        if any(
+            not isinstance(issue, ProviderSyncIssue)
+            for issue in self.provider_errors
+        ):
+            raise TypeError("provider_errors must contain ProviderSyncIssue values")
+        if self.health.status is ObservationHealth.UNAVAILABLE and (
+            self.sessions or self.provider_errors
+        ):
+            raise ValueError("unavailable observation reads cannot carry database facts")
+
+    def observations_for(self, market_date: date) -> tuple[RthObservation, ...]:
+        if type(market_date) is not date:
+            raise TypeError("market_date must be a date")
+        for session in self.sessions:
+            if session.market_date == market_date:
+                return session.observations
+        return ()
 
 
 @dataclass(frozen=True)
