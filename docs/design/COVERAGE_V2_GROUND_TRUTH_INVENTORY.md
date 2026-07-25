@@ -1,11 +1,14 @@
 # Coverage v2 Ground-Truth Inventory
 
-> **Status:** REVIEW GREEN - DESIGN DECISIONS NEXT
+> **Status:** REVIEW GREEN - DESIGN SPEC WRITTEN
 > **Observed:** 2026-07-25
 > **Code base:** `f019f9faf31c25ff8d71f29d97fe5945bf992d94`
 > **Purpose:** Evidence-only pre-spec inventory. This document does not select a
 > runtime calendar, authorize product changes, or turn observed bar counts into
 > acceptance constants.
+> **Successor:** The reviewed decisions are written at
+> [`2026-07-26-coverage-v2-session-truth-design.md`](../superpowers/specs/2026-07-26-coverage-v2-session-truth-design.md),
+> currently pending independent written review.
 
 ## 1. Executive Finding
 
