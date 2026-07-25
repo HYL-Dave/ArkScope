@@ -1338,7 +1338,7 @@ Resolved Task 5 product tip:
 - Create `tests/js/run_sa_extension_popup_fixture.mjs`
 - Create `tests/test_sa_extension_popup.py`
 
-- [ ] **Step 1: Add twelve RED mounted/runtime nodes**
+- [x] **Step 1: Add twelve RED mounted/runtime nodes**
 
 ```text
 test_popup_groups_exactly_five_normal_actions_as_three_plus_two
@@ -1355,39 +1355,43 @@ test_recorded_and_incident_runtime_use_exact_ids_bounds_mutex_and_reach_evidence
 test_popup_stays_english_keyboard_coherent_and_free_of_true_text_clipping
 ```
 
-- [ ] **Step 2: Build one structured action-limit response**
+Observed: exactly `12 failed`; every node reached the mounted fixture and
+failed on the absent catalog, grouped controls, recovery runtime, or bounded
+disclosure rather than on harness setup.
+
+- [x] **Step 2: Build one structured action-limit response**
 
 Fixed values are read from live background constants. Native Full/Deep batch
 limits are numeric or unavailable. Test all five rows against source constants
 and reject a shape that labels Market `18/30/80` as Alpha detail bounds.
 
-- [ ] **Step 3: Implement structured last-run status and descriptions**
+- [x] **Step 3: Implement structured last-run status and descriptions**
 
 Use DOM construction/textContent. Do not use `innerHTML` for dynamic values.
 Only stable reason labels from the catalog/protocol render. Reopening the popup
 loads last structured state and triggers outbox flush without replaying stale
 alerts.
 
-- [ ] **Step 4: Implement recovery messages under the shared mutex**
+- [x] **Step 4: Implement recovery messages under the shared mutex**
 
 Recorded repair traverses the frozen target list with no age filter. Incident
 scan tracks rounds, elapsed time, growth, oldest observed timestamp, stable
 rounds, reached-start evidence, and unresolved interval. At most 80 detail
 attempts occur per pass; Resume continues the same manifest.
 
-- [ ] **Step 5: Implement contextual and Advanced controls**
+- [x] **Step 5: Implement contextual and Advanced controls**
 
 No F12 path is required. A diagnostic wrapper, if retained, must call the
 same public runtime action and return run ID/hash. Preserve the existing Alpha
 article-link review and manual URL disclosure under their reconciliation
 contract; the new Market News Advanced disclosure is a separate owner.
 
-- [ ] **Step 6: Evolve the existing English boundary node**
+- [x] **Step 6: Evolve the existing English boundary node**
 
 Add `popup_action_catalog.js`, protocol, and telemetry product copy to the
 existing CJK census without renaming the node.
 
-- [ ] **Step 7: Verify mounted behavior and packaging**
+- [x] **Step 7: Verify mounted behavior and packaging**
 
 ```bash
 pytest -q tests/test_sa_extension_popup.py \
@@ -1399,14 +1403,38 @@ python3 extensions/sa_alpha_picks/build_firefox.py \
   --source extensions/sa_alpha_picks --output "$tmp/firefox"
 diff -u <(find "$tmp/firefox" -maxdepth 1 -type f -printf '%f\n' | sort) \
   <(python3 extensions/sa_alpha_picks/build_firefox.py \
-       --source extensions/sa_alpha_picks --print-expected-files | sort)
+       --source extensions/sa_alpha_picks --list \
+       | sed 's/^manifest\.firefox\.json$/manifest.json/' | sort)
 rm -rf "$tmp"
 ```
+
+Task 6 execution correction: the independently reviewed command named a
+nonexistent `--print-expected-files` option. The side-effect-free graph CLI
+shipped by Task 1 is `--list`; the `sed` projection reflects the builder's
+intentional source `manifest.firefox.json` to artifact `manifest.json`
+rename. This docs-only correction changes no product or node accounting.
 
 Expected: popup `12/12`; reconciliation `9/9`; Alpha `8/8`; packaging
 `10/10`.
 
-- [ ] **Step 8: Commit**
+Observed: the canonical Task 6 set is exactly `39/39`; all four JavaScript
+syntax checks pass. A fresh Firefox build contains exactly `15` files, and its
+sorted file list equals the side-effect-free dependency-graph projection.
+
+Four bounded, zero-node-count execution evolutions are explicit:
+
+1. `tests/test_sa_extension_reconciliation_flow.py` now loads the real
+   protocol/telemetry dependency graph through `importScripts`; the same 11
+   existing node IDs no longer rely on an incomplete VM.
+2. `tests/test_sa_local_readers.py` seeds the existing health node with a
+   structured derived-complete event rather than a legacy unverified success
+   row. Its node ID is unchanged.
+3. `install_firefox.sh` and `FIREFOX.md` now name the shipped `Quick Update`
+   control instead of the retired `Quick Refresh` label.
+4. The reviewed packaging command typo is corrected above from the nonexistent
+   option to the shipped `--list` projection. This is docs-only.
+
+- [x] **Step 8: Commit**
 
 ```bash
 git add extensions/sa_alpha_picks/background.js \
@@ -1417,6 +1445,9 @@ git add extensions/sa_alpha_picks/background.js \
   tests/test_sa_extension_reconciliation_ui.py
 git commit -m "feat: make SA extension controls bounded and auditable"
 ```
+
+Resolved Task 6 product tip:
+`679b7a65a97fc48f8b8d1f9551ad95c597b424db`.
 
 ---
 
