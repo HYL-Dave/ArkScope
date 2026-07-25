@@ -207,6 +207,26 @@ def _run_background_probe(body: str):
     return json.loads(completed.stdout)
 
 
+def _relative_luminance(rgb: list[float]) -> float:
+    channels = []
+    for value in rgb:
+        normalized = value / 255
+        channels.append(
+            normalized / 12.92
+            if normalized <= 0.04045
+            else ((normalized + 0.055) / 1.055) ** 2.4
+        )
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def _contrast_ratio(first: list[float], second: list[float]) -> float:
+    first_luminance = _relative_luminance(first)
+    second_luminance = _relative_luminance(second)
+    lighter = max(first_luminance, second_luminance)
+    darker = min(first_luminance, second_luminance)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 def test_popup_groups_exactly_five_normal_actions_as_three_plus_two():
     result = _run()
     actions = result["actions"]
@@ -580,3 +600,71 @@ def test_popup_stays_english_keyboard_coherent_and_free_of_true_text_clipping():
     assert "Audit recording is unavailable" in result["lastRunStatus"]
     assert "PLANTED_RAW_BACKEND_DETAIL" not in result["bodyText"]
     assert "PLANTED_RAW_ARTICLE_DETAIL" not in result["bodyText"]
+
+
+def test_popup_all_states_use_contrast_safe_text_and_control_boundaries():
+    result = _run("contrast_audit")
+    audit = result["contrastAudit"]
+    failures = []
+
+    for sample in [*audit["textSamples"], *audit["statusSamples"]]:
+        threshold = (
+            3.0
+            if sample["fontSize"] >= 24
+            or (sample["fontSize"] >= 18.66 and sample["fontWeight"] >= 700)
+            else 4.5
+        )
+        ratio = _contrast_ratio(sample["foreground"], sample["background"])
+        if ratio + 1e-9 < threshold:
+            failures.append(f'{sample["label"]} text {ratio:.2f}:1')
+
+    controls = audit["controls"]
+    control_ids = {sample["selector"] for sample in controls}
+    assert {
+        "#quickBtn",
+        "#fullBtn",
+        "#backfillBtn",
+        "#marketNewsBtn",
+        "#marketNewsCatchupBtn",
+        "#reviewRecoveryScopeBtn",
+        "#retryRecordedFailuresBtn",
+        "#incidentRecoveryBtn",
+        "#resumeRecoveryBtn",
+        "#cancelRecoveryBtn",
+        "#manualBtn",
+    }.issubset(control_ids)
+
+    for sample in controls:
+        fill_ratio = _contrast_ratio(sample["background"], sample["surrounding"])
+        if fill_ratio >= 3.0:
+            continue
+        boundary_ratio = _contrast_ratio(sample["border"], sample["surrounding"])
+        if (
+            sample["borderStyle"] in {"none", "hidden"}
+            or sample["borderWidth"] < 1
+            or boundary_ratio + 1e-9 < 3.0
+        ):
+            failures.append(f'{sample["label"]} boundary {boundary_ratio:.2f}:1')
+
+    for sample in audit["disabledControls"]:
+        ratio = _contrast_ratio(sample["foreground"], sample["background"])
+        if ratio + 1e-9 < 4.5:
+            failures.append(f'{sample["label"]} disabled text {ratio:.2f}:1')
+
+    action_controls = [sample for sample in controls if sample["actionId"]]
+    assert len(action_controls) == 5
+    for sample in action_controls:
+        assert sample["background"] == sample["surrounding"]
+        assert _contrast_ratio(sample["border"], sample["surrounding"]) >= 3.0
+
+    html = POPUP_HTML.read_text(encoding="utf-8")
+    for button_id in (
+        "quickBtn",
+        "fullBtn",
+        "backfillBtn",
+        "marketNewsBtn",
+        "marketNewsCatchupBtn",
+    ):
+        assert re.search(rf"#{button_id}\s*\{{", html) is None
+    assert "switching tabs in this browser during a run" in result["bodyText"]
+    assert failures == []

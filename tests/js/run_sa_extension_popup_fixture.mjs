@@ -104,6 +104,145 @@ function text(node) {
   return node ? node.textContent.replace(/\s+/g, " ").trim() : "";
 }
 
+function rgba(value) {
+  const match = String(value || "").match(
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/,
+  );
+  if (!match) return null;
+  return [
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    match[4] == null ? 1 : Number(match[4]),
+  ];
+}
+
+function composite(foreground, background) {
+  const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+  if (alpha === 0) return [0, 0, 0, 0];
+  return [
+    (foreground[0] * foreground[3]
+      + background[0] * background[3] * (1 - foreground[3])) / alpha,
+    (foreground[1] * foreground[3]
+      + background[1] * background[3] * (1 - foreground[3])) / alpha,
+    (foreground[2] * foreground[3]
+      + background[2] * background[3] * (1 - foreground[3])) / alpha,
+    alpha,
+  ];
+}
+
+function resolvedBackground(element) {
+  const layers = [];
+  for (let current = element; current; current = current.parentElement) {
+    const layer = rgba(current.ownerDocument.defaultView.getComputedStyle(current).backgroundColor);
+    if (layer && layer[3] > 0) layers.push(layer);
+  }
+  let result = [255, 255, 255, 1];
+  for (const layer of layers.reverse()) result = composite(layer, result);
+  return result.slice(0, 3).map((channel) => Math.round(channel));
+}
+
+function selectorFor(element) {
+  if (element.id) return "#" + element.id;
+  const classes = [...element.classList];
+  return element.tagName.toLowerCase() + (classes.length ? "." + classes.join(".") : "");
+}
+
+function styleSample(element, label) {
+  const style = element.ownerDocument.defaultView.getComputedStyle(element);
+  const foreground = rgba(style.color);
+  const border = rgba(style.borderTopColor);
+  return {
+    label,
+    selector: selectorFor(element),
+    text: text(element),
+    foreground: foreground ? foreground.slice(0, 3) : null,
+    background: resolvedBackground(element),
+    surrounding: resolvedBackground(element.parentElement || element),
+    border: border ? border.slice(0, 3) : null,
+    borderStyle: style.borderTopStyle,
+    borderWidth: Number.parseFloat(style.borderTopWidth) || 0,
+    fontSize: Number.parseFloat(style.fontSize) || 0,
+    fontWeight: Number.parseFloat(style.fontWeight) || 400,
+    disabled: element.matches("button") && element.disabled,
+    actionId: element.dataset.actionId || null,
+  };
+}
+
+function exposeContrastStates(document, popupFixture) {
+  const view = document.defaultView;
+  const incidentPreview = popupFixture.previews?.incident_window;
+  if (incidentPreview && typeof view.renderRecoveryConfirmation === "function") {
+    view.renderRecoveryConfirmation(incidentPreview);
+  }
+  if (typeof view.renderReconciliationQueue === "function") {
+    view.renderReconciliationQueue({
+      total: 1,
+      events: [{
+        lineage_id: 1,
+        symbol: "TEST",
+        role: "entry",
+        event_anchor_date: "2026-07-20",
+        reason_code: "review_required",
+        candidates: [{
+          article_id: "fixture-article",
+          url: "https://seekingalpha.com/alpha-picks/articles/1-fixture",
+          title: "Fixture article",
+          content_state: "complete",
+          published_date: "2026-07-20",
+          evidence_codes: ["exact_ticker"],
+          reason_code: "review_required",
+        }],
+      }],
+    });
+  }
+  if (typeof view.renderManualConfirmations === "function") {
+    view.renderManualConfirmations([{symbol: "TEST"}]);
+  }
+
+  document.querySelectorAll("details").forEach((node) => { node.open = true; });
+  document.querySelectorAll("[hidden]").forEach((node) => { node.hidden = false; });
+  document.querySelectorAll(".action-description").forEach((node) => {
+    node.style.display = "block";
+  });
+  document.querySelectorAll("button").forEach((node) => { node.disabled = false; });
+  document.getElementById("marketNewsAutoSyncResolved").textContent =
+    "Every 5 minutes in the current ET window";
+  const status = document.getElementById("status");
+  status.className = "partial";
+  status.textContent = "Needs attention";
+}
+
+function contrastAudit(document) {
+  const textSamples = [];
+  const walker = document.createTreeWalker(document.body, document.defaultView.NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.nodeValue.trim()) continue;
+    const element = node.parentElement;
+    const style = document.defaultView.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") continue;
+    textSamples.push(styleSample(element, selectorFor(element)));
+  }
+
+  const status = document.getElementById("status");
+  const statusSamples = ["success", "partial", "error", "empty"].map((state) => {
+    status.className = state;
+    return styleSample(status, "#status." + state);
+  });
+  status.className = "partial";
+
+  const controls = [...document.querySelectorAll("button")].map((button) =>
+    styleSample(button, selectorFor(button)),
+  );
+  const disabledControls = [...document.querySelectorAll("button")].map((button) => {
+    button.disabled = true;
+    const sample = styleSample(button, selectorFor(button) + ":disabled");
+    button.disabled = false;
+    return sample;
+  });
+  return {textSamples, statusSamples, controls, disabledControls};
+}
+
 function snapshot(document, sent) {
   const actions = [...document.querySelectorAll("[data-action-id]")]
     .filter((node) => node.matches("button"))
@@ -217,8 +356,14 @@ async function runPopup() {
         button.focus();
         button.dispatchEvent(new dom.window.FocusEvent("focusin", {bubbles: true}));
       }
+    } else if (scenario === "contrast_audit") {
+      exposeContrastStates(dom.window.document, fixture);
     }
-    return snapshot(dom.window.document, mocks.sent);
+    const result = snapshot(dom.window.document, mocks.sent);
+    if (scenario === "contrast_audit") {
+      result.contrastAudit = contrastAudit(dom.window.document);
+    }
+    return result;
   } finally {
     dom.window.close();
   }
