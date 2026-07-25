@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 
 
@@ -73,6 +73,11 @@ class CalendarDay:
             assert close_at is not None
             if not _is_timezone_aware(open_at) or not _is_timezone_aware(close_at):
                 raise ValueError("session datetimes must be timezone-aware")
+            if (
+                open_at.utcoffset() != timedelta(0)
+                or close_at.utcoffset() != timedelta(0)
+            ):
+                raise ValueError("session datetimes must have zero UTC offset")
             if open_at >= close_at:
                 raise ValueError("session open must be before session close")
             return
@@ -144,3 +149,38 @@ class CalendarHealthAssessment:
     def __post_init__(self) -> None:
         if self.forward_horizon_months < 0:
             raise ValueError("forward_horizon_months cannot be negative")
+
+        if self.status is CalendarHealth.OK:
+            if self.reason_codes or not self.date_classifiable:
+                raise ValueError(
+                    "ok health requires no reasons and a classifiable date"
+                )
+            return
+
+        if self.status is CalendarHealth.UNAVAILABLE:
+            if (
+                self.reason_codes
+                != (CalendarHealthReason.CALENDAR_UNAVAILABLE,)
+                or self.date_classifiable
+            ):
+                raise ValueError(
+                    "unavailable health requires calendar_unavailable and an "
+                    "unclassifiable date"
+                )
+            return
+
+        if self.status is CalendarHealth.DEGRADED:
+            if not self.reason_codes:
+                raise ValueError("degraded health requires at least one reason")
+            if CalendarHealthReason.CALENDAR_UNAVAILABLE in self.reason_codes:
+                raise ValueError("degraded health cannot be calendar_unavailable")
+            has_unreviewed_date = (
+                CalendarHealthReason.DATE_UNREVIEWED in self.reason_codes
+            )
+            if self.date_classifiable is has_unreviewed_date:
+                raise ValueError(
+                    "date_unreviewed must exactly match an unclassifiable date"
+                )
+            return
+
+        raise ValueError(f"unsupported calendar health status: {self.status!r}")

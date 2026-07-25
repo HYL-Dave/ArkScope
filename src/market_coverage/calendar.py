@@ -118,8 +118,14 @@ class XnysCalendarAdapter:
         fixtures: OfficialSessionFixtures | None = None,
         calendar_factory: Callable[..., Any] | None = None,
     ) -> None:
-        self._fixtures = fixtures or OfficialSessionFixtures()
-        self._calendar_factory = calendar_factory or exchange_calendars.get_calendar
+        self._fixtures = (
+            OfficialSessionFixtures() if fixtures is None else fixtures
+        )
+        self._calendar_factory = (
+            exchange_calendars.get_calendar
+            if calendar_factory is None
+            else calendar_factory
+        )
         self._calendar: Any | None = None
 
     def _get_calendar(self) -> Any:
@@ -161,23 +167,35 @@ class XnysCalendarAdapter:
 
 class CalendarHealthComposer:
     def __init__(self, *, fixtures: OfficialSessionFixtures | None = None) -> None:
-        self._fixtures = fixtures or OfficialSessionFixtures()
+        self._fixtures = (
+            OfficialSessionFixtures() if fixtures is None else fixtures
+        )
 
     def compose(
         self,
         *,
         requested_day: date,
         as_of: date,
-        resolution: CalendarDay | None,
+        resolution: CalendarDay,
     ) -> CalendarHealthAssessment:
-        if resolution is not None and resolution.market_date != requested_day:
+        if resolution.market_date != requested_day:
             raise ValueError("calendar resolution date does not match requested date")
 
         forward_horizon = self._fixtures.forward_horizon_months(as_of)
-        if (
-            resolution is not None
-            and resolution.availability is CalendarAvailability.UNAVAILABLE
-        ):
+        date_classifiable = self._fixtures.is_reviewed(requested_day)
+        if not date_classifiable:
+            reason_codes = [CalendarHealthReason.DATE_UNREVIEWED]
+            if forward_horizon < _MINIMUM_HEALTHY_FORWARD_MONTHS:
+                reason_codes.append(CalendarHealthReason.FIXTURE_HORIZON_LOW)
+            return CalendarHealthAssessment(
+                status=CalendarHealth.DEGRADED,
+                reason_codes=tuple(reason_codes),
+                date_classifiable=False,
+                reviewed_through=self._fixtures.reviewed_through,
+                forward_horizon_months=forward_horizon,
+            )
+
+        if resolution.availability is CalendarAvailability.UNAVAILABLE:
             return CalendarHealthAssessment(
                 status=CalendarHealth.UNAVAILABLE,
                 reason_codes=(CalendarHealthReason.CALENDAR_UNAVAILABLE,),
@@ -187,11 +205,6 @@ class CalendarHealthComposer:
             )
 
         reason_codes: list[CalendarHealthReason] = []
-        date_classifiable = self._fixtures.is_reviewed(requested_day)
-        if date_classifiable and resolution is None:
-            raise ValueError("a reviewed date requires a calendar resolution")
-        if not date_classifiable:
-            reason_codes.append(CalendarHealthReason.DATE_UNREVIEWED)
         if forward_horizon < _MINIMUM_HEALTHY_FORWARD_MONTHS:
             reason_codes.append(CalendarHealthReason.FIXTURE_HORIZON_LOW)
 

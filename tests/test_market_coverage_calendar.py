@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
-from datetime import date, datetime, timezone
+from dataclasses import FrozenInstanceError, replace
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -50,6 +50,21 @@ def test_calendar_adapter_returns_typed_regular_session():
             market_date=market_date,
             open_at_utc=datetime(2026, 7, 24, 20, 0, tzinfo=timezone.utc),
             close_at_utc=datetime(2026, 7, 24, 13, 30, tzinfo=timezone.utc),
+            session_kind=CalendarSessionKind.REGULAR,
+        )
+    non_utc = timezone(timedelta(hours=-4))
+    with pytest.raises(ValueError, match="zero UTC offset"):
+        CalendarDay.open(
+            market_date=market_date,
+            open_at_utc=datetime(2026, 7, 24, 9, 30, tzinfo=non_utc),
+            close_at_utc=datetime(2026, 7, 24, 20, 0, tzinfo=timezone.utc),
+            session_kind=CalendarSessionKind.REGULAR,
+        )
+    with pytest.raises(ValueError, match="zero UTC offset"):
+        CalendarDay.open(
+            market_date=market_date,
+            open_at_utc=datetime(2026, 7, 24, 13, 30, tzinfo=timezone.utc),
+            close_at_utc=datetime(2026, 7, 24, 16, 0, tzinfo=non_utc),
             session_kind=CalendarSessionKind.REGULAR,
         )
 
@@ -111,15 +126,35 @@ def test_calendar_adapter_failure_is_typed_unavailable():
         CalendarHealthReason,
     )
 
-    diagnostic = "Christmas market closed according to an unsafe exception"
-    construction = {}
+    class FalseyFixtures:
+        calendar_name = "FALSEY_XNYS"
+        reviewed_from = date(2025, 2, 1)
+        reviewed_through = date(2027, 11, 30)
 
-    def fail_to_construct_calendar(calendar_name, *, start, end):
-        construction.update(calendar_name=calendar_name, start=start, end=end)
-        raise RuntimeError(diagnostic)
+        def __bool__(self):
+            return False
+
+    class FalseyFailingFactory:
+        def __init__(self):
+            self.construction = {}
+
+        def __bool__(self):
+            return False
+
+        def __call__(self, calendar_name, *, start, end):
+            self.construction.update(
+                calendar_name=calendar_name,
+                start=start,
+                end=end,
+            )
+            raise RuntimeError(diagnostic)
+
+    diagnostic = "Christmas market closed according to an unsafe exception"
+    calendar_factory = FalseyFailingFactory()
 
     result = XnysCalendarAdapter(
-        calendar_factory=fail_to_construct_calendar
+        fixtures=FalseyFixtures(),
+        calendar_factory=calendar_factory,
     ).session(date(2026, 7, 24))
 
     assert isinstance(result, CalendarDay)
@@ -130,10 +165,10 @@ def test_calendar_adapter_failure_is_typed_unavailable():
     assert result.open_at_utc is None
     assert result.close_at_utc is None
     assert result.session_kind is None
-    assert construction == {
-        "calendar_name": "XNYS",
-        "start": "2025-01-01",
-        "end": "2027-12-31",
+    assert calendar_factory.construction == {
+        "calendar_name": "FALSEY_XNYS",
+        "start": "2025-02-01",
+        "end": "2027-11-30",
     }
 
 
@@ -164,7 +199,7 @@ def test_calendar_health_is_ok_for_reviewed_dates_and_healthy_horizon():
         OfficialSessionFixtures,
         XnysCalendarAdapter,
     )
-    from src.market_coverage.models import CalendarHealth
+    from src.market_coverage.models import CalendarHealth, CalendarHealthReason
 
     requested_day = date(2026, 7, 24)
     fixtures = OfficialSessionFixtures()
@@ -183,6 +218,12 @@ def test_calendar_health_is_ok_for_reviewed_dates_and_healthy_horizon():
     assert result.forward_horizon_months == 6
     with pytest.raises(FrozenInstanceError):
         result.status = CalendarHealth.DEGRADED
+    for changes in (
+        {"date_classifiable": False},
+        {"reason_codes": (CalendarHealthReason.FIXTURE_HORIZON_LOW,)},
+    ):
+        with pytest.raises(ValueError):
+            replace(result, **changes)
 
 
 def test_low_horizon_is_degraded_without_erasing_reviewed_history():
@@ -208,31 +249,82 @@ def test_low_horizon_is_degraded_without_erasing_reviewed_history():
     assert result.reason_codes == (CalendarHealthReason.FIXTURE_HORIZON_LOW,)
     assert result.date_classifiable is True
     assert result.forward_horizon_months == 5
+    for changes in (
+        {"reason_codes": ()},
+        {"reason_codes": (CalendarHealthReason.CALENDAR_UNAVAILABLE,)},
+        {"date_classifiable": False},
+    ):
+        with pytest.raises(ValueError):
+            replace(result, **changes)
 
 
 def test_unreviewed_date_is_degraded_and_unclassifiable():
     from src.market_coverage.calendar import (
         CalendarHealthComposer,
         OfficialSessionFixtures,
+        XnysCalendarAdapter,
     )
     from src.market_coverage.models import (
+        CalendarAvailability,
         CalendarHealth,
         CalendarHealthReason,
     )
 
-    requested_day = date(2024, 12, 31)
-    fixtures = OfficialSessionFixtures()
+    class FalseyFixtures:
+        def __init__(self):
+            self.delegate = OfficialSessionFixtures()
+            self.reviewed_days = []
 
-    result = CalendarHealthComposer(fixtures=fixtures).compose(
-        requested_day=requested_day,
-        as_of=date(2026, 7, 26),
-        resolution=None,
+        def __bool__(self):
+            return False
+
+        @property
+        def reviewed_through(self):
+            return self.delegate.reviewed_through
+
+        def is_reviewed(self, day):
+            self.reviewed_days.append(day)
+            return self.delegate.is_reviewed(day)
+
+        def forward_horizon_months(self, as_of):
+            return self.delegate.forward_horizon_months(as_of)
+
+    cases = (
+        (
+            date(2024, 12, 31),
+            date(2026, 7, 26),
+            (CalendarHealthReason.DATE_UNREVIEWED,),
+        ),
+        (
+            date(2028, 1, 1),
+            date(2027, 7, 1),
+            (
+                CalendarHealthReason.DATE_UNREVIEWED,
+                CalendarHealthReason.FIXTURE_HORIZON_LOW,
+            ),
+        ),
     )
+    fixtures = FalseyFixtures()
+    adapter = XnysCalendarAdapter()
+    composer = CalendarHealthComposer(fixtures=fixtures)
 
-    assert fixtures.is_reviewed(requested_day) is False
-    assert result.status is CalendarHealth.DEGRADED
-    assert result.reason_codes == (CalendarHealthReason.DATE_UNREVIEWED,)
-    assert result.date_classifiable is False
+    for requested_day, as_of, expected_reasons in cases:
+        resolution = adapter.session(requested_day)
+        assert resolution.availability is CalendarAvailability.UNAVAILABLE
+
+        result = composer.compose(
+            requested_day=requested_day,
+            as_of=as_of,
+            resolution=resolution,
+        )
+
+        assert result.status is CalendarHealth.DEGRADED
+        assert result.reason_codes == expected_reasons
+        assert result.date_classifiable is False
+        with pytest.raises(ValueError):
+            replace(result, date_classifiable=True)
+
+    assert fixtures.reviewed_days == [case[0] for case in cases]
 
 
 def test_adapter_failure_makes_health_unavailable():
@@ -262,3 +354,15 @@ def test_adapter_failure_makes_health_unavailable():
     assert result.status is CalendarHealth.UNAVAILABLE
     assert result.reason_codes == (CalendarHealthReason.CALENDAR_UNAVAILABLE,)
     assert result.date_classifiable is False
+    for changes in (
+        {"reason_codes": ()},
+        {
+            "reason_codes": (
+                CalendarHealthReason.CALENDAR_UNAVAILABLE,
+                CalendarHealthReason.FIXTURE_HORIZON_LOW,
+            )
+        },
+        {"date_classifiable": True},
+    ):
+        with pytest.raises(ValueError):
+            replace(result, **changes)
