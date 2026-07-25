@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MarketScope(str, Enum):
@@ -77,6 +80,51 @@ class CoverageDayReason(str, Enum):
     DATE_UNREVIEWED = "date_unreviewed"
     OBSERVATION_UNAVAILABLE = "observation_unavailable"
     NO_OBSERVATIONS = "no_observations"
+
+
+class ClosureReasonCode(str, Enum):
+    WEEKEND = "weekend"
+    MARKET_CLOSED = "market_closed"
+
+
+class _CoverageV2Model(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class PartialTickerCoverageV2(_CoverageV2Model):
+    ticker: str
+    observed_slot_count: int
+    expected_slot_count: int
+
+
+class CoverageCalendarHealthV2(_CoverageV2Model):
+    status: CalendarHealth
+    reason_codes: list[CalendarHealthReason] = Field(default_factory=list)
+    reviewed_through: str
+    forward_horizon_months: int
+
+
+class CoverageObservationHealthV2(_CoverageV2Model):
+    status: ObservationHealth
+    reason_code: ObservationHealthReason | None
+
+
+class CoverageDayV2(_CoverageV2Model):
+    date: str
+    coverage_status: CoverageDayStatus
+    status_reason_code: CoverageDayReason | None
+    closure_reason_code: ClosureReasonCode | None
+    session_kind: CalendarSessionKind | None
+    session_open_at_utc: str | None
+    session_close_at_utc: str | None
+    expected_slot_count: int | None
+    observed_ticker_count: int | None
+    complete_ticker_count: int | None
+    partial_ticker_count: int | None
+    unknown_ticker_count: int | None
+    partial_tickers: list[PartialTickerCoverageV2] = Field(default_factory=list)
+    unknown_tickers: list[str] = Field(default_factory=list)
+    unmatched_rth_row_count: int | None
 
 
 def _is_timezone_aware(value: datetime) -> bool:
@@ -155,6 +203,20 @@ class ProviderSyncIssue:
                 )
         if self.updated_at is not None and not isinstance(self.updated_at, str):
             raise TypeError("provider issue updated_at must be a string or None")
+
+
+class TradingDayCoverageV2(_CoverageV2Model):
+    version: Literal[2] = 2
+    market_scope: MarketScope = MarketScope.US_LISTED_EQUITY_PROXY
+    coverage_session: CoverageSession = CoverageSession.RTH
+    interval: Literal["15min"] = "15min"
+    lookback_days: int
+    universe_count: int
+    generated_at_et: str
+    calendar_health: CoverageCalendarHealthV2
+    observation_health: CoverageObservationHealthV2
+    days: list[CoverageDayV2] = Field(default_factory=list)
+    provider_errors: list[ProviderSyncIssue] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,8 @@ legacy inspection, and financial_cache (local-primary).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -28,7 +30,8 @@ from src.market_data_admin import (
     start_bootstrap_job,
     validate_market,
 )
-from src.market_data_direct import summarize_trading_day_coverage
+from src.market_coverage.models import TradingDayCoverageV2
+from src.market_coverage.service import TradingDayCoverageService
 from src.news_sync_status import overlay_news_sync_status
 from src.profile_state import ProfileStateStore
 
@@ -151,18 +154,18 @@ def market_data_coverage(ticker: str):
     return local_ticker_coverage(ticker)
 
 
-@router.get("/market-data/trading-days")
+@router.get(
+    "/market-data/trading-days",
+    response_model=TradingDayCoverageV2,
+)
 def market_data_trading_days(
     lookback_days: int = Query(10, ge=1, le=120),
-    interval: str = Query("15min"),
-):
-    """READ-ONLY trading-day / price-coverage diagnostics across the active universe.
+    interval: Literal["15min"] = Query("15min"),
+) -> TradingDayCoverageV2:
+    """Return read-only RTH session truth for the current active universe.
 
-    For the trailing window: weekend / US-holiday / trading-day per date, session-complete,
-    and how many universe tickers are full / partial / missing (+ the ticker lists), plus a
-    provider-error summary (e.g. an IBKR contract that won't resolve). PURE READ of
-    ``market_data.db`` — no PG, no provider call, no write, no scheduling. Powers the
-    Settings → Data Storage coverage panel.
+    Calendar, observation, and provider health remain independent facts. This
+    path reads local SQLite only and never schedules collection or repair work.
     """
     from src.active_universe import ActiveUniverseUnavailable
     from src.universe_scope import resolve_active_universe
@@ -171,9 +174,12 @@ def market_data_trading_days(
         universe = list(resolve_active_universe())
     except ActiveUniverseUnavailable as exc:
         raise HTTPException(status_code=503, detail=exc.as_dict()) from None
-    return summarize_trading_day_coverage(
-        universe, interval=interval, lookback_days=lookback_days,
+    return TradingDayCoverageService(
         db_path=resolve_market_db_path(),
+    ).get_coverage(
+        universe=universe,
+        interval=interval,
+        lookback_days=lookback_days,
     )
 
 

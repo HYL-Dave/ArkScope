@@ -27,8 +27,9 @@ write path) + #2c (completed-days-only gap rule). The scheduler ``price_backfill
   (2b·2): IBKR-primary / Polygon-fallback fetch → canonicalize-before-insert →
   INSERT OR IGNORE → provider_sync telemetry, under ``market_write_lock``.
 
-Deferred (B): bar-count completeness / early-close session model to HEAL an already-
-partial day — day-presence only marks a complete day present once it has ≥1 bar.
+Coverage v2 session truth and operator diagnostics live in ``src.market_coverage``.
+The day-presence helpers here remain private inputs to explicit generic executors;
+they are not an API coverage authority.
 """
 
 from __future__ import annotations
@@ -41,7 +42,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from datetime import time as dtime  # aliased — `time` (stdlib module) is used for monotonic()
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from src.market_data_admin import (
@@ -314,147 +315,6 @@ def _daterange(start: date, end: date):
     while d <= end:
         yield d
         d += timedelta(days=1)
-
-
-# Conservative per-interval "thin day" threshold (A.1): below this many bars on a COMPLETE
-# trading day, the whole day's coverage is suspiciously low (flagged 'thin' / 疑似不足, NOT a
-# hard error). 15min regular RTH = 26 bars; <20 is clearly short. An interval with no entry is
-# never flagged thin. NOTE: this is a blunt rule — a legitimate half-day / early close (~13-14
-# 15min bars) will read as 'thin' until a proper early-close calendar lands (deferred B+).
-_THIN_BAR_THRESHOLD = {"15min": 20}
-# 'complete_like' requires BOTH gates at this fraction (A.2): covered/universe (not too many
-# MISSING — a large gap shouldn't read complete) AND well_covered/present (those present aren't
-# thin — one fully-synced outlier shouldn't mask a thin day). A single LC-type gap in a large
-# universe still passes (0.9 tolerates it); below EITHER fraction → 'partial'.
-_COMPLETE_COVERED_RATIO = 0.9
-
-
-def summarize_trading_day_coverage(
-    tickers: List[str],
-    interval: str = "15min",
-    lookback_days: int = 10,
-    db_path: Optional[str] = None,
-    *,
-    today: Optional[date] = None,
-    now_et: Optional[datetime] = None,
-    max_errors: int = 50,
-) -> Dict[str, Any]:
-    """READ-ONLY per-day universe price-coverage diagnostics — the operator view of "what's
-    missing, can it be filled, is it even a trading day". NO PG, NO provider call, NO writes
-    (opens ``market_data.db`` ``mode=ro``); it does not heal or schedule anything.
-
-    For each calendar day in the trailing ``lookback_days`` window (newest-first) it reports:
-      - weekend / US-market-holiday / regular trading day (``data_coverage_tools._market_day_status``);
-      - ``session_complete`` for trading days (``_is_session_complete`` in America/New_York — the
-        in-progress day is flagged, not counted as a gap);
-      - across the (alias-canonicalized) universe: ``full`` / ``partial`` / ``missing`` counts +
-        the missing & partial ticker lists. full/partial are RELATIVE to ``max_observed_bar_count``
-        = the per-day MAX bar count (a per-ticker OUTLIER signal — which tickers lag the best-
-        covered ones that day); ``well_covered`` = present tickers with bars ≥
-        ``_THIN_BAR_THRESHOLD``; ``missing`` = zero bars that day.
-      - ``coverage_status`` (the UI-facing label): ``non_trading`` / ``in_progress`` / ``missing``
-        (complete day, zero coverage) / ``thin`` (even the best-covered ticker is sparse — max
-        bars below ``_THIN_BAR_THRESHOLD``) / ``complete_like`` (A.2: needs BOTH covered/universe
-        AND well_covered/present ≥ ``_COMPLETE_COVERED_RATIO``) / ``partial`` (large-scale missing
-        OR many present-but-sparse). Guards two traps: a uniformly-thin day reading complete, and
-        a single full outlier (or a large missing block) masking an incomplete day.
-    Plus a ``provider_errors`` summary from ``provider_sync_meta.last_error`` (e.g. an IBKR
-    contract that won't resolve — LC), so a recurring failure is visible instead of silently
-    retried. Non-trading days carry null coverage. An absent DB ⇒ every trading day all-missing
-    (honest), non-trading days still marked."""
-    now_et = _norm_now_et(now_et)
-    end = today or now_et.date()
-    start = end - timedelta(days=lookback_days)
-    db_interval = _INTERVAL_DB.get(interval, interval)
-    path = db_path or resolve_market_db_path()
-
-    aliases: Dict[str, str] = {}
-    counts_by_day: Dict[str, Dict[str, int]] = {}
-    provider_errors: List[Dict[str, Any]] = []
-    conn = None
-    try:
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    except sqlite3.OperationalError:
-        conn = None
-    if conn is not None:
-        try:
-            aliases = _load_ticker_aliases(conn)
-            if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='prices'").fetchone():
-                for d, tk, n in conn.execute(
-                    "SELECT substr(datetime,1,10) AS d, ticker, COUNT(*) AS n FROM prices "
-                    "WHERE interval = ? AND substr(datetime,1,10) >= ? GROUP BY d, ticker",
-                    (db_interval, start.isoformat())):
-                    counts_by_day.setdefault(d, {})[tk] = int(n)
-            if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_sync_meta'").fetchone():
-                provider_errors = [
-                    {"ticker": r[0], "interval": r[1], "last_error": r[2], "updated_at": r[3]}
-                    for r in conn.execute(
-                        "SELECT ticker, interval, last_error, updated_at FROM provider_sync_meta "
-                        "WHERE last_error IS NOT NULL AND interval = ? ORDER BY updated_at DESC LIMIT ?",
-                        (db_interval, max_errors))]
-        finally:
-            conn.close()
-
-    canon_universe = sorted({aliases.get(t.upper(), t.upper()) for t in tickers})
-
-    days: List[Dict[str, Any]] = []
-    for d in sorted(_daterange(start, end), reverse=True):
-        iso = d.isoformat()
-        mds = _market_day_status(d)
-        if not mds["is_trading_day"]:
-            days.append({
-                "date": iso, "is_trading_day": False, "reason": mds["reason"],
-                "holiday": mds["holiday"], "session_complete": None,
-                "coverage_status": "non_trading", "max_observed_bar_count": None,
-                "full": None, "partial": None, "missing": None, "covered": None,
-                "missing_tickers": [], "partial_tickers": [],
-            })
-            continue
-        complete = _is_session_complete(d, now_et)
-        present = {t: counts_by_day.get(iso, {}).get(t, 0) for t in canon_universe}
-        present = {t: n for t, n in present.items() if n > 0}
-        day_max = max(present.values()) if present else 0
-        partial = sorted(
-            ({"ticker": t, "bars": n} for t, n in present.items() if 0 < n < day_max),
-            key=lambda x: x["ticker"])
-        missing = sorted(t for t in canon_universe if t not in present)
-        thin_thr = _THIN_BAR_THRESHOLD.get(db_interval, 0)
-        well_covered = sum(1 for n in present.values() if n >= thin_thr)
-        n_universe = len(canon_universe)
-        covered_ratio = len(present) / n_universe if n_universe else 0.0   # not too many MISSING
-        well_ratio = well_covered / len(present) if present else 0.0       # present ones well-covered
-        if not complete:
-            status = "in_progress"                       # session not closed → don't judge thin
-        elif not present:
-            status = "missing"                           # complete trading day, zero coverage
-        elif day_max < thin_thr:
-            status = "thin"                              # even the best-covered ticker is sparse
-        elif covered_ratio >= _COMPLETE_COVERED_RATIO and well_ratio >= _COMPLETE_COVERED_RATIO:
-            status = "complete_like"                     # most of universe present AND those present well-covered
-        else:
-            status = "partial"                           # large-scale missing OR many present-but-sparse → uneven
-        days.append({
-            "date": iso, "is_trading_day": True, "reason": mds["reason"], "holiday": None,
-            "session_complete": complete,
-            "coverage_status": status,
-            "max_observed_bar_count": day_max,
-            "full": sum(1 for n in present.values() if day_max and n >= day_max),
-            "well_covered": well_covered,
-            "partial": len(partial),
-            "missing": len(missing),
-            "covered": len(present),
-            "missing_tickers": missing,
-            "partial_tickers": partial,
-        })
-
-    return {
-        "interval": interval,
-        "lookback_days": lookback_days,
-        "universe_count": len(canon_universe),
-        "generated_at_et": now_et.isoformat(),
-        "days": days,
-        "provider_errors": provider_errors,
-    }
 
 
 # --- provider_sync telemetry (NEW tables — NOT market_sync_meta) -------------------
