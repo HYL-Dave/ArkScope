@@ -226,7 +226,6 @@ vi.mock("./api", async (importOriginal) => {
             reason: mocked.longSkipReason,
             at: "2026-07-04T00:00:00+00:00",
           },
-          gap_planned: false,
           durable_state: {
             last_status: "failed",
             last_error: mocked.longDurableError,
@@ -267,7 +266,6 @@ vi.mock("./api", async (importOriginal) => {
               },
             },
           } : null,
-          gap_planned: false,
           durable_state: mocked.ibkrBodyBacklogMode === "succeeded" || mocked.ibkrBodyBacklogMode === "entitlement" ? {
             last_status: "succeeded",
             last_error: null,
@@ -350,7 +348,6 @@ vi.mock("./api", async (importOriginal) => {
           progress: null,
           last_attempt_at: "2026-07-04T00:00:00+00:00",
           last_result: null,
-          gap_planned: false,
           durable_state: {
             last_status: "skipped",
             last_error: null,
@@ -377,7 +374,6 @@ vi.mock("./api", async (importOriginal) => {
           progress: null,
           last_attempt_at: null,
           last_result: null,
-          gap_planned: true,
           durable_state: null,
           job_name: "collect.price_backfill",
         },

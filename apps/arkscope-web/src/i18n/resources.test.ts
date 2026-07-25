@@ -514,6 +514,10 @@ describe("bundled i18n resources", () => {
         provider: "IBKR Gateway",
         schedule: "價格缺口補抓",
         coverage: "交易日 / 價格覆蓋",
+        coverageDescription: "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
+        coverageReadOnly: "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
+        coverageMarketScope: "美國上市股票代理範圍",
+        coverageSession: "正規交易時段（RTH）",
         news: "新聞資料",
         macro: "總經資料",
         investor: "風險意願高於承受能力",
@@ -558,6 +562,10 @@ describe("bundled i18n resources", () => {
         provider: "IBKR Gateway",
         schedule: "Price Gap Backfill",
         coverage: "Trading-day / Price Coverage",
+        coverageDescription: "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",
+        coverageReadOnly: "Read-only diagnostic; does not start a repair or supply planner work.",
+        coverageMarketScope: "US-listed equity proxy",
+        coverageSession: "Regular trading hours (RTH)",
         news: "News Data",
         macro: "Macro Data",
         investor: "Risk appetite above capacity",
@@ -607,6 +615,11 @@ describe("bundled i18n resources", () => {
       expect(t(($) => $.dataSources.providers.names.ibkr)).toBe(expected.provider);
       expect(t(($) => $.dataSources.schedule.sources.priceBackfill.label)).toBe(expected.schedule);
       expect(t(($) => $.dataStorage.coverage.title)).toBe(expected.coverage);
+      expect(t(($) => $.dataStorage.coverage.description)).toBe(expected.coverageDescription);
+      expect(t(($) => $.dataStorage.coverage.readOnly)).toBe(expected.coverageReadOnly);
+      expect(t(($) => $.dataStorage.coverage.facts.marketScopeValue))
+        .toBe(expected.coverageMarketScope);
+      expect(t(($) => $.dataStorage.coverage.facts.sessionValue)).toBe(expected.coverageSession);
       expect(t(($) => $.newsStorage.title)).toBe(expected.news);
       expect(t(($) => $.macroStorage.title)).toBe(expected.macro);
       expect.soft(commonT(($) => $.personalization.mismatch.appetiteAboveCapacity))
@@ -700,12 +713,59 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 694,
+      settings: 713,
       research: 207,
       explore: 401,
       portfolio: 374,
       system: 20,
     } as const;
+
+    const expectedCoveragePaths = [
+      "title",
+      "description",
+      "readOnly",
+      "lookback",
+      "lookbackLabel",
+      "facts.universe",
+      "facts.interval",
+      "facts.marketScope",
+      "facts.marketScopeValue",
+      "facts.session",
+      "facts.sessionValue",
+      "facts.reviewedThrough",
+      "facts.horizonMonths",
+      "headings.date",
+      "headings.status",
+      "headings.expectedSlots",
+      "headings.complete",
+      "headings.partial",
+      "headings.unknown",
+      "status.weekend",
+      "status.marketClosed",
+      "status.inProgress",
+      "status.complete",
+      "status.partial",
+      "status.indeterminateTickers",
+      "status.unknown",
+      "status.unavailable",
+      "reasons.calendarUnavailable",
+      "reasons.dateUnreviewed",
+      "reasons.observationUnavailable",
+      "reasons.noObservations",
+      "health.fixtureHorizonLow",
+      "health.dateUnreviewed",
+      "health.calendarUnavailable",
+      "health.marketDbMissing",
+      "health.marketDbUnreadable",
+      "health.pricesSchemaMissing",
+      "drilldown.partialTitle",
+      "drilldown.partialDetail",
+      "drilldown.unknownTitle",
+      "drilldown.unknownDetail",
+      "drilldown.unmatched",
+      "drilldown.providerIssues",
+      "drilldown.sessionWindow",
+    ].map((path) => `dataStorage.coverage.${path}`).sort();
 
     expect(resourceNamespaces).toEqual(Object.keys(expectedCounts));
     const flattenedPortfolioByLocale = new Map<string, Map<string, string>>();
@@ -721,7 +781,15 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1794);
+      expect(total, `${locale}.total`).toBe(1813);
+
+      const settings = flattenResource(localeResources.settings as ResourceTree);
+      expect(
+        [...settings.keys()]
+          .filter((path) => path.startsWith("dataStorage.coverage."))
+          .sort(),
+        `${locale}.settings.dataStorage.coverage`,
+      ).toEqual(expectedCoveragePaths);
 
       const portfolio = flattenResource(localeResources.portfolio as ResourceTree);
       flattenedPortfolioByLocale.set(locale, portfolio);
@@ -1054,7 +1122,7 @@ describe("bundled i18n resources", () => {
       runtime: 21,
       providers: 103,
       dataSources: 162,
-      dataStorage: 48,
+      dataStorage: 67,
       newsStorage: 27,
       macroStorage: 31,
       investor: 140,
@@ -1070,9 +1138,9 @@ describe("bundled i18n resources", () => {
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
       const movedModelCount = flattenResource(commonModels).size - 1;
-      expect(physicalPreSliceCount).toBe(604);
+      expect(physicalPreSliceCount).toBe(623);
       expect(movedModelCount).toBe(23);
-      expect(physicalPreSliceCount + movedModelCount).toBe(627);
+      expect(physicalPreSliceCount + movedModelCount).toBe(646);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

@@ -25,7 +25,6 @@ const schedule = (over: Partial<ScheduleSourceState> = {}): ScheduleSourceState 
   progress: null,
   last_attempt_at: null,
   last_result: null,
-  gap_planned: false,
   durable_state: null,
   job_name: "collect.polygon_news",
   ...over,

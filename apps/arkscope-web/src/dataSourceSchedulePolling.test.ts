@@ -26,7 +26,6 @@ function source(over: Partial<ScheduleSourceState> = {}): ScheduleSourceState {
     progress: null,
     last_attempt_at: "2026-07-17T10:00:00Z",
     last_result: null,
-    gap_planned: false,
     durable_state: {
       last_status: "succeeded",
       last_error: null,

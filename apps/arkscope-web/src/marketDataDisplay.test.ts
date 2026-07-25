@@ -29,6 +29,12 @@ function settingsT(locale: Locale) {
 const zhT = settingsT("zh-Hant");
 const coverageStatusLabel = (row: Parameters<typeof localizedCoverageStatusLabel>[0]) =>
   localizedCoverageStatusLabel(row, zhT);
+
+function displayFunction<T extends (...args: never[]) => unknown>(name: string): T {
+  const value = (marketDataDisplay as unknown as Record<string, unknown>)[name];
+  if (typeof value !== "function") throw new Error(`missing display function ${name}`);
+  return value as T;
+}
 const macroRoutingLabel = (value: MacroStatus) => localizedMacroRoutingLabel(value, zhT);
 const marketRoutingLabel = (value: MarketDataStatus) => localizedMarketRoutingLabel(value, zhT);
 const newsPostgresRouteLabel = (value: NewsStatus) => localizedNewsPostgresRouteLabel(value, zhT);
@@ -178,26 +184,139 @@ describe("news cutover labels", () => {
 });
 
 describe("coverageStatusLabel", () => {
-  const row = (over: Record<string, unknown>) => ({
-    coverage_status: "complete_like" as const, reason: "regular_trading_day",
-    holiday: null, max_observed_bar_count: 26, ...over,
+  const row = (over: Record<string, unknown> = {}) => ({
+    date: "2026-07-24",
+    coverage_status: "complete",
+    status_reason_code: null,
+    closure_reason_code: null,
+    session_kind: "regular",
+    session_open_at_utc: "2026-07-24T13:30:00+00:00",
+    session_close_at_utc: "2026-07-24T20:00:00+00:00",
+    expected_slot_count: 26,
+    observed_ticker_count: 2,
+    complete_ticker_count: 2,
+    partial_ticker_count: 0,
+    unknown_ticker_count: 0,
+    partial_tickers: [],
+    unknown_tickers: [],
+    unmatched_rth_row_count: 0,
+    ...over,
   });
-  it("renders backend coverage_status (UI does not re-derive completeness)", () => {
-    expect(coverageStatusLabel(row({ coverage_status: "complete_like" })).tone).toBe("ok");
-    expect(coverageStatusLabel(row({ coverage_status: "missing" })))
-      .toEqual({ label: "缺資料", tone: "bad" });
-    expect(coverageStatusLabel(row({ coverage_status: "thin", max_observed_bar_count: 3 })))
-      .toEqual({ label: "疑似不足（最多 3 根）", tone: "warn" });
-    expect(coverageStatusLabel(row({ coverage_status: "partial", well_covered: 1, covered: 148 })))
-      .toEqual({ label: "部分覆蓋（1/148 檔完整）", tone: "warn" });
-    expect(coverageStatusLabel(row({ coverage_status: "in_progress" })).tone).toBe("muted");
+
+  it("maps every Coverage v2 day status in both locales and reserves positive tone for complete", () => {
+    const cases = [
+      { status: "in_progress", zh: "進行中", en: "In progress", tone: "muted" },
+      { status: "complete", zh: "完整", en: "Complete", tone: "ok" },
+      { status: "partial", zh: "部分", en: "Partial", tone: "warn" },
+      {
+        status: "indeterminate_tickers",
+        zh: "部分標的未能判定",
+        en: "Some tickers unresolved",
+        tone: "warn",
+      },
+      { status: "unknown", zh: "未知", en: "Unknown", tone: "muted" },
+    ];
+    for (const item of cases) {
+      expect(localizedCoverageStatusLabel(row({ coverage_status: item.status }) as never, zhT))
+        .toEqual({ label: item.zh, tone: item.tone });
+      expect(localizedCoverageStatusLabel(
+        row({ coverage_status: item.status }) as never,
+        settingsT("en"),
+      )).toEqual({ label: item.en, tone: item.tone });
+    }
+    expect(localizedCoverageStatusLabel(row({ coverage_status: "future_status" }) as never, zhT))
+      .toEqual({ label: "無法判定", tone: "bad" });
   });
-  it("distinguishes weekend vs holiday for non_trading", () => {
-    expect(coverageStatusLabel(row({ coverage_status: "non_trading", reason: "weekend" })).label)
-      .toBe("週末");
+
+  it("maps non-trading closure reasons without backend prose", () => {
     expect(coverageStatusLabel(row({
-      coverage_status: "non_trading", reason: "us_market_holiday", holiday: "Juneteenth National Independence Day",
-    })).label).toBe("假日（Juneteenth National Independence Day）");
+      coverage_status: "non_trading",
+      closure_reason_code: "weekend",
+    }) as never)).toEqual({ label: "週末", tone: "muted" });
+    expect(localizedCoverageStatusLabel(row({
+      coverage_status: "non_trading",
+      closure_reason_code: "market_closed",
+    }) as never, settingsT("en"))).toEqual({ label: "Market closed", tone: "muted" });
+    expect(JSON.stringify(row({ closure_reason_code: "market_closed" })))
+      .not.toContain("Juneteenth");
+  });
+
+  it("maps every Coverage v2 day reason in both locales", () => {
+    const reasonLabel = displayFunction<(reason: string | null, t: typeof zhT) => string | null>(
+      "coverageDayReasonLabel",
+    );
+    const cases = [
+      ["calendar_unavailable", "交易日曆無法使用", "Calendar unavailable"],
+      ["date_unreviewed", "日期超出已審日曆範圍", "Date outside reviewed calendar range"],
+      ["observation_unavailable", "觀測資料無法使用", "Observations unavailable"],
+      ["no_observations", "沒有觀測資料", "No observations"],
+    ];
+    for (const [reason, zh, en] of cases) {
+      expect(reasonLabel(reason, zhT)).toBe(zh);
+      expect(reasonLabel(reason, settingsT("en"))).toBe(en);
+    }
+    expect(reasonLabel(null, zhT)).toBeNull();
+    expect(reasonLabel("raw backend prose", zhT)).toBe("無法判定");
+  });
+
+  it("maps calendar and observation health without parsing diagnostics", () => {
+    const calendarLabels = displayFunction<(
+      health: { status: string; reason_codes: string[] },
+      t: typeof zhT,
+    ) => string[]>("coverageCalendarHealthLabels");
+    const observationLabel = displayFunction<(
+      health: { status: string; reason_code: string | null },
+      t: typeof zhT,
+    ) => string | null>("coverageObservationHealthLabel");
+
+    expect(calendarLabels({
+      status: "degraded",
+      reason_codes: ["fixture_horizon_low", "date_unreviewed"],
+    }, settingsT("en"))).toEqual([
+      "Reviewed calendar horizon is low",
+      "Date outside reviewed calendar range",
+    ]);
+    expect(observationLabel({
+      status: "unavailable",
+      reason_code: "market_db_unreadable",
+    }, zhT)).toBe("市場資料庫無法讀取");
+  });
+
+  it("keeps partial and unknown ticker facts independent", () => {
+    const facts = displayFunction<(
+      value: ReturnType<typeof row>,
+      t: typeof zhT,
+    ) => {
+      partialTitle: string | null;
+      partialDetails: string[];
+      unknownTitle: string | null;
+      unknownDetail: string | null;
+    }>("coverageTickerFactsPresentation");
+
+    expect(facts(row({
+      partial_tickers: [{ ticker: "MSFT", observed_slot_count: 12, expected_slot_count: 26 }],
+      unknown_tickers: ["AAPL"],
+    }), settingsT("en"))).toEqual({
+      partialTitle: "Partially observed tickers",
+      partialDetails: ["MSFT: 12/26 slots"],
+      unknownTitle: "Unresolved tickers",
+      unknownDetail: "1 tickers: AAPL",
+    });
+  });
+
+  it("renders unmatched RTH rows as a separate data-quality warning", () => {
+    const quality = displayFunction<(
+      value: ReturnType<typeof row>,
+      providerIssueCount: number,
+      t: typeof zhT,
+    ) => { unmatched: string | null; providerIssues: string | null }>(
+      "coverageDataQualityPresentation",
+    );
+
+    expect(quality(row({ unmatched_rth_row_count: 2 }), 1, zhT)).toEqual({
+      unmatched: "格線外的正規交易時段資料列：2",
+      providerIssues: "供應商問題：1",
+    });
   });
 });
 
@@ -556,7 +675,7 @@ describe("localized Settings market-data presentations", () => {
         write: "Normalized SQLite + legacy local projection（pre-exit test）",
         postgres: "可用（尚未退出）",
         read: "Legacy local direct surface",
-        coverage: "部分覆蓋（1/148 檔完整）",
+        coverage: "部分",
         provider: "已停用",
         scheduler: "部分完成（待補抓 2）",
         backlog: "內文佇列：4 篇目前可處理（其中 3 篇尚未嘗試） · 2 篇已排程稍後重試",
@@ -569,7 +688,7 @@ describe("localized Settings market-data presentations", () => {
         write: "Normalized SQLite + legacy local projection (pre-exit test)",
         postgres: "Available (not yet exited)",
         read: "Legacy local direct surface",
-        coverage: "Partial coverage (1/148 complete)",
+        coverage: "Partial",
         provider: "Disabled",
         scheduler: "Partially completed (2 remaining)",
         backlog: "Body queue: 4 available now (3 not yet attempted) · 2 scheduled for a later retry",
@@ -590,11 +709,7 @@ describe("localized Settings market-data presentations", () => {
       expect(localizedNewsReadSurfaceLabel(preExit, t)).toBe(expected.read);
       expect(localizedCoverageStatusLabel({
         coverage_status: "partial",
-        reason: "regular_trading_day",
-        holiday: null,
-        max_observed_bar_count: 26,
-        well_covered: 1,
-        covered: 148,
+        closure_reason_code: null,
       }, t)).toEqual({ label: expected.coverage, tone: "warn" });
       expect(localizedProviderHealthStatusLabel({
         id: "fred",

@@ -8,6 +8,11 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, TaskRoute, TradingDayCoverage } from "./api";
+import {
+  LocaleProvider,
+  createUiLocaleController,
+  type UiLocaleController,
+} from "./i18n";
 import { formatSystemTimestamp } from "./timeDisplay";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
@@ -90,10 +95,20 @@ mocked.macroStatus = macroStatus;
 mocked.macroSnapshot = macroSnapshot;
 
 const coverage: TradingDayCoverage = {
+  version: 2,
+  market_scope: "us_listed_equity_proxy",
+  coverage_session: "rth",
   interval: "15min",
   lookback_days: 10,
   universe_count: 149,
   generated_at_et: "2026-07-03T16:00:00-04:00",
+  calendar_health: {
+    status: "ok",
+    reason_codes: [],
+    reviewed_through: "2027-12-31",
+    forward_horizon_months: 17,
+  },
+  observation_health: { status: "ok", reason_code: null },
   days: [],
   provider_errors: [],
 };
@@ -194,17 +209,23 @@ afterEach(() => {
   mocked.coverage = coverage;
 });
 
-async function renderSettings(developerMode = false) {
+async function renderSettings(
+  developerMode = false,
+  localeController?: UiLocaleController,
+) {
   window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
+  const view = React.createElement(SettingsView, {
+    runtime: null,
+    developerMode,
+    onRuntimeChanged: vi.fn(),
+  });
   await act(async () => {
-    root!.render(withTestUiLocale(React.createElement(SettingsView, {
-      runtime: null,
-      developerMode,
-      onRuntimeChanged: vi.fn(),
-    })));
+    root!.render(localeController
+      ? React.createElement(LocaleProvider, { controller: localeController, children: view })
+      : withTestUiLocale(view));
   });
   await act(async () => { await Promise.resolve(); });
 }
@@ -228,14 +249,14 @@ describe("post-PG-exit storage panels", () => {
     expect(storage!.querySelector("h2")?.textContent).toBe("市場資料");
     expect(storage!.textContent).toContain("資料抓取由 Data Sources 管理。");
     expect(storage!.textContent).toContain(
-      "覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日",
+      "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
     );
-    expect(storage!.textContent).toContain("每列以 coverage_status 為準：");
-    expect(storage!.textContent).toContain("點開可看缺漏與 partial 標的、以及 provider 錯誤。");
     expect(storage!.textContent).toContain(
-      "full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。",
+      "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
     );
-    expect(storage!.textContent).toContain("全部標的 149 檔");
+    expect(storage!.textContent).toContain("美國上市股票代理範圍");
+    expect(storage!.textContent).toContain("正規交易時段（RTH）");
+    expect(storage!.textContent).toContain("2027-12-31");
     expect(host!.textContent).toContain("價格");
     expect(host!.textContent).toContain("價格 —");
     expect(host!.textContent).toContain("財務快取");
@@ -297,6 +318,22 @@ describe("post-PG-exit storage panels", () => {
   });
 
   it("renders English market data and storage outcomes", async () => {
+    const localePut = vi.fn(async (locale: "zh-Hant" | "en") => ({
+      locale,
+      source: "stored" as const,
+    }));
+    const localeController = createUiLocaleController({
+      initialLocale: "zh-Hant",
+      authority: {
+        get: async () => ({ locale: "zh-Hant", source: "stored" }),
+        put: localePut,
+      },
+      applyLocale: (locale) => {
+        void i18n.changeLanguage(locale);
+        document.documentElement.lang = locale;
+      },
+      writeCache: () => true,
+    });
     mocked.marketStatus = {
       ...marketStatus,
       sync: {
@@ -330,22 +367,27 @@ describe("post-PG-exit storage panels", () => {
       ...coverage,
       days: [{
         date: "2026-07-18",
-        is_trading_day: true,
-        reason: "regular_trading_day",
-        holiday: null,
-        session_complete: true,
         coverage_status: "partial",
-        max_observed_bar_count: 26,
-        full: 1,
-        well_covered: 1,
-        partial: 1,
-        missing: 1,
-        covered: 2,
-        missing_tickers: ["AAPL"],
-        partial_tickers: [{ ticker: "MSFT", bars: 12 }],
+        status_reason_code: null,
+        closure_reason_code: null,
+        session_kind: "regular",
+        session_open_at_utc: "2026-07-18T13:30:00+00:00",
+        session_close_at_utc: "2026-07-18T20:00:00+00:00",
+        expected_slot_count: 26,
+        observed_ticker_count: 148,
+        complete_ticker_count: 147,
+        partial_ticker_count: 1,
+        unknown_ticker_count: 1,
+        partial_tickers: [{
+          ticker: "MSFT",
+          observed_slot_count: 12,
+          expected_slot_count: 26,
+        }],
+        unknown_tickers: ["AAPL"],
+        unmatched_rth_row_count: 0,
       }],
     };
-    await renderSettings();
+    await renderSettings(false, localeController);
 
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
@@ -356,8 +398,27 @@ describe("post-PG-exit storage panels", () => {
     expect(getMarketDataStatus).toHaveBeenCalledOnce();
     expect(getTradingDayCoverage).toHaveBeenCalledOnce();
 
+    const lookback = mountedStorage.querySelector<HTMLSelectElement>("select");
+    if (!lookback) throw new Error("missing coverage lookback input");
+    lookback.dataset.identityMarker = "coverage-lookback";
     await act(async () => {
-      await i18n.changeLanguage("en");
+      lookback.value = "30";
+      lookback.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const mountedCoverageRow = Array.from(
+      mountedStorage.querySelectorAll<HTMLTableRowElement>("tbody tr"),
+    ).find((row) => row.textContent?.includes("2026-07-18"));
+    if (!mountedCoverageRow) throw new Error("missing mounted coverage row");
+    act(() => mountedCoverageRow.click());
+    expect(mountedStorage.textContent).toContain("部分觀測標的");
+    lookback.focus();
+    expect(document.activeElement).toBe(lookback);
+    expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await localeController.setLocale("en");
+      await Promise.resolve();
     });
 
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
@@ -373,6 +434,12 @@ describe("post-PG-exit storage panels", () => {
         "Fundamentals",
         "Financial Cache",
         "Latest Incremental Update",
+        "Universe",
+        "Interval",
+        "Market scope",
+        "Coverage session",
+        "Reviewed through",
+        "Forward horizon (months)",
       ]);
     expect(storage.textContent).toContain(
       "2,324,487 rows · 149 tickers · latest 2026-07-03T20:00:00+0000",
@@ -400,23 +467,34 @@ describe("post-PG-exit storage panels", () => {
     expect(coverageHeading.parentElement?.parentElement?.classList.contains("settings-section-head"))
       .toBe(true);
     expect(storage.textContent).toContain("Days");
-    expect(storage.textContent).toContain("Universe 149 tickers");
+    expect(storage.textContent).toContain("US-listed equity proxy");
+    expect(storage.textContent).toContain("Regular trading hours (RTH)");
+    expect(storage.textContent).toContain("2027-12-31");
     expect(storage.textContent).toContain(
-      "Each row uses the backend coverage_status as the source of truth.",
+      "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",
     );
     expect(storage.textContent).toContain(
-      "Full, partial, and missing are drill-downs relative to the best-covered ticker for that day.",
+      "Read-only diagnostic; does not start a repair or supply planner work.",
     );
     expect(Array.from(storage.querySelectorAll("table th")).map((node) => node.textContent))
-      .toEqual(["Date", "Status", "Maximum bars", "Covered", "Missing", "Partial tickers", ""]);
+      .toEqual(["Date", "Status", "Expected slots", "Complete", "Partial", "Unknown"]);
     const coverageRow = Array.from(storage.querySelectorAll<HTMLTableRowElement>("tbody tr"))
       .find((row) => row.textContent?.includes("2026-07-18"));
     if (!coverageRow) throw new Error("missing English coverage row");
-    act(() => coverageRow.click());
-    expect(storage.textContent).toContain("Missing tickers (1): AAPL");
-    expect(storage.textContent).toContain("Partial tickers: MSFT(12)");
+    expect(coverageRow).toBe(mountedCoverageRow);
+    expect(storage.textContent).toContain("Partially observed tickers");
+    expect(storage.textContent).toContain("MSFT: 12/26 slots");
+    expect(storage.textContent).toContain("Unresolved tickers");
+    expect(storage.textContent).toContain("1 tickers: AAPL");
+    const switchedLookback = storage.querySelector<HTMLSelectElement>("select");
+    expect(switchedLookback).toBe(lookback);
+    expect(switchedLookback?.value).toBe("30");
+    expect(switchedLookback?.dataset.identityMarker).toBe("coverage-lookback");
+    expect(document.activeElement).toBe(lookback);
+    expect(localePut).toHaveBeenCalledOnce();
+    expect(localePut).toHaveBeenCalledWith("en");
     expect(getMarketDataStatus).toHaveBeenCalledOnce();
-    expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+    expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);
     const dataStorageSource = readFileSync(
       resolve(import.meta.dirname, "./settings/DataStorageSection.tsx"),
       "utf8",
@@ -460,21 +538,26 @@ describe("post-PG-exit storage panels", () => {
     };
     mocked.coverage = {
       ...coverage,
+      observation_health: {
+        status: "unavailable",
+        reason_code: "market_db_unreadable",
+      },
       days: [{
         date: "2026-07-18",
-        is_trading_day: true,
-        reason: "regular_trading_day",
-        holiday: null,
-        session_complete: true,
-        coverage_status: "partial",
-        max_observed_bar_count: 26,
-        full: 1,
-        well_covered: 1,
-        partial: 1,
-        missing: 1,
-        covered: 2,
-        missing_tickers: ["AAPL"],
-        partial_tickers: [{ ticker: "MSFT", bars: 12 }],
+        coverage_status: "unknown",
+        status_reason_code: "observation_unavailable",
+        closure_reason_code: null,
+        session_kind: null,
+        session_open_at_utc: null,
+        session_close_at_utc: null,
+        expected_slot_count: null,
+        observed_ticker_count: null,
+        complete_ticker_count: null,
+        partial_ticker_count: null,
+        unknown_ticker_count: null,
+        partial_tickers: [],
+        unknown_tickers: [],
+        unmatched_rth_row_count: null,
       }],
       provider_errors: [{
         ticker: "AAPL",
@@ -484,30 +567,151 @@ describe("post-PG-exit storage panels", () => {
       }],
     };
 
-    const openCoverageRow = () => {
-      const row = Array.from(host!.querySelectorAll<HTMLTableRowElement>("tbody tr")).find((candidate) =>
-        candidate.textContent?.includes("2026-07-18"));
-      if (!row) throw new Error("missing planted coverage row");
-      act(() => row.click());
-    };
-
     await renderSettings(false);
-    openCoverageRow();
     expect(host!.textContent).toContain("增量更新失敗");
-    expect(host!.textContent).toContain("Provider 錯誤");
-    expect(host!.textContent).toContain("缺（1）：AAPL");
-    expect(host!.textContent).toContain("partial：MSFT(12)");
+    expect(host!.textContent).toContain("市場資料庫無法讀取");
+    expect(host!.textContent).toContain("觀測資料無法使用");
+    expect(host!.textContent).toContain("供應商問題：1");
     expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).not.toContain(providerDiagnostic);
     expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
 
     dispose();
     await renderSettings(true);
-    openCoverageRow();
     expect(host!.querySelector('[data-testid="developer-diagnostics"]')).not.toBeNull();
     expect(host!.textContent).toContain(syncDiagnostic);
     expect(host!.textContent).toContain(providerDiagnostic);
     expect(getMarketDataStatus).toHaveBeenCalledTimes(2);
     expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps calendar degradation separate from reviewed-day coverage", async () => {
+    mocked.coverage = {
+      version: 2,
+      market_scope: "us_listed_equity_proxy",
+      coverage_session: "rth",
+      interval: "15min",
+      lookback_days: 10,
+      universe_count: 2,
+      generated_at_et: "2026-07-24T16:30:00-04:00",
+      calendar_health: {
+        status: "degraded",
+        reason_codes: ["fixture_horizon_low"],
+        reviewed_through: "2027-12-31",
+        forward_horizon_months: 5,
+      },
+      observation_health: { status: "ok", reason_code: null },
+      days: [{
+        date: "2026-07-24",
+        coverage_status: "complete",
+        status_reason_code: null,
+        closure_reason_code: null,
+        session_kind: "regular",
+        session_open_at_utc: "2026-07-24T13:30:00+00:00",
+        session_close_at_utc: "2026-07-24T20:00:00+00:00",
+        expected_slot_count: 26,
+        observed_ticker_count: 2,
+        complete_ticker_count: 2,
+        partial_ticker_count: 0,
+        unknown_ticker_count: 0,
+        partial_tickers: [],
+        unknown_tickers: [],
+        unmatched_rth_row_count: 0,
+      }],
+      provider_errors: [],
+    };
+
+    await renderSettings();
+
+    const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
+    const dayRow = Array.from(storage!.querySelectorAll("tbody tr")).find((row) =>
+      row.textContent?.includes("2026-07-24"));
+    expect(dayRow?.textContent).toContain("完整");
+    expect(storage!.textContent).toContain("已審日曆的前瞻範圍不足");
+    expect(storage!.textContent).toContain("已審至 2027-12-31");
+  });
+
+  it("keeps unmatched rows and provider issues separate from coverage state", async () => {
+    const rawProviderDetail = "PLANTED_PROVIDER_DETAIL";
+    mocked.coverage = {
+      version: 2,
+      market_scope: "us_listed_equity_proxy",
+      coverage_session: "rth",
+      interval: "15min",
+      lookback_days: 10,
+      universe_count: 3,
+      generated_at_et: "2026-07-24T16:30:00-04:00",
+      calendar_health: {
+        status: "ok",
+        reason_codes: [],
+        reviewed_through: "2027-12-31",
+        forward_horizon_months: 17,
+      },
+      observation_health: { status: "ok", reason_code: null },
+      days: [
+        {
+          date: "2026-07-24",
+          coverage_status: "partial",
+          status_reason_code: null,
+          closure_reason_code: null,
+          session_kind: "regular",
+          session_open_at_utc: "2026-07-24T13:30:00+00:00",
+          session_close_at_utc: "2026-07-24T20:00:00+00:00",
+          expected_slot_count: 26,
+          observed_ticker_count: 2,
+          complete_ticker_count: 1,
+          partial_ticker_count: 1,
+          unknown_ticker_count: 1,
+          partial_tickers: [{
+            ticker: "MSFT",
+            observed_slot_count: 12,
+            expected_slot_count: 26,
+          }],
+          unknown_tickers: ["AAPL"],
+          unmatched_rth_row_count: 2,
+        },
+        {
+          date: "2026-07-23",
+          coverage_status: "indeterminate_tickers",
+          status_reason_code: null,
+          closure_reason_code: null,
+          session_kind: "regular",
+          session_open_at_utc: "2026-07-23T13:30:00+00:00",
+          session_close_at_utc: "2026-07-23T20:00:00+00:00",
+          expected_slot_count: 26,
+          observed_ticker_count: 2,
+          complete_ticker_count: 2,
+          partial_ticker_count: 0,
+          unknown_ticker_count: 1,
+          partial_tickers: [],
+          unknown_tickers: ["NVDA"],
+          unmatched_rth_row_count: 0,
+        },
+      ],
+      provider_errors: [{
+        ticker: "AAPL",
+        interval: "15min",
+        last_error: rawProviderDetail,
+        updated_at: "2026-07-24T20:05:00+00:00",
+      }],
+    };
+
+    await renderSettings(false);
+
+    const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
+    const dayRow = Array.from(storage!.querySelectorAll<HTMLTableRowElement>("tbody tr")).find(
+      (row) => row.textContent?.includes("2026-07-24"),
+    );
+    if (!dayRow) throw new Error("missing Coverage v2 day row");
+    expect(dayRow.textContent).toContain("部分");
+    expect(storage!.textContent).toContain("部分標的未能判定");
+    act(() => dayRow.click());
+    expect(storage!.textContent).toContain("部分觀測標的");
+    expect(storage!.textContent).toContain("MSFT：12/26 格");
+    expect(storage!.textContent).toContain("未能判定的標的");
+    expect(storage!.textContent).toContain("AAPL");
+    expect(storage!.textContent).toContain("格線外的正規交易時段資料列：2");
+    expect(storage!.textContent).toContain("供應商問題：1");
+    expect(storage!.textContent).not.toContain(rawProviderDetail);
   });
 });

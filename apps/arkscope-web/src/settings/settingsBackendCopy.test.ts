@@ -315,11 +315,11 @@ describe("Settings backend copy boundary", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        values: ["週末", "假日（休市日）", "盤中（未收盤）", "缺資料", "疑似不足（最多 1,234 根）", "部分覆蓋（12/20 檔完整）", "覆蓋完整"],
+        values: ["週末", "休市", "進行中", "完整", "部分", "部分標的未能判定", "未知", "無法判定"],
       },
       {
         locale: "en" as const,
-        values: ["Weekend", "Holiday (Market holiday)", "In progress", "Missing data", "Possibly thin (up to 1,234 bars)", "Partial coverage (12/20 complete)", "Complete coverage"],
+        values: ["Weekend", "Market closed", "In progress", "Complete", "Partial", "Some tickers unresolved", "Unknown", "Unable to determine"],
       },
     ];
 
@@ -327,12 +327,13 @@ describe("Settings backend copy boundary", () => {
       const t = settingsT(expected.locale);
       const values = [
         t(($) => $.dataStorage.coverage.status.weekend),
-        t(($) => $.dataStorage.coverage.status.holiday, { value: expected.locale === "en" ? "Market holiday" : "休市日" }),
+        t(($) => $.dataStorage.coverage.status.marketClosed),
         t(($) => $.dataStorage.coverage.status.inProgress),
-        t(($) => $.dataStorage.coverage.status.missing),
-        t(($) => $.dataStorage.coverage.status.thin, { value: "1,234" }),
-        t(($) => $.dataStorage.coverage.status.partial, { count: 12, value: 20 }),
-        t(($) => $.dataStorage.coverage.status.completeLike),
+        t(($) => $.dataStorage.coverage.status.complete),
+        t(($) => $.dataStorage.coverage.status.partial),
+        t(($) => $.dataStorage.coverage.status.indeterminateTickers),
+        t(($) => $.dataStorage.coverage.status.unknown),
+        t(($) => $.dataStorage.coverage.status.unavailable),
       ];
       expect(values).toEqual(expected.values);
     }

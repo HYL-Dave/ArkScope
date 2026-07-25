@@ -2401,45 +2401,90 @@ export function getMacroSnapshot(): Promise<MacroSnapshot> {
   return getJSON<MacroSnapshot>("/macro/snapshot");
 }
 
-// --- 交易日 / 價格覆蓋唯讀診斷 (Slice A/B; read-only over market_data.db) ---
+// --- trading-day coverage (Coverage v2; read-only over market_data.db) ---
 
-export type CoverageStatus =
+export type MarketScope = "us_listed_equity_proxy";
+export type CoverageSession = "rth";
+export type CalendarHealthStatus = "ok" | "degraded" | "unavailable";
+export type ObservationHealthStatus = "ok" | "unavailable";
+export type CalendarHealthReason =
+  | "fixture_horizon_low"
+  | "date_unreviewed"
+  | "calendar_unavailable";
+export type ObservationHealthReason =
+  | "market_db_missing"
+  | "market_db_unreadable"
+  | "prices_schema_missing";
+export type CoverageDayStatus =
+  | "unknown"
   | "non_trading"
   | "in_progress"
-  | "missing"
-  | "thin"
   | "partial"
-  | "complete_like";
+  | "indeterminate_tickers"
+  | "complete";
+export type CoverageDayReason =
+  | "calendar_unavailable"
+  | "date_unreviewed"
+  | "observation_unavailable"
+  | "no_observations";
+export type ClosureReasonCode = "weekend" | "market_closed";
+export type SessionKind = "regular" | "early_close";
+
+export interface PartialTickerCoverage {
+  ticker: string;
+  observed_slot_count: number;
+  expected_slot_count: number;
+}
+
+export interface CoverageCalendarHealth {
+  status: CalendarHealthStatus;
+  reason_codes: CalendarHealthReason[];
+  reviewed_through: string;
+  forward_horizon_months: number;
+}
+
+export interface CoverageObservationHealth {
+  status: ObservationHealthStatus;
+  reason_code: ObservationHealthReason | null;
+}
+
+export interface ProviderSyncIssue {
+  ticker: string;
+  interval: string;
+  last_error: string;
+  updated_at: string | null;
+}
 
 export interface TradingDayRow {
   date: string;
-  is_trading_day: boolean;
-  reason: string; // weekend | us_market_holiday | regular_trading_day
-  holiday: string | null;
-  session_complete: boolean | null;
-  coverage_status: CoverageStatus;
-  max_observed_bar_count: number | null;
-  full: number | null;
-  well_covered: number | null;
-  partial: number | null;
-  missing: number | null;
-  covered: number | null;
-  missing_tickers: string[];
-  partial_tickers: Array<{ ticker: string; bars: number }>;
+  coverage_status: CoverageDayStatus;
+  status_reason_code: CoverageDayReason | null;
+  closure_reason_code: ClosureReasonCode | null;
+  session_kind: SessionKind | null;
+  session_open_at_utc: string | null;
+  session_close_at_utc: string | null;
+  expected_slot_count: number | null;
+  observed_ticker_count: number | null;
+  complete_ticker_count: number | null;
+  partial_ticker_count: number | null;
+  unknown_ticker_count: number | null;
+  partial_tickers: PartialTickerCoverage[];
+  unknown_tickers: string[];
+  unmatched_rth_row_count: number | null;
 }
 
 export interface TradingDayCoverage {
-  interval: string;
+  version: 2;
+  market_scope: MarketScope;
+  coverage_session: CoverageSession;
+  interval: "15min";
   lookback_days: number;
   universe_count: number;
   generated_at_et: string;
+  calendar_health: CoverageCalendarHealth;
+  observation_health: CoverageObservationHealth;
   days: TradingDayRow[];
-  provider_errors: Array<{
-    ticker: string;
-    interval: string;
-    last_error: string | null;
-    updated_at: string | null;
-  }>;
+  provider_errors: ProviderSyncIssue[];
 }
 
 export function getTradingDayCoverage(
@@ -2451,7 +2496,7 @@ export function getTradingDayCoverage(
   );
 }
 
-// --- 新聞·事件 feed (score-free, local-first over news + FTS5) ---
+// --- News feed (score-free, local-first over news + FTS5) ---
 
 export type NewsContentAvailability = "full" | "headline_only" | "unknown";
 export type NewsContentRecovery = "retryable" | "terminal";
@@ -2676,8 +2721,6 @@ export interface ScheduleSourceState {
   // running this source", cross-process) writes no job_runs row, so this field is
   // the only way the UI can see it after a fire-and-return Run now.
   last_result: ScheduleRunResult | null;
-  // v1.4: this source plans scope from coverage + can finish `partial` (→ manual 補抓)
-  gap_planned: boolean;
   // v1.4: durable per-source state (survives restart). last_status 'partial' → a budget-bounded
   // run left a continuation that needs a manual continue; 'failed' carries last_error.
   durable_state: {

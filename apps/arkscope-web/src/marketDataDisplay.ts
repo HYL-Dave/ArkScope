@@ -1,8 +1,13 @@
 import type {
-  CoverageStatus,
+  CalendarHealthReason,
+  ClosureReasonCode,
+  CoverageCalendarHealth,
+  CoverageDayReason,
+  CoverageObservationHealth,
   MacroStatus,
   MarketDataStatus,
   NewsStatus,
+  ObservationHealthReason,
   ScheduleSourceState,
   TradingDayRow,
 } from "./api";
@@ -82,48 +87,201 @@ export function newsReadSurfaceLabel(status: NewsStatus, t: SettingsT): string {
     : t(($) => $.newsStorage.routing.read.pgMirror);
 }
 
-// coverage_status → UI label + tone. The backend owns the completeness judgement (Slice A.1);
-// the UI must render this label, NOT re-derive completeness from full/partial/missing.
+function unreachableCoverageValue(value: never): void {
+  void value;
+}
+
+function unavailableCoverageLabel(t: SettingsT): string {
+  return t(($) => $.dataStorage.coverage.status.unavailable);
+}
+
+const WEEKEND_CLOSURE_REASON = {
+  label: "weekend",
+} as const satisfies { label: ClosureReasonCode };
+const COVERAGE_UNAVAILABLE_TONE = "bad" as const;
+
+function closureReasonLabel(reason: ClosureReasonCode | null, t: SettingsT): string | null {
+  switch (reason) {
+    case WEEKEND_CLOSURE_REASON.label:
+      return t(($) => $.dataStorage.coverage.status.weekend);
+    case "market_closed":
+      return t(($) => $.dataStorage.coverage.status.marketClosed);
+    case null:
+      return null;
+    default:
+      unreachableCoverageValue(reason);
+      return unavailableCoverageLabel(t);
+  }
+}
+
 export function coverageStatusLabel(
-  row: Pick<TradingDayRow, "coverage_status" | "reason" | "holiday" | "max_observed_bar_count"> &
-    Partial<Pick<TradingDayRow, "well_covered" | "covered">>,  // only the 'partial' branch needs these
+  row: Pick<TradingDayRow, "coverage_status" | "closure_reason_code">,
   t: SettingsT,
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad" } {
   switch (row.coverage_status) {
-    case "non_trading":
+    case "unknown":
+      return { label: t(($) => $.dataStorage.coverage.status.unknown), tone: "muted" };
+    case "non_trading": {
+      const label = closureReasonLabel(row.closure_reason_code, t);
       return {
-        label: row.reason === "weekend"
-          ? t(($) => $.dataStorage.coverage.status.weekend)
-          : t(($) => $.dataStorage.coverage.status.holiday, { value: row.holiday ?? "" }),
-        tone: "muted",
+        label: label ?? unavailableCoverageLabel(t),
+        tone: label ? "muted" : COVERAGE_UNAVAILABLE_TONE,
       };
+    }
     case "in_progress":
       return { label: t(($) => $.dataStorage.coverage.status.inProgress), tone: "muted" };
-    case "missing":
-      return { label: t(($) => $.dataStorage.coverage.status.missing), tone: "bad" };
-    case "thin":
-      return {
-        label: t(($) => $.dataStorage.coverage.status.thin, {
-          value: String(row.max_observed_bar_count ?? 0),
-        }),
-        tone: "warn",
-      };
     case "partial":
+      return { label: t(($) => $.dataStorage.coverage.status.partial), tone: "warn" };
+    case "indeterminate_tickers":
       return {
-        label: t(($) => $.dataStorage.coverage.status.partial, {
-          count: row.well_covered ?? 0,
-          value: row.covered ?? 0,
-        }),
+        label: t(($) => $.dataStorage.coverage.status.indeterminateTickers),
         tone: "warn",
       };
-    case "complete_like":
-      return { label: t(($) => $.dataStorage.coverage.status.completeLike), tone: "ok" };
+    case "complete":
+      return { label: t(($) => $.dataStorage.coverage.status.complete), tone: "ok" };
     default:
-      return {
-        label: t(($) => $.dataStorage.coverage.status.unknown, { value: row.coverage_status }),
-        tone: "muted",
-      };
+      unreachableCoverageValue(row.coverage_status);
+      return { label: unavailableCoverageLabel(t), tone: "bad" };
   }
+}
+
+export function coverageDayReasonLabel(
+  reason: CoverageDayReason | null,
+  t: SettingsT,
+): string | null {
+  switch (reason) {
+    case "calendar_unavailable":
+      return t(($) => $.dataStorage.coverage.reasons.calendarUnavailable);
+    case "date_unreviewed":
+      return t(($) => $.dataStorage.coverage.reasons.dateUnreviewed);
+    case "observation_unavailable":
+      return t(($) => $.dataStorage.coverage.reasons.observationUnavailable);
+    case "no_observations":
+      return t(($) => $.dataStorage.coverage.reasons.noObservations);
+    case null:
+      return null;
+    default:
+      unreachableCoverageValue(reason);
+      return unavailableCoverageLabel(t);
+  }
+}
+
+function calendarHealthReasonLabel(reason: CalendarHealthReason, t: SettingsT): string {
+  switch (reason) {
+    case "fixture_horizon_low":
+      return t(($) => $.dataStorage.coverage.health.fixtureHorizonLow);
+    case "date_unreviewed":
+      return t(($) => $.dataStorage.coverage.health.dateUnreviewed);
+    case "calendar_unavailable":
+      return t(($) => $.dataStorage.coverage.health.calendarUnavailable);
+    default:
+      unreachableCoverageValue(reason);
+      return unavailableCoverageLabel(t);
+  }
+}
+
+export function coverageCalendarHealthLabels(
+  health: Pick<CoverageCalendarHealth, "status" | "reason_codes">,
+  t: SettingsT,
+): string[] {
+  switch (health.status) {
+    case "ok":
+      return [];
+    case "degraded":
+    case "unavailable":
+      return health.reason_codes.length > 0
+        ? health.reason_codes.map((reason) => calendarHealthReasonLabel(reason, t))
+        : [unavailableCoverageLabel(t)];
+    default:
+      unreachableCoverageValue(health.status);
+      return [unavailableCoverageLabel(t)];
+  }
+}
+
+function observationHealthReasonLabel(reason: ObservationHealthReason, t: SettingsT): string {
+  switch (reason) {
+    case "market_db_missing":
+      return t(($) => $.dataStorage.coverage.health.marketDbMissing);
+    case "market_db_unreadable":
+      return t(($) => $.dataStorage.coverage.health.marketDbUnreadable);
+    case "prices_schema_missing":
+      return t(($) => $.dataStorage.coverage.health.pricesSchemaMissing);
+    default:
+      unreachableCoverageValue(reason);
+      return unavailableCoverageLabel(t);
+  }
+}
+
+export function coverageObservationHealthLabel(
+  health: Pick<CoverageObservationHealth, "status" | "reason_code">,
+  t: SettingsT,
+): string | null {
+  switch (health.status) {
+    case "ok":
+      return null;
+    case "unavailable":
+      return health.reason_code === null
+        ? unavailableCoverageLabel(t)
+        : observationHealthReasonLabel(health.reason_code, t);
+    default:
+      unreachableCoverageValue(health.status);
+      return unavailableCoverageLabel(t);
+  }
+}
+
+export interface CoverageTickerFactsPresentation {
+  partialTitle: string | null;
+  partialDetails: string[];
+  unknownTitle: string | null;
+  unknownDetail: string | null;
+}
+
+export function coverageTickerFactsPresentation(
+  row: Pick<TradingDayRow, "partial_tickers" | "unknown_tickers">,
+  t: SettingsT,
+): CoverageTickerFactsPresentation {
+  const hasPartial = row.partial_tickers.length > 0;
+  const hasUnknown = row.unknown_tickers.length > 0;
+  return {
+    partialTitle: hasPartial
+      ? t(($) => $.dataStorage.coverage.drilldown.partialTitle)
+      : null,
+    partialDetails: row.partial_tickers.map((ticker) =>
+      t(($) => $.dataStorage.coverage.drilldown.partialDetail, {
+        ticker: ticker.ticker,
+        observed: ticker.observed_slot_count,
+        expected: ticker.expected_slot_count,
+      })),
+    unknownTitle: hasUnknown
+      ? t(($) => $.dataStorage.coverage.drilldown.unknownTitle)
+      : null,
+    unknownDetail: hasUnknown
+      ? t(($) => $.dataStorage.coverage.drilldown.unknownDetail, {
+        count: row.unknown_tickers.length,
+        value: row.unknown_tickers.join(", "),
+      })
+      : null,
+  };
+}
+
+export function coverageDataQualityPresentation(
+  row: Pick<TradingDayRow, "unmatched_rth_row_count">,
+  providerIssueCount: number,
+  t: SettingsT,
+): { unmatched: string | null; providerIssues: string | null } {
+  const unmatchedCount = row.unmatched_rth_row_count ?? 0;
+  return {
+    unmatched: unmatchedCount > 0
+      ? t(($) => $.dataStorage.coverage.drilldown.unmatched, {
+        count: unmatchedCount,
+      })
+      : null,
+    providerIssues: providerIssueCount > 0
+      ? t(($) => $.dataStorage.coverage.drilldown.providerIssues, {
+        count: providerIssueCount,
+      })
+      : null,
+  };
 }
 
 type SchedulerDurablePresentation = Pick<
