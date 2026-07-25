@@ -435,33 +435,42 @@ def _pending_continuation(source: str):
     return None
 
 
-_COVERAGE_TRUTH_RESULT_KEYS = frozenset({
-    "code",
-    "collect",
-    "error",
-    "local_refresh",
-    "reason_code",
-    "source",
-    "status",
-})
+def _coverage_truth_result_status(result: Any) -> Optional[str]:
+    if result == {
+        "source": "price_backfill",
+        "collect": {"planned": 0},
+        "reason_code": "coverage_truth_read_only",
+        "local_refresh": {"skipped": "coverage truth is read-only"},
+        "status": "succeeded",
+    }:
+        return "succeeded"
+    if result == {
+        "source": "price_backfill",
+        "collect": {"planned": 0},
+        "code": "legacy_unproven_gap",
+        "reason_code": "legacy_unproven_gap",
+        "error": "legacy_unproven_gap",
+        "status": "failed",
+    }:
+        return "failed"
+    return None
 
 
-def _coverage_truth_state_is_current(state: Any) -> bool:
+def _coverage_truth_state_is_current(
+    state: Any,
+    *,
+    allow_running: bool = False,
+) -> bool:
     if not isinstance(state, dict) or state.get("continuation") is not None:
         return False
-    result = state.get("last_result")
-    if not isinstance(result, dict):
+    result_status = _coverage_truth_result_status(state.get("last_result"))
+    if result_status is None:
         return False
-    if not set(result).issubset(_COVERAGE_TRUTH_RESULT_KEYS):
+    state_status = state.get("last_status")
+    if state_status != result_status and not (allow_running and state_status == "running"):
         return False
-    if result.get("source") != "price_backfill" or result.get("collect") != {"planned": 0}:
-        return False
-    reason_code = result.get("reason_code")
-    if reason_code == "coverage_truth_read_only":
-        return result.get("status") == "succeeded" and "code" not in result
-    if reason_code == "legacy_unproven_gap":
-        return result.get("status") == "failed" and result.get("code") == reason_code
-    return False
+    expected_error = None if result_status == "succeeded" else "legacy_unproven_gap"
+    return state.get("last_error") == expected_error
 
 
 def _coverage_truth_requires_legacy_rejection(source: str) -> bool:
@@ -474,10 +483,24 @@ def _coverage_truth_requires_legacy_rejection(source: str) -> bool:
     return state is not None and not _coverage_truth_state_is_current(state)
 
 
-def _coverage_truth_snapshot_state(state: Dict[str, Any]) -> Dict[str, Any]:
+def _coverage_truth_snapshot_state(
+    state: Dict[str, Any],
+    *,
+    source_running: bool,
+) -> Dict[str, Any]:
     """Project legacy planner state without exposing or implying resumable work."""
-    if _coverage_truth_state_is_current(state):
-        return dict(state)
+    if _coverage_truth_state_is_current(state, allow_running=source_running):
+        return {
+            key: state.get(key)
+            for key in (
+                "last_attempt",
+                "last_status",
+                "last_error",
+                "continuation",
+                "last_result",
+                "updated_at",
+            )
+        }
     return {
         "last_attempt": state.get("last_attempt"),
         "last_status": "failed",
@@ -1563,7 +1586,10 @@ def status_snapshot() -> Dict[str, Any]:
         durable_state = durable.get(source)
         if durable_state is not None:
             if d.coverage_repair_disabled:
-                durable_state = _coverage_truth_snapshot_state(durable_state)
+                durable_state = _coverage_truth_snapshot_state(
+                    durable_state,
+                    source_running=source_running,
+                )
             durable_state = _annotate_durable_state_for_snapshot(
                 durable_state,
                 source_running=source_running,

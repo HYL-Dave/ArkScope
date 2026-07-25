@@ -1996,11 +1996,17 @@ def test_price_backfill_source_registered(monkeypatch):
         ),
     )
     monkeypatch.setattr(schedule_route.threading, "Thread", _Thread)
-    monkeypatch.setattr(schedule_route, "require_db_write", lambda *args, **kwargs: None)
+    write_gates = []
+    monkeypatch.setattr(
+        schedule_route,
+        "require_db_write",
+        lambda action, context: write_gates.append((action, context)),
+    )
 
     response = schedule_route.run_now("price_backfill")
 
     assert response["status"] == "started"
+    assert write_gates == [("schedule_run_now", {"source": "price_backfill"})]
     assert dispatched == [
         (
             schedule_route.run_source,
@@ -2008,6 +2014,17 @@ def test_price_backfill_source_registered(monkeypatch):
             {"name": "runnow-price_backfill", "daemon": True},
         )
     ]
+
+    monkeypatch.setattr(
+        schedule_route,
+        "require_db_write",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("write gate blocked")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="write gate blocked"):
+        schedule_route.run_now("price_backfill")
+    assert len(dispatched) == 1
 
 
 def _install_coverage_repair_spies(monkeypatch):
@@ -2237,6 +2254,51 @@ def test_status_snapshot_preserves_durable_state_without_planner_metadata():
     assert snapshot["provider_fetch"] is False
     assert "gap_planned" not in snapshot
     assert "coverage_repair_disabled" not in snapshot
+
+    ds._state_store().record_outcome(
+        "price_backfill",
+        status="partial",
+        error="raw legacy planner error",
+        result={
+            "source": "price_backfill",
+            "status": "succeeded",
+            "reason_code": "coverage_truth_read_only",
+            "collect": {"planned": 0},
+            "local_refresh": {"skipped": "coverage truth is read-only"},
+        },
+        continuation=None,
+    )
+
+    contradictory = ds.status_snapshot()["price_backfill"]["durable_state"]
+
+    assert contradictory["last_status"] == "failed"
+    assert contradictory["last_error"] == "legacy_unproven_gap"
+    assert "raw legacy planner error" not in json.dumps(contradictory, sort_keys=True)
+
+    current_result = {
+        "source": "price_backfill",
+        "status": "succeeded",
+        "reason_code": "coverage_truth_read_only",
+        "collect": {"planned": 0},
+        "local_refresh": {"skipped": "coverage truth is read-only"},
+    }
+    ds._state_store().record_outcome(
+        "price_backfill",
+        status="succeeded",
+        error=None,
+        result=current_result,
+        continuation=None,
+    )
+    ds._state_store().record_attempt("price_backfill", datetime.now(timezone.utc))
+    assert ds._SOURCE_LOCKS["price_backfill"].acquire(blocking=False)
+    try:
+        active = ds.status_snapshot()["price_backfill"]["durable_state"]
+    finally:
+        ds._SOURCE_LOCKS["price_backfill"].release()
+
+    assert active["last_status"] == "running"
+    assert active["last_result"] == current_result
+    assert active["running_stale"] is False
 
 
 def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
