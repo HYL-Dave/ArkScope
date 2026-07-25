@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: WRITTEN - INDEPENDENT PLAN REVIEW PENDING**
+> **Status: PLAN REVIEW GREEN - CLEARANCE RECORDING**
 
 **Goal:** Replace maximum-relative market-data coverage with an offline,
 read-only XNYS/RTH slot-grid truth model, expose its closed semantic states in
@@ -59,13 +59,34 @@ is binding:
 - Settings `694` and total `1794` leaves per locale are grounded baselines,
   not values to copy without rederiving in Task 0.
 
-This plan resolves the reminder with an exact `+19/-0` resource ledger:
-Settings `694 -> 713` and total `1794 -> 1813` leaves per locale. The existing
-node remains named:
+This plan resolves the reminder with an exact `+32/-13` resource ledger, net
+`+19`: Settings `694 -> 713` and total `1794 -> 1813` leaves per locale. The
+existing node remains named:
 
 ```text
 contains the reviewed remaining-surface namespace inventory in both locales
 ```
+
+## Independent Plan-Review Resolution
+
+Independent full-plan review returned substantive GREEN with two required
+accounting-composition corrections and one narrative correction. All three
+were verified against the current node/key sets rather than accepted from the
+review prose alone:
+
+1. `test_route_registered` exists before and after with the exact same node
+   ID. It evolves in place. Therefore `test_trading_day_coverage.py` is
+   `+14/-18`, not `+15/-19`.
+2. The current 25-leaf coverage resource tree and reviewed 44-leaf target have
+   a 12-path intersection. The real resource ledger is `+32/-13`, net `+19`,
+   not `+19/-0`.
+3. The old route suite is not wholly max-relative. Stable route, storage,
+   alias, ordering, and diagnostic properties are carried by named V2
+   successors; only the 18 obsolete node IDs are removed.
+
+The final node/resource targets do not move. The backend comm composition does:
+it is `+68/-37`, net `+31`, rather than `+69/-38`. The exact clearance commit
+is recorded in a following docs-only commit before product edits begin.
 
 ## Locked Implementation Decisions
 
@@ -281,17 +302,20 @@ it.
 | `test_market_coverage_classifier.py` | 18 | 0 | 18 |
 | `test_market_coverage_observations.py` | 10 | 0 | 10 |
 | `test_market_coverage_boundaries.py` | 5 | 0 | 5 |
-| `test_trading_day_coverage.py` | 15 | 19 | 15 |
+| `test_trading_day_coverage.py` | 14 | 18 | 15 |
 | `test_scheduler_planner.py` | 0 | 9 | 0 |
 | `test_data_scheduler.py` | 5 | 10 | 98 |
-| **Total** | **69** | **38** | **+31 net** |
+| **Total** | **68** | **37** | **+31 net** |
 
-Expected backend final collection: `4713 + 69 - 38 = 4744`.
-Expected focused collection: `194 + 69 - 38 = 225`.
+Expected backend final collection: `4713 + 68 - 37 = 4744`.
+Expected focused collection: `194 + 68 - 37 = 225`.
 
-The nineteen old trading-day nodes are replaced, not renamed. The entire file
-asserts the retired max-relative contract. The nine planner nodes disappear
-with their product owner. Exactly ten scheduler nodes disappear:
+The trading-day suite is replaced as a contract, but
+`test_route_registered` evolves in place with its exact ID. Exactly 18 old
+node IDs are removed and 14 new IDs are added. Stable alias, ordering, route,
+storage-availability, sanitized-503, and provider-diagnostic properties are
+carried by named V2 successors; the nine planner nodes disappear with their
+product owner. Exactly ten scheduler nodes disappear:
 
 ```text
 test_price_backfill_uses_planner_scope_no_pg_no_mirror
@@ -342,7 +366,7 @@ in the review resolution keeps its exact ID.
 ## Exact Resource Ledger
 
 Replace the current `settings.dataStorage.coverage` subtree of `25` leaves
-with exactly `44` leaves per locale, net `+19/-0`:
+with exactly `44` leaves per locale: `+32/-13`, net `+19`:
 
 ```text
 base:       title, description, readOnly, lookback, lookbackLabel               5
@@ -360,6 +384,47 @@ drilldown:  partialTitle, partialDetail, unknownTitle, unknownDetail,
                                                                                 --
                                                                                 44
 ```
+
+Exactly 12 paths survive in place:
+
+```text
+title
+description
+readOnly
+lookback
+lookbackLabel
+headings.date
+headings.status
+status.weekend
+status.inProgress
+status.partial
+status.unknown
+drilldown.partialDetail
+```
+
+Exactly 13 paths are removed:
+
+```text
+headings.covered
+headings.maxBars
+headings.missing
+status.completeLike
+status.holiday
+status.missing
+status.thin
+drilldown.interval
+drilldown.missing
+drilldown.missingDetail
+drilldown.partial
+drilldown.providerError
+drilldown.universe
+```
+
+Every other path in the 44-leaf inventory is one of the 32 additions.
+`drilldown.interval -> facts.interval` and
+`drilldown.universe -> facts.universe` are path migrations and therefore each
+count as one removal plus one addition. The four retired status meanings and
+three retired max-relative headings are semantic removals, not renamed keys.
 
 Use labels followed by values instead of English pluralized sentence
 fragments. Representative copy is fixed as follows:
@@ -969,12 +1034,13 @@ Expected collection: `4757`.
 - Modify: `src/api/routes/market_data.py`
 - Replace: `tests/test_trading_day_coverage.py`
 
-**Accounting:** `test_trading_day_coverage.py +15/-19`, boundaries `+5/-0`;
-task net `+20/-19`. Backend full `4757 -> 4758`; focused `238 -> 239`.
+**Accounting:** `test_trading_day_coverage.py +14/-18`, boundaries `+5/-0`;
+task net `+19/-18`. Backend full `4757 -> 4758`; focused `238 -> 239`.
 
 - [ ] **Step 1: Replace the old route suite with fifteen V2 contract tests.**
 
-Remove all nineteen old max-relative nodes and add exactly:
+Evolve `test_route_registered` in place, remove the other 18 old IDs, and add
+exactly these 14 new IDs plus that surviving node:
 
 ```text
 test_service_dedupes_aliases_and_orders_requested_window
@@ -1276,8 +1342,8 @@ frontend task may not mask backend ledger drift.
 - Modify: `apps/arkscope-web/src/i18n/resources.test.ts`
 
 **Accounting:** frontend `+11/-2`; full `95/1063 -> 96/1072`; expanded
-focused `7/109 -> 8/118`. Resources `+19/-0`: Settings `694 -> 713`, total
-`1794 -> 1813`, coverage subtree `25 -> 44` per locale.
+focused `7/109 -> 8/118`. Resources `+32/-13`, net `+19`: Settings
+`694 -> 713`, total `1794 -> 1813`, coverage subtree `25 -> 44` per locale.
 
 - [ ] **Step 1: Add the three compile-time contract tests.**
 
@@ -1445,11 +1511,12 @@ Expected accounting:
 ```text
 base 4713
 head 4744
-comm +69/-38
+comm +68/-37
 ```
 
-The 38 removals must be exactly 19 V1 route nodes, nine planner nodes, and ten
-scheduler nodes. Compare existing environmental failure families by exact
+The 37 removals must be exactly 18 V1 route node IDs, nine planner nodes, and
+ten scheduler nodes. `test_route_registered` must be present at both sides
+with the same ID. Compare existing environmental failure families by exact
 node ID: new failures `0`, disappeared failures `0`. Do not convert baseline
 noise into an allowlist.
 
@@ -1661,13 +1728,13 @@ implementation review.
 
 ## Independent Implementation Reviewer Focus
 
-1. Reproduce backend `+69/-38` and frontend `+11/-2` from virgin archives.
+1. Reproduce backend `+68/-37` and frontend `+11/-2` from virgin archives.
 2. Confirm backend final `4744`, focused `225`; frontend final `96/1072`,
    focused `8/118`.
-3. Verify every removed node is one of the 38 named legacy nodes and every
-   added node matches the ledger.
-4. Verify Settings `713`, total `1813`, coverage subtree `44` per locale, with
-   the existing count node ID preserved.
+3. Verify every removed node is one of the 37 named legacy nodes, every added
+   node matches the ledger, and `test_route_registered` evolves in place.
+4. Verify resource comm `+32/-13`, Settings `713`, total `1813`, and coverage
+   subtree `44` per locale, with the existing count node ID preserved.
 5. Re-solve the exact Python 3.10 dependency set and compare installed
    metadata with requirements.
 6. Compare pinned XNYS against every official full/early-close/closure fixture.
