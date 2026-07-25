@@ -84,11 +84,39 @@ review prose alone:
    alias, ordering, and diagnostic properties are carried by named V2
    successors; only the 18 obsolete node IDs are removed.
 
-The final node/resource targets do not move. The backend comm composition does:
-it is `+68/-37`, net `+31`, rather than `+69/-38`. The exact clearance commit
+The plan-clearance node/resource targets do not move. At that checkpoint the
+backend comm composition is `+68/-37`, net `+31`, rather than `+69/-38`. The exact clearance commit
 containing all reviewed amendments is
 `PLAN_REVIEW_CLEARANCE_COMMIT=f6cbcb6e2343c14cd185e0f7e766ce98e77cc8db`.
 The following docs-only pointer commit changes no authority or product bytes.
+
+## Task 6 Independent Review Resolution
+
+Independent Task 6 review found that the first implementation preserved the
+net collection target but left four unsafe legacy seams: the public schedule
+route still required provider readiness, legacy state recognition was
+best-effort, status projection exposed resumable planner metadata until a new
+run, and continuation clearing preceded terminal audit. Review also identified
+one stale operator instruction and two test IDs whose names asserted the
+opposite of their evolved bodies.
+
+The reviewed correction is binding:
+
+1. `price_backfill` bypasses provider-readiness checks at both the route and
+   scheduler boundaries while retaining the write-permission gate for durable
+   telemetry.
+2. Any durable row that cannot prove the closed V2 reason-code/result shape is
+   `legacy_unproven_gap`; empty, unknown, malformed, and unreadable state fail
+   closed.
+3. Public status projects a fixed safe failure and never exposes legacy plan or
+   continuation content.
+4. Terminal job audit must succeed before legacy continuation state is cleared;
+   audit failure preserves the previous row for retry.
+5. `src/api/routes/schedule.py` is added to the reviewed modify set.
+6. The two misleading historical node IDs are retired and replaced with
+   behavior-accurate IDs. This changes Task 6 from `+5/-19` to `+7/-21`, and
+   the backend comm from `+68/-37` to `+70/-39`, without changing final `4744`
+   or focused `225`.
 
 ## Locked Implementation Decisions
 
@@ -247,6 +275,7 @@ docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md
 requirements.txt
 src/market_data_direct.py
 src/api/routes/market_data.py
+src/api/routes/schedule.py
 src/service/data_scheduler.py
 tests/test_trading_day_coverage.py
 tests/test_data_scheduler.py
@@ -306,18 +335,19 @@ it.
 | `test_market_coverage_boundaries.py` | 5 | 0 | 5 |
 | `test_trading_day_coverage.py` | 14 | 18 | 15 |
 | `test_scheduler_planner.py` | 0 | 9 | 0 |
-| `test_data_scheduler.py` | 5 | 10 | 98 |
-| **Total** | **68** | **37** | **+31 net** |
+| `test_data_scheduler.py` | 7 | 12 | 98 |
+| **Total** | **70** | **39** | **+31 net** |
 
-Expected backend final collection: `4713 + 68 - 37 = 4744`.
-Expected focused collection: `194 + 68 - 37 = 225`.
+Expected backend final collection: `4713 + 70 - 39 = 4744`.
+Expected focused collection: `194 + 70 - 39 = 225`.
 
 The trading-day suite is replaced as a contract, but
 `test_route_registered` evolves in place with its exact ID. Exactly 18 old
 node IDs are removed and 14 new IDs are added. Stable alias, ordering, route,
 storage-availability, sanitized-503, and provider-diagnostic properties are
 carried by named V2 successors; the nine planner nodes disappear with their
-product owner. Exactly ten scheduler nodes disappear:
+product owner. Exactly twelve scheduler nodes disappear: the ten retired
+planner-consumer nodes plus two misleading historical IDs:
 
 ```text
 test_price_backfill_uses_planner_scope_no_pg_no_mirror
@@ -330,9 +360,12 @@ test_v13a_manual_continue_consumes_saved_deferred_not_fresh_plan
 test_v13a_manual_continue_carries_remainder_when_over_budget
 test_v13_no_gaps_is_noop_success
 test_v14_status_snapshot_exposes_durable_state_and_gap_planned
+test_price_backfill_serializes_behind_ibkr_lock
+test_price_backfill_empty_scope_fails_loud
 ```
 
-Exactly five scheduler replacements are added:
+Exactly seven scheduler IDs are added: the five contract replacements plus two
+behavior-accurate successors:
 
 ```text
 test_coverage_derived_price_backfill_is_deliberate_noop
@@ -340,6 +373,8 @@ test_unknown_tickers_and_provider_errors_never_reach_price_executor
 test_legacy_unproven_gap_manual_continuation_is_rejected_without_worker
 test_legacy_unproven_gap_scheduler_continuation_is_rejected_without_worker
 test_status_snapshot_preserves_durable_state_without_planner_metadata
+test_price_backfill_ignores_gateway_lock_but_keeps_source_lock
+test_price_backfill_does_not_resolve_scope_for_deliberate_noop
 ```
 
 ### Frontend
@@ -1202,12 +1237,13 @@ git commit -m "feat: replace trading-day coverage with V2 truth"
 **Files:**
 - Delete: `src/scheduler_planner.py`
 - Delete: `tests/test_scheduler_planner.py`
+- Modify: `src/api/routes/schedule.py`
 - Modify: `src/service/data_scheduler.py`
 - Modify: `tests/test_data_scheduler.py`
 - Verify: `tests/test_market_data_direct.py`
 - Verify: `tests/test_market_coverage_boundaries.py`
 
-**Accounting:** planner `+0/-9`; scheduler `+5/-10`; task net `+5/-19`.
+**Accounting:** planner `+0/-9`; scheduler `+7/-12`; task net `+7/-21`.
 Backend full `4758 -> 4744`; focused `239 -> 225`.
 
 - [ ] **Step 1: Add the five replacement scheduler tests first.**
@@ -1236,10 +1272,14 @@ Expected: five RED nodes because the planner path still exists. A worker call,
 fresh plan, or accidental provider configuration lookup is evidence of the
 legacy path and belongs in the assertion.
 
-- [ ] **Step 3: Remove exactly the ten old scheduler nodes.**
+- [ ] **Step 3: Remove the ten old planner-consumer nodes and rename two
+  contradictory historical IDs.**
 
 Delete only the ten IDs listed in the Exact Test Ledger. Do not rename them to
 make the ledger appear additive. Preserve every unrelated scheduler node.
+Separately retire the two misleading IDs named in the Task 6 review resolution
+and replace them with the two behavior-accurate IDs. This is a reviewed
+`+2/-2` composition change, not an attempt to hide removed coverage.
 
 - [ ] **Step 4: Delete planner owner and tests.**
 
@@ -1316,7 +1356,8 @@ rerun green.
 
 ```bash
 git add -A src/scheduler_planner.py tests/test_scheduler_planner.py \
-  src/service/data_scheduler.py tests/test_data_scheduler.py
+  src/api/routes/schedule.py src/service/data_scheduler.py \
+  tests/test_data_scheduler.py
 git commit -m "refactor: retire unproven coverage planner work"
 git rev-parse HEAD
 ```
@@ -1513,14 +1554,14 @@ Expected accounting:
 ```text
 base 4713
 head 4744
-comm +68/-37
+comm +70/-39
 ```
 
-The 37 removals must be exactly 18 V1 route node IDs, nine planner nodes, and
-ten scheduler nodes. `test_route_registered` must be present at both sides
-with the same ID. Compare existing environmental failure families by exact
-node ID: new failures `0`, disappeared failures `0`. Do not convert baseline
-noise into an allowlist.
+The 39 removals must be exactly 18 V1 route node IDs, nine planner nodes, ten
+planner-consumer scheduler nodes, and the two contradictory scheduler IDs.
+`test_route_registered` must be present at both sides with the same ID. Compare
+existing environmental failure families by exact node ID: new failures `0`,
+disappeared failures `0`. Do not convert baseline noise into an allowlist.
 
 - [ ] **Step 2: Run backend focused and mutation gates.**
 
@@ -1730,7 +1771,7 @@ implementation review.
 
 ## Independent Implementation Reviewer Focus
 
-1. Reproduce backend `+68/-37` and frontend `+11/-2` from virgin archives.
+1. Reproduce backend `+70/-39` and frontend `+11/-2` from virgin archives.
 2. Confirm backend final `4744`, focused `225`; frontend final `96/1072`,
    focused `8/118`.
 3. Verify every removed node is one of the 37 named legacy nodes, every added
@@ -1752,8 +1793,9 @@ implementation review.
 14. Confirm max-relative DTO fields and status IDs are absent, not hidden.
 15. Confirm unknown/provider-error inputs cannot enter planner candidates or
     exclusions through any route.
-16. Confirm legacy continuation rejection is durable, safe, worker-free, and
-    preserves historical audit rows.
+16. Confirm legacy continuation rejection is durable, safe, worker-free,
+    redacted before the first V2 run, bypasses provider readiness, preserves
+    historical audit rows, and clears state only after terminal audit succeeds.
 17. Confirm explicit generic market-data executor behavior and its 63 tests
     remain intact.
 18. Verify calendar-health composition has one owner and fixture review/horizon

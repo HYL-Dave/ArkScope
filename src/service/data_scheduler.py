@@ -193,7 +193,7 @@ _N9_RETIRED_SOURCES = {
         "IV collection will return through the separate IV reboot path"
     ),
     "local_incremental": (
-        "prices PG mirror retired by P0-C; use ibkr_prices/price_backfill direct-local"
+        "prices PG mirror retired by P0-C; use ibkr_prices for provider collection"
     ),
 }
 
@@ -433,6 +433,65 @@ def _pending_continuation(source: str):
         if normalized is not None:
             return normalized
     return None
+
+
+_COVERAGE_TRUTH_RESULT_KEYS = frozenset({
+    "code",
+    "collect",
+    "error",
+    "local_refresh",
+    "reason_code",
+    "source",
+    "status",
+})
+
+
+def _coverage_truth_state_is_current(state: Any) -> bool:
+    if not isinstance(state, dict) or state.get("continuation") is not None:
+        return False
+    result = state.get("last_result")
+    if not isinstance(result, dict):
+        return False
+    if not set(result).issubset(_COVERAGE_TRUTH_RESULT_KEYS):
+        return False
+    if result.get("source") != "price_backfill" or result.get("collect") != {"planned": 0}:
+        return False
+    reason_code = result.get("reason_code")
+    if reason_code == "coverage_truth_read_only":
+        return result.get("status") == "succeeded" and "code" not in result
+    if reason_code == "legacy_unproven_gap":
+        return result.get("status") == "failed" and result.get("code") == reason_code
+    return False
+
+
+def _coverage_truth_requires_legacy_rejection(source: str) -> bool:
+    """Fail closed unless durable state proves it uses the read-only V2 protocol."""
+    try:
+        state = _state_store().get(source)
+    except Exception:  # noqa: BLE001
+        logger.warning("coverage truth state unreadable for %s", source, exc_info=True)
+        return True
+    return state is not None and not _coverage_truth_state_is_current(state)
+
+
+def _coverage_truth_snapshot_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Project legacy planner state without exposing or implying resumable work."""
+    if _coverage_truth_state_is_current(state):
+        return dict(state)
+    return {
+        "last_attempt": state.get("last_attempt"),
+        "last_status": "failed",
+        "last_error": "legacy_unproven_gap",
+        "continuation": None,
+        "last_result": {
+            "source": "price_backfill",
+            "status": "failed",
+            "code": "legacy_unproven_gap",
+            "reason_code": "legacy_unproven_gap",
+            "collect": {"planned": 0},
+        },
+        "updated_at": state.get("updated_at"),
+    }
 
 
 def _has_pending_continuation(source: str) -> bool:
@@ -929,12 +988,22 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     started = datetime.now(timezone.utc)
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started   # in-mem: interval backoff (incl. for attempted skips)
+    # Classify legacy coverage state and capture news continuations BEFORE record_attempt
+    # changes last_status to running. Coverage state that cannot prove the V2 protocol is
+    # rejected fail-closed; its durable row is not changed until terminal audit succeeds.
+    coverage_legacy_state = (
+        _coverage_truth_requires_legacy_rejection(source)
+        if d.coverage_repair_disabled
+        else False
+    )
     # Capture any pending continuation NOW — before record_attempt sets last_status='running'
     # (which would mask the durable 'partial'). Used by attended skip-gates (scheduler) and
     # manual-continue branches (api/cli consume saved deferred work).
-    pending_cont = _pending_continuation(source) if (
-        d.coverage_repair_disabled or d.news_direct_source is not None
-    ) else None
+    pending_cont = (
+        _pending_continuation(source)
+        if d.news_direct_source is not None
+        else None
+    )
     news_route = None
     try:
         if d.news_direct_source is not None:
@@ -969,10 +1038,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         # v1.2 (v1.2a fix): durable run-start recorded ONLY after all skip-only gates pass
         # (per-source + IBKR locks). A lock-busy skip returns above WITHOUT marking durable
         # 'running' — so a skip never overwrites the prior durable outcome (last_status/error).
-        try:
-            _state_store().record_attempt(source, started)
-        except Exception:  # noqa: BLE001 — local state must never break collection
-            logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
+        if not coverage_legacy_state:
+            try:
+                _state_store().record_attempt(source, started)
+            except Exception:  # noqa: BLE001 — local state must never break collection
+                logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
 
         # telemetry: running → terminal, visible in /jobs + provider health
         store = None
@@ -998,7 +1068,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             local_news_writer = False
             if d.coverage_repair_disabled:
                 result["collect"] = {"planned": 0}
-                if pending_cont is not None:
+                if coverage_legacy_state:
                     result.update({
                         "code": "legacy_unproven_gap",
                         "reason_code": "legacy_unproven_gap",
@@ -1218,18 +1288,41 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             result["status"] = "succeeded" if ok else "failed"
             if not ok and preserve_continuation_on_failure is not None:
                 continuation = preserve_continuation_on_failure
-        # v1.2: durable LOCAL outcome (recoverable + visible-failure), best-effort. This is the
-        # REAL run outcome (skips return earlier via _record_result and are not persisted here).
-        # error=None on success clears any stale last_error; continuation=None clears a prior
-        # partial's deferred scope. PG job_runs (below) is unchanged — `partial` lives ONLY in
-        # this local store; PG gets succeeded/failed (partial maps to succeeded — it completed
-        # its bounded batch without error), never `partial` in job_runs' enum.
-        try:
-            _state_store().record_outcome(source, status=result["status"], error=error,
-                                          result=result, continuation=continuation)
-        except Exception:  # noqa: BLE001 — local state must never break collection
-            logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
-        if store is not None and run_id is not None:
+        # Durable LOCAL outcome (recoverable + visible-failure), best-effort. For a rejected
+        # legacy coverage continuation, terminal job audit must succeed before this store is
+        # changed; otherwise the only durable evidence of pending legacy work would be lost.
+        # Other sources retain the established local-state-then-telemetry order. `partial`
+        # remains local-only and maps to succeeded in job telemetry.
+        telemetry_finished = False
+        if coverage_legacy_state and store is not None and run_id is not None:
+            try:
+                telemetry_finished = bool(store.finish_run(
+                    run_id,
+                    status="succeeded" if ok else "failed",
+                    message=None if ok else error,
+                    error=error,
+                    result=result,
+                ))
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"scheduler telemetry finish failed: {e}")
+        if not coverage_legacy_state or telemetry_finished:
+            try:
+                if coverage_legacy_state:
+                    _state_store().record_attempt(source, started)
+                _state_store().record_outcome(
+                    source,
+                    status=result["status"],
+                    error=error,
+                    result=result,
+                    continuation=continuation,
+                )
+            except Exception:  # noqa: BLE001 — local state must never break collection
+                logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
+        elif coverage_legacy_state:
+            logger.warning(
+                "preserving legacy coverage state because terminal audit was not recorded"
+            )
+        if not coverage_legacy_state and store is not None and run_id is not None:
             try:
                 store.finish_run(run_id, status="succeeded" if ok else "failed",
                                  message=None if ok else error, error=error, result=result)
@@ -1469,6 +1562,8 @@ def status_snapshot() -> Dict[str, Any]:
         source_running = _SOURCE_LOCKS[source].locked()
         durable_state = durable.get(source)
         if durable_state is not None:
+            if d.coverage_repair_disabled:
+                durable_state = _coverage_truth_snapshot_state(durable_state)
             durable_state = _annotate_durable_state_for_snapshot(
                 durable_state,
                 source_running=source_running,

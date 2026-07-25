@@ -71,13 +71,12 @@ def run_now(source: str):
     """
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
-    from src.provider_config_runtime import require_provider_config_ready
+    if not SOURCES[source].coverage_repair_disabled:
+        from src.provider_config_runtime import require_provider_config_ready
 
-    require_provider_config_ready("schedule_run_now")
-    # EVERY source writes a database when run — provider sources end in PG sync +
-    # local mirror refresh, and local_incremental writes market_data.db directly —
-    # so the choke-point applies unconditionally (was provider-fetch-only, which
-    # let local_incremental bypass require_db_write).
+        require_provider_config_ready("schedule_run_now")
+    # EVERY source writes durable run telemetry when run. Provider sources also
+    # write their owned data store, so the choke-point applies unconditionally.
     require_db_write("schedule_run_now", {"source": source})
     if _SOURCE_LOCKS[source].locked():
         return {"source": source, "status": "skipped", "reason": "already running"}

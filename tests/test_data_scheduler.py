@@ -1966,7 +1966,7 @@ def test_last_result_surfaces_skips_in_snapshot(tmp_path):
 
 # --- price_backfill: direct local writer source (2b·3) -----------------------------
 
-def test_price_backfill_source_registered():
+def test_price_backfill_source_registered(monkeypatch):
     d = ds.SOURCES["price_backfill"]
     assert d.coverage_repair_disabled is True
     assert d.adapter is None
@@ -1977,6 +1977,37 @@ def test_price_backfill_source_registered():
     assert d.writes_market_db is False
     assert "price_backfill" not in ds._SOURCE_PROVIDER_CONFIG
     assert ds.source_config("price_backfill")["enabled"] is False  # default-off
+
+    from src.api.routes import schedule as schedule_route
+
+    dispatched = []
+
+    class _Thread:
+        def __init__(self, *, target, args, **kwargs):
+            dispatched.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(
+        "src.provider_config_runtime.require_provider_config_ready",
+        lambda action: (_ for _ in ()).throw(
+            AssertionError("read-only coverage source must bypass provider readiness")
+        ),
+    )
+    monkeypatch.setattr(schedule_route.threading, "Thread", _Thread)
+    monkeypatch.setattr(schedule_route, "require_db_write", lambda *args, **kwargs: None)
+
+    response = schedule_route.run_now("price_backfill")
+
+    assert response["status"] == "started"
+    assert dispatched == [
+        (
+            schedule_route.run_source,
+            ("price_backfill", "api"),
+            {"name": "runnow-price_backfill", "daemon": True},
+        )
+    ]
 
 
 def _install_coverage_repair_spies(monkeypatch):
@@ -2043,7 +2074,13 @@ def _seed_legacy_price_backfill_audit(monkeypatch, profile_db):
     return telemetry, historical_id, historical_before
 
 
-def _seed_legacy_price_backfill_continuation():
+def _seed_legacy_price_backfill_continuation(continuation=None):
+    if continuation is None:
+        continuation = {
+            "deferred": ["NVDA", "TSLA"],
+            "lookback_days": 7,
+            "candidate_count": 2,
+        }
     ds._state_store().record_attempt(
         "price_backfill", datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc)
     )
@@ -2052,11 +2089,7 @@ def _seed_legacy_price_backfill_continuation():
         status="partial",
         error=None,
         result={"status": "partial", "contract": "legacy"},
-        continuation={
-            "deferred": ["NVDA", "TSLA"],
-            "lookback_days": 7,
-            "candidate_count": 2,
-        },
+        continuation=continuation,
     )
 
 
@@ -2104,6 +2137,27 @@ def test_unknown_tickers_and_provider_errors_never_reach_price_executor(
     assert "excluded" not in result
     assert all(value == 0 for value in calls.values())
 
+    state_writes = []
+
+    class _UnreadableCoverageState:
+        def get(self, source):
+            raise sqlite3.DatabaseError("unreadable legacy state")
+
+        def record_attempt(self, source, when):
+            state_writes.append(("attempt", source))
+
+        def record_outcome(self, source, **kwargs):
+            state_writes.append(("outcome", source, kwargs))
+
+    monkeypatch.setattr(ds, "_SCHED_STATE", _UnreadableCoverageState())
+
+    unreadable = ds.run_source("price_backfill", trigger_source="api")
+
+    assert unreadable["status"] == "failed"
+    assert unreadable["reason_code"] == "legacy_unproven_gap"
+    assert [entry[0] for entry in state_writes] == ["attempt", "outcome"]
+    assert all(value == 0 for value in calls.values())
+
 
 def test_legacy_unproven_gap_manual_continuation_is_rejected_without_worker(
     monkeypatch, tmp_path
@@ -2112,7 +2166,7 @@ def test_legacy_unproven_gap_manual_continuation_is_rejected_without_worker(
     telemetry, historical_id, historical_before = _seed_legacy_price_backfill_audit(
         monkeypatch, tmp_path / "profile_state.db"
     )
-    _seed_legacy_price_backfill_continuation()
+    _seed_legacy_price_backfill_continuation({"deferred": []})
 
     result = ds.run_source("price_backfill", trigger_source="api")
 
@@ -2141,7 +2195,8 @@ def test_legacy_unproven_gap_scheduler_continuation_is_rejected_without_worker(
     telemetry, historical_id, historical_before = _seed_legacy_price_backfill_audit(
         monkeypatch, tmp_path / "profile_state.db"
     )
-    _seed_legacy_price_backfill_continuation()
+    _seed_legacy_price_backfill_continuation({"unexpected_scope": ["NVDA"]})
+    monkeypatch.setattr(telemetry, "finish_run", lambda run_id, **kwargs: False)
 
     result = ds.run_source("price_backfill", trigger_source="scheduler")
 
@@ -2150,34 +2205,38 @@ def test_legacy_unproven_gap_scheduler_continuation_is_rejected_without_worker(
     assert result["collect"] == {"planned": 0}
     assert all(value == 0 for value in calls.values())
     durable = ds._state_store().get("price_backfill")
-    assert durable["last_status"] == "failed"
-    assert durable["continuation"] is None
-    assert durable["last_result"]["reason_code"] == "legacy_unproven_gap"
+    assert durable["last_status"] == "partial"
+    assert durable["continuation"] == {"unexpected_scope": ["NVDA"]}
+    assert durable["last_result"] == {"status": "partial", "contract": "legacy"}
     assert telemetry.get_runs_by_ids(
         job_name=ds.job_name("price_backfill"), run_ids=[historical_id]
     )[0] == historical_before
     audit = telemetry.list_runs(job_name=ds.job_name("price_backfill"))
     assert len(audit) == 2
     assert audit[0]["id"] != historical_id
-    assert audit[0]["status"] == "failed"
-    assert audit[0]["result"]["reason_code"] == "legacy_unproven_gap"
+    assert audit[0]["status"] == "running"
+    assert audit[0]["result"] is None
 
 
-def test_status_snapshot_preserves_durable_state_without_planner_metadata(monkeypatch):
-    calls = _install_coverage_repair_spies(monkeypatch)
-    result = ds.run_source("price_backfill", trigger_source="api")
+def test_status_snapshot_preserves_durable_state_without_planner_metadata():
+    _seed_legacy_price_backfill_continuation()
 
     snapshot = ds.status_snapshot()["price_backfill"]
 
-    assert result["status"] == "succeeded"
+    assert snapshot["durable_state"]["last_status"] == "failed"
+    assert snapshot["durable_state"]["last_error"] == "legacy_unproven_gap"
     assert snapshot["durable_state"]["last_result"]["reason_code"] == (
-        "coverage_truth_read_only"
+        "legacy_unproven_gap"
     )
     assert snapshot["durable_state"]["continuation"] is None
+    serialized = json.dumps(snapshot["durable_state"], sort_keys=True)
+    assert "NVDA" not in serialized
+    assert "lookback_days" not in serialized
+    assert "candidate_count" not in serialized
+    assert "contract" not in serialized
     assert snapshot["provider_fetch"] is False
     assert "gap_planned" not in snapshot
     assert "coverage_repair_disabled" not in snapshot
-    assert all(value == 0 for value in calls.values())
 
 
 def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
@@ -2269,9 +2328,7 @@ def test_local_incremental_retirement_does_not_call_local_refresh(monkeypatch):
     assert "prices PG mirror retired by P0-C" in res["error"]
 
 
-def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
-    # Historical node ID evolves in place: the disabled source no longer waits
-    # behind the Gateway lock, while its own source lock still blocks re-entry.
+def test_price_backfill_ignores_gateway_lock_but_keeps_source_lock(monkeypatch):
     monkeypatch.setattr(
         ds,
         "_run_sanitized_prices_worker_subprocess",
@@ -2300,9 +2357,7 @@ def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
         ds._SOURCE_LOCKS["price_backfill"].release()
 
 
-def test_price_backfill_empty_scope_fails_loud(monkeypatch):
-    # Historical node ID evolves in place: Coverage v2 cannot prove a gap, so
-    # even an empty scope is an honest no-op and must not consult the universe.
+def test_price_backfill_does_not_resolve_scope_for_deliberate_noop(monkeypatch):
     monkeypatch.setattr(
         ds,
         "_run_sanitized_prices_worker_subprocess",
