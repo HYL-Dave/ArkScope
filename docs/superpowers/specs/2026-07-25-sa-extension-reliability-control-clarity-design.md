@@ -41,6 +41,63 @@ cannot become a durable healthy anchor until the row lands. Repair remains
 stricter: durable audit creation is a precondition to start and terminal audit
 finalization is part of repair completion.
 
+## Post-Merge Contrast Deviation (2026-07-25)
+
+The merged popup passed its original geometry, clipping, keyboard, label, and
+description gates, but user inspection found that the normal action labels
+were difficult to read. Browser computed-style evidence proved a real cascade
+defect: five legacy ID selectors still supplied saturated action backgrounds,
+while the newer `.action-button` class supplied dark-blue text. The resulting
+text contrast ranges from `1.12:1` to `2.03:1`.
+
+Expanding every disclosure and exposing conditional controls found the full
+bounded repair set:
+
+- all five normal action buttons fail text contrast;
+- both auto-sync helper lines are `4.11:1`, and the resolved-window hint is
+  `2.85:1`;
+- the partial status is `3.46:1`;
+- `Review recovery scope` is the only recovery control without a matching
+  button variant and renders as white text on the browser's light button face;
+- `Fetch and review` is `3.08:1`; and
+- after the normal actions return to white backgrounds, their current
+  `#b9c6d4` border would provide only `1.74:1` non-text contrast.
+
+One external-review claim is explicitly rejected after full selector and DOM
+binding verification: `incidentRecoveryBtn`, `resumeRecoveryBtn`, and
+`cancelRecoveryBtn` are descendants of `.recovery-actions`, and
+`retryRecordedFailuresBtn` is named in the same rule. Those four controls
+already render white on `#315f7d` at `6.85:1`. Only
+`reviewRecoveryScopeBtn` lacks the variant.
+
+The user approved one bounded post-merge repair before LIVE closeout:
+
+1. delete the five obsolete ID-specific action background and hover rules;
+2. make the normal action owner white with `#174b72` text and a control border
+   of at least `3:1` against white (`#7b93ab` is the reviewed value);
+3. give `Review recovery scope` a matching contrast-safe outline treatment;
+4. keep filled recovery and reconciliation actions explicit, and make the
+   manual action use the existing neutral filled-action treatment rather than
+   warning orange;
+5. render helper text with `#666`, partial status with `#b45309`, and disabled
+   labels with a dark foreground that remains readable on `#bdbdbd`;
+6. add one computed-style regression node that enumerates every text-bearing
+   control, opens `<details>`, exposes conditional controls, drives all status
+   variants, and checks normal text `>=4.5:1`, large text `>=3:1`, and required
+   control boundaries `>=3:1`;
+7. prove that node RED by removing each load-bearing repair class in a
+   disposable copy, then run real Chrome and Firefox popup visual gates; and
+8. add one operator note inside `What these actions do`: scans may activate
+   and scroll Seeking Alpha tabs, so switching tabs in the same browser during
+   a run is unsupported and may reduce capture completeness.
+
+This deviation changes no scraper, capture budget, auto-sync cadence, native
+protocol, database, or web-app behavior. `#b45309` on `#fff3e0` is accepted at
+`4.58:1`; any future change to either color must rerun the computed-style gate.
+The gate gap itself is part of closeout evidence: the original visual matrix
+checked geometry and visible labels but did not expand hidden states or audit
+contrast.
+
 ## 1. Purpose and Authority
 
 The Firefox extension build loaded on 2026-07-19 omitted

@@ -115,6 +115,31 @@ two advisories. All three were independently checked before clearance:
    overrides; `DataAccessLayer` consumes them and implements the parked-row
    distinction. The exact symbols and locations are recorded below.
 
+## Post-Merge Contrast-Repair Clearance
+
+After the reviewed implementation merged, user inspection exposed a popup
+contrast regression that the original browser gate did not measure. The
+design authority now contains the approved computed-style evidence and exact
+repair boundary. This is a post-merge reviewed deviation, not a reopening of
+capture behavior.
+
+Grounded baseline at `4bf7a503` is:
+
+- `tests/test_sa_extension_popup.py` has `12` nodes;
+- `tests/test_sa_extension_packaging.py` has `10` nodes;
+- the focused pair is `22 passed`;
+- backend collection remains `4710` and frontend remains `95 files / 1063`;
+- the worktree is clean and both `master` and
+  `codex/sa-extension-reliability` point at `4bf7a503` before the deviation.
+
+The deviation adds exactly one popup contrast node and removes none. Expected
+accounting is backend `+1/-0` to `4711`; the focused pair becomes `23`, while
+frontend node accounting remains unchanged. The product file set is limited
+to `popup.html` and `popup_action_catalog.js`; the fixture runner and popup
+pytest owner may change only to implement the generic computed-style gate.
+All scraper, protocol, native-host, backend, web-app, package, and database
+owners remain byte-identical.
+
 ## Grounded Baseline
 
 The following values were reproduced on clean `c49a2417` on 2026-07-25.
@@ -1727,6 +1752,90 @@ git commit -m "docs: record SA extension reliability evidence"
 
 Do not merge, install into production browsers, write production telemetry,
 or execute historical repair. Report the review-ready tip and exact commands.
+
+---
+
+## Task 10: Post-Merge Popup Contrast Repair
+
+**Files:**
+- Modify `tests/js/run_sa_extension_popup_fixture.mjs`
+- Modify `tests/test_sa_extension_popup.py`
+- Modify `extensions/sa_alpha_picks/popup.html`
+- Modify `extensions/sa_alpha_picks/popup_action_catalog.js`
+- Modify this plan and the design/evidence/priority/roadmap closeout records
+
+- [ ] **Step 1: RED - expose browser-computed contrast evidence**
+
+Add one `contrast_audit` fixture scenario. It must open every `<details>`,
+remove `hidden` only inside the disposable fixture DOM, provide text for the
+resolved auto-sync hint, render the recovery confirmation and reconciliation
+buttons, and return computed foreground/background/border/font properties for
+every text-bearing button plus every non-empty visible text node. Transparent
+backgrounds resolve through ancestors to the body background.
+
+The Python node computes WCAG relative luminance from those returned RGB
+values. It requires ordinary text `>=4.5`, large text `>=3.0`, and any button
+whose fill does not distinguish it from its surrounding surface to have a
+boundary `>=3.0`. Disabled buttons are reported separately and must retain a
+readable label even though WCAG exempts inactive controls.
+
+- [ ] **Step 2: Verify RED for the grounded failures**
+
+Run:
+
+```bash
+pytest -q tests/test_sa_extension_popup.py::test_popup_all_states_use_contrast_safe_text_and_control_boundaries
+```
+
+Expected: FAIL listing the five normal actions, two auto-sync helper lines,
+resolved-window hint, partial status, `reviewRecoveryScopeBtn`, `manualBtn`,
+and the normal action boundary. The three recovery descendants and Retry must
+not appear in the failure list.
+
+- [ ] **Step 3: GREEN - repair the single CSS owner**
+
+In `popup.html`:
+
+- delete the five ID-specific normal-action background/hover rules;
+- use `#174b72` on `#fff` with `#7b93ab` border for `.action-button` and the
+  outline review control;
+- use `#666` for helper copy;
+- use `#b45309` for partial status on `#fff3e0`;
+- use `#315f7d` with white text for the manual action and existing filled
+  recovery actions;
+- set disabled text to a dark foreground on `#bdbdbd`; and
+- keep every filled reconciliation variant's white foreground explicit.
+
+In `popup_action_catalog.js`/`popup.html`, add exactly one shared disclosure
+note stating that scans may activate and scroll Seeking Alpha tabs and that
+switching tabs in the same browser during a run is unsupported.
+
+- [ ] **Step 4: Verify GREEN and mutation sensitivity**
+
+Run the new node and the focused pair. In disposable copies, independently
+restore one legacy ID background, remove the review-control variant, restore
+the orange manual background, and restore each low-contrast helper/partial
+value. Every mutation must make the contrast node RED for the expected owner.
+
+Expected focused result: `23 passed` (`+1/-0`).
+
+- [ ] **Step 5: Run Chrome and Firefox visual gates**
+
+Load Chrome from source and Firefox from a fresh deterministic artifact. Open
+all disclosures and drive conditional controls visible. Verify computed
+contrast, keyboard focus, descriptions, no clipping, five normal actions, and
+the new shared tab-activation warning. Confirm both browsers render the
+outline boundary and all filled actions clearly.
+
+- [ ] **Step 6: Close out only after installed-browser proof**
+
+Record the contrast gate gap, historical repair result, Firefox-only
+auto-sync operating choice, and P2.6 Part 2 boundary. The operating choice is
+not a browser capability claim: Firefox is the single auto-sync owner because
+scrolling captures activate a working tab, isolating automation from daily
+Chrome use and avoiding duplicate schedules. Chrome remains a manual fallback.
+An app-owned collector remains unadopted and requires its own decision/spec.
+Only then mark design, plan, evidence, roadmap, and priority map LIVE COMPLETE.
 
 ---
 
