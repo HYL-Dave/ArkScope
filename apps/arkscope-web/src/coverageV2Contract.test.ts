@@ -12,6 +12,7 @@ import type {
   MarketScope,
   ObservationHealthReason,
   ObservationHealthStatus,
+  SessionKind,
   TradingDayCoverage,
   TradingDayRow,
 } from "./api";
@@ -49,6 +50,7 @@ const coverageDayReasons = [
   "no_observations",
 ] as const satisfies readonly CoverageDayReason[];
 const closureReasonCodes = ["weekend", "market_closed"] as const satisfies readonly ClosureReasonCode[];
+const sessionKinds = ["regular", "early_close"] as const satisfies readonly SessionKind[];
 
 const exactCatalogs: [
   Equal<(typeof marketScopes)[number], MarketScope>,
@@ -60,7 +62,8 @@ const exactCatalogs: [
   Equal<(typeof coverageDayStatuses)[number], CoverageDayStatus>,
   Equal<(typeof coverageDayReasons)[number], CoverageDayReason>,
   Equal<(typeof closureReasonCodes)[number], ClosureReasonCode>,
-] = [true, true, true, true, true, true, true, true, true];
+  Equal<(typeof sessionKinds)[number], SessionKind>,
+] = [true, true, true, true, true, true, true, true, true, true];
 
 const v2Fixture = {
   version: 2,
@@ -103,10 +106,22 @@ const retiredDayFixture = {
   missing_tickers: ["AAPL"],
 } satisfies TradingDayRow;
 
+const retiredStatusFixture = {
+  ...v2Fixture.days[0],
+  // @ts-expect-error Coverage v1 status must not return to the DTO.
+  coverage_status: "complete_like",
+} satisfies TradingDayRow;
+
+const retiredMaxRelativeFixture = {
+  ...v2Fixture.days[0],
+  // @ts-expect-error Coverage v1 max-relative field must not return to the DTO.
+  max_observed_bar_count: 26,
+} satisfies TradingDayRow;
+
 describe("Coverage v2 contract", () => {
   it("exports the exact closed Coverage v2 enum catalogs", () => {
     const source = readFileSync(resolve(import.meta.dirname, "./api.ts"), "utf8");
-    expect(exactCatalogs).toEqual([true, true, true, true, true, true, true, true, true]);
+    expect(exactCatalogs).toEqual([true, true, true, true, true, true, true, true, true, true]);
     expect(source).toContain("export type MarketScope = \"us_listed_equity_proxy\"");
     expect(source).toContain("export type CoverageDayStatus =");
     expect(source).toContain("export type ObservationHealthReason =");
@@ -120,6 +135,8 @@ describe("Coverage v2 contract", () => {
     );
     expect(v2Fixture.version).toBe(2);
     expect(retiredDayFixture.missing_tickers).toEqual(["AAPL"]);
+    expect(retiredStatusFixture.coverage_status).toBe("complete_like");
+    expect(retiredMaxRelativeFixture.max_observed_bar_count).toBe(26);
     expect(coverageSource).toContain("version: 2");
     expect(coverageSource).not.toMatch(/missing_tickers|max_observed_bar_count|complete_like/);
   });

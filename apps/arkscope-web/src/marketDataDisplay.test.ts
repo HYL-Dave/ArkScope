@@ -27,8 +27,6 @@ function settingsT(locale: Locale) {
 }
 
 const zhT = settingsT("zh-Hant");
-const coverageStatusLabel = (row: Parameters<typeof localizedCoverageStatusLabel>[0]) =>
-  localizedCoverageStatusLabel(row, zhT);
 
 function displayFunction<T extends (...args: never[]) => unknown>(name: string): T {
   const value = (marketDataDisplay as unknown as Record<string, unknown>)[name];
@@ -205,6 +203,13 @@ describe("coverageStatusLabel", () => {
 
   it("maps every Coverage v2 day status in both locales and reserves positive tone for complete", () => {
     const cases = [
+      {
+        status: "non_trading",
+        closureReason: "weekend",
+        zh: "週末",
+        en: "Weekend",
+        tone: "muted",
+      },
       { status: "in_progress", zh: "進行中", en: "In progress", tone: "muted" },
       { status: "complete", zh: "完整", en: "Complete", tone: "ok" },
       { status: "partial", zh: "部分", en: "Partial", tone: "warn" },
@@ -217,10 +222,14 @@ describe("coverageStatusLabel", () => {
       { status: "unknown", zh: "未知", en: "Unknown", tone: "muted" },
     ];
     for (const item of cases) {
-      expect(localizedCoverageStatusLabel(row({ coverage_status: item.status }) as never, zhT))
+      const coverageRow = row({
+        coverage_status: item.status,
+        closure_reason_code: item.closureReason ?? null,
+      });
+      expect(localizedCoverageStatusLabel(coverageRow as never, zhT))
         .toEqual({ label: item.zh, tone: item.tone });
       expect(localizedCoverageStatusLabel(
-        row({ coverage_status: item.status }) as never,
+        coverageRow as never,
         settingsT("en"),
       )).toEqual({ label: item.en, tone: item.tone });
     }
@@ -229,14 +238,20 @@ describe("coverageStatusLabel", () => {
   });
 
   it("maps non-trading closure reasons without backend prose", () => {
-    expect(coverageStatusLabel(row({
-      coverage_status: "non_trading",
-      closure_reason_code: "weekend",
-    }) as never)).toEqual({ label: "週末", tone: "muted" });
-    expect(localizedCoverageStatusLabel(row({
-      coverage_status: "non_trading",
-      closure_reason_code: "market_closed",
-    }) as never, settingsT("en"))).toEqual({ label: "Market closed", tone: "muted" });
+    const cases = [
+      { reason: "weekend", zh: "週末", en: "Weekend" },
+      { reason: "market_closed", zh: "休市", en: "Market closed" },
+    ];
+    for (const item of cases) {
+      const coverageRow = row({
+        coverage_status: "non_trading",
+        closure_reason_code: item.reason,
+      });
+      expect(localizedCoverageStatusLabel(coverageRow as never, zhT))
+        .toEqual({ label: item.zh, tone: "muted" });
+      expect(localizedCoverageStatusLabel(coverageRow as never, settingsT("en")))
+        .toEqual({ label: item.en, tone: "muted" });
+    }
     expect(JSON.stringify(row({ closure_reason_code: "market_closed" })))
       .not.toContain("Juneteenth");
   });
