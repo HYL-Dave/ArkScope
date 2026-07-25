@@ -1,6 +1,6 @@
 # ArkScope SA Extension Reliability and Control-Clarity Design
 
-> **Status: POST-MERGE CONTRAST REPAIR REVIEW GREEN - MERGE APPROVED**
+> **Status: LIVE COMPLETE - 2026-07-25**
 >
 > Written against clean `master` at `38178f65` on 2026-07-25. This document
 > is the design authority for the bounded Seeking Alpha browser-extension
@@ -8,6 +8,9 @@
 > implementation is authorized only on the isolated branch after the separate
 > RED-first implementation plan received independent GREEN. The plan is
 > `docs/superpowers/plans/2026-07-25-sa-extension-reliability-control-clarity.md`.
+> Implementation, audited historical repair, the reviewed popup-contrast
+> deviation, merged-tree verification, and installed Chrome/Firefox readback
+> are complete through merged tip `2ef8bb69`.
 
 ## Review Resolution (2026-07-25)
 
@@ -1158,44 +1161,44 @@ Stop and amend this design or plan if:
 
 ## 15. Acceptance Checklist
 
-- [ ] A fresh Firefox build cannot omit `article_identity.js` or any other
+- [x] A fresh Firefox build cannot omit `article_identity.js` or any other
       manifest/popup/injection dependency.
-- [ ] Failed build leaves the previous known-good build intact.
-- [ ] Structured outcomes and reason codes are closed, validated, and
+- [x] Failed build leaves the previous known-good build intact.
+- [x] Structured outcomes and reason codes are closed, validated, and
       fixture-parity tested.
-- [ ] `detail_failed > 0` cannot coexist with persisted `succeeded`.
-- [ ] Alpha Picks nested failure counts also cannot hide behind success.
-- [ ] Paywall/403/login/modal/timeout/parser/soft-404 remain retryable, not
+- [x] `detail_failed > 0` cannot coexist with persisted `succeeded`.
+- [x] Alpha Picks nested failure counts also cannot hide behind success.
+- [x] Paywall/403/login/modal/timeout/parser/soft-404 remain retryable, not
       source-unavailable.
-- [ ] Aggregate status is derived only from phase/item truth.
-- [ ] Last healthy means latest real derived-complete sync, never generic
+- [x] Aggregate status is derived only from phase/item truth.
+- [x] Last healthy means latest real derived-complete sync, never generic
       `succeeded` or `skipped`.
-- [ ] Routine Catch Up remains visibly and mechanically 24h-bounded.
-- [ ] Recorded-ID retry has no age cutoff.
-- [ ] Incident recovery displays the actual interval and caps it at 168 hours.
-- [ ] Known missing details and rediscovered metadata are separate result axes.
-- [ ] Zero recorded IDs start no retry; zero known IDs do not hide a real
+- [x] Routine Catch Up remains visibly and mechanically 24h-bounded.
+- [x] Recorded-ID retry has no age cutoff.
+- [x] Incident recovery displays the actual interval and caps it at 168 hours.
+- [x] Known missing details and rediscovered metadata are separate result axes.
+- [x] Zero recorded IDs start no retry; zero known IDs do not hide a real
       metadata-discovery interval.
-- [ ] Rediscovery never claims total interval completeness.
-- [ ] Repair manifests are immutable, hashed, resumable, and terminally
+- [x] Rediscovery never claims total interval completeness.
+- [x] Repair manifests are immutable, hashed, resumable, and terminally
       audited in `job_runs`.
-- [ ] Any unresolved item prevents complete status.
-- [ ] Routine telemetry failure is visible and replayed idempotently.
-- [ ] Repair does not start without durable audit persistence.
-- [ ] Popup has five normal controls grouped 3+2 with the approved labels.
-- [ ] Every normal control has one accessible description owner and one
+- [x] Any unresolved item prevents complete status.
+- [x] Routine telemetry failure is visible and replayed idempotently.
+- [x] Repair does not start without durable audit persistence.
+- [x] Popup has five normal controls grouped 3+2 with the approved labels.
+- [x] Every normal control has one accessible description owner and one
       explicit non-guarantee.
-- [ ] Contextual Retry exists only for real recorded failures.
-- [ ] Advanced incident recovery is normally collapsed and automatically
+- [x] Contextual Retry exists only for real recorded failures.
+- [x] Advanced incident recovery is normally collapsed and automatically
       surfaced when relevant.
-- [ ] No arbitrary range picker or sixth permanent recovery button ships.
-- [ ] No supported workflow requires F12; emergency wrappers use the same
+- [x] No arbitrary range picker or sixth permanent recovery button ships.
+- [x] No supported workflow requires F12; emergency wrappers use the same
       audited command.
-- [ ] Web health renders stable structured state through bilingual resources.
-- [ ] Popup remains explicitly English with no second locale authority.
-- [ ] Fresh incident target N/hash is separately approved before production
+- [x] Web health renders stable structured state through bilingual resources.
+- [x] Popup remains explicitly English with no second locale authority.
+- [x] Fresh incident target N/hash is separately approved before production
       repair.
-- [ ] Production repair produces four-state per-item evidence, integrity/FK
+- [x] Production repair produces four-state per-item evidence, integrity/FK
       checks, and idempotent replay proof without committing licensed content.
-- [ ] Calibration refusal, `/sa/feed` semantics, Settings sanitizer, Coverage
+- [x] Calibration refusal, `/sa/feed` semantics, Settings sanitizer, Coverage
       v2, and other standing backlogs remain outside this unit.

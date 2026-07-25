@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: POST-MERGE CONTRAST REPAIR REVIEW GREEN - MERGE APPROVED**
+> **Status: LIVE COMPLETE - 2026-07-25**
 >
 > The design passed independent review and its required disclosure amendment
 > plus all three advisories are incorporated through `9da1a9c9`. A later
@@ -19,9 +19,10 @@
 > below with no product or test-accounting change. The docs-only commit that
 > contains this resolution is resolved with `git rev-parse HEAD` as
 > `PLAN_REVIEW_CLEARANCE_COMMIT=7d4f11164861aa0a50cc7771fef7388577f4da0b`.
-> The isolated implementation worktree records that authority below. Merge,
-> extension installation, and production repair remain separately
-> unauthorized.
+> The isolated implementation worktree recorded that authority below. The
+> implementation, separately approved production repair, reviewed contrast
+> deviation, merged-tree verification, installed-browser readback, and safe
+> worktree/branch cleanup are complete through merged tip `2ef8bb69`.
 
 **Goal:** Make the Seeking Alpha browser extension impossible to package with
 missing runtime dependencies, make partial capture failures durably visible,
@@ -1827,7 +1828,7 @@ contrast, keyboard focus, descriptions, no clipping, five normal actions, and
 the new shared tab-activation warning. Confirm both browsers render the
 outline boundary and all filled actions clearly.
 
-- [ ] **Step 6: Close out only after installed-browser proof**
+- [x] **Step 6: Close out only after installed-browser proof**
 
 Record the contrast gate gap, historical repair result, Firefox-only
 auto-sync operating choice, and P2.6 Part 2 boundary. The operating choice is
@@ -1836,6 +1837,14 @@ scrolling captures activate a working tab, isolating automation from daily
 Chrome use and avoiding duplicate schedules. Chrome remains a manual fallback.
 An app-owned collector remains unadopted and requires its own decision/spec.
 Only then mark design, plan, evidence, roadmap, and priority map LIVE COMPLETE.
+
+Closeout proof: Firefox auto-sync was disabled before deployment; the merged
+installer atomically rebuilt a 15-file Firefox artifact containing
+`article_identity.js`, and both Firefox and Chrome were reloaded through their
+normal extension UIs. No reload-triggered job appeared. The operator opened
+both popups, expanded `What these actions do` and `Advanced`, and confirmed
+that normal, explanatory, and advanced controls are clear. Firefox remains the
+sole auto-sync owner after the operator re-enables it; Chrome remains manual.
 
 ---
 

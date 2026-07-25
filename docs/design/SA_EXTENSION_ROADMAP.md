@@ -26,6 +26,25 @@ Already implemented today:
 
 Current content-capture limitations for Alpha Picks article bodies are documented in `docs/design/SA_ALPHA_PICKS_CONTENT_CAPTURE.md`.
 
+Reliability baseline LIVE as of 2026-07-25:
+
+- Firefox packaging is dependency-closed and atomic; a missing runtime file
+  fails before replacing the previous build.
+- Extension outcomes are structured and aggregate status is derived from
+  phase/item truth, so partial detail failure cannot hide behind success.
+- Market News supports audited no-age recorded-ID retry and bounded incident
+  rediscovery; the reviewed historical manifest completed with zero retryable
+  items.
+- The English popup groups five routine controls, states exact bounds and
+  non-guarantees, exposes contextual/Advanced recovery without F12, and has
+  installed Chrome/Firefox contrast verification.
+- Firefox is the single auto-sync owner by operating choice; Chrome is a
+  manual fallback because scrolling capture may activate the working tab.
+
+This baseline does not adopt an embedded or app-owned collector. Lifecycle
+telemetry, shared capture-core extraction, and the embedded-browser decision
+remain P2.6 Part 2 work under the prerequisite below.
+
 ## P0 prerequisite: capture runtime stability and embedded-browser readiness
 
 This roadmap now has a runtime prerequisite before adding broader SA surfaces or replacing the external browser path.
