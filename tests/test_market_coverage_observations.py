@@ -190,6 +190,13 @@ def test_unreadable_market_db_is_typed_unavailable(tmp_path):
     )
     _assert_market_unreadable(api, malformed_timestamp_path, session)
 
+    noncanonical_timestamp_path = tmp_path / "noncanonical-timestamp.db"
+    _create_market_db(
+        noncanonical_timestamp_path,
+        raw_rows=(("AAA", "2026-01-05T15:00:00-0500"),),
+    )
+    _assert_market_unreadable(api, noncanonical_timestamp_path, session)
+
     incompatible_provider_path = tmp_path / "incompatible-provider-meta.db"
     _create_market_db(incompatible_provider_path)
     conn = sqlite3.connect(incompatible_provider_path)
@@ -313,10 +320,10 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
         path,
         rows=(
             ("AAA", first.open_at_utc),
+            ("AAA", datetime(2026, 1, 5, 14, 45, tzinfo=UTC)),
             ("AAA", utc_date_boundary_row),
             ("AAA", second.open_at_utc),
         ),
-        raw_rows=(("\tAAA\t", "\r\n2026-01-05 09:45:00-05:00\v\f"),),
     )
     statements: list[str] = []
     real_connect = sqlite3.connect
@@ -346,9 +353,35 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
         and " from prices" in statement.lower()
     ]
     assert len(prices_queries) == 1
-    assert "substr(" not in prices_queries[0].lower()
-    assert "trim(ticker," in prices_queries[0].lower()
-    assert prices_queries[0].lower().count("trim(datetime,") == 2
+    prices_query = prices_queries[0]
+    assert "substr(" not in prices_query.lower()
+    assert "upper(" not in prices_query.lower()
+    assert "trim(" not in prices_query.lower()
+    planner = real_connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        plan_details = tuple(
+            row[3]
+            for row in planner.execute(
+                f"EXPLAIN QUERY PLAN {prices_query}"
+            )
+        )
+    finally:
+        planner.close()
+    search_details = tuple(
+        detail.upper()
+        for detail in plan_details
+        if detail.upper().startswith("SEARCH PRICES")
+    )
+    assert any(
+        " USING " in detail
+        and "TICKER=?" in detail
+        and "DATETIME>?" in detail
+        and "DATETIME<?" in detail
+        for detail in search_details
+    )
+    assert all(
+        not detail.upper().startswith("SCAN PRICES") for detail in plan_details
+    )
 
 
 def test_reader_excludes_extended_hours_rows(tmp_path):
@@ -404,7 +437,7 @@ def test_reader_retains_in_window_off_grid_rows(tmp_path):
     assert classified.unmatched_rth_row_count == 1
 
 
-def test_reader_maps_aliases_to_canonical_tickers(tmp_path):
+def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
     api = _api()
     path = tmp_path / "market.db"
     session = _est_session(date(2026, 1, 5))
@@ -413,30 +446,75 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path):
         path,
         rows=(
             ("\tbrk b\t", session.open_at_utc),
-            ("\tbrk.b\t", session.open_at_utc),
+            ("\tBrK.B\t", session.open_at_utc),
+            ("BRK B", session.open_at_utc),
             ("UNRELATED", session.open_at_utc),
         ),
         aliases=(("\tBrK.B\t", "\tbrk b\t"),),
         provider_issues=(
-            ("\tbrk.b\t", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
+            ("\tBrK.B\t", "15min", "contract unavailable", "2026-01-06T00:00:00Z"),
         ),
     )
+    statements: list[str] = []
+    real_connect = sqlite3.connect
+
+    def traced_connect(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+        conn.set_trace_callback(statements.append)
+        return conn
+
+    monkeypatch.setattr(api.module.sqlite3, "connect", traced_connect)
 
     result = api.RthObservationReader(path).read(
         universe=("BRK B",),
         sessions=(session,),
         interval="15min",
     )
+    monkeypatch.setattr(api.module.sqlite3, "connect", real_connect)
 
     rows = result.observations_for(session.market_date)
-    assert tuple(row.ticker for row in rows) == ("BRK B", "BRK B")
+    assert tuple(row.ticker for row in rows) == ("BRK B", "BRK B", "BRK B")
     assert tuple(row.observed_at for row in rows) == (
+        session.open_at_utc,
         session.open_at_utc,
         session.open_at_utc,
     )
     assert len(result.provider_errors) == 1
     assert result.provider_errors[0].ticker == "BRK B"
     assert result.provider_errors[0].last_error == "contract unavailable"
+    provider_queries = [
+        statement
+        for statement in statements
+        if statement.lstrip().lower().startswith("select")
+        and " from provider_sync_meta" in statement.lower()
+    ]
+    assert len(provider_queries) == 1
+    assert "upper(" not in provider_queries[0].lower()
+    assert "trim(" not in provider_queries[0].lower()
+
+    chain_path = tmp_path / "alias-chain.db"
+    _create_market_db(
+        chain_path,
+        rows=(
+            ("OLD", session.open_at_utc),
+            ("MID", session.open_at_utc),
+        ),
+        aliases=(("OLD", "MID"), ("MID", "NEW")),
+        provider_issues=(
+            ("OLD", "15min", "old contract", "2026-01-06T00:00:00Z"),
+        ),
+    )
+    chain_result = api.RthObservationReader(chain_path).read(
+        universe=("OLD",),
+        sessions=(session,),
+        interval="15min",
+    )
+    assert tuple(
+        row.ticker for row in chain_result.observations_for(session.market_date)
+    ) == ("NEW", "NEW")
+    assert tuple(issue.ticker for issue in chain_result.provider_errors) == (
+        "NEW",
+    )
 
     incompatible_alias_path = tmp_path / "incompatible-aliases.db"
     _create_market_db(incompatible_alias_path)
@@ -465,6 +543,14 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path):
     finally:
         conn.close()
     _assert_market_unreadable(api, colliding_alias_path, session)
+
+    cycle_path = tmp_path / "cyclic-aliases.db"
+    _create_market_db(cycle_path, aliases=(("AAA", "BBB"), ("BBB", "AAA")))
+    _assert_market_unreadable(api, cycle_path, session)
+
+    self_cycle_path = tmp_path / "self-cyclic-aliases.db"
+    _create_market_db(self_cycle_path, aliases=(("AAA", "AAA"),))
+    _assert_market_unreadable(api, self_cycle_path, session)
 
 
 def test_query_only_rejects_accidental_writes(tmp_path, monkeypatch):

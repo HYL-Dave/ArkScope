@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections.abc import Sequence
-from datetime import date, datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from pathlib import Path
 import sqlite3
 
@@ -24,12 +25,32 @@ _TICKER_ALIAS_COLUMNS = frozenset({"alias", "canonical"})
 _PROVIDER_SYNC_COLUMNS = frozenset(
     {"ticker", "interval", "last_error", "updated_at"}
 )
-# SQLite TRIM's second argument is a character set; keep Python and SQL aligned.
 _ASCII_WHITESPACE = " \t\n\r\v\f"
+_STORED_UTC_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S+0000"
 
 
 class _StoredDatabaseError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class _TickerAliasIndex:
+    resolved_by_normalized: dict[str, str]
+    raw_candidates_by_canonical: dict[str, frozenset[str]]
+
+    def resolve(self, normalized_ticker: str) -> str:
+        return self.resolved_by_normalized.get(
+            normalized_ticker,
+            normalized_ticker,
+        )
+
+    def candidates_for(self, canonical_tickers: set[str]) -> tuple[str, ...]:
+        candidates = set(canonical_tickers)
+        for canonical in canonical_tickers:
+            candidates.update(
+                self.raw_candidates_by_canonical.get(canonical, ())
+            )
+        return tuple(sorted(candidates))
 
 
 def _open_read_only_market_db(path: str | Path) -> sqlite3.Connection:
@@ -91,14 +112,15 @@ def _normalize_stored_ticker(value: object, *, field_name: str) -> str:
         raise _StoredDatabaseError(str(exc)) from exc
 
 
-def _load_aliases(conn: sqlite3.Connection) -> dict[str, str]:
+def _load_aliases(conn: sqlite3.Connection) -> _TickerAliasIndex:
     columns = _table_columns(conn, "ticker_aliases")
     if columns is None:
-        return {}
+        return _TickerAliasIndex({}, {})
     if not _TICKER_ALIAS_COLUMNS <= columns:
         raise _StoredDatabaseError("ticker_aliases schema is incompatible")
 
-    aliases: dict[str, str] = {}
+    direct_targets: dict[str, str] = {}
+    raw_rows: list[tuple[str, str, str, str]] = []
     for raw_alias, raw_canonical in conn.execute(
         "SELECT alias, canonical FROM ticker_aliases"
     ):
@@ -110,18 +132,60 @@ def _load_aliases(conn: sqlite3.Connection) -> dict[str, str]:
             raw_canonical,
             field_name="stored canonical ticker",
         )
-        existing = aliases.get(alias)
+        existing = direct_targets.get(alias)
         if existing is not None and existing != canonical:
             raise _StoredDatabaseError(
                 f"normalized ticker alias collision: {alias}"
             )
-        aliases[alias] = canonical
-    return aliases
+        direct_targets[alias] = canonical
+        assert isinstance(raw_alias, str)
+        assert isinstance(raw_canonical, str)
+        raw_rows.append((raw_alias, raw_canonical, alias, canonical))
+
+    resolved: dict[str, str] = {}
+    visiting: set[str] = set()
+
+    def resolve(ticker: str) -> str:
+        existing = resolved.get(ticker)
+        if existing is not None:
+            return existing
+        if ticker in visiting:
+            raise _StoredDatabaseError(
+                f"ticker alias cycle includes: {ticker}"
+            )
+        visiting.add(ticker)
+        target = direct_targets.get(ticker)
+        final = ticker if target is None else resolve(target)
+        visiting.remove(ticker)
+        resolved[ticker] = final
+        return final
+
+    for ticker in sorted(set(direct_targets) | set(direct_targets.values())):
+        resolve(ticker)
+
+    raw_candidates: dict[str, set[str]] = {}
+    for raw_alias, raw_canonical, alias, canonical in raw_rows:
+        final = resolved[alias]
+        if resolved[canonical] != final:
+            raise _StoredDatabaseError(
+                f"ticker alias resolution conflict: {alias}"
+            )
+        raw_candidates.setdefault(final, set()).update(
+            (raw_alias, raw_canonical)
+        )
+
+    return _TickerAliasIndex(
+        resolved_by_normalized=resolved,
+        raw_candidates_by_canonical={
+            canonical: frozenset(candidates)
+            for canonical, candidates in raw_candidates.items()
+        },
+    )
 
 
 def _canonical_universe(
     universe: Sequence[str],
-    aliases: dict[str, str],
+    aliases: _TickerAliasIndex,
 ) -> tuple[str, ...]:
     if isinstance(universe, (str, bytes)):
         raise TypeError("universe must be a sequence of ticker strings")
@@ -130,29 +194,13 @@ def _canonical_universe(
     seen: set[str] = set()
     for raw_ticker in universe:
         ticker = _normalize_ticker(raw_ticker, field_name="universe ticker")
-        ticker = aliases.get(ticker, ticker)
+        ticker = aliases.resolve(ticker)
         if ticker not in seen:
             seen.add(ticker)
             canonical.append(ticker)
     if not canonical:
         raise ValueError("universe must contain at least one canonical ticker")
     return tuple(canonical)
-
-
-def _stored_ticker_scope(
-    aliases: dict[str, str],
-    canonical_universe: set[str],
-) -> tuple[str, ...]:
-    return tuple(
-        sorted(
-            canonical_universe
-            | {
-                alias
-                for alias, canonical in aliases.items()
-                if canonical in canonical_universe
-            }
-        )
-    )
 
 
 def _open_sessions(sessions: Sequence[CalendarDay]) -> tuple[CalendarDay, ...]:
@@ -191,33 +239,24 @@ def _open_sessions(sessions: Sequence[CalendarDay]) -> tuple[CalendarDay, ...]:
 def _parse_stored_timestamp(value: object) -> datetime:
     if not isinstance(value, str):
         raise _StoredDatabaseError("stored price datetime must be a string")
-    serialized = value.strip(_ASCII_WHITESPACE)
-    if serialized.endswith(("Z", "z")):
-        serialized = f"{serialized[:-1]}+00:00"
-    elif (
-        len(serialized) >= 5
-        and serialized[-5] in {"+", "-"}
-        and serialized[-4:].isdigit()
-    ):
-        serialized = f"{serialized[:-2]}:{serialized[-2:]}"
     try:
-        parsed = datetime.fromisoformat(serialized)
+        parsed = datetime.strptime(value, _STORED_UTC_TIMESTAMP_FORMAT)
     except ValueError as exc:
         raise _StoredDatabaseError(
             f"invalid stored price datetime: {value!r}"
         ) from exc
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
+    if parsed.strftime(_STORED_UTC_TIMESTAMP_FORMAT) != value:
         raise _StoredDatabaseError(
-            "stored price datetime must be timezone-aware"
+            f"non-canonical stored price datetime: {value!r}"
         )
-    return parsed.astimezone(timezone.utc)
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 def _read_provider_errors(
     conn: sqlite3.Connection,
     *,
     interval: str,
-    aliases: dict[str, str],
+    aliases: _TickerAliasIndex,
     canonical_universe: set[str],
 ) -> tuple[ProviderSyncIssue, ...]:
     columns = _table_columns(conn, "provider_sync_meta")
@@ -226,15 +265,15 @@ def _read_provider_errors(
     if not _PROVIDER_SYNC_COLUMNS <= columns:
         raise _StoredDatabaseError("provider_sync_meta schema is incompatible")
 
-    stored_tickers = _stored_ticker_scope(aliases, canonical_universe)
+    stored_tickers = aliases.candidates_for(canonical_universe)
     placeholders = ", ".join("?" for _ in stored_tickers)
     issues: list[ProviderSyncIssue] = []
     for raw_ticker, raw_interval, raw_error, raw_updated_at in conn.execute(
         "SELECT ticker, interval, last_error, updated_at "
         "FROM provider_sync_meta "
-        "WHERE interval = ? AND last_error IS NOT NULL "
-        f"AND UPPER(TRIM(ticker, ?)) IN ({placeholders})",
-        (interval, _ASCII_WHITESPACE, *stored_tickers),
+        f"WHERE ticker IN ({placeholders}) "
+        "AND interval = ? AND last_error IS NOT NULL",
+        (*stored_tickers, interval),
     ):
         ticker = _normalize_stored_ticker(
             raw_ticker,
@@ -255,7 +294,7 @@ def _read_provider_errors(
 
         if raw_interval != interval or raw_error is None:
             continue
-        ticker = aliases.get(ticker, ticker)
+        ticker = aliases.resolve(ticker)
         if ticker not in canonical_universe:
             continue
         issues.append(
@@ -286,7 +325,7 @@ def _read_session_observations(
     *,
     sessions: tuple[CalendarDay, ...],
     interval: str,
-    aliases: dict[str, str],
+    aliases: _TickerAliasIndex,
     canonical_universe: tuple[str, ...],
 ) -> tuple[RthSessionObservations, ...]:
     buckets: dict[date, list[RthObservation]] = {
@@ -296,26 +335,23 @@ def _read_session_observations(
         return ()
 
     canonical_set = set(canonical_universe)
-    stored_tickers = _stored_ticker_scope(aliases, canonical_set)
+    stored_tickers = aliases.candidates_for(canonical_set)
     placeholders = ", ".join("?" for _ in stored_tickers)
     earliest_open = sessions[0].open_at_utc
     latest_close = sessions[-1].close_at_utc
     assert earliest_open is not None
     assert latest_close is not None
-    lower_bound = (earliest_open.date() - timedelta(days=1)).isoformat()
-    upper_bound = (latest_close.date() + timedelta(days=2)).isoformat()
+    lower_bound = earliest_open.strftime(_STORED_UTC_TIMESTAMP_FORMAT)
+    upper_bound = latest_close.strftime(_STORED_UTC_TIMESTAMP_FORMAT)
     query = (
         "SELECT ticker, datetime FROM prices "
-        f"WHERE interval = ? AND UPPER(TRIM(ticker, ?)) IN ({placeholders}) "
-        "AND TRIM(datetime, ?) >= ? AND TRIM(datetime, ?) < ?"
+        f"WHERE ticker IN ({placeholders}) AND interval = ? "
+        "AND datetime >= ? AND datetime < ?"
     )
     parameters = (
-        interval,
-        _ASCII_WHITESPACE,
         *stored_tickers,
-        _ASCII_WHITESPACE,
+        interval,
         lower_bound,
-        _ASCII_WHITESPACE,
         upper_bound,
     )
 
@@ -326,7 +362,7 @@ def _read_session_observations(
             raw_ticker,
             field_name="stored price ticker",
         )
-        ticker = aliases.get(ticker, ticker)
+        ticker = aliases.resolve(ticker)
         if ticker not in canonical_set:
             continue
         observed_at = _parse_stored_timestamp(raw_timestamp)
