@@ -733,13 +733,13 @@ git commit -m "docs: clear SA extension reliability implementation plan"
 - Create `tests/test_sa_extension_packaging.py`
 - Create packaging fixtures under `tests/fixtures/sa_extension/packaging/`
 
-- [ ] **Step 1: Replace the old popup-only node with its named successor**
+- [x] **Step 1: Replace the old popup-only node with its named successor**
 
 The successor must assert that the installer invokes the build helper before
 launcher/config/native-manifest writes and contains no runtime asset `cp` list
 or `scrape*.js` glob.
 
-- [ ] **Step 2: Add ten RED packaging nodes**
+- [x] **Step 2: Add ten RED packaging nodes**
 
 Use exactly these IDs:
 
@@ -765,23 +765,25 @@ pytest -q tests/test_extension_install_paths.py tests/test_sa_extension_packagin
 Expected RED: `11` new/successor nodes fail for missing builder/delegation;
 the three installer-host path parameter cases remain green.
 
-- [ ] **Step 3: Implement the strict graph parser**
+Observed: exactly `11 failed / 3 passed` before product implementation.
+
+- [x] **Step 3: Implement the strict graph parser**
 
 Use `json`, `html.parser`, `pathlib`, `tempfile`, and a narrow balanced-token
 scanner for JavaScript calls. Do not use a permissive regex that can skip a
 dynamic expression. Every error names the source file and rejected reference.
 
-- [ ] **Step 4: Implement exact temporary build and atomic replacement**
+- [x] **Step 4: Implement exact temporary build and atomic replacement**
 
 Expose a side-effect-free graph command plus a build command. Tests must use a
 temporary output. Never point a test at the loaded `build/firefox` directory.
 
-- [ ] **Step 5: Route the installer through the builder**
+- [x] **Step 5: Route the installer through the builder**
 
 Build first. Only after success write launcher/config/native registration.
 Keep host ID and addon ID unchanged.
 
-- [ ] **Step 6: Verify GREEN and a real fresh artifact**
+- [x] **Step 6: Verify GREEN and a real fresh artifact**
 
 ```bash
 pytest -q tests/test_extension_install_paths.py tests/test_sa_extension_packaging.py
@@ -797,7 +799,12 @@ rm -rf "$tmp"
 Expected: `14` focused nodes green (three parametrized host cases plus the
 eleven ledger nodes); exact generated closure; no npm invocation.
 
-- [ ] **Step 7: Commit and record packaging checkpoint**
+Observed: `14 passed`; a fresh real build contains exactly `12` files,
+including `article_identity.js`. Two independent output directories had the
+same file list and per-file hashes. The normalized artifact hash-list SHA-256
+is `089a379302cdd6cd7ada109675caae295b38450d88720d7010bab797cd5c8866`.
+
+- [x] **Step 7: Commit and record packaging checkpoint**
 
 ```bash
 git add extensions/sa_alpha_picks/build_firefox.py \
@@ -810,6 +817,12 @@ git rev-parse HEAD
 
 Record this 40-character hash as `PACKAGING_GATE_TIP` in the evidence ledger.
 Every later task must rebuild successfully at each commit.
+
+Resolved `PACKAGING_GATE_TIP`:
+`a2869f2ce7a2c2e603657593ef9534a438cd02a6`. Backend checkpoint collection is
+`4631`, focused collection is `248`, and their sorted node-list SHA-256 values
+are `6a005572814a1c539e96b521b0a9cdb2984d47e8ec625f0dc6a696d6da3a635b`
+and `46fcc1766e2e8301e75b7ce5cdb7089d5d98e81955a916f1f84c0e9c72f2a300`.
 
 ---
 
