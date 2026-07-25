@@ -949,7 +949,7 @@ Resolved Task 2 product tip:
 - Modify `tests/test_sa_native_host_telemetry.py`
 - Modify `tests/test_job_runs.py`
 
-- [ ] **Step 1: Add eight RED outbox nodes**
+- [x] **Step 1: Add eight RED outbox nodes**
 
 ```text
 test_outbox_commits_record_before_native_delivery
@@ -962,7 +962,11 @@ test_outbox_age_bound_evicts_expired_and_surfaces_the_loss
 test_oversize_storage_failure_or_event_conflict_is_visible_and_never_persisted
 ```
 
-- [ ] **Step 2: Replace one job endpoint node and add nine more**
+Observed: exact `8 failed`; every node failed because
+`extension_telemetry.js` did not exist. The shared protocol fixture loaded
+before that missing-file boundary.
+
+- [x] **Step 2: Replace one job endpoint node and add nine more**
 
 Remove `test_record_extension_job_rejects_invalid_status`; add its named
 successor plus:
@@ -984,7 +988,7 @@ The final summary node must insert an older complete event after a newer
 degraded event and prove capture timestamps, not insertion order, own latest
 attempt and latest healthy selection.
 
-- [ ] **Step 3: Add four native-host RED nodes**
+- [x] **Step 3: Add four native-host RED nodes**
 
 ```text
 test_native_host_rejects_extension_record_with_caller_status
@@ -995,7 +999,12 @@ test_native_host_returns_typed_sidecar_rejection_without_raw_detail
 
 Existing native post/degrade/no-profile-writer nodes evolve in place.
 
-- [ ] **Step 4: Implement outbox controller and job wrapper integration**
+Observed across job-runs plus native telemetry: exact `18 failed / 59
+passed`. Failures were the absent atomic-store/summary methods, old
+caller-owned request model, old native payload, and absent limits/fixed-route
+interfaces. Existing unrelated nodes stayed green.
+
+- [x] **Step 4: Implement outbox controller and job wrapper integration**
 
 Inject storage/native/clock/UUID dependencies for tests. Persist a structured
 last-run summary separately from legacy raw refresh snapshots so popup status
@@ -1005,25 +1014,29 @@ truth. Strengthen the existing
 node in place to require telemetry after protocol and before job registration;
 do not rename or recount it.
 
-- [ ] **Step 5: Remove caller DB status from native/API contracts**
+- [x] **Step 5: Remove caller DB status from native/API contracts**
 
 Use Pydantic `extra="forbid"`. Native host validates required identity and
 timestamps, forwards the structured result to the fixed endpoint, and returns
 only stable persistence fields. The sidecar derives status and event hash.
 
-- [ ] **Step 6: Implement atomic local-store dedupe**
+- [x] **Step 6: Implement atomic local-store dedupe**
 
 Do not call `list_runs()` then insert. Open one connection, `BEGIN IMMEDIATE`,
 parse existing extension payload event identities, compare canonical event
 hash, then insert or return existing. Commit exactly once.
 
-- [ ] **Step 7: Prove no scheduler/backoff coupling**
+- [x] **Step 7: Prove no scheduler/backoff coupling**
 
 Strengthen existing `/jobs/status`/history tests and add a source census in
 the evidence ledger. The scheduler modules and scheduler-state store must have
 zero product diff.
 
-- [ ] **Step 8: Verify GREEN and rebuild**
+Observed: Chrome manifest plus scheduler/data-scheduler owners are
+byte-identical. The old direct `recordExtensionJobAsync`, caller-status
+classifier, and slug-derived job writer have zero residual hits.
+
+- [x] **Step 8: Verify GREEN and rebuild**
 
 ```bash
 pytest -q tests/test_sa_extension_telemetry_outbox.py \
@@ -1037,7 +1050,17 @@ rm -rf "$tmp"
 
 Expected: outbox `8/8`; native `14/14`; job runs `63/63`; protocol `12/12`.
 
-- [ ] **Step 9: Commit**
+Observed: those four suites are exactly `8/8`, `14/14`, `63/63`, and
+`12/12`; with Alpha adapter coverage the Task 3 core is `105/105`. The
+canonical 12-file focused set is `284/284`. Full collection is `4667` and
+focused collection is `284`; sorted node-list SHA-256 values are
+`51548195153e1f9e12a24fa5475d9de33b4afba9e813ae3a5ce5abd1a66ef085`
+and `2c3b4e302fff4c190ebbc3bb5a05db2b4ece2186a5c2d0430b41bab25217a717`.
+Two independent Firefox builds are byte-identical and contain exactly `14`
+files; normalized artifact hash-list SHA-256 is
+`951dc32c892a1d35f64fcb0b0d49eb31752536420f913aa8522a4850444dc7b5`.
+
+- [x] **Step 9: Commit**
 
 ```bash
 git add extensions/sa_alpha_picks/extension_telemetry.js \
@@ -1049,6 +1072,9 @@ git add extensions/sa_alpha_picks/extension_telemetry.js \
   tests/test_sa_native_host_telemetry.py tests/test_job_runs.py
 git commit -m "feat: persist SA extension telemetry idempotently"
 ```
+
+Resolved Task 3 product tip:
+`df49d5b5369193c4bd94ef660cd90df0892d956e`.
 
 ---
 
