@@ -25,7 +25,7 @@
       line-height: 1.4;
     }
     #status.success { background: #e8f5e9; color: #2e7d32; }
-    #status.partial { background: #fff3e0; color: #e65100; }
+    #status.partial { background: #fff3e0; color: #b45309; }
     #status.error { background: #ffebee; color: #c62828; }
     #status.empty { background: #f5f5f5; color: #666; }
     .btn-row {
@@ -45,31 +45,12 @@
     }
     button:disabled {
       background: #bdbdbd !important;
+      color: #174b72 !important;
       cursor: not-allowed;
     }
-    #quickBtn {
-      background: #1976d2;
-    }
-    #quickBtn:hover:not(:disabled) { background: #1565c0; }
-    #fullBtn {
-      background: #7b1fa2;
-    }
-    #fullBtn:hover:not(:disabled) { background: #6a1b9a; }
-    #backfillBtn {
-      background: #2e7d32;
-    }
-    #backfillBtn:hover:not(:disabled) { background: #1b5e20; }
-    #marketNewsBtn {
-      background: #00838f;
-    }
-    #marketNewsBtn:hover:not(:disabled) { background: #006064; }
-    #marketNewsCatchupBtn {
-      background: #00695c;
-    }
-    #marketNewsCatchupBtn:hover:not(:disabled) { background: #004d40; }
     .btn-hint {
       font-size: 10px;
-      color: #999;
+      color: #666;
       text-align: center;
       margin-bottom: 8px;
     }
@@ -96,7 +77,7 @@
       gap: 2px;
     }
     .toggle-row small {
-      color: #777;
+      color: #666;
       font-size: 11px;
     }
     .toggle-controls {
@@ -190,10 +171,12 @@
     .reconciliation-use,
     .reconciliation-confirm {
       background: #1976d2;
+      color: white;
     }
     .reconciliation-reject,
     .reconciliation-cancel {
       background: #666;
+      color: white;
     }
     .reconciliation-confirmation {
       margin-top: 7px;
@@ -232,7 +215,8 @@
     }
     #manualBtn {
       margin-top: 6px;
-      background: #ef6c00;
+      background: #315f7d;
+      color: white;
     }
     body {
       width: 360px;
@@ -285,7 +269,7 @@
       width: 100%;
       min-height: 36px;
       padding: 8px 10px;
-      border: 1px solid #b9c6d4;
+      border: 1px solid #7b93ab;
       border-radius: 4px;
       background: #fff;
       color: #174b72;
@@ -363,6 +347,17 @@
       padding: 7px 9px;
       border-radius: 4px;
       background: #315f7d;
+      color: white;
+      font-size: 11px;
+    }
+    #reviewRecoveryScopeBtn {
+      flex: 0 1 auto;
+      min-height: 32px;
+      padding: 7px 9px;
+      border: 1px solid #7b93ab;
+      border-radius: 4px;
+      background: #fff;
+      color: #174b72;
       font-size: 11px;
     }
     .recovery-confirmation {
@@ -449,6 +444,7 @@
       </thead>
       <tbody></tbody>
     </table>
+    <p class="section-note">Scans may activate and scroll Seeking Alpha tabs. Avoid switching tabs in this browser during a run; background-tab capture completeness is not guaranteed.</p>
   </details>
 
   <section aria-labelledby="marketNewsRecoveryHeading">
