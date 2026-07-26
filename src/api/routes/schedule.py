@@ -21,7 +21,6 @@ from src.service.data_scheduler import (
     job_name,
     run_source,
     set_source_config,
-    source_control_mode,
     status_snapshot,
 )
 
@@ -39,25 +38,12 @@ class ScheduleUpdate(BaseModel):
     interval_minutes: int | None = None
 
 
-def _require_schedule_controls(source: str) -> None:
-    mode = source_control_mode(source)
-    if mode != "scheduled":
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "schedule_control_unavailable",
-                "control_mode": mode,
-            },
-        )
-
-
 @router.put("/schedule/{source}")
 def put_schedule(source: str, body: ScheduleUpdate):
     """Persist one source's enable flag / interval (profile_settings keys
     ``schedule.<source>.*`` — locked fork F3)."""
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
-    _require_schedule_controls(source)
     if body.enabled is None and body.interval_minutes is None:
         raise HTTPException(status_code=400, detail="nothing to update")
     require_profile_state_write("set_schedule", {
@@ -72,7 +58,7 @@ def put_schedule(source: str, body: ScheduleUpdate):
 @router.post("/schedule/run/{source}")
 def run_now(source: str):
     """Run one source immediately (Run now), same path as the scheduler —
-    collect → PG sync → local refresh — with trigger_source='api'.
+    direct-local collection with trigger_source='api'.
 
     Fire-and-return: a collection can take minutes (IBKR over the universe), so
     the run executes on a background thread; the UI polls GET /schedule for the
@@ -85,11 +71,9 @@ def run_now(source: str):
     """
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
-    _require_schedule_controls(source)
-    if not SOURCES[source].coverage_repair_disabled:
-        from src.provider_config_runtime import require_provider_config_ready
+    from src.provider_config_runtime import require_provider_config_ready
 
-        require_provider_config_ready("schedule_run_now")
+    require_provider_config_ready("schedule_run_now")
     # EVERY source writes durable run telemetry when run. Provider sources also
     # write their owned data store, so the choke-point applies unconditionally.
     require_db_write("schedule_run_now", {"source": source})

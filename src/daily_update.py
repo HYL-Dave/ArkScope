@@ -20,7 +20,7 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
     # 更新所有新聞 (顯式 scope 必填)
     python -m src.daily_update --news --scope active-universe
 
-    # 更新所有新聞 + 股價 (--all 不含 IV)
+    # 更新所有新聞 + 股價
     python -m src.daily_update --all --scope active-universe
 
     # 單一 source / 顯式清單
@@ -29,9 +29,6 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
 
     # 模擬執行 (印出 per-source 計畫，不碰 IBKR/DB/job_runs)
     python -m src.daily_update --all --scope active-universe --dry-run
-
-    # --sync-db 是退役相容旗標；active sources 已直寫本地 store。
-    python -m src.daily_update --all --scope active-universe --sync-db
 
     # 舊 PG news_scores 同步已退役；使用 scripts/scoring/import_news_scores_local.py。
     python -m src.daily_update --scores
@@ -432,13 +429,10 @@ Examples:
     # Update specific source
     python -m src.daily_update --polygon --scope active-universe
     python -m src.daily_update --ibkr-prices --tickers AAPL,MSFT
-    python -m src.daily_update --iv-history --scope active-universe   # heavy, opt-in (NOT in --all)
 
     # Dry run (prints the per-source plan; never touches IBKR/DB)
     python -m src.daily_update --all --scope active-universe --dry-run
 
-    # Collect and sync to DB in one step
-    python -m src.daily_update --all --scope active-universe --sync-db
     python -m src.daily_update --scores                  # retired; use local score importer
 
 Note: IBKR sources require TWS/Gateway running.
@@ -446,8 +440,6 @@ Note: IBKR sources require TWS/Gateway running.
       IBKR serialization, job_runs telemetry collect.<source> trigger='cli').
       Locks are CROSS-PROCESS (flock under data/locks/): overlapping the app
       scheduler skips the run instead of double-fetching; IBKR serializes.
-      Without --sync-db a run is TRUE collect-only (Parquet only — no PG sync,
-      no local-mirror refresh).
       Explicit scope (--tickers / --scope active-universe) is required.
         """
     )
@@ -455,7 +447,7 @@ Note: IBKR sources require TWS/Gateway running.
     parser.add_argument('--status', action='store_true',
                        help='Show current data status for all sources')
     parser.add_argument('--all', action='store_true',
-                       help='Update all news sources + prices (needs --scope/--tickers; IV is separate)')
+                       help='Update all news sources + prices (needs --scope/--tickers)')
     parser.add_argument('--news', action='store_true',
                        help='Update all news sources (Polygon + Finnhub + IBKR news)')
     parser.add_argument('--polygon', action='store_true',
@@ -466,16 +458,12 @@ Note: IBKR sources require TWS/Gateway running.
                        help='Update IBKR news only (requires TWS/Gateway)')
     parser.add_argument('--ibkr-prices', action='store_true',
                        help='Update IBKR prices only (requires TWS/Gateway)')
-    parser.add_argument('--iv-history', action='store_true',
-                       help='Collect ATM IV history (requires TWS/Gateway)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Show what would be done without executing')
     parser.add_argument('--parallel', action='store_true',
                        help='Run sources concurrently (per-source/IBKR locks still apply)')
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress collector output (for background runs)')
-    parser.add_argument('--sync-db', action='store_true',
-                       help='Sync collected data to database after collection')
     parser.add_argument('--scores', action='store_true',
                        help='Retired PG score sync; use scripts/scoring/import_news_scores_local.py')
     parser.add_argument('--tickers', type=str, default=None,
@@ -487,8 +475,6 @@ Note: IBKR sources require TWS/Gateway running.
 
     args.ibkr_news = getattr(args, 'ibkr_news', False)
     args.ibkr_prices = getattr(args, 'ibkr_prices', False)
-    args.iv_history = getattr(args, 'iv_history', False)
-    args.sync_db = getattr(args, 'sync_db', False)
 
     if args.quiet:
         logging.getLogger().setLevel(logging.WARNING)
@@ -501,7 +487,7 @@ Note: IBKR sources require TWS/Gateway running.
 
     # Default to status if no action specified (--scores is an action).
     if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
-                args.ibkr_news, args.ibkr_prices, args.iv_history, args.scores]):
+                args.ibkr_news, args.ibkr_prices, args.scores]):
         args.status = True
 
     if args.status:
@@ -509,7 +495,7 @@ Note: IBKR sources require TWS/Gateway running.
         return
 
     # The ordered per-source plan (same step set as before the thin-wrapper
-    # rewrite; IV stays opt-in, never swept by --all).
+    # rewrite.
     sources: List[str] = []
     if args.all or args.news or args.polygon:
         sources.append("polygon_news")
@@ -519,8 +505,6 @@ Note: IBKR sources require TWS/Gateway running.
         sources.append("ibkr_news")
     if args.all or args.ibkr_prices:
         sources.append("ibkr_prices")
-    if args.iv_history:
-        sources.append("iv_history")
 
     # Resolve the explicit scope once for every source; collectors no longer
     # own an implicit universe default.
@@ -557,10 +541,7 @@ Note: IBKR sources require TWS/Gateway running.
         logger.info("*** DRY RUN MODE - No actual collection ***")
         logger.info(f"\nPLAN (scope: {len(tickers or [])} tickers):")
         for s in sources:
-            # without --sync-db the run is TRUE collect-only: Parquet only, no PG
-            # sync and no local-mirror refresh (PG unchanged → nothing to mirror)
-            steps = "collect -> db sync -> local mirror refresh" if args.sync_db else "collect (only)"
-            logger.info(f"  {s}: {steps}")
+            logger.info(f"  {s}: direct-local collect")
         logger.info("\nDry run complete (nothing executed).")
         sys.exit(0)
 
@@ -571,7 +552,7 @@ Note: IBKR sources require TWS/Gateway running.
     telem = _RunTelemetry(enabled=True, payload={
         "flags": {k: bool(getattr(args, k, False)) for k in (
             "all", "news", "polygon", "finnhub", "ibkr_news", "ibkr_prices",
-            "iv_history", "sync_db", "scores", "parallel")},
+            "scores", "parallel")},
         "scope": args.scope,
         "tickers": args.tickers,
         "ticker_count": len(tickers or []),
@@ -580,12 +561,11 @@ Note: IBKR sources require TWS/Gateway running.
 
     # Execute through the scheduler core — the SAME path as the app's Run now:
     # per-source locks (overlap skips), shared IBKR gateway lock, job_runs rows
-    # collect.<source> trigger='cli', collect -> PG sync -> local mirror refresh.
+    # collect.<source> trigger='cli', direct-local collection.
     results: Dict[str, bool] = {}
 
     def _run(s: str) -> bool:
-        r = run_source(s, trigger_source="cli", tickers=tickers,
-                       skip_sync=not args.sync_db)
+        r = run_source(s, trigger_source="cli", tickers=tickers)
         if r.get("status") == "skipped":
             logger.warning(f"{s}: skipped — {r.get('reason')}")
             return False

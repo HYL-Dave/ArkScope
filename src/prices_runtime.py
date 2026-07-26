@@ -10,7 +10,6 @@ MAX_ERROR_LEN = 240
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ArkScope direct-local prices worker")
-    parser.add_argument("--source", choices=("ibkr_prices", "price_backfill"), required=True)
     parser.add_argument("--tickers", required=True)
     parser.add_argument("--lookback-days", type=int, default=5)
     parser.add_argument("--provider", choices=("ibkr", "polygon"), default="ibkr")
@@ -53,7 +52,6 @@ def sanitize_error(exc: BaseException) -> dict[str, Any]:
 
 def _run_worker(
     *,
-    source: str,
     tickers: str,
     lookback_days: int,
     provider: str,
@@ -74,7 +72,6 @@ def main(argv: list[str] | None = None) -> int:
     try:
         _apply_provider_config()
         result = _run_worker(
-            source=args.source,
             tickers=args.tickers,
             lookback_days=args.lookback_days,
             provider=args.provider,

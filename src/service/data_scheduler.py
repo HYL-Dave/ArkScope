@@ -14,13 +14,10 @@ Sources v1:
     subprocess, serialized behind ONE shared IBKR lock (one Gateway session;
     client-id hygiene + the ib_insync asyncio loop is safer in its own process)
   - ibkr_prices                       — direct-local adapter into market_data.db
-  - local_incremental                 — retired PG mirror path
 
 Active writers now write local stores directly. Prices are post-P0-C
 direct-local; news is post-N8a PG-exited: provider fetches write normalized
-SQLite and project the legacy local read surface directly. The old PG mirror
-sync hooks remain only as retired compatibility metadata until N9 cleanup
-removes the dead paths.
+SQLite and project the legacy local read surface directly.
 
 Write-contention guarantees (the user's explicit SQLite concern):
   - provider fetches happen outside market_data.db write locks where possible;
@@ -78,7 +75,6 @@ _ERROR_TAIL = 600
 class SourceDef:
     name: str
     label: str
-    sync_flag: Optional[str]            # retired PG mirror flag, None = no PG sync
     ibkr: bool = False                  # serialize behind the shared IBKR lock
     needs_price_scope: bool = False     # resolve active-universe tickers at run time
     default_interval_min: int = 60
@@ -92,9 +88,6 @@ class SourceDef:
     # code, with zero logic duplication. IBKR sources deliberately STAY subprocess:
     # process isolation is a feature there (ib_insync asyncio + client-id hygiene).
     adapter: Optional[tuple] = None
-    # Coverage v2 is diagnostic-only: this historical source ID keeps locking and
-    # telemetry, but cannot derive repair work from unknown observations.
-    coverage_repair_disabled: bool = False
     # Direct-local prices worker: run through a sanitized subprocess so ib_insync
     # stays out of scheduler worker threads.
     prices_worker: bool = False
@@ -117,7 +110,6 @@ SOURCES: Dict[str, SourceDef] = {
     for s in (
         SourceDef(
             "polygon_news", "Polygon 新聞",
-            "--news",
             adapter=("src.collectors.polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
@@ -126,7 +118,6 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
-            "--news",
             adapter=("src.collectors.finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             writes_market_db=True,
@@ -135,7 +126,7 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "ibkr_news", "IBKR 新聞",
-            "--news", ibkr=True,
+            ibkr=True,
             needs_price_scope=True, default_interval_min=120,
             news_direct_source="ibkr",
             writes_market_db=True,
@@ -144,36 +135,12 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "ibkr_prices", "IBKR 股價",
-            None,
             ibkr=True, universe_tickers=True, default_interval_min=60,
             prices_worker=True, writes_market_db=True,
             source_mode="direct_local",
             write_target="market_data.db",
             source_badges=("IBKR", "直寫本地"),
             description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
-        ),
-        SourceDef(
-            "iv_history", "IV 歷史",
-            "--iv", ibkr=True,
-            needs_price_scope=True, default_interval_min=1440,
-            description="ATM IV snapshot (heavy; Gateway) → PG → local mirror",
-        ),
-        SourceDef(
-            "local_incremental", "本地鏡像增量",
-            None, default_interval_min=15,
-            source_mode="retired_pg_mirror",
-            write_target="none",
-            description="Retired PG → market_data.db delta path; use direct-local sources",
-        ),
-        SourceDef(
-            "price_backfill", "價格缺口補抓",
-            None, default_interval_min=360,
-            coverage_repair_disabled=True,
-            source_mode="coverage_read_only",
-            write_target="none",
-            description="Coverage-derived repair is disabled: Coverage v2 reports "
-                        "unknown observations, not proven actionable gaps. The source ID "
-                        "remains for historical telemetry.",
         ),
     )
 }
@@ -185,27 +152,7 @@ _DAILY_UPDATE_ALIAS = {
     "finnhub_news": "daily_update.finnhub",
     "ibkr_news": "daily_update.ibkr_news",
     "ibkr_prices": "daily_update.ibkr_prices",
-    "iv_history": "daily_update.iv_history",
 }
-_N9_RETIRED_SOURCES = {
-    "iv_history": (
-        "iv_history PG mirror source retired by N9 batch-1; "
-        "IV collection will return through the separate IV reboot path"
-    ),
-    "local_incremental": (
-        "prices PG mirror retired by P0-C; use ibkr_prices for provider collection"
-    ),
-}
-
-ScheduleControlMode = Literal["scheduled", "read_only", "retired"]
-
-
-def source_control_mode(source: str) -> ScheduleControlMode:
-    if source in _N9_RETIRED_SOURCES:
-        return "retired"
-    if SOURCES[source].coverage_repair_disabled:
-        return "read_only"
-    return "scheduled"
 
 # --- locks (single sidecar process) -------------------------------------------
 # The Gateway lock (in-process + cross-process) now lives in src.ibkr_gateway_lock so EVERY
@@ -220,11 +167,9 @@ from src.ibkr_gateway_lock import (  # noqa: E402
 )
 
 _SOURCE_LOCKS: Dict[str, threading.Lock] = {name: threading.Lock() for name in SOURCES}
-_LOCAL_REFRESH_LOCK = threading.Lock()  # one incremental_update at a time (skip-if-busy)
 
 # --- cross-process lock twins (sidecar ⟷ daily_update CLI) ---------------------
 _SOURCE_FLOCKS: Dict[str, _FileLock] = {name: _FileLock(f"source_{name}") for name in SOURCES}
-_LOCAL_REFRESH_FLOCK = _FileLock("local_refresh")
 
 # in-memory last-attempt per source (UTC); seeded from job_runs on scheduler start
 _LAST_ATTEMPT: Dict[str, datetime] = {}
@@ -445,103 +390,6 @@ def _pending_continuation(source: str):
     return None
 
 
-def _coverage_truth_result_status(result: Any) -> Optional[str]:
-    if result == {
-        "source": "price_backfill",
-        "collect": {"planned": 0},
-        "reason_code": "coverage_truth_read_only",
-        "local_refresh": {"skipped": "coverage truth is read-only"},
-        "status": "succeeded",
-    }:
-        return "succeeded"
-    if result == {
-        "source": "price_backfill",
-        "collect": {"planned": 0},
-        "code": "legacy_unproven_gap",
-        "reason_code": "legacy_unproven_gap",
-        "error": "legacy_unproven_gap",
-        "status": "failed",
-    }:
-        return "failed"
-    return None
-
-
-def _coverage_truth_state_is_current(
-    state: Any,
-    *,
-    allow_running: bool = False,
-) -> bool:
-    if not isinstance(state, dict) or state.get("continuation") is not None:
-        return False
-    result_status = _coverage_truth_result_status(state.get("last_result"))
-    if result_status is None:
-        return False
-    state_status = state.get("last_status")
-    if state_status != result_status and not (allow_running and state_status == "running"):
-        return False
-    expected_error = None if result_status == "succeeded" else "legacy_unproven_gap"
-    return state.get("last_error") == expected_error
-
-
-def _coverage_truth_state_is_blank(state: Any) -> bool:
-    """A pre-V2 row with only attempt metadata proves no outcome either way."""
-    return isinstance(state, dict) and all(
-        state.get(key) is None
-        for key in ("last_status", "last_error", "continuation", "last_result")
-    )
-
-
-def _coverage_truth_requires_legacy_rejection(source: str) -> bool:
-    """Fail closed unless durable state proves it uses the read-only V2 protocol."""
-    try:
-        state = _state_store().get(source)
-    except Exception:  # noqa: BLE001
-        logger.warning("coverage truth state unreadable for %s", source, exc_info=True)
-        return True
-    return (
-        state is not None
-        and not _coverage_truth_state_is_blank(state)
-        and not _coverage_truth_state_is_current(state)
-    )
-
-
-def _coverage_truth_snapshot_state(
-    state: Dict[str, Any],
-    *,
-    source_running: bool,
-) -> Dict[str, Any]:
-    """Project legacy planner state without exposing or implying resumable work."""
-    if (
-        _coverage_truth_state_is_blank(state)
-        or _coverage_truth_state_is_current(state, allow_running=source_running)
-    ):
-        return {
-            key: state.get(key)
-            for key in (
-                "last_attempt",
-                "last_status",
-                "last_error",
-                "continuation",
-                "last_result",
-                "updated_at",
-            )
-        }
-    return {
-        "last_attempt": state.get("last_attempt"),
-        "last_status": "failed",
-        "last_error": "legacy_unproven_gap",
-        "continuation": None,
-        "last_result": {
-            "source": "price_backfill",
-            "status": "failed",
-            "code": "legacy_unproven_gap",
-            "reason_code": "legacy_unproven_gap",
-            "collect": {"planned": 0},
-        },
-        "updated_at": state.get("updated_at"),
-    }
-
-
 def _has_pending_continuation(source: str) -> bool:
     """Attended mode (decision 4): a prior `partial` left a saved continuation → the SCHEDULER
     must NOT auto-resume it; only a manual trigger processes it."""
@@ -553,8 +401,6 @@ def source_config(source: str) -> Dict[str, Any]:
     store = _store()
     enabled = (store.get_setting(f"schedule.{source}.enabled") or "").strip().lower() in (
         "1", "true", "yes", "on")
-    if source_control_mode(source) != "scheduled":
-        enabled = False
     raw = store.get_setting(f"schedule.{source}.interval_minutes")
     try:
         interval = max(5, min(7 * 24 * 60, int(raw))) if raw else d.default_interval_min
@@ -567,8 +413,6 @@ def set_source_config(source: str, *, enabled: Optional[bool] = None,
                       interval_minutes: Optional[int] = None) -> Dict[str, Any]:
     if source not in SOURCES:
         raise KeyError(source)
-    if source_control_mode(source) != "scheduled":
-        raise ValueError(f"schedule controls unavailable for {source!r}")
     store = _store()
     if enabled is not None:
         store.set_setting(f"schedule.{source}.enabled", "true" if enabled else "false")
@@ -864,24 +708,6 @@ def _news_pg_exit_audit_state(db_path: str) -> Optional[bool]:
         return None
 
 
-def _news_pg_exit_assume_completed_for_refresh(market_db: str) -> bool:
-    from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
-    from src.news_providers import parse_news_toggle
-
-    try:
-        if parse_news_toggle(_store().get_setting(NEWS_PG_EXIT_COMPLETED_KEY)) is True:
-            return True
-    except Exception:  # noqa: BLE001 — routing falls back to the DB audit marker
-        pass
-    audit_state = _news_pg_exit_audit_state(market_db)
-    if audit_state is None:
-        logger.warning(
-            "news PG-exit audit marker could not be read; excluding news from local mirror"
-        )
-        return True
-    return audit_state
-
-
 def _blocked_news_audit_route():
     from src.news_normalized.routing import NewsWriteMode, NewsWriteRoute
 
@@ -945,85 +771,68 @@ def _read_news_write_route_for_scheduler():
     return route
 
 
-def _local_refresh() -> Dict[str, Any]:
-    """PG → local market_data.db delta. Skip-if-busy (in-process AND cross-process):
-    concurrent refreshes are idempotent (INSERT OR IGNORE) but wasteful."""
-    if not _LOCAL_REFRESH_LOCK.acquire(blocking=False):
-        return {"skipped": "local refresh already running"}
-    try:
-        if not _LOCAL_REFRESH_FLOCK.acquire():
-            return {"skipped": "local refresh already running in another process"}
-        try:
-            from src.market_data_admin import incremental_update, resolve_market_db_path
+NewsExecutionMode = Literal["direct_local", "reject"]
 
-            market_db = resolve_market_db_path()
-            if not Path(market_db).exists():
-                return {"skipped": "no local market DB (bootstrap first)"}
-            domains = (
-                ("prices",)
-                if _news_pg_exit_assume_completed_for_refresh(market_db)
-                else None
-            )
-            res = incremental_update(domains=domains) if domains is not None else incremental_update()
-            domain_rows = {}
-            skipped_domains = {}
-            for key, value in res.items():
-                if not isinstance(value, dict):
-                    continue
-                if value.get("skipped"):
-                    domain_rows[key] = None
-                    skipped_domains[key] = value["skipped"]
-                else:
-                    domain_rows[key] = value.get("rows_added")
-            out = {"ok": res.get("ok"), "domains": domain_rows}
-            if skipped_domains:
-                out["skipped_domains"] = skipped_domains
-            return out
-        finally:
-            _LOCAL_REFRESH_FLOCK.release()
-    finally:
-        _LOCAL_REFRESH_LOCK.release()
+
+class UnsupportedNewsWriteMode(RuntimeError):
+    pass
+
+
+def _classify_news_write_mode(mode: object) -> NewsExecutionMode:
+    from src.news_normalized.routing import NewsWriteMode
+
+    if mode is NewsWriteMode.NORMALIZED:
+        return "direct_local"
+    if mode is NewsWriteMode.LEGACY_LOCAL:
+        return "direct_local"
+    if mode is NewsWriteMode.LEGACY_PG:
+        return "reject"
+    if mode is NewsWriteMode.BLOCKED:
+        return "reject"
+    raise UnsupportedNewsWriteMode("unsupported_news_write_mode")
 
 
 def run_source(source: str, trigger_source: str = "scheduler", *,
-               tickers: Optional[List[str]] = None,
-               skip_sync: bool = False) -> Dict[str, Any]:
-    """Execute one source end-to-end (direct-local collect → local refresh) with
-    telemetry. Same-source overlap SKIPS (never queues) — in-process AND
-    cross-process (CLI vs sidecar); IBKR sources serialize behind the shared
-    Gateway lock (also cross-process). ``skip_sync=True`` = TRUE collect-only for
-    legacy collector paths: no local-mirror refresh. PG data sync is retired and
-    stale ``sync_flag`` paths fail closed before invoking any importer.
+               tickers: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Execute one direct-local source with durable state and telemetry.
 
-    DELIBERATE exception: job_runs TELEMETRY still runs for collect-only — it is
-    metadata (not data), best-effort/swallowed, bounded by connect_timeout, and
-    load-bearing: the scheduler seeds last-attempt from these rows, so a manual
-    collect-only run SUPPRESSES an immediate scheduled re-fetch of the same
-    source. Disabling it for collect-only would re-open the double-provider-fetch
-    window it exists to close. Never raises."""
+    Same-source overlap skips rather than queues across both threads and
+    processes. IBKR sources additionally serialize behind the shared Gateway
+    lock. Never raises.
+    """
     d = SOURCES.get(source)
     if d is None:
         return {"source": source, "status": "unknown_source"}
-    if source in _N9_RETIRED_SOURCES:
+
+    news_route = None
+    news_execution_mode: Optional[NewsExecutionMode] = None
+    if d.news_direct_source is not None:
+        from src.news_normalized.routing import NewsWriteMode
+
+        news_route = _read_news_write_route_for_scheduler()
+        try:
+            news_execution_mode = _classify_news_write_mode(news_route.mode)
+        except UnsupportedNewsWriteMode:
+            return {
+                "source": source,
+                "status": "failed",
+                "code": "unsupported_news_write_mode",
+                "reason_code": "unsupported_news_write_mode",
+            }
+
+    from src.provider_config_runtime import provider_config_setup_state
+
+    setup_state = provider_config_setup_state()
+    if setup_state.required:
         return _record_result({
             "source": source,
             "status": "failed",
-            "error": _N9_RETIRED_SOURCES[source],
+            "error": setup_state.reason or "provider config setup required",
+            "code": setup_state.code,
         })
-    if not d.coverage_repair_disabled:
-        from src.provider_config_runtime import provider_config_setup_state
-
-        setup_state = provider_config_setup_state()
-        if setup_state.required:
-            return _record_result({
-                "source": source,
-                "status": "failed",
-                "error": setup_state.reason or "provider config setup required",
-                "code": setup_state.code,
-            })
-        missing_config = _provider_config_missing_for_source(source)
-        if missing_config is not None:
-            return _record_result(missing_config)
+    missing_config = _provider_config_missing_for_source(source)
+    if missing_config is not None:
+        return _record_result(missing_config)
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
@@ -1040,14 +849,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     started = datetime.now(timezone.utc)
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started   # in-mem: interval backoff (incl. for attempted skips)
-    # Classify legacy coverage state and capture news continuations BEFORE record_attempt
-    # changes last_status to running. Coverage state that cannot prove the V2 protocol is
-    # rejected fail-closed; its durable row is not changed until terminal audit succeeds.
-    coverage_legacy_state = (
-        _coverage_truth_requires_legacy_rejection(source)
-        if d.coverage_repair_disabled
-        else False
-    )
     # Capture any pending continuation NOW — before record_attempt sets last_status='running'
     # (which would mask the durable 'partial'). Used by attended skip-gates (scheduler) and
     # manual-continue branches (api/cli consume saved deferred work).
@@ -1056,12 +857,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         if d.news_direct_source is not None
         else None
     )
-    news_route = None
     try:
-        if d.news_direct_source is not None:
-            from src.news_normalized.routing import NewsWriteMode
-
-            news_route = _read_news_write_route_for_scheduler()
         normalized_pending_cont = (
             _normalized_news_continuation(pending_cont)
             if d.news_direct_source is not None
@@ -1090,11 +886,10 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         # v1.2 (v1.2a fix): durable run-start recorded ONLY after all skip-only gates pass
         # (per-source + IBKR locks). A lock-busy skip returns above WITHOUT marking durable
         # 'running' — so a skip never overwrites the prior durable outcome (last_status/error).
-        if not coverage_legacy_state:
-            try:
-                _state_store().record_attempt(source, started)
-            except Exception:  # noqa: BLE001 — local state must never break collection
-                logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
+        try:
+            _state_store().record_attempt(source, started)
+        except Exception:  # noqa: BLE001 — local state must never break collection
+            logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
 
         # telemetry: running → terminal, visible in /jobs + provider health
         store = None
@@ -1116,22 +911,10 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         writer_partial = False
         preserve_continuation_on_failure = None
         try:
-            collected = False
-            local_news_writer = False
-            if d.coverage_repair_disabled:
-                result["collect"] = {"planned": 0}
-                if coverage_legacy_state:
-                    result.update({
-                        "code": "legacy_unproven_gap",
-                        "reason_code": "legacy_unproven_gap",
-                    })
-                    raise RuntimeError("legacy_unproven_gap")
-                result["reason_code"] = "coverage_truth_read_only"
-                collected = True
-            elif d.news_direct_source is not None:
-                if news_route.mode == NewsWriteMode.BLOCKED:
+            if d.news_direct_source is not None:
+                if news_execution_mode == "reject" and news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
-                if news_route.mode == NewsWriteMode.LEGACY_PG:
+                if news_execution_mode == "reject":
                     raise RuntimeError(
                         "legacy PG news sync route retired by N9; use normalized/local "
                         "news writers"
@@ -1144,14 +927,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         "legacy local IBKR news collector route retired by N9; use "
                         "normalized IBKR news writer"
                     )
-                local_news_writer = news_route.mode == NewsWriteMode.NORMALIZED or (
-                    news_route.mode == NewsWriteMode.LEGACY_LOCAL
-                    and d.news_direct_source != "ibkr"
-                )
 
-            if d.coverage_repair_disabled:
-                pass
-            elif news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
+            if news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
                 pending_writer_continuation = (
                     pending_cont if trigger_source != "scheduler" else None
                 )
@@ -1208,7 +985,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 if writer_continuation is not None:
                     result["collect"]["continuation"] = writer_continuation
                 writer_partial = result["collect"].get("status") == "partial"
-                collected = True
             elif (
                 news_route is not None
                 and news_route.mode == NewsWriteMode.LEGACY_LOCAL
@@ -1228,7 +1004,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     provider=make_news_provider(d.news_direct_source),
                     progress_cb=lambda done, total, current: _set_progress(
                         source, done, total, current))
-                collected = True
             elif d.prices_worker:
                 scope = tickers if tickers is not None else _resolve_price_scope()
                 if not scope:
@@ -1238,8 +1013,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     sys.executable,
                     "-m",
                     "src.prices_runtime",
-                    "--source",
-                    source,
                     "--tickers",
                     ",".join(scope),
                     "--provider",
@@ -1260,7 +1033,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         raise RuntimeError(
                             _sanitized_prices_worker_failure_message(step["payload"])
                         )
-                collected = True
             elif d.adapter is not None:
                 # In-process provider adapter (import-safe collector module);
                 # resolved lazily so tests can monkeypatch the module function and
@@ -1287,25 +1059,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     # NOT to re-acquire it (non-reentrant; would self-deadlock).
                     kwargs["acquire_gateway_lock"] = False
                 result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
-                collected = True
-            if collected and d.sync_flag and not skip_sync and not local_news_writer:
-                raise RuntimeError(
-                    f"retired PG mirror sync requested for {source} ({d.sync_flag}); "
-                    "use direct-local writers"
-                )
-
-            if skip_sync:
-                # TRUE collect-only (CLI without --sync-db): PG untouched → a local
-                # mirror refresh would pull nothing; do not touch PG or the local DB.
-                result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
-            elif d.coverage_repair_disabled:
-                result["local_refresh"] = {"skipped": "coverage truth is read-only"}
-            elif local_news_writer or d.prices_worker or (d.adapter is not None and d.sync_flag is None):
-                # DIRECT local writers already wrote market_data.db themselves — a PG→local mirror
-                # would be pointless and could re-pull stale PG news/prices.
-                result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
-            else:
-                result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001
             lock_busy_reason = (
                 _market_write_lock_busy_reason(e)
@@ -1340,41 +1093,19 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             result["status"] = "succeeded" if ok else "failed"
             if not ok and preserve_continuation_on_failure is not None:
                 continuation = preserve_continuation_on_failure
-        # Durable LOCAL outcome (recoverable + visible-failure), best-effort. For a rejected
-        # legacy coverage continuation, terminal job audit must succeed before this store is
-        # changed; otherwise the only durable evidence of pending legacy work would be lost.
-        # Other sources retain the established local-state-then-telemetry order. `partial`
-        # remains local-only and maps to succeeded in job telemetry.
-        telemetry_finished = False
-        if coverage_legacy_state and store is not None and run_id is not None:
-            try:
-                telemetry_finished = bool(store.finish_run(
-                    run_id,
-                    status="succeeded" if ok else "failed",
-                    message=None if ok else error,
-                    error=error,
-                    result=result,
-                ))
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"scheduler telemetry finish failed: {e}")
-        if not coverage_legacy_state or telemetry_finished:
-            try:
-                if coverage_legacy_state:
-                    _state_store().record_attempt(source, started)
-                _state_store().record_outcome(
-                    source,
-                    status=result["status"],
-                    error=error,
-                    result=result,
-                    continuation=continuation,
-                )
-            except Exception:  # noqa: BLE001 — local state must never break collection
-                logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
-        elif coverage_legacy_state:
-            logger.warning(
-                "preserving legacy coverage state because terminal audit was not recorded"
+        # Durable local state remains the user-facing recovery source; telemetry is
+        # best-effort and cannot block collection.
+        try:
+            _state_store().record_outcome(
+                source,
+                status=result["status"],
+                error=error,
+                result=result,
+                continuation=continuation,
             )
-        if not coverage_legacy_state and store is not None and run_id is not None:
+        except Exception:  # noqa: BLE001 — local state must never break collection
+            logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
+        if store is not None and run_id is not None:
             try:
                 store.finish_run(run_id, status="succeeded" if ok else "failed",
                                  message=None if ok else error, error=error, result=result)
@@ -1614,11 +1345,6 @@ def status_snapshot() -> Dict[str, Any]:
         source_running = _SOURCE_LOCKS[source].locked()
         durable_state = durable.get(source)
         if durable_state is not None:
-            if d.coverage_repair_disabled:
-                durable_state = _coverage_truth_snapshot_state(
-                    durable_state,
-                    source_running=source_running,
-                )
             durable_state = _annotate_durable_state_for_snapshot(
                 durable_state,
                 source_running=source_running,
@@ -1629,19 +1355,13 @@ def status_snapshot() -> Dict[str, Any]:
             "description": d.description,
             "ibkr": d.ibkr,
             "provider_fetch": (
-                not d.coverage_repair_disabled
-                and (
-                    d.adapter is not None
-                    or d.news_direct_source is not None
-                    or d.prices_worker
-                )
+                d.adapter is not None
+                or d.news_direct_source is not None
+                or d.prices_worker
             ),
             "source_mode": d.source_mode,
             "write_target": d.write_target,
             "source_badges": list(d.source_badges),
-            "retired": source in _N9_RETIRED_SOURCES,
-            "retired_reason": _N9_RETIRED_SOURCES.get(source),
-            "control_mode": source_control_mode(source),
             "enabled": cfg["enabled"],
             "interval_minutes": cfg["interval_minutes"],
             "default_interval_minutes": d.default_interval_min,
