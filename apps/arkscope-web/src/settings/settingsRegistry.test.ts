@@ -73,8 +73,8 @@ const BASELINE_SECTIONS: ReadonlyArray<{
   {
     id: "data_storage",
     title: "市場資料",
-    description: "查看價格、IV、基本面與交易日資料覆蓋。",
-    keywords: ["market data", "市場資料", "price", "價格", "iv", "基本面", "coverage", "sqlite"],
+    description: "查看價格、基本面與交易日資料覆蓋。",
+    keywords: ["market data", "市場資料", "price", "價格", "基本面", "coverage", "sqlite"],
   },
   {
     id: "news_storage",
