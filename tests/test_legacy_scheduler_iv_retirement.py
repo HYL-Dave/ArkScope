@@ -207,12 +207,20 @@ def _preview_or_placeholder(paths: migration.RetirementPaths) -> migration.Previ
 
 
 def _apply(paths: migration.RetirementPaths) -> dict[str, object]:
-    preview = _preview_or_placeholder(paths)
+    manifests = sorted(paths.backup_root.glob("legacy_scheduler_iv_retirement_*/manifest.json"))
+    if manifests:
+        manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+        preview_sha256 = manifest["preview_sha256"]
+        pre_retirement_commit = manifest["pre_retirement_commit"]
+    else:
+        preview = _preview_or_placeholder(paths)
+        preview_sha256 = preview.preview_sha256
+        pre_retirement_commit = preview.pre_retirement_commit
     return dict(
         migration.apply_retirement(
             paths,
-            expected_preview_sha256=preview.preview_sha256,
-            expected_pre_retirement_commit=preview.pre_retirement_commit,
+            expected_preview_sha256=preview_sha256,
+            expected_pre_retirement_commit=pre_retirement_commit,
         )
     )
 
@@ -321,6 +329,8 @@ def test_preview_classifies_exact_targets_and_value_multisets(paths):
     assert report.profile_targets["scheduler_state_count"] == 3
     assert report.profile_targets["profile_settings_count"] == 3
     assert report.profile_targets["job_runs_count"] == 3
+    assert report.profile_targets["job_run_status_counts"] == {"failed": 1, "succeeded": 2}
+    assert "job_runs" not in report.profile_targets
     assert report.market_targets["row_count"] == 4
     assert report.market_targets["ticker_count"] == 4
     assert report.market_targets["id_bounds"] == [1, 4]
@@ -409,6 +419,16 @@ def test_archive_verification_rejects_tamper_before_apply(paths):
         ),
     )
 
+    complete_paths = _make_fixture(paths.profile_db.parent / "missing-artifact")
+    complete_preview = _preview_or_placeholder(complete_paths)
+    complete_archive = migration.create_archive(complete_paths, complete_preview)
+    manifest_path = complete_archive / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest["artifacts"]["RESTORE.txt"]
+    (complete_archive / "RESTORE.txt").unlink()
+    manifest_path.write_bytes(_json_bytes(manifest) + b"\n")
+    _assert_code("archive_tampered", lambda: migration.verify_archive(complete_archive))
+
 
 def test_apply_removes_only_target_operational_state_and_iv_payload(paths):
     result = _apply(paths)
@@ -457,10 +477,29 @@ def test_apply_resumes_after_profile_owner_checkpoint(paths, monkeypatch):
     monkeypatch.setattr(migration, "_after_phase_checkpoint", interrupt)
     with pytest.raises(RuntimeError, match="interrupt after profile"):
         _apply(paths)
+    checkpoint = next(paths.backup_root.glob("*/manifest.json"))
+    assert json.loads(checkpoint.read_text(encoding="utf-8"))["phase"] == "profile_applied"
     monkeypatch.setattr(migration, "_after_phase_checkpoint", original)
     result = _apply(paths)
     assert result["phase"] == "complete"
     assert result["resumed_from"] == "profile_applied"
+
+    pre_checkpoint = _make_fixture(paths.profile_db.parent / "pre-profile-checkpoint")
+    original_write = migration._write_manifest_phase
+    raised_before_write = False
+
+    def interrupt_before_write(archive_dir, manifest, phase, **kwargs):
+        nonlocal raised_before_write
+        if phase == "profile_applied" and not raised_before_write:
+            raised_before_write = True
+            raise RuntimeError("interrupt before profile checkpoint")
+        return original_write(archive_dir, manifest, phase, **kwargs)
+
+    monkeypatch.setattr(migration, "_write_manifest_phase", interrupt_before_write)
+    with pytest.raises(RuntimeError, match="interrupt before profile checkpoint"):
+        _apply(pre_checkpoint)
+    monkeypatch.setattr(migration, "_write_manifest_phase", original_write)
+    assert _apply(pre_checkpoint)["phase"] == "complete"
 
 
 def test_apply_resumes_after_market_owner_checkpoint(paths, monkeypatch):
@@ -477,10 +516,30 @@ def test_apply_resumes_after_market_owner_checkpoint(paths, monkeypatch):
     monkeypatch.setattr(migration, "_after_phase_checkpoint", interrupt)
     with pytest.raises(RuntimeError, match="interrupt after market"):
         _apply(paths)
+    checkpoint = next(paths.backup_root.glob("*/manifest.json"))
+    assert json.loads(checkpoint.read_text(encoding="utf-8"))["phase"] == "market_applied"
+    next(paths.iv_parquet_dir.glob("*.parquet")).unlink()
     monkeypatch.setattr(migration, "_after_phase_checkpoint", original)
     result = _apply(paths)
     assert result["phase"] == "complete"
     assert result["resumed_from"] == "market_applied"
+
+    pre_checkpoint = _make_fixture(paths.profile_db.parent / "pre-market-checkpoint")
+    original_write = migration._write_manifest_phase
+    raised_before_write = False
+
+    def interrupt_before_write(archive_dir, manifest, phase, **kwargs):
+        nonlocal raised_before_write
+        if phase == "market_applied" and not raised_before_write:
+            raised_before_write = True
+            raise RuntimeError("interrupt before market checkpoint")
+        return original_write(archive_dir, manifest, phase, **kwargs)
+
+    monkeypatch.setattr(migration, "_write_manifest_phase", interrupt_before_write)
+    with pytest.raises(RuntimeError, match="interrupt before market checkpoint"):
+        _apply(pre_checkpoint)
+    monkeypatch.setattr(migration, "_write_manifest_phase", original_write)
+    assert _apply(pre_checkpoint)["phase"] == "complete"
 
 
 def test_second_apply_is_byte_and_row_idempotent(paths):
