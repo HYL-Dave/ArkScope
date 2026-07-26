@@ -15,7 +15,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -161,28 +161,42 @@ def _schema_entries(
     return entries
 
 
-def _ordered_table_rows(connection: sqlite3.Connection, table: str) -> tuple[list[str], list[list[object]]]:
+def _ordered_table_cursor(
+    connection: sqlite3.Connection,
+    table: str,
+) -> tuple[list[str], sqlite3.Cursor]:
     columns = [row[1] for row in connection.execute(f"PRAGMA table_info({_quote(table)})")]
     if not columns:
-        return [], []
+        return [], connection.execute("SELECT 1 WHERE 0")
     try:
         cursor = connection.execute(f"SELECT * FROM {_quote(table)} ORDER BY rowid")
-        rows = [_normalize_row(row) for row in cursor]
     except sqlite3.OperationalError:
         order = ", ".join(_quote(column) for column in columns)
-        rows = [
-            _normalize_row(row)
-            for row in connection.execute(f"SELECT * FROM {_quote(table)} ORDER BY {order}")
-        ]
-    return columns, rows
+        cursor = connection.execute(f"SELECT * FROM {_quote(table)} ORDER BY {order}")
+    return columns, cursor
+
+
+def _update_framed_digest(digest: Any, value: object) -> None:
+    payload = _canonical_bytes(value)
+    digest.update(len(payload).to_bytes(8, byteorder="big"))
+    digest.update(payload)
 
 
 def _logical_database_digest(path: Path, *, domain: str, exclude_targets: bool) -> str:
-    payload: dict[str, object] = {"schema": [], "tables": []}
+    digest = hashlib.sha256()
+    _update_framed_digest(
+        digest,
+        {"version": 2, "domain": domain, "exclude_targets": exclude_targets},
+    )
     with _connect_read_only(path) as connection:
-        payload["schema"] = _schema_entries(
-            connection,
-            exclude_market_target=exclude_targets and domain == "market",
+        _update_framed_digest(
+            digest,
+            {
+                "schema": _schema_entries(
+                    connection,
+                    exclude_market_target=exclude_targets and domain == "market",
+                )
+            },
         )
         tables = [
             row[0]
@@ -194,19 +208,23 @@ def _logical_database_digest(path: Path, *, domain: str, exclude_targets: bool) 
         for table in tables:
             if exclude_targets and domain == "market" and table == "iv_history":
                 continue
-            columns, rows = _ordered_table_rows(connection, table)
-            if exclude_targets and domain == "profile":
-                if table == "scheduler_state" and "source" in columns:
-                    position = columns.index("source")
-                    rows = [row for row in rows if row[position] not in TARGET_SOURCES]
-                elif table == "profile_settings" and "key" in columns:
-                    position = columns.index("key")
-                    rows = [row for row in rows if not _is_target_setting(row[position])]
-            elif exclude_targets and domain == "market" and table == "market_sync_meta":
-                position = columns.index("domain")
-                rows = [row for row in rows if row[position] != "iv"]
-            payload["tables"].append({"name": table, "columns": columns, "rows": rows})
-    return _sha256_bytes(_canonical_bytes(payload))
+            columns, cursor = _ordered_table_cursor(connection, table)
+            _update_framed_digest(digest, {"table": table, "columns": columns})
+            for raw_row in cursor:
+                row = _normalize_row(raw_row)
+                if exclude_targets and domain == "profile":
+                    if table == "scheduler_state" and "source" in columns:
+                        if row[columns.index("source")] in TARGET_SOURCES:
+                            continue
+                    elif table == "profile_settings" and "key" in columns:
+                        if _is_target_setting(row[columns.index("key")]):
+                            continue
+                elif exclude_targets and domain == "market" and table == "market_sync_meta":
+                    if row[columns.index("domain")] == "iv":
+                        continue
+                _update_framed_digest(digest, row)
+            _update_framed_digest(digest, {"table_end": table})
+    return digest.hexdigest()
 
 
 def _database_fingerprint(path: Path, *, domain: str) -> Mapping[str, object]:

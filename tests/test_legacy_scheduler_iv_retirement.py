@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import stat
+import tracemalloc
 from pathlib import Path
 
 import pandas as pd
@@ -350,6 +351,34 @@ def test_preview_is_read_only_and_deterministic(paths):
     assert first == second
     assert not paths.backup_root.exists()
     assert {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in source_paths} == before
+
+
+def test_logical_database_digest_is_memory_bounded(tmp_path):
+    database = tmp_path / "large-logical-digest.db"
+    payload = "x" * 1024
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE bulk_rows (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)")
+        connection.executemany(
+            "INSERT INTO bulk_rows (id, payload) VALUES (?, ?)",
+            ((index, payload) for index in range(25_000)),
+        )
+
+    tracemalloc.start()
+    first = migration._logical_database_digest(
+        database,
+        domain="profile",
+        exclude_targets=False,
+    )
+    _, peak_bytes = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    second = migration._logical_database_digest(
+        database,
+        domain="profile",
+        exclude_targets=False,
+    )
+
+    assert first == second
+    assert peak_bytes < 8 * 1024 * 1024
 
 
 def test_preview_rejects_schema_or_index_drift(tmp_path):
