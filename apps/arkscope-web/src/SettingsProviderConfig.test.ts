@@ -212,9 +212,6 @@ vi.mock("./api", async (importOriginal) => {
           source_mode: "direct_local",
           write_target: "market_data.db",
           source_badges: ["Polygon", "直寫本地"],
-          retired: false,
-          retired_reason: null,
-          control_mode: "scheduled",
           enabled: true,
           interval_minutes: 30,
           default_interval_minutes: 30,
@@ -246,9 +243,6 @@ vi.mock("./api", async (importOriginal) => {
           source_mode: "direct_local",
           write_target: "market_data.db",
           source_badges: [],
-          retired: false,
-          retired_reason: null,
-          control_mode: "scheduled",
           enabled: true,
           interval_minutes: 120,
           default_interval_minutes: 120,
@@ -333,20 +327,17 @@ vi.mock("./api", async (importOriginal) => {
           },
           job_name: "collect.ibkr_news",
         },
-        writer_lock_deferred: {
-          label: "PLANTED_UNKNOWN_SCHEDULE_LABEL",
-          description: "PLANTED_UNKNOWN_SCHEDULE_DESCRIPTION",
+        finnhub_news: {
+          label: "PLANTED_SCHEDULE_FINNHUB_LABEL",
+          description: "PLANTED_SCHEDULE_FINNHUB_DESCRIPTION",
           ibkr: false,
           provider_fetch: true,
           source_mode: "direct_local",
           write_target: "market_data.db",
           source_badges: [],
-          retired: false,
-          retired_reason: null,
-          control_mode: "scheduled",
           enabled: true,
-          interval_minutes: 30,
-          default_interval_minutes: 30,
+          interval_minutes: 60,
+          default_interval_minutes: 60,
           running: false,
           progress: null,
           last_attempt_at: "2026-07-04T00:00:00+00:00",
@@ -358,28 +349,25 @@ vi.mock("./api", async (importOriginal) => {
             last_attempt: "2026-07-04T00:00:00+00:00",
             updated_at: "2026-07-04T00:01:00+00:00",
           },
-          job_name: "collect.writer_lock_deferred",
+          job_name: "collect.finnhub_news",
         },
-        price_backfill: {
-          label: "PLANTED_SCHEDULE_BACKFILL_LABEL",
-          description: "PLANTED_SCHEDULE_BACKFILL_DESCRIPTION",
+        ibkr_prices: {
+          label: "PLANTED_SCHEDULE_IBKR_PRICES_LABEL",
+          description: "PLANTED_SCHEDULE_IBKR_PRICES_DESCRIPTION",
           ibkr: true,
-          provider_fetch: false,
-          source_mode: "coverage_read_only",
-          write_target: "none",
+          provider_fetch: true,
+          source_mode: "direct_local",
+          write_target: "market_data.db",
           source_badges: [],
-          retired: false,
-          retired_reason: null,
-          control_mode: "read_only",
-          enabled: false,
-          interval_minutes: 360,
-          default_interval_minutes: 360,
+          enabled: true,
+          interval_minutes: 60,
+          default_interval_minutes: 60,
           running: false,
           progress: null,
           last_attempt_at: null,
           last_result: null,
           durable_state: null,
-          job_name: "collect.price_backfill",
+          job_name: "collect.ibkr_prices",
         },
       },
     })),
@@ -793,7 +781,7 @@ describe("Settings provider config authority", () => {
     expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("新觸發已略過");
   });
 
-  it("shows_disabled_provider_and_read_only_schedule_states_as_neutral_text", async () => {
+  it("renders_disabled_providers_as_neutral_and_all_four_schedule_rows_as_controllable", async () => {
     await renderDataSources();
     const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("retired_provider"));
@@ -803,45 +791,56 @@ describe("Settings provider config authority", () => {
     expect(providerRow.querySelector(".ds-chip")).toBeNull();
     expect(providerRow.querySelector(".muted")).not.toBeNull();
 
-    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("價格缺口補抓"));
-    if (!row) throw new Error("missing price_backfill row");
-    expect(row.textContent).toContain("唯讀");
-    expect(row.querySelector("input")).toBeNull();
-    expect(row.querySelector("button")).toBeNull();
-    expect(row.textContent).not.toContain("排程關閉");
-    expect(row.querySelectorAll("td")[3]?.textContent).toBe("唯讀");
+    const zhLabels = ["Polygon 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價"];
+    const zhRows = zhLabels.map((label) => {
+      const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+        node.textContent?.includes(label));
+      if (!row) throw new Error(`missing active schedule row: ${label}`);
+      return row;
+    });
+    expect(zhRows).toHaveLength(4);
+    for (const row of zhRows) {
+      expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
+      expect(row.querySelector("input[type='number']")).not.toBeNull();
+      expect(Array.from(row.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("執行"))).toBe(true);
+      expect(row.textContent).not.toMatch(/唯讀|已退役/);
+    }
+    expect(host!.textContent).not.toMatch(/價格缺口補抓|本地鏡像增量|IV 歷史/);
 
     await act(async () => { await i18n.changeLanguage("en"); });
-    const englishRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Price Gap Backfill"));
-    if (!englishRow) throw new Error("missing English price_backfill row");
-    expect(englishRow.textContent).toContain("Read-only");
-    expect(englishRow.textContent).toContain(
-      "Coverage v2 retains historical run records only; it does not schedule, backfill, or write price data.",
-    );
-    expect(englishRow.querySelector("input")).toBeNull();
-    expect(englishRow.querySelector("button")).toBeNull();
+    const enLabels = ["Polygon News", "Finnhub News", "IBKR News", "IBKR Prices"];
+    for (const label of enLabels) {
+      const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+        node.textContent?.includes(label));
+      if (!row) throw new Error(`missing active English schedule row: ${label}`);
+      expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
+      expect(row.querySelector("input[type='number']")).not.toBeNull();
+      expect(Array.from(row.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("Run"))).toBe(true);
+      expect(row.textContent).not.toMatch(/Read-only|Retired/);
+    }
+    expect(host!.textContent).not.toMatch(/Price Gap Backfill|Local Mirror Incremental|IV History/);
   });
 
   it("renders_persisted_skipped_history_as_neutral_instead_of_never_run", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("writer_lock_deferred"));
+      node.textContent?.includes("Finnhub 新聞"));
     if (!row) throw new Error("missing durable skipped row");
     expect(row.textContent).toContain("上次已跳過");
     expect(row.textContent).not.toContain("尚未執行");
     expect(row.querySelector(".ui-status-badge")).toBeNull();
   });
 
-  it("does_not_render_storage_route_source_badges", async () => {
+  it("does_not_render_backend_storage_route_badges_for_active_schedule_rows", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("價格缺口補抓"));
-    if (!row) throw new Error("missing price_backfill row");
-    expect(row.querySelector("td")?.textContent).toContain("價格缺口補抓");
+      node.textContent?.includes("IBKR 股價"));
+    if (!row) throw new Error("missing IBKR prices row");
+    expect(row.querySelector("td")?.textContent).toContain("IBKR 股價");
     expect(row.querySelector("td")?.textContent).toContain(
-      "Coverage v2 僅保留歷史執行紀錄；不會排程、補抓或寫入價格資料。",
+      "為目前全部標的擷取 15 分鐘價格並直接寫入本機市場資料庫。",
     );
     expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
     expect(row.textContent).not.toContain("IBKR/Polygon");
@@ -1173,8 +1172,9 @@ describe("Settings provider config authority", () => {
       expect(host!.textContent).toContain(
         "Write incremental Polygon news to local normalized news data.",
       );
-      expect(host!.textContent).toContain("Price Gap Backfill");
-      expect(host!.textContent).toContain("writer_lock_deferred");
+      expect(host!.textContent).toContain("Finnhub News");
+      expect(host!.textContent).toContain("IBKR Prices");
+      expect(host!.textContent).not.toMatch(/Price Gap Backfill|Local Mirror Incremental|IV History/);
       expect(host!.textContent).toContain("No signal");
       expect(host!.textContent).toContain("No key required");
       expect(host!.textContent).toContain("Snapshot available: 11 series · 29,571 observations");
@@ -1193,8 +1193,10 @@ describe("Settings provider config authority", () => {
         "PLANTED_SCHEDULE_POLYGON_LABEL",
         "PLANTED_SCHEDULE_POLYGON_DESCRIPTION",
         "PLANTED_SCHEDULE_IBKR_LABEL",
-        "PLANTED_UNKNOWN_SCHEDULE_LABEL",
-        "PLANTED_SCHEDULE_BACKFILL_LABEL",
+        "PLANTED_SCHEDULE_FINNHUB_LABEL",
+        "PLANTED_SCHEDULE_FINNHUB_DESCRIPTION",
+        "PLANTED_SCHEDULE_IBKR_PRICES_LABEL",
+        "PLANTED_SCHEDULE_IBKR_PRICES_DESCRIPTION",
       ]) {
         expect(host!.textContent).not.toContain(raw);
       }

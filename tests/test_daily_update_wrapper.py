@@ -60,20 +60,21 @@ def test_help_exits_zero_with_full_flag_set():
     r = _run("--help")
     assert r.returncode == 0
     for flag in ("--status", "--all", "--news", "--polygon", "--finnhub",
-                 "--ibkr-news", "--ibkr-prices", "--iv-history", "--dry-run",
-                 "--parallel", "--quiet", "--sync-db", "--scores",
+                 "--ibkr-news", "--ibkr-prices", "--dry-run",
+                 "--parallel", "--quiet", "--scores",
                  "--tickers", "--scope"):
         assert flag in r.stdout, f"flag {flag} missing from --help"
+    assert "--iv-history" not in r.stdout
+    assert "--sync-db" not in r.stdout
 
 
 def test_protected_command_dry_run_plan(universe_dbs):
     # The protected gate command in plan-only mode: same source step set as the
-    # pre-wrapper orchestrator (news x3 + prices; IV stays opt-in), exit 0.
+    # active direct collectors (news x3 + prices), exit 0.
     r = _run(
         "--all",
         "--scope",
         "active-universe",
-        "--sync-db",
         "--dry-run",
         profile_db=universe_dbs["profile_db"],
         sa_db=universe_dbs["sa_db"],
@@ -82,34 +83,26 @@ def test_protected_command_dry_run_plan(universe_dbs):
     assert r.returncode == 0
     for source in ("polygon_news", "finnhub_news", "ibkr_news", "ibkr_prices"):
         assert source in out
-    assert "iv_history" not in out          # --all never sweeps IV
-    assert "db sync" in out                  # --sync-db reflected in the plan
+    assert "iv_history" not in out
+    assert "db sync" not in out
+    assert "local mirror refresh" not in out
     assert "Dry run complete" in out
 
 
-def test_dry_run_without_sync_db_collect_only():
+def test_dry_run_reports_direct_local_collection_without_mirror_controls():
     r = _run("--news", "--tickers", "AAPL", "--dry-run")
     out = r.stdout + r.stderr
     assert r.returncode == 0
     assert "polygon_news" in out and "ibkr_prices" not in out
-    assert "db sync" not in out              # collect-only: PG sync skipped
-    # TRUE collect-only: the plan must not promise a local mirror refresh either
-    # (PG untouched → nothing to mirror; run_source skips it when skip_sync=True)
+    assert "db sync" not in out
     assert "local mirror refresh" not in out
-    assert "collect (only)" in out
+    assert "collect (only)" not in out
 
 
 def test_no_scope_errors():
     r = _run("--news", "--dry-run")
     assert r.returncode == 1
     assert "explicit ticker scope required" in (r.stdout + r.stderr)
-
-
-def test_iv_history_opt_in_only():
-    r = _run("--iv-history", "--tickers", "AAPL", "--dry-run")
-    out = r.stdout + r.stderr
-    assert r.returncode == 0
-    assert "iv_history" in out and "polygon_news" not in out
 
 
 def test_scores_flag_is_retired_and_does_not_shell_to_pg_importer():

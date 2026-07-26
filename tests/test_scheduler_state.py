@@ -24,13 +24,13 @@ def _dt(s):
 
 
 def test_record_attempt_then_outcome(store):
-    store.record_attempt("price_backfill", _dt("2026-06-24T10:00:00"))
-    row = store.get("price_backfill")
+    store.record_attempt("polygon_news", _dt("2026-06-24T10:00:00"))
+    row = store.get("polygon_news")
     assert row["last_attempt"] == "2026-06-24T10:00:00+0000"
     assert row["last_status"] == "running"          # attempt → running until outcome
-    store.record_outcome("price_backfill", status="succeeded", error=None,
+    store.record_outcome("polygon_news", status="succeeded", error=None,
                           result={"rows_added": 5})
-    row = store.get("price_backfill")
+    row = store.get("polygon_news")
     assert row["last_status"] == "succeeded" and row["last_error"] is None
     assert row["last_attempt"] == "2026-06-24T10:00:00+0000"   # outcome preserves last_attempt
     assert row["last_result"] == {"rows_added": 5}
@@ -49,15 +49,15 @@ def test_outcome_records_and_then_clears_error(store):
 
 def test_partial_status_and_continuation_roundtrip(store):
     # partial is a LOCAL-only status; continuation carries the remaining scope (v1.3).
-    store.record_attempt("price_backfill", _dt("2026-06-24T10:00:00"))
-    store.record_outcome("price_backfill", status="partial", error=None,
+    store.record_attempt("ibkr_news", _dt("2026-06-24T10:00:00"))
+    store.record_outcome("ibkr_news", status="partial", error=None,
                          result={"done": 20}, continuation={"deferred": ["NVDA", "TSLA"]})
-    row = store.get("price_backfill")
+    row = store.get("ibkr_news")
     assert row["last_status"] == "partial"
     assert row["continuation"] == {"deferred": ["NVDA", "TSLA"]}
     # a clean run clears the continuation
-    store.record_outcome("price_backfill", status="succeeded", error=None, result={}, continuation=None)
-    assert store.get("price_backfill")["continuation"] is None
+    store.record_outcome("ibkr_news", status="succeeded", error=None, result={}, continuation=None)
+    assert store.get("ibkr_news")["continuation"] is None
 
 
 def test_last_attempts_for_seeding(store):
@@ -90,11 +90,11 @@ def test_attempt_does_not_clobber_prior_outcome_fields(store):
 def test_reconcile_interrupted_running_marks_terminal(store):
     store.record_attempt("ibkr_news", _dt("2026-06-24T10:00:00"))
     store.record_outcome("polygon_news", status="succeeded", error=None, result={"ok": True})
-    store.record_attempt("price_backfill", _dt("2026-06-24T11:00:00"))
+    store.record_attempt("finnhub_news", _dt("2026-06-24T11:00:00"))
 
     changed = store.reconcile_interrupted_running(error="sidecar restarted before run finished")
 
-    assert changed == ["ibkr_news", "price_backfill"]
+    assert changed == ["finnhub_news", "ibkr_news"]
     ibkr = store.get("ibkr_news")
     assert ibkr["last_status"] == "failed"
     assert ibkr["last_error"] == "sidecar restarted before run finished"

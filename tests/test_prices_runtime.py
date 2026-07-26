@@ -3,13 +3,22 @@ import json
 import pytest
 
 
-def test_prices_worker_requires_source_and_tickers():
+def test_prices_worker_requires_tickers_without_source_selector():
     from src import prices_runtime as worker
 
     with pytest.raises(SystemExit) as caught:
         worker.parse_args([])
 
     assert caught.value.code == 2
+
+    parsed = worker.parse_args(["--tickers", "AAPL,MSFT"])
+    assert parsed.tickers == "AAPL,MSFT"
+    assert parsed.provider == "ibkr"
+    assert not hasattr(parsed, "source")
+
+    with pytest.raises(SystemExit) as retired:
+        worker.parse_args(["--source", "ibkr_prices", "--tickers", "AAPL"])
+    assert retired.value.code == 2
 
 
 def test_prices_worker_prints_sanitized_success_json(monkeypatch, capsys):
@@ -29,7 +38,6 @@ def test_prices_worker_prints_sanitized_success_json(monkeypatch, capsys):
     )
 
     code = worker.main([
-        "--source", "ibkr_prices",
         "--tickers", "AAPL,NVDA",
         "--gateway-lock-held",
     ])
@@ -54,7 +62,7 @@ def test_prices_worker_prints_sanitized_error_json(monkeypatch, capsys):
 
     monkeypatch.setattr(worker, "_run_worker", boom)
 
-    code = worker.main(["--source", "ibkr_prices", "--tickers", "AAPL"])
+    code = worker.main(["--tickers", "AAPL"])
 
     assert code == 1
     payload = json.loads(capsys.readouterr().out)

@@ -13,14 +13,20 @@ from types import SimpleNamespace
 
 import pytest
 
+from src import prices_runtime
 import src.service.data_scheduler as ds
 from src.active_universe import ActiveUniverseUnavailable
 from src.profile_state import ProfileStateStore
-from src.service.job_runs_store import JobRunsLocalStore as _RealJobRunsLocalStore
 
 _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
-_REAL_LOCAL_REFRESH = ds._local_refresh
 _REAL_RESOLVE_PRICE_SCOPE = ds._resolve_price_scope
+ACTIVE_SOURCE_IDS = {
+    "polygon_news",
+    "finnhub_news",
+    "ibkr_news",
+    "ibkr_prices",
+}
+RETIRED_SOURCE_IDS = {"price_backfill", "local_incremental", "iv_history"}
 
 
 @pytest.fixture(autouse=True)
@@ -55,9 +61,8 @@ def hermetic(tmp_path, monkeypatch):
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
     # (a live sidecar's flocks would make these tests skip spuriously, and vice versa)
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
-    # default stubs: no real subprocess, no real local refresh, no telemetry
+    # default stubs: no real subprocess or telemetry
     monkeypatch.setattr(ds, "_run_subprocess", lambda argv: {"returncode": 0})
-    monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
     # active-universe scope: stub a non-empty default so price/universe sources are
     # hermetic (no real profile DB). Tests asserting the empty-scope path override this.
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
@@ -94,6 +99,7 @@ def hermetic(tmp_path, monkeypatch):
 # --- config -------------------------------------------------------------------
 
 def test_defaults_everything_disabled():
+    assert set(ds.SOURCES) == ACTIVE_SOURCE_IDS
     for source in ds.SOURCES:
         cfg = ds.source_config(source)
         assert cfg["enabled"] is False  # nothing fetches until the user opts in
@@ -101,16 +107,12 @@ def test_defaults_everything_disabled():
 
 
 def test_no_active_runtime_source_uses_migrate_to_supabase_sync():
-    offenders = []
-    for name, source_def in ds.SOURCES.items():
-        if (
-            source_def.sync_flag
-            and name not in ds._N9_RETIRED_SOURCES
-            and source_def.news_direct_source is None
-        ):
-            offenders.append((name, source_def.sync_flag))
+    source = Path(ds.__file__).read_text(encoding="utf-8")
 
-    assert offenders == []
+    assert set(ds.SOURCES) == ACTIVE_SOURCE_IDS
+    assert all(not hasattr(source_def, "sync_flag") for source_def in ds.SOURCES.values())
+    assert "migrate_to_supabase.py" not in source
+    assert "_local_refresh(" not in source
 
 
 def test_scheduler_runtime_no_longer_references_migrate_to_supabase_script():
@@ -120,17 +122,24 @@ def test_scheduler_runtime_no_longer_references_migrate_to_supabase_script():
 def test_scheduler_source_defs_have_no_legacy_collector_plumbing():
     from dataclasses import fields
 
-    assert "collector" not in {field.name for field in fields(ds.SourceDef)}
-    assert all(not hasattr(source_def, "collector") for source_def in ds.SOURCES.values())
+    field_names = {field.name for field in fields(ds.SourceDef)}
+
+    assert set(ds.SOURCES) == ACTIVE_SOURCE_IDS
+    assert {"collector", "sync_flag", "coverage_repair_disabled"}.isdisjoint(field_names)
+    for source_def in ds.SOURCES.values():
+        assert not hasattr(source_def, "collector")
+        assert not hasattr(source_def, "sync_flag")
+        assert not hasattr(source_def, "coverage_repair_disabled")
 
 
 def test_status_snapshot_provider_fetch_tracks_live_fetch_paths():
     snap = ds.status_snapshot()
 
-    for source in ("polygon_news", "finnhub_news", "ibkr_news", "ibkr_prices"):
+    assert set(snap) == ACTIVE_SOURCE_IDS
+    for source in ACTIVE_SOURCE_IDS:
         assert snap[source]["provider_fetch"] is True
-    assert snap["price_backfill"]["provider_fetch"] is False
-    assert snap["local_incremental"]["provider_fetch"] is False
+        assert "control_mode" not in snap[source]
+        assert "retired" not in snap[source]
 
 
 def test_set_config_roundtrip_and_clamp():
@@ -161,7 +170,7 @@ def test_is_due_matrix():
 
 def test_tick_fires_only_enabled_and_due():
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
-    ds._LAST_ATTEMPT["local_incremental"] = _NOW - timedelta(minutes=5)  # not due
+    ds._LAST_ATTEMPT["ibkr_prices"] = _NOW - timedelta(minutes=5)  # not due
     fired = []
     out = ds.tick_once(_NOW, fire=fired.append)
     assert out == fired == ["finnhub_news"]
@@ -207,7 +216,6 @@ def test_startup_burst_defers_all_extra_market_writers(monkeypatch):
         "finnhub_news",
         "ibkr_news",
         "ibkr_prices",
-        "price_backfill",
     }
     fired = []
     skipped = []
@@ -223,8 +231,7 @@ def test_startup_burst_defers_all_extra_market_writers(monkeypatch):
     out = ds.tick_once(now, fire=fired.append)
 
     assert out == fired
-    assert "price_backfill" in fired
-    actual_writers = due_sources - {"price_backfill"}
+    actual_writers = due_sources
     assert len(set(fired) & actual_writers) == 1
     deferred = [row for row in skipped if row.get("skip_kind") == "market_writer_backpressure"]
     assert {row["source"] for row in deferred} == actual_writers - set(fired)
@@ -314,7 +321,7 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     # NO --news PG sync subprocess, NO local mirror. (OFF path = the test above, unchanged.)
     import src.collectors.polygon_news as cpn
     hermetic.set_setting("use_local_news", None)  # unset resolves to the production default ON
-    calls = {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 0, "provider": None}
+    calls = {"run_incremental": 0, "sync": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental", calls["run_incremental"] + 1))
 
@@ -323,8 +330,6 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
             calls["sync"] += 1
         return {"returncode": 0}
     monkeypatch.setattr(ds, "_run_subprocess", _subproc)
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (calls.__setitem__("refresh", calls["refresh"] + 1), {"ok": True})[1])
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: (calls.__setitem__("provider", source), object())[1])
 
@@ -338,8 +343,7 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     assert calls["direct"] == 1 and calls["provider"] == "polygon"   # direct writer + provider used
     assert calls["run_incremental"] == 0                             # NOT the Parquet adapter
     assert calls["sync"] == 0                                        # NO --news PG sync
-    assert calls["refresh"] == 0                                     # NO local mirror
-    assert "skipped" in res["local_refresh"]                         # mirror explicitly skipped
+    assert "local_refresh" not in res
     assert res["collect"]["source"] == "polygon" and res["ticker_count"] == 2
 
 
@@ -354,6 +358,131 @@ def _patch_news_write_route(monkeypatch, mode, reason="test route"):
 
     monkeypatch.setattr(routing, "read_news_write_route", _read_route)
     return calls
+
+
+def test_news_write_mode_classifier_is_exhaustive_for_current_modes():
+    import src.news_normalized.routing as routing
+
+    assert {
+        mode: ds._classify_news_write_mode(mode)
+        for mode in routing.NewsWriteMode
+    } == {
+        routing.NewsWriteMode.NORMALIZED: "direct_local",
+        routing.NewsWriteMode.LEGACY_LOCAL: "direct_local",
+        routing.NewsWriteMode.LEGACY_PG: "reject",
+        routing.NewsWriteMode.BLOCKED: "reject",
+    }
+
+
+def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_telemetry(
+    monkeypatch,
+):
+    calls = {
+        "provider_setup": 0,
+        "provider_config": 0,
+        "source_lock": 0,
+        "source_flock": 0,
+        "adapter": 0,
+        "provider": 0,
+        "writer": 0,
+        "json_worker": 0,
+        "prices_worker": 0,
+        "subprocess": 0,
+        "telemetry": 0,
+    }
+
+    class _CountingLock:
+        def __init__(self, name):
+            self.name = name
+
+        def acquire(self, *args, **kwargs):
+            calls[self.name] += 1
+            return True
+
+        def release(self):
+            return None
+
+        def locked(self):
+            return False
+
+    class _Telemetry:
+        def create_run(self, *args, **kwargs):
+            calls["telemetry"] += 1
+            return 1
+
+        def finish_run(self, *args, **kwargs):
+            calls["telemetry"] += 1
+            return True
+
+    def _provider_setup():
+        calls["provider_setup"] += 1
+        return SimpleNamespace(required=False, reason=None, code=None)
+
+    def _provider_config(source):
+        calls["provider_config"] += 1
+        return None
+
+    def _called(name, result):
+        def _inner(*args, **kwargs):
+            calls[name] += 1
+            return result
+        return _inner
+
+    monkeypatch.setattr(
+        ds,
+        "_read_news_write_route_for_scheduler",
+        lambda: SimpleNamespace(mode=object(), reason="future unreviewed mode"),
+    )
+    monkeypatch.setattr(
+        "src.provider_config_runtime.provider_config_setup_state",
+        _provider_setup,
+    )
+    monkeypatch.setattr(ds, "_provider_config_missing_for_source", _provider_config)
+    monkeypatch.setitem(ds._SOURCE_LOCKS, "polygon_news", _CountingLock("source_lock"))
+    monkeypatch.setitem(ds._SOURCE_FLOCKS, "polygon_news", _CountingLock("source_flock"))
+    monkeypatch.setattr(
+        "src.service.job_runs_store.get_job_runs_store",
+        lambda dal: _Telemetry(),
+    )
+    monkeypatch.setattr(
+        "src.collectors.polygon_news.run_incremental",
+        _called("adapter", {"mode": "up_to_date", "new_articles": 0}),
+    )
+    monkeypatch.setattr(
+        "src.news_providers.make_news_provider",
+        _called("provider", object()),
+    )
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        _called("writer", {"source": "polygon", "tickers_scanned": 0}),
+    )
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        _called("json_worker", {"returncode": 0, "payload": {}}),
+    )
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_prices_worker_subprocess",
+        _called("prices_worker", {"returncode": 0, "payload": {}}),
+    )
+    monkeypatch.setattr(
+        ds,
+        "_run_subprocess",
+        _called("subprocess", {"returncode": 0}),
+    )
+
+    result = ds.run_source("polygon_news", trigger_source="manual")
+
+    assert result == {
+        "source": "polygon_news",
+        "status": "failed",
+        "code": "unsupported_news_write_mode",
+        "reason_code": "unsupported_news_write_mode",
+    }
+    assert "ok" not in result
+    assert calls == {name: 0 for name in calls}
+    assert ds._state_store().get("polygon_news") is None
 
 
 @pytest.mark.parametrize(
@@ -394,9 +523,6 @@ def test_normalized_news_route_calls_writer_under_market_lock(
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
                             AssertionError("PG sync subprocess must not run")))
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(
-                            AssertionError("_local_refresh must not run")))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     events = []
@@ -492,7 +618,7 @@ def test_normalized_news_route_calls_writer_under_market_lock(
     assert res["collect"]["articles_seen"] == 2
     assert res["collect"]["legacy_rows_inserted"] == 1
     assert res["ticker_count"] == 2
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert "local_refresh" not in res
     assert events == [
         ("connect", "/tmp/test-market-data.db", 10.0),
         ("store", fake_conn),
@@ -516,9 +642,6 @@ def test_normalized_news_route_preserves_writer_partial_continuation(monkeypatch
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
                             AssertionError("PG sync subprocess must not run")))
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(
-                            AssertionError("_local_refresh must not run")))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     class FakeConn:
@@ -642,9 +765,6 @@ def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monk
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
                             AssertionError("PG sync subprocess must not run")))
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(
-                            AssertionError("_local_refresh must not run")))
     monkeypatch.setattr("src.news_providers.make_news_provider", lambda source, **k: object())
     direct_calls = []
 
@@ -660,7 +780,7 @@ def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monk
     assert res["status"] == "succeeded"
     assert direct_calls == [("polygon", ["AAPL", "NVDA"])]
     assert res["collect"]["source"] == "polygon"
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert "local_refresh" not in res
 
 
 def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypatch):
@@ -683,7 +803,7 @@ def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypa
     )
     _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
                             "blocked rollback route")
-    calls = {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    calls = {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0}
     monkeypatch.setattr(ds, "_run_normalized_news_writer",
                         lambda *a, **k: calls.__setitem__(
                             "normalized", calls["normalized"] + 1))
@@ -696,15 +816,12 @@ def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypa
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (calls.__setitem__(
                             "sync", calls["sync"] + 1), {"returncode": 0})[1])
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (calls.__setitem__(
-                            "refresh", calls["refresh"] + 1), {"ok": True})[1])
 
     res = ds.run_source("polygon_news", trigger_source="scheduler")
 
     assert res["status"] == "failed"
     assert "blocked rollback route" in res["error"]
-    assert calls == {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    assert calls == {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0}
 
 
 def test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_it(
@@ -872,9 +989,6 @@ def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch)
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
                             AssertionError("PG sync subprocess must not run")))
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(
-                            AssertionError("_local_refresh must not run")))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     class FakeConn:
@@ -934,7 +1048,7 @@ def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkey
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
                                           "legacy local test route")
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
-    calls = {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 0, "provider": None}
+    calls = {"run_incremental": 0, "sync": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental",
                                                           calls["run_incremental"] + 1))
@@ -945,9 +1059,6 @@ def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkey
         return {"returncode": 0}
 
     monkeypatch.setattr(ds, "_run_subprocess", _subproc)
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (calls.__setitem__("refresh", calls["refresh"] + 1),
-                                 {"ok": True})[1])
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: (calls.__setitem__("provider", source), object())[1])
 
@@ -962,33 +1073,10 @@ def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkey
 
     assert res["status"] == "succeeded"
     assert len(route_calls) == 1
-    assert calls == {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 1,
+    assert calls == {"run_incremental": 0, "sync": 0, "direct": 1,
                      "provider": "polygon"}
     assert res["collect"]["source"] == "polygon"
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
-
-
-def test_skip_sync_message_precedes_legacy_local_news_route(monkeypatch):
-    import src.news_normalized.routing as routing
-
-    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
-                            "legacy local test route")
-    monkeypatch.setattr("src.news_providers.make_news_provider", lambda source, **k: object())
-    monkeypatch.setattr(
-        "src.news_direct.backfill_news_direct",
-        lambda tickers, **kwargs: {"source": kwargs["source"], "tickers_scanned": len(tickers)},
-    )
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(
-                            AssertionError("PG sync subprocess must not run")))
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(
-                            AssertionError("_local_refresh must not run")))
-
-    res = ds.run_source("polygon_news", trigger_source="cli", skip_sync=True)
-
-    assert res["status"] == "succeeded"
-    assert res["local_refresh"]["skipped"] == "collect-only run (no PG sync)"
+    assert "local_refresh" not in res
 
 
 def test_legacy_news_route_pg_fails_before_collector_sync_and_mirror(monkeypatch):
@@ -1011,10 +1099,6 @@ def test_legacy_news_route_pg_fails_before_collector_sync_and_mirror(monkeypatch
     sync_calls = []
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (sync_calls.append(argv), {"returncode": 0})[1])
-    refresh_calls = []
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (refresh_calls.append(True), {"ok": True})[1])
-
     res = ds.run_source("finnhub_news", trigger_source="api")
 
     assert res["status"] == "failed"
@@ -1022,7 +1106,6 @@ def test_legacy_news_route_pg_fails_before_collector_sync_and_mirror(monkeypatch
     assert len(route_calls) == 1
     assert seen == {}
     assert sync_calls == []
-    assert refresh_calls == []
 
 
 def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirror(
@@ -1060,14 +1143,6 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
         )
 
     monkeypatch.setattr(ds.subprocess, "run", _subprocess)
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("_local_refresh must not run for normalized IBKR")
-        ),
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert res["status"] == "succeeded"
@@ -1085,7 +1160,7 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     assert "--gateway-lock-held" in argv
     assert "--retry-body-ids" not in argv
     assert "sync" not in res
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert "local_refresh" not in res
 
 
 def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
@@ -1128,14 +1203,6 @@ def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
         )
 
     monkeypatch.setattr(ds.subprocess, "run", _subprocess)
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("_local_refresh must not run for post-exit IBKR news")
-        ),
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert res["status"] == "succeeded"
@@ -1145,7 +1212,7 @@ def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
     assert "collect_ibkr_news.py" not in rendered_calls
     assert "migrate_to_supabase.py" not in rendered_calls
     assert "--news" not in rendered_calls
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert "local_refresh" not in res
 
 
 def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailable(
@@ -1189,14 +1256,6 @@ def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailabl
         )
 
     monkeypatch.setattr(ds.subprocess, "run", _subprocess)
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("_local_refresh must not run for post-exit IBKR news")
-        ),
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert res["status"] == "succeeded"
@@ -1229,116 +1288,11 @@ def test_ibkr_news_fails_closed_when_pg_exit_audit_cannot_be_read(
             AssertionError("normalized worker should not run when audit is unreadable")
         ),
     )
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("_local_refresh must not run for blocked news")
-        ),
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert res["status"] == "failed"
     assert "audit marker could not be read" in res["error"]
     assert calls == []
-
-
-def test_post_exit_ibkr_local_refresh_excludes_retired_pg_domains(tmp_path, monkeypatch):
-    market_db = tmp_path / "market_data.db"
-    conn = sqlite3.connect(market_db)
-    try:
-        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
-        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
-        conn.commit()
-    finally:
-        conn.close()
-
-    class _Lock:
-        def acquire(self, *args, **kwargs):
-            return True
-
-        def release(self):
-            pass
-
-    import src.market_data_admin as mda
-
-    calls = []
-    monkeypatch.setattr(ds, "_LOCAL_REFRESH_LOCK", _Lock())
-    monkeypatch.setattr(ds, "_LOCAL_REFRESH_FLOCK", _Lock())
-    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
-    monkeypatch.setattr(
-        mda,
-        "incremental_update",
-        lambda *args, **kwargs: (
-            calls.append(kwargs.get("domains")),
-            {
-                "ok": True,
-                "prices": {"ok": True, "rows_added": 1},
-                "news": {"skipped": "domain disabled"},
-                "iv": {"skipped": "domain disabled"},
-                "fundamentals": {"skipped": "domain disabled"},
-            },
-        )[1],
-    )
-
-    res = _REAL_LOCAL_REFRESH()
-
-    assert calls == [("prices",)]
-    assert res == {
-        "ok": True,
-        "domains": {"prices": 1, "news": None, "iv": None, "fundamentals": None},
-        "skipped_domains": {
-            "news": "domain disabled",
-            "iv": "domain disabled",
-            "fundamentals": "domain disabled",
-        },
-    }
-
-
-def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path, monkeypatch):
-    market_db = tmp_path / "market_data.db"
-    market_db.write_text("not sqlite", encoding="utf-8")
-
-    class _Lock:
-        def acquire(self, *args, **kwargs):
-            return True
-
-        def release(self):
-            pass
-
-    import src.market_data_admin as mda
-
-    calls = []
-    monkeypatch.setattr(ds, "_LOCAL_REFRESH_LOCK", _Lock())
-    monkeypatch.setattr(ds, "_LOCAL_REFRESH_FLOCK", _Lock())
-    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
-    monkeypatch.setattr(
-        mda,
-        "incremental_update",
-        lambda *args, **kwargs: (
-            calls.append(kwargs.get("domains")),
-            {
-                "ok": True,
-                "prices": {"ok": True, "rows_added": 1},
-                "news": {"skipped": "domain disabled"},
-                "iv": {"skipped": "domain disabled"},
-                "fundamentals": {"skipped": "domain disabled"},
-            },
-        )[1],
-    )
-
-    res = _REAL_LOCAL_REFRESH()
-
-    assert calls == [("prices",)]
-    assert res["domains"]["news"] is None
-    assert res["domains"]["iv"] is None
-    assert res["domains"]["fundamentals"] is None
-    assert res["skipped_domains"] == {
-        "news": "domain disabled",
-        "iv": "domain disabled",
-        "fundamentals": "domain disabled",
-    }
 
 
 def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(
@@ -1374,14 +1328,6 @@ def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(
         return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
 
     monkeypatch.setattr(ds.subprocess, "run", _run)
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("_local_refresh must not run for normalized IBKR")
-        ),
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert len(subprocess_calls) == 1
@@ -1389,7 +1335,7 @@ def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(
     assert res["collect"]["status"] == "partial"
     assert res["collect"]["continuation"] == payload["continuation"]
     assert "sync" not in res
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert "local_refresh" not in res
     row = ds._state_store().get("ibkr_news")
     assert row["last_status"] == "partial"
     assert row["continuation"] is None
@@ -1430,14 +1376,6 @@ def test_normalized_ibkr_worker_failure_hides_raw_child_stderr(
         )
 
     monkeypatch.setattr(ds.subprocess, "run", _run)
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("_local_refresh must not run for normalized IBKR")
-        ),
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     rendered = json.dumps(res, sort_keys=True)
@@ -1492,17 +1430,11 @@ def test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror(
     monkeypatch.setattr(
         ds, "_run_subprocess", lambda argv: (calls.append(argv), {"returncode": 0})[1]
     )
-    refresh_calls = []
-    monkeypatch.setattr(
-        ds, "_local_refresh", lambda: (refresh_calls.append(True), {"ok": True})[1]
-    )
-
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert res["status"] == "failed"
     assert len(route_calls) == 1
     assert calls == []
-    assert refresh_calls == []
     assert "legacy local IBKR news collector route retired" in res["error"]
 
 
@@ -1513,7 +1445,7 @@ def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypat
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
                                           "blocked test route")
-    provider_calls = {"adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    provider_calls = {"adapter": 0, "direct": 0, "sync": 0}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: provider_calls.__setitem__(
                             "adapter", provider_calls["adapter"] + 1))
@@ -1523,16 +1455,12 @@ def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypat
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (provider_calls.__setitem__(
                             "sync", provider_calls["sync"] + 1), {"returncode": 0})[1])
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (provider_calls.__setitem__(
-                            "refresh", provider_calls["refresh"] + 1), {"ok": True})[1])
-
     res = ds.run_source("polygon_news", trigger_source="api")
 
     assert res["status"] == "failed"
     assert len(route_calls) == 1
     assert "blocked test route" in res["error"]
-    assert provider_calls == {"adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    assert provider_calls == {"adapter": 0, "direct": 0, "sync": 0}
     row = ds._state_store().get("polygon_news")
     assert row["last_status"] == "failed"
     assert "blocked test route" in row["last_error"]
@@ -1576,18 +1504,6 @@ def test_default_ibkr_legacy_news_route_does_not_launch_collector(monkeypatch):
     assert res["status"] == "failed"
     assert "legacy local IBKR news collector route retired" in res["error"]
     assert calls == []
-
-
-def test_run_source_iv_history_retired_before_provider_work(monkeypatch):
-    def _sub(argv):
-        raise AssertionError("retired iv_history source must not launch collector or PG sync")
-
-    monkeypatch.setattr(ds, "_run_subprocess", _sub)
-
-    res = ds.run_source("iv_history", trigger_source="api")
-
-    assert res["status"] == "failed"
-    assert "retired by N9 batch-1" in res["error"]
 
 
 def test_run_source_skips_when_already_running():
@@ -1635,20 +1551,14 @@ def test_price_scope_required(monkeypatch):
     assert "--gateway-lock-held" in seen["argv"]
 
 
-def test_local_incremental_has_no_subprocess(monkeypatch):
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(AssertionError("subprocess used")))
-    res = ds.run_source("local_incremental")
-    assert res["status"] == "failed"
-    assert "prices PG mirror retired by P0-C" in res["error"]
-
-
 def test_run_source_never_raises(monkeypatch):
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(RuntimeError("disk gone")))
-    res = ds.run_source("local_incremental")
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("disk gone")),
+    )
+    res = ds.run_source("polygon_news")
     assert res["status"] == "failed"
-    assert "prices PG mirror retired by P0-C" in res["error"]
+    assert res["error"] == "disk gone"
 
 
 # --- cross-process locks (CLI ⟷ sidecar) -----------------------------------------
@@ -1697,26 +1607,6 @@ def test_run_source_releases_file_locks(tmp_path):
     fh.close()
 
 
-# --- collect-only semantics (skip_sync) -------------------------------------------
-
-def test_skip_sync_is_true_collect_only(monkeypatch):
-    # CLI without --sync-db: collect only — NO PG sync subprocess AND no local
-    # mirror refresh.
-    sync_calls = []
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (sync_calls.append(argv), {"returncode": 0})[1])
-    monkeypatch.setattr(ds, "_local_refresh",
-                        lambda: (_ for _ in ()).throw(AssertionError("refresh must not run")))
-    res = ds.run_source("polygon_news", trigger_source="cli", skip_sync=True)
-    assert res["status"] == "succeeded"
-    assert sync_calls == []                                   # no PG sync
-    assert "skipped" in res["local_refresh"]                  # no local refresh
-    # default (scheduler/API) path also skips mirror refresh for direct-local writers
-    monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
-    res = ds.run_source("polygon_news")
-    assert "skipped" in res["local_refresh"]
-
-
 # --- startup seed must not depend on PG -------------------------------------------
 
 def test_seed_skipped_fast_when_pg_unreachable(monkeypatch):
@@ -1746,7 +1636,7 @@ def test_pg_reachable_probe_is_bounded(monkeypatch):
 def test_get_schedule_snapshot_shape():
     from src.api.routes.schedule import get_schedule
     out = get_schedule()["sources"]
-    assert set(out.keys()) == set(ds.SOURCES.keys())
+    assert set(out) == ACTIVE_SOURCE_IDS
     p = out["polygon_news"]
     assert p["enabled"] is False and p["running"] is False
     assert p["provider_fetch"] is True and p["job_name"] == "collect.polygon_news"
@@ -1754,36 +1644,29 @@ def test_get_schedule_snapshot_shape():
         assert "PG → local mirror" not in out[name]["description"]
         assert "normalized SQLite" in out[name]["description"]
         assert "no news PG sync/mirror" in out[name]["description"]
-    assert out["local_incremental"]["provider_fetch"] is False
     assert out["ibkr_prices"]["ibkr"] is True
+    for source in out.values():
+        assert "control_mode" not in source
+        assert "retired" not in source
+        assert "retired_reason" not in source
 
 
 def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
     snap = ds.status_snapshot()
 
+    assert set(snap) == ACTIVE_SOURCE_IDS
+
     prices = snap["ibkr_prices"]
     assert prices["source_mode"] == "direct_local"
     assert prices["write_target"] == "market_data.db"
     assert prices["source_badges"] == ["IBKR", "直寫本地"]
-    assert prices["retired"] is False
-
-    backfill = snap["price_backfill"]
-    assert backfill["source_mode"] == "coverage_read_only"
-    assert backfill["write_target"] == "none"
-    assert backfill["source_badges"] == []
-    assert backfill["provider_fetch"] is False
-    assert backfill["retired"] is False
-    assert backfill["control_mode"] == "read_only"
 
     assert snap["polygon_news"]["source_badges"] == ["Polygon", "直寫本地"]
     assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
     assert snap["ibkr_news"]["source_badges"] == ["IBKR", "直寫本地"]
-
-    retired = snap["local_incremental"]
-    assert retired["source_mode"] == "retired_pg_mirror"
-    assert retired["source_badges"] == []
-    assert retired["retired"] is True
-    assert "PG mirror retired" in retired["retired_reason"]
+    assert all("control_mode" not in source for source in snap.values())
+    assert all("retired" not in source for source in snap.values())
+    assert all("retired_reason" not in source for source in snap.values())
 
 
 def test_put_schedule_validates():
@@ -1910,9 +1793,11 @@ def test_adapter_universe_unavailable_fails_loud(monkeypatch):
     assert "source_db_missing" not in json.dumps(durable, sort_keys=True)
 
 
-def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
-    # The daily_update thin wrapper passes an explicit ticker list (--tickers)
-    # and collect-only mode (no --sync-db → skip_sync) through run_source.
+def test_run_source_explicit_tickers_reaches_active_adapter_without_mirror_controls(
+    monkeypatch,
+):
+    # The daily_update thin wrapper passes an explicit ticker list through the
+    # active direct-local adapter without any PG mirror selector.
     seen = {}
 
     def _fake_direct(tickers, *, source, provider, progress_cb=None, **kw):
@@ -1922,31 +1807,29 @@ def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
     monkeypatch.setattr("src.news_direct.backfill_news_direct", _fake_direct)
     monkeypatch.setattr(ds, "_resolve_price_scope",
                         lambda: (_ for _ in ()).throw(AssertionError("must not resolve")))
-    calls = []
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
     res = ds.run_source("polygon_news", trigger_source="cli",
-                        tickers=["AAPL", "NVDA"], skip_sync=True)
+                        tickers=["AAPL", "NVDA"])
     assert res["status"] == "succeeded" and res["ticker_count"] == 2
     assert seen["tickers"] == ["AAPL", "NVDA"]
-    assert calls == []          # skip_sync: NO PG sync subprocess
+    assert "sync_flag" not in res
+    assert "skip_sync" not in res
 
 
-def test_run_now_choke_point_guards_scheduled_and_rejects_retired_sources(monkeypatch):
-    # Runnable sources pass the write choke point; retired sources expose no
-    # operator control and therefore never reach it.
+def test_schedule_routes_reject_removed_source_ids_before_writes_or_provider_work(
+    monkeypatch,
+):
+    # Active sources pass the write choke point. Removed IDs are ordinary
+    # unknown sources and are rejected before writes or provider work.
     from fastapi import HTTPException
     from src.api.routes import schedule as sr
     gated = []
     monkeypatch.setattr(sr, "require_db_write", lambda action, ctx: gated.append(ctx["source"]))
     monkeypatch.setattr(sr, "run_source", lambda *a, **k: {"status": "succeeded"})
-    with pytest.raises(HTTPException) as exc:
-        sr.run_now("local_incremental")
-    assert exc.value.status_code == 409
-    assert exc.value.detail == {
-        "code": "schedule_control_unavailable",
-        "control_mode": "retired",
-    }
+    for source in RETIRED_SOURCE_IDS:
+        with pytest.raises(HTTPException) as exc:
+            sr.run_now(source)
+        assert exc.value.status_code == 404
+        assert gated == []
 
     out = sr.run_now("polygon_news")
     assert out["status"] == "started"
@@ -1972,412 +1855,17 @@ def test_last_result_surfaces_skips_in_snapshot(tmp_path):
     assert snap["last_result"]["status"] == "succeeded"
 
 
-# --- price_backfill: direct local writer source (2b·3) -----------------------------
-
-def test_price_backfill_source_registered(monkeypatch):
-    d = ds.SOURCES["price_backfill"]
-    assert d.coverage_repair_disabled is True
-    assert d.adapter is None
-    assert d.sync_flag is None
-    assert d.ibkr is False
-    assert d.prices_worker is False
-    assert d.universe_tickers is False
-    assert d.writes_market_db is False
-    assert "price_backfill" not in ds._SOURCE_PROVIDER_CONFIG
-    assert ds.source_config("price_backfill")["enabled"] is False  # default-off
-    ds._store().set_setting("schedule.price_backfill.enabled", "true")
-    assert ds.source_config("price_backfill")["enabled"] is False
-    assert ds._is_due("price_backfill", _NOW) is False
-    with pytest.raises(ValueError, match="schedule controls unavailable"):
-        ds.set_source_config("price_backfill", enabled=True)
-
-    from src.api.routes import schedule as schedule_route
-    from fastapi import HTTPException
-
-    for operation in (
-        lambda: schedule_route.put_schedule(
-            "price_backfill", schedule_route.ScheduleUpdate(enabled=True)
-        ),
-        lambda: schedule_route.run_now("price_backfill"),
-    ):
-        with pytest.raises(HTTPException) as exc:
-            operation()
-        assert exc.value.status_code == 409
-        assert exc.value.detail == {
-            "code": "schedule_control_unavailable",
-            "control_mode": "read_only",
-        }
-
-
-def _install_coverage_repair_spies(monkeypatch):
-    calls = {
-        "provider_setup": 0,
-        "provider_config": 0,
-        "scope": 0,
-        "worker": 0,
-        "local_refresh": 0,
-    }
-
-    def _provider_setup():
-        calls["provider_setup"] += 1
-        return SimpleNamespace(required=False, reason=None, code=None)
-
-    monkeypatch.setattr(
-        "src.provider_config_runtime.provider_config_setup_state",
-        _provider_setup,
-    )
-    monkeypatch.setattr(
-        ds,
-        "_provider_config_missing_for_source",
-        lambda source: calls.__setitem__(
-            "provider_config", calls["provider_config"] + 1
-        ),
-    )
-    monkeypatch.setattr(
-        ds,
-        "_resolve_price_scope",
-        lambda: calls.__setitem__("scope", calls["scope"] + 1) or ["AAPL"],
-    )
-    monkeypatch.setattr(
-        ds,
-        "_run_sanitized_prices_worker_subprocess",
-        lambda argv: calls.__setitem__("worker", calls["worker"] + 1)
-        or {"returncode": 0, "payload": {"rows_added": 1, "error_count": 0}},
-    )
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: calls.__setitem__("local_refresh", calls["local_refresh"] + 1)
-        or {"ok": True},
-    )
-    return calls
-
-
-def _seed_legacy_price_backfill_audit(monkeypatch, profile_db):
-    telemetry = _RealJobRunsLocalStore(profile_db)
-    historical_id = telemetry.record_completed_run(
-        ds.job_name("price_backfill"),
-        status="succeeded",
-        started_at="2026-06-24T09:00:00+00:00",
-        finished_at="2026-06-24T09:01:00+00:00",
-        trigger_source="api",
-        payload={"source": "price_backfill", "contract": "legacy"},
-        result={"status": "partial", "continuation": {"deferred": ["NVDA"]}},
-    )
-    historical_before = telemetry.get_runs_by_ids(
-        job_name=ds.job_name("price_backfill"), run_ids=[historical_id]
-    )[0]
-    monkeypatch.setattr(
-        "src.service.job_runs_store.get_job_runs_store", lambda dal: telemetry
-    )
-    return telemetry, historical_id, historical_before
-
-
-def _seed_legacy_price_backfill_continuation(continuation=None):
-    if continuation is None:
-        continuation = {
-            "deferred": ["NVDA", "TSLA"],
-            "lookback_days": 7,
-            "candidate_count": 2,
-        }
-    ds._state_store().record_attempt(
-        "price_backfill", datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc)
-    )
-    ds._state_store().record_outcome(
-        "price_backfill",
-        status="partial",
-        error=None,
-        result={"status": "partial", "contract": "legacy"},
-        continuation=continuation,
-    )
-
-
-def test_coverage_derived_price_backfill_is_deliberate_noop(monkeypatch, tmp_path):
-    calls = _install_coverage_repair_spies(monkeypatch)
-    telemetry = _RealJobRunsLocalStore(tmp_path / "profile_state.db")
-    monkeypatch.setattr(
-        "src.service.job_runs_store.get_job_runs_store", lambda dal: telemetry
-    )
-
-    result = ds.run_source("price_backfill", trigger_source="scheduler")
-
-    assert result["status"] == "succeeded"
-    assert result["reason_code"] == "coverage_truth_read_only"
-    assert result["collect"] == {"planned": 0}
-    assert all(value == 0 for value in calls.values())
-    durable = ds._state_store().get("price_backfill")
-    assert durable["last_status"] == "succeeded"
-    assert durable["last_result"]["reason_code"] == "coverage_truth_read_only"
-    audit = telemetry.list_runs(job_name=ds.job_name("price_backfill"))
-    assert len(audit) == 1
-    assert audit[0]["status"] == "succeeded"
-    assert audit[0]["result"]["reason_code"] == "coverage_truth_read_only"
-
-
-def test_blank_price_backfill_history_is_neutral_and_first_run_succeeds(
-    monkeypatch, tmp_path
-):
-    calls = _install_coverage_repair_spies(monkeypatch)
-    telemetry = _RealJobRunsLocalStore(tmp_path / "profile_state.db")
-    monkeypatch.setattr(
-        "src.service.job_runs_store.get_job_runs_store", lambda dal: telemetry
-    )
-    with sqlite3.connect(ds._state_store().db_path) as conn:
-        conn.execute(
-            "INSERT INTO scheduler_state "
-            "(source, last_attempt, last_status, last_error, continuation, "
-            "last_result, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (
-                "price_backfill",
-                "2026-07-04T02:06:05+0000",
-                None,
-                None,
-                None,
-                None,
-                "2026-07-05T17:30:56+0000",
-            ),
-        )
-
-    before = ds.status_snapshot()["price_backfill"]["durable_state"]
-
-    assert before["last_status"] is None
-    assert before["last_error"] is None
-    assert before["last_result"] is None
-
-    result = ds.run_source("price_backfill", trigger_source="api")
-
-    assert result["status"] == "succeeded"
-    assert result["reason_code"] == "coverage_truth_read_only"
-    assert all(value == 0 for value in calls.values())
-    durable = ds._state_store().get("price_backfill")
-    assert durable["last_status"] == "succeeded"
-    assert durable["last_error"] is None
-
-
-def test_status_or_continuation_only_price_backfill_state_fails_closed():
-    blank_state = {
-        "last_status": None,
-        "last_error": None,
-        "continuation": None,
-        "last_result": None,
-    }
-
-    for field, value in (
-        ("last_status", "partial"),
-        ("continuation", {"deferred": ["NVDA"]}),
-    ):
-        state = {**blank_state, field: value}
-
-        assert ds._coverage_truth_state_is_blank(state) is False
-        projected = ds._coverage_truth_snapshot_state(state, source_running=False)
-        assert projected["last_status"] == "failed"
-        assert projected["last_error"] == "legacy_unproven_gap"
-        assert projected["continuation"] is None
-
-
-def test_error_or_result_only_price_backfill_state_fails_closed():
-    blank_state = {
-        "last_status": None,
-        "last_error": None,
-        "continuation": None,
-        "last_result": None,
-    }
-
-    for field, value in (
-        ("last_error", "raw legacy failure"),
-        ("last_result", {"status": "partial", "contract": "legacy"}),
-    ):
-        state = {**blank_state, field: value}
-
-        assert ds._coverage_truth_state_is_blank(state) is False
-        projected = ds._coverage_truth_snapshot_state(state, source_running=False)
-        assert projected["last_status"] == "failed"
-        assert projected["last_error"] == "legacy_unproven_gap"
-        assert projected["last_result"]["reason_code"] == "legacy_unproven_gap"
-
-
-def test_unknown_tickers_and_provider_errors_never_reach_price_executor(
-    monkeypatch, tmp_path
-):
-    calls = _install_coverage_repair_spies(monkeypatch)
-    telemetry = _RealJobRunsLocalStore(tmp_path / "profile_state.db")
-    monkeypatch.setattr(
-        "src.service.job_runs_store.get_job_runs_store", lambda dal: telemetry
-    )
-
-    result = ds.run_source(
-        "price_backfill",
-        trigger_source="api",
-        tickers=["UNKNOWN_TICKER", "PROVIDER_ERROR_TICKER"],
-    )
-
-    assert result["status"] == "succeeded"
-    assert result["reason_code"] == "coverage_truth_read_only"
-    assert result["collect"] == {"planned": 0}
-    assert "plan" not in result
-    assert "excluded" not in result
-    assert all(value == 0 for value in calls.values())
-
-    state_writes = []
-
-    class _UnreadableCoverageState:
-        def get(self, source):
-            raise sqlite3.DatabaseError("unreadable legacy state")
-
-        def record_attempt(self, source, when):
-            state_writes.append(("attempt", source))
-
-        def record_outcome(self, source, **kwargs):
-            state_writes.append(("outcome", source, kwargs))
-
-    monkeypatch.setattr(ds, "_SCHED_STATE", _UnreadableCoverageState())
-
-    unreadable = ds.run_source("price_backfill", trigger_source="api")
-
-    assert unreadable["status"] == "failed"
-    assert unreadable["reason_code"] == "legacy_unproven_gap"
-    assert [entry[0] for entry in state_writes] == ["attempt", "outcome"]
-    assert all(value == 0 for value in calls.values())
-
-
-def test_legacy_unproven_gap_manual_continuation_is_rejected_without_worker(
-    monkeypatch, tmp_path
-):
-    calls = _install_coverage_repair_spies(monkeypatch)
-    telemetry, historical_id, historical_before = _seed_legacy_price_backfill_audit(
-        monkeypatch, tmp_path / "profile_state.db"
-    )
-    _seed_legacy_price_backfill_continuation({"deferred": []})
-
-    result = ds.run_source("price_backfill", trigger_source="api")
-
-    assert result["status"] == "failed"
-    assert result["code"] == result["reason_code"] == "legacy_unproven_gap"
-    assert result["collect"] == {"planned": 0}
-    assert all(value == 0 for value in calls.values())
-    durable = ds._state_store().get("price_backfill")
-    assert durable["last_status"] == "failed"
-    assert durable["continuation"] is None
-    assert durable["last_result"]["reason_code"] == "legacy_unproven_gap"
-    assert telemetry.get_runs_by_ids(
-        job_name=ds.job_name("price_backfill"), run_ids=[historical_id]
-    )[0] == historical_before
-    audit = telemetry.list_runs(job_name=ds.job_name("price_backfill"))
-    assert len(audit) == 2
-    assert audit[0]["id"] != historical_id
-    assert audit[0]["status"] == "failed"
-    assert audit[0]["result"]["reason_code"] == "legacy_unproven_gap"
-
-    retry = ds.run_source("price_backfill", trigger_source="api")
-
-    assert retry["status"] == "succeeded"
-    assert retry["reason_code"] == "coverage_truth_read_only"
-    assert ds._state_store().get("price_backfill")["continuation"] is None
-
-
-def test_legacy_unproven_gap_scheduler_continuation_is_rejected_without_worker(
-    monkeypatch, tmp_path
-):
-    calls = _install_coverage_repair_spies(monkeypatch)
-    telemetry, historical_id, historical_before = _seed_legacy_price_backfill_audit(
-        monkeypatch, tmp_path / "profile_state.db"
-    )
-    _seed_legacy_price_backfill_continuation({"unexpected_scope": ["NVDA"]})
-    monkeypatch.setattr(telemetry, "finish_run", lambda run_id, **kwargs: False)
-
-    result = ds.run_source("price_backfill", trigger_source="scheduler")
-
-    assert result["status"] == "failed"
-    assert result["code"] == result["reason_code"] == "legacy_unproven_gap"
-    assert result["collect"] == {"planned": 0}
-    assert all(value == 0 for value in calls.values())
-    durable = ds._state_store().get("price_backfill")
-    assert durable["last_status"] == "partial"
-    assert durable["continuation"] == {"unexpected_scope": ["NVDA"]}
-    assert durable["last_result"] == {"status": "partial", "contract": "legacy"}
-    assert telemetry.get_runs_by_ids(
-        job_name=ds.job_name("price_backfill"), run_ids=[historical_id]
-    )[0] == historical_before
-    audit = telemetry.list_runs(job_name=ds.job_name("price_backfill"))
-    assert len(audit) == 2
-    assert audit[0]["id"] != historical_id
-    assert audit[0]["status"] == "running"
-    assert audit[0]["result"] is None
-
-
-def test_status_snapshot_preserves_durable_state_without_planner_metadata():
-    _seed_legacy_price_backfill_continuation()
-
-    snapshot = ds.status_snapshot()["price_backfill"]
-
-    assert snapshot["durable_state"]["last_status"] == "failed"
-    assert snapshot["durable_state"]["last_error"] == "legacy_unproven_gap"
-    assert snapshot["durable_state"]["last_result"]["reason_code"] == (
-        "legacy_unproven_gap"
-    )
-    assert snapshot["durable_state"]["continuation"] is None
-    serialized = json.dumps(snapshot["durable_state"], sort_keys=True)
-    assert "NVDA" not in serialized
-    assert "lookback_days" not in serialized
-    assert "candidate_count" not in serialized
-    assert "contract" not in serialized
-    assert snapshot["provider_fetch"] is False
-    assert "gap_planned" not in snapshot
-    assert "coverage_repair_disabled" not in snapshot
-
-    ds._state_store().record_outcome(
-        "price_backfill",
-        status="partial",
-        error="raw legacy planner error",
-        result={
-            "source": "price_backfill",
-            "status": "succeeded",
-            "reason_code": "coverage_truth_read_only",
-            "collect": {"planned": 0},
-            "local_refresh": {"skipped": "coverage truth is read-only"},
-        },
-        continuation=None,
-    )
-
-    contradictory = ds.status_snapshot()["price_backfill"]["durable_state"]
-
-    assert contradictory["last_status"] == "failed"
-    assert contradictory["last_error"] == "legacy_unproven_gap"
-    assert "raw legacy planner error" not in json.dumps(contradictory, sort_keys=True)
-
-    current_result = {
-        "source": "price_backfill",
-        "status": "succeeded",
-        "reason_code": "coverage_truth_read_only",
-        "collect": {"planned": 0},
-        "local_refresh": {"skipped": "coverage truth is read-only"},
-    }
-    ds._state_store().record_outcome(
-        "price_backfill",
-        status="succeeded",
-        error=None,
-        result=current_result,
-        continuation=None,
-    )
-    ds._state_store().record_attempt("price_backfill", datetime.now(timezone.utc))
-    assert ds._SOURCE_LOCKS["price_backfill"].acquire(blocking=False)
-    try:
-        active = ds.status_snapshot()["price_backfill"]["durable_state"]
-    finally:
-        ds._SOURCE_LOCKS["price_backfill"].release()
-
-    assert active["last_status"] == "running"
-    assert active["last_result"] == current_result
-    assert active["running_stale"] is False
-
-
 def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
-    calls = []
+    captured = []
 
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
 
     def fake_worker(argv):
-        calls.append(argv)
+        captured[:] = argv
+        parsed = prices_runtime.parse_args(argv[3:])
+        assert parsed.provider == "ibkr"
+        assert parsed.tickers == "AAPL,NVDA"
+        assert "--source" not in argv
         return {
             "returncode": 0,
             "payload": {
@@ -2390,22 +1878,16 @@ def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
         }
 
     monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", fake_worker)
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(AssertionError("no PG mirror")),
-    )
 
     res = ds.run_source("ibkr_prices")
 
     assert res["status"] == "succeeded"
-    argv = calls[-1]
+    argv = captured
     assert argv[:3] == [sys.executable, "-m", "src.prices_runtime"]
-    assert "--source" in argv and "ibkr_prices" in argv
     assert "--tickers" in argv and "AAPL,NVDA" in argv
     assert "--gateway-lock-held" in argv
     assert "collect_ibkr_prices.py" not in " ".join(argv)
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert "local_refresh" not in res
 
 
 def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
@@ -2424,12 +1906,6 @@ def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
         "_run_subprocess",
         lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync subprocess")),
     )
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(AssertionError("no PG mirror refresh")),
-    )
-
     res = ds.run_source("ibkr_prices")
 
     assert res["status"] == "succeeded"
@@ -2437,72 +1913,8 @@ def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
     assert argv[:3] == [sys.executable, "-m", "src.prices_runtime"]
     assert "--tickers" in argv and "NVDA" in argv
     assert "--gateway-lock-held" in argv
-    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
-
-
-def test_local_incremental_retired_after_p0c():
-    res = ds.run_source("local_incremental")
-
-    assert res["status"] == "failed"
-    assert "prices PG mirror retired by P0-C" in res["error"]
-
-
-def test_local_incremental_retirement_does_not_call_local_refresh(monkeypatch):
-    monkeypatch.setattr(
-        ds,
-        "_local_refresh",
-        lambda: (_ for _ in ()).throw(AssertionError("_local_refresh retired for local_incremental")),
-    )
-
-    res = ds.run_source("local_incremental")
-
-    assert res["status"] == "failed"
-    assert "prices PG mirror retired by P0-C" in res["error"]
-
-
-def test_price_backfill_ignores_gateway_lock_but_keeps_source_lock(monkeypatch):
-    monkeypatch.setattr(
-        ds,
-        "_run_sanitized_prices_worker_subprocess",
-        lambda argv: (_ for _ in ()).throw(AssertionError("worker must not run")),
-    )
-    monkeypatch.setattr(
-        ds,
-        "_resolve_price_scope",
-        lambda: (_ for _ in ()).throw(AssertionError("scope must not resolve")),
-    )
-    monkeypatch.setattr(ds, "_IBKR_LOCK_TIMEOUT_S", 0.05)  # fast timeout → skip, not 30min block
-    assert ds._IBKR_LOCK.acquire(blocking=False)           # someone holds the gateway
-    try:
-        res = ds.run_source("price_backfill")
-        assert res["status"] == "succeeded"
-        assert res["reason_code"] == "coverage_truth_read_only"
-    finally:
-        ds._IBKR_LOCK.release()
-
-    assert ds._SOURCE_LOCKS["price_backfill"].acquire(blocking=False)
-    try:
-        res = ds.run_source("price_backfill")
-        assert res["status"] == "skipped"
-        assert res["reason"] == "already running"
-    finally:
-        ds._SOURCE_LOCKS["price_backfill"].release()
-
-
-def test_price_backfill_does_not_resolve_scope_for_deliberate_noop(monkeypatch):
-    monkeypatch.setattr(
-        ds,
-        "_run_sanitized_prices_worker_subprocess",
-        lambda argv: (_ for _ in ()).throw(AssertionError("worker must not run")),
-    )
-    monkeypatch.setattr(
-        ds,
-        "_resolve_price_scope",
-        lambda: (_ for _ in ()).throw(AssertionError("scope must not resolve")),
-    )
-    res = ds.run_source("price_backfill")
-    assert res["status"] == "succeeded"
-    assert res["reason_code"] == "coverage_truth_read_only"
+    assert "--source" not in argv
+    assert "local_refresh" not in res
 
 
 # --- v1.2: durable scheduler_state persistence ------------------------------------

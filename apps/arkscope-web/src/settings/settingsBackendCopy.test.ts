@@ -155,24 +155,21 @@ describe("Settings backend copy boundary", () => {
     }
   });
 
-  it("maps all seven schedule source ids without backend labels", () => {
+  it("maps exactly four active schedule source ids without backend labels", () => {
     const ids = [
       "polygon_news",
       "finnhub_news",
       "ibkr_news",
       "ibkr_prices",
-      "iv_history",
-      "local_incremental",
-      "price_backfill",
     ];
     const cases = [
       {
         locale: "zh-Hant" as const,
-        labels: ["Polygon 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價", "IV 歷史", "本地鏡像增量", "價格缺口補抓"],
+        labels: ["Polygon 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價"],
       },
       {
         locale: "en" as const,
-        labels: ["Polygon News", "Finnhub News", "IBKR News", "IBKR Prices", "IV History", "Local Mirror Incremental", "Price Gap Backfill"],
+        labels: ["Polygon News", "Finnhub News", "IBKR News", "IBKR Prices"],
       },
     ];
 

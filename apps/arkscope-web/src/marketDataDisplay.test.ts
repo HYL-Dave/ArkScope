@@ -418,7 +418,7 @@ describe("schedulerStateLabel", () => {
       last_status: "partial",
       continuation: { deferred: ["NVDA", "TSLA"] },
       last_result: {
-        source: "price_backfill",
+        source: "finnhub_news",
         status: "partial",
         collect: {
           continuation: {

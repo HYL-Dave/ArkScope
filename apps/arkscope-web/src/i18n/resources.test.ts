@@ -512,7 +512,7 @@ describe("bundled i18n resources", () => {
         section: "資料來源與排程",
         task: "AI 研究",
         provider: "IBKR Gateway",
-        schedule: "價格缺口補抓",
+        schedule: "IBKR 股價",
         coverage: "交易日 / 價格覆蓋",
         coverageDescription: "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
         coverageReadOnly: "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
@@ -560,7 +560,7 @@ describe("bundled i18n resources", () => {
         section: "Data Sources and Schedules",
         task: "AI Research",
         provider: "IBKR Gateway",
-        schedule: "Price Gap Backfill",
+        schedule: "IBKR Prices",
         coverage: "Trading-day / Price Coverage",
         coverageDescription: "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",
         coverageReadOnly: "Read-only diagnostic; does not start a repair or supply planner work.",
@@ -613,7 +613,7 @@ describe("bundled i18n resources", () => {
       expect(t(($) => $.registry.sections.dataSources.title)).toBe(expected.section);
       expect(t(($) => $.models.tasks.aiResearch.label)).toBe(expected.task);
       expect(t(($) => $.dataSources.providers.names.ibkr)).toBe(expected.provider);
-      expect(t(($) => $.dataSources.schedule.sources.priceBackfill.label)).toBe(expected.schedule);
+      expect(t(($) => $.dataSources.schedule.sources.ibkrPrices.label)).toBe(expected.schedule);
       expect(t(($) => $.dataStorage.coverage.title)).toBe(expected.coverage);
       expect(t(($) => $.dataStorage.coverage.description)).toBe(expected.coverageDescription);
       expect(t(($) => $.dataStorage.coverage.readOnly)).toBe(expected.coverageReadOnly);
@@ -713,7 +713,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 714,
+      settings: 706,
       research: 207,
       explore: 401,
       portfolio: 374,
@@ -781,9 +781,13 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1814);
+      expect(total, `${locale}.total`).toBe(1806);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
+      expect(
+        [...settings.keys()].filter((path) => /dataSources\.schedule\.(?:labels\.(?:readOnly|retired)|sources\.(?:ivHistory|localIncremental|priceBackfill))/u.test(path)),
+        `${locale}.settings.retiredScheduleCopy`,
+      ).toEqual([]);
       expect(
         [...settings.keys()]
           .filter((path) => path.startsWith("dataStorage.coverage."))
