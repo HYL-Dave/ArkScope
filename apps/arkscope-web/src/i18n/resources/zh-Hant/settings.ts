@@ -432,8 +432,6 @@ const settings = {
       defaultValue: "預設",
       noKey: "免金鑰",
       recommendedImport: "建議匯入",
-      retired: "已退役",
-      readOnly: "唯讀",
       scheduleEnabled: "排程開啟",
       scheduleDisabled: "排程關閉",
     },
@@ -584,18 +582,6 @@ const settings = {
         ibkrPrices: {
           label: "IBKR 股價",
           description: "為目前全部標的擷取 15 分鐘價格並直接寫入本機市場資料庫。",
-        },
-        ivHistory: {
-          label: "IV 歷史",
-          description: "已退役的 ATM IV 歷史收集來源。",
-        },
-        localIncremental: {
-          label: "本地鏡像增量",
-          description: "已退役的舊式市場資料鏡像路徑。",
-        },
-        priceBackfill: {
-          label: "價格缺口補抓",
-          description: "Coverage v2 僅保留歷史執行紀錄；不會排程、補抓或寫入價格資料。",
         },
       },
       unknownSourceDescription: "資料來源 {{sourceId}} 沒有已審核的說明。",

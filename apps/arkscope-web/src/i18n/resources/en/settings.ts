@@ -433,8 +433,6 @@ const settings = {
       defaultValue: "Default",
       noKey: "No key required",
       recommendedImport: "Import recommended",
-      retired: "Retired",
-      readOnly: "Read-only",
       scheduleEnabled: "Schedule on",
       scheduleDisabled: "Schedule off",
     },
@@ -585,18 +583,6 @@ const settings = {
         ibkrPrices: {
           label: "IBKR Prices",
           description: "Collect 15-minute prices for the current Universe directly into the local market database.",
-        },
-        ivHistory: {
-          label: "IV History",
-          description: "Retired ATM IV history collection source.",
-        },
-        localIncremental: {
-          label: "Local Mirror Incremental",
-          description: "Retired legacy market-data mirror path.",
-        },
-        priceBackfill: {
-          label: "Price Gap Backfill",
-          description: "Coverage v2 retains historical run records only; it does not schedule, backfill, or write price data.",
         },
       },
       unknownSourceDescription: "Data source {{sourceId}} has no reviewed description.",

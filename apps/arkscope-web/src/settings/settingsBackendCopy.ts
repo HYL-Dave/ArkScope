@@ -333,21 +333,6 @@ export function scheduleSourceCopy(
         label: t(($) => $.dataSources.schedule.sources.ibkrPrices.label),
         description: t(($) => $.dataSources.schedule.sources.ibkrPrices.description),
       };
-    case "iv_history":
-      return {
-        label: t(($) => $.dataSources.schedule.sources.ivHistory.label),
-        description: t(($) => $.dataSources.schedule.sources.ivHistory.description),
-      };
-    case "local_incremental":
-      return {
-        label: t(($) => $.dataSources.schedule.sources.localIncremental.label),
-        description: t(($) => $.dataSources.schedule.sources.localIncremental.description),
-      };
-    case "price_backfill":
-      return {
-        label: t(($) => $.dataSources.schedule.sources.priceBackfill.label),
-        description: t(($) => $.dataSources.schedule.sources.priceBackfill.description),
-      };
     default:
       return {
         label: id,
