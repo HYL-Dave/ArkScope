@@ -997,6 +997,10 @@ export function DataSourcesSection({
             <tbody>
               {Object.entries(schedule).map(([id, s]) => {
                 const sourceCopy = scheduleSourceCopy(id, t);
+                const controlsAvailable = s.control_mode === "scheduled";
+                const unavailableControlCopy = s.control_mode === "read_only"
+                  ? t(($) => $.dataSources.labels.readOnly)
+                  : t(($) => $.dataSources.labels.retired);
                 return (
                   <tr key={id}>
                   <td>
@@ -1007,41 +1011,58 @@ export function DataSourcesSection({
                         {t(($) => $.dataSources.labels.retired)}
                       </span>
                     )}
-                  </td>
-                  <td>
-                    <label className="ds-toggle">
-                      <input
-                        type="checkbox"
-                        checked={s.enabled}
-                        disabled={busy === id}
-                        onChange={(e) => void setEnabled(id, e.target.checked)}
-                      />
-                      <span className={s.enabled ? "tiny" : "muted tiny ds-schedule-disabled"}>
-                        {s.enabled
-                          ? t(($) => $.dataSources.labels.scheduleEnabled)
-                          : t(($) => $.dataSources.labels.scheduleDisabled)}
+                    {s.control_mode === "read_only" && (
+                      <span className="ds-chip ds-disabled">
+                        {t(($) => $.dataSources.labels.readOnly)}
                       </span>
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      className="ds-interval"
-                      type="number"
-                      min={5}
-                      placeholder={String(s.interval_minutes)}
-                      value={drafts[id] ?? ""}
-                      disabled={busy === id}
-                      onChange={(e) => setDrafts((d) => ({ ...d, [id]: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") void applyInterval(id); }}
-                    />
-                    {drafts[id] && (
-                      <button className="btn-ghost tiny" onClick={() => void applyInterval(id)}>
-                        {t(($) => $.actions.apply)}
-                      </button>
                     )}
                   </td>
                   <td>
-                    {s.running ? (
+                    {controlsAvailable ? (
+                      <label className="ds-toggle">
+                        <input
+                          type="checkbox"
+                          checked={s.enabled}
+                          disabled={busy === id}
+                          onChange={(e) => void setEnabled(id, e.target.checked)}
+                        />
+                        <span className={s.enabled ? "tiny" : "muted tiny ds-schedule-disabled"}>
+                          {s.enabled
+                            ? t(($) => $.dataSources.labels.scheduleEnabled)
+                            : t(($) => $.dataSources.labels.scheduleDisabled)}
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="muted tiny">{unavailableControlCopy}</span>
+                    )}
+                  </td>
+                  <td>
+                    {controlsAvailable ? (
+                      <>
+                        <input
+                          className="ds-interval"
+                          type="number"
+                          min={5}
+                          placeholder={String(s.interval_minutes)}
+                          value={drafts[id] ?? ""}
+                          disabled={busy === id}
+                          onChange={(e) => setDrafts((d) => ({ ...d, [id]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") void applyInterval(id); }}
+                        />
+                        {drafts[id] && (
+                          <button className="btn-ghost tiny" onClick={() => void applyInterval(id)}>
+                            {t(($) => $.actions.apply)}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="muted tiny">{unavailableControlCopy}</span>
+                    )}
+                  </td>
+                  <td>
+                    {!controlsAvailable ? (
+                      <span className="muted tiny">{unavailableControlCopy}</span>
+                    ) : s.running ? (
                       <SourceRunProgress
                         sourceLabel={sourceCopy.label}
                         running={s.running}

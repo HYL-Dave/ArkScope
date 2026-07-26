@@ -214,6 +214,7 @@ vi.mock("./api", async (importOriginal) => {
           source_badges: ["Polygon", "直寫本地"],
           retired: false,
           retired_reason: null,
+          control_mode: "scheduled",
           enabled: true,
           interval_minutes: 30,
           default_interval_minutes: 30,
@@ -247,6 +248,7 @@ vi.mock("./api", async (importOriginal) => {
           source_badges: [],
           retired: false,
           retired_reason: null,
+          control_mode: "scheduled",
           enabled: true,
           interval_minutes: 120,
           default_interval_minutes: 120,
@@ -341,6 +343,7 @@ vi.mock("./api", async (importOriginal) => {
           source_badges: [],
           retired: false,
           retired_reason: null,
+          control_mode: "scheduled",
           enabled: true,
           interval_minutes: 30,
           default_interval_minutes: 30,
@@ -362,11 +365,12 @@ vi.mock("./api", async (importOriginal) => {
           description: "PLANTED_SCHEDULE_BACKFILL_DESCRIPTION",
           ibkr: true,
           provider_fetch: false,
-          source_mode: "direct_local",
-          write_target: "market_data.db",
-          source_badges: ["IBKR/Polygon", "直寫本地", "缺口補抓"],
+          source_mode: "coverage_read_only",
+          write_target: "none",
+          source_badges: [],
           retired: false,
           retired_reason: null,
+          control_mode: "read_only",
           enabled: false,
           interval_minutes: 360,
           default_interval_minutes: 360,
@@ -789,7 +793,7 @@ describe("Settings provider config authority", () => {
     expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("新觸發已略過");
   });
 
-  it("shows_disabled_provider_and_schedule_states_as_neutral_text", async () => {
+  it("shows_disabled_provider_and_read_only_schedule_states_as_neutral_text", async () => {
     await renderDataSources();
     const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("retired_provider"));
@@ -802,12 +806,22 @@ describe("Settings provider config authority", () => {
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("價格缺口補抓"));
     if (!row) throw new Error("missing price_backfill row");
-    expect(row.textContent).toContain("排程關閉");
-    const scheduleCell = row.querySelectorAll("td")[1];
-    expect(scheduleCell?.querySelector(".ui-status-badge")).toBeNull();
-    expect(scheduleCell?.querySelector(".ds-schedule-disabled")?.textContent).toBe("排程關閉");
-    expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("執行"))).toBe(true);
+    expect(row.textContent).toContain("唯讀");
+    expect(row.querySelector("input")).toBeNull();
+    expect(row.querySelector("button")).toBeNull();
+    expect(row.textContent).not.toContain("排程關閉");
+    expect(row.querySelectorAll("td")[3]?.textContent).toBe("唯讀");
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    const englishRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("Price Gap Backfill"));
+    if (!englishRow) throw new Error("missing English price_backfill row");
+    expect(englishRow.textContent).toContain("Read-only");
+    expect(englishRow.textContent).toContain(
+      "Coverage v2 retains historical run records only; it does not schedule, backfill, or write price data.",
+    );
+    expect(englishRow.querySelector("input")).toBeNull();
+    expect(englishRow.querySelector("button")).toBeNull();
   });
 
   it("renders_persisted_skipped_history_as_neutral_instead_of_never_run", async () => {
@@ -827,7 +841,7 @@ describe("Settings provider config authority", () => {
     if (!row) throw new Error("missing price_backfill row");
     expect(row.querySelector("td")?.textContent).toContain("價格缺口補抓");
     expect(row.querySelector("td")?.textContent).toContain(
-      "依交易日覆蓋缺口補抓價格並直接寫入本機市場資料庫。",
+      "Coverage v2 僅保留歷史執行紀錄；不會排程、補抓或寫入價格資料。",
     );
     expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
     expect(row.textContent).not.toContain("IBKR/Polygon");

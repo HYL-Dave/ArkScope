@@ -161,7 +161,6 @@ def test_is_due_matrix():
 
 def test_tick_fires_only_enabled_and_due():
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
-    ds.set_source_config("local_incremental", enabled=True, interval_minutes=15)
     ds._LAST_ATTEMPT["local_incremental"] = _NOW - timedelta(minutes=5)  # not due
     fired = []
     out = ds.tick_once(_NOW, fire=fired.append)
@@ -1774,6 +1773,7 @@ def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
     assert backfill["source_badges"] == []
     assert backfill["provider_fetch"] is False
     assert backfill["retired"] is False
+    assert backfill["control_mode"] == "read_only"
 
     assert snap["polygon_news"]["source_badges"] == ["Polygon", "直寫本地"]
     assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
@@ -1932,17 +1932,25 @@ def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
     assert calls == []          # skip_sync: NO PG sync subprocess
 
 
-def test_run_now_choke_point_covers_all_sources(monkeypatch):
-    # finding-4 regression: local_incremental writes market_data.db, so Run now
-    # must pass require_db_write for EVERY source — not just provider fetches.
+def test_run_now_choke_point_guards_scheduled_and_rejects_retired_sources(monkeypatch):
+    # Runnable sources pass the write choke point; retired sources expose no
+    # operator control and therefore never reach it.
+    from fastapi import HTTPException
     from src.api.routes import schedule as sr
     gated = []
     monkeypatch.setattr(sr, "require_db_write", lambda action, ctx: gated.append(ctx["source"]))
     monkeypatch.setattr(sr, "run_source", lambda *a, **k: {"status": "succeeded"})
-    for source in ("local_incremental", "polygon_news"):
-        out = sr.run_now(source)
-        assert out["status"] == "started"
-    assert gated == ["local_incremental", "polygon_news"]
+    with pytest.raises(HTTPException) as exc:
+        sr.run_now("local_incremental")
+    assert exc.value.status_code == 409
+    assert exc.value.detail == {
+        "code": "schedule_control_unavailable",
+        "control_mode": "retired",
+    }
+
+    out = sr.run_now("polygon_news")
+    assert out["status"] == "started"
+    assert gated == ["polygon_news"]
 
 
 def test_last_result_surfaces_skips_in_snapshot(tmp_path):
@@ -1977,54 +1985,28 @@ def test_price_backfill_source_registered(monkeypatch):
     assert d.writes_market_db is False
     assert "price_backfill" not in ds._SOURCE_PROVIDER_CONFIG
     assert ds.source_config("price_backfill")["enabled"] is False  # default-off
+    ds._store().set_setting("schedule.price_backfill.enabled", "true")
+    assert ds.source_config("price_backfill")["enabled"] is False
+    assert ds._is_due("price_backfill", _NOW) is False
+    with pytest.raises(ValueError, match="schedule controls unavailable"):
+        ds.set_source_config("price_backfill", enabled=True)
 
     from src.api.routes import schedule as schedule_route
+    from fastapi import HTTPException
 
-    dispatched = []
-
-    class _Thread:
-        def __init__(self, *, target, args, **kwargs):
-            dispatched.append((target, args, kwargs))
-
-        def start(self):
-            return None
-
-    monkeypatch.setattr(
-        "src.provider_config_runtime.require_provider_config_ready",
-        lambda action: (_ for _ in ()).throw(
-            AssertionError("read-only coverage source must bypass provider readiness")
+    for operation in (
+        lambda: schedule_route.put_schedule(
+            "price_backfill", schedule_route.ScheduleUpdate(enabled=True)
         ),
-    )
-    monkeypatch.setattr(schedule_route.threading, "Thread", _Thread)
-    write_gates = []
-    monkeypatch.setattr(
-        schedule_route,
-        "require_db_write",
-        lambda action, context: write_gates.append((action, context)),
-    )
-
-    response = schedule_route.run_now("price_backfill")
-
-    assert response["status"] == "started"
-    assert write_gates == [("schedule_run_now", {"source": "price_backfill"})]
-    assert dispatched == [
-        (
-            schedule_route.run_source,
-            ("price_backfill", "api"),
-            {"name": "runnow-price_backfill", "daemon": True},
-        )
-    ]
-
-    monkeypatch.setattr(
-        schedule_route,
-        "require_db_write",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("write gate blocked")
-        ),
-    )
-    with pytest.raises(RuntimeError, match="write gate blocked"):
-        schedule_route.run_now("price_backfill")
-    assert len(dispatched) == 1
+        lambda: schedule_route.run_now("price_backfill"),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            operation()
+        assert exc.value.status_code == 409
+        assert exc.value.detail == {
+            "code": "schedule_control_unavailable",
+            "control_mode": "read_only",
+        }
 
 
 def _install_coverage_repair_spies(monkeypatch):
@@ -2130,6 +2112,88 @@ def test_coverage_derived_price_backfill_is_deliberate_noop(monkeypatch, tmp_pat
     assert len(audit) == 1
     assert audit[0]["status"] == "succeeded"
     assert audit[0]["result"]["reason_code"] == "coverage_truth_read_only"
+
+
+def test_blank_price_backfill_history_is_neutral_and_first_run_succeeds(
+    monkeypatch, tmp_path
+):
+    calls = _install_coverage_repair_spies(monkeypatch)
+    telemetry = _RealJobRunsLocalStore(tmp_path / "profile_state.db")
+    monkeypatch.setattr(
+        "src.service.job_runs_store.get_job_runs_store", lambda dal: telemetry
+    )
+    with sqlite3.connect(ds._state_store().db_path) as conn:
+        conn.execute(
+            "INSERT INTO scheduler_state "
+            "(source, last_attempt, last_status, last_error, continuation, "
+            "last_result, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (
+                "price_backfill",
+                "2026-07-04T02:06:05+0000",
+                None,
+                None,
+                None,
+                None,
+                "2026-07-05T17:30:56+0000",
+            ),
+        )
+
+    before = ds.status_snapshot()["price_backfill"]["durable_state"]
+
+    assert before["last_status"] is None
+    assert before["last_error"] is None
+    assert before["last_result"] is None
+
+    result = ds.run_source("price_backfill", trigger_source="api")
+
+    assert result["status"] == "succeeded"
+    assert result["reason_code"] == "coverage_truth_read_only"
+    assert all(value == 0 for value in calls.values())
+    durable = ds._state_store().get("price_backfill")
+    assert durable["last_status"] == "succeeded"
+    assert durable["last_error"] is None
+
+
+def test_status_or_continuation_only_price_backfill_state_fails_closed():
+    blank_state = {
+        "last_status": None,
+        "last_error": None,
+        "continuation": None,
+        "last_result": None,
+    }
+
+    for field, value in (
+        ("last_status", "partial"),
+        ("continuation", {"deferred": ["NVDA"]}),
+    ):
+        state = {**blank_state, field: value}
+
+        assert ds._coverage_truth_state_is_blank(state) is False
+        projected = ds._coverage_truth_snapshot_state(state, source_running=False)
+        assert projected["last_status"] == "failed"
+        assert projected["last_error"] == "legacy_unproven_gap"
+        assert projected["continuation"] is None
+
+
+def test_error_or_result_only_price_backfill_state_fails_closed():
+    blank_state = {
+        "last_status": None,
+        "last_error": None,
+        "continuation": None,
+        "last_result": None,
+    }
+
+    for field, value in (
+        ("last_error", "raw legacy failure"),
+        ("last_result", {"status": "partial", "contract": "legacy"}),
+    ):
+        state = {**blank_state, field: value}
+
+        assert ds._coverage_truth_state_is_blank(state) is False
+        projected = ds._coverage_truth_snapshot_state(state, source_running=False)
+        assert projected["last_status"] == "failed"
+        assert projected["last_error"] == "legacy_unproven_gap"
+        assert projected["last_result"]["reason_code"] == "legacy_unproven_gap"
 
 
 def test_unknown_tickers_and_provider_errors_never_reach_price_executor(

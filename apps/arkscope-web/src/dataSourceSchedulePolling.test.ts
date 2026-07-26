@@ -19,6 +19,7 @@ function source(over: Partial<ScheduleSourceState> = {}): ScheduleSourceState {
     source_badges: [],
     retired: false,
     retired_reason: null,
+    control_mode: "scheduled",
     enabled: true,
     interval_minutes: 120,
     default_interval_minutes: 120,

@@ -713,7 +713,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 713,
+      settings: 714,
       research: 207,
       explore: 401,
       portfolio: 374,
@@ -781,7 +781,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1813);
+      expect(total, `${locale}.total`).toBe(1814);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1121,7 +1121,7 @@ describe("bundled i18n resources", () => {
       models: 69,
       runtime: 21,
       providers: 103,
-      dataSources: 162,
+      dataSources: 163,
       dataStorage: 67,
       newsStorage: 27,
       macroStorage: 31,
@@ -1138,9 +1138,9 @@ describe("bundled i18n resources", () => {
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
       const movedModelCount = flattenResource(commonModels).size - 1;
-      expect(physicalPreSliceCount).toBe(623);
+      expect(physicalPreSliceCount).toBe(624);
       expect(movedModelCount).toBe(23);
-      expect(physicalPreSliceCount + movedModelCount).toBe(646);
+      expect(physicalPreSliceCount + movedModelCount).toBe(647);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

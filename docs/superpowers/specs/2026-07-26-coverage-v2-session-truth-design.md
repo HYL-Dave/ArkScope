@@ -1,16 +1,18 @@
 # ArkScope Coverage v2 Session-Truth Design
 
-> **Status: IMPLEMENTATION COMPLETE - INDEPENDENT REVIEW PENDING**
+> **Status: IMPLEMENTATION REVIEW GREEN - P3 TEST CLOSURE COMPLETE - INTEGRATION PENDING**
 >
 > Written against clean design branch tip `7a8548fa` on 2026-07-26. This
 > document converts the reviewed evidence in
 > [`COVERAGE_V2_GROUND_TRUTH_INVENTORY.md`](../../design/COVERAGE_V2_GROUND_TRUTH_INVENTORY.md)
 > into the product and engineering authority for Coverage v2. The RED-first
-> implementation is complete at review-repair product tip `cb33a193`;
+> initial implementation closed at review-repair product tip `cb33a193`; the
+> approved read-only-control follow-up and its four-field mutation-sensitive
+> test closure are complete in the isolated worktree;
 > evidence lives in
 > `docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`.
-> Integration and LIVE status remain blocked on independent implementation
-> review.
+> Integration and LIVE status remain pending; no merge or production action is
+> claimed by this document.
 
 ## Review Resolution (2026-07-26)
 
@@ -662,6 +664,14 @@ cannot be trusted under V2. It must not resume. The implementation plan must
 choose a fail-closed, no-schema mechanism that rejects it with a stable
 `legacy_unproven_gap` reason while preserving historical audit rows. It must
 not infer V2 proof from old ticker/date lists.
+
+The stable `price_backfill` source ID remains only so historical run telemetry
+is still readable. Its control mode is `read_only`: Settings exposes no
+schedule toggle, interval edit, or Run action, and the corresponding write
+routes reject attempts with a typed response. A pre-V2 scheduler row whose
+status, error, continuation, and result are all absent is neutral no-result
+history, not proof of a legacy gap. Any non-empty row that cannot prove the
+closed V2 result contract remains `legacy_unproven_gap` and fails closed.
 
 ## 10. Failure Semantics
 

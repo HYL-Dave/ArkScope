@@ -434,6 +434,7 @@ const settings = {
       noKey: "No key required",
       recommendedImport: "Import recommended",
       retired: "Retired",
+      readOnly: "Read-only",
       scheduleEnabled: "Schedule on",
       scheduleDisabled: "Schedule off",
     },
@@ -595,7 +596,7 @@ const settings = {
         },
         priceBackfill: {
           label: "Price Gap Backfill",
-          description: "Fill trading-day price gaps directly into the local market database.",
+          description: "Coverage v2 retains historical run records only; it does not schedule, backfill, or write price data.",
         },
       },
       unknownSourceDescription: "Data source {{sourceId}} has no reviewed description.",

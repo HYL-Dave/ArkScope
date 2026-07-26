@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTATION COMPLETE - INDEPENDENT REVIEW PENDING**
+> **Status: IMPLEMENTATION REVIEW GREEN - P3 TEST CLOSURE COMPLETE - INTEGRATION PENDING**
 
 Review packet:
 `docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`.
@@ -108,9 +108,10 @@ The reviewed correction is binding:
 1. `price_backfill` bypasses provider-readiness checks at both the route and
    scheduler boundaries while retaining the write-permission gate for durable
    telemetry.
-2. Any durable row that cannot prove the closed V2 reason-code/result shape is
-   `legacy_unproven_gap`; empty, unknown, malformed, and unreadable state fail
-   closed.
+2. Any non-empty durable row that cannot prove the closed V2
+   reason-code/result shape is `legacy_unproven_gap`; unknown, malformed, and
+   unreadable state fail closed. A row carrying attempt metadata but no status,
+   error, continuation, or result is neutral no-result history.
 3. Public status projects a fixed safe failure and never exposes legacy plan or
    continuation content.
 4. Terminal job audit must succeed before legacy continuation state is cleared;
@@ -146,6 +147,60 @@ the final review-ready backend accounting is `+72/-39`, collection `4746`, and
 focused `227`; frontend accounting remains `+11/-2`, full `96/1072`, and
 focused `8/118`. The Task 6 and Task 7 checkpoint values remain historical
 evidence and are not rewritten as though the repair existed earlier.
+
+## Independent Implementation Review Follow-Up
+
+Independent implementation review returned substantive GREEN and identified
+two bounded product defects plus one evidence-accounting issue. The approved
+follow-up keeps the V2 truth model unchanged:
+
+1. `price_backfill` retains its stable ID and historical telemetry but gains a
+   closed `read_only` control mode. Public schedule mutation and Run routes
+   reject it, stale persisted enable flags cannot make it due, and Settings
+   renders no toggle, interval editor, or Run action. Existing retired sources
+   use the sibling `retired` mode; active sources use `scheduled`.
+2. A pre-V2 scheduler row with only attempt/update metadata is neutral. It no
+   longer projects a fabricated failed run or forces one failing no-op before
+   self-healing. Legacy continuation/result shapes remain fail-closed and
+   worker-free.
+3. The existing price-backfill description is replaced in both locales with
+   the read-only contract, and one `dataSources.labels.readOnly` leaf is added.
+   Resources therefore evolve Settings `713 -> 714`, total `1813 -> 1814`,
+   and the Data Sources subtree `162 -> 163` per locale.
+4. Backend accounting gains one new blank-history node and renames one obsolete
+   all-sources route node: the product-fix checkpoint is `+74/-40`, collection
+   `4747`, and focused `228`. Frontend accounting becomes `+12/-3` through one
+   renamed mounted node, so collection remains `96/1072` and focused remains
+   `8/118`.
+5. Absolute full-suite failure/error counts are environment observations. The
+   acceptance invariant is exact equality of normalized non-passing node IDs
+   between equally configured base and tip runs.
+6. The dependency evidence records the repository's existing `spacy`/`typer`
+   `pip check` conflict instead of claiming a globally clean environment. The
+   exact Coverage calendar solution remains mechanically checked.
+
+## Follow-Up Re-Review Test Closure
+
+Independent follow-up review returned GREEN on every product finding and
+identified one P3 test-only mutation gap: the blank-state predicate's four
+decisive fields were only covered by all-null and multi-field fixtures. The
+closure is binding:
+
+1. Product behavior remains unchanged. A state is blank only when
+   `last_status`, `last_error`, `continuation`, and `last_result` are all
+   `None`.
+2. Two named scheduler tests cover the four single-field shapes in pairs. Each
+   shape must project to the fixed `legacy_unproven_gap` failure rather than
+   expose legacy content or become neutral.
+3. Removing any one of the four predicate fields must independently make its
+   owning test fail. The product file must be restored byte-for-byte after
+   every mutation probe.
+4. Backend accounting gains two tests and no removals, moving final composition
+   to `+76/-40`, full collection to `4749`, and focused collection to `230`.
+   Frontend and resource accounting do not change.
+5. `Price Gap Backfill` remains the stable historical source identity. Its
+   `Read-only` chip, description, and absence of controls own current behavior;
+   renaming the identity is outside this test-only closure.
 
 ## Locked Implementation Decisions
 
@@ -1585,12 +1640,13 @@ Expected accounting:
 
 ```text
 base 4713
-head 4746
-comm +72/-39
+head 4749
+comm +76/-40
 ```
 
-The 39 removals must be exactly 18 V1 route node IDs, nine planner nodes, ten
-planner-consumer scheduler nodes, and the two contradictory scheduler IDs.
+The 40 removals must be exactly 18 V1 route node IDs, nine planner nodes, ten
+planner-consumer scheduler nodes, the two contradictory scheduler IDs, and the
+post-review all-sources Run node whose retired-source premise no longer holds.
 `test_route_registered` must be present at both sides with the same ID. Compare
 existing environmental failure families by exact node ID: new failures `0`,
 disappeared failures `0`. Do not convert baseline noise into an allowlist.
@@ -1609,13 +1665,15 @@ pytest -q \
   tests/test_data_scheduler.py
 ```
 
-Expected: `227 passed`. Reprove:
+Expected: `230 passed`. Reprove:
 
 - all seven precedence paths;
 - 13:29/13:30 early-close transition;
 - off-grid counted and not filled;
 - unknown/provider diagnostics absent from planner and exclusions;
 - legacy continuation refusal with zero worker calls; and
+- all four single-field legacy markers independently reject blank-state
+  classification; and
 - `mode=ro`/`query_only` database byte preservation.
 
 - [ ] **Step 3: Run frontend canonical A/B.**
@@ -1625,14 +1683,15 @@ Expected:
 ```text
 base 95 files / 1063
 head 96 files / 1072
-comm +11/-2
+comm +12/-3
 focused head 8 files / 118
-resources Settings 713 / total 1813 / coverage 44 per locale
+resources Settings 714 / total 1814 / coverage 44 per locale
 ```
 
-Verify the two removed IDs and eleven added IDs exactly. Existing nodes retain
-their names. Run typecheck, build, scanner twice, key parity, no-empty-leaf,
-and dynamic-key gates.
+Verify the three removed IDs and twelve added IDs exactly. The only additional
+pair is the mounted schedule-control node renamed for the read-only contract.
+Other existing nodes retain their names. Run typecheck, build, scanner twice,
+key parity, no-empty-leaf, and dynamic-key gates.
 
 - [ ] **Step 4: Run structural byte gates.**
 
@@ -1783,8 +1842,8 @@ npm run check:i18n-literals
 npm run build
 ```
 
-Expected: backend `227` focused, frontend `8/118` focused, full collections
-`4746` and `96/1072`, scanner `36/20/0/20`, resources `713/1813`, and all
+Expected: backend `230` focused, frontend `8/118` focused, full collections
+`4749` and `96/1072`, scanner `36/20/0/20`, resources `714/1814`, and all
 structural gates green.
 
 - [ ] **Step 5: Commit review-ready evidence.**
@@ -1803,12 +1862,12 @@ implementation review.
 
 ## Independent Implementation Reviewer Focus
 
-1. Reproduce backend `+72/-39` and frontend `+11/-2` from virgin archives.
-2. Confirm backend final `4746`, focused `227`; frontend final `96/1072`,
+1. Reproduce backend `+76/-40` and frontend `+12/-3` from virgin archives.
+2. Confirm backend final `4749`, focused `230`; frontend final `96/1072`,
    focused `8/118`.
-3. Verify every removed node is one of the 39 named legacy nodes, every added
-   node matches the ledger, and `test_route_registered` evolves in place.
-4. Verify resource comm `+32/-13`, Settings `713`, total `1813`, and coverage
+3. Verify every removed node is one of the 40 named nodes, every added node
+   matches the ledger, and `test_route_registered` evolves in place.
+4. Verify resource comm `+33/-13`, Settings `714`, total `1814`, and coverage
    subtree `44` per locale, with the existing count node ID preserved.
 5. Re-solve the exact Python 3.10 dependency set and compare installed
    metadata with requirements.
@@ -1831,17 +1890,19 @@ implementation review.
 16. Confirm legacy continuation rejection is durable, safe, worker-free,
     redacted before the first V2 run, bypasses provider readiness, preserves
     historical audit rows, and clears state only after terminal audit succeeds.
-17. Confirm explicit generic market-data executor behavior and its 63 tests
+17. Remove each blank-state predicate field independently and confirm the
+    corresponding single-field legacy-state test fails.
+18. Confirm explicit generic market-data executor behavior and its 63 tests
     remain intact.
-18. Verify calendar-health composition has one owner and fixture review/horizon
+19. Verify calendar-health composition has one owner and fixture review/horizon
     questions remain separate.
-19. Verify normal-mode diagnostic boundary and Developer-only raw detail remain
+20. Verify normal-mode diagnostic boundary and Developer-only raw detail remain
     unchanged.
-20. Re-run both locale/width matrices with worst credible composition and
+21. Re-run both locale/width matrices with worst credible composition and
     element-level clipping checks.
-21. Verify CSS, formatters, schemas, migrations, extensions, Electron, package
+22. Verify CSS, formatters, schemas, migrations, extensions, Electron, package
     locks, and protected backend owners are byte-identical.
-22. Verify production evidence was read-only and all isolated ports are closed.
+23. Verify production evidence was read-only and all isolated ports are closed.
 
 ## Post-Review Integration Protocol
 
@@ -1849,7 +1910,7 @@ Only after independent implementation review returns GREEN:
 
 1. record the review resolution in docs and commit it;
 2. fast-forward merge only;
-3. rerun backend `227`, frontend `8/118`, both full collections, scanner,
+3. rerun backend `230`, frontend `8/118`, both full collections, scanner,
    resources, typecheck/build, no-PG, and byte gates on the merged tree;
 4. perform one production read-only Settings smoke with no scheduler/repair
    interaction;

@@ -2699,6 +2699,8 @@ export interface ScheduleRunResult {
   } | null;
 }
 
+export type ScheduleControlMode = "scheduled" | "read_only" | "retired";
+
 export interface ScheduleSourceState {
   label: string;
   description: string;
@@ -2709,6 +2711,7 @@ export interface ScheduleSourceState {
   source_badges: string[];
   retired: boolean;
   retired_reason: string | null;
+  control_mode: ScheduleControlMode;
   enabled: boolean;
   interval_minutes: number;
   default_interval_minutes: number;

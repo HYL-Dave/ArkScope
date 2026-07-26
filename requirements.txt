@@ -1,8 +1,9 @@
 openai
-# Coverage v2 calendar solution
-exchange-calendars==4.13.2
+# Shared numerical stack pinned while resolving the Coverage v2 dependency set
 numpy==1.26.4
 pandas==2.3.1
+# Coverage v2 calendar solution
+exchange-calendars==4.13.2
 pyluach==2.3.0
 toolz==1.1.0
 tzdata==2025.2

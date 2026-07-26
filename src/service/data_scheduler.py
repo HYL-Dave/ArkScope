@@ -61,7 +61,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +196,16 @@ _N9_RETIRED_SOURCES = {
         "prices PG mirror retired by P0-C; use ibkr_prices for provider collection"
     ),
 }
+
+ScheduleControlMode = Literal["scheduled", "read_only", "retired"]
+
+
+def source_control_mode(source: str) -> ScheduleControlMode:
+    if source in _N9_RETIRED_SOURCES:
+        return "retired"
+    if SOURCES[source].coverage_repair_disabled:
+        return "read_only"
+    return "scheduled"
 
 # --- locks (single sidecar process) -------------------------------------------
 # The Gateway lock (in-process + cross-process) now lives in src.ibkr_gateway_lock so EVERY
@@ -473,6 +483,14 @@ def _coverage_truth_state_is_current(
     return state.get("last_error") == expected_error
 
 
+def _coverage_truth_state_is_blank(state: Any) -> bool:
+    """A pre-V2 row with only attempt metadata proves no outcome either way."""
+    return isinstance(state, dict) and all(
+        state.get(key) is None
+        for key in ("last_status", "last_error", "continuation", "last_result")
+    )
+
+
 def _coverage_truth_requires_legacy_rejection(source: str) -> bool:
     """Fail closed unless durable state proves it uses the read-only V2 protocol."""
     try:
@@ -480,7 +498,11 @@ def _coverage_truth_requires_legacy_rejection(source: str) -> bool:
     except Exception:  # noqa: BLE001
         logger.warning("coverage truth state unreadable for %s", source, exc_info=True)
         return True
-    return state is not None and not _coverage_truth_state_is_current(state)
+    return (
+        state is not None
+        and not _coverage_truth_state_is_blank(state)
+        and not _coverage_truth_state_is_current(state)
+    )
 
 
 def _coverage_truth_snapshot_state(
@@ -489,7 +511,10 @@ def _coverage_truth_snapshot_state(
     source_running: bool,
 ) -> Dict[str, Any]:
     """Project legacy planner state without exposing or implying resumable work."""
-    if _coverage_truth_state_is_current(state, allow_running=source_running):
+    if (
+        _coverage_truth_state_is_blank(state)
+        or _coverage_truth_state_is_current(state, allow_running=source_running)
+    ):
         return {
             key: state.get(key)
             for key in (
@@ -528,6 +553,8 @@ def source_config(source: str) -> Dict[str, Any]:
     store = _store()
     enabled = (store.get_setting(f"schedule.{source}.enabled") or "").strip().lower() in (
         "1", "true", "yes", "on")
+    if source_control_mode(source) != "scheduled":
+        enabled = False
     raw = store.get_setting(f"schedule.{source}.interval_minutes")
     try:
         interval = max(5, min(7 * 24 * 60, int(raw))) if raw else d.default_interval_min
@@ -540,6 +567,8 @@ def set_source_config(source: str, *, enabled: Optional[bool] = None,
                       interval_minutes: Optional[int] = None) -> Dict[str, Any]:
     if source not in SOURCES:
         raise KeyError(source)
+    if source_control_mode(source) != "scheduled":
+        raise ValueError(f"schedule controls unavailable for {source!r}")
     store = _store()
     if enabled is not None:
         store.set_setting(f"schedule.{source}.enabled", "true" if enabled else "false")
@@ -1612,6 +1641,7 @@ def status_snapshot() -> Dict[str, Any]:
             "source_badges": list(d.source_badges),
             "retired": source in _N9_RETIRED_SOURCES,
             "retired_reason": _N9_RETIRED_SOURCES.get(source),
+            "control_mode": source_control_mode(source),
             "enabled": cfg["enabled"],
             "interval_minutes": cfg["interval_minutes"],
             "default_interval_minutes": d.default_interval_min,
