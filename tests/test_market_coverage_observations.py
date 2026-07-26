@@ -297,6 +297,10 @@ def test_optional_provider_diagnostic_corruption_is_quarantined_and_source_prese
                 ("AAA", "15min", "  contract unavailable  ", "later"),
             ),
         )
+        conn.execute(
+            "INSERT INTO provider_sync_meta VALUES "
+            "('AAA', '15min', CAST(X'80' AS TEXT), 'invalid-utf8')"
+        )
         conn.commit()
     finally:
         conn.close()

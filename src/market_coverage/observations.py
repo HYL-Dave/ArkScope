@@ -275,19 +275,53 @@ def _read_provider_errors(
         return ()
     placeholders = ", ".join("?" for _ in stored_tickers)
     issues: list[ProviderSyncIssue] = []
-    for raw_ticker, raw_interval, raw_error, raw_updated_at in conn.execute(
-        "SELECT ticker, interval, last_error, updated_at "
+    for (
+        ticker_type,
+        ticker_blob,
+        interval_type,
+        interval_blob,
+        error_type,
+        error_blob,
+        updated_at_type,
+        updated_at_blob,
+    ) in conn.execute(
+        "SELECT typeof(ticker), CAST(ticker AS BLOB), "
+        "typeof(interval), CAST(interval AS BLOB), "
+        "typeof(last_error), CAST(last_error AS BLOB), "
+        "typeof(updated_at), CAST(updated_at AS BLOB) "
         "FROM provider_sync_meta "
         f"WHERE ticker IN ({placeholders}) "
         "AND interval = ? AND last_error IS NOT NULL",
         (*stored_tickers, interval),
     ):
         try:
+            if (
+                ticker_type != "text"
+                or interval_type != "text"
+                or error_type != "text"
+                or updated_at_type not in {"text", "null"}
+                or not isinstance(ticker_blob, bytes)
+                or not isinstance(interval_blob, bytes)
+                or not isinstance(error_blob, bytes)
+                or (
+                    updated_at_type == "text"
+                    and not isinstance(updated_at_blob, bytes)
+                )
+            ):
+                continue
+            raw_ticker = ticker_blob.decode("utf-8")
+            raw_interval = interval_blob.decode("utf-8")
+            raw_error = error_blob.decode("utf-8")
+            raw_updated_at = (
+                updated_at_blob.decode("utf-8")
+                if updated_at_type == "text"
+                else None
+            )
             ticker = _normalize_stored_ticker(
                 raw_ticker,
                 field_name="provider issue ticker",
             )
-        except _StoredDatabaseError:
+        except (UnicodeDecodeError, _StoredDatabaseError):
             continue
         if not isinstance(raw_interval, str) or (
             not raw_interval
