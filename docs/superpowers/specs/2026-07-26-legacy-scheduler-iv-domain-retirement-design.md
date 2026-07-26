@@ -1,12 +1,15 @@
 # Legacy Scheduler Sources and IV Domain Retirement Design
 
-> **Status: WRITTEN - INDEPENDENT REVIEW PENDING**
+> **Status: ADOPTED - IMPLEMENTATION PLAN REVIEW PENDING**
 >
 > Written against clean `master` tip `16d77bae` on 2026-07-26. This document
 > authorizes no product edit, migration, provider call, or production write.
-> A separately reviewed RED-first implementation plan is required before work
-> begins. Production data removal requires a second explicit approval after
-> implementation review.
+> Independent full-document review returned GREEN after the accounting and
+> ownership amendments through `7bb7cc29`. The RED-first implementation plan
+> is `docs/superpowers/plans/2026-07-26-legacy-scheduler-iv-domain-retirement.md`;
+> it remains under independent review and does not yet authorize work.
+> Production data removal requires a second explicit approval after
+> implementation review and merge.
 
 ## 1. Purpose And Authority
 
