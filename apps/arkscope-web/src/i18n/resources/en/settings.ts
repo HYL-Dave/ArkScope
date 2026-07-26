@@ -108,8 +108,8 @@ const settings = {
       },
       dataStorage: {
         title: "Market Data",
-        description: "Review price, IV, fundamentals, and trading-day data coverage.",
-        searchAliases: "market data|price|iv|fundamentals|coverage|sqlite|trading-day coverage",
+        description: "Review price, fundamentals, and trading-day data coverage.",
+        searchAliases: "market data|price|fundamentals|coverage|sqlite|trading-day coverage",
       },
       newsStorage: {
         title: "News Data",
@@ -618,28 +618,26 @@ const settings = {
   },
   dataStorage: {
     title: "Market Data",
-    description: "Review data volume, latest timestamps, and recent updates for prices, news, implied volatility, fundamentals, and the financial cache. Data collection is managed under Data Sources.",
+    description: "Review data volume, latest timestamps, and recent updates for prices, news, fundamentals, and the financial cache. Data collection is managed under Data Sources.",
     loading: "Loading...",
     available: "Available",
     empty: "No data yet",
     labels: {
       prices: "Prices",
       news: "News",
-      iv: "IV",
       fundamentals: "Fundamentals",
       financialCache: "Financial Cache",
     },
     summary: {
       prices: "{{value}} rows · {{count}} tickers · latest {{timestamp}}",
       news: "{{value}} articles · {{count}} sources · latest {{timestamp}}",
-      iv: "{{value}} rows · {{count}} tickers · latest {{timestamp}}",
       fundamentals: "{{value}} rows · {{count}} tickers · latest {{timestamp}}",
       financialCache: "{{value}} rows ({{count}} valid · {{expiredCount}} expired) · latest fetch {{timestamp}}",
     },
     update: {
       title: "Latest Incremental Update",
       never: "No incremental update yet",
-      succeeded: "Prices {{pricesValue}} · News {{newsValue}} · IV {{ivValue}} · Fundamentals {{fundamentalsValue}}",
+      succeeded: "Prices {{pricesValue}} · News {{newsValue}} · Fundamentals {{fundamentalsValue}}",
       failed: "Incremental update failed",
       generatedAt: "Generated {{timestamp}}",
     },

@@ -10,8 +10,6 @@ import {
   addTickerTag,
   deleteNote,
   getStoredFundamentals,
-  getIvAnalysis,
-  getIvHistory,
   getMarketDataCoverage,
   getMarketDataStatus,
   getTagCatalog,
@@ -22,8 +20,6 @@ import {
   removeTickerTag,
   type FinancialStatement,
   type FundamentalsResult,
-  type IVAnalysis,
-  type IVHistoryResult,
   type MarketDataCoverage,
   type MarketDataStatus,
   type Note,
@@ -279,12 +275,9 @@ function OverviewTab({
   );
 }
 
-// 數據 tab: IV + fundamentals, read-only (re-calls the endpoints — no provider
-// fetch). All reads go through the DAL, so they hit the local market DB when
-// routing is on and fall back to PG otherwise.
+// Data tab: stored fundamentals and local coverage, read-only. Opening or
+// refreshing this surface never triggers a provider fetch.
 const DATA_OPERATIONS = [
-  "ticker_load_iv",
-  "ticker_load_iv_history",
   "ticker_load_fundamentals",
   "ticker_load_market_status",
   "ticker_load_coverage",
@@ -300,8 +293,6 @@ function DataTab({
   onNavigateTarget: (target: NavigationTarget) => void;
 }) {
   const { t } = useTranslation("explore");
-  const [iv, setIv] = useState<IVAnalysis | null>(null);
-  const [ivHist, setIvHist] = useState<IVHistoryResult | null>(null);
   const [fund, setFund] = useState<FundamentalsResult | null>(null);
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
   const [coverage, setCoverage] = useState<MarketDataCoverage | null>(null);
@@ -311,17 +302,13 @@ function DataTab({
   const load = useCallback(async () => {
     setLoading(true);
     setErrs([]);
-    // Independent reads: one failure (e.g. no IV data) must not blank the others.
+    // Independent reads: one unavailable diagnostic must not blank the others.
     const results = await Promise.allSettled([
-      getIvAnalysis(ticker),
-      getIvHistory(ticker),
       getStoredFundamentals(ticker),
       getMarketDataStatus(),
       getMarketDataCoverage(ticker),
     ]);
-    const [rIv, rHist, rFund, rStatus, rCov] = results;
-    setIv(rIv.status === "fulfilled" ? rIv.value : null);
-    setIvHist(rHist.status === "fulfilled" ? rHist.value : null);
+    const [rFund, rStatus, rCov] = results;
     setFund(rFund.status === "fulfilled" ? rFund.value : null);
     setStatus(rStatus.status === "fulfilled" ? rStatus.value : null);
     setCoverage(rCov.status === "fulfilled" ? rCov.value : null);
@@ -346,8 +333,6 @@ function DataTab({
       : status.use_local_market_setting
         ? t(($) => $.tickerDetail.localPending)
         : t(($) => $.tickerDetail.localDisabled);
-  const recentHist = ivHist ? ivHist.points.slice(-30).reverse() : []; // newest first, cap 30
-
   return (
     <div className="detail-data">
       <section className="detail-col">
@@ -361,11 +346,6 @@ function DataTab({
         </div>
         <dl className="kv">
           <Kv k={t(($) => $.tickerDetail.localMarketData)} v={routingLabel} />
-          <Kv k={t(($) => $.tickerDetail.ivCurrentSource)} v={sourceLabel(iv?.source_path, t)} />
-          <Kv
-            k={t(($) => $.tickerDetail.ivLocalCoverage)}
-            v={coverage ? coverageLabel(coverage.iv, t) : "—"}
-          />
           <Kv
             k={t(($) => $.tickerDetail.fundamentalsCurrentSource)}
             v={sourceLabel(fund?.source_path, t)}
@@ -388,73 +368,6 @@ function DataTab({
             onNavigate={onNavigateTarget}
           />
         ))}
-      </section>
-
-      <section className="detail-col">
-        <h4 className="detail-section">
-          {t(($) => $.tickerDetail.impliedVolatility)}
-          {iv?.signal ? (
-            <span> {t(($) => $.tickerDetail.ivSignalSuffix, { signal: iv.signal })}</span>
-          ) : null}
-        </h4>
-        {loading && !iv && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
-        {iv && (
-          <dl className="kv">
-            <Kv k={t(($) => $.tickerDetail.kvLabels.currentAtmIv)} v={fmtNum(iv.current_iv)} />
-            <Kv k={t(($) => $.tickerDetail.kvLabels.hv30d)} v={fmtNum(iv.hv_30d)} />
-            <Kv k={t(($) => $.tickerDetail.kvLabels.vrp)} v={fmtNum(iv.vrp)} />
-            <Kv k={t(($) => $.tickerDetail.kvLabels.ivRank)} v={fmtNum(iv.iv_rank)} />
-            <Kv
-              k={t(($) => $.tickerDetail.kvLabels.ivPercentile)}
-              v={fmtNum(iv.iv_percentile)}
-            />
-            <Kv k={t(($) => $.tickerDetail.kvLabels.spot)} v={fmtNum(iv.spot_price)} />
-            <Kv k={t(($) => $.tickerDetail.kvLabels.historyDays)} v={String(iv.history_days)} />
-          </dl>
-        )}
-        {recentHist.length > 0 && (
-          <details className="detail-raw">
-            {/* the history table is its own request → label it with its OWN source */}
-            <summary>
-              {recentHist.length === 1
-                ? t(($) => $.tickerDetail.ivHistorySummary.one, {
-                    count: recentHist.length,
-                    source: sourceLabel(ivHist?.source_path, t),
-                  })
-                : t(($) => $.tickerDetail.ivHistorySummary.other, {
-                    count: recentHist.length,
-                    source: sourceLabel(ivHist?.source_path, t),
-                  })}
-            </summary>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{t(($) => $.tickerDetail.date)}</th>
-                  <th>{t(($) => $.tickerDetail.atmIv)}</th>
-                  <th>{t(($) => $.tickerDetail.hv30)}</th>
-                  <th>{t(($) => $.tickerDetail.vrp)}</th>
-                  <th>{t(($) => $.tickerDetail.spot)}</th>
-                  <th>{t(($) => $.tickerDetail.quotes)}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentHist.map((p) => (
-                  <tr key={p.date}>
-                    <td>{p.date}</td>
-                    <td>{fmtNum(p.atm_iv)}</td>
-                    <td>{fmtNum(p.hv_30d)}</td>
-                    <td>{fmtNum(p.vrp)}</td>
-                    <td>{fmtNum(p.spot_price)}</td>
-                    <td>{p.num_quotes ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-        )}
-        {!loading && iv && iv.history_days === 0 && (
-          <p className="muted tiny">{t(($) => $.tickerDetail.noIv)}</p>
-        )}
       </section>
 
       <section className="detail-col">

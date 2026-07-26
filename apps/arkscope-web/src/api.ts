@@ -1933,37 +1933,15 @@ export function getConsensus(ticker: string): Promise<ConsensusSummary> {
   return getJSON<ConsensusSummary>(`/analysis/consensus/${encodeURIComponent(ticker)}`, 20_000);
 }
 
-// --- ticker detail: IV + fundamentals (local-first via DAL routing) ---
+// --- ticker detail: stored fundamentals and local coverage ---
 // These read through the DAL, so they automatically hit the local market DB when
 // routing is enabled and fall back to PG otherwise. Shapes mirror the Python
-// IVAnalysisResult / IVHistoryPoint / FundamentalsResult schemas.
+// FundamentalsResult schema.
 
 // source_path = TRUE per-call origin of the underlying read (local market DB vs PG /
 // file). pg_fallback = local-first miss → PG; pg = PG primary (routing off);
 // file = file-backed dev config; none = no data anywhere.
 export type SourcePath = "local" | "pg_fallback" | "pg" | "file" | "none";
-
-export interface IVAnalysis {
-  ticker: string;
-  current_iv: number | null;
-  hv_30d: number | null;
-  vrp: number | null;
-  iv_rank: number | null;
-  iv_percentile: number | null;
-  spot_price: number | null;
-  history_days: number;
-  signal: string | null; // HIGH_IV_SELL | LOW_IV_BUY | NEUTRAL
-  source_path?: SourcePath;
-}
-
-export interface IVHistoryPoint {
-  date: string;
-  atm_iv: number;
-  hv_30d: number | null;
-  vrp: number | null;
-  spot_price: number | null;
-  num_quotes: number | null;
-}
 
 export interface FinancialStatement {
   report_period: string;
@@ -2008,23 +1986,7 @@ export interface MarketDataCoverage {
   exists: boolean;
   prices: boolean;
   news: boolean;
-  iv: boolean;
   fundamentals: boolean;
-}
-
-export function getIvAnalysis(ticker: string): Promise<IVAnalysis> {
-  return getJSON<IVAnalysis>(`/options/${encodeURIComponent(ticker)}`, 20_000);
-}
-
-// The history table is a separate request from the IV summary, so it carries its
-// OWN source_path (the two can diverge across a bootstrap/toggle boundary).
-export interface IVHistoryResult {
-  points: IVHistoryPoint[];
-  source_path: SourcePath;
-}
-
-export function getIvHistory(ticker: string): Promise<IVHistoryResult> {
-  return getJSON<IVHistoryResult>(`/options/${encodeURIComponent(ticker)}/history`, 20_000);
 }
 
 // STORED-ONLY fundamentals: DAL local-first + PG, with NO external SEC/Financial-
@@ -2268,13 +2230,12 @@ export interface NewsStatus {
   sync: NewsDirectSync | null;
 }
 
-// iv/fundamentals are id-keyed snapshot domains → date-only "latest" (no time).
+// Fundamentals are date-keyed snapshots, so latest is date-only (no time).
 export interface MarketDataStatus {
   market_db: string;
   exists: boolean;
   prices: { row_count: number; ticker_count: number; latest_datetime: string | null };
   news: { row_count: number; source_count: number; latest_published: string | null };
-  iv: { row_count: number; ticker_count: number; latest_date: string | null };
   fundamentals: { row_count: number; ticker_count: number; latest_date: string | null };
   // 3c-C local-primary cache (not a PG mirror): valid vs expired by TTL, latest fetch.
   financial_cache: {
@@ -2286,7 +2247,6 @@ export interface MarketDataStatus {
   sync: {
     prices: SyncMeta | null;
     news: SyncMeta | null;
-    iv: SyncMeta | null;
     fundamentals: SyncMeta | null;
   };
   use_local_market_setting: boolean;
@@ -2298,43 +2258,8 @@ export interface MarketDataStatus {
   pg_fallback_active: boolean;
 }
 
-// One job result covers both bootstrap (rows/total/match) and update
-// (rows_added/ok) — fields are optional and read per job.kind.
-interface DomainResult {
-  rows?: number;
-  total?: number;
-  match?: boolean;
-  rows_added?: number;
-  ok?: boolean;
-  error?: string | null;
-}
-
-export interface MarketDataJob {
-  id: string;
-  kind: string; // "bootstrap_market" | "update_market"
-  status: "running" | "done" | "error";
-  progress: { written: number; total: number };
-  // Per-domain results are null on the incremental missing-DB early return
-  // (bootstrap them first); bootstrap + a normal update always populate all four.
-  result: {
-    match?: boolean;
-    ok?: boolean;
-    prices: DomainResult | null;
-    news: DomainResult | null;
-    iv: DomainResult | null;
-    fundamentals: DomainResult | null;
-    // bootstrap only: rows of the local-primary cache carried over across the rebuild
-    financial_cache?: { carried_over: number };
-  } | null;
-  error: string | null;
-}
-
 export function getMarketDataStatus(): Promise<MarketDataStatus> {
   return getJSON<MarketDataStatus>("/market-data/status");
-}
-
-export function getMarketDataJob(jobId: string): Promise<MarketDataJob> {
-  return getJSON<MarketDataJob>(`/market-data/jobs/${encodeURIComponent(jobId)}`);
 }
 
 // News direct-local ingest. After news PG exit, polygon/finnhub/ibkr write

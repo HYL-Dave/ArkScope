@@ -392,6 +392,10 @@ describe("post-PG-exit storage panels", () => {
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
     expect(mountedStorage.textContent).toContain(
+      "顯示價格、新聞、基本面與財務快取的資料量、最新時間及最近更新。",
+    );
+    expect(mountedStorage.textContent).not.toContain("隱含波動率");
+    expect(mountedStorage.textContent).toContain(
       `價格 +11 @ ${formatSystemTimestamp("2026-07-20T01:00:00Z")}`,
     );
     expect(mountedStorage.textContent).toContain("2,324,487 列 · 149 檔");
@@ -439,6 +443,10 @@ describe("post-PG-exit storage panels", () => {
     if (!storage) throw new Error("missing Market Data section");
     expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
+    expect(storage.textContent).toContain(
+      "Review data volume, latest timestamps, and recent updates for prices, news, fundamentals, and the financial cache.",
+    );
+    expect(storage.textContent).not.toContain("implied volatility");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))
       .toEqual([
         "Market Data",

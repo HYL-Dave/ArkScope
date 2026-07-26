@@ -36,23 +36,22 @@ function syncLine(status: MarketDataStatus, t: SettingsT): string {
     return `+${m.rows_added.toLocaleString()} @ ${ts}`;
   };
   const s = status.sync;
-  if (!s.prices && !s.news && !s.iv && !s.fundamentals) {
+  if (!s.prices && !s.news && !s.fundamentals) {
     return t(($) => $.dataStorage.update.never);
   }
-  if ([s.prices, s.news, s.iv, s.fundamentals].some((value) => value?.last_error)) {
+  if ([s.prices, s.news, s.fundamentals].some((value) => value?.last_error)) {
     return t(($) => $.dataStorage.update.failed);
   }
   return t(($) => $.dataStorage.update.succeeded, {
     pricesValue: fmt(s.prices),
     newsValue: fmt(s.news),
-    ivValue: fmt(s.iv),
     fundamentalsValue: fmt(s.fundamentals),
   });
 }
 
 function syncDiagnostics(status: MarketDataStatus): Array<string | null> {
   const sync = status.sync;
-  return [sync.prices, sync.news, sync.iv, sync.fundamentals]
+  return [sync.prices, sync.news, sync.fundamentals]
     .map((value) => value?.last_error ?? null);
 }
 
@@ -90,7 +89,6 @@ export function DataStorageSection({
   const exists = status?.exists ?? false;
   const pr = status?.prices;
   const nw = status?.news;
-  const iv = status?.iv;
   const fd = status?.fundamentals;
   const fc = status?.financial_cache;
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
@@ -134,12 +132,6 @@ export function DataStorageSection({
               value: nw!.row_count.toLocaleString(),
               count: nw!.source_count,
               timestamp: nw!.latest_published ?? "—",
-            }) : "—"}</dd>
-            <dt>{t(($) => $.dataStorage.labels.iv)}</dt>
-            <dd>{exists ? t(($) => $.dataStorage.summary.iv, {
-              value: iv!.row_count.toLocaleString(),
-              count: iv!.ticker_count,
-              timestamp: iv!.latest_date ?? "—",
             }) : "—"}</dd>
             <dt>{t(($) => $.dataStorage.labels.fundamentals)}</dt>
             <dd>{exists ? t(($) => $.dataStorage.summary.fundamentals, {

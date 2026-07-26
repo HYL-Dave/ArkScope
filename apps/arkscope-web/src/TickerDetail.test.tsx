@@ -575,7 +575,7 @@ describe("Ticker Detail localization", () => {
       "無法載入市場資料狀態。",
       "無法載入市場資料覆蓋。",
     ]);
-    expect(host!.textContent).toContain(SOURCE_DATE_RANGE);
+    expect(apiMocks.getPriceChange).toHaveBeenCalledWith(TICKER, 30);
     expect(host!.textContent).toContain(SOURCE_ROW);
     expect(apiMocks.getIvAnalysis).not.toHaveBeenCalled();
     expect(apiMocks.getIvHistory).not.toHaveBeenCalled();
@@ -600,7 +600,6 @@ describe("Ticker Detail localization", () => {
     expect(host!.textContent).toContain(UNKNOWN_SOURCE_PATH);
 
     await switchLocale("en");
-    expect(host!.textContent).toContain("No data");
     expect(host!.textContent).toContain(UNKNOWN_SOURCE_PATH);
   });
 

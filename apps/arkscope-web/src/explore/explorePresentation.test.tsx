@@ -429,7 +429,7 @@ describe("Explore presentation boundary", () => {
     const presentation = await loadPresentation();
 
     expect(presentation.EXPLORE_OPERATIONS).toEqual(OPERATIONS);
-    expect(new Set(presentation.EXPLORE_OPERATIONS)).toHaveProperty("size", 40);
+    expect(new Set(presentation.EXPLORE_OPERATIONS)).toHaveProperty("size", 38);
     for (const locale of ["zh-Hant", "en"] as const) {
       const t = exploreT(locale);
       for (const operation of OPERATIONS) {
