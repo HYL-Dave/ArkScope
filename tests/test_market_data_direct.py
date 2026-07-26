@@ -108,11 +108,11 @@ def test_preflight_idempotent_second_run_noop(tmp_path):
     assert all(v == 0 for v in res2["folded"].values())  # nothing left to fold
 
 
-def test_preflight_touches_no_pg(tmp_path, monkeypatch):
+def test_preflight_touches_no_pg(tmp_path):
     # local-only (lock 8): a PG dial must never happen on this path.
     db = tmp_path / "m.db"
     _live_shaped_db(db)
-    monkeypatch.setattr(mda, "_pg_conn", lambda: (_ for _ in ()).throw(AssertionError("PG touched")))
+    assert not hasattr(mda, "_pg_conn")
     res = mdd.preflight_canonicalize(str(db))
     assert res["ok"] is True
 

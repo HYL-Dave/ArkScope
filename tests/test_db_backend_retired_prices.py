@@ -31,7 +31,7 @@ def test_query_health_stats_no_longer_queries_prices_after_batch3():
 
     assert stats["prices"] == {"rows": [], "error": None}
     assert stats["news"] == {"rows": [], "error": None}
-    assert stats["iv_history"] == {"rows": [], "error": None}
+    assert "iv_history" not in stats
     assert stats["financial_cache"] == {"rows": [], "error": None}
 
 
