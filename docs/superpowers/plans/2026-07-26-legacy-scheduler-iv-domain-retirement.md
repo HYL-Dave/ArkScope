@@ -146,7 +146,7 @@ Backend node IDs are raw pytest `file.py::node` strings:
 
 ```bash
 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest --collect-only -q \
-  | sed -n '/^tests\/.*::/p' \
+  | sed -n '/^\(tests\|scripts\/testing\)\/.*::/p' \
   | LC_ALL=C sort > /tmp/legacy-retirement-be-full.nodes
 wc -l /tmp/legacy-retirement-be-full.nodes
 sha256sum /tmp/legacy-retirement-be-full.nodes
@@ -158,6 +158,9 @@ Expected base:
 4749
 e7dc826f33c202789f8ad5f43787d1eedd8f288cc55aa4996d0a100761a21b20
 ```
+
+The two `scripts/testing/` nodes are part of pytest's full collection. Omitting
+them yields `4747` and a different hash even though pytest reports `4749`.
 
 Frontend node IDs use repository-relative `file<TAB>name` fields from Vitest
 JSON. Vitest 4 emits `.file`, not `.filepath`:
@@ -241,6 +244,11 @@ i18n/resources.test.ts                        14
 marketDataDisplay.test.ts                     36
 settings/settingsBackendCopy.test.ts          12
 ```
+
+Derive this focused list by exact file projection from the canonical frontend
+full list. Do not place a file path immediately after Vitest 4's optional
+`--json` flag: it is parsed as the JSON output path and will overwrite that
+file.
 
 ### 3.3 Fixed non-node ledgers
 
@@ -735,7 +743,11 @@ Use `superpowers:using-git-worktrees`. Start from exact base:
 
 ```bash
 git rev-parse HEAD
-# expected: 7bb7cc29f70ca899a5b598f2322ce181daa17ebe
+# expected Task 0 authorization tip:
+# 0bdd526112f7975ecf13064a96e2e8672fa16667
+git merge-base --is-ancestor \
+  7bb7cc29f70ca899a5b598f2322ce181daa17ebe HEAD
+# expected: exit 0; 7bb7cc29 remains the behavioral A/B base
 git status --short
 # expected: no output
 ```
@@ -794,7 +806,8 @@ min(id): 1
 max(id): 248
 IDs are non-contiguous
 Parquet files: AMD/NVDA/PLTR/PYPL, exact SQLite value multisets
-job_runs: local_incremental=1350, price_backfill=2, iv_history=0
+job_runs: collect.local_incremental=1350, collect.price_backfill=2,
+          collect.iv_history=0
 ```
 
 These numbers are dated observations, not acceptance constants. Any changed
