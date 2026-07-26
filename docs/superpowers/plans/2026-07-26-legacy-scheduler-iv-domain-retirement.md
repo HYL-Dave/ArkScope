@@ -93,8 +93,14 @@ and neither changes a target count:
    backend tests were already in the reviewed 40-node retirement set, so
    backend/frontend arithmetic is unchanged.
 
-The exact clearance commit is recorded by the pointer-only docs commit after
-this amendment; that pointer changes no product authority or accounting.
+The exact clearance commit containing both corrections is:
+
+```text
+PLAN_REVIEW_CLEARANCE_COMMIT=5f528475420c8de407125bceb32d94050cfa8e14
+```
+
+This following pointer-only docs commit changes no product authority or
+accounting.
 
 ## 2. Locked Decisions
 

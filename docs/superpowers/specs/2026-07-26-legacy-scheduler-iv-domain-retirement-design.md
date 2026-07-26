@@ -8,7 +8,8 @@
 > ownership amendments through `7bb7cc29`. The RED-first implementation plan
 > is `docs/superpowers/plans/2026-07-26-legacy-scheduler-iv-domain-retirement.md`;
 > independent plan review is GREEN after two docs-only corrections and Task 0
-> may begin in an isolated worktree.
+> may begin in an isolated worktree. Clearance is
+> `5f528475420c8de407125bceb32d94050cfa8e14`.
 > Production data removal requires a second explicit approval after
 > implementation review and merge.
 
