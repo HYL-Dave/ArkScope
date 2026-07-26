@@ -197,35 +197,6 @@ def test_unreadable_market_db_is_typed_unavailable(tmp_path):
     )
     _assert_market_unreadable(api, noncanonical_timestamp_path, session)
 
-    incompatible_provider_path = tmp_path / "incompatible-provider-meta.db"
-    _create_market_db(incompatible_provider_path)
-    conn = sqlite3.connect(incompatible_provider_path)
-    try:
-        conn.execute(
-            "CREATE TABLE provider_sync_meta "
-            "(ticker TEXT, interval TEXT, last_error TEXT)"
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    _assert_market_unreadable(api, incompatible_provider_path, session)
-
-    malformed_provider_path = tmp_path / "malformed-provider-meta.db"
-    _create_market_db(malformed_provider_path)
-    conn = sqlite3.connect(malformed_provider_path)
-    try:
-        conn.execute(
-            "CREATE TABLE provider_sync_meta ("
-            "ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
-        )
-        conn.execute(
-            "INSERT INTO provider_sync_meta VALUES ('AAA', '15min', '', 'now')"
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    _assert_market_unreadable(api, malformed_provider_path, session)
-
     valid_path = tmp_path / "caller-error.db"
     _create_market_db(valid_path)
     with pytest.raises(ValueError, match="universe ticker"):
@@ -285,6 +256,57 @@ def test_readable_empty_prices_table_is_ok(tmp_path):
         session.market_date,
     )
     assert result.provider_errors == ()
+
+
+def test_optional_provider_diagnostic_corruption_is_quarantined_and_source_preserved(
+    tmp_path,
+):
+    api = _api()
+    session = _est_session(date(2026, 1, 5))
+    assert session.open_at_utc is not None
+
+    incompatible_path = tmp_path / "incompatible-provider-meta.db"
+    _create_market_db(incompatible_path, rows=(("AAA", session.open_at_utc),))
+    conn = sqlite3.connect(incompatible_path)
+    try:
+        conn.execute(
+            "CREATE TABLE provider_sync_meta "
+            "(ticker TEXT, interval TEXT, last_error TEXT)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    incompatible = _read(api, incompatible_path, session)
+    assert incompatible.health.status is api.ObservationHealth.OK
+    assert len(incompatible.observations_for(session.market_date)) == 1
+    assert incompatible.provider_errors == ()
+
+    malformed_path = tmp_path / "malformed-provider-meta.db"
+    _create_market_db(malformed_path, rows=(("AAA", session.open_at_utc),))
+    conn = sqlite3.connect(malformed_path)
+    try:
+        conn.execute(
+            "CREATE TABLE provider_sync_meta ("
+            "ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO provider_sync_meta VALUES (?, ?, ?, ?)",
+            (
+                ("AAA", "15min", "", "now"),
+                ("AAA", "15min", "  contract unavailable  ", "later"),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    malformed = _read(api, malformed_path, session)
+    assert malformed.health.status is api.ObservationHealth.OK
+    assert len(malformed.observations_for(session.market_date)) == 1
+    assert tuple(issue.last_error for issue in malformed.provider_errors) == (
+        "  contract unavailable  ",
+    )
 
 
 def test_reader_is_read_only_and_preserves_database_bytes(tmp_path):
@@ -550,7 +572,7 @@ def test_reader_maps_aliases_to_canonical_tickers(tmp_path, monkeypatch):
     assert tuple(issue.ticker for issue in nbsp_result.provider_errors) == (
         "BRK B",
     )
-    assert nbsp_result.provider_errors[0].last_error == "stale contract"
+    assert nbsp_result.provider_errors[0].last_error == f"stale contract{nbsp}"
 
     nbsp_timestamp_path = tmp_path / "nbsp-timestamp.db"
     _create_market_db(

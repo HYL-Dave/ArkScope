@@ -366,6 +366,12 @@ describe("post-PG-exit storage panels", () => {
     };
     mocked.coverage = {
       ...coverage,
+      calendar_health: {
+        ...coverage.calendar_health,
+        status: "degraded",
+        reason_codes: ["fixture_horizon_low"],
+        forward_horizon_months: 5,
+      },
       days: [{
         date: "2026-07-18",
         coverage_status: "partial",
@@ -416,6 +422,17 @@ describe("post-PG-exit storage panels", () => {
     act(() => mountedCoverageToggle.click());
     expect(mountedStorage.textContent).toContain("部分觀測標的");
     expect(mountedStorage.textContent).not.toContain(rawUnknownTicker);
+    const mountedCalendarHealth = mountedStorage.querySelector<HTMLElement>(
+      '[data-testid="coverage-calendar-health"]',
+    );
+    const mountedPartialDetail = Array.from(
+      mountedStorage.querySelectorAll<HTMLElement>("tbody p"),
+    ).find((node) => node.textContent?.includes("MSFT"));
+    if (!mountedCalendarHealth || !mountedPartialDetail) {
+      throw new Error("missing coverage locale-purity witnesses");
+    }
+    mountedCalendarHealth.dataset.identityMarker = "coverage-calendar-health";
+    mountedPartialDetail.dataset.identityMarker = "coverage-partial-detail";
     lookback.focus();
     expect(document.activeElement).toBe(lookback);
     expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);
@@ -497,6 +514,16 @@ describe("post-PG-exit storage panels", () => {
     expect(switchedLookback).toBe(lookback);
     expect(switchedLookback?.value).toBe("30");
     expect(switchedLookback?.dataset.identityMarker).toBe("coverage-lookback");
+    const switchedCalendarHealth = storage.querySelector<HTMLElement>(
+      '[data-testid="coverage-calendar-health"]',
+    );
+    const switchedPartialDetail = Array.from(
+      storage.querySelectorAll<HTMLElement>("tbody p"),
+    ).find((node) => node.textContent?.includes("MSFT"));
+    expect(switchedCalendarHealth).toBe(mountedCalendarHealth);
+    expect(switchedCalendarHealth?.dataset.identityMarker).toBe("coverage-calendar-health");
+    expect(switchedPartialDetail).toBe(mountedPartialDetail);
+    expect(switchedPartialDetail?.dataset.identityMarker).toBe("coverage-partial-detail");
     expect(document.activeElement).toBe(lookback);
     expect(localePut).toHaveBeenCalledOnce();
     expect(localePut).toHaveBeenCalledWith("en");

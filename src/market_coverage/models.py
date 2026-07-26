@@ -193,7 +193,6 @@ class ProviderSyncIssue:
         for field_name, value in (
             ("ticker", self.ticker),
             ("interval", self.interval),
-            ("last_error", self.last_error),
         ):
             if not isinstance(value, str):
                 raise TypeError(f"provider issue {field_name} must be a string")
@@ -201,6 +200,10 @@ class ProviderSyncIssue:
                 raise ValueError(
                     f"provider issue {field_name} must be a non-empty value"
                 )
+        if not isinstance(self.last_error, str):
+            raise TypeError("provider issue last_error must be a string")
+        if not self.last_error.strip():
+            raise ValueError("provider issue last_error must be a non-empty value")
         if self.updated_at is not None and not isinstance(self.updated_at, str):
             raise TypeError("provider issue updated_at must be a string or None")
 
@@ -248,7 +251,7 @@ class ObservationReadResult:
             raise TypeError("health must be ObservationHealthAssessment")
         if not isinstance(self.canonical_universe, tuple):
             raise TypeError("canonical_universe must be an immutable tuple")
-        if not self.canonical_universe or any(
+        if any(
             not isinstance(ticker, str)
             or not ticker
             or ticker != ticker.strip()
@@ -423,7 +426,14 @@ class DayCoverage:
     def _validate_ticker_coverages(self) -> None:
         if self.ticker_coverages is None:
             return
-        if not isinstance(self.ticker_coverages, tuple) or not self.ticker_coverages:
+        if not isinstance(self.ticker_coverages, tuple):
+            raise ValueError("completed coverage requires ticker classifications")
+        if not self.ticker_coverages:
+            if (
+                self.status is CoverageDayStatus.UNKNOWN
+                and self.reason_code is CoverageDayReason.NO_OBSERVATIONS
+            ):
+                return
             raise ValueError("completed coverage requires ticker classifications")
         if any(
             not isinstance(ticker, TickerCoverage)

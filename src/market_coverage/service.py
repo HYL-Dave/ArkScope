@@ -57,8 +57,6 @@ def _canonical_universe(universe: Sequence[str]) -> tuple[str, ...]:
         if ticker not in seen:
             seen.add(ticker)
             canonical.append(ticker)
-    if not canonical:
-        raise ValueError("universe must contain at least one ticker")
     return tuple(canonical)
 
 

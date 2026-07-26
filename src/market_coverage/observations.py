@@ -205,8 +205,6 @@ def _canonical_universe(
         if ticker not in seen:
             seen.add(ticker)
             canonical.append(ticker)
-    if not canonical:
-        raise ValueError("universe must contain at least one canonical ticker")
     return tuple(canonical)
 
 
@@ -270,9 +268,11 @@ def _read_provider_errors(
     if columns is None:
         return ()
     if not _PROVIDER_SYNC_COLUMNS <= columns:
-        raise _StoredDatabaseError("provider_sync_meta schema is incompatible")
+        return ()
 
     stored_tickers = aliases.candidates_for(canonical_universe)
+    if not stored_tickers:
+        return ()
     placeholders = ", ".join("?" for _ in stored_tickers)
     issues: list[ProviderSyncIssue] = []
     for raw_ticker, raw_interval, raw_error, raw_updated_at in conn.execute(
@@ -282,22 +282,25 @@ def _read_provider_errors(
         "AND interval = ? AND last_error IS NOT NULL",
         (*stored_tickers, interval),
     ):
-        ticker = _normalize_stored_ticker(
-            raw_ticker,
-            field_name="provider issue ticker",
-        )
+        try:
+            ticker = _normalize_stored_ticker(
+                raw_ticker,
+                field_name="provider issue ticker",
+            )
+        except _StoredDatabaseError:
+            continue
         if not isinstance(raw_interval, str) or (
             not raw_interval
             or raw_interval != raw_interval.strip()
         ):
-            raise _StoredDatabaseError("provider issue interval is malformed")
+            continue
         if raw_error is not None and (
             not isinstance(raw_error, str)
             or not raw_error.strip()
         ):
-            raise _StoredDatabaseError("provider issue last_error is malformed")
+            continue
         if raw_updated_at is not None and not isinstance(raw_updated_at, str):
-            raise _StoredDatabaseError("provider issue updated_at is malformed")
+            continue
 
         if raw_interval != interval or raw_error is None:
             continue
@@ -308,7 +311,7 @@ def _read_provider_errors(
             ProviderSyncIssue(
                 ticker=ticker,
                 interval=raw_interval,
-                last_error=raw_error.strip(),
+                last_error=raw_error,
                 updated_at=raw_updated_at,
             )
         )
@@ -340,6 +343,11 @@ def _read_session_observations(
     }
     if not sessions:
         return ()
+    if not canonical_universe:
+        return tuple(
+            RthSessionObservations(market_date=market_date, observations=())
+            for market_date in sorted(buckets)
+        )
 
     canonical_set = set(canonical_universe)
     stored_tickers = aliases.candidates_for(canonical_set)
@@ -459,6 +467,23 @@ class RthObservationReader:
                 return _unavailable(
                     ObservationHealthReason.PRICES_SCHEMA_MISSING,
                     canonical_universe=requested_universe,
+                )
+
+            if not requested_universe:
+                return ObservationReadResult(
+                    health=ObservationHealthAssessment(
+                        status=ObservationHealth.OK,
+                        reason_code=None,
+                    ),
+                    canonical_universe=(),
+                    sessions=tuple(
+                        RthSessionObservations(
+                            market_date=session.market_date,
+                            observations=(),
+                        )
+                        for session in session_windows
+                    ),
+                    provider_errors=(),
                 )
 
             aliases = _load_aliases(conn)

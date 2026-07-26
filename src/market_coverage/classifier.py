@@ -204,8 +204,6 @@ class SlotCoverageClassifier:
             if ticker not in seen:
                 seen.add(ticker)
                 canonical.append(ticker)
-        if not canonical:
-            raise ValueError("universe must contain at least one canonical ticker")
         return tuple(canonical)
 
     @staticmethod

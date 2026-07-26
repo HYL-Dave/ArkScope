@@ -279,7 +279,7 @@ function TradingDayCoveragePanel({ developerMode }: { developerMode: boolean }) 
             <p
               className="tiny"
               data-testid="coverage-calendar-health"
-              key={`${index}-${label}`}
+              key={`${index}-${cov.calendar_health.reason_codes[index] ?? "unavailable"}`}
               style={{ color: "var(--warn, #b8860b)" }}
             >
               {label}
@@ -413,8 +413,12 @@ function CoverageRow({
                 <p className="tiny" style={{ margin: "0 0 4px" }}>
                   <strong>{tickerFacts.partialTitle}</strong>
                 </p>
-                {tickerFacts.partialDetails.map((detail) => (
-                  <p className="tiny" key={detail} style={{ margin: "0 0 4px" }}>
+                {tickerFacts.partialDetails.map((detail, index) => (
+                  <p
+                    className="tiny"
+                    key={`${index}-${row.partial_tickers[index]?.ticker ?? "partial"}`}
+                    style={{ margin: "0 0 4px" }}
+                  >
                     {detail}
                   </p>
                 ))}

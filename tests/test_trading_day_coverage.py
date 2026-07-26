@@ -319,6 +319,33 @@ def test_service_emits_exact_v2_contract_without_retired_fields(tmp_path):
     assert not any(retired in serialized for retired in _RETIRED_FIELDS)
 
 
+def test_empty_active_universe_returns_honest_unknown_coverage(tmp_path):
+    monday = date(2026, 7, 13)
+    sunday = date(2026, 7, 12)
+    path = tmp_path / "market.db"
+    _create_market_db(path)
+
+    result = _coverage(
+        path,
+        calendar=_Calendar({monday: _session(monday), sunday: CalendarDay.closed(sunday)}),
+        clock=_Clock(datetime(2026, 7, 13, 17, 0, tzinfo=EASTERN)),
+        universe=(),
+    )
+    trading_day = _day(result, monday)
+
+    assert result["universe_count"] == 0
+    assert result["observation_health"] == {"status": "ok", "reason_code": None}
+    assert result["provider_errors"] == []
+    assert trading_day["coverage_status"] == "unknown"
+    assert trading_day["status_reason_code"] == "no_observations"
+    assert trading_day["observed_ticker_count"] == 0
+    assert trading_day["complete_ticker_count"] == 0
+    assert trading_day["partial_ticker_count"] == 0
+    assert trading_day["unknown_ticker_count"] == 0
+    assert trading_day["partial_tickers"] == []
+    assert trading_day["unknown_tickers"] == []
+
+
 def test_regular_session_uses_exact_rth_slots_despite_extended_rows(tmp_path):
     monday = date(2026, 7, 13)
     sunday = date(2026, 7, 12)
