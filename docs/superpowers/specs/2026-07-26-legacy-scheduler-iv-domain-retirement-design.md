@@ -100,7 +100,9 @@ A read-only inspection at `2026-07-26T21:25:40+08:00` found:
   `schedule.local_incremental.enabled=false` preference;
 - `market_sync_meta` has one `domain='iv'` row with last success
   `2026-07-03T00:14:04+00:00` and `rows_added=0`;
-- `market_data.db.iv_history` has 24 rows, 4 tickers, IDs `1..248`, and dates
+- `market_data.db.iv_history` has 24 rows, 4 tickers, minimum ID 1, maximum ID
+  248, non-contiguous IDs
+  `1-11,27,32,36,70,76,81,190,197,203,211,233,241,248`, and dates
   `2026-01-30..2026-03-06`;
 - ticker counts are AMD 9, NVDA 8, PLTR 1, and PYPL 6; and
 - four files under `data/options/iv_history/` contain 9/8/1/6 rows and are
@@ -133,7 +135,11 @@ still exposes it through:
 - OpenAI and Anthropic hand-written tool bridges plus the central registry;
 - the dedicated IV-history compressor reducer;
 - the `iv_environment` evidence-packet section used by AI Card;
-- `analysis_tools`' opt-in `latest_iv/latest_vrp` path; and
+- `analysis_tools`' opt-in `latest_iv/latest_vrp` path;
+- `scripts/analysis/compare_bs_vs_american.py`, which calls
+  `DataAccessLayer.get_iv_history()`, plus
+  `scripts/analysis/scan_option_mispricing.py`, which bypasses the DAL and
+  reads `data/options/iv_history/{ticker}.parquet` directly; and
 - legacy local-market bootstrap, validation, checksum, and incremental mirror
   machinery.
 
@@ -223,6 +229,14 @@ granularity, scheduler identity, storage schema, or UI.
     tools. Their old `iv_history`/`iv` facts, prose, thresholds, and backend
     queries leave with the legacy store; their live price/news/fundamentals
     behavior remains.
+22. **Retire the two old-store analysis scripts.** Remove
+    `compare_bs_vs_american.py` and `scan_option_mispricing.py` rather than
+    adapting an about-to-retire scripts surface to a new IV input. The reusable
+    option math and its tests remain in `src/options_math`; no replacement CLI
+    is created. This specifically supersedes the B6 survivor-table ruling for
+    these two files only. `scan_unusual_activity.py` and every other entry in
+    the scripts disposition remain unchanged; broader scripts retirement is a
+    separate bounded line.
 
 ## 3. Scope
 
@@ -260,6 +274,7 @@ In scope:
 
 - remove the old IV table/files, schema, DAL/backend protocol, API, UI,
   health/status, evidence, and agent-tool surfaces;
+- remove the two analysis scripts that consume the old DAL/Parquet store;
 - remove obsolete all-domain PG mirror bootstrap/validate/incremental code and
   public retired endpoints that no current caller uses;
 - remove the old IV sync-meta shape from current status DTOs;
@@ -342,7 +357,7 @@ Gateway locks, worker launch, or telemetry creation.
 
 ### 5.2 Scheduler simplification
 
-Remove these dead concepts rather than preserving wrappers:
+Remove these obsolete concepts rather than preserving wrappers:
 
 - `_N9_RETIRED_SOURCES` as an active routing owner;
 - `ScheduleControlMode` and `source_control_mode()`;
@@ -350,7 +365,9 @@ Remove these dead concepts rather than preserving wrappers:
 - legacy price-backfill result normalization and blank/legacy-state projection;
 - the coverage-read-only execution branch;
 - `_local_refresh()` and its scheduler-owned locks;
-- `SourceDef.sync_flag` and the retired PG-sync rejection branch;
+- `SourceDef.sync_flag` and the retired PG-sync rejection branch, but only
+  after replacing their conditional fail-closed role with the exhaustive
+  pre-provider boundary below;
 - `run_source(..., skip_sync=...)`; and
 - scheduled/manual branches whose only purpose was to distinguish no-op,
   retired, or mirror sources.
@@ -361,6 +378,19 @@ retry, telemetry, and local-write behavior. Removing the scheduler's obsolete
 by direct collectors. Removing `price_backfill` also must not remove or alter
 the provider-neutral `backfill_prices_direct()` primitive used by the active
 `ibkr_prices` worker.
+
+The `sync_flag` guard is unreachable for the current four `NewsWriteMode`
+members, but it is not intrinsically dead: `BLOCKED` and `LEGACY_PG` fail
+before collection, unsupported IBKR `LEGACY_LOCAL` fails before collection,
+and the two permitted direct-local paths set `local_news_writer=true`. A future
+unhandled mode could currently fall through to collection and be caught only
+by the post-collect `sync_flag` guard. Therefore Tranche 1 must replace that
+accidental protection with an explicit exhaustive mode classifier before any
+provider call. `NORMALIZED`, `LEGACY_LOCAL`, `LEGACY_PG`, and `BLOCKED` each
+have one named path; any unrecognized/future mode fails before provider,
+worker, write, or telemetry work. A mutation test must prove that adding or
+injecting a fifth mode cannot fall through to an adapter. Only then may the
+stale `sync_flag` field and post-collect PG guard leave.
 
 ### 5.3 CLI and route contract
 
@@ -451,7 +481,9 @@ New durable boundaries must prove:
 
 - exact four-source catalog membership;
 - permanent IDs absent from schedule, CLI, and Settings owners;
-- old IDs produce `404` with zero provider/write/worker calls; and
+- old IDs produce `404` with zero provider/write/worker calls;
+- the four current `NewsWriteMode` values are exhaustive and an unknown mode
+  fails before provider/adapter work; and
 - all four remaining rows still execute through their existing paths.
 
 Tranche 1 changes no registry or bridge tool count: central registry remains
@@ -560,8 +592,12 @@ get_iv_skew_analysis
 ```
 
 Retain pure option-pricing, IV-rank, volatility, and mispricing mathematics and
-standalone scripts that compute from explicit/live inputs rather than the old
-store. The retirement boundary is storage-backed product capability, not the
+surviving product code that computes from explicit/live inputs rather than the
+old store. Remove `scripts/analysis/compare_bs_vs_american.py` and
+`scripts/analysis/scan_option_mispricing.py` in full. The former's math-only
+mode does not justify preserving or splitting a CLI that is already scheduled
+for scripts retirement; equivalent reusable math remains library-owned and
+tested. The retirement boundary is storage-backed product capability, not the
 mathematical concept of IV.
 
 ### 6.6 Tranche 2 resource delta
@@ -661,7 +697,12 @@ New or evolved named contracts must prove:
 - Ticker Detail makes no old IV request and renders no empty IV shell;
 - evidence packets neither emit nor report missing legacy IV;
 - provider health no longer derives success from stale IV dates;
-- resource and tool-count deltas are exact; and
+- resource and tool-count deltas are exact;
+- the no-PG smoke removes exactly
+  `CheckSpec("iv_history", "GET", "/options/AMD/history", ...)` and its direct
+  `options.iv_history(...)` dispatch, changing the fixed check inventory from
+  24 to 23 with every other check unchanged;
+- no non-migration script reads the retired DAL/table/Parquet path; and
 - the production migration preview/archive/apply/replay/restore contracts in
   Section 7 are mutation-sensitive.
 
@@ -798,6 +839,8 @@ future IV implementation never imports this archive automatically.
 - `src/market_data_admin.py`
 - `src/market_data_direct.py` (protected shared price primitive; IV-domain
   enumerations only)
+- `scripts/analysis/compare_bs_vs_american.py` (remove)
+- `scripts/analysis/scan_option_mispricing.py` (remove)
 - `src/api/routes/options.py`
 - `src/api/routes/scan.py`
 - `src/api/routes/market_data.py`
@@ -829,9 +872,10 @@ plan.
 
 Current merged evidence reports backend collection `4749`, frontend
 `96/1072`, scanner `36/20/0/20`, resources `714/1814`, central tools `56`, and
-provider bridge tools `57`. A design-time focused backend census across 15
-principal files collected 461 nodes; an eight-file frontend census collected
-129 nodes.
+provider bridge tools `57`. The no-PG smoke currently contains 24 checks and
+must finish with exactly 23 after its one named IV-history check/dispatch is
+retired. A design-time focused backend census across 15 principal files
+collected 461 nodes; an eight-file frontend census collected 129 nodes.
 
 All are dated observations. Task 0 of the implementation plan must reproduce
 normalized node lists and hashes before locking exact tranche arithmetic.
@@ -896,7 +940,13 @@ Implementation closeout updates:
 - `PG_EXIT_REMAINDER_SCOPING.md` current-state rows to say the local legacy IV
   surface is retired, while preserving dated PG-drop history;
 - `IV_PROVIDER_PROOF_PACKET_PLAN.md` with a short note that the old source/data
-  contract is gone and no old row is a future seed; and
+  contract is gone and no old row is a future seed;
+- `REPO_HYGIENE_B6_MODULE_DISPOSITION.md` to supersede its survivor ruling for
+  exactly the two removed analysis scripts and to retain the separate broader
+  scripts-retirement direction;
+- current option-theory documentation so it no longer advertises either
+  removed script as an executable workflow while preserving historical
+  methodology findings; and
 - current CLI/API documentation that still advertises the removed paths.
 
 No closeout may claim that IV as a product/research domain is abandoned. Only
