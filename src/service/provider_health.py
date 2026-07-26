@@ -22,7 +22,7 @@ Key presence is READ-ONLY (locked fork F5): presence + source
 may suggest importing file-backed values into the app-managed provider store.
 
 Signal sources merged (all already persisted; each degrades independently):
-  - DatabaseBackend.query_health_stats()  — news per source / prices / iv /
+  - DatabaseBackend.query_health_stats()  — news per source / prices /
     financial_cache per source (+ MAX(fetched_at))
   - sa_refresh_meta (get_sa_refresh_meta) — SA capture per-scope success/error
   - job_runs (get_job_runs_store(...).latest_runs_by_name) — latest run per job
@@ -259,8 +259,6 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     # prices rows: [(max_datetime,)] — collected via IBKR (§2)
     price_rows = (stats.get("prices") or {}).get("rows", [])
     prices_latest = _to_dt(price_rows[0][0]) if price_rows and price_rows[0] else None
-    iv_rows = (stats.get("iv_history") or {}).get("rows", [])
-    iv_latest = _to_dt(iv_rows[0][0]) if iv_rows and iv_rows[0] else None
     # financial_cache rows: (source, cached, expired[, latest_fetched])
     fin_by_src: Dict[str, Dict[str, Any]] = {}
     for row in (stats.get("financial_cache") or {}).get("rows", []):
@@ -323,9 +321,9 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             "signals": signals or {},
         })
 
-    # IBKR — gateway: prices + iv + its news feed; host/port = the "key" (F5)
+    # IBKR — gateway: prices + its news feed; host/port = the "key" (F5)
     ibkr_news = news_by_src.get("ibkr", {})
-    ibkr_success = max(filter(None, [prices_latest, iv_latest, ibkr_news.get("latest")]),
+    ibkr_success = max(filter(None, [prices_latest, ibkr_news.get("latest")]),
                        default=None)
     _add(
         "ibkr", "IBKR Gateway", "market",
@@ -333,9 +331,9 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         config_error=_config_error("ibkr"),
         last_success=ibkr_success,
         weekend_maintenance=True,
-        detail=(f"prices latest {_iso(prices_latest) or '—'} · iv latest "
-                f"{_iso(iv_latest) or '—'} · news 7d {ibkr_news.get('recent_7d', 0)}"),
-        signals={"prices_latest": _iso(prices_latest), "iv_latest": _iso(iv_latest),
+        detail=(f"prices latest {_iso(prices_latest) or '—'} · "
+                f"news 7d {ibkr_news.get('recent_7d', 0)}"),
+        signals={"prices_latest": _iso(prices_latest),
                  "news_latest": _iso(ibkr_news.get("latest")),
                  "news_recent_7d": ibkr_news.get("recent_7d", 0)},
     )

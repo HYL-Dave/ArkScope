@@ -16,7 +16,7 @@ Public API:
   - **Reducers**:
     :data:`ToolReducer`, :func:`truncate_with_marker`,
     :func:`web_result_reducer`, :func:`option_chain_reducer`,
-    :func:`iv_history_reducer`, :func:`python_output_reducer`,
+    :func:`python_output_reducer`,
     :func:`get_reducer`, :func:`register_reducer`,
     :func:`default_registry`.
 
@@ -71,7 +71,6 @@ from .reducers import (
     ToolReducer,
     default_registry,
     get_reducer,
-    iv_history_reducer,
     option_chain_reducer,
     python_output_reducer,
     register_reducer,
@@ -113,7 +112,6 @@ __all__ = [
     "ToolReducer",
     "default_registry",
     "get_reducer",
-    "iv_history_reducer",
     "option_chain_reducer",
     "python_output_reducer",
     "register_reducer",

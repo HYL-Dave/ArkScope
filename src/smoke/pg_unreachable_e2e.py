@@ -210,7 +210,6 @@ REQUIRED_CHECKS: tuple[CheckSpec, ...] = (
     CheckSpec("news_ticker", "GET", "/news/NVDA?days=30", 200, _assert_key("articles")),
     CheckSpec("news_sentiment", "GET", "/news/NVDA/sentiment?days=9999", 200, _assert_key("ticker")),
     CheckSpec("fundamentals_stored", "GET", "/fundamentals/NVDA?stored=true", 200, _assert_list_or_dict),
-    CheckSpec("iv_history", "GET", "/options/AMD/history", 200, _assert_key("points")),
     CheckSpec("sa_feed", "GET", "/sa/feed?limit=5", 200, _assert_list_or_dict),
     CheckSpec("sa_health", "GET", "/sa/market-news/health", 200, _assert_key("severity")),
     CheckSpec("macro_status", "GET", "/macro/status", 200, _assert_key("local_first_active")),
@@ -460,12 +459,6 @@ class _HandlerDirectClient:
                 200,
                 fundamentals.fundamentals(ticker, stored=stored, dal=self.dal),
             )
-
-        if method == "GET" and route.startswith("/options/") and route.endswith("/history"):
-            from src.api.routes import options
-
-            ticker = route.removeprefix("/options/").removesuffix("/history").strip("/")
-            return _DirectResponse(200, options.iv_history(ticker, dal=self.dal))
 
         if method == "GET" and route == "/sa/feed":
             from src.api.routes import seeking_alpha

@@ -4,8 +4,8 @@ DatabaseBackend — reads data from PostgreSQL archive/runtime tables.
 Implements the DataBackend protocol using psycopg2 with direct SQL queries.
 Designed for both self-hosted PostgreSQL (Docker) and cloud services.
 After N9 batch-1/2 and batch-3, market-data runtime domains that moved
-local-first (``news``, ``news_scores``, ``prices``, ``iv_history``,
-``fundamentals``, ``financial_data_cache``) are retired stubs here.
+local-first (``news``, ``news_scores``, ``prices``, ``fundamentals``,
+``financial_data_cache``) are retired stubs here.
 App-record archive methods are intentionally retained pending a separate
 archive-policy decision.
 
@@ -28,7 +28,7 @@ import psycopg2.extras
 
 from src.news_content_availability import ContentFilter, empty_content_counts
 
-from .sqlite_backend import _IV_COLS, _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
+from .sqlite_backend import _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -404,14 +404,6 @@ class DatabaseBackend:
         return pd.DataFrame(columns=_PRICE_COLS)
 
     # --------------------------------------------------------
-    # IV History
-    # --------------------------------------------------------
-
-    def query_iv_history(self, ticker: str) -> pd.DataFrame:
-        """Retired PG IV history surface."""
-        return pd.DataFrame(columns=_IV_COLS)
-
-    # --------------------------------------------------------
     # Fundamentals
     # --------------------------------------------------------
 
@@ -768,7 +760,6 @@ class DatabaseBackend:
         return {
             "news": {"rows": [], "error": None},
             "prices": {"rows": [], "error": None},
-            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
 

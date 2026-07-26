@@ -320,49 +320,9 @@ class ToolRegistry:
         ))
 
     def _register_options_tools(self) -> None:
-        from .options_tools import (
-            get_iv_analysis,
-            get_iv_history_data,
-            scan_mispricing,
-            calculate_greeks,
-        )
+        from .options_tools import calculate_greeks
         from .option_chain_tools import get_option_chain
         from .iv_skew_tools import get_iv_skew_analysis
-
-        self.register(ToolDefinition(
-            name="get_iv_analysis",
-            description="Full implied volatility analysis: IV rank, percentile, VRP, and trading signal.",
-            function=get_iv_analysis,
-            category="options",
-            parameters=[
-                ToolParameter("ticker", "string", "Stock ticker symbol"),
-            ],
-        ))
-
-        self.register(ToolDefinition(
-            name="get_iv_history_data",
-            description="Get raw IV history data points (ATM IV, HV, VRP) for a ticker.",
-            function=get_iv_history_data,
-            category="options",
-            parameters=[
-                ToolParameter("ticker", "string", "Stock ticker symbol"),
-            ],
-        ))
-
-        self.register(ToolDefinition(
-            name="scan_mispricing",
-            description="Scan for mispriced options comparing theoretical vs market prices.",
-            function=scan_mispricing,
-            category="options",
-            parameters=[
-                ToolParameter("tickers", "array", "List of ticker symbols to scan"),
-                ToolParameter("mispricing_threshold_pct", "number",
-                              "Minimum mispricing % to report", required=False, default=10.0),
-                ToolParameter("min_confidence", "string",
-                              "Minimum confidence level", required=False, default="MEDIUM",
-                              enum=["HIGH", "MEDIUM", "LOW"]),
-            ],
-        ))
 
         self.register(ToolDefinition(
             name="calculate_greeks",

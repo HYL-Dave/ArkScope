@@ -198,7 +198,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
         name="deep_researcher",
         description=(
             "Performs thorough multi-source investigation: cross-referencing "
-            "news sentiment, price action, fundamentals, IV/options data, "
+            "news sentiment, price action, fundamentals, "
             "and event signals to produce comprehensive analysis."
         ),
         model="gpt-5.4",
@@ -210,7 +210,6 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "get_ticker_prices",
             "get_price_change",
             "get_sector_performance",
-            "get_iv_analysis",
             "detect_anomalies",
             "detect_event_chains",
             "synthesize_signal",

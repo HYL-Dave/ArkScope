@@ -251,7 +251,6 @@ def get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> 
             "market_db": {"path": path, "exists": True},
             "prices": prices,
             "news": _news_summary(conn, t),
-            "iv": _domain_summary(conn, "iv_history", t, "date"),
             "fundamentals": _domain_summary(conn, "fundamentals", t, "snapshot_date"),
             "sync": overlay_news_sync_status(_sync_meta(conn), path),
             "note": "local-only diagnostic; no provider fetch attempted",

@@ -260,77 +260,6 @@ def option_chain_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, A
 
 
 # ---------------------------------------------------------------------------
-# iv_history_reducer (get_iv_history_data)
-# ---------------------------------------------------------------------------
-
-
-def iv_history_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
-    """For ``get_iv_history_data``: keep last 30 days from a list-of-points payload.
-
-    Real shape (from ``src/tools/options_tools.py``):
-    a top-level JSON list of :class:`IVHistoryPoint`-shaped dicts:
-
-    .. code-block:: text
-
-        [{"date": "...", "atm_iv": 0.25, "hv_30d": ..., "vrp": ...,
-          "spot_price": ..., "num_quotes": ...}, ...]
-
-    Strategy: parse as list, keep last ``keep_days`` rows, re-serialise
-    with a ``_compressed`` metadata dict appended.
-
-    Falls through to ``truncate_with_marker`` on shape mismatch.
-    """
-    if len(payload) <= budget:
-        return payload, {}
-
-    try:
-        data = json.loads(payload)
-    except (json.JSONDecodeError, TypeError):
-        return truncate_with_marker(payload, budget=budget)
-
-    # Accept both list and dict-with-history shapes (defensive)
-    history: List[Any]
-    if isinstance(data, list):
-        history = data
-    elif isinstance(data, dict) and isinstance(data.get("history"), list):
-        history = data["history"]
-    else:
-        return truncate_with_marker(payload, budget=budget)
-
-    keep_days = 30
-    kept = history[-keep_days:]
-    dropped = max(0, len(history) - len(kept))
-
-    if isinstance(data, list):
-        out: Any = {
-            "_compressed": {
-                "shape": "list",
-                "kept_days": keep_days,
-                "dropped_rows": dropped,
-            },
-            "history": kept,
-        }
-    else:
-        out = dict(data)
-        out["history"] = kept
-        out["_compressed"] = {
-            "shape": "dict.history",
-            "kept_days": keep_days,
-            "dropped_rows": dropped,
-        }
-
-    summary = json.dumps(out, ensure_ascii=False)
-    if len(summary) > budget:
-        return truncate_with_marker(summary, budget=budget)
-
-    return summary, {
-        "dropped_chars": len(payload) - len(summary),
-        "dropped_rows": dropped,
-        "kept_days": keep_days,
-    }
-
-
-# ---------------------------------------------------------------------------
 # python_output_reducer (execute_python_analysis)
 # ---------------------------------------------------------------------------
 
@@ -417,8 +346,6 @@ _DEFAULT_REGISTRY: Dict[str, ToolReducer] = {
     "tavily_search":           tavily_search_reducer,
     # Options
     "get_option_chain":        option_chain_reducer,
-    # IV history (top-level list of IVHistoryPoint)
-    "get_iv_history_data":     iv_history_reducer,
     # Python analysis (CodeExecutionResult.output / .error / .generated_code)
     "execute_python_analysis": python_output_reducer,
 }

@@ -185,7 +185,6 @@ def create_app() -> FastAPI:
     from .routes.prices import router as prices_router
     from .routes.options import router as options_router
     from .routes.signals import router as signals_router
-    from .routes.scan import router as scan_router
     from .routes.fundamentals import router as fundamentals_router
     from .routes.config_routes import router as config_router
     from .routes.health import router as health_router
@@ -214,7 +213,6 @@ def create_app() -> FastAPI:
     app.include_router(prices_router)
     app.include_router(options_router)
     app.include_router(signals_router)
-    app.include_router(scan_router)
     app.include_router(fundamentals_router)
     app.include_router(config_router)
     app.include_router(health_router)

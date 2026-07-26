@@ -59,7 +59,6 @@ def status(
         "data_sources": {
             "news_tickers": len(dal.get_available_tickers("news")),
             "price_tickers": len(dal.get_available_tickers("prices")),
-            "iv_tickers": len(dal.get_available_tickers("iv_history")),
             "fundamentals_tickers": len(dal.get_available_tickers("fundamentals")),
         },
     }

@@ -15,10 +15,9 @@ No LLM runs here, and ArkScope-generated LLM scores are excluded by design
       pipeline; the whole ``signal_tools`` module is intentionally NOT imported
     - ``get_earnings_impact`` composed conclusions (directional bias, surprise
       correlation, expected move)
-    - the ``signal`` label from ``get_iv_analysis`` (a judgment, not a fact)
 
   INCLUDED (each tagged with ``source_type`` + ``as_of`` + freshness)
-    - observed market: price summary, IV environment numbers
+    - observed market: price summary
     - deterministic_metric: clean technicals computed straight from raw OHLCV
       (returns, range, realized vol, volume vs trailing average) — NO trend
       labels, NO action/confidence, NO composite score
@@ -426,33 +425,7 @@ def gather_evidence(
         errors["analyst"] = str(exc)
         missing.append("analyst")
 
-    # 5. IV environment — numeric only; the judgment `signal` field is dropped.
-    try:
-        from src.tools.options_tools import get_iv_analysis
-
-        iv = get_iv_analysis(dal, tkr)
-        iv_data = {
-            k: getattr(iv, k, None)
-            for k in (
-                "current_iv", "hv_30d", "vrp", "iv_rank",
-                "iv_percentile", "spot_price", "history_days",
-            )
-        }
-        if iv_data.get("current_iv") is not None:
-            b.add(
-                "iv_environment",
-                "observed_market",
-                iv_data,
-                note="IV numbers + derived rank/percentile; the get_iv_analysis 'signal' label is dropped.",
-            )
-            present.append("iv")
-        else:
-            missing.append("iv")
-    except Exception as exc:
-        errors["iv"] = str(exc)
-        missing.append("iv")
-
-    # 6. Seeking Alpha digest — opinion/community, only if enabled (no LLM scores).
+    # 5. Seeking Alpha digest — opinion/community, only if enabled (no LLM scores).
     if sa_enabled:
         try:
             from src.tools.sa_digest_tools import get_sa_digest

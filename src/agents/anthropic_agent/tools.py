@@ -276,58 +276,6 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
         # Options Tools
         {
-            "name": "get_iv_analysis",
-            "description": "Full implied volatility analysis: IV rank, percentile, VRP, and trading signal.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
-                    }
-                },
-                "required": ["ticker"]
-            }
-        },
-        {
-            "name": "get_iv_history_data",
-            "description": "Get raw IV history data points (ATM IV, HV, VRP) for a ticker.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
-                    }
-                },
-                "required": ["ticker"]
-            }
-        },
-        {
-            "name": "scan_mispricing",
-            "description": "Scan for mispriced options comparing theoretical vs market prices.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "tickers": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of ticker symbols to scan"
-                    },
-                    "mispricing_threshold_pct": {
-                        "type": "number",
-                        "description": "Minimum mispricing % to report (default: 10.0)"
-                    },
-                    "min_confidence": {
-                        "type": "string",
-                        "enum": ["HIGH", "MEDIUM", "LOW"],
-                        "description": "Minimum confidence level (default: MEDIUM)"
-                    }
-                },
-                "required": ["tickers"]
-            }
-        },
-        {
             "name": "calculate_greeks",
             "description": "Calculate Black-Scholes Greeks (delta, gamma, theta, vega, rho) for an option.",
             "input_schema": {
@@ -1436,12 +1384,7 @@ def execute_tool(
         get_price_change,
         get_sector_performance,
     )
-    from src.tools.options_tools import (
-        get_iv_analysis,
-        get_iv_history_data,
-        scan_mispricing,
-        calculate_greeks,
-    )
+    from src.tools.options_tools import calculate_greeks
     from src.tools.option_chain_tools import get_option_chain
     from src.tools.iv_skew_tools import get_iv_skew_analysis
     from src.tools.portfolio_tools import get_portfolio_analysis
@@ -1537,20 +1480,6 @@ def execute_tool(
             dal,
             tool_input["sector"],
             days=tool_input.get("days", 7)
-        ),
-        "get_iv_analysis": lambda: get_iv_analysis(
-            dal,
-            tool_input["ticker"]
-        ),
-        "get_iv_history_data": lambda: get_iv_history_data(
-            dal,
-            tool_input["ticker"]
-        ),
-        "scan_mispricing": lambda: scan_mispricing(
-            dal,
-            tool_input["tickers"],
-            mispricing_threshold_pct=tool_input.get("mispricing_threshold_pct", 10.0),
-            min_confidence=tool_input.get("min_confidence", "MEDIUM")
         ),
         "calculate_greeks": lambda: calculate_greeks(
             S=tool_input["S"],

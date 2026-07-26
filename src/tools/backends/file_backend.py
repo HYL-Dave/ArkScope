@@ -10,7 +10,6 @@ Data path mapping:
     15min prices        : data/prices/15min/{TICKER}_15min_*.csv
     Hourly prices       : data/prices/hourly/{TICKER}_hourly_*.csv
     Daily prices        : data/prices/daily/{TICKER}.parquet or .csv
-    IV history          : data/options/iv_history/{TICKER}.parquet
     Fundamentals        : data_lake/raw/ibkr_fundamentals/{TICKER}_*.json
 """
 
@@ -123,7 +122,6 @@ class FileBackend:
         # Data paths
         self._news_dir = self._base / "data" / "news"
         self._prices_dir = self._base / "data" / "prices"
-        self._iv_dir = self._base / "data" / "options" / "iv_history"
         self._fundamentals_dir = self._base / "data_lake" / "raw" / "ibkr_fundamentals"
 
         # Load model priority from config (fallback to default)
@@ -494,27 +492,6 @@ class FileBackend:
         return daily
 
     # --------------------------------------------------------
-    # IV History
-    # --------------------------------------------------------
-
-    def query_iv_history(self, ticker: str) -> pd.DataFrame:
-        """Query IV history for a ticker from local Parquet."""
-        ticker = ticker.upper()
-        path = self._iv_dir / f"{ticker}.parquet"
-
-        if not path.exists():
-            return pd.DataFrame(columns=[
-                "date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes",
-            ])
-
-        df = pd.read_parquet(path)
-        output_cols = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
-        for col in output_cols:
-            if col not in df.columns:
-                df[col] = None
-        return df[output_cols].sort_values("date").reset_index(drop=True)
-
-    # --------------------------------------------------------
     # Fundamentals
     # --------------------------------------------------------
 
@@ -592,11 +569,6 @@ class FileBackend:
                         parts = f.stem.split("_")
                         if parts:
                             tickers.add(parts[0])
-
-        elif data_type == "iv_history":
-            if self._iv_dir.exists():
-                for f in self._iv_dir.glob("*.parquet"):
-                    tickers.add(f.stem)
 
         elif data_type == "fundamentals":
             if self._fundamentals_dir.exists():

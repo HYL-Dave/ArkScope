@@ -65,12 +65,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_price_change,
         get_sector_performance,
     )
-    from src.tools.options_tools import (
-        get_iv_analysis,
-        get_iv_history_data,
-        scan_mispricing,
-        calculate_greeks,
-    )
+    from src.tools.options_tools import calculate_greeks
     from src.tools.option_chain_tools import get_option_chain as _get_option_chain
     from src.tools.iv_skew_tools import get_iv_skew_analysis as _get_iv_skew_analysis
     from src.tools.portfolio_tools import get_portfolio_analysis as _get_portfolio_analysis
@@ -283,50 +278,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # ================================================================
     # Options Tools
     # ================================================================
-
-    @function_tool
-    def tool_get_iv_analysis(ticker: str) -> str:
-        """Full implied volatility analysis: IV rank, percentile, VRP, and trading signal.
-
-        Args:
-            ticker: Stock ticker symbol
-
-        Returns current_iv, hv, vrp, iv_rank, iv_percentile, and trading signal.
-        """
-        result = get_iv_analysis(dal, ticker)
-        return _serialize_result(result, "get_iv_analysis")
-
-    @function_tool
-    def tool_get_iv_history_data(ticker: str) -> str:
-        """Get raw IV history data points (ATM IV, HV, VRP) for a ticker.
-
-        Args:
-            ticker: Stock ticker symbol
-
-        Returns list of historical IV data points with dates.
-        """
-        result = get_iv_history_data(dal, ticker)
-        return _serialize_result(result, "get_iv_history_data")
-
-    @function_tool
-    def tool_scan_mispricing(
-        tickers: List[str],
-        mispricing_threshold_pct: float = 10.0,
-        min_confidence: str = "MEDIUM"
-    ) -> str:
-        """Scan for mispriced options comparing theoretical vs market prices.
-
-        Args:
-            tickers: List of ticker symbols to scan
-            mispricing_threshold_pct: Minimum mispricing % to report (default: 10.0)
-            min_confidence: Minimum confidence level - HIGH, MEDIUM, or LOW (default: MEDIUM)
-        """
-        result = scan_mispricing(
-            dal, tickers,
-            mispricing_threshold_pct=mispricing_threshold_pct,
-            min_confidence=min_confidence
-        )
-        return _serialize_result(result, "scan_mispricing")
 
     @function_tool
     def tool_calculate_greeks(
@@ -1187,9 +1138,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_current_quote,
         tool_get_price_change,
         tool_get_sector_performance,
-        tool_get_iv_analysis,
-        tool_get_iv_history_data,
-        tool_scan_mispricing,
         tool_calculate_greeks,
         tool_get_option_chain,
         tool_get_iv_skew_analysis,

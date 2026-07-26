@@ -1,11 +1,11 @@
 # ArkScope Tool Catalog (canonical)
 
 **Date**: 2026-06-04
-**Status**: CANONICAL tool authority — introspection table from live `ToolRegistry` + **gpt-5.5 review folded 2026-06-04**; verdicts locked for every contested tool (web 3-way split, `codex_web_research` retire, CA definition-only narrowing, `synthesize_signal` preserve-adapt, `refresh_sa_alpha_picks` → `profile_state_write`). Third and last canonical doc (ProductSpec → ProviderCatalog → **ToolCatalog**). Code follow-ups now **done**: `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only status (842b5bf); post-catalog drift rows folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`); `get_current_quote` added as read-through quote primitive; `get_portfolio_holdings` added as the local holdings snapshot primitive. **Live registry now 56** (bridges 57). Next → build the desktop-app shell.
+**Status**: CANONICAL tool authority — introspection table from live `ToolRegistry` + **gpt-5.5 review folded 2026-06-04**; verdicts locked for every contested tool (web 3-way split, `codex_web_research` retire, CA definition-only narrowing, `synthesize_signal` preserve-adapt, `refresh_sa_alpha_picks` → `profile_state_write`). Third and last canonical doc (ProductSpec → ProviderCatalog → **ToolCatalog**). Code follow-ups now **done**: `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only status (842b5bf); post-catalog drift rows folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`); `get_current_quote` added as read-through quote primitive; `get_portfolio_holdings` added as the local holdings snapshot primitive; the obsolete storage-backed IV analysis/history/mispricing tools were retired with their legacy domain. **Live registry now 53** (bridges 54).
 
 **Authority**: this doc owns the **registry tool layer** — what each tool is, which of the four capability classes it belongs to, and its keep/adapt/definition-only/retire verdict + the tool-design rules. Product/agent boundaries = `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`; per-provider facts the tools consume = `ARKSCOPE_PROVIDER_CATALOG.md`; architecture = `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`.
 
-> 中文摘要：直接從 `ToolRegistry` introspect 出的 **56 個工具**（codex_web_research 已於 2a168e9 移除；catalog 定稿後漂移的三個工具已補列；`get_current_quote` 與 `get_portfolio_holdings` 已新增）逐一分類（穩定 primitive／composed-analysis／agent-control／retire-adapt）並標 keep/adapt/preserve-adapt/definition-only/retire。**這份是 code-introspection 出來的事實表，不是文件印象**；verdict 已折入 gpt-5.5 2026-06-04 review（web 三分、codex 退場、CA 收窄、`refresh_sa_alpha_picks`→`profile_state_write`），僅 §4「still open」待 build 時定序。
+> 中文摘要：直接從 `ToolRegistry` introspect 出的 **53 個工具**逐一分類（穩定 primitive／composed-analysis／agent-control／retire-adapt）並標 keep/adapt/preserve-adapt/definition-only/retire。**這份是 code-introspection 出來的事實表，不是文件印象**；舊 IV store 所屬三工具已隨該 domain 退役，live option chain、skew 與 Greeks 保留。
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### 0.1 Source of truth = live introspection (NOT doc impression)
 
-Every tool below was enumerated by constructing `ToolRegistry` and calling `register_all()` + `list_all()` on **2026-06-04**, then reconciled to the current live registry after post-catalog drift and the 2026-07 quote/holdings primitives — name, category, and parameters are authoritative from code. **Count: 56 registry tools** (+`delegate_to_subagent` injected at each agent bridge = **57** in bridges), across 11 categories. Lineage: post-RL-retirement baseline 52/53; `codex_web_research` removed 2026-06-04 (2a168e9) → 51/52; three already-registered drift tools folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`) → 54/55; `get_current_quote` added 2026-07 → 55/56; `get_portfolio_holdings` added 2026-07 → **56/57**.
+Every tool below was enumerated by constructing `ToolRegistry` and calling `register_all()` + `list_all()` on **2026-06-04**, then reconciled to the current live registry after later reviewed changes — name, category, and parameters are authoritative from code. **Count: 53 registry tools** (+`delegate_to_subagent` injected at each agent bridge = **54** in bridges), across 11 categories. The legacy store-backed `get_iv_analysis`, `get_iv_history_data`, and `scan_mispricing` capabilities are permanently retired; live option-chain, skew, and pure Greeks tools remain.
 
 > Re-run to refresh: `python -c "from src.tools.registry import ToolRegistry; r=ToolRegistry(); r.register_all(); print(len(r.list_all()))"`.
 
@@ -21,7 +21,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 
 | Class | Meaning | Tools-as-definitions? |
 |-------|---------|----------------------|
-| **SP — stable primitive** | Fetch/compute a stable fact: query price / fundamentals / macro / filing / SA capture / IV / Greeks. | ❌ **No** — keep a stable implementation; the agent must NOT re-wire these ad-hoc each call. |
+| **SP — stable primitive** | Fetch/compute a stable fact: query price / fundamentals / macro / filing / SA capture / live options / Greeks. | ❌ **No** — keep a stable implementation; the agent must NOT re-wire these ad-hoc each call. |
 | **CA — composed analysis** | Compose primitives into a higher-order analysis (digest, comparison, multi-factor synthesis). | ✅ **Candidate** — can survive as a *definition / recipe / schema* a strong model composes from primitives. |
 | **AC — agent-control** | Memory, reports, code execution, web access, alerts, subagents — the agent's own machinery. | ❌ No — these are infrastructure with permission gates (ProductSpec §4.3). |
 | **RA — retire-adapt** | Scenario changed: provider/storage assumption wrong, methodology known-flawed, or superseded (RL already retired). | n/a — verdict is adapt or retire. |
@@ -32,9 +32,9 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 
 ---
 
-## 1. Introspection table — all 56 tools (grouped by capability class)
+## 1. Introspection table — all 53 tools (grouped by capability class)
 
-### 1.1 Stable primitives (SP) — 33 tools · verdict: **keep-current** (keep the implementation)
+### 1.1 Stable primitives (SP) — 31 tools · verdict: **keep-current** (keep the implementation)
 
 > gpt-5.5 Q1: "which are stable primitive — keep the implementation, don't let the agent rewrite the wiring." These are the data/compute primitives. DAL/provider-backed; the agent calls them, never re-implements them.
 
@@ -68,13 +68,11 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 | `get_macro_value` | analysis | series_id*, observation_date*, as_of? | FRED (point-in-time) | keep-current |
 | `get_ticker_data_coverage` | analysis | ticker*, target_date? | local data coverage diagnostics | keep-current |
 | `get_option_chain` | options | ticker*, expiry?, num_strikes?, max_expirations_for_term_structure? | IBKR options | keep-current |
-| `get_iv_analysis` | options | ticker* | IV store | keep-current |
-| `get_iv_history_data` | options | ticker* | IV history parquet | keep-current |
-| `get_iv_skew_analysis` | options | ticker*, expiry?, num_strikes? | IV store | keep-current |
+| `get_iv_skew_analysis` | options | ticker*, expiry?, num_strikes? | live IBKR option chain | keep-current |
 | `calculate_greeks` | options | S*, K*, T*, r*, sigma*, option_type?, model?, dividend_yield? | pure math (Black-Scholes) | keep-current |
 | `check_data_freshness` | analysis (freshness) | — | freshness meta (truth = data) | keep-current |
 
-### 1.2 Composed analysis (CA) — 10 tools · verdict: **mixed** (2 definition-only · 3 keep-impl/adapt-output · 3 signal keep-current · 1 preserve-adapt · 1 adapt)
+### 1.2 Composed analysis (CA) — 9 tools · verdict: **mixed** (2 definition-only · 3 keep-impl/adapt-output · 3 signal keep-current · 1 preserve-adapt)
 
 > gpt-5.5 Q2 + review (2026-06-04): only the **thin orchestration** digests (`get_morning_brief`, `get_watchlist_overview`) are true definition-only candidates. `get_peer_comparison` / `get_earnings_impact` / `get_portfolio_analysis` carry **real deterministic computation** (sector resolution + percentile / earnings-drift / beta+correlation+P&L) → **keep the implementation**, adapt only the *output* to the §2 card where they conclude. `synthesize_signal` is **preserve-adapt**, not definition-only (see §1.4).
 
@@ -89,7 +87,6 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 | `detect_event_chains` | signals | ticker*, days? | event-chain pattern detection | keep-current |
 | `get_signal_factors` | signals | ticker*, days?, as_of_date?, strategy? | multi-factor decomposition | keep-current (pairs w/ `synthesize_signal` = signal + explainability) |
 | `synthesize_signal` | signals | ticker*, days?, strategy?, as_of_date? | weighted multi-factor synthesis | **preserve-adapt** — keep deterministic impl; surface as *evidence* signal (data_quality + traceability), weaken recommendation authority, not final decision |
-| `scan_mispricing` | options | tickers*, mispricing_threshold_pct?, min_confidence? | option pricing vs Black-Scholes | **adapt** (flawed methodology — see §1.4) |
 
 ### 1.3 Agent-control (AC) — 13 tools · verdict: mostly keep-current; **1 adapt** (save_report). `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only (842b5bf)
 
@@ -113,7 +110,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 
 *(`codex_web_research` was here — **removed** 2a168e9, see §1.4; the deep-research capability re-homes provider-neutral in §1.5.)*
 
-*(+ `delegate_to_subagent` — injected at each agent bridge, not in the registry's 56; AC class; `subagent_mode`-bounded per ProductSpec §4.1.)*
+*(+ `delegate_to_subagent` — injected at each agent bridge, not in the registry's 53; AC class; `subagent_mode`-bounded per ProductSpec §4.1.)*
 
 ### 1.4 Retire-adapt (RA) flags — scenario changed
 
@@ -121,7 +118,6 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 
 | Tool | Class | Flag | Why |
 |------|-------|------|-----|
-| `scan_mispricing` | options/CA | **adapt** | Naive Black-Scholes "market > theoretical = overpriced" is **known-flawed** — `docs/data/OPTIONS_PRICING_THEORY.md` shows VRP makes it always wrong; correct method = IV-percentile-rank vs own 252-day history. Re-base the methodology. |
 | `save_report` | reports/AC | **adapt** | Must **accept/store** the ProductSpec §2 card fields (conclusion / counter-thesis / triggers / invalidation / confidence / traceability) + metadata. The card is produced by agent/report composition — `save_report` stores it, it does **not** generate it. |
 | `refresh_sa_alpha_picks` | portfolio/AC | **adapt done ✓ (842b5bf)** | The agent-facing tool is pure read-only status. The protected native host still writes the legacy JSON only during the reviewed readers-first transition; terminal authority is the automatic DB-derived source in the 2026-07-17 retirement design. |
 | `codex_web_research` | web/AC | **retired ✓ (2a168e9)** | Removed: hard-binds external Codex CLI + OpenAI OAuth + `--full-auto --search`; bypassed BYOK and the §2 output contract. Capability re-homed as provider-neutral `deep_research` (§1.5). |
@@ -159,20 +155,20 @@ additive action will require `profile_state_write` when designed.
 
 | Verdict | Count | Tools |
 |---------|------:|-------|
-| **keep-current** | 50 | all SP (33) · 3 signal impls (detect_anomalies, detect_event_chains, get_signal_factors) · 3 CA compute tools (get_peer_comparison, get_earnings_impact, get_portfolio_analysis — *adapt output to §2 where they conclude*) · 11 AC (memory R/W ×4, reports R ×2, execute_python_analysis, tavily ×2, scan_alerts, refresh_sa_alpha_picks — read-only, adapt done 842b5bf) |
+| **keep-current** | 48 | all SP (31) · 3 signal impls (detect_anomalies, detect_event_chains, get_signal_factors) · 3 CA compute tools (get_peer_comparison, get_earnings_impact, get_portfolio_analysis — *adapt output to §2 where they conclude*) · 11 AC (memory R/W ×4, reports R ×2, execute_python_analysis, tavily ×2, scan_alerts, refresh_sa_alpha_picks — read-only, adapt done 842b5bf) |
 | **definition-only / adapt-to-card** | 2 | get_morning_brief, get_watchlist_overview |
 | **preserve-adapt** | 1 | synthesize_signal |
-| **adapt** | 2 | scan_mispricing, save_report |
+| **adapt** | 1 | save_report |
 | **keep/adapt** (gate + backend) | 1 | web_browse |
-| **retired ✓** (not in live 51) | — | codex_web_research (2026-06-04, `2a168e9`) · RL tools (2026-06-03, `94861f7`+`6b49c74`) |
+| **retired ✓** | — | codex_web_research · RL tools · get_iv_analysis · get_iv_history_data · scan_mispricing |
 
-**Total live = 50 + 2 + 1 + 2 + 1 = 56 ✓**
+**Total live = 48 + 2 + 1 + 1 + 1 = 53 ✓**
 
 ---
 
 ## 3. Tool-design rules (LOCK candidates — for review)
 
-1. **Data primitives stay implemented.** SP-class tools (price/fundamentals/macro/filing/SA/IV/Greeks) keep stable code. The agent calls them; it does **not** re-author the data wiring per query. (Stability + provider-abstraction via the DAL — ProviderCatalog.)
+1. **Data primitives stay implemented.** SP-class tools (price/fundamentals/macro/filing/SA/live options/Greeks) keep stable code. The agent calls them; it does **not** re-author the data wiring per query. (Stability + provider-abstraction via the DAL — ProviderCatalog.)
 2. **"Tools as definitions" applies only to composed-analysis.** A strong model may compose CA recipes from SP primitives; only CA-class tools are candidates to become definition/schema rather than hardcoded pipelines.
 3. **Decision-bearing output conforms to the §2 AI output contract.** Any agent/composition output bearing a conclusion/recommendation (the digests; a saved report's body) is the fixed-schema card + traceability, not free prose. `save_report` **stores** those §2 card fields + traceability metadata — it does **not** generate them.
 4. **Prefer provider-native signals over re-scoring** (ProductSpec §3): analyst consensus / sentiment / factor grades enter as evidence; the LLM integrates, it doesn't re-compute everything.
@@ -193,7 +189,6 @@ additive action will require `profile_state_write` when designed.
 4. **`refresh_sa_alpha_picks` → read-only status**; implicit agent-side mutation remains removed. The later 2026-07-17 ruling supersedes the proposed explicit follow action: current Alpha Picks become an automatic DB-derived universe source after readers-first JSON retirement. A future source-retirement mutation, if needed, uses `profile_state_write` and preserves captured history.
 
 **Still open (build sequencing, not blocking adoption):**
-1. **`scan_mispricing` adapt timing** — re-base on IV-percentile-rank now, or defer until an options-analysis surface exists?
-2. **`deep_research` build path** — OpenAI SDK, Anthropic SDK, or ArkScope-orchestrated first? (spike, ProductSpec §7)
-3. **CloakBrowser backend** — when/whether to wire `cloakbrowser_spike` behind `web_browse` vs stay on `playwright_builtin`. (spike, ProductSpec §7)
-4. **DB-universe follow-up**: execute the reviewed readers-first `tickers_core.json` retirement after P2.8 Slice 3. Do not add the superseded follow/opt-in control; retain only the named future source-retirement action if the Alpha Picks feed is actually discontinued.
+1. **`deep_research` build path** — OpenAI SDK, Anthropic SDK, or ArkScope-orchestrated first? (spike, ProductSpec §7)
+2. **CloakBrowser backend** — when/whether to wire `cloakbrowser_spike` behind `web_browse` vs stay on `playwright_builtin`. (spike, ProductSpec §7)
+3. **DB-universe follow-up**: execute the reviewed readers-first `tickers_core.json` retirement after P2.8 Slice 3. Do not add the superseded follow/opt-in control; retain only the named future source-retirement action if the Alpha Picks feed is actually discontinued.

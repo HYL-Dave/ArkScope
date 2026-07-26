@@ -13,143 +13,36 @@ from src.news_identity import canonical_article_hash
 from src.profile_state import ProfileStateStore
 
 
-def _legacy_bootstrap_market(*args, **kwargs):
-    return mda.bootstrap_market(*args, allow_retired_pg_mirror=True, **kwargs)
-
-
-def _legacy_validate_market(*args, **kwargs):
-    return mda.validate_market(*args, allow_retired_pg_mirror=True, **kwargs)
-
-
-def _legacy_incremental_update(*args, **kwargs):
-    return mda.incremental_update(*args, allow_retired_pg_mirror=True, **kwargs)
-
-
-# --- a minimal fake PG serving BOTH domains (no live DB needed) ---------------
-
-_PRICE_ROWS = [
-    ("AAPL", "2026-06-01T09:00:00+0000", "15min", 100.0, 102.0, 99.0, 101.0, 1000),
-    ("AAPL", "2026-06-01T09:15:00+0000", "15min", 101.0, 103.0, 100.0, 102.0, 1100),
-    ("NVDA", "2026-06-01T09:00:00+0000", "15min", 900.0, 905.0, 899.0, 904.0, 2000),
-]
-_NEWS_ROWS = [
-    (1, "AAPL", "Apple beat estimates", "iPhone demand", "http://a", "Reuters",
-     "polygon", "2026-06-01T12:00:00+0000", "h1"),
-    (2, "NVDA", "Nvidia new chip", "datacenter", "http://b", "Bloomberg",
-     "finnhub", "2026-06-01T12:00:00+0000", "h2"),
-]
-# 3c-A: iv_history (id, ticker, date, atm_iv, hv_30d, vrp, spot_price, num_quotes)
-_IV_ROWS = [
-    (1, "AAPL", "2026-06-01", 0.25, 0.20, 0.05, 101.0, 12),
-    (2, "AAPL", "2026-06-02", 0.26, 0.21, 0.05, 102.0, 14),
-    (3, "NVDA", "2026-06-01", 0.45, 0.40, 0.05, 904.0, 30),
-]
-# 3c-A: fundamentals (id, ticker, snapshot_date, data::text — ReportSnapshot JSON)
-_FUND_ROWS = [
-    (1, "AAPL", "2026-06-01",
-     '{"reports": {"ReportSnapshot": {"Name": "Apple Inc"}, '
-     '"ReportsFinSummary": {"rev": 1}, "ReportsOwnership": {"inst": 0.6}}}'),
-    (2, "NVDA", "2026-06-01", '{"reports": {"ReportSnapshot": {"Name": "NVIDIA"}}}'),
-]
-
-
-def _price_checksum(rows):
-    out = {}
-    for r in rows:
-        out[(r[0], r[2])] = out.get((r[0], r[2]), 0) + 1
-    return [(t, iv, n) for (t, iv), n in out.items()]
-
-
-def _news_checksum(rows):
-    # mirror PG: SELECT source, ticker, COUNT(*), SUM(id) GROUP BY source, ticker
-    out = {}
-    for r in rows:
-        key = (r[6], r[1])  # (source, ticker)
-        cnt, sid = out.get(key, (0, 0))
-        out[key] = (cnt + 1, sid + r[0])  # +1 row, +id
-    return [(src, tk, c, s) for (src, tk), (c, s) in out.items()]
-
-
-def _ticker_idsum_checksum(rows):
-    # mirror PG for iv/fundamentals: SELECT ticker, COUNT(*), SUM(id) GROUP BY ticker
-    # (id is col 0, ticker is col 1 in both row shapes).
-    out = {}
-    for r in rows:
-        cnt, sid = out.get(r[1], (0, 0))
-        out[r[1]] = (cnt + 1, sid + r[0])
-    return [(tk, c, s) for tk, (c, s) in out.items()]
-
-
-class _FakeCursor:
-    def __init__(self, prices, news, price_total=None, news_total=None,
-                 iv=None, fund=None, iv_total=None, fund_total=None):
-        self._p, self._n = prices, news
-        self._iv = _IV_ROWS if iv is None else iv
-        self._f = _FUND_ROWS if fund is None else fund
-        self._pt = price_total if price_total is not None else len(prices)
-        self._nt = news_total if news_total is not None else len(news)
-        self._ivt = iv_total if iv_total is not None else len(self._iv)
-        self._ft = fund_total if fund_total is not None else len(self._f)
-        self._mode, self._it, self._val = None, None, None
-
-    @staticmethod
-    def _domain(s):
-        if "FROM iv_history" in s:
-            return "iv"
-        if "FROM fundamentals" in s:
-            return "fundamentals"
-        if "FROM news" in s:
-            return "news"
-        return "prices"
-
-    def execute(self, sql, params=None):
-        s = " ".join(sql.split())
-        dom = self._domain(s)
-        rows = {"prices": self._p, "news": self._n, "iv": self._iv, "fundamentals": self._f}[dom]
-        if "GROUP BY" in s:  # checked before COUNT(*): checksum SQL contains both
-            checksum = {"prices": _price_checksum, "news": _news_checksum,
-                        "iv": _ticker_idsum_checksum, "fundamentals": _ticker_idsum_checksum}[dom]
-            self._mode, self._val = "all", checksum(rows)
-        elif "COUNT(*)" in s:
-            total = {"prices": self._pt, "news": self._nt,
-                     "iv": self._ivt, "fundamentals": self._ft}[dom]
-            self._mode, self._val = "one", (total,)
-        else:
-            self._mode, self._it = "select", iter(rows)
-
-    def fetchone(self):
-        return self._val if self._mode == "one" else None
-
-    def fetchall(self):
-        return list(self._val) if self._mode == "all" else []
-
-    def fetchmany(self, n):
-        out = []
-        for _ in range(n):
-            try:
-                out.append(next(self._it))
-            except StopIteration:
-                break
-        return out
-
-
-class _FakePG:
-    def __init__(self, prices, news, price_total=None, news_total=None,
-                 iv=None, fund=None, iv_total=None, fund_total=None):
-        self._c = _FakeCursor(prices, news, price_total, news_total,
-                              iv=iv, fund=fund, iv_total=iv_total, fund_total=fund_total)
-
-    def cursor(self):
-        return self._c
-
-    def close(self):
-        pass
-
-
-@pytest.fixture()
-def fake_pg(monkeypatch):
-    """Patch _pg_conn → fake serving prices + news + iv + fundamentals (happy path)."""
-    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, _NEWS_ROWS))
+def _create_local_market_db(path: str) -> None:
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(mda._PRICES_SCHEMA)
+        conn.executescript(mda._NEWS_SCHEMA)
+        conn.executescript(
+            "CREATE TABLE fundamentals ("
+            "id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, "
+            "snapshot_date TEXT NOT NULL, data TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO prices "
+            "(ticker, datetime, interval, open, high, low, close, volume) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("AAPL", "2026-06-01T09:00:00+0000", "15min", 100, 102, 99, 101, 1000),
+        )
+        conn.execute(
+            "INSERT INTO news "
+            "(ticker, title, description, url, publisher, source, published_at, article_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("AAPL", "Apple beat estimates", "iPhone demand", "http://a", "Reuters",
+             "polygon", "2026-06-01T12:00:00+0000", "h1"),
+        )
+        conn.execute(
+            "INSERT INTO fundamentals (id, ticker, snapshot_date, data) VALUES (?, ?, ?, ?)",
+            (1, "AAPL", "2026-06-01", '{"reports": {"ReportSnapshot": {"Name": "Apple"}}}'),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # --- admin core ---------------------------------------------------------------
@@ -160,26 +53,12 @@ def test_local_stats_missing(tmp_path):
     assert s["prices"]["row_count"] == 0 and s["news"]["row_count"] == 0
 
 
-# --- 3c-A: iv_history + fundamentals ------------------------------------------
-
-_NEW_IV = (4, "AAPL", "2026-06-03", 0.27, 0.22, 0.05, 103.0, 16)
-_NEW_FUND = (3, "TSLA", "2026-06-02", '{"reports": {"ReportSnapshot": {"Name": "Tesla"}}}')
-
-
-_NEW_PRICE = ("AAPL", "2026-06-01T09:30:00+0000", "15min", 102.0, 104.0, 101.0, 103.0, 1200)
-_NEW_NEWS = (3, "AAPL", "Apple new product launch", "big reveal", "http://d", "Reuters",
-             "polygon", "2026-06-02T10:00:00+0000", "h3")
-
-
-_NEW_TICKER_BAR = ("TSLA", "2026-05-01T09:00:00+0000", "15min", 200.0, 202.0, 199.0, 201.0, 500)
-
-
 # --- 3c-C: financial_cache (local-primary; carry-over on rebuild) -------------
 
-def test_local_stats_financial_cache_counts(tmp_path, fake_pg):
+def test_local_stats_financial_cache_counts(tmp_path):
     from src.tools.backends.sqlite_backend import SqliteBackend
     out = str(tmp_path / "market_data.db")
-    _legacy_bootstrap_market(out)
+    _create_local_market_db(out)
     sb = SqliteBackend(out)
     sb.set_financial_cache("valid", "AAPL", {"x": 1}, expires_at="2099-01-01T00:00:00+00:00")
     sb.set_financial_cache("expired", "AAPL", {"x": 2}, expires_at="2000-01-01T00:00:00+00:00")
@@ -188,18 +67,19 @@ def test_local_stats_financial_cache_counts(tmp_path, fake_pg):
     assert fc["latest_fetched_at"] is not None
 
 
-def test_local_ticker_coverage(tmp_path, fake_pg):
+def test_local_ticker_coverage(tmp_path):
     out = str(tmp_path / "market_data.db")
     # missing DB → exists False, all domains False
     cov = mda.local_ticker_coverage("AAPL", out)
-    assert cov["exists"] is False and not any(cov[d] for d in ("prices", "news", "iv", "fundamentals"))
-    _legacy_bootstrap_market(out)  # fake serves AAPL+NVDA across all domains
+    assert set(cov) == {"exists", "prices", "news", "fundamentals"}
+    assert cov["exists"] is False and not any(cov[d] for d in ("prices", "news", "fundamentals"))
+    _create_local_market_db(out)
     cov = mda.local_ticker_coverage("aapl", out)  # case-insensitive
     assert cov["exists"] is True
-    assert cov["prices"] and cov["news"] and cov["iv"] and cov["fundamentals"]
+    assert cov["prices"] and cov["news"] and cov["fundamentals"]
     absent = mda.local_ticker_coverage("ZZZZ", out)  # tracked DB, untracked ticker
     assert absent["exists"] is True
-    assert not (absent["prices"] or absent["news"] or absent["iv"] or absent["fundamentals"])
+    assert not (absent["prices"] or absent["news"] or absent["fundamentals"])
 
 
 # --- routes -------------------------------------------------------------------

@@ -66,16 +66,6 @@ class DataBackend(Protocol):
         """
         ...
 
-    def query_iv_history(self, ticker: str) -> pd.DataFrame:
-        """
-        Query IV history for a ticker.
-
-        Returns:
-            DataFrame with columns:
-                date, atm_iv, hv_30d, vrp, spot_price, num_quotes
-        """
-        ...
-
     def query_fundamentals(self, ticker: str) -> dict:
         """
         Query fundamental data for a ticker.
@@ -110,7 +100,7 @@ class DataBackend(Protocol):
         List tickers with available data of a given type.
 
         Args:
-            data_type: One of 'news', 'prices', 'iv_history', 'fundamentals'
+            data_type: One of 'news', 'prices', or 'fundamentals'
 
         Returns:
             Sorted list of ticker symbols

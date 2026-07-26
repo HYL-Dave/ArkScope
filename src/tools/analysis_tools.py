@@ -349,8 +349,6 @@ def get_watchlist_overview(
         logger.warning("watchlist overview: news stats scan failed: %s", e)
         news_by_ticker = {}
 
-    include_iv = os.environ.get("ARKSCOPE_OVERVIEW_INCLUDE_IV") == "1"
-
     tickers_summary: List[dict] = []
 
     for info in watchlist.details:
@@ -389,22 +387,6 @@ def get_watchlist_overview(
             summary["bullish_ratio"] = (
                 round(bullish_count / scored_count, 3) if scored_count else 0
             )
-
-        # IV is intentionally off the default cockpit path: querying full IV
-        # history once per ticker makes /overview too slow for startup UI. Keep
-        # the legacy field available for manual diagnostics when explicitly
-        # requested.
-        if include_iv:
-            try:
-                iv_points = dal.get_iv_history(t)
-                if iv_points:
-                    summary["latest_iv"] = round(iv_points[-1].atm_iv, 4)
-                    summary["latest_vrp"] = (
-                        round(iv_points[-1].vrp, 4)
-                        if iv_points[-1].vrp is not None else None
-                    )
-            except Exception:
-                pass
 
         tickers_summary.append(summary)
 

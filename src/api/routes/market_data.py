@@ -3,8 +3,7 @@ Market-data lifecycle routes (slice 3a.1) — local SQLite bootstrap/status/vali
 
 Reports and controls the local market_data.db authority. The old PG
 bootstrap/update/validate mirror endpoints are fail-closed; active collection now
-uses direct-local providers. Domains: prices, normalized news, IV/fundamentals
-legacy inspection, and financial_cache (local-primary).
+uses direct-local providers.
 """
 
 from __future__ import annotations
@@ -21,14 +20,11 @@ from src.market_data_admin import (
     USE_LOCAL_MARKET_STRICT_KEY,
     env_routing_enabled,
     env_strict_enabled,
-    get_job,
     local_market_stats,
     local_ticker_coverage,
     overlay_price_sync_retired,
     read_sync_meta,
     resolve_market_db_path,
-    start_bootstrap_job,
-    validate_market,
 )
 from src.market_coverage.models import TradingDayCoverageV2
 from src.market_coverage.service import TradingDayCoverageService
@@ -60,7 +56,7 @@ def _strict_setting_enabled(store: ProfileStateStore) -> bool:
 def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     """Local market-data status (PURE READ; does not touch PG).
 
-    Reports the local per-domain stats (prices + news + iv + fundamentals + the
+    Reports the local per-domain stats (prices + news + fundamentals + the
     local-primary financial_cache). Post-PG-exit local authority is the default:
     the legacy persisted/env routing fields are exposed for provenance only, not
     as live PG fallback controls.
@@ -83,7 +79,6 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "prices_authority": "local",
         "price_mirror_retired": True,
         "news": stats["news"],
-        "iv": stats["iv"],
         "fundamentals": stats["fundamentals"],
         "financial_cache": stats["financial_cache"],  # 3c-C local-primary cache (rows/valid/expired)
         "fundamentals_mode": "local_cache_refetch",
@@ -121,25 +116,6 @@ def update_route(store: ProfileStateStore = Depends(get_profile_store)):
     require_db_write("market_update", {"db": resolve_market_db_path()})
     _manual_update_domains(store)
     raise _retired_market_update_http_error()
-
-
-@router.get("/market-data/jobs/{job_id}")
-def market_data_job(job_id: str):
-    """Poll a market-data background job (e.g. bootstrap).
-
-    When a bootstrap finishes successfully the market DB has just appeared/changed,
-    so we drop the lru_cache'd DAL → the next read re-evaluates routing (covers the
-    enable-before-build order without a restart). Idempotent; the client stops
-    polling at done, so this fires ~once.
-    """
-    job = get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="job not found")
-    if job.get("kind") == "bootstrap_market" and job.get("status") == "done":
-        from src.api.dependencies import get_dal
-
-        get_dal.cache_clear()
-    return job
 
 
 @router.get("/market-data/coverage/{ticker}")

@@ -45,19 +45,6 @@ CREATE TABLE IF NOT EXISTS prices (
     UNIQUE(ticker, datetime, interval)
 );
 
--- Implied volatility history
-CREATE TABLE IF NOT EXISTS iv_history (
-    id         BIGSERIAL PRIMARY KEY,
-    ticker     VARCHAR(10)      NOT NULL,
-    date       DATE             NOT NULL,
-    atm_iv     DOUBLE PRECISION,
-    hv_30d     DOUBLE PRECISION,
-    vrp        DOUBLE PRECISION,  -- volatility risk premium = atm_iv - hv_30d
-    spot_price DOUBLE PRECISION,
-    num_quotes INTEGER,
-    UNIQUE(ticker, date)
-);
-
 -- Fundamentals snapshots (JSONB for flexibility)
 CREATE TABLE IF NOT EXISTS fundamentals (
     id            BIGSERIAL PRIMARY KEY,
@@ -89,7 +76,7 @@ CREATE TABLE IF NOT EXISTS agent_queries (
     answer      TEXT,
     provider    VARCHAR(20),           -- 'openai', 'anthropic'
     model       VARCHAR(50),
-    tools_used  JSONB,                 -- ["get_ticker_news", "get_iv_analysis"]
+    tools_used  JSONB,                 -- ["get_ticker_news", "calculate_greeks"]
     duration_ms INTEGER,
     tokens_in   INTEGER,
     tokens_out  INTEGER,
@@ -118,10 +105,6 @@ CREATE INDEX IF NOT EXISTS idx_news_title_trgm
 CREATE INDEX IF NOT EXISTS idx_prices_ticker_interval_dt
     ON prices(ticker, interval, datetime DESC);
 
--- IV History
-CREATE INDEX IF NOT EXISTS idx_iv_ticker_date
-    ON iv_history(ticker, date DESC);
-
 -- Signals
 CREATE INDEX IF NOT EXISTS idx_signals_ticker_date
     ON signals(ticker, created_at DESC);
@@ -138,7 +121,6 @@ CREATE INDEX IF NOT EXISTS idx_queries_date
 
 -- ALTER TABLE news ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE prices ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE iv_history ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE fundamentals ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE signals ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE agent_queries ENABLE ROW LEVEL SECURITY;

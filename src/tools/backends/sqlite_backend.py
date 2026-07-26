@@ -1,5 +1,5 @@
 """
-SqliteBackend — local-first market-data backend (3a prices + 3b news + 3c iv/fund/cache).
+SqliteBackend — local-first market-data backend.
 
 Part of the PostgreSQL → local SQLite migration (see
 ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §3/§4). This backend
@@ -7,9 +7,9 @@ serves the *market_data* domain from a local ``market_data.db`` (SQLite, WAL).
 It is NOT a full ``DataBackend`` — only the methods used by
 :class:`~src.tools.backends.local_market_backend.LocalMarketDatabaseBackend` are
 implemented: 3a = ``query_prices``; 3b = ``query_news`` (unscored) +
-``query_news_search`` (FTS5); 3c-A = ``query_iv_history`` + ``query_fundamentals``;
+``query_news_search`` (FTS5); 3c-A = ``query_fundamentals``;
 3c-C = ``get_financial_cache`` + ``set_financial_cache`` (LOCAL-PRIMARY cache);
-plus ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
+plus ``get_available_tickers('prices'|'news'|'fundamentals')``.
 Score-dependent reads (news_scores deferred) and everything else stay on PostgreSQL.
 
 Reads open the DB **read-only** (``mode=ro``); the data tables are written only by
@@ -46,9 +46,6 @@ logger = logging.getLogger(__name__)
 
 _PRICE_COLS = ["datetime", "open", "high", "low", "close", "volume"]
 _INTERVAL_MAP = {"1h": "1h", "hourly": "1h", "1d": "1d", "daily": "1d", "15min": "15min"}
-# query_iv_history output shape (match DatabaseBackend exactly).
-_IV_COLS = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
-
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -216,7 +213,7 @@ class SqliteBackend:
 
     def query_health_stats(self) -> dict:
         """Local recompute of freshness/health stats from market_data.db — SAME shape as
-        DatabaseBackend.query_health_stats (``{news,prices,iv_history,financial_cache}``,
+        DatabaseBackend.query_health_stats (``{news,prices,financial_cache}``,
         each ``{"rows": [positional tuples], "error": str|None}``), so provider-health /
         freshness stop needing PG. A missing optional table is an honest empty (error None),
         not a failure — same 'tolerate a pre-X DB' stance as the rest of the local backend."""
@@ -246,7 +243,6 @@ class SqliteBackend:
            "SUM(CASE WHEN published_at > ? THEN 1 ELSE 0 END) AS recent_count "
            "FROM news GROUP BY source", (news_cutoff,))
         _q("prices", "prices", "SELECT MAX(datetime) FROM prices")
-        _q("iv_history", "iv_history", "SELECT MAX(date) FROM iv_history")
         _q("financial_cache", "financial_cache",
            "SELECT source, "
            "SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) AS cached, "
@@ -707,30 +703,6 @@ class SqliteBackend:
         finally:
             conn.close()
 
-    # --- iv history + fundamentals (3c-A): read-mostly snapshots -------------
-
-    def query_iv_history(self, ticker: str) -> pd.DataFrame:
-        """Local IV history for ``ticker`` (ordered by date ASC) — same columns as
-        the PG path. Empty frame on any miss (caller falls back to PG)."""
-        empty = pd.DataFrame(columns=_IV_COLS)
-        ticker = self._canon(ticker)
-        try:
-            conn = self._connect()
-        except sqlite3.OperationalError:
-            return empty
-        try:
-            rows = conn.execute(
-                "SELECT date, atm_iv, hv_30d, vrp, spot_price, num_quotes FROM iv_history "
-                "WHERE ticker = ? ORDER BY date ASC",
-                (ticker,),
-            ).fetchall()
-            return pd.DataFrame([tuple(r) for r in rows], columns=_IV_COLS) if rows else empty
-        except sqlite3.OperationalError as e:
-            logger.warning(f"SqliteBackend.query_iv_history({ticker}): {e}")
-            return empty
-        finally:
-            conn.close()
-
     def query_fundamentals(self, ticker: str) -> dict:
         """Latest local fundamentals snapshot for ``ticker``. Returns the same dict
         shape as the PG path (``snapshot`` / ``fin_summary`` / ``ownership`` pulled
@@ -861,10 +833,9 @@ class SqliteBackend:
                 conn.close()
 
     def get_available_tickers(self, data_type: str) -> List[str]:
-        """Distinct tickers for a local domain (prices 3a / news 3b / iv_history /
-        fundamentals 3c-A)."""
+        """Distinct tickers for a local domain."""
         table = {"prices": "prices", "news": "news",
-                 "iv_history": "iv_history", "fundamentals": "fundamentals"}.get(data_type)
+                 "fundamentals": "fundamentals"}.get(data_type)
         if table is None:
             return []
         try:

@@ -25,8 +25,6 @@ from .backends.file_backend import FileBackend
 from .backends.db_backend import DatabaseBackend
 from .schemas import (
     FundamentalsResult,
-    IVAnalysisResult,
-    IVHistoryPoint,
     NewsArticle,
     NewsQueryResult,
     PriceBar,
@@ -721,26 +719,6 @@ class DataAccessLayer:
             "days": {},
             "content_counts": empty_content_counts(),
         }
-
-    def get_iv_history(self, ticker: str) -> List[IVHistoryPoint]:
-        """Query IV history and return structured result."""
-        df = self._backend.query_iv_history(ticker)
-
-        points = []
-        for _, row in df.iterrows():
-            points.append(IVHistoryPoint(
-                date=str(row["date"]),
-                atm_iv=float(row["atm_iv"]),
-                hv_30d=_safe_float(row.get("hv_30d")),
-                vrp=_safe_float(row.get("vrp")),
-                spot_price=_safe_float(row.get("spot_price")),
-                num_quotes=_safe_int(row.get("num_quotes")),
-            ))
-        return points
-
-    def get_iv_history_df(self, ticker: str) -> pd.DataFrame:
-        """Query IV history as raw DataFrame (for analysis functions)."""
-        return self._backend.query_iv_history(ticker)
 
     def get_fundamentals(self, ticker: str) -> FundamentalsResult:
         """Query fundamentals and return structured result."""

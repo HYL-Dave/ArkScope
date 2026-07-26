@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 _DEFAULT_THRESHOLDS = {
     "news": 24,
     "prices": 48,      # 考慮週末
-    "iv_history": 48,   # 考慮週末
 }
 
 _CACHE_TTL_SECONDS = 300  # 5 minutes
@@ -85,7 +84,7 @@ class FreshnessRegistry:
             except Exception as e:
                 logger.warning("FreshnessRegistry.scan() failed: %s", e)
                 err_msg = f"query failed: {e}"
-                for src in ("news", "prices", "iv_history", "fundamentals_cache"):
+                for src in ("news", "prices", "fundamentals_cache"):
                     result[src] = SourceHealth(
                         source=src, is_stale=True, stale_reason=err_msg,
                     )
@@ -95,7 +94,6 @@ class FreshnessRegistry:
 
             result["news"] = self._parse_news(stats.get("news", {}))
             result["prices"] = self._parse_prices(stats.get("prices", {}))
-            result["iv_history"] = self._parse_iv(stats.get("iv_history", {}))
             result["fundamentals_cache"] = self._parse_financial_cache(
                 stats.get("financial_cache", {})
             )
@@ -118,7 +116,7 @@ class FreshnessRegistry:
             return ""
 
         parts = []
-        for key in ("news", "prices", "iv_history", "fundamentals_cache"):
+        for key in ("news", "prices", "fundamentals_cache"):
             h = self._cache.get(key)
             if not h:
                 continue
@@ -126,8 +124,6 @@ class FreshnessRegistry:
                 parts.append(self._fmt_news(h))
             elif key == "prices":
                 parts.append(self._fmt_prices(h))
-            elif key == "iv_history":
-                parts.append(self._fmt_iv(h))
             elif key == "fundamentals_cache":
                 parts.append(self._fmt_cache(h))
 
@@ -150,7 +146,7 @@ class FreshnessRegistry:
         lines = ["=== Data Freshness Report ===", ""]
         now = datetime.now(timezone.utc)
 
-        for key in ("news", "prices", "iv_history", "fundamentals_cache"):
+        for key in ("news", "prices", "fundamentals_cache"):
             h = self._cache.get(key)
             if not h:
                 continue
@@ -246,33 +242,6 @@ class FreshnessRegistry:
 
         return h
 
-    def _parse_iv(self, stat: Dict[str, Any]) -> SourceHealth:
-        h = SourceHealth(source="iv_history", expected_frequency="daily")
-        if stat.get("error"):
-            h.is_stale = True
-            h.stale_reason = f"query failed: {stat['error']}"
-            return h
-
-        rows = stat.get("rows", [])
-        if not rows or not rows[0] or not rows[0][0]:
-            h.is_stale = True
-            h.stale_reason = "no IV data found"
-            return h
-
-        latest = rows[0][0]
-        ts = latest if isinstance(latest, datetime) else _parse_ts(latest)
-        h.latest_data_at = ts
-
-        threshold_hours = self._thresholds.get("iv_history", 48)
-        if ts:
-            now = datetime.now(timezone.utc)
-            age_hours = (now - ts).total_seconds() / 3600
-            if age_hours > threshold_hours:
-                h.is_stale = True
-                h.stale_reason = f"latest IV is {age_hours:.0f}h old (threshold: {threshold_hours}h)"
-
-        return h
-
     def _parse_financial_cache(self, stat: Dict[str, Any]) -> SourceHealth:
         h = SourceHealth(source="fundamentals_cache", expected_frequency="quarterly")
         if stat.get("error"):
@@ -321,14 +290,6 @@ class FreshnessRegistry:
         if h.latest_data_at:
             return f"Prices: fresh (1d bars to {h.latest_data_at.strftime('%Y-%m-%d')})"
         return "Prices: fresh"
-
-    @staticmethod
-    def _fmt_iv(h: SourceHealth) -> str:
-        if h.is_stale:
-            return f"IV: STALE ({h.stale_reason})"
-        if h.latest_data_at:
-            return f"IV: fresh ({h.latest_data_at.strftime('%Y-%m-%d')})"
-        return "IV: fresh"
 
     @staticmethod
     def _fmt_cache(h: SourceHealth) -> str:

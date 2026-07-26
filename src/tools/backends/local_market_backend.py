@@ -1,6 +1,6 @@
 """
 LocalMarketDatabaseBackend — DatabaseBackend that serves the market_data domain
-from a local SQLite (3a prices + 3b news + 3c-A iv).
+from local SQLite stores.
 
 Why a SUBCLASS of DatabaseBackend rather than a wrapper: the DAL and agents branch
 on ``isinstance(backend, DatabaseBackend)`` in ~30 places to decide "is this a
@@ -22,8 +22,6 @@ Overridden market reads:
     (optional 1-5 ``sentiment_score`` on the local row), so a scored miss is an
     honest empty. ``query_news_search`` (3b, FTS5) + ``query_news_stats`` (score-free
     scout stats; no PG fallback on local empty);
-  - ``query_iv_history`` (3c-A) — local-only after N9 batch-1; the old PG
-    ``iv_history`` mirror is intentionally abandoned;
   - ``get_available_tickers('prices')`` is local-only after P0-C;
     other local domains remain transitional where noted.
 
@@ -182,18 +180,6 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             offset=offset,
         )
 
-    def query_iv_history(self, ticker: str) -> pd.DataFrame:
-        try:
-            df = self._market.query_iv_history(ticker)
-        except Exception as e:
-            logger.warning(f"local query_iv_history failed ({e})")
-            df = None
-        if df is not None and not df.empty:
-            provenance.record("iv", "local")
-            return df
-        provenance.record("iv", "none")
-        return df if df is not None else pd.DataFrame()
-
     def query_fundamentals(self, ticker: str) -> dict:
         """The PG-mirrored fundamentals table is retired as an authority.
 
@@ -234,11 +220,11 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             logger.warning(f"local query_health_stats failed ({e})")
             if self._strict:  # local-only: honest empty health, no PG
                 return {k: {"rows": [], "error": str(e)}
-                        for k in ("news", "prices", "iv_history", "financial_cache")}
+                        for k in ("news", "prices", "financial_cache")}
             return super().query_health_stats()
 
     def get_available_tickers(self, data_type: str):
-        if data_type in ("prices", "news", "iv_history", "fundamentals"):  # all local-first now
+        if data_type in ("prices", "news", "fundamentals"):  # all local-first now
             try:
                 local = self._market.get_available_tickers(data_type)
                 if data_type == "prices":

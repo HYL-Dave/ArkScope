@@ -132,54 +132,6 @@ class CurrentQuoteResult(BaseModel):
 
 
 # ============================================================
-# Options / IV
-# ============================================================
-
-class IVHistoryPoint(BaseModel):
-    """Single day IV record."""
-    date: str
-    atm_iv: float
-    hv_30d: Optional[float] = None
-    vrp: Optional[float] = None
-    spot_price: Optional[float] = None
-    num_quotes: Optional[int] = None
-
-
-class IVAnalysisResult(BaseModel):
-    """Full IV analysis for a ticker."""
-    ticker: str
-    current_iv: Optional[float] = Field(None, description="Latest ATM IV")
-    hv_30d: Optional[float] = Field(None, description="30-day historical vol")
-    vrp: Optional[float] = Field(None, description="Volatility risk premium (IV - HV)")
-    iv_rank: Optional[float] = Field(None, description="IV rank (0-100)")
-    iv_percentile: Optional[float] = Field(None, description="IV percentile (0-100)")
-    spot_price: Optional[float] = None
-    history_days: int = Field(0, description="Number of IV history records")
-    signal: Optional[str] = Field(
-        None,
-        description="Trading signal: HIGH_IV_SELL, LOW_IV_BUY, NEUTRAL"
-    )
-
-
-class MispricingResult(BaseModel):
-    """Option mispricing detection result."""
-    underlying: str
-    expiry: str
-    strike: float
-    right: str = Field(description="C or P")
-    theoretical_price: float
-    market_mid: float
-    mispricing_pct: float = Field(description="(theo - market) / market * 100")
-    signal: str = Field(description="UNDERPRICED, OVERPRICED, or FAIR")
-    confidence: float = Field(description="Signal confidence 0-1")
-    model: str = Field(default="american", description="Pricing model used")
-    delta: Optional[float] = None
-    gamma: Optional[float] = None
-    theta: Optional[float] = None
-    vega: Optional[float] = None
-
-
-# ============================================================
 # Trading Signals
 # ============================================================
 

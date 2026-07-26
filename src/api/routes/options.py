@@ -1,54 +1,10 @@
-"""Options / IV routes."""
+"""Option-pricing routes."""
 
-from fastapi import APIRouter, Depends, Query
-from typing import List
+from fastapi import APIRouter, Query
 
-from src.api.dependencies import get_dal
-from src.tools.backends import provenance
-from src.tools.data_access import DataAccessLayer
-from src.tools.options_tools import (
-    get_iv_analysis,
-    get_iv_history_data,
-    scan_mispricing,
-    calculate_greeks,
-)
+from src.tools.options_tools import calculate_greeks
 
 router = APIRouter(prefix="/options", tags=["options"])
-
-
-@router.get("/{ticker}")
-def iv_analysis(
-    ticker: str,
-    dal: DataAccessLayer = Depends(get_dal),
-):
-    """Full IV environment analysis: rank, percentile, VRP, signal.
-
-    Adds ``source_path`` (local | pg_fallback | pg | file | none) — the TRUE origin
-    of the underlying IV-history read (recorded by the local-first backend; otherwise
-    derived from the backend type). Read-only; no provider fetch.
-    """
-    provenance.reset()
-    result = get_iv_analysis(dal, ticker=ticker)
-    source = provenance.read("iv") or provenance.fallback(dal.backend_type, not result.history_days)
-    return {**result.model_dump(), "source_path": source}
-
-
-@router.get("/{ticker}/history")
-def iv_history(
-    ticker: str,
-    dal: DataAccessLayer = Depends(get_dal),
-):
-    """Raw IV history data points, with this request's OWN ``source_path``.
-
-    The 數據 tab fetches the IV summary and this history in separate requests; each
-    read gets its own true origin so the table is never labeled with the summary
-    call's provenance (they can diverge across a bootstrap/toggle boundary).
-    Returns ``{points: [...], source_path: local | pg_fallback | pg | file | none}``.
-    """
-    provenance.reset()
-    points = get_iv_history_data(dal, ticker=ticker)
-    source = provenance.read("iv") or provenance.fallback(dal.backend_type, not points)
-    return {"points": [p.model_dump() for p in points], "source_path": source}
 
 
 @router.get("/greeks/calculate")

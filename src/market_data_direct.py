@@ -1,6 +1,6 @@
 """Direct provider→SQLite market-data backfill (PG-exit slice #2).
 
-Sibling of ``market_data_admin.py`` — that module's ``incremental_update`` is the
+Sibling of ``market_data_admin.py`` — that module's former PG mirror is retired; this is the
 PG→SQLite MIRROR; this module writes the local ``prices`` table DIRECTLY from a
 provider (IBKR primary / Polygon fallback) so local freshness no longer depends on
 PG. No runtime PG dependency lives here.
@@ -65,7 +65,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # (verified), so no shared threading.Lock / data_scheduler import is needed.
 _MARKET_WRITE_LOCK_NAME = "local_refresh"
 
-_CANON_DOMAINS = ("prices", "news", "iv_history", "fundamentals")
+_CANON_DOMAINS = ("prices", "news", "fundamentals")
 _EXCHANGE_TZ = "America/New_York"
 # A US trading day counts as "complete" (eligible for gap-fill) only after this ET time —
 # the RTH close (16:00) + a small settle buffer. Conservatively uses the REGULAR close even
