@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
+> **Status: IMPLEMENTED - INDEPENDENT REVIEW PENDING**
 
 Review packet, created during implementation:
 `docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md`.
@@ -254,8 +254,8 @@ file.
 
 ```text
                            Base        TRANCHE_1_TIP       Final
-Backend full              4749             4731            4690
-Backend focused            663              645             604
+Backend full              4749             4731            4691
+Backend focused            663              645             605
 Frontend full             1072             1072            1072
 Frontend focused           139              139             139
 Settings leaves            714              706             704
@@ -273,8 +273,8 @@ Backend composition:
 
 ```text
 Tranche 1: +6/-24 = -18
-Tranche 2: +22/-63 = -41
-Base -> final: +28/-87 = -59
+Tranche 2: +23/-63 = -40
+Base -> final: +29/-87 = -58
 ```
 
 Frontend composition:
@@ -737,7 +737,7 @@ Stop and amend before proceeding if any of these occurs:
 - Modify: this plan only if independently reviewed accounting requires a
   docs-only correction
 
-- [ ] **Step 1: Create an isolated worktree and branch.**
+- [x] **Step 1: Create an isolated worktree and branch.**
 
 Use `superpowers:using-git-worktrees`. Start from exact base:
 
@@ -755,13 +755,13 @@ git status --short
 Do not copy `data/`, `config/.env`, browser profiles, or production database
 files into the worktree.
 
-- [ ] **Step 2: Reproduce full and focused node lists.**
+- [x] **Step 2: Reproduce full and focused node lists.**
 
 Run the recipes in Sections 3.1 and 3.2. Store normalized lists and SHA-256 in
 the evidence file. Expected exact collections are `4749`, `663`, `1072`, and
 `139` with the hashes stated above.
 
-- [ ] **Step 3: Reproduce non-node baselines.**
+- [x] **Step 3: Reproduce non-node baselines.**
 
 Run:
 
@@ -794,7 +794,7 @@ PY
 Expected resources are Settings `714`, Explore `401`, total `1814`, scanner
 `36/20/0/20`, tool counts `56/57/57`, and no-PG inventory `24`.
 
-- [ ] **Step 4: Capture a read-only production-shaped observation.**
+- [x] **Step 4: Capture a read-only production-shaped observation.**
 
 Use SQLite URI `mode=ro`; do not use the migration script yet. Record paths,
 sizes, mtimes, integrity/FK state, and:
@@ -813,7 +813,7 @@ job_runs: collect.local_incremental=1350, collect.price_backfill=2,
 These numbers are dated observations, not acceptance constants. Any changed
 shape is handled by the stop conditions.
 
-- [ ] **Step 5: Create and commit the clearance evidence.**
+- [x] **Step 5: Create and commit the clearance evidence.**
 
 The evidence header must say `IMPLEMENTATION IN PROGRESS - NO PRODUCTION
 WRITE`, include both normalized node lists/hashes, and distinguish environment
@@ -839,7 +839,7 @@ git commit -m "docs: record legacy retirement implementation baseline"
 - Modify: `apps/arkscope-web/src/marketDataDisplay.test.ts`
 - Modify: `apps/arkscope-web/src/i18n/resources.test.ts`
 
-- [ ] **Step 1: Replace retired behavior tests with exact four-source contracts.**
+- [x] **Step 1: Replace retired behavior tests with exact four-source contracts.**
 
 The central assertion shape is:
 
@@ -862,7 +862,7 @@ def test_scheduler_source_defs_have_no_legacy_collector_plumbing():
 Evolve the existing catalog/status assertions in place. Delete the 19 retired
 nodes and apply the two exact renames in Section 3.4.
 
-- [ ] **Step 2: Add the additive NewsWriteMode classifier tests.**
+- [x] **Step 2: Add the additive NewsWriteMode classifier tests.**
 
 Use the real current enum members and a foreign enum value/object to prove
 future values do not fall through:
@@ -895,7 +895,7 @@ The second test must patch provider config, adapter, worker subprocess, DB
 write, source locks, and job telemetry. It must fail RED because current code
 falls through or reaches a patched seam, not because fixture setup is invalid.
 
-- [ ] **Step 3: Make the prices-worker argv contract consume the real parser.**
+- [x] **Step 3: Make the prices-worker argv contract consume the real parser.**
 
 Evolve `test_p0c1_ibkr_prices_runs_prices_worker_subprocess`:
 
@@ -914,7 +914,7 @@ def fake_worker(argv: list[str]) -> dict[str, object]:
 This is the required real-shape parser/argv seam. Rename the parser test as
 specified in Section 3.4 and require ticker/provider arguments without source.
 
-- [ ] **Step 4: Make CLI and mounted frontend tests assert absence.**
+- [x] **Step 4: Make CLI and mounted frontend tests assert absence.**
 
 The daily parser must reject `--iv-history` and `--sync-db`; `--all` must still
 select current news/prices collectors. Mounted Settings must render exactly
@@ -922,7 +922,7 @@ four active rows, four toggles/run controls, and no retired ID/copy/control
 mode. Resource tests must expect Settings `706` and total `1806` after product
 implementation.
 
-- [ ] **Step 5: Run the RED set.**
+- [x] **Step 5: Run the RED set.**
 
 ```bash
 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -946,7 +946,7 @@ Expected: RED only on removed catalog/CLI/control/resource contracts and the
 new unknown-mode boundary. A parser fixture error or unrelated failure is the
 wrong RED and must be fixed before product edits.
 
-- [ ] **Step 6: Commit the RED contracts.**
+- [x] **Step 6: Commit the RED contracts.**
 
 ```bash
 git add tests/test_data_scheduler.py tests/test_scheduler_state.py \
@@ -970,7 +970,7 @@ git commit -m "test: define active scheduler retirement contract"
 - Modify: `src/prices_runtime.py`
 - Byte gate: `src/market_data_direct.py`
 
-- [ ] **Step 1: Reduce `SourceDef` and `SOURCES`.**
+- [x] **Step 1: Reduce `SourceDef` and `SOURCES`.**
 
 Remove the three dead definitions and fields used only by them. The surviving
 shape must be equivalent to:
@@ -999,7 +999,7 @@ dataclass's required-before-default ordering. Remove `_N9_RETIRED_SOURCES`, `Sch
 `source_control_mode`, coverage no-op helpers, `_local_refresh`, and
 source-specific operational branches only after their callers are gone.
 
-- [ ] **Step 2: Add the exhaustive pre-provider classifier.**
+- [x] **Step 2: Add the exhaustive pre-provider classifier.**
 
 Implement explicit identity branches, not enum membership:
 
@@ -1030,21 +1030,21 @@ Catch `UnsupportedNewsWriteMode` at that boundary and return the fixed envelope
 Keep direct-local routing behavior for the two accepted modes. Do not retain a
 post-collect `sync_flag` guard.
 
-- [ ] **Step 3: Collapse route/status behavior to active rows.**
+- [x] **Step 3: Collapse route/status behavior to active rows.**
 
 `GET /schedule` projects only the four catalog entries. Mutation and run-now
 routes use ordinary source membership; the three old IDs are indistinguishable
 from other unknown IDs and return typed 404 before `require_db_write()` and
 before provider readiness checks.
 
-- [ ] **Step 4: Remove daily mirror flags and source selector.**
+- [x] **Step 4: Remove daily mirror flags and source selector.**
 
 Delete `--iv-history` and `--sync-db` parsing/dispatch. Remove `skip_sync` from
 `run_source()` and callers. Remove `--source` from `prices_runtime.parse_args`,
 the scheduler argv, and `_run_worker` parameters. Preserve `--tickers`,
 `--provider`, and Gateway lock semantics.
 
-- [ ] **Step 5: Run Tranche 1 backend tests and mutation probes.**
+- [x] **Step 5: Run Tranche 1 backend tests and mutation probes.**
 
 ```bash
 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1061,7 +1061,7 @@ fixture or substitute the unknown object; the downstream-seam test must fail
 if the classifier is changed to permissive fallthrough. Restore source bytes
 and rerun GREEN.
 
-- [ ] **Step 6: Commit backend Tranche 1.**
+- [x] **Step 6: Commit backend Tranche 1.**
 
 ```bash
 git add src/service/data_scheduler.py src/api/routes/schedule.py \
@@ -1078,24 +1078,24 @@ git commit -m "refactor: retire legacy scheduler source identities"
 - Modify: `apps/arkscope-web/src/i18n/resources/en/settings.ts`
 - Modify: `apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts`
 
-- [ ] **Step 1: Remove dead DTO and presenter branches.**
+- [x] **Step 1: Remove dead DTO and presenter branches.**
 
 Delete `ScheduleControlMode`, `control_mode`, retired reason, and read-only
 presentation branches. Keep the generic unknown source-label fallback, but no
 literal branch for any of the three retired IDs.
 
-- [ ] **Step 2: Render every returned row as an active schedule row.**
+- [x] **Step 2: Render every returned row as an active schedule row.**
 
 Remove read-only/retired chips and conditional control suppression. Preserve
 the current toggle, interval, run, busy, and error behavior for the four real
 rows.
 
-- [ ] **Step 3: Delete the exact eight resource leaves.**
+- [x] **Step 3: Delete the exact eight resource leaves.**
 
 Delete only the eight paths in Section 3.7 from both locale bundles. Do not
 rewrite unrelated copy.
 
-- [ ] **Step 4: Run focused frontend and resource gates.**
+- [x] **Step 4: Run focused frontend and resource gates.**
 
 ```bash
 cd apps/arkscope-web
@@ -1113,7 +1113,7 @@ npm run build
 Expected Settings `706`, Explore `401`, total `1806`, parity zero, empty leaves
 zero, and exactly four mounted rows in both locales.
 
-- [ ] **Step 5: Commit frontend Tranche 1.**
+- [x] **Step 5: Commit frontend Tranche 1.**
 
 ```bash
 git add apps/arkscope-web/src/api.ts \
@@ -1129,7 +1129,7 @@ git commit -m "feat: expose only active schedule controls"
 **Files:**
 - Modify: `docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md`
 
-- [ ] **Step 1: Recompute the exact Tranche 1 ledger.**
+- [x] **Step 1: Recompute the exact Tranche 1 ledger.**
 
 Expected:
 
@@ -1147,13 +1147,13 @@ scanner: 36/20/0/20
 List the two additive classifier IDs separately from all retirements and
 renames.
 
-- [ ] **Step 2: Run full equivalent-environment A/B gates.**
+- [x] **Step 2: Run full equivalent-environment A/B gates.**
 
 Run backend/full frontend, typecheck, build, scanner twice, resources, no-PG,
 and retained price/news tests. Compare normalized non-passing node sets rather
 than absolute environment failure counts.
 
-- [ ] **Step 3: Verify removed concepts mechanically.**
+- [x] **Step 3: Verify removed concepts mechanically.**
 
 ```bash
 rg -n 'price_backfill|local_incremental|iv_history|ScheduleControlMode|source_control_mode|skip_sync|sync_flag|_local_refresh' \
@@ -1164,7 +1164,7 @@ rg -n 'price_backfill|local_incremental|iv_history|ScheduleControlMode|source_co
 Expected: no retired scheduler/control implementation. Historical docs/tests
 outside the active-owner set are not blanket-deleted.
 
-- [ ] **Step 4: Record and commit the named checkpoint.**
+- [x] **Step 4: Record and commit the named checkpoint.**
 
 ```bash
 git add docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md
@@ -1183,7 +1183,7 @@ an independent checkpoint read confirms the node/resource arithmetic.
 - Create: `tests/test_legacy_iv_retirement_boundaries.py`
 - Modify: all Tranche 2 existing test owners listed in Sections 3.6 and 4.3
 
-- [ ] **Step 1: Replace old API contracts with absence plus retained Greeks.**
+- [x] **Step 1: Replace old API contracts with absence plus retained Greeks.**
 
 ```python
 def test_retired_market_admin_and_iv_routes_are_absent_while_greeks_remains_reachable(
@@ -1204,7 +1204,7 @@ def test_retired_market_admin_and_iv_routes_are_absent_while_greeks_remains_reac
 Use the actual Greeks method/query contract from the current test fixture; do
 not weaken it to route registration alone.
 
-- [ ] **Step 2: Add runtime boundary tests.**
+- [x] **Step 2: Add runtime boundary tests.**
 
 The new boundary file must parse/import current owners and assert exact old
 storage/API symbols are absent while retained option owners remain:
@@ -1230,7 +1230,7 @@ asserts that `_JOBS`, `_JOBS_LOCK`, `start_bootstrap_job`, `start_update_job`,
 `/market-data/jobs/` are absent from their exact former files; it does not ban
 generic `get_job` names elsewhere in the application.
 
-- [ ] **Step 3: Evolve tool, bridge, health, evidence, and reducer contracts.**
+- [x] **Step 3: Evolve tool, bridge, health, evidence, and reducer contracts.**
 
 Name-set tests must assert:
 
@@ -1248,19 +1248,19 @@ Evidence tests assert no `iv_environment` and no missing/error entry invented
 for retired IV. Provider health/freshness/data coverage tests must preserve
 their existing non-IV facts and stop querying the old store.
 
-- [ ] **Step 4: Evolve frontend RED contracts.**
+- [x] **Step 4: Evolve frontend RED contracts.**
 
 Ticker Detail must make no old IV request, render no old IV section/column, and
 preserve surviving price/fundamentals results when another surviving leg
 fails. Settings Data Storage must omit the old IV row. Both locales remain
 covered. Resource inventory expects final `704/379/1782` only after code lands.
 
-- [ ] **Step 5: Evolve no-PG inventory.**
+- [x] **Step 5: Evolve no-PG inventory.**
 
 Remove exactly the IV-history CheckSpec and direct dispatch. Assert inventory
 23 and every remaining check name/path unchanged.
 
-- [ ] **Step 6: Run RED tests.**
+- [x] **Step 6: Run RED tests.**
 
 ```bash
 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1282,7 +1282,7 @@ npm test -- --run src/TickerDetail.test.tsx \
 Expected: RED on active old owners/counts/routes/resources. Retained Greeks,
 option-chain, IV-skew, and pure option-pricing tests must remain GREEN.
 
-- [ ] **Step 7: Commit Tranche 2 RED contracts.**
+- [x] **Step 7: Commit Tranche 2 RED contracts.**
 
 ```bash
 git add tests apps/arkscope-web/src
@@ -1294,14 +1294,14 @@ git commit -m "test: define legacy IV domain retirement contract"
 **Files:**
 - Remove/modify the Tranche 2 runtime owners in Sections 4.2 and 4.3
 
-- [ ] **Step 1: Remove storage and DAL ownership.**
+- [x] **Step 1: Remove storage and DAL ownership.**
 
 Delete old schema/protocol/backend methods and SQL initialization. Preserve
 all non-IV backend methods and historical N9 migrations. Remove
 `market_sync_meta` IV handling only from current runtime owners; production row
 deletion remains Task 9/post-merge.
 
-- [ ] **Step 2: Remove API/DTO/status ownership.**
+- [x] **Step 2: Remove API/DTO/status ownership.**
 
 Delete the two old options routes and the sole scan router/module. Remove the
 scan router include from `src/api/app.py`. Keep the Greeks route and actual
@@ -1311,14 +1311,14 @@ coverage DTOs atomically. Also remove
 imports from `src/api/routes/market_data.py`; all routes that once created such
 jobs are permanent 409 tombstones.
 
-- [ ] **Step 3: Remove tool, bridge, evidence, and health ownership.**
+- [x] **Step 3: Remove tool, bridge, evidence, and health ownership.**
 
 Delete exactly the three old tools from central/OpenAI/Anthropic registries and
 dispatch. Delete the dedicated history reducer. Remove `iv_environment`,
 `ARKSCOPE_OVERVIEW_INCLUDE_IV`, `latest_iv`, and `latest_vrp`. Keep live chain,
 skew, Greeks, and generic volatility/math helpers.
 
-- [ ] **Step 4: Remove the shared PG mirror implementation.**
+- [x] **Step 4: Remove the shared PG mirror implementation.**
 
 Delete current bootstrap/update/validate mirror endpoints and implementation
 that only serve retired PG domains. Keep current direct-local market coverage
@@ -1339,7 +1339,7 @@ test_job_not_found_404
 test_bootstrap_done_poll_invalidates_dal_cache
 ```
 
-- [ ] **Step 5: Remove the two old-store analysis scripts.**
+- [x] **Step 5: Remove the two old-store analysis scripts.**
 
 ```bash
 git rm scripts/analysis/compare_bs_vs_american.py \
@@ -1349,7 +1349,7 @@ git rm scripts/analysis/compare_bs_vs_american.py \
 Do not replace them, edit unrelated scripts, or claim broader scripts
 retirement complete.
 
-- [ ] **Step 6: Run backend and protected-capability tests.**
+- [x] **Step 6: Run backend and protected-capability tests.**
 
 ```bash
 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1366,7 +1366,7 @@ retirement complete.
 
 Expected: GREEN, tool counts `53/54/54`, no-PG `23`, and no old runtime owner.
 
-- [ ] **Step 7: Commit backend Tranche 2.**
+- [x] **Step 7: Commit backend Tranche 2.**
 
 ```bash
 git add src sql scripts/analysis tests
@@ -1378,7 +1378,7 @@ git commit -m "refactor: retire legacy IV runtime domain"
 **Files:**
 - Modify the Tranche 2 frontend owners in Section 4.3
 
-- [ ] **Step 1: Remove frontend DTOs and requests.**
+- [x] **Step 1: Remove frontend DTOs and requests.**
 
 Delete `IVAnalysis`, `IVHistoryPoint`, `IVHistoryResult`, old request helpers,
 `MarketDataStatus.iv`, sync IV, and ticker-coverage IV members. Do not alter
@@ -1386,13 +1386,13 @@ live option-chain/Greeks DTOs. Delete the unconsumed `MarketDataJob` interface
 and `getMarketDataJob()` helper with `/market-data/jobs/{job_id}`; do not add a
 replacement poller.
 
-- [ ] **Step 2: Simplify Ticker Detail and Data Storage.**
+- [x] **Step 2: Simplify Ticker Detail and Data Storage.**
 
 Remove old request effects and IV UI sections. Preserve independent surviving
 request results/errors and reflow the Data tab without an empty shell. Remove
 only the old IV storage row/status phrase from Settings.
 
-- [ ] **Step 3: Remove exact resource leaves.**
+- [x] **Step 3: Remove exact resource leaves.**
 
 Delete the 2 Settings and 22 Explore leaves from Section 3.7 in both locales.
 Rewrite the three existing Settings leaves authorized by the spec without
@@ -1404,7 +1404,7 @@ registry.sections.dataStorage.searchAliases
 dataStorage.update.succeeded
 ```
 
-- [ ] **Step 4: Run frontend tests and visual contracts.**
+- [x] **Step 4: Run frontend tests and visual contracts.**
 
 ```bash
 cd apps/arkscope-web
@@ -1419,7 +1419,7 @@ npm run build
 Expected resources: Settings `704`, Explore `379`, total `1782`; parity zero;
 empty leaves zero; frontend collection still 1072/139.
 
-- [ ] **Step 5: Commit frontend Tranche 2.**
+- [x] **Step 5: Commit frontend Tranche 2.**
 
 ```bash
 git add apps/arkscope-web/src
@@ -1432,7 +1432,7 @@ git commit -m "feat: remove legacy IV product surfaces"
 - Create: `scripts/migration/retire_legacy_scheduler_iv.py`
 - Create: `tests/test_legacy_scheduler_iv_retirement.py`
 
-- [ ] **Step 1: Write all 16 migration tests before the tool.**
+- [x] **Step 1: Write all 16 planned migration tests before the tool.**
 
 Build synthetic profile/market DBs and four small Parquet fixtures matching the
 reviewed schema. Include unrelated tables/rows and target `job_runs`. The five
@@ -1450,7 +1450,7 @@ Each test must fail for its own missing phase, not because the module cannot be
 imported. Start with a minimal module exposing the planned names and raising a
 phase-specific `NotImplementedError` so all REDs are attributable.
 
-- [ ] **Step 2: Define structured types and CLI.**
+- [x] **Step 2: Define structured types and CLI.**
 
 Use these dataclasses for the public migration boundary:
 
@@ -1488,7 +1488,7 @@ restore --archive-dir PATH --profile-db PATH --market-db PATH
         --expected-current-commit COMMIT --output PATH
 ```
 
-- [ ] **Step 3: Implement read-only preview.**
+- [x] **Step 3: Implement read-only preview.**
 
 Open both DBs with `path.resolve().as_uri() + "?mode=ro"`. Inspect exact table/index SQL plus
 `sqlite_master` trigger/view references. Record integrity/FK, sizes/mtimes,
@@ -1498,7 +1498,7 @@ value tuples, not just row counts.
 
 Preview performs no mkdir/write and contacts no provider, PG, or Gateway.
 
-- [ ] **Step 4: Implement archive creation and verification.**
+- [x] **Step 4: Implement archive creation and verification.**
 
 Create:
 
@@ -1519,7 +1519,7 @@ Directory mode is 0700; every file is 0600. The mini DB contains exact table,
 index, and rows. Manifest artifact hashes are verified before apply can start.
 Use atomic temp-file replacement plus fsync for manifest state.
 
-- [ ] **Step 5: Implement resumable apply.**
+- [x] **Step 5: Implement resumable apply.**
 
 Manifest phases are:
 
@@ -1533,14 +1533,14 @@ matching `schedule.<id>.%` keys. Market transaction removes only
 are removed only after archive verification. Re-read source mtime/digests
 between preview, archive, and each owner; drift aborts.
 
-- [ ] **Step 6: Implement idempotence and restore.**
+- [x] **Step 6: Implement idempotence and restore.**
 
 Second apply verifies the same archive/non-target/job history and returns
 `already_applied=true`. Restore refuses a present nonempty or differently
 shaped target. Under exact old commit, it restores table/index/rows/files/state
 and verifies archive hashes plus integrity/FK.
 
-- [ ] **Step 7: Run tests and mutation probes.**
+- [x] **Step 7: Run tests and mutation probes.**
 
 ```bash
 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1556,9 +1556,11 @@ Mutation requirements:
 5. make second apply rewrite manifest/data -> idempotence test RED;
 6. allow restore over a nonempty target -> restore-refusal test RED.
 
-Restore product bytes after each mutation and rerun all 16 GREEN.
+Restore product bytes after each mutation and rerun the full migration suite
+GREEN. Copied-production proof added one reviewed, RED-first memory-bound node,
+so the final suite contains 17 tests without changing migration semantics.
 
-- [ ] **Step 8: Commit the migration tool.**
+- [x] **Step 8: Commit the migration tool.**
 
 ```bash
 git add scripts/migration/retire_legacy_scheduler_iv.py \
@@ -1572,7 +1574,7 @@ git commit -m "feat: add audited legacy IV retirement migration"
 - Modify: `docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md`
 - Modify: current-state sections in the design documents listed below
 
-- [ ] **Step 1: Prove migration on copies, never production.**
+- [x] **Step 1: Prove migration on copies, never production.**
 
 Use SQLite online backups or byte copies made while no copied test process is
 writing. Copy the four Parquets into a temporary fixture root. Set concrete
@@ -1661,13 +1663,13 @@ manifest SHA, artifact hashes, row/digest comparisons, idempotent result, and
 restore round trip. Do not place production secrets or arbitrary exception
 text in evidence.
 
-- [ ] **Step 2: Run canonical final A/B accounting.**
+- [x] **Step 2: Run canonical final A/B accounting.**
 
 Expected final:
 
 ```text
-backend full 4690, base composition +28/-87
-backend focused 604
+backend full 4691, base composition +29/-87
+backend focused 605
 frontend full 1072, base composition +4/-4
 frontend focused 139
 resources 704/379/1782
@@ -1676,17 +1678,24 @@ no-PG 23
 scanner 36/20/0/20 twice
 ```
 
+The one-node backend deviation is
+`test_preview_digest_memory_is_bounded_for_large_tables`. The original digest
+materialized an entire logical table and reached about 6 GiB RSS against the
+production-shaped market database. The replacement is a length-framed,
+streaming SHA-256 digest. This changes no product or migration result; it adds
+one mutation-sensitive resource-bound contract.
+
 Also compare base -> `TRANCHE_1_TIP` and `TRANCHE_1_TIP` -> final. Rerun the
 Tranche 1 focused suites at final tip so Tranche 2 cannot hide a regression.
 
-- [ ] **Step 3: Run full technical gates.**
+- [x] **Step 3: Run full technical gates.**
 
 Run backend/full frontend, typecheck, build, resource/scanner gates, no-PG,
 retained option suites, `git diff --check`, skip/only/todo census, and exact
 byte gates for protected N9 and option-math owners. Compare normalized
 non-passing sets against equivalent base runs.
 
-- [ ] **Step 4: Run bilingual visual/runtime gates.**
+- [x] **Step 4: Run bilingual visual/runtime gates.**
 
 Use isolated API/Vite and copied/fake data. Verify Settings Data Sources,
 Settings Data Storage, and Ticker Detail Data tab in `zh-Hant` and `en` at
@@ -1704,7 +1713,7 @@ locale switch preserves tab, focus, drafts, and reading position
 No CSS change is expected. If real geometry proves one necessary, stop and use
 the reviewed CSS-deviation protocol with a named RED test.
 
-- [ ] **Step 5: Update current documentation without rewriting history.**
+- [x] **Step 5: Update current documentation without rewriting history.**
 
 Update current-state references in:
 
@@ -1724,7 +1733,7 @@ IV remains gated. Record that only two old-store-coupled scripts were removed;
 the broader scripts retirement remains open. Preserve dated historical entries
 that were true at their time.
 
-- [ ] **Step 6: Commit review-ready evidence and stop.**
+- [x] **Step 6: Commit review-ready evidence and stop.**
 
 ```bash
 git add docs

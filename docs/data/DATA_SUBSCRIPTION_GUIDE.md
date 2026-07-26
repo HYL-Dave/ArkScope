@@ -3,6 +3,13 @@
 > **目的**: 記錄 AI Agent 自主發現板塊爆發模式所需的數據訂閱策略
 > **最後更新**: 2026-01-30
 
+> **2026-07-26 current-state supersession:** 本文的訂閱與方法論分析仍保留，
+> 但舊的每日 `iv_history` snapshot、SQLite/Parquet 24-row store、排程來源與
+> store-backed IV 工具已退役。這不代表 ArkScope 放棄 IV：live option chain、
+> skew 與純 Greeks 能力仍保留；未來的歷史 IV 必須依
+> `IV_PROVIDER_PROOF_PACKET_PLAN.md` 建立 provider-neutral、帶 provenance 與
+> granularity 的新契約，不得復用舊 `iv_history` ID 或資料形狀。
+
 ---
 
 ## 目錄

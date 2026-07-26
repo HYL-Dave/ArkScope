@@ -5,6 +5,14 @@
 > **Drafted:** 2026-06-07 (from the data-collection-audit workflow). Promote to **Adopted** only after the §10 open questions are locked.
 > **Scope:** How ArkScope collects market/news/SA data, at what cadence, where it is stored (local-first SQLite vs remote PostgreSQL), how it migrates off remote PG, how price data is layered for charting, and how `daily_update.py` is repositioned. Companion to the three canon docs (Workbench Product Spec / Provider Catalog / Tool Catalog).
 
+> **2026-07-26 current-state supersession:** The legacy scheduler identities
+> `price_backfill`, `local_incremental`, and `iv_history` and the old 24-row
+> SQLite/Parquet IV snapshot domain are retired. Rows and phases below that describe
+> their earlier PG-to-local transition are dated history, not live capability.
+> Direct IBKR price primitives and the live option-chain/skew/pure-Greeks capabilities
+> remain. Any future persisted IV line starts from the provider-neutral proof packet
+> with a new semantic ID/schema; it must not revive the old `iv_history` contract.
+
 ---
 
 ## 0. Status & decision summary
@@ -45,7 +53,7 @@ Per-source cadence, retention, health surface, and cost gate. Provider-level dat
 | **IBKR prices — 15min (base)** | yes (Gateway-gated) | scheduled / backfill | daily delta; backfill on demand | base granularity, ~1–2y; live PG = **2.25M rows, 148 tickers, 2024-01-02→2026-06-05, `15min` only** | connected / maintenance / last_success / last_error | free (IB session) |
 | **IBKR prices — 1m / 5m** | proposed | backfill | manual | 1m ~30–60d, 5m ~6–12m (§6) | as above | free; pacing ≤60 hist reqs/10min (`ibkr_source.py:223-229`) |
 | **IBKR prices — 1d (adjusted)** | proposed | backfill | manual / periodic | **permanent** (`fetch_adjusted_prices`, `ADJUSTED_LAST`, `ibkr_source.py:1163`) | as above | free (IB session) |
-| **IV / options history** | yes (Gateway-gated) | **opt-in backfill** (currently swept by `--all` — see §7) | manual | `iv_history`, permanent | connected / maintenance / last_success / last_error | free (IB session); heavy |
+| **IV / options history (legacy)** | **retired 2026-07-26** | none | none | old `iv_history` snapshot removed | n/a | Future provider-neutral IV remains separately gated. |
 | **Fundamentals** | yes | manual / cached | on demand | TTL: annual 180d / quarterly 90d / ttm 30d | connected / stale / last_success / last_error | **fallback chain:** IBKR snapshot → SEC EDGAR (free) → Financial Datasets (**metered**, cached). Not wired into `daily_update.py` (absent, not stale). |
 | **Macro / calendar (FRED + Finnhub)** | yes | scheduled | per release schedule | `macro_*`, `cal_*` tables → **`macro_calendar.db`** (its own DB; see §4b/topology — NOT market_data.db) | per-table count + last-fetched (`macro_calendar_health.py:449-459`) | free |
 | **Analyst consensus (Finnhub)** | yes | scheduled cache | 24h TTL | daily cache | connected / stale / last_success | free |
@@ -95,7 +103,7 @@ Written **exclusively** by the extension → native-host path, independent of th
 | `llm_credentials` | **profile_state.db** | already local SQLite (same file) | `model_credentials.py:81-94` |
 | `prices` | **market_data.db** | remote PG | `db_backend.py:591` |
 | `fundamentals` | **market_data.db** | remote PG | `db_backend.py:657` |
-| `iv_history` | **market_data.db** | remote PG | `db_backend.py:635` |
+| `iv_history` (legacy snapshot) | **retired 2026-07-26** | archived historical PG/local snapshot | removed legacy readers/store |
 | `financial_data_cache` | **market_data.db** | remote PG | `db_backend.py:1029,1053` |
 | `analyst_consensus` | **market_data.db** | separate `data/cache/analyst_consensus.db` (fold in) | `analyst_consensus.py:27-39` |
 | `macro_series`, `macro_observations`, `macro_release_dates` | **`macro_calendar.db`** (revised 2026-06-23; was market_data.db — see §4b) | remote PG | `store.py:457,528,598` |
@@ -221,7 +229,7 @@ needs a **direct provider→SQLite** path, not a mirror fix.
 | 2 | **Price direct backfill** | NEW `market_data_direct.py`: `_normalize_utc` (byte-identical UTC PK string), `detect_price_gaps` (per-ticker-per-trading-day, weekend/holiday + early-close aware — NOT a hardcoded 26 bars), `backfill_prices_direct` (IBKR primary behind the scheduler IBKR lock + Polygon fallback → `INSERT OR IGNORE`); new scheduler source, coexists with the mirror (idempotent). **MUST canonicalize the ticker BEFORE insert** (apply the canon map at write time, not just read) — else a provider writing an alias spelling (`BRK.B`) re-creates the cross-domain split inside `prices`, and a same-PK collision would be silently dropped by `INSERT OR IGNORE` (making row totals diverge — validation note §4b·2). | market_data.db + `provider_sync_runs`/`provider_sync_meta` (NEW; do NOT reuse `market_sync_meta`, which means "PG mirror") | med / L |
 | 3 | **Fundamentals gap** | NEW `fundamentals_backfill.py`: gap-detect vs active universe → free **SEC EDGAR** → snapshot JSON into `fundamentals`. (~23 Core tickers missing.) | market_data.db | low / M |
 | 4 | **News sentiment fill** | (a) persist Polygon polarity → **new scale-tagged columns** (`provider_sentiment`/scale), NEVER the 1-5 CHECK `sentiment_score`; (b) LLM-on-analysis is the only 1-5 writer, going forward. (Today: 362,975 news, 0 scored.) | market_data.db `news` | low / M |
-| 5 | **IV source/method** | add `iv_source`/`iv_method`/`as_of` + natural-key UNIQUE; dual-source (self-computed + externally-pre-computed); widen by priority. (Today: 4 tickers, 24 rows, stale.) Lowest priority. | market_data.db `iv_history` | low / M |
+| 5 | **IV source/method (historical proposal, superseded)** | The 24-row `iv_history` domain was retired. A future provider-neutral design requires a separately reviewed schema/ID after the proof packet; do not widen or revive the legacy table. | new authority TBD | gated / separate unit |
 
 **Sequence:** 1 canon → 2 price (the big knife; own review; **strict mode safe to ENABLE only after this**) → 3 fundamentals → 4 sentiment → (then §macro/cal local store) → 5 IV.
 **Cross-cutting end-state:** once direct writes are authoritative + validated, **demote the PG

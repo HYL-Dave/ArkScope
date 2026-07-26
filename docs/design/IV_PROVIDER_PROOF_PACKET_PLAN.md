@@ -37,7 +37,11 @@ The packet answers four questions:
 - No edits to `config/.env`.
 - No FieldDefs yet, except after a provider is selected in a later slice.
 - No production collector, scheduler job, UI, or database migration.
-- No attempt to preserve the old 24-row PG `iv_history`; it remains a drop candidate.
+- No attempt to preserve or import the old 24-row PG/local `iv_history`. Its product
+  contract is retired by the review-pending 2026-07-26 unit; copied-data archive and
+  restore are proven, while production rows/files remain untouched until a separately
+  approved migration archives them before deletion. Any future implementation starts
+  fresh with a new semantic ID/schema.
 
 ## Inputs
 

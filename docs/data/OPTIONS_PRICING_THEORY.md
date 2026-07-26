@@ -4,6 +4,14 @@
 > **前提**: 已讀過 [OPTIONS_BASICS_TUTORIAL.md](./OPTIONS_BASICS_TUTORIAL.md)
 > **最後更新**: 2026-01-29
 
+> **2026-07-26 current-state supersession:** 本文保留的是錯誤方法如何被證偽的
+> 理論紀錄。`scripts/analysis/scan_option_mispricing.py`、舊
+> `iv_history` store 與其產品/工具消費者已退役；下文的 v1 掃描輸出與
+> `data/options/iv_history/...` 是歷史形狀，不是現行功能或未來 schema。
+> `src/options_math/` 的純定價/Greeks 原語與 live option-chain/skew 能力仍在。
+> 未來 IV 歷史若重新成立，必須走 provider-neutral proof packet、明確
+> provenance/granularity、研究假說與成本 gate，不復用本文件描述的舊快照契約。
+
 ---
 
 ## 目錄
@@ -23,7 +31,7 @@
 
 ## 為什麼需要這份文件
 
-我們開發了 `scan_option_mispricing.py` 腳本，用 Black-Scholes + 歷史波動率 計算理論價，
+當時曾開發 `scan_option_mispricing.py` 腳本，用 Black-Scholes + 歷史波動率 計算理論價，
 與市場價格比較來找「錯價」。結果發現：
 
 ```
@@ -662,15 +670,15 @@ S - K ≤ C - P ≤ S - K·e^(-rT)
 
 ## 我們的工具與其限制
 
-### 已實作的工具
+### 現行原語與已退役工具
 
 | 工具 | 檔案 | 功能 | 限制 |
 |------|------|------|------|
-| 歷史波動率計算 | `analysis/option_pricing.py` | 3 種 HV 方法 | 回顧性，不是預測 |
-| Black-Scholes 定價 | `analysis/option_pricing.py` | 理論價 + Greeks | 假設波動率恆定 |
-| IV 反推 | `analysis/option_pricing.py` | Brent 法解 IV | 需要有效市場報價 |
-| Smile 調整 | `analysis/option_pricing.py` | 簡化二次近似 | 不如 SABR 準確 |
-| 錯價掃描 | `scripts/analysis/scan_option_mispricing.py` | HV vs 市場價 | **方法論根本問題** |
+| 歷史波動率計算 | `src/options_math/option_pricing.py` | 3 種 HV 方法 | 回顧性，不是預測 |
+| Black-Scholes 定價 | `src/options_math/option_pricing.py` | 理論價 + Greeks | 假設波動率恆定 |
+| IV 反推 | `src/options_math/option_pricing.py` | Brent 法解 IV | 需要有效市場報價 |
+| Smile 調整 | `src/options_math/option_pricing.py` | 簡化二次近似 | 不如 SABR 準確 |
+| 錯價掃描（已退役） | `scripts/analysis/scan_option_mispricing.py`（歷史路徑） | HV vs 市場價 | **方法論根本問題；2026-07-26 移除** |
 | IBKR Scanner | `scripts/analysis/scan_unusual_activity.py` | 異常活動偵測 | 依賴 IBKR 訂閱 |
 
 ### 錯價掃描的改進方向
@@ -681,7 +689,7 @@ S - K ≤ C - P ≤ S - K·e^(-rT)
   比較: 理論價 vs 市場價
   問題: 永遠顯示 overpriced
 
-改進 (v2 - IV Percentile):
+歷史構想 (v2 - IV Percentile；未採用、不得直接照此實作):
   1. 收集歷史 IV 數據 (每日 ATM IV)
   2. 計算當前 IV 的百分位排名
   3. 輸出: 「AMD 的 IV 目前在過去一年的 85th percentile」
@@ -689,7 +697,7 @@ S - K ≤ C - P ≤ S - K·e^(-rT)
 
 所需數據:
   ├── 每日抓取 ATM option 報價 → 反推 IV
-  ├── 存到 data/options/iv_history/{ticker}.parquet
+  ├── 舊構想曾指定 data/options/iv_history/{ticker}.parquet（已退役）
   └── 累積 252 天後開始有效
 ```
 

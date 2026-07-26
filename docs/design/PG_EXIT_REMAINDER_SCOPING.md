@@ -5,6 +5,15 @@
 - **Context:** news-domain PG exit is LIVE-complete (`news_pg_exit_runs` id=1 completed, fail-closed). **Overall ArkScope PG exit is NOT complete.**
 - **Purpose of this doc:** scope the *remainder* of the PG exit — enumerate residual PG domains, assign a destination strategy per domain, define the `scripts/` retirement rule with a runtime-coupling inventory as its gating input, produce the N9 drop list, and sequence the remaining slices. **This document implements nothing.**
 
+> **2026-07-26 current-state supersession:** The implementation branch for the
+> reviewed legacy-scheduler/IV retirement has removed scheduler identities
+> `price_backfill`, `local_incremental`, and `iv_history`, the old local 24-row IV
+> store and store-backed product/tool consumers, plus exactly two analysis scripts
+> coupled to that store. It is **IMPLEMENTED - INDEPENDENT REVIEW PENDING**; no
+> production data deletion has run. Historical survey rows below remain as dated
+> evidence. Broader `scripts/` retirement is still per-domain work, not part of this
+> unit. Future provider-neutral IV remains gated and must use a new semantic ID/schema.
+
 Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRECT_LOCAL_PLAN.md`.
 
 ---
@@ -45,7 +54,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 | `news` (PG) | 343k | market | **local cutover; PG archived/dropped in N9 batch-1** | app reads normalized local news post-N8a; PG source rows are retained only in the batch-1 archive |
 | `sa_*` (comments/signals/market_news/articles/alpha_picks) | ~95k | market | **local authority; PG archived/dropped in N9 batch-1** | S-H confirmed active SA authority is local `sa_capture.db`; the old PG rollback-basis rule was replaced by the batch-1 archive |
 | `fundamentals` | 130 | market | **refetch/cache; PG archived/dropped in N9 batch-1** | EDGAR base + paid supplement; period-aware TTL; PG snapshot rows were intentionally not promoted |
-| `iv_history` | ~24 | market | **drop + forward reboot; PG archived/dropped in N9 batch-1** | abandon old data; rebuild capability; the old scheduler `iv_history` PG-mirror source is now fail-closed with an N9 retirement error, not a provider fetch |
+| `iv_history` | ~24 | market | **legacy local domain retired in review-pending 2026-07-26 unit; PG archived/dropped in N9 batch-1** | old snapshot/store consumers removed; future provider-neutral IV requires a new ID/schema |
 | `macro_*` / `cal_*` | 0 | market | **empty-table proof folded into N9** | local `macro_calendar.db` is active under `use_local_macro=true`; reviewer verified PG macro/cal tables are empty, so N9 batch-1 needs grep + empty-table proof rather than a separate seed/refetch slice |
 | `financial_data_cache` | 24 | market (cache) | **cold-start done; PG archived/dropped in N9 batch-1** | S-H2 removed the desktop runtime PG read-through/promotion path; local miss is an honest miss and callers refetch SEC/FD into local cache. PG table had only 24 rows / 7 unexpired / 0 paid FD rows and is retained only in the batch-1 archive |
 | `job_runs` | 13k | app-state | **relocated; PG archive dropped in N9 batch-2** | S-H1 live-applied 2026-07-03 into local `profile_state.db` (`job_runs=13,652`, reviewed fingerprint `38cf152141aae4304344baeeb46c6476f9870ff0f86fb793469bed96b0cad447`, backup `data/profile_state.db.bak-pre-s-h1-job-runs-20260703T021241462312Z.db`); N9 batch-2 live drop 2026-07-05 removed PG `job_runs` after archive `data/pg_archive/n9_batch2_20260704T162352Z/`; local `scheduler_state` remains partial continuity state, not full history |
@@ -71,7 +80,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 | `data_scheduler.py:827` | `python -m src.news_normalized.ibkr_cli` | news | **converted in S-A1**; old script retained as compatibility wrapper |
 | `data_scheduler.py:128` → 938 | `collect_ibkr_news.py` | news | **likely dead** (post-exit routing never selects legacy) → confirm, then retire |
 | `data_scheduler.py:135` → 938 | `collect_ibkr_prices.py` | prices | active |
-| `data_scheduler.py:141` → 938 | `collect_iv_history.py` | iv | retired by N9 offline hardening; `run_source("iv_history")` fails before provider work/PG sync and points to the separate IV reboot path |
+| `data_scheduler.py:141` → 938 | `collect_iv_history.py` | iv | dated coupling; scheduler identity and subprocess path are removed by the review-pending 2026-07-26 retirement unit |
 | `data_scheduler.py:958` | `migrate_to_supabase.py <sync_flag>` (`_MIGRATE`) | PG sync | retires per-domain as each leaves PG; fully gone at N9 |
 
 ### C. Parallel CLI path
@@ -206,7 +215,7 @@ Read-only SQLite checks (`PRAGMA quick_check`) all passed:
 
 | Local DB | Relevant tables / counts | Survey conclusion |
 |---|---:|---|
-| `data/market_data.db` | `prices=2,324,172`, `news_articles=292,461`, `news_article_scores=491,808`, `financial_cache=20`, `iv_history=24`, `fundamentals=130` | S-G scores are local; P0-C proved local prices authority and cut scheduled writes local; IV/fundamentals local rows are tiny legacy snapshots |
+| `data/market_data.db` | dated 2026-07-01 observation: `prices=2,324,172`, `news_articles=292,461`, `news_article_scores=491,808`, `financial_cache=20`, `iv_history=24`, `fundamentals=130` | The 24 IV rows were later classified as a legacy snapshot and are targeted by the review-pending 2026-07-26 audited retirement migration. |
 | `data/sa_capture.db` | `sa_alpha_picks=112`, `sa_articles=395`, `sa_article_comments=41,215`, `sa_market_news=22,086`, `sa_comment_signals=39,853`, `sa_market_news_tickers=21,689` | SA data is local and active; PG `sa_*` was archived/dropped in N9 batch-1 after the reader/script grep |
 | `data/profile_state.db` | `agent_queries=2`, `research_reports=2`, `agent_memories=1`, `scheduler_state=5`, `profile_settings=15` | app-records already have a local app-state home; future app-state should not go into `market_data.db` |
 | `data/macro_calendar.db` | `macro_series=11`, `macro_observations=29,571`, `macro_release_dates=4,659`, `cal_ipo_events=86`, `cal_economic_events=0`, `cal_earnings_events=0` | macro/FRED and IPO events are local; economic/earnings event emptiness must be decided before PG drop |
@@ -247,7 +256,7 @@ Therefore "scripts retirement" must be a per-domain definition-of-done:
 | News scores | Local `news_article_scores` is live and bridges legacy rows through the normalized news maps. Active local score imports use `scripts/scoring/import_news_scores_local.py`; PG score table is gone | S-G removed the hard-local score degradation for migrated/imported scores. Live proof: reviewed fingerprint `34607859293ae7ee20726448e1b733fe55b2cf9fc720a31f6c97a853dec76ab3`, `pg_score_rows=503,226`, `inserted_or_updated=491,808`, `rejected_rows=604`, `missing_legacy_rows=14`, idempotent reapply `inserted_or_updated=0`; PG `news_scores` was archived/dropped in N9 batch-1 |
 | SA | local `sa_capture.db` is populated and SA tools prefer hard-local backend; job telemetry now comes from local `job_runs` | PG `sa_*` was archived/dropped in N9 batch-1; job telemetry belongs to app-state/ops, not SA market data |
 | Fundamentals | S-B retires the frozen `fundamentals` mirror table as an authority; `stored=true` reads only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise returns honest empty; live cache may initially be cold; default analysis remains SEC EDGAR / Financial Datasets refetch with local cache | PG-free after S-B; old `fundamentals` table was archived/dropped in N9 batch-1 |
-| IV | only 24 local rows; old scheduler `iv_history` PG-mirror source is fail-closed after N9 offline hardening; tools/UI read local and local misses are honest-empty | old PG `iv_history` was archived/dropped in N9 batch-1; preserve capability via rebooted local schema + provider abstraction |
+| IV | dated survey found only 24 local rows; the review-pending 2026-07-26 unit removes that store, scheduler identity, UI/API, DAL, and three store-backed tools | old PG/local snapshot is retired; preserve future capability only through a new provider-neutral schema + semantic ID after proof/cost gates |
 | Prices | local table has 2.3M rows and price data is core | P0-C reconcile + direct-local cutover is live-complete: final fingerprint `61bbf613…`, local rows `2,324,487`, PG-only unexplained `0`, no bulk copy, scheduled `ibkr_prices` direct-local, price reads local-only. PG `prices` is archive/rollback only until batch-3 |
 | Macro/cal | local macro/calendar store selects `macro_calendar.db`; local macro/FRED and IPO rows exist, but economic/earnings event tables are empty | PG macro/cal tables were verified empty and archived/dropped in N9 batch-1, with no seed/refetch slice |
 | Financial cache | S-H2 made `LocalMarketDatabaseBackend.get_financial_cache()` local-only. Local miss is an honest miss; callers refetch SEC/FD and repopulate local cache | PG `financial_data_cache` was archived/dropped in N9 batch-1 |

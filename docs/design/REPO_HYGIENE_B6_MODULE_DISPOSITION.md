@@ -8,6 +8,13 @@
 > deletions now; scripts survivor-table changes = standing-ruling changes.
 > Nothing here executes anything.
 
+> **2026-07-26 scoped supersession:** The review-pending legacy-IV retirement
+> removes exactly two `scripts/analysis` consumers because they directly depend on
+> the retired store: `compare_bs_vs_american.py` and
+> `scan_option_mispricing.py`. This is a domain retirement, not a reversal of the
+> broader survivor-table ruling. `scan_unusual_activity.py` remains; all further
+> `scripts/` retirement still requires the per-domain coupling rule.
+
 ## 1. `analysis/` — ✅ MIGRATED (B7 merged; `src/options_math/` live)
 
 Root-level package (`option_pricing.py`, `rate_curve.py`, `__init__.py`) predating `src/`
@@ -20,8 +27,8 @@ Complete consumer inventory (rewired by the B7 implementation branch):
 | Consumer | Sites |
 |---|---|
 | `src/tools/options_tools.py` | lazy imports at `:40` `:151` `:152` `:187` `:264` `:267` |
-| `scripts/analysis/compare_bs_vs_american.py` | `:27` (retained survivor — must keep working) |
-| `scripts/analysis/scan_option_mispricing.py` | `:51` (same) |
+| `scripts/analysis/compare_bs_vs_american.py` | retired with the legacy IV store on the review-pending 2026-07-26 branch |
+| `scripts/analysis/scan_option_mispricing.py` | retired with the legacy IV store on the review-pending 2026-07-26 branch |
 | `tests/test_option_pricing.py`, `tests/test_rate_curve.py` | direct imports, in-function imports, and `patch("analysis.rate_curve...")` string target |
 
 (`tests/test_analysis_cards_api.py` is a false match — it imports the routes module.)
@@ -54,7 +61,7 @@ per-subfolder evidence:
 | `migration/` (10 files) | **10 test files** import `scripts.migration` (refusal/gate pins) | keep-historical (gate evidence; tests depend) |
 | `scoring/` (7+README) | **4 test files** + S-G active import CLI | keep (user-ruled) |
 | `diagnostics/` (1) | `tests/test_news_normalized_ibkr_adapter.py:16` imports the probe's helpers | keep (has a live test consumer — stronger than "ad hoc") |
-| `analysis/` (3) | imports root `analysis/` package (see §1 — B7 must rewire) | keep-historical; B7 dependency noted |
+| `analysis/` (1 after scoped IV retirement) | retained `scan_unusual_activity.py` does not read the retired IV store | keep; the other two scripts were domain-retired, while broader scripts retirement remains open |
 | `huggingface/` (3) | none (docs/provenance) | keep (user-ruled) |
 | `live/` (3) | none (operator smokes, deliberately outside CI) | keep |
 | `p1_2/` (1) | none | keep-historical |
