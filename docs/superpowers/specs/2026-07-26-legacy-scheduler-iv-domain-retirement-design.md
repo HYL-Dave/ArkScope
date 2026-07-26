@@ -1,13 +1,14 @@
 # Legacy Scheduler Sources and IV Domain Retirement Design
 
-> **Status: ADOPTED - IMPLEMENTATION PLAN REVIEW PENDING**
+> **Status: ADOPTED - IMPLEMENTATION CLEARED**
 >
 > Written against clean `master` tip `16d77bae` on 2026-07-26. This document
 > authorizes no product edit, migration, provider call, or production write.
 > Independent full-document review returned GREEN after the accounting and
 > ownership amendments through `7bb7cc29`. The RED-first implementation plan
 > is `docs/superpowers/plans/2026-07-26-legacy-scheduler-iv-domain-retirement.md`;
-> it remains under independent review and does not yet authorize work.
+> independent plan review is GREEN after two docs-only corrections and Task 0
+> may begin in an isolated worktree.
 > Production data removal requires a second explicit approval after
 > implementation review and merge.
 
@@ -525,6 +526,13 @@ Remove:
 - `MarketDataStatus.iv` and `MarketDataStatus.sync.iv`;
 - ticker `MarketDataCoverage.iv`; and
 - `/health.data_sources.iv_tickers`.
+
+Also remove the unreachable in-process market-data job poller as one closed
+subsystem: `GET /market-data/jobs/{job_id}`, `_JOBS`, `_JOBS_LOCK`,
+`start_bootstrap_job`, `start_update_job`, `get_job`, and frontend
+`MarketDataJob` / `getMarketDataJob()`. The only routes that formerly created
+these jobs are permanent 409 PG-mirror tombstones. This removal does not touch
+the separate durable `/jobs` API or any `job_runs` row.
 
 `GET /options/greeks/calculate` remains. If route reordering or module
 extraction is needed to preserve it after dynamic routes disappear, that is a

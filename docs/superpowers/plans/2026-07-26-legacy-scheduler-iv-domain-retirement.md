@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: WRITTEN - INDEPENDENT REVIEW PENDING**
+> **Status: PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
 
 Review packet, created during implementation:
 `docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md`.
@@ -72,6 +72,29 @@ Independent review returned GREEN after four corrections. They are binding:
 The plan-review reminder is also binding: Tranche 1's additive classifier tests
 are separately identified from retirement and rename nodes. Their additions
 must not be hidden inside net `+N/-M` arithmetic.
+
+### 1.2 Independent plan-review resolution
+
+Independent plan review returned substantive GREEN with two required
+docs-only corrections. Both were independently verified against current code
+and neither changes a target count:
+
+1. The unknown `NewsWriteMode` example now asserts ArkScope's actual scheduler
+   failure envelope: `status="failed"`, plus equal stable `code` and
+   `reason_code`. It also asserts that no `ok` field is present. The former
+   `result["ok"]` example would have raised `KeyError`, producing an
+   unattributable RED before testing the classifier contract.
+2. Tranche 2 explicitly removes the unreachable in-process market-data job
+   poller. `start_bootstrap_job`, `start_update_job`, `_JOBS`, `_JOBS_LOCK`,
+   and `get_job` have no current product caller because bootstrap/update/
+   validate routes are permanent 409 tombstones. Remove
+   `GET /market-data/jobs/{job_id}`, frontend `MarketDataJob`/
+   `getMarketDataJob`, and the backend helpers together. The seven owning
+   backend tests were already in the reviewed 40-node retirement set, so
+   backend/frontend arithmetic is unchanged.
+
+The exact clearance commit is recorded by the pointer-only docs commit after
+this amendment; that pointer changes no product authority or accounting.
 
 ## 2. Locked Decisions
 
@@ -388,7 +411,8 @@ tests/test_sqlite_backend.py (-4)
 
 tests/test_market_data_admin.py (-40)
   the reviewed IV/PG mirror bootstrap, incremental, checksum, update,
-  validation, and retired-mirror route nodes enumerated in Task 6
+  validation, retired-mirror route, and unreachable in-process job-poller
+  nodes enumerated in Task 6
 
 tests/test_tools.py (-4)
   the three old IV-history-backed tools plus their old catalog assertion
@@ -404,7 +428,7 @@ Add 22 exact nodes:
 
 ```text
 tests/test_api.py (+1)
-  test_legacy_iv_routes_are_absent_while_greeks_remains_reachable
+  test_retired_market_admin_and_iv_routes_are_absent_while_greeks_remains_reachable
 
 tests/test_evidence_packet.py (+1)
   test_packet_has_no_legacy_iv_environment_or_missing_iv_source
@@ -842,8 +866,10 @@ def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_teleme
     # Patch every downstream seam to raise AssertionError if reached.
     # Inject a route whose mode is not one of the four reviewed enum members.
     result = ds.run_source("polygon_news", trigger_source="manual")
-    assert result["ok"] is False
+    assert result["status"] == "failed"
+    assert result["code"] == "unsupported_news_write_mode"
     assert result["reason_code"] == "unsupported_news_write_mode"
+    assert "ok" not in result
 ```
 
 The second test must patch provider config, adapter, worker subprocess, DB
@@ -978,9 +1004,11 @@ def _classify_news_write_mode(mode: object) -> NewsExecutionMode:
 
 Call it immediately after reading the news route and before provider config,
 locks, adapter/worker construction, write permission, or `_record_result`.
-Catch `UnsupportedNewsWriteMode` at that boundary and return fixed
-`reason_code="unsupported_news_write_mode"` without durable telemetry. Keep
-direct-local routing behavior for the two accepted modes. Do not retain a
+Catch `UnsupportedNewsWriteMode` at that boundary and return the fixed envelope
+`{"source": source, "status": "failed", "code":
+"unsupported_news_write_mode", "reason_code":
+"unsupported_news_write_mode"}` without an `ok` field or durable telemetry.
+Keep direct-local routing behavior for the two accepted modes. Do not retain a
 post-collect `sync_flag` guard.
 
 - [ ] **Step 3: Collapse route/status behavior to active rows.**
@@ -1139,14 +1167,19 @@ an independent checkpoint read confirms the node/resource arithmetic.
 - [ ] **Step 1: Replace old API contracts with absence plus retained Greeks.**
 
 ```python
-def test_legacy_iv_routes_are_absent_while_greeks_remains_reachable(client):
-    assert client.get("/options/AMD").status_code == 404
-    assert client.get("/options/AMD/history").status_code == 404
-    assert client.get("/scan/mispricing").status_code == 404
+def test_retired_market_admin_and_iv_routes_are_absent_while_greeks_remains_reachable(
+    client,
+):
+    paths = client.app.openapi()["paths"]
+    assert "/options/{ticker}" not in paths
+    assert "/options/{ticker}/history" not in paths
+    assert "/scan/mispricing" not in paths
+    assert "/market-data/jobs/{job_id}" not in paths
+    assert "/options/greeks/calculate" in paths
     assert client.get(
         "/options/greeks/calculate",
-        params={"spot": 100, "strike": 100, "days": 30, "volatility": 0.2},
-    ).status_code != 404
+        params={"S": 100, "K": 100, "T": 0.25, "sigma": 0.2},
+    ).status_code == 200
 ```
 
 Use the actual Greeks method/query contract from the current test fixture; do
@@ -1172,7 +1205,11 @@ Do not reject generic variable names such as `iv_history` inside pure math or
 historical N9 migration evidence.
 `test_non_migration_scripts_do_not_read_legacy_iv_store` scans all current
 scripts except the reviewed migration namespace and must prove both analysis
-scripts are gone.
+scripts are gone. The same boundary suite reads the three job-poller owners and
+asserts that `_JOBS`, `_JOBS_LOCK`, `start_bootstrap_job`, `start_update_job`,
+`get_job`, `MarketDataJob`, `getMarketDataJob`, and
+`/market-data/jobs/` are absent from their exact former files; it does not ban
+generic `get_job` names elsewhere in the application.
 
 - [ ] **Step 3: Evolve tool, bridge, health, evidence, and reducer contracts.**
 
@@ -1250,7 +1287,10 @@ deletion remains Task 9/post-merge.
 Delete the two old options routes and the sole scan router/module. Remove the
 scan router include from `src/api/app.py`. Keep the Greeks route and actual
 calculation assertions. Remove old IV members from market status, health, and
-coverage DTOs atomically.
+coverage DTOs atomically. Also remove
+`GET /market-data/jobs/{job_id}` and its `get_job`/`start_bootstrap_job`
+imports from `src/api/routes/market_data.py`; all routes that once created such
+jobs are permanent 409 tombstones.
 
 - [ ] **Step 3: Remove tool, bridge, evidence, and health ownership.**
 
@@ -1265,7 +1305,20 @@ Delete current bootstrap/update/validate mirror endpoints and implementation
 that only serve retired PG domains. Keep current direct-local market coverage
 and active data paths. Remove the 40 exact obsolete test nodes listed in
 Section 3.6; if any listed node still proves a live direct-local property, stop
-instead of deleting it.
+instead of deleting it. Delete `_JOBS`, `_JOBS_LOCK`, `start_bootstrap_job`,
+`start_update_job`, and `get_job` as one unreachable product subsystem; delete
+the test-only `_drain_update_job` helper with its owning nodes. Those seven
+nodes are already among the reviewed 40:
+
+```text
+test_bootstrap_job_records_retired_pg_mirror_error
+test_update_job_surfaces_iv_or_fundamentals_failure
+test_update_job_all_domains_fail_is_error
+test_update_job_passes_explicit_domains_to_incremental_update
+test_update_job_ignores_skipped_domains_when_deciding_success
+test_job_not_found_404
+test_bootstrap_done_poll_invalidates_dal_cache
+```
 
 - [ ] **Step 5: Remove the two old-store analysis scripts.**
 
@@ -1310,7 +1363,9 @@ git commit -m "refactor: retire legacy IV runtime domain"
 
 Delete `IVAnalysis`, `IVHistoryPoint`, `IVHistoryResult`, old request helpers,
 `MarketDataStatus.iv`, sync IV, and ticker-coverage IV members. Do not alter
-live option-chain/Greeks DTOs.
+live option-chain/Greeks DTOs. Delete the unconsumed `MarketDataJob` interface
+and `getMarketDataJob()` helper with `/market-data/jobs/{job_id}`; do not add a
+replacement poller.
 
 - [ ] **Step 2: Simplify Ticker Detail and Data Storage.**
 
@@ -1680,16 +1735,18 @@ Independent implementation review must verify at least:
    option capabilities;
 7. the two removed analysis scripts have no surviving replacement/direct path,
    while unrelated scripts are untouched;
-8. no-PG changes exactly 24 -> 23 through the named IV check/dispatch;
-9. migration preview/archive/apply/idempotence/restore tests each fail under an
+8. the dead market-data job poller is absent end to end while the separate
+   durable `/jobs` and `job_runs` systems remain unchanged;
+9. no-PG changes exactly 24 -> 23 through the named IV check/dispatch;
+10. migration preview/archive/apply/idempotence/restore tests each fail under an
    independent mutation;
-10. copied-data archive contains exact value-level SQLite/Parquet duplicates
+11. copied-data archive contains exact value-level SQLite/Parquet duplicates
     and restore material;
-11. `job_runs` and all non-target logical digests are unchanged;
-12. product resources change exactly `1814 -> 1806 -> 1782` with no scanner
+12. `job_runs` and all non-target logical digests are unchanged;
+13. product resources change exactly `1814 -> 1806 -> 1782` with no scanner
     debt/allowlist change;
-13. production remains byte/mtime unchanged throughout review; and
-14. evidence distinguishes dated observations from acceptance invariants.
+14. production remains byte/mtime unchanged throughout review; and
+15. evidence distinguishes dated observations from acceptance invariants.
 
 ## 8. Post-Review Integration And Production Protocol
 
