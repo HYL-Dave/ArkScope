@@ -1,6 +1,6 @@
 # ArkScope Coverage v2 Session-Truth Design
 
-> **Status: IMPLEMENTATION REVIEW GREEN - P3 TEST CLOSURE COMPLETE - INTEGRATION PENDING**
+> **Status: LIVE COMPLETE - 2026-07-26 - MERGED PRODUCT `3f0fb18f`**
 >
 > Written against clean design branch tip `7a8548fa` on 2026-07-26. This
 > document converts the reviewed evidence in
@@ -8,11 +8,12 @@
 > into the product and engineering authority for Coverage v2. The RED-first
 > initial implementation closed at review-repair product tip `cb33a193`; the
 > approved read-only-control follow-up and its four-field mutation-sensitive
-> test closure are complete in the isolated worktree;
+> test closure are merged;
 > evidence lives in
 > `docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`.
-> Integration and LIVE status remain pending; no merge or production action is
-> claimed by this document.
+> Merged-tree verification and the production read-only smoke are recorded in
+> that evidence packet. No provider, scheduler, repair, or database write was
+> performed for closeout.
 
 ## Review Resolution (2026-07-26)
 
