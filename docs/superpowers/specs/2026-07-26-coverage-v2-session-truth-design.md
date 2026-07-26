@@ -6,7 +6,8 @@
 > document converts the reviewed evidence in
 > [`COVERAGE_V2_GROUND_TRUTH_INVENTORY.md`](../../design/COVERAGE_V2_GROUND_TRUTH_INVENTORY.md)
 > into the product and engineering authority for Coverage v2. The RED-first
-> implementation is complete at product tip `0b719735`; evidence lives in
+> implementation is complete at review-repair product tip `cb33a193`;
+> evidence lives in
 > `docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`.
 > Integration and LIVE status remain blocked on independent implementation
 > review.

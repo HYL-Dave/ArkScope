@@ -118,8 +118,34 @@ The reviewed correction is binding:
 5. `src/api/routes/schedule.py` is added to the reviewed modify set.
 6. The two misleading historical node IDs are retired and replaced with
    behavior-accurate IDs. This changes Task 6 from `+5/-19` to `+7/-21`, and
-   the backend comm from `+68/-37` to `+70/-39`, without changing final `4744`
-   or focused `225`.
+   the backend comm from `+68/-37` to `+70/-39`, without changing the initial
+   implementation checkpoint of `4744` or focused `225`.
+
+## Post-Evidence Independent Review Resolution
+
+A read-only independent review of the initial product tip `0b719735` found
+five concrete gaps. The bounded repair started at `db410e09`; a same-review
+follow-up at final product tip `cb33a193` closes undecodable optional diagnostic
+text without changing node accounting:
+
+1. a valid empty active universe now returns honest `unknown/no_observations`
+   coverage instead of raising `ValueError` and producing HTTP 500;
+2. malformed, schema-incompatible, or non-UTF-8 optional provider-diagnostic
+   storage is quarantined without changing otherwise valid price-observation
+   health;
+3. valid provider diagnostic source text remains byte-preserved rather than
+   being trimmed at read time;
+4. localized labels are no longer React keys, so an in-place locale switch
+   preserves the mounted calendar-health and partial-detail nodes; and
+5. evidence wording now distinguishes the 35-path initial product range from
+   the later evidence and review-fix commits.
+
+The backend repairs add exactly two named tests and remove none. The mounted
+frontend contract evolves in place with no node-accounting change. Therefore
+the final review-ready backend accounting is `+72/-39`, collection `4746`, and
+focused `227`; frontend accounting remains `+11/-2`, full `96/1072`, and
+focused `8/118`. The Task 6 and Task 7 checkpoint values remain historical
+evidence and are not rewritten as though the repair existed earlier.
 
 ## Locked Implementation Decisions
 
@@ -334,23 +360,24 @@ it.
 | `test_market_coverage_dependencies.py` | 6 | 0 | 6 |
 | `test_market_coverage_calendar.py` | 10 | 0 | 10 |
 | `test_market_coverage_classifier.py` | 18 | 0 | 18 |
-| `test_market_coverage_observations.py` | 10 | 0 | 10 |
+| `test_market_coverage_observations.py` | 11 | 0 | 11 |
 | `test_market_coverage_boundaries.py` | 5 | 0 | 5 |
-| `test_trading_day_coverage.py` | 14 | 18 | 15 |
+| `test_trading_day_coverage.py` | 15 | 18 | 16 |
 | `test_scheduler_planner.py` | 0 | 9 | 0 |
 | `test_data_scheduler.py` | 7 | 12 | 98 |
-| **Total** | **70** | **39** | **+31 net** |
+| **Total** | **72** | **39** | **+33 net** |
 
-Expected backend final collection: `4713 + 70 - 39 = 4744`.
-Expected focused collection: `194 + 70 - 39 = 225`.
+Final review-ready backend collection: `4713 + 72 - 39 = 4746`.
+Final focused collection: `194 + 72 - 39 = 227`.
 
 The trading-day suite is replaced as a contract, but
 `test_route_registered` evolves in place with its exact ID. Exactly 18 old
-node IDs are removed and 14 new IDs are added. Stable alias, ordering, route,
-storage-availability, sanitized-503, and provider-diagnostic properties are
-carried by named V2 successors; the nine planner nodes disappear with their
-product owner. Exactly twelve scheduler nodes disappear: the ten retired
-planner-consumer nodes plus two misleading historical IDs:
+node IDs are removed and 15 new IDs are added: 14 at the initial implementation
+checkpoint plus the post-evidence empty-universe contract. Stable alias,
+ordering, route, storage-availability, sanitized-503, and provider-diagnostic
+properties are carried by named V2 successors; the nine planner nodes
+disappear with their product owner. Exactly twelve scheduler nodes disappear:
+the ten retired planner-consumer nodes plus two misleading historical IDs:
 
 ```text
 test_price_backfill_uses_planner_scope_no_pg_no_mirror
@@ -1341,8 +1368,10 @@ pytest --collect-only -q > /tmp/coverage-v2-backend-tip.txt
 sed -n '/::/p' /tmp/coverage-v2-backend-tip.txt | LC_ALL=C sort | sha256sum
 ```
 
-Expected: `8 files / 225 passed`, full collection `4744`. Record the final
-hash; do not predeclare it before implementation.
+Expected at the Task 7 implementation checkpoint: `8 files / 225 passed`, full
+collection `4744`. Record that checkpoint hash; do not predeclare it before
+implementation. The post-evidence review repair later supersedes these final
+review-ready counts as described above.
 
 - [ ] **Step 8: Re-run direct mutation probes.**
 
@@ -1556,8 +1585,8 @@ Expected accounting:
 
 ```text
 base 4713
-head 4744
-comm +70/-39
+head 4746
+comm +72/-39
 ```
 
 The 39 removals must be exactly 18 V1 route node IDs, nine planner nodes, ten
@@ -1580,7 +1609,7 @@ pytest -q \
   tests/test_data_scheduler.py
 ```
 
-Expected: `225 passed`. Reprove:
+Expected: `227 passed`. Reprove:
 
 - all seven precedence paths;
 - 13:29/13:30 early-close transition;
@@ -1754,8 +1783,8 @@ npm run check:i18n-literals
 npm run build
 ```
 
-Expected: backend `225` focused, frontend `8/118` focused, full collections
-`4744` and `96/1072`, scanner `36/20/0/20`, resources `713/1813`, and all
+Expected: backend `227` focused, frontend `8/118` focused, full collections
+`4746` and `96/1072`, scanner `36/20/0/20`, resources `713/1813`, and all
 structural gates green.
 
 - [ ] **Step 5: Commit review-ready evidence.**
@@ -1774,10 +1803,10 @@ implementation review.
 
 ## Independent Implementation Reviewer Focus
 
-1. Reproduce backend `+70/-39` and frontend `+11/-2` from virgin archives.
-2. Confirm backend final `4744`, focused `225`; frontend final `96/1072`,
+1. Reproduce backend `+72/-39` and frontend `+11/-2` from virgin archives.
+2. Confirm backend final `4746`, focused `227`; frontend final `96/1072`,
    focused `8/118`.
-3. Verify every removed node is one of the 37 named legacy nodes, every added
+3. Verify every removed node is one of the 39 named legacy nodes, every added
    node matches the ledger, and `test_route_registered` evolves in place.
 4. Verify resource comm `+32/-13`, Settings `713`, total `1813`, and coverage
    subtree `44` per locale, with the existing count node ID preserved.
@@ -1788,7 +1817,10 @@ implementation review.
 8. Mutate 13:29/13:30 to prove the early-close buffer test owns the boundary.
 9. Mutate off-grid handling twice to prove counting and non-filling are
    independently protected.
-10. Confirm reader filters by session window only and cannot write.
+10. Confirm reader filters by session window only and cannot write; malformed,
+    incompatible, or non-UTF-8 optional provider diagnostics must be
+    quarantined without changing valid observation health or trimming valid
+    source text.
 11. Confirm no provider/Gateway/PG/network import or call exists in coverage.
 12. Confirm `indeterminate_tickers` uses exact matching and never gains
     complete/success semantics by prefix.
@@ -1817,7 +1849,7 @@ Only after independent implementation review returns GREEN:
 
 1. record the review resolution in docs and commit it;
 2. fast-forward merge only;
-3. rerun backend `225`, frontend `8/118`, both full collections, scanner,
+3. rerun backend `227`, frontend `8/118`, both full collections, scanner,
    resources, typecheck/build, no-PG, and byte gates on the merged tree;
 4. perform one production read-only Settings smoke with no scheduler/repair
    interaction;
