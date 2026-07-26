@@ -17,7 +17,6 @@ sys.path.insert(0, str(project_root))
 from src.tools.data_access import DataAccessLayer
 from src.tools.schemas import (
     FundamentalsResult,
-    IVHistoryPoint,
     NewsArticle,
     NewsQueryResult,
     PriceBar,
@@ -208,32 +207,6 @@ class TestPrices:
         assert "NVDA" in tickers
         assert "AAPL" in tickers
         assert len(tickers) > 50  # We have 135+ tickers
-
-
-# ============================================================
-# IV History
-# ============================================================
-
-class TestIVHistory:
-    def test_get_iv_history(self, dal):
-        """get_iv_history() should return IV data points."""
-        points = dal.get_iv_history("AMD")
-        assert isinstance(points, list)
-        if points:
-            p = points[0]
-            assert isinstance(p, IVHistoryPoint)
-            assert p.date
-            assert p.atm_iv > 0
-
-    def test_get_iv_history_df(self, dal):
-        """get_iv_history_df() should return raw DataFrame."""
-        df = dal.get_iv_history_df("AMD")
-        assert "atm_iv" in df.columns
-
-    def test_iv_history_empty_ticker(self, dal):
-        """Non-existent ticker should return empty list."""
-        points = dal.get_iv_history("XXXNOTREAL")
-        assert points == []
 
 
 # ============================================================

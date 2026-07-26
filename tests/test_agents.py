@@ -94,7 +94,7 @@ class TestAnthropicToolSchemas:
         """All bridge tools (registry + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 57
+        assert len(tools) == 54
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -123,9 +123,6 @@ class TestAnthropicToolSchemas:
             "get_current_quote",
             "get_price_change",
             "get_sector_performance",
-            "get_iv_analysis",
-            "get_iv_history_data",
-            "scan_mispricing",
             "calculate_greeks",
             "detect_anomalies",
             "detect_event_chains",
@@ -173,6 +170,9 @@ class TestAnthropicToolSchemas:
             "get_sa_digest",
         }
         assert tool_names == expected
+        assert {"get_iv_analysis", "get_iv_history_data", "scan_mispricing"}.isdisjoint(
+            tool_names,
+        )
 
 
 # ============================================================
@@ -293,7 +293,7 @@ class TestOpenAIToolCreation:
         """OpenAI bridge tools (registry + delegate_to_subagent)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 57
+        assert len(tools) == 54
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -528,7 +528,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 56
+        assert len(schemas) == 53
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -542,7 +542,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 56
+        assert len(schemas) == 53
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

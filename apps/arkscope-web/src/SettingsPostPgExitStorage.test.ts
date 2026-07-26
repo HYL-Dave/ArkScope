@@ -43,10 +43,9 @@ const marketStatus: MarketDataStatus = {
   exists: true,
   prices: { row_count: 2_324_487, ticker_count: 149, latest_datetime: "2026-07-03T20:00:00+0000" },
   news: { row_count: 371_672, source_count: 3, latest_published: "2026-06-27T11:11:00+0000" },
-  iv: { row_count: 24, ticker_count: 4, latest_date: "2026-03-06" },
   fundamentals: { row_count: 130, ticker_count: 130, latest_date: "2026-06-01" },
   financial_cache: { row_count: 24, valid_count: 7, expired_count: 17, latest_fetched_at: "2026-07-01T00:00:00+00:00" },
-  sync: { prices: null, news: null, iv: null, fundamentals: null },
+  sync: { prices: null, news: null, fundamentals: null },
   use_local_market_setting: false,
   env_override: false,
   local_market_strict_setting: false,
@@ -350,12 +349,6 @@ describe("post-PG-exit storage panels", () => {
           rows_added: 12,
           updated_at: "2026-07-20T02:00:01Z",
         },
-        iv: {
-          last_success: "2026-07-20T03:00:00Z",
-          last_error: null,
-          rows_added: 13,
-          updated_at: "2026-07-20T03:00:01Z",
-        },
         fundamentals: {
           last_success: "2026-07-20T04:00:00Z",
           last_error: null,
@@ -451,7 +444,6 @@ describe("post-PG-exit storage panels", () => {
         "Market Data",
         "Prices",
         "News",
-        "IV",
         "Fundamentals",
         "Financial Cache",
         "Latest Incremental Update",
@@ -473,9 +465,6 @@ describe("post-PG-exit storage panels", () => {
     );
     expect(storage.textContent).toContain(
       `News +12 @ ${formatSystemTimestamp("2026-07-20T02:00:00Z")}`,
-    );
-    expect(storage.textContent).toContain(
-      `IV +13 @ ${formatSystemTimestamp("2026-07-20T03:00:00Z")}`,
     );
     expect(storage.textContent).toContain(
       `Fundamentals +14 @ ${formatSystemTimestamp("2026-07-20T04:00:00Z")}`,

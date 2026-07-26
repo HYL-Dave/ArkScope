@@ -7,8 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   FinancialStatement,
   FundamentalsResult,
-  IVAnalysis,
-  IVHistoryResult,
   MarketDataCoverage,
   MarketDataStatus,
   Note,
@@ -55,7 +53,6 @@ const SOURCE_TAG_VALUE = "SOURCE/TAG 原值 <keep>";
 const SOURCE_TAG_SOURCE = "provider:raw/v9";
 const SOURCE_DATE_RANGE = "SOURCE_DATE_RANGE_NOT_LOCALIZED";
 const SOURCE_NOTE_BODY = "SOURCE NOTE / 原文 <keep>";
-const SOURCE_SIGNAL = "SOURCE_SIGNAL_V9";
 const SOURCE_FUNDAMENTAL_PROVIDER = "provider/source-fundamentals";
 const SOURCE_ROW = "SOURCE Revenue / 營收 <keep>";
 const SOURCE_NEWER_STATE_LIST = "SOURCE NEWER STATE LIST / 保留";
@@ -86,13 +83,6 @@ const EN_OVERVIEW_KV_LABELS = [
   "Dates",
 ] as const;
 const ZH_DATA_KV_LABELS = [
-  "目前 ATM IV",
-  "HV 30d",
-  "VRP (IV−HV)",
-  "IV rank",
-  "IV percentile",
-  "Spot",
-  "歷史天數",
   "快照日期",
   "市值",
   "P/E",
@@ -115,13 +105,6 @@ const ZH_DATA_KV_LABELS = [
   "總債務",
 ] as const;
 const EN_DATA_KV_LABELS = [
-  "Current ATM IV",
-  "HV 30d",
-  "VRP (IV−HV)",
-  "IV rank",
-  "IV percentile",
-  "Spot",
-  "History days",
   "Snapshot date",
   "Market cap",
   "P/E",
@@ -177,33 +160,6 @@ const PRICE: PriceChange = {
   date_range: SOURCE_DATE_RANGE,
 };
 
-const IV: IVAnalysis = {
-  ticker: TICKER,
-  current_iv: 0.42,
-  hv_30d: 0.31,
-  vrp: 0.11,
-  iv_rank: 77,
-  iv_percentile: 81,
-  spot_price: 1234.56,
-  history_days: 2,
-  signal: SOURCE_SIGNAL,
-  source_path: "local",
-};
-
-const IV_HISTORY: IVHistoryResult = {
-  source_path: "file",
-  points: [
-    {
-      date: "SOURCE_HISTORY_DATE",
-      atm_iv: 0.42,
-      hv_30d: 0.31,
-      vrp: 0.11,
-      spot_price: 1234.56,
-      num_quotes: 29,
-    },
-  ],
-};
-
 const STATEMENT: FinancialStatement = {
   report_period: "SOURCE_REPORT_PERIOD",
   fiscal_period: "SOURCE_FISCAL_PERIOD",
@@ -245,7 +201,6 @@ const COVERAGE: MarketDataCoverage = {
   exists: true,
   prices: true,
   news: true,
-  iv: true,
   fundamentals: false,
 };
 
@@ -254,10 +209,9 @@ const STATUS: MarketDataStatus = {
   exists: true,
   prices: { row_count: 1, ticker_count: 1, latest_datetime: "SOURCE_PRICE_TIME" },
   news: { row_count: 1, source_count: 1, latest_published: "SOURCE_NEWS_TIME" },
-  iv: { row_count: 1, ticker_count: 1, latest_date: "SOURCE_IV_DATE" },
   fundamentals: { row_count: 1, ticker_count: 1, latest_date: "SOURCE_FUND_DATE" },
   financial_cache: { row_count: 1, valid_count: 1, expired_count: 0, latest_fetched_at: "SOURCE_FETCH_TIME" },
-  sync: { prices: null, news: null, iv: null, fundamentals: null },
+  sync: { prices: null, news: null, fundamentals: null },
   use_local_market_setting: true,
   env_override: false,
   local_market_strict_setting: false,
@@ -424,8 +378,12 @@ beforeEach(async () => {
   document.documentElement.lang = "zh-Hant";
   apiMocks.getTickerState.mockReset().mockResolvedValue(STATE);
   apiMocks.getPriceChange.mockReset().mockResolvedValue(PRICE);
-  apiMocks.getIvAnalysis.mockReset().mockResolvedValue(IV);
-  apiMocks.getIvHistory.mockReset().mockResolvedValue(IV_HISTORY);
+  apiMocks.getIvAnalysis.mockReset().mockRejectedValue(
+    new Error("legacy IV analysis request must not execute"),
+  );
+  apiMocks.getIvHistory.mockReset().mockRejectedValue(
+    new Error("legacy IV history request must not execute"),
+  );
   apiMocks.getStoredFundamentals.mockReset().mockResolvedValue(FUNDAMENTALS);
   apiMocks.getMarketDataStatus.mockReset().mockResolvedValue(STATUS);
   apiMocks.getMarketDataCoverage.mockReset().mockResolvedValue(COVERAGE);
@@ -479,12 +437,12 @@ describe("Ticker Detail localization", () => {
     await click(buttonByText("數據"));
     await waitForText(SOURCE_ROW);
     expectKvLabels(ZH_DATA_KV_LABELS);
-    expect(host!.textContent).toContain("IV 歷史（最近 1 筆 · 來源 本地檔案）");
     expect(host!.textContent).toContain("損益表（1 期）");
     expect(host!.textContent).toContain("資產負債表（1 期）");
     expect(host!.textContent).toContain("現金流量表（1 期）");
     expect(host!.textContent).toContain(SOURCE_FUNDAMENTAL_PROVIDER);
-    expect(host!.textContent).toContain(SOURCE_SIGNAL);
+    expect(apiMocks.getIvAnalysis).not.toHaveBeenCalled();
+    expect(apiMocks.getIvHistory).not.toHaveBeenCalled();
     expect(host!.querySelector("img")).toBeNull();
     expect(apiMocks.getTickerState).toHaveBeenCalledWith(TICKER);
     expect(apiMocks.getPriceChange).toHaveBeenCalledWith(TICKER, 30);
@@ -527,12 +485,10 @@ describe("Ticker Detail localization", () => {
       "Notes(2)",
       "AI Card",
       "Data source / freshness",
-      "Implied volatility (IV)",
       "Fundamentals",
       "Income statements",
       "Balance sheet",
       "Cash flow",
-      "IV history (latest 1 row · Source Local file)",
       "Income statements (1 period)",
       "Balance sheet (1 period)",
       "Cash flow (1 period)",
@@ -540,10 +496,11 @@ describe("Ticker Detail localization", () => {
       "SOURCE Total assets / 資產",
       "SOURCE Free cash flow / 現金",
       SOURCE_FUNDAMENTAL_PROVIDER,
-      SOURCE_SIGNAL,
     ]) {
       expect(text).toContain(expected);
     }
+    expect(apiMocks.getIvAnalysis).not.toHaveBeenCalled();
+    expect(apiMocks.getIvHistory).not.toHaveBeenCalled();
     expect(text).not.toContain("來源列已翻譯");
   });
 
@@ -601,13 +558,7 @@ describe("Ticker Detail localization", () => {
     expect(apiMocks.getTickerState).toHaveBeenCalledTimes(1);
   });
 
-  it("preserves successful legs while naming IV history fundamentals status and coverage failures", async () => {
-    apiMocks.getIvHistory.mockRejectedValueOnce(
-      structuredError("iv_history_failed", `/options/${TICKER}/history`),
-    );
-    apiMocks.getStoredFundamentals.mockRejectedValueOnce(
-      structuredError("fundamentals_failed", `/fundamentals/${TICKER}?stored=true`),
-    );
+  it("preserves successful price and fundamentals legs while retiring legacy IV requests", async () => {
     apiMocks.getMarketDataStatus.mockRejectedValueOnce(
       structuredError("market_status_failed", "/market-data/status"),
     );
@@ -621,30 +572,24 @@ describe("Ticker Detail localization", () => {
     const titles = Array.from(host!.querySelectorAll('[role="alert"] .ui-status-badge'))
       .map((node) => node.textContent);
     expect(titles).toEqual([
-      "無法載入 IV 歷史。",
-      "無法載入基本面。",
       "無法載入市場資料狀態。",
       "無法載入市場資料覆蓋。",
     ]);
-    expect(host!.textContent).toContain("0.42");
-    expect(host!.textContent).toContain(SOURCE_SIGNAL);
+    expect(host!.textContent).toContain(SOURCE_DATE_RANGE);
+    expect(host!.textContent).toContain(SOURCE_ROW);
+    expect(apiMocks.getIvAnalysis).not.toHaveBeenCalled();
+    expect(apiMocks.getIvHistory).not.toHaveBeenCalled();
     expect(host!.textContent).not.toContain(RAW_ERROR);
   });
 
   it("maps reviewed source-path enums and preserves unknown stable IDs", async () => {
-    apiMocks.getIvAnalysis.mockResolvedValueOnce({ ...IV, source_path: "local" });
-    apiMocks.getIvHistory.mockResolvedValueOnce({ ...IV_HISTORY, source_path: "file" });
-    apiMocks.getStoredFundamentals.mockResolvedValueOnce({ ...FUNDAMENTALS, source_path: "pg_fallback" });
+    apiMocks.getStoredFundamentals.mockResolvedValueOnce({ ...FUNDAMENTALS, source_path: "local" });
     await mountTicker();
     await click(buttonByText("數據"));
     await waitForCalls(apiMocks.getMarketDataCoverage, 1);
     expect(host!.textContent).toContain("本地");
-    expect(host!.textContent).toContain("本地檔案");
-    expect(host!.textContent).toContain("PG（本地缺→回退）");
 
     unmountTicker();
-    apiMocks.getIvAnalysis.mockResolvedValueOnce({ ...IV, source_path: "pg" });
-    apiMocks.getIvHistory.mockResolvedValueOnce({ ...IV_HISTORY, source_path: "none" });
     apiMocks.getStoredFundamentals.mockResolvedValueOnce({
       ...FUNDAMENTALS,
       source_path: UNKNOWN_SOURCE_PATH as SourcePath,
@@ -652,8 +597,6 @@ describe("Ticker Detail localization", () => {
     await mountTicker();
     await click(buttonByText("數據"));
     await waitForCalls(apiMocks.getMarketDataCoverage, 2);
-    expect(host!.textContent).toContain("PG");
-    expect(host!.textContent).toContain("無資料");
     expect(host!.textContent).toContain(UNKNOWN_SOURCE_PATH);
 
     await switchLocale("en");
@@ -874,9 +817,9 @@ describe("Ticker Detail localization", () => {
     const main = host!.querySelector<HTMLElement>("main")!;
     const refreshButton = buttonByText("重新整理");
     const sourceLabel = Array.from(host!.querySelectorAll("dt"))
-      .find((node) => node.textContent === "IV · 本次來源")!;
+      .find((node) => node.textContent === "基本面 · 本次來源")!;
     const sourceValue = sourceLabel.nextElementSibling;
-    expect(sourceValue?.textContent).toBe("本地");
+    expect(sourceValue?.textContent).toBe("PG（本地缺→回退）");
     main.scrollTop = 411;
     refreshButton.focus();
     const before = requestCounts();
@@ -885,9 +828,9 @@ describe("Ticker Detail localization", () => {
 
     expect(host!.textContent).toContain("Data source / freshness");
     expect(buttonByText("Refresh")).toBe(refreshButton);
-    expect(sourceLabel.textContent).toBe("IV · Source this time");
+    expect(sourceLabel.textContent).toBe("Fundamentals · Source this time");
     expect(sourceLabel.nextElementSibling).toBe(sourceValue);
-    expect(sourceValue?.textContent).toBe("Local");
+    expect(sourceValue?.textContent).toBe("PG (local missing → fallback)");
     expect(document.activeElement).toBe(refreshButton);
     expect(main.scrollTop).toBe(411);
     expect(requestCounts()).toEqual(before);

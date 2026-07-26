@@ -36,11 +36,10 @@ class _FakeDAL:
         self._backend = backend
 
 
-def _stats(news_rows=(), prices_latest=None, iv_latest=None, fin_rows=()):
+def _stats(news_rows=(), prices_latest=None, fin_rows=()):
     return {
         "news": {"rows": list(news_rows), "error": None},
         "prices": {"rows": [(prices_latest,)] if prices_latest else [], "error": None},
-        "iv_history": {"rows": [(iv_latest,)] if iv_latest else [], "error": None},
         "financial_cache": {"rows": list(fin_rows), "error": None},
     }
 

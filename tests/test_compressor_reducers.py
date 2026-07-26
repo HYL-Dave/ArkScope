@@ -26,7 +26,6 @@ sys.path.insert(0, str(project_root))
 from src.agents.shared.compressor import (
     default_registry,
     get_reducer,
-    iv_history_reducer,
     option_chain_reducer,
     python_output_reducer,
     register_reducer,
@@ -236,83 +235,6 @@ class TestOptionChainReducer:
 
 
 # ============================================================
-# iv_history_reducer
-# ============================================================
-
-
-class TestIvHistoryReducer:
-    """Real shape from src/tools/options_tools.py: top-level list of
-    IVHistoryPoint dicts (NOT wrapped in {"history": [...]})."""
-
-    def _real_iv_history(self, n_days: int = 90) -> str:
-        # Top-level array, matching List[IVHistoryPoint] serialisation
-        return json.dumps([
-            {
-                "date": f"2026-01-{i:02d}",
-                "atm_iv": 0.2 + i * 0.001,
-                "hv_30d": 0.18 + i * 0.001,
-                "vrp": 0.02,
-                "spot_price": 100.0 + i,
-                "num_quotes": 10,
-            }
-            for i in range(1, n_days + 1)
-        ])
-
-    def test_short_list_passes_through(self):
-        payload = json.dumps([{"date": "2026-04-01", "atm_iv": 0.25}])
-        out, _meta = iv_history_reducer(payload, budget=10_000)
-        assert out == payload
-
-    def test_long_list_keeps_last_30_days(self):
-        # 90 days × ~120 chars each → ~10KB original; sliced to 30 days
-        # → ~3.5KB. Budget 5KB leaves headroom for the _compressed block.
-        payload = self._real_iv_history(90)
-        assert len(payload) > 5_000
-        out, meta = iv_history_reducer(payload, budget=5_000)
-        assert len(out) <= 5_000
-
-        data = json.loads(out)
-        # Out shape: {"_compressed": {...}, "history": [last 30 entries]}
-        assert "_compressed" in data
-        assert data["_compressed"]["shape"] == "list"
-        assert len(data["history"]) == 30
-        # Most recent kept — last item in original is i=90
-        assert data["history"][-1]["date"] == "2026-01-90"
-        assert meta["kept_days"] == 30
-        assert meta["dropped_rows"] == 60
-
-    def test_dict_with_history_shape_also_supported(self):
-        """Defensive: if upstream wraps as {"ticker": ..., "history": [...]}
-        we still handle it."""
-        # Use full IVHistoryPoint shape so payload exceeds the budget
-        payload = json.dumps({
-            "ticker": "NVDA",
-            "history": [
-                {
-                    "date": f"2026-01-{i:02d}",
-                    "atm_iv": 0.2 + i * 0.001,
-                    "hv_30d": 0.18 + i * 0.001,
-                    "vrp": 0.02,
-                    "spot_price": 100.0 + i,
-                    "num_quotes": 10,
-                }
-                for i in range(1, 91)
-            ],
-        })
-        assert len(payload) > 5_000
-        out, _meta = iv_history_reducer(payload, budget=5_000)
-        data = json.loads(out)
-        assert data["_compressed"]["shape"] == "dict.history"
-        assert len(data["history"]) == 30
-        assert data["ticker"] == "NVDA"
-
-    def test_falls_back_on_unsupported_shape(self):
-        payload = json.dumps({"ticker": "T", "data": "not a history list"}) + "z" * 10_000
-        out, _meta = iv_history_reducer(payload, budget=500)
-        assert len(out) <= 500
-
-
-# ============================================================
 # python_output_reducer
 # ============================================================
 
@@ -382,7 +304,7 @@ class TestRegistry:
         # tavily_search has a results[] shape we know how to slice.
         assert reg["tavily_search"] is tavily_search_reducer
         assert reg["get_option_chain"] is option_chain_reducer
-        assert reg["get_iv_history_data"] is iv_history_reducer
+        assert "get_iv_history_data" not in reg
         assert reg["execute_python_analysis"] is python_output_reducer
 
     def test_demoted_web_tools_use_default(self):

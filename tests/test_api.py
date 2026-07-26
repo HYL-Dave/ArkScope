@@ -52,7 +52,7 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["tools_registered"] == 56
+        assert data["tools_registered"] == 53
         assert data["data_sources"]["price_tickers"] > 50
 
 
@@ -157,23 +157,6 @@ class TestNewsFeed:
 
 
 class TestOptionsEndpoints:
-    def test_iv_analysis(self, client):
-        r = client.get("/options/AMD")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["ticker"] == "AMD"
-        assert data["current_iv"] is not None
-
-    def test_iv_history(self, client):
-        r = client.get("/options/AMD/history")
-        assert r.status_code == 200
-        data = r.json()
-        # {points, source_path}: the table is its own request → own provenance
-        assert data["source_path"] in ("local", "pg_fallback", "pg", "file", "none")
-        assert isinstance(data["points"], list)
-        assert len(data["points"]) >= 1
-        assert "atm_iv" in data["points"][0]
-
     def test_greeks(self, client):
         r = client.get("/options/greeks/calculate?S=150&K=155&T=0.25&sigma=0.30")
         assert r.status_code == 200
@@ -205,19 +188,6 @@ class TestSignalEndpoints:
         r = client.get("/signals/NVDA/event-chains?days=9999")
         assert r.status_code == 200
         data = r.json()
-        assert isinstance(data, list)
-
-
-# ============================================================
-# Scan
-# ============================================================
-
-class TestScanEndpoints:
-    def test_mispricing_scan(self, client):
-        r = client.get("/scan/mispricing?tickers=AMD,NVDA")
-        assert r.status_code == 200
-        data = r.json()
-        # Empty without cached quotes, but should not error
         assert isinstance(data, list)
 
 
@@ -404,45 +374,31 @@ class _FakeDALBT:
         self.backend_type = backend_type
 
 
-def test_iv_analysis_source_path_mapping(monkeypatch):
-    """/options/{ticker} reports source_path: recorded provenance passes through; when
-    nothing is recorded it maps by backend type to pg / file (data) or none (empty)."""
-    from src.api.routes import options as opt
-    from src.tools.backends import provenance
-    from src.tools.schemas import IVAnalysisResult
+def test_retired_market_admin_and_iv_routes_are_absent_while_greeks_remains_reachable(
+    client,
+):
+    paths = client.app.openapi()["paths"]
+    assert "/options/{ticker}" not in paths
+    assert "/options/{ticker}/history" not in paths
+    assert "/scan/mispricing" not in paths
+    assert "/market-data/jobs/{job_id}" not in paths
+    assert "/options/greeks/calculate" in paths
 
-    monkeypatch.setattr(opt, "get_iv_analysis",
-                        lambda dal, ticker: IVAnalysisResult(ticker=ticker, history_days=8, current_iv=0.3))
-    monkeypatch.setattr(provenance, "read", lambda d: "local")  # recorded → passes through
-    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("LocalMarketDatabaseBackend"))["source_path"] == "local"
-
-    monkeypatch.setattr(provenance, "read", lambda d: None)  # not recorded → by backend type
-    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("DatabaseBackend"))["source_path"] == "pg"
-    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("FileBackend"))["source_path"] == "file"
-
-    monkeypatch.setattr(opt, "get_iv_analysis",
-                        lambda dal, ticker: IVAnalysisResult(ticker=ticker, history_days=0))
-    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("DatabaseBackend"))["source_path"] == "none"  # empty
-
-
-def test_iv_history_source_path_mapping(monkeypatch):
-    """/options/{ticker}/history carries its OWN source_path (separate request from
-    the summary — the table must never borrow the summary call's provenance)."""
-    from src.api.routes import options as opt
-    from src.tools.backends import provenance
-    from src.tools.schemas import IVHistoryPoint
-
-    pts = [IVHistoryPoint(date="2026-06-01", atm_iv=0.3)]
-    monkeypatch.setattr(opt, "get_iv_history_data", lambda dal, ticker: pts)
-    monkeypatch.setattr(provenance, "read", lambda d: "local")
-    out = opt.iv_history("NVDA", dal=_FakeDALBT("LocalMarketDatabaseBackend"))
-    assert out["source_path"] == "local" and out["points"][0]["atm_iv"] == 0.3
-
-    monkeypatch.setattr(provenance, "read", lambda d: None)  # not recorded → by backend type
-    assert opt.iv_history("NVDA", dal=_FakeDALBT("FileBackend"))["source_path"] == "file"
-    monkeypatch.setattr(opt, "get_iv_history_data", lambda dal, ticker: [])
-    out = opt.iv_history("NVDA", dal=_FakeDALBT("DatabaseBackend"))
-    assert out["source_path"] == "none" and out["points"] == []
+    response = client.get(
+        "/options/greeks/calculate",
+        params={
+            "S": 150,
+            "K": 155,
+            "T": 0.25,
+            "sigma": 0.30,
+            "option_type": "C",
+            "model": "american",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert {"delta", "gamma", "theta", "vega", "rho"} <= set(data)
+    assert 0 <= data["delta"] <= 1
 
 
 def test_fundamentals_stored_source_path_mapping(monkeypatch):

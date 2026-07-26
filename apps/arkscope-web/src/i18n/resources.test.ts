@@ -90,12 +90,12 @@ function flattenResource(tree: ResourceTree, prefix = ""): Map<string, string> {
 describe("bundled i18n resources", () => {
   it("contains the exact Explore subtree inventory in both locales", () => {
     const expectedSubtreeCounts = {
-      errors: 50,
+      errors: 48,
       home: 23,
       watchlist: 71,
       universe: 35,
       news: 43,
-      tickerDetail: 105,
+      tickerDetail: 85,
       aiCard: 67,
       tags: 7,
     } as const;
@@ -158,10 +158,6 @@ describe("bundled i18n resources", () => {
     const expectedTask7Copy = {
       "zh-Hant": {
         tickerDetail: {
-          ivHistorySummary: {
-            one: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
-            other: "IV 歷史（最近 {{count}} 筆 · 來源 {{source}}）",
-          },
           statementSummary: {
             one: "{{title}}（{{count}} 期）",
             other: "{{title}}（{{count}} 期）",
@@ -176,13 +172,6 @@ describe("bundled i18n resources", () => {
             volume: "成交量",
             bars: "K 線筆數",
             dates: "日期範圍",
-            currentAtmIv: "目前 ATM IV",
-            hv30d: "HV 30d",
-            vrp: "VRP (IV−HV)",
-            ivRank: "IV rank",
-            ivPercentile: "IV percentile",
-            spot: "Spot",
-            historyDays: "歷史天數",
             snapshotDate: "快照日期",
             marketCap: "市值",
             pe: "P/E",
@@ -216,10 +205,6 @@ describe("bundled i18n resources", () => {
       },
       en: {
         tickerDetail: {
-          ivHistorySummary: {
-            one: "IV history (latest {{count}} row · Source {{source}})",
-            other: "IV history (latest {{count}} rows · Source {{source}})",
-          },
           statementSummary: {
             one: "{{title}} ({{count}} period)",
             other: "{{title}} ({{count}} periods)",
@@ -234,13 +219,6 @@ describe("bundled i18n resources", () => {
             volume: "Volume",
             bars: "Bars",
             dates: "Dates",
-            currentAtmIv: "Current ATM IV",
-            hv30d: "HV 30d",
-            vrp: "VRP (IV−HV)",
-            ivRank: "IV rank",
-            ivPercentile: "IV percentile",
-            spot: "Spot",
-            historyDays: "History days",
             snapshotDate: "Snapshot date",
             marketCap: "Market cap",
             pe: "P/E",
@@ -283,7 +261,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(401);
+      expect(flattened.size, `${locale}.explore`).toBe(379);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -311,8 +289,6 @@ describe("bundled i18n resources", () => {
         "news.modeLabel",
         "news.marketProviderLabel",
         "news.dayWindowLabel",
-        "tickerDetail.ivHistorySummary.one",
-        "tickerDetail.ivHistorySummary.other",
         "tickerDetail.statementSummary.one",
         "tickerDetail.statementSummary.other",
         "tickerDetail.retry",
@@ -331,6 +307,28 @@ describe("bundled i18n resources", () => {
         expect.soft(flattened.has(path), `${locale}.explore.${path}`).toBe(true);
       }
       for (const path of [
+        "errors.operations.tickerLoadIv",
+        "errors.operations.tickerLoadIvHistory",
+        "tickerDetail.ivSignalSuffix",
+        "tickerDetail.atmIv",
+        "tickerDetail.hv30",
+        "tickerDetail.ivHistorySummary.one",
+        "tickerDetail.ivHistorySummary.other",
+        "tickerDetail.quotes",
+        "tickerDetail.spot",
+        "tickerDetail.vrp",
+        "tickerDetail.noIv",
+        "tickerDetail.impliedVolatility",
+        "tickerDetail.ivLocalCoverage",
+        "tickerDetail.ivCurrentSource",
+        "tickerDetail.ivHistory",
+        "tickerDetail.kvLabels.currentAtmIv",
+        "tickerDetail.kvLabels.hv30d",
+        "tickerDetail.kvLabels.vrp",
+        "tickerDetail.kvLabels.ivRank",
+        "tickerDetail.kvLabels.ivPercentile",
+        "tickerDetail.kvLabels.spot",
+        "tickerDetail.kvLabels.historyDays",
         "watchlist.emptyList",
         "watchlist.maybeTryArchived",
         "watchlist.tryArchived",
@@ -713,9 +711,9 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 706,
+      settings: 704,
       research: 207,
-      explore: 401,
+      explore: 379,
       portfolio: 374,
       system: 20,
     } as const;
@@ -781,13 +779,17 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1806);
+      expect(total, `${locale}.total`).toBe(1782);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
         [...settings.keys()].filter((path) => /dataSources\.schedule\.(?:labels\.(?:readOnly|retired)|sources\.(?:ivHistory|localIncremental|priceBackfill))/u.test(path)),
         `${locale}.settings.retiredScheduleCopy`,
       ).toEqual([]);
+      expect(settings.has("dataStorage.labels.iv"), `${locale}.settings.dataStorage.labels.iv`)
+        .toBe(false);
+      expect(settings.has("dataStorage.summary.iv"), `${locale}.settings.dataStorage.summary.iv`)
+        .toBe(false);
       expect(
         [...settings.keys()]
           .filter((path) => path.startsWith("dataStorage.coverage."))
@@ -1126,7 +1128,7 @@ describe("bundled i18n resources", () => {
       runtime: 21,
       providers: 103,
       dataSources: 155,
-      dataStorage: 67,
+      dataStorage: 65,
       newsStorage: 27,
       macroStorage: 31,
       investor: 140,
@@ -1142,9 +1144,9 @@ describe("bundled i18n resources", () => {
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
       const movedModelCount = flattenResource(commonModels).size - 1;
-      expect(physicalPreSliceCount).toBe(616);
+      expect(physicalPreSliceCount).toBe(614);
       expect(movedModelCount).toBe(23);
-      expect(physicalPreSliceCount + movedModelCount).toBe(639);
+      expect(physicalPreSliceCount + movedModelCount).toBe(637);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

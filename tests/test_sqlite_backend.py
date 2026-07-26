@@ -1,5 +1,4 @@
-"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend
-(3a prices + 3b news + 3c-A iv_history/fundamentals)."""
+"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend."""
 
 from __future__ import annotations
 
@@ -23,7 +22,7 @@ def _dt(day: date, hour: int, minute: int) -> str:
 
 @pytest.fixture()
 def market_db(tmp_path):
-    """A market_data.db with 15min bars + news (FTS5) + iv_history + fundamentals."""
+    """A market_data.db with 15min bars, news (FTS5), and fundamentals."""
     day = date.today() - timedelta(days=2)  # safely inside a 30-day window
     db = tmp_path / "market_data.db"
     conn = sqlite3.connect(db)
@@ -39,10 +38,6 @@ def market_db(tmp_path):
             url TEXT, publisher TEXT, source TEXT, published_at TEXT, article_hash TEXT
         );
         CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news', content_rowid='id', tokenize='porter unicode61');
-        CREATE TABLE iv_history (
-            id INTEGER PRIMARY KEY, ticker TEXT, date TEXT,
-            atm_iv REAL, hv_30d REAL, vrp REAL, spot_price REAL, num_quotes INTEGER
-        );
         CREATE TABLE fundamentals (
             id INTEGER PRIMARY KEY, ticker TEXT, snapshot_date TEXT, data TEXT
         );
@@ -68,13 +63,6 @@ def market_db(tmp_path):
     conn.executemany("INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)", news)
     conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
 
-    # iv_history: two AAPL snapshots (ASC order check) + one NVDA
-    iv = [
-        (1, "AAPL", "2026-05-01", 0.25, 0.20, 0.05, 101.0, 12),
-        (2, "AAPL", "2026-05-02", 0.26, 0.21, 0.05, 102.0, 14),
-        (3, "NVDA", "2026-05-01", 0.45, 0.40, 0.05, 904.0, 30),
-    ]
-    conn.executemany("INSERT INTO iv_history VALUES (?,?,?,?,?,?,?,?)", iv)
     # fundamentals: AAPL has two snapshots — latest (DESC) must win; reports JSON shape
     fund = [
         (1, "AAPL", "2026-05-01", '{"reports": {"ReportSnapshot": {"Name": "STALE"}}}'),
@@ -139,7 +127,6 @@ def test_get_available_tickers(market_db):
     b = SqliteBackend(db)
     assert b.get_available_tickers("prices") == ["AAPL"]
     assert b.get_available_tickers("news") == ["AAPL", "NVDA"]          # 3b: news local
-    assert b.get_available_tickers("iv_history") == ["AAPL", "NVDA"]    # 3c-A
     assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # 3c-A
     assert b.get_available_tickers("options") == []                     # unknown → empty
 
@@ -380,25 +367,7 @@ def test_query_news_stats_unscored_local_counts(market_db):
     assert int(row["bearish_count"]) == 0
 
 
-# --- iv_history + fundamentals (3c-A) ----------------------------------------
-
-_IV_COLS = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
-
-
-def test_query_iv_history(market_db):
-    db, _ = market_db
-    df = SqliteBackend(db).query_iv_history("aapl")  # case-insensitive
-    assert list(df.columns) == _IV_COLS
-    assert len(df) == 2
-    assert list(df["date"]) == ["2026-05-01", "2026-05-02"]  # ASC order
-    assert df.iloc[0]["atm_iv"] == 0.25 and df.iloc[-1]["spot_price"] == 102.0
-
-
-def test_query_iv_history_empty(market_db, tmp_path):
-    db, _ = market_db
-    assert SqliteBackend(db).query_iv_history("NOPE").empty            # unknown ticker
-    assert list(SqliteBackend(db).query_iv_history("NOPE").columns) == _IV_COLS
-    assert SqliteBackend(str(tmp_path / "nope.db")).query_iv_history("AAPL").empty  # no DB
+# --- fundamentals (3c-A) ----------------------------------------------------
 
 
 def test_query_fundamentals_latest_snapshot(market_db):
@@ -544,7 +513,6 @@ def test_available_tickers_routing(market_db, monkeypatch):
     b = _make(db)
     assert b.get_available_tickers("prices") == ["AAPL"]              # local
     assert b.get_available_tickers("news") == ["AAPL", "NVDA"]        # local (3b)
-    assert b.get_available_tickers("iv_history") == ["AAPL", "NVDA"]  # local (3c-A)
     assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # local (3c-A)
     assert b.get_available_tickers("options") == ["PGONLY"]          # non-local → PG (super)
 
@@ -566,20 +534,6 @@ def test_p0c_available_price_tickers_empty_is_honest_empty_no_pg(tmp_path, monke
 
     assert _make(str(db)).get_available_tickers("prices") == []
     assert hit == []
-
-
-def test_iv_history_local_then_honest_empty_without_pg(market_db, monkeypatch):
-    db, _ = market_db
-    hit = []
-    monkeypatch.setattr(DatabaseBackend, "query_iv_history",
-                        lambda self, ticker: (_ for _ in ()).throw(
-                            AssertionError("PG iv_history fallback must not be used after N9 batch-1")
-                        ))
-    b = _make(db)
-    df = b.query_iv_history("AAPL")          # local has AAPL → PG not hit
-    assert len(df) == 2 and hit == []
-    df = b.query_iv_history("UNKNOWN")        # local empty → honest empty, no PG fallback
-    assert df.empty and hit == []
 
 
 def test_fundamentals_mirror_table_retired_no_pg_fallback(market_db, monkeypatch):
@@ -640,24 +594,6 @@ def test_financial_cache_miss_is_honest_empty_without_pg(market_db, monkeypatch)
     assert b._market.get_financial_cache("mk_NVDA") is None
 
 
-def test_provenance_iv_recorded(market_db, monkeypatch):
-    # LocalMarketDatabaseBackend records the TRUE per-call origin of the IV read.
-    from src.tools.backends import provenance
-    db, _ = market_db
-    b = _make(db)
-    provenance.reset(); b.query_iv_history("AAPL")           # local has AAPL
-    assert provenance.read("iv") == "local"
-    monkeypatch.setattr(  # local miss → PG would return data, but N9 makes this honest empty
-        DatabaseBackend, "query_iv_history",
-        lambda self, t: pd.DataFrame([["2026-01-01", 0.3, 0.2, 0.1, 1.0, 5]], columns=_IV_COLS))
-    provenance.reset(); b.query_iv_history("UNKNOWN")
-    assert provenance.read("iv") == "none"
-    monkeypatch.setattr(  # local miss → PG empty → none
-        DatabaseBackend, "query_iv_history", lambda self, t: pd.DataFrame(columns=_IV_COLS))
-    provenance.reset(); b.query_iv_history("UNKNOWN")
-    assert provenance.read("iv") == "none"
-
-
 def test_provenance_fundamentals_records_none_after_mirror_retirement(
     market_db, monkeypatch
 ):
@@ -690,7 +626,6 @@ def test_inherited_vs_overridden_methods(market_db):
     assert type(b).query_prices is not DatabaseBackend.query_prices
     assert type(b).query_news is not DatabaseBackend.query_news
     assert type(b).query_news_search is not DatabaseBackend.query_news_search
-    assert type(b).query_iv_history is not DatabaseBackend.query_iv_history       # 3c-A
     assert type(b).query_fundamentals is not DatabaseBackend.query_fundamentals   # 3c-A
     assert type(b).get_financial_cache is not DatabaseBackend.get_financial_cache  # 3c-C
     assert type(b).set_financial_cache is not DatabaseBackend.set_financial_cache  # 3c-C
@@ -903,14 +838,13 @@ def test_news_feed_description_html_cleaned(tmp_path):
 # --- health_stats local recompute (sub-slice B: PG-exit for provider health) ----
 
 def test_query_health_stats_local_shape(market_db):
-    # SqliteBackend recomputes the same {news,prices,iv_history,financial_cache} shape
+    # SqliteBackend recomputes the current health shape
     # query_health_stats returns, from market_data.db — so provider health stops needing PG.
     db, _ = market_db
     stats = SqliteBackend(db).query_health_stats()
-    assert set(stats) == {"news", "prices", "iv_history", "financial_cache"}
+    assert set(stats) == {"news", "prices", "financial_cache"}
     assert all(stats[k]["error"] is None for k in stats)
     assert stats["prices"]["rows"][0][0] is not None              # MAX(datetime)
-    assert stats["iv_history"]["rows"][0][0] is not None          # MAX(date)
     news_rows = stats["news"]["rows"]
     assert news_rows and all(len(r) == 3 for r in news_rows)      # (source, latest, recent_count)
     assert stats["financial_cache"]["rows"] == []                 # fixture has no fin cache → honest empty
@@ -922,7 +856,7 @@ def test_health_stats_local_first(market_db, monkeypatch):
     monkeypatch.setattr(DatabaseBackend, "query_health_stats", lambda self: (hit.append("PG"), {})[1])
     stats = _make(db).query_health_stats()
     assert hit == []                                             # served locally, PG NOT hit
-    assert set(stats) == {"news", "prices", "iv_history", "financial_cache"}
+    assert set(stats) == {"news", "prices", "financial_cache"}
 
 
 # --- review fix: query_news_search + query_news_stats local sentiment (news_scores retired) ---
@@ -1020,7 +954,7 @@ def test_query_news_stats_aggregates_local_sentiment(tmp_path):
 
 _MARKET_PG_METHODS = (
     "query_prices", "query_news", "query_news_search", "query_news_stats", "query_news_feed",
-    "query_iv_history", "query_fundamentals", "get_financial_cache", "query_health_stats",
+    "query_fundamentals", "get_financial_cache", "query_health_stats",
     "get_available_tickers",
 )
 
@@ -1041,7 +975,7 @@ def test_strict_market_serves_local_without_pg(market_db, monkeypatch):
     assert len(b.query_prices("AAPL", days=30)) == 8
     assert b.get_available_tickers("prices") == ["AAPL"]
     assert not b.query_news(ticker="AAPL", scored_only=False).empty
-    assert set(b.query_health_stats()) == {"news", "prices", "iv_history", "financial_cache"}
+    assert set(b.query_health_stats()) == {"news", "prices", "financial_cache"}
 
 
 def test_strict_market_local_miss_is_honest_empty_not_pg(market_db, monkeypatch):
@@ -1050,7 +984,6 @@ def test_strict_market_local_miss_is_honest_empty_not_pg(market_db, monkeypatch)
     b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
     # local MISS → honest empty / unavailable, NOT a PG fallback (no AssertionError raised)
     assert b.query_prices("ZZZZ", days=30).empty
-    assert b.query_iv_history("ZZZZ").empty
     assert b.query_fundamentals("ZZZZ") in ({}, None)
     assert b.get_financial_cache("nope:key") is None
     assert b.get_available_tickers("options") == []   # non-local type → strict empty, not PG
@@ -1085,13 +1018,6 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
         lambda self, ticker, interval="15min", days=30:
             (price_hit.append(ticker), _PG_SENTINEL)[1],
     )
-    iv_hit = []
-    pg_iv = pd.DataFrame([("2026-01-01", 0.3, 0.2, 0.1, 1.0, 5)], columns=_IV_COLS)
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_iv_history",
-        lambda self, ticker: (iv_hit.append(ticker), pg_iv)[1],
-    )
     fund_hit = []
     monkeypatch.setattr(
         DatabaseBackend,
@@ -1114,10 +1040,8 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
     assert b.query_news_stats(ticker="ZZZZ").empty
 
     assert b.query_prices("UNKNOWN").empty
-    assert b.query_iv_history("UNKNOWN").empty
     assert b.query_fundamentals("UNKNOWN") == {}
     assert price_hit == []
-    assert iv_hit == []
     assert fund_hit == []
 
 

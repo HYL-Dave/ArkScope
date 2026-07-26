@@ -16,9 +16,6 @@ sys.path.insert(0, str(project_root))
 from src.tools.data_access import DataAccessLayer
 from src.tools.schemas import (
     FundamentalsResult,
-    IVAnalysisResult,
-    IVHistoryPoint,
-    MispricingResult,
     NewsQueryResult,
     PriceQueryResult,
     SECFiling,
@@ -44,30 +41,31 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All tools should be registered (incl. P1.2 macro_calendar)."""
-        assert len(registry.list_all()) == 56
+        assert len(registry.list_all()) == 53
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
         names = registry.list_names()
-        expected = [
+        expected = {
             "get_ticker_news", "get_news_sentiment_summary", "search_news_by_keyword",
             "get_ticker_prices", "get_current_quote", "get_price_change", "get_sector_performance",
             "get_ticker_data_coverage",
-            "get_iv_analysis", "get_iv_history_data", "scan_mispricing", "calculate_greeks",
+            "calculate_greeks", "get_option_chain", "get_iv_skew_analysis",
             "detect_anomalies", "detect_event_chains", "synthesize_signal",
             "get_fundamentals_analysis", "get_sec_filings",
             "get_watchlist_overview", "get_morning_brief",
             "get_portfolio_holdings",
             "execute_python_analysis",
-        ]
-        for name in expected:
-            assert name in names, f"Missing tool: {name}"
+        }
+        retired = {"get_iv_analysis", "get_iv_history_data", "scan_mispricing"}
+        assert expected <= set(names)
+        assert retired.isdisjoint(names)
 
     def test_categories(self, registry):
         """Tools should be properly categorized."""
         assert len(registry.list_by_category("news")) == 10
         assert len(registry.list_by_category("prices")) == 4
-        assert len(registry.list_by_category("options")) == 6
+        assert len(registry.list_by_category("options")) == 3
         assert len(registry.list_by_category("signals")) == 4
         assert len(registry.list_by_category("analysis")) == 13
         assert len(registry.list_by_category("portfolio")) == 7
@@ -76,7 +74,7 @@ class TestRegistry:
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 56
+        assert len(schema) == 53
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -87,7 +85,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 56
+        assert len(schema) == 53
         for tool in schema:
             assert "name" in tool
             assert "description" in tool
@@ -193,33 +191,10 @@ class TestPriceTools:
 
 
 # ============================================================
-# Options Tools (7-10)
+# Retained options tools
 # ============================================================
 
 class TestOptionsTools:
-    def test_get_iv_analysis(self, dal):
-        from src.tools.options_tools import get_iv_analysis
-        result = get_iv_analysis(dal, ticker="AMD")
-        assert isinstance(result, IVAnalysisResult)
-        assert result.ticker == "AMD"
-        assert result.history_days >= 1
-        assert result.current_iv is not None
-        assert result.current_iv > 0
-
-    def test_get_iv_analysis_no_data(self, dal):
-        from src.tools.options_tools import get_iv_analysis
-        result = get_iv_analysis(dal, ticker="XXXNOTREAL")
-        assert isinstance(result, IVAnalysisResult)
-        assert result.history_days == 0
-        assert result.signal in ("NO_DATA", "NO_IV_DATA")
-
-    def test_get_iv_history_data(self, dal):
-        from src.tools.options_tools import get_iv_history_data
-        result = get_iv_history_data(dal, ticker="AMD")
-        assert isinstance(result, list)
-        assert len(result) >= 1
-        assert isinstance(result[0], IVHistoryPoint)
-
     def test_calculate_greeks(self):
         from src.tools.options_tools import calculate_greeks
         result = calculate_greeks(S=150, K=155, T=0.25, r=0.05, sigma=0.30, option_type="C")
@@ -237,14 +212,6 @@ class TestOptionsTools:
         result = calculate_greeks(S=150, K=155, T=0.25, r=0.05, sigma=0.30, option_type="P")
         # Put delta should be between -1 and 0
         assert -1 <= result["delta"] <= 0
-
-    def test_scan_mispricing_no_quotes(self, dal):
-        from src.tools.options_tools import scan_mispricing
-        # Without cached quotes, should return empty list
-        result = scan_mispricing(dal, tickers=["AMD"])
-        assert isinstance(result, list)
-        assert len(result) == 0
-
 
 # ============================================================
 # Signal Tools (11-13)

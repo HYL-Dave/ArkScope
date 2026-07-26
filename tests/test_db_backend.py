@@ -52,12 +52,10 @@ def test_retired_pg_domain_methods_do_not_query_dropped_tables(monkeypatch):
     assert backend.query_news_search(query="NVDA").empty
     assert backend.query_news_stats(ticker="NVDA").empty
     assert backend.query_news_scores(123).empty
-    assert backend.query_iv_history("NVDA").empty
     assert backend.query_fundamentals("NVDA") == {}
     assert backend.get_financial_cache("k") is None
     assert backend.set_financial_cache("k", "NVDA", {"x": 1}) is False
     assert backend.get_available_tickers("news") == []
-    assert backend.get_available_tickers("iv_history") == []
     assert backend.get_available_tickers("fundamentals") == []
 
     feed = backend.query_news_feed(q="nvda", ticker="NVDA")
@@ -85,7 +83,7 @@ def test_query_health_stats_is_retired_after_batch3(monkeypatch):
 
     stats = DatabaseBackend(dsn="postgresql://poisoned/arkscope").query_health_stats()
 
-    for key in ("news", "prices", "iv_history", "financial_cache"):
+    for key in ("news", "prices", "financial_cache"):
         assert stats[key] == {"rows": [], "error": None}
 
 
@@ -152,24 +150,6 @@ class TestNewsDB:
         assert result.ticker == "NVDA"
         assert result.count == 0
         assert result.articles == []
-
-
-# ---------------------------------------------------------------------------
-# IV History
-# ---------------------------------------------------------------------------
-
-@requires_db
-class TestIVHistoryDB:
-    def test_query_iv_history(self, backend):
-        """PG iv_history is retired after N9 batch-1."""
-        df = backend.query_iv_history("AMD")
-        assert "atm_iv" in df.columns
-        assert df.empty
-
-    def test_iv_via_dal(self, dal):
-        """DAL wraps retired PG IV data as an empty sequence."""
-        points = dal.get_iv_history("AMD")
-        assert points == []
 
 
 # ---------------------------------------------------------------------------

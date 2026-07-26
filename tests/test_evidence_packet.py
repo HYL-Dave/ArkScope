@@ -1,8 +1,8 @@
 """Tests for the deterministic, objective EvidencePacket gatherer.
 
 The load-bearing invariant: ArkScope LLM scores never enter the packet. These
-tests prove sentiment_score/risk_score are stripped from news, the IV `signal`
-judgment is dropped, the clean technical block is pure arithmetic, and one failing
+tests prove sentiment_score/risk_score are stripped from news, the retired IV
+domain is absent, the clean technical block is pure arithmetic, and one failing
 source degrades into coverage rather than zeroing the packet.
 """
 
@@ -86,17 +86,10 @@ _CONSENSUS = {
     },
     "price_target": None,
 }
-_IV = SimpleNamespace(
-    current_iv=0.45, hv_30d=0.40, vrp=0.05, iv_rank=60.0, iv_percentile=55.0,
-    spot_price=124.0, history_days=120, signal="NEUTRAL",
-)
-
-
 def _gather(dal):
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
         mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
-        mp.setattr("src.tools.options_tools.get_iv_analysis", lambda dal, t: _IV)
         return gather_evidence(dal, "aapl", now_iso="2026-06-05T00:00:00Z")
 
 
@@ -124,12 +117,13 @@ def test_news_rows_are_whitelisted_fields_only():
     assert set(row.keys()) == {"date", "ticker", "title", "source", "url", "publisher", "excerpt"}
 
 
-def test_iv_signal_judgment_is_dropped():
+def test_packet_has_no_legacy_iv_environment_or_missing_iv_source():
     packet = _gather(_FakeDAL(_bars(), _scored_articles()))
-    iv = next(i for i in packet.items if i.source == "iv_environment")
-    assert iv.source_type == "observed_market"
-    assert "signal" not in iv.data  # the get_iv_analysis judgment label is excluded
-    assert iv.data["iv_rank"] == 60.0
+    assert not any(item.source == "iv_environment" for item in packet.items)
+    coverage = packet.items[-1]
+    assert "iv" not in coverage.data["present"]
+    assert "iv" not in coverage.data["missing"]
+    assert "iv" not in coverage.data["errors"]
 
 
 # --- structure --------------------------------------------------------------
@@ -155,18 +149,16 @@ def test_packet_has_expected_sources_and_tags():
 
 def test_one_failing_source_degrades_to_coverage():
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
-        mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
-
         def _boom(dal, t):
-            raise RuntimeError("iv source down")
+            raise RuntimeError("fundamentals source down")
 
-        mp.setattr("src.tools.options_tools.get_iv_analysis", _boom)
+        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", _boom)
+        mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
         packet = gather_evidence(_FakeDAL(_bars(), _scored_articles()), "AAPL", now_iso="2026-06-05T00:00:00Z")
 
     cov = packet.items[-1]
-    assert "iv" in cov.data["missing"]
-    assert "iv" in cov.data["errors"]
+    assert "fundamentals" in cov.data["missing"]
+    assert "fundamentals" in cov.data["errors"]
     # the rest of the packet still built
     assert any(i.source == "price_summary" for i in packet.items)
 
@@ -188,7 +180,6 @@ def test_empty_analyst_degrades_to_coverage_not_evidence():
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
         mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: empty_consensus)
-        mp.setattr("src.tools.options_tools.get_iv_analysis", lambda dal, t: _IV)
         packet = gather_evidence(_FakeDAL(_bars(), _scored_articles()), "AAPL", now_iso="2026-06-05T00:00:00Z")
 
     assert not any(i.source == "analyst_recommendations" for i in packet.items)
@@ -221,7 +212,6 @@ def test_sa_digest_extracts_correct_fields_when_enabled():
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
         mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
-        mp.setattr("src.tools.options_tools.get_iv_analysis", lambda dal, t: _IV)
         mp.setattr("src.tools.sa_digest_tools.get_sa_digest", lambda dal, t: fake_digest)
         packet = gather_evidence(
             _FakeDAL(_bars(), _scored_articles()), "AAPL",

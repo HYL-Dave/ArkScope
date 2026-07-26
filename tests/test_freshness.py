@@ -59,10 +59,6 @@ class TestFreshnessRegistryScan:
                 "rows": [(now - timedelta(hours=12),)],
                 "error": None,
             },
-            "iv_history": {
-                "rows": [(now - timedelta(hours=6),)],
-                "error": None,
-            },
             "financial_cache": {
                 "rows": [("sec_edgar", 30, 5)],
                 "error": None,
@@ -73,13 +69,11 @@ class TestFreshnessRegistryScan:
 
         assert "news" in result
         assert "prices" in result
-        assert "iv_history" in result
         assert "fundamentals_cache" in result
 
         # All should be fresh (within thresholds)
         assert result["news"].is_stale is False
         assert result["prices"].is_stale is False
-        assert result["iv_history"].is_stale is False
         assert result["fundamentals_cache"].is_stale is False
 
     def test_scan_stale_news(self):
@@ -87,7 +81,6 @@ class TestFreshnessRegistryScan:
         stats = {
             "news": {"rows": [("finnhub", old, 0)], "error": None},
             "prices": {"rows": [], "error": None},
-            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         fr = FreshnessRegistry(db_backend=self._make_backend(stats))
@@ -100,7 +93,6 @@ class TestFreshnessRegistryScan:
         stats = {
             "news": {"rows": [], "error": "connection refused"},
             "prices": {"rows": [], "error": None},
-            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         fr = FreshnessRegistry(db_backend=self._make_backend(stats))
@@ -113,7 +105,6 @@ class TestFreshnessRegistryScan:
         stats = {
             "news": {"rows": [], "error": None},
             "prices": {"rows": [], "error": None},
-            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         fr = FreshnessRegistry(db_backend=self._make_backend(stats))
@@ -126,7 +117,6 @@ class TestFreshnessRegistryScan:
         stats = {
             "news": {"rows": [], "error": None},
             "prices": {"rows": [], "error": None},
-            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         backend = self._make_backend(stats)
@@ -142,7 +132,6 @@ class TestFreshnessRegistryScan:
         stats = {
             "news": {"rows": [], "error": None},
             "prices": {"rows": [], "error": None},
-            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         backend = self._make_backend(stats)
@@ -165,9 +154,9 @@ class TestFreshnessRegistryScan:
         fr = FreshnessRegistry(db_backend=backend)
         result = fr.scan(force=True)
 
-        # Should have all 4 sources, all stale
-        assert len(result) == 4
-        for key in ("news", "prices", "iv_history", "fundamentals_cache"):
+        # Should have all current sources, all stale
+        assert len(result) == 3
+        for key in ("news", "prices", "fundamentals_cache"):
             assert key in result
             assert result[key].is_stale is True
             assert "connection lost" in result[key].stale_reason
@@ -195,10 +184,6 @@ class TestFreshnessFormat:
                 "rows": [(now - timedelta(hours=12),)],
                 "error": None,
             },
-            "iv_history": {
-                "rows": [(now - timedelta(hours=18),)],
-                "error": None,
-            },
             "financial_cache": {
                 "rows": [("sec_edgar", 25, 3)],
                 "error": None,
@@ -213,7 +198,6 @@ class TestFreshnessFormat:
         summary = fr.format_summary()
         assert "News:" in summary
         assert "Prices:" in summary
-        assert "IV:" in summary
         assert "Fundamentals:" in summary
 
     def test_format_summary_empty(self):

@@ -17,10 +17,6 @@ def _make_market_db(path):
             id INTEGER PRIMARY KEY, ticker TEXT, title TEXT, description TEXT,
             url TEXT, publisher TEXT, source TEXT, published_at TEXT, article_hash TEXT
         );
-        CREATE TABLE iv_history (
-            id INTEGER PRIMARY KEY, ticker TEXT, date TEXT,
-            atm_iv REAL, hv_30d REAL, vrp REAL, spot_price REAL, num_quotes INTEGER
-        );
         CREATE TABLE fundamentals (
             id INTEGER PRIMARY KEY, ticker TEXT, snapshot_date TEXT, data TEXT
         );
@@ -41,7 +37,6 @@ def _make_market_db(path):
         "INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)",
         (1, "CLS", "headline", None, None, None, "ibkr", "2026-06-18T15:00:00+0000", "h"),
     )
-    conn.execute("INSERT INTO iv_history VALUES (?,?,?,?,?,?,?,?)", (1, "CLS", "2026-06-18", 0.3, 0.2, 0.1, 11.5, 5))
     conn.execute("INSERT INTO fundamentals VALUES (?,?,?,?)", (1, "CLS", "2026-06-01", "{}"))
     conn.execute(
         "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
@@ -68,7 +63,6 @@ def test_ticker_data_coverage_explains_weekend_price_gap(tmp_path, monkeypatch):
     assert out["prices"]["target_date"]["status"] == "non_trading_day"
     assert out["prices"]["target_date"]["reason"] == "weekend"
     assert out["news"]["latest_published_date"] == "2026-06-18"
-    assert out["iv"]["latest_date"] == "2026-06-18"
     assert out["fundamentals"]["latest_date"] == "2026-06-01"
 
 

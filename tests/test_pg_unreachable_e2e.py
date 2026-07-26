@@ -8,32 +8,31 @@ import pytest
 def test_required_checks_cover_pg_exit_surfaces():
     from src.smoke.pg_unreachable_e2e import REQUIRED_CHECKS
 
-    names = {check.name for check in REQUIRED_CHECKS}
-    assert {
-        "healthz",
-        "system_status",
-        "provider_config",
-        "provider_health",
-        "schedule_status",
-        "market_status",
-        "market_update_retired",
-        "price_read",
-        "price_coverage",
-        "news_status",
-        "news_feed",
-        "news_ticker",
-        "news_sentiment",
-        "fundamentals_stored",
-        "iv_history",
-        "sa_feed",
-        "sa_health",
-        "macro_status",
-        "macro_snapshot",
-        "macro_health",
-        "macro_ipo",
-        "reports",
-        "universe_summaries",
-    } <= names
+    assert [(check.name, check.method, check.path) for check in REQUIRED_CHECKS] == [
+        ("healthz", "GET", "/healthz"),
+        ("system_status", "GET", "/status"),
+        ("provider_config", "GET", "/providers/config"),
+        ("provider_config_policy", "GET", "/providers/config"),
+        ("provider_health", "GET", "/providers/health"),
+        ("schedule_status", "GET", "/schedule"),
+        ("market_status", "GET", "/market-data/status"),
+        ("market_update_retired", "POST", "/market-data/update"),
+        ("price_read", "GET", "/prices/NVDA?interval=15min&days=7"),
+        ("price_coverage", "GET", "/market-data/coverage/NVDA"),
+        ("news_status", "GET", "/news/status"),
+        ("news_feed", "GET", "/news/feed?days=7&limit=5"),
+        ("news_ticker", "GET", "/news/NVDA?days=30"),
+        ("news_sentiment", "GET", "/news/NVDA/sentiment?days=9999"),
+        ("fundamentals_stored", "GET", "/fundamentals/NVDA?stored=true"),
+        ("sa_feed", "GET", "/sa/feed?limit=5"),
+        ("sa_health", "GET", "/sa/market-news/health"),
+        ("macro_status", "GET", "/macro/status"),
+        ("macro_snapshot", "GET", "/macro/snapshot"),
+        ("macro_health", "GET", "/macro/health"),
+        ("macro_ipo", "GET", "/macro/ipo-calendar?limit=5"),
+        ("reports", "GET", "/reports"),
+        ("universe_summaries", "DIRECT", "get_universe_summaries"),
+    ]
 
 
 def test_report_sanitizes_poison_dsn(tmp_path):

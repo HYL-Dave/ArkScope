@@ -33,8 +33,6 @@ const OPERATIONS = [
   "news_load_more",
   "ticker_load_state",
   "ticker_load_price",
-  "ticker_load_iv",
-  "ticker_load_iv_history",
   "ticker_load_fundamentals",
   "ticker_load_market_status",
   "ticker_load_coverage",
@@ -248,14 +246,6 @@ const EXPECTED_TITLES: Record<Operation, Record<Locale, string>> = {
     "zh-Hant": "無法載入價格概覽。",
     en: "Could not load the price overview.",
   },
-  ticker_load_iv: {
-    "zh-Hant": "無法載入隱含波動率。",
-    en: "Could not load implied volatility.",
-  },
-  ticker_load_iv_history: {
-    "zh-Hant": "無法載入 IV 歷史。",
-    en: "Could not load IV history.",
-  },
   ticker_load_fundamentals: {
     "zh-Hant": "無法載入基本面。",
     en: "Could not load fundamentals.",
@@ -380,8 +370,6 @@ const ROUTE_CASES: ReadonlyArray<{
   { path: "/analysis/cards/72/save", expected: "/analysis/cards/{run_id}/save", allowedOperations: ["home_save_card", "card_save"] },
   { path: "/analysis/cards/72/translate", expected: "/analysis/cards/{run_id}/translate", allowedOperations: ["card_translate"] },
   { path: "/prices/AAPL/change?days=30", expected: "/prices/{ticker}/change", allowedOperations: ["ticker_load_price"] },
-  { path: "/options/AAPL", expected: "/options/{ticker}", allowedOperations: ["ticker_load_iv"] },
-  { path: "/options/AAPL/history", expected: "/options/{ticker}/history", allowedOperations: ["ticker_load_iv_history"] },
   { path: "/fundamentals/AAPL?stored=true", expected: "/fundamentals/{ticker}", allowedOperations: ["ticker_load_fundamentals"] },
   { path: "/market-data/status", expected: "/market-data/status", allowedOperations: ["ticker_load_market_status"] },
   { path: "/market-data/coverage/AAPL", expected: "/market-data/coverage/{ticker}", allowedOperations: ["ticker_load_coverage"] },
