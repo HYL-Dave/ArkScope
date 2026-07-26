@@ -5,7 +5,9 @@
 > APPROVED; I18N-2 SETTINGS TERMINOLOGY ADDENDUM ADOPTED, 2026-07-20;
 > P2.8 SLICE 5 TERMINOLOGY ADDENDUM WRITTEN REVIEW APPROVED, 2026-07-22;
 > I18N-3 EXPLORE TERMINOLOGY ADDENDUM WRITTEN REVIEW APPROVED, 2026-07-23;
-> I18N-4/5 REMAINING-SURFACES ADDENDUM ADOPTED AND LIVE, 2026-07-24.**
+> I18N-4/5 REMAINING-SURFACES ADDENDUM ADOPTED AND LIVE, 2026-07-24;
+> COVERAGE V2 SESSION-TRUTH ADDENDUM WRITTEN - INDEPENDENT IMPLEMENTATION
+> REVIEW PENDING, 2026-07-26.**
 > This is the single repository authority for product-facing English and
 > Traditional Chinese terminology. Other documents link here instead of
 > copying canonical term tables.
@@ -131,6 +133,8 @@ printed in the interface.
 | Market-data settings section | Market Data | 市場資料 | Do not duplicate the English label in zh-Hant. |
 | News-data settings section | News Data | 新聞資料 | Do not use the former bilingual status heading. |
 | Market-data coverage subsection | Trading-day / Price Coverage | 交易日 / 價格覆蓋 | A coverage diagnostic, not a separate Calendar feature. |
+| Canonical market-data coverage session | Regular trading hours (RTH) | 正規交易時段（RTH） | Coverage compares exact slot starts inside the reviewed session; `rth` remains the stable ID. |
+| Current US-equity coverage scope | US-listed equity proxy | 美國上市股票代理範圍 | A declared proxy scope, not a claim that every symbol is XNYS-listed; `us_listed_equity_proxy` remains the stable ID. |
 | AI/data service owner | Provider | Provider | Preserve English in Traditional Chinese copy. |
 | Delegated authorization protocol | OAuth | OAuth | Preserve protocol name. |
 | AI acting component | Agent | Agent | Preserve professional AI term unless an owning domain records a narrower term. |

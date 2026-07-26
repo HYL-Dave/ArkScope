@@ -1,13 +1,15 @@
 # ArkScope Coverage v2 Session-Truth Design
 
-> **Status: REVIEW GREEN - IMPLEMENTATION PLAN NEXT**
+> **Status: IMPLEMENTATION COMPLETE - INDEPENDENT REVIEW PENDING**
 >
 > Written against clean design branch tip `7a8548fa` on 2026-07-26. This
 > document converts the reviewed evidence in
 > [`COVERAGE_V2_GROUND_TRUTH_INVENTORY.md`](../../design/COVERAGE_V2_GROUND_TRUTH_INVENTORY.md)
-> into the product and engineering authority for Coverage v2. It authorizes
-> neither implementation nor dependency changes until a separate RED-first
-> implementation plan receives independent GREEN.
+> into the product and engineering authority for Coverage v2. The RED-first
+> implementation is complete at product tip `0b719735`; evidence lives in
+> `docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`.
+> Integration and LIVE status remain blocked on independent implementation
+> review.
 
 ## Review Resolution (2026-07-26)
 

@@ -9,7 +9,10 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
+> **Status: IMPLEMENTATION COMPLETE - INDEPENDENT REVIEW PENDING**
+
+Review packet:
+`docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`.
 
 **Goal:** Replace maximum-relative market-data coverage with an offline,
 read-only XNYS/RTH slot-grid truth model, expose its closed semantic states in
