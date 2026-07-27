@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
+> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
 
 **Goal:** Make `GET /sa/feed` distinguish first-run absence, missing storage,
 unreadable or incompatible storage, query failure, valid empty results, and
@@ -671,7 +671,7 @@ Stop and return to design review if any of these occurs:
 - Modify `tests/test_job_runs.py`
 - Modify `src/service/job_runs_store.py`
 
-- [ ] **Step 1: Write five named RED tests.**
+- [x] **Step 1: Write five named RED tests.**
 
   Add the four `read_job_activity_if_exists` node IDs plus
   `test_sa_store_history_contract_has_no_pruning_or_time_cutoff` from Section
@@ -691,7 +691,7 @@ Stop and return to design review if any of these occurs:
     `DROP TABLE job_runs`, and the reader source contains no `started_at`,
     `finished_at`, status, limit age, or timestamp predicate.
 
-- [ ] **Step 2: Run RED and verify failure provenance.**
+- [x] **Step 2: Run RED and verify failure provenance.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -703,13 +703,13 @@ Stop and return to design review if any of these occurs:
   exception, permission accident, or accidental real profile access is an
   invalid RED and must be fixed before implementation.
 
-- [ ] **Step 3: Implement `read_job_activity_if_exists`.**
+- [x] **Step 3: Implement `read_job_activity_if_exists`.**
 
   Follow Section 5.1. Use `sqlite_master` to distinguish absent table from a
   malformed query. Use parameter placeholders for all names. Always close the
   connection.
 
-- [ ] **Step 4: Prove mutation sensitivity.**
+- [x] **Step 4: Prove mutation sensitivity.**
 
   Temporarily replace the reader body with
   `JobRunsLocalStore(db_path); return "none"`. The missing-profile test must
@@ -720,7 +720,7 @@ Stop and return to design review if any of these occurs:
   relevant-reader test with a non-succeeded row; the relevant/unrelated or
   contract test must fail. Restore and rerun green.
 
-- [ ] **Step 5: Run the complete job-runs suite.**
+- [x] **Step 5: Run the complete job-runs suite.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q tests/test_job_runs.py
@@ -728,7 +728,7 @@ Stop and return to design review if any of these occurs:
 
   Expected: `68 passed`.
 
-- [ ] **Step 6: Commit Task 1.**
+- [x] **Step 6: Commit Task 1.**
 
   ```bash
   git add src/service/job_runs_store.py tests/test_job_runs.py
@@ -742,7 +742,7 @@ Stop and return to design review if any of these occurs:
 - Modify `tests/test_sa_feed.py`
 - Modify `src/tools/sa_tools.py`
 
-- [ ] **Step 1: Add missing-path and precedence RED tests.**
+- [x] **Step 1: Add missing-path and precedence RED tests.**
 
   Add this one authority-completeness node to `tests/test_job_runs.py` and the
   11 new feed nodes summarized below (their seven exact names are in Section
@@ -769,7 +769,7 @@ Stop and return to design review if any of these occurs:
   proves their union equals the immutable seven-name owner. Production code
   must not import the service registry.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -781,13 +781,13 @@ Stop and return to design review if any of these occurs:
   `available=true/no_items_in_window`, or the new reason is absent. A failure
   caused by writing the real profile path is invalid.
 
-- [ ] **Step 3: Add the immutable activity owner and safe empty projection.**
+- [x] **Step 3: Add the immutable activity owner and safe empty projection.**
 
   Implement `SA_STORE_ACTIVITY_JOB_NAMES`, import only the no-create primitive
   and `resolve_profile_state_db_path`, and evolve `_empty_feed` to preserve
   normalized `days` plus `query`.
 
-- [ ] **Step 4: Add the first four ordered states.**
+- [x] **Step 4: Add the first four ordered states.**
 
   After parameter normalization, classify in this exact order:
 
@@ -799,7 +799,7 @@ Stop and return to design review if any of these occurs:
   Use `os.path.lexists` to reserve broken symlinks for the unreadable state.
   No missing path may reach `sa_capture_store.connect`.
 
-- [ ] **Step 5: Run GREEN and mutation probes.**
+- [x] **Step 5: Run GREEN and mutation probes.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -818,7 +818,7 @@ Stop and return to design review if any of these occurs:
   - construct `JobRunsLocalStore` in the feed path;
   - move missing-store inspection before `requires_local_sa`.
 
-- [ ] **Step 6: Commit Task 2.**
+- [x] **Step 6: Commit Task 2.**
 
   ```bash
   git add src/tools/sa_tools.py tests/test_job_runs.py tests/test_sa_feed.py
@@ -831,7 +831,7 @@ Stop and return to design review if any of these occurs:
 - Modify `tests/test_sa_feed.py`
 - Modify `src/tools/sa_tools.py`
 
-- [ ] **Step 1: Add path/open RED tests.**
+- [x] **Step 1: Add path/open RED tests.**
 
   Add:
 
@@ -846,7 +846,7 @@ Stop and return to design review if any of these occurs:
   path/SQLite prose, and remain `available=false`. The open-failure fixture
   simulates disappearance or access failure after the filesystem check.
 
-- [ ] **Step 2: Add schema-capability RED tests.**
+- [x] **Step 2: Add schema-capability RED tests.**
 
   Add one parametrized function with five explicit IDs, one required-column
   node, and one additive-schema node. The five IDs are counted separately in
@@ -858,7 +858,7 @@ Stop and return to design review if any of these occurs:
   column. For the additive case, add an unknown table and columns and require a
   normal valid-empty result.
 
-- [ ] **Step 3: Add the post-validation query RED test.**
+- [x] **Step 3: Add the post-validation query RED test.**
 
   Inject the failure at `_sa_feed_local_conn`, after successful open and schema
   validation. Use a private marker containing a fake local path and SQLite
@@ -881,7 +881,7 @@ Stop and return to design review if any of these occurs:
   preserve the exact typed reason. A handler-direct call does not satisfy this
   node.
 
-- [ ] **Step 4: Run RED and confirm each failure class.**
+- [x] **Step 4: Run RED and confirm each failure class.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -893,7 +893,7 @@ Stop and return to design review if any of these occurs:
   invalid. The query test must fail at the injected seam, not during schema
   setup.
 
-- [ ] **Step 5: Implement direct read-only open and schema probe.**
+- [x] **Step 5: Implement direct read-only open and schema probe.**
 
   Follow Sections 5.4 and 5.5. Split `_sa_feed_local` into a connection-owning
   classifier and `_sa_feed_local_conn`. Preserve existing filters, ordering,
@@ -902,7 +902,7 @@ Stop and return to design review if any of these occurs:
   Probe both FTS capabilities even when `q is None`. Do not add a request-shape
   exception.
 
-- [ ] **Step 6: Evolve existing valid-empty and route nodes in place.**
+- [x] **Step 6: Evolve existing valid-empty and route nodes in place.**
 
   `test_feed_empty_window` additionally proves that valid zero is
   `available=true/no_items_in_window` only after a compatible query.
@@ -915,7 +915,7 @@ Stop and return to design review if any of these occurs:
   The new real-HTTP node, rather than this handler-direct node, proves every
   unavailable store reason remains a typed HTTP `200` response.
 
-- [ ] **Step 7: Run all feed and job-history tests.**
+- [x] **Step 7: Run all feed and job-history tests.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -924,7 +924,7 @@ Stop and return to design review if any of these occurs:
 
   Expected: `107 passed`.
 
-- [ ] **Step 8: Prove the store/query boundaries by mutation.**
+- [x] **Step 8: Prove the store/query boundaries by mutation.**
 
   Independently verify:
 
@@ -936,7 +936,7 @@ Stop and return to design review if any of these occurs:
     red;
   - pass `str(exc)` to `_empty_feed` -> sanitization node turns red.
 
-- [ ] **Step 9: Commit Task 3.**
+- [x] **Step 9: Commit Task 3.**
 
   ```bash
   git add src/tools/sa_tools.py tests/test_sa_feed.py
@@ -953,7 +953,7 @@ Stop and return to design review if any of these occurs:
 - Modify `apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts`
 - Modify `apps/arkscope-web/src/i18n/resources.test.ts`
 
-- [ ] **Step 1: Add one resource leaf per locale and evolve counts.**
+- [x] **Step 1: Add one resource leaf per locale and evolve counts.**
 
   Add `explore.news.seekingAlphaNotCreated` with neutral first-run meaning:
 
@@ -966,7 +966,7 @@ Stop and return to design review if any of these occurs:
   Explore `news 43 -> 44`, Explore `379 -> 380`, total `1782 -> 1783`, Settings
   unchanged at `704`.
 
-- [ ] **Step 2: Add the two mounted RED nodes and evolve recovery coverage.**
+- [x] **Step 2: Add the two mounted RED nodes and evolve recovery coverage.**
 
   Add the two node IDs in Section 3.2. Use adversarial unavailable fixtures
   with positive totals, nonempty facets, rows, and pagination potential. Loop
@@ -983,7 +983,7 @@ Stop and return to design review if any of these occurs:
   exhaustive `switch`, the `unreachableSAFeedReason(value: never)` helper, and
   the absence of a set-based availability classifier.
 
-- [ ] **Step 3: Run RED.**
+- [x] **Step 3: Run RED.**
 
   ```bash
   cd apps/arkscope-web
@@ -995,14 +995,14 @@ Stop and return to design review if any of these occurs:
   and resource count `379/1782`. A test fixture type error unrelated to the
   contract is invalid RED.
 
-- [ ] **Step 4: Implement the closed TypeScript union and rendering gates.**
+- [x] **Step 4: Implement the closed TypeScript union and rendering gates.**
 
   Follow Section 5.6. Gate statistics, rows, and Load More at render time with
   `feed.available`; do not merely rely on backend empty arrays. Keep valid
   empty and populated behavior unchanged. Use the required exhaustive switch;
   a `Set.has()` implementation is not contract-equivalent. Do not add CSS.
 
-- [ ] **Step 5: Run focused GREEN and mutation probes.**
+- [x] **Step 5: Run focused GREEN and mutation probes.**
 
   ```bash
   cd apps/arkscope-web
@@ -1025,7 +1025,7 @@ Stop and return to design review if any of these occurs:
 
   Restore all mutations before continuing.
 
-- [ ] **Step 6: Commit Task 4.**
+- [x] **Step 6: Commit Task 4.**
 
   ```bash
   git add apps/arkscope-web/src/api.ts \
@@ -1042,7 +1042,7 @@ Stop and return to design review if any of these occurs:
 **Files:**
 - Modify `docs/superpowers/evidence/2026-07-27-sa-feed-store-truth.md`
 
-- [ ] **Step 1: Run the isolated no-create matrix.**
+- [x] **Step 1: Run the isolated no-create matrix.**
 
   Use only temporary paths. Cover:
 
@@ -1062,7 +1062,7 @@ Stop and return to design review if any of these occurs:
   version, table names, and relevant row counts before/after. No absent parent
   or file may appear.
 
-- [ ] **Step 2: Run canonical collections and exact comm.**
+- [x] **Step 2: Run canonical collections and exact comm.**
 
   Re-run Section 2.1 against `PLAN_REVIEW_CLEARANCE_COMMIT` and `HEAD`.
   Expected:
@@ -1077,7 +1077,7 @@ Stop and return to design review if any of these occurs:
   Compare node IDs with `comm -13` and `comm -23`, not only counts. The exact
   added names must match Section 3.
 
-- [ ] **Step 3: Run focused and full suites.**
+- [x] **Step 3: Run focused and full suites.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1100,7 +1100,7 @@ Stop and return to design review if any of these occurs:
   the Task 0 environment baseline. Expected new failures: zero. Focused suites,
   typecheck, build, scanner, and no-PG must be fully green.
 
-- [ ] **Step 4: Run resource/tool/no-PG gates.**
+- [x] **Step 4: Run resource/tool/no-PG gates.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1112,7 +1112,7 @@ Stop and return to design review if any of these occurs:
 
   Expected: tools `53/54/54`; no-PG inventory `23`; no tool/route name change.
 
-- [ ] **Step 5: Prove byte-identical boundaries.**
+- [x] **Step 5: Prove byte-identical boundaries.**
 
   ```bash
   git diff --exit-code PLAN_REVIEW_CLEARANCE_COMMIT -- \
@@ -1135,7 +1135,7 @@ Stop and return to design review if any of these occurs:
   Also require no change under DB migration, provider, Gateway, PG, scheduler,
   repair, Alpha Picks, extension, native-host, and CSS ownership.
 
-- [ ] **Step 6: Run isolated bilingual browser evidence.**
+- [x] **Step 6: Run isolated bilingual browser evidence.**
 
   Start only an isolated sidecar/profile/SA fixture. Verify at 390, 960, and
   1440 CSS pixels in both locales:
@@ -1149,7 +1149,7 @@ Stop and return to design review if any of these occurs:
   Use semantic locators. No production browser, extension, provider, scheduler,
   or repair action is allowed.
 
-- [ ] **Step 7: Update evidence and run repository hygiene.**
+- [x] **Step 7: Update evidence and run repository hygiene.**
 
   ```bash
   git diff --check
@@ -1161,7 +1161,7 @@ Stop and return to design review if any of these occurs:
   results, mutation probes, byte gates, browser matrix, and any environment-only
   full-suite failures. Do not call the implementation LIVE or touch production.
 
-- [ ] **Step 8: Commit review-ready evidence.**
+- [x] **Step 8: Commit review-ready evidence.**
 
   ```bash
   git add docs/superpowers/evidence/2026-07-27-sa-feed-store-truth.md \
