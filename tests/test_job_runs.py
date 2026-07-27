@@ -12,6 +12,8 @@ Coverage:
 from __future__ import annotations
 
 import json
+import inspect
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -19,6 +21,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.service import jobs as jobs_module
+from src.service import job_runs_store as job_runs_store_module
 from src.service.job_runs_store import (
     ENV_USE_LOCAL_JOB_RUNS,
     USE_LOCAL_JOB_RUNS_KEY,
@@ -60,6 +63,105 @@ def _mock_cursor(conn, *, fetchone=None, fetchall=None, rowcount=1):
     cur.__exit__ = MagicMock(return_value=False)
     conn.cursor.return_value = cur
     return cur
+
+
+def _create_minimal_job_runs_db(path: Path, *job_names: str) -> None:
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE job_runs (job_name TEXT NOT NULL)")
+        conn.executemany(
+            "INSERT INTO job_runs (job_name) VALUES (?)",
+            ((name,) for name in job_names),
+        )
+
+
+def test_read_job_activity_if_exists_missing_profile_is_none_and_no_create(tmp_path):
+    db = tmp_path / "missing" / "profile_state.db"
+
+    result = job_runs_store_module.read_job_activity_if_exists(
+        db, {"sa_market_news_refresh"}
+    )
+
+    assert result == "none"
+    assert not db.exists()
+    assert not db.parent.exists()
+
+
+def test_read_job_activity_if_exists_missing_table_is_none_and_no_mutation(tmp_path):
+    db = tmp_path / "profile_state.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+
+    before_stat = db.stat()
+    with sqlite3.connect(f"file:{db.resolve()}?mode=ro", uri=True) as conn:
+        before_schema = conn.execute("PRAGMA schema_version").fetchone()[0]
+        before_names = conn.execute(
+            "SELECT name FROM sqlite_master ORDER BY name"
+        ).fetchall()
+
+    result = job_runs_store_module.read_job_activity_if_exists(
+        db, {"sa_market_news_refresh"}
+    )
+
+    after_stat = db.stat()
+    with sqlite3.connect(f"file:{db.resolve()}?mode=ro", uri=True) as conn:
+        after_schema = conn.execute("PRAGMA schema_version").fetchone()[0]
+        after_names = conn.execute(
+            "SELECT name FROM sqlite_master ORDER BY name"
+        ).fetchall()
+    assert result == "none"
+    assert (after_stat.st_size, after_stat.st_mtime_ns) == (
+        before_stat.st_size,
+        before_stat.st_mtime_ns,
+    )
+    assert after_schema == before_schema
+    assert after_names == before_names
+
+
+def test_read_job_activity_if_exists_distinguishes_relevant_and_unrelated_rows(tmp_path):
+    db = tmp_path / "profile_state.db"
+    _create_minimal_job_runs_db(db, "unrelated_job")
+
+    assert job_runs_store_module.read_job_activity_if_exists(
+        db, {"sa_market_news_refresh"}
+    ) == "none"
+
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO job_runs (job_name) VALUES (?)",
+            ("sa_market_news_refresh",),
+        )
+    assert job_runs_store_module.read_job_activity_if_exists(
+        db, {"sa_market_news_refresh"}
+    ) == "present"
+
+
+def test_read_job_activity_if_exists_unreadable_or_malformed_is_unknown(tmp_path):
+    directory = tmp_path / "profile-directory"
+    directory.mkdir()
+    malformed = tmp_path / "profile_state.db"
+    malformed.write_bytes(b"not a sqlite database")
+
+    assert job_runs_store_module.read_job_activity_if_exists(
+        directory, {"sa_market_news_refresh"}
+    ) == "unknown"
+    assert job_runs_store_module.read_job_activity_if_exists(
+        malformed, {"sa_market_news_refresh"}
+    ) == "unknown"
+
+
+def test_sa_store_history_contract_has_no_pruning_or_time_cutoff():
+    runtime_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in Path("src").rglob("*.py")
+    ).lower()
+    assert "delete from job_runs" not in runtime_source
+    assert "drop table job_runs" not in runtime_source
+
+    reader_source = inspect.getsource(
+        job_runs_store_module.read_job_activity_if_exists
+    ).lower()
+    for forbidden in ("started_at", "finished_at", "status", "timestamp"):
+        assert forbidden not in reader_source
 
 
 _SA_RUN_OUTCOMES = (

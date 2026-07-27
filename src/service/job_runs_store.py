@@ -29,7 +29,7 @@ import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +123,50 @@ def _validate_repair_payload(payload: Any, expected_hash: str) -> Dict[str, Any]
     ):
         raise ValueError("manifest_invalid")
     return payload
+
+
+JobActivityEvidence = Literal["none", "present", "unknown"]
+
+
+def read_job_activity_if_exists(
+    db_path: str | Path,
+    job_names: Iterable[str],
+) -> JobActivityEvidence:
+    """Read whether any named job exists without creating or changing storage."""
+    path = Path(db_path).expanduser()
+    if not os.path.lexists(path):
+        return "none"
+    if not path.is_file():
+        return "unknown"
+
+    names = tuple(sorted({str(name) for name in job_names if str(name)}))
+    if not names:
+        return "none"
+
+    conn: Optional[sqlite3.Connection] = None
+    try:
+        conn = sqlite3.connect(
+            f"{path.resolve().as_uri()}?mode=ro",
+            uri=True,
+            timeout=5.0,
+        )
+        table = conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='job_runs'"
+        ).fetchone()
+        if table is None:
+            return "none"
+        placeholders = ",".join("?" for _ in names)
+        row = conn.execute(
+            f"SELECT 1 FROM job_runs WHERE job_name IN ({placeholders}) LIMIT 1",
+            names,
+        ).fetchone()
+        return "present" if row is not None else "none"
+    except sqlite3.Error:
+        return "unknown"
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 class JobRunsStore:
