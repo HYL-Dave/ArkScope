@@ -327,12 +327,12 @@ src/sa/extension_run_protocol.py
 src/sa/market_news_recovery.py
 src/service/jobs.py
 src/sa_native_host.py
-src/sa_native_manifest.py
 extensions/sa_alpha_picks/**
 apps/arkscope-web/src/styles.css
-apps/arkscope-web/src/primitives.css
-apps/arkscope-web/src/shell.css
-apps/arkscope-web/src/tokens.css
+apps/arkscope-web/src/ui/primitives.css
+apps/arkscope-web/src/shell/shell.css
+apps/arkscope-web/src/ui/tokens.ts
+apps/arkscope-web/src/ui/tokens.json
 apps/arkscope-web/scripts/i18n/**
 sql/**
 ```
@@ -585,13 +585,13 @@ Stop and return to design review if any of these occurs:
 - Create `docs/superpowers/evidence/2026-07-27-sa-feed-store-truth.md`
 - Modify `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Record independent plan-review clearance.**
+- [x] **Step 1: Record independent plan-review clearance.**
 
   Resolve every review item against source. Commit only plan/spec/priority-map
   corrections on `master`, then record the full commit as
   `PLAN_REVIEW_CLEARANCE_COMMIT`. Product work is forbidden before this commit.
 
-- [ ] **Step 2: Create an isolated worktree.**
+- [x] **Step 2: Create an isolated worktree.**
 
   ```bash
   git worktree add /tmp/arkscope-sa-feed-store-truth \
@@ -601,13 +601,13 @@ Stop and return to design review if any of these occurs:
   Do not copy `data/`, `config/.env`, browser profiles, production databases,
   or the untracked `docs/design/SCRIPTS_RETIREMENT_DECISION.md` into it.
 
-- [ ] **Step 3: Reproduce all four collections and hashes.**
+- [x] **Step 3: Reproduce all four collections and hashes.**
 
   Run Section 2.1 exactly. Expected: backend `4691/77`, frontend
   `96 files / 1072 nodes` and `2 files / 25 focused nodes`, with all four
   baseline hashes exact. Any drift is a stop condition.
 
-- [ ] **Step 4: Reproduce behavior and non-node baselines.**
+- [x] **Step 4: Reproduce behavior and non-node baselines.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -638,13 +638,13 @@ Stop and return to design review if any of these occurs:
   Expected: focused `77` and `25` green; resources `379/704/1782`;
   tools `53/54/54`; no-PG `23`, `ok=true`, `pg_attempts=[]`; scanner exact.
 
-- [ ] **Step 5: Capture byte baselines.**
+- [x] **Step 5: Capture byte baselines.**
 
   Record `git rev-parse HEAD:<path>` for every protected tracked file and a
   sorted `git ls-tree -r` SHA-256 for protected directory families. Include the
   scanner hashes in Section 2.2.
 
-- [ ] **Step 6: Create the evidence packet.**
+- [x] **Step 6: Create the evidence packet.**
 
   Header:
 
@@ -656,7 +656,7 @@ Stop and return to design review if any of these occurs:
   resource/scanner/tool/no-PG facts, protected byte hashes, and an explicit
   statement that no production file or external service was touched.
 
-- [ ] **Step 7: Commit Task 0 docs only.**
+- [x] **Step 7: Commit Task 0 docs only.**
 
   ```bash
   git add docs/superpowers/evidence/2026-07-27-sa-feed-store-truth.md \
@@ -1121,12 +1121,13 @@ Stop and return to design review if any of these occurs:
     src/sa/extension_run_protocol.py \
     src/sa/market_news_recovery.py \
     src/service/jobs.py \
-    src/sa_native_host.py src/sa_native_manifest.py \
+    src/sa_native_host.py \
     extensions/sa_alpha_picks \
     apps/arkscope-web/src/styles.css \
-    apps/arkscope-web/src/primitives.css \
-    apps/arkscope-web/src/shell.css \
-    apps/arkscope-web/src/tokens.css \
+    apps/arkscope-web/src/ui/primitives.css \
+    apps/arkscope-web/src/shell/shell.css \
+    apps/arkscope-web/src/ui/tokens.ts \
+    apps/arkscope-web/src/ui/tokens.json \
     apps/arkscope-web/scripts/i18n \
     sql
   ```
