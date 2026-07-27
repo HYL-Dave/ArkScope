@@ -9,6 +9,7 @@ no-PG in SA-local mode, and the degraded shapes.
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
@@ -77,6 +78,169 @@ def _feed(db_path, **kw):
     res = sa_tools.get_sa_feed(dal, **kw)
     backend._get_conn.assert_not_called()
     return res
+
+
+def _missing_store_dal(db_path):
+    dal = MagicMock()
+    backend = MagicMock()
+    backend._sa_db = str(db_path)
+    backend._get_conn.side_effect = AssertionError("SA feed must not touch PG")
+    dal._backend = backend
+    return dal, backend
+
+
+def _seed_job_activity(path, job_name, status):
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE job_runs (job_name TEXT NOT NULL, status TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO job_runs (job_name, status) VALUES (?, ?)",
+            (job_name, status),
+        )
+
+
+def _assert_activity_history_marks_missing(tmp_path, monkeypatch, job_name):
+    sa_db = tmp_path / "missing-sa.db"
+    for status in ("running", "succeeded", "failed"):
+        profile_db = tmp_path / f"profile-{status}.db"
+        _seed_job_activity(profile_db, job_name, status)
+        monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+        dal, backend = _missing_store_dal(sa_db)
+
+        result = sa_tools.get_sa_feed(dal, days=30)
+
+        backend._get_conn.assert_not_called()
+        assert result["available"] is False, (job_name, status, result)
+        assert result["empty_reason"] == "store_missing", (job_name, status, result)
+        assert not sa_db.exists()
+
+
+def test_missing_store_without_profile_is_not_created_and_creates_nothing(
+    tmp_path, monkeypatch
+):
+    sa_db = tmp_path / "sa" / "sa_capture.db"
+    profile_db = tmp_path / "profile" / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(
+        dal, q="  private query  ", days=99999, limit=99999, offset=-5
+    )
+
+    backend._get_conn.assert_not_called()
+    assert result["available"] is False
+    assert result["empty_reason"] == "store_not_created"
+    assert result["days"] == 3650
+    assert result["query"] == "private query"
+    assert not sa_db.exists() and not sa_db.parent.exists()
+    assert not profile_db.exists() and not profile_db.parent.exists()
+
+
+def test_missing_store_with_empty_profile_is_not_created_without_mutation(
+    tmp_path, monkeypatch
+):
+    sa_db = tmp_path / "missing-sa.db"
+    profile_db = tmp_path / "profile_state.db"
+    with sqlite3.connect(profile_db) as conn:
+        conn.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+    before = profile_db.stat()
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal)
+
+    after = profile_db.stat()
+    backend._get_conn.assert_not_called()
+    assert result["available"] is False
+    assert result["empty_reason"] == "store_not_created"
+    assert (after.st_size, after.st_mtime_ns) == (before.st_size, before.st_mtime_ns)
+    assert not sa_db.exists()
+
+
+def test_missing_store_history_sa_alpha_picks_refresh_is_missing(tmp_path, monkeypatch):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "sa_alpha_picks_refresh"
+    )
+
+
+def test_missing_store_history_sa_extension_manual_fetch_is_missing(tmp_path, monkeypatch):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "sa_extension:manual_fetch"
+    )
+
+
+def test_missing_store_history_sa_market_news_refresh_is_missing(tmp_path, monkeypatch):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "sa_market_news_refresh"
+    )
+
+
+def test_missing_store_history_sa_market_news_retry_recorded_is_missing(
+    tmp_path, monkeypatch
+):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "sa_market_news_retry_recorded"
+    )
+
+
+def test_missing_store_history_sa_market_news_incident_recovery_is_missing(
+    tmp_path, monkeypatch
+):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "sa_market_news_incident_recovery"
+    )
+
+
+def test_missing_store_history_sa_market_news_repair_is_missing(tmp_path, monkeypatch):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "sa_market_news_repair"
+    )
+
+
+def test_missing_store_history_extract_sa_comment_signals_is_missing(
+    tmp_path, monkeypatch
+):
+    _assert_activity_history_marks_missing(
+        tmp_path, monkeypatch, "extract_sa_comment_signals"
+    )
+
+
+def test_missing_store_with_unreadable_history_fails_closed_as_missing(
+    tmp_path, monkeypatch
+):
+    sa_db = tmp_path / "missing-sa.db"
+    profile_db = tmp_path / "profile_state.db"
+    profile_db.mkdir()
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal)
+
+    backend._get_conn.assert_not_called()
+    assert result["available"] is False
+    assert result["empty_reason"] == "store_missing"
+    assert not sa_db.exists()
+
+
+def test_backend_unavailable_precedes_store_and_history_checks(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        sa_tools,
+        "read_job_activity_if_exists",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("history inspected before backend availability")
+        ),
+        raising=False,
+    )
+    dal = MagicMock()
+    dal._backend = None
+
+    result = sa_tools.get_sa_feed(dal, q="  query  ", days=99999)
+
+    assert result["available"] is False
+    assert result["empty_reason"] == "backend_unavailable"
+    assert result["days"] == 3650
+    assert result["query"] == "query"
 
 
 def test_feed_both_types_newest_first(tmp_path):
@@ -174,12 +338,20 @@ def test_feed_empty_window(tmp_path):
     assert res["empty_reason"] == "no_items_in_window"
 
 
-def test_feed_pg_mode_requires_local(tmp_path):
+def test_feed_pg_mode_requires_local(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        sa_tools,
+        "read_job_activity_if_exists",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("history inspected before local-SA routing")
+        ),
+        raising=False,
+    )
     dal = MagicMock()
     dal._backend = MagicMock(spec=["_get_conn"])  # no _sa_db
     res = sa_tools.get_sa_feed(dal, days=30)
     assert res["available"] is False and res["empty_reason"] == "requires_local_sa"
-    assert "use_local_sa" not in res["error"]
+    assert "error" not in res
 
 
 def test_feed_clamps_params(tmp_path):

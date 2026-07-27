@@ -164,6 +164,25 @@ def test_sa_store_history_contract_has_no_pruning_or_time_cutoff():
         assert forbidden not in reader_source
 
 
+def test_sa_store_activity_job_names_cover_all_current_authorities():
+    from src.sa.extension_run_protocol import OPERATION_CONTRACTS
+    from src.sa.market_news_recovery import REPAIR_JOB_NAME
+    from src.tools.sa_tools import SA_STORE_ACTIVITY_JOB_NAMES
+
+    extension_names = {
+        contract["job_name"] for contract in OPERATION_CONTRACTS.values()
+    }
+    service_names = {
+        definition.name
+        for definition in jobs_module._JOB_DEFINITIONS.values()
+        if definition.feature_flag == "sa_enabled"
+    }
+    expected = extension_names | service_names | {REPAIR_JOB_NAME}
+
+    assert SA_STORE_ACTIVITY_JOB_NAMES == expected
+    assert len(SA_STORE_ACTIVITY_JOB_NAMES) == 7
+
+
 _SA_RUN_OUTCOMES = (
     Path(__file__).parent / "fixtures" / "sa_extension" / "run_outcomes.json"
 )

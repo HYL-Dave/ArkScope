@@ -15,12 +15,27 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from src.app_records_store import resolve_profile_state_db_path
+from src.service.job_runs_store import read_job_activity_if_exists
+
 logger = logging.getLogger(__name__)
 
 _DISABLED_MSG = (
     "Seeking Alpha Alpha Picks is not enabled. "
     "To enable: set seeking_alpha.enabled: true in config/user_profile.yaml "
     "and install the SA Alpha Picks Chrome extension (see extensions/sa_alpha_picks/)"
+)
+
+SA_STORE_ACTIVITY_JOB_NAMES = frozenset(
+    {
+        "sa_alpha_picks_refresh",
+        "sa_extension:manual_fetch",
+        "sa_market_news_refresh",
+        "sa_market_news_retry_recorded",
+        "sa_market_news_incident_recovery",
+        "sa_market_news_repair",
+        "extract_sa_comment_signals",
+    }
 )
 
 
@@ -724,20 +739,17 @@ def _focus_local(
 # ---------------------------------------------------------------------------
 
 
-def _empty_feed(days, *, error=None, empty_reason=None):
-    out = {
+def _empty_feed(days, *, query=None, empty_reason=None):
+    return {
         "available": False,
         "days": days,
-        "query": None,
+        "query": query,
         "total": 0,
         "items": [],
         "by_type": {},
         "by_day": {},
         "empty_reason": empty_reason,
     }
-    if error:
-        out["error"] = error
-    return out
 
 
 def get_sa_feed(
@@ -783,18 +795,26 @@ def get_sa_feed(
 
         backend = getattr(dal, "_backend", None)
         if backend is None or not hasattr(backend, "_get_conn"):
-            return _empty_feed(days, empty_reason="backend_unavailable",
-                               error="DB unavailable; SA feed requires the database backend.")
+            return _empty_feed(
+                days, query=q, empty_reason="backend_unavailable"
+            )
         sa_db = getattr(backend, "_sa_db", None)
         if sa_db is None:
-            return _empty_feed(days, empty_reason="requires_local_sa",
-                               error="get_sa_feed requires the local sa_capture.db "
-                                     "routing; this backend has no SA capture store.")
+            return _empty_feed(
+                days, query=q, empty_reason="requires_local_sa"
+            )
+        if not os.path.lexists(sa_db):
+            history = read_job_activity_if_exists(
+                resolve_profile_state_db_path(dal),
+                SA_STORE_ACTIVITY_JOB_NAMES,
+            )
+            reason = "store_not_created" if history == "none" else "store_missing"
+            return _empty_feed(days, query=q, empty_reason=reason)
         return _sa_feed_local(sa_db, q=q, ticker=tkr, item_type=item_type,
                               days=days, limit=limit, offset=offset)
     except Exception as e:
         logger.error("get_sa_feed error: %s", e)
-        return _empty_feed(30, empty_reason="error", error=str(e))
+        return _empty_feed(days, query=q, empty_reason="error")
 
 
 def _display_snippet(raw: Optional[str], title: Optional[str]) -> str:
