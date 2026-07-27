@@ -1,6 +1,6 @@
 # Legacy Scheduler Sources and IV Domain Retirement Design
 
-> **Status: MERGED - PRODUCTION RETIREMENT PENDING**
+> **Status: LIVE COMPLETE - PRODUCTION RETIREMENT APPLIED 2026-07-27**
 >
 > Written against clean `master` tip `16d77bae` on 2026-07-26. This document
 > authorizes no product edit, migration, provider call, or production write.
@@ -11,9 +11,15 @@
 > implementation review returned GREEN with no product findings after the two
 > evidence-index corrections in `28b136d1`. `master` fast-forwarded to that
 > exact reviewed tip on 2026-07-27. Plan clearance is
-> `5f528475420c8de407125bceb32d94050cfa8e14`. No production migration has run.
-> Production data removal still requires stopped writers, a fresh merged-code
-> preview, and a second explicit approval for that exact manifest.
+> `5f528475420c8de407125bceb32d94050cfa8e14`. With ArkScope and all writers
+> stopped, merged code produced reviewed preview
+> `0ed0916d2cd165574e7ddbce1dbefe755526ced0aa105e82db34d452814aca0b`;
+> the user then explicitly approved that exact manifest. Archive/apply,
+> idempotent second apply, database health/digest checks, retained-option gates,
+> restart, and UI smoke all completed. The rollback archive is
+> `data/backups/legacy_scheduler_iv_retirement_20260727T123347933126Z/`
+> (manifest SHA-256
+> `30c01ea8fd009a3d47c5ac96ffd4dd9b0282a1adef03faafb91c3dd50dd92fad`).
 
 ## 1. Purpose And Authority
 

@@ -9,11 +9,13 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: MERGED - PRODUCTION RETIREMENT PENDING**
+> **Status: LIVE COMPLETE - PRODUCTION RETIREMENT APPLIED 2026-07-27**
 >
 > Independent implementation review returned GREEN after the evidence-index
 > corrections in `28b136d1`; `master` fast-forwarded to that exact tip on
-> 2026-07-27. Steps 2-9 in the production protocol remain separately gated.
+> 2026-07-27. The separately gated production protocol completed on the same
+> date against exact preview
+> `0ed0916d2cd165574e7ddbce1dbefe755526ced0aa105e82db34d452814aca0b`.
 
 Review packet, created during implementation:
 `docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md`.
@@ -1797,6 +1799,34 @@ These steps are unauthorized until independent implementation review is GREEN.
 8. Restart ArkScope and run bilingual Settings/Ticker Detail smoke.
 9. Only then mark spec/plan/evidence/priority map `LIVE COMPLETE`, recording
    archive path/digest and restore command.
+
+### 8.1 Production execution result (2026-07-27)
+
+The user stopped ArkScope desktop and SA auto-sync. A process census and open-
+file census then found no ArkScope writer or target-file holder. Merged code at
+`1142ac95ffe682100237b9ab8060b953a74e64e0` produced preview
+`0ed0916d2cd165574e7ddbce1dbefe755526ced0aa105e82db34d452814aca0b`.
+The preview classified exactly two scheduler-state rows, one schedule setting,
+one IV sync row, 24 SQLite IV rows, and four matching Parquet files; both
+databases had `integrity_check=ok` and zero foreign-key violations. The user
+gave the required second explicit approval for that exact SHA.
+
+Apply created
+`data/backups/legacy_scheduler_iv_retirement_20260727T123347933126Z/` with
+directory mode `0700` and artifact mode `0600`. Every manifest artifact hash
+verified, and the manifest SHA-256 is
+`30c01ea8fd009a3d47c5ac96ffd4dd9b0282a1adef03faafb91c3dd50dd92fad`.
+The first apply reached `phase=complete`; the second returned
+`already_applied=true`, `resumed_from=complete`. Postchecks found no target
+rows, table, sync state, or Parquet file; both database health checks remained
+clean; all 1,352 target `job_runs` retained digest
+`8a120cf820863fd3c325a5ee4d95a9a8177300307fdc01b625e0428d7a297ecc`;
+and non-target profile/market digests remained respectively
+`07ce9321a512d6afa9e30c7a880e48012ea1a6009dbf549bfc8c21aff9d19817`
+and `de9478692e6f57915ebbf7d6ed9279c8cc20632fa313c73808020b902fd15706`.
+The exact four-source scheduler smoke passed, retained scheduler/options suites
+reported `174 passed / 1 skipped`, and the user confirmed the restarted UI no
+longer shows any of the three retired identities or the old IV surface.
 
 The production archive remains rollback material only. Future IV code must not
 import it automatically or reuse the retired semantic IDs.
