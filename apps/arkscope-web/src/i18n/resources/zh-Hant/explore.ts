@@ -245,6 +245,7 @@ const explore = {
     titleOnlyUnavailable: "僅標題 · 來源未提供內文",
     titleOnlyPending: "僅標題 · 內文待處理",
     contentUnknown: "內文狀態不明",
+    seekingAlphaNotCreated: "Seeking Alpha 本地資料庫尚未初始化。請先執行一次瀏覽器擴充功能。",
     seekingAlphaPathUnavailable: "Seeking Alpha 本地資料路徑尚未就緒。",
     seekingAlphaUnavailable: "Seeking Alpha 資料尚未就緒。",
   },

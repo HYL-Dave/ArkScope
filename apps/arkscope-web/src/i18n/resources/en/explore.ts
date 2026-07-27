@@ -245,6 +245,7 @@ const explore = {
     titleOnlyUnavailable: "Title only · Source did not provide content",
     titleOnlyPending: "Title only · Content pending",
     contentUnknown: "Content state unknown",
+    seekingAlphaNotCreated: "The local Seeking Alpha store has not been initialized. Run the browser extension once.",
     seekingAlphaPathUnavailable: "The local Seeking Alpha data path is not ready.",
     seekingAlphaUnavailable: "Seeking Alpha data is not ready.",
   },

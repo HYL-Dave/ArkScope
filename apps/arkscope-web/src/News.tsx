@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getNewsFeed, type NewsContentFilter, type NewsFeedItem, type NewsFeedResponse,
-  getSAFeed, type SAFeedItem, type SAFeedResponse,
+  getSAFeed, type SAFeedEmptyReason, type SAFeedItem, type SAFeedResponse,
 } from "./api";
 import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
 import {
@@ -390,6 +390,44 @@ function contentLabel(item: NewsFeedItem, t: ExploreT): string | null {
   return null;
 }
 
+const SA_FEED_COPY = {
+  none: 0,
+  pathUnavailable: 1,
+  storeNotCreated: 2,
+  degraded: 3,
+} as const;
+
+type SAFeedReasonPresentation = {
+  copy: (typeof SA_FEED_COPY)[keyof typeof SA_FEED_COPY];
+  canOpenDataSources: boolean;
+};
+
+function unreachableSAFeedReason(value: never): void {
+  void value;
+}
+
+function classifySAFeedReason(reason: SAFeedEmptyReason): SAFeedReasonPresentation {
+  switch (reason) {
+    case null:
+    case "no_items_in_window":
+      return { copy: SA_FEED_COPY.none, canOpenDataSources: false };
+    case "backend_unavailable":
+      return { copy: SA_FEED_COPY.degraded, canOpenDataSources: false };
+    case "requires_local_sa":
+      return { copy: SA_FEED_COPY.pathUnavailable, canOpenDataSources: true };
+    case "store_not_created":
+      return { copy: SA_FEED_COPY.storeNotCreated, canOpenDataSources: true };
+    case "store_missing":
+    case "store_unreadable":
+    case "store_schema_incompatible":
+    case "store_query_failed":
+      return { copy: SA_FEED_COPY.degraded, canOpenDataSources: true };
+    default:
+      unreachableSAFeedReason(reason);
+      return { copy: SA_FEED_COPY.degraded, canOpenDataSources: false };
+  }
+}
+
 // --- Seeking Alpha evidence feed (Layer C-1) -------------------------------
 function SAFeedBody({
   feed, items, q, loading, onMore, onOpenTicker, onNavigateTarget, t,
@@ -403,19 +441,20 @@ function SAFeedBody({
   onNavigateTarget: (target: NavigationTarget) => void;
   t: ExploreT;
 }) {
-  // available=false is a DEGRADED state (e.g. SA not local-first), not an error.
-  const requiresLocalSa = Boolean(
-    feed && !feed.available && feed.empty_reason === "requires_local_sa",
-  );
-  const degraded = feed && !feed.available
-    ? requiresLocalSa
-      ? t(($) => $.news.seekingAlphaPathUnavailable)
-      : t(($) => $.news.seekingAlphaUnavailable)
+  const availability = feed && !feed.available
+    ? classifySAFeedReason(feed.empty_reason)
     : null;
+  const unavailableCopy = availability?.copy === SA_FEED_COPY.pathUnavailable
+    ? t(($) => $.news.seekingAlphaPathUnavailable)
+    : availability?.copy === SA_FEED_COPY.storeNotCreated
+      ? t(($) => $.news.seekingAlphaNotCreated)
+      : availability?.copy === SA_FEED_COPY.degraded
+        ? t(($) => $.news.seekingAlphaUnavailable)
+        : null;
 
   return (
     <>
-      {feed && (
+      {feed?.available && (
         <p className="muted tiny news-stats">
           {t(($) => $.news.totalPrefix)} {feed.total.toLocaleString()} {t(($) => $.news.rowsSuffix)}
           {Object.entries(feed.by_type).map(([type, count]) => (
@@ -426,10 +465,10 @@ function SAFeedBody({
           )}
         </p>
       )}
-      {degraded && (
+      {unavailableCopy && (
         <>
-          <p className="muted">{degraded}</p>
-          {requiresLocalSa && (
+          <p className="muted">{unavailableCopy}</p>
+          {availability?.canOpenDataSources && (
             <button
               type="button"
               className="btn-ghost"
@@ -441,50 +480,52 @@ function SAFeedBody({
         </>
       )}
 
-      <ul className="news-list">
-        {items.map((item, index) => (
-          <li key={`${item.type}-${item.id}-${index}`} className="news-item">
-            <div className="news-row">
-              <span className="muted mono tiny news-time">
-                {item.published_at.slice(5, 16).replace("T", " ")}
-              </span>
-              <span className="list-chip">{saRuntimeTypeLabel(item.type, t)}</span>
-              {item.tickers.map((ticker) => (
-                <button
-                  key={ticker}
-                  className="news-ticker-chip"
-                  onClick={() => onOpenTicker(ticker)}
-                  title={t(($) => $.news.openTicker, { ticker })}
-                >
-                  {ticker}
-                </button>
-              ))}
-              {item.url ? (
-                <a className="news-title" href={item.url} target="_blank" rel="noreferrer">
-                  {item.title}
-                </a>
-              ) : (
-                <span className="news-title">{item.title}</span>
-              )}
-              <span className="muted tiny news-meta">
-                {t(($) => $.news.saShort)}
-                {item.comments_count > 0 ? (
-                  <> {t(($) => $.news.commentCount, {
-                    formattedCount: item.comments_count.toLocaleString(),
-                  })}</>
-                ) : null}
-                {item.url ? <> {t(($) => $.news.originalArticle)}</> : null}
-              </span>
-            </div>
-            {/* snippet is server-cleaned plain text (src/text_snippet.py) — render as
-                text only; do NOT add a markdown/HTML renderer here. */}
-            {item.snippet && <div className="news-desc muted tiny">{item.snippet}</div>}
-          </li>
-        ))}
-      </ul>
+      {feed?.available && (
+        <ul className="news-list">
+          {items.map((item, index) => (
+            <li key={`${item.type}-${item.id}-${index}`} className="news-item">
+              <div className="news-row">
+                <span className="muted mono tiny news-time">
+                  {item.published_at.slice(5, 16).replace("T", " ")}
+                </span>
+                <span className="list-chip">{saRuntimeTypeLabel(item.type, t)}</span>
+                {item.tickers.map((ticker) => (
+                  <button
+                    key={ticker}
+                    className="news-ticker-chip"
+                    onClick={() => onOpenTicker(ticker)}
+                    title={t(($) => $.news.openTicker, { ticker })}
+                  >
+                    {ticker}
+                  </button>
+                ))}
+                {item.url ? (
+                  <a className="news-title" href={item.url} target="_blank" rel="noreferrer">
+                    {item.title}
+                  </a>
+                ) : (
+                  <span className="news-title">{item.title}</span>
+                )}
+                <span className="muted tiny news-meta">
+                  {t(($) => $.news.saShort)}
+                  {item.comments_count > 0 ? (
+                    <> {t(($) => $.news.commentCount, {
+                      formattedCount: item.comments_count.toLocaleString(),
+                    })}</>
+                  ) : null}
+                  {item.url ? <> {t(($) => $.news.originalArticle)}</> : null}
+                </span>
+              </div>
+              {/* snippet is server-cleaned plain text (src/text_snippet.py) — render as
+                  text only; do NOT add a markdown/HTML renderer here. */}
+              {item.snippet && <div className="news-desc muted tiny">{item.snippet}</div>}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {loading && <p className="muted tiny">{t(($) => $.news.loadingLower)}</p>}
-      {feed && items.length < feed.total && !loading && (
+      {feed?.available && items.length < feed.total && !loading && (
         <button className="btn-ghost" style={{ marginTop: 10 }} onClick={onMore}>
           {t(($) => $.news.loadMoreProgress, {
             visible: items.length,

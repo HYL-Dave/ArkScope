@@ -1,4 +1,7 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import i18n from "i18next";
@@ -160,6 +163,59 @@ const saFeed: SAFeedResponse = {
   by_day: { "2026-07-17": 2 },
   empty_reason: null,
 };
+
+const UNAVAILABLE_SA_FEED_REASONS = [
+  "backend_unavailable",
+  "requires_local_sa",
+  "store_not_created",
+  "store_missing",
+  "store_unreadable",
+  "store_schema_incompatible",
+  "store_query_failed",
+] as const;
+
+const SA_STORE_PATH_REASONS = [
+  "requires_local_sa",
+  "store_not_created",
+  "store_missing",
+  "store_unreadable",
+  "store_schema_incompatible",
+  "store_query_failed",
+] as const;
+
+function unavailableSaFeed(
+  reason: (typeof UNAVAILABLE_SA_FEED_REASONS)[number],
+  over: Partial<SAFeedResponse> = {},
+): SAFeedResponse {
+  return {
+    ...saFeed,
+    available: false,
+    total: 9,
+    by_type: { article: 9 },
+    by_day: { "2026-07-17": 9 },
+    empty_reason: reason,
+    ...over,
+  };
+}
+
+function unavailableCopy(
+  reason: (typeof UNAVAILABLE_SA_FEED_REASONS)[number],
+  locale: "zh-Hant" | "en",
+): string {
+  if (reason === "store_not_created") {
+    return locale === "zh-Hant"
+      ? "Seeking Alpha 本地資料庫尚未初始化。請先執行一次瀏覽器擴充功能。"
+      : "The local Seeking Alpha store has not been initialized. Run the browser extension once.";
+  }
+  if (reason === "requires_local_sa") {
+    return locale === "zh-Hant"
+      ? "Seeking Alpha 本地資料路徑尚未就緒。"
+      : "The local Seeking Alpha data path is not ready.";
+  }
+  return locale === "zh-Hant"
+    ? "Seeking Alpha 資料尚未就緒。"
+    : "Seeking Alpha data is not ready.";
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -690,6 +746,18 @@ describe("News localization", () => {
   });
 
   it("offers only the reviewed News and Data Sources recovery targets", async () => {
+    const newsSource = readFileSync(resolve(import.meta.dirname, "News.tsx"), "utf8");
+    const classifierStart = newsSource.indexOf("function classifySAFeedReason(");
+    const classifierEnd = newsSource.indexOf("// --- Seeking Alpha evidence feed", classifierStart);
+    const classifierSource = newsSource.slice(classifierStart, classifierEnd);
+    expect(classifierStart).toBeGreaterThanOrEqual(0);
+    expect(classifierEnd).toBeGreaterThan(classifierStart);
+    expect(newsSource).toContain("function unreachableSAFeedReason(value: never): void");
+    expect(newsSource).toContain("classifySAFeedReason(feed.empty_reason)");
+    expect(classifierSource).toMatch(/switch\s*\(reason\)/u);
+    expect(classifierSource).toMatch(/default:\s*unreachableSAFeedReason\(reason\)/u);
+    expect(classifierSource).not.toMatch(/\bnew\s+Set\b|\.has\s*\(/u);
+
     const onNavigateTarget = vi.fn();
     apiMocks.getNewsFeed.mockReset().mockResolvedValue(marketFeed({
       available: false,
@@ -707,26 +775,20 @@ describe("News localization", () => {
       section: "news_storage",
     });
 
-    unmountNews();
-    onNavigateTarget.mockClear();
-    apiMocks.getNewsFeed.mockReset().mockResolvedValue(marketFeed());
-    apiMocks.getSAFeed.mockReset().mockResolvedValue({
-      ...saFeed,
-      available: false,
-      items: [],
-      total: 0,
-      by_type: {},
-      by_day: {},
-      empty_reason: "requires_local_sa",
-    });
-    await mount({ onNavigateTarget });
-    await change(modeSelect(), "sa");
-    await waitForText("Seeking Alpha 本地資料路徑尚未就緒。");
-    await click(buttonByText("前往資料來源與排程"));
-    expect(onNavigateTarget).toHaveBeenLastCalledWith({
-      kind: "settings_section",
-      section: "data_sources",
-    });
+    for (const reason of SA_STORE_PATH_REASONS) {
+      unmountNews();
+      onNavigateTarget.mockClear();
+      apiMocks.getNewsFeed.mockReset().mockResolvedValue(marketFeed());
+      apiMocks.getSAFeed.mockReset().mockResolvedValue(unavailableSaFeed(reason));
+      await mount({ onNavigateTarget });
+      await change(modeSelect(), "sa");
+      await waitForText(unavailableCopy(reason, "zh-Hant"));
+      await click(buttonByText("前往資料來源與排程"));
+      expect(onNavigateTarget, reason).toHaveBeenLastCalledWith({
+        kind: "settings_section",
+        section: "data_sources",
+      });
+    }
 
     unmountNews();
     onNavigateTarget.mockClear();
@@ -744,6 +806,17 @@ describe("News localization", () => {
     await waitForText("此條件下沒有 Seeking Alpha 內容。");
     expect(host!.textContent).not.toContain("前往資料來源與排程");
     expect(host!.textContent).not.toContain("前往新聞資料");
+    expect(onNavigateTarget).not.toHaveBeenCalled();
+
+    unmountNews();
+    onNavigateTarget.mockClear();
+    apiMocks.getSAFeed.mockReset().mockResolvedValue(
+      unavailableSaFeed("backend_unavailable", { items: [], total: 0, by_type: {}, by_day: {} }),
+    );
+    await mount({ onNavigateTarget });
+    await change(modeSelect(), "sa");
+    await waitForText("Seeking Alpha 資料尚未就緒。");
+    expect(host!.textContent).not.toContain("前往資料來源與排程");
     expect(onNavigateTarget).not.toHaveBeenCalled();
 
     unmountNews();
@@ -770,6 +843,48 @@ describe("News localization", () => {
     expect(host!.textContent).not.toContain("前往資料來源與排程");
     expect(host!.textContent).not.toContain("前往新聞資料");
     expect(onNavigateTarget).not.toHaveBeenCalled();
+  });
+
+  it("renders typed SA store availability copy in both locales", async () => {
+    for (const locale of ["zh-Hant", "en"] as const) {
+      for (const reason of UNAVAILABLE_SA_FEED_REASONS) {
+        unmountNews();
+        await switchLocale(locale);
+        apiMocks.getSAFeed.mockReset().mockResolvedValue(unavailableSaFeed(reason));
+        await mount();
+        await change(modeSelect(), "sa");
+        await waitForText(unavailableCopy(reason, locale));
+      }
+    }
+  });
+
+  it("hides all feed claims and controls for every unavailable SA reason", async () => {
+    for (const reason of UNAVAILABLE_SA_FEED_REASONS) {
+      unmountNews();
+      apiMocks.getSAFeed.mockReset().mockResolvedValue(unavailableSaFeed(reason));
+      await mount();
+      await change(modeSelect(), "sa");
+      await waitForText(unavailableCopy(reason, "zh-Hant"));
+
+      expect(host!.querySelector(".news-stats"), `${reason}: statistics`).toBeNull();
+      expect(host!.querySelector(".news-item"), `${reason}: rows`).toBeNull();
+      expect(host!.textContent, `${reason}: source item`).not.toContain(SA_TITLE);
+      expect(host!.textContent, `${reason}: facets`).not.toContain("分析文章 9");
+      expect(host!.textContent, `${reason}: pagination`).not.toContain("載入更多");
+
+      unmountNews();
+      apiMocks.getSAFeed.mockReset().mockResolvedValue(unavailableSaFeed(reason, {
+        items: [],
+        total: 0,
+        by_type: {},
+        by_day: {},
+      }));
+      await mount();
+      await change(modeSelect(), "sa");
+      await waitForText(unavailableCopy(reason, "zh-Hant"));
+      expect(host!.textContent, `${reason}: valid-empty copy`)
+        .not.toContain("此條件下沒有 Seeking Alpha 內容。");
+    }
   });
 
   it("keeps an in-flight page response and renders completion in the active locale", async () => {

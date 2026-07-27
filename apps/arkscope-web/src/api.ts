@@ -2483,15 +2483,26 @@ export interface SAFeedItem {
   detail_route: string | null; // present → open internally; null → fall back to url
 }
 
+export type SAFeedEmptyReason =
+  | "backend_unavailable"
+  | "requires_local_sa"
+  | "store_not_created"
+  | "store_missing"
+  | "store_unreadable"
+  | "store_schema_incompatible"
+  | "store_query_failed"
+  | "no_items_in_window"
+  | null;
+
 export interface SAFeedResponse {
-  available: boolean; // false = degraded (e.g. SA not local-first), NOT an error
+  available: boolean; // false = typed unavailable state, not an HTTP error
   days: number;
   query: string | null;
   total: number;
   items: SAFeedItem[];
   by_type: Record<string, number>;
   by_day: Record<string, number>;
-  empty_reason: string | null;
+  empty_reason: SAFeedEmptyReason;
 }
 
 export function getSAFeed(params: {
