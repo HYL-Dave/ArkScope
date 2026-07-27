@@ -243,6 +243,267 @@ def test_backend_unavailable_precedes_store_and_history_checks(tmp_path, monkeyp
     assert result["query"] == "query"
 
 
+_REQUIRED_FEED_COLUMNS = {
+    "sa_articles": (
+        "id INTEGER PRIMARY KEY",
+        "article_id TEXT",
+        "title TEXT",
+        "ticker TEXT",
+        "published_date TEXT",
+        "url TEXT",
+        "body_markdown TEXT",
+        "comments_count INTEGER",
+    ),
+    "sa_market_news": (
+        "id INTEGER PRIMARY KEY",
+        "news_id TEXT",
+        "title TEXT",
+        "published_at TEXT",
+        "url TEXT",
+        "summary TEXT",
+        "body_markdown TEXT",
+        "comments_count INTEGER",
+    ),
+    "sa_market_news_tickers": ("news_row_id INTEGER", "ticker TEXT"),
+}
+
+
+def _create_minimal_feed_db(
+    path,
+    *,
+    missing_table=None,
+    missing_column=None,
+    additive=False,
+):
+    with sqlite3.connect(path) as conn:
+        for table, declarations in _REQUIRED_FEED_COLUMNS.items():
+            if table == missing_table:
+                continue
+            columns = tuple(
+                declaration
+                for declaration in declarations
+                if declaration.split()[0] != missing_column
+            )
+            conn.execute(f"CREATE TABLE {table} ({', '.join(columns)})")
+        if missing_table != "sa_articles_fts":
+            conn.execute(
+                "CREATE VIRTUAL TABLE sa_articles_fts USING fts5(title, body_markdown)"
+            )
+        if missing_table != "sa_market_news_fts":
+            conn.execute(
+                "CREATE VIRTUAL TABLE sa_market_news_fts USING fts5(title, summary)"
+            )
+        if additive:
+            conn.execute("ALTER TABLE sa_articles ADD COLUMN future_field TEXT")
+            conn.execute("CREATE TABLE future_capability (value TEXT)")
+
+
+def _assert_store_failure(result, reason, *, query="private query"):
+    assert result["available"] is False
+    assert result["empty_reason"] == reason
+    assert result["days"] == 3650
+    assert result["query"] == query
+    assert "error" not in result
+
+
+def test_directory_sa_store_is_unreadable(tmp_path, monkeypatch):
+    sa_db = tmp_path / "sa_capture.db"
+    sa_db.mkdir()
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile.db"))
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_unreadable")
+
+
+def test_broken_symlink_sa_store_is_unreadable(tmp_path, monkeypatch):
+    sa_db = tmp_path / "sa_capture.db"
+    sa_db.symlink_to(tmp_path / "absent-target.db")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile.db"))
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_unreadable")
+    assert sa_db.is_symlink()
+
+
+def test_malformed_sa_store_is_unreadable(tmp_path, monkeypatch):
+    sa_db = tmp_path / "sa_capture.db"
+    sa_db.write_bytes(b"not a sqlite database")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile.db"))
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_unreadable")
+
+
+def test_sa_store_open_failure_is_unreadable_and_sanitized(tmp_path, monkeypatch):
+    sa_db = tmp_path / "private-store.db"
+    _create_minimal_feed_db(sa_db)
+    marker = f"sqlite could not open {sa_db}"
+    monkeypatch.setattr(
+        sa_tools,
+        "_open_sa_feed_read_only",
+        lambda _path: (_ for _ in ()).throw(sqlite3.OperationalError(marker)),
+        raising=False,
+    )
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_unreadable")
+    assert marker not in repr(result)
+    assert str(sa_db) not in repr(result)
+
+
+@pytest.mark.parametrize(
+    "missing_table",
+    (
+        "sa_articles",
+        "sa_market_news",
+        "sa_market_news_tickers",
+        "sa_articles_fts",
+        "sa_market_news_fts",
+    ),
+    ids=(
+        "sa_articles",
+        "sa_market_news",
+        "sa_market_news_tickers",
+        "sa_articles_fts",
+        "sa_market_news_fts",
+    ),
+)
+def test_missing_required_feed_table_is_schema_incompatible(
+    tmp_path, missing_table
+):
+    sa_db = tmp_path / "sa_capture.db"
+    _create_minimal_feed_db(sa_db, missing_table=missing_table)
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q=None, days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_schema_incompatible", query=None)
+
+
+def test_missing_required_feed_column_is_schema_incompatible(tmp_path):
+    sa_db = tmp_path / "sa_capture.db"
+    _create_minimal_feed_db(sa_db, missing_column="body_markdown")
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q=None, days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_schema_incompatible", query=None)
+
+
+def test_extra_feed_schema_remains_compatible(tmp_path):
+    sa_db = tmp_path / "sa_capture.db"
+    _create_minimal_feed_db(sa_db, additive=True)
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, days=30)
+
+    backend._get_conn.assert_not_called()
+    assert result["available"] is True
+    assert result["empty_reason"] == "no_items_in_window"
+    assert result["total"] == 0
+
+
+def test_post_validation_query_failure_is_typed_sanitized_and_preserves_request(
+    tmp_path, monkeypatch
+):
+    sa_db = tmp_path / "private-store.db"
+    _create_minimal_feed_db(sa_db)
+    marker = f"sqlite query failed at {sa_db}"
+    monkeypatch.setattr(
+        sa_tools,
+        "_sa_feed_local_conn",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            sqlite3.OperationalError(marker)
+        ),
+        raising=False,
+    )
+    dal, backend = _missing_store_dal(sa_db)
+
+    result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
+
+    backend._get_conn.assert_not_called()
+    _assert_store_failure(result, "store_query_failed")
+    assert marker not in repr(result)
+    assert str(sa_db) not in repr(result)
+
+
+def test_route_returns_typed_200_for_every_unavailable_store_reason(monkeypatch):
+    import asyncio
+
+    import fastapi.routing
+    import httpx
+    from fastapi import FastAPI
+
+    from src.api.routes import seeking_alpha as routes
+
+    app = FastAPI()
+    app.include_router(routes.router)
+
+    async def get_test_dal():
+        return object()
+
+    async def run_sync_endpoint_inline(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    app.dependency_overrides[routes.get_dal] = get_test_dal
+    # Keep real ASGI transport while bypassing this sandbox's AnyIO threadpool hang.
+    monkeypatch.setattr(
+        fastapi.routing, "run_in_threadpool", run_sync_endpoint_inline
+    )
+    unavailable_reasons = (
+        "backend_unavailable",
+        "requires_local_sa",
+        "store_not_created",
+        "store_missing",
+        "store_unreadable",
+        "store_schema_incompatible",
+        "store_query_failed",
+    )
+
+    async def exercise_route():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            results = []
+            for reason in unavailable_reasons:
+                monkeypatch.setattr(
+                    routes,
+                    "get_sa_feed",
+                    lambda *_args, _reason=reason, **_kwargs: {
+                        "available": False,
+                        "days": 30,
+                        "query": None,
+                        "total": 0,
+                        "items": [],
+                        "by_type": {},
+                        "by_day": {},
+                        "empty_reason": _reason,
+                    },
+                )
+                response = await client.get("/sa/feed")
+                results.append((reason, response))
+            return results
+
+    for reason, response in asyncio.run(exercise_route()):
+        assert response.status_code == 200, reason
+        assert response.json()["empty_reason"] == reason
+
+
 def test_feed_both_types_newest_first(tmp_path):
     db = tmp_path / "sa.db"; _seed(db)
     res = _feed(db, days=30)

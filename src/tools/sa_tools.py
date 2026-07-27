@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.app_records_store import resolve_profile_state_db_path
@@ -738,6 +740,36 @@ def _focus_local(
 # 2-reader compose) so total / facets / pagination are accurate.
 # ---------------------------------------------------------------------------
 
+_SA_FEED_REQUIRED_SCHEMA = {
+    "sa_articles": frozenset(
+        {
+            "id",
+            "article_id",
+            "title",
+            "ticker",
+            "published_date",
+            "url",
+            "body_markdown",
+            "comments_count",
+        }
+    ),
+    "sa_market_news": frozenset(
+        {
+            "id",
+            "news_id",
+            "title",
+            "published_at",
+            "url",
+            "summary",
+            "body_markdown",
+            "comments_count",
+        }
+    ),
+    "sa_market_news_tickers": frozenset({"news_row_id", "ticker"}),
+    "sa_articles_fts": frozenset({"title", "body_markdown"}),
+    "sa_market_news_fts": frozenset({"title", "summary"}),
+}
+
 
 def _empty_feed(days, *, query=None, empty_reason=None):
     return {
@@ -814,7 +846,11 @@ def get_sa_feed(
                               days=days, limit=limit, offset=offset)
     except Exception as e:
         logger.error("get_sa_feed error: %s", e)
-        return _empty_feed(days, query=q, empty_reason="error")
+        safe_days = days if isinstance(days, int) else 30
+        safe_query = (q.strip() or None) if isinstance(q, str) else None
+        return _empty_feed(
+            safe_days, query=safe_query, empty_reason="store_query_failed"
+        )
 
 
 def _display_snippet(raw: Optional[str], title: Optional[str]) -> str:
@@ -828,10 +864,87 @@ def _display_snippet(raw: Optional[str], title: Optional[str]) -> str:
     return markdown_to_plain_snippet(raw, drop_title=title)
 
 
+def _open_sa_feed_read_only(sa_db: str | os.PathLike[str]) -> sqlite3.Connection:
+    path = Path(sa_db).expanduser()
+    conn = sqlite3.connect(
+        f"{path.resolve().as_uri()}?mode=ro",
+        uri=True,
+        timeout=5.0,
+    )
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only = ON")
+    except Exception:
+        conn.close()
+        raise
+    return conn
+
+
+def _sa_feed_schema_is_compatible(conn: sqlite3.Connection) -> bool:
+    for table, required_columns in _SA_FEED_REQUIRED_SCHEMA.items():
+        table_row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        ).fetchone()
+        if table_row is None:
+            return False
+        columns = {
+            str(row[1])
+            for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+        }
+        if not required_columns.issubset(columns):
+            return False
+    return True
+
+
 def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[str, Any]:
-    """SQLite feed: UNION of normalized sa_articles + sa_market_news. The window
-    cutoff is applied PER COLUMN TYPE — published_date (DATE) vs published_at
-    (TIMESTAMP) — so a date-only article is not dropped by a timestamp cutoff."""
+    if not os.path.isfile(sa_db):
+        return _empty_feed(days, query=q, empty_reason="store_unreadable")
+
+    try:
+        conn = _open_sa_feed_read_only(sa_db)
+    except (OSError, sqlite3.Error) as exc:
+        logger.error("SA feed store open failed: %s", exc)
+        return _empty_feed(days, query=q, empty_reason="store_unreadable")
+
+    try:
+        try:
+            compatible = _sa_feed_schema_is_compatible(conn)
+        except sqlite3.Error as exc:
+            logger.error("SA feed store inspection failed: %s", exc)
+            return _empty_feed(days, query=q, empty_reason="store_unreadable")
+        if not compatible:
+            return _empty_feed(
+                days, query=q, empty_reason="store_schema_incompatible"
+            )
+        try:
+            return _sa_feed_local_conn(
+                conn,
+                q=q,
+                ticker=ticker,
+                item_type=item_type,
+                days=days,
+                limit=limit,
+                offset=offset,
+            )
+        except Exception as exc:
+            logger.error("SA feed query failed: %s", exc)
+            return _empty_feed(days, query=q, empty_reason="store_query_failed")
+    finally:
+        conn.close()
+
+
+def _sa_feed_local_conn(
+    conn: sqlite3.Connection,
+    *,
+    q,
+    ticker,
+    item_type,
+    days,
+    limit,
+    offset,
+) -> Dict[str, Any]:
+    """Query a validated feed connection without acquiring another store."""
     from src import sa_capture_store as store
 
     now = datetime.now(timezone.utc) - timedelta(days=days)
@@ -890,57 +1003,53 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
     base = " UNION ALL ".join(s for s, _ in parts)
     bp = [p for _, ps in parts for p in ps]
 
-    conn = store.connect(sa_db, read_only=True)
-    try:
-        total = conn.execute(f"SELECT COUNT(*) FROM ({base})", bp).fetchone()[0]
-        by_type = {r[0]: r[1] for r in conn.execute(
-            f"SELECT type, COUNT(*) FROM ({base}) GROUP BY type", bp)}
-        by_day = {r[0]: r[1] for r in conn.execute(
-            f"SELECT substr(published_at,1,10) d, COUNT(*) FROM ({base}) GROUP BY d ORDER BY d DESC", bp)}
-        rows = conn.execute(
-            f"SELECT * FROM ({base}) ORDER BY published_at DESC, item_id DESC LIMIT ? OFFSET ?",
-            bp + [limit, offset]).fetchall()
+    total = conn.execute(f"SELECT COUNT(*) FROM ({base})", bp).fetchone()[0]
+    by_type = {r[0]: r[1] for r in conn.execute(
+        f"SELECT type, COUNT(*) FROM ({base}) GROUP BY type", bp)}
+    by_day = {r[0]: r[1] for r in conn.execute(
+        f"SELECT substr(published_at,1,10) d, COUNT(*) FROM ({base}) GROUP BY d ORDER BY d DESC", bp)}
+    rows = conn.execute(
+        f"SELECT * FROM ({base}) ORDER BY published_at DESC, item_id DESC LIMIT ? OFFSET ?",
+        bp + [limit, offset]).fetchall()
 
-        news_ids = [r["row_id"] for r in rows if r["type"] == "market_news"]
-        news_tk: Dict[int, List[str]] = {}
-        if news_ids:
-            ph = ",".join("?" * len(news_ids))
-            for jr in conn.execute(
-                f"SELECT news_row_id, ticker FROM sa_market_news_tickers WHERE news_row_id IN ({ph})",
-                news_ids):
-                news_tk.setdefault(jr["news_row_id"], []).append(jr["ticker"])
+    news_ids = [r["row_id"] for r in rows if r["type"] == "market_news"]
+    news_tk: Dict[int, List[str]] = {}
+    if news_ids:
+        ph = ",".join("?" * len(news_ids))
+        for jr in conn.execute(
+            f"SELECT news_row_id, ticker FROM sa_market_news_tickers WHERE news_row_id IN ({ph})",
+            news_ids):
+            news_tk.setdefault(jr["news_row_id"], []).append(jr["ticker"])
 
-        items = []
-        for r in rows:
-            if r["type"] == "article":
-                tickers = [r["single_ticker"]] if r["single_ticker"] else []
-                detail_route = f"/sa/articles/{r['item_id']}" if r["has_detail"] else None
-            else:
-                tickers = sorted(news_tk.get(r["row_id"], []))
-                detail_route = None  # no /sa/market-news/{id} endpoint in C-1 → click uses url
-            items.append({
-                "type": r["type"],
-                "id": r["item_id"],
-                "title": r["title"],
-                "tickers": tickers,
-                "published_at": r["published_at"],
-                "url": r["url"],
-                "source": "seeking_alpha",
-                "snippet": _display_snippet(r["snippet_src"], r["title"]),
-                "has_detail": bool(r["has_detail"]),
-                "comments_count": r["comments_count"],
-                "detail_route": detail_route,
-            })
+    items = []
+    for r in rows:
+        if r["type"] == "article":
+            tickers = [r["single_ticker"]] if r["single_ticker"] else []
+            detail_route = f"/sa/articles/{r['item_id']}" if r["has_detail"] else None
+        else:
+            tickers = sorted(news_tk.get(r["row_id"], []))
+            detail_route = None  # no /sa/market-news/{id} endpoint in C-1 -> click uses url
+        items.append({
+            "type": r["type"],
+            "id": r["item_id"],
+            "title": r["title"],
+            "tickers": tickers,
+            "published_at": r["published_at"],
+            "url": r["url"],
+            "source": "seeking_alpha",
+            "snippet": _display_snippet(r["snippet_src"], r["title"]),
+            "has_detail": bool(r["has_detail"]),
+            "comments_count": r["comments_count"],
+            "detail_route": detail_route,
+        })
 
-        return {
-            "available": True,
-            "days": days,
-            "query": q,
-            "total": total,
-            "items": items,
-            "by_type": by_type,
-            "by_day": by_day,
-            "empty_reason": "no_items_in_window" if total == 0 else None,
-        }
-    finally:
-        conn.close()
+    return {
+        "available": True,
+        "days": days,
+        "query": q,
+        "total": total,
+        "items": items,
+        "by_type": by_type,
+        "by_day": by_day,
+        "empty_reason": "no_items_in_window" if total == 0 else None,
+    }
