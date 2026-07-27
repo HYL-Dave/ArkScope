@@ -441,6 +441,28 @@ def test_post_validation_query_failure_is_typed_sanitized_and_preserves_request(
     assert str(sa_db) not in repr(result)
 
 
+def test_unexpected_internal_failure_is_typed_sanitized_and_preserves_request():
+    marker = "private failure at /tmp/sa-outer-catch.db"
+
+    class UnexpectedBackend:
+        def _get_conn(self):
+            raise AssertionError("outer fallback must not touch PG")
+
+        @property
+        def _sa_db(self):
+            raise RuntimeError(marker)
+
+    class UnexpectedDal:
+        _backend = UnexpectedBackend()
+
+    result = sa_tools.get_sa_feed(
+        UnexpectedDal(), q="  private query  ", days=99999
+    )
+
+    _assert_store_failure(result, "store_query_failed")
+    assert marker not in repr(result)
+
+
 def test_route_returns_typed_200_for_every_unavailable_store_reason(monkeypatch):
     import asyncio
 

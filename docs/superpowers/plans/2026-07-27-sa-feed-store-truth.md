@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
+> **Status: IMPLEMENTATION REVIEW GREEN - TEST-CLOSURE RE-REVIEW NEXT**
 
 **Goal:** Make `GET /sa/feed` distinguish first-run absence, missing storage,
 unreadable or incompatible storage, query failure, valid empty results, and
@@ -81,6 +81,26 @@ GREEN. Two non-design advisories were checked against the code and accepted:
 
 The HTTP node changes backend accounting by `+1/-0`; all other reviewed
 counts remain unchanged.
+
+### 1.3 Independent implementation-review resolution
+
+Independent implementation review returned GREEN with zero required product
+changes. One test-layer advisory was verified and accepted before integration:
+the outer `get_sa_feed` catch-all is reachable after request normalization,
+but only the inner post-validation failure path had regression coverage for
+safe diagnostics and preserved request facts. A single test-only node now
+drives an `_sa_db` property failure through that outer fallback and requires
+`store_query_failed`, normalized `days/query`, and no raw marker in the
+response.
+
+Two independent RED mutations prove the node is load-bearing: restoring the
+old fixed `days=30` projection turns it red, and restoring `error=str(e)` turns
+it red. Product source is byte-identical to reviewed product tip `841d7241`.
+This closure changes backend accounting by `+1/-0` to final `+31/-0`; frontend
+and every non-node ledger remain unchanged. The matched full run is
+`4623 passed / 27 failed / 72 skipped`; its non-passing set is byte-identical
+to the reviewed tip (`27/27`, new `0`, gone `0`). Only this test/evidence delta
+needs follow-up review before integration.
 
 ## 2. Grounded Baseline
 
@@ -192,7 +212,7 @@ test_sa_store_activity_job_names_cover_all_current_authorities
 test_sa_store_history_contract_has_no_pruning_or_time_cutoff
 ```
 
-`tests/test_sa_feed.py` adds exactly 24 nodes:
+`tests/test_sa_feed.py` adds exactly 25 nodes:
 
 ```text
 test_missing_store_without_profile_is_not_created_and_creates_nothing
@@ -218,6 +238,7 @@ test_missing_required_feed_table_is_schema_incompatible[sa_market_news_fts]
 test_missing_required_feed_column_is_schema_incompatible
 test_extra_feed_schema_remains_compatible
 test_post_validation_query_failure_is_typed_sanitized_and_preserves_request
+test_unexpected_internal_failure_is_typed_sanitized_and_preserves_request
 test_route_returns_typed_200_for_every_unavailable_store_reason
 ```
 
@@ -230,9 +251,9 @@ Final backend accounting:
 
 ```text
 tests/test_job_runs.py  63 -> 69  (+6/-0)
-tests/test_sa_feed.py   14 -> 38  (+24/-0)
-focused                77 -> 107 (+30/-0)
-full                 4691 -> 4721 (+30/-0)
+tests/test_sa_feed.py   14 -> 39  (+25/-0)
+focused                77 -> 108 (+31/-0)
+full                 4691 -> 4722 (+31/-0)
 ```
 
 ### 3.2 Frontend node ledger
@@ -1068,8 +1089,8 @@ Stop and return to design review if any of these occurs:
   Expected:
 
   ```text
-  backend focused 77 -> 107, +30/-0
-  backend full    4691 -> 4721, +30/-0
+  backend focused 77 -> 108, +31/-0
+  backend full    4691 -> 4722, +31/-0
   frontend focused 25 -> 27, +2/-0
   frontend full   1072 -> 1074, +2/-0, still 96 files
   ```
@@ -1195,11 +1216,13 @@ Stop and return to design review if any of these occurs:
   8. both FTS tables checked even without `q`;
   9. post-validation failure preserves normalized request facts and leaks no
      path/prose;
-  10. valid empty is reachable only after a successful compatible query;
-  11. mounted unavailable fixtures render no count/facet/row/empty/load-more;
-  12. both locale states and Data Sources action mapping;
-  13. exact resource/scanner/tool/no-PG accounting;
-  14. protected byte families and no production writes.
+  10. the outer catch-all independently preserves normalized request facts and
+      leaks no path/prose;
+  11. valid empty is reachable only after a successful compatible query;
+  12. mounted unavailable fixtures render no count/facet/row/empty/load-more;
+  13. both locale states and Data Sources action mapping;
+  14. exact resource/scanner/tool/no-PG accounting;
+  15. protected byte families and no production writes.
 
 - [ ] **Step 3: Resolve findings with RED-first evidence.**
 
@@ -1219,7 +1242,7 @@ This section is not authorized until Task 6 is GREEN.
 1. Confirm `master` still contains `PLAN_REVIEW_CLEARANCE_COMMIT` and has no
    conflicting product changes.
 2. Fast-forward only; do not create a merge commit.
-3. On the merged tree, rerun backend focused `107`, frontend focused `27`, both
+3. On the merged tree, rerun backend focused `108`, frontend focused `27`, both
    full collections, exact node comm, resources `380/704/1783`, scanner twice,
    tools `53/54/54`, typecheck/build, no-PG `23`, and protected byte gates.
 4. Capture production DB facts using SQLite URI `mode=ro` only:
