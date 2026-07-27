@@ -1,6 +1,6 @@
 # SA Feed Store Truth Design
 
-> **Status**: USER DESIGN APPROVED - INDEPENDENT REVIEW PENDING
+> **Status**: INDEPENDENT REVIEW GREEN - IMPLEMENTATION PLAN AUTHORIZED
 > **Date**: 2026-07-27
 > **Grounding commit**: `5ba126736076238f4bee54e419c4bb24f2f6f017`
 > **Scope**: `GET /sa/feed`, the `get_sa_feed` tool response, its no-create
@@ -245,7 +245,10 @@ The compatibility probe checks only what the current feed reader needs:
 
 Both FTS tables are required even for a request without `q`, because the
 advertised endpoint includes search and must not alternate between apparently
-available and structurally unavailable based only on the current filter.
+available and structurally unavailable based only on the current filter. If FTS
+were checked only when `q` is present, the same damaged store could report
+`available=true` without `q` and `store_schema_incompatible` with `q`; store
+availability is a property of the store capability, not of the current request.
 
 The probe and feed query use one read-only connection. Failure while opening or
 reading SQLite metadata is `store_unreadable`; failure after the schema has
@@ -404,8 +407,14 @@ to manufacture a failure.
 After merge, production verification is read-only:
 
 - the real readable store still returns the expected valid feed shape;
+- a separate merged-code process points `ARKSCOPE_SA_DB` at a unique absent
+  temporary path while retaining the real profile-history authority, and must
+  return `store_missing` without creating that path; this exercises the shipped
+  negative path without renaming, chmodding, corrupting, or opening the real SA
+  store for write;
 - production `sa_capture.db` and `profile_state.db` size, mtime, integrity, and
-  relevant row counts remain unchanged;
+  relevant row counts remain unchanged across both positive and negative
+  smokes, and the temporary SA path is absent before and after;
 - no extension, provider, scheduler, repair, or browser action is triggered;
 - the two-locale News surface displays its normal populated state; and
 - the priority map records this micro-slice complete while keeping Alpha Picks
