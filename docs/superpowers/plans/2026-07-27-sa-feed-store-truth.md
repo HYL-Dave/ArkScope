@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: INDEPENDENT PLAN REVIEW PENDING**
+> **Status: PLAN REVIEW GREEN - IMPLEMENTATION CLEARED**
 
 **Goal:** Make `GET /sa/feed` distinguish first-run absence, missing storage,
 unreadable or incompatible storage, query failure, valid empty results, and
@@ -63,6 +63,24 @@ were checked against the code and accepted because they close real ambiguity:
 
 The second advisory is a release gate, not permission to manufacture a
 production fault.
+
+### 1.2 Independent plan-review resolution
+
+Independent review reproduced all five baselines and returned substantive
+GREEN. Two non-design advisories were checked against the code and accepted:
+
+1. The existing route node calls `sa_feed(...)` directly. It proves the
+   handler's feature-disabled `503`, but cannot prove that every typed
+   unavailable payload remains HTTP `200` through FastAPI transport. One real
+   HTTP node is therefore added and loops over every unavailable reason.
+2. A `Set<SAFeedEmptyReason>.has(...)` would not make a future union member a
+   compile error. The frontend must use one exhaustive `switch` whose default
+   passes its value to a `never` helper, following the existing Coverage V2
+   pattern. The existing recovery-target node gains the source-level guard;
+   the frontend node count does not change.
+
+The HTTP node changes backend accounting by `+1/-0`; all other reviewed
+counts remain unchanged.
 
 ## 2. Grounded Baseline
 
@@ -174,7 +192,7 @@ test_sa_store_activity_job_names_cover_all_current_authorities
 test_sa_store_history_contract_has_no_pruning_or_time_cutoff
 ```
 
-`tests/test_sa_feed.py` adds exactly 23 nodes:
+`tests/test_sa_feed.py` adds exactly 24 nodes:
 
 ```text
 test_missing_store_without_profile_is_not_created_and_creates_nothing
@@ -200,6 +218,7 @@ test_missing_required_feed_table_is_schema_incompatible[sa_market_news_fts]
 test_missing_required_feed_column_is_schema_incompatible
 test_extra_feed_schema_remains_compatible
 test_post_validation_query_failure_is_typed_sanitized_and_preserves_request
+test_route_returns_typed_200_for_every_unavailable_store_reason
 ```
 
 The seven activity names above are seven separate test functions. They must
@@ -211,9 +230,9 @@ Final backend accounting:
 
 ```text
 tests/test_job_runs.py  63 -> 69  (+6/-0)
-tests/test_sa_feed.py   14 -> 37  (+23/-0)
-focused                77 -> 106 (+29/-0)
-full                 4691 -> 4720 (+29/-0)
+tests/test_sa_feed.py   14 -> 38  (+24/-0)
+focused                77 -> 107 (+30/-0)
+full                 4691 -> 4721 (+30/-0)
 ```
 
 ### 3.2 Frontend node ledger
@@ -502,23 +521,28 @@ indexes, triggers, and user-version differences are accepted.
 `api.ts` introduces a closed `SAFeedEmptyReason` type and applies it to
 `SAFeedResponse.empty_reason`.
 
-`News.tsx` derives three separate facts:
+`News.tsx` derives availability presentation through one exhaustive classifier.
+It must cover all nine members of `SAFeedEmptyReason` (including `null`) and
+route its default branch through a `never` helper:
 
 ```typescript
-const unavailable = Boolean(feed && !feed.available);
-const notCreated = unavailable && feed?.empty_reason === "store_not_created";
-const canOpenDataSources = unavailable && new Set<SAFeedEmptyReason>([
-  "requires_local_sa",
-  "store_not_created",
-  "store_missing",
-  "store_unreadable",
-  "store_schema_incompatible",
-  "store_query_failed",
-]).has(feed?.empty_reason ?? null);
+function unreachableSAFeedReason(value: never): void {
+  void value;
+}
+
+function classifySAFeedReason(reason: SAFeedEmptyReason): SAFeedReasonPresentation {
+  switch (reason) {
+    // one explicit case for every closed-union member
+    default:
+      unreachableSAFeedReason(reason);
+      return { copy: "degraded", canOpenDataSources: false };
+  }
+}
 ```
 
-Do not instantiate a new set on every render in final code; use a module-level
-immutable set or an exhaustive switch. The rendering contract is:
+The fallback after the `never` call remains a fail-safe for malformed runtime
+JSON, but adding a declared union member without a case must fail TypeScript
+compilation. A set-based classifier is not accepted. The rendering contract is:
 
 - statistics and facets require `feed?.available`;
 - rows and Load More require `feed?.available` even if an adversarial fixture
@@ -849,12 +873,20 @@ Stop and return to design review if any of these occurs:
   configured_path not in repr(result)
   ```
 
+  Also add
+  `test_route_returns_typed_200_for_every_unavailable_store_reason`. Build a
+  minimal FastAPI app with the real Seeking Alpha router, override only
+  `get_dal`, and monkeypatch the tool seam to return each closed unavailable
+  payload inside one explicit loop. Every response must be HTTP `200` and must
+  preserve the exact typed reason. A handler-direct call does not satisfy this
+  node.
+
 - [ ] **Step 4: Run RED and confirm each failure class.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
     tests/test_sa_feed.py -k \
-    'unreadable or schema_incompatible or extra_feed_schema or post_validation'
+    'unreadable or schema_incompatible or extra_feed_schema or post_validation or route_returns'
   ```
 
   Missing table/column must fail as incompatible, not because fixture SQL is
@@ -877,9 +909,11 @@ Stop and return to design review if any of these occurs:
 
   `test_route_handler_happy_and_disabled` additionally proves:
 
-  - unavailable store reasons return the typed payload at HTTP `200`;
   - feature disabled remains HTTP `503`;
   - populated route behavior is unchanged.
+
+  The new real-HTTP node, rather than this handler-direct node, proves every
+  unavailable store reason remains a typed HTTP `200` response.
 
 - [ ] **Step 7: Run all feed and job-history tests.**
 
@@ -888,7 +922,7 @@ Stop and return to design review if any of these occurs:
     tests/test_job_runs.py tests/test_sa_feed.py
   ```
 
-  Expected: `106 passed`.
+  Expected: `107 passed`.
 
 - [ ] **Step 8: Prove the store/query boundaries by mutation.**
 
@@ -945,7 +979,9 @@ Stop and return to design review if any of these occurs:
 
   Evolve the existing recovery-target node without renaming it. Every
   path/store reason receives Data Sources; `backend_unavailable` and valid empty
-  do not claim that action.
+  do not claim that action. The same node reads `News.tsx` and requires the
+  exhaustive `switch`, the `unreachableSAFeedReason(value: never)` helper, and
+  the absence of a set-based availability classifier.
 
 - [ ] **Step 3: Run RED.**
 
@@ -963,7 +999,8 @@ Stop and return to design review if any of these occurs:
 
   Follow Section 5.6. Gate statistics, rows, and Load More at render time with
   `feed.available`; do not merely rely on backend empty arrays. Keep valid
-  empty and populated behavior unchanged. Do not add CSS.
+  empty and populated behavior unchanged. Use the required exhaustive switch;
+  a `Set.has()` implementation is not contract-equivalent. Do not add CSS.
 
 - [ ] **Step 5: Run focused GREEN and mutation probes.**
 
@@ -1031,8 +1068,8 @@ Stop and return to design review if any of these occurs:
   Expected:
 
   ```text
-  backend focused 77 -> 106, +29/-0
-  backend full    4691 -> 4720, +29/-0
+  backend focused 77 -> 107, +30/-0
+  backend full    4691 -> 4721, +30/-0
   frontend focused 25 -> 27, +2/-0
   frontend full   1072 -> 1074, +2/-0, still 96 files
   ```
@@ -1181,7 +1218,7 @@ This section is not authorized until Task 6 is GREEN.
 1. Confirm `master` still contains `PLAN_REVIEW_CLEARANCE_COMMIT` and has no
    conflicting product changes.
 2. Fast-forward only; do not create a merge commit.
-3. On the merged tree, rerun backend focused `106`, frontend focused `27`, both
+3. On the merged tree, rerun backend focused `107`, frontend focused `27`, both
    full collections, exact node comm, resources `380/704/1783`, scanner twice,
    tools `53/54/54`, typecheck/build, no-PG `23`, and protected byte gates.
 4. Capture production DB facts using SQLite URI `mode=ro` only:
