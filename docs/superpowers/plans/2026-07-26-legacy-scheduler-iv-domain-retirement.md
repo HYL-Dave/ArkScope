@@ -1679,7 +1679,7 @@ scanner 36/20/0/20 twice
 ```
 
 The one-node backend deviation is
-`test_preview_digest_memory_is_bounded_for_large_tables`. The original digest
+`test_logical_database_digest_is_memory_bounded`. The original digest
 materialized an entire logical table and reached about 6 GiB RSS against the
 production-shaped market database. The replacement is a length-framed,
 streaming SHA-256 digest. This changes no product or migration result; it adds
