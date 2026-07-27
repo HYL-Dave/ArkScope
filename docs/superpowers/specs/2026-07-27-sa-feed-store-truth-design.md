@@ -1,6 +1,6 @@
 # SA Feed Store Truth Design
 
-> **Status**: INDEPENDENT REVIEW GREEN - IMPLEMENTATION PLAN AUTHORIZED
+> **Status**: LIVE COMPLETE - MERGED AND READ-ONLY RELEASE GATES GREEN 2026-07-28
 > **Date**: 2026-07-27
 > **Grounding commit**: `5ba126736076238f4bee54e419c4bb24f2f6f017`
 > **Scope**: `GET /sa/feed`, the `get_sa_feed` tool response, its no-create
@@ -419,6 +419,30 @@ After merge, production verification is read-only:
 - the two-locale News surface displays its normal populated state; and
 - the priority map records this micro-slice complete while keeping Alpha Picks
   alignment open.
+
+### 11.1 Release Resolution
+
+Independent re-review returned GREEN with zero findings. `master`
+fast-forwarded to reviewed tip `aaee26b7` without a merge commit. Merged-tree
+verification reproduced backend `4722` and focused `108`, frontend `96/1074`
+and focused `27`, resources `380/704/1783`, scanner `36/20/0/20` twice, tools
+`53/54/54`, no-PG `23/23`, typecheck/build, and protected byte gates.
+
+A direct merged-code positive smoke read the real store normally. A separate
+negative process retained the real read-only profile authority while pointing
+at a unique absent temporary SA path; it returned `store_missing`, preserved
+normalized request facts, exposed no path or diagnostic, and created neither
+the file nor its parent. The bilingual News surface rendered its populated
+state with no locale write or runtime exception.
+
+The live Firefox extension wrote new capture results while a later browser
+permission wait was in progress. Those external writes were identified from
+their extension trigger sources rather than misattributed to this release.
+After the next extension cycle completed, one bounded final pre/UI/post window
+produced byte-for-byte identical fact packets for both production databases.
+Integrity remained `ok`, foreign-key violations remained zero, and no refresh,
+recovery, scheduler, provider, or repair control was invoked by the release
+gate.
 
 ## 12. Stop Conditions
 

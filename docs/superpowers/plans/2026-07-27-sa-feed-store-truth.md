@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTATION REVIEW GREEN - TEST-CLOSURE RE-REVIEW NEXT**
+> **Status: LIVE COMPLETE - MERGED AND READ-ONLY RELEASE GATES GREEN 2026-07-28**
 
 **Goal:** Make `GET /sa/feed` distinguish first-run absence, missing storage,
 unreadable or incompatible storage, query failure, valid empty results, and
@@ -99,8 +99,26 @@ it red. Product source is byte-identical to reviewed product tip `841d7241`.
 This closure changes backend accounting by `+1/-0` to final `+31/-0`; frontend
 and every non-node ledger remain unchanged. The matched full run is
 `4623 passed / 27 failed / 72 skipped`; its non-passing set is byte-identical
-to the reviewed tip (`27/27`, new `0`, gone `0`). Only this test/evidence delta
-needs follow-up review before integration.
+to the reviewed tip (`27/27`, new `0`, gone `0`). At that point, only this
+test/evidence delta still needed follow-up review before integration.
+
+### 1.4 Post-Review Integration And Release Resolution
+
+Independent test-closure re-review returned GREEN with zero findings and
+reproduced backend `4722`, focused `108`, exact `+31/-0`, the full-run
+non-passing set `27/27`, frontend `96/1074`, scanner, tools, and no-PG gates.
+`master` then fast-forwarded to exact reviewed tip `aaee26b7` without a merge
+commit.
+
+Merged-tree verification reproduced the reviewed full/focused hashes and all
+non-node gates. Direct merged-code positive and absent-path negative smokes
+were read-only; the latter returned `store_missing` from real profile history,
+leaked no path or diagnostic, and created no temporary store. A semantic
+bilingual News check rendered the normal populated state without a locale
+write or runtime exception. External Firefox extension writes occurred during
+an earlier permission wait; after that cycle completed, the final bounded
+pre/UI/post window preserved both production database fact packets exactly.
+The separate Alpha Picks availability-alignment contract remains open.
 
 ## 2. Grounded Baseline
 
@@ -1197,12 +1215,12 @@ Stop and return to design review if any of these occurs:
 - Modify only review corrections and evidence/status documents authorized by
   this plan
 
-- [ ] **Step 1: Stop product work at review-ready.**
+- [x] **Step 1: Stop product work at review-ready.**
 
   Do not merge, push, run a production smoke, restart ArkScope, trigger SA
   capture, or edit production databases before independent review.
 
-- [ ] **Step 2: Reviewer reproduces canonical A/B.**
+- [x] **Step 2: Reviewer reproduces canonical A/B.**
 
   Required independent checks:
 
@@ -1224,13 +1242,13 @@ Stop and return to design review if any of these occurs:
   14. exact resource/scanner/tool/no-PG accounting;
   15. protected byte families and no production writes.
 
-- [ ] **Step 3: Resolve findings with RED-first evidence.**
+- [x] **Step 3: Resolve findings with RED-first evidence.**
 
   Any product correction receives a named failing test before code. Update
   node/resource accounting if and only if the reviewed correction genuinely
   changes it. Re-run all affected and final gates.
 
-- [ ] **Step 4: Record review clearance.**
+- [x] **Step 4: Record review clearance.**
 
   Independent GREEN is required before integration. Commit review-only
   evidence corrections, then record the exact reviewed tip.
