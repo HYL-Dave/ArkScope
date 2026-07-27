@@ -1,6 +1,6 @@
 # Legacy Scheduler Sources and IV Domain Retirement Design
 
-> **Status: IMPLEMENTED - INDEPENDENT REVIEW PENDING**
+> **Status: MERGED - PRODUCTION RETIREMENT PENDING**
 >
 > Written against clean `master` tip `16d77bae` on 2026-07-26. This document
 > authorizes no product edit, migration, provider call, or production write.
@@ -8,13 +8,12 @@
 > ownership amendments through `7bb7cc29`. The RED-first implementation plan
 > is `docs/superpowers/plans/2026-07-26-legacy-scheduler-iv-domain-retirement.md`;
 > independent plan review is GREEN after two docs-only corrections. The
-> implementation is complete on the isolated
-> `codex/legacy-scheduler-iv-retirement` branch and is awaiting independent
-> review. Clearance is
-> `5f528475420c8de407125bceb32d94050cfa8e14`.
-> No production migration has run. Production data removal still requires
-> independent implementation GREEN, merge, stopped writers, fresh preview,
-> and a second explicit approval.
+> implementation review returned GREEN with no product findings after the two
+> evidence-index corrections in `28b136d1`. `master` fast-forwarded to that
+> exact reviewed tip on 2026-07-27. Plan clearance is
+> `5f528475420c8de407125bceb32d94050cfa8e14`. No production migration has run.
+> Production data removal still requires stopped writers, a fresh merged-code
+> preview, and a second explicit approval for that exact manifest.
 
 ## 1. Purpose And Authority
 

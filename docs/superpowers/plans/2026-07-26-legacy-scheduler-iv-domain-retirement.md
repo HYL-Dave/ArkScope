@@ -9,7 +9,11 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTED - INDEPENDENT REVIEW PENDING**
+> **Status: MERGED - PRODUCTION RETIREMENT PENDING**
+>
+> Independent implementation review returned GREEN after the evidence-index
+> corrections in `28b136d1`; `master` fast-forwarded to that exact tip on
+> 2026-07-27. Steps 2-9 in the production protocol remain separately gated.
 
 Review packet, created during implementation:
 `docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md`.

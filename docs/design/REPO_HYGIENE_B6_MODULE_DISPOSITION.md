@@ -8,7 +8,7 @@
 > deletions now; scripts survivor-table changes = standing-ruling changes.
 > Nothing here executes anything.
 
-> **2026-07-26 scoped supersession:** The review-pending legacy-IV retirement
+> **2026-07-27 scoped supersession:** The merged legacy-IV retirement
 > removes exactly two `scripts/analysis` consumers because they directly depend on
 > the retired store: `compare_bs_vs_american.py` and
 > `scan_option_mispricing.py`. This is a domain retirement, not a reversal of the
@@ -27,8 +27,8 @@ Complete consumer inventory (rewired by the B7 implementation branch):
 | Consumer | Sites |
 |---|---|
 | `src/tools/options_tools.py` | lazy imports at `:40` `:151` `:152` `:187` `:264` `:267` |
-| `scripts/analysis/compare_bs_vs_american.py` | retired with the legacy IV store on the review-pending 2026-07-26 branch |
-| `scripts/analysis/scan_option_mispricing.py` | retired with the legacy IV store on the review-pending 2026-07-26 branch |
+| `scripts/analysis/compare_bs_vs_american.py` | retired with the legacy IV product contract in merged tip `28b136d1` |
+| `scripts/analysis/scan_option_mispricing.py` | retired with the legacy IV product contract in merged tip `28b136d1` |
 | `tests/test_option_pricing.py`, `tests/test_rate_curve.py` | direct imports, in-function imports, and `patch("analysis.rate_curve...")` string target |
 
 (`tests/test_analysis_cards_api.py` is a false match — it imports the routes module.)
