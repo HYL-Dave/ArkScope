@@ -226,7 +226,7 @@ Add exactly two frontend nodes; remove or rename none:
 
 ```text
 src/marketDataDisplay.test.ts > schedulerStateLabel > renders price unresolved count and bounded ticker list without continuation
-src/SettingsProviderConfig.test.ts > renders price partial facts without a Continue control in both locales
+src/SettingsProviderConfig.test.ts > Settings provider config authority > renders price partial facts without a Continue control in both locales
 ```
 
 | File | Base | Add | Remove | Final |
@@ -1750,6 +1750,10 @@ of these occurs:
 
 - [ ] **Step 2: Add the mounted bilingual RED node and bounded fixture mode.**
 
+  Place the fixture changes and new node inside the existing
+  `describe("Settings provider config authority", ...)` block; the exact node
+  ID in Section 3.2 includes that prefix.
+
   Add to `mocked`:
 
   ```typescript
@@ -1957,7 +1961,10 @@ of these occurs:
 
   The 26-row mutation must affect the target/day-presence predicate, not merely
   add a dead condition after an empty target set. The one-row node must turn
-  RED for the semantic reason.
+  RED for the semantic reason. Preserve the exact temporary diff for this
+  mutation in the evidence packet so review can prove that target
+  classification, rather than only `_unresolved_price_target_dates()` on an
+  already-empty target set, was changed.
 
 - [ ] **Step 2: Reproduce exact final collections and comms.**
 
