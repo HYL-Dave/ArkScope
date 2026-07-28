@@ -672,6 +672,7 @@ The untracked `docs/design/SCRIPTS_RETIREMENT_DECISION.md` remains user-owned in
 the main worktree and is not copied into or modified by this isolated slice.
 
 Independent full-document re-review returned GREEN with zero findings at
-`1a695141`. A RED-first implementation plan is the next gate. Product edits
-remain unauthorized until that plan receives independent review; provider
-calls, production writes, merge, and push remain separately unauthorized.
+`1a695141`; independent plan review then cleared reviewed plan tip `9d1e648a`.
+Task 0 same-environment grounding is the next gate. Product edits remain
+unauthorized until Task 0 closes; provider calls, production writes, merge,
+and push remain separately unauthorized.

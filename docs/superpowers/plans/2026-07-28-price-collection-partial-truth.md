@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: DRAFT - INDEPENDENT PLAN REVIEW REQUIRED**
+> **Status: APPROVED - TASK 0 AUTHORIZED 2026-07-29**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -51,10 +51,13 @@ anti-false-partial shapes, the fixed-26-slot mutation, the local fail-closed
 audit projection, and the explicit non-convergence of normalized-news audit
 behavior.
 
-Product edits remain unauthorized until an independent plan review records a
-clearance commit. If implementation contradicts the spec, changes any
-protected boundary, or changes an exact node/resource ledger below, stop and
-amend the authority before continuing.
+Independent plan review cleared reviewed plan tip `9d1e648a` after the exact
+frontend node identity was aligned with its enclosing Vitest `describe` and
+the load-bearing 26-slot mutation gained a reviewable-diff evidence pin. Task
+0 grounding is authorized; product edits remain unauthorized until Task 0
+closes with a complete same-environment baseline. If implementation
+contradicts the spec, changes any protected boundary, or changes an exact
+node/resource ledger below, stop and amend the authority before continuing.
 
 The main worktree's untracked files remain user-owned and out of scope:
 
@@ -759,7 +762,9 @@ of these occurs:
 10. a live provider, Gateway, browser, scheduler, or production write is needed
     for RED/GREEN or review;
 11. the base full suite cannot produce a same-environment non-passing node-ID
-    set for A/B comparison; or
+    set for A/B comparison; before stopping, preserve the last verbose node
+    line as EIR-002 diagnostic evidence rather than treating partial output as
+    a baseline; or
 12. either main-worktree untracked document changes.
 
 ## 7. Task 0 - Reground After Plan Clearance
@@ -846,7 +851,8 @@ of these occurs:
 - [ ] **Step 5: Capture the same-environment full non-passing set.**
 
   ```bash
-  /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
+  PYTHONUNBUFFERED=1 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
+    -vv --tb=short \
     > /tmp/price-truth-base-full.txt 2>&1
   sed -n 's/^FAILED \([^ ]*::[^ ]*\).*/\1/p; s/^ERROR \([^ ]*::[^ ]*\).*/\1/p' \
     /tmp/price-truth-base-full.txt \
@@ -860,7 +866,9 @@ of these occurs:
   The command may exit nonzero because EIR-002 is open, but it must terminate
   and produce a normalized set. Record the dated count and hash as an
   observation. If it hangs or cannot produce a complete set, stop under Stop
-  Condition 11; do not infer a baseline from partial output.
+  Condition 11; run `tail -40 /tmp/price-truth-base-full.txt`, preserve the
+  final started/completed node line as diagnostic evidence, and do not infer a
+  baseline from partial output.
 
 - [ ] **Step 6: Capture protected-boundary baselines.**
 
@@ -1991,7 +1999,8 @@ of these occurs:
     tests/test_prices_runtime.py \
     tests/test_data_scheduler.py
 
-  /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
+  PYTHONUNBUFFERED=1 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
+    -vv --tb=short \
     > /tmp/price-truth-tip-full.txt 2>&1
   sed -n 's/^FAILED \([^ ]*::[^ ]*\).*/\1/p; s/^ERROR \([^ ]*::[^ ]*\).*/\1/p' \
     /tmp/price-truth-tip-full.txt \
