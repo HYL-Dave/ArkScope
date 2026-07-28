@@ -223,6 +223,21 @@ not a zero-bar target and is not classified by this V1 rule, even if Coverage
 v2 later reports missing slots. Slot-level truth and no-trade authority remain
 separate work.
 
+Collection outcome and Coverage status answer different questions. Collection
+`succeeded` means that this bounded operation left no original zero-bar target
+unresolved; it does not mean that every expected RTH slot is present. The same
+ticker-day may therefore be collection `succeeded` and Coverage v2 `partial`
+after one row resolves the day-presence target but fewer than all expected RTH
+slots are observed. This is an intentional dual state, not a contradiction. The
+collector and Settings source row must not translate operation success into a
+claim that price coverage is complete; Coverage remains the read-side owner of
+that claim.
+
+Removing this dual state is separate work. It requires per-slot collection
+facts plus sufficient authority to distinguish provider omission from no-trade
+intervals, halts, listing boundaries, and entitlement failures. This slice
+must not infer any of those causes from low volume or an incomplete slot grid.
+
 ### LD 4 - Reconciliation uses the original target identity
 
 Only the pre-fetch zero-bar target dates are rechecked. The writer must not
@@ -506,7 +521,9 @@ following behaviors mutation-sensitive.
    per-ticker facts.
 3. A pre-populated/idempotent day with zero inserted rows remains `succeeded`.
 4. A low-volume fixture with one stored row and no new rows is not classified
-   as unresolved by this V1 day-presence rule.
+   as unresolved by this V1 day-presence rule. Its collection result makes no
+   Coverage-completeness claim and may coexist with a Coverage v2 `partial`
+   result for the same ticker-day.
 5. A provider result that returns older-window rows but leaves the target date
    empty is unresolved; non-empty fetch output alone is not success proof.
 6. A resolved target advances meta success and clears its current error.
@@ -590,7 +607,9 @@ Then accept exactly one of these truthful outcomes:
 
 1. **Resolved:** one or more valid 2026-07-27 LCID rows are written; current
    provider error clears; collector/scheduler succeeds; Coverage no longer has
-   LCID as all-unknown for that day.
+   LCID as all-unknown for that day. Coverage may still report `partial` when
+   fewer than all expected RTH slots are observed; that does not invalidate the
+   bounded collection outcome.
 2. **Still unresolved:** no LCID row is written; current provider meta receives
    `price_day_unresolved_after_fetch` without advancing success; direct worker
    and scheduler report partial with count one; audit-layer runs are failed;
