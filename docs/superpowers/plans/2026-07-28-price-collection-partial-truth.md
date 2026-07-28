@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: APPROVED - TASK 0 AUTHORIZED 2026-07-29**
+> **Status: TASK 0 BLOCKED - FULL-SUITE BASELINE HANG 2026-07-29**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -54,10 +54,13 @@ behavior.
 Independent plan review cleared reviewed plan tip `9d1e648a` after the exact
 frontend node identity was aligned with its enclosing Vitest `describe` and
 the load-bearing 26-slot mutation gained a reviewable-diff evidence pin. Task
-0 grounding is authorized; product edits remain unauthorized until Task 0
-closes with a complete same-environment baseline. If implementation
-contradicts the spec, changes any protected boundary, or changes an exact
-node/resource ledger below, stop and amend the authority before continuing.
+0 then stopped under Stop Condition 11 because the required full-suite
+baseline hung reproducibly at
+`tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`. Product
+edits remain unauthorized until that harness blocker is resolved or the A/B
+protocol is formally amended and reviewed. If implementation contradicts the
+spec, changes any protected boundary, or changes an exact node/resource ledger
+below, stop and amend the authority before continuing.
 
 The main worktree's untracked files remain user-owned and out of scope:
 

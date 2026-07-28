@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED - IMPLEMENTATION PLAN AUTHORIZED 2026-07-28**
+> **Status: APPROVED DESIGN - IMPLEMENTATION BLOCKED AT TASK 0 2026-07-29**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -673,6 +673,9 @@ the main worktree and is not copied into or modified by this isolated slice.
 
 Independent full-document re-review returned GREEN with zero findings at
 `1a695141`; independent plan review then cleared reviewed plan tip `9d1e648a`.
-Task 0 same-environment grounding is the next gate. Product edits remain
-unauthorized until Task 0 closes; provider calls, production writes, merge,
-and push remain separately unauthorized.
+Task 0 reproduced every collection and focused gate but stopped under Stop
+Condition 11 when the required full-suite baseline hung reproducibly at
+`tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`. Product
+edits remain unauthorized until that harness blocker is resolved or the A/B
+protocol is formally amended and reviewed; provider calls, production writes,
+merge, and push remain separately unauthorized.
