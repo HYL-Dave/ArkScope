@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: DRAFT - FINAL INDEPENDENT RE-REVIEW REQUIRED**
+> **Status: APPROVED - IMPLEMENTATION PLAN AUTHORIZED 2026-07-28**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -671,6 +671,7 @@ This contract violation is inserted before maintenance work:
 The untracked `docs/design/SCRIPTS_RETIREMENT_DECISION.md` remains user-owned in
 the main worktree and is not copied into or modified by this isolated slice.
 
-Independent full-document review is the only next gate. Product edits,
-implementation planning, provider calls, production writes, merge, and push
-remain unauthorized.
+Independent full-document re-review returned GREEN with zero findings at
+`1a695141`. A RED-first implementation plan is the next gate. Product edits
+remain unauthorized until that plan receives independent review; provider
+calls, production writes, merge, and push remain separately unauthorized.
