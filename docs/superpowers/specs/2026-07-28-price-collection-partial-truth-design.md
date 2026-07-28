@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: DRAFT - INDEPENDENT WRITTEN REVIEW REQUIRED**
+> **Status: DRAFT - FINAL INDEPENDENT RE-REVIEW REQUIRED**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -68,6 +68,21 @@ provider-outcome protocol.
     `provider_sync_meta.provider` value records the configured primary path for
     the run; it does not prove whether an individual stored row came from IBKR
     or Polygon fallback.
+12. Three-value `job_runs.status` projection is not consistent across existing
+    degraded work. In `src.service.data_scheduler.run_source()`, normalized-news
+    writers set scheduler durable status to `partial` while `ok` remains true,
+    so `store.finish_run()` persists their `job_runs` row as `succeeded`.
+    `src.sa.extension_run_protocol` instead maps semantic `degraded` to
+    `job_runs.status='failed'`. Normalized-news `partial` is not uniformly
+    resumable: current covered shapes include both a real continuation and
+    `continuation=null`.
+13. `DataSourcesSection.jobOutcome()` renders the latest `job_runs` status as a
+    generic check/cross glyph, while `renderLastRun()` also renders the
+    scheduler durable-state badge. Consequently, existing normalized-news
+    partial work can appear as check-plus-partial, while the price projection
+    in LD 10 will appear as cross-plus-partial. This is a
+    projection/presentation inconsistency, not evidence that either audit
+    glyph is the semantic partial-state owner.
 
 ### 2.2 Dated production observations
 
@@ -156,6 +171,10 @@ not a substitute for Task 0.
   entitlement issue, provider omission, or repairable gap;
 - changing the legacy top-up target calendar or replacing its fixed close
   buffer with the Coverage v2 calendar in this slice;
+- normalizing `job_runs` partial projections across normalized news, prices,
+  and the SA extension, changing non-price persistence, or redesigning the
+  Data Sources audit-glyph/durable-state presentation;
+- changing provider-health aggregation or presentation;
 - requiring every RTH slot to be present after collection;
 - changing IBKR or Polygon adapter return types, retry policy, request count,
   fallback order, or error handling;
@@ -314,9 +333,21 @@ No schema migration is justified for this bounded fix:
 | `failed` | `failed` | `failed` | `failed` |
 
 The structured result retains status, counts, and bounded ticker IDs, so the
-`failed` audit projection cannot be mistaken for total data loss. This follows
-the existing rule that a three-value persistence layer cannot store degraded
-work as succeeded.
+`failed` audit projection does not erase the successful per-ticker facts. The
+prices path deliberately chooses the fail-closed side of the existing
+three-value split: degraded work is not stored as audit success. This is a
+local decision, not a claim that the repository already has one universal
+projection rule.
+
+Normalized news currently makes the opposite audit projection, and generic
+Data Sources rendering can therefore show check-plus-partial for news and
+cross-plus-partial for prices. This slice records that inconsistency but does
+not change normalized news, SA, provider health, global job history, or the
+generic glyph. A separate bounded follow-up must first inventory history,
+health, failure counters, backoff, status APIs, and UI consumers; distinguish
+the existing partial/degraded shapes without assuming continuation is always
+present; and only then decide whether the durable enum, audit projection,
+schema, or presentation should converge.
 
 ### LD 11 - Partial is a completed process result
 
@@ -495,6 +526,7 @@ inventory node in place.
 - `data_sources/polygon_source.py`
 - `src/market_coverage/**`
 - Coverage v2 API route and frontend DTO/presentation
+- `src/service/provider_health.py` and provider-health presentation
 - SQLite schemas and migration files
 - provider configuration authority
 - scheduler source catalog and intervals
@@ -520,13 +552,16 @@ following behaviors mutation-sensitive.
 2. All scanned tickers unresolved derives `failed` without discarding their
    per-ticker facts.
 3. A pre-populated/idempotent day with zero inserted rows remains `succeeded`.
-4. A low-volume fixture with one stored row and no new rows is not classified
-   as unresolved by this V1 day-presence rule. Its collection result makes no
-   Coverage-completeness claim and may coexist with a Coverage v2 `partial`
-   result for the same ticker-day.
+4. A low-volume fixture with one stored row, no new rows, and no other issue is
+   not classified as unresolved and derives `succeeded` under this V1
+   day-presence rule. Its collection result makes no Coverage-completeness
+   claim and may coexist with a Coverage v2 `partial` result for the same
+   ticker-day.
 5. A provider result that returns older-window rows but leaves the target date
    empty is unresolved; non-empty fetch output alone is not success proof.
-6. A resolved target advances meta success and clears its current error.
+6. A run whose only pre-fetch zero-bar target gains at least one stored row and
+   has no other issue derives `succeeded`, advances meta success, and clears
+   its current error.
 7. An unresolved target preserves prior `last_success`, writes the stable
    reason, retains factual rows-added/frontier progress, and cannot clear the
    current error.
@@ -536,6 +571,10 @@ following behaviors mutation-sensitive.
    never stores partial as succeeded.
 10. Provider fetch remains outside `market_write_lock`; reconciliation and
     telemetry remain inside the write phase.
+
+Items 3, 4, and 6 are three separately named anti-false-partial nodes. They
+must not be collapsed into one parametrized assertion or inferred only from a
+positive unresolved case.
 
 ### 9.2 Worker and scheduler
 
@@ -565,6 +604,8 @@ At minimum, independently prove RED for:
 
 - deleting the post-write target query;
 - treating `rows_added == 0` as unconditional success;
+- replacing the day-presence recheck with an all-slots rule such as
+  `stored_row_count == 26`; the one-row low-volume node must turn RED;
 - advancing meta success for an unresolved ticker;
 - hard-coding worker status back to `succeeded`;
 - making the scheduler rely on return code while ignoring payload `partial`;
