@@ -18,7 +18,7 @@ state.
 
 ---
 
-> **Status:** DRAFT - INDEPENDENT PLAN REVIEW NEXT
+> **Status:** APPROVED - INDEPENDENT PLAN REVIEW GREEN 2026-07-29
 >
 > **Product base:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
 >
