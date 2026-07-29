@@ -489,29 +489,55 @@ class TestExtractToolInfo:
 # API Endpoint Tests (without actual LLM calls)
 # ============================================================
 
-class TestQueryEndpoint:
-    @pytest.fixture
-    def client(self):
-        from fastapi.testclient import TestClient
-        from src.api.app import create_app
-        app = create_app()
-        with TestClient(app) as c:
-            yield c
+def _query_route_request(monkeypatch, method, path, **kwargs):
+    import asyncio
 
-    def test_providers_endpoint(self, client):
+    import httpx
+    from fastapi import FastAPI
+
+    from src.api.routes import query as query_routes
+
+    app = FastAPI()
+    app.include_router(query_routes.router)
+
+    async def get_test_dal():
+        return object()
+
+    app.dependency_overrides[query_routes.get_dal] = get_test_dal
+    monkeypatch.setattr(
+        query_routes,
+        "_resolve_personalization",
+        lambda _assistant_stance: ("", {}),
+    )
+
+    async def request():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+        ) as client:
+            return await client.request(method, path, **kwargs)
+
+    return asyncio.run(request())
+
+
+class TestQueryEndpoint:
+    def test_providers_endpoint(self, monkeypatch):
         """GET /query/providers returns provider info."""
-        r = client.get("/query/providers")
+        r = _query_route_request(monkeypatch, "GET", "/query/providers")
         assert r.status_code == 200
         data = r.json()
         assert "providers" in data
         assert "openai" in data["providers"]
         assert "anthropic" in data["providers"]
 
-    def test_query_endpoint_bad_provider(self, client):
+    def test_query_endpoint_bad_provider(self, monkeypatch):
         """POST /query with unknown provider returns 400."""
-        r = client.post(
+        r = _query_route_request(
+            monkeypatch,
+            "POST",
             "/query",
-            json={"question": "Test", "provider": "unknown"}
+            json={"question": "Test", "provider": "unknown"},
         )
         assert r.status_code == 400
         assert "Unknown provider" in r.json()["detail"]
