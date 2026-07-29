@@ -1,6 +1,6 @@
 # Query Route Harness Lifespan-Exposure Reduction Design
 
-> **Status:** DRAFT - INDEPENDENT SPEC REVIEW NEXT
+> **Status:** APPROVED - INDEPENDENT SPEC REVIEW GREEN 2026-07-29
 >
 > **Date:** 2026-07-29
 >
