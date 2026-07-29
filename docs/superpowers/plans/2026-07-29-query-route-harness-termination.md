@@ -18,7 +18,7 @@ state.
 
 ---
 
-> **Status:** APPROVED - INDEPENDENT PLAN REVIEW GREEN 2026-07-29
+> **Status:** IMPLEMENTED - INDEPENDENT IMPLEMENTATION REVIEW NEXT
 >
 > **Product base:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
 >
@@ -118,7 +118,7 @@ does not authorize claiming that full-suite termination is globally fixed.
 - Create: `docs/superpowers/evidence/2026-07-29-query-route-harness-termination.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Record branch and clearance identity.**
+- [x] **Step 1: Record branch and clearance identity.**
 
   Run:
 
@@ -134,7 +134,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Record the exact reviewed plan SHA as `PLAN_REVIEW_CLEARANCE_COMMIT` in the
   evidence packet before touching `tests/test_agents.py`.
 
-- [ ] **Step 2: Reconfirm worktree isolation.**
+- [x] **Step 2: Reconfirm worktree isolation.**
 
   Run:
 
@@ -149,7 +149,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: neither main-worktree draft exists here, no isolated data file
   exists, and only reviewed authority documents differ.
 
-- [ ] **Step 3: Reproduce all three normalized collections.**
+- [x] **Step 3: Reproduce all three normalized collections.**
 
   Backend full:
 
@@ -184,7 +184,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: the exact counts and hashes in Section 2; each owned ID appears
   exactly once.
 
-- [ ] **Step 4: Observe the existing two-node runtime without using it as RED.**
+- [x] **Step 4: Observe the existing two-node runtime without using it as RED.**
 
   Run:
 
@@ -198,7 +198,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   compatible with the known intermittent incident and does not satisfy the
   structural RED in Task 1.
 
-- [ ] **Step 5: Attempt one instrumented base full run.**
+- [x] **Step 5: Attempt one instrumented base full run.**
 
   Run in a controllable PTY:
 
@@ -248,7 +248,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Never delete or compare it to production by basename alone. The absolute
   worktree path and inode establish that it is an isolated test artifact.
 
-- [ ] **Step 6: Create the initial evidence packet.**
+- [x] **Step 6: Create the initial evidence packet.**
 
   Create this exact structure:
 
@@ -273,7 +273,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Record exact commands, exits, counts, hashes, and whether the base full run
   terminated. Do not describe a later pass as disproving the incident.
 
-- [ ] **Step 7: Commit Task 0 docs only.**
+- [x] **Step 7: Commit Task 0 docs only.**
 
   ```bash
   git add \
@@ -290,7 +290,7 @@ does not authorize claiming that full-suite termination is globally fixed.
 - Modify: `tests/test_agents.py:485-520`
 - Modify: `docs/superpowers/evidence/2026-07-29-query-route-harness-termination.md`
 
-- [ ] **Step 1: Run the deterministic structural RED.**
+- [x] **Step 1: Run the deterministic structural RED.**
 
   Run:
 
@@ -314,7 +314,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   A SQLite, import, profile, provider, or timeout failure is the wrong RED and
   must be corrected at the test-command layer without editing product code.
 
-- [ ] **Step 2: Replace only the owned test harness with this exact code.**
+- [x] **Step 2: Replace only the owned test harness with this exact code.**
 
   Replace the current `TestQueryEndpoint` fixture and methods with:
 
@@ -377,7 +377,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   or move imports into product code. Both handlers and the dependency override
   are async, so the SA sync-handler workaround is inapplicable.
 
-- [ ] **Step 3: Run the structural gate and the two owned nodes.**
+- [x] **Step 3: Run the structural gate and the two owned nodes.**
 
   Run the strengthened structural gate:
 
@@ -416,7 +416,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: `2 passed`, retaining the exact `200`/provider-key and
   `400`/detail assertions.
 
-- [ ] **Step 4: Repeat the owned harness under one outer bound.**
+- [x] **Step 4: Repeat the owned harness under one outer bound.**
 
   Run:
 
@@ -434,7 +434,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: exit `0`; twenty iterations, `40` total owned-node executions,
   every iteration `2 passed`. Timeout or any failure is a stop.
 
-- [ ] **Step 5: Reproduce byte-identical node accounting.**
+- [x] **Step 5: Reproduce byte-identical node accounting.**
 
   Run:
 
@@ -479,7 +479,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: all three commands produce no output; counts and hashes remain
   exactly `4722/fcdb1b7d...`, `31/78d7cdbe...`, and `2/5e1e62ac...`.
 
-- [ ] **Step 6: Record GREEN and commit the test-only change.**
+- [x] **Step 6: Record GREEN and commit the test-only change.**
 
   Add the RED exit/message, exact diff, targeted result, repetition result,
   and three collection comparisons to the evidence packet. Run:
@@ -499,7 +499,7 @@ does not authorize claiming that full-suite termination is globally fixed.
 **Files:**
 - Modify: `docs/superpowers/evidence/2026-07-29-query-route-harness-termination.md`
 
-- [ ] **Step 1: Prove no product or adjacent harness change.**
+- [x] **Step 1: Prove no product or adjacent harness change.**
 
   Run:
 
@@ -519,7 +519,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: both quiet commands exit `0`; only the one owned test and authority
   documents appear in the name list.
 
-- [ ] **Step 2: Run the final instrumented full suite.**
+- [x] **Step 2: Run the final instrumented full suite.**
 
   Run in a controllable PTY:
 
@@ -583,7 +583,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected before final source/focused gates: the worktree `data/` directory
   is empty. No production path is read, moved, or compared by basename.
 
-- [ ] **Step 3: Re-run final focused and source gates.**
+- [x] **Step 3: Re-run final focused and source gates.**
 
   Run the complete structural gate from committed `HEAD`:
 
@@ -664,7 +664,7 @@ does not authorize claiming that full-suite termination is globally fixed.
   Expected: structural gate `0`, targeted `2 passed`, repeated `40/40`, and
   all three node streams byte-identical at the hashes in Section 2.
 
-- [ ] **Step 4: Record exact final evidence.**
+- [x] **Step 4: Record exact final evidence.**
 
   Record:
 
@@ -686,7 +686,7 @@ does not authorize claiming that full-suite termination is globally fixed.
 - Modify: `docs/superpowers/evidence/2026-07-29-query-route-harness-termination.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Set truthful review-ready statuses.**
+- [x] **Step 1: Set truthful review-ready statuses.**
 
   Set the spec and plan header to this exact value:
 
@@ -703,13 +703,13 @@ does not authorize claiming that full-suite termination is globally fixed.
   Summarize whether the full suite terminated and avoid claiming a
   deterministic ambient root-cause fix.
 
-- [ ] **Step 2: Add a newest-first priority-map entry.**
+- [x] **Step 2: Add a newest-first priority-map entry.**
 
   Record exact node hashes, targeted/repetition results, full-suite outcome,
   protected boundaries, implementation commit, and the sole next gate:
   independent implementation review. Do not edit an older decision-log entry.
 
-- [ ] **Step 3: Commit closeout documents.**
+- [x] **Step 3: Commit closeout documents.**
 
   ```bash
   git diff --check
