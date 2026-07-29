@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED DESIGN - IMPLEMENTATION BLOCKED AT TASK 0 2026-07-29**
+> **Status: APPROVED DESIGN - TASK 0 RESTART PENDING FOCUSED PLAN CONFIRMATION 2026-07-29**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -675,7 +675,15 @@ Independent full-document re-review returned GREEN with zero findings at
 `1a695141`; independent plan review then cleared reviewed plan tip `9d1e648a`.
 Task 0 reproduced every collection and focused gate but stopped under Stop
 Condition 11 when the required full-suite baseline hung reproducibly at
-`tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`. Product
-edits remain unauthorized until that harness blocker is resolved or the A/B
-protocol is formally amended and reviewed; provider calls, production writes,
-merge, and push remain separately unauthorized.
+`tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`. The
+reviewed harness slice is now merged at `2edf12e1`, and this docs branch is
+rebased onto that restart base with all reviewed decision-log history
+preserved. Merged collections and the two owned route nodes match the reviewed
+harness evidence exactly. The original first-node exposure is removed, but an
+instrumented harness run later stopped at untouched
+`tests/test_api.py::TestHealth::test_status`, so no global termination claim is
+made. The implementation plan retains Stop Condition 11 and instruments only
+its base and tip full-suite commands with diagnostic-only
+`faulthandler_timeout=120`. Product edits remain unauthorized until focused
+review confirms this handoff and Task 0 restarts from Step 1; provider calls,
+production writes, merge, and push remain separately unauthorized.

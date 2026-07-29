@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: TASK 0 BLOCKED - FULL-SUITE BASELINE HANG 2026-07-29**
+> **Status: REBASED AFTER HARNESS MERGE - FOCUSED PLAN CONFIRMATION NEXT 2026-07-29**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -40,8 +40,8 @@ the existing TypeScript-AST visible-literal scanner.
 3. Small-issue authority:
    `docs/design/ENGINEERING_ISSUE_REGISTER.md`; this contract violation remains
    an active priority-map slice rather than an EIR item.
-4. Product base:
-   `542776c2e00ae1737d5b424a3b8858b079a63e38`.
+4. Restart product base:
+   `2edf12e11a8ff9299a9b65b900309c8ed218b717`.
 5. Reviewed spec tip:
    `1a695141` on isolated branch `codex/price-collection-truth`.
 
@@ -56,11 +56,22 @@ frontend node identity was aligned with its enclosing Vitest `describe` and
 the load-bearing 26-slot mutation gained a reviewable-diff evidence pin. Task
 0 then stopped under Stop Condition 11 because the required full-suite
 baseline hung reproducibly at
-`tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`. Product
-edits remain unauthorized until that harness blocker is resolved or the A/B
-protocol is formally amended and reviewed. If implementation contradicts the
-spec, changes any protected boundary, or changes an exact node/resource ledger
-below, stop and amend the authority before continuing.
+`tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`.
+
+The independently reviewed query-route harness slice is now fast-forwarded on
+`master` at `2edf12e1`. Merged verification retained the exact `4722`, `31`,
+and `2` collection identities and both owned route nodes passed. This branch
+was rebased onto that tip while preserving both decision-log histories. The
+old blocked run remains diagnostic evidence, not a baseline. The harness
+change removes the reproduced `test_agents` lifespan exposure, but its
+instrumented tip run later stopped at the next untouched lifespan family,
+`tests/test_api.py::TestHealth::test_status`; therefore it does not establish
+global full-suite termination. After focused confirmation of this amendment,
+Task 0 restarts from Step 1 and Stop Condition 11 remains fully binding.
+Product RED remains unauthorized until the restarted Task 0 closes. If
+implementation contradicts the spec, changes any protected boundary, or
+changes an exact node/resource ledger below, stop and amend the authority
+before continuing.
 
 The main worktree's untracked files remain user-owned and out of scope:
 
@@ -74,9 +85,12 @@ They must not be copied, edited, staged, or used as implementation authority.
 ## 2. Grounded Baseline
 
 All collection values below were independently reproduced on clean
-`1a695141`; the three docs commits after `542776c2` contain no product code.
-Normalized node IDs, not an absolute environment-dependent pass/fail total,
-are the accounting authority.
+`1a695141`. The merged harness changes only `tests/test_agents.py` and leaves
+all four canonical collection streams byte-identical; merged verification on
+restart base `2edf12e1` reproduced backend full `4722/fcdb1b7d...`, agents
+`31/78d7cdbe...`, and owned routes `2/5e1e62ac...`. Normalized node IDs, not
+an absolute environment-dependent pass/fail total, are the accounting
+authority.
 
 | Gate | Baseline |
 |---|---|
@@ -770,6 +784,15 @@ of these occurs:
     a baseline; or
 12. either main-worktree untracked document changes.
 
+**Stop-11 resolution for the restart:** the original first blocking exposure
+was removed by reviewed harness commit `31230232`, merged at `2edf12e1`. This
+does not waive or narrow Stop Condition 11. Both full-suite commands below now
+set `faulthandler_timeout=120`; that option emits all-thread stacks after 120
+seconds but does not terminate pytest. If the restarted base or final run
+stalls at `test_api.py` or any other node, wait for the dump, interrupt the run,
+retain the last node and stacks as diagnostic evidence, and stop without
+constructing a partial A/B set.
+
 ## 7. Task 0 - Reground After Plan Clearance
 
 **Files:**
@@ -783,14 +806,14 @@ of these occurs:
   ```bash
   git status --short --branch
   git rev-parse HEAD
-  git merge-base --is-ancestor 542776c2 HEAD
-  git diff --name-only 542776c2...HEAD
+  git merge-base --is-ancestor 2edf12e1 HEAD
+  git diff --name-only 2edf12e1...HEAD
   ```
 
-  Expected before product edits: branch `codex/price-collection-truth`; product
-  base is an ancestor; only the reviewed spec, plan, and priority-map docs
-  differ from `542776c2`. Export the exact runtime identity and record its
-  output in the evidence packet:
+  Expected before product edits: branch `codex/price-collection-truth`;
+  restart base is an ancestor; only the reviewed price-truth spec, plan,
+  evidence packet, and priority-map docs differ from `2edf12e1`. Export the
+  exact runtime identity and record its output in the evidence packet:
 
   ```bash
   export PLAN_REVIEW_CLEARANCE_COMMIT="$(git rev-parse HEAD)"
@@ -855,7 +878,7 @@ of these occurs:
 
   ```bash
   PYTHONUNBUFFERED=1 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
-    -vv --tb=short \
+    -vv --tb=short -o faulthandler_timeout=120 \
     > /tmp/price-truth-base-full.txt 2>&1
   sed -n 's/^FAILED \([^ ]*::[^ ]*\).*/\1/p; s/^ERROR \([^ ]*::[^ ]*\).*/\1/p' \
     /tmp/price-truth-base-full.txt \
@@ -868,10 +891,12 @@ of these occurs:
 
   The command may exit nonzero because EIR-002 is open, but it must terminate
   and produce a normalized set. Record the dated count and hash as an
-  observation. If it hangs or cannot produce a complete set, stop under Stop
-  Condition 11; run `tail -40 /tmp/price-truth-base-full.txt`, preserve the
-  final started/completed node line as diagnostic evidence, and do not infer a
-  baseline from partial output.
+  observation. `faulthandler_timeout=120` emits stacks but does not terminate
+  pytest. If the run remains stalled after the dump or cannot produce a
+  complete set, interrupt it and stop under Stop Condition 11; run
+  `tail -40 /tmp/price-truth-base-full.txt`, preserve the final
+  started/completed node line and dump as diagnostic evidence, and do not
+  infer a baseline from partial output.
 
 - [ ] **Step 6: Capture protected-boundary baselines.**
 
@@ -915,7 +940,7 @@ of these occurs:
 
   > **Status: TASK 0 GROUNDED - RED-FIRST IMPLEMENTATION ACTIVE**
   >
-  > **Product base:** `542776c2...`
+  > **Product base:** `2edf12e1...`
   > **Plan-review clearance:** recorded from Task 0 Step 1
 
   ## 1. Scope And Authorities
@@ -2003,7 +2028,7 @@ of these occurs:
     tests/test_data_scheduler.py
 
   PYTHONUNBUFFERED=1 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
-    -vv --tb=short \
+    -vv --tb=short -o faulthandler_timeout=120 \
     > /tmp/price-truth-tip-full.txt 2>&1
   sed -n 's/^FAILED \([^ ]*::[^ ]*\).*/\1/p; s/^ERROR \([^ ]*::[^ ]*\).*/\1/p' \
     /tmp/price-truth-tip-full.txt \
@@ -2018,6 +2043,9 @@ of these occurs:
   Expected focused: `168 passed`. Expected new full-suite non-passing IDs:
   none. Any disappeared EIR-002 node is recorded as an environment observation,
   not claimed as this slice's fix unless the changed files causally own it.
+  `faulthandler_timeout=120` emits stacks but does not terminate pytest; a
+  post-dump stall triggers the same manual interrupt and Stop Condition 11 as
+  the base run, and partial output cannot enter the A/B comparison.
 
 - [ ] **Step 4: Run frontend full and non-node gates.**
 
