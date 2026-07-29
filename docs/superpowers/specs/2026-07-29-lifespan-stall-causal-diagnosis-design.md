@@ -1,6 +1,6 @@
 # Full-Suite Lifespan Stall Causal Diagnosis Design
 
-> **Status:** DRAFT - INDEPENDENT SPEC REVIEW NEXT
+> **Status:** APPROVED - EXPERIMENT PLAN REVIEW NEXT
 >
 > **Date:** 2026-07-29
 >
