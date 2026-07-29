@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED DESIGN - TASK 0 BLOCKED BY TEST_API LIFESPAN STALL 2026-07-29**
+> **Status: APPROVED PRODUCT DESIGN - TIERED VERIFICATION AMENDMENT REVIEW NEXT**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -616,7 +616,7 @@ At minimum, independently prove RED for:
 
 ### 10.1 Pre-merge
 
-- canonical backend A/B collection and node-ID comparison;
+- complete tiered backend A/B collection and node-ID comparison;
 - focused direct/worker/scheduler suites;
 - canonical frontend A/B collection and focused scheduler-presentation tests;
 - resource delta/parity and scanner twice;
@@ -676,17 +676,124 @@ Independent full-document re-review returned GREEN with zero findings at
 Task 0 reproduced every collection and focused gate but stopped under Stop
 Condition 11 when the required full-suite baseline hung reproducibly at
 `tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`. The
-reviewed harness slice is now merged at `2edf12e1`, and this docs branch is
-rebased onto that restart base with all reviewed decision-log history
-preserved. Merged collections and the two owned route nodes match the reviewed
-harness evidence exactly. The original first-node exposure is removed, but an
-instrumented harness run later stopped at untouched
-`tests/test_api.py::TestHealth::test_status`, so no global termination claim is
-made. The implementation plan retains Stop Condition 11 and instruments only
-its base and tip full-suite commands with diagnostic-only
-`faulthandler_timeout=120`. Focused review then cleared the handoff, and the
-Task 0 restart reproduced every collection and focused gate before stalling at
-that same `test_api.py` boundary. Its 120-second dump was preserved without
-constructing a partial baseline. Product edits remain unauthorized pending a
-separately reviewed resolution; provider calls, production writes, merge, and
-push remain separately unauthorized.
+reviewed harness slice merged at `2edf12e1`. A later causal diagnosis merged
+at `e6d4b7fa` after independently reviewed evidence selected
+`V6 ambient_or_machine_state_dominates`: the tested SEC collection, route-mount
+predecessor, and direct `edgar` import factors were not necessary for the
+stall, while its mechanism remained unknown. The condition also changed in
+both directions without a reboot. No product, dependency, SEC, import, or
+additional TestClient seam was selected.
+
+This branch is rebased onto `e6d4b7fa` with all reviewed decision-log history
+preserved. Product edits remain unauthorized until the verification amendment
+below receives focused review and Task 0 produces a complete tiered baseline.
+Provider calls, production writes, merge, and push remain separately
+unauthorized.
+
+## 12. Tiered Verification Amendment
+
+### 12.1 Purpose and boundary
+
+The historical monolithic backend command remains useful diagnostic evidence,
+but its intermittent portal stall is not the sole admission mechanism for this
+product fix. The replacement admission protocol partitions the complete
+backend collection into deterministic fresh-process tiers. This changes
+execution mechanics, not test ownership or expected behavior:
+
+- no node is excluded, renamed, marked, or converted;
+- every real lifespan node remains in exactly one tier;
+- partial output from a stalled process is never a pass;
+- a failed assertion in a naturally completed tier remains a non-passing node;
+  and
+- the unresolved stall remains owned by `EIR-005`, not by a speculative
+  product or test seam in this slice.
+
+### 12.2 One immutable coverage map
+
+The base side first produces the canonical sorted, unique backend collection.
+The reviewed scratch builder counts nodes per test file and assigns whole
+files to eight tiers using deterministic longest-processing-time ordering:
+
+1. sort files by descending base node count, then ascending path;
+2. assign each file to the currently lightest tier, breaking load ties by
+   ascending tier number; and
+3. serialize each tier's paths in ascending order.
+
+The resulting map is immutable for the base/tip comparison. Tip-side nodes
+added to an already mapped file inherit that file's tier. A new or missing
+test file, duplicate node, unmapped node, changed builder hash, or changed map
+hash is a stop condition requiring review.
+
+Before any runtime result is admitted, collection-only runs for all eight
+tiers must prove:
+
+```text
+sorted union(tier node IDs) == canonical node IDs
+sum(tier node counts) == canonical node count
+sum(tier node counts) == count(unique tier node IDs)
+```
+
+This proof is performed independently on base and tip. It is the mechanical
+answer to whether tiering silently dropped or duplicated coverage.
+
+### 12.3 Runtime outcomes and banking
+
+Each tier runs sequentially in its own fresh Python process from the same
+isolated worktree protocol. Each attempt starts from empty ignored worktree
+data and unique temporary dependency paths; generated data is archived before
+the next attempt. The subprocess environment is rebuilt from an explicit
+allowlist: runtime paths, locale/timezone, scheduler disablement, isolated
+ArkScope stores/locks, and the SHA-pinned reporter interface. Ambient provider
+credentials, database overrides, Python paths, and user configuration are not
+inherited. No tiers run concurrently. Within a tier, sorted file paths preserve
+their relative order. A SHA-pinned scratch pytest reporter captures exact
+`report.nodeid` values; transcript token parsing is not an authority because
+valid node IDs contain spaces. The reporter must add no collected node, and
+its collected and seen sets must both equal the tier's collection manifest. A
+tier has one of four closed outcomes:
+
+| Outcome | Meaning | Admission |
+|---|---|---|
+| `complete_pass` | pytest exits naturally with code 0, a terminal summary, and zero reporter non-passing nodes | complete |
+| `complete_nonpassing` | pytest exits naturally with code 1, a terminal summary, and at least one reporter non-passing node, including test setup/teardown errors | complete; every failed/error node enters the baseline |
+| `unresolved_stall` | the current node makes no progress through the reviewed dump/termination bound | incomplete; no partial result is admitted |
+| `invalid` | collection/runner/command/isolation failure, pytest exit outside 0/1, missing terminal summary, or exit/non-passing inconsistency | incomplete and stop |
+
+All eight initial attempts run even if one tier stalls. An unresolved tier
+receives exactly one deferred retry after the remaining initial attempts.
+Completed tier artifacts may be banked across that retry window only while the
+side, Git identity, canonical collection hash, builder/map hashes, interpreter
+and dependency fingerprint, command, and isolation boundary remain unchanged.
+Any change invalidates the bank.
+
+The base baseline is complete only when all eight tiers have a complete
+outcome. If any tier remains unresolved or invalid, Stop Condition 11 applies
+at that tier boundary: Task 0 remains incomplete and product RED remains
+unauthorized, while already completed tiers do not need to be rerun under an
+unchanged identity.
+
+### 12.4 Base/tip comparability
+
+Base and tip must use the same protocol version, immutable file map, tier
+commands, outcome classifier, isolation rules, retry limit, and normalization
+recipe. The final A/B compares the union of normalized non-passing node IDs
+from eight complete base tiers with the corresponding union from eight
+complete tip tiers.
+
+Tiered output may be compared only with tiered output. Historical monolithic
+failure totals or partial transcripts cannot serve as either side. A bounded,
+instrumented monolithic attempt may still be retained as diagnostic evidence,
+but it cannot replace, override, or invalidate a complete tiered result.
+
+### 12.5 Honest limitation
+
+Fresh-process tiers reset process-global, module, fixture, and teardown state
+between groups of files. A historical monolithic run does not. The two
+execution contexts can expose different failures and are not directly
+comparable.
+
+The protocol therefore proves the complete test collection under the reviewed
+tiered context; it does not claim to reproduce every order-dependent property
+of a single 4,722-node process. Real lifespan tests remain present, and the
+separate `EIR-005` observer owns the unresolved monolithic machine-state
+behavior. This limitation must appear in every base/tip evidence summary.

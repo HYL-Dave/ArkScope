@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: TASK 0 RESTART BLOCKED - TEST_API LIFESPAN STALL 2026-07-29**
+> **Status: REBASED - TIERED VERIFICATION CONTRACT REVIEW NEXT**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -41,7 +41,7 @@ the existing TypeScript-AST visible-literal scanner.
    `docs/design/ENGINEERING_ISSUE_REGISTER.md`; this contract violation remains
    an active priority-map slice rather than an EIR item.
 4. Restart product base:
-   `2edf12e11a8ff9299a9b65b900309c8ed218b717`.
+   `e6d4b7fac7e91c59e855a7f543caac4f57094d86`.
 5. Reviewed spec tip:
    `1a695141` on isolated branch `codex/price-collection-truth`.
 
@@ -58,31 +58,31 @@ the load-bearing 26-slot mutation gained a reviewable-diff evidence pin. Task
 baseline hung reproducibly at
 `tests/test_agents.py::TestQueryEndpoint::test_providers_endpoint`.
 
-The independently reviewed query-route harness slice is now fast-forwarded on
-`master` at `2edf12e1`. Merged verification retained the exact `4722`, `31`,
-and `2` collection identities and both owned route nodes passed. This branch
-was rebased onto that tip while preserving both decision-log histories. The
-old blocked run remains diagnostic evidence, not a baseline. The harness
-change removes the reproduced `test_agents` lifespan exposure, but its
-instrumented tip run later stopped at the next untouched lifespan family,
-`tests/test_api.py::TestHealth::test_status`; therefore it does not establish
-global full-suite termination. Focused confirmation and the resulting restart
-are recorded below; Stop Condition 11 remains fully binding. Product RED
-remains unauthorized until Task 0 closes with a complete baseline. If
-implementation contradicts the spec, changes any protected boundary, or
-changes an exact node/resource ledger below, stop and amend the authority
-before continuing.
+The independently reviewed query-route harness slice merged on `master` at
+`2edf12e1`. A later bounded causal diagnosis merged at `e6d4b7fa` after its
+independent raw reconstruction returned GREEN and selected
+`V6 ambient_or_machine_state_dominates`. The tested SEC collection,
+route-mount predecessor, and direct `edgar` import factors were not necessary
+for the observed stall; no causal product, dependency, import, or additional
+TestClient seam was selected. `EIR-005` owns the unresolved machine-state
+behavior.
+
+This branch is rebased onto `e6d4b7fa` while preserving every reviewed price,
+harness, and diagnosis decision-log entry. The old blocked runs remain
+diagnostic evidence, not baselines. The product design, node/resource ledgers,
+and predicted final hashes are unchanged. The only new admission mechanism is
+the tiered backend protocol in Section 2.2 and Tasks 0/5. Stop Condition 11
+remains binding at tier granularity. Product RED remains unauthorized until
+focused review clears this amendment and Task 0 closes with a complete tiered
+baseline.
 
 Focused review of `7844429a..5fecce65` returned GREEN with zero findings and
-authorized the Task 0 restart. Steps 1-4 then reproduced every canonical and
-focused baseline exactly. The instrumented Step 5 run passed the converted
-`test_agents` exposure and stopped at
-`tests/test_api.py::TestHealth::test_status`. After 120 seconds, faulthandler
-showed the pytest thread waiting in `TestClient.__enter__` while the AnyIO
-portal thread remained in its event loop. The run was interrupted only after
-that dump. Stop Condition 11 therefore applies again: no normalized
-non-passing set, protected Step 6, product RED, or implementation may be
-derived from this partial run.
+authorized the historical Task 0 restart. That attempt reproduced every
+canonical and focused baseline exactly, then stopped at
+`tests/test_api.py::TestHealth::test_status`. Its post-dump partial transcript
+remains inadmissible. The causal diagnosis later demonstrated that betting on
+a clean monolithic window is not a verification strategy. This amendment
+therefore resets Task 0 rather than reusing either historical partial run.
 
 The main worktree's untracked files remain user-owned and out of scope:
 
@@ -98,8 +98,9 @@ They must not be copied, edited, staged, or used as implementation authority.
 All collection values below were independently reproduced on clean
 `1a695141`. The merged harness changes only `tests/test_agents.py` and leaves
 all four canonical collection streams byte-identical; merged verification on
-restart base `2edf12e1` reproduced backend full `4722/fcdb1b7d...`, agents
-`31/78d7cdbe...`, and owned routes `2/5e1e62ac...`. Normalized node IDs, not
+restart base `e6d4b7fa` reproduced backend full `4722/fcdb1b7d...`. The
+earlier harness merge separately reproduced agents `31/78d7cdbe...` and owned
+routes `2/5e1e62ac...`. Normalized node IDs, not
 an absolute environment-dependent pass/fail total, are the accounting
 authority.
 
@@ -120,8 +121,8 @@ authority.
 The root `node_modules` symlink and empty ignored `data/` directory are
 worktree-only test prerequisites. They are not product input and must never be
 replaced with the production `data/` tree. The known backend non-green family
-is EIR-002; Task 0 must derive its same-environment node-ID set before product
-edits. No historical failure count is an allowlist.
+is EIR-002; Task 0 must derive its complete tiered-protocol node-ID set before
+product edits. No historical failure count is an allowlist.
 
 ### 2.1 Canonical collection recipes
 
@@ -182,6 +183,351 @@ cut -f1 /tmp/price-truth-fe-focused.nodes | sort | uniq -c
 Vitest 4 treats the token after `--json` as an optional output filename. Do
 not append test paths after `--json`; generate the full JSON stream first and
 filter the normalized TSV.
+
+### 2.2 Tiered backend protocol
+
+Protocol ID: `price-truth-tier-v1`.
+
+Use one fresh artifact root and preserve it through the complete base/tip
+comparison:
+
+```bash
+export PRICE_TRUTH_TIER_ROOT=/tmp/price-truth-tier-v1
+test ! -e "$PRICE_TRUTH_TIER_ROOT"
+mkdir -p "$PRICE_TRUTH_TIER_ROOT"
+cp /tmp/price-truth-be-full.nodes "$PRICE_TRUTH_TIER_ROOT/base.nodes"
+```
+
+Create `$PRICE_TRUTH_TIER_ROOT/build_tiers.py` from this exact scratch source.
+It is an evidence artifact, not tracked product or test code:
+
+```python
+from collections import Counter
+import os
+from pathlib import Path
+
+
+ROOT = Path(os.environ["PRICE_TRUTH_TIER_ROOT"])
+TIER_COUNT = 8
+
+nodes = ROOT.joinpath("base.nodes").read_text(encoding="utf-8").splitlines()
+if nodes != sorted(set(nodes)):
+    raise SystemExit("base.nodes must be sorted and unique")
+
+counts = Counter(node.split("::", 1)[0] for node in nodes)
+tiers: list[list[tuple[str, int]]] = [[] for _ in range(TIER_COUNT)]
+loads = [0] * TIER_COUNT
+
+for path, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
+    tier = min(range(TIER_COUNT), key=lambda index: (loads[index], index))
+    tiers[tier].append((path, count))
+    loads[tier] += count
+
+map_lines: list[str] = []
+for tier, members in enumerate(tiers):
+    ordered = sorted(members)
+    ROOT.joinpath(f"T{tier}.paths").write_text(
+        "".join(f"{path}\n" for path, _ in ordered),
+        encoding="utf-8",
+    )
+    map_lines.extend(f"T{tier}\t{count}\t{path}" for path, count in ordered)
+
+ROOT.joinpath("tier-map.tsv").write_text(
+    "".join(f"{line}\n" for line in map_lines),
+    encoding="utf-8",
+)
+
+for tier, members in enumerate(tiers):
+    print(f"T{tier}\tfiles={len(members)}\tnodes={loads[tier]}")
+```
+
+Run and pin it:
+
+```bash
+sha256sum "$PRICE_TRUTH_TIER_ROOT/build_tiers.py"
+/home/hyl/.virtualenvs/llm_app/bin/python \
+  "$PRICE_TRUTH_TIER_ROOT/build_tiers.py"
+sha256sum "$PRICE_TRUTH_TIER_ROOT/tier-map.tsv"
+wc -l "$PRICE_TRUTH_TIER_ROOT/base.nodes" \
+  "$PRICE_TRUTH_TIER_ROOT/tier-map.tsv" \
+  "$PRICE_TRUTH_TIER_ROOT"/T?.paths
+```
+
+Expected scratch-source SHA-256:
+`0f0421f86f46265427914bce7bbede694beaa8d04b5d3b2ea9562d27cd7c8d9c`.
+Expected base map SHA-256:
+`3d7adb7e1db7b92b25b3ae83fe56ec182c6b070802cd45d95e091c673115994a`.
+Expected base distribution:
+
+| Tier | Files | Nodes |
+|---|---:|---:|
+| T0 | 32 | 591 |
+| T1 | 32 | 591 |
+| T2 | 31 | 590 |
+| T3 | 31 | 590 |
+| T4 | 32 | 590 |
+| T5 | 31 | 590 |
+| T6 | 32 | 590 |
+| T7 | 32 | 590 |
+
+Under the locked `+17/-0` ledger, the same map predicts tip loads
+`591/591/600/590/590/590/590/597`: scheduler `+6` and worker `+4` remain in
+T2, while direct collector `+7` remains in T7. Do not rebalance the tip.
+
+For a side named `SIDE` (`base` or `tip`), collect every tier using the same
+immutable path files:
+
+```bash
+set -o pipefail
+SIDE=base
+for tier in 0 1 2 3 4 5 6 7; do
+  mapfile -t paths < "$PRICE_TRUTH_TIER_ROOT/T${tier}.paths"
+  /home/hyl/.virtualenvs/llm_app/bin/python -m pytest --collect-only -q \
+    "${paths[@]}" \
+    | sed -n '/^\(tests\|scripts\/testing\)\/.*::/p' \
+    | LC_ALL=C sort \
+    > "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${tier}.nodes"
+done
+
+cat "$PRICE_TRUTH_TIER_ROOT"/"$SIDE"-T?.nodes \
+  | LC_ALL=C sort \
+  > "$PRICE_TRUTH_TIER_ROOT/${SIDE}-tier-union.nodes"
+cat "$PRICE_TRUTH_TIER_ROOT"/"$SIDE"-T?.nodes | wc -l
+cat "$PRICE_TRUTH_TIER_ROOT"/"$SIDE"-T?.nodes | LC_ALL=C sort -u | wc -l
+cmp "$PRICE_TRUTH_TIER_ROOT/${SIDE}.nodes" \
+  "$PRICE_TRUTH_TIER_ROOT/${SIDE}-tier-union.nodes"
+```
+
+Base must report `4722`, `4722`, and byte equality with
+`fcdb1b7dc197c35d43684e7dde846ea82dc975ca6bb688162e88c5f312d43ff0`.
+Tip must report `4739`, `4739`, and byte equality with the canonical tip
+collection. Before tip collection, prove that its unique file paths equal the
+253 mapped paths; a new or missing test file is not assigned ad hoc:
+
+```bash
+cat "$PRICE_TRUTH_TIER_ROOT"/T?.paths \
+  | LC_ALL=C sort -u \
+  > "$PRICE_TRUTH_TIER_ROOT/mapped.paths"
+cut -d: -f1 "$PRICE_TRUTH_TIER_ROOT/tip.nodes" \
+  | LC_ALL=C sort -u \
+  > "$PRICE_TRUTH_TIER_ROOT/tip.paths"
+cmp "$PRICE_TRUTH_TIER_ROOT/mapped.paths" \
+  "$PRICE_TRUTH_TIER_ROOT/tip.paths"
+```
+
+Canonical collection contains node IDs with embedded spaces, so transcript
+token parsing is forbidden. Create
+`$PRICE_TRUTH_TIER_ROOT/arkscope_price_truth_tier_reporter.py` from this exact
+stdlib-only scratch plugin:
+
+```python
+import json
+import os
+from pathlib import Path
+
+
+_REPORT_VALUE = os.environ.get("PRICE_TRUTH_TIER_REPORT")
+if not _REPORT_VALUE:
+    raise RuntimeError("PRICE_TRUTH_TIER_REPORT is required")
+
+_REPORT_PATH = Path(_REPORT_VALUE)
+_collected_node_ids: list[str] = []
+_seen_node_ids: set[str] = set()
+_nonpassing_node_ids: set[str] = set()
+
+
+def pytest_collection_finish(session) -> None:
+    global _collected_node_ids
+    _collected_node_ids = sorted(item.nodeid for item in session.items)
+
+
+def pytest_runtest_logreport(report) -> None:
+    _seen_node_ids.add(report.nodeid)
+    if report.failed:
+        _nonpassing_node_ids.add(report.nodeid)
+
+
+def pytest_sessionfinish(session, exitstatus) -> None:
+    payload = {
+        "schema_version": 1,
+        "exitstatus": int(exitstatus),
+        "collected_node_ids": _collected_node_ids,
+        "seen_node_ids": sorted(_seen_node_ids),
+        "nonpassing_node_ids": sorted(_nonpassing_node_ids),
+    }
+    temporary = _REPORT_PATH.with_suffix(_REPORT_PATH.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(_REPORT_PATH)
+```
+
+Expected reporter SHA-256:
+`09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928`.
+Before Task 0 runtime, prove a collection-only invocation with
+`-p arkscope_price_truth_tier_reporter` adds no node and that a temporary
+failing parametrized probe preserves its full space-containing
+`report.nodeid`. The probe stays under the artifact root and is not a
+repository test.
+
+Runtime tiers execute sequentially, one process at a time, using sorted paths,
+`PYTHONUNBUFFERED=1`, `-vv --tb=short`, and
+`-o faulthandler_timeout=120`. Each attempt records command, Git identity,
+Python/pytest/dependency fingerprint, start/end time, exit code, transcript
+SHA, terminal summary, reporter-derived non-passing node IDs, and
+worktree-data before/after facts.
+
+Before the first base attempt, record the runtime fingerprint:
+
+```bash
+printf '%s\n' "$PATH"
+/home/hyl/.virtualenvs/llm_app/bin/python --version
+/home/hyl/.virtualenvs/llm_app/bin/python -m pytest --version
+/home/hyl/.virtualenvs/llm_app/bin/python -m pip freeze \
+  | LC_ALL=C sort \
+  | sha256sum
+```
+
+Every attempt starts with the isolated worktree's ignored `data/` directory
+empty and uses unique temporary home, cache, lock, test-temp, ArkScope-store,
+and EDGAR paths. Launch through `env -i`; inherit no provider credential,
+database override, `PYTHONPATH`, or user configuration. After an attempt, move
+any generated worktree data into that attempt's artifact directory and
+recreate empty `data/` before the next tier. Never delete, overwrite, compare
+by basename with, or point at the main worktree's production data. A non-empty
+start, failed archive, reused isolation path, external provider attempt, or
+concurrent tier process is `invalid`.
+
+Use this exact command shape for each side/tier/attempt, substituting only the
+three uppercase values:
+
+```bash
+set -euo pipefail
+SIDE=base
+TIER=0
+ATTEMPT=1
+TRIAL_ROOT="$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}-a${ATTEMPT}"
+test ! -e "$TRIAL_ROOT"
+test -z "$(find data -mindepth 1 -maxdepth 1 -print -quit)"
+mkdir -p "$TRIAL_ROOT"
+mkdir -p \
+  "$TRIAL_ROOT/home" \
+  "$TRIAL_ROOT/tmp" \
+  "$TRIAL_ROOT/locks" \
+  "$TRIAL_ROOT/edgar"
+mapfile -t paths < "$PRICE_TRUTH_TIER_ROOT/T${TIER}.paths"
+
+env -i \
+PATH="$PATH" \
+LANG=C.UTF-8 \
+LC_ALL=C.UTF-8 \
+TZ=Asia/Taipei \
+HOME="$TRIAL_ROOT/home" \
+TMPDIR="$TRIAL_ROOT/tmp" \
+XDG_CACHE_HOME="$TRIAL_ROOT/xdg-cache" \
+PYTHONHASHSEED=0 \
+PYTHONUNBUFFERED=1 \
+PYTHONPATH="$PRICE_TRUTH_TIER_ROOT" \
+ARKSCOPE_DISABLE_SCHEDULER=1 \
+ARKSCOPE_LOCK_DIR="$TRIAL_ROOT/locks" \
+ARKSCOPE_PROFILE_DB="$TRIAL_ROOT/profile_state.db" \
+ARKSCOPE_MARKET_DB="$TRIAL_ROOT/market_data.db" \
+ARKSCOPE_MACRO_CALENDAR_DB="$TRIAL_ROOT/macro_calendar.db" \
+ARKSCOPE_SA_DB="$TRIAL_ROOT/sa_capture.db" \
+ARKSCOPE_CONSENSUS_DB="$TRIAL_ROOT/consensus.db" \
+EDGAR_LOCAL_DATA_DIR="$TRIAL_ROOT/edgar" \
+PRICE_TRUTH_TIER_REPORT="$TRIAL_ROOT/report.json" \
+setsid /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
+  -vv --tb=short -o faulthandler_timeout=120 \
+  -o "cache_dir=$TRIAL_ROOT/pytest-cache" \
+  --basetemp "$TRIAL_ROOT/pytest-tmp" \
+  -p arkscope_price_truth_tier_reporter \
+  "${paths[@]}" \
+  > "$TRIAL_ROOT/transcript.txt" 2>&1 &
+pid=$!
+printf '%s\n' "$pid" > "$TRIAL_ROOT/process-group.txt"
+
+set +e
+wait "$pid"
+rc=$?
+set -e
+printf '%s\n' "$rc" > "$TRIAL_ROOT/exit-code.txt"
+```
+
+Run that command in an owned execution session so the reviewed no-progress
+rule can terminate its exact process group. Do not launch the next tier until
+the current process has exited and its generated data has been archived:
+
+```bash
+find data -mindepth 1 -print | LC_ALL=C sort \
+  > "$TRIAL_ROOT/data-after.paths"
+if test -s "$TRIAL_ROOT/data-after.paths"; then
+  mv data "$TRIAL_ROOT/data-after"
+  mkdir data
+fi
+sha256sum "$TRIAL_ROOT/transcript.txt"
+test -z "$(find data -mindepth 1 -maxdepth 1 -print -quit)"
+```
+
+Only natural pytest exit 0 or 1 plus a terminal summary is complete. For a
+node that stops making progress, wait for the 120-second dump; if no completed
+node appears by 150 seconds from that node's start, use the recorded PID from a
+control shell:
+
+```bash
+pid="$(cat "$TRIAL_ROOT/process-group.txt")"
+test "$(ps -o pgid= -p "$pid" | tr -d ' ')" = "$pid"
+kill -INT -- "-$pid"
+sleep 10
+if kill -0 -- "-$pid" 2>/dev/null; then
+  kill -KILL -- "-$pid"
+fi
+```
+
+Record the signals and tier as `unresolved_stall`; do not normalize its
+partial transcript. Never select a process by name or kill a group whose PGID
+does not equal the recorded value.
+
+For the selected naturally completed attempt only, require shell exit and
+structured exit to match, and require both structured collected/seen sets to
+equal the tier's collection-only node set:
+
+```bash
+grep -Eq '^=+ .+ in [0-9.]+s =+$' "$TRIAL_ROOT/transcript.txt"
+jq -e --argjson rc "$rc" \
+  '.schema_version == 1
+   and .exitstatus == $rc
+   and (
+     ($rc == 0 and (.nonpassing_node_ids | length) == 0)
+     or ($rc == 1 and (.nonpassing_node_ids | length) > 0)
+   )' \
+  "$TRIAL_ROOT/report.json"
+jq -r '.collected_node_ids[]' "$TRIAL_ROOT/report.json" \
+  | LC_ALL=C sort > "$TRIAL_ROOT/collected.nodes"
+jq -r '.seen_node_ids[]' "$TRIAL_ROOT/report.json" \
+  | LC_ALL=C sort > "$TRIAL_ROOT/seen.nodes"
+cmp "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}.nodes" \
+  "$TRIAL_ROOT/collected.nodes"
+cmp "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}.nodes" \
+  "$TRIAL_ROOT/seen.nodes"
+jq -r '.nonpassing_node_ids[]' "$TRIAL_ROOT/report.json" \
+  | LC_ALL=C sort -u \
+  > "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}-nonpassing.nodes"
+```
+
+Transcript parsing is used only to prove that pytest emitted its terminal
+summary. It is never used to derive a node ID or non-passing set.
+
+Run all eight initial attempts. Retry each unresolved tier exactly once, in
+ascending tier order, only after every other initial attempt. Bank completed
+tiers only under the unchanged identity tuple defined by design Section 12.3.
+Any unresolved retry leaves the side incomplete under Stop Condition 11.
+
+After the tiered side finishes, make one separately bounded monolithic attempt
+with the same faulthandler/no-progress rule. It is diagnostic only: completion
+does not replace tier artifacts, and a stall does not invalidate a complete
+tiered side. Its partial transcript is never a pass or an A/B input.
 
 ## 3. Exact Accounting
 
@@ -789,47 +1135,53 @@ of these occurs:
    stdout or frontend DTO;
 10. a live provider, Gateway, browser, scheduler, or production write is needed
     for RED/GREEN or review;
-11. the base full suite cannot produce a same-environment non-passing node-ID
-    set for A/B comparison; before stopping, preserve the last verbose node
-    line as EIR-002 diagnostic evidence rather than treating partial output as
-    a baseline; or
+11. any base or tip tier cannot produce a complete natural-exit outcome after
+    its one deferred retry, or either side's tier union does not exactly equal
+    its canonical collection; preserve the tier identity, last verbose node,
+    dump, signals, and transcript as EIR-005 diagnostic evidence, keep all
+    partial output out of the baseline, and stop at that tier boundary; or
 12. either main-worktree untracked document changes.
 
-**Stop-11 resolution for the restart:** the original first blocking exposure
-was removed by reviewed harness commit `31230232`, merged at `2edf12e1`. This
-does not waive or narrow Stop Condition 11. Both full-suite commands below now
-set `faulthandler_timeout=120`; that option emits all-thread stacks after 120
-seconds but does not terminate pytest. If the restarted base or final run
-stalls at `test_api.py` or any other node, wait for the dump, interrupt the run,
-retain the last node and stacks as diagnostic evidence, and stop without
-constructing a partial A/B set.
+**Stop-11 resolution for the restart:** reviewed diagnosis `e6d4b7fa`
+established that no tested code/import factor was necessary and that the
+condition changes over time without a reboot. The approved response is not an
+exclusion or a pass waiver. Section 2.2 replaces one monolithic admission run
+with eight complete-collection tiers, one deferred retry per unresolved tier,
+and completed-tier banking under an immutable identity. Stop Condition 11 is
+preserved at tier granularity. A bounded monolithic attempt remains
+diagnostic-only and cannot become an A/B side.
 
 ## 7. Task 0 - Reground After Plan Clearance
 
 **Files:**
-- Create: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
+- Modify: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-> **Restart attempt 2026-07-29:** Steps 1-4 completed at clearance
+> **Historical restart attempt 2026-07-29:** Steps 1-4 completed at clearance
 > `5fecce6536f5d9f4a13903a6c1059e235ba15324`. Step 5 emitted its 120-second
 > dump and then remained stalled at `test_api.py::TestHealth::test_status`.
 > The operator interrupted it under Stop Condition 11. Steps 6-8 and all
 > product work remain unstarted.
+>
+> **Tiered restart 2026-07-30:** diagnosis closeout is merged at
+> `e6d4b7fa`; the branch is rebased, but every Task 0 checkbox is reset.
+> Historical focused results may inform review but cannot satisfy the new
+> base-side protocol.
 
-- [x] **Step 1: Record the clearance identities.**
+- [ ] **Step 1: Record the clearance identities.**
 
   Run:
 
   ```bash
   git status --short --branch
   git rev-parse HEAD
-  git merge-base --is-ancestor 2edf12e1 HEAD
-  git diff --name-only 2edf12e1...HEAD
+  git merge-base --is-ancestor e6d4b7fa HEAD
+  git diff --name-only e6d4b7fa...HEAD
   ```
 
   Expected before product edits: branch `codex/price-collection-truth`;
   restart base is an ancestor; only the reviewed price-truth spec, plan,
-  evidence packet, and priority-map docs differ from `2edf12e1`. Export the
+  evidence packet, and priority-map docs differ from `e6d4b7fa`. Export the
   exact runtime identity and record its output in the evidence packet:
 
   ```bash
@@ -837,7 +1189,7 @@ constructing a partial A/B set.
   printf '%s\n' "$PLAN_REVIEW_CLEARANCE_COMMIT"
   ```
 
-- [x] **Step 2: Prove the worktree is isolated and contains no production data.**
+- [ ] **Step 2: Prove the worktree is isolated and contains no production data.**
 
   Run:
 
@@ -856,13 +1208,13 @@ constructing a partial A/B set.
   appear in Git status. Do not copy `data/`, `config/.env`, browser profiles,
   or either main-worktree untracked document into this worktree.
 
-- [x] **Step 3: Reproduce all four canonical collections.**
+- [ ] **Step 3: Reproduce all four canonical collections.**
 
   Run Section 2.1 exactly. Expected: backend `4722/151` with composition
   `63/4/84`; frontend `96 files / 1074 nodes` and focused `86` with composition
   `36/14/36`; all four SHA-256 values match Section 2.
 
-- [x] **Step 4: Reproduce focused and non-node behavior.**
+- [ ] **Step 4: Reproduce focused and non-node behavior.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -891,29 +1243,35 @@ constructing a partial A/B set.
   Expected: backend `151 passed`; frontend focused `86 passed`; scanner twice
   `36/20/0/20`; tools `53/54/54`; no-PG `23/23`, `ok=true`, and no PG attempt.
 
-- [ ] **Step 5: Capture the same-environment full non-passing set.**
+- [ ] **Step 5: Build and complete the base tiered non-passing set.**
+
+  Execute Section 2.2 with `SIDE=base`. Prove the builder/map hashes, the
+  `591/591/590/590/590/590/590/590` distribution, exact `4722` tier union,
+  zero duplicate/missing nodes, and all eight complete runtime outcomes.
+
+  For each naturally completed tier, accept only the reporter-derived
+  `base-Tn-nonpassing.nodes` produced by Section 2.2; never parse node IDs from
+  `FAILED` or `ERROR` transcript lines. A passing tier has an empty structured
+  non-passing list and therefore an empty file. Only after all eight tiers are
+  complete, form:
 
   ```bash
-  PYTHONUNBUFFERED=1 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
-    -vv --tb=short -o faulthandler_timeout=120 \
-    > /tmp/price-truth-base-full.txt 2>&1
-  sed -n 's/^FAILED \([^ ]*::[^ ]*\).*/\1/p; s/^ERROR \([^ ]*::[^ ]*\).*/\1/p' \
-    /tmp/price-truth-base-full.txt \
+  cat "$PRICE_TRUTH_TIER_ROOT"/base-T?-nonpassing.nodes \
     | LC_ALL=C sort -u \
-    | tee /tmp/price-truth-base-nonpassing.nodes \
+    | tee "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes" \
     | sha256sum
-  wc -l /tmp/price-truth-base-nonpassing.nodes
-  tail -80 /tmp/price-truth-base-full.txt
+  wc -l "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes"
   ```
 
-  The command may exit nonzero because EIR-002 is open, but it must terminate
-  and produce a normalized set. Record the dated count and hash as an
-  observation. `faulthandler_timeout=120` emits stacks but does not terminate
-  pytest. If the run remains stalled after the dump or cannot produce a
-  complete set, interrupt it and stop under Stop Condition 11; run
-  `tail -40 /tmp/price-truth-base-full.txt`, preserve the final
-  started/completed node line and dump as diagnostic evidence, and do not
-  infer a baseline from partial output.
+  Record each tier outcome, attempts, duration, exit, transcript SHA, node
+  count, and non-passing count. EIR-002 permits completed failing tiers; it
+  does not permit an unresolved tier. If the one deferred retry remains
+  unresolved, preserve all completed tier artifacts and stop under
+  Stop Condition 11 without starting Step 6 or product RED.
+
+  Once the tiered base is complete, run the bounded diagnostic monolithic
+  attempt from Section 2.2. Record `complete` or `stalled` without using its
+  output in the baseline.
 
 - [ ] **Step 6: Capture protected-boundary baselines.**
 
@@ -948,16 +1306,16 @@ constructing a partial A/B set.
   Store exact output in the evidence packet. The catalog must contain the same
   four active source IDs and intervals before and after.
 
-- [ ] **Step 7: Create the evidence packet with explicit initial state.**
+- [ ] **Step 7: Update the evidence packet with explicit grounded state.**
 
-  Create this exact section structure:
+  Preserve the historical sections and update this exact section structure:
 
   ```markdown
   # Price Collection Partial-Truth Evidence
 
   > **Status: TASK 0 GROUNDED - RED-FIRST IMPLEMENTATION ACTIVE**
   >
-  > **Product base:** `2edf12e1...`
+  > **Product base:** `e6d4b7fa...`
   > **Plan-review clearance:** recorded from Task 0 Step 1
 
   ## 1. Scope And Authorities
@@ -967,7 +1325,7 @@ constructing a partial A/B set.
   ## 5. Node And Resource Accounting
   ## 6. Mutation Evidence
   ## 7. Protected Boundaries
-  ## 8. Full-Suite A/B
+  ## 8. Tiered Backend A/B And Monolithic Diagnostic
   ## 9. Review Resolution
   ## 10. Integration And Read-Only Release Observation
   ```
@@ -2021,7 +2379,8 @@ constructing a partial A/B set.
 
 - [ ] **Step 2: Reproduce exact final collections and comms.**
 
-  Run Section 2.1, writing `*-tip.nodes`, then:
+  Run Section 2.1, writing `*-tip.nodes`, copy the backend stream to
+  `$PRICE_TRUTH_TIER_ROOT/tip.nodes`, then:
 
   ```bash
   comm -13 /tmp/price-truth-be-full.nodes /tmp/price-truth-be-full-tip.nodes
@@ -2036,33 +2395,46 @@ constructing a partial A/B set.
   `de48671aa1d3f70cb87166e3f5b026804e206ac31f8e29fe7e74b38cde9448d5`,
   exact `+2/-0`.
 
-- [ ] **Step 3: Run focused and full test gates.**
+- [ ] **Step 3: Run focused and tiered backend gates.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
     tests/test_market_data_direct.py \
     tests/test_prices_runtime.py \
     tests/test_data_scheduler.py
-
-  PYTHONUNBUFFERED=1 /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
-    -vv --tb=short -o faulthandler_timeout=120 \
-    > /tmp/price-truth-tip-full.txt 2>&1
-  sed -n 's/^FAILED \([^ ]*::[^ ]*\).*/\1/p; s/^ERROR \([^ ]*::[^ ]*\).*/\1/p' \
-    /tmp/price-truth-tip-full.txt \
-    | LC_ALL=C sort -u \
-    | tee /tmp/price-truth-tip-nonpassing.nodes \
-    | sha256sum
-  comm -13 \
-    /tmp/price-truth-base-nonpassing.nodes \
-    /tmp/price-truth-tip-nonpassing.nodes
   ```
 
-  Expected focused: `168 passed`. Expected new full-suite non-passing IDs:
-  none. Any disappeared EIR-002 node is recorded as an environment observation,
-  not claimed as this slice's fix unless the changed files causally own it.
-  `faulthandler_timeout=120` emits stacks but does not terminate pytest; a
-  post-dump stall triggers the same manual interrupt and Stop Condition 11 as
-  the base run, and partial output cannot enter the A/B comparison.
+  Expected focused: `168 passed`.
+
+  Re-run Section 2.2 with `SIDE=tip`, reusing the exact base
+  `build_tiers.py`, `tier-map.tsv`, and `T?.paths`. First write the canonical
+  4,739-node stream to `$PRICE_TRUTH_TIER_ROOT/tip.nodes`; prove its unique
+  file set is exactly the mapped 253 paths and its tier union is exact with no
+  duplicates. Then execute all eight tip runtime tiers under the same command,
+  classifier, isolation, and deferred-retry protocol.
+
+  Use only the structured reporter outputs from naturally completed tiers:
+
+  ```bash
+  cat "$PRICE_TRUTH_TIER_ROOT"/tip-T?-nonpassing.nodes \
+    | LC_ALL=C sort -u \
+    | tee "$PRICE_TRUTH_TIER_ROOT/tip-nonpassing.nodes" \
+    | sha256sum
+  comm -13 \
+    "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes" \
+    "$PRICE_TRUTH_TIER_ROOT/tip-nonpassing.nodes"
+  ```
+
+  Expected new tiered non-passing IDs: none. Any disappeared EIR-002 node is
+  recorded as an environment observation, not claimed as this slice's fix
+  unless the changed files causally own it. A stalled or invalid tip tier
+  leaves the tip incomplete under Stop Condition 11; its partial transcript
+  cannot enter the A/B comparison.
+
+  After the complete tip-side tier result, run one bounded, instrumented
+  monolithic diagnostic attempt. State explicitly that its process context is
+  different from the tiered protocol and from every historical monolithic run.
+  Whether it completes or stalls, it is not an A/B input.
 
 - [ ] **Step 4: Run frontend full and non-node gates.**
 
@@ -2201,6 +2573,10 @@ constructing a partial A/B set.
   price partial audit is failed while normalized-news audit is unchanged
   frontend count/list is source-exact, bilingual, and has no Continue
   exact node/resource/boundary ledgers close
+  base and tip tier unions each equal their complete canonical collection
+  the immutable builder/map and all eight tier commands are side-exact
+  stalled tier output is never normalized or called passing
+  tiered results are not compared with historical monolithic results
   ```
 
 - [ ] **Step 2: Resolve findings RED-first.**
@@ -2279,5 +2655,11 @@ constructing a partial A/B set.
 - [x] Normalized-news audit behavior is explicitly tested unchanged.
 - [x] No adapter, Coverage, schema, provider-health, scheduler-cadence, source
   catalog, Gateway lock, scripts, production DB, or repair work entered scope.
+- [x] Eight immutable whole-file tiers cover the backend collection exactly;
+  base and tip use one map and one closed outcome/retry protocol.
+- [x] A stalled tier remains incomplete under Stop Condition 11, while
+  completed tiers can be banked only under an unchanged identity.
+- [x] The plan states that fresh-process tiered context and historical
+  monolithic context are not directly comparable.
 - [x] No plan step contains an unresolved implementation choice or an
   ungrounded external-market acceptance constant.
