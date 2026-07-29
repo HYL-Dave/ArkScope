@@ -5,7 +5,7 @@
 > stateful experiment; do not distribute trial cells across concurrent agents.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** DRAFT - INDEPENDENT PLAN REVIEW NEXT
+> **Status:** DIAGNOSIS REVIEW-READY - INDEPENDENT REVIEW NEXT
 >
 > **Spec authority:**
 > `docs/superpowers/specs/2026-07-29-lifespan-stall-causal-diagnosis-design.md`
