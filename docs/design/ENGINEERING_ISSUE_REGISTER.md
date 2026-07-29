@@ -192,6 +192,40 @@ Each entry records:
   expose raw model name, stop details, or Provider prose.
 - `closure_evidence`: none.
 
+### EIR-005 - Diagnose the intermittent full-suite TestClient portal stall
+
+- `status`: `open`
+- `observed_at`: `2026-07-29`; independently revalidated `2026-07-30`.
+- `impact`: A monolithic backend run can stop before application lifespan is
+  created, preventing a trustworthy complete-suite result and repeatedly
+  blocking unrelated product verification. This is a test-runtime reliability
+  defect; current evidence does not establish a desktop startup defect.
+- `evidence`:
+  - three pre-experiment dumps and the frozen 80-trial matrix are recorded in
+    `docs/superpowers/evidence/2026-07-29-lifespan-stall-causal-diagnosis.md`;
+  - the independently reconstructed matrix selected
+    `V6 ambient_or_machine_state_dominates`: every A/B and E/B cell produced
+    `10/10` matching stalls, while E0 proved no leaker thread and E1 proved one;
+  - the reviewer later observed three non-stall A0B0 replays, but supplied no
+    raw coordinates, so that report is not the admission authority;
+  - Section 13.2 of the evidence records a fresh exact-controller A0B0 replay
+    with three further six-flag matching stalls and immutable nine-file
+    manifest `ed2f1067...`; and
+  - each fresh dump stops at
+    `Future.result -> _spawn_task_from_thread -> start_task_soon ->
+    TestClient.__enter__`, with the portal thread idle in `select()` and no
+    pyrate-limiter thread.
+- `owner`: separately reviewed full-suite machine-state observer slice, ordered
+  after the active price-truth line's next review checkpoint.
+- `next_action`: keep the monolithic suite instrumented but non-exclusive in
+  the reviewed price verification contract. After that contract reaches its
+  next review checkpoint, write the Section 7 observer spec before another
+  broad harness conversion. The observer must capture AnyIO wakeup-socket
+  state, selector registrations, `asyncio.all_tasks`, system load/file
+  descriptors, and SIGINT receipt/response. A matching real desktop startup
+  failure promotes this entry immediately and overrides the deferred ordering.
+- `closure_evidence`: none.
+
 ## 5. Seed Triage: Items Not Opened
 
 These observations were considered while creating the register and are not

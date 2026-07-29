@@ -5,7 +5,7 @@
 > stateful experiment; do not distribute trial cells across concurrent agents.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** DIAGNOSIS REVIEW-READY - INDEPENDENT REVIEW NEXT
+> **Status:** DIAGNOSIS REVIEW GREEN - CLOSEOUT REVIEW NEXT
 >
 > **Spec authority:**
 > `docs/superpowers/specs/2026-07-29-lifespan-stall-causal-diagnosis-design.md`
@@ -36,6 +36,10 @@ Starlette/FastAPI `TestClient`, AnyIO, JSON, SHA-256, git.
 - The experiment may produce a verdict only. It authorizes no fix.
 - Tracked changes are limited to the approved spec, this plan, the final
   evidence document, and `docs/design/PROJECT_PRIORITY_MAP.md`.
+- **User-approved closeout scope amendment (2026-07-30):**
+  `docs/design/ENGINEERING_ISSUE_REGISTER.md` may change only to transfer the
+  unresolved V6 incident owner; this does not authorize an observer or any
+  product, test, dependency, or harness change.
 - Do not modify `src/`, `data_sources/`, `tests/`, `tests/conftest.py`,
   requirements, installed packages, or pytest configuration.
 - Do not convert or exclude another `TestClient` family.

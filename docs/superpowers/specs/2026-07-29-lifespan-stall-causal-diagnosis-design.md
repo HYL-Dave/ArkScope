@@ -1,6 +1,6 @@
 # Full-Suite Lifespan Stall Causal Diagnosis Design
 
-> **Status:** APPROVED - DIAGNOSIS REVIEW NEXT
+> **Status:** APPROVED - DIAGNOSIS REVIEW GREEN; CLOSEOUT REVIEW NEXT
 >
 > **Date:** 2026-07-29
 >
