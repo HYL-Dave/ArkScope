@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED DESIGN - TASK 0 RESTART PENDING FOCUSED PLAN CONFIRMATION 2026-07-29**
+> **Status: APPROVED DESIGN - TASK 0 BLOCKED BY TEST_API LIFESPAN STALL 2026-07-29**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -684,6 +684,9 @@ instrumented harness run later stopped at untouched
 `tests/test_api.py::TestHealth::test_status`, so no global termination claim is
 made. The implementation plan retains Stop Condition 11 and instruments only
 its base and tip full-suite commands with diagnostic-only
-`faulthandler_timeout=120`. Product edits remain unauthorized until focused
-review confirms this handoff and Task 0 restarts from Step 1; provider calls,
-production writes, merge, and push remain separately unauthorized.
+`faulthandler_timeout=120`. Focused review then cleared the handoff, and the
+Task 0 restart reproduced every collection and focused gate before stalling at
+that same `test_api.py` boundary. Its 120-second dump was preserved without
+constructing a partial baseline. Product edits remain unauthorized pending a
+separately reviewed resolution; provider calls, production writes, merge, and
+push remain separately unauthorized.

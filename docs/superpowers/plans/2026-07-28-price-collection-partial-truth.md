@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: REBASED AFTER HARNESS MERGE - FOCUSED PLAN CONFIRMATION NEXT 2026-07-29**
+> **Status: TASK 0 RESTART BLOCKED - TEST_API LIFESPAN STALL 2026-07-29**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -66,12 +66,23 @@ old blocked run remains diagnostic evidence, not a baseline. The harness
 change removes the reproduced `test_agents` lifespan exposure, but its
 instrumented tip run later stopped at the next untouched lifespan family,
 `tests/test_api.py::TestHealth::test_status`; therefore it does not establish
-global full-suite termination. After focused confirmation of this amendment,
-Task 0 restarts from Step 1 and Stop Condition 11 remains fully binding.
-Product RED remains unauthorized until the restarted Task 0 closes. If
+global full-suite termination. Focused confirmation and the resulting restart
+are recorded below; Stop Condition 11 remains fully binding. Product RED
+remains unauthorized until Task 0 closes with a complete baseline. If
 implementation contradicts the spec, changes any protected boundary, or
 changes an exact node/resource ledger below, stop and amend the authority
 before continuing.
+
+Focused review of `7844429a..5fecce65` returned GREEN with zero findings and
+authorized the Task 0 restart. Steps 1-4 then reproduced every canonical and
+focused baseline exactly. The instrumented Step 5 run passed the converted
+`test_agents` exposure and stopped at
+`tests/test_api.py::TestHealth::test_status`. After 120 seconds, faulthandler
+showed the pytest thread waiting in `TestClient.__enter__` while the AnyIO
+portal thread remained in its event loop. The run was interrupted only after
+that dump. Stop Condition 11 therefore applies again: no normalized
+non-passing set, protected Step 6, product RED, or implementation may be
+derived from this partial run.
 
 The main worktree's untracked files remain user-owned and out of scope:
 
@@ -799,7 +810,13 @@ constructing a partial A/B set.
 - Create: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Record the clearance identities.**
+> **Restart attempt 2026-07-29:** Steps 1-4 completed at clearance
+> `5fecce6536f5d9f4a13903a6c1059e235ba15324`. Step 5 emitted its 120-second
+> dump and then remained stalled at `test_api.py::TestHealth::test_status`.
+> The operator interrupted it under Stop Condition 11. Steps 6-8 and all
+> product work remain unstarted.
+
+- [x] **Step 1: Record the clearance identities.**
 
   Run:
 
@@ -820,7 +837,7 @@ constructing a partial A/B set.
   printf '%s\n' "$PLAN_REVIEW_CLEARANCE_COMMIT"
   ```
 
-- [ ] **Step 2: Prove the worktree is isolated and contains no production data.**
+- [x] **Step 2: Prove the worktree is isolated and contains no production data.**
 
   Run:
 
@@ -839,13 +856,13 @@ constructing a partial A/B set.
   appear in Git status. Do not copy `data/`, `config/.env`, browser profiles,
   or either main-worktree untracked document into this worktree.
 
-- [ ] **Step 3: Reproduce all four canonical collections.**
+- [x] **Step 3: Reproduce all four canonical collections.**
 
   Run Section 2.1 exactly. Expected: backend `4722/151` with composition
   `63/4/84`; frontend `96 files / 1074 nodes` and focused `86` with composition
   `36/14/36`; all four SHA-256 values match Section 2.
 
-- [ ] **Step 4: Reproduce focused and non-node behavior.**
+- [x] **Step 4: Reproduce focused and non-node behavior.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
