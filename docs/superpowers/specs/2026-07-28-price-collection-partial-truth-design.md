@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED PRODUCT DESIGN - TIERED VERIFICATION AMENDMENT REVIEW NEXT**
+> **Status: APPROVED PRODUCT DESIGN - DETERMINISTIC RUNNER AMENDMENT REVIEW NEXT**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -685,10 +685,13 @@ both directions without a reboot. No product, dependency, SEC, import, or
 additional TestClient seam was selected.
 
 This branch is rebased onto `e6d4b7fa` with all reviewed decision-log history
-preserved. Product edits remain unauthorized until the verification amendment
-below receives focused review and Task 0 produces a complete tiered baseline.
-Provider calls, production writes, merge, and push remain separately
-unauthorized.
+preserved. Focused review cleared the tiered verification contract at
+`3863b3be`, but its first runtime execution was invalidated by manual
+termination delay and an added process-identity race. Section 13 replaces
+manual supervision with a deterministic runner. Product edits remain
+unauthorized until that runner amendment receives focused review and Task 0
+produces a complete tiered baseline. Provider calls, production writes, merge,
+and push remain separately unauthorized.
 
 ## 12. Tiered Verification Amendment
 
@@ -797,3 +800,286 @@ tiered context; it does not claim to reproduce every order-dependent property
 of a single 4,722-node process. Real lifespan tests remain present, and the
 separate `EIR-005` observer owns the unresolved monolithic machine-state
 behavior. This limitation must appear in every base/tip evidence summary.
+
+## 13. Deterministic Tier Runner Amendment
+
+### 13.1 Reason and scope
+
+The tier contract is sound, but its first execution did not follow its own
+control protocol:
+
+- T0 and T1 emitted their 120-second faulthandler dumps, but manual
+  orchestration did not enforce the 150-second no-progress boundary;
+- an operator-added immediate PID/PGID/SID assertion sampled T2 before
+  `setsid` completed; and
+- all three attempts were therefore `invalid`, with no admitted runtime node.
+
+This amendment changes only how the reviewed tier protocol is executed. It
+does not change the eight-tier map, collection identity, final reporter,
+environment allowlist, outcome table, banking tuple, retry count, node
+accounting, product code, test code, providers, Gateway, or production data.
+The invalid `/tmp/price-truth-tier-v1` root remains frozen evidence and must
+not be reused.
+
+The replacement is one standard-library, SHA-pinned Python module. The same
+file has two roles:
+
+1. the parent-side controller owns launch, progress deadlines, signal
+   delivery, artifact persistence, classification, banking, and side-level
+   sequencing; and
+2. when loaded by pytest as a plugin, it emits structured test start/finish
+   events over one inherited pipe.
+
+No operator may add a wrapper assertion, signal, timeout, retry, or alternate
+classification around this runner. An operator may start the reviewed command
+and observe it; all control decisions remain inside the pinned process.
+
+Two smaller-looking alternatives are rejected. A fixed whole-tier timeout
+either guesses too low and kills a healthy slow tier or guesses too high and
+wastes an unbounded operational window. Parsing verbose transcript lines
+would reintroduce the exact ambiguity removed by the final reporter; the
+canonical collection already contains 11 node IDs with spaces.
+
+The T0/T1 dumps add two non-lifespan event-loop-stall shapes to `EIR-005`.
+They remain referenced through evidence Section 8.4. This price branch does
+not edit the EIR register; the later observer spec owns that transfer.
+
+### 13.2 Pinned-copy preflight
+
+The implementation plan must provide the runner as exact appendix source,
+copy it into a fresh artifact root, and record its SHA-256 in immutable
+`preflight.json`. Before any subprocess launch, the runner must:
+
+- prove `Path(__file__).resolve()` is the copied path recorded by preflight;
+- hash itself, the unchanged final reporter, builder, tier map, canonical
+  manifests, interpreter/dependency fingerprint, and any reviewed probe
+  fixture;
+- compare every value with `preflight.json`; and
+- refuse to run if a file is missing, changed, relocated, or inconsistent.
+
+This follows the diagnosis-controller pattern. It protects against accidental
+source drift; it is not presented as an adversarial code-signing boundary.
+An incomplete attempt directory or non-atomic prior record is also `invalid`
+and prevents further launch.
+
+### 13.3 Stable process-group ownership
+
+The controller launches pytest directly with:
+
+```text
+subprocess.Popen(..., start_new_session=True, pass_fds=(progress_write_fd,))
+```
+
+`Popen` returns only after child setup has passed the fork/exec error channel,
+so the controller receives the real child PID after `setsid`. It then records
+PID, PGID, and SID and requires:
+
+```text
+PID == PGID == SID
+```
+
+before admitting the attempt. This check exists only inside the runner. A
+mismatch is `invalid`; it must never cause the controller to guess or signal
+an unverified process group. The controller terminates only the directly owned
+child in that exceptional cleanup path, records whether cleanup completed,
+and refuses every later tier.
+
+The controller and child remain in the same PID namespace. Operator-side PID
+translation, process-name selection, and external `kill` commands are
+forbidden.
+
+### 13.4 Structured progress channel
+
+The controller adds one runner-internal
+`PRICE_TRUTH_PROGRESS_FD=<write-fd>` variable after constructing the unchanged
+application environment allowlist, and passes only that descriptor through
+`pass_fds`. It is never inherited from the operator's ambient environment and
+is not an application configuration seam. When pytest loads the runner file
+as a plugin:
+
+- a missing, non-integer, closed, or non-writable
+  `PRICE_TRUTH_PROGRESS_FD` raises immediately;
+- the descriptor is marked non-inheritable before tests can spawn children;
+- `pytest_runtest_logstart(nodeid, location)` and
+  `pytest_runtest_logfinish(nodeid, location)` each emit exactly one JSON
+  object per line;
+- every event contains schema version, sequence number, event name, exact
+  `nodeid`, and child `time.monotonic_ns()`; and
+- each newline-terminated JSON event is encoded and sent in one `os.write`
+  no larger than the descriptor's `PIPE_BUF`.
+
+There is no buffered text wrapper and no delayed flush. A malformed,
+oversized, duplicate-sequence, out-of-order, or unexpected event makes the
+attempt `invalid`.
+
+The controller drains the pipe continuously. For each valid event it appends
+one canonical line to `progress.jsonl`, adding runner receive
+`time.monotonic_ns()` and receive wall time. The write is flushed before the
+deadline state changes. Child monotonic time is audit evidence; the runner
+receive timestamp owns the deadline so control does not depend on comparing
+two process-local observations.
+
+The progress stream is control-plane evidence only. It must never contribute
+to collection totals, seen-node totals, non-passing sets, or A/B comparison.
+The unchanged final reporter remains the sole node-admission authority, and
+its collected/seen sets must still compare byte-for-byte with the tier
+manifest.
+
+### 13.5 Three no-progress phases
+
+Runtime bounds remain fixed at:
+
+```text
+faulthandler per-item dump: 120 seconds
+no-progress deadline:       150 seconds
+SIGINT grace:                10 seconds
+```
+
+Runtime mode accepts no command-line override for these values.
+
+The controller uses `time.monotonic_ns()` and has three explicit phases:
+
+1. **Pre-first-node.** The 150-second deadline starts immediately before
+   `Popen`. Collection normally consumes about 20-30 seconds, but it does not
+   borrow time from the first test: receipt of the first log-start event
+   resets the full 150-second window.
+2. **Active node.** Every valid log-start event resets the full 150-second
+   deadline. The matching log-finish event proves that item setup/call/teardown
+   completed and resets the deadline once more. Arbitrary transcript output,
+   logs, faulthandler text, and file mtime changes do not reset it.
+3. **Post-last-progress.** After a log-finish event, the runner is in this
+   phase until the next log-start event or process exit. For the final item,
+   that full 150-second window covers session finish and final process
+   shutdown. There is no separate unbounded teardown grace.
+
+Pytest's configured faulthandler timer is per item. A collection or final
+session-finish hang may therefore cross the 150-second boundary without a
+120-second dump. This is expected input to the closed classification below,
+not permission to wait longer.
+
+### 13.6 Deadline, dump, and signal classification
+
+At a no-progress deadline breach, the runner records the exact phase, last
+valid progress sequence/node, monotonic timestamps, transcript size/hash
+snapshot, and whether the exact faulthandler dump marker is present. Reading
+that marker is permitted only to distinguish dump presence. Transcript text
+never supplies node IDs or pass/fail accounting.
+
+Dump presence is scoped to the current progress window. At launch and on every
+valid start/finish event, the controller records the current transcript byte
+offset. At breach it searches only bytes written after that offset for the
+exact `Timeout (0:02:00)!` marker. A dump from an earlier item cannot classify
+a later collection, item, session-finish, or shutdown breach.
+
+The controller then:
+
+1. revalidates that the live PID owns an equal PGID and SID;
+2. sends `SIGINT` to that exact process group;
+3. waits exactly 10 monotonic seconds;
+4. sends `SIGKILL` to the same group only if it remains alive; and
+5. waits for and records final process termination.
+
+The result is closed:
+
+| Breach evidence | Outcome |
+|---|---|
+| 150-second breach and transcript contains the 120-second per-item dump | `unresolved_stall` |
+| 150-second breach without that dump, including collection or final-teardown hang | `invalid` |
+| malformed/missing progress channel, identity failure, controller error, unsafe cleanup, or artifact boundary failure | `invalid` |
+
+Whether `SIGINT` alone terminates pytest or `SIGKILL` is required does not
+change `unresolved_stall`; it is retained as signal-path evidence. No forced
+termination can become `complete_pass` or `complete_nonpassing`.
+
+If the child exits naturally, the plugin closes its descriptor and the
+controller drains through pipe EOF before `wait()` finalization. EOF while the
+child is still running, child exit without timely EOF, or progress after EOF is
+`invalid`. Natural exit 0/1 is admitted only after the unchanged terminal
+summary, final reporter, manifest comparisons, and outcome checks in Section
+12.3 all pass.
+
+### 13.7 Attempt and side records
+
+Every attempt has a unique directory and an atomically replaced
+`record.json`. At minimum it records:
+
+- protocol version, side, tier, attempt, Git and all preflight identities;
+- exact command and allowlisted environment names;
+- PID/PGID/SID and wall/monotonic launch/end values;
+- fixed dump/deadline/grace bounds;
+- `progress.jsonl` path, SHA-256, event count, and last valid event;
+- transcript, reporter, terminal-summary, and data-boundary validation;
+- deadline phase and dump-marker result;
+- ordered signal events with monotonic timestamps and process state;
+- natural or forced return status; and
+- one closed Section 12.3 outcome with its mechanical reasons.
+
+The attempt directory is created before launch and is never reused. Runner
+interruption, missing final record, leftover temporary record, or an artifact
+that cannot be reconstructed is `invalid` on the next invocation.
+
+The side-level controller, not the operator, runs tiers in order. An
+`unresolved_stall` permits the remaining initial tiers and exactly one
+deferred retry under the unchanged Section 12.3 rule. The first `invalid`
+atomically closes the side as incomplete and the runner refuses to launch
+every subsequent initial tier, retry, or diagnostic monolithic run.
+
+Completed-tier banking retains the exact existing identity tuple. The pinned
+runner and progress protocol are represented by the already-required command
+and protocol identity; this amendment does not weaken or replace any banking
+field.
+
+### 13.8 Mandatory pre-runtime probes
+
+The implementation plan must pin scratch fixtures and execute four probes
+before Task 0 runtime:
+
+1. **Fast natural pass:** one test emits a progress event, exits 0, closes the
+   pipe, and satisfies final-reporter admission without any signal.
+2. **SIGINT termination:** one sleeping test crosses a short probe deadline,
+   emits the probe faulthandler dump, receives process-group `SIGINT`, and
+   exits within the probe grace without `SIGKILL`.
+3. **SIGKILL fallback:** one sleeping test deliberately ignores `SIGINT`,
+   crosses the same probe deadline, and requires process-group `SIGKILL`
+   after the complete grace.
+4. **Collection identity:** collect-only execution with and without the
+   progress plugin yields the same exact one-node collection and SHA-256.
+
+Probe mode uses separately pinned short constants so review does not spend
+160 seconds per kill-path fixture. Runtime mode cannot select those constants,
+and every record states its mode and effective bounds. Probe source, runner,
+reporter, commands, raw artifacts, records, and manifests all receive SHA-256
+entries in evidence.
+
+Each mutation must be mechanically visible:
+
+- remove or delay a progress event and the corresponding deadline probe
+  changes outcome;
+- omit the dump marker and the hang class becomes `invalid`;
+- make the child ignore `SIGINT` and the fallback record must show
+  `SIGKILL`;
+- alter the runner after preflight and no child may launch;
+- omit/garble the progress descriptor and plugin startup must fail closed;
+  and
+- let an `invalid` record exist and a later-tier launch must be refused.
+
+### 13.9 Protected invariants and stop conditions
+
+This amendment is invalid if implementation or its plan:
+
+- parses transcript node IDs or derives any node accounting from progress;
+- changes the final reporter or its collected/seen/non-passing authority;
+- changes tier membership, count, ordering, retries, banking semantics,
+  outcome names, environment allowlist, or base/tip comparison;
+- adds a repository test node merely to test scratch control code;
+- permits runtime deadline overrides or operator-added wrappers;
+- launches a later tier after `invalid`;
+- treats a no-dump breach as `unresolved_stall`;
+- reuses `/tmp/price-truth-tier-v1` or any prior attempt directory;
+- touches product/test/provider/Gateway/production-data paths; or
+- starts Task 0 or product RED before separate plan review clears the exact
+  runner source, probes, hashes, and commands.
+
+The implementation plan is the next gate after focused review of this
+amendment. It must include the exact runner source and reproducible probe
+recipes. This design alone authorizes no runtime attempt.
