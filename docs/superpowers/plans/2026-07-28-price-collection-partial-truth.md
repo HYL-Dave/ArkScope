@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: REBASED - TIERED VERIFICATION CONTRACT REVIEW NEXT**
+> **Status: DETERMINISTIC TIER RUNNER PLAN REVIEW NEXT**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -44,6 +44,8 @@ the existing TypeScript-AST visible-literal scanner.
    `e6d4b7fac7e91c59e855a7f543caac4f57094d86`.
 5. Reviewed spec tip:
    `1a695141` on isolated branch `codex/price-collection-truth`.
+6. Reviewed deterministic-runner design tip:
+   `1d08a9f30a87066ea0a2e3b3274a22210cdfa57d`.
 
 Independent full-document re-review returned GREEN with zero findings. It
 verified the local day-presence rule, the three separately named
@@ -70,11 +72,12 @@ behavior.
 This branch is rebased onto `e6d4b7fa` while preserving every reviewed price,
 harness, and diagnosis decision-log entry. The old blocked runs remain
 diagnostic evidence, not baselines. The product design, node/resource ledgers,
-and predicted final hashes are unchanged. The only new admission mechanism is
-the tiered backend protocol in Section 2.2 and Tasks 0/5. Stop Condition 11
-remains binding at tier granularity. Product RED remains unauthorized until
-focused review clears this amendment and Task 0 closes with a complete tiered
-baseline.
+and predicted final hashes are unchanged. The tiered admission mechanism is
+retained, but deterministic runner design `1d08a9f3` replaces its invalid
+manual orchestration. Stop Condition 11 remains binding at tier granularity.
+Product RED remains unauthorized until focused review clears the exact runner
+source, probes, mutation packet, commands, and this amended plan, and Task 0
+closes with a complete tiered baseline.
 
 Focused review of `7844429a..5fecce65` returned GREEN with zero findings and
 authorized the historical Task 0 restart. That attempt reproduced every
@@ -184,19 +187,24 @@ Vitest 4 treats the token after `--json` as an optional output filename. Do
 not append test paths after `--json`; generate the full JSON stream first and
 filter the normalized TSV.
 
-### 2.2 Tiered backend protocol
+### 2.2 Deterministic tiered backend protocol
 
-Protocol ID: `price-truth-tier-v1`.
+Protocol ID: `price-truth-tier-v2`.
 
 Use one fresh artifact root and preserve it through the complete base/tip
 comparison:
 
 ```bash
-export PRICE_TRUTH_TIER_ROOT=/tmp/price-truth-tier-v1
+test -d /tmp/price-truth-tier-v1
+export PRICE_TRUTH_TIER_ROOT=/tmp/price-truth-tier-v2
 test ! -e "$PRICE_TRUTH_TIER_ROOT"
 mkdir -p "$PRICE_TRUTH_TIER_ROOT"
 cp /tmp/price-truth-be-full.nodes "$PRICE_TRUTH_TIER_ROOT/base.nodes"
 ```
+
+The v1 root is frozen invalid evidence. The `test -d` command proves the root
+still exists without reading its contents; no v2 runner, probe, mutation, or
+runtime command may read its contents, write to it, move it, or delete it.
 
 Create `$PRICE_TRUTH_TIER_ROOT/build_tiers.py` from this exact scratch source.
 It is an evidence artifact, not tracked product or test code:
@@ -279,7 +287,11 @@ immutable path files:
 
 ```bash
 set -o pipefail
-SIDE=base
+: "${SIDE:?set SIDE to base or tip}"
+case "$SIDE" in
+  base|tip) ;;
+  *) printf 'invalid SIDE: %s\n' "$SIDE" >&2; exit 2 ;;
+esac
 for tier in 0 1 2 3 4 5 6 7; do
   mapfile -t paths < "$PRICE_TRUTH_TIER_ROOT/T${tier}.paths"
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest --collect-only -q \
@@ -365,169 +377,602 @@ def pytest_sessionfinish(session, exitstatus) -> None:
 
 Expected reporter SHA-256:
 `09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928`.
-Before Task 0 runtime, prove a collection-only invocation with
-`-p arkscope_price_truth_tier_reporter` adds no node and that a temporary
-failing parametrized probe preserves its full space-containing
-`report.nodeid`. The probe stays under the artifact root and is not a
-repository test.
+The frozen v1 reporter probe already proves that this exact blob preserves a
+failing parametrized node ID containing spaces. Record that prior artifact's
+identity rather than rerunning or changing the reporter. The v2 collection
+probe below independently proves that adding the progress plugin changes no
+collected node.
 
-Runtime tiers execute sequentially, one process at a time, using sorted paths,
-`PYTHONUNBUFFERED=1`, `-vv --tb=short`, and
-`-o faulthandler_timeout=120`. Each attempt records command, Git identity,
-Python/pytest/dependency fingerprint, start/end time, exit code, transcript
-SHA, terminal summary, reporter-derived non-passing node IDs, and
-worktree-data before/after facts.
-
-Before the first base attempt, record the runtime fingerprint:
+Runtime control is owned by one dual-role, standard-library Python module.
+Extract Appendix A from this plan into the fresh artifact root; do not copy the
+already invalid v1 runner or recreate the source from prose:
 
 ```bash
-printf '%s\n' "$PATH"
-/home/hyl/.virtualenvs/llm_app/bin/python --version
-/home/hyl/.virtualenvs/llm_app/bin/python -m pytest --version
-/home/hyl/.virtualenvs/llm_app/bin/python -m pip freeze \
-  | LC_ALL=C sort \
-  | sha256sum
+export PRICE_TRUTH_PLAN="$PWD/docs/superpowers/plans/2026-07-28-price-collection-partial-truth.md"
+awk '
+  /^<!-- PRICE_TRUTH_RUNNER_V2_BEGIN -->$/ { emit=1; next }
+  /^<!-- PRICE_TRUTH_RUNNER_V2_END -->$/ { emit=0 }
+  emit && $0 != "```python" && $0 != "```" { print }
+' "$PRICE_TRUTH_PLAN" \
+  > "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py"
+
+sha256sum "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py"
+/home/hyl/.virtualenvs/llm_app/bin/python -m py_compile \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py"
 ```
 
-Every attempt starts with the isolated worktree's ignored `data/` directory
-empty and uses unique temporary home, cache, lock, test-temp, ArkScope-store,
-and EDGAR paths. Launch through `env -i`; inherit no provider credential,
-database override, `PYTHONPATH`, or user configuration. After an attempt, move
-any generated worktree data into that attempt's artifact directory and
-recreate empty `data/` before the next tier. Never delete, overwrite, compare
-by basename with, or point at the main worktree's production data. A non-empty
-start, failed archive, reused isolation path, external provider attempt, or
-concurrent tier process is `invalid`.
+Expected runner SHA-256:
+`35cda547ac8b1afaba1231d56cb04d703a284cdd81de978397ce7887ac51339e`.
+Appendix extraction, not a nearby working copy, is the runtime authority.
+`PRICE_TRUTH_PROGRESS_FD` is checked only by `pytest_configure()` when pytest
+loads this file as a plugin. Module execution for `prepare-preflight`,
+`probe-suite`, `run-side`, and `run-diagnostic` must not require that
+descriptor.
 
-Use this exact command shape for each side/tier/attempt, substituting only the
-three uppercase values:
+Create these exact scratch probe fixtures under
+`$PRICE_TRUTH_TIER_ROOT`. They are evidence artifacts, not repository tests:
+
+`probe_pass.py`:
+
+```python
+def test_probe_pass():
+    assert True
+```
+
+`probe_interruptible.py`:
+
+```python
+import signal
+import time
+
+
+def _raise_keyboard_interrupt(signum, frame):
+    raise KeyboardInterrupt
+
+
+def test_probe_interruptible():
+    signal.signal(signal.SIGINT, _raise_keyboard_interrupt)
+    time.sleep(30)
+```
+
+`probe_ignore_sigint.py`:
+
+```python
+import signal
+import subprocess
+import sys
+import time
+
+
+def test_probe_ignore_sigint():
+    subprocess.Popen([
+        sys.executable,
+        "-c",
+        (
+            "import signal,time;"
+            "signal.signal(signal.SIGINT,signal.SIG_IGN);"
+            "time.sleep(30)"
+        ),
+    ])
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    time.sleep(30)
+```
+
+`probe.nodes`:
+
+```text
+probe_pass.py::test_probe_pass
+```
+
+`probe-tier-map.tsv`:
+
+```text
+T0	1	probe_pass.py
+```
+
+Require these exact source identities:
+
+| Artifact | SHA-256 |
+|---|---|
+| `probe_pass.py` | `f284d6dd93c54cd5050f1964d62fb75498e9e1be777e20709d1a175423c1f06e` |
+| `probe_interruptible.py` | `47ce71581932a8023ae57ac7b975d67a2040cae18f7e5b44f5a72ca804a5d402` |
+| `probe_ignore_sigint.py` | `cd029264a3224bc4a2e6928185b6ff6f1e34e56d9406974310eb5715cbcd7942` |
+| `probe.nodes` | `85e427423e6a22513ced4f286045ab33023ba6f0d3e0f3344f8490c4faf92537` |
+| `probe-tier-map.tsv` | `fe3ecde0a8261879529289f72f433e1cf0c747e59f0dbfec1f0b5e78d1d525f4` |
+
+The same module creates a closed preflight from current immutable artifacts.
+Its preflight creation is not self-authenticating: first compare the runner,
+reporter, builder, fixture, canonical-manifest, and map hashes with this plan.
+The subsequent preflight rejects accidental drift, relocation, interpreter,
+dependency, PATH, or Git-identity changes before child launch.
+
+Before any base runtime, execute the mandatory probes:
 
 ```bash
-set -euo pipefail
-SIDE=base
-TIER=0
-ATTEMPT=1
-TRIAL_ROOT="$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}-a${ATTEMPT}"
-test ! -e "$TRIAL_ROOT"
-test -z "$(find data -mindepth 1 -maxdepth 1 -print -quit)"
-mkdir -p "$TRIAL_ROOT"
-mkdir -p \
-  "$TRIAL_ROOT/home" \
-  "$TRIAL_ROOT/tmp" \
-  "$TRIAL_ROOT/locks" \
-  "$TRIAL_ROOT/edgar"
-mapfile -t paths < "$PRICE_TRUTH_TIER_ROOT/T${TIER}.paths"
+/home/hyl/.virtualenvs/llm_app/bin/python \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  prepare-preflight \
+  --artifact-root "$PRICE_TRUTH_TIER_ROOT" \
+  --repo "$PWD" \
+  --side probe
 
-env -i \
-PATH="$PATH" \
-LANG=C.UTF-8 \
-LC_ALL=C.UTF-8 \
-TZ=Asia/Taipei \
-HOME="$TRIAL_ROOT/home" \
-TMPDIR="$TRIAL_ROOT/tmp" \
-XDG_CACHE_HOME="$TRIAL_ROOT/xdg-cache" \
-PYTHONHASHSEED=0 \
-PYTHONUNBUFFERED=1 \
-PYTHONPATH="$PRICE_TRUTH_TIER_ROOT" \
-ARKSCOPE_DISABLE_SCHEDULER=1 \
-ARKSCOPE_LOCK_DIR="$TRIAL_ROOT/locks" \
-ARKSCOPE_PROFILE_DB="$TRIAL_ROOT/profile_state.db" \
-ARKSCOPE_MARKET_DB="$TRIAL_ROOT/market_data.db" \
-ARKSCOPE_MACRO_CALENDAR_DB="$TRIAL_ROOT/macro_calendar.db" \
-ARKSCOPE_SA_DB="$TRIAL_ROOT/sa_capture.db" \
-ARKSCOPE_CONSENSUS_DB="$TRIAL_ROOT/consensus.db" \
-EDGAR_LOCAL_DATA_DIR="$TRIAL_ROOT/edgar" \
-PRICE_TRUTH_TIER_REPORT="$TRIAL_ROOT/report.json" \
-setsid /home/hyl/.virtualenvs/llm_app/bin/python -m pytest \
-  -vv --tb=short -o faulthandler_timeout=120 \
-  -o "cache_dir=$TRIAL_ROOT/pytest-cache" \
-  --basetemp "$TRIAL_ROOT/pytest-tmp" \
-  -p arkscope_price_truth_tier_reporter \
-  "${paths[@]}" \
-  > "$TRIAL_ROOT/transcript.txt" 2>&1 &
-pid=$!
-printf '%s\n' "$pid" > "$TRIAL_ROOT/process-group.txt"
+sha256sum "$PRICE_TRUTH_TIER_ROOT/probe-preflight.json"
 
-set +e
-wait "$pid"
-rc=$?
-set -e
-printf '%s\n' "$rc" > "$TRIAL_ROOT/exit-code.txt"
+/home/hyl/.virtualenvs/llm_app/bin/python \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  probe-suite \
+  --preflight "$PRICE_TRUTH_TIER_ROOT/probe-preflight.json"
+
+jq -e '
+  .protocol_id == "price-truth-tier-v2"
+  and .checks == {
+    "collection_identity": true,
+    "fd_fail_closed": true,
+    "pass": true,
+    "sigint": true,
+    "sigkill": true
+  }
+' "$PRICE_TRUTH_TIER_ROOT/probe-summary.json"
+sha256sum "$PRICE_TRUTH_TIER_ROOT/probe-summary.json"
 ```
 
-Run that command in an owned execution session so the reviewed no-progress
-rule can terminate its exact process group. Do not launch the next tier until
-the current process has exited and its generated data has been archived:
+Expected summary SHA-256:
+`47564c644c95e54007d67e4b08ddaeb35ed8370f858b3f004f00f54ef9e1ad48`.
+PID, timestamp, transcript, progress, record, and preflight hashes are
+environment observations and must be recorded rather than predicted. Require
+the following record facts:
+
+| Probe | Required record |
+|---|---|
+| `probe-fast-pass` | `complete_pass`, two progress events, pipe EOF, no signal |
+| `probe-sigint` | `unresolved_stall`, current-window dump, SIGINT, no SIGKILL |
+| `probe-sigkill` | `unresolved_stall`, current-window dump, SIGINT then SIGKILL |
+| collect control/plugin | identical one-node `collected_node_ids`, plugin emits zero runtime events |
+| missing/garbled FD | nonzero pytest exit and transcript names `PRICE_TRUTH_PROGRESS_FD` |
+
+Probe mode alone uses dump/deadline/grace `2/3/1` seconds. Runtime mode has
+immutable `120/150/10` values and accepts no CLI override.
+
+#### Runner mutation packet
+
+Run every mutation in its own fresh root. First construct M1-M5 from the
+reviewed pristine bytes:
 
 ```bash
-find data -mindepth 1 -print | LC_ALL=C sort \
-  > "$TRIAL_ROOT/data-after.paths"
-if test -s "$TRIAL_ROOT/data-after.paths"; then
-  mv data "$TRIAL_ROOT/data-after"
-  mkdir data
-fi
-sha256sum "$TRIAL_ROOT/transcript.txt"
-test -z "$(find data -mindepth 1 -maxdepth 1 -print -quit)"
+for number in 1 2 3 4 5; do
+  MUTATION_ROOT="/tmp/price-truth-tier-v2-m${number}"
+  test ! -e "$MUTATION_ROOT"
+  mkdir "$MUTATION_ROOT"
+  cp \
+    "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+    "$PRICE_TRUTH_TIER_ROOT/arkscope_price_truth_tier_reporter.py" \
+    "$PRICE_TRUTH_TIER_ROOT/build_tiers.py" \
+    "$PRICE_TRUTH_TIER_ROOT/probe.nodes" \
+    "$PRICE_TRUTH_TIER_ROOT/probe-tier-map.tsv" \
+    "$PRICE_TRUTH_TIER_ROOT/probe_pass.py" \
+    "$PRICE_TRUTH_TIER_ROOT/probe_interruptible.py" \
+    "$PRICE_TRUTH_TIER_ROOT/probe_ignore_sigint.py" \
+    "$MUTATION_ROOT/"
+done
 ```
 
-Only natural pytest exit 0 or 1 plus a terminal summary is complete. For a
-node that stops making progress, wait for the 120-second dump; if no completed
-node appears by 150 seconds from that node's start, use the recorded PID from a
-control shell:
+Apply each exact patch below with `apply_patch` to these fixed paths:
+
+| Mutation | Patched artifact |
+|---|---|
+| M1 | `/tmp/price-truth-tier-v2-m1/price_truth_tier_runner.py` |
+| M2 | `/tmp/price-truth-tier-v2-m2/price_truth_tier_runner.py` |
+| M3 | `/tmp/price-truth-tier-v2-m3/probe_interruptible.py` |
+| M4 | `/tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py` |
+
+Then capture each diff against the pristine artifact; a source diff must exit
+exactly `1`:
 
 ```bash
-pid="$(cat "$TRIAL_ROOT/process-group.txt")"
-test "$(ps -o pgid= -p "$pid" | tr -d ' ')" = "$pid"
-kill -INT -- "-$pid"
-sleep 10
-if kill -0 -- "-$pid" 2>/dev/null; then
-  kill -KILL -- "-$pid"
-fi
+diff -u \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  /tmp/price-truth-tier-v2-m1/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v2-m1/mutation.diff \
+  || test "$?" -eq 1
+diff -u \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  /tmp/price-truth-tier-v2-m2/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v2-m2/mutation.diff \
+  || test "$?" -eq 1
+diff -u \
+  "$PRICE_TRUTH_TIER_ROOT/probe_interruptible.py" \
+  /tmp/price-truth-tier-v2-m3/probe_interruptible.py \
+  > /tmp/price-truth-tier-v2-m3/mutation.diff \
+  || test "$?" -eq 1
+diff -u \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v2-m4/mutation.diff \
+  || test "$?" -eq 1
+sha256sum /tmp/price-truth-tier-v2-m{1,2,3,4}/mutation.diff
 ```
 
-Record the signals and tier as `unresolved_stall`; do not normalize its
-partial transcript. Never select a process by name or kill a group whose PGID
-does not equal the recorded value.
-
-For the selected naturally completed attempt only, require shell exit and
-structured exit to match, and require both structured collected/seen sets to
-equal the tier's collection-only node set:
+Prepare each probe preflight only after its own mutation is present:
 
 ```bash
-grep -Eq '^=+ .+ in [0-9.]+s =+$' "$TRIAL_ROOT/transcript.txt"
-jq -e --argjson rc "$rc" \
-  '.schema_version == 1
-   and .exitstatus == $rc
-   and (
-     ($rc == 0 and (.nonpassing_node_ids | length) == 0)
-     or ($rc == 1 and (.nonpassing_node_ids | length) > 0)
-   )' \
-  "$TRIAL_ROOT/report.json"
-jq -r '.collected_node_ids[]' "$TRIAL_ROOT/report.json" \
-  | LC_ALL=C sort > "$TRIAL_ROOT/collected.nodes"
-jq -r '.seen_node_ids[]' "$TRIAL_ROOT/report.json" \
-  | LC_ALL=C sort > "$TRIAL_ROOT/seen.nodes"
-cmp "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}.nodes" \
-  "$TRIAL_ROOT/collected.nodes"
-cmp "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}.nodes" \
-  "$TRIAL_ROOT/seen.nodes"
-jq -r '.nonpassing_node_ids[]' "$TRIAL_ROOT/report.json" \
-  | LC_ALL=C sort -u \
-  > "$PRICE_TRUTH_TIER_ROOT/${SIDE}-T${TIER}-nonpassing.nodes"
+for number in 1 2 3 4 5; do
+  MUTATION_ROOT="/tmp/price-truth-tier-v2-m${number}"
+  /home/hyl/.virtualenvs/llm_app/bin/python \
+    "$MUTATION_ROOT/price_truth_tier_runner.py" \
+    prepare-preflight \
+    --artifact-root "$MUTATION_ROOT" \
+    --repo "$PWD" \
+    --side probe
+done
 ```
 
-Transcript parsing is used only to prove that pytest emitted its terminal
-summary. It is never used to derive a node ID or non-passing set.
+For M1-M4, preserve expected nonzero exits mechanically:
 
-Run all eight initial attempts. Retry each unresolved tier exactly once, in
-ascending tier order, only after every other initial attempt. Bank completed
-tiers only under the unchanged identity tuple defined by design Section 12.3.
-Any unresolved retry leaves the side incomplete under Stop Condition 11.
+```bash
+sha256sum /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v2-m4/runner-before.sha256
 
-After the tiered side finishes, make one separately bounded monolithic attempt
-with the same faulthandler/no-progress rule. It is diagnostic only: completion
-does not replace tier artifacts, and a stall does not invalidate a complete
-tiered side. Its partial transcript is never a pass or an A/B input.
+for number in 1 2 3 4; do
+  MUTATION_ROOT="/tmp/price-truth-tier-v2-m${number}"
+  set +e
+  /home/hyl/.virtualenvs/llm_app/bin/python \
+    "$MUTATION_ROOT/price_truth_tier_runner.py" \
+    probe-suite \
+    --preflight "$MUTATION_ROOT/probe-preflight.json" \
+    > "$MUTATION_ROOT/mutation.stdout" \
+    2> "$MUTATION_ROOT/mutation.stderr"
+  rc="$?"
+  set -e
+  printf '%s\n' "$rc" > "$MUTATION_ROOT/exit-code.txt"
+  test "$rc" -ne 0
+done
+
+sha256sum /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v2-m4/runner-after.sha256
+diff -u \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v2-m4/runtime-drift.diff \
+  || test "$?" -eq 1
+```
+
+The exact mutations and owning assertions are:
+
+1. **M1 - delayed progress cannot revive an expired window.**
+
+   ```diff
+                        events = selector.select(timeout=min(remaining, 0.1))
+   +                    if mode == "probe" and events:
+   +                        time.sleep(PROBE_BOUNDS["deadline_seconds"] + 1)
+                        deadline_due = time.monotonic_ns() >= deadline_ns
+   ```
+
+   `probe-fast-pass/record.json` must be `invalid` with
+   `invalid_reason=deadline_breach_without_dump`, `progress_count=0`,
+   `active_nodeid_at_end=null`, and `deadline_phase=pre_first_node`. This is
+   the load-bearing proof that a pipe event already waiting when the parent
+   resumes after the old deadline cannot start a new full window.
+
+   ```bash
+   jq -e '
+     .outcome == "invalid"
+     and .invalid_reason == "deadline_breach_without_dump"
+     and .progress_count == 0
+     and .active_nodeid_at_end == null
+     and .dump_present == false
+     and .deadline_phase == "pre_first_node"
+   ' /tmp/price-truth-tier-v2-m1/probe-fast-pass/record.json
+   ```
+
+2. **M2 - no current-window dump.**
+
+   ```diff
+    PROBE_BOUNDS = {
+   -    "dump_seconds": 2,
+   +    "dump_seconds": 20,
+        "deadline_seconds": 3,
+   ```
+
+   Run `probe-suite`. Both sleeping records must be `invalid` with
+   `invalid_reason=deadline_breach_without_dump` and `dump_present=false`.
+   Neither may be admitted as `unresolved_stall`.
+
+   ```bash
+   jq -e '
+     .outcome == "invalid"
+     and .invalid_reason == "deadline_breach_without_dump"
+     and .dump_present == false
+   ' \
+     /tmp/price-truth-tier-v2-m2/probe-sigint/record.json \
+     /tmp/price-truth-tier-v2-m2/probe-sigkill/record.json
+   ```
+
+3. **M3 - interruptible child ignores SIGINT.**
+
+   ```diff
+    def test_probe_interruptible():
+   -    signal.signal(signal.SIGINT, _raise_keyboard_interrupt)
+   +    signal.signal(signal.SIGINT, signal.SIG_IGN)
+        time.sleep(30)
+   ```
+
+   Run `probe-suite`. `probe-sigint/record.json` must remain
+   `unresolved_stall` but change to `killed=true` with an ordered SIGKILL event,
+   causing the suite's `sigint` check to fail.
+
+   ```bash
+   jq -e '
+     [.timeline[].event] as $events
+     | .outcome == "unresolved_stall"
+       and .interrupted == true
+       and .killed == true
+       and ($events | index("sigint"))
+           < ($events | index("sigkill"))
+       and ($events | index("sigkill"))
+           < ($events | index("group_exit_after_sigkill"))
+   ' /tmp/price-truth-tier-v2-m3/probe-sigint/record.json
+   ```
+
+4. **M4 - between-launch runner drift.**
+
+   ```diff
+        pass_record = _probe_record(
+            preflight_path,
+            preflight,
+            "probe_pass",
+            "probe-fast-pass",
+        )
+   +    runner_path = Path(__file__)
+   +    runner_path.write_text(
+   +        runner_path.read_text(encoding="utf-8") + "\n# MUTATION M4\n",
+   +        encoding="utf-8",
+   +    )
+        interrupt_record = _probe_record(
+   ```
+
+   Record the runner SHA immediately before `probe-suite` and again after it.
+   `probe-fast-pass/record.json` must exist, the hashes must differ,
+   `probe-sigint` must not exist, and stderr must contain
+   `preflight artifact changed`. This proves preflight is revalidated between
+   child launches, not only once at controller entry.
+
+   ```bash
+   test -f /tmp/price-truth-tier-v2-m4/probe-fast-pass/record.json
+   test ! -e /tmp/price-truth-tier-v2-m4/probe-sigint
+   ! cmp \
+     /tmp/price-truth-tier-v2-m4/runner-before.sha256 \
+     /tmp/price-truth-tier-v2-m4/runner-after.sha256
+   rg -F 'preflight artifact changed' \
+     /tmp/price-truth-tier-v2-m4/mutation.stderr
+   ```
+
+5. **M5 - invalid progress descriptor.** Use a dedicated fresh M5 root with
+   pristine source and fixture bytes, prepare its probe preflight, and run
+   `probe-suite`. Its two dedicated input-mutation arms omit
+   `PRICE_TRUTH_PROGRESS_FD` and set `not-a-file-descriptor`, respectively.
+   Preserve both commands, transcripts, and records. Both child pytest
+   commands must fail in `pytest_configure`, while the module-mode preflight
+   and parent runner complete without the variable.
+
+   Run its pristine suite normally, require exit `0`, and assert:
+
+   ```bash
+   MUTATION_ROOT=/tmp/price-truth-tier-v2-m5
+   /home/hyl/.virtualenvs/llm_app/bin/python \
+     "$MUTATION_ROOT/price_truth_tier_runner.py" \
+     probe-suite \
+     --preflight "$MUTATION_ROOT/probe-preflight.json"
+   jq -e '
+     .returncode != 0
+     and .pytest_configure_failure == true
+     and .invalid_reason == null
+   ' \
+     "$MUTATION_ROOT/probe-progress-fd-missing/record.json" \
+     "$MUTATION_ROOT/probe-progress-fd-garbled/record.json"
+   ```
+
+6. **M6 - prior invalid closes the side.** After base collection artifacts
+   exist, create `/tmp/price-truth-tier-v2-m6` and copy the pristine runner,
+   reporter, builder, all five probe artifacts, `base.nodes`,
+   `tier-map.tsv`, all eight `T?.paths`, and all eight `base-T?.nodes` files
+   into it. Create a base preflight there, then create `seed_invalid.py` from
+   this exact source:
+
+   ```bash
+   MUTATION_ROOT=/tmp/price-truth-tier-v2-m6
+   test ! -e "$MUTATION_ROOT"
+   mkdir "$MUTATION_ROOT"
+   cp \
+     "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+     "$PRICE_TRUTH_TIER_ROOT/arkscope_price_truth_tier_reporter.py" \
+     "$PRICE_TRUTH_TIER_ROOT/build_tiers.py" \
+     "$PRICE_TRUTH_TIER_ROOT/probe.nodes" \
+     "$PRICE_TRUTH_TIER_ROOT/probe-tier-map.tsv" \
+     "$PRICE_TRUTH_TIER_ROOT/probe_pass.py" \
+     "$PRICE_TRUTH_TIER_ROOT/probe_interruptible.py" \
+     "$PRICE_TRUTH_TIER_ROOT/probe_ignore_sigint.py" \
+     "$PRICE_TRUTH_TIER_ROOT/base.nodes" \
+     "$PRICE_TRUTH_TIER_ROOT/tier-map.tsv" \
+     "$PRICE_TRUTH_TIER_ROOT"/T?.paths \
+     "$PRICE_TRUTH_TIER_ROOT"/base-T?.nodes \
+     "$MUTATION_ROOT/"
+
+   /home/hyl/.virtualenvs/llm_app/bin/python \
+     "$MUTATION_ROOT/price_truth_tier_runner.py" \
+     prepare-preflight \
+     --artifact-root "$MUTATION_ROOT" \
+     --repo "$PWD" \
+     --side base
+   ```
+
+   ```python
+   import json
+   from pathlib import Path
+
+   import price_truth_tier_runner as runner
+
+
+   root = Path(__file__).resolve().parent
+   preflight_path = root / "base-preflight.json"
+   preflight = runner._verify_preflight(preflight_path)
+   trial = root / "base-T0-a1"
+   trial.mkdir()
+   record = {
+       "bank_identity": runner._bank_identity(
+           preflight_path,
+           preflight,
+           "runtime",
+       ),
+       "label": "base-T0-a1",
+       "outcome": "invalid",
+   }
+   (trial / "record.json").write_text(
+       json.dumps(record, indent=2, sort_keys=True) + "\n",
+       encoding="utf-8",
+   )
+   ```
+
+   Run and admit the negative control exactly:
+
+   ```bash
+   PYTHONPATH="$MUTATION_ROOT" \
+     /home/hyl/.virtualenvs/llm_app/bin/python \
+     "$MUTATION_ROOT/seed_invalid.py"
+   find "$MUTATION_ROOT" -maxdepth 1 -type d -printf '%f\n' \
+     | LC_ALL=C sort \
+     > "$MUTATION_ROOT/directories-before-run-side.txt"
+
+   set +e
+   /home/hyl/.virtualenvs/llm_app/bin/python \
+     "$MUTATION_ROOT/price_truth_tier_runner.py" \
+     run-side \
+     --preflight "$MUTATION_ROOT/base-preflight.json" \
+     > "$MUTATION_ROOT/mutation.stdout" \
+     2> "$MUTATION_ROOT/mutation.stderr"
+   rc="$?"
+   set -e
+   printf '%s\n' "$rc" > "$MUTATION_ROOT/exit-code.txt"
+   test "$rc" -ne 0
+
+   jq -e '
+     .complete == false
+     and .invalid_attempt == "base-T0-a1"
+     and .selected_attempts == {}
+     and .unresolved_tiers == []
+   ' "$MUTATION_ROOT/base-summary.json"
+   test ! -e "$MUTATION_ROOT/base-T1-a1"
+   ```
+
+   The runner must refuse on the seeded record, atomically write the
+   incomplete summary above, and create no T1 or later attempt directory.
+
+For M1, require the fields above with `jq`. For M2, require both sleep records
+to have `invalid_reason=deadline_breach_without_dump` and
+`dump_present=false`. For M3, require `probe-sigint` to remain
+`unresolved_stall` but contain ordered `sigint`, `sigkill`, and
+`group_exit_after_sigkill` timeline events with `killed=true`. For M4, save
+`runner-before.sha256`, `runner-after.sha256`, and
+`runtime-drift.diff` in addition to `mutation.diff`.
+
+M1-M4 diffs, M5 input records, M6 seeded record, commands, exit codes, and
+owning record fields go into evidence. Restore is by abandoning each mutation
+root; then re-hash the canonical runner and fixtures. Mutation roots are never
+inputs to Task 0. Expected `invalid` records in M1/M2 and the seeded M6 record
+are negative control results, not Stop Condition 11 runtime attempts.
+
+#### Runtime side command
+
+For each side, the collection-only recipe above must already have produced:
+
+```text
+<side>.nodes
+<side>-T0.nodes ... <side>-T7.nodes
+T0.paths ... T7.paths
+tier-map.tsv
+```
+
+Re-prove exact union, uniqueness, canonical equality, builder/map hashes, and
+the base or tip file-set rule before preflight creation. Then use exactly:
+
+```bash
+: "${SIDE:?set SIDE to base or tip}"
+case "$SIDE" in
+  base|tip) ;;
+  *) printf 'invalid SIDE: %s\n' "$SIDE" >&2; exit 2 ;;
+esac
+
+/home/hyl/.virtualenvs/llm_app/bin/python \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  prepare-preflight \
+  --artifact-root "$PRICE_TRUTH_TIER_ROOT" \
+  --repo "$PWD" \
+  --side "$SIDE"
+
+sha256sum "$PRICE_TRUTH_TIER_ROOT/${SIDE}-preflight.json"
+
+/home/hyl/.virtualenvs/llm_app/bin/python \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  run-side \
+  --preflight "$PRICE_TRUTH_TIER_ROOT/${SIDE}-preflight.json"
+```
+
+No `timeout`, shell backgrounding, external process inspection, signal,
+wrapper, or alternate retry is permitted. The runner launches pytest directly
+with `start_new_session=True`, validates PID=PGID=SID, drains the structured
+pipe, owns the three no-progress phases, classifies the current-window dump,
+sends SIGINT and conditional SIGKILL, archives generated worktree data, and
+atomically records every attempt.
+
+The runner starts all eight initial tiers sequentially. It banks only natural
+`complete_pass` or `complete_nonpassing` attempts under the closed identity,
+defers each `unresolved_stall` for one ascending retry after all initial
+tiers, and refuses every later launch after the first `invalid`. Progress
+events control deadlines only. The unchanged reporter and exact tier
+manifest remain the sole collection, seen, and non-passing authorities.
+
+Require the completed side summary. `invalid_attempt` is absent from a
+completed summary, so use a null-coalescing assertion:
+
+```bash
+jq -e --arg side "$SIDE" '
+  .protocol_id == "price-truth-tier-v2"
+  and .side == $side
+  and .complete == true
+  and (.invalid_attempt // null) == null
+  and .unresolved_tiers == []
+  and (.selected_attempts | keys | sort)
+      == ["0","1","2","3","4","5","6","7"]
+' "$PRICE_TRUTH_TIER_ROOT/${SIDE}-summary.json"
+
+sha256sum \
+  "$PRICE_TRUTH_TIER_ROOT/${SIDE}-summary.json" \
+  "$PRICE_TRUTH_TIER_ROOT/${SIDE}-nonpassing.nodes"
+```
+
+Every selected attempt must have a matching complete record and non-passing
+artifact. EIR-002 permits a naturally completed non-green tier; it does not
+permit an unresolved or invalid side.
+
+Only after a complete side, run the separately bounded diagnostic command:
+
+```bash
+/home/hyl/.virtualenvs/llm_app/bin/python \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  run-diagnostic \
+  --preflight "$PRICE_TRUTH_TIER_ROOT/${SIDE}-preflight.json"
+```
+
+Its record is diagnostic only. It cannot replace, override, or enter the
+tiered A/B result. A prior invalid or incomplete side prevents its launch.
+If the diagnostic itself is invalid, no later runner launch is permitted
+under that preflight, but the already completed tiered admission remains
+separately identified.
+
+Every base/tip summary must state that fresh-process tiers reset
+process-global, module, fixture, and teardown state between file groups and
+therefore are not directly comparable with historical monolithic runs.
+Transcript text supplies only terminal-summary and current-window dump
+presence; it never supplies node IDs or pass/fail accounting.
 
 ## 3. Exact Accounting
 
@@ -1135,11 +1580,15 @@ of these occurs:
    stdout or frontend DTO;
 10. a live provider, Gateway, browser, scheduler, or production write is needed
     for RED/GREEN or review;
-11. any base or tip tier cannot produce a complete natural-exit outcome after
-    its one deferred retry, or either side's tier union does not exactly equal
-    its canonical collection; preserve the tier identity, last verbose node,
-    dump, signals, and transcript as EIR-005 diagnostic evidence, keep all
-    partial output out of the baseline, and stop at that tier boundary; or
+11. outside the pre-registered negative-control mutation roots, the pristine
+    runner classifies any probe or base/tip/diagnostic attempt `invalid`; any
+    base or tip tier cannot produce a complete natural-exit outcome after its
+    one deferred retry; or either side's tier union does not exactly equal its
+    canonical collection;
+    preserve the runner/preflight identity, tier, last structured progress
+    event, dump, signals, progress stream, record, and transcript as EIR-005
+    diagnostic evidence, keep all partial output out of the baseline, and
+    stop at that tier boundary; or
 12. either main-worktree untracked document changes.
 
 **Stop-11 resolution for the restart:** reviewed diagnosis `e6d4b7fa`
@@ -1147,9 +1596,10 @@ established that no tested code/import factor was necessary and that the
 condition changes over time without a reboot. The approved response is not an
 exclusion or a pass waiver. Section 2.2 replaces one monolithic admission run
 with eight complete-collection tiers, one deferred retry per unresolved tier,
-and completed-tier banking under an immutable identity. Stop Condition 11 is
-preserved at tier granularity. A bounded monolithic attempt remains
-diagnostic-only and cannot become an A/B side.
+completed-tier banking under an immutable identity, and one SHA-pinned runner
+that owns every deadline and signal. Stop Condition 11 is preserved at tier
+granularity. A bounded monolithic attempt remains diagnostic-only and cannot
+become an A/B side.
 
 ## 7. Task 0 - Reground After Plan Clearance
 
@@ -1164,9 +1614,11 @@ diagnostic-only and cannot become an A/B side.
 > product work remain unstarted.
 >
 > **Tiered restart 2026-07-30:** diagnosis closeout is merged at
-> `e6d4b7fa`; the branch is rebased, but every Task 0 checkbox is reset.
-> Historical focused results may inform review but cannot satisfy the new
-> base-side protocol.
+> `e6d4b7fa`; manual tier execution was later invalidated at `fa42d44a`
+> because it missed the reviewed no-progress deadline and added an unreviewed
+> PID sampling check. Deterministic runner design `1d08a9f3` replaces that
+> control plane. Every Task 0 checkbox remains reset. Historical focused and
+> invalid tier results may inform review but cannot satisfy v2.
 
 - [ ] **Step 1: Record the clearance identities.**
 
@@ -1245,33 +1697,29 @@ diagnostic-only and cannot become an A/B side.
 
 - [ ] **Step 5: Build and complete the base tiered non-passing set.**
 
-  Execute Section 2.2 with `SIDE=base`. Prove the builder/map hashes, the
+  Execute all of Section 2.2 with `SIDE=base`: exact runner extraction,
+  mandatory probes, six-mutation packet, collection proof, preflight, and the
+  single `run-side` command. Prove the builder/map hashes, the
   `591/591/590/590/590/590/590/590` distribution, exact `4722` tier union,
-  zero duplicate/missing nodes, and all eight complete runtime outcomes.
+  zero duplicate/missing nodes, and all eight complete selected outcomes.
 
-  For each naturally completed tier, accept only the reporter-derived
-  `base-Tn-nonpassing.nodes` produced by Section 2.2; never parse node IDs from
-  `FAILED` or `ERROR` transcript lines. A passing tier has an empty structured
-  non-passing list and therefore an empty file. Only after all eight tiers are
-  complete, form:
+  Accept only each selected attempt's reporter-derived non-passing artifact.
+  The runner, not an operator pipeline, creates the sorted union at
+  `$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes`. Never parse node IDs from
+  `FAILED`, `ERROR`, progress, or other transcript lines. A passing selected
+  attempt contributes an empty structured non-passing file.
 
-  ```bash
-  cat "$PRICE_TRUTH_TIER_ROOT"/base-T?-nonpassing.nodes \
-    | LC_ALL=C sort -u \
-    | tee "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes" \
-    | sha256sum
-  wc -l "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes"
-  ```
+  Record the runner/preflight/probe identities and each selected attempt's
+  outcome, attempt number, duration, exit, transcript/progress/report SHA,
+  node count, non-passing count, data boundary, and signal timeline. EIR-002
+  permits a naturally completed failing tier; it does not permit an invalid
+  or unresolved side. If a deferred retry remains unresolved, preserve the
+  atomic incomplete summary and all artifacts, then stop under Stop Condition
+  11 without starting Step 6 or product RED.
 
-  Record each tier outcome, attempts, duration, exit, transcript SHA, node
-  count, and non-passing count. EIR-002 permits completed failing tiers; it
-  does not permit an unresolved tier. If the one deferred retry remains
-  unresolved, preserve all completed tier artifacts and stop under
-  Stop Condition 11 without starting Step 6 or product RED.
-
-  Once the tiered base is complete, run the bounded diagnostic monolithic
-  attempt from Section 2.2. Record `complete` or `stalled` without using its
-  output in the baseline.
+  Once the tiered base is complete, invoke the Section 2.2
+  `run-diagnostic` command. Record its closed outcome without using it in the
+  baseline.
 
 - [ ] **Step 6: Capture protected-boundary baselines.**
 
@@ -2406,35 +2854,39 @@ diagnostic-only and cannot become an A/B side.
 
   Expected focused: `168 passed`.
 
-  Re-run Section 2.2 with `SIDE=tip`, reusing the exact base
-  `build_tiers.py`, `tier-map.tsv`, and `T?.paths`. First write the canonical
-  4,739-node stream to `$PRICE_TRUTH_TIER_ROOT/tip.nodes`; prove its unique
-  file set is exactly the mapped 253 paths and its tier union is exact with no
-  duplicates. Then execute all eight tip runtime tiers under the same command,
-  classifier, isolation, and deferred-retry protocol.
+  Run only Section 2.2's side-collection and **Runtime side command**
+  subsections with `SIDE=tip`, reusing the exact pinned runner, reporter,
+  `build_tiers.py`, all five probe artifacts, `tier-map.tsv`, and `T?.paths`.
+  Do not repeat fresh-root initialization, mandatory probes, or mutations.
+  First write the canonical 4,739-node stream to
+  `$PRICE_TRUTH_TIER_ROOT/tip.nodes`; prove its unique file set is exactly the
+  mapped 253 paths and its tier union is exact with no duplicates. Create the
+  tip preflight only after those artifacts exist, then invoke the single
+  `run-side` command. Runtime constants, classifier, environment, sequencing,
+  banking, and deferred retry must be byte-identical to base.
 
-  Use only the structured reporter outputs from naturally completed tiers:
+  Compare only the aggregate files emitted from complete selected attempts:
 
   ```bash
-  cat "$PRICE_TRUTH_TIER_ROOT"/tip-T?-nonpassing.nodes \
-    | LC_ALL=C sort -u \
-    | tee "$PRICE_TRUTH_TIER_ROOT/tip-nonpassing.nodes" \
-    | sha256sum
+  sha256sum "$PRICE_TRUTH_TIER_ROOT/tip-nonpassing.nodes"
   comm -13 \
+    "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes" \
+    "$PRICE_TRUTH_TIER_ROOT/tip-nonpassing.nodes"
+  comm -23 \
     "$PRICE_TRUTH_TIER_ROOT/base-nonpassing.nodes" \
     "$PRICE_TRUTH_TIER_ROOT/tip-nonpassing.nodes"
   ```
 
-  Expected new tiered non-passing IDs: none. Any disappeared EIR-002 node is
-  recorded as an environment observation, not claimed as this slice's fix
-  unless the changed files causally own it. A stalled or invalid tip tier
-  leaves the tip incomplete under Stop Condition 11; its partial transcript
-  cannot enter the A/B comparison.
+  Expected new tiered non-passing IDs from `comm -13`: none. Every disappeared
+  ID from `comm -23` is recorded as an environment observation, not claimed as
+  this slice's fix unless the changed files causally own it. A stalled or
+  invalid tip tier leaves the tip incomplete under Stop Condition 11; its
+  partial transcript cannot enter the A/B comparison.
 
-  After the complete tip-side tier result, run one bounded, instrumented
-  monolithic diagnostic attempt. State explicitly that its process context is
-  different from the tiered protocol and from every historical monolithic run.
-  Whether it completes or stalls, it is not an A/B input.
+  After the complete tip-side result, invoke `run-diagnostic` with the same
+  tip preflight. State explicitly that its process context is different from
+  the tiered protocol and every historical monolithic run. Whatever its
+  closed outcome, it is not an A/B input.
 
 - [ ] **Step 4: Run frontend full and non-node gates.**
 
@@ -2663,3 +3115,2156 @@ diagnostic-only and cannot become an A/B side.
   monolithic context are not directly comparable.
 - [x] No plan step contains an unresolved implementation choice or an
   ungrounded external-market acceptance constant.
+- [x] The exact v2 runner source is appendix-pinned, dual-role mode gating
+  is explicit, all four mandatory probes pass, and all six control-plane
+  mutations have one reproducible owning observation.
+
+## Appendix A - Exact Deterministic Tier Runner
+
+This appendix is executable source, not pseudocode. Section 2.2 owns its
+extraction command and SHA-256.
+
+<!-- PRICE_TRUTH_RUNNER_V2_BEGIN -->
+```python
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import re
+import selectors
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+
+PROTOCOL_ID = "price-truth-tier-v2"
+PLUGIN_MODULE = "price_truth_tier_runner"
+REPORTER_MODULE = "arkscope_price_truth_tier_reporter"
+PROGRESS_ENV = "PRICE_TRUTH_PROGRESS_FD"
+FROZEN_V1_ROOT = Path("/tmp/price-truth-tier-v1")
+RUNTIME_BOUNDS = {
+    "dump_seconds": 120,
+    "deadline_seconds": 150,
+    "grace_seconds": 10,
+}
+PROBE_BOUNDS = {
+    "dump_seconds": 2,
+    "deadline_seconds": 3,
+    "grace_seconds": 1,
+}
+EOF_EXIT_GRACE_SECONDS = 1
+TERMINAL_SUMMARY_RE = re.compile(
+    rb"(?m)^=+ .+ in [0-9.]+s =+\r?$"
+)
+
+_progress_fd: int | None = None
+_progress_sequence = 0
+_progress_active_nodeid: str | None = None
+
+
+def _plugin_fd() -> int:
+    if _progress_fd is None:
+        raise RuntimeError("price-truth progress plugin is not configured")
+    return _progress_fd
+
+
+def _emit_progress(event: str, nodeid: str) -> None:
+    global _progress_sequence
+    fd = _plugin_fd()
+    _progress_sequence += 1
+    payload = {
+        "child_monotonic_ns": time.monotonic_ns(),
+        "event": event,
+        "nodeid": nodeid,
+        "schema_version": 1,
+        "sequence": _progress_sequence,
+    }
+    encoded = (
+        json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n"
+    ).encode("utf-8")
+    pipe_buf = int(os.fpathconf(fd, "PC_PIPE_BUF"))
+    if len(encoded) > pipe_buf:
+        raise RuntimeError("price-truth progress event exceeds PIPE_BUF")
+    if os.write(fd, encoded) != len(encoded):
+        raise RuntimeError("short write to price-truth progress pipe")
+
+
+def pytest_configure(config) -> None:
+    global _progress_active_nodeid, _progress_fd, _progress_sequence
+    raw = os.environ.get(PROGRESS_ENV)
+    if raw is None or not raw.isdecimal():
+        raise RuntimeError(f"{PROGRESS_ENV} must be a decimal file descriptor")
+    fd = int(raw)
+    if fd <= 2:
+        raise RuntimeError(f"{PROGRESS_ENV} must not target a standard stream")
+    try:
+        metadata = os.fstat(fd)
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    except OSError as exc:
+        raise RuntimeError(f"{PROGRESS_ENV} is not open") from exc
+    if not stat.S_ISFIFO(metadata.st_mode):
+        raise RuntimeError(f"{PROGRESS_ENV} must reference a pipe")
+    if (flags & os.O_ACCMODE) == os.O_RDONLY:
+        raise RuntimeError(f"{PROGRESS_ENV} must be writable")
+    os.set_inheritable(fd, False)
+    _progress_fd = fd
+    _progress_sequence = 0
+    _progress_active_nodeid = None
+
+
+def pytest_runtest_logstart(nodeid, location) -> None:
+    global _progress_active_nodeid
+    if _progress_active_nodeid is not None:
+        raise RuntimeError("price-truth progress start while an item is active")
+    _emit_progress("logstart", str(nodeid))
+    _progress_active_nodeid = str(nodeid)
+
+
+def pytest_runtest_logfinish(nodeid, location) -> None:
+    global _progress_active_nodeid
+    value = str(nodeid)
+    if _progress_active_nodeid != value:
+        raise RuntimeError("price-truth progress finish does not match start")
+    _emit_progress("logfinish", value)
+    _progress_active_nodeid = None
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError(f"expected JSON object: {path}")
+    return value
+
+
+def _artifact(preflight: dict[str, Any], role: str) -> Path:
+    matches = [
+        Path(item["path"])
+        for item in preflight["artifacts"]
+        if item["role"] == role
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"preflight role must be unique: {role}")
+    return matches[0]
+
+
+def _pip_freeze_sha256() -> str:
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "freeze"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    lines = sorted(result.stdout.decode("utf-8").splitlines())
+    return _sha256_bytes(("".join(f"{line}\n" for line in lines)).encode())
+
+
+def _verify_preflight(path: Path) -> dict[str, Any]:
+    preflight = _load_json(path)
+    required = {
+        "artifact_root",
+        "artifacts",
+        "git_identity",
+        "path",
+        "pip_freeze_sha256",
+        "protocol_id",
+        "python",
+        "python_version",
+        "pytest_version",
+        "repo",
+        "schema_version",
+        "side",
+        "tiers",
+    }
+    if set(preflight) != required:
+        raise RuntimeError("preflight keys do not match the closed schema")
+    if preflight["schema_version"] != 1:
+        raise RuntimeError("unsupported preflight schema")
+    if preflight["protocol_id"] != PROTOCOL_ID:
+        raise RuntimeError("preflight protocol mismatch")
+    root = Path(preflight["artifact_root"]).resolve()
+    if root == FROZEN_V1_ROOT:
+        raise RuntimeError("the frozen v1 artifact root cannot be reused")
+    if path.resolve().parent != root:
+        raise RuntimeError("preflight must live in its artifact root")
+    runner = _artifact(preflight, "runner").resolve()
+    if Path(__file__).resolve() != runner:
+        raise RuntimeError("run the copied runner recorded in preflight")
+    roles: set[str] = set()
+    for item in preflight["artifacts"]:
+        if set(item) != {"path", "role", "sha256"}:
+            raise RuntimeError("artifact entry does not match closed schema")
+        role = item["role"]
+        artifact_path = Path(item["path"])
+        if not isinstance(role, str) or not role or role in roles:
+            raise RuntimeError("artifact roles must be unique strings")
+        roles.add(role)
+        if not artifact_path.is_file():
+            raise RuntimeError(f"preflight artifact is missing: {artifact_path}")
+        if _sha256(artifact_path) != item["sha256"]:
+            raise RuntimeError(f"preflight artifact changed: {artifact_path}")
+    if preflight["python"] != sys.executable:
+        raise RuntimeError("interpreter path changed")
+    if preflight["python_version"] != sys.version:
+        raise RuntimeError("interpreter version changed")
+    import pytest
+
+    if preflight["pytest_version"] != pytest.__version__:
+        raise RuntimeError("pytest version changed")
+    if preflight["pip_freeze_sha256"] != _pip_freeze_sha256():
+        raise RuntimeError("dependency fingerprint changed")
+    if preflight["path"] != os.environ.get("PATH", ""):
+        raise RuntimeError("PATH changed")
+    repo = Path(preflight["repo"]).resolve()
+    git_identity = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
+    if git_identity != preflight["git_identity"]:
+        raise RuntimeError("Git identity changed")
+    if preflight["side"] not in {"base", "tip", "probe"}:
+        raise RuntimeError("invalid preflight side")
+    tiers = preflight["tiers"]
+    if not isinstance(tiers, list):
+        raise RuntimeError("preflight tiers must be a list")
+    expected_tiers = [] if preflight["side"] == "probe" else list(range(8))
+    observed_tiers = [item.get("tier") for item in tiers]
+    if observed_tiers != expected_tiers:
+        raise RuntimeError("preflight tier sequence is invalid")
+    for item in tiers:
+        if set(item) != {"nodes_role", "paths_role", "tier"}:
+            raise RuntimeError("tier entry does not match closed schema")
+        _artifact(preflight, item["nodes_role"])
+        _artifact(preflight, item["paths_role"])
+    if preflight["side"] != "probe":
+        _verify_collection_partition(preflight)
+    return preflight
+
+
+def _worktree_data_entries(repo: Path) -> list[str]:
+    data = repo / "data"
+    if not data.is_dir():
+        raise RuntimeError("isolated worktree data directory is missing")
+    return sorted(
+        str(path.relative_to(repo))
+        for path in data.rglob("*")
+    )
+
+
+def _archive_worktree_data(repo: Path, trial: Path) -> list[str]:
+    entries = _worktree_data_entries(repo)
+    if not entries:
+        return []
+    data = repo / "data"
+    destination = trial / "data-after"
+    if destination.exists():
+        raise RuntimeError("attempt data archive already exists")
+    data.rename(destination)
+    data.mkdir()
+    if _worktree_data_entries(repo):
+        raise RuntimeError("failed to restore empty worktree data directory")
+    return entries
+
+
+def _bounds(mode: str) -> dict[str, int]:
+    if mode == "runtime":
+        return dict(RUNTIME_BOUNDS)
+    if mode == "probe":
+        return dict(PROBE_BOUNDS)
+    raise RuntimeError(f"unknown runner mode: {mode}")
+
+
+def _dump_marker(dump_seconds: int) -> bytes:
+    minutes, seconds = divmod(dump_seconds, 60)
+    return f"Timeout (0:{minutes:02d}:{seconds:02d})!".encode("ascii")
+
+
+def _child_env(
+    preflight: dict[str, Any],
+    trial: Path,
+    report_path: Path,
+    progress_write_fd: int,
+) -> dict[str, str]:
+    root = Path(preflight["artifact_root"])
+    home = trial / "home"
+    tmp = trial / "tmp"
+    locks = trial / "locks"
+    edgar = trial / "edgar"
+    for directory in (home, tmp, locks, edgar):
+        directory.mkdir(parents=True, exist_ok=False)
+    return {
+        "PATH": preflight["path"],
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "Asia/Taipei",
+        "HOME": str(home),
+        "TMPDIR": str(tmp),
+        "XDG_CACHE_HOME": str(trial / "xdg-cache"),
+        "PYTHONHASHSEED": "0",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": str(root),
+        "ARKSCOPE_DISABLE_SCHEDULER": "1",
+        "ARKSCOPE_LOCK_DIR": str(locks),
+        "ARKSCOPE_PROFILE_DB": str(trial / "profile_state.db"),
+        "ARKSCOPE_MARKET_DB": str(trial / "market_data.db"),
+        "ARKSCOPE_MACRO_CALENDAR_DB": str(trial / "macro_calendar.db"),
+        "ARKSCOPE_SA_DB": str(trial / "sa_capture.db"),
+        "ARKSCOPE_CONSENSUS_DB": str(trial / "consensus.db"),
+        "EDGAR_LOCAL_DATA_DIR": str(edgar),
+        "PRICE_TRUTH_TIER_REPORT": str(report_path),
+        PROGRESS_ENV: str(progress_write_fd),
+    }
+
+
+def _process_identity(process: subprocess.Popen[bytes]) -> dict[str, int]:
+    return {
+        "pid": process.pid,
+        "pgid": os.getpgid(process.pid),
+        "sid": os.getsid(process.pid),
+    }
+
+
+def _identity_is_owned(identity: dict[str, int]) -> bool:
+    return identity["pid"] == identity["pgid"] == identity["sid"]
+
+
+def _timeline_event(event: str, **fields: Any) -> dict[str, Any]:
+    return {
+        "event": event,
+        "monotonic_ns": time.monotonic_ns(),
+        "wall_time_epoch": time.time(),
+        **fields,
+    }
+
+
+def _terminate_direct_child(
+    process: subprocess.Popen[bytes],
+    timeline: list[dict[str, Any]],
+) -> bool:
+    if process.poll() is not None:
+        return True
+    process.terminate()
+    timeline.append(_timeline_event("direct_child_sigterm"))
+    try:
+        process.wait(timeout=1)
+        return True
+    except subprocess.TimeoutExpired:
+        process.kill()
+        timeline.append(_timeline_event("direct_child_sigkill"))
+        try:
+            process.wait(timeout=1)
+            return True
+        except subprocess.TimeoutExpired:
+            return False
+
+
+def _process_group_exists(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _wait_for_group_exit(
+    process: subprocess.Popen[bytes],
+    pgid: int,
+    timeout_seconds: int,
+) -> tuple[int | None, bool]:
+    deadline = time.monotonic_ns() + timeout_seconds * 1_000_000_000
+    while True:
+        returncode = process.poll()
+        if not _process_group_exists(pgid):
+            if returncode is None:
+                try:
+                    returncode = process.wait(timeout=0.1)
+                except subprocess.TimeoutExpired:
+                    return returncode, False
+            return returncode, True
+        if time.monotonic_ns() >= deadline:
+            return returncode, False
+        time.sleep(0.01)
+
+
+def _terminate_owned_group(
+    process: subprocess.Popen[bytes],
+    expected_identity: dict[str, int] | None,
+    grace_seconds: int,
+    timeline: list[dict[str, Any]],
+) -> tuple[int | None, bool, bool, bool]:
+    if expected_identity is None or not _identity_is_owned(expected_identity):
+        _terminate_direct_child(process, timeline)
+        return process.poll(), False, False, False
+    try:
+        if process.poll() is None:
+            current_identity = _process_identity(process)
+            if current_identity != expected_identity:
+                _terminate_direct_child(process, timeline)
+                return process.poll(), False, False, False
+    except ProcessLookupError:
+        if _process_group_exists(expected_identity["pgid"]):
+            return process.poll(), False, False, False
+        return process.poll(), False, False, True
+    pgid = expected_identity["pgid"]
+    if not _process_group_exists(pgid):
+        return process.poll(), False, False, True
+    interrupted = True
+    killed = False
+    try:
+        os.killpg(pgid, signal.SIGINT)
+    except ProcessLookupError:
+        return process.poll(), False, False, True
+    timeline.append(_timeline_event("sigint", identity=expected_identity))
+    returncode, group_gone = _wait_for_group_exit(
+        process,
+        pgid,
+        grace_seconds,
+    )
+    if group_gone:
+        timeline.append(
+            _timeline_event("group_exit_after_sigint", returncode=returncode)
+        )
+        return returncode, interrupted, killed, True
+    killed = True
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return process.poll(), interrupted, False, True
+    timeline.append(_timeline_event("sigkill", identity=expected_identity))
+    returncode, group_gone = _wait_for_group_exit(
+        process,
+        pgid,
+        grace_seconds,
+    )
+    if group_gone:
+        timeline.append(
+            _timeline_event("group_exit_after_sigkill", returncode=returncode)
+        )
+        return returncode, interrupted, killed, True
+    timeline.append(_timeline_event("cleanup_timeout"))
+    return returncode, interrupted, killed, False
+
+
+def _parse_progress_event(
+    raw: bytes,
+    expected_sequence: int,
+    active_nodeid: str | None,
+) -> tuple[dict[str, Any], str | None]:
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("malformed progress event") from exc
+    required = {
+        "child_monotonic_ns",
+        "event",
+        "nodeid",
+        "schema_version",
+        "sequence",
+    }
+    if not isinstance(payload, dict) or set(payload) != required:
+        raise RuntimeError("progress event does not match closed schema")
+    if payload["schema_version"] != 1:
+        raise RuntimeError("progress schema mismatch")
+    if payload["sequence"] != expected_sequence:
+        raise RuntimeError("progress sequence mismatch")
+    if not isinstance(payload["child_monotonic_ns"], int):
+        raise RuntimeError("progress monotonic timestamp is not an integer")
+    if not isinstance(payload["nodeid"], str) or not payload["nodeid"]:
+        raise RuntimeError("progress nodeid is invalid")
+    event = payload["event"]
+    nodeid = payload["nodeid"]
+    if event == "logstart":
+        if active_nodeid is not None:
+            raise RuntimeError("progress start arrived while an item is active")
+        active_nodeid = nodeid
+    elif event == "logfinish":
+        if active_nodeid != nodeid:
+            raise RuntimeError("progress finish does not match active item")
+        active_nodeid = None
+    else:
+        raise RuntimeError("unknown progress event")
+    return payload, active_nodeid
+
+
+def _read_node_file(path: Path) -> list[str]:
+    nodes = path.read_text(encoding="utf-8").splitlines()
+    if nodes != sorted(set(nodes)):
+        raise RuntimeError(f"node manifest is not sorted and unique: {path}")
+    return nodes
+
+
+def _verify_collection_partition(preflight: dict[str, Any]) -> None:
+    canonical = _read_node_file(_artifact(preflight, "canonical_nodes"))
+    map_entries: dict[str, tuple[int, int]] = {}
+    for line in _artifact(preflight, "tier_map").read_text(
+        encoding="utf-8"
+    ).splitlines():
+        fields = line.split("\t")
+        if len(fields) != 3 or not fields[0].startswith("T"):
+            raise RuntimeError("tier map row is malformed")
+        try:
+            tier = int(fields[0][1:])
+            count = int(fields[1])
+        except ValueError as exc:
+            raise RuntimeError("tier map row is malformed") from exc
+        path = fields[2]
+        if tier not in range(8) or count <= 0 or not path:
+            raise RuntimeError("tier map row is invalid")
+        if path in map_entries:
+            raise RuntimeError("tier map contains a duplicate path")
+        map_entries[path] = (tier, count)
+    all_nodes: list[str] = []
+    all_paths: list[str] = []
+    for tier in range(8):
+        entry = _tier_entry(preflight, tier)
+        paths = _artifact(preflight, entry["paths_role"]).read_text(
+            encoding="utf-8"
+        ).splitlines()
+        if paths != sorted(set(paths)) or not paths:
+            raise RuntimeError(f"tier paths are invalid: {tier}")
+        nodes = _read_node_file(_artifact(preflight, entry["nodes_role"]))
+        node_paths = [node.split("::", 1)[0] for node in nodes]
+        if set(node_paths) != set(paths):
+            raise RuntimeError(f"tier node/path membership differs: {tier}")
+        for path in paths:
+            mapped = map_entries.get(path)
+            if mapped is None or mapped[0] != tier:
+                raise RuntimeError(f"tier map assignment differs: {path}")
+            if (
+                preflight["side"] == "base"
+                and node_paths.count(path) != mapped[1]
+            ):
+                raise RuntimeError(f"base tier map count differs: {path}")
+        all_nodes.extend(nodes)
+        all_paths.extend(paths)
+    if all_paths != list(dict.fromkeys(all_paths)):
+        raise RuntimeError("tier paths are not globally unique")
+    if set(all_paths) != set(map_entries):
+        raise RuntimeError("tier path union differs from tier map")
+    if len(all_nodes) != len(set(all_nodes)):
+        raise RuntimeError("tier node union contains duplicates")
+    if sorted(all_nodes) != canonical:
+        raise RuntimeError("tier node union differs from canonical collection")
+
+
+def _validate_natural_result(
+    returncode: int,
+    transcript: Path,
+    report_path: Path,
+    expected_nodes_path: Path,
+) -> tuple[str, list[str], dict[str, Any]]:
+    transcript_bytes = transcript.read_bytes()
+    terminal_summary = bool(TERMINAL_SUMMARY_RE.search(transcript_bytes))
+    details: dict[str, Any] = {
+        "terminal_summary": terminal_summary,
+        "transcript_sha256": _sha256(transcript),
+    }
+    if returncode not in {0, 1} or not terminal_summary:
+        return "invalid", [], details
+    if not report_path.is_file():
+        return "invalid", [], details
+    report = _load_json(report_path)
+    details["report_sha256"] = _sha256(report_path)
+    required = {
+        "collected_node_ids",
+        "exitstatus",
+        "nonpassing_node_ids",
+        "schema_version",
+        "seen_node_ids",
+    }
+    if set(report) != required or report["schema_version"] != 1:
+        return "invalid", [], details
+    expected = _read_node_file(expected_nodes_path)
+    collected = report["collected_node_ids"]
+    seen = report["seen_node_ids"]
+    nonpassing = report["nonpassing_node_ids"]
+    if (
+        report["exitstatus"] != returncode
+        or collected != expected
+        or seen != expected
+        or not isinstance(nonpassing, list)
+        or nonpassing != sorted(set(nonpassing))
+        or any(node not in expected for node in nonpassing)
+    ):
+        return "invalid", [], details
+    if returncode == 0 and not nonpassing:
+        return "complete_pass", [], details
+    if returncode == 1 and nonpassing:
+        return "complete_nonpassing", nonpassing, details
+    return "invalid", [], details
+
+
+def _bank_identity(
+    preflight_path: Path,
+    preflight: dict[str, Any],
+    mode: str,
+) -> dict[str, Any]:
+    return {
+        "canonical_nodes_sha256": _sha256(
+            _artifact(preflight, "canonical_nodes")
+        ),
+        "environment_names": sorted(
+            _child_env_names()
+        ),
+        "git_identity": preflight["git_identity"],
+        "mode": mode,
+        "pip_freeze_sha256": preflight["pip_freeze_sha256"],
+        "preflight_sha256": _sha256(preflight_path),
+        "protocol_id": PROTOCOL_ID,
+        "python": preflight["python"],
+        "reporter_sha256": _sha256(_artifact(preflight, "reporter")),
+        "runner_sha256": _sha256(_artifact(preflight, "runner")),
+        "side": preflight["side"],
+        "tier_map_sha256": _sha256(_artifact(preflight, "tier_map")),
+    }
+
+
+def _child_env_names() -> set[str]:
+    return {
+        "ARKSCOPE_CONSENSUS_DB",
+        "ARKSCOPE_DISABLE_SCHEDULER",
+        "ARKSCOPE_LOCK_DIR",
+        "ARKSCOPE_MACRO_CALENDAR_DB",
+        "ARKSCOPE_MARKET_DB",
+        "ARKSCOPE_PROFILE_DB",
+        "ARKSCOPE_SA_DB",
+        "EDGAR_LOCAL_DATA_DIR",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "PATH",
+        "PRICE_TRUTH_TIER_REPORT",
+        PROGRESS_ENV,
+        "PYTHONHASHSEED",
+        "PYTHONPATH",
+        "PYTHONUNBUFFERED",
+        "TMPDIR",
+        "TZ",
+        "XDG_CACHE_HOME",
+    }
+
+
+def _run_attempt(
+    *,
+    preflight_path: Path,
+    preflight: dict[str, Any],
+    trial: Path,
+    cwd: Path,
+    selectors_: list[str],
+    expected_nodes_path: Path,
+    mode: str,
+    label: str,
+    tier: int | None,
+    attempt: int,
+) -> dict[str, Any]:
+    verified_preflight = _verify_preflight(preflight_path)
+    if verified_preflight != preflight:
+        raise RuntimeError("preflight changed before attempt launch")
+    bank_identity = _bank_identity(preflight_path, preflight, mode)
+    bounds = _bounds(mode)
+    repo = Path(preflight["repo"])
+    data_before = _worktree_data_entries(repo)
+    if data_before:
+        raise RuntimeError(f"worktree data is not empty: {data_before}")
+    trial.mkdir(parents=True, exist_ok=False)
+    transcript = trial / "transcript.txt"
+    report_path = trial / "report.json"
+    progress_path = trial / "progress.jsonl"
+    read_fd, write_fd = os.pipe()
+    os.set_blocking(read_fd, False)
+    env = _child_env(preflight, trial, report_path, write_fd)
+    if set(env) != _child_env_names():
+        raise RuntimeError("child environment names changed")
+    args = [
+        preflight["python"],
+        "-m",
+        "pytest",
+        "-vv",
+        "--tb=short",
+        "-o",
+        f"faulthandler_timeout={bounds['dump_seconds']}",
+        "-o",
+        f"cache_dir={trial / 'pytest-cache'}",
+        "--basetemp",
+        str(trial / "pytest-tmp"),
+        "-p",
+        REPORTER_MODULE,
+        "-p",
+        PLUGIN_MODULE,
+        *selectors_,
+    ]
+    started_wall = time.time()
+    started_mono = time.monotonic_ns()
+    deadline_ns = started_mono + bounds["deadline_seconds"] * 1_000_000_000
+    phase = "pre_first_node"
+    active_nodeid: str | None = None
+    expected_sequence = 1
+    progress_count = 0
+    last_progress: dict[str, Any] | None = None
+    window_offset = 0
+    pipe_buffer = b""
+    pipe_eof = False
+    child_exit_observed_ns: int | None = None
+    timeline = [_timeline_event("launch_requested", label=label)]
+    outcome = "invalid"
+    returncode: int | None = None
+    interrupted = False
+    killed = False
+    cleanup_complete = False
+    dump_present = False
+    invalid_reason: str | None = None
+    nonpassing_path: Path | None = None
+    nonpassing_count: int | None = None
+    process: subprocess.Popen[bytes] | None = None
+    identity: dict[str, int] | None = None
+    selector = selectors.DefaultSelector()
+    try:
+        with transcript.open("wb") as transcript_handle, progress_path.open(
+            "w", encoding="utf-8"
+        ) as progress_handle:
+            process = subprocess.Popen(
+                args,
+                cwd=cwd,
+                env=env,
+                stdout=transcript_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                pass_fds=(write_fd,),
+            )
+            os.close(write_fd)
+            write_fd = -1
+            identity = _process_identity(process)
+            timeline.append(_timeline_event("launched", identity=identity))
+            if not _identity_is_owned(identity):
+                invalid_reason = "process_group_identity_mismatch"
+                cleanup_complete = _terminate_direct_child(process, timeline)
+            else:
+                selector.register(read_fd, selectors.EVENT_READ)
+                while invalid_reason is None and returncode is None:
+                    now_ns = time.monotonic_ns()
+                    remaining = max(0, deadline_ns - now_ns) / 1_000_000_000
+                    events = selector.select(timeout=min(remaining, 0.1))
+                    deadline_due = time.monotonic_ns() >= deadline_ns
+                    for key, _ in (() if deadline_due else events):
+                        while True:
+                            try:
+                                chunk = os.read(key.fd, 65536)
+                            except BlockingIOError:
+                                break
+                            if not chunk:
+                                pipe_eof = True
+                                selector.unregister(key.fd)
+                                break
+                            pipe_buffer += chunk
+                            while b"\n" in pipe_buffer:
+                                raw, pipe_buffer = pipe_buffer.split(b"\n", 1)
+                                received_mono = time.monotonic_ns()
+                                if received_mono >= deadline_ns:
+                                    deadline_due = True
+                                    break
+                                try:
+                                    payload, active_nodeid = _parse_progress_event(
+                                        raw,
+                                        expected_sequence,
+                                        active_nodeid,
+                                    )
+                                except RuntimeError as exc:
+                                    invalid_reason = str(exc)
+                                    break
+                                transcript_handle.flush()
+                                window_offset = os.fstat(
+                                    transcript_handle.fileno()
+                                ).st_size
+                                enriched = {
+                                    **payload,
+                                    "runner_received_at_epoch": time.time(),
+                                    "runner_received_monotonic_ns": received_mono,
+                                    "transcript_offset": window_offset,
+                                }
+                                progress_handle.write(
+                                    json.dumps(
+                                        enriched,
+                                        separators=(",", ":"),
+                                        sort_keys=True,
+                                    )
+                                    + "\n"
+                                )
+                                progress_handle.flush()
+                                progress_count += 1
+                                last_progress = enriched
+                                expected_sequence += 1
+                                phase = (
+                                    "active_node"
+                                    if payload["event"] == "logstart"
+                                    else "post_last_progress"
+                                )
+                                deadline_ns = (
+                                    received_mono
+                                    + bounds["deadline_seconds"]
+                                    * 1_000_000_000
+                                )
+                            if (
+                                invalid_reason is not None
+                                or pipe_eof
+                                or deadline_due
+                            ):
+                                break
+                    if invalid_reason is not None:
+                        (
+                            returncode,
+                            interrupted,
+                            killed,
+                            cleanup_complete,
+                        ) = _terminate_owned_group(
+                            process,
+                            identity,
+                            bounds["grace_seconds"],
+                            timeline,
+                        )
+                        break
+                    deadline_due = (
+                        deadline_due or time.monotonic_ns() >= deadline_ns
+                    )
+                    if deadline_due:
+                        transcript_handle.flush()
+                        transcript_snapshot = transcript.read_bytes()
+                        current_window = transcript_snapshot[window_offset:]
+                        dump_present = (
+                            _dump_marker(bounds["dump_seconds"])
+                            in current_window
+                        )
+                        timeline.append(
+                            _timeline_event(
+                                "deadline_breach",
+                                dump_present=dump_present,
+                                last_progress=last_progress,
+                                phase=phase,
+                                transcript_sha256=_sha256_bytes(
+                                    transcript_snapshot
+                                ),
+                                transcript_size=len(transcript_snapshot),
+                                transcript_offset=window_offset,
+                            )
+                        )
+                        (
+                            returncode,
+                            interrupted,
+                            killed,
+                            cleanup_complete,
+                        ) = _terminate_owned_group(
+                            process,
+                            identity,
+                            bounds["grace_seconds"],
+                            timeline,
+                        )
+                        outcome = (
+                            "unresolved_stall"
+                            if dump_present and cleanup_complete
+                            else "invalid"
+                        )
+                        if not dump_present:
+                            invalid_reason = "deadline_breach_without_dump"
+                        elif not cleanup_complete:
+                            invalid_reason = "deadline_cleanup_incomplete"
+                        break
+                    polled = process.poll()
+                    if pipe_eof:
+                        if pipe_buffer:
+                            invalid_reason = "partial_progress_event_at_eof"
+                            (
+                                returncode,
+                                interrupted,
+                                killed,
+                                cleanup_complete,
+                            ) = _terminate_owned_group(
+                                process,
+                                identity,
+                                bounds["grace_seconds"],
+                                timeline,
+                            )
+                        elif polled is None:
+                            invalid_reason = "pipe_eof_while_child_running"
+                            (
+                                returncode,
+                                interrupted,
+                                killed,
+                                cleanup_complete,
+                            ) = _terminate_owned_group(
+                                process,
+                                identity,
+                                bounds["grace_seconds"],
+                                timeline,
+                            )
+                        elif _process_group_exists(identity["pgid"]):
+                            invalid_reason = "pipe_eof_with_live_process_group"
+                            (
+                                returncode,
+                                interrupted,
+                                killed,
+                                cleanup_complete,
+                            ) = _terminate_owned_group(
+                                process,
+                                identity,
+                                bounds["grace_seconds"],
+                                timeline,
+                            )
+                        else:
+                            returncode = polled
+                            cleanup_complete = True
+                        break
+                    if polled is not None:
+                        if child_exit_observed_ns is None:
+                            child_exit_observed_ns = time.monotonic_ns()
+                            timeline.append(
+                                _timeline_event(
+                                    "child_exit_observed_before_pipe_eof",
+                                    returncode=polled,
+                                )
+                            )
+                        elif (
+                            time.monotonic_ns() - child_exit_observed_ns
+                            >= EOF_EXIT_GRACE_SECONDS * 1_000_000_000
+                        ):
+                            invalid_reason = "child_exit_without_timely_pipe_eof"
+                            (
+                                returncode,
+                                interrupted,
+                                killed,
+                                cleanup_complete,
+                            ) = _terminate_owned_group(
+                                process,
+                                identity,
+                                bounds["grace_seconds"],
+                                timeline,
+                            )
+                            break
+                        continue
+                if (
+                    invalid_reason is None
+                    and outcome == "invalid"
+                    and returncode is not None
+                ):
+                    if active_nodeid is not None:
+                        invalid_reason = "unbalanced_progress_at_natural_exit"
+                    elif progress_count != (
+                        2 * len(_read_node_file(expected_nodes_path))
+                    ):
+                        invalid_reason = "natural_exit_progress_count_mismatch"
+                    else:
+                        outcome, nonpassing, natural = _validate_natural_result(
+                            returncode,
+                            transcript,
+                            report_path,
+                            expected_nodes_path,
+                        )
+                        if outcome == "invalid":
+                            invalid_reason = "natural_result_validation_failed"
+                        else:
+                            nonpassing_path = (
+                                Path(preflight["artifact_root"])
+                                / f"{label}-nonpassing.nodes"
+                            )
+                            nonpassing_path.write_text(
+                                "".join(f"{node}\n" for node in nonpassing),
+                                encoding="utf-8",
+                            )
+                            nonpassing_count = len(nonpassing)
+                        timeline.append(
+                            _timeline_event(
+                                "natural_validation",
+                                details=natural,
+                                outcome=outcome,
+                            )
+                        )
+    except KeyboardInterrupt:
+        invalid_reason = "operator_interrupted_runner"
+        if process is not None:
+            (
+                returncode,
+                interrupted,
+                killed,
+                cleanup_complete,
+            ) = _terminate_owned_group(
+                process,
+                identity,
+                bounds["grace_seconds"],
+                timeline,
+            )
+    except BaseException as exc:
+        invalid_reason = f"runner_exception:{type(exc).__name__}:{exc}"
+        if process is not None and process.poll() is None:
+            (
+                returncode,
+                interrupted,
+                killed,
+                cleanup_complete,
+            ) = _terminate_owned_group(
+                process,
+                identity,
+                bounds["grace_seconds"],
+                timeline,
+            )
+    finally:
+        selector.close()
+        if write_fd >= 0:
+            os.close(write_fd)
+        try:
+            os.close(read_fd)
+        except OSError:
+            pass
+    if invalid_reason is not None:
+        outcome = "invalid"
+    try:
+        data_after = _archive_worktree_data(repo, trial)
+    except BaseException as exc:
+        data_after = []
+        invalid_reason = f"data_archive_failed:{type(exc).__name__}:{exc}"
+        outcome = "invalid"
+    try:
+        verified_after = _verify_preflight(preflight_path)
+        if verified_after != preflight:
+            raise RuntimeError("preflight changed during attempt")
+    except BaseException as exc:
+        invalid_reason = (
+            f"post_attempt_preflight_failed:{type(exc).__name__}:{exc}"
+        )
+        outcome = "invalid"
+    ended_mono = time.monotonic_ns()
+    record = {
+        "active_nodeid_at_end": active_nodeid,
+        "attempt": attempt,
+        "bank_identity": bank_identity,
+        "bounds": bounds,
+        "cleanup_complete": cleanup_complete,
+        "command": args,
+        "data_entries_after": data_after,
+        "data_entries_before": data_before,
+        "deadline_phase": phase,
+        "dump_present": dump_present,
+        "duration_seconds": (ended_mono - started_mono) / 1_000_000_000,
+        "ended_at_epoch": time.time(),
+        "ended_monotonic_ns": ended_mono,
+        "environment_names": sorted(env),
+        "identity": identity,
+        "interrupted": interrupted,
+        "invalid_reason": invalid_reason,
+        "killed": killed,
+        "label": label,
+        "last_progress": last_progress,
+        "mode": mode,
+        "nonpassing_count": nonpassing_count,
+        "nonpassing_path": (
+            str(nonpassing_path) if nonpassing_path is not None else None
+        ),
+        "nonpassing_sha256": (
+            _sha256(nonpassing_path)
+            if nonpassing_path is not None
+            else None
+        ),
+        "outcome": outcome,
+        "pipe_eof": pipe_eof,
+        "progress_count": progress_count,
+        "progress_path": str(progress_path),
+        "progress_sha256": (
+            _sha256(progress_path) if progress_path.is_file() else None
+        ),
+        "protocol_id": PROTOCOL_ID,
+        "report_sha256": _sha256(report_path) if report_path.is_file() else None,
+        "report_path": str(report_path),
+        "returncode": returncode,
+        "schema_version": 1,
+        "side": preflight["side"],
+        "started_at_epoch": started_wall,
+        "started_monotonic_ns": started_mono,
+        "timeline": timeline,
+        "tier": tier,
+        "transcript_sha256": (
+            _sha256(transcript) if transcript.is_file() else None
+        ),
+        "transcript_path": str(transcript),
+    }
+    _atomic_json(trial / "record.json", record)
+    return record
+
+
+def _record_for(root: Path, label: str) -> dict[str, Any] | None:
+    trial = root / label
+    if not trial.exists():
+        return None
+    record = trial / "record.json"
+    temporary = trial / "record.json.tmp"
+    if temporary.exists() or not record.is_file():
+        raise RuntimeError(f"incomplete attempt directory is invalid: {trial}")
+    return _load_json(record)
+
+
+def _audit_side_attempt_directories(root: Path, side: str) -> None:
+    if (root / f"{side}-summary.json.tmp").exists():
+        raise RuntimeError("incomplete side summary is invalid")
+    for trial in sorted(root.glob(f"{side}-*")):
+        if not trial.is_dir():
+            continue
+        record = trial / "record.json"
+        if (trial / "record.json.tmp").exists() or not record.is_file():
+            raise RuntimeError(
+                f"incomplete attempt directory is invalid: {trial}"
+            )
+
+
+def _validate_banked(
+    record: dict[str, Any],
+    bank_identity: dict[str, Any],
+    root: Path,
+) -> None:
+    if record.get("bank_identity") != bank_identity:
+        raise RuntimeError("banked attempt identity changed")
+    side = bank_identity["side"]
+    label = record.get("label")
+    if (
+        record.get("protocol_id") != PROTOCOL_ID
+        or record.get("schema_version") != 1
+        or record.get("side") != side
+        or record.get("mode") != "runtime"
+        or record.get("bounds") != RUNTIME_BOUNDS
+        or not isinstance(label, str)
+    ):
+        raise RuntimeError("banked attempt record identity is invalid")
+    match = re.fullmatch(rf"{re.escape(side)}-T([0-7])-a([12])", label)
+    if match is not None:
+        tier = int(match.group(1))
+        attempt = int(match.group(2))
+        expected_nodes_path = root / f"{side}-T{tier}.nodes"
+    elif label == f"{side}-diagnostic-monolithic":
+        tier = None
+        attempt = 1
+        expected_nodes_path = root / f"{side}.nodes"
+    else:
+        raise RuntimeError("banked attempt label is invalid")
+    if record.get("tier") != tier or record.get("attempt") != attempt:
+        raise RuntimeError("banked attempt coordinates changed")
+    trial = root / label
+    for path_field, hash_field, filename in (
+        ("progress_path", "progress_sha256", "progress.jsonl"),
+        ("transcript_path", "transcript_sha256", "transcript.txt"),
+    ):
+        path = trial / filename
+        if (
+            record.get(path_field) != str(path)
+            or not path.is_file()
+            or record.get(hash_field) != _sha256(path)
+        ):
+            raise RuntimeError(f"banked {filename} artifact changed")
+    outcome = record.get("outcome")
+    if outcome == "invalid":
+        raise RuntimeError("an invalid attempt closes the side")
+    if outcome not in {
+        "complete_pass",
+        "complete_nonpassing",
+        "unresolved_stall",
+    }:
+        raise RuntimeError("banked attempt outcome is invalid")
+    if outcome == "unresolved_stall":
+        if any(
+            record.get(field) is not None
+            for field in (
+                "nonpassing_count",
+                "nonpassing_path",
+                "nonpassing_sha256",
+            )
+        ):
+            raise RuntimeError("stalled attempt has non-passing artifacts")
+        return
+    report_path = trial / "report.json"
+    if (
+        record.get("report_path") != str(report_path)
+        or not report_path.is_file()
+        or record.get("report_sha256") != _sha256(report_path)
+    ):
+        raise RuntimeError("banked reporter artifact changed")
+    path = root / f"{label}-nonpassing.nodes"
+    if record.get("nonpassing_path") != str(path) or not path.is_file():
+        raise RuntimeError("banked non-passing path changed")
+    nodes = _read_node_file(path)
+    if (
+        record.get("nonpassing_count") != len(nodes)
+        or record.get("nonpassing_sha256") != _sha256(path)
+    ):
+        raise RuntimeError("banked non-passing artifact changed")
+    if (outcome == "complete_pass" and nodes) or (
+        outcome == "complete_nonpassing" and not nodes
+    ):
+        raise RuntimeError("banked non-passing outcome is inconsistent")
+    expected_nodes = set(_read_node_file(expected_nodes_path))
+    if any(node not in expected_nodes for node in nodes):
+        raise RuntimeError("banked non-passing node is outside its manifest")
+
+
+def _write_incomplete_side_summary(
+    preflight: dict[str, Any],
+    bank_identity: dict[str, Any],
+    *,
+    invalid_attempt: str | None,
+    selected: dict[int, dict[str, Any]],
+    unresolved: list[int],
+) -> dict[str, Any]:
+    summary = {
+        "bank_identity": bank_identity,
+        "complete": False,
+        "invalid_attempt": invalid_attempt,
+        "protocol_id": PROTOCOL_ID,
+        "schema_version": 1,
+        "selected_attempts": {
+            str(key): value["label"]
+            for key, value in sorted(selected.items())
+        },
+        "side": preflight["side"],
+        "unresolved_tiers": sorted(unresolved),
+    }
+    _atomic_json(
+        Path(preflight["artifact_root"])
+        / f"{preflight['side']}-summary.json",
+        summary,
+    )
+    return summary
+
+
+def _tier_entry(preflight: dict[str, Any], tier: int) -> dict[str, Any]:
+    matches = [item for item in preflight["tiers"] if item["tier"] == tier]
+    if len(matches) != 1:
+        raise RuntimeError(f"missing tier entry: {tier}")
+    return matches[0]
+
+
+def _run_tier(
+    preflight_path: Path,
+    preflight: dict[str, Any],
+    tier: int,
+    attempt: int,
+) -> dict[str, Any]:
+    root = Path(preflight["artifact_root"])
+    side = preflight["side"]
+    label = f"{side}-T{tier}-a{attempt}"
+    existing = _record_for(root, label)
+    bank_identity = _bank_identity(preflight_path, preflight, "runtime")
+    if existing is not None:
+        _validate_banked(existing, bank_identity, root)
+        return existing
+    entry = _tier_entry(preflight, tier)
+    paths = _artifact(preflight, entry["paths_role"]).read_text(
+        encoding="utf-8"
+    ).splitlines()
+    if paths != sorted(set(paths)) or not paths:
+        raise RuntimeError(f"tier paths are invalid: {tier}")
+    record = _run_attempt(
+        preflight_path=preflight_path,
+        preflight=preflight,
+        trial=root / label,
+        cwd=Path(preflight["repo"]),
+        selectors_=paths,
+        expected_nodes_path=_artifact(preflight, entry["nodes_role"]),
+        mode="runtime",
+        label=label,
+        tier=tier,
+        attempt=attempt,
+    )
+    if record.get("outcome") != "invalid":
+        _validate_banked(record, bank_identity, root)
+    return record
+
+
+def _combine_nonpassing(
+    preflight: dict[str, Any],
+    selected: dict[int, dict[str, Any]],
+) -> Path:
+    root = Path(preflight["artifact_root"])
+    side = preflight["side"]
+    nodes: set[str] = set()
+    for tier, record in sorted(selected.items()):
+        path = root / f"{record['label']}-nonpassing.nodes"
+        if not path.is_file():
+            raise RuntimeError(f"missing banked nonpassing file: T{tier}")
+        nodes.update(path.read_text(encoding="utf-8").splitlines())
+    destination = root / f"{side}-nonpassing.nodes"
+    destination.write_text(
+        "".join(f"{node}\n" for node in sorted(nodes)),
+        encoding="utf-8",
+    )
+    return destination
+
+
+def run_side(preflight_path: Path) -> dict[str, Any]:
+    preflight = _verify_preflight(preflight_path)
+    if preflight["side"] not in {"base", "tip"}:
+        raise RuntimeError("run-side requires base or tip preflight")
+    root = Path(preflight["artifact_root"])
+    bank_identity = _bank_identity(preflight_path, preflight, "runtime")
+    if (root / f"{preflight['side']}-summary.json.tmp").exists():
+        raise RuntimeError("incomplete side summary is invalid")
+    try:
+        _audit_side_attempt_directories(root, preflight["side"])
+    except RuntimeError:
+        _write_incomplete_side_summary(
+            preflight,
+            bank_identity,
+            invalid_attempt="incomplete_attempt_artifact",
+            selected={},
+            unresolved=[],
+        )
+        raise
+    for record_path in sorted(root.glob(f"{preflight['side']}-*/record.json")):
+        record = _load_json(record_path)
+        try:
+            _validate_banked(record, bank_identity, root)
+        except RuntimeError:
+            _write_incomplete_side_summary(
+                preflight,
+                bank_identity,
+                invalid_attempt=str(record.get("label")),
+                selected={},
+                unresolved=[],
+            )
+            raise
+    selected: dict[int, dict[str, Any]] = {}
+    unresolved: list[int] = []
+    for tier in range(8):
+        try:
+            record = _run_tier(preflight_path, preflight, tier, 1)
+        except RuntimeError:
+            _write_incomplete_side_summary(
+                preflight,
+                bank_identity,
+                invalid_attempt=f"{preflight['side']}-T{tier}-a1:runner_error",
+                selected=selected,
+                unresolved=unresolved,
+            )
+            raise
+        outcome = record["outcome"]
+        if outcome == "invalid":
+            _write_incomplete_side_summary(
+                preflight,
+                bank_identity,
+                invalid_attempt=record["label"],
+                selected=selected,
+                unresolved=unresolved,
+            )
+            raise RuntimeError(f"invalid tier closes side: T{tier}/a1")
+        if outcome == "unresolved_stall":
+            unresolved.append(tier)
+        else:
+            selected[tier] = record
+    still_unresolved: list[int] = []
+    for tier in unresolved:
+        try:
+            record = _run_tier(preflight_path, preflight, tier, 2)
+        except RuntimeError:
+            _write_incomplete_side_summary(
+                preflight,
+                bank_identity,
+                invalid_attempt=f"{preflight['side']}-T{tier}-a2:runner_error",
+                selected=selected,
+                unresolved=unresolved,
+            )
+            raise
+        outcome = record["outcome"]
+        if outcome == "invalid":
+            _write_incomplete_side_summary(
+                preflight,
+                bank_identity,
+                invalid_attempt=record["label"],
+                selected=selected,
+                unresolved=unresolved,
+            )
+            raise RuntimeError(f"invalid tier closes side: T{tier}/a2")
+        if outcome == "unresolved_stall":
+            still_unresolved.append(tier)
+        else:
+            selected[tier] = record
+    if still_unresolved:
+        return _write_incomplete_side_summary(
+            preflight,
+            bank_identity,
+            invalid_attempt=None,
+            selected=selected,
+            unresolved=still_unresolved,
+        )
+    if set(selected) != set(range(8)):
+        raise RuntimeError("side selection is incomplete")
+    try:
+        verified_after = _verify_preflight(preflight_path)
+        if verified_after != preflight:
+            raise RuntimeError("preflight changed before side completion")
+        for record in selected.values():
+            _validate_banked(record, bank_identity, root)
+    except RuntimeError:
+        _write_incomplete_side_summary(
+            preflight,
+            bank_identity,
+            invalid_attempt="side_completion_identity",
+            selected=selected,
+            unresolved=[],
+        )
+        raise
+    nonpassing = _combine_nonpassing(preflight, selected)
+    summary = {
+        "bank_identity": bank_identity,
+        "complete": True,
+        "nonpassing_count": len(
+            nonpassing.read_text(encoding="utf-8").splitlines()
+        ),
+        "nonpassing_sha256": _sha256(nonpassing),
+        "protocol_id": PROTOCOL_ID,
+        "schema_version": 1,
+        "selected_attempts": {
+            str(key): value["label"]
+            for key, value in sorted(selected.items())
+        },
+        "side": preflight["side"],
+        "unresolved_tiers": [],
+    }
+    _atomic_json(root / f"{preflight['side']}-summary.json", summary)
+    return summary
+
+
+def run_diagnostic(preflight_path: Path) -> dict[str, Any]:
+    preflight = _verify_preflight(preflight_path)
+    if preflight["side"] not in {"base", "tip"}:
+        raise RuntimeError("run-diagnostic requires base or tip preflight")
+    root = Path(preflight["artifact_root"])
+    _audit_side_attempt_directories(root, preflight["side"])
+    summary_path = root / f"{preflight['side']}-summary.json"
+    if not summary_path.is_file():
+        raise RuntimeError("diagnostic requires a side summary")
+    summary = _load_json(summary_path)
+    if (
+        summary.get("protocol_id") != PROTOCOL_ID
+        or summary.get("side") != preflight["side"]
+        or summary.get("complete") is not True
+    ):
+        raise RuntimeError("diagnostic requires a complete tiered side")
+    bank_identity = _bank_identity(preflight_path, preflight, "runtime")
+    for record_path in sorted(
+        root.glob(f"{preflight['side']}-*/record.json")
+    ):
+        _validate_banked(_load_json(record_path), bank_identity, root)
+    label = f"{preflight['side']}-diagnostic-monolithic"
+    existing = _record_for(root, label)
+    if existing is not None:
+        _validate_banked(existing, bank_identity, root)
+        return existing
+    return _run_attempt(
+        preflight_path=preflight_path,
+        preflight=preflight,
+        trial=root / label,
+        cwd=Path(preflight["repo"]),
+        selectors_=[],
+        expected_nodes_path=_artifact(preflight, "canonical_nodes"),
+        mode="runtime",
+        label=label,
+        tier=None,
+        attempt=1,
+    )
+
+
+def _probe_record(
+    preflight_path: Path,
+    preflight: dict[str, Any],
+    role: str,
+    label: str,
+) -> dict[str, Any]:
+    fixture = _artifact(preflight, role)
+    nodes = _artifact(preflight, "probe_nodes")
+    return _run_attempt(
+        preflight_path=preflight_path,
+        preflight=preflight,
+        trial=Path(preflight["artifact_root"]) / label,
+        cwd=Path(preflight["artifact_root"]),
+        selectors_=[fixture.name],
+        expected_nodes_path=nodes,
+        mode="probe",
+        label=label,
+        tier=None,
+        attempt=1,
+    )
+
+
+def _collect_identity_arm(
+    preflight_path: Path,
+    preflight: dict[str, Any],
+    *,
+    plugin_enabled: bool,
+) -> tuple[list[str], dict[str, Any]]:
+    if _verify_preflight(preflight_path) != preflight:
+        raise RuntimeError("preflight changed before collection probe")
+    root = Path(preflight["artifact_root"])
+    label = (
+        "probe-collect-plugin"
+        if plugin_enabled
+        else "probe-collect-control"
+    )
+    trial = root / label
+    trial.mkdir(parents=True, exist_ok=False)
+    transcript = trial / "transcript.txt"
+    report_path = trial / "report.json"
+    manifest_path = trial / "collected.nodes"
+    read_fd = -1
+    write_fd = -1
+    if plugin_enabled:
+        read_fd, write_fd = os.pipe()
+        os.set_blocking(read_fd, False)
+    env = _child_env(preflight, trial, report_path, write_fd)
+    if not plugin_enabled:
+        env.pop(PROGRESS_ENV)
+    args = [
+        preflight["python"],
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "-o",
+        f"cache_dir={trial / 'pytest-cache'}",
+        "--basetemp",
+        str(trial / "pytest-tmp"),
+        "-p",
+        REPORTER_MODULE,
+    ]
+    if plugin_enabled:
+        args.extend(["-p", PLUGIN_MODULE])
+    args.append(_artifact(preflight, "probe_pass").name)
+    timeline = [_timeline_event("collect_probe_launch")]
+    process: subprocess.Popen[bytes] | None = None
+    identity: dict[str, int] | None = None
+    cleanup_complete = False
+    returncode: int | None = None
+    progress_bytes = b""
+    invalid_reason: str | None = None
+    try:
+        with transcript.open("wb") as transcript_handle:
+            process = subprocess.Popen(
+                args,
+                cwd=root,
+                env=env,
+                stdout=transcript_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                pass_fds=((write_fd,) if plugin_enabled else ()),
+            )
+            if plugin_enabled:
+                os.close(write_fd)
+                write_fd = -1
+            identity = _process_identity(process)
+            timeline.append(_timeline_event("collect_probe_started", identity=identity))
+            if not _identity_is_owned(identity):
+                invalid_reason = "process_group_identity_mismatch"
+                cleanup_complete = _terminate_direct_child(process, timeline)
+                returncode = process.poll()
+            else:
+                try:
+                    returncode = process.wait(
+                        timeout=PROBE_BOUNDS["deadline_seconds"]
+                    )
+                    if _process_group_exists(identity["pgid"]):
+                        invalid_reason = "collect_probe_live_group_after_exit"
+                        (
+                            returncode,
+                            _,
+                            _,
+                            cleanup_complete,
+                        ) = _terminate_owned_group(
+                            process,
+                            identity,
+                            PROBE_BOUNDS["grace_seconds"],
+                            timeline,
+                        )
+                    else:
+                        cleanup_complete = True
+                except subprocess.TimeoutExpired:
+                    invalid_reason = "collect_probe_timeout"
+                    (
+                        returncode,
+                        _,
+                        _,
+                        cleanup_complete,
+                    ) = _terminate_owned_group(
+                        process,
+                        identity,
+                        PROBE_BOUNDS["grace_seconds"],
+                        timeline,
+                    )
+        if plugin_enabled:
+            pipe_eof = False
+            while True:
+                try:
+                    chunk = os.read(read_fd, 65536)
+                except BlockingIOError:
+                    break
+                if not chunk:
+                    pipe_eof = True
+                    break
+                progress_bytes += chunk
+            if not pipe_eof:
+                invalid_reason = invalid_reason or "collect_probe_pipe_not_closed"
+            if progress_bytes:
+                invalid_reason = "collect_only_emitted_runtime_progress"
+        if returncode != 0 or not cleanup_complete:
+            invalid_reason = invalid_reason or "collect_probe_nonzero"
+        if not report_path.is_file():
+            invalid_reason = invalid_reason or "collect_probe_report_missing"
+            collected: list[str] = []
+        else:
+            report = _load_json(report_path)
+            expected = _read_node_file(_artifact(preflight, "probe_nodes"))
+            collected = report.get("collected_node_ids", [])
+            if (
+                report.get("schema_version") != 1
+                or report.get("exitstatus") != 0
+                or collected != expected
+                or report.get("seen_node_ids") != []
+                or report.get("nonpassing_node_ids") != []
+            ):
+                invalid_reason = invalid_reason or "collect_probe_report_invalid"
+            else:
+                manifest_path.write_text(
+                    "".join(f"{node}\n" for node in collected),
+                    encoding="utf-8",
+                )
+    except BaseException as exc:
+        invalid_reason = (
+            f"collect_probe_exception:{type(exc).__name__}:{exc}"
+        )
+        collected = []
+        if (
+            process is not None
+            and identity is not None
+            and (
+                process.poll() is None
+                or _process_group_exists(identity["pgid"])
+            )
+        ):
+            (
+                returncode,
+                _,
+                _,
+                cleanup_complete,
+            ) = _terminate_owned_group(
+                process,
+                identity,
+                PROBE_BOUNDS["grace_seconds"],
+                timeline,
+            )
+    finally:
+        if write_fd >= 0:
+            os.close(write_fd)
+        if read_fd >= 0:
+            os.close(read_fd)
+    try:
+        data_after = _archive_worktree_data(
+            Path(preflight["repo"]),
+            trial,
+        )
+    except BaseException as exc:
+        data_after = []
+        invalid_reason = (
+            f"collect_probe_data_archive_failed:{type(exc).__name__}:{exc}"
+        )
+    try:
+        if _verify_preflight(preflight_path) != preflight:
+            raise RuntimeError("preflight changed during collection probe")
+    except BaseException as exc:
+        invalid_reason = (
+            f"collect_probe_postflight_failed:{type(exc).__name__}:{exc}"
+        )
+    record = {
+        "cleanup_complete": cleanup_complete,
+        "collected_node_ids": collected,
+        "collected_nodes_path": (
+            str(manifest_path) if manifest_path.is_file() else None
+        ),
+        "collected_nodes_sha256": (
+            _sha256(manifest_path) if manifest_path.is_file() else None
+        ),
+        "command": args,
+        "data_entries_after": data_after,
+        "identity": identity,
+        "invalid_reason": invalid_reason,
+        "label": label,
+        "mode": "probe",
+        "bounds": dict(PROBE_BOUNDS),
+        "plugin_enabled": plugin_enabled,
+        "progress_bytes": len(progress_bytes),
+        "protocol_id": PROTOCOL_ID,
+        "returncode": returncode,
+        "schema_version": 1,
+        "timeline": timeline,
+        "transcript_sha256": _sha256(transcript),
+    }
+    _atomic_json(trial / "record.json", record)
+    if invalid_reason is not None:
+        raise RuntimeError(f"{label} failed: {invalid_reason}")
+    return collected, record
+
+
+def _plugin_fd_fail_closed_arm(
+    preflight_path: Path,
+    preflight: dict[str, Any],
+    *,
+    value: str | None,
+) -> dict[str, Any]:
+    if _verify_preflight(preflight_path) != preflight:
+        raise RuntimeError("preflight changed before FD probe")
+    root = Path(preflight["artifact_root"])
+    suffix = "missing" if value is None else "garbled"
+    label = f"probe-progress-fd-{suffix}"
+    trial = root / label
+    trial.mkdir(parents=True, exist_ok=False)
+    transcript = trial / "transcript.txt"
+    env = _child_env(preflight, trial, trial / "unused-report.json", -1)
+    if value is None:
+        env.pop(PROGRESS_ENV)
+    else:
+        env[PROGRESS_ENV] = value
+    args = [
+        preflight["python"],
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "-o",
+        f"cache_dir={trial / 'pytest-cache'}",
+        "--basetemp",
+        str(trial / "pytest-tmp"),
+        "-p",
+        PLUGIN_MODULE,
+        _artifact(preflight, "probe_pass").name,
+    ]
+    timeline = [_timeline_event("fd_fail_closed_probe_launch")]
+    with transcript.open("wb") as transcript_handle:
+        process = subprocess.Popen(
+            args,
+            cwd=root,
+            env=env,
+            stdout=transcript_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        identity = _process_identity(process)
+        if not _identity_is_owned(identity):
+            cleanup_complete = _terminate_direct_child(process, timeline)
+            returncode = process.poll()
+            invalid_reason = "process_group_identity_mismatch"
+        else:
+            try:
+                returncode = process.wait(
+                    timeout=PROBE_BOUNDS["deadline_seconds"]
+                )
+                if _process_group_exists(identity["pgid"]):
+                    (
+                        returncode,
+                        _,
+                        _,
+                        cleanup_complete,
+                    ) = _terminate_owned_group(
+                        process,
+                        identity,
+                        PROBE_BOUNDS["grace_seconds"],
+                        timeline,
+                    )
+                    invalid_reason = "fd_probe_live_group_after_exit"
+                else:
+                    cleanup_complete = True
+                    invalid_reason = None
+            except subprocess.TimeoutExpired:
+                (
+                    returncode,
+                    _,
+                    _,
+                    cleanup_complete,
+                ) = _terminate_owned_group(
+                    process,
+                    identity,
+                    PROBE_BOUNDS["grace_seconds"],
+                    timeline,
+                )
+                invalid_reason = "fd_fail_closed_probe_timeout"
+    transcript_text = transcript.read_text(encoding="utf-8", errors="replace")
+    pytest_configure_failure = (
+        "pytest_configure" in transcript_text
+        and PROGRESS_ENV in transcript_text
+    )
+    if (
+        invalid_reason is None
+        and (
+            returncode == 0
+            or not pytest_configure_failure
+            or not cleanup_complete
+        )
+    ):
+        invalid_reason = "progress_fd_did_not_fail_closed"
+    try:
+        data_after = _archive_worktree_data(
+            Path(preflight["repo"]),
+            trial,
+        )
+    except BaseException as exc:
+        data_after = []
+        invalid_reason = (
+            f"fd_probe_data_archive_failed:{type(exc).__name__}:{exc}"
+        )
+    try:
+        if _verify_preflight(preflight_path) != preflight:
+            raise RuntimeError("preflight changed during FD probe")
+    except BaseException as exc:
+        invalid_reason = f"fd_probe_postflight_failed:{type(exc).__name__}:{exc}"
+    record = {
+        "cleanup_complete": cleanup_complete,
+        "bounds": dict(PROBE_BOUNDS),
+        "command": args,
+        "data_entries_after": data_after,
+        "identity": identity,
+        "invalid_reason": invalid_reason,
+        "label": label,
+        "mode": "probe",
+        "protocol_id": PROTOCOL_ID,
+        "pytest_configure_failure": pytest_configure_failure,
+        "returncode": returncode,
+        "schema_version": 1,
+        "transcript_sha256": _sha256(transcript),
+        "value_kind": suffix,
+    }
+    _atomic_json(trial / "record.json", record)
+    if invalid_reason is not None:
+        raise RuntimeError(f"{label} failed: {invalid_reason}")
+    return record
+
+
+def run_probe_suite(preflight_path: Path) -> dict[str, Any]:
+    preflight = _verify_preflight(preflight_path)
+    if preflight["side"] != "probe":
+        raise RuntimeError("probe-suite requires probe preflight")
+    root = Path(preflight["artifact_root"])
+    pass_record = _probe_record(
+        preflight_path,
+        preflight,
+        "probe_pass",
+        "probe-fast-pass",
+    )
+    interrupt_record = _probe_record(
+        preflight_path,
+        preflight,
+        "probe_interruptible",
+        "probe-sigint",
+    )
+    kill_record = _probe_record(
+        preflight_path,
+        preflight,
+        "probe_ignore_sigint",
+        "probe-sigkill",
+    )
+    control_nodes, control_record = _collect_identity_arm(
+        preflight_path,
+        preflight,
+        plugin_enabled=False,
+    )
+    plugin_nodes, plugin_record = _collect_identity_arm(
+        preflight_path,
+        preflight,
+        plugin_enabled=True,
+    )
+    missing_fd_record = _plugin_fd_fail_closed_arm(
+        preflight_path,
+        preflight,
+        value=None,
+    )
+    garbled_fd_record = _plugin_fd_fail_closed_arm(
+        preflight_path,
+        preflight,
+        value="not-a-file-descriptor",
+    )
+    interrupt_events = [
+        item["event"] for item in interrupt_record["timeline"]
+    ]
+    kill_events = [item["event"] for item in kill_record["timeline"]]
+    try:
+        interrupt_sigint_index = interrupt_events.index("sigint")
+        interrupt_exit_index = interrupt_events.index(
+            "group_exit_after_sigint"
+        )
+        kill_sigint_index = kill_events.index("sigint")
+        kill_sigkill_index = kill_events.index("sigkill")
+        kill_exit_index = kill_events.index("group_exit_after_sigkill")
+        kill_sigint_ns = kill_record["timeline"][kill_sigint_index][
+            "monotonic_ns"
+        ]
+        kill_sigkill_ns = kill_record["timeline"][kill_sigkill_index][
+            "monotonic_ns"
+        ]
+    except (KeyError, ValueError):
+        interrupt_sigint_index = -1
+        interrupt_exit_index = -1
+        kill_sigint_index = -1
+        kill_sigkill_index = -1
+        kill_exit_index = -1
+        kill_sigint_ns = 0
+        kill_sigkill_ns = 0
+    expected = {
+        "pass": (
+            pass_record["outcome"] == "complete_pass"
+            and pass_record["cleanup_complete"]
+            and pass_record["pipe_eof"]
+            and pass_record["progress_count"] == 2
+            and not pass_record["interrupted"]
+            and not pass_record["killed"]
+        ),
+        "sigint": (
+            interrupt_record["outcome"] == "unresolved_stall"
+            and interrupt_record["dump_present"]
+            and interrupt_record["cleanup_complete"]
+            and interrupt_record["interrupted"]
+            and not interrupt_record["killed"]
+            and 0 <= interrupt_sigint_index < interrupt_exit_index
+            and "sigkill" not in interrupt_events
+        ),
+        "sigkill": (
+            kill_record["outcome"] == "unresolved_stall"
+            and kill_record["dump_present"]
+            and kill_record["cleanup_complete"]
+            and kill_record["interrupted"]
+            and kill_record["killed"]
+            and 0 <= kill_sigint_index < kill_sigkill_index < kill_exit_index
+            and kill_sigkill_ns - kill_sigint_ns
+            >= PROBE_BOUNDS["grace_seconds"] * 1_000_000_000
+        ),
+        "collection_identity": (
+            control_nodes == plugin_nodes
+            and control_nodes
+            == _read_node_file(_artifact(preflight, "probe_nodes"))
+            and control_record["collected_nodes_sha256"]
+            == plugin_record["collected_nodes_sha256"]
+            == _sha256(_artifact(preflight, "probe_nodes"))
+        ),
+        "fd_fail_closed": (
+            missing_fd_record["returncode"] not in {None, 0}
+            and garbled_fd_record["returncode"] not in {None, 0}
+            and missing_fd_record["pytest_configure_failure"]
+            and garbled_fd_record["pytest_configure_failure"]
+        ),
+    }
+    if not all(expected.values()):
+        raise RuntimeError(f"probe outcome mismatch: {expected}")
+    summary = {
+        "checks": expected,
+        "protocol_id": PROTOCOL_ID,
+        "records": {
+            "pass": pass_record["label"],
+            "sigint": interrupt_record["label"],
+            "sigkill": kill_record["label"],
+            "collect_control": control_record["label"],
+            "collect_plugin": plugin_record["label"],
+            "fd_missing": missing_fd_record["label"],
+            "fd_garbled": garbled_fd_record["label"],
+        },
+        "schema_version": 1,
+    }
+    _atomic_json(root / "probe-summary.json", summary)
+    return summary
+
+
+def _preflight_artifact(
+    path: Path,
+    role: str,
+) -> dict[str, str]:
+    if not path.is_file():
+        raise RuntimeError(f"preflight source artifact is missing: {path}")
+    return {
+        "path": str(path.resolve()),
+        "role": role,
+        "sha256": _sha256(path),
+    }
+
+
+def prepare_preflight(
+    *,
+    artifact_root: Path,
+    repo: Path,
+    side: str,
+) -> Path:
+    root = artifact_root.resolve()
+    repo = repo.resolve()
+    if side not in {"base", "tip", "probe"}:
+        raise RuntimeError("prepare side must be base, tip, or probe")
+    if root == FROZEN_V1_ROOT:
+        raise RuntimeError("the frozen v1 artifact root cannot be reused")
+    if Path(__file__).resolve() != (root / "price_truth_tier_runner.py"):
+        raise RuntimeError("prepare must run the standard copied runner name")
+    if not repo.is_dir() or not (repo / ".git").exists():
+        raise RuntimeError("prepare repo is not an isolated Git worktree")
+    output = root / f"{side}-preflight.json"
+    if output.exists() or output.with_suffix(".json.tmp").exists():
+        raise RuntimeError("preflight output already exists")
+    common = [
+        _preflight_artifact(
+            root / "price_truth_tier_runner.py",
+            "runner",
+        ),
+        _preflight_artifact(
+            root / "arkscope_price_truth_tier_reporter.py",
+            "reporter",
+        ),
+        _preflight_artifact(root / "build_tiers.py", "builder"),
+        _preflight_artifact(root / "probe.nodes", "probe_nodes"),
+        _preflight_artifact(
+            root / "probe-tier-map.tsv",
+            "reviewed_probe_tier_map",
+        ),
+        _preflight_artifact(root / "probe_pass.py", "probe_pass"),
+        _preflight_artifact(
+            root / "probe_interruptible.py",
+            "probe_interruptible",
+        ),
+        _preflight_artifact(
+            root / "probe_ignore_sigint.py",
+            "probe_ignore_sigint",
+        ),
+    ]
+    tiers: list[dict[str, Any]] = []
+    if side == "probe":
+        artifacts = [
+            *common,
+            _preflight_artifact(root / "probe.nodes", "canonical_nodes"),
+            _preflight_artifact(
+                root / "probe-tier-map.tsv",
+                "tier_map",
+            ),
+        ]
+    else:
+        artifacts = [
+            *common,
+            _preflight_artifact(
+                root / f"{side}.nodes",
+                "canonical_nodes",
+            ),
+            _preflight_artifact(root / "tier-map.tsv", "tier_map"),
+        ]
+        for tier in range(8):
+            paths_role = f"tier_{tier}_paths"
+            nodes_role = f"tier_{tier}_nodes"
+            artifacts.extend(
+                [
+                    _preflight_artifact(
+                        root / f"T{tier}.paths",
+                        paths_role,
+                    ),
+                    _preflight_artifact(
+                        root / f"{side}-T{tier}.nodes",
+                        nodes_role,
+                    ),
+                ]
+            )
+            tiers.append(
+                {
+                    "nodes_role": nodes_role,
+                    "paths_role": paths_role,
+                    "tier": tier,
+                }
+            )
+    git_identity = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
+    import pytest
+
+    payload = {
+        "artifact_root": str(root),
+        "artifacts": artifacts,
+        "git_identity": git_identity,
+        "path": os.environ.get("PATH", ""),
+        "pip_freeze_sha256": _pip_freeze_sha256(),
+        "protocol_id": PROTOCOL_ID,
+        "python": sys.executable,
+        "python_version": sys.version,
+        "pytest_version": pytest.__version__,
+        "repo": str(repo),
+        "schema_version": 1,
+        "side": side,
+        "tiers": tiers,
+    }
+    _atomic_json(output, payload)
+    return output
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    for name in ("probe-suite", "run-side", "run-diagnostic"):
+        child = subparsers.add_parser(name)
+        child.add_argument("--preflight", type=Path, required=True)
+    prepare = subparsers.add_parser("prepare-preflight")
+    prepare.add_argument("--artifact-root", type=Path, required=True)
+    prepare.add_argument("--repo", type=Path, required=True)
+    prepare.add_argument(
+        "--side",
+        choices=("base", "tip", "probe"),
+        required=True,
+    )
+    args = parser.parse_args()
+    if args.command == "prepare-preflight":
+        result = {
+            "preflight": str(
+                prepare_preflight(
+                    artifact_root=args.artifact_root,
+                    repo=args.repo,
+                    side=args.side,
+                )
+            )
+        }
+    elif args.command == "probe-suite":
+        result = run_probe_suite(args.preflight)
+    elif args.command == "run-side":
+        result = run_side(args.preflight)
+    else:
+        result = run_diagnostic(args.preflight)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+<!-- PRICE_TRUTH_RUNNER_V2_END -->
