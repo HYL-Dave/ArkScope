@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED PRODUCT DESIGN + DRAFT RUNNER V3 HANDSHAKE AMENDMENT - FOCUSED REVIEW NEXT**
+> **Status: APPROVED PRODUCT DESIGN + APPROVED RUNNER V3 HANDSHAKE AMENDMENT - EXACT-SOURCE PLAN REVIEW NEXT**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -1176,8 +1176,8 @@ This amendment is invalid if implementation or its plan:
 - starts Task 0 or product RED before separate plan review clears the exact
   runner source, probes, hashes, and commands.
 
-The implementation plan is the next gate after focused review of this
-amendment. It must use protocol `price-truth-tier-v3`, include the exact
-runner source and reproducible probe/mutation recipes, and update every
-identity and predicted hash named above. This design alone authorizes no
-runtime attempt.
+Focused review cleared this amendment at `6c89d4a1` with zero findings. The
+exact-source implementation plan is now the next independent gate. It must use
+protocol `price-truth-tier-v3`, include the exact runner source and
+reproducible probe/mutation recipes, and update every identity and predicted
+hash named above. This design alone authorizes no runtime attempt.

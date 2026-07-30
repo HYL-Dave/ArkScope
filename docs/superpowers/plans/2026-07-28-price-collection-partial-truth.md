@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: DETERMINISTIC TIER RUNNER PLAN REVIEW NEXT**
+> **Status: DETERMINISTIC TIER RUNNER V3 EXACT-SOURCE PLAN REVIEW NEXT**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -46,6 +46,10 @@ the existing TypeScript-AST visible-literal scanner.
    `1a695141` on isolated branch `codex/price-collection-truth`.
 6. Reviewed deterministic-runner design tip:
    `1d08a9f30a87066ea0a2e3b3274a22210cdfa57d`.
+7. Reviewed deterministic-v2 exact-source plan tip:
+   `00d35376511b8bd28c16dd9c40415e0ddbc533ab`.
+8. Reviewed v3 EOF/leader/group-drain amendment tip:
+   `6c89d4a1`.
 
 Independent full-document re-review returned GREEN with zero findings. It
 verified the local day-presence rule, the three separately named
@@ -78,6 +82,13 @@ manual orchestration. Stop Condition 11 remains binding at tier granularity.
 Product RED remains unauthorized until focused review clears the exact runner
 source, probes, mutation packet, commands, and this amended plan, and Task 0
 closes with a complete tiered baseline.
+
+The deterministic-v2 Task 0 run later proved its controller bounded stalls but
+misclassified a complete T3 final-exit handoff as invalid because clean EOF
+preceded `Popen.poll()` by about 10ms. The reviewed v3 amendment resolves only
+that transport boundary with independent one-second leader-convergence and
+group-drain stages. This plan pins the resulting exact source and controls;
+it does not admit the v2 T3 attempt retroactively.
 
 Focused review of `7844429a..5fecce65` returned GREEN with zero findings and
 authorized the historical Task 0 restart. That attempt reproduced every
@@ -189,22 +200,25 @@ filter the normalized TSV.
 
 ### 2.2 Deterministic tiered backend protocol
 
-Protocol ID: `price-truth-tier-v2`.
+Protocol ID: `price-truth-tier-v3`.
 
 Use one fresh artifact root and preserve it through the complete base/tip
 comparison:
 
 ```bash
 test -d /tmp/price-truth-tier-v1
-export PRICE_TRUTH_TIER_ROOT=/tmp/price-truth-tier-v2
+test -d /tmp/price-truth-tier-v2
+export PRICE_TRUTH_TIER_ROOT=/tmp/price-truth-tier-v3
 test ! -e "$PRICE_TRUTH_TIER_ROOT"
 mkdir -p "$PRICE_TRUTH_TIER_ROOT"
 cp /tmp/price-truth-be-full.nodes "$PRICE_TRUTH_TIER_ROOT/base.nodes"
 ```
 
-The v1 root is frozen invalid evidence. The `test -d` command proves the root
-still exists without reading its contents; no v2 runner, probe, mutation, or
-runtime command may read its contents, write to it, move it, or delete it.
+The v1 and v2 roots are frozen invalid evidence. The `test -d` commands prove
+that both roots still exist without reading their contents; no v3 runner,
+probe, mutation, or runtime command may read either root, write to either
+root, move either root, or delete either root. No v1 or v2 record may be
+imported into the v3 bank.
 
 Create `$PRICE_TRUTH_TIER_ROOT/build_tiers.py` from this exact scratch source.
 It is an evidence artifact, not tracked product or test code:
@@ -379,7 +393,7 @@ Expected reporter SHA-256:
 `09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928`.
 The frozen v1 reporter probe already proves that this exact blob preserves a
 failing parametrized node ID containing spaces. Record that prior artifact's
-identity rather than rerunning or changing the reporter. The v2 collection
+identity rather than rerunning or changing the reporter. The v3 collection
 probe below independently proves that adding the progress plugin changes no
 collected node.
 
@@ -390,8 +404,8 @@ already invalid v1 runner or recreate the source from prose:
 ```bash
 export PRICE_TRUTH_PLAN="$PWD/docs/superpowers/plans/2026-07-28-price-collection-partial-truth.md"
 awk '
-  /^<!-- PRICE_TRUTH_RUNNER_V2_BEGIN -->$/ { emit=1; next }
-  /^<!-- PRICE_TRUTH_RUNNER_V2_END -->$/ { emit=0 }
+  /^<!-- PRICE_TRUTH_RUNNER_V3_BEGIN -->$/ { emit=1; next }
+  /^<!-- PRICE_TRUTH_RUNNER_V3_END -->$/ { emit=0 }
   emit && $0 != "```python" && $0 != "```" { print }
 ' "$PRICE_TRUTH_PLAN" \
   > "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py"
@@ -402,7 +416,8 @@ sha256sum "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py"
 ```
 
 Expected runner SHA-256:
-`35cda547ac8b1afaba1231d56cb04d703a284cdd81de978397ce7887ac51339e`.
+`bb5d2245071aa48f8f0ad4e28a0966aa26744f213dcec65a69d947a383fd9de9`.
+The extracted file is exactly `2,413` lines and `89,789` bytes.
 Appendix extraction, not a nearby working copy, is the runtime authority.
 `PRICE_TRUTH_PROGRESS_FD` is checked only by `pytest_configure()` when pytest
 loads this file as a plugin. Module execution for `prepare-preflight`,
@@ -470,6 +485,93 @@ probe_pass.py::test_probe_pass
 T0	1	probe_pass.py
 ```
 
+Create the EOF/leader/group-drain fixture from the exact embedded sources,
+including the nested directory and separate node manifest:
+
+```bash
+mkdir "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake"
+
+awk '
+  /^<!-- PRICE_TRUTH_HANDSHAKE_CONFTEST_BEGIN -->$/ { emit=1; next }
+  /^<!-- PRICE_TRUTH_HANDSHAKE_CONFTEST_END -->$/ { emit=0 }
+  emit && $0 != "```python" && $0 != "```" { print }
+' "$PRICE_TRUTH_PLAN" \
+  > "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake/conftest.py"
+
+awk '
+  /^<!-- PRICE_TRUTH_HANDSHAKE_TEST_BEGIN -->$/ { emit=1; next }
+  /^<!-- PRICE_TRUTH_HANDSHAKE_TEST_END -->$/ { emit=0 }
+  emit && $0 != "```python" && $0 != "```" { print }
+' "$PRICE_TRUTH_PLAN" \
+  > "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake/test_handshake.py"
+
+awk '
+  /^<!-- PRICE_TRUTH_HANDSHAKE_NODES_BEGIN -->$/ { emit=1; next }
+  /^<!-- PRICE_TRUTH_HANDSHAKE_NODES_END -->$/ { emit=0 }
+  emit && $0 != "```text" && $0 != "```" { print }
+' "$PRICE_TRUTH_PLAN" \
+  > "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake.nodes"
+```
+
+The fixture intentionally creates both transport windows with wide timing
+margin. During `pytest_sessionfinish`, it starts a same-PGID descendant with
+`close_fds=True`, closes the progress descriptor, and keeps the leader alive
+for `0.5s`. The descendant watches its parent disappear and then remains alive
+for another `0.2s`. Both delays are below their independent `1s` bounds, while
+each is long enough for the required timeline event to be observable.
+
+`probe_eof_handshake/conftest.py`:
+
+<!-- PRICE_TRUTH_HANDSHAKE_CONFTEST_BEGIN -->
+```python
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+
+import pytest
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_sessionfinish(session, exitstatus) -> None:
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os,time\n"
+                "parent = os.getppid()\n"
+                "while os.getppid() == parent:\n"
+                "    time.sleep(0.01)\n"
+                "time.sleep(0.2)\n"
+            ),
+        ],
+        close_fds=True,
+    )
+    os.close(int(os.environ["PRICE_TRUTH_PROGRESS_FD"]))
+    time.sleep(0.5)
+```
+<!-- PRICE_TRUTH_HANDSHAKE_CONFTEST_END -->
+
+`probe_eof_handshake/test_handshake.py`:
+
+<!-- PRICE_TRUTH_HANDSHAKE_TEST_BEGIN -->
+```python
+def test_handshake_probe_passes() -> None:
+    assert True
+```
+<!-- PRICE_TRUTH_HANDSHAKE_TEST_END -->
+
+`probe_eof_handshake.nodes`:
+
+<!-- PRICE_TRUTH_HANDSHAKE_NODES_BEGIN -->
+```text
+probe_eof_handshake/test_handshake.py::test_handshake_probe_passes
+```
+<!-- PRICE_TRUTH_HANDSHAKE_NODES_END -->
+
 Require these exact source identities:
 
 | Artifact | SHA-256 |
@@ -479,6 +581,9 @@ Require these exact source identities:
 | `probe_ignore_sigint.py` | `cd029264a3224bc4a2e6928185b6ff6f1e34e56d9406974310eb5715cbcd7942` |
 | `probe.nodes` | `85e427423e6a22513ced4f286045ab33023ba6f0d3e0f3344f8490c4faf92537` |
 | `probe-tier-map.tsv` | `fe3ecde0a8261879529289f72f433e1cf0c747e59f0dbfec1f0b5e78d1d525f4` |
+| `probe_eof_handshake/conftest.py` | `6252ff7bec61796d20cfc0d2b3622ed05b73bf45220c251a9b9747a5f0faa74a` |
+| `probe_eof_handshake/test_handshake.py` | `3e2f09ac4d7652b2382e58fb11455e4c9584274b7b6debf03ededa9b1406efa6` |
+| `probe_eof_handshake.nodes` | `35a5e9ab7a9d38f9650d368ee1c09836dcdfb6aefd3c758ba4a674c66595b83c` |
 
 The same module creates a closed preflight from current immutable artifacts.
 Its preflight creation is not self-authenticating: first compare the runner,
@@ -504,9 +609,10 @@ sha256sum "$PRICE_TRUTH_TIER_ROOT/probe-preflight.json"
   --preflight "$PRICE_TRUTH_TIER_ROOT/probe-preflight.json"
 
 jq -e '
-  .protocol_id == "price-truth-tier-v2"
+  .protocol_id == "price-truth-tier-v3"
   and .checks == {
     "collection_identity": true,
+    "eof_exit_handshake": true,
     "fd_fail_closed": true,
     "pass": true,
     "sigint": true,
@@ -517,7 +623,7 @@ sha256sum "$PRICE_TRUTH_TIER_ROOT/probe-summary.json"
 ```
 
 Expected summary SHA-256:
-`47564c644c95e54007d67e4b08ddaeb35ed8370f858b3f004f00f54ef9e1ad48`.
+`9f664ea7608385edaf568ae7f35cc94fa5301fea7dd798ea0dd65b14881c1e87`.
 PID, timestamp, transcript, progress, record, and preflight hashes are
 environment observations and must be recorded rather than predicted. Require
 the following record facts:
@@ -525,22 +631,24 @@ the following record facts:
 | Probe | Required record |
 |---|---|
 | `probe-fast-pass` | `complete_pass`, two progress events, pipe EOF, no signal |
+| `probe-eof-exit-handshake` | `complete_pass`, two progress events, no signal, ordered `leader_exit_after_eof`, `process_group_drain_started`, `group_drained` |
 | `probe-sigint` | `unresolved_stall`, current-window dump, SIGINT, no SIGKILL |
 | `probe-sigkill` | `unresolved_stall`, current-window dump, SIGINT then SIGKILL |
 | collect control/plugin | identical one-node `collected_node_ids`, plugin emits zero runtime events |
 | missing/garbled FD | nonzero pytest exit and transcript names `PRICE_TRUTH_PROGRESS_FD` |
 
 Probe mode alone uses dump/deadline/grace `2/3/1` seconds. Runtime mode has
-immutable `120/150/10` values and accepts no CLI override.
+immutable `120/150/10` values. Both modes use independent
+EOF-leader/group-drain bounds `1/1`; no bound accepts a CLI override.
 
 #### Runner mutation packet
 
-Run every mutation in its own fresh root. First construct M1-M5 from the
-reviewed pristine bytes:
+Run every mutation in its own fresh root. First construct M1-M5 and M7a/M7b
+from the reviewed pristine bytes:
 
 ```bash
-for number in 1 2 3 4 5; do
-  MUTATION_ROOT="/tmp/price-truth-tier-v2-m${number}"
+for number in 1 2 3 4 5 7a 7b; do
+  MUTATION_ROOT="/tmp/price-truth-tier-v3-m${number}"
   test ! -e "$MUTATION_ROOT"
   mkdir "$MUTATION_ROOT"
   cp \
@@ -552,6 +660,10 @@ for number in 1 2 3 4 5; do
     "$PRICE_TRUTH_TIER_ROOT/probe_pass.py" \
     "$PRICE_TRUTH_TIER_ROOT/probe_interruptible.py" \
     "$PRICE_TRUTH_TIER_ROOT/probe_ignore_sigint.py" \
+    "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake.nodes" \
+    "$MUTATION_ROOT/"
+  cp -R \
+    "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake" \
     "$MUTATION_ROOT/"
 done
 ```
@@ -560,43 +672,79 @@ Apply each exact patch below with `apply_patch` to these fixed paths:
 
 | Mutation | Patched artifact |
 |---|---|
-| M1 | `/tmp/price-truth-tier-v2-m1/price_truth_tier_runner.py` |
-| M2 | `/tmp/price-truth-tier-v2-m2/price_truth_tier_runner.py` |
-| M3 | `/tmp/price-truth-tier-v2-m3/probe_interruptible.py` |
-| M4 | `/tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py` |
+| M1 | `/tmp/price-truth-tier-v3-m1/price_truth_tier_runner.py` |
+| M2 | `/tmp/price-truth-tier-v3-m2/price_truth_tier_runner.py` |
+| M3 | `/tmp/price-truth-tier-v3-m3/probe_interruptible.py` |
+| M4 | `/tmp/price-truth-tier-v3-m4/price_truth_tier_runner.py` |
+| M7a | `/tmp/price-truth-tier-v3-m7a/price_truth_tier_runner.py` |
+| M7b | `/tmp/price-truth-tier-v3-m7b/price_truth_tier_runner.py` |
 
 Then capture each diff against the pristine artifact; a source diff must exit
 exactly `1`:
 
 ```bash
 diff -u \
+  --label pristine/price_truth_tier_runner.py \
+  --label M1/price_truth_tier_runner.py \
   "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
-  /tmp/price-truth-tier-v2-m1/price_truth_tier_runner.py \
-  > /tmp/price-truth-tier-v2-m1/mutation.diff \
+  /tmp/price-truth-tier-v3-m1/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m1/mutation.diff \
   || test "$?" -eq 1
 diff -u \
+  --label pristine/price_truth_tier_runner.py \
+  --label M2/price_truth_tier_runner.py \
   "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
-  /tmp/price-truth-tier-v2-m2/price_truth_tier_runner.py \
-  > /tmp/price-truth-tier-v2-m2/mutation.diff \
+  /tmp/price-truth-tier-v3-m2/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m2/mutation.diff \
   || test "$?" -eq 1
 diff -u \
+  --label pristine/probe_interruptible.py \
+  --label M3/probe_interruptible.py \
   "$PRICE_TRUTH_TIER_ROOT/probe_interruptible.py" \
-  /tmp/price-truth-tier-v2-m3/probe_interruptible.py \
-  > /tmp/price-truth-tier-v2-m3/mutation.diff \
+  /tmp/price-truth-tier-v3-m3/probe_interruptible.py \
+  > /tmp/price-truth-tier-v3-m3/mutation.diff \
   || test "$?" -eq 1
 diff -u \
+  --label pristine/price_truth_tier_runner.py \
+  --label M4/price_truth_tier_runner.py \
   "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
-  /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
-  > /tmp/price-truth-tier-v2-m4/mutation.diff \
+  /tmp/price-truth-tier-v3-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m4/mutation.diff \
   || test "$?" -eq 1
-sha256sum /tmp/price-truth-tier-v2-m{1,2,3,4}/mutation.diff
+diff -u \
+  --label pristine/price_truth_tier_runner.py \
+  --label M7a/price_truth_tier_runner.py \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  /tmp/price-truth-tier-v3-m7a/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m7a/mutation.diff \
+  || test "$?" -eq 1
+diff -u \
+  --label pristine/price_truth_tier_runner.py \
+  --label M7b/price_truth_tier_runner.py \
+  "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
+  /tmp/price-truth-tier-v3-m7b/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m7b/mutation.diff \
+  || test "$?" -eq 1
+sha256sum \
+  /tmp/price-truth-tier-v3-m{1,2,3,4,7a,7b}/mutation.diff
 ```
+
+Expected mutation-diff SHA-256 values:
+
+| Mutation | SHA-256 |
+|---|---|
+| M1 | `1467fd6585b7c2e897c2c77d379fcbbb15831704d783c668df6537bba63a57cf` |
+| M2 | `6405a62660754a81b4cbf957df4e8fa0a50586b5d720ac9c46c9702c38180e5e` |
+| M3 | `9232528b6cdab6bc6e2d181660a09ffe0e2278cd41cab8a0c780bc303d28b261` |
+| M4 | `c6372e35d6c91b859b84ccb15708746d069b50ff5d82aa03bbeb6c782a50b7cf` |
+| M7a | `aa15cc5fe19b7812fa69b3d73c289f1c5f6dffa89c983506015716f3470e2d27` |
+| M7b | `9732466f4c4877d3eaa90b52ac4440b3b15640c5103bfe760b2e4774575782de` |
 
 Prepare each probe preflight only after its own mutation is present:
 
 ```bash
-for number in 1 2 3 4 5; do
-  MUTATION_ROOT="/tmp/price-truth-tier-v2-m${number}"
+for number in 1 2 3 4 5 7a 7b; do
+  MUTATION_ROOT="/tmp/price-truth-tier-v3-m${number}"
   /home/hyl/.virtualenvs/llm_app/bin/python \
     "$MUTATION_ROOT/price_truth_tier_runner.py" \
     prepare-preflight \
@@ -606,14 +754,14 @@ for number in 1 2 3 4 5; do
 done
 ```
 
-For M1-M4, preserve expected nonzero exits mechanically:
+For M1-M4 and M7a/M7b, preserve expected nonzero exits mechanically:
 
 ```bash
-sha256sum /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
-  > /tmp/price-truth-tier-v2-m4/runner-before.sha256
+sha256sum /tmp/price-truth-tier-v3-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m4/runner-before.sha256
 
-for number in 1 2 3 4; do
-  MUTATION_ROOT="/tmp/price-truth-tier-v2-m${number}"
+for number in 1 2 3 4 7a 7b; do
+  MUTATION_ROOT="/tmp/price-truth-tier-v3-m${number}"
   set +e
   /home/hyl/.virtualenvs/llm_app/bin/python \
     "$MUTATION_ROOT/price_truth_tier_runner.py" \
@@ -627,12 +775,14 @@ for number in 1 2 3 4; do
   test "$rc" -ne 0
 done
 
-sha256sum /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
-  > /tmp/price-truth-tier-v2-m4/runner-after.sha256
+sha256sum /tmp/price-truth-tier-v3-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m4/runner-after.sha256
 diff -u \
+  --label pristine/price_truth_tier_runner.py \
+  --label M4-runtime/price_truth_tier_runner.py \
   "$PRICE_TRUTH_TIER_ROOT/price_truth_tier_runner.py" \
-  /tmp/price-truth-tier-v2-m4/price_truth_tier_runner.py \
-  > /tmp/price-truth-tier-v2-m4/runtime-drift.diff \
+  /tmp/price-truth-tier-v3-m4/price_truth_tier_runner.py \
+  > /tmp/price-truth-tier-v3-m4/runtime-drift.diff \
   || test "$?" -eq 1
 ```
 
@@ -644,24 +794,29 @@ The exact mutations and owning assertions are:
                         events = selector.select(timeout=min(remaining, 0.1))
    +                    if mode == "probe" and events:
    +                        time.sleep(PROBE_BOUNDS["deadline_seconds"] + 1)
-                        deadline_due = time.monotonic_ns() >= deadline_ns
+                        no_progress_due = (
    ```
 
    `probe-fast-pass/record.json` must be `invalid` with
-   `invalid_reason=deadline_breach_without_dump`, `progress_count=0`,
-   `active_nodeid_at_end=null`, and `deadline_phase=pre_first_node`. This is
-   the load-bearing proof that a pipe event already waiting when the parent
-   resumes after the old deadline cannot start a new full window.
+   `invalid_reason=partial_progress_event_at_eof`, `progress_count=0`,
+   `active_nodeid_at_end=null`, `deadline_phase=transport_handshake`,
+   `pipe_eof=true`, and no signal. The child can naturally finish while the
+   parent delays handling the ready event; transport-terminal priority must
+   prevent the late event from reviving the expired window or being admitted
+   as complete progress.
 
    ```bash
    jq -e '
      .outcome == "invalid"
-     and .invalid_reason == "deadline_breach_without_dump"
+     and .invalid_reason == "partial_progress_event_at_eof"
      and .progress_count == 0
      and .active_nodeid_at_end == null
      and .dump_present == false
-     and .deadline_phase == "pre_first_node"
-   ' /tmp/price-truth-tier-v2-m1/probe-fast-pass/record.json
+     and .deadline_phase == "transport_handshake"
+     and .pipe_eof == true
+     and .interrupted == false
+     and .killed == false
+   ' /tmp/price-truth-tier-v3-m1/probe-fast-pass/record.json
    ```
 
 2. **M2 - no current-window dump.**
@@ -683,8 +838,8 @@ The exact mutations and owning assertions are:
      and .invalid_reason == "deadline_breach_without_dump"
      and .dump_present == false
    ' \
-     /tmp/price-truth-tier-v2-m2/probe-sigint/record.json \
-     /tmp/price-truth-tier-v2-m2/probe-sigkill/record.json
+     /tmp/price-truth-tier-v3-m2/probe-sigint/record.json \
+     /tmp/price-truth-tier-v3-m2/probe-sigkill/record.json
    ```
 
 3. **M3 - interruptible child ignores SIGINT.**
@@ -710,7 +865,7 @@ The exact mutations and owning assertions are:
            < ($events | index("sigkill"))
        and ($events | index("sigkill"))
            < ($events | index("group_exit_after_sigkill"))
-   ' /tmp/price-truth-tier-v2-m3/probe-sigint/record.json
+   ' /tmp/price-truth-tier-v3-m3/probe-sigint/record.json
    ```
 
 4. **M4 - between-launch runner drift.**
@@ -727,7 +882,7 @@ The exact mutations and owning assertions are:
    +        runner_path.read_text(encoding="utf-8") + "\n# MUTATION M4\n",
    +        encoding="utf-8",
    +    )
-        interrupt_record = _probe_record(
+       handshake_record = _probe_record(
    ```
 
    Record the runner SHA immediately before `probe-suite` and again after it.
@@ -737,13 +892,13 @@ The exact mutations and owning assertions are:
    child launches, not only once at controller entry.
 
    ```bash
-   test -f /tmp/price-truth-tier-v2-m4/probe-fast-pass/record.json
-   test ! -e /tmp/price-truth-tier-v2-m4/probe-sigint
+   test -f /tmp/price-truth-tier-v3-m4/probe-fast-pass/record.json
+   test ! -e /tmp/price-truth-tier-v3-m4/probe-eof-exit-handshake
    ! cmp \
-     /tmp/price-truth-tier-v2-m4/runner-before.sha256 \
-     /tmp/price-truth-tier-v2-m4/runner-after.sha256
+     /tmp/price-truth-tier-v3-m4/runner-before.sha256 \
+     /tmp/price-truth-tier-v3-m4/runner-after.sha256
    rg -F 'preflight artifact changed' \
-     /tmp/price-truth-tier-v2-m4/mutation.stderr
+     /tmp/price-truth-tier-v3-m4/mutation.stderr
    ```
 
 5. **M5 - invalid progress descriptor.** Use a dedicated fresh M5 root with
@@ -757,7 +912,7 @@ The exact mutations and owning assertions are:
    Run its pristine suite normally, require exit `0`, and assert:
 
    ```bash
-   MUTATION_ROOT=/tmp/price-truth-tier-v2-m5
+   MUTATION_ROOT=/tmp/price-truth-tier-v3-m5
    /home/hyl/.virtualenvs/llm_app/bin/python \
      "$MUTATION_ROOT/price_truth_tier_runner.py" \
      probe-suite \
@@ -772,14 +927,15 @@ The exact mutations and owning assertions are:
    ```
 
 6. **M6 - prior invalid closes the side.** After base collection artifacts
-   exist, create `/tmp/price-truth-tier-v2-m6` and copy the pristine runner,
-   reporter, builder, all five probe artifacts, `base.nodes`,
+   exist, create `/tmp/price-truth-tier-v3-m6` and copy the pristine runner,
+   reporter, builder, all eight probe files plus the handshake directory,
+   `base.nodes`,
    `tier-map.tsv`, all eight `T?.paths`, and all eight `base-T?.nodes` files
    into it. Create a base preflight there, then create `seed_invalid.py` from
    this exact source:
 
    ```bash
-   MUTATION_ROOT=/tmp/price-truth-tier-v2-m6
+   MUTATION_ROOT=/tmp/price-truth-tier-v3-m6
    test ! -e "$MUTATION_ROOT"
    mkdir "$MUTATION_ROOT"
    cp \
@@ -791,10 +947,14 @@ The exact mutations and owning assertions are:
      "$PRICE_TRUTH_TIER_ROOT/probe_pass.py" \
      "$PRICE_TRUTH_TIER_ROOT/probe_interruptible.py" \
      "$PRICE_TRUTH_TIER_ROOT/probe_ignore_sigint.py" \
+     "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake.nodes" \
      "$PRICE_TRUTH_TIER_ROOT/base.nodes" \
      "$PRICE_TRUTH_TIER_ROOT/tier-map.tsv" \
      "$PRICE_TRUTH_TIER_ROOT"/T?.paths \
      "$PRICE_TRUTH_TIER_ROOT"/base-T?.nodes \
+     "$MUTATION_ROOT/"
+   cp -R \
+     "$PRICE_TRUTH_TIER_ROOT/probe_eof_handshake" \
      "$MUTATION_ROOT/"
 
    /home/hyl/.virtualenvs/llm_app/bin/python \
@@ -866,19 +1026,81 @@ The exact mutations and owning assertions are:
    The runner must refuse on the seeded record, atomically write the
    incomplete summary above, and create no T1 or later attempt directory.
 
+7. **M7a - EOF/leader convergence has its own bound.**
+
+   ```diff
+   -EOF_LEADER_HANDSHAKE_SECONDS = 1
+   +EOF_LEADER_HANDSHAKE_SECONDS = 0
+    PROCESS_GROUP_DRAIN_SECONDS = 1
+   ```
+
+   `mutation.diff` is the source patch authority and must have SHA-256
+   `aa15cc5f...`. Run `probe-suite`; the suite must exit nonzero, only
+   `eof_exit_handshake` may be false, and the handshake record must fail in
+   stage one without entering group drain:
+
+   ```bash
+   jq -e '
+     [.timeline[].event] as $events
+     | .outcome == "invalid"
+       and .invalid_reason == "pipe_eof_while_child_running"
+       and ($events | index("eof_leader_handshake_started")) != null
+       and ($events | index("eof_leader_handshake_timeout")) != null
+       and ($events | index("process_group_drain_started")) == null
+       and ($events | index("group_drained")) == null
+   ' /tmp/price-truth-tier-v3-m7a/probe-eof-exit-handshake/record.json
+   test ! -e /tmp/price-truth-tier-v3-m7a/probe-summary.json
+   rg -F "probe outcome mismatch: {'pass': True, 'eof_exit_handshake': False, 'sigint': True, 'sigkill': True, 'collection_identity': True, 'fd_fail_closed': True}" \
+     /tmp/price-truth-tier-v3-m7a/mutation.stderr
+   ```
+
+8. **M7b - process-group drain has its own full bound.**
+
+   ```diff
+    EOF_LEADER_HANDSHAKE_SECONDS = 1
+   -PROCESS_GROUP_DRAIN_SECONDS = 1
+   +PROCESS_GROUP_DRAIN_SECONDS = 0
+    RUNTIME_BOUNDS = {
+   ```
+
+   Apply the exact one-line mutation
+   `PROCESS_GROUP_DRAIN_SECONDS = 0`. Run `probe-suite`; the suite must exit
+   nonzero, only `eof_exit_handshake` may be false, stage one must succeed,
+   and stage two must independently fail:
+
+   ```bash
+   jq -e '
+     [.timeline[].event] as $events
+     | .outcome == "invalid"
+       and .invalid_reason == "pipe_eof_with_live_process_group"
+       and ($events | index("leader_exit_after_eof")) != null
+       and ($events | index("process_group_drain_started")) != null
+       and ($events | index("process_group_drain_timeout")) != null
+       and ($events | index("group_drained")) == null
+   ' /tmp/price-truth-tier-v3-m7b/probe-eof-exit-handshake/record.json
+   test ! -e /tmp/price-truth-tier-v3-m7b/probe-summary.json
+   rg -F "probe outcome mismatch: {'pass': True, 'eof_exit_handshake': False, 'sigint': True, 'sigkill': True, 'collection_identity': True, 'fd_fail_closed': True}" \
+     /tmp/price-truth-tier-v3-m7b/mutation.stderr
+   ```
+
 For M1, require the fields above with `jq`. For M2, require both sleep records
 to have `invalid_reason=deadline_breach_without_dump` and
 `dump_present=false`. For M3, require `probe-sigint` to remain
 `unresolved_stall` but contain ordered `sigint`, `sigkill`, and
 `group_exit_after_sigkill` timeline events with `killed=true`. For M4, save
 `runner-before.sha256`, `runner-after.sha256`, and
-`runtime-drift.diff` in addition to `mutation.diff`.
+`runtime-drift.diff` in addition to `mutation.diff`; the construction run
+produced mutation-source SHA `1d0817f6...`, runtime-mutated source SHA
+`4cf58cff...`, and runtime-drift SHA `fa1ee4f...`. For M7a/M7b, require the
+closed mismatch dictionary to retain every other check as `true`; failed
+probe suites must not write a canonical `probe-summary.json`.
 
-M1-M4 diffs, M5 input records, M6 seeded record, commands, exit codes, and
-owning record fields go into evidence. Restore is by abandoning each mutation
-root; then re-hash the canonical runner and fixtures. Mutation roots are never
-inputs to Task 0. Expected `invalid` records in M1/M2 and the seeded M6 record
-are negative control results, not Stop Condition 11 runtime attempts.
+M1-M4 and M7a/M7b diffs, M5 input records, M6 seeded record, commands, exit
+codes, and owning record fields go into evidence. Restore is by abandoning
+each mutation root; then re-hash the canonical runner and fixtures. Mutation
+roots are never inputs to Task 0. Expected `invalid` records in M1/M2/M7a/M7b
+and the seeded M6 record are negative control results, not Stop Condition 11
+runtime attempts.
 
 #### Runtime side command
 
@@ -935,7 +1157,7 @@ completed summary, so use a null-coalescing assertion:
 
 ```bash
 jq -e --arg side "$SIDE" '
-  .protocol_id == "price-truth-tier-v2"
+  .protocol_id == "price-truth-tier-v3"
   and .side == $side
   and .complete == true
   and (.invalid_attempt // null) == null
@@ -1618,7 +1840,8 @@ become an A/B side.
 > because it missed the reviewed no-progress deadline and added an unreviewed
 > PID sampling check. Deterministic runner design `1d08a9f3` replaces that
 > control plane. Every Task 0 checkbox remains reset. Historical focused and
-> invalid tier results may inform review but cannot satisfy v2.
+> invalid tier results may inform review but cannot satisfy v3. The later v2
+> T3 EOF/exit invalid likewise remains evidence only.
 
 - [ ] **Step 1: Record the clearance identities.**
 
@@ -1698,8 +1921,9 @@ become an A/B side.
 - [ ] **Step 5: Build and complete the base tiered non-passing set.**
 
   Execute all of Section 2.2 with `SIDE=base`: exact runner extraction,
-  mandatory probes, six-mutation packet, collection proof, preflight, and the
-  single `run-side` command. Prove the builder/map hashes, the
+  mandatory probes, M1-M6 plus independent M7a/M7b controls, collection
+  proof, preflight, and the single `run-side` command. Prove the builder/map
+  hashes, the
   `591/591/590/590/590/590/590/590` distribution, exact `4722` tier union,
   zero duplicate/missing nodes, and all eight complete selected outcomes.
 
@@ -2856,7 +3080,8 @@ become an A/B side.
 
   Run only Section 2.2's side-collection and **Runtime side command**
   subsections with `SIDE=tip`, reusing the exact pinned runner, reporter,
-  `build_tiers.py`, all five probe artifacts, `tier-map.tsv`, and `T?.paths`.
+  `build_tiers.py`, all pinned probe files and the handshake fixture
+  directory, `tier-map.tsv`, and `T?.paths`.
   Do not repeat fresh-root initialization, mandatory probes, or mutations.
   First write the canonical 4,739-node stream to
   `$PRICE_TRUTH_TIER_ROOT/tip.nodes`; prove its unique file set is exactly the
@@ -3115,16 +3340,16 @@ become an A/B side.
   monolithic context are not directly comparable.
 - [x] No plan step contains an unresolved implementation choice or an
   ungrounded external-market acceptance constant.
-- [x] The exact v2 runner source is appendix-pinned, dual-role mode gating
-  is explicit, all four mandatory probes pass, and all six control-plane
-  mutations have one reproducible owning observation.
+- [x] The exact v3 runner source is appendix-pinned, dual-role mode gating
+  is explicit, all six closed probe-summary checks pass, and M1-M6 plus
+  independent M7a/M7b have reproducible owning observations.
 
-## Appendix A - Exact Deterministic Tier Runner
+## Appendix A - Exact Deterministic Tier Runner V3
 
 This appendix is executable source, not pseudocode. Section 2.2 owns its
 extraction command and SHA-256.
 
-<!-- PRICE_TRUTH_RUNNER_V2_BEGIN -->
+<!-- PRICE_TRUTH_RUNNER_V3_BEGIN -->
 ```python
 from __future__ import annotations
 
@@ -3145,22 +3370,30 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOL_ID = "price-truth-tier-v2"
+PROTOCOL_ID = "price-truth-tier-v3"
 PLUGIN_MODULE = "price_truth_tier_runner"
 REPORTER_MODULE = "arkscope_price_truth_tier_reporter"
 PROGRESS_ENV = "PRICE_TRUTH_PROGRESS_FD"
-FROZEN_V1_ROOT = Path("/tmp/price-truth-tier-v1")
+FROZEN_ROOTS = {
+    Path("/tmp/price-truth-tier-v1"),
+    Path("/tmp/price-truth-tier-v2"),
+}
+EOF_LEADER_HANDSHAKE_SECONDS = 1
+PROCESS_GROUP_DRAIN_SECONDS = 1
 RUNTIME_BOUNDS = {
     "dump_seconds": 120,
     "deadline_seconds": 150,
+    "eof_leader_handshake_seconds": EOF_LEADER_HANDSHAKE_SECONDS,
     "grace_seconds": 10,
+    "process_group_drain_seconds": PROCESS_GROUP_DRAIN_SECONDS,
 }
 PROBE_BOUNDS = {
     "dump_seconds": 2,
     "deadline_seconds": 3,
+    "eof_leader_handshake_seconds": EOF_LEADER_HANDSHAKE_SECONDS,
     "grace_seconds": 1,
+    "process_group_drain_seconds": PROCESS_GROUP_DRAIN_SECONDS,
 }
-EOF_EXIT_GRACE_SECONDS = 1
 TERMINAL_SUMMARY_RE = re.compile(
     rb"(?m)^=+ .+ in [0-9.]+s =+\r?$"
 )
@@ -3311,8 +3544,8 @@ def _verify_preflight(path: Path) -> dict[str, Any]:
     if preflight["protocol_id"] != PROTOCOL_ID:
         raise RuntimeError("preflight protocol mismatch")
     root = Path(preflight["artifact_root"]).resolve()
-    if root == FROZEN_V1_ROOT:
-        raise RuntimeError("the frozen v1 artifact root cannot be reused")
+    if root in FROZEN_ROOTS:
+        raise RuntimeError("a frozen artifact root cannot be reused")
     if path.resolve().parent != root:
         raise RuntimeError("preflight must live in its artifact root")
     runner = _artifact(preflight, "runner").resolve()
@@ -3517,6 +3750,38 @@ def _wait_for_group_exit(
             return returncode, True
         if time.monotonic_ns() >= deadline:
             return returncode, False
+        time.sleep(0.01)
+
+
+def _wait_for_natural_leader_exit(
+    process: subprocess.Popen[bytes],
+    timeout_seconds: int,
+) -> tuple[int | None, bool, float]:
+    started_ns = time.monotonic_ns()
+    deadline_ns = started_ns + timeout_seconds * 1_000_000_000
+    while True:
+        returncode = process.poll()
+        now_ns = time.monotonic_ns()
+        if returncode is not None:
+            return returncode, True, (now_ns - started_ns) / 1_000_000_000
+        if now_ns >= deadline_ns:
+            return None, False, (now_ns - started_ns) / 1_000_000_000
+        time.sleep(0.01)
+
+
+def _wait_for_natural_group_drain(
+    pgid: int,
+    timeout_seconds: int,
+) -> tuple[bool, float]:
+    started_ns = time.monotonic_ns()
+    deadline_ns = started_ns + timeout_seconds * 1_000_000_000
+    while True:
+        group_exists = _process_group_exists(pgid)
+        now_ns = time.monotonic_ns()
+        if not group_exists:
+            return True, (now_ns - started_ns) / 1_000_000_000
+        if now_ns >= deadline_ns:
+            return False, (now_ns - started_ns) / 1_000_000_000
         time.sleep(0.01)
 
 
@@ -3838,7 +4103,10 @@ def _run_attempt(
     window_offset = 0
     pipe_buffer = b""
     pipe_eof = False
+    expected_progress_count = 2 * len(_read_node_file(expected_nodes_path))
+    eof_observed_ns: int | None = None
     child_exit_observed_ns: int | None = None
+    transport_deadline_ns: int | None = None
     timeline = [_timeline_event("launch_requested", label=label)]
     outcome = "invalid"
     returncode: int | None = None
@@ -3876,10 +4144,20 @@ def _run_attempt(
                 selector.register(read_fd, selectors.EVENT_READ)
                 while invalid_reason is None and returncode is None:
                     now_ns = time.monotonic_ns()
-                    remaining = max(0, deadline_ns - now_ns) / 1_000_000_000
+                    active_deadline_ns = (
+                        transport_deadline_ns
+                        if transport_deadline_ns is not None
+                        else deadline_ns
+                    )
+                    remaining = (
+                        max(0, active_deadline_ns - now_ns) / 1_000_000_000
+                    )
                     events = selector.select(timeout=min(remaining, 0.1))
-                    deadline_due = time.monotonic_ns() >= deadline_ns
-                    for key, _ in (() if deadline_due else events):
+                    no_progress_due = (
+                        transport_deadline_ns is None
+                        and time.monotonic_ns() >= deadline_ns
+                    )
+                    for key, _ in events:
                         while True:
                             try:
                                 chunk = os.read(key.fd, 65536)
@@ -3887,14 +4165,28 @@ def _run_attempt(
                                 break
                             if not chunk:
                                 pipe_eof = True
+                                eof_observed_ns = time.monotonic_ns()
                                 selector.unregister(key.fd)
+                                timeline.append(
+                                    _timeline_event(
+                                        "pipe_eof_observed",
+                                        active_nodeid=active_nodeid,
+                                        expected_progress_count=(
+                                            expected_progress_count
+                                        ),
+                                        progress_count=progress_count,
+                                    )
+                                )
                                 break
                             pipe_buffer += chunk
                             while b"\n" in pipe_buffer:
                                 raw, pipe_buffer = pipe_buffer.split(b"\n", 1)
                                 received_mono = time.monotonic_ns()
-                                if received_mono >= deadline_ns:
-                                    deadline_due = True
+                                if (
+                                    transport_deadline_ns is None
+                                    and received_mono >= deadline_ns
+                                ):
+                                    no_progress_due = True
                                     break
                                 try:
                                     payload, active_nodeid = _parse_progress_event(
@@ -3940,7 +4232,7 @@ def _run_attempt(
                             if (
                                 invalid_reason is not None
                                 or pipe_eof
-                                or deadline_due
+                                or no_progress_due
                             ):
                                 break
                     if invalid_reason is not None:
@@ -3956,10 +4248,230 @@ def _run_attempt(
                             timeline,
                         )
                         break
-                    deadline_due = (
-                        deadline_due or time.monotonic_ns() >= deadline_ns
+                    polled = process.poll()
+                    if pipe_eof:
+                        if pipe_buffer:
+                            invalid_reason = "partial_progress_event_at_eof"
+                        elif active_nodeid is not None:
+                            invalid_reason = "unbalanced_progress_at_pipe_eof"
+                        elif progress_count != expected_progress_count:
+                            invalid_reason = "incomplete_progress_at_pipe_eof"
+                        if invalid_reason is not None:
+                            (
+                                returncode,
+                                interrupted,
+                                killed,
+                                cleanup_complete,
+                            ) = _terminate_owned_group(
+                                process,
+                                identity,
+                                bounds["grace_seconds"],
+                                timeline,
+                            )
+                        else:
+                            phase = "transport_handshake"
+                            handshake_bound = bounds[
+                                "eof_leader_handshake_seconds"
+                            ]
+                            if child_exit_observed_ns is not None:
+                                elapsed = (
+                                    eof_observed_ns - child_exit_observed_ns
+                                ) / 1_000_000_000
+                                if eof_observed_ns >= transport_deadline_ns:
+                                    timeline.append(
+                                        _timeline_event(
+                                            "eof_leader_handshake_timeout",
+                                            bound_seconds=handshake_bound,
+                                            elapsed_seconds=elapsed,
+                                            first_observation="leader_exit",
+                                        )
+                                    )
+                                    invalid_reason = (
+                                        "child_exit_without_timely_pipe_eof"
+                                    )
+                                    (
+                                        returncode,
+                                        interrupted,
+                                        killed,
+                                        cleanup_complete,
+                                    ) = _terminate_owned_group(
+                                        process,
+                                        identity,
+                                        bounds["grace_seconds"],
+                                        timeline,
+                                    )
+                                    break
+                                timeline.append(
+                                    _timeline_event(
+                                        "pipe_eof_after_leader_exit",
+                                        bound_seconds=handshake_bound,
+                                        elapsed_seconds=elapsed,
+                                        returncode=polled,
+                                    )
+                                )
+                            else:
+                                timeline.append(
+                                    _timeline_event(
+                                        "eof_leader_handshake_started",
+                                        bound_seconds=handshake_bound,
+                                        first_observation="pipe_eof",
+                                    )
+                                )
+                                if polled is None:
+                                    (
+                                        polled,
+                                        leader_gone,
+                                        elapsed,
+                                    ) = _wait_for_natural_leader_exit(
+                                        process,
+                                        handshake_bound,
+                                    )
+                                else:
+                                    leader_gone = True
+                                    elapsed = 0.0
+                                if not leader_gone:
+                                    timeline.append(
+                                        _timeline_event(
+                                            "eof_leader_handshake_timeout",
+                                            bound_seconds=handshake_bound,
+                                            elapsed_seconds=elapsed,
+                                            first_observation="pipe_eof",
+                                        )
+                                    )
+                                    invalid_reason = (
+                                        "pipe_eof_while_child_running"
+                                    )
+                                    (
+                                        returncode,
+                                        interrupted,
+                                        killed,
+                                        cleanup_complete,
+                                    ) = _terminate_owned_group(
+                                        process,
+                                        identity,
+                                        bounds["grace_seconds"],
+                                        timeline,
+                                    )
+                                    break
+                                timeline.append(
+                                    _timeline_event(
+                                        "leader_exit_after_eof",
+                                        bound_seconds=handshake_bound,
+                                        elapsed_seconds=elapsed,
+                                        returncode=polled,
+                                    )
+                                )
+                            drain_bound = bounds[
+                                "process_group_drain_seconds"
+                            ]
+                            timeline.append(
+                                _timeline_event(
+                                    "process_group_drain_started",
+                                    bound_seconds=drain_bound,
+                                    pgid=identity["pgid"],
+                                )
+                            )
+                            group_gone, elapsed = (
+                                _wait_for_natural_group_drain(
+                                    identity["pgid"],
+                                    drain_bound,
+                                )
+                            )
+                            if not group_gone:
+                                timeline.append(
+                                    _timeline_event(
+                                        "process_group_drain_timeout",
+                                        bound_seconds=drain_bound,
+                                        elapsed_seconds=elapsed,
+                                        pgid=identity["pgid"],
+                                    )
+                                )
+                                invalid_reason = (
+                                    "pipe_eof_with_live_process_group"
+                                )
+                                (
+                                    returncode,
+                                    interrupted,
+                                    killed,
+                                    cleanup_complete,
+                                ) = _terminate_owned_group(
+                                    process,
+                                    identity,
+                                    bounds["grace_seconds"],
+                                    timeline,
+                                )
+                                break
+                            timeline.append(
+                                _timeline_event(
+                                    "group_drained",
+                                    bound_seconds=drain_bound,
+                                    elapsed_seconds=elapsed,
+                                    pgid=identity["pgid"],
+                                )
+                            )
+                            returncode = polled
+                            cleanup_complete = True
+                        break
+                    if polled is not None:
+                        if child_exit_observed_ns is None:
+                            child_exit_observed_ns = time.monotonic_ns()
+                            transport_deadline_ns = (
+                                child_exit_observed_ns
+                                + bounds["eof_leader_handshake_seconds"]
+                                * 1_000_000_000
+                            )
+                            phase = "transport_handshake"
+                            timeline.append(
+                                _timeline_event(
+                                    "child_exit_observed_before_pipe_eof",
+                                    returncode=polled,
+                                )
+                            )
+                            timeline.append(
+                                _timeline_event(
+                                    "eof_leader_handshake_started",
+                                    bound_seconds=bounds[
+                                        "eof_leader_handshake_seconds"
+                                    ],
+                                    first_observation="leader_exit",
+                                )
+                            )
+                        elif time.monotonic_ns() >= transport_deadline_ns:
+                            elapsed = (
+                                time.monotonic_ns() - child_exit_observed_ns
+                            ) / 1_000_000_000
+                            timeline.append(
+                                _timeline_event(
+                                    "eof_leader_handshake_timeout",
+                                    bound_seconds=bounds[
+                                        "eof_leader_handshake_seconds"
+                                    ],
+                                    elapsed_seconds=elapsed,
+                                    first_observation="leader_exit",
+                                )
+                            )
+                            invalid_reason = "child_exit_without_timely_pipe_eof"
+                            (
+                                returncode,
+                                interrupted,
+                                killed,
+                                cleanup_complete,
+                            ) = _terminate_owned_group(
+                                process,
+                                identity,
+                                bounds["grace_seconds"],
+                                timeline,
+                            )
+                            break
+                        continue
+                    no_progress_due = (
+                        no_progress_due
+                        or (
+                            transport_deadline_ns is None
+                            and time.monotonic_ns() >= deadline_ns
+                        )
                     )
-                    if deadline_due:
+                    if no_progress_due:
                         transcript_handle.flush()
                         transcript_snapshot = transcript.read_bytes()
                         current_window = transcript_snapshot[window_offset:]
@@ -4001,78 +4513,6 @@ def _run_attempt(
                         elif not cleanup_complete:
                             invalid_reason = "deadline_cleanup_incomplete"
                         break
-                    polled = process.poll()
-                    if pipe_eof:
-                        if pipe_buffer:
-                            invalid_reason = "partial_progress_event_at_eof"
-                            (
-                                returncode,
-                                interrupted,
-                                killed,
-                                cleanup_complete,
-                            ) = _terminate_owned_group(
-                                process,
-                                identity,
-                                bounds["grace_seconds"],
-                                timeline,
-                            )
-                        elif polled is None:
-                            invalid_reason = "pipe_eof_while_child_running"
-                            (
-                                returncode,
-                                interrupted,
-                                killed,
-                                cleanup_complete,
-                            ) = _terminate_owned_group(
-                                process,
-                                identity,
-                                bounds["grace_seconds"],
-                                timeline,
-                            )
-                        elif _process_group_exists(identity["pgid"]):
-                            invalid_reason = "pipe_eof_with_live_process_group"
-                            (
-                                returncode,
-                                interrupted,
-                                killed,
-                                cleanup_complete,
-                            ) = _terminate_owned_group(
-                                process,
-                                identity,
-                                bounds["grace_seconds"],
-                                timeline,
-                            )
-                        else:
-                            returncode = polled
-                            cleanup_complete = True
-                        break
-                    if polled is not None:
-                        if child_exit_observed_ns is None:
-                            child_exit_observed_ns = time.monotonic_ns()
-                            timeline.append(
-                                _timeline_event(
-                                    "child_exit_observed_before_pipe_eof",
-                                    returncode=polled,
-                                )
-                            )
-                        elif (
-                            time.monotonic_ns() - child_exit_observed_ns
-                            >= EOF_EXIT_GRACE_SECONDS * 1_000_000_000
-                        ):
-                            invalid_reason = "child_exit_without_timely_pipe_eof"
-                            (
-                                returncode,
-                                interrupted,
-                                killed,
-                                cleanup_complete,
-                            ) = _terminate_owned_group(
-                                process,
-                                identity,
-                                bounds["grace_seconds"],
-                                timeline,
-                            )
-                            break
-                        continue
                 if (
                     invalid_reason is None
                     and outcome == "invalid"
@@ -4604,15 +5044,17 @@ def _probe_record(
     preflight: dict[str, Any],
     role: str,
     label: str,
+    nodes_role: str = "probe_nodes",
 ) -> dict[str, Any]:
     fixture = _artifact(preflight, role)
-    nodes = _artifact(preflight, "probe_nodes")
+    nodes = _artifact(preflight, nodes_role)
+    root = Path(preflight["artifact_root"])
     return _run_attempt(
         preflight_path=preflight_path,
         preflight=preflight,
-        trial=Path(preflight["artifact_root"]) / label,
-        cwd=Path(preflight["artifact_root"]),
-        selectors_=[fixture.name],
+        trial=root / label,
+        cwd=root,
+        selectors_=[str(fixture.relative_to(root))],
         expected_nodes_path=nodes,
         mode="probe",
         label=label,
@@ -4981,6 +5423,13 @@ def run_probe_suite(preflight_path: Path) -> dict[str, Any]:
         "probe_pass",
         "probe-fast-pass",
     )
+    handshake_record = _probe_record(
+        preflight_path,
+        preflight,
+        "probe_eof_handshake",
+        "probe-eof-exit-handshake",
+        "probe_eof_handshake_nodes",
+    )
     interrupt_record = _probe_record(
         preflight_path,
         preflight,
@@ -5017,11 +5466,18 @@ def run_probe_suite(preflight_path: Path) -> dict[str, Any]:
         item["event"] for item in interrupt_record["timeline"]
     ]
     kill_events = [item["event"] for item in kill_record["timeline"]]
+    handshake_events = [
+        item["event"] for item in handshake_record["timeline"]
+    ]
     try:
         interrupt_sigint_index = interrupt_events.index("sigint")
         interrupt_exit_index = interrupt_events.index(
             "group_exit_after_sigint"
         )
+    except (KeyError, ValueError):
+        interrupt_sigint_index = -1
+        interrupt_exit_index = -1
+    try:
         kill_sigint_index = kill_events.index("sigint")
         kill_sigkill_index = kill_events.index("sigkill")
         kill_exit_index = kill_events.index("group_exit_after_sigkill")
@@ -5032,13 +5488,27 @@ def run_probe_suite(preflight_path: Path) -> dict[str, Any]:
             "monotonic_ns"
         ]
     except (KeyError, ValueError):
-        interrupt_sigint_index = -1
-        interrupt_exit_index = -1
         kill_sigint_index = -1
         kill_sigkill_index = -1
         kill_exit_index = -1
         kill_sigint_ns = 0
         kill_sigkill_ns = 0
+    try:
+        handshake_leader_index = handshake_events.index(
+            "leader_exit_after_eof"
+        )
+        handshake_drain_start_index = handshake_events.index(
+            "process_group_drain_started"
+        )
+        handshake_drained_index = handshake_events.index("group_drained")
+        handshake_drain_elapsed = handshake_record["timeline"][
+            handshake_drained_index
+        ]["elapsed_seconds"]
+    except (KeyError, ValueError):
+        handshake_leader_index = -1
+        handshake_drain_start_index = -1
+        handshake_drained_index = -1
+        handshake_drain_elapsed = 0.0
     expected = {
         "pass": (
             pass_record["outcome"] == "complete_pass"
@@ -5047,6 +5517,21 @@ def run_probe_suite(preflight_path: Path) -> dict[str, Any]:
             and pass_record["progress_count"] == 2
             and not pass_record["interrupted"]
             and not pass_record["killed"]
+        ),
+        "eof_exit_handshake": (
+            handshake_record["outcome"] == "complete_pass"
+            and handshake_record["cleanup_complete"]
+            and handshake_record["pipe_eof"]
+            and handshake_record["progress_count"] == 2
+            and not handshake_record["interrupted"]
+            and not handshake_record["killed"]
+            and 0
+            <= handshake_leader_index
+            < handshake_drain_start_index
+            < handshake_drained_index
+            and handshake_drain_elapsed >= 0.1
+            and "sigint" not in handshake_events
+            and "sigkill" not in handshake_events
         ),
         "sigint": (
             interrupt_record["outcome"] == "unresolved_stall"
@@ -5088,6 +5573,7 @@ def run_probe_suite(preflight_path: Path) -> dict[str, Any]:
         "checks": expected,
         "protocol_id": PROTOCOL_ID,
         "records": {
+            "eof_exit_handshake": handshake_record["label"],
             "pass": pass_record["label"],
             "sigint": interrupt_record["label"],
             "sigkill": kill_record["label"],
@@ -5125,8 +5611,8 @@ def prepare_preflight(
     repo = repo.resolve()
     if side not in {"base", "tip", "probe"}:
         raise RuntimeError("prepare side must be base, tip, or probe")
-    if root == FROZEN_V1_ROOT:
-        raise RuntimeError("the frozen v1 artifact root cannot be reused")
+    if root in FROZEN_ROOTS:
+        raise RuntimeError("a frozen artifact root cannot be reused")
     if Path(__file__).resolve() != (root / "price_truth_tier_runner.py"):
         raise RuntimeError("prepare must run the standard copied runner name")
     if not repo.is_dir() or not (repo / ".git").exists():
@@ -5157,6 +5643,18 @@ def prepare_preflight(
         _preflight_artifact(
             root / "probe_ignore_sigint.py",
             "probe_ignore_sigint",
+        ),
+        _preflight_artifact(
+            root / "probe_eof_handshake" / "conftest.py",
+            "probe_eof_handshake_conftest",
+        ),
+        _preflight_artifact(
+            root / "probe_eof_handshake" / "test_handshake.py",
+            "probe_eof_handshake",
+        ),
+        _preflight_artifact(
+            root / "probe_eof_handshake.nodes",
+            "probe_eof_handshake_nodes",
         ),
     ]
     tiers: list[dict[str, Any]] = []
@@ -5267,4 +5765,4 @@ def main() -> int:
 if __name__ == "__main__":
     raise SystemExit(main())
 ```
-<!-- PRICE_TRUTH_RUNNER_V2_END -->
+<!-- PRICE_TRUTH_RUNNER_V3_END -->
