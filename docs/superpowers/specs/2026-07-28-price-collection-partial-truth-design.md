@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: APPROVED PRODUCT + RUNNER DESIGN - EXACT-SOURCE PLAN REVIEW NEXT**
+> **Status: APPROVED PRODUCT DESIGN + DRAFT RUNNER V3 HANDSHAKE AMENDMENT - FOCUSED REVIEW NEXT**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -818,8 +818,10 @@ This amendment changes only how the reviewed tier protocol is executed. It
 does not change the eight-tier map, collection identity, final reporter,
 environment allowlist, outcome table, banking tuple, retry count, node
 accounting, product code, test code, providers, Gateway, or production data.
-The invalid `/tmp/price-truth-tier-v1` root remains frozen evidence and must
-not be reused.
+The invalid `/tmp/price-truth-tier-v1` and
+`/tmp/price-truth-tier-v2` roots remain frozen evidence and must not be
+reused. The next protocol identity is `price-truth-tier-v3`, and its
+implementation must use a fresh `/tmp/price-truth-tier-v3` root.
 
 The replacement is one standard-library, SHA-pinned Python module. The same
 file has two roles:
@@ -843,6 +845,19 @@ canonical collection already contains 11 node IDs with spaces.
 The T0/T1 dumps add two non-lifespan event-loop-stall shapes to `EIR-005`.
 They remain referenced through evidence Section 8.4. This price branch does
 not edit the EIR register; the later observer spec owns that transfer.
+
+Focused review later cleared the exact deterministic-v2 runner at
+`00d35376`. Its Task 0 run bounded three stalls correctly, then stopped at T3:
+all 590 expected nodes produced 1,180 balanced progress events, the reporter
+recorded exact collected/seen sets with zero non-passing nodes and exit status
+0, and the terminal summary was complete. The progress pipe nevertheless
+reached EOF while `Popen.poll()` still returned `None`; the reviewed v2 rule
+therefore injected `SIGINT`, after which the leader returned 0 and the group
+disappeared about 10 milliseconds later. That signal makes T3 permanently
+invalid and does not permit retroactive admission. It does establish that an
+immediate EOF/poll comparison conflates a complete final-exit handoff with
+malformed early EOF. Evidence Section 8.7 pins the complete blocker packet;
+the v3 transport handshake below resolves only that classification boundary.
 
 ### 13.2 Pinned-copy preflight
 
@@ -935,7 +950,17 @@ no-progress deadline:       150 seconds
 SIGINT grace:                10 seconds
 ```
 
-Runtime mode accepts no command-line override for these values.
+Transport shutdown adds two separately named bounds:
+
+```text
+EOF_LEADER_HANDSHAKE_SECONDS = 1
+PROCESS_GROUP_DRAIN_SECONDS  = 1
+```
+
+Both constants are exactly one second in runtime and probe mode. They are
+independent budgets: time consumed waiting for the pytest leader does not
+reduce the complete process-group drain budget. Runtime and probe mode accept
+no command-line override for any of these values.
 
 The controller uses `time.monotonic_ns()` and has three explicit phases:
 
@@ -956,6 +981,18 @@ Pytest's configured faulthandler timer is per item. A collection or final
 session-finish hang may therefore cross the 150-second boundary without a
 120-second dump. This is expected input to the closed classification below,
 not permission to wait longer.
+
+The no-progress machine ends when the runner first observes a transport
+terminal fact: clean pipe EOF or natural leader exit. From that observation
+onward, the 150-second deadline is cancelled and cannot compete with or
+override the two transport-handshake bounds. The runner receive-side
+monotonic timestamp of each stage transition owns its corresponding deadline.
+
+EOF is eligible for the handshake only when the pipe buffer is empty, no node
+is active, and the valid progress count is exactly twice the expected node
+count. Partial buffered data, unbalanced progress, incomplete progress, or a
+later event after EOF is immediately `invalid`; no transport grace may turn
+any of those shapes into a natural result.
 
 ### 13.6 Deadline, dump, and signal classification
 
@@ -991,12 +1028,39 @@ Whether `SIGINT` alone terminates pytest or `SIGKILL` is required does not
 change `unresolved_stall`; it is retained as signal-path evidence. No forced
 termination can become `complete_pass` or `complete_nonpassing`.
 
-If the child exits naturally, the plugin closes its descriptor and the
-controller drains through pipe EOF before `wait()` finalization. EOF while the
-child is still running, child exit without timely EOF, or progress after EOF is
-`invalid`. Natural exit 0/1 is admitted only after the unchanged terminal
-summary, final reporter, manifest comparisons, and outcome checks in Section
-12.3 all pass.
+Natural transport shutdown is a symmetric two-stage handshake:
+
+1. **EOF/leader convergence.** The first observed side starts
+   `EOF_LEADER_HANDSHAKE_SECONDS`.
+   - If clean, fully complete EOF arrives first, the runner waits up to the
+     complete one-second bound for `Popen.poll()` to observe leader exit.
+   - If leader exit arrives first, the runner waits up to the same complete
+     one-second bound for clean EOF.
+   - Success records `leader_exit_after_eof` or
+     `pipe_eof_after_leader_exit`, including the bound and elapsed monotonic
+     time. Timeout remains `invalid` as
+     `pipe_eof_while_child_running` or
+     `child_exit_without_timely_pipe_eof`.
+2. **Process-group drain.** After both EOF and leader exit are observed, the
+   runner records `process_group_drain_started` and waits a separate complete
+   `PROCESS_GROUP_DRAIN_SECONDS` for the originally verified PGID to
+   disappear. This stage is mandatory in both observation orders. Natural
+   disappearance records `group_drained`; a still-live group after the
+   complete bound remains `invalid` as
+   `pipe_eof_with_live_process_group`.
+
+The phrase "child/group is still running" in this contract means that the
+corresponding complete handshake bound expired while the verified process or
+process group remained observable. A single immediate `poll()` or
+`killpg(..., 0)` observation is not sufficient.
+
+Successful transport convergence injects no signal. Only after both stages
+succeed may the runner call the unchanged natural-result validator. Exit 0/1
+is admitted only after the unchanged terminal summary, final reporter,
+collected/seen/non-passing manifest comparisons, progress-count check, data
+boundary, and Section 12.3 outcome checks all pass. The handshake resolves
+only transport ordering; it cannot make incomplete or malformed test evidence
+admissible.
 
 ### 13.7 Attempt and side records
 
@@ -1006,11 +1070,12 @@ Every attempt has a unique directory and an atomically replaced
 - protocol version, side, tier, attempt, Git and all preflight identities;
 - exact command and allowlisted environment names;
 - PID/PGID/SID and wall/monotonic launch/end values;
-- fixed dump/deadline/grace bounds;
+- fixed dump/deadline/signal bounds and both named transport bounds;
 - `progress.jsonl` path, SHA-256, event count, and last valid event;
 - transcript, reporter, terminal-summary, and data-boundary validation;
 - deadline phase and dump-marker result;
-- ordered signal events with monotonic timestamps and process state;
+- ordered EOF/leader/group-drain and signal events with receive-side
+  monotonic timestamps, wall time, elapsed time, bound, and process state;
 - natural or forced return status; and
 - one closed Section 12.3 outcome with its mechanical reasons.
 
@@ -1024,32 +1089,49 @@ deferred retry under the unchanged Section 12.3 rule. The first `invalid`
 atomically closes the side as incomplete and the runner refuses to launch
 every subsequent initial tier, retry, or diagnostic monolithic run.
 
-Completed-tier banking retains the exact existing identity tuple. The pinned
-runner and progress protocol are represented by the already-required command
-and protocol identity; this amendment does not weaken or replace any banking
-field.
+Completed-tier banking retains the exact existing identity tuple. Protocol
+identity becomes `price-truth-tier-v3`; the pinned runner and progress
+protocol remain represented by the already-required command and protocol
+identity. No v2 record may be imported, selected, or treated as a v3 banked
+result. This amendment does not weaken or replace any banking field.
 
 ### 13.8 Mandatory pre-runtime probes
 
-The implementation plan must pin scratch fixtures and execute four probes
+The implementation plan must pin scratch fixtures and execute five probes
 before Task 0 runtime:
 
 1. **Fast natural pass:** one test emits a progress event, exits 0, closes the
    pipe, and satisfies final-reporter admission without any signal.
-2. **SIGINT termination:** one sleeping test crosses a short probe deadline,
+2. **EOF/leader/group handshake:** one passing scratch test is accompanied by
+   a `pytest_sessionfinish` hook that starts a short-lived same-PGID
+   descendant without inheriting the progress descriptor, closes the progress
+   descriptor, and then sleeps for 0.5 seconds. The descendant must outlive
+   the pytest leader but disappear within the separate group-drain bound. The
+   result must be `complete_pass`, inject no signal, and record
+   `leader_exit_after_eof`, `process_group_drain_started`, and
+   `group_drained` in order. Final reporter and manifest admission must also
+   pass.
+3. **SIGINT termination:** one sleeping test crosses a short probe deadline,
    emits the probe faulthandler dump, receives process-group `SIGINT`, and
    exits within the probe grace without `SIGKILL`.
-3. **SIGKILL fallback:** one sleeping test deliberately ignores `SIGINT`,
+4. **SIGKILL fallback:** one sleeping test deliberately ignores `SIGINT`,
    crosses the same probe deadline, and requires process-group `SIGKILL`
    after the complete grace.
-4. **Collection identity:** collect-only execution with and without the
+5. **Collection identity:** collect-only execution with and without the
    progress plugin yields the same exact one-node collection and SHA-256.
 
 Probe mode uses separately pinned short constants so review does not spend
-160 seconds per kill-path fixture. Runtime mode cannot select those constants,
-and every record states its mode and effective bounds. Probe source, runner,
-reporter, commands, raw artifacts, records, and manifests all receive SHA-256
-entries in evidence.
+160 seconds per kill-path fixture; the two transport constants remain exactly
+one second in both modes. Runtime mode cannot select probe dump/deadline/signal
+constants, and every record states its mode and effective bounds. Probe
+source, runner, reporter, commands, raw artifacts, records, and manifests all
+receive SHA-256 entries in evidence.
+
+The exact-source plan must replace the v2 appendix with the complete v3
+runner, pin every new fixture SHA-256, update the runner/preflight identity
+tables, add an `eof_exit_handshake` check to the closed probe-summary object,
+and predict the new deterministic probe-summary SHA-256. Those values belong
+to the plan after extraction and execution; this design does not invent them.
 
 Each mutation must be mechanically visible:
 
@@ -1061,7 +1143,17 @@ Each mutation must be mechanically visible:
 - alter the runner after preflight and no child may launch;
 - omit/garble the progress descriptor and plugin startup must fail closed;
   and
-- let an `invalid` record exist and a later-tier launch must be refused.
+- let an `invalid` record exist and a later-tier launch must be refused;
+- **M7a:** set only `EOF_LEADER_HANDSHAKE_SECONDS` to zero; the handshake
+  probe must become `invalid` in stage one and must not reach
+  `group_drained`; and
+- **M7b:** set only `PROCESS_GROUP_DRAIN_SECONDS` to zero; the same probe must
+  complete stage one, enter `process_group_drain_started`, and become
+  `invalid` in stage two.
+
+M7a and M7b use separate fresh roots and exact diffs. A mutation that zeros
+both constants is insufficient because a stage-one failure cannot prove that
+stage two independently fails closed.
 
 ### 13.9 Protected invariants and stop conditions
 
@@ -1075,11 +1167,17 @@ This amendment is invalid if implementation or its plan:
 - permits runtime deadline overrides or operator-added wrappers;
 - launches a later tier after `invalid`;
 - treats a no-dump breach as `unresolved_stall`;
-- reuses `/tmp/price-truth-tier-v1` or any prior attempt directory;
+- shares one elapsed budget between the two transport stages;
+- admits an EOF handshake with partial, active, or incomplete progress;
+- skips process-group drain after either EOF/leader observation order;
+- reuses `/tmp/price-truth-tier-v1`,
+  `/tmp/price-truth-tier-v2`, or any prior attempt directory;
 - touches product/test/provider/Gateway/production-data paths; or
 - starts Task 0 or product RED before separate plan review clears the exact
   runner source, probes, hashes, and commands.
 
 The implementation plan is the next gate after focused review of this
-amendment. It must include the exact runner source and reproducible probe
-recipes. This design alone authorizes no runtime attempt.
+amendment. It must use protocol `price-truth-tier-v3`, include the exact
+runner source and reproducible probe/mutation recipes, and update every
+identity and predicted hash named above. This design alone authorizes no
+runtime attempt.
