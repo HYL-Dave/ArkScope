@@ -373,12 +373,16 @@ class TestSignalEndpoints:
 # ============================================================
 
 class TestFundamentalsEndpoints:
-    def test_fundamentals(self, client):
-        r = client.get("/fundamentals/NVDA")
+    def test_fundamentals(self, hermetic_market_app, monkeypatch):
+        provider_calls = _install_fundamentals_provider_spies(monkeypatch)
+        r = _api_get(hermetic_market_app, "/fundamentals/NVDA")
         assert r.status_code == 200
+        assert provider_calls == []
         data = r.json()
         assert data["ticker"] == "NVDA"
-        assert data["market_cap"] is not None
+        assert data["data_source"] == "ibkr"
+        assert data["market_cap"] == 1_500_000_000_000.0
+        assert data["pe_ratio"] == 30.0
 
     def test_sec_filings(self, client):
         r = client.get("/sec/NVDA")

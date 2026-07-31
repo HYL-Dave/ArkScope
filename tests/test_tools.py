@@ -405,12 +405,16 @@ class TestSignalTools:
 # ============================================================
 
 class TestAnalysisTools:
-    def test_get_fundamentals_analysis(self, dal):
+    def test_get_fundamentals_analysis(self, hermetic_dal, monkeypatch):
         from src.tools.analysis_tools import get_fundamentals_analysis
-        result = get_fundamentals_analysis(dal, ticker="NVDA")
+        provider_calls = _install_fundamentals_provider_spies(monkeypatch)
+        result = get_fundamentals_analysis(hermetic_dal, ticker="NVDA")
+        assert provider_calls == []
         assert isinstance(result, FundamentalsResult)
         assert result.ticker == "NVDA"
-        assert result.market_cap is not None
+        assert result.data_source == "ibkr"
+        assert result.market_cap == 1_500_000_000_000.0
+        assert result.pe_ratio == 30.0
 
     def test_get_sec_filings(self, dal):
         from src.tools.analysis_tools import get_sec_filings
