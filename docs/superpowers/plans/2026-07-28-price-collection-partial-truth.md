@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: TASK 0 NATIVE BASE COMPLETE - PRODUCT RED AUTHORIZED**
+> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -2087,7 +2087,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 - Modify: `src/market_data_direct.py`
 - Modify: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
 
-- [ ] **Step 1: Add one-day test helpers without adding nodes.**
+- [x] **Step 1: Add one-day test helpers without adding nodes.**
 
   Add beside `_backfill_db`:
 
@@ -2115,7 +2115,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   At this instant, 2026-06-22 is the sole completed target date and 2026-06-23
   is still in progress.
 
-- [ ] **Step 2: Add the seven exact RED nodes.**
+- [x] **Step 2: Add the seven exact RED nodes.**
 
   Use the existing `_FakeIBKR`, `_FakePolygon`, `_bar`, and SQLite helpers. The
   load-bearing assertions are:
@@ -2307,7 +2307,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
       assert result["unresolved_after_fetch_tickers"] == ["LCID"]
   ```
 
-- [ ] **Step 3: Evolve the five existing nodes without renaming them.**
+- [x] **Step 3: Evolve the five existing nodes without renaming them.**
 
   Make these assertion changes:
 
@@ -2369,7 +2369,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   Also update comments that currently claim per-ticker failures leave the run
   succeeded. Preserve their isolation assertions.
 
-- [ ] **Step 4: Run the direct suite and capture the right RED.**
+- [x] **Step 4: Run the direct suite and capture the right RED.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -2381,13 +2381,13 @@ continues to use the existing closed outcome table and Stop Condition 11.
   exists. A provider/network call, calendar error, invalid date fixture, or SQL
   setup error is the wrong RED and must be corrected before product edits.
 
-- [ ] **Step 5: Implement Sections 5.1 and 5.2 exactly.**
+- [x] **Step 5: Implement Sections 5.1 and 5.2 exactly.**
 
   Keep fetch in the first unlocked phase. Reconcile only `item["gaps"]` after
   `_insert_rows()` in the second write phase. Keep the existing outer fatal
   failure finalizer and best-effort per-ticker meta recovery.
 
-- [ ] **Step 6: Run direct GREEN and exact collection.**
+- [x] **Step 6: Run direct GREEN and exact collection.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -2403,7 +2403,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 
   Expected: `70 passed`, exactly `+7/-0`; all existing direct node IDs survive.
 
-- [ ] **Step 7: Commit collector truth.**
+- [x] **Step 7: Commit collector truth.**
 
   ```bash
   git add src/market_data_direct.py tests/test_market_data_direct.py \
@@ -2419,7 +2419,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 - Modify: `src/prices_runtime.py`
 - Modify: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
 
-- [ ] **Step 1: Add a valid result factory and four exact RED nodes.**
+- [x] **Step 1: Add a valid result factory and four exact RED nodes.**
 
   Add this non-test helper:
 
@@ -2533,7 +2533,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
               worker.sanitize_result(malformed)
   ```
 
-- [ ] **Step 2: Evolve the two existing worker nodes in place.**
+- [x] **Step 2: Evolve the two existing worker nodes in place.**
 
   `test_prices_worker_prints_sanitized_success_json` must return
   `_collector_result(status="succeeded", errors={}, unresolved=[])`, require
@@ -2544,7 +2544,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   whose planted message is absent and whose class remains present. Keep both
   cases inside the same existing node.
 
-- [ ] **Step 3: Run worker RED.**
+- [x] **Step 3: Run worker RED.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -2555,13 +2555,13 @@ continues to use the existing closed outcome table and Stop Condition 11.
   result exits zero, malformed counts are coerced, and new fields are absent.
   All failures must be contract assertions, not argparse or fixture failures.
 
-- [ ] **Step 4: Implement Section 5.3 exactly.**
+- [x] **Step 4: Implement Section 5.3 exactly.**
 
   Keep `_run_worker()` and provider arguments unchanged. Validate all facts
   before serializing; strip per-ticker error values; preserve only the stable
   lock-busy diagnostic needed by scheduler skip classification.
 
-- [ ] **Step 5: Run worker and direct GREEN.**
+- [x] **Step 5: Run worker and direct GREEN.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -2571,7 +2571,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 
   Expected: `78 passed` (`8 + 70`).
 
-- [ ] **Step 6: Commit the worker boundary.**
+- [x] **Step 6: Commit the worker boundary.**
 
   ```bash
   git add src/prices_runtime.py tests/test_prices_runtime.py \
@@ -2587,7 +2587,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 - Modify: `src/service/data_scheduler.py`
 - Modify: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
 
-- [ ] **Step 1: Add scheduler price-payload and audit helpers.**
+- [x] **Step 1: Add scheduler price-payload and audit helpers.**
 
   Add near the existing prices-worker tests:
 
@@ -2638,7 +2638,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
       return store
   ```
 
-- [ ] **Step 2: Add the two strict parser RED nodes.**
+- [x] **Step 2: Add the two strict parser RED nodes.**
 
   ```python
   def test_prices_worker_stdout_parser_preserves_partial_truth_and_bounded_tickers():
@@ -2675,7 +2675,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   and preservation of a bounded payload, not a second independent truncation
   policy.
 
-- [ ] **Step 3: Add the four scheduler outcome RED nodes.**
+- [x] **Step 3: Add the four scheduler outcome RED nodes.**
 
   ```python
   def test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation(
@@ -2779,7 +2779,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
       assert finished["error"] is None
   ```
 
-- [ ] **Step 4: Evolve the five existing scheduler nodes in place.**
+- [x] **Step 4: Evolve the five existing scheduler nodes in place.**
 
   Use a fully valid `_scheduled_price_payload()` in both subprocess-launch
   nodes and in `test_price_scope_required`. Extend
@@ -2789,7 +2789,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   `test_prices_worker_retryable_lock_busy_is_skip_not_failure` unchanged except
   for any parser-required exception-envelope field. No node may be renamed.
 
-- [ ] **Step 5: Run scheduler RED.**
+- [x] **Step 5: Run scheduler RED.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -2801,14 +2801,14 @@ continues to use the existing closed outcome table and Stop Condition 11.
   success/history sequence lacks the required first failed audit. Normalized
   news must remain green.
 
-- [ ] **Step 6: Implement Section 5.4 exactly.**
+- [x] **Step 6: Implement Section 5.4 exactly.**
 
   Preserve the exception envelope and lock-busy skip. Treat payload status as
   semantic truth. Keep `price_partial` local to the prices branch and use a
   separate audit error so durable partial has no fabricated continuation or
   raw diagnostic.
 
-- [ ] **Step 7: Run all backend focused tests and collect exact nodes.**
+- [x] **Step 7: Run all backend focused tests and collect exact nodes.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -2833,7 +2833,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   `9faa90281df39dddccf7bedf3ad2ad7304341560c00dea8ff8b9dd887f5e55a3`;
   exact `+17/-0` with only Section 3.1 additions.
 
-- [ ] **Step 8: Commit scheduler projection.**
+- [x] **Step 8: Commit scheduler projection.**
 
   ```bash
   git add src/service/data_scheduler.py tests/test_data_scheduler.py \
@@ -2854,7 +2854,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 - Modify: `apps/arkscope-web/src/i18n/resources.test.ts`
 - Modify: `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
 
-- [ ] **Step 1: Add the pure display RED node.**
+- [x] **Step 1: Add the pure display RED node.**
 
   Add inside `describe("schedulerStateLabel", ...)`:
 
@@ -2893,7 +2893,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   });
   ```
 
-- [ ] **Step 2: Add the mounted bilingual RED node and bounded fixture mode.**
+- [x] **Step 2: Add the mounted bilingual RED node and bounded fixture mode.**
 
   Place the fixture changes and new node inside the existing
   `describe("Settings provider config authority", ...)` block; the exact node
@@ -2986,7 +2986,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   });
   ```
 
-- [ ] **Step 3: Evolve the resource count node without renaming it.**
+- [x] **Step 3: Evolve the resource count node without renaming it.**
 
   Change only these expected values:
 
@@ -2998,7 +2998,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 
   Explore stays `380`; every other subtree count stays exact.
 
-- [ ] **Step 4: Run frontend RED.**
+- [x] **Step 4: Run frontend RED.**
 
   ```bash
   cd apps/arkscope-web
@@ -3012,13 +3012,13 @@ continues to use the existing closed outcome table and Stop Condition 11.
   partial label and missing DTO/resources; the evolved resource count fails by
   exactly two leaves per locale.
 
-- [ ] **Step 5: Implement Section 5.5 exactly.**
+- [x] **Step 5: Implement Section 5.5 exactly.**
 
   Keep `DataSourcesSection.tsx` byte-identical. The dedicated branch must be
   source-exact (`ibkr_prices`), status-exact (`partial`), require a positive
   count plus at least one bounded ticker, and return `needsContinue=false`.
 
-- [ ] **Step 6: Run focused frontend GREEN and inventory.**
+- [x] **Step 6: Run focused frontend GREEN and inventory.**
 
   ```bash
   cd apps/arkscope-web
@@ -3050,7 +3050,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   `b6f01cae4038c5c94f51da05ad920e52b723c387c6f48938f7dce6a13b028e4f`;
   exact `+2/-0`; Settings `706`, Explore `380`, total `1785`.
 
-- [ ] **Step 7: Run frontend static gates.**
+- [x] **Step 7: Run frontend static gates.**
 
   ```bash
   cd apps/arkscope-web
@@ -3063,7 +3063,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 
   Expected: scanner twice `36/20/0/20`; typecheck and build exit zero.
 
-- [ ] **Step 8: Commit frontend truth.**
+- [x] **Step 8: Commit frontend truth.**
 
   ```bash
   git add \
@@ -3087,7 +3087,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 - Modify: `docs/superpowers/plans/2026-07-28-price-collection-partial-truth.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Run the eight independent mutation probes.**
+- [x] **Step 1: Run the eight independent mutation probes.**
 
   Apply one mutation at a time with `apply_patch`, run only its owning node,
   reverse that exact patch with `apply_patch`, and verify the product-file blob
@@ -3111,7 +3111,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   classification, rather than only `_unresolved_price_target_dates()` on an
   already-empty target set, was changed.
 
-- [ ] **Step 2: Reproduce exact final collections and comms.**
+- [x] **Step 2: Reproduce exact final collections and comms.**
 
   Run Section 2.1, writing `*-tip.nodes`, copy the backend stream to
   `$PRICE_TRUTH_TIER_ROOT/tip.nodes`, then:
@@ -3129,7 +3129,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   `de48671aa1d3f70cb87166e3f5b026804e206ac31f8e29fe7e74b38cde9448d5`,
   exact `+2/-0`.
 
-- [ ] **Step 3: Run focused and tiered backend gates.**
+- [x] **Step 3: Run focused and tiered backend gates.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -3175,7 +3175,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   the tiered protocol and every historical monolithic run. Whatever its
   closed outcome, it is not an A/B input.
 
-- [ ] **Step 4: Run frontend full and non-node gates.**
+- [x] **Step 4: Run frontend full and non-node gates.**
 
   ```bash
   cd apps/arkscope-web
@@ -3199,7 +3199,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   typecheck/build zero; tools `53/54/54`; no-PG `23/23`, `ok=true`,
   `pg_attempts=[]`.
 
-- [ ] **Step 5: Prove byte-identical protected files and trees.**
+- [x] **Step 5: Prove byte-identical protected files and trees.**
 
   ```bash
   git diff --exit-code "$PLAN_REVIEW_CLEARANCE_COMMIT" -- \
@@ -3234,7 +3234,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
     tests/test_data_scheduler.py::test_is_due_matrix
   ```
 
-- [ ] **Step 6: Prove shared frontend files changed only in allowed sections.**
+- [x] **Step 6: Prove shared frontend files changed only in allowed sections.**
 
   Review:
 
@@ -3257,7 +3257,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   `src/marketDataDisplay.test.ts`; they must remain green in the full focused
   file run.
 
-- [ ] **Step 7: Complete the evidence packet and mark review-ready.**
+- [x] **Step 7: Complete the evidence packet and mark review-ready.**
 
   Record:
 
@@ -3277,7 +3277,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   Update lifecycle headers to `IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW
   NEXT` and add a newest-first priority-map entry with the exact final numbers.
 
-- [ ] **Step 8: Commit review evidence.**
+- [x] **Step 8: Commit review evidence.**
 
   ```bash
   git add \
