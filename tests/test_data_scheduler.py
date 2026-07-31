@@ -2329,6 +2329,7 @@ def test_prices_worker_stdout_parser_rejects_malformed_partial_payloads():
         {**valid, "error_tickers": ["LCID"] * 26},
         {**valid, "error_tickers": [123]},
         {**valid, "unresolved_after_fetch_tickers": ["LCID\nPRIVATE"]},
+        {**valid, "error_tickers": ["AAPL"]},
     ]
     for payload in invalid:
         assert ds._parse_sanitized_prices_worker_stdout(json.dumps(payload)) is None

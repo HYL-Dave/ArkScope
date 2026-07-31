@@ -679,6 +679,11 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
         return None
     if counts["unresolved_after_fetch_count"] > counts["error_count"]:
         return None
+    if (
+        counts["error_count"] <= 25
+        and not set(unresolved_tickers).issubset(error_tickers)
+    ):
+        return None
     scanned = counts["tickers_scanned"]
     error_count = counts["error_count"]
     expected = (

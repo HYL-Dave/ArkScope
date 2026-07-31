@@ -364,6 +364,11 @@ describe("schedulerStateLabel", () => {
   });
 
   it("renders price unresolved count and bounded ticker list without continuation", () => {
+    const unresolvedTickers = Array.from(
+      { length: 30 },
+      (_, index) => `T${String(index).padStart(2, "0")}`,
+    );
+    const visibleTickers = unresolvedTickers.slice(0, 25).join(", ");
     const durable = {
       last_status: "partial",
       continuation: null,
@@ -373,19 +378,19 @@ describe("schedulerStateLabel", () => {
         collect: {
           status: "partial" as const,
           tickers_scanned: 150,
-          succeeded_ticker_count: 149,
-          unresolved_after_fetch_count: 1,
-          unresolved_after_fetch_tickers: ["LCID"],
+          succeeded_ticker_count: 120,
+          unresolved_after_fetch_count: 30,
+          unresolved_after_fetch_tickers: unresolvedTickers,
         },
       },
     };
     expect(localizedSchedulerStateLabel(durable, zhT)).toEqual({
-      label: "部分完成（抓取後仍有 1 個標的無法確認：LCID）",
+      label: `部分完成（抓取後仍有 30 個標的無法確認：${visibleTickers}）`,
       tone: "warn",
       needsContinue: false,
     });
     expect(localizedSchedulerStateLabel(durable, settingsT("en"))).toEqual({
-      label: "Partially completed (1 ticker remains unresolved after collection: LCID)",
+      label: `Partially completed (30 tickers remain unresolved after collection: ${visibleTickers})`,
       tone: "warn",
       needsContinue: false,
     });

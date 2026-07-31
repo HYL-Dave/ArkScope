@@ -416,14 +416,19 @@ def _upsert_provider_meta(conn, *, provider: str, ticker: str, interval: str,
     success (error is None); an error preserves the prior ``last_success``. ``ticker``
     must already be canonical (the caller canonicalizes before insert — lock 2)."""
     now = _now()
-    last_success = None if error else now
+    last_success = None if error is not None else now
     conn.execute(
         "INSERT INTO provider_sync_meta "
         "(provider, ticker, interval, last_success, last_bar_datetime, last_error, rows_added, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(provider, ticker, interval) DO UPDATE SET "
         "  last_success = COALESCE(excluded.last_success, provider_sync_meta.last_success), "
-        "  last_bar_datetime = COALESCE(excluded.last_bar_datetime, provider_sync_meta.last_bar_datetime), "
+        "  last_bar_datetime = CASE "
+        "    WHEN excluded.last_bar_datetime IS NULL THEN provider_sync_meta.last_bar_datetime "
+        "    WHEN provider_sync_meta.last_bar_datetime IS NULL THEN excluded.last_bar_datetime "
+        "    WHEN excluded.last_bar_datetime > provider_sync_meta.last_bar_datetime "
+        "      THEN excluded.last_bar_datetime "
+        "    ELSE provider_sync_meta.last_bar_datetime END, "
         "  last_error = excluded.last_error, rows_added = excluded.rows_added, updated_at = excluded.updated_at",
         (provider, ticker, interval, last_success, last_bar_datetime, error, rows_added, now))
     conn.commit()
@@ -703,6 +708,7 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
     buffered: dict[str, dict[str, object]] = {}
     total = len(scope)
     for i, canon in enumerate(scope, 1):
+        zero_bar: list[date] = []
         try:
             # TOP-UP: fetch the WHOLE complete-day window (not just zero-bar days)
             # so sparse/partial days heal. INSERT OR IGNORE dedupes present bars.
@@ -717,7 +723,8 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
             )
             buffered[canon] = {"rows": rows, "gaps": zero_bar, "error": None}
         except Exception as e:  # noqa: BLE001 — per-ticker isolation, never fatal
-            buffered[canon] = {"rows": [], "gaps": [], "error": str(e)}
+            error = str(e).strip() or type(e).__name__
+            buffered[canon] = {"rows": [], "gaps": zero_bar, "error": error}
         if progress_cb:
             progress_cb(i, total, canon)
 
@@ -744,7 +751,7 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                     if isinstance(gaps, list):
                         rollup["gaps_found"] += len(gaps)
                     error = item.get("error")
-                    if error:
+                    if error is not None:
                         rollup["errors"][canon] = str(error)
                         # The recovery telemetry write must itself be best-effort: if it
                         # raises (same conn already faulting — disk/lock), it must NOT escape
@@ -765,7 +772,7 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                         targets = targets if isinstance(targets, list) else []
                         added = _insert_rows(conn, rows)
                         rollup["rows_added"] += added
-                        last_bar = rows[-1][1] if rows else None
+                        last_bar = max((row[1] for row in rows), default=None)
                         unresolved = _unresolved_price_target_dates(
                             conn,
                             ticker=canon,

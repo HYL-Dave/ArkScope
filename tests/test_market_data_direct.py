@@ -231,9 +231,11 @@ def test_provider_sync_meta_upsert_then_update(tmp_path):
                               last_bar_datetime="2026-06-17T13:30:00+0000", rows_added=5, error=None)
     mdd._upsert_provider_meta(conn, provider="ibkr", ticker="AAPL", interval="15min",
                               last_bar_datetime="2026-06-18T13:30:00+0000", rows_added=3, error=None)
+    mdd._upsert_provider_meta(conn, provider="ibkr", ticker="AAPL", interval="15min",
+                              last_bar_datetime="2026-06-16T13:30:00+0000", rows_added=0, error=None)
     row = conn.execute("SELECT last_bar_datetime, rows_added FROM provider_sync_meta "
                        "WHERE provider='ibkr' AND ticker='AAPL' AND interval='15min'").fetchone()
-    assert row == ("2026-06-18T13:30:00+0000", 3)  # upsert, single row
+    assert row == ("2026-06-18T13:30:00+0000", 0)  # frontier never moves backward
     assert conn.execute("SELECT COUNT(*) FROM provider_sync_meta").fetchone()[0] == 1
     conn.close()
 
@@ -244,7 +246,16 @@ def test_provider_sync_meta_error_preserves_last_success(tmp_path):
     mdd._ensure_provider_sync_tables(conn)
     mdd._upsert_provider_meta(conn, provider="ibkr", ticker="AAPL", interval="15min",
                               last_bar_datetime="2026-06-17T13:30:00+0000", rows_added=5, error=None)
-    s1 = conn.execute("SELECT last_success FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()[0]
+    s1 = "2000-01-01T00:00:00+00:00"
+    conn.execute(
+        "UPDATE provider_sync_meta SET last_success=? WHERE ticker='AAPL'",
+        (s1,),
+    )
+    conn.commit()
+    mdd._upsert_provider_meta(conn, provider="ibkr", ticker="AAPL", interval="15min",
+                              last_bar_datetime=None, rows_added=0, error="")
+    row = conn.execute("SELECT last_success, last_error FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()
+    assert row[0] == s1 and row[1] == ""  # only None means success
     mdd._upsert_provider_meta(conn, provider="ibkr", ticker="AAPL", interval="15min",
                               last_bar_datetime=None, rows_added=0, error="gateway down")
     row = conn.execute("SELECT last_success, last_error FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()
@@ -378,15 +389,18 @@ def _bar(dt, o=1.0, h=2.0, l=0.5, c=1.5, v=100):
 
 
 class _FakeIBKR:
-    def __init__(self, bars_by_ticker=None, raises_for=None):
+    def __init__(self, bars_by_ticker=None, raises_for=None, exceptions_by_ticker=None):
         self._bars = bars_by_ticker or {}
         self._raises = set(raises_for or ())
+        self._exceptions = exceptions_by_ticker or {}
         self.calls = []
 
     def fetch_historical_intraday(self, tickers, start_date, end_date, interval="15 mins", **k):
         self.calls.append((tuple(tickers), start_date, end_date, interval))
         out = {}
         for t in tickers:
+            if t in self._exceptions:
+                raise self._exceptions[t]
             if t in self._raises:
                 raise RuntimeError(f"gateway error for {t}")
             # faithful to real IBKR: only return bars within the requested [start,end] range
@@ -505,14 +519,17 @@ def test_backfill_partial_preserves_healthy_rows_and_marks_unresolved_target(
 
 
 def test_backfill_failed_when_every_ticker_has_issue(tmp_path, monkeypatch):
-    ibkr = _FakeIBKR({"LCID": []}, raises_for=["BAD"])
+    ibkr = _FakeIBKR({"BAD": [], "LCID": []})
     db, result = _run_one_complete_day(
         tmp_path, monkeypatch, tickers="BAD,LCID", ibkr=ibkr,
     )
     assert result["status"] == "failed"
     assert result["succeeded_ticker_count"] == 0
-    assert set(result["errors"]) == {"BAD", "LCID"}
-    assert result["unresolved_after_fetch_tickers"] == ["LCID"]
+    assert result["errors"] == {
+        "BAD": "price_day_unresolved_after_fetch",
+        "LCID": "price_day_unresolved_after_fetch",
+    }
+    assert result["unresolved_after_fetch_tickers"] == ["BAD", "LCID"]
     conn = sqlite3.connect(db)
     assert conn.execute(
         "SELECT status, error FROM provider_sync_runs"
@@ -706,13 +723,13 @@ def test_backfill_per_ticker_exception_isolated(tmp_path, monkeypatch):
     db = _backfill_db(tmp_path)
     ibkr = _FakeIBKR(
         {"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
-        raises_for=["BAD"],
+        exceptions_by_ticker={"BAD": TimeoutError()},
     )
     db, res = _run_one_complete_day(
         tmp_path, monkeypatch, tickers="AAPL,BAD", ibkr=ibkr, db=db,
     )
     assert res["rows_added"] == 1                 # AAPL succeeded
-    assert "BAD" in res["errors"]                 # BAD recorded, not fatal
+    assert res["errors"] == {"BAD": "TimeoutError"}  # empty exception text stays an issue
     assert res["status"] == "partial"
     assert res["succeeded_ticker_count"] == 1
     conn = sqlite3.connect(db)
