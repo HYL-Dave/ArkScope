@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: DETERMINISTIC TIER RUNNER V3 EXACT-SOURCE PLAN REVIEW NEXT**
+> **Status: TASK 0 NATIVE BASE COMPLETE - PRODUCT RED NEXT AFTER REVIEW**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -97,6 +97,16 @@ canonical and focused baseline exactly, then stopped at
 remains inadmissible. The causal diagnosis later demonstrated that betting on
 a clean monolithic window is not a verification strategy. This amendment
 therefore resets Task 0 rather than reusing either historical partial run.
+
+On 2026-07-31 a direct A/B proved the missing execution boundary: the Codex
+managed sandbox rejects the Unix-socket self-pipe send used by
+`call_soon_threadsafe()`, while native execution delivers it. The reviewed
+observer campaign was not run. Exact v3 bytes in a fresh native-only root
+completed all eight base tiers on their first attempts. This does not amend
+the product design, node ledger, runner, reporter, map, retry rules, or
+predicted tip hashes. It only establishes that base and tip runtime admission
+must use the same native boundary; sandboxed tier records may not be mixed
+with that bank.
 
 The main worktree's untracked files remain user-owned and out of scope:
 
@@ -201,6 +211,22 @@ filter the normalized TSV.
 ### 2.2 Deterministic tiered backend protocol
 
 Protocol ID: `price-truth-tier-v3`.
+
+Runtime execution boundary: invoke `probe-suite`, `run-side`, and
+`run-diagnostic` outside the Codex managed sandbox. Before a side starts, the
+exact wakeup probe at SHA-256 `10647c1e...` must report
+`callback_fired=true`, `ready_count=0`, and `wake_bytes=0`. A failed probe
+stops before pytest launch. This boundary check is external to the pinned
+runner and does not change bank identity. Base and tip must use this same
+boundary.
+
+Both sides must also start with `src/data` absent. T6 may create exactly
+`src/data/cache/risk_free_rate.json` through the existing
+`get_risk_free_rate()` test path; no other `src/data` entry is allowed.
+Record its identity after the side, then move `src/data` reversibly to a
+side-specific `/tmp` quarantine before the next side. This is a symmetric
+execution-artifact boundary, not an admitted input and not permission to
+change the risk-free-rate product path in this slice.
 
 Use one fresh artifact root and preserve it through the complete base/tip
 comparison:
@@ -1842,8 +1868,17 @@ become an A/B side.
 > control plane. Every Task 0 checkbox remains reset. Historical focused and
 > invalid tier results may inform review but cannot satisfy v3. The later v2
 > T3 EOF/exit invalid likewise remains evidence only.
+>
+> **Native-boundary completion 2026-07-31:** the managed sandbox/native
+> wakeup A/B closed EIR-005. Exact v3 inputs were copied into fresh
+> `/tmp/price-truth-tier-v3-native-boundary`; all six probes passed and all
+> eight base tiers completed naturally on first attempts. The base summary is
+> `f83ce823...`, complete `4722/fcdb1b7d...`, with the exact 27-node
+> EIR-002 union `7aafce5d...`. The same-boundary tip is now the required A/B
+> counterpart. Section 8.11 of the evidence packet owns full identities and
+> the diagnostic-monolithic qualifier.
 
-- [ ] **Step 1: Record the clearance identities.**
+- [x] **Step 1: Record the clearance identities.**
 
   Run:
 
@@ -1864,7 +1899,7 @@ become an A/B side.
   printf '%s\n' "$PLAN_REVIEW_CLEARANCE_COMMIT"
   ```
 
-- [ ] **Step 2: Prove the worktree is isolated and contains no production data.**
+- [x] **Step 2: Prove the worktree is isolated and contains no production data.**
 
   Run:
 
@@ -1874,6 +1909,7 @@ become an A/B side.
   test "$(readlink node_modules)" = "/mnt/md0/PycharmProjects/ArkScope/node_modules"
   test -d data
   test -z "$(find data -mindepth 1 -maxdepth 1 -print -quit)"
+  test ! -e src/data
   git check-ignore -q node_modules
   git check-ignore -q data
   git status --short
@@ -1883,13 +1919,13 @@ become an A/B side.
   appear in Git status. Do not copy `data/`, `config/.env`, browser profiles,
   or either main-worktree untracked document into this worktree.
 
-- [ ] **Step 3: Reproduce all four canonical collections.**
+- [x] **Step 3: Reproduce all four canonical collections.**
 
   Run Section 2.1 exactly. Expected: backend `4722/151` with composition
   `63/4/84`; frontend `96 files / 1074 nodes` and focused `86` with composition
   `36/14/36`; all four SHA-256 values match Section 2.
 
-- [ ] **Step 4: Reproduce focused and non-node behavior.**
+- [x] **Step 4: Reproduce focused and non-node behavior.**
 
   ```bash
   /home/hyl/.virtualenvs/llm_app/bin/python -m pytest -q \
@@ -1918,7 +1954,7 @@ become an A/B side.
   Expected: backend `151 passed`; frontend focused `86 passed`; scanner twice
   `36/20/0/20`; tools `53/54/54`; no-PG `23/23`, `ok=true`, and no PG attempt.
 
-- [ ] **Step 5: Build and complete the base tiered non-passing set.**
+- [x] **Step 5: Build and complete the base tiered non-passing set.**
 
   Execute all of Section 2.2 with `SIDE=base`: exact runner extraction,
   mandatory probes, M1-M6 plus independent M7a/M7b controls, collection
@@ -1945,7 +1981,7 @@ become an A/B side.
   `run-diagnostic` command. Record its closed outcome without using it in the
   baseline.
 
-- [ ] **Step 6: Capture protected-boundary baselines.**
+- [x] **Step 6: Capture protected-boundary baselines.**
 
   ```bash
   git rev-parse HEAD:data_sources/ibkr_source.py
@@ -1968,7 +2004,11 @@ become an A/B side.
           "default_interval_min": value.default_interval_min,
           "ibkr": value.ibkr,
           "prices_worker": value.prices_worker,
-          "provider_fetch": value.provider_fetch,
+          "provider_fetch": (
+              value.adapter is not None
+              or value.news_direct_source is not None
+              or value.prices_worker
+          ),
       }
       for key, value in sorted(SOURCES.items())
   }, sort_keys=True, indent=2))
@@ -1978,7 +2018,7 @@ become an A/B side.
   Store exact output in the evidence packet. The catalog must contain the same
   four active source IDs and intervals before and after.
 
-- [ ] **Step 7: Update the evidence packet with explicit grounded state.**
+- [x] **Step 7: Update the evidence packet with explicit grounded state.**
 
   Preserve the historical sections and update this exact section structure:
 
@@ -2005,10 +2045,10 @@ become an A/B side.
   Replace the descriptive clearance line with the real full SHA captured in
   Step 1 before saving the file.
 
-- [ ] **Step 8: Record Task 0 and commit docs only.**
+- [x] **Step 8: Record Task 0 and commit docs only.**
 
   Add a newest-first priority-map entry with exact reproduced hashes and the
-  phrase `RED-FIRST IMPLEMENTATION ACTIVE`. Then run:
+  phrase `PRODUCT RED NEXT AFTER REVIEW`. Then run:
 
   ```bash
   git add \

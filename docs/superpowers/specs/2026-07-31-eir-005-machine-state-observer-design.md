@@ -1,6 +1,6 @@
 # EIR-005 Machine-State Observer Design
 
-> **Status:** APPROVED SPEC - PLAN F1 AMENDMENT REVIEW NEXT
+> **Status:** SUPERSEDED - CAMPAIGN NOT RUN; EXECUTION BOUNDARY CLOSED
 >
 > **Date:** 2026-07-31
 >
@@ -735,3 +735,28 @@ After GREEN:
 
 No observer runtime, strace arm, product/test change, or unchanged price-v3
 rerun is authorized by the approved spec alone.
+
+## 11. Superseding Closeout
+
+Focused re-review cleared the F1 amendment at `73d5305e`, but the behavioral
+campaign was not launched. Before launch, a smaller controlled experiment
+varied the outer execution boundary that the earlier V6 matrix had not
+fingerprinted.
+
+The identical 942-byte asyncio wakeup probe produced queued-but-unfired work
+in `3/3` Codex managed-sandbox runs and normal callback delivery in `3/3`
+native runs. A direct Unix `socketpair.sendall()` control returned `EPERM`
+only in the managed sandbox. CPython source binds those observations to
+`call_soon_threadsafe()`: the callback enters `_ready`, the self-pipe send is
+attempted, and `_write_to_self()` swallows the resulting `OSError`.
+
+The unchanged v3 price runner then completed all eight tiers natively on
+their first attempts. This stronger boundary A/B makes the planned
+same-boundary observer campaign non-discriminating and unnecessary. The
+campaign is cancelled, not failed or partially executed. No Appendix source
+was run against product tiers, and no product/test/runtime file changed.
+
+The durable execution rule is narrower than the abandoned campaign:
+cross-thread asyncio/AnyIO admission runs must execute natively unless the
+managed sandbox first passes the pinned wakeup probe. Details and artifact
+identities are recorded in the parent diagnosis evidence Section 14.

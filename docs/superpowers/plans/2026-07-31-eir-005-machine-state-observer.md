@@ -8,7 +8,7 @@
 > `superpowers:verification-before-completion` before any GREEN, verdict, or
 > closeout claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: BLOCKING F1 AMENDED - FOCUSED RE-REVIEW NEXT**
+> **Status: SUPERSEDED CLOSEOUT - CAMPAIGN NOT RUN**
 
 **Goal:** Run one finite, paired, read-only machine-state campaign that
 distinguishes supported shared wakeup state, self-pipe integrity failure,
@@ -823,6 +823,30 @@ Stop without improvising if:
 16. the normal ArkScope desktop reproduces the failure.
 
 Campaign budget exhaustion produces O5/O6. It is not permission to continue.
+
+## 8. Closeout Without Campaign Execution
+
+Focused re-review cleared amended exact-source tip `73d5305e` with zero
+findings. Before Task 3 launched, an execution-boundary A/B established a
+stronger cause than any O1-O6 result could provide:
+
+- identical wakeup probe bytes: managed sandbox `3/3` queued/unfired versus
+  native `3/3` fired/drained;
+- direct `socketpair.sendall()`: managed sandbox `EPERM`, native success;
+- grounded CPython ordering: enqueue first, self-pipe wake second, `OSError`
+  swallowed outside debug mode; and
+- unchanged v3 runner: all eight native base tiers complete on first attempt.
+
+Tasks 3 and 4 are intentionally not executed. They are not incomplete work:
+both campaign arms would inherit one outer execution boundary and would no
+longer discriminate the proven sandbox/native cause. Task 5 closes through
+this docs-only packet instead. Appendix A-F remain reviewed historical source;
+none is promoted to a runtime tool or copied into the official v3 bank.
+
+The execution handoff rule in the spec is now resolved: canonical backend
+admission that exercises cross-thread asyncio or AnyIO wakeups runs outside
+the incompatible managed sandbox. A later sandbox-policy change must pass the
+pinned probe before results can be treated as equivalent.
 
 ---
 
