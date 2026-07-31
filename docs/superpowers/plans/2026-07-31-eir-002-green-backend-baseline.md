@@ -55,7 +55,7 @@ Those commands run natively only after this exact probe passes:
 ```text
 /tmp/arkscope_asyncio_wakeup_probe.py
 bytes: 942
-SHA-256: 10647c1e97d0eaee9668b908bed2ce0d697c6bf2e887a8f81b890ee511c18f91
+SHA-256: 10647c1e64c49fc2e082701d7a735e40782620314c125cd103a9a3f9bb37bc2e
 required result:
 {"callback_fired": true, "ready_count": 0, "wake_bytes": 0}
 ```
@@ -221,7 +221,7 @@ test ! -e "$report"
 test ! -e "$transcript"
 test "$(wc -c < "$probe")" -eq 942
 test "$(sha256sum "$probe" | awk '{print $1}')" = \
-  10647c1e97d0eaee9668b908bed2ce0d697c6bf2e887a8f81b890ee511c18f91
+  10647c1e64c49fc2e082701d7a735e40782620314c125cd103a9a3f9bb37bc2e
 test "$(sha256sum "$reporter" | awk '{print $1}')" = \
   09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928
 
@@ -274,7 +274,7 @@ Required identity:
 ```text
 76 lines / 2,217 bytes
 SHA-256:
-63d57f298bc7c7077ea54fa168f0bc2fc78ccc94ce818ae74bd95d797b5aff10
+a88cb25653453b50a90d34ff5c7a865ae8a58ac59f8f1a30843da038d808d8a5
 ```
 
 This wrapper owns the native/sandbox boundary, fresh runtime roots, exact
@@ -432,7 +432,7 @@ reporter:
 09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928
 wrapper:
 76 lines / 2217 bytes
-63d57f298bc7c7077ea54fa168f0bc2fc78ccc94ce818ae74bd95d797b5aff10
+a88cb25653453b50a90d34ff5c7a865ae8a58ac59f8f1a30843da038d808d8a5
 ```
 
 - [ ] **Step 3: Reproduce base canonical and focused collections**
