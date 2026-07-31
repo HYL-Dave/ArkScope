@@ -75,6 +75,9 @@ _RTH_COMPLETE_AFTER_ET = dtime(16, 30)
 # JobRunsStore (PG telemetry) only accepts these — provider_sync_runs mirrors that set
 # so a run status can round-trip without a separate validation contract.
 _VALID_RUN_STATUSES = frozenset({"running", "succeeded", "failed"})
+_PRICE_DAY_UNRESOLVED_AFTER_FETCH = "price_day_unresolved_after_fetch"
+_PRICE_COLLECTION_PARTIAL = "price_collection_partial"
+_PRICE_COLLECTION_FAILED = "price_collection_failed"
 
 _INTERVAL_DB = {"15min": "15min", "15 mins": "15min"}  # provider label → stored label
 
@@ -533,6 +536,38 @@ def _insert_rows(conn, rows) -> int:
     return conn.total_changes - before
 
 
+def _unresolved_price_target_dates(
+    conn,
+    *,
+    ticker: str,
+    interval: str,
+    targets: List[date],
+) -> List[date]:
+    unique_targets = sorted(set(targets))
+    if not unique_targets:
+        return []
+    placeholders = ", ".join("?" for _ in unique_targets)
+    target_ids = [target.isoformat() for target in unique_targets]
+    rows = conn.execute(
+        "SELECT DISTINCT substr(datetime, 1, 10) FROM prices "
+        "WHERE ticker = ? AND interval = ? "
+        f"AND substr(datetime, 1, 10) IN ({placeholders})",
+        (ticker, _INTERVAL_DB.get(interval, interval), *target_ids),
+    ).fetchall()
+    present = {str(row[0]) for row in rows}
+    return [target for target in unique_targets if target.isoformat() not in present]
+
+
+def _derive_price_collection_status(tickers_scanned: int, issue_count: int) -> str:
+    if tickers_scanned <= 0 or issue_count < 0 or issue_count > tickers_scanned:
+        raise ValueError("invalid price collection outcome counts")
+    if issue_count == 0:
+        return "succeeded"
+    if issue_count == tickers_scanned:
+        return "failed"
+    return "partial"
+
+
 def backfill_prices_direct(
     tickers_arg: Optional[str] = None,
     interval: str = "15min",
@@ -632,8 +667,17 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
     end = today or now_et.date()
     start = end - timedelta(days=lookback_days)
     fetch_days = _complete_trading_days(start, end, now_et)  # the top-up window (2c-gated)
-    rollup = {"provider": provider, "tickers_scanned": 0, "gaps_found": 0,
-              "rows_added": 0, "errors": {}}
+    rollup = {
+        "status": "succeeded",
+        "provider": provider,
+        "tickers_scanned": 0,
+        "succeeded_ticker_count": 0,
+        "gaps_found": 0,
+        "rows_added": 0,
+        "errors": {},
+        "unresolved_after_fetch_count": 0,
+        "unresolved_after_fetch_tickers": [],
+    }
 
     with market_write_lock():
         preflight_canonicalize(path)  # local-only regularize; does NOT take the lock
@@ -717,12 +761,40 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                     try:
                         rows = item.get("rows")
                         rows = rows if isinstance(rows, list) else []
+                        targets = item.get("gaps")
+                        targets = targets if isinstance(targets, list) else []
                         added = _insert_rows(conn, rows)
                         rollup["rows_added"] += added
                         last_bar = rows[-1][1] if rows else None
-                        _upsert_provider_meta(conn, provider=provider, ticker=canon,
-                                              interval=interval, last_bar_datetime=last_bar,
-                                              rows_added=added, error=None)
+                        unresolved = _unresolved_price_target_dates(
+                            conn,
+                            ticker=canon,
+                            interval=interval,
+                            targets=targets,
+                        )
+                        if unresolved:
+                            rollup["errors"][canon] = _PRICE_DAY_UNRESOLVED_AFTER_FETCH
+                            rollup["unresolved_after_fetch_tickers"].append(canon)
+                            _upsert_provider_meta(
+                                conn,
+                                provider=provider,
+                                ticker=canon,
+                                interval=interval,
+                                last_bar_datetime=last_bar,
+                                rows_added=added,
+                                error=_PRICE_DAY_UNRESOLVED_AFTER_FETCH,
+                            )
+                        else:
+                            rollup["succeeded_ticker_count"] += 1
+                            _upsert_provider_meta(
+                                conn,
+                                provider=provider,
+                                ticker=canon,
+                                interval=interval,
+                                last_bar_datetime=last_bar,
+                                rows_added=added,
+                                error=None,
+                            )
                     except Exception as e:  # noqa: BLE001 — per-ticker isolation, never fatal
                         rollup["errors"][canon] = str(e)
                         try:
@@ -744,10 +816,29 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                     logger.warning("provider_sync_runs failed-finalize write failed; "
                                    "run row may stay 'running'", exc_info=True)
                 raise
-            _finish_provider_run(conn, run_id, status="succeeded",
-                                 tickers_scanned=rollup["tickers_scanned"],
-                                 gaps_found=rollup["gaps_found"],
-                                 rows_added=rollup["rows_added"], error=None)
+            unresolved_tickers = sorted(set(rollup["unresolved_after_fetch_tickers"]))
+            rollup["unresolved_after_fetch_tickers"] = unresolved_tickers
+            rollup["unresolved_after_fetch_count"] = len(unresolved_tickers)
+            issue_count = len(rollup["errors"])
+            rollup["succeeded_ticker_count"] = rollup["tickers_scanned"] - issue_count
+            rollup["status"] = _derive_price_collection_status(
+                rollup["tickers_scanned"],
+                issue_count,
+            )
+            run_error = {
+                "succeeded": None,
+                "partial": _PRICE_COLLECTION_PARTIAL,
+                "failed": _PRICE_COLLECTION_FAILED,
+            }[rollup["status"]]
+            _finish_provider_run(
+                conn,
+                run_id,
+                status="succeeded" if rollup["status"] == "succeeded" else "failed",
+                tickers_scanned=rollup["tickers_scanned"],
+                gaps_found=rollup["gaps_found"],
+                rows_added=rollup["rows_added"],
+                error=run_error,
+            )
         finally:
             conn.close()
     return rollup

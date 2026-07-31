@@ -437,6 +437,212 @@ def _backfill_db(tmp_path):
     return db
 
 
+_ONE_COMPLETE_DAY_NOW = datetime(2026, 6, 23, 18, 0, tzinfo=timezone.utc)
+
+
+def _run_one_complete_day(
+    tmp_path, monkeypatch, *, tickers, ibkr, polygon=None, db=None,
+):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = db or _backfill_db(tmp_path)
+    result = mdd.backfill_prices_direct(
+        tickers_arg=tickers,
+        lookback_days=1,
+        provider="ibkr",
+        db_path=str(db),
+        ibkr_src=ibkr,
+        polygon_src=polygon or _FakePolygon(),
+        now_et=_ONE_COMPLETE_DAY_NOW,
+    )
+    return db, result
+
+
+def test_backfill_partial_preserves_healthy_rows_and_marks_unresolved_target(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    conn = sqlite3.connect(db)
+    mdd._ensure_provider_sync_tables(conn)
+    mdd._upsert_provider_meta(
+        conn, provider="ibkr", ticker="LCID", interval="15min",
+        last_bar_datetime="2026-06-19T13:30:00+0000", rows_added=0,
+        error=None,
+    )
+    conn.execute(
+        "UPDATE provider_sync_meta SET last_success='2000-01-01T00:00:00+00:00' "
+        "WHERE provider='ibkr' AND ticker='LCID' AND interval='15min'"
+    )
+    conn.commit()
+    conn.close()
+    ibkr = _FakeIBKR({
+        "AAPL": [_bar(datetime(2026, 6, 22, 9, 30))],
+        "LCID": [],
+    })
+    db, result = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="AAPL,LCID", ibkr=ibkr, db=db,
+    )
+    assert result["status"] == "partial"
+    assert result["tickers_scanned"] == 2
+    assert result["succeeded_ticker_count"] == 1
+    assert result["rows_added"] == 1
+    assert result["errors"] == {"LCID": "price_day_unresolved_after_fetch"}
+    assert result["unresolved_after_fetch_count"] == 1
+    assert result["unresolved_after_fetch_tickers"] == ["LCID"]
+    conn = sqlite3.connect(db)
+    assert conn.execute(
+        "SELECT status, error FROM provider_sync_runs"
+    ).fetchone() == ("failed", "price_collection_partial")
+    assert conn.execute(
+        "SELECT last_success, last_error FROM provider_sync_meta WHERE ticker='LCID'"
+    ).fetchone() == (
+        "2000-01-01T00:00:00+00:00", "price_day_unresolved_after_fetch",
+    )
+    assert conn.execute(
+        "SELECT COUNT(*) FROM prices WHERE ticker='AAPL'"
+    ).fetchone()[0] == 1
+    conn.close()
+
+
+def test_backfill_failed_when_every_ticker_has_issue(tmp_path, monkeypatch):
+    ibkr = _FakeIBKR({"LCID": []}, raises_for=["BAD"])
+    db, result = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="BAD,LCID", ibkr=ibkr,
+    )
+    assert result["status"] == "failed"
+    assert result["succeeded_ticker_count"] == 0
+    assert set(result["errors"]) == {"BAD", "LCID"}
+    assert result["unresolved_after_fetch_tickers"] == ["LCID"]
+    conn = sqlite3.connect(db)
+    assert conn.execute(
+        "SELECT status, error FROM provider_sync_runs"
+    ).fetchone() == ("failed", "price_collection_failed")
+    conn.close()
+
+
+def test_backfill_resolved_zero_bar_target_stays_succeeded_and_clears_error(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    conn = sqlite3.connect(db)
+    mdd._ensure_provider_sync_tables(conn)
+    mdd._upsert_provider_meta(
+        conn, provider="ibkr", ticker="AAPL", interval="15min",
+        last_bar_datetime=None, rows_added=0, error="old_error",
+    )
+    conn.execute(
+        "UPDATE provider_sync_meta SET last_success='2000-01-01T00:00:00+00:00' "
+        "WHERE provider='ibkr' AND ticker='AAPL' AND interval='15min'"
+    )
+    conn.commit()
+    conn.close()
+    result = mdd.backfill_prices_direct(
+        tickers_arg="AAPL", lookback_days=1, provider="ibkr",
+        db_path=str(db),
+        ibkr_src=_FakeIBKR({"AAPL": [_bar(datetime(2026, 6, 22, 9, 30))]}),
+        polygon_src=_FakePolygon(), now_et=_ONE_COMPLETE_DAY_NOW,
+    )
+    assert result["status"] == "succeeded"
+    assert result["succeeded_ticker_count"] == 1
+    assert result["unresolved_after_fetch_count"] == 0
+    conn = sqlite3.connect(db)
+    last_success, last_error = conn.execute(
+        "SELECT last_success, last_error FROM provider_sync_meta "
+        "WHERE provider='ibkr' AND ticker='AAPL' AND interval='15min'"
+    ).fetchone()
+    assert last_success != "2000-01-01T00:00:00+00:00"
+    assert last_error is None
+    conn.close()
+
+
+def test_backfill_one_row_low_volume_day_stays_succeeded(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "INSERT INTO prices "
+        "(ticker,datetime,interval,open,high,low,close,volume) "
+        "VALUES ('LCID','2026-06-22T13:30:00+0000','15min',1,1,1,1,1)"
+    )
+    conn.commit()
+    conn.close()
+    result = mdd.backfill_prices_direct(
+        tickers_arg="LCID", lookback_days=1, provider="ibkr",
+        db_path=str(db), ibkr_src=_FakeIBKR(), polygon_src=_FakePolygon(),
+        now_et=_ONE_COMPLETE_DAY_NOW,
+    )
+    assert result["rows_added"] == 0
+    assert result["gaps_found"] == 0
+    assert result["status"] == "succeeded"
+    assert result["unresolved_after_fetch_count"] == 0
+
+
+def test_backfill_non_target_rows_do_not_resolve_original_zero_bar_target(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setattr(
+        mdd,
+        "_fetch_rows_for_gaps",
+        lambda *args, **kwargs: [(
+            "LCID", "2026-06-20T13:30:00+0000", "15min",
+            1.0, 1.0, 1.0, 1.0, 1,
+        )],
+    )
+    db, result = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="LCID", ibkr=_FakeIBKR(),
+    )
+    assert result["rows_added"] == 1
+    assert result["status"] == "failed"
+    assert result["unresolved_after_fetch_tickers"] == ["LCID"]
+    conn = sqlite3.connect(db)
+    assert conn.execute(
+        "SELECT last_bar_datetime, last_success, last_error "
+        "FROM provider_sync_meta WHERE ticker='LCID'"
+    ).fetchone() == (
+        "2026-06-20T13:30:00+0000", None,
+        "price_day_unresolved_after_fetch",
+    )
+    conn.close()
+
+
+def test_backfill_rechecks_original_target_set_only_once(tmp_path, monkeypatch):
+    calls = []
+
+    def original_targets(*args, **kwargs):
+        calls.append(1)
+        if len(calls) != 1:
+            raise AssertionError("target set was rederived after fetch")
+        return {"LCID": [date(2026, 6, 22)]}
+
+    monkeypatch.setattr(mdd, "detect_price_gaps", original_targets)
+    db, result = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="LCID", ibkr=_FakeIBKR(),
+    )
+    assert db.exists()
+    assert calls == [1]
+    assert result["status"] == "failed"
+    assert result["unresolved_after_fetch_tickers"] == ["LCID"]
+
+
+def test_backfill_exception_and_unresolved_tickers_share_one_issue_rollup(
+    tmp_path, monkeypatch,
+):
+    ibkr = _FakeIBKR(
+        {"AAPL": [_bar(datetime(2026, 6, 22, 9, 30))], "LCID": []},
+        raises_for=["BAD"],
+    )
+    _, result = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="AAPL,BAD,LCID", ibkr=ibkr,
+    )
+    assert result["status"] == "partial"
+    assert result["tickers_scanned"] == 3
+    assert result["succeeded_ticker_count"] == 1
+    assert set(result["errors"]) == {"BAD", "LCID"}
+    assert result["unresolved_after_fetch_count"] == 1
+    assert result["unresolved_after_fetch_tickers"] == ["LCID"]
+
+
 def test_backfill_inserts_canonical_rows_and_is_idempotent(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _backfill_db(tmp_path)
@@ -498,15 +704,21 @@ def test_backfill_polygon_fallback_when_ibkr_empty(tmp_path, monkeypatch):
 def test_backfill_per_ticker_exception_isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _backfill_db(tmp_path)
-    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]},
-                     raises_for=["BAD"])
-    res = mdd.backfill_prices_direct(tickers_arg="AAPL,BAD", lookback_days=2, provider="ibkr",
-                                     db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    ibkr = _FakeIBKR(
+        {"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
+        raises_for=["BAD"],
+    )
+    db, res = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="AAPL,BAD", ibkr=ibkr, db=db,
+    )
     assert res["rows_added"] == 1                 # AAPL succeeded
     assert "BAD" in res["errors"]                 # BAD recorded, not fatal
+    assert res["status"] == "partial"
+    assert res["succeeded_ticker_count"] == 1
     conn = sqlite3.connect(db)
-    # run recorded succeeded (per-ticker failures don't fail the whole run)
-    assert conn.execute("SELECT status FROM provider_sync_runs").fetchone()[0] == "succeeded"
+    assert conn.execute(
+        "SELECT status, error FROM provider_sync_runs"
+    ).fetchone() == ("failed", "price_collection_partial")
     assert conn.execute("SELECT last_error FROM provider_sync_meta WHERE ticker='BAD'").fetchone()[0]
     conn.close()
 
@@ -578,23 +790,32 @@ def test_backfill_none_provider_constructs_default(tmp_path, monkeypatch):
 def test_backfill_meta_write_failure_in_error_path_does_not_abort_batch(tmp_path, monkeypatch):
     # review #1: if a per-ticker error's recovery meta-write ALSO fails (same conn, disk/
     # lock fault), it must NOT escape to the outer handler and abort the batch — isolation
-    # must hold: remaining tickers still process, run stays 'succeeded'.
+    # must hold: remaining tickers still process and the partial run is recorded honestly.
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _backfill_db(tmp_path)
-    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]},
-                     raises_for=["BAD"])
+    ibkr = _FakeIBKR(
+        {"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
+        raises_for=["BAD"],
+    )
     real = mdd._upsert_provider_meta
+
     def flaky(conn, **kw):
         if kw.get("error"):  # the error-path recovery write blows up
             raise sqlite3.OperationalError("disk full during telemetry write")
         return real(conn, **kw)
+
     monkeypatch.setattr(mdd, "_upsert_provider_meta", flaky)
-    res = mdd.backfill_prices_direct(tickers_arg="BAD,AAPL", lookback_days=2, provider="ibkr",
-                                     db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    db, res = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="BAD,AAPL", ibkr=ibkr, db=db,
+    )
     assert "BAD" in res["errors"]      # BAD recorded
     assert res["rows_added"] == 1      # AAPL still processed — batch NOT aborted
+    assert res["status"] == "partial"
+    assert res["succeeded_ticker_count"] == 1
     conn = sqlite3.connect(db)
-    assert conn.execute("SELECT status FROM provider_sync_runs").fetchone()[0] == "succeeded"
+    assert conn.execute(
+        "SELECT status, error FROM provider_sync_runs"
+    ).fetchone() == ("failed", "price_collection_partial")
     conn.close()
 
 
@@ -757,12 +978,13 @@ def test_backfill_topup_idempotent_on_complete_day(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _backfill_db(tmp_path)
     ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]})
-    a = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+    a = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=1, provider="ibkr",
                                    db_path=str(db), ibkr_src=ibkr,
-                                   now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
-    b = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                   now_et=_ONE_COMPLETE_DAY_NOW)
+    b = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=1, provider="ibkr",
                                    db_path=str(db), ibkr_src=ibkr,
-                                   now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+                                   now_et=_ONE_COMPLETE_DAY_NOW)
+    assert a["status"] == b["status"] == "succeeded"
     assert a["rows_added"] == 1 and b["rows_added"] == 0
 
 
@@ -792,10 +1014,12 @@ def test_backfill_ibkr_empty_from_swallowed_request_error_falls_to_polygon(tmp_p
     epoch_ms = int(datetime(2026, 6, 22, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
     poly = _FakePolygon(results_by_day={date(2026, 6, 22): [
         {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
-    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=1, provider="ibkr",
                                      db_path=str(db), ibkr_src=ibkr, polygon_src=poly,
-                                     now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+                                     now_et=_ONE_COMPLETE_DAY_NOW)
     assert res["rows_added"] == 1 and poly.calls          # silently switched to Polygon
+    assert res["status"] == "succeeded"
+    assert res["unresolved_after_fetch_count"] == 0
     # masked: NOT recorded as a per-ticker error (the documented MED limitation)
     conn = sqlite3.connect(db)
     assert conn.execute("SELECT last_error FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()[0] is None
@@ -894,7 +1118,17 @@ def test_backfill_fetches_provider_rows_outside_market_write_lock(tmp_path, monk
 
     monkeypatch.setattr(mdd, "market_write_lock", fake_market_lock)
     monkeypatch.setattr(mdd, "_fetch_rows_for_gaps", fake_fetch)
-    monkeypatch.setattr(mdd, "detect_price_gaps", lambda *a, **k: {"AAPL": ["2026-07-03"]})
+    real_reconcile = mdd._unresolved_price_target_dates
+    reconciliation_observed_lock = []
+
+    def checked_reconcile(*args, **kwargs):
+        reconciliation_observed_lock.append(in_lock["value"])
+        return real_reconcile(*args, **kwargs)
+
+    monkeypatch.setattr(mdd, "_unresolved_price_target_dates", checked_reconcile)
+    monkeypatch.setattr(
+        mdd, "detect_price_gaps", lambda *a, **k: {"AAPL": [date(2026, 7, 3)]},
+    )
 
     res = mdd.backfill_prices_direct(
         tickers_arg="AAPL",
@@ -908,6 +1142,7 @@ def test_backfill_fetches_provider_rows_outside_market_write_lock(tmp_path, monk
 
     assert res["rows_added"] == 1
     assert fetch_observed_lock == [False]
+    assert reconciliation_observed_lock == [True]
 
 
 # --- PG-exit: standalone backfill acquires the shared IBKR Gateway lock -------------
