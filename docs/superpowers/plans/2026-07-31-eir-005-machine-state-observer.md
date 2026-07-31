@@ -8,7 +8,7 @@
 > `superpowers:verification-before-completion` before any GREEN, verdict, or
 > closeout claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: EXACT-SOURCE PLAN REVIEW NEXT**
+> **Status: BLOCKING F1 AMENDED - FOCUSED RE-REVIEW NEXT**
 
 **Goal:** Run one finite, paired, read-only machine-state campaign that
 distinguishes supported shared wakeup state, self-pipe integrity failure,
@@ -56,10 +56,20 @@ verified the six-boolean load-bearing vector, O1-O6 precedence, the two fixed
 surfaces, finite paired budget, read-only boundary, conditional-only strace,
 and the explicit return to price banking after closeout.
 
+Focused review of initial exact-source tip `b7ebefc5` found one blocking defect:
+the P-surface matcher required sanitized thread name `asyncio-portal`, while
+grounded AnyIO 4.9 creates an unnamed thread observed as
+`Thread-1 (run_blocking_portal)` and sanitized to `thread`. The conjunction
+therefore could never select the real P loop. This amendment replaces that
+condition in both independent implementations with the exact owner-stack
+anchor `anyio/from_thread.py::run_blocking_portal`, removes the dead
+`start_blocking_portal` owner-stack branch, adds a real AnyIO portal probe,
+and adds M9a/M9b to break the plugin and verifier anchors independently.
+
 This plan adds exact source and executable controls. It does **not** authorize
-the behavioral campaign until focused plan review independently extracts the
+the behavioral campaign until focused re-review independently extracts the
 appendices, reproduces every source SHA, replays the probes, and confirms all
-eight mutations.
+ten mutations.
 
 The main worktree's known untracked drafts remain user-owned and protected:
 
@@ -119,9 +129,9 @@ Appendices A-C are the runtime authority:
 
 | Artifact | Lines | Bytes | SHA-256 |
 |---|---:|---:|---|
-| `eir005_observer_controller.py` | 2758 | 97772 | `9726f1b5ffa346992d2f44945d1224e402fdacc052554f452d4d72bc87205a41` |
-| `eir005_observer_plugin.py` | 596 | 19409 | `ac5b343613ee6d83957f2507f1f11555f04a72856998e319ffaa1d0db1cea164` |
-| `eir005_observer_verifier.py` | 686 | 21784 | `063544cfbf4b64a898b6088e1310a8690b17b4b616aeef7f77ffeef2aa8c7f77` |
+| `eir005_observer_controller.py` | 2848 | 100714 | `8b2ef6d20abedd4042b3be4b0a995548181207bf42c5e1ad01be4f793843058e` |
+| `eir005_observer_plugin.py` | 598 | 19384 | `a5b806396b7492e08910e0bbeb69a7aca567df5d2e0e8d10d52c7e39302bc37e` |
+| `eir005_observer_verifier.py` | 708 | 22565 | `ba03bf9bb91cf0450051ed15206d128cb66d54d9eb0ae90267aa5772b78d5afc` |
 
 The controller imports only the **copied** v3 runner module in the new root.
 It never imports a record, summary, or banked result from the official root.
@@ -169,9 +179,10 @@ Appendix E fixtures are:
 | `probes/probe_interruptible.py` | 11 | 223 | `1a5d026c464f0e8f2c199a28d0c48aea4bbc8a0afda35f1cde9f58eda0c60fd1` |
 | `probes/probe_ignore_sigint.py` | 20 | 422 | `738de35828baf135c937e7a91146b46b1450515d7d76168b0caded0eae074940` |
 | `probes/probe.nodes` | 1 | 38 | `d245d2628d188bb1a1f97f134ae1c4428969545908481de96c2e87e2e864d8c2` |
+| `probes/probe_real_anyio_portal.py` | 48 | 1399 | `73205f44076312fcc848bc4ceb1c562fdd8063a49532fa0a13d3ebdb496674e5` |
 
 The pristine probe summary is deterministic and must be SHA-256
-`5f95b3d9731d93d9bc979760343d59152b68c10d60812b8f8f66566b539b24bc`.
+`e0e4120b8dab9c8e564c1256ba662ce1cfeeefdd92b4ee7a3de0ce5c616475fa`.
 PID, timestamps, preflight, transcript, and per-attempt record hashes are host
 observations and are recorded rather than predicted.
 
@@ -306,6 +317,12 @@ awk '
   /^<!-- EIR005_PROBE_NODES_END -->$/ { emit=0 }
   emit && $0 != "```text" && $0 != "```" { print }
 ' "$EIR005_PLAN" > "$EIR005_ROOT/probes/probe.nodes"
+
+awk '
+  /^<!-- EIR005_PROBE_REAL_ANYIO_PORTAL_BEGIN -->$/ { emit=1; next }
+  /^<!-- EIR005_PROBE_REAL_ANYIO_PORTAL_END -->$/ { emit=0 }
+  emit && $0 != "```python" && $0 != "```" { print }
+' "$EIR005_PLAN" > "$EIR005_ROOT/probes/probe_real_anyio_portal.py"
 ```
 
 Do not copy source from another `/tmp` construction root.
@@ -343,7 +360,11 @@ PYTHONPATH="$EIR005_ROOT" \
   /home/hyl/.virtualenvs/llm_app/bin/python -m py_compile \
   "$EIR005_ROOT/eir005_observer_controller.py" \
   "$EIR005_ROOT/eir005_observer_plugin.py" \
-  "$EIR005_ROOT/eir005_observer_verifier.py"
+  "$EIR005_ROOT/eir005_observer_verifier.py" \
+  "$EIR005_ROOT/probes/probe_pass.py" \
+  "$EIR005_ROOT/probes/probe_interruptible.py" \
+  "$EIR005_ROOT/probes/probe_ignore_sigint.py" \
+  "$EIR005_ROOT/probes/probe_real_anyio_portal.py"
 ```
 
 Every value must match §2 exactly.
@@ -404,9 +425,9 @@ sha256sum "$EIR005_ROOT/probe-summary.json"
 ```
 
 Expected summary SHA:
-`5f95b3d9731d93d9bc979760343d59152b68c10d60812b8f8f66566b539b24bc`.
+`e0e4120b8dab9c8e564c1256ba662ce1cfeeefdd92b4ee7a3de0ce5c616475fa`.
 
-The nine design probes, one mutation-specific `ss` fail-closed probe, and one
+The ten design probes, one mutation-specific `ss` fail-closed probe, and one
 static gate prove:
 
 1. plugin collection identity and a real O-arm natural subprocess;
@@ -418,8 +439,12 @@ static gate prove:
 7. SIGINT-natural and SIGKILL cleanup paths;
 8. paired-verifier rejection of either missing arm and controller claims;
 9. frozen-root/preflight refusal; and
-10. unavailable `ss` cannot be reclassified as an empty receive queue; and
-11. no prohibited target-loop intervention call or assignment.
+10. a real AnyIO blocking portal is selected exactly once by the plugin and
+    independently exactly once by the verifier through
+    `anyio/from_thread.py::run_blocking_portal`, with thread name remaining
+    diagnostic only;
+11. unavailable `ss` cannot be reclassified as an empty receive queue; and
+12. no prohibited target-loop intervention call or assignment.
 
 - [ ] **Step 2: Inspect the transport and signal records.**
 
@@ -433,7 +458,7 @@ Require:
 
 Do not pin host timestamps or per-run record hashes.
 
-### Task 2: Prove all eight mutations
+### Task 2: Prove all ten mutations
 
 Each mutation gets a fresh root
 `/tmp/eir005-machine-state-observer-v1-mN`. Seed only the pristine source,
@@ -442,14 +467,16 @@ preflight after applying the mutation.
 
 | ID | Exact mutation | Owning probe | Mutated source SHA-256 | Portable diff SHA-256 | Required RED |
 |---|---|---|---|---|---|
-| M1 | `_queued_bytes`: replace `return max(0, int(value[0]))` with `return 0` | `queued_wake` | `952aa1da2b0f1ff1f160a55deb95f59224fe9fde989657b9a4175f07ca42990f` | `53e5c6b4d39569ed507da6b07dea4d62f09ddc8fb619febb49d1d30f25262392` | `queued wake was not observed` |
-| M2 | clear `registrations` immediately before sorting | `healthy_loop` | `13a9113fdbc4517471e0427d7ccc5192573d84683479871a8a90393e1419d46a` | `78495ceffab4d5bc605401cead99437d98d80b1a4ebdb7948885f6c3e796340f` | healthy loop incomplete |
-| M3 | `_loop_candidates`: return `loops[:1]` | `multiple_loops` | `4245f3c01492b5c164d235e8d35cd3ac74404100e1aa39f696608ab8a6e09bee` | `28b5fc0641d389c4ef6024392683d220be467ec58a449fc946161f253de9a2ab` | loops collapsed |
-| M4 | `_qualified_name`: return raw `repr(value)` | `sanitization` | `0c0352e7cf39865a557bcd17fe93db24bf9864e4b1d023727b5db750997f814b` | `8e8796ec43bc26cb7aeae74599a2b8f18ea623f17bab38b05458d42ec73112ee` | prohibited content leaked |
-| M5 | `_derive_result`: return non-null controller claim | `paired_verifier` | `7d88e2c8ed39d239995d4b9959c01bfbf67803fc4efca9e82c1b84acbae7f503` | `89b274df5b6a83eebba9e35a90adb82c048a8ed2c8912e8d61236990f51a6d1f` | paired verifier fails |
-| M6 | permit one record and arm subset in `_paired_block_qualifies` | `paired_verifier` | `8135be7e0a11da29c0fac31da9ba220a932aea7448f9ba38b52629dfeb4acb93` | `fde48136951f5d27748192625b1d96c1116a2e66e66f9bed6d0549d3493da364` | paired verifier fails |
-| M7 | `_ss_rows`: nonzero `ss` returns `[]` | `ss_fail_closed` | `09f0f8ffc89725663a784965171229bdf40191a57c83d8f3c54ab64920dde298` | `1916368b29d32c86c0770b9fbfda1384efa349fb12ddd8d2b57dcf31e667ebab` | unavailable became empty |
-| M8 | `_assert_artifact_root_safe`: unconditional return | `frozen_root` | `a732646ce37c3435bfab89984d5f1acbbac29b5bcbac848c94f8b36fe13882f7` | `dbcdf279b02674b434e25e88256fb4247a29097c23969842831bf9d449bf152b` | official root accepted |
+| M1 | `_queued_bytes`: replace `return max(0, int(value[0]))` with `return 0` | `queued_wake` | `0a1a1cd4f5a20b07a2cd1e4f09fd46230f0e85a7069802f32586c5554bd0ab7e` | `53e5c6b4d39569ed507da6b07dea4d62f09ddc8fb619febb49d1d30f25262392` | `queued wake was not observed` |
+| M2 | clear `registrations` immediately before sorting | `healthy_loop` | `261427057f1e6b325b0f76ca0016eedd38078046c23035aca1004650ff8fde8e` | `78495ceffab4d5bc605401cead99437d98d80b1a4ebdb7948885f6c3e796340f` | healthy loop incomplete |
+| M3 | `_loop_candidates`: return `loops[:1]` | `multiple_loops` | `aa9feae68201b26f955ccdbebfc39dcfce057c3d3f4a030295109712a01736f7` | `88b4739ef17f1e2ae2fbf4ea0b39408fdecdd570dbc30e8978a0a5a0556dce06` | loops collapsed |
+| M4 | `_qualified_name`: return raw `repr(value)` | `sanitization` | `e1eccc62f492b9246f56a0a68bb01c0a126fce454d749ddb084d35c8623fe669` | `8e8796ec43bc26cb7aeae74599a2b8f18ea623f17bab38b05458d42ec73112ee` | prohibited content leaked |
+| M5 | `_derive_result`: return non-null controller claim | `paired_verifier` | `7568d06a3bb0ebf4e0369d7c2d6966734f670b0f08102907e56d2b5fe6058110` | `91817bca8868ceebda90f1eddc4bc7256fb6c453c4d9ae936c28ae9a27dc90ac` | paired verifier fails |
+| M6 | permit one record and arm subset in `_paired_block_qualifies` | `paired_verifier` | `69c05995c02c639d50e87f9cac891a97f01a17f63453534917b76fb24ff42b54` | `334c065a522a172c9e8cfbc3a0f26f09d72b8bc564b6e23292795e62ab8fb9f9` | paired verifier fails |
+| M7 | `_ss_rows`: nonzero `ss` returns `[]` | `ss_fail_closed` | `f4031105d7fa7481debcb44164911f9269398c33227427b8a601d41d2162ab70` | `1916368b29d32c86c0770b9fbfda1384efa349fb12ddd8d2b57dcf31e667ebab` | unavailable became empty |
+| M8 | `_assert_artifact_root_safe`: unconditional return | `frozen_root` | `c021cd02294ea5fee269a7185da48469ebd19e4807712107585f261b617752a9` | `dbcdf279b02674b434e25e88256fb4247a29097c23969842831bf9d449bf152b` | official root accepted |
+| M9a | plugin portal anchor: replace exact function with `broken_run_blocking_portal` | `real_anyio_portal` | `6ede5fb906b45e1a5041a5b021dbd8e7a3b47ade1b0095cf92b62d14f63670e2` | `becbe2f6ffba1a027c711e52dd28603607305e1ac03cdf232064bdec0f560898` | plugin portal match fails |
+| M9b | verifier portal anchor: replace exact function with `broken_run_blocking_portal` | `real_anyio_portal` | `3c23ddce5a4b2206d3f859f68cb28a055d1a98b4417a2b12873a14b72ff4649a` | `26742834195b2c9bb87db781c57325fb22801c43122e436a343ab120de3c770d` | verifier portal match fails |
 
 - [ ] **Step 1: Seed, mutate, preflight, and run each arm from the closed
   mapping.**
@@ -459,6 +486,8 @@ set -euo pipefail
 export EIR005_PLAN="$PWD/docs/superpowers/plans/2026-07-31-eir-005-machine-state-observer.md"
 export EIR005_ROOT=/tmp/eir005-machine-state-observer-v1
 
+mutation_ids=(1 2 3 4 5 6 7 8 9a 9b)
+mutation_markers=(M1 M2 M3 M4 M5 M6 M7 M8 M9A M9B)
 mutation_files=(
   eir005_observer_plugin.py
   eir005_observer_plugin.py
@@ -468,10 +497,13 @@ mutation_files=(
   eir005_observer_verifier.py
   eir005_observer_controller.py
   eir005_observer_controller.py
+  eir005_observer_plugin.py
+  eir005_observer_verifier.py
 )
 owning_probes=(
   queued_wake healthy_loop multiple_loops sanitization
   paired_verifier paired_verifier ss_fail_closed frozen_root
+  real_anyio_portal real_anyio_portal
 )
 required_red_patterns=(
   "RuntimeError: queued wake was not observed"
@@ -482,30 +514,37 @@ required_red_patterns=(
   "RuntimeError: paired verifier probe failed"
   "RuntimeError: unavailable ss was downgraded to an empty queue"
   "RuntimeError: official v3 root was accepted as observer output"
+  "RuntimeError: real AnyIO portal plugin match failed"
+  "RuntimeError: real AnyIO portal verifier match failed"
 )
 mutated_source_shas=(
-  952aa1da2b0f1ff1f160a55deb95f59224fe9fde989657b9a4175f07ca42990f
-  13a9113fdbc4517471e0427d7ccc5192573d84683479871a8a90393e1419d46a
-  4245f3c01492b5c164d235e8d35cd3ac74404100e1aa39f696608ab8a6e09bee
-  0c0352e7cf39865a557bcd17fe93db24bf9864e4b1d023727b5db750997f814b
-  7d88e2c8ed39d239995d4b9959c01bfbf67803fc4efca9e82c1b84acbae7f503
-  8135be7e0a11da29c0fac31da9ba220a932aea7448f9ba38b52629dfeb4acb93
-  09f0f8ffc89725663a784965171229bdf40191a57c83d8f3c54ab64920dde298
-  a732646ce37c3435bfab89984d5f1acbbac29b5bcbac848c94f8b36fe13882f7
+  0a1a1cd4f5a20b07a2cd1e4f09fd46230f0e85a7069802f32586c5554bd0ab7e
+  261427057f1e6b325b0f76ca0016eedd38078046c23035aca1004650ff8fde8e
+  aa9feae68201b26f955ccdbebfc39dcfce057c3d3f4a030295109712a01736f7
+  e1eccc62f492b9246f56a0a68bb01c0a126fce454d749ddb084d35c8623fe669
+  7568d06a3bb0ebf4e0369d7c2d6966734f670b0f08102907e56d2b5fe6058110
+  69c05995c02c639d50e87f9cac891a97f01a17f63453534917b76fb24ff42b54
+  f4031105d7fa7481debcb44164911f9269398c33227427b8a601d41d2162ab70
+  c021cd02294ea5fee269a7185da48469ebd19e4807712107585f261b617752a9
+  6ede5fb906b45e1a5041a5b021dbd8e7a3b47ade1b0095cf92b62d14f63670e2
+  3c23ddce5a4b2206d3f859f68cb28a055d1a98b4417a2b12873a14b72ff4649a
 )
 portable_diff_shas=(
   53e5c6b4d39569ed507da6b07dea4d62f09ddc8fb619febb49d1d30f25262392
   78495ceffab4d5bc605401cead99437d98d80b1a4ebdb7948885f6c3e796340f
-  28b5fc0641d389c4ef6024392683d220be467ec58a449fc946161f253de9a2ab
+  88b4739ef17f1e2ae2fbf4ea0b39408fdecdd570dbc30e8978a0a5a0556dce06
   8e8796ec43bc26cb7aeae74599a2b8f18ea623f17bab38b05458d42ec73112ee
-  89b274df5b6a83eebba9e35a90adb82c048a8ed2c8912e8d61236990f51a6d1f
-  fde48136951f5d27748192625b1d96c1116a2e66e66f9bed6d0549d3493da364
+  91817bca8868ceebda90f1eddc4bc7256fb6c453c4d9ae936c28ae9a27dc90ac
+  334c065a522a172c9e8cfbc3a0f26f09d72b8bc564b6e23292795e62ab8fb9f9
   1916368b29d32c86c0770b9fbfda1384efa349fb12ddd8d2b57dcf31e667ebab
   dbcdf279b02674b434e25e88256fb4247a29097c23969842831bf9d449bf152b
+  becbe2f6ffba1a027c711e52dd28603607305e1ac03cdf232064bdec0f560898
+  26742834195b2c9bb87db781c57325fb22801c43122e436a343ab120de3c770d
 )
 
-for mutation_id in $(seq 1 8); do
-  index=$((mutation_id - 1))
+for index in "${!mutation_ids[@]}"; do
+  mutation_id="${mutation_ids[$index]}"
+  mutation_marker="${mutation_markers[$index]}"
   mutation_root="/tmp/eir005-machine-state-observer-v1-m${mutation_id}"
   mutation_file="${mutation_files[$index]}"
   owning_probe="${owning_probes[$index]}"
@@ -523,11 +562,17 @@ for mutation_id in $(seq 1 8); do
     "$EIR005_ROOT/P.paths" \
     "$EIR005_ROOT/P.nodes" \
     "$mutation_root/"
-  cp "$EIR005_ROOT/probes/"* "$mutation_root/probes/"
+  cp \
+    "$EIR005_ROOT/probes/probe_pass.py" \
+    "$EIR005_ROOT/probes/probe_interruptible.py" \
+    "$EIR005_ROOT/probes/probe_ignore_sigint.py" \
+    "$EIR005_ROOT/probes/probe.nodes" \
+    "$EIR005_ROOT/probes/probe_real_anyio_portal.py" \
+    "$mutation_root/probes/"
 
   awk \
-    -v begin="<!-- EIR005_M${mutation_id}_DIFF_BEGIN -->" \
-    -v end="<!-- EIR005_M${mutation_id}_DIFF_END -->" '
+    -v begin="<!-- EIR005_${mutation_marker}_DIFF_BEGIN -->" \
+    -v end="<!-- EIR005_${mutation_marker}_DIFF_END -->" '
       $0 == begin { emit=1; next }
       $0 == end { emit=0 }
       emit && $0 == "<!-- EIR005_DIFF_CONTEXT_BLANK -->" {
@@ -568,13 +613,13 @@ for mutation_id in $(seq 1 8); do
     "$mutation_root/mutation.stderr"
 
   test "$(sha256sum "$EIR005_ROOT/probe-summary.json" | cut -d " " -f 1)" = \
-    5f95b3d9731d93d9bc979760343d59152b68c10d60812b8f8f66566b539b24bc
+    e0e4120b8dab9c8e564c1256ba662ce1cfeeefdd92b4ee7a3de0ce5c616475fa
   test "$(sha256sum "$EIR005_ROOT/eir005_observer_controller.py" | cut -d " " -f 1)" = \
-    9726f1b5ffa346992d2f44945d1224e402fdacc052554f452d4d72bc87205a41
+    8b2ef6d20abedd4042b3be4b0a995548181207bf42c5e1ad01be4f793843058e
   test "$(sha256sum "$EIR005_ROOT/eir005_observer_plugin.py" | cut -d " " -f 1)" = \
-    ac5b343613ee6d83957f2507f1f11555f04a72856998e319ffaa1d0db1cea164
+    a5b806396b7492e08910e0bbeb69a7aca567df5d2e0e8d10d52c7e39302bc37e
   test "$(sha256sum "$EIR005_ROOT/eir005_observer_verifier.py" | cut -d " " -f 1)" = \
-    063544cfbf4b64a898b6088e1310a8690b17b4b616aeef7f77ffeef2aa8c7f77
+    ba03bf9bb91cf0450051ed15206d128cb66d54d9eb0ae90267aa5772b78d5afc
   sha256sum --quiet -c \
     /tmp/price-truth-tier-v3/task0-v3-incomplete-manifest.sha256
 done
@@ -1565,6 +1610,10 @@ def prepare_preflight(*, artifact_root: Path, repo: Path) -> Path:
         ("probe_interruptible", "probes/probe_interruptible.py"),
         ("probe_ignore_sigint", "probes/probe_ignore_sigint.py"),
         ("probe_nodes", "probes/probe.nodes"),
+        (
+            "probe_real_anyio_portal",
+            "probes/probe_real_anyio_portal.py",
+        ),
     ]
     artifacts = [
         _artifact_record(root / relative, role)
@@ -3390,6 +3439,87 @@ def _probe_paired_verifier(preflight: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _probe_real_anyio_portal(
+    preflight: dict[str, Any],
+    root: Path,
+) -> dict[str, Any]:
+    snapshot_path = root / "probe-real-anyio-portal-snapshot.json"
+    if snapshot_path.exists() or snapshot_path.with_suffix(".json.tmp").exists():
+        raise RuntimeError("real AnyIO portal probe output already exists")
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(root)
+    fixture = subprocess.run(
+        [
+            preflight["python"],
+            str(_artifact(preflight, "probe_real_anyio_portal")),
+            "--artifact-root",
+            str(root),
+            "--output",
+            str(snapshot_path),
+            "--repo",
+            preflight["repo"],
+        ],
+        cwd=root,
+        env=env,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=10,
+    )
+    if fixture.returncode != 0 or not snapshot_path.is_file():
+        raise RuntimeError("real AnyIO portal fixture failed")
+    snapshot = _load_json(snapshot_path)
+    anchored = [
+        loop
+        for loop in snapshot["loops"]
+        if any(
+            frame["file"].endswith("anyio/from_thread.py")
+            and frame["function"] == "run_blocking_portal"
+            for frame in loop["thread_stack"]
+        )
+    ]
+    plugin_matches = [
+        loop
+        for loop in snapshot["loops"]
+        if loop["target_match_reasons"] == ["anyio_portal_thread"]
+    ]
+    verifier = subprocess.run(
+        [
+            preflight["python"],
+            str(_artifact(preflight, "verifier")),
+            "probe-portal",
+            "--snapshot",
+            str(snapshot_path),
+        ],
+        cwd=root,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=10,
+    )
+    if len(anchored) != 1:
+        raise RuntimeError("real AnyIO portal fixture anchor is not unique")
+    if len(plugin_matches) != 1 or plugin_matches[0]["label"] != anchored[0]["label"]:
+        raise RuntimeError("real AnyIO portal plugin match failed")
+    if verifier.returncode != 0:
+        raise RuntimeError("real AnyIO portal verifier match failed")
+    verifier_payload = json.loads(verifier.stdout)
+    expected = {
+        "selected_label": anchored[0]["label"],
+        "stack_anchor": "anyio/from_thread.py::run_blocking_portal",
+    }
+    if verifier_payload != expected:
+        raise RuntimeError("real AnyIO portal verifier result changed")
+    return {
+        "owner_thread_name": anchored[0]["owner_thread_name"],
+        "plugin_matches": 1,
+        "stack_anchor": "anyio/from_thread.py::run_blocking_portal",
+        "verifier_matches": 1,
+    }
+
+
 def _probe_ss_fail_closed() -> dict[str, Any]:
     original = list(SS_COMMAND)
     try:
@@ -3466,6 +3596,10 @@ def run_probe_suite(
             root,
         ),
         "queued_wake": lambda: _probe_queued_wake(root, repo),
+        "real_anyio_portal": lambda: _probe_real_anyio_portal(
+            preflight,
+            root,
+        ),
         "sanitization": lambda: _probe_sanitization(root, repo),
         "signal_timeline": lambda: _probe_signal_timeline(
             preflight_path=preflight_path,
@@ -3515,6 +3649,7 @@ def main() -> int:
             "paired_verifier",
             "plugin_identity",
             "queued_wake",
+            "real_anyio_portal",
             "sanitization",
             "signal_timeline",
             "ss_fail_closed",
@@ -3864,6 +3999,14 @@ def _loop_candidates() -> list[Any]:
     return loops
 
 
+def _is_anyio_portal_stack(stack: list[dict[str, Any]]) -> bool:
+    return any(
+        frame["file"].endswith("anyio/from_thread.py")
+        and frame["function"] == "run_blocking_portal"
+        for frame in stack
+    )
+
+
 def capture_snapshot(
     *,
     artifact_root: Path,
@@ -3921,14 +4064,8 @@ def capture_snapshot(
         match_reasons: list[str] = []
         if surface == "A" and owner_ident == target_thread_ident:
             match_reasons.append("pytest_target_thread")
-        if surface == "P" and owner is not None:
-            has_anyio_stack = any(
-                "anyio" in frame["file"]
-                or frame["function"] == "start_blocking_portal"
-                for frame in stack
-            )
-            if owner["name"] == "asyncio-portal" and has_anyio_stack:
-                match_reasons.append("anyio_portal_thread")
+        if surface == "P" and _is_anyio_portal_stack(stack):
+            match_reasons.append("anyio_portal_thread")
         loops.append(
             {
                 "class": _qualified_name(type(loop)),
@@ -4440,6 +4577,14 @@ def _observer_events(path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def _is_anyio_portal_stack(stack: list[dict[str, Any]]) -> bool:
+    return any(
+        frame["file"].endswith("anyio/from_thread.py")
+        and frame["function"] == "run_blocking_portal"
+        for frame in stack
+    )
+
+
 def _target_loop(
     snapshot: dict[str, Any],
     surface: str,
@@ -4452,20 +4597,30 @@ def _target_loop(
             if loop["owner_thread_ident"] == snapshot["target_thread_ident"]
         ]
     else:
-        matches = []
-        for loop in loops:
-            stack = loop["thread_stack"]
-            has_anyio = any(
-                "anyio" in frame["file"]
-                or frame["function"] == "start_blocking_portal"
-                for frame in stack
-            )
-            if (
-                loop["owner_thread_name"] == "asyncio-portal"
-                and has_anyio
-            ):
-                matches.append(loop)
+        matches = [
+            loop
+            for loop in loops
+            if _is_anyio_portal_stack(loop["thread_stack"])
+        ]
     return matches[0] if len(matches) == 1 else None
+
+
+def _probe_portal(snapshot_path: Path) -> dict[str, Any]:
+    snapshot = _load_json(snapshot_path)
+    selected = _target_loop(snapshot, "P")
+    if selected is None:
+        raise RuntimeError("real AnyIO portal verifier match failed")
+    anchored = any(
+        frame["file"].endswith("anyio/from_thread.py")
+        and frame["function"] == "run_blocking_portal"
+        for frame in selected["thread_stack"]
+    )
+    if not anchored:
+        raise RuntimeError("real AnyIO portal verifier anchor is absent")
+    return {
+        "selected_label": selected["label"],
+        "stack_anchor": "anyio/from_thread.py::run_blocking_portal",
+    }
 
 
 def _kernel_by_sequence(path: Path) -> dict[int, dict[str, Any]]:
@@ -4820,6 +4975,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("probe-paired")
+    portal = subparsers.add_parser("probe-portal")
+    portal.add_argument("--snapshot", type=Path, required=True)
     verify = subparsers.add_parser("verify")
     verify.add_argument("--campaign-summary", type=Path, required=True)
     verify.add_argument("--output", type=Path, required=True)
@@ -4827,6 +4984,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "probe-paired":
         result = _probe_paired()
+    elif args.command == "probe-portal":
+        result = _probe_portal(args.snapshot)
     else:
         result = verify_campaign(
             campaign_summary_path=args.campaign_summary,
@@ -4935,9 +5094,64 @@ probes/probe_pass.py::test_probe_pass
 ```
 <!-- EIR005_PROBE_NODES_END -->
 
+### `probes/probe_real_anyio_portal.py`
+
+<!-- EIR005_PROBE_REAL_ANYIO_PORTAL_BEGIN -->
+```python
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+
+from anyio.from_thread import start_blocking_portal
+
+import eir005_observer_plugin as observer
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--artifact-root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--repo", type=Path, required=True)
+    args = parser.parse_args()
+
+    portal_context = start_blocking_portal()
+    portal_context.__enter__()
+    snapshot = observer.capture_snapshot(
+        artifact_root=args.artifact_root,
+        repo=args.repo,
+        surface="P",
+        target_active=True,
+        target_nodeid="probe::real_anyio_portal",
+        target_thread_ident=None,
+        target_thread_native_id=None,
+        trial="probe-real-anyio-portal",
+        trigger="early",
+        sequence=1,
+        loop_labels={},
+    )
+    temporary = args.output.with_suffix(args.output.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(snapshot, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(args.output)
+
+    # Process isolation closes the live daemon portal without exercising the
+    # machine-state condition that this probe is meant only to identify.
+    os._exit(0)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+<!-- EIR005_PROBE_REAL_ANYIO_PORTAL_END -->
+
 ## Appendix F: Exact Mutation Diffs
 
-The eight portable unified diffs are the exact one-hunk changes listed in
+The ten portable unified diffs are the exact one-hunk changes listed in
 Task 2. Review and execution regenerate them with the fixed
 `pristine/eir005_observer_*.py` and `mutated/eir005_observer_*.py` labels and
 compare the SHA values in the mutation table before running each owning
@@ -4994,7 +5208,7 @@ the tracked Markdown has no trailing whitespace.
 +    return loops[:1]
 <!-- EIR005_DIFF_CONTEXT_BLANK -->
 <!-- EIR005_DIFF_CONTEXT_BLANK -->
- def capture_snapshot(
+ def _is_anyio_portal_stack(stack: list[dict[str, Any]]) -> bool:
 ```
 <!-- EIR005_M3_DIFF_END -->
 
@@ -5021,7 +5235,7 @@ the tracked Markdown has no trailing whitespace.
 ```diff
 --- pristine/eir005_observer_verifier.py
 +++ mutated/eir005_observer_verifier.py
-@@ -500,7 +500,8 @@
+@@ -518,7 +518,8 @@
      blocks: list[dict[str, Any]],
      controller_claim: str | None,
  ) -> tuple[str, dict[str, Any]]:
@@ -5040,7 +5254,7 @@ the tracked Markdown has no trailing whitespace.
 ```diff
 --- pristine/eir005_observer_verifier.py
 +++ mutated/eir005_observer_verifier.py
-@@ -417,8 +417,8 @@
+@@ -435,8 +435,8 @@
  ) -> bool:
      del controller_claim
      return (
@@ -5088,3 +5302,39 @@ the tracked Markdown has no trailing whitespace.
          raise RuntimeError("observer artifacts may not use the official v3 root")
 ```
 <!-- EIR005_M8_DIFF_END -->
+
+### M9a
+
+<!-- EIR005_M9A_DIFF_BEGIN -->
+```diff
+--- pristine/eir005_observer_plugin.py
++++ mutated/eir005_observer_plugin.py
+@@ -315,7 +315,7 @@
+ def _is_anyio_portal_stack(stack: list[dict[str, Any]]) -> bool:
+     return any(
+         frame["file"].endswith("anyio/from_thread.py")
+-        and frame["function"] == "run_blocking_portal"
++        and frame["function"] == "broken_run_blocking_portal"
+         for frame in stack
+     )
+<!-- EIR005_DIFF_CONTEXT_BLANK -->
+```
+<!-- EIR005_M9A_DIFF_END -->
+
+### M9b
+
+<!-- EIR005_M9B_DIFF_BEGIN -->
+```diff
+--- pristine/eir005_observer_verifier.py
++++ mutated/eir005_observer_verifier.py
+@@ -288,7 +288,7 @@
+ def _is_anyio_portal_stack(stack: list[dict[str, Any]]) -> bool:
+     return any(
+         frame["file"].endswith("anyio/from_thread.py")
+-        and frame["function"] == "run_blocking_portal"
++        and frame["function"] == "broken_run_blocking_portal"
+         for frame in stack
+     )
+<!-- EIR005_DIFF_CONTEXT_BLANK -->
+```
+<!-- EIR005_M9B_DIFF_END -->

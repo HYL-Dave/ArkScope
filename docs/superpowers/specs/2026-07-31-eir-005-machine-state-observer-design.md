@@ -1,6 +1,6 @@
 # EIR-005 Machine-State Observer Design
 
-> **Status:** APPROVED SPEC - EXACT-SOURCE PLAN REVIEW NEXT
+> **Status:** APPROVED SPEC - PLAN F1 AMENDMENT REVIEW NEXT
 >
 > **Date:** 2026-07-31
 >
@@ -152,6 +152,37 @@ The last result changes the handoff design. Attach-time strace is not a
 mandatory gate. Launch-under-strace is a timing-perturbing, conditional
 qualifier described in LD 10.
 
+### 2.5 Exact-source plan F1
+
+Focused review of exact-source plan `b7ebefc5` found one campaign-fatal target
+selection defect. Grounded AnyIO 4.9.0
+`anyio.from_thread.start_blocking_portal()` creates
+`Thread(target=run_blocking_portal, daemon=True)` without an explicit thread
+name. A direct runtime probe observed
+`Thread-1 (run_blocking_portal)`, which the observer's closed thread-name
+sanitizer correctly reduces to `thread`.
+
+The reviewed plan instead required the sanitized name `asyncio-portal` in
+conjunction with an AnyIO stack. That name predicate is false for the grounded
+runtime, so every P-surface snapshot would have produced zero match reasons
+and O1-O3 would have been structurally unreachable. The original probes did
+not instantiate a real AnyIO blocking portal, so this defect was also
+invisible to their RED-first surface.
+
+The correction is limited to target-loop identity and its proof:
+
+- P-surface identity uses the exact owner-thread stack anchor
+  `anyio/from_thread.py::run_blocking_portal`;
+- sanitized thread name remains recorded diagnostic evidence but is not a
+  selection predicate;
+- a real AnyIO portal probe proves the plugin and verifier each select exactly
+  one matching loop; and
+- independent plugin-side and verifier-side mutations must each turn that
+  probe RED.
+
+The behavioral campaign remains unauthorized until the amended exact source,
+identity chain, pristine summary, and mutation evidence pass focused review.
+
 ## 3. Locked Decisions
 
 ### LD 1 - Separate diagnostic authority
@@ -284,6 +315,19 @@ stable module-qualified type name, not a `repr`.
 The snapshot must identify its target loop by thread and stack evidence. It
 must not silently select "the first asyncio loop"; T2 already proves that more
 than one loop may exist.
+
+For surface P, the closed target predicate is an owner-thread stack containing
+one frame whose normalized filename ends with `anyio/from_thread.py` and whose
+function is exactly `run_blocking_portal`. Thread name is diagnostic only and
+must not participate in this predicate. The plugin and independent verifier
+must implement that same literal anchor separately and must each select
+exactly one loop. Zero or multiple matches are invalid. The broader
+`start_blocking_portal` function name is not a substitute: that frame belongs
+to the calling thread rather than the portal owner thread.
+
+Surface A continues to bind the target through its owner thread identity and
+grounded stack evidence; this amendment does not change either selected
+surface or its node manifest.
 
 ### LD 7 - Out-of-process cross-check
 
@@ -543,6 +587,11 @@ The later exact-source plan must prove its observer before a real campaign.
    from qualifying.
 9. **Frozen price root:** changing one byte in a copied v3 identity causes
    preflight refusal before a behavioral attempt.
+10. **Real AnyIO portal identity:** a controlled fixture starts
+    `anyio.from_thread.start_blocking_portal()`. The plugin and independent
+    verifier must each select exactly one loop through the literal
+    `anyio/from_thread.py::run_blocking_portal` owner-stack anchor while the
+    sanitized owner thread name remains `thread`.
 
 ### 5.2 Required mutation sensitivity
 
@@ -556,7 +605,10 @@ check:
 5. trust a controller-derived verdict instead of recomputing raw evidence;
 6. permit a one-arm block to qualify;
 7. downgrade unavailable `ss` to an empty queue; and
-8. let an observer attempt write into or import the official v3 bank.
+8. let an observer attempt write into or import the official v3 bank;
+9. **M9a:** break the plugin's exact AnyIO portal stack anchor; and
+10. **M9b:** break the verifier's independently implemented exact AnyIO portal
+    stack anchor.
 
 Every mutation must turn its owning probe RED for the intended reason.
 
@@ -642,7 +694,9 @@ Stop and report without improvising if:
 10. a result relies on one snapshot, one surface, or strace alone;
 11. a reviewer asks for another broad matrix or runner generation without new
     evidence and a user-approved scope change; or
-12. the normal desktop exhibits the same failure.
+12. the normal desktop exhibits the same failure; or
+13. the real AnyIO portal probe produces zero or multiple exact target-loop
+    matches in either the plugin or verifier.
 
 Budget exhaustion produces `O5` or `O6`; it is not permission to continue
 sampling indefinitely.
@@ -665,16 +719,19 @@ This handoff is an execution boundary, not a change in evidentiary standard.
 ## 10. Next Gate
 
 Independent full-document review returned GREEN with zero findings at
-`e11851cb`. Exact-source plan review is next.
+`e11851cb`. Focused review of exact-source plan `b7ebefc5` then blocked on the
+false P-surface thread-name predicate described in §2.5. Review of the bounded
+exact-source amendment is next.
 
 After GREEN:
 
-1. write one exact-source RED-first observer plan;
-2. independently review its probes, mutations, schedule, and bounds;
-3. run the finite two-surface campaign;
-4. reconstruct raw evidence and select O1-O6;
-5. close the observer campaign; and
-6. return to the reviewed price-truth banking/product gate.
+1. independently reproduce the amended source identities;
+2. replay all probes, including the real AnyIO portal probe;
+3. replay M1-M9b and verify each owning RED;
+4. run the finite two-surface campaign;
+5. reconstruct raw evidence and select O1-O6;
+6. close the observer campaign; and
+7. return to the reviewed price-truth banking/product gate.
 
 No observer runtime, strace arm, product/test change, or unchanged price-v3
 rerun is authorized by the approved spec alone.
