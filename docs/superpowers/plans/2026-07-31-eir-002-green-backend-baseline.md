@@ -62,6 +62,11 @@ required result:
 
 Any probe mismatch stops the run. It does not authorize a sandbox fallback.
 
+Node.js `v22.14.0` is a pinned test-toolchain dependency, like the pinned
+Python interpreter. Adding its exact binary directory to the blank
+environment does not add a provider credential or historical product data and
+does not weaken the blank-environment contract.
+
 ## 1. File Map
 
 ### Product and test changes
@@ -215,10 +220,13 @@ report="/tmp/eir002-green-baseline/reports/$stage.json"
 transcript="/tmp/eir002-green-baseline/reports/$stage.txt"
 probe=/tmp/arkscope_asyncio_wakeup_probe.py
 reporter=/tmp/eir002-green-baseline/arkscope_eir002_reporter.py
+node_dir=/home/hyl/.nvm/versions/node/v22.14.0/bin
 
 test ! -e "$root"
 test ! -e "$report"
 test ! -e "$transcript"
+test -x "$node_dir/node"
+test "$("$node_dir/node" --version)" = "v22.14.0"
 test "$(wc -c < "$probe")" -eq 942
 test "$(sha256sum "$probe" | awk '{print $1}')" = \
   10647c1e64c49fc2e082701d7a735e40782620314c125cd103a9a3f9bb37bc2e
@@ -241,7 +249,7 @@ mkdir -p \
 
 set +e
 env -i \
-  PATH="/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin" \
+  PATH="/home/hyl/.virtualenvs/llm_app/bin:$node_dir:/usr/bin:/bin" \
   LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=Asia/Taipei \
   HOME="$root/home" \
   TMPDIR="$root/tmp" \
@@ -272,9 +280,9 @@ exit "${pipeline_status[0]}"
 Required identity:
 
 ```text
-76 lines / 2,217 bytes
+79 lines / 2,353 bytes
 SHA-256:
-a88cb25653453b50a90d34ff5c7a865ae8a58ac59f8f1a30843da038d808d8a5
+e7c963f1bc97125b70b435fb3c41bf4e59d501f0da561f2ef6d921c12083c84f
 ```
 
 This wrapper owns the native/sandbox boundary, fresh runtime roots, exact
@@ -431,8 +439,8 @@ Expected identities:
 reporter:
 09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928
 wrapper:
-76 lines / 2217 bytes
-a88cb25653453b50a90d34ff5c7a865ae8a58ac59f8f1a30843da038d808d8a5
+79 lines / 2353 bytes
+e7c963f1bc97125b70b435fb3c41bf4e59d501f0da561f2ef6d921c12083c84f
 ```
 
 - [ ] **Step 3: Reproduce base canonical and focused collections**
@@ -558,7 +566,7 @@ cmp \
 Run the exact native wrapper from an unrestricted terminal context:
 
 ```bash
-/tmp/eir002-green-baseline/run_native.sh base-full
+/tmp/eir002-green-baseline/run_native.sh base-full-v2
 
 /tmp/eir002-green-baseline/run_native.sh base-focused \
   tests/test_data_access.py \
@@ -568,10 +576,17 @@ Run the exact native wrapper from an unrestricted terminal context:
   tests/test_app_records_store.py
 ```
 
+The pre-amendment `base-full` stage is immutable rejected evidence: its
+restricted `PATH` omitted the pinned Node.js toolchain and produced 54
+additional `FileNotFoundError: 'node'` failures. Preserve that single-use
+runtime, report, and transcript. It is not a base result and must not be
+imported into any ledger row. `base-full-v2` is the first admissible canonical
+attempt under the corrected wrapper.
+
 Expected reporter facts:
 
 ```text
-base-full:
+base-full-v2:
 collected: 4739
 seen: 4739
 passed: 4640
