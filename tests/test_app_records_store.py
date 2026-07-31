@@ -35,7 +35,7 @@ def test_report_insert_query_roundtrip(store):
         tool_calls=3, duration_seconds=12.5, tokens_in=100, tokens_out=200,
         created_at="2026-06-20T10:00:00")
     assert isinstance(rid, int)
-    df = store.query_reports()
+    df = store.query_reports(today="2026-06-21")
     assert list(df.columns) == _REPORT_COLS
     row = df.iloc[0]
     assert row["title"] == "AFRM entry" and row["conclusion"] == "BUY"
