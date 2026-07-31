@@ -130,6 +130,7 @@ const mocked = vi.hoisted(() => ({
   scheduleLastAttemptAt: "2026-07-14T10:00:00Z",
   scheduleUpdatedAt: "2026-07-14T10:01:00Z",
   ibkrBodyBacklogMode: "legacy" as "legacy" | "succeeded" | "partial" | "entitlement",
+  priceScheduleMode: "blank" as "blank" | "partial",
   importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
   putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
 }));
@@ -365,8 +366,43 @@ vi.mock("./api", async (importOriginal) => {
           running: false,
           progress: null,
           last_attempt_at: null,
-          last_result: null,
-          durable_state: null,
+          last_result: mocked.priceScheduleMode === "partial" ? {
+            source: "ibkr_prices",
+            status: "partial",
+            collect: {
+              status: "partial",
+              tickers_scanned: 150,
+              succeeded_ticker_count: 149,
+              gaps_found: 150,
+              rows_added: 3874,
+              error_count: 1,
+              error_tickers: ["LCID"],
+              unresolved_after_fetch_count: 1,
+              unresolved_after_fetch_tickers: ["LCID"],
+            },
+          } : null,
+          durable_state: mocked.priceScheduleMode === "partial" ? {
+            last_status: "partial",
+            last_error: null,
+            continuation: null,
+            last_result: {
+              source: "ibkr_prices",
+              status: "partial",
+              collect: {
+                status: "partial",
+                tickers_scanned: 150,
+                succeeded_ticker_count: 149,
+                gaps_found: 150,
+                rows_added: 3874,
+                error_count: 1,
+                error_tickers: ["LCID"],
+                unresolved_after_fetch_count: 1,
+                unresolved_after_fetch_tickers: ["LCID"],
+              },
+            },
+            last_attempt: "2026-07-28T00:19:00Z",
+            updated_at: "2026-07-28T00:22:00Z",
+          } : null,
           job_name: "collect.ibkr_prices",
         },
       },
@@ -424,6 +460,7 @@ afterEach(() => {
   mocked.scheduleLastAttemptAt = "2026-07-14T10:00:00Z";
   mocked.scheduleUpdatedAt = "2026-07-14T10:01:00Z";
   mocked.ibkrBodyBacklogMode = "legacy";
+  mocked.priceScheduleMode = "blank";
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -744,6 +781,40 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.includes("執行"))).toBe(true);
     expect(row.textContent).not.toContain("provider_article_id");
+  });
+
+  it("renders price partial facts without a Continue control in both locales", async () => {
+    mocked.priceScheduleMode = "partial";
+    const jobs = health.jobs as Record<string, {
+      status: string; finished_at: string; error: string;
+    }>;
+    jobs["collect.ibkr_prices"] = {
+      status: "failed",
+      finished_at: "2026-07-28T00:22:00Z",
+      error: "price_collection_partial",
+    };
+    try {
+      await renderDataSources();
+      const row = () => Array.from(host!.querySelectorAll("tr")).find((node) =>
+        node.textContent?.includes(
+          i18n.language === "en" ? "IBKR Prices" : "IBKR 股價",
+        ));
+      expect(row()?.textContent).toContain("✗");
+      expect(row()?.textContent)
+        .toContain("部分完成（抓取後仍有 1 個標的無法確認：LCID）");
+      expect(Array.from(row()!.querySelectorAll("button")).some((button) =>
+        button.textContent?.trim() === "補抓")).toBe(false);
+
+      await act(async () => { await i18n.changeLanguage("en"); });
+      expect(row()?.textContent).toContain("✗");
+      expect(row()?.textContent).toContain(
+        "Partially completed (1 ticker remains unresolved after collection: LCID)",
+      );
+      expect(Array.from(row()!.querySelectorAll("button")).some((button) =>
+        button.textContent?.trim() === "Continue")).toBe(false);
+    } finally {
+      delete jobs["collect.ibkr_prices"];
+    }
   });
 
   it("renders entitlement-blocked bodies as retained headlines without a retry action", async () => {

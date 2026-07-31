@@ -363,6 +363,39 @@ describe("schedulerStateLabel", () => {
     expect(r).toEqual({ label: "部分完成（待補抓 2）", tone: "warn", needsContinue: true });
   });
 
+  it("renders price unresolved count and bounded ticker list without continuation", () => {
+    const durable = {
+      last_status: "partial",
+      continuation: null,
+      last_result: {
+        source: "ibkr_prices",
+        status: "partial",
+        collect: {
+          status: "partial" as const,
+          tickers_scanned: 150,
+          succeeded_ticker_count: 149,
+          unresolved_after_fetch_count: 1,
+          unresolved_after_fetch_tickers: ["LCID"],
+        },
+      },
+    };
+    expect(localizedSchedulerStateLabel(durable, zhT)).toEqual({
+      label: "部分完成（抓取後仍有 1 個標的無法確認：LCID）",
+      tone: "warn",
+      needsContinue: false,
+    });
+    expect(localizedSchedulerStateLabel(durable, settingsT("en"))).toEqual({
+      label: "Partially completed (1 ticker remains unresolved after collection: LCID)",
+      tone: "warn",
+      needsContinue: false,
+    });
+    const nonPrice = {
+      ...durable,
+      last_result: { ...durable.last_result, source: "polygon_news" },
+    };
+    expect(localizedSchedulerStateLabel(nonPrice, zhT).label).toBe("部分完成");
+  });
+
   it("renders durable IBKR body counts without promising a manual retry", () => {
     const result = schedulerStateLabel({
       last_status: "partial",
@@ -530,7 +563,7 @@ describe("schedulerBodyBacklogPresentation", () => {
         source: "ibkr_news",
         status: "partial",
         collect: {
-          status: "partial",
+          status: "partial" as const,
           body_backlog: {
             status: "ok",
             due_now: 4,
@@ -692,7 +725,7 @@ describe("localized Settings market-data presentations", () => {
         source: "ibkr_news",
         status: "partial",
         collect: {
-          status: "partial",
+          status: "partial" as const,
           body_backlog: {
             status: "ok" as const,
             due_now: 4,

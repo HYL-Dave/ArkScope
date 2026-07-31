@@ -2625,13 +2625,20 @@ export interface ScheduleRunResult {
   reason?: string;
   at?: string;
   collect?: {
-    status?: string;
+    status?: "succeeded" | "partial" | "failed";
     continuation?: ScheduleContinuationCounts | null;
     legs?: ScheduleWorkerLegs;
     body_backlog?: ScheduleBodyBacklog;
     retry_bodies_attempted?: number;
     retry_bodies_fetched?: number;
     tickers_scanned?: number;
+    succeeded_ticker_count?: number;
+    gaps_found?: number;
+    rows_added?: number;
+    error_count?: number;
+    error_tickers?: string[];
+    unresolved_after_fetch_count?: number;
+    unresolved_after_fetch_tickers?: string[];
   } | null;
 }
 

@@ -711,7 +711,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 704,
+      settings: 706,
       research: 207,
       explore: 380,
       portfolio: 374,
@@ -779,7 +779,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1783);
+      expect(total, `${locale}.total`).toBe(1785);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1119,6 +1119,10 @@ describe("bundled i18n resources", () => {
   });
 
   it("preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move", () => {
+    const postSliceSettingsPaths = [
+      "dataSources.schedule.history.priceUnresolved_one",
+      "dataSources.schedule.history.priceUnresolved_other",
+    ] as const;
     const expectedSubtreeCounts = {
       actions: 18,
       workspace: 29,
@@ -1139,7 +1143,14 @@ describe("bundled i18n resources", () => {
       const workspaceCount = flattenResource(
         (settings.investor as ResourceTree).workspace as ResourceTree,
       ).size;
-      const physicalPreSliceCount = flattenResource(settings).size - workspaceCount + 5;
+      const flattenedSettings = flattenResource(settings);
+      for (const path of postSliceSettingsPaths) {
+        expect(flattenedSettings.has(path), `${locale}.settings.${path}`).toBe(true);
+      }
+      const physicalPreSliceCount = flattenedSettings.size
+        - workspaceCount
+        + 5
+        - postSliceSettingsPaths.length;
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
@@ -1150,7 +1161,11 @@ describe("bundled i18n resources", () => {
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
-        expect(flattenResource(settings[subtree] as ResourceTree).size, `${locale}.${subtree}`)
+        const currentSliceDelta = subtree === "dataSources" ? postSliceSettingsPaths.length : 0;
+        expect(
+          flattenResource(settings[subtree] as ResourceTree).size - currentSliceDelta,
+          `${locale}.${subtree}`,
+        )
           .toBe(count);
       }
     }

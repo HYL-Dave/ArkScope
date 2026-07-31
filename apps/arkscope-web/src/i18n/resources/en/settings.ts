@@ -597,6 +597,8 @@ const settings = {
         unknown: "Last status was {{value}}",
         runningStale: "Running too long",
         partialActionable: "Partially completed ({{count}} remaining)",
+        priceUnresolved_one: "Partially completed ({{count}} ticker remains unresolved after collection: {{tickers}})",
+        priceUnresolved_other: "Partially completed ({{count}} tickers remain unresolved after collection: {{tickers}})",
         partialTickersAndBodies: "Partially completed ({{count}} tickers and {{value}} bodies pending follow-up)",
         partialBodies: "Partially completed ({{count}} bodies pending follow-up)",
         partialTickers: "Partially completed ({{count}} tickers pending follow-up)",

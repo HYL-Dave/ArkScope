@@ -356,7 +356,30 @@ export function schedulerStateLabel(
         };
       }
       const collect = durable?.last_result?.collect;
-      const observed = collect?.continuation;
+      const unresolved = positiveCount(collect?.unresolved_after_fetch_count);
+      const unresolvedTickers = Array.isArray(collect?.unresolved_after_fetch_tickers)
+        ? collect.unresolved_after_fetch_tickers
+          .filter((ticker): ticker is string => typeof ticker === "string" && ticker.length > 0)
+          .slice(0, 25)
+        : [];
+      let priceLabel: string | null = null;
+      if (
+        durable?.last_result?.source === "ibkr_prices"
+        && collect?.status === "partial"
+        && unresolved > 0
+        && unresolvedTickers.length > 0
+      ) {
+        priceLabel = unresolved === 1
+          ? t(($) => $.dataSources.schedule.history.priceUnresolved_one, {
+            count: unresolved,
+            tickers: unresolvedTickers.join(", "),
+          })
+          : t(($) => $.dataSources.schedule.history.priceUnresolved_other, {
+            count: unresolved,
+            tickers: unresolvedTickers.join(", "),
+          });
+      }
+      const observed = priceLabel === null ? collect?.continuation : undefined;
       const tickers = positiveCount(observed?.deferred_ticker_count);
       const bodies = collect?.body_backlog === undefined
         ? positiveCount(observed?.deferred_body_count)
@@ -395,7 +418,7 @@ export function schedulerStateLabel(
         };
       }
       return {
-        label: t(($) => $.dataSources.schedule.history.partial),
+        label: priceLabel ?? t(($) => $.dataSources.schedule.history.partial),
         tone: "warn",
         needsContinue: false,
       };
