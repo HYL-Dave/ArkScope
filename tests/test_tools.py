@@ -301,32 +301,41 @@ class TestNewsTools:
 # ============================================================
 
 class TestPriceTools:
-    def test_get_ticker_prices(self, dal):
+    def test_get_ticker_prices(self, hermetic_dal):
         from src.tools.price_tools import get_ticker_prices
-        result = get_ticker_prices(dal, ticker="NVDA", interval="15min", days=7)
+        result = get_ticker_prices(
+            hermetic_dal,
+            ticker="NVDA",
+            interval="15min",
+            days=7,
+        )
         assert isinstance(result, PriceQueryResult)
         assert result.ticker == "NVDA"
-        assert result.count > 0
+        assert result.count == 2
+        assert [bar.close for bar in result.bars] == [101.0, 105.0]
 
-    def test_get_price_change(self, dal):
+    def test_get_price_change(self, hermetic_dal):
         from src.tools.price_tools import get_price_change
-        result = get_price_change(dal, ticker="NVDA", days=30)
-        assert isinstance(result, dict)
+        result = get_price_change(hermetic_dal, ticker="NVDA", days=30)
         assert result["ticker"] == "NVDA"
-        assert result["bar_count"] > 0
-        assert "change_pct" in result
-        assert "period_high" in result
-        assert result["period_high"] >= result["period_low"]
+        assert result["bar_count"] == 2
+        assert result["change_pct"] == 10.0
+        assert result["period_high"] == 112.0
+        assert result["period_low"] == 99.0
+        assert result["total_volume"] == 2200
 
-    def test_get_sector_performance(self, dal):
+    def test_get_sector_performance(self, hermetic_dal):
         from src.tools.price_tools import get_sector_performance
-        result = get_sector_performance(dal, sector="AI_CHIPS", days=30)
-        assert isinstance(result, dict)
+        result = get_sector_performance(
+            hermetic_dal,
+            sector="AI_CHIPS",
+            days=30,
+        )
         assert result["sector"] == "AI_CHIPS"
-        assert result["ticker_count"] > 0
-        assert "avg_change_pct" in result
-        assert "best_ticker" in result
-        assert "worst_ticker" in result
+        assert result["ticker_count"] == 2
+        assert result["avg_change_pct"] == 6.0
+        assert result["best_ticker"] == "NVDA"
+        assert result["worst_ticker"] == "AMD"
 
     def test_get_sector_performance_unknown(self, dal):
         from src.tools.price_tools import get_sector_performance

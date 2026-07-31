@@ -204,13 +204,17 @@ def _install_fundamentals_provider_spies(monkeypatch):
 # ============================================================
 
 class TestHealth:
-    def test_status(self, client):
-        r = client.get("/status")
+    def test_status(self, hermetic_market_app):
+        r = _api_get(hermetic_market_app, "/status")
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
         assert data["tools_registered"] == 53
-        assert data["data_sources"]["price_tickers"] > 50
+        assert data["data_sources"] == {
+            "news_tickers": 2,
+            "price_tickers": 2,
+            "fundamentals_tickers": 1,
+        }
 
 
 # ============================================================
@@ -252,29 +256,39 @@ class TestNewsEndpoints:
 # ============================================================
 
 class TestPriceEndpoints:
-    def test_get_prices(self, client):
-        r = client.get("/prices/NVDA?interval=15min&days=7")
+    def test_get_prices(self, hermetic_market_app):
+        r = _api_get(
+            hermetic_market_app,
+            "/prices/NVDA?interval=15min&days=7",
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["ticker"] == "NVDA"
-        assert data["count"] > 0
-        assert len(data["bars"]) > 0
+        assert data["count"] == 2
+        assert [bar["close"] for bar in data["bars"]] == [101.0, 105.0]
 
-    def test_price_change(self, client):
-        r = client.get("/prices/NVDA/change?days=30")
+    def test_price_change(self, hermetic_market_app):
+        r = _api_get(hermetic_market_app, "/prices/NVDA/change?days=30")
         assert r.status_code == 200
         data = r.json()
         assert data["ticker"] == "NVDA"
-        assert "change_pct" in data
-        assert data["bar_count"] > 0
+        assert data["bar_count"] == 2
+        assert data["change_pct"] == 10.0
+        assert data["period_high"] == 112.0
+        assert data["period_low"] == 99.0
 
-    def test_sector_performance(self, client):
-        r = client.get("/prices/sector/AI_CHIPS?days=30")
+    def test_sector_performance(self, hermetic_market_app):
+        r = _api_get(
+            hermetic_market_app,
+            "/prices/sector/AI_CHIPS?days=30",
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["sector"] == "AI_CHIPS"
-        assert data["ticker_count"] > 0
-        assert "avg_change_pct" in data
+        assert data["ticker_count"] == 2
+        assert data["avg_change_pct"] == 6.0
+        assert data["best_ticker"] == "NVDA"
+        assert data["worst_ticker"] == "AMD"
 
 
 # ============================================================

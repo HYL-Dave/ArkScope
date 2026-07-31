@@ -269,19 +269,19 @@ class TestAnthropicToolExecution:
         assert data["count"] == 2
         assert data["source_breakdown"] == {"polygon": 1, "ibkr": 1}
 
-    def test_execute_get_price_change(self, dal):
-        """execute_tool dispatches to get_price_change."""
+    def test_execute_get_price_change(self, hermetic_dal):
         from src.agents.anthropic_agent.tools import execute_tool
 
         result = execute_tool(
             "get_price_change",
             {"ticker": "NVDA", "days": 30},
-            dal
+            hermetic_dal,
         )
 
         data = json.loads(_unwrap(result))
         assert data["ticker"] == "NVDA"
-        assert "change_pct" in data
+        assert data["bar_count"] == 2
+        assert data["change_pct"] == 10.0
 
     def test_execute_calculate_greeks(self, dal):
         """execute_tool dispatches to calculate_greeks (no DAL needed)."""
