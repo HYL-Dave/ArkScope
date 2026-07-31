@@ -149,13 +149,20 @@ Each entry records:
   - 26 IDs trace to the 2026-02-05 real-repository-data tests in `74433f84`;
     one ID is the moving-window test introduced by `e6d99342`; and
   - the approved classification and disposition are now owned by
-    `docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md`.
+    `docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md`;
+  - the Task 6 review packet at
+    `docs/superpowers/evidence/2026-07-31-eir-002-green-backend-baseline.md`
+    records exact collection `4730/c34de9a0...`, native
+    `4658 passed / 72 skipped / 0 failed`, an empty non-passing stream,
+    protected anchors `94 passed / 18 skipped`, and exact artifact
+    quarantine/restoration.
 - `owner`: promoted EIR-002 green-backend-baseline slice.
-- `next_action`: independently review the exact-node implementation plan at
-  `docs/superpowers/plans/2026-07-31-eir-002-green-backend-baseline.md`.
-  Implementation remains unauthorized until that review is green. Do not
-  restore the retired data premise as a fixture and do not run canonical
-  API/full admission in the incompatible managed sandbox.
+- `next_action`: independently review the committed Task 6 implementation
+  packet. Reproduce canonical `4730/c34de9a0...`, focused
+  `123/37386cd2...`, all three mutations, protected `94/18`, native
+  `4658/72/0`, the empty non-passing stream, and zero product/data drift.
+  Keep this entry promoted until exact-tip fast-forward and merged
+  verification complete under Task 7.
 - `closure_evidence`: none.
 
 ### EIR-003 - Audit the 89 I18N-2-era Settings copy rewrites
