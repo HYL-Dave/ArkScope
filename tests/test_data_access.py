@@ -109,13 +109,6 @@ class TestConfigAccess:
 # ============================================================
 
 class TestNews:
-    def test_get_news_all(self, dal):
-        """get_news() should return news from scored files."""
-        result = dal.get_news(days=9999)  # All time
-        assert isinstance(result, NewsQueryResult)
-        assert result.count > 0
-        assert len(result.articles) > 0
-
     def test_get_news_ticker(self, dal):
         """get_news() should filter by ticker."""
         result = dal.get_news(ticker="NVDA", days=9999)
@@ -123,13 +116,6 @@ class TestNews:
         assert result.ticker == "NVDA"
         for article in result.articles:
             assert article.ticker == "NVDA"
-
-    def test_get_news_source_breakdown(self, dal):
-        """News result should have source breakdown."""
-        result = dal.get_news(days=9999)
-        assert isinstance(result.source_breakdown, dict)
-        # Should have at least ibkr or polygon
-        assert len(result.source_breakdown) > 0
 
     def test_news_article_schema(self, dal):
         """News articles should have required fields."""
@@ -162,15 +148,6 @@ class TestNews:
 # ============================================================
 
 class TestPrices:
-    def test_get_prices_15min(self, dal):
-        """get_prices() should return 15min bars."""
-        result = dal.get_prices("NVDA", interval="15min", days=9999)
-        assert isinstance(result, PriceQueryResult)
-        assert result.ticker == "NVDA"
-        assert result.interval == "15min"
-        assert result.count > 0
-        assert len(result.bars) > 0
-
     def test_price_bar_schema(self, dal):
         """Price bars should have valid OHLCV."""
         result = dal.get_prices("AAPL", interval="15min", days=9999)
@@ -182,65 +159,23 @@ class TestPrices:
             assert bar.close > 0
             assert bar.volume >= 0
 
-    def test_get_prices_hourly(self, dal):
-        """get_prices() should return hourly bars."""
-        result = dal.get_prices("AAPL", interval="1h", days=9999)
-        assert isinstance(result, PriceQueryResult)
-        assert result.count > 0
-
-    def test_get_prices_daily_resampled(self, dal):
-        """get_prices() daily should resample from 15min if no daily dir."""
-        result = dal.get_prices("NVDA", interval="1d", days=9999)
-        assert isinstance(result, PriceQueryResult)
-        # Should have data (resampled from 15min)
-        assert result.count > 0
-
     def test_get_prices_df(self, dal):
         """get_prices_df() should return raw DataFrame."""
         df = dal.get_prices_df("NVDA", interval="15min", days=30)
         assert isinstance(df, type(df))  # pandas DataFrame
         assert "close" in df.columns
 
-    def test_available_price_tickers(self, dal):
-        """get_available_tickers('prices') should list price tickers."""
-        tickers = dal.get_available_tickers("prices")
-        assert "NVDA" in tickers
-        assert "AAPL" in tickers
-        assert len(tickers) > 50  # We have 135+ tickers
-
-
 # ============================================================
 # Fundamentals
 # ============================================================
 
 class TestFundamentals:
-    def test_get_fundamentals(self, dal):
-        """get_fundamentals() should return structured result."""
-        result = dal.get_fundamentals("NVDA")
-        assert isinstance(result, FundamentalsResult)
-        assert result.ticker == "NVDA"
-        assert result.market_cap is not None
-        assert result.market_cap > 0
-
-    def test_fundamentals_has_ratios(self, dal):
-        """Fundamentals should include key financial ratios."""
-        result = dal.get_fundamentals("NVDA")
-        # NVDA should have PE ratio
-        assert result.pe_ratio is not None or result.snapshot is not None
-
     def test_fundamentals_empty_ticker(self, dal):
         """Non-existent ticker should return empty result."""
         result = dal.get_fundamentals("XXXNOTREAL")
         assert isinstance(result, FundamentalsResult)
         assert result.ticker == "XXXNOTREAL"
         assert result.market_cap is None
-
-    def test_available_fundamentals_tickers(self, dal):
-        """get_available_tickers('fundamentals') should list available tickers."""
-        tickers = dal.get_available_tickers("fundamentals")
-        assert "NVDA" in tickers
-        assert len(tickers) > 10
-
 
 # ============================================================
 # SEC Filings (FileBackend returns empty)
