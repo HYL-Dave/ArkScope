@@ -14,6 +14,7 @@ Use integration tests or manual testing for full agent flows.
 import json
 import re
 
+import pandas as pd
 import pytest
 
 
@@ -179,24 +180,94 @@ class TestAnthropicToolSchemas:
 # Anthropic Tool Execution Tests
 # ============================================================
 
+class _HermeticAgentBackend:
+    def query_news(
+        self,
+        ticker=None,
+        days=30,
+        source="auto",
+        scored_only=True,
+        model=None,
+    ):
+        del days, model
+        rows = [
+            {
+                "date": "2026-07-30T14:00:00+0000",
+                "ticker": "NVDA",
+                "title": "NVIDIA earnings beat expectations",
+                "source": "polygon",
+                "url": "https://example.test/nvda-earnings",
+                "publisher": "Example Wire",
+                "sentiment_score": 5.0,
+                "risk_score": 2.0,
+                "description": "NVIDIA reported stronger earnings.",
+            },
+            {
+                "date": "2026-07-30T13:00:00+0000",
+                "ticker": "NVDA",
+                "title": "NVIDIA product update",
+                "source": "ibkr",
+                "url": "https://example.test/nvda-product",
+                "publisher": "Example Desk",
+                "sentiment_score": 3.0,
+                "risk_score": 3.0,
+                "description": "NVIDIA announced a product update.",
+            },
+        ]
+        frame = pd.DataFrame(rows)
+        if ticker:
+            frame = frame[frame["ticker"] == ticker.upper()]
+        if source not in ("", "auto", None):
+            frame = frame[frame["source"] == source]
+        if scored_only:
+            frame = frame[frame["sentiment_score"].notna()]
+        return frame.reset_index(drop=True)
+
+    def query_prices(self, ticker, interval="15min", days=30):
+        del days
+        if ticker.upper() != "NVDA" or interval not in ("15min", "1d"):
+            return pd.DataFrame(
+                columns=["datetime", "open", "high", "low", "close", "volume"]
+            )
+        if interval == "1d":
+            rows = [
+                ("2026-07-29T00:00:00+0000", 100.0, 106.0, 99.0, 105.0, 1000),
+                ("2026-07-30T00:00:00+0000", 105.0, 112.0, 104.0, 110.0, 1200),
+            ]
+        else:
+            rows = [
+                ("2026-07-30T13:30:00+0000", 100.0, 102.0, 99.0, 101.0, 100),
+                ("2026-07-30T13:45:00+0000", 101.0, 106.0, 100.0, 105.0, 120),
+            ]
+        return pd.DataFrame(
+            rows,
+            columns=["datetime", "open", "high", "low", "close", "volume"],
+        )
+
+
+@pytest.fixture()
+def hermetic_dal():
+    return DataAccessLayer(backend=_HermeticAgentBackend())
+
+
 class TestAnthropicToolExecution:
     @pytest.fixture
     def dal(self):
         return DataAccessLayer()
 
-    def test_execute_get_ticker_news(self, dal):
-        """execute_tool dispatches to get_ticker_news."""
+    def test_execute_get_ticker_news(self, hermetic_dal):
         from src.agents.anthropic_agent.tools import execute_tool
 
         result = execute_tool(
             "get_ticker_news",
             {"ticker": "NVDA", "days": 9999},
-            dal
+            hermetic_dal,
         )
 
         data = json.loads(_unwrap(result))
         assert data["ticker"] == "NVDA"
-        assert data["count"] > 0
+        assert data["count"] == 2
+        assert data["source_breakdown"] == {"polygon": 1, "ibkr": 1}
 
     def test_execute_get_price_change(self, dal):
         """execute_tool dispatches to get_price_change."""

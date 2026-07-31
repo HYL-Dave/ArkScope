@@ -8,6 +8,8 @@ import sys
 import asyncio
 from pathlib import Path
 
+import httpx
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,8 +19,10 @@ sys.path.insert(0, str(project_root))
 from src.analysis.contracts import AnalysisArtifact, AnalysisRequest, IntegrityResult, RenderedReport
 from src.analysis.service import SavedAnalysisReport
 from src.api.app import create_app
+from src.api.dependencies import get_dal
 from src.agents.config import get_agent_config
 from src.api.routes.analysis import AnalysisRunRequest, run_analysis
+from src.tools.data_access import DataAccessLayer
 
 
 def test_fixed_task_runtime_routes_mount_on_real_app():
@@ -42,6 +46,159 @@ def client():
         yield c
 
 
+_HERMETIC_NEWS_ROWS = [
+    {
+        "date": "2026-07-30T14:00:00+0000",
+        "ticker": "NVDA",
+        "title": "NVIDIA earnings beat expectations",
+        "source": "polygon",
+        "url": "https://example.test/nvda-earnings",
+        "publisher": "Example Wire",
+        "sentiment_score": 5.0,
+        "risk_score": 2.0,
+        "description": "NVIDIA reported stronger earnings.",
+    },
+    {
+        "date": "2026-07-30T13:00:00+0000",
+        "ticker": "NVDA",
+        "title": "NVIDIA product update",
+        "source": "ibkr",
+        "url": "https://example.test/nvda-product",
+        "publisher": "Example Desk",
+        "sentiment_score": 3.0,
+        "risk_score": 3.0,
+        "description": "NVIDIA announced a product update.",
+    },
+    {
+        "date": "2026-07-30T12:00:00+0000",
+        "ticker": "AMD",
+        "title": "AMD earnings preview",
+        "source": "finnhub",
+        "url": "https://example.test/amd-earnings",
+        "publisher": "Example Wire",
+        "sentiment_score": 2.0,
+        "risk_score": 4.0,
+        "description": "Analysts preview AMD earnings.",
+    },
+]
+
+_HERMETIC_PRICE_ROWS = {
+    ("NVDA", "15min"): [
+        ("2026-07-30T13:30:00+0000", 100.0, 102.0, 99.0, 101.0, 100),
+        ("2026-07-30T13:45:00+0000", 101.0, 106.0, 100.0, 105.0, 120),
+    ],
+    ("NVDA", "1d"): [
+        ("2026-07-29T00:00:00+0000", 100.0, 106.0, 99.0, 105.0, 1000),
+        ("2026-07-30T00:00:00+0000", 105.0, 112.0, 104.0, 110.0, 1200),
+    ],
+    ("AMD", "15min"): [
+        ("2026-07-30T13:30:00+0000", 50.0, 52.0, 49.0, 51.0, 200),
+        ("2026-07-30T13:45:00+0000", 51.0, 53.0, 50.0, 52.0, 220),
+    ],
+    ("AMD", "1d"): [
+        ("2026-07-29T00:00:00+0000", 50.0, 53.0, 49.0, 52.0, 2000),
+        ("2026-07-30T00:00:00+0000", 52.0, 53.0, 50.0, 51.0, 2200),
+    ],
+}
+
+_PRICE_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
+
+
+class _HermeticMarketBackend:
+    def query_news(
+        self,
+        ticker=None,
+        days=30,
+        source="auto",
+        scored_only=True,
+        model=None,
+    ):
+        del days, model
+        frame = pd.DataFrame(_HERMETIC_NEWS_ROWS)
+        if ticker:
+            frame = frame[frame["ticker"] == ticker.upper()]
+        if source not in ("", "auto", None):
+            frame = frame[frame["source"] == source]
+        if scored_only:
+            frame = frame[frame["sentiment_score"].notna()]
+        return frame.reset_index(drop=True)
+
+    def query_prices(self, ticker, interval="15min", days=30):
+        del days
+        rows = _HERMETIC_PRICE_ROWS.get((ticker.upper(), interval), [])
+        return pd.DataFrame(rows, columns=_PRICE_COLUMNS)
+
+    def query_fundamentals(self, ticker):
+        if ticker.upper() != "NVDA":
+            return {}
+        return {
+            "collected_at": "2026-07-30T00:00:00+0000",
+            "snapshot": {
+                "market_cap": 1_500_000_000_000.0,
+                "pe_ratio": 30.0,
+                "price_to_sales": 15.0,
+                "price_to_book": 25.0,
+            },
+        }
+
+    def get_available_tickers(self, data_type):
+        return {
+            "news": ["AMD", "NVDA"],
+            "prices": ["AMD", "NVDA"],
+            "fundamentals": ["NVDA"],
+        }.get(data_type, [])
+
+
+@pytest.fixture()
+def hermetic_market_app():
+    app = create_app()
+    dal = DataAccessLayer(
+        base_path=project_root,
+        backend=_HermeticMarketBackend(),
+    )
+    app.dependency_overrides[get_dal] = lambda: dal
+    try:
+        yield app
+    finally:
+        app.dependency_overrides.pop(get_dal, None)
+
+
+def _api_get(app, path):
+    async def _request():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            return await client.get(path)
+
+    return asyncio.run(_request())
+
+
+def _install_fundamentals_provider_spies(monkeypatch):
+    calls = []
+
+    def _record_sec(*args, **kwargs):
+        del args, kwargs
+        calls.append("sec_edgar")
+        raise RuntimeError("SEC provider fallback reached")
+
+    def _record_fd(*args, **kwargs):
+        del args, kwargs
+        calls.append("financial_datasets")
+        return False
+
+    monkeypatch.setattr(
+        "data_sources.sec_edgar_financials.SECEdgarFinancials",
+        _record_sec,
+    )
+    monkeypatch.setattr(
+        "src.tools.analysis_tools._is_fd_enabled",
+        _record_fd,
+    )
+    return calls
+
+
 # ============================================================
 # Health
 # ============================================================
@@ -61,27 +218,33 @@ class TestHealth:
 # ============================================================
 
 class TestNewsEndpoints:
-    def test_get_news(self, client):
-        r = client.get("/news/NVDA?days=9999")
+    def test_get_news(self, hermetic_market_app):
+        r = _api_get(hermetic_market_app, "/news/NVDA?days=9999")
         assert r.status_code == 200
         data = r.json()
         assert data["ticker"] == "NVDA"
-        assert data["count"] > 0
-        assert len(data["articles"]) > 0
+        assert data["count"] == 2
+        assert data["source_breakdown"] == {"polygon": 1, "ibkr": 1}
 
-    def test_get_news_sentiment(self, client):
-        r = client.get("/news/NVDA/sentiment?days=9999")
+    def test_get_news_sentiment(self, hermetic_market_app):
+        r = _api_get(hermetic_market_app, "/news/NVDA/sentiment?days=9999")
         assert r.status_code == 200
         data = r.json()
         assert data["ticker"] == "NVDA"
-        assert data["scored_count"] > 0
-        assert 1 <= data["sentiment_mean"] <= 5
+        assert data["article_count"] == 2
+        assert data["scored_count"] == 2
+        assert data["sentiment_mean"] == 4.0
+        assert data["bullish_ratio"] == 0.5
 
-    def test_search_news(self, client):
-        r = client.get("/news/search/keyword?keyword=earnings&days=9999")
+    def test_search_news(self, hermetic_market_app):
+        r = _api_get(
+            hermetic_market_app,
+            "/news/search/keyword?keyword=earnings&days=9999",
+        )
         assert r.status_code == 200
         data = r.json()
-        assert data["count"] > 0
+        assert data["count"] == 2
+        assert {article["ticker"] for article in data["articles"]} == {"NVDA", "AMD"}
 
 
 # ============================================================
