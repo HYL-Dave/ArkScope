@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTATION RE-REVIEW-READY - INDEPENDENT REVIEW NEXT**
+> **Status: LIVE COMPLETE - MERGED AND NATURAL-CYCLE VERIFIED**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -3295,7 +3295,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
 **Files:**
 - Modify only when resolving verified findings in files already owned by this plan.
 
-- [ ] **Step 1: Request independent implementation review.**
+- [x] **Step 1: Request independent implementation review.**
 
   Provide the spec, plan, evidence packet, product base, clearance commit,
   product tip, exact node lists, and mutation records. Ask the reviewer to
@@ -3318,7 +3318,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   tiered results are not compared with historical monolithic results
   ```
 
-- [ ] **Step 2: Resolve findings RED-first.**
+- [x] **Step 2: Resolve findings RED-first.**
 
   For each verified finding, add or evolve a named test that fails for that
   finding, record its node-ledger effect, implement the minimum correction,
@@ -3326,7 +3326,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   provider scheduling, extended-hours, pacing, structured adapter-outcome,
   EIR-002, or scripts-retirement work.
 
-- [ ] **Step 3: Integrate only after GREEN and explicit user approval.**
+- [x] **Step 3: Integrate only after GREEN and explicit user approval.**
 
   Use `superpowers:finishing-a-development-branch`. Verify master has not moved
   incompatibly, fast-forward merge the exact reviewed tip, and rerun canonical
@@ -3338,25 +3338,25 @@ continues to use the existing closed outcome table and Stop Condition 11.
 **Files:**
 - Modify: lifecycle docs only after observed evidence is complete.
 
-- [ ] **Step 1: Restart merged ArkScope without triggering collection.**
+- [x] **Step 1: Restart merged ArkScope without triggering collection.**
 
   Restart only after merge. Confirm the desktop/sidecar loads merged code. Do
   not press Run, change cadence, or start a provider probe.
 
-- [ ] **Step 2: Capture read-only pre-run facts.**
+- [x] **Step 2: Capture read-only pre-run facts.**
 
   With both SQLite databases in `mode=ro`, record latest
   `collect.ibkr_prices`, LCID `provider_sync_meta`, LCID latest stored bar,
   2026-07-27 Coverage row, file size/mtime, `PRAGMA integrity_check`, and
   `PRAGMA foreign_key_check`. This is observation, not repair.
 
-- [ ] **Step 3: Obtain explicit approval before any manual provider action.**
+- [x] **Step 3: Obtain explicit approval before any manual provider action.**
 
   The ordinary enabled scheduler cycle may occur naturally. A manual Run,
   provider/Gateway probe, cadence change, retry experiment, or LCID repair
   requires a fresh user approval immediately before execution.
 
-- [ ] **Step 4: Accept either truthful terminal outcome.**
+- [x] **Step 4: Accept either truthful terminal outcome.**
 
   ```text
   Resolved:
@@ -3372,7 +3372,7 @@ continues to use the existing closed outcome table and Stop Condition 11.
   Neither outcome may claim which provider, pacing rule, halt, entitlement, or
   no-trade condition caused it.
 
-- [ ] **Step 5: Close lifecycle docs only after bounded observation.**
+- [x] **Step 5: Close lifecycle docs only after bounded observation.**
 
   Record merged SHA, read-only before/after facts, the actual natural-run
   outcome, and unchanged non-target DB integrity. Mark the slice LIVE only when
@@ -3381,6 +3381,13 @@ continues to use the existing closed outcome table and Stop Condition 11.
   map's current explicit decision. Calendar-aware price scheduling and
   extended-hours capture remain separate candidate slices until explicitly
   reprioritized.
+
+  Closeout selected **Resolved** without a manual provider action. The unchanged
+  600-minute schedule created job `18329` naturally at
+  `2026-07-31T10:21:39+00:00`; it inserted 62 LCID rows and finished with
+  `unresolved_after_fetch_count=0`. Coverage v2 then reported 2026-07-30 as
+  `150 complete / 0 unknown`, and both SQLite databases retained
+  `integrity_check=ok` with zero foreign-key violations.
 
 ## 15. Plan Self-Review Checklist
 

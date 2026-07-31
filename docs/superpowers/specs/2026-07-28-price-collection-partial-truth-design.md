@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: IMPLEMENTATION RE-REVIEW-READY - INDEPENDENT REVIEW NEXT**
+> **Status: LIVE COMPLETE - MERGED AND NATURAL-CYCLE VERIFIED**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`
@@ -659,6 +659,31 @@ Then accept exactly one of these truthful outcomes:
 The observation must not assert which upstream provider caused the outcome.
 Any live manual trigger, provider probe, or data repair requires explicit user
 approval immediately before execution.
+
+### 10.3 Observed release closeout
+
+Reviewed tip `66ef3bbc` fast-forwarded to `master` on 2026-07-31. Merged
+verification reproduced backend focused `168`, canonical backend collection
+`4739/a72bbd36...`, frontend `96/1076`, canonical frontend collection
+`de48671a...`, typecheck/build, and both scanner passes.
+
+The merged desktop first loaded with its scheduler disabled solely to capture
+read-only pre-run facts, then restarted with the unchanged saved cadence.
+`collect.ibkr_prices` job `18329` started naturally at
+`2026-07-31T10:21:39+00:00`; no Run control, provider probe, cadence change,
+retry experiment, or repair was used. It found one target, inserted 62 LCID
+rows, rechecked the original target as resolved, and finished with
+`status=succeeded`, `succeeded_ticker_count=150`, and
+`unresolved_after_fetch_count=0`.
+
+LCID advanced from a latest stored bar of `2026-07-29T23:45:00+0000` to
+`2026-07-30T23:45:00+0000`. Coverage v2 changed 2026-07-30 from
+`149 complete / 1 unknown (LCID)` to `150 complete / 0 unknown`; 2026-07-27
+remained complete. Both production SQLite databases returned
+`PRAGMA integrity_check=ok` and zero foreign-key violations before and after
+the natural cycle. This is the bounded local before/after fact required by
+this design; it does not identify which upstream path supplied the rows or why
+they were previously unavailable.
 
 ## 11. Sequencing
 
