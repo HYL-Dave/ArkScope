@@ -1,6 +1,6 @@
 # ArkScope Price Collection Partial-Truth Design
 
-> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
+> **Status: IMPLEMENTATION RE-REVIEW-READY - INDEPENDENT REVIEW NEXT**
 >
 > **Date:** 2026-07-28
 > **Grounding commit:** `542776c2e00ae1737d5b424a3b8858b079a63e38`

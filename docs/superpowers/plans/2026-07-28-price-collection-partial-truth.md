@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: IMPLEMENTATION REVIEW-READY - INDEPENDENT REVIEW NEXT**
+> **Status: IMPLEMENTATION RE-REVIEW-READY - INDEPENDENT REVIEW NEXT**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
