@@ -120,12 +120,12 @@ Each entry records:
 
 ### EIR-002 - Eliminate the environment-dependent non-green backend baseline
 
-- `status`: `open`
-- `observed_at`: `2026-07-25`
+- `status`: `promoted`
+- `observed_at`: `2026-07-31`
 - `impact`: The full backend suite is not green and changes classification
-  across mounted-data/config environments. That forces every change review to
-  reconstruct failure-set equivalence and can conceal a new failure inside
-  familiar noise.
+  across mounted-data/config environments. The current native boundary has 27
+  known failures. That forces every change review to reconstruct failure-set
+  equivalence and can conceal a new failure inside familiar noise.
 - `evidence`:
   - `docs/superpowers/evidence/2026-07-25-sa-extension-reliability-control-clarity.md:188-200`
     records matched implementer A/B at `30 failed / 7 errors` and matched
@@ -141,10 +141,20 @@ Each entry records:
 
     Capture normalized failed/error node IDs, environment inputs, and the run
     date. Neither `31` nor any historical family count is an allowlist.
-- `owner`: backend test-reliability maintenance batch.
-- `next_action`: perform a fresh virgin census, group failures by root cause,
-  and promote any group that requires a data-authority or fixture-contract
-  decision. Fix only genuinely independent fixture defects in one batch.
+  - a fresh native census at `3092fb4128dad9a2579f267e915519fa9cdf648c`
+    collected `4739` nodes at SHA-256
+    `a72bbd36dfad3d36aee2e6630e6024ec9fb4e910bebaf1363d44df8a1aa204dd`
+    and reproduced exactly `27` non-passing IDs at SHA-256
+    `7aafce5d2cba923480cc1fb6221bce4f5a33e0bf61c06cf94227cafefe227f15`;
+  - 26 IDs trace to the 2026-02-05 real-repository-data tests in `74433f84`;
+    one ID is the moving-window test introduced by `e6d99342`; and
+  - the draft classification and disposition are now owned by
+    `docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md`.
+- `owner`: promoted EIR-002 green-backend-baseline slice.
+- `next_action`: independently review the promoted design, then write its
+  exact-node implementation plan. Do not restore the retired data premise as a
+  fixture and do not run canonical API/full admission in the incompatible
+  managed sandbox.
 - `closure_evidence`: none.
 
 ### EIR-003 - Audit the 89 I18N-2-era Settings copy rewrites
@@ -246,6 +256,38 @@ Each entry records:
     Section 14 and
     `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
     Section 8.11.
+
+### EIR-006 - Stop presenting a historical CSV close as a current valuation input
+
+- `status`: `promoted`
+- `observed_at`: `2026-07-31`
+- `impact`: The registered `get_detailed_financials` agent tool can calculate
+  market cap and related valuation ratios from the last close in a historical
+  repository CSV while describing that value as current. On the observation
+  date, the newest CSV bar was 2026-07-02. A cache miss can therefore turn a
+  stale close into valuation output and persist the result in the 90-day
+  financial cache without exposing price age or provenance.
+- `evidence`:
+  - `src/tools/analysis_tools.py:598-692` calls
+    `FinancialMetricsCalculator.get_metrics_dict()` on a cache miss and uses
+    its market-cap result;
+  - `data_sources/financial_metrics_calculator.py:983-1040` calculates market
+    cap from `_get_current_price_ibkr()` when the historical fundamentals
+    snapshot lacks market cap;
+  - `data_sources/financial_metrics_calculator.py:44-97` selects the newest
+    matching file under `data/prices/15min` or `data/prices/hourly`, returns
+    its final close, and labels it current without a freshness test; and
+  - the 2026-07-31 read-only census found 225 15-minute CSVs for 150 tickers
+    with a global latest timestamp of `2026-07-02T10:15:00-04:00`.
+- `owner`: the 2026-07-31 EIR-002 design entry in
+  `docs/design/PROJECT_PRIORITY_MAP.md`, which queues a separately reviewed
+  bounded detailed-financials price-authority slice before CSV deletion.
+- `next_action`: decide whether the valuation path uses a typed current quote,
+  the latest local SQLite bar with explicit age/provenance, or omits price-based
+  metrics when freshness is unproven. Add a RED product-truth contract before
+  implementation. Old price CSVs may not be physically deleted until the live
+  consumer is removed or rewired and a fresh consumer census is clean.
+- `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened
 
