@@ -272,9 +272,9 @@ exit "${pipeline_status[0]}"
 Required identity:
 
 ```text
-75 lines / 2,188 bytes
+76 lines / 2,217 bytes
 SHA-256:
-53ccc22126194145b89a9333816533e198d1f503fc380e5de5224bb251c904fb
+63d57f298bc7c7077ea54fa168f0bc2fc78ccc94ce818ae74bd95d797b5aff10
 ```
 
 This wrapper owns the native/sandbox boundary, fresh runtime roots, exact
@@ -431,8 +431,8 @@ Expected identities:
 reporter:
 09d2bc52c7706b49e5f363fa2c6bcfc93523038f1c805fef08bb98a409301928
 wrapper:
-75 lines / 2188 bytes
-53ccc22126194145b89a9333816533e198d1f503fc380e5de5224bb251c904fb
+76 lines / 2217 bytes
+63d57f298bc7c7077ea54fa168f0bc2fc78ccc94ce818ae74bd95d797b5aff10
 ```
 
 - [ ] **Step 3: Reproduce base canonical and focused collections**
@@ -1944,7 +1944,17 @@ From the main worktree, verify `master` is an ancestor and use `git merge
 
 - [ ] **Step 3: Run merged focused and native full verification**
 
-From the merged main-worktree root, do not reuse branch result files. Run:
+From the merged main-worktree root, do not reuse branch result files. First
+capture the exact pre-run state:
+
+```bash
+git status --short --untracked-files=all \
+  > /tmp/eir002-green-baseline/merged-pre-status.txt
+find data src/data -type f -print 2>/dev/null | LC_ALL=C sort \
+  > /tmp/eir002-green-baseline/merged-pre-data.paths
+```
+
+Then run:
 
 ```bash
 PYTHONPATH="/tmp/eir002-green-baseline:$(git rev-parse --show-toplevel)" \
@@ -1974,7 +1984,38 @@ empty non-passing set, and protected `94 passed / 18 skipped`.
 Compare merged product/data paths against the pre-implementation merge base.
 The only test collection difference must remain the exact nine retired IDs.
 
-- [ ] **Step 4: Close EIR-002 with exact merged evidence**
+- [ ] **Step 4: Reconcile and quarantine merged-run artifacts**
+
+Capture the post-run state:
+
+```bash
+git status --short --untracked-files=all \
+  > /tmp/eir002-green-baseline/merged-post-status.txt
+find data src/data -type f -print 2>/dev/null | LC_ALL=C sort \
+  > /tmp/eir002-green-baseline/merged-post-data.paths
+comm -13 \
+  /tmp/eir002-green-baseline/merged-pre-data.paths \
+  /tmp/eir002-green-baseline/merged-post-data.paths \
+  > /tmp/eir002-green-baseline/merged-new-data.paths
+```
+
+`src/data/cache/risk_free_rate.json` is a known possible full-suite artifact,
+not an allowed repository change. For every path in `merged-new-data.paths`,
+record its exact path, inode, size, modification time, and SHA-256. Move each
+new file by its exact path to a unique location under
+`/tmp/eir002-green-baseline/merged-quarantine/`; do not glob or match by
+basename. Preserve the quarantine manifest in closeout evidence.
+
+If that known path existed before the run, it is pre-existing user state:
+record its pre/post metadata and SHA, require byte identity, and do not move
+it. Any modification of a pre-existing ignored file is a Stop Condition.
+
+Re-run the status and data inventory after quarantine. They must be
+byte-identical to `merged-pre-status.txt` and `merged-pre-data.paths`.
+Pre-existing user files, including the untracked scripts-retirement decision,
+must remain untouched.
+
+- [ ] **Step 5: Close EIR-002 with exact merged evidence**
 
 Set EIR-002 to `closed` only after merged verification. Record:
 
@@ -1988,7 +2029,7 @@ Set EIR-002 to `closed` only after merged verification. Record:
 Add the newest-first priority-map closeout entry. EIR-006 remains promoted and
 independent.
 
-- [ ] **Step 5: Commit docs-only closeout and request focused review**
+- [ ] **Step 6: Commit docs-only closeout and request focused review**
 
 ```bash
 git add docs/design/ENGINEERING_ISSUE_REGISTER.md \
@@ -2020,7 +2061,9 @@ Stop immediately if:
 13. full reporter `seen_node_ids` is not exactly the collected set;
 14. any product, provider, schema, frontend, scripts, or data file changes;
 15. EIR-006 is mixed into this implementation; or
-16. old CSV/parquet files are deleted, moved, archived, or rewritten.
+16. old CSV/parquet files are deleted, moved, archived, or rewritten; or
+17. a branch or merged native run leaves an unaccounted repository-relative
+    artifact.
 
 ## 6. Plan Self-Review Map
 
