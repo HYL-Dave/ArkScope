@@ -1,6 +1,6 @@
 # EIR-005 Machine-State Observer Design
 
-> **Status:** DRAFT - INDEPENDENT SPEC REVIEW NEXT
+> **Status:** APPROVED SPEC - EXACT-SOURCE PLAN REVIEW NEXT
 >
 > **Date:** 2026-07-31
 >
@@ -664,7 +664,8 @@ This handoff is an execution boundary, not a change in evidentiary standard.
 
 ## 10. Next Gate
 
-Independent full-document review is next.
+Independent full-document review returned GREEN with zero findings at
+`e11851cb`. Exact-source plan review is next.
 
 After GREEN:
 
@@ -676,4 +677,4 @@ After GREEN:
 6. return to the reviewed price-truth banking/product gate.
 
 No observer runtime, strace arm, product/test change, or unchanged price-v3
-rerun is authorized by this draft alone.
+rerun is authorized by the approved spec alone.
