@@ -1,9 +1,10 @@
 # ArkScope EIR-002 Green Backend Baseline Design
 
-> **Status: DRAFT - INDEPENDENT DESIGN REVIEW NEXT**
+> **Status: APPROVED - INDEPENDENT DESIGN REVIEW GREEN**
 >
 > **Date:** 2026-07-31
 > **Grounding commit:** `3092fb4128dad9a2579f267e915519fa9cdf648c`
+> **Reviewed design commit:** `20d4e7e2`
 > **Scope:** the exact 27-node native backend non-passing set owned by
 > `EIR-002`, its obsolete ambient-data assumptions, and the test seams needed
 > to establish a green backend baseline

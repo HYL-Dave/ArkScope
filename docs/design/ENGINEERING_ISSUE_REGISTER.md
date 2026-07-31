@@ -148,13 +148,14 @@ Each entry records:
     `7aafce5d2cba923480cc1fb6221bce4f5a33e0bf61c06cf94227cafefe227f15`;
   - 26 IDs trace to the 2026-02-05 real-repository-data tests in `74433f84`;
     one ID is the moving-window test introduced by `e6d99342`; and
-  - the draft classification and disposition are now owned by
+  - the approved classification and disposition are now owned by
     `docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md`.
 - `owner`: promoted EIR-002 green-backend-baseline slice.
-- `next_action`: independently review the promoted design, then write its
-  exact-node implementation plan. Do not restore the retired data premise as a
-  fixture and do not run canonical API/full admission in the incompatible
-  managed sandbox.
+- `next_action`: independently review the exact-node implementation plan at
+  `docs/superpowers/plans/2026-07-31-eir-002-green-backend-baseline.md`.
+  Implementation remains unauthorized until that review is green. Do not
+  restore the retired data premise as a fixture and do not run canonical
+  API/full admission in the incompatible managed sandbox.
 - `closure_evidence`: none.
 
 ### EIR-003 - Audit the 89 I18N-2-era Settings copy rewrites
