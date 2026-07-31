@@ -1528,6 +1528,52 @@ def test_ibkr_sources_serialize_behind_gateway_lock(monkeypatch):
     assert ds.run_source("polygon_news")["status"] == "succeeded"
 
 
+def _scheduled_price_payload(
+    *, status="succeeded", scanned=2, errors=0, unresolved=0,
+):
+    unresolved_tickers = ["LCID"][:unresolved]
+    error_order = ["LCID", "BAD"] if unresolved else ["BAD", "LCID"]
+    error_tickers = sorted(error_order[:errors])
+    return {
+        "status": status,
+        "provider": "ibkr",
+        "tickers_scanned": scanned,
+        "succeeded_ticker_count": scanned - errors,
+        "gaps_found": unresolved,
+        "rows_added": 26 if status == "succeeded" else 1,
+        "error_count": errors,
+        "error_tickers": error_tickers,
+        "unresolved_after_fetch_count": unresolved,
+        "unresolved_after_fetch_tickers": unresolved_tickers,
+        "error_class": "",
+        "error": "",
+        "retryable": False,
+    }
+
+
+class _RecordingJobStore:
+    def __init__(self):
+        self.created = []
+        self.finished = []
+
+    def create_run(self, name, **kwargs):
+        self.created.append((name, kwargs))
+        return len(self.created)
+
+    def finish_run(self, run_id, **kwargs):
+        self.finished.append((run_id, kwargs))
+        return True
+
+
+def _install_recording_job_store(monkeypatch):
+    store = _RecordingJobStore()
+    monkeypatch.setattr(
+        "src.service.job_runs_store.JobRunsLocalStore",
+        lambda profile_db: store,
+    )
+    return store
+
+
 def test_price_scope_required(monkeypatch):
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
     res = ds.run_source("ibkr_prices")
@@ -1542,7 +1588,7 @@ def test_price_scope_required(monkeypatch):
         "_run_sanitized_prices_worker_subprocess",
         lambda argv: seen.update({"argv": argv}) or {
             "returncode": 0,
-            "payload": {"tickers_scanned": 2, "rows_added": 0, "error_count": 0},
+            "payload": _scheduled_price_payload(),
         },
     )
     res = ds.run_source("ibkr_prices")
@@ -1869,11 +1915,8 @@ def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
         return {
             "returncode": 0,
             "payload": {
-                "status": "succeeded",
-                "provider": "ibkr",
-                "tickers_scanned": 2,
+                **_scheduled_price_payload(),
                 "rows_added": 3,
-                "error_count": 0,
             },
         }
 
@@ -1897,7 +1940,10 @@ def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
         seen["argv"] = argv
         return {
             "returncode": 0,
-            "payload": {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 2, "error_count": 0},
+            "payload": {
+                **_scheduled_price_payload(scanned=1),
+                "rows_added": 2,
+            },
         }
 
     monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", _fake_worker)
@@ -1915,6 +1961,108 @@ def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
     assert "--gateway-lock-held" in argv
     assert "--source" not in argv
     assert "local_refresh" not in res
+
+
+def test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation(
+    monkeypatch,
+):
+    store = _install_recording_job_store(monkeypatch)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "LCID"])
+    monkeypatch.setattr(
+        ds, "_run_sanitized_prices_worker_subprocess",
+        lambda argv: {
+            "returncode": 0,
+            "payload": _scheduled_price_payload(
+                status="partial", errors=1, unresolved=1,
+            ),
+        },
+    )
+    result = ds.run_source("ibkr_prices", trigger_source="api")
+    assert result["status"] == "partial"
+    assert result["collect"]["succeeded_ticker_count"] == 1
+    assert result["collect"]["unresolved_after_fetch_tickers"] == ["LCID"]
+    durable = ds._state_store().get("ibkr_prices")
+    assert durable["last_status"] == "partial"
+    assert durable["last_error"] is None
+    assert durable["continuation"] is None
+    _, finished = store.finished[-1]
+    assert finished["status"] == "failed"
+    assert finished["error"] == "price_collection_partial"
+    assert finished["message"] == "price_collection_partial"
+    assert finished["result"]["status"] == "partial"
+
+
+def test_prices_failed_payload_persists_failed_without_partial(monkeypatch):
+    store = _install_recording_job_store(monkeypatch)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["BAD", "LCID"])
+    monkeypatch.setattr(
+        ds, "_run_sanitized_prices_worker_subprocess",
+        lambda argv: {
+            "returncode": 1,
+            "payload": _scheduled_price_payload(
+                status="failed", errors=2, unresolved=1,
+            ),
+        },
+    )
+    result = ds.run_source("ibkr_prices", trigger_source="api")
+    assert result["status"] == "failed"
+    assert result["collect"]["status"] == "failed"
+    durable = ds._state_store().get("ibkr_prices")
+    assert durable["last_status"] == "failed"
+    assert durable["continuation"] is None
+    _, finished = store.finished[-1]
+    assert finished["status"] == "failed"
+    assert finished["error"] == "price_collection_failed"
+
+
+def test_prices_success_clears_prior_partial_and_preserves_audit_history(monkeypatch):
+    store = _install_recording_job_store(monkeypatch)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "LCID"])
+    steps = iter([
+        {
+            "returncode": 0,
+            "payload": _scheduled_price_payload(
+                status="partial", errors=1, unresolved=1,
+            ),
+        },
+        {
+            "returncode": 0,
+            "payload": _scheduled_price_payload(status="succeeded"),
+        },
+    ])
+    monkeypatch.setattr(
+        ds, "_run_sanitized_prices_worker_subprocess", lambda argv: next(steps),
+    )
+    assert ds.run_source("ibkr_prices")["status"] == "partial"
+    assert ds.run_source("ibkr_prices")["status"] == "succeeded"
+    durable = ds._state_store().get("ibkr_prices")
+    assert durable["last_status"] == "succeeded"
+    assert durable["last_error"] is None
+    assert durable["continuation"] is None
+    assert [kwargs["status"] for _, kwargs in store.finished] == [
+        "failed", "succeeded",
+    ]
+    assert store.finished[0][1]["error"] == "price_collection_partial"
+    assert store.finished[1][1]["error"] is None
+
+
+def test_price_partial_projection_does_not_change_normalized_news_audit_status(
+    monkeypatch,
+):
+    import src.news_normalized.routing as routing
+
+    store = _install_recording_job_store(monkeypatch)
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED)
+    monkeypatch.setattr(
+        ds, "_run_normalized_news_writer",
+        lambda *args, **kwargs: {"status": "partial", "continuation": None},
+    )
+    result = ds.run_source("polygon_news", trigger_source="api")
+    assert result["status"] == "partial"
+    assert ds._state_store().get("polygon_news")["continuation"] is None
+    _, finished = store.finished[-1]
+    assert finished["status"] == "succeeded"
+    assert finished["error"] is None
 
 
 # --- v1.2: durable scheduler_state persistence ------------------------------------
@@ -2132,7 +2280,7 @@ def test_prices_worker_stdout_parse_preserves_retryable_and_counts():
     making skipped_lock_busy classification dead code and zeroing telemetry."""
     import json as _json
 
-    from src.prices_runtime import sanitize_error, sanitize_result
+    from src.prices_runtime import sanitize_error
 
     failure = _json.dumps(sanitize_error(TimeoutError("market_data.db write lock busy (timeout)")))
     payload = ds._parse_sanitized_prices_worker_stdout(failure)
@@ -2141,15 +2289,49 @@ def test_prices_worker_stdout_parse_preserves_retryable_and_counts():
     assert "write lock busy" in payload["error"]
     assert ds._prices_worker_retryable_skip_reason(payload) is not None
 
-    success = _json.dumps(sanitize_result({
-        "provider": "ibkr", "tickers_scanned": 3, "gaps_found": 2,
-        "rows_added": 55, "errors": {"NVDA": "boom"},
-    }))
+    success_payload = _scheduled_price_payload(
+        status="succeeded", scanned=3, errors=0, unresolved=0,
+    )
+    success_payload["gaps_found"] = 2
+    success_payload["rows_added"] = 55
+    success = _json.dumps(success_payload)
     ok = ds._parse_sanitized_prices_worker_stdout(success)
     assert ok["status"] == "succeeded" and ok["rows_added"] == 55
     assert ok["tickers_scanned"] == 3 and ok["gaps_found"] == 2
-    assert ok["error_count"] == 1 and ok["error_tickers"] == ["NVDA"]
+    assert ok["succeeded_ticker_count"] == 3
+    assert ok["error_count"] == 0 and ok["error_tickers"] == []
+    assert ok["unresolved_after_fetch_count"] == 0
+    assert ok["unresolved_after_fetch_tickers"] == []
     assert ok["provider"] == "ibkr"
+
+
+def test_prices_worker_stdout_parser_preserves_partial_truth_and_bounded_tickers():
+    raw = _scheduled_price_payload(
+        status="partial", scanned=30, errors=1, unresolved=1,
+    )
+    raw["succeeded_ticker_count"] = 29
+    raw["error_tickers"] = ["LCID"]
+    raw["unresolved_after_fetch_tickers"] = ["LCID"]
+    parsed = ds._parse_sanitized_prices_worker_stdout(json.dumps(raw))
+    assert parsed == raw
+
+
+def test_prices_worker_stdout_parser_rejects_malformed_partial_payloads():
+    valid = _scheduled_price_payload(status="partial", errors=1, unresolved=1)
+    invalid = [
+        {**valid, "status": "complete"},
+        {**valid, "provider": "PRIVATE_PROVIDER"},
+        {**valid, "rows_added": -1},
+        {**valid, "error_count": True},
+        {**valid, "succeeded_ticker_count": 2},
+        {**valid, "unresolved_after_fetch_count": 2},
+        {**valid, "error_tickers": "LCID"},
+        {**valid, "error_tickers": ["LCID"] * 26},
+        {**valid, "error_tickers": [123]},
+        {**valid, "unresolved_after_fetch_tickers": ["LCID\nPRIVATE"]},
+    ]
+    for payload in invalid:
+        assert ds._parse_sanitized_prices_worker_stdout(json.dumps(payload)) is None
 
 
 def test_normalized_news_lock_busy_is_retryable_skip(monkeypatch):

@@ -593,7 +593,33 @@ def _sanitized_worker_failure_message(payload: Dict[str, Any]) -> str:
     return "normalized IBKR worker failed"
 
 
-_PRICES_WORKER_COUNT_KEYS = ("tickers_scanned", "gaps_found", "rows_added", "error_count")
+_PRICES_WORKER_STATUSES = frozenset({"succeeded", "partial", "failed"})
+_PRICES_WORKER_COUNT_KEYS = (
+    "tickers_scanned",
+    "succeeded_ticker_count",
+    "gaps_found",
+    "rows_added",
+    "error_count",
+    "unresolved_after_fetch_count",
+)
+
+
+def _parse_price_ticker_ids(value: Any) -> Optional[List[str]]:
+    if (
+        not isinstance(value, list)
+        or len(value) > 25
+        or any(not isinstance(item, str) for item in value)
+    ):
+        return None
+    normalized = sorted({item.strip().upper() for item in value})
+    if any(
+        not item
+        or len(item) > 12
+        or any(ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ._-" for ch in item)
+        for item in normalized
+    ):
+        return None
+    return normalized
 
 
 def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
@@ -605,20 +631,73 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
         return None
     if not isinstance(raw, dict):
         return None
-    payload: Dict[str, Any] = {"status": str(raw.get("status") or "unknown")}
-    for key in _PRICES_WORKER_COUNT_KEYS:
-        payload[key] = _safe_int(raw.get(key))
-    provider = str(raw.get("provider") or "")
-    payload["provider"] = provider if provider in ("ibkr", "polygon") else None
-    tickers = raw.get("error_tickers")
-    payload["error_tickers"] = (
-        [str(t)[:12] for t in tickers[:25]] if isinstance(tickers, list) else []
-    )
+    status = raw.get("status")
+    if status not in _PRICES_WORKER_STATUSES:
+        return None
+
+    has_structured_counts = any(key in raw for key in _PRICES_WORKER_COUNT_KEYS)
     error_class = str(raw.get("error_class") or "")
-    payload["error_class"] = error_class if error_class.replace("_", "").isalnum() else ""
-    payload["error"] = str(raw.get("error") or "")[:_ERROR_TAIL]
-    payload["retryable"] = raw.get("retryable") is True
-    return payload
+    safe_error_class = (
+        error_class if error_class.replace("_", "").isalnum() else ""
+    )
+    if status == "failed" and not has_structured_counts:
+        return {
+            "status": "failed",
+            "provider": None,
+            **{key: 0 for key in _PRICES_WORKER_COUNT_KEYS},
+            "error_tickers": [],
+            "unresolved_after_fetch_tickers": [],
+            "error_class": safe_error_class,
+            "error": str(raw.get("error") or "")[:_ERROR_TAIL],
+            "retryable": raw.get("retryable") is True,
+        }
+
+    provider = raw.get("provider")
+    if provider not in {"ibkr", "polygon"}:
+        return None
+    counts: Dict[str, int] = {}
+    for key in _PRICES_WORKER_COUNT_KEYS:
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        counts[key] = value
+    error_tickers = _parse_price_ticker_ids(raw.get("error_tickers"))
+    unresolved_tickers = _parse_price_ticker_ids(
+        raw.get("unresolved_after_fetch_tickers")
+    )
+    if error_tickers is None or unresolved_tickers is None:
+        return None
+    if len(error_tickers) != min(counts["error_count"], 25):
+        return None
+    if len(unresolved_tickers) != min(
+        counts["unresolved_after_fetch_count"], 25
+    ):
+        return None
+    if counts["succeeded_ticker_count"] != (
+        counts["tickers_scanned"] - counts["error_count"]
+    ):
+        return None
+    if counts["unresolved_after_fetch_count"] > counts["error_count"]:
+        return None
+    scanned = counts["tickers_scanned"]
+    error_count = counts["error_count"]
+    expected = (
+        "succeeded" if error_count == 0
+        else "failed" if scanned > 0 and error_count == scanned
+        else "partial"
+    )
+    if scanned <= 0 or status != expected:
+        return None
+    return {
+        "status": status,
+        "provider": provider,
+        **counts,
+        "error_tickers": error_tickers,
+        "unresolved_after_fetch_tickers": unresolved_tickers,
+        "error_class": "",
+        "error": "",
+        "retryable": False,
+    }
 
 
 def _run_sanitized_prices_worker_subprocess(argv: List[str]) -> Dict[str, Any]:
@@ -632,6 +711,7 @@ def _run_sanitized_prices_worker_subprocess(argv: List[str]) -> Dict[str, Any]:
             "retryable": False,
             "provider": None,
             "error_tickers": [],
+            "unresolved_after_fetch_tickers": [],
             **{key: 0 for key in _PRICES_WORKER_COUNT_KEYS},
         }
         return {"returncode": proc.returncode or 1, "payload": payload}
@@ -909,6 +989,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         error: Optional[str] = None
         writer_continuation = None
         writer_partial = False
+        price_partial = False
+        price_audit_error: Optional[str] = None
         preserve_continuation_on_failure = None
         try:
             if d.news_direct_source is not None:
@@ -1021,7 +1103,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 ]
                 step = _run_sanitized_prices_worker_subprocess(argv)
                 result["collect"] = step["payload"]
-                if step["returncode"] != 0:
+                price_status = step["payload"]["status"]
+                if price_status == "partial" and step["returncode"] == 0:
+                    price_partial = True
+                    price_audit_error = "price_collection_partial"
+                elif price_status == "failed":
                     reason = _prices_worker_retryable_skip_reason(step["payload"])
                     if reason is not None:
                         result.update({
@@ -1030,9 +1116,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                             "skip_kind": "skipped_lock_busy",
                         })
                     else:
-                        raise RuntimeError(
-                            _sanitized_prices_worker_failure_message(step["payload"])
-                        )
+                        raise RuntimeError("price_collection_failed")
+                elif price_status != "succeeded" or step["returncode"] != 0:
+                    raise RuntimeError(
+                        _sanitized_prices_worker_failure_message(step["payload"])
+                    )
             elif d.adapter is not None:
                 # In-process provider adapter (import-safe collector module);
                 # resolved lazily so tests can monkeypatch the module function and
@@ -1084,9 +1172,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         continuation = None
         if result.get("status") == "skipped":
             continuation = pending_cont if pending_cont is not None else None
-        elif ok and writer_partial:
+        elif ok and (writer_partial or price_partial):
             result["status"] = "partial"
-            continuation = writer_continuation
+            continuation = writer_continuation if writer_partial else None
             if continuation is not None:
                 result["continuation"] = continuation
         else:
@@ -1107,8 +1195,15 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
         if store is not None and run_id is not None:
             try:
-                store.finish_run(run_id, status="succeeded" if ok else "failed",
-                                 message=None if ok else error, error=error, result=result)
+                audit_failed = (not ok) or price_partial
+                audit_error = price_audit_error if price_partial else error
+                store.finish_run(
+                    run_id,
+                    status="failed" if audit_failed else "succeeded",
+                    message=audit_error if audit_failed else None,
+                    error=audit_error if audit_failed else None,
+                    result=result,
+                )
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"scheduler telemetry finish failed: {e}")
         return _record_result(result)
