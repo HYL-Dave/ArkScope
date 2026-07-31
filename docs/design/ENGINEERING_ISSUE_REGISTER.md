@@ -89,7 +89,7 @@ Each entry records:
 | `next_action` | Smallest concrete action that advances the entry. |
 | `closure_evidence` | Empty while open; commit, command, and result at close. |
 
-## 4. Open Entries
+## 4. Entries
 
 ### EIR-001 - Retire unreachable `.page-head*` CSS
 
@@ -194,12 +194,13 @@ Each entry records:
 
 ### EIR-005 - Diagnose the intermittent full-suite TestClient portal stall
 
-- `status`: `open`
-- `observed_at`: `2026-07-29`; independently revalidated `2026-07-30`.
-- `impact`: A monolithic backend run can stop before application lifespan is
-  created, preventing a trustworthy complete-suite result and repeatedly
-  blocking unrelated product verification. This is a test-runtime reliability
-  defect; current evidence does not establish a desktop startup defect.
+- `status`: `closed`
+- `observed_at`: `2026-07-29`; independently revalidated `2026-07-30`;
+  execution-boundary cause closed `2026-07-31`.
+- `impact`: A backend run inside the Codex managed sandbox can stop before or
+  during event-loop work because that boundary rejects Unix-socket self-pipe
+  sends. This repeatedly blocked unrelated product verification. Native
+  execution completes the same suite; no desktop startup defect was found.
 - `evidence`:
   - three pre-experiment dumps and the frozen 80-trial matrix are recorded in
     `docs/superpowers/evidence/2026-07-29-lifespan-stall-causal-diagnosis.md`;
@@ -214,17 +215,37 @@ Each entry records:
   - each fresh dump stops at
     `Future.result -> _spawn_task_from_thread -> start_task_soon ->
     TestClient.__enter__`, with the portal thread idle in `select()` and no
-    pyrate-limiter thread.
-- `owner`: separately reviewed full-suite machine-state observer slice, ordered
-  after the active price-truth line's next review checkpoint.
-- `next_action`: keep the monolithic suite instrumented but non-exclusive in
-  the reviewed price verification contract. After that contract reaches its
-  next review checkpoint, write the Section 7 observer spec before another
-  broad harness conversion. The observer must capture AnyIO wakeup-socket
-  state, selector registrations, `asyncio.all_tasks`, system load/file
-  descriptors, and SIGINT receipt/response. A matching real desktop startup
-  failure promotes this entry immediately and overrides the deferred ordering.
-- `closure_evidence`: none.
+    pyrate-limiter thread;
+  - the exact 942-byte wakeup probe at SHA-256 `10647c1e...` produced
+    `callback_fired=false`, `_ready=1`, and zero wake bytes in `3/3` managed
+    sandbox runs, while the identical bytes produced `true`, `_ready=0`, and
+    zero residual bytes in `3/3` native runs;
+  - direct `socket.socketpair().sendall()` returned
+    `PermissionError: [Errno 1] Operation not permitted` only in the managed
+    sandbox and completed natively; and
+  - the unchanged price-v3 runner then completed all eight native tiers on
+    their first attempts: `4722` admitted nodes, `27` known EIR-002
+    non-passing nodes, SHA-256 `7aafce5d...`, and no unresolved tier.
+- `owner`: closed. Backend admission that exercises cross-thread asyncio or
+  AnyIO wakeups must use the native execution boundary, not the incompatible
+  managed sandbox.
+- `next_action`: none for EIR-005. If the sandbox policy changes, rerun the
+  pinned wakeup probe before treating sandbox and native results as
+  interchangeable. EIR-002 remains the independent owner of the 27 non-green
+  data-fixture nodes.
+- `closure_evidence`:
+  - docs-only evidence and Task 0 commit
+    `381de752dc40ceb61a37033ed090b25c95d1b140`;
+  - exact sandbox/native probe and syscall artifacts verified `12/12` from
+    `/tmp/eir005-sandbox-boundary-closeout-20260731/manifest.sha256`
+    (`4806f3d6...`);
+  - unchanged native v3 `run-side` returned `complete=true`, selected all
+    eight first attempts, unresolved `[]`, non-passing `27/7aafce5d...`; and
+  - canonical records:
+    `docs/superpowers/evidence/2026-07-29-lifespan-stall-causal-diagnosis.md`
+    Section 14 and
+    `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
+    Section 8.11.
 
 ## 5. Seed Triage: Items Not Opened
 
