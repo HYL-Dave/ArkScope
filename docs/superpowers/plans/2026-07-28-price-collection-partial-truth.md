@@ -9,7 +9,7 @@
 > `superpowers:verification-before-completion` before any passing or complete
 > claim. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: TASK 0 NATIVE BASE COMPLETE - PRODUCT RED NEXT AFTER REVIEW**
+> **Status: TASK 0 NATIVE BASE COMPLETE - PRODUCT RED AUTHORIZED**
 
 **Goal:** Make direct-local price collection report per-ticker unresolved
 completed-day targets as structural partial truth from collector through
@@ -2057,6 +2057,28 @@ become an A/B side.
   git diff --cached --check
   git commit -m "docs: ground price collection truth task 0"
   ```
+
+### 7.1 Task 0 closeout advisory ruling
+
+Focused closeout review cleared `73d5305e..0075ba9e` with zero findings.
+`master` and `codex/price-collection-truth` were then fast-forwarded to exact
+reviewed tip `0075ba9ef49ff3cd4a71d1c6c42d89de7046f7d8`.
+
+The reviewed v3 runner remains unchanged. Its terminal-summary regular
+expression does not accept pytest's optional `(h:mm:ss)` suffix. This defect
+is fail-closed: it can reject a naturally completed tier, but it cannot admit
+an incomplete tier or create a false pass. T4 is unchanged by the planned
+product node delta and completed the native base in `48.183s`, so replacing
+the runner and invalidating the complete reviewed base before product RED is
+not proportionate.
+
+If a tip tier naturally completes but is classified
+`natural_result_validation_failed` solely because its terminal line adds the
+`(h:mm:ss)` suffix, stop the side immediately. Do not reinterpret the record
+as pass and do not retry in hope of a faster duration. Amend the runner to a
+separately reviewed v3.1 expression, rerun its control probes, and rebuild the
+entire tip side under that one protocol identity. Any other invalid reason
+continues to use the existing closed outcome table and Stop Condition 11.
 
 ## 8. Task 1 - Direct Collector RED And GREEN
 
