@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 0 BLOCKED - PROVIDER-SAFE BASE AMENDMENT REVIEW REQUIRED
+> **Status:** TASK 5 BLOCKED - OLD-PATH CENSUS AMENDMENT REVIEW REQUIRED
 >
 > **Date:** 2026-08-01
 >
@@ -288,8 +288,11 @@ Modify:
 ```text
 README.md
 PROJECT_STRUCTURE.md
+scripts/__init__.py
+tests/test_db_backend.py
 docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md
 docs/design/REPO_HYGIENE_B6_MODULE_DISPOSITION.md
+docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md
 docker/README.md
 src/auth_drivers/chatgpt_oauth_probe.py
 docs/design/LLM_AUTH_DRIVER_PLAN.md
@@ -696,6 +699,19 @@ After Tranche A:
 
 - `README.md` and `PROJECT_STRUCTURE.md` describe only the transitional
   `scripts/scoring/` owner and state final root retirement is Tranche B;
+- `scripts/__init__.py` names only the transitional `scripts.scoring`
+  namespace and assigns package-marker removal to Tranche B; it may not claim
+  that `scripts.migration` still exists;
+- `tests/test_db_backend.py` describes only its isolated PostgreSQL/schema
+  prerequisites and may not require the nonexistent
+  `scripts/migrate_to_supabase.py`;
+- `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md` preserves its portability/import
+  capability requirements but labels the unimplemented
+  `scripts/profile_export.py`, `scripts/profile_import.py`, and
+  `scripts/migrate_pg_to_local.py` command shapes as rejected historical design
+  placeholders. A future implementation must select an app-owned module or
+  installed CLI in its own reviewed slice; Tranche A does not fabricate that
+  replacement;
 - `REFACTOR_PROTECTION_SMOKE_GATES.md` replaces the old broad survivor table
   with the approved interim rule: only the nine Section 0.1 paths are allowed;
 - `REPO_HYGIENE_B6_MODULE_DISPOSITION.md` labels its old Section 3 table
@@ -1275,6 +1291,15 @@ paths, not broad directories. It must say Tranche B owns final root removal.
 
 Make these exact semantic changes:
 
+- `scripts/__init__.py`: retain only the transitional `scripts.scoring`
+  package-marker rationale and state that Tranche B owns final removal;
+- `tests/test_db_backend.py`: remove the nonexistent data-import script from
+  the active test prerequisites; the isolated archive/test DB and schema are
+  sufficient for the retired-domain assertions;
+- `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`: add a dated
+  implementation-location supersession that rejects its three root-script
+  command shapes as current runnable instructions without weakening the
+  portability/import capability requirements or inventing replacement paths;
 - `training/data_prep/state_builder.py`: tell the user to re-export or retrain a
   model with required schema metadata;
 - `training/model_registry.py`: describe required schema metadata without a
@@ -1340,7 +1365,20 @@ scripts.migration
 scripts.diagnostics
 ```
 
-Classify every remaining hit as one of:
+The raw search is a discovery superset. Before old-path classification:
+
+1. extract exact current references to the nine Section 0.1 retained paths
+   into a separately counted and hashed `approved_tranche_a_survivor` stream;
+2. extract lexical matches that do not denote a repository path into a
+   separately counted and hashed `lexical_non_path` stream; and
+3. define the old-path candidate set as raw search minus those two explicit
+   side streams.
+
+The survivor filter may match only exact retained paths or their direct
+package owner. A broad `scripts/` directory statement, a removed namespace, or
+an unimplemented root command may not enter it. No row may be silently dropped.
+
+Classify every old-path candidate as one of:
 
 ```text
 historical_record
@@ -1382,8 +1420,11 @@ docs/design/DESKTOP_APP_CARRYOVER_ANALYSIS.md
 git add \
   README.md \
   PROJECT_STRUCTURE.md \
+  scripts/__init__.py \
+  tests/test_db_backend.py \
   docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md \
   docs/design/REPO_HYGIENE_B6_MODULE_DISPOSITION.md \
+  docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md \
   docker/README.md \
   src/auth_drivers/chatgpt_oauth_probe.py \
   docs/design/LLM_AUTH_DRIVER_PLAN.md \
