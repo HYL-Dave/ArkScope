@@ -1,6 +1,6 @@
 # `scripts/` Comprehensive Retirement — Decision Document
 
-> **Status: APPROVED DECISION AUTHORITY; TRANCHE A PLAN WRITTEN; INDEPENDENT PLAN REVIEW REQUIRED**
+> **Status: APPROVED DECISION AUTHORITY; TRANCHE A COMPLETE; TRANCHE B NOT STARTED**
 >
 > Written 2026-07-27 against clean `master` tip `5ba12673`, then fully
 > re-grounded on 2026-08-01 against exact clean tip
@@ -17,6 +17,13 @@
 > implementation remains blocked on independent review clearance of the
 > RED-first Tranche A plan. Any production-data deletion or potentially billable
 > provider revalidation requires a second explicit approval at execution time.
+>
+> Tranche A implementation received independent GREEN review and `master`
+> fast-forwarded linearly to the exact reviewed checkpoint:
+> `SCRIPTS_TRANCHE_A_TIP=d6ef3b9726c00d1ffbbeb70ea11a74aa8ae24678`.
+> The root package now remains intentionally only for `scripts/scoring/` and its
+> package marker. Tranche B has not started; no production score data or local
+> scoring secret changed in Tranche A.
 >
 > Supersedes nothing.
 > `REPO_HYGIENE_B6_MODULE_DISPOSITION.md` §3 and
@@ -612,6 +619,19 @@ Record a named `SCRIPTS_TRANCHE_A_TIP` commit plus exact collection/node ledger,
 canonical full-green admission, default-collection proof for `tests/live/`, and
 a classified old-path census. Final review compares base to this checkpoint
 independently.
+
+Tranche A completed at:
+
+```text
+SCRIPTS_TRANCHE_A_TIP=d6ef3b9726c00d1ffbbeb70ea11a74aa8ae24678
+```
+
+The reviewed checkpoint has exact collection `4553/69152591...`, native
+admission `4481 passed / 72 skipped / 0 failed`, the reviewed nine-path
+physical tree, and zero `current_runnable` old-path census verdicts. Root
+`scripts/` remains only for the transitional scoring owner and package marker.
+This checkpoint does not authorize Tranche B, production score-data changes,
+local-secret changes, or archive deletion.
 
 ### 6.2 Tranche B: legacy score contract and final closure
 
