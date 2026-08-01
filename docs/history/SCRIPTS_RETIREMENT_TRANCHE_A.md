@@ -44,9 +44,10 @@ Its durable behavior is owned by:
 - the production-contract assertions in
   `tests/test_news_normalized_ibkr_adapter.py`.
 
-Task 3 removes three tests that exist only to import or verify the spent probe.
-The other 17 adapter contract nodes remain. Removing the executable does not
-remove typed unavailable handling, output sanitization, or adapter behavior.
+Task 3 removed three tests that existed only to import or verify the spent
+probe. The other 17 adapter contract nodes remain. Removing the executable did
+not remove typed unavailable handling, output sanitization, or adapter
+behavior.
 
 ## 3. Retired News Dashboard Knowledge
 

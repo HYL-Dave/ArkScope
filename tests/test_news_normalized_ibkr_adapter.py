@@ -1,5 +1,4 @@
 from contextlib import contextmanager, nullcontext
-import json
 import logging
 import sqlite3
 import traceback
@@ -12,11 +11,6 @@ from data_sources.ibkr_source import (
     IBKRDataSource,
     IBKRNewsArticleUnavailable,
     RequestError,
-)
-from scripts.diagnostics.probe_ibkr_news_bodies import (
-    DEFAULT_PROBES,
-    ProbeSpec,
-    main as probe_main,
 )
 from src.news_normalized.ibkr_adapter import IBKRHeadline, IBKRNormalizedProvider
 from src.news_normalized.models import (
@@ -351,96 +345,3 @@ def test_ibkr_strict_body_method_propagates_but_compatibility_method_catches():
     with pytest.raises(TimeoutError):
         source.fetch_news_article_body_strict("DJ-N", "DJ-N$2")
     assert source.fetch_news_article_body("DJ-N", "DJ-N$2") is None
-
-
-def test_probe_output_never_contains_body_or_exception_payload(capsys, monkeypatch):
-    monkeypatch.setattr(
-        "scripts.diagnostics.probe_ibkr_news_bodies._apply_effective_ibkr_env",
-        lambda _profile_db: None,
-    )
-    secret = "LICENSED-ARTICLE-SECRET-7f3c"
-
-    class Source:
-        def fetch_news_article_body_strict(self, provider, article_id):
-            if article_id == "ok":
-                return f"<p>{secret}</p>"
-            raise RuntimeError(f"failure contains {secret}")
-
-        def disconnect(self):
-            pass
-
-    probes = (
-        ProbeSpec("normal", "DJ-RTA", "ok"),
-        ProbeSpec("error", "DJ-N", "bad"),
-    )
-
-    exit_code = probe_main(
-        [],
-        source_factory=Source,
-        probes=probes,
-        lock_factory=nullcontext,
-    )
-
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert secret not in captured.out
-    assert secret not in captured.err
-    payload = json.loads(captured.out)
-    assert payload[0] == {
-        "html_tags": 2,
-        "label": "normal",
-        "length": len(f"<p>{secret}</p>"),
-        "present": True,
-        "provider": "DJ-RTA",
-        "response_class": "body",
-    }
-    assert payload[1]["response_class"] == "error"
-    assert payload[1]["error_type"] == "RuntimeError"
-
-
-def test_probe_classifies_ibkr_unavailable_without_payload(capsys, monkeypatch):
-    monkeypatch.setattr(
-        "scripts.diagnostics.probe_ibkr_news_bodies._apply_effective_ibkr_env",
-        lambda _profile_db: None,
-    )
-
-    class Source:
-        def fetch_news_article_body_strict(self, provider, article_id):
-            raise IBKRNewsArticleUnavailable(10172)
-
-        def disconnect(self):
-            pass
-
-    exit_code = probe_main(
-        [],
-        source_factory=Source,
-        probes=(ProbeSpec("missing", "DJ-N", "secret-id"),),
-        lock_factory=nullcontext,
-    )
-
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "secret-id" not in captured.out
-    assert "secret-id" not in captured.err
-    assert json.loads(captured.out) == [
-        {
-            "error_code": 10172,
-            "html_tags": 0,
-            "label": "missing",
-            "length": 0,
-            "present": False,
-            "provider": "DJ-N",
-            "response_class": "unavailable",
-        }
-    ]
-
-
-def test_probe_has_five_reviewed_default_cases():
-    assert len(DEFAULT_PROBES) == 5
-    assert {item.label for item in DEFAULT_PROBES} == {
-        "recent_body",
-        "recent_missing",
-        "old_body",
-        "old_missing",
-        "alert",
-    }
