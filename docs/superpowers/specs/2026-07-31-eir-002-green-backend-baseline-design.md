@@ -1,6 +1,6 @@
 # ArkScope EIR-002 Green Backend Baseline Design
 
-> **Status: APPROVED - INDEPENDENT DESIGN REVIEW GREEN**
+> **Status: TASK 7 BOUNDED AMENDMENT - INDEPENDENT REVIEW NEXT**
 >
 > **Date:** 2026-07-31
 > **Grounding commit:** `3092fb4128dad9a2579f267e915519fa9cdf648c`
@@ -248,6 +248,42 @@ The final suite must pass without provider credentials and without copied
 repository data. Adding a key, mount, or historical file to make a node pass
 changes the question and is not an EIR-002 repair.
 
+### LD 9 - Keep canonical admission blank and repair the exposed protected node
+
+Task 7 proved that the merged main worktree is not the blank environment
+defined by LD 8. Its ignored `config/.env` is read directly at import time by
+`tests/test_db_backend.py`, enabling nineteen PostgreSQL integration nodes that
+remain skipped in the reviewed branch worktree. The production scheduler also
+writes ignored databases in the main worktree while a long suite is running.
+Neither state is an admissible canonical input.
+
+The data-bearing run exposed one independently reproducible stale assertion:
+`tests/test_db_backend.py::TestFundamentalsDB::test_fundamentals_via_dal`
+expects `FundamentalsResult.found`, but that field has never existed in the
+schema. The current typed absence fact is `data_source == "none"`. This node
+must keep its exact identity and change only that assertion. No product code,
+skip rule, fixture, provider behavior, or other integration node may change.
+
+Canonical merged admission must run from a fresh worktree at the exact merged
+master commit with:
+
+- no `config/.env`;
+- an existing but empty repository `data/` directory;
+- no copied production or historical data; and
+- one explicit `node_modules` symlink to the reviewed main-worktree install,
+  pinned by target path, tracked and installed lockfile SHAs, Node version,
+  and required `jsdom` version; and
+- the same pinned native wrapper, reporter, Node.js, and wakeup probe.
+
+The `node_modules` link is a test-toolchain dependency, not an admission data
+input. No other symlink into the production root is allowed.
+
+The canonical ledger remains `4730 collected / 4658 passed / 72 skipped`.
+The main worktree's data-bearing owning node is a supplemental proof that the
+stale assertion is repaired; its different pass/skip projection is not a
+substitute for canonical admission. This amendment additionally owns only
+`tests/test_db_backend.py` and the EIR-002 authority documents.
+
 ## 4. Exact Node Disposition
 
 ### 4.1 Nine nodes removed with explicit successor ownership
@@ -418,7 +454,9 @@ Closure requires all of the following:
 6. no provider credential or historical data mount is present;
 7. no product file changed;
 8. protected current backend tests remain green; and
-9. `EIR-002` receives commit, command, and result closure evidence.
+9. the data-bearing `test_fundamentals_via_dal` node passes against the current
+   typed absence shape; and
+10. `EIR-002` receives commit, command, and result closure evidence.
 
 ## 8. Protected Boundaries And Out Of Scope
 

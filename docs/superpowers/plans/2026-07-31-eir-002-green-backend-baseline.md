@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** DRAFT - INDEPENDENT PLAN REVIEW NEXT
+> **Status:** TASK 7 BOUNDED AMENDMENT - INDEPENDENT REVIEW NEXT
 >
 > **Date:** 2026-07-31
 >
@@ -1933,6 +1933,9 @@ not merge.
 ### Task 7: Reviewed Merge And EIR Closure
 
 **Files:**
+- Modify after amendment review: `tests/test_db_backend.py`
+- Modify for amendment: `docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md`
+- Modify for amendment: `docs/superpowers/plans/2026-07-31-eir-002-green-backend-baseline.md`
 - Modify after merge: `docs/design/ENGINEERING_ISSUE_REGISTER.md`
 - Modify after merge: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Modify after merge: `docs/superpowers/evidence/2026-07-31-eir-002-green-backend-baseline.md`
@@ -1959,31 +1962,101 @@ From the main worktree, verify `master` is an ancestor and use `git merge
 
 - [ ] **Step 3: Run merged focused and native full verification**
 
-From the merged main-worktree root, do not reuse branch result files. First
-capture the exact pre-run state:
+The first main-worktree attempt is frozen as rejected Task 7 evidence. It
+proved exact collection `4730/c34de9a0...` and focused `123/123`, then stopped
+when a real extension sync modified the production log and databases. After
+sync was paused, `merged-full` saw all 4,730 nodes but returned one failure:
 
-```bash
-git status --short --untracked-files=all \
-  > /tmp/eir002-green-baseline/merged-pre-status.txt
-find data src/data -type f -print 2>/dev/null | LC_ALL=C sort \
-  > /tmp/eir002-green-baseline/merged-pre-data.paths
+```text
+tests/test_db_backend.py::TestFundamentalsDB::test_fundamentals_via_dal
 ```
 
-Then run:
+The same node fails in the main worktree with ignored `config/.env` present
+and skips in the reviewed worktree where that file is absent. Git history and
+the current schema prove that `FundamentalsResult.found` never existed; the
+current absence discriminator is `data_source="none"`. The production
+scheduler also completed `collect.ibkr_news` run `18436` during the main-root
+suite, so that root cannot satisfy the frozen-data admission boundary.
+
+Before another full run:
+
+1. preserve the failed `merged-full` reporter and transcript;
+2. change only
+   `tests/test_db_backend.py::TestFundamentalsDB::test_fundamentals_via_dal`
+   from `result.found is False` to `result.data_source == "none"`;
+3. prove the owning node RED before and GREEN after in the data-bearing main
+   worktree, with its node ID unchanged;
+4. create a fresh worktree at the exact amended master commit, require
+   `config/.env` absent, create only an empty `data/` directory, and prove no
+   production data file is reachable there; explicitly link only the reviewed
+   `node_modules` toolchain; and
+5. run fresh `merged-v2-focused` and `merged-v2-full` stages from that clean
+   worktree with the unchanged wrapper/reporter/probe identities.
+
+The clean merged worktree, not the production main root, owns canonical
+`4658/72/0` admission. The main worktree owning-node pass is supplemental.
+Collection remains exactly `+0/-9`; no skip marker or test identity changes.
+Any second node failure, production-data access, or canonical pass/skip drift
+is a Stop Condition.
+
+The commands below record the historical first attempt and must not be rerun
+under the consumed `merged-focused` or `merged-full` stage names. The amended
+execution must first record the exact test-fix tip and build its own detached
+worktree:
+
+```bash
+fix_tip="$(git rev-parse HEAD)"
+test -z "$(git status --short --untracked-files=all \
+  | grep -v '^?? docs/design/SCRIPTS_RETIREMENT_DECISION.md$')"
+test ! -e /tmp/arkscope-eir002-merged-v2
+test ! -L /tmp/arkscope-eir002-merged-v2
+git worktree add --detach /tmp/arkscope-eir002-merged-v2 "$fix_tip"
+cd /tmp/arkscope-eir002-merged-v2
+test "$(git rev-parse HEAD)" = "$fix_tip"
+test ! -e config/.env
+mkdir data
+test ! -L data
+test -z "$(find data -mindepth 1 -print -quit)"
+node_modules_target=/mnt/md0/PycharmProjects/ArkScope/node_modules
+test -d "$node_modules_target"
+test "$(sha256sum package-lock.json | awk '{print $1}')" = \
+  5322cb03099b873066b7572c02db68a427ddc7509fdc9850cf9d8d3948a19f2c
+ln -s "$node_modules_target" node_modules
+test "$(readlink -f node_modules)" = "$node_modules_target"
+test "$(sha256sum node_modules/.package-lock.json | awk '{print $1}')" = \
+  4dd5182f8111b54dd608344c45513f3b310f39321a3cc9832b60cefc2fa241ff
+test "$(/home/hyl/.nvm/versions/node/v22.14.0/bin/node --version)" = \
+  "v22.14.0"
+test "$(/home/hyl/.nvm/versions/node/v22.14.0/bin/node \
+  -p "require('./node_modules/jsdom/package.json').version")" = "29.1.1"
+git status --short --untracked-files=all \
+  > /tmp/eir002-green-baseline/merged-v2-pre-status.txt
+find data src/data -type f -print 2>/dev/null | LC_ALL=C sort \
+  > /tmp/eir002-green-baseline/merged-v2-pre-data.paths
+```
+
+Before pytest, also inspect the worktree's full ignored inventory and require
+that no project database, historical dataset, provider credential, or other
+symlink into the production root is present. `data/` is the sole deliberately
+added data path; `node_modules` is the sole allowed production-root link and
+is admitted only as the pinned test toolchain above. If any other input is
+reachable, stop instead of deleting or masking it.
+
+Run the clean canonical stages from that worktree:
 
 ```bash
 PYTHONPATH="/tmp/eir002-green-baseline:$(git rev-parse --show-toplevel)" \
-PRICE_TRUTH_TIER_REPORT=/tmp/eir002-green-baseline/merged-collect-full.json \
+PRICE_TRUTH_TIER_REPORT=/tmp/eir002-green-baseline/merged-v2-collect-full.json \
 pytest --collect-only -q -p arkscope_eir002_reporter
 
-/tmp/eir002-green-baseline/run_native.sh merged-focused \
+/tmp/eir002-green-baseline/run_native.sh merged-v2-focused \
   tests/test_data_access.py \
   tests/test_api.py \
   tests/test_tools.py \
   tests/test_agents.py \
   tests/test_app_records_store.py
 
-/tmp/eir002-green-baseline/run_native.sh merged-full
+/tmp/eir002-green-baseline/run_native.sh merged-v2-full
 
 pytest -q \
   tests/test_sqlite_backend.py \
@@ -1992,12 +2065,15 @@ pytest -q \
   tests/test_db_backend.py
 ```
 
-Extract and hash `merged-collect-full.json` exactly as in Task 6. Require
-`4730/c34de9a0...`, focused `123 passed`, full `4658 passed / 72 skipped`,
-empty non-passing set, and protected `94 passed / 18 skipped`.
+Extract and hash `merged-v2-collect-full.json` exactly as in Task 6. Require
+`4730/c34de9a0...`, focused `123 passed`, full
+`4658 passed / 72 skipped`, empty non-passing set, and protected
+`94 passed / 18 skipped`.
 
 Compare merged product/data paths against the pre-implementation merge base.
 The only test collection difference must remain the exact nine retired IDs.
+The frozen main-root attempts, their consumed stage names, and their artifact
+transactions remain auditable in Evidence Section 8; they are not rerun.
 
 - [ ] **Step 4: Reconcile and quarantine merged-run artifacts**
 
@@ -2005,28 +2081,31 @@ Capture the post-run state:
 
 ```bash
 git status --short --untracked-files=all \
-  > /tmp/eir002-green-baseline/merged-post-status.txt
+  > /tmp/eir002-green-baseline/merged-v2-post-status.txt
 find data src/data -type f -print 2>/dev/null | LC_ALL=C sort \
-  > /tmp/eir002-green-baseline/merged-post-data.paths
+  > /tmp/eir002-green-baseline/merged-v2-post-data.paths
 comm -13 \
-  /tmp/eir002-green-baseline/merged-pre-data.paths \
-  /tmp/eir002-green-baseline/merged-post-data.paths \
-  > /tmp/eir002-green-baseline/merged-new-data.paths
+  /tmp/eir002-green-baseline/merged-v2-pre-data.paths \
+  /tmp/eir002-green-baseline/merged-v2-post-data.paths \
+  > /tmp/eir002-green-baseline/merged-v2-new-data.paths
 ```
 
 `src/data/cache/risk_free_rate.json` is a known possible full-suite artifact,
-not an allowed repository change. For every path in `merged-new-data.paths`,
-record its exact path, inode, size, modification time, and SHA-256. Move each
-new file by its exact path to a unique location under
-`/tmp/eir002-green-baseline/merged-quarantine/`; do not glob or match by
-basename. Preserve the quarantine manifest in closeout evidence.
+not an allowed repository change. For every path in
+`merged-v2-new-data.paths`, record its exact path, inode, size, modification
+time, and SHA-256. Move each new file by its exact path to a unique location
+under `/tmp/eir002-green-baseline/merged-v2-quarantine/`; do not glob or match
+by basename. Preserve the quarantine manifest in closeout evidence.
 
 If that known path existed before the run, it is pre-existing user state:
 record its pre/post metadata and SHA, require byte identity, and do not move
 it. Any modification of a pre-existing ignored file is a Stop Condition.
 
 Re-run the status and data inventory after quarantine. They must be
-byte-identical to `merged-pre-status.txt` and `merged-pre-data.paths`.
+byte-identical to `merged-v2-pre-status.txt` and
+`merged-v2-pre-data.paths`. Re-run the `node_modules` target, installed
+lockfile SHA, Node version, and `jsdom` version checks; any drift is a Stop
+Condition.
 Pre-existing user files, including the untracked scripts-retirement decision,
 must remain untouched.
 
@@ -2078,7 +2157,11 @@ Stop immediately if:
 15. EIR-006 is mixed into this implementation; or
 16. old CSV/parquet files are deleted, moved, archived, or rewritten; or
 17. a branch or merged native run leaves an unaccounted repository-relative
-    artifact.
+    artifact; or
+18. the clean Task 7 worktree contains `config/.env`, a non-empty `data/`,
+    any provider credential or project database, historical data, or a
+    symlink that reaches the production root other than the exact pinned
+    `node_modules` toolchain link.
 
 ## 6. Plan Self-Review Map
 

@@ -155,14 +155,25 @@ Each entry records:
     records exact collection `4730/c34de9a0...`, native
     `4658 passed / 72 skipped / 0 failed`, an empty non-passing stream,
     protected anchors `94 passed / 18 skipped`, and exact artifact
-    quarantine/restoration.
+    quarantine/restoration;
+  - Task 7 fast-forwarded exact reviewed tip `99bc071e` and reproduced
+    `4730/c34de9a0...` plus focused `123/123`. Main-root full admission then
+    exposed one stale protected assertion only when ignored `config/.env`
+    enabled the PG integration class:
+    `tests/test_db_backend.py::TestFundamentalsDB::test_fundamentals_via_dal`
+    reads nonexistent `FundamentalsResult.found`. The same node skips without
+    that file. A real scheduler write during the run separately proved the
+    production main root is not a frozen data boundary.
 - `owner`: promoted EIR-002 green-backend-baseline slice.
-- `next_action`: independently review the committed Task 6 implementation
-  packet. Reproduce canonical `4730/c34de9a0...`, focused
-  `123/37386cd2...`, all three mutations, protected `94/18`, native
-  `4658/72/0`, the empty non-passing stream, and zero product/data drift.
-  Keep this entry promoted until exact-tip fast-forward and merged
-  verification complete under Task 7.
+- `next_action`: independently review the bounded Task 7 amendment. It keeps
+  the exposed node ID, changes only its stale `.found` assertion to the
+  current `data_source == "none"` absence contract, and moves canonical
+  merged admission to a fresh exact-master worktree with no `config/.env` and
+  only an empty `data/` directory. Its sole production-root link is the
+  explicitly pinned `node_modules` test toolchain. Keep this entry promoted
+  until that node is GREEN in the data-bearing control and clean merged
+  admission reproduces exact `4730/c34de9a0...`, `4658/72/0`, and an empty
+  non-passing stream.
 - `closure_evidence`: none.
 
 ### EIR-003 - Audit the 89 I18N-2-era Settings copy rewrites
