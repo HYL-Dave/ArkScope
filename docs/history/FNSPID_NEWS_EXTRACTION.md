@@ -5,8 +5,8 @@
 > The processing scripts (a local FNSPID + OpenAI o3/Flex pipeline under
 > `NewsExtraction/`) were retired in the 2026-05 local-first pivot; this page
 > preserves the WHAT/WHY. The published dataset's column/score provenance lives in
-> [`../../scripts/huggingface/column_mapping.md`](../../scripts/huggingface/column_mapping.md)
-> and [`../../scripts/huggingface/SCORING_PROMPTS.md`](../../scripts/huggingface/SCORING_PROMPTS.md).
+> [`column_mapping.md`](./news-scoring/column_mapping.md)
+> and [`SCORING_PROMPTS.md`](./news-scoring/SCORING_PROMPTS.md).
 
 ## Source
 
@@ -49,7 +49,7 @@ validated records, ran a 17-dimension LLM quality analysis (o3 / o4-mini via Ope
 Flex), and exported Parquet / CSV / DuckDB. That tooling is **retired** — recover it
 from git history if ever needed; do not re-add it to an active module path. The
 sentiment/risk **scoring** prompts (a separate pipeline) are preserved verbatim in
-`SCORING_PROMPTS.md`.
+[`SCORING_PROMPTS.md`](./news-scoring/SCORING_PROMPTS.md).
 
 ## Why it was de-focused
 

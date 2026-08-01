@@ -22,8 +22,9 @@ The OpenAI CSV scoring pipeline that produced the open dataset
 multi-API-key shells (hard-wired to `/mnt/md0/finrl/...` FNSPID/o3 paths), and the root
 `OPENAI_SCRIPTS.md` — was retired in the 2026-05 local-first pivot. The exact sentiment /
 risk / summary prompts are preserved for reproducibility at
-[`../huggingface/SCORING_PROMPTS.md`](../huggingface/SCORING_PROMPTS.md); the dataset
-column mapping is in [`../huggingface/column_mapping.md`](../huggingface/column_mapping.md).
+[`SCORING_PROMPTS.md`](../../docs/history/news-scoring/SCORING_PROMPTS.md); the
+dataset column mapping is in
+[`column_mapping.md`](../../docs/history/news-scoring/column_mapping.md).
 
 ## Scripts
 
@@ -64,7 +65,8 @@ python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
 
 - Active scorers: `score_ibkr_news.py`, `score_sentiment_anthropic.py`, `score_risk_anthropic.py`, `openai_summary.py`
 - API key files: `api_keys_tier1.txt`, `api_keys_tier5.txt` (gitignored)
-- Open-dataset prompts (provenance): `../huggingface/SCORING_PROMPTS.md`
+- Open-dataset prompts (provenance):
+  `../../docs/history/news-scoring/SCORING_PROMPTS.md`
 
 ## score_ibkr_news.py — detailed reference
 

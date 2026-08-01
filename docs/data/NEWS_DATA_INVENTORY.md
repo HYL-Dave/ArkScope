@@ -4,7 +4,10 @@
 >
 > 相關文件:
 > - [歷史分析紀錄](../analysis/HISTORICAL_ANALYSIS_LOG.md) - 分析實驗紀錄
-> - LLM 評分資料的舊獨立清單已移除；目前以 `/mnt/md0/finrl` 實體 CSV、`scripts/huggingface/output/README.md`、`scripts/huggingface/column_mapping.md`、`scripts/huggingface/merge_for_release.py` 為準。
+> - LLM 評分資料的舊獨立清單與 release packager 已退役；公開資料集的 durable
+>   provenance 由
+>   [`column_mapping.md`](../history/news-scoring/column_mapping.md) 與
+>   [`SCORING_PROMPTS.md`](../history/news-scoring/SCORING_PROMPTS.md) 保存。
 
 > **⚠️ 版本說明 (2026-01-06)**
 > - 本文件部分內容為歷史實驗紀錄，可能與當前專案狀態有出入
@@ -589,7 +592,8 @@ EOF
 
 > 下列 OpenAI CSV scorer（`score_sentiment_openai.py` / `score_risk_openai.py`）已於
 > 2026-05 local-first pivot 移除，**非可執行建議**。當時評分用的 prompt 已保留於
-> `scripts/huggingface/SCORING_PROMPTS.md`（開源資料集 provenance）。
+> [`SCORING_PROMPTS.md`](../history/news-scoring/SCORING_PROMPTS.md)
+> （開源資料集 provenance）。
 ```bash
 # o4-mini 評分命令 (早期版本)
 python score_sentiment_openai.py \

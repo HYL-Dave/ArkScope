@@ -196,7 +196,6 @@ docs/insights/
 *.local.md
 *.local.txt
 *.local.json
-scripts/huggingface/output/
 
 # -----------------------------------------------------------------------------
 # Local tooling / generated indexes (machine-local, never track)

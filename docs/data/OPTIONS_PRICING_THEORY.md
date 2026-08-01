@@ -679,7 +679,7 @@ S - K ≤ C - P ≤ S - K·e^(-rT)
 | IV 反推 | `src/options_math/option_pricing.py` | Brent 法解 IV | 需要有效市場報價 |
 | Smile 調整 | `src/options_math/option_pricing.py` | 簡化二次近似 | 不如 SABR 準確 |
 | 錯價掃描（已退役） | `scripts/analysis/scan_option_mispricing.py`（歷史路徑） | HV vs 市場價 | **方法論根本問題；2026-07-26 移除** |
-| IBKR Scanner | `scripts/analysis/scan_unusual_activity.py` | 異常活動偵測 | 依賴 IBKR 訂閱 |
+| IBKR Scanner primitives | `data_sources/ibkr_source.py` | 異常活動候選原語 | wrapper 已退役；產品化需訂閱/capability UX |
 
 ### 錯價掃描的改進方向
 
@@ -735,7 +735,7 @@ S - K ≤ C - P ≤ S - K·e^(-rT)
 |------|------|------|
 | 定價引擎 | `analysis/option_pricing.py` | B-S、HV、IV、Greeks |
 | 錯價掃描 | `scripts/analysis/scan_option_mispricing.py` | 期權錯價檢測 |
-| 異常活動 | `scripts/analysis/scan_unusual_activity.py` | IBKR Scanner |
+| 異常活動候選 | [`SCRIPTS_RETIREMENT_TRANCHE_A.md`](../history/SCRIPTS_RETIREMENT_TRANCHE_A.md#4-unusual-options-candidate) | 舊 wrapper 已退役；保留 scanner primitives |
 | IBKR 數據源 | `data_sources/ibkr_source.py` | Option Chain / Quote |
 | 單元測試 | `tests/test_option_pricing.py` | 定價引擎測試 |
 

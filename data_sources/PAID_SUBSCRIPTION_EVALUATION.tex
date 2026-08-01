@@ -763,6 +763,11 @@ Business & \$50/月 & 商業 & 內部商業使用授權 \\
 \newpage
 \section{Financial Datasets}
 
+本節整體是 2026-01-14 的歷史研究快照；其中價格、endpoint 與成功狀態
+不得當成現行 registry。2026-08-01 的靜態 inventory 與後續
+spend-control 產品邊界見
+\texttt{docs/design/FINANCIAL\_DATASETS\_CAPABILITY\_SPEND\_DECISION.md}。
+
 \subsection{定位}
 專為 \textbf{AI Financial Agent} 設計的 LLM-optimized API，提供直接來自 SEC/EDGAR 的原始財務數據。
 
@@ -820,9 +825,14 @@ Enterprise & 洽詢 & 客製 & 專屬運算資源 \\
 
 \textbf{結論}: 若 \textbf{PEAD 策略}是重點，Financial Datasets 的 Segmented Revenue API 是極高價值的差異化來源。建議先用 Pay-As-You-Go (\$20) 測試。
 
-\subsection{API 實測驗證 (2026-01-14)}
+\subsection{歷史 API 實測記錄 (2026-01-14)}
 
 使用 PAYG 方案 (\$20 儲值) 完成 \textbf{23 個端點}全面測試，驗證文檔準確性。
+這是 dated research snapshot，不是現行 endpoint、entitlement 或費用
+registry。原 live probe 與 result directory 已退役；2026-08-01 的靜態
+inventory 與後續產品邊界由
+\texttt{docs/design/FINANCIAL\_DATASETS\_CAPABILITY\_SPEND\_DECISION.md}
+持有。
 
 \begin{table}[H]
 \centering
@@ -889,7 +899,9 @@ Enterprise & 洽詢 & 客製 & 專屬運算資源 \\
 \end{itemize}
 \end{tcolorbox}
 
-\textbf{實測腳本}: \texttt{scripts/testing/test\_financial\_datasets\_api.py}
+\textbf{Current owner}:
+\texttt{docs/design/FINANCIAL\_DATASETS\_CAPABILITY\_SPEND\_DECISION.md}.
+The retired probe is not a current runbook or retained capability artifact.
 
 % ============================================================
 \newpage
@@ -1268,11 +1280,15 @@ reqTickByTickData & - & 需市場數據訂閱 & Tick-by-tick 數據 \\
 \end{tabular}
 \end{table}
 
-\subsection*{數據收集器}
+\subsection*{歷史數據收集器構想 (pre-consolidation)}
 
-已實作 \texttt{scripts/collection/collect\_ibkr\_fundamentals.py}：
+舊文件曾將
+\texttt{scripts/collection/collect\_ibkr\_fundamentals.py}
+描述為已實作的收集器；該路徑現已不存在，以下內容不是現行可執行建議，
+本次退役也不捏造 replacement collector。
 
-使用 \texttt{defusedxml} + \texttt{ElementTree} 解析 XML (防禦 XXE 攻擊)，提取 P/E, ROE, EPS 等財務指標，輸出 JSON + CSV 格式。
+當時文件宣稱使用 \texttt{defusedxml} + \texttt{ElementTree} 解析 XML
+(防禦 XXE 攻擊)，提取 P/E, ROE, EPS 等財務指標，並輸出 JSON + CSV。
 
 % ============================================================
 \newpage
