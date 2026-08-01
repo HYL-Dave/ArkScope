@@ -26,9 +26,9 @@ evidence, not to an indefinitely runnable one-shot CLI.
 | S-G score cutover | `news_scores_cutover.py`, `src/news_normalized/score_cutover.py`, and cutover-only tests | [S-G implementation plan](../superpowers/plans/2026-07-03-s-g-scorer-cutover.md) and [PG-exit remainder record](../design/PG_EXIT_REMAINDER_SCOPING.md) |
 | P0-C price reconciliation and HAPN patch | `p0c_prices_reconcile.py`, `p0c_hapn_patch.py`, both price migration cores, and migration-only tests | [P0-C executed plan](../design/PG_EXIT_P0C_PRICES_RECONCILE_CUTOVER_PLAN.md) |
 
-Tranche A removes the migration executables and their gate-only tests only
-after the exact collection delta is reviewed. Current product tests are not
-replaced by historical assertions.
+Task 4 removed the migration executables, spent domain cores, and gate-only
+tests only after the exact collection delta and consumer census were reviewed.
+Current product tests were not replaced by historical assertions.
 
 ## 2. IBKR News Diagnostic Lineage
 
