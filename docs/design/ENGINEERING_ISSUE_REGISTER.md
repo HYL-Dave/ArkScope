@@ -305,15 +305,30 @@ Each entry records:
     matching file under `data/prices/15min` or `data/prices/hourly`, returns
     its final close, and labels it current without a freshness test; and
   - the 2026-07-31 read-only census found 225 15-minute CSVs for 150 tickers
-    with a global latest timestamp of `2026-07-02T10:15:00-04:00`.
-- `owner`: the 2026-07-31 EIR-002 design entry in
-  `docs/design/PROJECT_PRIORITY_MAP.md`, which queues a separately reviewed
-  bounded detailed-financials price-authority slice before CSV deletion.
-- `next_action`: decide whether the valuation path uses a typed current quote,
-  the latest local SQLite bar with explicit age/provenance, or omits price-based
-  metrics when freshness is unproven. Add a RED product-truth contract before
-  implementation. Old price CSVs may not be physically deleted until the live
-  consumer is removed or rewired and a fresh consumer census is clean.
+    with a global latest timestamp of `2026-07-02T10:15:00-04:00`;
+  - the 2026-08-01 consumer census found that `get_peer_comparison`,
+    `daily_update`, and `FileBackend` also inherit or advertise the old price
+    path, while current training does not consume the 300 price CSVs;
+  - current training help, data/formula guides, and the canonical local-first
+    workbench spec still advertise retired repository price paths or authority;
+  - Settings, Ticker Detail, Dashboard through `GET /status`, and the registered
+    ticker-coverage tool still project the retired `fundamentals` table even
+    though the stored-only product route accepts only positive SEC annual cache
+    rows, and Settings still includes a retired 2026-06-27 fundamentals sync
+    row in its update summary;
+  - all 2,314,293 canonical 15-minute CSV timestamp keys were represented in
+    `market_data.db`, with 161 value differences left intentionally
+    unreconciled under the SQLite-authority ruling; and
+  - 75 hourly CSVs contain unique 2023 history, which the user explicitly
+    chose to discard rather than migrate.
+- `owner`:
+  `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
+- `next_action`: independent full-document review of the hard-cutover design.
+  After review, write a RED-first implementation plan. Product cutover must
+  merge before an exact deletion manifest is built; physical deletion of 225
+  15-minute CSVs, 75 hourly CSVs, their stale zero-row collection summary,
+  retired detailed-financial cache rows, and legacy fundamentals rows plus
+  their retired sync row requires a separate explicit user approval.
 - `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened
