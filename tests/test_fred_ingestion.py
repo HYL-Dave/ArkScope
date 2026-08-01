@@ -6,7 +6,7 @@ Strategy:
 - Real MacroCalendarStore mocked at the conn level so the SQL shape
   observed during ingestion is the same as commit 1's tests.
 - Live FRED calls are NOT in this test module — see
-  scripts/p1_2/smoke_fred.py for that.
+  tests/live/smoke_fred.py for that.
 """
 
 from __future__ import annotations

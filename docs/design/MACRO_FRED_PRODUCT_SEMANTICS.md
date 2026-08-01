@@ -72,7 +72,7 @@ P1.2's defining sophistication — append-only revision logs, ALFRED vintages, `
    - **Finnhub economic/earnings calendars stay OUT** — both tables are empty (never ran); surfacing them would be dishonest until a deliberate backfill decision.
 5. **Refresh stays off; manual jobs remain.** No scheduler source, no cadence obligation. `POST /jobs/run/…` remains the ad-hoc refresh path. *Refresh enablement* (cadence, staleness thresholds, which sub-domains auto-update) is a separate, consumer-gated future decision — the P1.2 vintage/revision machinery stays dormant with it.
 6. **Gate mechanics belong to the implementation plan.** The current single flag (`macro_calendar_enabled`) conflates the axes; the slice decides whether to re-scope it to mean "auto-refresh enabled" (reads always-on) or flip-plus-label. Constraint either way: provider-health/E2E must keep "refresh off" ≠ "provider broken" (the existing `disabled`-outranks discipline generalizes to the new wording).
-7. **Dead-code sweep guardrail (unchanged from draft):** `src/macro_calendar/`, the two agent tools, `/macro/*` routes, and `scripts/p1_2/` are **protected capability** (carryover hard-lock #5) — not dead code. The sweep MAY fix stale copy inside them (e.g. `macro_calendar_tools.py` still says "requires PostgreSQL DAL backend") but must not remove capability.
+7. **Dead-code sweep guardrail (unchanged from draft):** `src/macro_calendar/`, the two agent tools, `/macro/*` routes, and the manual `tests/live/smoke_fred.py` check are **protected capability** (carryover hard-lock #5) — not dead code. The sweep MAY fix stale copy inside them (e.g. `macro_calendar_tools.py` still says "requires PostgreSQL DAL backend") but must not remove capability.
 
 ## 7. Non-goals now
 

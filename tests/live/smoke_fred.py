@@ -10,7 +10,7 @@ from any output. Verifies:
     state of the series as known on that date
   - Ingestion path against an in-memory FakeStore (no DB write)
 
-Run: python scripts/p1_2/smoke_fred.py
+Run: python tests/live/smoke_fred.py
 """
 
 from __future__ import annotations

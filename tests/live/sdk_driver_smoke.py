@@ -1,7 +1,7 @@
 """7B live driver smoke — STANDALONE, NOT in the pytest suite; makes ONE real
 billing call against the Claude subscription.
 
-  HOW TO RUN:  python scripts/live/sdk_driver_smoke.py   (exit 0 = PASS)
+  HOW TO RUN:  python tests/live/sdk_driver_smoke.py   (exit 0 = PASS)
   REQUIRES:    an ACTIVE anthropic `claude_code_oauth` credential in the local
                CredentialStore + its token in the token-store; network.
   COST:        ~one short Sonnet turn on the subscription (the §9 smoke model).
