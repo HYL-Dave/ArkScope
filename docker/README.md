@@ -27,8 +27,10 @@ first startup (schema lineage record).
 
 ## Restore an archive dump (two-stage proof pattern)
 
-Mirrors the PG-exit gate CLIs (`scripts/migration/n9_*.py`): restore into a
-scratch database, verify presence, then inspect — never restore over a live DB.
+The removed PG-exit gate CLIs (`scripts/migration/n9_*.py`) are historical
+evidence for this two-stage proof pattern, not current operators: restore into
+a scratch database, verify presence, then inspect — never restore over a live
+DB.
 
 ```bash
 # 1. Create a scratch DB and restore the dump into it

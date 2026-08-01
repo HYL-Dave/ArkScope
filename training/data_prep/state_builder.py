@@ -169,7 +169,7 @@ def schema_from_metadata(meta: dict) -> StateSchema:
     if missing:
         raise KeyError(
             f"metadata is missing required schema keys: {missing}. "
-            f"Run scripts/patch_model_metadata.py on this model first."
+            "Re-export or retrain this model with complete schema metadata."
         )
     return StateSchema(
         ticker_order=tuple(meta["ticker_order"]),

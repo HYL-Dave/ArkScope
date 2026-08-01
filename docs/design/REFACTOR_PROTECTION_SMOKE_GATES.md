@@ -170,31 +170,29 @@ Passing evidence is a timestamped `record_extension_job ... status=succeeded` fo
 
 ---
 
-## 6. `scripts/` survivor rule (AUTHORITY — relocated from `PG_EXIT_REMAINDER_SCOPING.md` §5, 2026-07-06)
+## 6. `scripts/` interim survivor rule (AUTHORITY — revised 2026-08-01)
 
-- **`scripts/` holds only app-unrelated or historical material.** `src/` never imports
-  `scripts/`. Anything runnable that the app, its gates, or its operators actively depend
-  on is `python -m src.<module>` — the only exceptions are the explicitly user-ruled
-  retained families below.
+- **Only the nine paths below may remain under root `scripts/` after Tranche A.**
+  `src/` never imports `scripts/`; the package is not an app runtime surface.
 - **Provider clients stay in `data_sources/` unless deliberately migrated.** Runtime
   orchestration / domain logic lives in `src/<domain>/...` modules. Do **not** create a
   second provider layer under `src/providers/`.
 
-**Survivor table (anything else appearing under `scripts/` is residue):**
+**Interim survivor table (anything else appearing under root `scripts/` is residue):**
 
 | Retained | Why (one line) |
 |---|---|
-| `scripts/analysis/` | One-off options research scans (BS-vs-American, mispricing, unusual activity) — research, not runtime |
-| `scripts/diagnostics/` | Manual operator probes (`probe_ibkr_news_bodies.py`) — ad hoc, keyed, never scheduled |
-| `scripts/huggingface/` | Open-data release tooling + scoring prompts — historical record (user-ruled retained) |
-| `scripts/live/` | Manual live-API smokes (SDK driver/route) — operator-run with real keys, deliberately outside CI |
-| `scripts/migration/` | Completed PG-exit migration CLIs kept as gate evidence (N8a/N9 batches, cutovers, reconciles) |
-| `scripts/p1_2/` | FRED provider-evaluation smoke — historical evidence for P1.2 |
-| `scripts/scoring/` | Scoring archive + occasional local score-import CLI (`import_news_scores_local.py`) — user-ruled retained |
-| `scripts/testing/` | Manual paid-API experiments (financial datasets) — exploratory, not gates |
-| `scripts/visualization/` | Legacy news dashboard/data-loader — historical |
-| `scripts/__init__.py` | Retained package marker: historical tests import `scripts.scoring` / `scripts.migration` namespaces |
+| `scripts/__init__.py` | Transitional package marker for `scripts.scoring`; Tranche B owns removal |
+| `scripts/scoring/README.md` | Transitional scorer/importer ownership and provenance |
+| `scripts/scoring/__init__.py` | Transitional scoring package marker |
+| `scripts/scoring/import_news_scores_local.py` | Occasional local import into the retained score reader |
+| `scripts/scoring/openai_summary.py` | Transitional OpenAI summary scorer |
+| `scripts/scoring/score_ibkr_news.py` | Transitional IBKR-news scorer |
+| `scripts/scoring/score_risk_anthropic.py` | Transitional Anthropic risk scorer |
+| `scripts/scoring/score_sentiment_anthropic.py` | Transitional Anthropic sentiment scorer |
+| `scripts/scoring/validate_scores.py` | Transitional score validation |
 
-Changing this table = changing a standing ruling (owner decision + map §10 entry), not a
-refactor detail. Execution record of the consolidation that finalized it:
-`docs/superpowers/plans/2026-07-06-scripts-runtime-consolidation.md` + map §10 2026-07-06.
+Tranche B owns the atomic retirement of the legacy score writers, readers,
+routes, tests, and this final root package. Manual live checks, including the
+FRED provider evaluation, live under `tests/live/`; they are never
+default-collected.

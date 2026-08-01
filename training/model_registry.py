@@ -41,7 +41,8 @@ class ModelMetadata:
     training_date: str = ""          # ISO date (UTC with Z suffix)
     model_path: str = ""             # relative path to .pth
     data_hash: str = ""              # MD5 of training CSV
-    # State schema (required for live inference; patched via scripts/patch_model_metadata.py for older models)
+    # State schema is required for live inference; incomplete artifacts must be
+    # re-exported or retrained with these fields.
     ticker_order: List[str] = field(default_factory=list)
     tech_indicator_list: List[str] = field(default_factory=list)
     extra_feature_cols: List[str] = field(default_factory=list)

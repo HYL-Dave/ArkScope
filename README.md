@@ -88,7 +88,8 @@ stub).
 - `apps/arkscope-web/` — the workbench GUI (React + Vite); `apps/arkscope-desktop/` — Electron shell
 - `src/` — agent, tools, DAL, API sidecar (`src/api/`), analysis pipeline, monitor, signals, data ingestion (`src/collectors/`, `src/daily_update.py`)
 - `data_sources/` — data-source API clients
-- `scripts/` — historical / one-off utilities only (no runtime paths; those live in `src/`)
+- `scripts/` — transitional `scripts/scoring/` owner only; Tranche B removes the
+  root after retiring the legacy score surface (no app runtime paths)
 - `extensions/sa_alpha_picks/` — SA browser extension + native host
 - `docs/design/` — current specs & decision log (`PROJECT_PRIORITY_MAP.md` first)
 - `training/` — RL training (paused; see `docs/design/RL_COLLAPSE_FINDINGS.md`)

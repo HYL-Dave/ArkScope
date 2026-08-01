@@ -2,7 +2,8 @@
 
 Falsifiable proof of the A≠B distinction + the ChatGPT-backend capability floor
 (LLM_AUTH_DRIVER_PLAN.md §9), grounded in Novelloom's PROVEN probe + driver
-(`scripts/probe_chatgpt_oauth_backend.py`, `shared/auth/openai_chatgpt_oauth.py`):
+(upstream historical `scripts/probe_chatgpt_oauth_backend.py` and
+`shared/auth/openai_chatgpt_oauth.py`, not ArkScope-local paths):
 
   P1  : the OAuth access_token is REJECTED by api.openai.com (the standard public
         API) but STREAMS against https://chatgpt.com/backend-api/codex — proving it

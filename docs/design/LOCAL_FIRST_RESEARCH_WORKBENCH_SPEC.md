@@ -11,6 +11,15 @@
 - `PHASE_C_UNIFIED_RUNNER_SPEC.md` — paused; preserved as-is; do not touch in this spec.
 - Tool-side memory dirs (`~/.claude/...`, `~/.codex/...`).
 
+> **2026-08-01 implementation-location supersession:** The portability,
+> profile export/import, and explicit PostgreSQL-import capabilities below
+> remain requirements. The command shapes `scripts/profile_export.py`,
+> `scripts/profile_import.py`, and `scripts/migrate_pg_to_local.py` were never
+> implemented and are rejected historical design placeholders, not runnable
+> instructions. Any future implementation must choose an app-owned module or
+> installed CLI in its own reviewed slice; this tranche does not invent a
+> replacement path.
+
 ---
 
 ## 0. What this spec locks vs leaves open

@@ -75,7 +75,8 @@ def load_model(model_dir: Path) -> InferenceArtifacts:
 
     Raises:
         FileNotFoundError: missing model_sb3.zip or metadata.json
-        KeyError:          metadata lacks schema fields (run patch_model_metadata.py)
+        KeyError:          metadata lacks schema fields; re-export or retrain
+                           the model with complete schema metadata
     """
     model_dir = Path(model_dir)
     zip_path = model_dir / "model_sb3.zip"

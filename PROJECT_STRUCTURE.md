@@ -18,7 +18,7 @@
 |------|------|
 | `src/` | Agent, tools, DAL, analysis pipeline, monitor, multi-factor signals, data ingestion (`src/collectors/`, `src/daily_update.py` — **protected runtime path**) |
 | `data_sources/` | Data-source API clients (Finnhub, Tiingo, SEC EDGAR, Polygon, IBKR, …) |
-| `scripts/` | Historical / one-off utilities only (analysis, migration records, scoring archive) — no runtime paths |
+| `scripts/` | Transitional `scripts/scoring/` owner only; Tranche B removes the root after retiring the legacy score surface — no app runtime paths |
 | `extensions/sa_alpha_picks/` | Seeking Alpha browser extension + Native Messaging host |
 | `training/` | RL training — **paused** (see `docs/design/RL_COLLAPSE_FINDINGS.md`) |
 | `config/` | `.env`, `user_profile.yaml`, watchlists, sectors, skills |

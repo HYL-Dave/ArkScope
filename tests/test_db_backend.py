@@ -4,7 +4,9 @@ Tests for DatabaseBackend against PostgreSQL.
 These tests require:
 1. DATABASE_URL configured in config/.env
 2. Schema created via sql/001_init_schema.sql
-3. Data imported via scripts/migrate_to_supabase.py
+
+The retired-domain assertions require only the isolated PostgreSQL database
+and schema; no legacy data import is required.
 
 Tests are auto-skipped if DB is not available.
 

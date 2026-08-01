@@ -426,16 +426,20 @@ Finnhub:                                   ██████│█████�
                                             開始收集
 ```
 
-### 執行步驟
+### 歷史執行步驟（不可執行）
+
+以下是 2025-12、collector consolidation 前的操作紀錄；這些 root
+scripts 已移除。現行操作由 app 的「資料來源與排程」設定及 app-owned
+scheduler 負責，不應重建這些 CLI。
 
 ```bash
-# Step 1: Finnhub 先跑 (快，~1 分鐘)
+# Historical Step 1: Finnhub 先跑 (快，~1 分鐘)
 python scripts/collection/collect_finnhub_news.py
 
-# Step 2: Polygon 歷史 (慢，~10 小時)
+# Historical Step 2: Polygon 歷史 (慢，~10 小時)
 python scripts/collection/collect_polygon_news.py --full-history
 
-# Step 3: 未來每天排程
+# Historical Step 3: 每天排程
 0 6 * * * python scripts/collection/collect_finnhub_news.py
 0 7 * * * python scripts/collection/collect_polygon_news.py --days 1
 ```

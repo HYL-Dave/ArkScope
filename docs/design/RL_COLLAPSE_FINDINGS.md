@@ -46,7 +46,7 @@ All artifacts under git history, used during this investigation:
 |------|---------|
 | `training/data_prep/state_builder.py` | Pure-function reconstruction of `StockTradingEnv._initiate_state()`. State schema lives in metadata, not CSV. |
 | `tests/test_state_parity.py` | Element-wise parity test: builder == env reset / day-1 zero-action. 4 tests, zero tolerance. |
-| `scripts/patch_model_metadata.py` | Backfills `ticker_order` / indicator schema into older metadata.json files. Auto-detects extended (9) vs baseline (8) indicator list from recorded `state_dim`. |
+| `scripts/patch_model_metadata.py` | Historical removed utility. Models missing `ticker_order` or indicator schema must be re-exported or retrained with complete metadata. |
 | `training/rl/inference.py` | `load_model` / `predict_from_frame` / `decode_action` / `ObsNormalizer`. Numpy-version-skew safe via `custom_objects` overrides for `_last_obs / _last_original_obs / _last_episode_starts / observation_space / action_space`. |
 | `training/rl/live_features.py` | Live feature frame builder with `PriceAdapter` / `SentimentAdapter` Protocols. IBKR + Parquet concrete adapters share training's exact ticker mapping and sentiment coalesce rules. |
 | `tests/test_live_features.py` | 8 unit tests with fake adapters. |
@@ -55,7 +55,7 @@ All artifacts under git history, used during this investigation:
 | `training/research/rl_policy_sensitivity_probe.py` | Per-model cross-date deterministic action correlation + obs delta + stochastic spread. The original collapse-detector. |
 | `training/research/rl_ensemble_scan.py` | Multi-model × multi-date scan with realised next-day return join. Single IBKR fetch for the widest range, indicators computed once. |
 | `training/scripts/rl_vlite_rerun.sh` | Wrapper: 5-epoch instrumented PPO run. `LOG_STD_INIT` and `VECNORMALIZE_OBS` env vars switch experiments. |
-| `scripts/analysis/extract_sb3_train_metrics.py` | TensorBoard EventAccumulator → train_metrics.csv with the 8 PPO actor/critic scalars. |
+| `scripts/analysis/extract_sb3_train_metrics.py` | Historical removed extractor. Retained telemetry is the TensorBoard event stream plus `monitor.csv`; inspect those artifacts directly. |
 | `training/research/replay_rl_static_baselines.py` | C' replay: trained / constant / zero on a full training episode. Apples-to-apples with training env. |
 
 Training-side instrumentation:

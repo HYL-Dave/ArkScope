@@ -51,10 +51,12 @@ reviewer full A/B passed with failure sets and passed counts exactly equal.
 | `.env.template` | template (B4a already made it local-first) | keep |
 | `skills/` (.gitkeep, EMPTY) | **read by code**: `skills.py:31` `_CUSTOM_DIR` (Tier 3a/3b custom skills) | **defer to the Investment-Skills design line** — retiring it = code change + deciding the custom-skills home (profile DB vs dir); not a hygiene call |
 
-## 3. `scripts/` — survivor table re-audit: **TABLE STANDS, no changes recommended**
+## 3. `scripts/` — historical ruling, superseded 2026-08-01
 
-Any change here = changing the standing ruling (`REFACTOR_PROTECTION_SMOKE_GATES.md` §6);
-per-subfolder evidence:
+The table below records the 2026-07-06 ruling and is no longer a current
+survivor authority. The approved
+`docs/design/SCRIPTS_RETIREMENT_DECISION.md` and Tranche A replaced it with an
+exact nine-path interim scoring owner; Tranche B owns final root removal.
 
 | Subfolder | Consumers | Verdict |
 |---|---|---|

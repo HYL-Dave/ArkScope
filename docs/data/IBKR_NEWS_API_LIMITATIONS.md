@@ -97,17 +97,22 @@ Methodology caveat: local SQLite counts are a lower bound. Articles already miss
 
 ## Workarounds
 
-### 1. Regular Collection (Current Approach)
+### 1. Regular Collection
 
 Run the collector frequently to capture new articles before they fall out of the 300-article window.
 
+The following cron command is pre-consolidation history and is not runnable:
+
 ```bash
-# Daily collection via cron
+# Historical daily collection via cron (removed)
 0 6 * * * cd /path/to/project && python scripts/collection/collect_ibkr_news.py --incremental
 ```
 
-**Pros**: Simple, works with existing infrastructure
-**Cons**: May miss articles during gaps in collection
+Current operation belongs to the app-owned scheduler and its Data Sources &
+Scheduling settings. Do not restore a root collection CLI.
+
+**Historical pros**: Simple, worked with the old infrastructure
+**Historical cons**: Could miss articles during gaps in collection
 
 ### 2. Real-time Streaming (Recommended)
 

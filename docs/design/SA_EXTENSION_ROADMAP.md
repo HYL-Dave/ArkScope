@@ -328,21 +328,21 @@ and localized web-health matrices are complete. Fast-forward merge and
 merged-tree deployment verification are approved. Historical repair remains
 blocked on a fresh installed-build preview and exact-manifest approval.
 
-Supporting analysis/tooling now lives in:
+Supporting analysis logic now lives in:
 
 - `src/service/sa_market_news_density.py`
   - pure analysis helpers for ET bucket aggregation, interval recommendation, and merged schedule windows
   - intended as the reusable logic layer if auto-sync tuning is later exposed via API or jobs
-- `scripts/analysis/analyze_sa_market_news_density.py`
-  - operator-facing script to inspect recent SA market-news publish density from PostgreSQL
-  - use this before changing `MARKET_NEWS_AUTO_SYNC_WINDOWS_ET` so cadence changes stay data-backed
 
-Recommended operator workflow for future tuning:
+The removed `scripts/analysis/analyze_sa_market_news_density.py` command below
+is completed historical evidence, not a current operator instruction:
 
-1. Run `python scripts/analysis/analyze_sa_market_news_density.py --days 30 --bucket-minutes 60`
-2. Review weekday/weekend ET windows and top density buckets
-3. Update extension auto-sync windows only if the observed density profile materially changed
-4. Keep the analysis helper/script as the source of truth for schedule recalibration
+```text
+python scripts/analysis/analyze_sa_market_news_density.py --days 30 --bucket-minutes 60
+```
+
+Any future recalibration surface must call the retained app-owned analysis
+module through its own reviewed API or job rather than restoring a root script.
 
 ### Phase SA-R2: Latest Articles metadata v1
 

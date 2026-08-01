@@ -201,7 +201,11 @@ From Novelloom doc-19 real probes (2026-05-22, backend `chatgpt.com/backend-api/
 
 ## 9. Falsifiable probe list
 
-Redacted smoke harness discipline (Novelloom `scripts/probe_chatgpt_oauth_backend.py`): record response shape/status/error, **never save tokens/PII**, user-triggered diagnostics only. **Per [[feedback-live-verify-cheap-models]], run live probes on gpt-5.4 / gpt-5.4-mini for cost.**
+Redacted smoke harness discipline (Novelloom upstream historical
+`scripts/probe_chatgpt_oauth_backend.py`, not an ArkScope-local path): record
+response shape/status/error, **never save tokens/PII**, user-triggered
+diagnostics only. **Per [[feedback-live-verify-cheap-models]], run live probes
+on gpt-5.4 / gpt-5.4-mini for cost.**
 
 | # | Probe | Method | PASS | FAIL |
 |---|-------|--------|------|------|

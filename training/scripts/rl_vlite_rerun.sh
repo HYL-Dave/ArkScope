@@ -12,9 +12,8 @@
 #     monitor.csv                       (per-episode rewards/lengths)
 #     model_sb3.zip + metadata.json     (normal artifacts)
 #
-# Then run:
-#   python scripts/analysis/extract_sb3_train_metrics.py \
-#       --model-dir trained_models/<model_id>
+# Inspect the retained TensorBoard event stream and monitor.csv directly; the
+# former root-level metrics extractor has been retired.
 #
 # Usage:
 #   bash training/scripts/rl_vlite_rerun.sh                                  # ext CSV (default)
