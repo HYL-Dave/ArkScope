@@ -172,7 +172,7 @@ class TestFundamentalsDB:
         """DAL wraps retired PG fundamentals as not found."""
         result = dal.get_fundamentals("NVDA")
         assert result.ticker == "NVDA"
-        assert result.found is False
+        assert result.data_source == "none"
 
 
 # ---------------------------------------------------------------------------
