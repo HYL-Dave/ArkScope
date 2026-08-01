@@ -1,6 +1,6 @@
 # ArkScope EIR-002 Green Backend Baseline Design
 
-> **Status: TASK 7 BOUNDED AMENDMENT - INDEPENDENT REVIEW NEXT**
+> **Status: IMPLEMENTED - FINAL CLOSEOUT REVIEW NEXT**
 >
 > **Date:** 2026-07-31
 > **Grounding commit:** `3092fb4128dad9a2579f267e915519fa9cdf648c`

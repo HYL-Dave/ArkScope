@@ -120,12 +120,13 @@ Each entry records:
 
 ### EIR-002 - Eliminate the environment-dependent non-green backend baseline
 
-- `status`: `promoted`
+- `status`: `closed`
 - `observed_at`: `2026-07-31`
-- `impact`: The full backend suite is not green and changes classification
-  across mounted-data/config environments. The current native boundary has 27
-  known failures. That forces every change review to reconstruct failure-set
-  equivalence and can conceal a new failure inside familiar noise.
+- `impact`: Before closure, the full backend suite was not green and changed
+  classification across mounted-data/config environments. The native boundary
+  had 27 known failures, forcing every change review to reconstruct
+  failure-set equivalence and risking concealment of a new failure inside
+  familiar noise.
 - `evidence`:
   - `docs/superpowers/evidence/2026-07-25-sa-extension-reliability-control-clarity.md:188-200`
     records matched implementer A/B at `30 failed / 7 errors` and matched
@@ -164,17 +165,24 @@ Each entry records:
     reads nonexistent `FundamentalsResult.found`. The same node skips without
     that file. A real scheduler write during the run separately proved the
     production main root is not a frozen data boundary.
-- `owner`: promoted EIR-002 green-backend-baseline slice.
-- `next_action`: independently review the bounded Task 7 amendment. It keeps
-  the exposed node ID, changes only its stale `.found` assertion to the
-  current `data_source == "none"` absence contract, and moves canonical
-  merged admission to a fresh exact-master worktree with no `config/.env` and
-  only an empty `data/` directory. Its sole production-root link is the
-  explicitly pinned `node_modules` test toolchain. Keep this entry promoted
-  until that node is GREEN in the data-bearing control and clean merged
-  admission reproduces exact `4730/c34de9a0...`, `4658/72/0`, and an empty
-  non-passing stream.
-- `closure_evidence`: none.
+- `owner`: closed by the EIR-002 green-backend-baseline slice.
+- `next_action`: none. Treat any later canonical non-passing node as a new
+  regression or separately classified register item, not inherited debt.
+- `closure_evidence`:
+  - amendment `038f0c21` received independent GREEN review;
+  - test-fix commit `c18f8eb0` changed only the stale `.found` assertion to
+    `data_source == "none"` and the data-bearing owning node passed;
+  - a fresh exact-tip worktree with no `config/.env`, empty `data/`, and only
+    the pinned `node_modules` toolchain reproduced collection
+    `4730/c34de9a0...`, focused `123/123`, native
+    `4658 passed / 72 skipped / 0 failed`, protected
+    `94 passed / 18 skipped`, and empty non-passing SHA `e3b0c442...`;
+  - the full reporter recorded all `4730` nodes seen with exit status zero;
+    and
+  - all 638 generated repo-relative files were manifested and quarantined by
+    exact path, with original/quarantined path-plus-SHA streams both
+    `6ca72947...`; pre/restored status, ignored inventory, data inventory,
+    symlinks, and toolchain identities matched.
 
 ### EIR-003 - Audit the 89 I18N-2-era Settings copy rewrites
 

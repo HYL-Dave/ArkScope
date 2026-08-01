@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 7 BOUNDED AMENDMENT - INDEPENDENT REVIEW NEXT
+> **Status:** TASK 7 COMPLETE - FINAL CLOSEOUT REVIEW NEXT
 >
 > **Date:** 2026-07-31
 >
@@ -1940,7 +1940,7 @@ not merge.
 - Modify after merge: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Modify after merge: `docs/superpowers/evidence/2026-07-31-eir-002-green-backend-baseline.md`
 
-- [ ] **Step 1: Require explicit implementation-review clearance**
+- [x] **Step 1: Require explicit implementation-review clearance**
 
 The review must independently reproduce:
 
@@ -1954,13 +1954,13 @@ The review must independently reproduce:
 
 No finding may be waived by the implementer.
 
-- [ ] **Step 2: Fast-forward master to the exact reviewed tip**
+- [x] **Step 2: Fast-forward master to the exact reviewed tip**
 
 From the main worktree, verify `master` is an ancestor and use `git merge
 --ff-only`. Do not merge or stage
 `docs/design/SCRIPTS_RETIREMENT_DECISION.md`.
 
-- [ ] **Step 3: Run merged focused and native full verification**
+- [x] **Step 3: Run merged focused and native full verification**
 
 The first main-worktree attempt is frozen as rejected Task 7 evidence. It
 proved exact collection `4730/c34de9a0...` and focused `123/123`, then stopped
@@ -2075,7 +2075,7 @@ The only test collection difference must remain the exact nine retired IDs.
 The frozen main-root attempts, their consumed stage names, and their artifact
 transactions remain auditable in Evidence Section 8; they are not rerun.
 
-- [ ] **Step 4: Reconcile and quarantine merged-run artifacts**
+- [x] **Step 4: Reconcile and quarantine merged-run artifacts**
 
 Capture the post-run state:
 
@@ -2109,7 +2109,7 @@ Condition.
 Pre-existing user files, including the untracked scripts-retirement decision,
 must remain untouched.
 
-- [ ] **Step 5: Close EIR-002 with exact merged evidence**
+- [x] **Step 5: Close EIR-002 with exact merged evidence**
 
 Set EIR-002 to `closed` only after merged verification. Record:
 
@@ -2123,7 +2123,7 @@ Set EIR-002 to `closed` only after merged verification. Record:
 Add the newest-first priority-map closeout entry. EIR-006 remains promoted and
 independent.
 
-- [ ] **Step 6: Commit docs-only closeout and request focused review**
+- [x] **Step 6: Commit docs-only closeout and request focused review**
 
 ```bash
 git add docs/design/ENGINEERING_ISSUE_REGISTER.md \
