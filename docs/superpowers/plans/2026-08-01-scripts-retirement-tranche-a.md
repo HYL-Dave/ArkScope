@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** IMPLEMENTATION PLAN WRITTEN - INDEPENDENT PLAN REVIEW REQUIRED
+> **Status:** TASK 0 BLOCKED - PROVIDER-SAFE BASE AMENDMENT REVIEW REQUIRED
 >
 > **Date:** 2026-08-01
 >
@@ -102,17 +102,41 @@ that the scorer survives the final programme.
 
 ### 0.2 Production and provider boundary
 
-Tranche A performs no provider request, Gateway connection, scheduler action,
-production database write, production-data migration, ignored archive change,
-or local-secret operation. In particular:
+No admitted Tranche A verification may perform a provider request, Gateway
+connection, scheduler action, production database write, production-data
+migration, ignored archive change, or local-secret operation. In particular:
 
-- do not execute either Financial Datasets probe;
+- automated admission must exclude both Financial Datasets probe files at
+  collection time and may not execute either probe;
 - do not execute the IBKR diagnostic or any moved live smoke;
 - do not run any retired migration CLI;
 - do not change anything under `data/backups/`;
 - do not delete the legacy scheduler/IV archive or edit its ignored
   `RESTORE.txt`; and
 - do not read the contents of `config/scoring_keys.txt`.
+
+The first Task 0 native attempt exposed a contradiction in the reviewed plan:
+this section prohibited executing the two probes while Task 0 Step 5 ran the
+unfiltered 4,730-node suite that collected both of them. That attempt made 29
+unauthenticated Financial Datasets request attempts under `env -i`; it supplied
+no Financial Datasets API key attributable to the user's account. Its surviving
+28 response artifacts contain `200`, `400`, `401`, `404`, and `410` statuses,
+but they are not cost, entitlement, or capability classification evidence.
+The user subsequently confirmed that bounded testing spend can be approved,
+but that clarification does not retroactively make this run an admitted
+provider-free base.
+
+Preserve the first attempt as immutable rejected evidence. Do not overwrite its
+report, transcript, or exact-path quarantine. The replacement provider-safe
+base must use the reviewed `--ignore` arguments in Task 0 Step 5, must never
+create `comparison_results/`, and must be the only native base admitted to the
+Tranche A A/B ledger.
+
+This correction also applies to how earlier EIR-002 full-suite history is read:
+those commands used a blank credential environment, but they did not exclude
+the two probe nodes and therefore made the same unauthenticated request shape.
+Their test and collection results remain valid for their stated purposes; they
+are not evidence that those historical runs were network-free.
 
 ### 0.3 Canonical admission boundary
 
@@ -327,8 +351,26 @@ The final Tranche A delta is exactly `+0/-177`. No helper may be collected,
 and no retained node may be renamed, parametrized into a different identity,
 skipped, or marked xfail.
 
-Because all 177 removed nodes pass in the accepted base, final native admission
-is:
+Physical collection identity and executable admission identity are deliberately
+separate at the base:
+
+```text
+physical collect-only authority:
+4730 / c34de9a0fe53e400409d3ec26d75a8c907ee277b121279693ea9f69c8638aabb
+
+provider-safe native base after exact two-file exclusion:
+4728 / 49e4a32b5f536cea97053578f2fba4456ffbbe0c10a4b66540c4f26d2b55329f
+4656 passed / 72 skipped / 0 failed
+```
+
+The native executable A/B therefore compares the 4,728 safe base nodes with
+the 4,553 final nodes: exactly 175 executed base nodes leave after Task 0.
+The repository collection ledger still proves the full physical `-177/+0`,
+including the two paid-probe nodes removed in Task 2. Neither identity may be
+substituted for the other.
+
+The final 4,553-node physical collection contains the same 72 intentional
+skips, so final native admission is:
 
 ```text
 4553 collected and seen
@@ -527,6 +569,62 @@ It must record:
 - capability, credential entitlement, and user spend authorization as separate
   facts; and
 - no provider call was made while extracting the inventory.
+
+It must also separate three evidence classes:
+
+1. the literal endpoint/request-shape inventory extracted from the retired
+   files;
+2. the rejected Task 0 observation: 29 unauthenticated attempts and 28
+   surviving response artifacts, explicitly not accepted as endpoint cost,
+   entitlement, or availability evidence; and
+3. dated official observations rechecked on 2026-08-01:
+   - Credits is advertised as `$20` for `1,000` requests and premium requests
+     consume `8x`;
+   - Build is advertised as `$200/month` for `100,000` requests and premium
+     requests consume `4x`;
+   - the Terms state that API and MCP calls are billable units, Credits draws
+     prepaid balance, subscription overage draws prepaid balance, and an empty
+     balance yields HTTP `402`; and
+   - the published MCP tool list, API documentation index, and OpenAPI
+     inventory expose no documented account-balance or remaining-usage
+     operation.
+
+The dated official source URLs are:
+
+```text
+https://www.financialdatasets.ai/pricing
+https://www.financialdatasets.ai/terms-of-use
+https://docs.financialdatasets.ai/mcp-server
+https://docs.financialdatasets.ai/llms.txt
+https://docs.financialdatasets.ai/api/openapi.json
+```
+
+The decision input must preserve these owner-directed requirements for a later
+product slice without implementing them in Tranche A:
+
+- the existing enable control means "allow metered network requests", not
+  "hide cached Financial Datasets data";
+- cached data remains readable while metered requests are disabled;
+- endpoint policy uses a reviewed classification such as
+  `no_credit`, `core_1x`, `premium`, or `unknown`, with `unknown` failing
+  closed for automatic calls;
+- the product does not impose a user-configured daily or per-request cap;
+- before first metered enablement the user explicitly selects `credits` or
+  `subscription`; the declaration is editable and changes are audit-recorded;
+- Credits UI warns that requests consume prepaid balance, while subscription
+  UI prompts a user who declared a subscription to enable the source and warns
+  that overage may draw prepaid balance;
+- HTTP `402` becomes typed `credits_exhausted` and stops blind automatic
+  retries;
+- locally observed request units are labelled non-authoritative because other
+  clients, purchases, resets, and provider-side multipliers are not fully
+  observable; and
+- until an official balance API or MCP tool exists, the UI links to the
+  provider dashboard rather than scraping or calling a private endpoint.
+
+Registry implementation, backend enforcement, Settings UI, i18n, audit
+persistence, and typed runtime handling form a separate reviewed product slice.
+They are not Tranche A work.
 
 Exact endpoint set:
 
@@ -741,28 +839,64 @@ Expected:
 94 passed, 18 skipped
 ```
 
-- [ ] **Step 5: Run one native base admission**
+- [ ] **Step 5: Run one provider-safe native base admission**
 
 Before the run, require no `config/.env`, create only an empty `data/`, and
 link the reviewed `node_modules` toolchain exactly as in EIR-002. Inventory
 `data` and `src/data`, ordinary/ignored status, and symlinks before the run.
 
-Run natively:
+First preserve and classify the already completed unfiltered attempt:
+
+```text
+/tmp/eir002-green-baseline/reports/scripts-a-base-full.json
+/tmp/eir002-green-baseline/reports/scripts-a-base-full.txt
+/tmp/scripts-retirement-tranche-a/quarantine/task0-base-full/
+```
+
+It is immutable rejected evidence and must not enter the A/B ledger. Record:
+
+```text
+report SHA-256:
+9babd7b9f24dda99594436dfa98d10c2af86b1b59b3ea5f19313489f4b1c5b9e
+transcript SHA-256:
+c913fea3daef11d4b61335a13e055a7782b241db51d46bec511ae6704fe4db2b
+pre-quarantine and quarantined ignored-artifact SHA manifest:
+3e90b5ba1780547bdc8b77c5abf2cda5cf358f1c1fb82fd284f3b148545ca313
+4730 collected / 4730 seen / exitstatus 0
+29 unauthenticated request attempts
+28 surviving response artifacts because one retry output overwrote an earlier
+artifact with the same path
+surviving statuses: 2x 200, 1x 400, 20x 401, 4x 404, 1x 410
+```
+
+Do not infer free/paid classification, entitlement, capability, or account
+spend from those statuses.
+
+Require `comparison_results/` to be absent before the replacement run. Run
+natively with exactly these two exclusions:
 
 ```bash
-/tmp/eir002-green-baseline/run_native.sh scripts-a-base-full
+/tmp/eir002-green-baseline/run_native.sh \
+  scripts-a-base-provider-safe-full \
+  --ignore=scripts/testing/test_financial_datasets_api.py \
+  --ignore=scripts/testing/test_financial_datasets_api_retry.py
 ```
 
 Require reporter facts:
 
 ```text
-4730 collected
-4730 seen
-4658 passed
+4728 collected
+4728 seen
+ordered collected stream:
+49e4a32b5f536cea97053578f2fba4456ffbbe0c10a4b66540c4f26d2b55329f
+4656 passed
 72 skipped
 0 non-passing
 exitstatus 0
 ```
+
+Require `comparison_results/` still absent after pytest exits. Any appearance
+means a paid probe imported or executed and invalidates the attempt.
 
 Manifest and exact-path quarantine every newly generated repository-relative
 artifact. Restore the pre-run inventory byte-for-byte. Do not touch a
@@ -790,6 +924,12 @@ Create:
 ```
 
 Replace the reviewed-plan instruction with the observed SHA before committing.
+Section 5 must distinguish the rejected 4,730-node unfiltered attempt from the
+admitted 4,728-node provider-safe attempt, retain their artifacts separately,
+and include the historical EIR-002 qualification from Section 0.2. It must say
+that no admitted Task 0 run executed a Financial Datasets probe; it must not
+claim that all historical full-suite runs were network-free.
+
 Add a newest-first priority-map entry stating Task 0 is grounded and
 implementation remains blocked until independent evidence review.
 
@@ -1360,11 +1500,17 @@ Evidence must contain:
 - all four collection identities;
 - exact 159-node disposition and 54-node domain-core ledger;
 - every structural RED/GREEN result;
-- exact endpoint inventory proof with no provider call;
+- exact endpoint inventory proof with no provider call during Task 2 static
+  extraction;
+- the rejected Task 0 request observation, kept separate from classification
+  and from the admitted provider-safe base;
+- dated official pricing/billing/no-balance-interface observations and the
+  separately scoped product-policy requirements from Section 3.2;
 - old-path classified census;
 - secret metadata-only checks;
 - retained score/adapter/protected results;
-- native base/final reporter JSON and empty non-passing sets;
+- provider-safe native base and final reporter JSON plus their empty
+  non-passing sets;
 - artifact manifests and quarantine transactions; and
 - protected main-draft SHA before and after.
 
@@ -1392,7 +1538,10 @@ delta, current tree, retained gates, old-path census, and native admission.
 
 The reviewer must independently reproduce:
 
-- base `4730/c34de9a0...`;
+- physical collect-only base `4730/c34de9a0...`;
+- provider-safe native base `4728/49e4a32b...` with
+  `4656 passed / 72 skipped / 0 failed`, exact two-file exclusion, and no
+  `comparison_results/`;
 - final `4553/69152591...`;
 - exact `+0/-177`;
 - 159 direct dispositions and 54 additional domain nodes;
@@ -1400,7 +1549,8 @@ The reviewer must independently reproduce:
 - 36 retained scoring nodes and 17 retained adapter nodes;
 - protected `94 passed / 18 skipped`;
 - native `4481 passed / 72 skipped / 0 failed`; and
-- zero provider, production-data, archive, or secret operation.
+- zero provider, production-data, archive, or secret operation in every
+  admitted run, with the rejected request-bearing attempt reported separately.
 
 - [ ] **Step 2: Fast-forward master to the exact reviewed tip**
 
@@ -1445,7 +1595,8 @@ Stop immediately if:
 5. target construction is not exact `4553/69152591...` before edits;
 6. collection differs from exact `+0/-177`;
 7. a moved live smoke enters default pytest collection;
-8. a provider, Gateway, scheduler, paid endpoint, or production DB is touched;
+8. after this amendment, any admitted run touches a provider, Gateway,
+   scheduler, paid endpoint, or production DB;
 9. `config/scoring_keys.txt` content is read, hashed into evidence, moved,
    altered, staged, or deleted;
 10. a live source consumer of a migration core/CLI is found;
@@ -1462,7 +1613,11 @@ Stop immediately if:
 18. native reporter sees fewer nodes than it collected;
 19. a pre-existing ignored/user file changes during verification;
 20. an unaccounted repository-relative artifact remains; or
-21. the protected main-worktree draft is modified or lost without the exact
+21. an admitted provider-safe run creates `comparison_results/`, or its
+    collected stream differs from exact `4728/49e4a32b...`;
+22. the rejected unfiltered Task 0 report, transcript, or quarantine is
+    overwritten, deleted, or promoted into the A/B ledger; or
+23. the protected main-worktree draft is modified or lost without the exact
     reviewed quarantine/identity transaction.
 
 ## 6. Plan Self-Review Map
@@ -1473,7 +1628,9 @@ Stop immediately if:
 | Exact 159-node direct disposition | Task 0 / Section 2.2 |
 | Final target hash derived before deletion | Task 0 / Section 2.1 |
 | Manual live checks preserved but never collected | Task 1 |
-| Financial Datasets static knowledge extracted without spend | Task 2 |
+| Financial Datasets static knowledge extracted without a provider call | Task 2 |
+| Rejected request-bearing base separated from provider-safe admission | Task 0 |
+| Metered-provider policy recorded but implementation deferred | Task 2 / separate product slice |
 | HuggingFace prompts/mapping retained as history | Task 2 |
 | Visualization and unusual-options knowledge retained, code removed | Task 2 |
 | Diagnostic executable leaves; adapter behavior stays | Task 3 |
