@@ -1,6 +1,6 @@
 # `scripts/` Comprehensive Retirement — Decision Document
 
-> **Status: PROPOSED DECISIONS LOCKED; RE-GROUNDED AGAINST `24202182`; INDEPENDENT WRITTEN REVIEW REQUIRED**
+> **Status: APPROVED DECISION AUTHORITY; TRANCHE A PLAN WRITTEN; INDEPENDENT PLAN REVIEW REQUIRED**
 >
 > Written 2026-07-27 against clean `master` tip `5ba12673`, then fully
 > re-grounded on 2026-08-01 against exact clean tip
@@ -9,13 +9,14 @@
 > the physical `scripts/` tree is byte-unchanged between those two commits, but
 > its consumers, test ledger, and standing authorities were re-audited.
 >
-> This document still authorizes no deletion, move, rewrite, product edit, live
-> provider call, or production-data operation. It records the user's disposition
-> rulings, including the target that root `scripts/` physically disappears.
-> Work remains blocked on independent review, a RED-first implementation plan,
-> and that plan's review clearance. Any production-data deletion or potentially
-> billable provider revalidation requires a second explicit approval at
-> execution time.
+> Independent full-document review returned GREEN with zero findings, and the
+> reviewed bytes were committed alone as `d89d433c`. This authority records the
+> user's disposition rulings, including the target that root `scripts/`
+> physically disappears. It does not by itself authorize deletion, move,
+> rewrite, product edit, live provider call, or production-data operation:
+> implementation remains blocked on independent review clearance of the
+> RED-first Tranche A plan. Any production-data deletion or potentially billable
+> provider revalidation requires a second explicit approval at execution time.
 >
 > Supersedes nothing.
 > `REPO_HYGIENE_B6_MODULE_DISPOSITION.md` §3 and
