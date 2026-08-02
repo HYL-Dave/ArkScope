@@ -409,10 +409,89 @@ present and are rerun because model-visible descriptions change.
 The canonical frontend list is normalized from `vitest list --json` as sorted
 `relative_file<TAB>full_test_name` rows.
 
+The normalizer is part of the identity contract. It must JSON-decode the
+`name` field before writing it. Raw JSON text extraction and `jq @tsv` are
+forbidden because they preserve or add an escape layer around literal
+backslashes. Materialize the source between the markers byte-for-byte; the
+identity covers the shebang through the final newline after `main()`:
+
+```text
+62 lines / 2,233 bytes
+SHA-256:
+955dca592d243505ced622a84e88a35160a3fa787ffb954f38a6a43e1a72fcac
+```
+
+<!-- EIR006_VITEST_LIST_NORMALIZER_START -->
+```python
+#!/usr/bin/env python3
+"""Normalize decoded Vitest list JSON into deterministic node rows."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+
+def _arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--web-root", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    return parser.parse_args()
+
+
+def _reject_record_separator(value: str, *, field: str) -> None:
+    if any(separator in value for separator in ("\t", "\n", "\r")):
+        raise ValueError(f"{field} contains a record separator")
+
+
+def main() -> None:
+    args = _arguments()
+    payload = json.loads(args.input.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise TypeError("Vitest list JSON must be an array")
+
+    web_root = args.web_root.resolve(strict=True)
+    rows: list[str] = []
+    for index, item in enumerate(payload):
+        if not isinstance(item, dict):
+            raise TypeError(f"entry {index} must be an object")
+        file_value = item.get("file")
+        name = item.get("name")
+        if not isinstance(file_value, str) or not isinstance(name, str):
+            raise TypeError(f"entry {index} requires string file and name")
+
+        file_path = Path(file_value)
+        if not file_path.is_absolute():
+            raise ValueError(f"entry {index} file must be absolute")
+        try:
+            relative_file = file_path.resolve(strict=True).relative_to(web_root)
+        except ValueError as exc:
+            raise ValueError(f"entry {index} escapes web root") from exc
+
+        relative_text = relative_file.as_posix()
+        _reject_record_separator(relative_text, field=f"entry {index} file")
+        _reject_record_separator(name, field=f"entry {index} name")
+        rows.append(f"{relative_text}\t{name}")
+
+    if len(rows) != len(set(rows)):
+        raise ValueError("normalized Vitest node rows must be unique")
+
+    rows.sort(key=lambda row: row.encode("utf-8"))
+    output = "" if not rows else "\n".join(rows) + "\n"
+    args.output.write_bytes(output.encode("utf-8"))
+
+
+if __name__ == "__main__":
+    main()
+```
+<!-- EIR006_VITEST_LIST_NORMALIZER_END -->
+
 | Collection | Files | Nodes | SHA-256 |
 |---|---:|---:|---|
-| Base full | 96 | 1,076 | `de48671aa1d3f70cb87166e3f5b026804e206ac31f8e29fe7e74b38cde9448d5` |
-| Target full | 97 | 1,077 | `8a88600623ff985d24f20fab85ba8375c574f230a1a964c09667a1184b2ceea2` |
+| Base full | 96 | 1,076 | `ef7f106054745c137ff70fe6ef2043bb7655185379de1f0a6ec3b1b2997b9396` |
+| Target full | 97 | 1,077 | `3f5e9f5bbe88d5ac48015a8c9e9d669dcd649a53a2ac868fc8a98d21f8d7e4eb` |
 | Base focused | 4 | 45 | `09a2b4ef080a5badab79fb674b5c5c6b85a0eb7c639c2fe9534616eff2b5bb84` |
 | Target focused | 5 | 46 | `5d64841ccdd943eb81f1cea50870115ed60dffe57ff6fc9867179552a4a7f127` |
 
@@ -941,19 +1020,25 @@ precomputed SHA differs.
 - [ ] **Step 4: Reproduce frontend base and preconstruct target**
 
 Use the exact installed toolchain from the main repository only after checking
-both lockfile SHAs recorded by Tranche A. Run `vitest list --json`, normalize
-each row as:
+both lockfile SHAs recorded by Tranche A. Materialize the exact Section 2.6
+normalizer under the fresh evidence root, then require its exact
+`62 / 2233 / 955dca592d243505...` identity before use. Run
+`vitest list --json` into an unmodified JSON artifact and invoke that pinned
+normalizer with the exact frontend root. The normalizer parses JSON with
+`json.loads()` and writes each decoded row as:
 
 ```text
 relative_file<TAB>full_test_name
 ```
 
-then `LC_ALL=C sort`. Record exact:
+Do not parse the JSON as text, copy its quoted representation, or pass decoded
+names through `jq @tsv`; all three violate the runtime-name contract. Record
+exact:
 
 ```text
-base full:    96 files / 1076 / de48671aa1d3f70c...
+base full:    96 files / 1076 / ef7f106054745c13...
 base focused:  4 files /   45 / 09a2b4ef080a5bad...
-target full:  97 files / 1077 / 8a88600623ff985d...
+target full:  97 files / 1077 / 3f5e9f5bbe88d5ac...
 target focus:  5 files /   46 / 5d64841ccdd943eb...
 ```
 
@@ -1642,7 +1727,7 @@ Collect and compare final identities before product edits:
 
 ```text
 backend: 4581 / 6e4994bb664501cff75cb06dbad18db82ba68cbbe4b2b26c4d480250d7c4699f
-frontend full: 97 files / 1077 / 8a88600623ff985d24f20fab85ba8375c574f230a1a964c09667a1184b2ceea2
+frontend full: 97 files / 1077 / 3f5e9f5bbe88d5ac48015a8c9e9d669dcd649a53a2ac868fc8a98d21f8d7e4eb
 frontend focused: 5 files / 46 / 5d64841ccdd943eb81f1cea50870115ed60dffe57ff6fc9867179552a4a7f127
 ```
 
@@ -1721,7 +1806,7 @@ actual streams byte-for-byte to the preconstructed Task 0 targets:
 ```text
 backend full:    4581 / 6e4994bb664501cff75cb06dbad18db82ba68cbbe4b2b26c4d480250d7c4699f
 backend focused:  335 / 58230b548925b29035cff401520e0948b01dcaed8da2deed41149bea6b4a5ae1
-frontend full:   1077 / 8a88600623ff985d24f20fab85ba8375c574f230a1a964c09667a1184b2ceea2
+frontend full:   1077 / 3f5e9f5bbe88d5ac48015a8c9e9d669dcd649a53a2ac868fc8a98d21f8d7e4eb
 frontend focused:  46 / 5d64841ccdd943eb81f1cea50870115ed60dffe57ff6fc9867179552a4a7f127
 ```
 
