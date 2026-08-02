@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** DRAFT - INDEPENDENT PLAN REVIEW NEXT
+> **Status:** TASK 0 EVIDENCE REVIEW NEXT - TASK 1 NOT STARTED
 >
 > **Date:** 2026-08-03
 >
@@ -186,6 +186,7 @@ blob SHA, exact diff, owning-node result, restore operation, and restored SHA.
 | `src/daily_update.py` | Read current SQLite price statistics rather than repository files |
 | `src/tools/registry.py` | Remove the old model-visible valuation-source claim |
 | `src/agents/anthropic_agent/tools.py` | Keep the Anthropic tool description byte-aligned with the registered contract |
+| `src/agents/openai_agent/tools.py` | Keep the OpenAI tool description byte-aligned with the registered contract |
 
 No database schema migration is planned. No price collector, current quote,
 provider, scheduler, or Financial Datasets policy owner may change.
@@ -542,6 +543,38 @@ unrelated_lexical_hit
 duplicate, empty, or silently dropped rows stop work. The exact row counts and
 SHAs are grounded in Task 0 before implementation and then become immutable
 plan-amendment fields; they are not invented in advance from prose.
+
+Task 0 grounded the two ledgers as follows:
+
+```text
+consumer discovery:
+375 rows / 0c105ac7b247e78d1528efb138f8823fb196c9bb1c92092dba8f52ac194b4b29
+
+consumer census:
+375 rows / a8d165a2947f429a6918675fbd1357d8ddbbd11595a4e42b75c6027d8cd2b971
+
+behavior propagation:
+4 rows / 613024acc6568296cb798a2832fb8ca1e67fba05a9857c4e4bd5629755c556ba
+```
+
+The structured discovery producer emitted 383 raw submatches. Eight were exact
+duplicate `(path,line,symbol_or_pattern)` occurrences caused by overlapping
+search expressions; the producer audits that count and defines the discovery
+identity as the 375-row unique tuple stream. Removing verdict/owner from the
+census reconstructs that stream byte-for-byte. The final census contains no
+duplicate or unknown row.
+
+`behavior-propagation.tsv` columns are exactly:
+
+```text
+caller_path<TAB>caller_symbol<TAB>callee<TAB>owning_test_nodes<TAB>planned_disposition
+```
+
+The four current callers are the Anthropic bridge, OpenAI bridge,
+`/fundamentals` route, and institutional evidence packet. This Task 0 finding
+adds the OpenAI bridge to Sections 1.1 and Task 5 and adds its existing
+reachability node to Task 3. It changes no test identity or planned collection
+hash.
 
 ---
 
@@ -939,11 +972,12 @@ all docs.
 
 **Files:**
 
+- Modify: `docs/superpowers/plans/2026-08-03-eir-006-valuation-price-truth.md`
 - Modify: `docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Read only: all product/test/data paths named by the design
 
-- [ ] **Step 1: Verify exact branch, authority, and clean boundary**
+- [x] **Step 1: Verify exact branch, authority, and clean boundary**
 
 ```bash
 cd /tmp/arkscope-eir-006
@@ -969,7 +1003,7 @@ test ! -e /tmp/eir006-valuation-price-truth
 mkdir -p /tmp/eir006-valuation-price-truth/{baseline,census,protected,artifacts}
 ```
 
-- [ ] **Step 2: Reproduce canonical backend collection**
+- [x] **Step 2: Reproduce canonical backend collection**
 
 ```bash
 cd /tmp/arkscope-eir-006
@@ -988,7 +1022,7 @@ sha256sum /tmp/eir006-valuation-price-truth/baseline/backend.nodes
 Expected: exact `4553 / 69152591306a8dee...`. Reporter exit is zero,
 `seen_node_ids=[]`, and `nonpassing_node_ids=[]` because this is collect-only.
 
-- [ ] **Step 3: Reproduce backend focused base and preconstruct all targets**
+- [x] **Step 3: Reproduce backend focused base and preconstruct all targets**
 
 Collect the 14 existing affected files from Section 2.4 and record exact:
 
@@ -1017,7 +1051,7 @@ Write these immutable pre-edit streams:
 Stop if a claimed ID already exists, the removed ID is absent/multiple, or any
 precomputed SHA differs.
 
-- [ ] **Step 4: Reproduce frontend base and preconstruct target**
+- [x] **Step 4: Reproduce frontend base and preconstruct target**
 
 Use the exact installed toolchain from the main repository only after checking
 both lockfile SHAs recorded by Tranche A. Materialize the exact Section 2.6
@@ -1045,7 +1079,7 @@ target focus:  5 files /   46 / 5d64841ccdd943eb...
 The target construction inserts only the exact Dashboard node in Section 2.6.
 Do not parse human console prose and do not use whitespace-delimited node IDs.
 
-- [ ] **Step 5: Materialize the closed pre-edit consumer census**
+- [x] **Step 5: Materialize the closed pre-edit consumer census**
 
 Run broad searches over current source, tests, training, current docs, config,
 and app code for at least:
@@ -1083,13 +1117,12 @@ structured or NUL-safe producer. Add a disposition for every row and assert:
   stream without loss.
 
 Separately enumerate every `get_fundamentals_analysis()` caller and its owning
-tests in `behavior-propagation.tsv`. At minimum the `/fundamentals` route and
-`evidence_packet.py` path are present. Record counts and SHAs in evidence and
-amend Sections 2.7/Task 0 with those exact values before Task 1. This is the
-only anticipated docs-only Task 0 amendment; it requires focused independent
-review.
+tests in `behavior-propagation.tsv`. Task 0 found exactly the four callers and
+the immutable stream identity recorded in Section 2.7. The route, evidence,
+Anthropic bridge, and OpenAI bridge must all remain represented. This grounded
+docs-only amendment requires focused independent review before Task 1.
 
-- [ ] **Step 6: Pin protected paths and current production identities read-only**
+- [x] **Step 6: Pin protected paths and current production identities read-only**
 
 Record path/blob SHAs for all out-of-scope owners:
 
@@ -1114,17 +1147,24 @@ scheduler state/cadence read-only snapshot
 Do not read secrets. Do not query a provider. These dated observations are a
 before/after safety boundary, not acceptance constants for deletion.
 
-- [ ] **Step 7: Run native green base under the canonical boundary**
+- [x] **Step 7: Run native green base under the canonical boundary**
 
 Create a fresh detached exact-tip worktree with no `config/.env`, empty
 `data/`, absent `src/data`, and the pinned `node_modules` link. Run the wakeup
 probe in the same native context, then:
 
+The pinned wrapper takes exactly one single-use stage name and runs against its
+current working directory; it does not accept a worktree path. Therefore run:
+
 ```bash
+cd /path/to/fresh-worktree
 /tmp/eir002-green-baseline/run_native.sh \
-  /path/to/fresh-worktree \
-  /tmp/eir006-valuation-price-truth/baseline/native-base-full
+  eir006-task0-native-base-e261abc2
 ```
+
+The wrapper itself executes the pinned wakeup probe in that same native
+context. Passing the worktree as an argument is invalid and must not be used by
+later base/tip gates.
 
 Expected:
 
@@ -1137,7 +1177,7 @@ empty non-passing SHA e3b0c442...
 Inventory and exact-path quarantine every new artifact. A modified pre-existing
 file or reporter mismatch stops Task 0.
 
-- [ ] **Step 8: Commit the Task 0 evidence checkpoint and stop for review**
+- [x] **Step 8: Commit the Task 0 evidence checkpoint and stop for review**
 
 Update evidence with exact census counts/SHAs, base collections, native result,
 protected identities, and artifact transaction. Update priority map newest
@@ -1462,6 +1502,8 @@ pytest \
   tests/test_api.py::test_fundamentals_stored_source_path_mapping \
   tests/test_api.py::test_fundamentals_stored_expired_cache_is_honest_empty \
   tests/test_tools.py::TestAnalysisTools::test_get_fundamentals_analysis \
+  tests/test_agents.py::TestAnthropicToolSchemas::test_tool_names \
+  tests/test_agents.py::TestOpenAIToolCreation::test_tools_have_names \
   tests/test_evidence_packet.py::test_packet_has_expected_sources_and_tags \
   tests/test_evidence_packet.py::test_one_failing_source_degrades_to_coverage \
   -q
@@ -1657,6 +1699,7 @@ witness.
 - Modify: `apps/arkscope-web/src/settings/settingsCopy.test.ts`
 - Modify: `src/tools/registry.py`
 - Modify: `src/agents/anthropic_agent/tools.py`
+- Modify: `src/agents/openai_agent/tools.py`
 - Modify: `src/tools/analysis_tools.py`
 - Modify: `src/tools/schemas.py`
 - Modify: `src/tools/backends/file_backend.py`
@@ -1902,10 +1945,14 @@ wrapper/reporter/probe/toolchain identities and the fresh-worktree boundary.
 Run the probe and then:
 
 ```bash
+cd /path/to/fresh-exact-tip-worktree
 /tmp/eir002-green-baseline/run_native.sh \
-  /path/to/fresh-exact-tip-worktree \
-  /tmp/eir006-valuation-price-truth/final/native-tip-full
+  eir006-task6-native-tip-REPLACE_WITH_TIP_SHORT_SHA
 ```
+
+The stage name is single-use and must be replaced with the actual reviewed tip
+identity before execution. The wrapper owns the probe, report, and transcript;
+the operator must not pass worktree or output paths as positional arguments.
 
 Expected exact admission:
 
