@@ -40,7 +40,6 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
-from datetime import time as dtime  # aliased — `time` (stdlib module) is used for monotonic()
 from pathlib import Path
 from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
@@ -54,6 +53,13 @@ from src.market_data_admin import (
     _now,
     resolve_market_db_path,
 )
+from src.market_sessions import (
+    EXCHANGE_TZ as _EXCHANGE_TZ,
+    RTH_COMPLETE_AFTER_ET as _RTH_COMPLETE_AFTER_ET,
+    complete_trading_days as _complete_trading_days,
+    is_session_complete as _is_session_complete,
+    normalize_now_et as _norm_now_et,
+)
 from src.tools.data_coverage_tools import _market_day_status
 
 logger = logging.getLogger(__name__)
@@ -66,12 +72,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _MARKET_WRITE_LOCK_NAME = "local_refresh"
 
 _CANON_DOMAINS = ("prices", "news", "fundamentals")
-_EXCHANGE_TZ = "America/New_York"
-# A US trading day counts as "complete" (eligible for gap-fill) only after this ET time —
-# the RTH close (16:00) + a small settle buffer. Conservatively uses the REGULAR close even
-# on early-close days (a half-day is then considered complete a few hours "late", which is
-# harmless for a gap filler). Per-day bar-count completeness is deferred (see the docstring).
-_RTH_COMPLETE_AFTER_ET = dtime(16, 30)
 # JobRunsStore (PG telemetry) only accepts these — provider_sync_runs mirrors that set
 # so a run status can round-trip without a separate validation contract.
 _VALID_RUN_STATUSES = frozenset({"running", "succeeded", "failed"})
@@ -213,37 +213,6 @@ def preflight_canonicalize(db_path: Optional[str] = None) -> dict:
         return {"ok": True, "exists": True, "created_aliases": not had, "folded": folded}
     finally:
         conn.close()
-
-
-# --- trading-day completeness (shared by gap detection + top-up backfill) ----------
-
-def _norm_now_et(now_et: Optional[datetime]) -> datetime:
-    """Resolve the ET clock: None → now(ET); naive → assume ET; aware → convert to ET."""
-    et = ZoneInfo(_EXCHANGE_TZ)
-    if now_et is None:
-        return datetime.now(et)
-    if now_et.tzinfo is None:
-        return now_et.replace(tzinfo=et)
-    return now_et.astimezone(et)
-
-
-def _is_session_complete(d: date, now_et: datetime) -> bool:
-    """A US trading day is COMPLETE iff strictly before the current ET date, or it IS the
-    current ET date and ET-now is past the close buffer (2c). A future ET day is never
-    complete. Judged in America/New_York (NOT a UTC date)."""
-    today_et = now_et.date()
-    if d < today_et:
-        return True
-    if d == today_et:
-        return now_et.timetz().replace(tzinfo=None) >= _RTH_COMPLETE_AFTER_ET
-    return False
-
-
-def _complete_trading_days(start: date, end: date, now_et: datetime) -> List[date]:
-    """Complete US trading days in [start, end] — weekends + US holidays excluded,
-    in-progress day excluded until close. The set a top-up backfill fetches over."""
-    return [d for d in _daterange(start, end)
-            if _market_day_status(d)["is_trading_day"] and _is_session_complete(d, now_et)]
 
 
 # --- gap detection (MISSING TRADING DAYS — day-presence, not bar-count) ------------

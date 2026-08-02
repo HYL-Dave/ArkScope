@@ -104,6 +104,8 @@ class TestDetailedFinancialsSchema:
         assert df.ticker == "TEST"
         assert df.data_source == "sec_edgar"
         assert df.ev_to_ebitda is None
+        assert df.valuation_price_basis.available is False
+        assert df.valuation_price_basis.empty_reason == "no_qualified_price"
 
     def test_full_creation(self):
         from src.tools.schemas import DetailedFinancials
@@ -113,9 +115,21 @@ class TestDetailedFinancialsSchema:
             sbc_to_revenue=0.036,
             rd_to_revenue=0.099,
             rule_of_40=160.8,
+            valuation_price_basis={
+                "available": True,
+                "source": "local_market_db",
+                "interval": "15min",
+                "required_market_date": "2026-06-23",
+                "market_date": "2026-06-23",
+                "timestamp": "2026-06-23T20:00:00+00:00",
+                "price": 107.0,
+                "empty_reason": None,
+            },
         )
         assert df.ev_to_ebitda == 55.0
         assert df.rule_of_40 == 160.8
+        assert df.valuation_price_basis.price == 107.0
+        assert df.valuation_price_basis.source == "local_market_db"
 
     def test_model_dump(self):
         from src.tools.schemas import DetailedFinancials
@@ -123,6 +137,16 @@ class TestDetailedFinancialsSchema:
         d = df.model_dump()
         assert d["ticker"] == "TEST"
         assert d["pe_ratio"] == 25.0
+        assert d["valuation_price_basis"] == {
+            "available": False,
+            "source": None,
+            "interval": None,
+            "required_market_date": None,
+            "market_date": None,
+            "timestamp": None,
+            "price": None,
+            "empty_reason": "no_qualified_price",
+        }
 
 
 # ============================================================

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -247,11 +247,26 @@ class WatchlistResult(BaseModel):
 # Detailed Financials (valuation + tech metrics)
 # ============================================================
 
+
+class ValuationPriceBasis(BaseModel):
+    available: bool = False
+    source: Optional[Literal["local_market_db"]] = None
+    interval: Optional[Literal["15min"]] = None
+    required_market_date: Optional[str] = None
+    market_date: Optional[str] = None
+    timestamp: Optional[str] = None
+    price: Optional[float] = None
+    empty_reason: Optional[Literal["no_qualified_price"]] = "no_qualified_price"
+
+
 class DetailedFinancials(BaseModel):
     """Comprehensive financial metrics for valuation analysis."""
     ticker: str
     report_date: Optional[str] = None
     data_source: str = Field(default="sec_edgar")
+    valuation_price_basis: ValuationPriceBasis = Field(
+        default_factory=ValuationPriceBasis
+    )
 
     # Valuation (EV-based — SEC EDGAR cached quarterly)
     market_cap: Optional[float] = None
