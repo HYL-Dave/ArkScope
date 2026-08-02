@@ -316,9 +316,12 @@ Each entry records:
     though the stored-only product route accepts only positive SEC annual cache
     rows, and Settings still includes a retired 2026-06-27 fundamentals sync
     row in its update summary;
-  - all 2,314,293 canonical 15-minute CSV timestamp keys were represented in
-    `market_data.db`, with 161 value differences left intentionally
-    unreconciled under the SQLite-authority ruling; and
+  - the raw-ticker CSV view contained 2,314,293 unique 15-minute keys and 161
+    apparent SQLite differences; after current aliases, the canonical view
+    contained 2,298,763 unique keys, all represented in `market_data.db`, with
+    176 conflicting duplicate keys and 43 SQLite differences (23 volume-only,
+    20 including OHLC) left intentionally unreconciled under the
+    SQLite-authority ruling; and
   - 75 hourly CSVs contain unique 2023 history, which the user explicitly
     chose to discard rather than migrate.
 - `owner`:

@@ -146,19 +146,35 @@ rederive an exact manifest rather than hard-code this observation.
 
 ### 2.6 CSV-to-SQLite comparison
 
-The 225 15-minute CSV files contain:
+The 225 15-minute CSV files contain 2,547,747 physical rows. Two views must be
+kept distinct:
 
-- 2,547,747 physical rows;
-- 2,314,293 unique `(canonical_ticker, datetime)` keys;
-- 233,454 duplicate rows;
-- 58 duplicate keys with conflicting CSV values; and
-- 161 unique keys whose values differ from the current SQLite row.
+| View | Unique keys | Duplicate rows | Conflicting duplicate keys | Keys differing from SQLite |
+|---|---:|---:|---:|---:|
+| raw-ticker diagnostic | 2,314,293 | 233,454 | 58 | 161 |
+| canonical deletion authority | 2,298,763 | 248,984 | 176 | 43 |
 
-After applying the current `LC -> HAPN` ticker alias, every unique 15-minute CSV
-key exists in `market_data.db`. The evidence does not establish whether the CSV
-or SQLite value is more accurate for the 161 differences. The product ruling
+The raw view keys rows by the ticker stored in the CSV plus normalized absolute
+timestamp; it resolves that ticker only for the SQLite lookup, so alias-
+equivalent raw keys remain separate. The canonical view first applies the
+current ticker-alias table, then groups every CSV value variant by
+`(canonical_ticker, absolute_datetime)`. A canonical key differs from SQLite
+only when none of its CSV value variants exactly matches the current SQLite
+row.
+
+Only `LC -> HAPN` changes this corpus. All 15,530 `LC` keys overlap a `HAPN`
+key after canonicalization, and 118 of those alias-pair keys carry conflicting
+values. That explains both the raw-to-canonical key reduction and why the raw
+comparison reports 161 differences while the canonical comparison reports 43.
+Of the 43 canonical differences, 23 are volume-only and 20 include OHLC.
+
+Every one of the 2,298,763 canonical 15-minute CSV keys exists in
+`market_data.db`. The evidence does not establish whether the CSV or SQLite
+value is more accurate for the 43 canonical differences. The product ruling
 is to keep the current SQLite authority and discard the historical CSV
-alternatives rather than preserve two competing truths.
+alternatives rather than preserve two competing truths. The final deletion
+manifest must recompute both views, but only the canonical method is an
+admission authority; the raw view is diagnostic.
 
 The 75 hourly CSVs are different: their 2023 rows have no complete current
 local duplicate. Training does not read them, and current documentation frames
@@ -173,9 +189,12 @@ Seven additional surfaces must move before deletion:
 1. `src.daily_update.get_ibkr_prices_status()` scans
    `data/prices/{hourly,15min}` and would falsely report no price data after
    deletion even while SQLite is healthy.
-2. `FileBackend.query_prices()` still implements CSV/Parquet price reads,
-   including hourly and daily fallback behavior. Explicit no-DSN callers can
-   therefore reactivate the retired files.
+2. `FileBackend.query_prices()` still implements CSV/Parquet price reads, and
+   `FileBackend.get_available_tickers("prices")` still globs the same retired
+   directories. Explicit no-DSN callers can therefore reactivate or advertise
+   the retired files. Its `get_available_tickers("fundamentals")` branch also
+   scans the already-absent `data_lake/raw/ibkr_fundamentals` path and must not
+   survive as a false file-backed capability.
 3. `local_market_stats()` and `local_ticker_coverage()` still derive their
    `fundamentals` facts from the retired table.
 4. The registered `get_ticker_data_coverage` tool independently summarizes the
@@ -192,6 +211,12 @@ Seven additional surfaces must move before deletion:
    current implementation still reads the retired table. The system status can
    therefore advertise legacy ticker coverage independently of the stored-only
    SEC contract, and Dashboard renders that count directly.
+
+Two indirect callers are behavior-propagation consumers rather than an eighth
+legacy-data authority: the `/fundamentals` route and the evidence packet's
+institutional-evidence builder both call `get_fundamentals_analysis()`. The
+implementation plan must place their existing test nodes in the affected-node
+ledger so LD 12 cannot change beneath them without review.
 
 Current training collection uses yfinance or direct IBKR daily bars, not these
 300 CSVs. Its help text incorrectly says the IBKR option reads a retired daily
@@ -312,7 +337,8 @@ new evidence. It does not use EIR-006 to create one.
 - removal of legacy IBKR snapshot overrides and annual-analysis short circuit;
 - truthful propagation through peer comparisons;
 - rewire of `daily_update` price status to the SQLite authority;
-- retirement of FileBackend CSV price reads;
+- retirement of FileBackend CSV price reads and dead price/fundamentals file
+  discovery;
 - replacement of legacy-table fundamentals status/coverage with the exact
   positive stored-SEC cache contract already used by `stored=true`;
 - truthful existing Settings, Ticker Detail, Dashboard, market-data API,
@@ -334,8 +360,8 @@ new evidence. It does not use EIR-006 to create one.
 - changing price collection cadence, fallback, retry, or partial-truth logic;
 - changing Coverage v2 slot classification or claiming complete coverage from
   the valuation selector;
-- backfilling, repairing, or choosing between the 161 differing CSV/SQLite
-  values;
+- backfilling, repairing, or choosing among the 43 canonical CSV/SQLite
+  differences or 176 conflicting canonical duplicate keys;
 - migrating the 75 hourly CSVs;
 - preserving a durable archive of the deleted data;
 - secure-erasure or DB-file compaction solely to reclaim pages from these rows;
@@ -561,6 +587,11 @@ IBKR override.
 snapshot before SEC/FD evaluation. Existing SEC cache behavior and the
 Financial Datasets enablement gate remain unchanged.
 
+The `/fundamentals` route and evidence-packet institutional-evidence path
+inherit this behavior through `get_fundamentals_analysis()`. Their existing
+tests must be named in the implementation node ledger even though those
+callers do not reference the retired table or cache key directly.
+
 The low-level table may remain inspectable until its rows are deleted, but it
 is not a product authority.
 
@@ -641,11 +672,14 @@ refresh authority. `read_sync_meta()` and `get_ticker_data_coverage` must
 project `sync.fundamentals=null` even before physical deletion. Current price
 and news telemetry remain unchanged.
 
-### LD 16 - FileBackend cannot resurrect retired price CSVs
+### LD 16 - FileBackend cannot resurrect retired file authorities
 
 `FileBackend.query_prices()` returns the standard empty price frame and does
-not inspect `data/prices`. Its price-file loaders are removed if no remaining
-non-test consumer exists.
+not inspect `data/prices`. `FileBackend.get_available_tickers("prices")` and
+`FileBackend.get_available_tickers("fundamentals")` return an exact empty list
+without testing, globbing, or opening the retired `data/prices` or already-
+absent `data_lake/raw/ibkr_fundamentals` paths. Its price-file loaders are
+removed if no remaining non-test consumer exists.
 
 This is a deliberate capability retirement for the no-DSN file backend.
 SQLite-backed DAL shapes retain price capability.
@@ -826,13 +860,16 @@ recent available day is introduced.
 ### 8.3 Other live surfaces
 
 20. Annual fundamentals analysis does not short-circuit on a legacy snapshot
-    and still respects the existing SEC cache and FD enablement gate.
+    and still respects the existing SEC cache and FD enablement gate; existing
+    `/fundamentals` route and evidence-packet tests remain in the affected-node
+    ledger and pass against that result shape.
 21. Peer comparison counts and names peers whose valuation price is
     unavailable while excluding null values from rankings/statistics.
 22. `daily_update` price status reads fixture SQLite stats and never scans a
     price directory.
-23. FileBackend returns the exact empty price-frame shape without opening a
-    CSV.
+23. FileBackend returns the exact empty price-frame shape and exact empty
+    price/fundamentals ticker lists without testing, globbing, or opening a
+    retired directory.
 24. A legacy `fundamentals` row alone cannot make market-data status, system
     status, ticker coverage, or the registered coverage tool claim stored
     fundamentals.
@@ -915,6 +952,14 @@ unrelated_lexical_hit
 
 Unknown is not a verdict. Any unclassified hit stops the slice.
 
+This old-data census is not the complete affected-node ledger. Before test
+counts are locked, the implementation plan must separately enumerate current
+product callers of `get_fundamentals_analysis()` and identify their existing
+owning tests. At minimum, the `/fundamentals` route and evidence-packet
+institutional-evidence path must receive explicit ledger dispositions. This
+behavior-propagation inventory does not create an eighth old-data authority or
+expand the final deletion census.
+
 The final deletion census must show:
 
 - zero `rewired_current_consumer` entries still targeting old data;
@@ -942,6 +987,8 @@ The final manifest records, without reading secrets:
 - the exact collection-summary identity and contents classification;
 - per-family file and row counts and min/max timestamps;
 - the current SQLite comparison summary;
+- the exact ticker-alias rows and deterministic comparison implementation
+  identity used to derive the raw and canonical views;
 - exact old cache keys and row metadata;
 - exact legacy fundamentals ticker/snapshot metadata;
 - exact retired fundamentals sync-row metadata;
@@ -952,10 +999,19 @@ The final manifest records, without reading secrets:
 
 The manifest must repeat the known decision-relevant facts:
 
-- all canonical 15-minute CSV timestamp keys were represented in SQLite at
-  design time, with 161 value differences left unreconciled;
+- the raw-ticker diagnostic view contained 2,314,293 unique keys and reported
+  161 SQLite differences;
+- after current aliases, the canonical deletion-authority view contained
+  2,298,763 unique keys, all represented in SQLite, with 176 conflicting
+  duplicate keys and 43 SQLite differences left unreconciled: 23 volume-only
+  and 20 including OHLC;
 - the hourly 2023 rows were unique locally; and
 - the user chose discard without migration.
+
+The final manifest must rederive both views from normalized absolute
+timestamps. Only the canonical view decides deletion admission. A raw-view
+match cannot substitute for it, and any change to the alias input or comparison
+method between review and execution stops for re-review.
 
 ### 10.2 Execution shape
 
@@ -1098,7 +1154,8 @@ Stop and amend this design or its implementation plan if:
 11. a provider request occurs;
 12. production data changes during product implementation;
 13. the consumer census has an unknown verdict;
-14. the deletion manifest differs between review and execution;
+14. the deletion manifest, canonicalization input, or comparison method differs
+    between review and execution;
 15. any destructive step lacks explicit user approval; or
 16. the managed sandbox is used as canonical admission despite a failing
     wakeup probe.
