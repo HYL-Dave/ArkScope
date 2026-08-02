@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 0 EVIDENCE REVIEW NEXT - TASK 1 NOT STARTED
+> **Status:** TASK 1 REVIEW READY - TASK 2 NOT STARTED
 >
 > **Date:** 2026-08-03
 >
@@ -1208,7 +1208,7 @@ targets, census closure, native base, and no-write boundary before Task 1.
 - Modify: `tests/test_detailed_financials.py`
 - Test: `tests/test_market_data_direct.py`
 
-- [ ] **Step 1: Write the ten selector tests before product code**
+- [x] **Step 1: Write the ten selector tests before product code**
 
 Use fixture-only SQLite builders. The `prices` fixture stores timestamps in the
 real `YYYY-MM-DDTHH:MM:SS+0000` shape and creates `ticker_aliases` only in the
@@ -1233,7 +1233,7 @@ Each node owns one independent contract:
 The multi-shape assertions within nodes 7 and 9 use local helper loops inside
 the owning node. Do not parametrize them or create extra collected IDs.
 
-- [ ] **Step 2: Run structural/product RED and verify the failure reason**
+- [x] **Step 2: Run structural/product RED and verify the failure reason**
 
 ```bash
 pytest tests/test_valuation_price.py -q
@@ -1250,7 +1250,7 @@ Collect the full backend and compare to exact Task 1 identity:
 4563 / 5fdc93f3dc78548048d7269d8088715028a57b1e2c54fe1ac422154d187f3986
 ```
 
-- [ ] **Step 3: Extract the calendar without semantic drift**
+- [x] **Step 3: Extract the calendar without semantic drift**
 
 Implement Section 3.1. Keep private aliases in `market_data_direct.py`. Run:
 
@@ -1261,13 +1261,13 @@ pytest tests/test_market_data_direct.py -q
 Expected: all 70 existing nodes pass; collection is byte-identical to base for
 that file. Any renamed helper/node or changed backfill behavior stops work.
 
-- [ ] **Step 4: Implement schema and selector**
+- [x] **Step 4: Implement schema and selector**
 
 Implement Sections 3.2-3.3. Use read-only URI mode and metadata validation.
 Do not call `_ensure_ticker_aliases`, a writable backend, or a DAL. The selector
 must be independently usable for the post-merge read-only smoke.
 
-- [ ] **Step 5: Run selector GREEN and no-create witnesses**
+- [x] **Step 5: Run selector GREEN and no-create witnesses**
 
 ```bash
 pytest tests/test_valuation_price.py tests/test_market_data_direct.py \
@@ -1278,7 +1278,7 @@ Expected: green. Record pre/post directory inventory for the missing path,
 broken symlink, and junk DB fixtures; no `-journal`, `-wal`, `-shm`, parent,
 or SQLite file may appear.
 
-- [ ] **Step 6: Commit the bounded product slice**
+- [x] **Step 6: Commit the bounded product slice**
 
 ```bash
 git add \
