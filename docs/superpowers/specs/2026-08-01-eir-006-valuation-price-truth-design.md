@@ -1,9 +1,10 @@
 # ArkScope EIR-006 Valuation Price Truth Design
 
-> **Status: DRAFT - INDEPENDENT REVIEW NEXT**
+> **Status: APPROVED - IMPLEMENTATION PLAN REVIEW NEXT**
 >
 > **Date:** 2026-08-01
 > **Grounding commit:** `fd6d1b86383df2a98f97b235d9796d4bcaaa7a58`
+> **Reviewed design commit:** `124622bc`
 > **Scope:** detailed-financials valuation price authority, static financial
 > cache semantics, legacy fundamentals bypass, repository CSV price readers,
 > and the separately approved final deletion of retired price/fundamentals data
@@ -1162,7 +1163,11 @@ Stop and amend this design or its implementation plan if:
 
 ## 14. Next Gate
 
-Independent full-document review is next.
+Independent full-document review returned GREEN with zero findings at
+`124622bc`.
 
-No implementation plan, product edit, cache-row deletion, CSV movement, or
-provider request is authorized by this draft.
+Independent review of
+`docs/superpowers/plans/2026-08-03-eir-006-valuation-price-truth.md` is next.
+No product edit, cache-row deletion, CSV movement, or provider request is
+authorized before that plan review clears its own next gate. Physical deletion
+still requires the later exact manifest and separate explicit user approval.

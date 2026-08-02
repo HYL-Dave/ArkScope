@@ -326,12 +326,15 @@ Each entry records:
     chose to discard rather than migrate.
 - `owner`:
   `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: independent full-document review of the hard-cutover design.
-  After review, write a RED-first implementation plan. Product cutover must
-  merge before an exact deletion manifest is built; physical deletion of 225
-  15-minute CSVs, 75 hourly CSVs, their stale zero-row collection summary,
-  retired detailed-financial cache rows, and legacy fundamentals rows plus
-  their retired sync row requires a separate explicit user approval.
+- `next_action`: independent review of the exact RED-first implementation plan
+  at
+  `docs/superpowers/plans/2026-08-03-eir-006-valuation-price-truth.md`.
+  Product cutover must merge before an exact deletion manifest is built;
+  physical deletion of 225 15-minute CSVs, 75 hourly CSVs, their stale
+  zero-row collection summary, retired detailed-financial cache rows, and
+  legacy fundamentals rows plus their retired sync row remains a later,
+  separately reviewed exact-source operation requiring explicit user approval
+  of the fresh manifest.
 - `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened
