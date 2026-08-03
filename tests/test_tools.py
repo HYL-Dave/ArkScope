@@ -125,6 +125,18 @@ class _HermeticMarketBackend:
             },
         }
 
+    def get_financial_cache(self, cache_key):
+        if cache_key != "fundamentals_analysis:sec_edgar:NVDA:annual:v1":
+            return None
+        return FundamentalsResult(
+            ticker="NVDA",
+            snapshot_date="2025-12-31",
+            data_source="sec_edgar",
+            roe=0.31,
+            revenue_growth=0.25,
+            free_cash_flow=500_000.0,
+        ).model_dump()
+
     def get_available_tickers(self, data_type):
         return {
             "news": ["AMD", "NVDA"],
@@ -412,9 +424,12 @@ class TestAnalysisTools:
         assert provider_calls == []
         assert isinstance(result, FundamentalsResult)
         assert result.ticker == "NVDA"
-        assert result.data_source == "ibkr"
-        assert result.market_cap == 1_500_000_000_000.0
-        assert result.pe_ratio == 30.0
+        assert result.data_source == "sec_edgar"
+        assert result.snapshot_date == "2025-12-31"
+        assert result.roe == 0.31
+        assert result.revenue_growth == 0.25
+        assert result.market_cap is None
+        assert result.pe_ratio is None
 
     def test_get_sec_filings(self, dal):
         from src.tools.analysis_tools import get_sec_filings

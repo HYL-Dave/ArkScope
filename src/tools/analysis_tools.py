@@ -198,7 +198,7 @@ def get_fundamentals_analysis(
     Get fundamental analysis for a ticker.
 
     Data source priority:
-    1. DB/File backend (IBKR snapshot) — fast, pre-computed metrics (annual only)
+    1. Positive/negative SEC cache
     2. SEC EDGAR XBRL API (free, real-time) — structured financial statements
     3. Financial Datasets API (paid, cached) — Q4, TTM, most complete
 
@@ -210,14 +210,7 @@ def get_fundamentals_analysis(
     Returns:
         FundamentalsResult with financial metrics and statements
     """
-    # 1. Try DB/File backend (IBKR snapshot) — only for annual
-    if period == "annual":
-        result = dal.get_fundamentals(ticker)
-        if result.snapshot_date:
-            result.data_source = "ibkr"
-            return result
-    else:
-        result = FundamentalsResult(ticker=ticker.upper())
+    result = FundamentalsResult(ticker=ticker.upper())
 
     # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies). LOCAL-FIRST
     # CACHE (#3): the SEC fetch is free but live + rate-limited (10 req/s, declared UA),
@@ -941,6 +934,17 @@ def get_peer_comparison(
                 "direction": direction,
             }
 
+    unavailable_tickers = []
+    unavailable_reasons: Dict[str, int] = {}
+    for peer_ticker, financial in financials.items():
+        price_basis = financial.valuation_price_basis
+        if price_basis.available:
+            continue
+        unavailable_tickers.append(peer_ticker)
+        if price_basis.empty_reason is not None:
+            reason = price_basis.empty_reason
+            unavailable_reasons[reason] = unavailable_reasons.get(reason, 0) + 1
+
     return {
         "target_ticker": target,
         "sector": resolved_sector,
@@ -952,5 +956,10 @@ def get_peer_comparison(
             "peers_with_data": len(financials),
             "peers_failed": [e["ticker"] for e in errors],
             "data_source": "sec_edgar",
+            "valuation_price_unavailable_count": len(unavailable_tickers),
+            "valuation_price_unavailable_tickers": sorted(unavailable_tickers),
+            "valuation_price_empty_reason_counts": dict(
+                sorted(unavailable_reasons.items())
+            ),
         },
     }

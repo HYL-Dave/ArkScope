@@ -29,10 +29,14 @@ class _FakeBackend:
 
 
 class _FakeDAL:
-    def __init__(self, backend):
+    def __init__(self, backend, legacy_result=None):
         self._backend = backend
+        self.legacy_result = legacy_result or FundamentalsResult(ticker="NONE")
+        self.legacy_calls = []
+
     def get_fundamentals(self, ticker):
-        return FundamentalsResult(ticker=ticker.upper())  # no IBKR snapshot → SEC branch
+        self.legacy_calls.append(ticker)
+        return self.legacy_result
 
 
 def _sec_returns(monkeypatch, income=None, balance=None, cashflow=None):
@@ -198,6 +202,165 @@ def test_sec_cache_miss_writes_with_shared_cache_key(monkeypatch):
     assert dal._backend.set_calls
     assert dal._backend.set_calls[0][:4] == (expected_key, "AAPL", 90, "sec_edgar")
     assert dal._backend.store[expected_key]["roe"] == 0.44
+
+
+def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
+    monkeypatch,
+):
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    import data_sources.financial_datasets_client as fd_mod
+    import data_sources.sec_edgar_financials as sec_mod
+
+    ticker = "AAPL"
+    legacy = FundamentalsResult(
+        ticker=ticker,
+        snapshot_date="2025-09-30",
+        data_source="ibkr",
+        roe=9.99,
+        market_cap=999.0,
+        snapshot={"private_legacy_marker": "must not win"},
+    )
+
+    # Positive local SEC cache must win without consulting any retired or live source.
+    cached_backend = _FakeBackend()
+    cached_backend.store[fundamentals_analysis_cache_key(ticker, "annual")] = (
+        FundamentalsResult(
+            ticker=ticker,
+            snapshot_date="2025-12-31",
+            data_source="sec_edgar",
+            roe=0.44,
+        ).model_dump()
+    )
+    cached_dal = _FakeDAL(cached_backend, legacy_result=legacy)
+
+    def _provider_forbidden(*_args, **_kwargs):
+        raise AssertionError("positive SEC cache must not reach a provider")
+
+    monkeypatch.setattr(sec_mod, "SECEdgarFinancials", _provider_forbidden)
+    monkeypatch.setattr(at, "_is_fd_enabled", _provider_forbidden)
+
+    cached = at.get_fundamentals_analysis(cached_dal, ticker)
+
+    assert cached.model_dump() == FundamentalsResult(
+        ticker=ticker,
+        snapshot_date="2025-12-31",
+        data_source="sec_edgar",
+        roe=0.44,
+    ).model_dump()
+    assert cached_dal.legacy_calls == []
+
+    # On a miss, positive SEC facts must return before the paid-provider gate.
+    events = []
+
+    class _PositiveSEC:
+        def __init__(self):
+            events.append("sec:init")
+
+        def get_income_statement(self, *_args, **_kwargs):
+            events.append("sec:income")
+            return [object()]
+
+        def get_balance_sheet(self, *_args, **_kwargs):
+            events.append("sec:balance")
+            return []
+
+        def get_cash_flow_statement(self, *_args, **_kwargs):
+            events.append("sec:cashflow")
+            return []
+
+    def _build_result(ticker_value, source, *_statements):
+        events.append(f"build:{source}")
+        return FundamentalsResult(
+            ticker=ticker_value.upper(),
+            snapshot_date="2025-12-31",
+            data_source=source,
+            roe=0.31 if source == "sec_edgar" else 0.52,
+        )
+
+    def _unexpected_fd_gate(_dal):
+        events.append("fd:gate")
+        return True
+
+    monkeypatch.setattr(sec_mod, "SECEdgarFinancials", _PositiveSEC)
+    monkeypatch.setattr(at, "_build_result_from_statements", _build_result)
+    monkeypatch.setattr(at, "_is_fd_enabled", _unexpected_fd_gate)
+
+    sec_dal = _FakeDAL(_FakeBackend(), legacy_result=legacy)
+    sec_result = at.get_fundamentals_analysis(sec_dal, ticker)
+
+    assert sec_result.data_source == "sec_edgar"
+    assert sec_result.roe == 0.31
+    assert events == [
+        "sec:init",
+        "sec:income",
+        "sec:balance",
+        "sec:cashflow",
+        "build:sec_edgar",
+    ]
+    assert sec_dal.legacy_calls == []
+
+    # When SEC has no facts, the existing paid-provider enablement gate still owns
+    # whether the FD client is unreachable or may supply the result.
+    class _EmptySEC:
+        def get_income_statement(self, *_args, **_kwargs):
+            return []
+
+        def get_balance_sheet(self, *_args, **_kwargs):
+            return []
+
+        def get_cash_flow_statement(self, *_args, **_kwargs):
+            return []
+
+    class _FakeFD:
+        def __init__(self, *_args, **_kwargs):
+            events.append("fd:init")
+
+        def get_income_statements(self, *_args, **_kwargs):
+            events.append("fd:income")
+            return [object()]
+
+        def get_balance_sheets(self, *_args, **_kwargs):
+            events.append("fd:balance")
+            return []
+
+        def get_cash_flow_statements(self, *_args, **_kwargs):
+            events.append("fd:cashflow")
+            return []
+
+    monkeypatch.setattr(sec_mod, "SECEdgarFinancials", _EmptySEC)
+    monkeypatch.setattr(fd_mod, "FinancialDatasetsClient", _FakeFD)
+
+    events.clear()
+    monkeypatch.setattr(
+        at,
+        "_is_fd_enabled",
+        lambda _dal: events.append("fd:disabled") or False,
+    )
+    disabled_dal = _FakeDAL(_FakeBackend(), legacy_result=legacy)
+    disabled = at.get_fundamentals_analysis(disabled_dal, ticker)
+    assert disabled == FundamentalsResult(ticker=ticker)
+    assert events == ["fd:disabled"]
+    assert disabled_dal.legacy_calls == []
+
+    events.clear()
+    monkeypatch.setattr(
+        at,
+        "_is_fd_enabled",
+        lambda _dal: events.append("fd:enabled") or True,
+    )
+    enabled_dal = _FakeDAL(_FakeBackend(), legacy_result=legacy)
+    enabled = at.get_fundamentals_analysis(enabled_dal, ticker)
+    assert enabled.data_source == "financial_datasets"
+    assert enabled.roe == 0.52
+    assert events == [
+        "fd:enabled",
+        "fd:init",
+        "fd:income",
+        "fd:balance",
+        "fd:cashflow",
+        "build:financial_datasets",
+    ]
+    assert enabled_dal.legacy_calls == []
 
 
 # --- SEC User-Agent canonicalization (ARKSCOPE_SEC_USER_AGENT) ----------------------

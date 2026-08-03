@@ -9,12 +9,17 @@ source degrades into coverage rather than zeroing the packet.
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 
 import pytest
 
 from src.evidence_packet import EvidencePacket, compute_technical_evidence, gather_evidence
-from src.tools.schemas import NewsArticle, NewsQueryResult, PriceBar, PriceQueryResult
+from src.tools.schemas import (
+    FundamentalsResult,
+    NewsArticle,
+    NewsQueryResult,
+    PriceBar,
+    PriceQueryResult,
+)
 
 
 def _bars(n: int = 25) -> list[PriceBar]:
@@ -71,7 +76,8 @@ def _scored_articles() -> list[NewsArticle]:
     ]
 
 
-_FUNDAMENTALS = SimpleNamespace(
+_FUNDAMENTALS = FundamentalsResult(
+    ticker="AAPL",
     roe=0.31, roa=0.18, debt_to_equity=1.4, current_ratio=1.1, revenue_growth=0.08,
     earnings_growth=0.05, gross_margin=0.46, operating_margin=0.30, net_margin=0.25,
     free_cash_flow=9.9e10, cash_and_equivalents=3e10, total_debt=1e11,

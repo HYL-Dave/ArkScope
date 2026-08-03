@@ -19,6 +19,16 @@ def _mock_financials(ticker, **overrides):
 
     defaults = {
         "ticker": ticker,
+        "valuation_price_basis": {
+            "available": True,
+            "source": "local_market_db",
+            "interval": "15min",
+            "required_market_date": "2026-07-31",
+            "market_date": "2026-07-31",
+            "timestamp": "2026-07-31T19:45:00+00:00",
+            "price": 100.0,
+            "empty_reason": None,
+        },
         "pe_ratio": 30.0,
         "ev_to_ebitda": 25.0,
         "ev_to_revenue": 10.0,
@@ -290,6 +300,67 @@ class TestDataQuality:
         assert dq["peers_with_data"] == 2
         assert dq["peers_failed"] == []
         assert dq["data_source"] == "sec_edgar"
+
+    def test_unavailable_valuation_prices_are_counted_named_and_excluded(self):
+        from src.tools.analysis_tools import get_peer_comparison
+
+        mock_dal = MagicMock()
+        financials = {
+            "ALPHA": _mock_financials("ALPHA", pe_ratio=20.0),
+            "BETA": _mock_financials("BETA", pe_ratio=40.0),
+            "GAMMA": _mock_financials(
+                "GAMMA",
+                valuation_price_basis={
+                    "available": False,
+                    "source": None,
+                    "interval": None,
+                    "required_market_date": "2026-07-31",
+                    "market_date": None,
+                    "timestamp": None,
+                    "price": None,
+                    "empty_reason": "no_qualified_price",
+                },
+                market_cap=None,
+                enterprise_value=None,
+                pe_ratio=None,
+                pb_ratio=None,
+                ps_ratio=None,
+                ev_to_ebitda=None,
+                ev_to_revenue=None,
+                fcf_yield=None,
+                peg_ratio=None,
+                gross_margin=0.55,
+            ),
+        }
+
+        with patch("src.tools.analysis_tools.get_detailed_financials") as mock_gdf:
+            mock_gdf.side_effect = lambda _dal, peer: financials[peer]
+            result = get_peer_comparison(
+                mock_dal,
+                ticker="ALPHA",
+                tickers=["GAMMA", "BETA", "ALPHA"],
+            )
+
+        assert result["peer_count"] == 3
+        assert result["comparison_matrix"]["GAMMA"]["gross_margin"] == 0.55
+        assert result["comparison_matrix"]["GAMMA"]["pe_ratio"] is None
+        assert result["sector_stats"]["pe_ratio"] == {
+            "median": 30.0,
+            "mean": 30.0,
+            "count": 2,
+        }
+        assert result["rankings"]["pe_ratio"]["rank"] == 1
+        assert result["rankings"]["pe_ratio"]["of"] == 2
+        assert result["data_quality"] == {
+            "peers_with_data": 3,
+            "peers_failed": [],
+            "data_source": "sec_edgar",
+            "valuation_price_unavailable_count": 1,
+            "valuation_price_unavailable_tickers": ["GAMMA"],
+            "valuation_price_empty_reason_counts": {
+                "no_qualified_price": 1,
+            },
+        }
 
 
 # ============================================================
