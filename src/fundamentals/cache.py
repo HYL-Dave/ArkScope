@@ -8,8 +8,11 @@ PG DatabaseBackend rows and return an honest miss when no local SQLite cache exi
 from __future__ import annotations
 
 import copy
+import json
 import logging
+import sqlite3
 from collections.abc import Mapping
+from datetime import datetime, timezone
 from typing import Any, Optional, Tuple
 
 from src.tools.schemas import FundamentalsResult
@@ -115,6 +118,89 @@ def fundamentals_analysis_cache_key(ticker: str, period: str = "annual") -> str:
     return f"fundamentals_analysis:sec_edgar:{ticker.strip().upper()}:{period}:v1"
 
 
+def validate_positive_annual_sec_payload(
+    payload: object,
+    *,
+    ticker: str,
+) -> Optional[FundamentalsResult]:
+    """Validate one positive annual SEC payload shared by stored projections."""
+    if not isinstance(payload, dict) or payload.get("_negative"):
+        return None
+    try:
+        result = FundamentalsResult.model_validate(payload)
+    except Exception:
+        return None
+    expected_ticker = ticker.strip().upper()
+    if (
+        result.ticker.strip().upper() != expected_ticker
+        or result.data_source != "sec_edgar"
+        or not result.snapshot_date
+    ):
+        return None
+    return result
+
+
+def _parse_aware_datetime(value: object) -> Optional[datetime]:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def stored_annual_sec_fundamentals(
+    conn: sqlite3.Connection,
+    *,
+    now_utc: Optional[datetime] = None,
+) -> dict[str, dict[str, object]]:
+    """Project positive, unexpired annual SEC analysis rows by ticker."""
+    now = now_utc or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
+    try:
+        rows = conn.execute(
+            "SELECT cache_key, source, data, expires_at "
+            "FROM financial_cache ORDER BY cache_key"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+
+    prefix = "fundamentals_analysis:sec_edgar:"
+    suffix = ":annual:v1"
+    projected: dict[str, dict[str, object]] = {}
+    for cache_key, source, raw_payload, expires_at in rows:
+        if (
+            not isinstance(cache_key, str)
+            or not cache_key.startswith(prefix)
+            or not cache_key.endswith(suffix)
+            or source != "sec_edgar"
+        ):
+            continue
+        ticker = cache_key[len(prefix):-len(suffix)]
+        if not ticker or fundamentals_analysis_cache_key(ticker) != cache_key:
+            continue
+        expiry = _parse_aware_datetime(expires_at)
+        if expiry is None or expiry <= now:
+            continue
+        try:
+            payload = json.loads(raw_payload) if isinstance(raw_payload, (str, bytes)) else raw_payload
+        except (TypeError, ValueError):
+            continue
+        result = validate_positive_annual_sec_payload(payload, ticker=ticker)
+        if result is not None:
+            projected[ticker] = result.model_dump()
+    return projected
+
+
 def _local_cache_reader(backend: Any):
     if backend is None:
         return None
@@ -148,10 +234,4 @@ def read_cached_sec_fundamentals(
         return None, False
     if isinstance(payload, dict) and payload.get("_negative"):
         return None, True
-    try:
-        result = FundamentalsResult.model_validate(payload)
-    except Exception:  # noqa: BLE001 - stale/incompatible cache shape is a miss.
-        return None, False
-    if not result.snapshot_date and result.data_source == "none":
-        return None, False
-    return result, False
+    return validate_positive_annual_sec_payload(payload, ticker=ticker), False

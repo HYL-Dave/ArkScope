@@ -35,6 +35,7 @@ from typing import List, Optional
 
 import pandas as pd
 
+from src.fundamentals.cache import stored_annual_sec_fundamentals
 from src.news_content_availability import (
     ContentFilter,
     empty_content_counts,
@@ -834,8 +835,16 @@ class SqliteBackend:
 
     def get_available_tickers(self, data_type: str) -> List[str]:
         """Distinct tickers for a local domain."""
-        table = {"prices": "prices", "news": "news",
-                 "fundamentals": "fundamentals"}.get(data_type)
+        table = {"prices": "prices", "news": "news"}.get(data_type)
+        if data_type == "fundamentals":
+            try:
+                conn = self._connect()
+            except sqlite3.OperationalError:
+                return []
+            try:
+                return sorted(stored_annual_sec_fundamentals(conn))
+            finally:
+                conn.close()
         if table is None:
             return []
         try:

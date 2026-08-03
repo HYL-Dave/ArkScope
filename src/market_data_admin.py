@@ -9,6 +9,7 @@ import threading
 from pathlib import Path
 from typing import Dict, Optional
 
+from src.fundamentals.cache import stored_annual_sec_fundamentals
 from src.news_identity import apply_news_identity_plan, plan_news_identity_repair
 
 logger = logging.getLogger(__name__)
@@ -349,13 +350,18 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
                 "source_count": conn.execute("SELECT COUNT(DISTINCT source) FROM news").fetchone()[0],
                 "latest_published": conn.execute("SELECT MAX(published_at) FROM news").fetchone()[0],
             }
-        if _table_exists(conn, "fundamentals"):
-            out["fundamentals"] = {
-                "row_count": conn.execute("SELECT COUNT(*) FROM fundamentals").fetchone()[0],
-                "ticker_count": conn.execute("SELECT COUNT(DISTINCT ticker) FROM fundamentals").fetchone()[0],
-                "latest_date": conn.execute("SELECT MAX(snapshot_date) FROM fundamentals").fetchone()[0],
-            }
         if _table_exists(conn, "financial_cache"):
+            stored_fundamentals = stored_annual_sec_fundamentals(conn)
+            snapshot_dates = [
+                row["snapshot_date"]
+                for row in stored_fundamentals.values()
+                if row.get("snapshot_date")
+            ]
+            out["fundamentals"] = {
+                "row_count": len(stored_fundamentals),
+                "ticker_count": len(stored_fundamentals),
+                "latest_date": max(snapshot_dates) if snapshot_dates else None,
+            }
             now = _now()  # same UTC ISO-seconds format the cache stores expires_at in
             total = conn.execute("SELECT COUNT(*) FROM financial_cache").fetchone()[0]
             valid = conn.execute(
@@ -391,12 +397,12 @@ def local_ticker_coverage(ticker: str, out_path: Optional[str] = None) -> dict:
     t = _load_ticker_aliases(conn).get(ticker.upper(), ticker.upper())
     try:
         cov["exists"] = True
-        for domain, table in (("prices", "prices"), ("news", "news"),
-                              ("fundamentals", "fundamentals")):
+        for domain, table in (("prices", "prices"), ("news", "news")):
             if _table_exists(conn, table):
                 cov[domain] = conn.execute(
                     f"SELECT 1 FROM {table} WHERE ticker = ? LIMIT 1", (t,)
                 ).fetchone() is not None
+        cov["fundamentals"] = t in stored_annual_sec_fundamentals(conn)
     except sqlite3.OperationalError:
         pass
     finally:
@@ -421,7 +427,7 @@ def read_sync_meta(out_path: Optional[str] = None) -> dict:
         for r in conn.execute(
             "SELECT domain, last_success, last_error, rows_added, updated_at FROM market_sync_meta"
         ).fetchall():
-            if r[0] in out:
+            if r[0] in ("prices", "news"):
                 out[r[0]] = {"last_success": r[1], "last_error": r[2],
                              "rows_added": r[3], "updated_at": r[4]}
     except sqlite3.OperationalError:

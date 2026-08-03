@@ -7,19 +7,16 @@ with the project's existing data without any database setup.
 Data path mapping:
     Scored news (IBKR)  : data/news/ibkr_scored_final.parquet
     Scored news (Polygon): data/news/polygon_scored_final.csv
-    15min prices        : data/prices/15min/{TICKER}_15min_*.csv
-    Hourly prices       : data/prices/hourly/{TICKER}_hourly_*.csv
-    Daily prices        : data/prices/daily/{TICKER}.parquet or .csv
-    Fundamentals        : data_lake/raw/ibkr_fundamentals/{TICKER}_*.json
+    Prices              : retired; SQLite is authoritative
+    Fundamentals        : retired; stored SEC cache is authoritative
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import warnings
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import List, Optional
 
@@ -396,134 +393,20 @@ class FileBackend:
         interval: str = "15min",
         days: int = 30,
     ) -> pd.DataFrame:
-        """Query OHLCV price bars from local CSV/Parquet files."""
-        ticker = ticker.upper()
-        cutoff_dt = datetime.now() - timedelta(days=days)
-
-        if interval == "15min":
-            df = self._load_price_files(self._prices_dir / "15min", ticker, "15min")
-        elif interval in ("1h", "hourly"):
-            df = self._load_price_files(self._prices_dir / "hourly", ticker, "hourly")
-        elif interval in ("1d", "daily"):
-            df = self._load_daily_prices(ticker)
-        else:
-            logger.warning(f"Unknown interval {interval}, falling back to 15min")
-            df = self._load_price_files(self._prices_dir / "15min", ticker, "15min")
-
-        if df.empty:
-            return pd.DataFrame(columns=["datetime", "open", "high", "low", "close", "volume"])
-
-        # Parse and filter by date
-        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce", utc=True)
-        df = df.dropna(subset=["datetime"])
-        df = df[df["datetime"] >= pd.Timestamp(cutoff_dt, tz="UTC")]
-        df = df.sort_values("datetime").reset_index(drop=True)
-
-        # Format datetime back to ISO string
-        df["datetime"] = df["datetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
-
-        output_cols = ["datetime", "open", "high", "low", "close", "volume"]
-        return df[output_cols]
-
-    def _load_price_files(
-        self, directory: Path, ticker: str, pattern_prefix: str
-    ) -> pd.DataFrame:
-        """Load all matching price CSV files for a ticker."""
-        if not directory.exists():
-            return pd.DataFrame()
-
-        # Match patterns like NVDA_15min_2024_2026.csv
-        matches = sorted(directory.glob(f"{ticker}_{pattern_prefix}_*.csv"))
-        if not matches:
-            return pd.DataFrame()
-
-        frames = []
-        for f in matches:
-            try:
-                df = pd.read_csv(f, usecols=["datetime", "open", "high", "low", "close", "volume"])
-                frames.append(df)
-            except Exception as e:
-                logger.warning(f"Error reading {f}: {e}")
-        if not frames:
-            return pd.DataFrame()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            return pd.concat(frames, ignore_index=True)
-
-    def _load_daily_prices(self, ticker: str) -> pd.DataFrame:
-        """Load daily prices from Parquet or CSV."""
-        daily_dir = self._prices_dir / "daily"
-        if not daily_dir.exists():
-            # Try resampling 15min data
-            return self._resample_to_daily(ticker)
-
-        for ext, reader in [(".parquet", pd.read_parquet), (".csv", pd.read_csv)]:
-            path = daily_dir / f"{ticker}{ext}"
-            if path.exists():
-                df = reader(path)
-                # Normalize column name (some may have 'date' instead of 'datetime')
-                if "date" in df.columns and "datetime" not in df.columns:
-                    df = df.rename(columns={"date": "datetime"})
-                return df
-
-        # Fall back to resampling
-        return self._resample_to_daily(ticker)
-
-    def _resample_to_daily(self, ticker: str) -> pd.DataFrame:
-        """Resample 15min data to daily OHLCV."""
-        df = self._load_price_files(self._prices_dir / "15min", ticker, "15min")
-        if df.empty:
-            return pd.DataFrame()
-
-        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce", utc=True)
-        df = df.dropna(subset=["datetime"])
-        df = df.set_index("datetime")
-
-        daily = df.resample("1D").agg({
-            "open": "first",
-            "high": "max",
-            "low": "min",
-            "close": "last",
-            "volume": "sum",
-        }).dropna(subset=["open"])
-
-        daily = daily.reset_index()
-        daily["datetime"] = daily["datetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
-        return daily
+        """Retired file authority: prices are available only from SQLite."""
+        del ticker, interval, days
+        return pd.DataFrame(
+            columns=["datetime", "open", "high", "low", "close", "volume"]
+        )
 
     # --------------------------------------------------------
     # Fundamentals
     # --------------------------------------------------------
 
     def query_fundamentals(self, ticker: str) -> dict:
-        """Query fundamental data from local IBKR JSON files."""
-        ticker = ticker.upper()
-        if not self._fundamentals_dir.exists():
-            return {}
-
-        # Find most recent file for this ticker
-        matches = sorted(self._fundamentals_dir.glob(f"{ticker}_*.json"), reverse=True)
-        if not matches:
-            return {}
-
-        try:
-            with open(matches[0]) as f:
-                data = json.load(f)
-        except Exception as e:
-            logger.warning(f"Error reading fundamentals for {ticker}: {e}")
-            return {}
-
-        # Extract the ReportSnapshot if available
-        reports = data.get("reports", {})
-        snapshot = reports.get("ReportSnapshot", {})
-
-        return {
-            "ticker": ticker,
-            "collected_at": data.get("collected_at"),
-            "snapshot": snapshot,
-            "fin_summary": reports.get("ReportsFinSummary", {}),
-            "ownership": reports.get("ReportsOwnership", {}),
-        }
+        """Retired file authority: fundamentals are available from stored SEC."""
+        del ticker
+        return {}
 
     # --------------------------------------------------------
     # SEC Filings (limited — no local file store)
@@ -561,20 +444,7 @@ class FileBackend:
             if not polygon.empty and "ticker" in polygon.columns:
                 tickers.update(polygon["ticker"].dropna().unique())
 
-        elif data_type == "prices":
-            for d in [self._prices_dir / "15min", self._prices_dir / "hourly"]:
-                if d.exists():
-                    for f in d.glob("*.csv"):
-                        # Extract ticker from filenames like NVDA_15min_2024_2026.csv
-                        parts = f.stem.split("_")
-                        if parts:
-                            tickers.add(parts[0])
-
-        elif data_type == "fundamentals":
-            if self._fundamentals_dir.exists():
-                for f in self._fundamentals_dir.glob("*.json"):
-                    parts = f.stem.split("_")
-                    if parts:
-                        tickers.add(parts[0])
+        elif data_type in ("prices", "fundamentals"):
+            return []
 
         return sorted(tickers)

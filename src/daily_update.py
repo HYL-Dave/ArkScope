@@ -50,6 +50,8 @@ from datetime import datetime, date, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from src.market_data_admin import local_market_stats
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -281,45 +283,21 @@ def get_ibkr_news_status() -> Dict:
 
 
 def get_ibkr_prices_status() -> Dict:
-    """Get IBKR price data status."""
-    data_dir = Path("data/prices")
-
-    if not data_dir.exists():
-        return {'exists': False, 'total_bars': 0, 'latest_date': None, 'tickers': 0}
-
-    total_bars = 0
+    """Get price status from the current local SQLite authority."""
+    stats = local_market_stats()
+    prices = stats["prices"]
+    latest_datetime = prices.get("latest_datetime")
     latest_date = None
-    tickers = set()
-
-    try:
-        import pandas as pd
-
-        for subdir in ['hourly', '15min']:
-            sub_path = data_dir / subdir
-            if not sub_path.exists():
-                continue
-
-            for csv in sub_path.glob("*.csv"):
-                df = pd.read_csv(csv)
-                total_bars += len(df)
-
-                if 'ticker' in df.columns:
-                    tickers.update(df['ticker'].unique())
-
-                if 'datetime' in df.columns:
-                    df['_dt'] = pd.to_datetime(df['datetime'], errors='coerce', utc=True)
-                    max_dt = df['_dt'].max()
-                    if pd.notna(max_dt):
-                        if latest_date is None or max_dt > latest_date:
-                            latest_date = max_dt
-    except Exception as e:
-        logger.warning(f"Error reading IBKR data: {e}")
-
+    if isinstance(latest_datetime, str):
+        try:
+            latest_date = date.fromisoformat(latest_datetime[:10])
+        except ValueError:
+            latest_date = None
     return {
-        'exists': True,
-        'total_bars': total_bars,
-        'latest_date': latest_date.date() if latest_date else None,
-        'tickers': len(tickers),
+        'exists': stats["exists"],
+        'total_bars': prices.get("row_count", 0),
+        'latest_date': latest_date,
+        'tickers': prices.get("ticker_count", 0),
     }
 
 

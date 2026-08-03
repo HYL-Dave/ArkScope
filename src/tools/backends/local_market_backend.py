@@ -227,12 +227,12 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         if data_type in ("prices", "news", "fundamentals"):  # all local-first now
             try:
                 local = self._market.get_available_tickers(data_type)
-                if data_type == "prices":
+                if data_type in ("prices", "fundamentals"):
                     return local
                 if local:
                     return local
             except Exception:
-                if data_type == "prices":
+                if data_type in ("prices", "fundamentals"):
                     return []
         if data_type == "news" and self._news_strict:
             return []  # news PG-exit: honest local empty, no PG

@@ -74,6 +74,21 @@ def test_local_ticker_coverage(tmp_path):
     assert set(cov) == {"exists", "prices", "news", "fundamentals"}
     assert cov["exists"] is False and not any(cov[d] for d in ("prices", "news", "fundamentals"))
     _create_local_market_db(out)
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    from src.tools.schemas import FundamentalsResult
+
+    SqliteBackend(out).set_financial_cache(
+        fundamentals_analysis_cache_key("AAPL"),
+        "AAPL",
+        FundamentalsResult(
+            ticker="AAPL",
+            data_source="sec_edgar",
+            snapshot_date="2026-05-31",
+        ).model_dump(),
+        source="sec_edgar",
+        expires_at="2099-01-01T00:00:00+00:00",
+    )
     cov = mda.local_ticker_coverage("aapl", out)  # case-insensitive
     assert cov["exists"] is True
     assert cov["prices"] and cov["news"] and cov["fundamentals"]

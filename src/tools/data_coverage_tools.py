@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+from src.fundamentals.cache import stored_annual_sec_fundamentals
 from src.market_data_admin import resolve_market_db_path
 from src.news_sync_status import overlay_news_sync_status
 
@@ -181,19 +182,32 @@ def _news_summary(conn: sqlite3.Connection, ticker: str) -> dict:
 
 
 def _sync_meta(conn: sqlite3.Connection) -> dict:
+    out = {"prices": None, "news": None, "fundamentals": None}
     if not _table_exists(conn, "market_sync_meta"):
-        return {}
+        return out
     rows = conn.execute(
         "SELECT domain, last_success, last_error, rows_added, updated_at FROM market_sync_meta ORDER BY domain"
     ).fetchall()
-    return {
-        r["domain"]: {
+    for r in rows:
+        if r["domain"] not in ("prices", "news"):
+            continue
+        out[r["domain"]] = {
             "last_success": r["last_success"],
             "last_error": r["last_error"],
             "rows_added": r["rows_added"],
             "updated_at": r["updated_at"],
         }
-        for r in rows
+    return out
+
+
+def _stored_sec_summary(conn: sqlite3.Connection, ticker: str) -> dict:
+    payload = stored_annual_sec_fundamentals(conn).get(ticker)
+    snapshot_date = payload.get("snapshot_date") if payload else None
+    return {
+        "available": payload is not None,
+        "row_count": 1 if payload is not None else 0,
+        "earliest_date": snapshot_date,
+        "latest_date": snapshot_date,
     }
 
 
@@ -251,7 +265,7 @@ def get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> 
             "market_db": {"path": path, "exists": True},
             "prices": prices,
             "news": _news_summary(conn, t),
-            "fundamentals": _domain_summary(conn, "fundamentals", t, "snapshot_date"),
+            "fundamentals": _stored_sec_summary(conn, t),
             "sync": overlay_news_sync_status(_sync_meta(conn), path),
             "note": "local-only diagnostic; no provider fetch attempted",
         }

@@ -125,6 +125,7 @@ def test_empty_and_missing(market_db, tmp_path):
 def test_get_available_tickers(market_db):
     db, _ = market_db
     b = SqliteBackend(db)
+    _store_positive_sec_fundamentals(b, "AAPL", "NVDA")
     assert b.get_available_tickers("prices") == ["AAPL"]
     assert b.get_available_tickers("news") == ["AAPL", "NVDA"]          # 3b: news local
     assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # 3c-A
@@ -470,6 +471,25 @@ def _make(db):
     return LocalMarketDatabaseBackend("postgresql://fake/db", market_db=db)
 
 
+def _store_positive_sec_fundamentals(backend, *tickers):
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from src.tools.schemas import FundamentalsResult
+
+    writer = getattr(backend, "_market", backend)
+    for ticker in tickers:
+        assert writer.set_financial_cache(
+            fundamentals_analysis_cache_key(ticker),
+            ticker,
+            FundamentalsResult(
+                ticker=ticker,
+                data_source="sec_edgar",
+                snapshot_date="2026-05-02",
+            ).model_dump(),
+            source="sec_edgar",
+            expires_at="2099-01-01T00:00:00+00:00",
+        )
+
+
 def test_is_databasebackend_subclass(market_db):
     # REGRESSION (the "enable local market → all data wrong" bug): the DAL/agents
     # branch on isinstance(backend, DatabaseBackend) in ~30 places to gate every
@@ -511,6 +531,7 @@ def test_available_tickers_routing(market_db, monkeypatch):
     db, _ = market_db
     monkeypatch.setattr(DatabaseBackend, "get_available_tickers", lambda self, data_type: ["PGONLY"])
     b = _make(db)
+    _store_positive_sec_fundamentals(b, "AAPL", "NVDA")
     assert b.get_available_tickers("prices") == ["AAPL"]              # local
     assert b.get_available_tickers("news") == ["AAPL", "NVDA"]        # local (3b)
     assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # local (3c-A)

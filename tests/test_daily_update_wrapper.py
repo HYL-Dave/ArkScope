@@ -11,8 +11,10 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from src import sa_capture_store
@@ -162,3 +164,61 @@ def test_daily_update_unavailable_scope_exits_before_any_source(
     assert "active_universe_unavailable: sa_alpha_picks_current" in output
     assert str(missing_sa) not in output
     assert "Traceback" not in output
+
+
+def test_price_status_uses_sqlite_stats_without_scanning_repository_files(monkeypatch):
+    import src.daily_update as daily_update
+
+    stats = {
+        "exists": True,
+        "prices": {
+            "row_count": 321,
+            "ticker_count": 7,
+            "latest_datetime": "2026-07-31T19:45:00+0000",
+        },
+    }
+    monkeypatch.setattr(
+        daily_update,
+        "local_market_stats",
+        lambda: stats,
+        raising=False,
+    )
+
+    def _must_not_scan(*_args, **_kwargs):
+        raise AssertionError("retired repository price paths must not be scanned")
+
+    real_exists = Path.exists
+    real_glob = Path.glob
+    real_rglob = Path.rglob
+
+    def _is_retired_price_path(path):
+        text = str(path)
+        return text == "data/prices" or text.startswith("data/prices/")
+
+    def _guarded_exists(path):
+        if _is_retired_price_path(path):
+            return _must_not_scan(path)
+        return real_exists(path)
+
+    def _guarded_glob(path, pattern):
+        if _is_retired_price_path(path):
+            return _must_not_scan(path, pattern)
+        return real_glob(path, pattern)
+
+    def _guarded_rglob(path, pattern):
+        if _is_retired_price_path(path):
+            return _must_not_scan(path, pattern)
+        return real_rglob(path, pattern)
+
+    monkeypatch.setattr(Path, "exists", _guarded_exists)
+    monkeypatch.setattr(Path, "glob", _guarded_glob)
+    monkeypatch.setattr(Path, "rglob", _guarded_rglob)
+    monkeypatch.setattr(pd, "read_csv", _must_not_scan)
+    monkeypatch.setattr(pd, "read_parquet", _must_not_scan)
+
+    assert daily_update.get_ibkr_prices_status() == {
+        "exists": True,
+        "total_bars": 321,
+        "latest_date": date(2026, 7, 31),
+        "tickers": 7,
+    }

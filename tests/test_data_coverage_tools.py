@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
+from src.fundamentals.cache import fundamentals_analysis_cache_key
+from src.market_data_admin import _FIN_CACHE_SCHEMA
 from src.tools.data_coverage_tools import get_ticker_data_coverage
+from src.tools.schemas import FundamentalsResult
 
 
 def _make_market_db(path):
@@ -26,6 +30,7 @@ def _make_market_db(path):
         );
         """
     )
+    conn.executescript(_FIN_CACHE_SCHEMA)
     conn.executemany(
         "INSERT INTO prices VALUES (?,?,?,?,?,?,?,?)",
         [
@@ -38,6 +43,25 @@ def _make_market_db(path):
         (1, "CLS", "headline", None, None, None, "ibkr", "2026-06-18T15:00:00+0000", "h"),
     )
     conn.execute("INSERT INTO fundamentals VALUES (?,?,?,?)", (1, "CLS", "2026-06-01", "{}"))
+    conn.execute(
+        "INSERT INTO financial_cache "
+        "(cache_key, source, ticker, data, fetched_at, expires_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (
+            fundamentals_analysis_cache_key("CLS"),
+            "sec_edgar",
+            "CLS",
+            json.dumps(
+                FundamentalsResult(
+                    ticker="CLS",
+                    data_source="sec_edgar",
+                    snapshot_date="2026-06-01",
+                ).model_dump()
+            ),
+            "2026-06-02T00:00:00+00:00",
+            "2099-01-01T00:00:00+00:00",
+        ),
+    )
     conn.execute(
         "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
         ("prices", "2026-06-22T12:00:00+00:00", None, 2, "2026-06-22T12:00:01+00:00"),
