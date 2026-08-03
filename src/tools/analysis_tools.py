@@ -26,6 +26,19 @@ from .schemas import DetailedFinancials, FinancialStatement, FundamentalsResult,
 logger = logging.getLogger(__name__)
 
 
+_DETAILED_VALUATION_FIELD_MAP = {
+    "market_cap": "market_cap",
+    "enterprise_value": "enterprise_value",
+    "pe_ratio": "price_to_earnings_ratio",
+    "pb_ratio": "price_to_book_ratio",
+    "ps_ratio": "price_to_sales_ratio",
+    "ev_to_ebitda": "enterprise_value_to_ebitda_ratio",
+    "ev_to_revenue": "enterprise_value_to_revenue_ratio",
+    "fcf_yield": "free_cash_flow_yield",
+    "peg_ratio": "peg_ratio",
+}
+
+
 def _dataclass_to_dict(obj) -> dict:
     """Convert a dataclass to dict, dropping None values."""
     from dataclasses import asdict
@@ -600,13 +613,7 @@ def get_detailed_financials(
     ticker: str,
 ) -> DetailedFinancials:
     """
-    Comprehensive financial metrics with layered data sources.
-
-    Layer 1: SEC EDGAR cached metrics (quarterly, stored in financial_data_cache)
-             — EV/EBITDA, EV/Revenue, margins, growth, SBC, R&D, Rule of 40
-    Layer 2: IBKR real-time (optional, requires TWS)
-             — PE, PB, PS, market_cap override with live prices
-    Layer 3: Finnhub earnings surprise (last 4 quarters + upcoming)
+    Combine cached SEC facts with a request-time qualified local price.
 
     Args:
         dal: DataAccessLayer instance
@@ -615,65 +622,92 @@ def get_detailed_financials(
     Returns:
         DetailedFinancials with all available metrics
     """
-    ticker = ticker.upper()
-    years_for_growth = 2  # YoY growth window
-    cache_key = f"metrics_{ticker}_annual_y{years_for_growth}"
+    from data_sources.financial_metrics_calculator import (
+        FinancialMetricsCalculator,
+        calculate_valuation_metrics,
+    )
+    from src.fundamentals.cache import (
+        detailed_financials_cache_key,
+        validate_detailed_financials_static_payload,
+    )
+    from src.valuation_price import get_valuation_price_basis
 
-    # --- Layer 1: SEC EDGAR metrics (cached) ---
-    cached = None
+    ticker = ticker.strip().upper()
+    years_for_growth = 2
+    cache_key = detailed_financials_cache_key(ticker)
+    backend = getattr(dal, "_backend", None)
+    payload = None
+
+    reader = getattr(backend, "get_financial_cache", None)
     try:
-        if hasattr(dal._backend, "get_financial_cache"):
-            cached = dal._backend.get_financial_cache(cache_key)
+        if callable(reader):
+            payload = validate_detailed_financials_static_payload(
+                reader(cache_key),
+                ticker=ticker,
+            )
     except Exception as e:
         logger.debug(f"Cache read failed for {ticker}: {e}")
 
-    if cached:
-        metrics = cached.get("standard", {})
-        tech = cached.get("tech", {})
-        logger.info(f"{ticker}: Using cached financial metrics")
-    else:
-        # Calculate fresh from SEC EDGAR
+    if payload is None:
         try:
-            from data_sources.financial_metrics_calculator import FinancialMetricsCalculator
-
             calc = FinancialMetricsCalculator(ticker, years_for_growth=years_for_growth)
-            metrics = calc.get_metrics_dict()
+            metrics = calc.get_static_metrics_dict()
             tech = calc.get_tech_metrics()
+            valuation_inputs = calc.get_valuation_inputs()
+            candidate = {
+                "version": 2,
+                "ticker": ticker,
+                "period": "annual",
+                "years_for_growth": years_for_growth,
+                "data_source": "sec_edgar",
+                "report_date": metrics.get("report_date"),
+                "static_metrics": metrics,
+                "tech_metrics": tech,
+                "valuation_inputs": valuation_inputs,
+            }
+            payload = validate_detailed_financials_static_payload(
+                candidate,
+                ticker=ticker,
+            )
 
-            # Cache to DB
-            try:
-                if hasattr(dal._backend, "set_financial_cache"):
-                    dal._backend.set_financial_cache(
-                        cache_key, ticker,
-                        {"standard": metrics, "tech": tech},
-                        ttl_days=90, source="sec_edgar",
+            writer = getattr(backend, "set_financial_cache", None)
+            if payload is not None and callable(writer):
+                try:
+                    writer(
+                        cache_key,
+                        ticker,
+                        payload,
+                        ttl_days=90,
+                        source="sec_edgar",
                     )
-            except Exception as e:
-                logger.debug(f"Cache write failed for {ticker}: {e}")
+                except Exception as e:
+                    logger.debug(f"Cache write failed for {ticker}: {e}")
 
         except Exception as e:
             logger.warning(f"SEC EDGAR metrics failed for {ticker}: {e}")
-            metrics = {}
-            tech = {}
+            payload = None
 
-    # --- Layer 2: IBKR real-time enrichment (optional) ---
-    ibkr_pe = None
-    ibkr_pb = None
-    ibkr_ps = None
-    ibkr_mktcap = None
+    if payload is None:
+        payload = {
+            "report_date": None,
+            "static_metrics": {},
+            "tech_metrics": {},
+            "valuation_inputs": {},
+        }
 
-    try:
-        fundamentals = dal.get_fundamentals(ticker)
-        if fundamentals and fundamentals.snapshot:
-            snap = fundamentals.snapshot
-            ibkr_pe = snap.get("pe_ratio")
-            ibkr_pb = snap.get("price_to_book")
-            ibkr_ps = snap.get("price_to_sales")
-            ibkr_mktcap = snap.get("market_cap")
-    except Exception as e:
-        logger.debug(f"IBKR enrichment failed for {ticker}: {e}")
+    metrics = payload["static_metrics"]
+    tech = payload["tech_metrics"]
+    valuation_inputs = payload["valuation_inputs"]
+    price_basis = get_valuation_price_basis(ticker)
+    valuation = calculate_valuation_metrics(
+        price=price_basis.price if price_basis.available else None,
+        valuation_inputs=valuation_inputs,
+    )
+    detailed_valuation = {
+        product_field: valuation[calculator_field]
+        for product_field, calculator_field in _DETAILED_VALUATION_FIELD_MAP.items()
+    }
 
-    # --- Layer 3: Finnhub earnings surprise ---
     earnings_history = None
     upcoming = None
     try:
@@ -683,22 +717,12 @@ def get_detailed_financials(
     except Exception as e:
         logger.debug(f"Finnhub earnings failed for {ticker}: {e}")
 
-    # --- Build result (IBKR overrides SEC for price-based metrics) ---
     return DetailedFinancials(
         ticker=ticker,
-        report_date=metrics.get("report_date"),
-        data_source="ibkr+sec_edgar" if ibkr_pe else "sec_edgar",
-        # Valuation — EV-based (SEC)
-        market_cap=ibkr_mktcap or metrics.get("market_cap"),
-        enterprise_value=metrics.get("enterprise_value"),
-        ev_to_ebitda=metrics.get("enterprise_value_to_ebitda_ratio"),
-        ev_to_revenue=metrics.get("enterprise_value_to_revenue_ratio"),
-        fcf_yield=metrics.get("free_cash_flow_yield"),
-        peg_ratio=metrics.get("peg_ratio"),
-        # Valuation — price-based (IBKR preferred)
-        pe_ratio=ibkr_pe or metrics.get("price_to_earnings_ratio"),
-        pb_ratio=ibkr_pb or metrics.get("price_to_book_ratio"),
-        ps_ratio=ibkr_ps or metrics.get("price_to_sales_ratio"),
+        report_date=payload.get("report_date"),
+        data_source="sec_edgar",
+        valuation_price_basis=price_basis,
+        **detailed_valuation,
         # Profitability
         gross_margin=metrics.get("gross_margin"),
         operating_margin=metrics.get("operating_margin"),
@@ -721,10 +745,10 @@ def get_detailed_financials(
         debt_to_equity=metrics.get("debt_to_equity"),
         current_ratio=metrics.get("current_ratio"),
         interest_coverage=metrics.get("interest_coverage"),
-        # Cash (from balance sheet / cash flow in metrics calculator)
-        free_cash_flow=None,
-        cash_and_equivalents=None,
-        total_debt=None,
+        # SEC-derived balance-sheet and cash-flow facts
+        free_cash_flow=valuation_inputs.get("free_cash_flow"),
+        cash_and_equivalents=valuation_inputs.get("cash_and_equivalents"),
+        total_debt=valuation_inputs.get("total_debt"),
         # Per-share
         eps=metrics.get("earnings_per_share"),
         fcf_per_share=metrics.get("free_cash_flow_per_share"),

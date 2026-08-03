@@ -3,7 +3,7 @@
 Financial Metrics Calculator - Complete 39 metrics matching Financial Datasets API.
 
 This module calculates all 39 financial metrics that Financial Datasets API provides,
-using free data from SEC EDGAR (via sec_edgar_financials.py) and IBKR fundamentals.
+using free data from SEC EDGAR (via sec_edgar_financials.py).
 
 Usage:
     from data_sources.financial_metrics_calculator import FinancialMetricsCalculator
@@ -13,7 +13,7 @@ Usage:
 
     # Or get specific categories
     profitability = calc.get_profitability_metrics()
-    valuation = calc.get_valuation_metrics()
+    valuation = calc.get_valuation_metrics(price=qualified_price)
 
 Metrics Categories (39 total):
     - Valuation (9): market_cap, enterprise_value, P/E, P/B, P/S, EV/EBITDA, etc.
@@ -26,75 +26,90 @@ Metrics Categories (39 total):
 
 Data Sources:
     - SEC EDGAR: Financial statements (Income, Balance Sheet, Cash Flow)
-    - IBKR Fundamentals: Market price, shares outstanding, market cap, EV
+    - Qualified price: supplied explicitly by the caller
 """
 
-import json
 import logging
-from dataclasses import dataclass, asdict, field
-from pathlib import Path
+import math
+from collections.abc import Mapping
+from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from data_sources.sec_edgar_financials import SECEdgarFinancials
+from src.fundamentals.cache import CALCULATOR_DYNAMIC_FIELDS
 
 logger = logging.getLogger(__name__)
 
 
-def _get_current_price_ibkr(ticker: str) -> Optional[float]:
-    """
-    Get current stock price from IBKR price data in data/prices/.
+def _finite_number(value: object) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
 
-    Looks for price data in order of preference:
-    1. data/prices/15min/{ticker}_15min_*.csv (most recent)
-    2. data/prices/hourly/{ticker}_hourly_*.csv (fallback)
 
-    Returns the latest close price from the most recent file.
-    """
-    project_root = Path(__file__).parent.parent
-    price_dirs = [
-        project_root / "data" / "prices" / "15min",
-        project_root / "data" / "prices" / "hourly",
-    ]
+def _divide(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
+    if numerator is None or denominator is None or denominator == 0:
+        return None
+    return numerator / denominator
 
-    for price_dir in price_dirs:
-        if not price_dir.exists():
-            continue
 
-        # Find all files for this ticker
-        patterns = [f"{ticker}_15min_*.csv", f"{ticker}_hourly_*.csv"]
-        files = []
-        for pattern in patterns:
-            files.extend(sorted(price_dir.glob(pattern), reverse=True))
+def calculate_valuation_metrics(
+    *,
+    price: Optional[float],
+    valuation_inputs: Mapping[str, Optional[float]],
+) -> Dict[str, Optional[float]]:
+    """Calculate the nine price-dependent fields from explicit base-unit facts."""
+    result = {field: None for field in CALCULATOR_DYNAMIC_FIELDS}
+    normalized_price = _finite_number(price)
+    shares = _finite_number(valuation_inputs.get("outstanding_shares"))
+    if normalized_price is None or normalized_price <= 0 or shares is None or shares <= 0:
+        return result
 
-        if files:
-            # Read the most recent file
-            latest_file = files[0]
-            try:
-                import pandas as pd
-                # Read CSV - try with header first, fallback to no header
-                try:
-                    df = pd.read_csv(latest_file)
-                    if 'close' in df.columns:
-                        latest_price = float(df['close'].iloc[-1])
-                    else:
-                        # No header, use positional index
-                        df = pd.read_csv(latest_file, header=None)
-                        latest_price = float(df.iloc[-1, 4])  # close is column 4
-                except:
-                    # Fallback: no header
-                    df = pd.read_csv(latest_file, header=None)
-                    latest_price = float(df.iloc[-1, 4])
+    market_cap = normalized_price * shares
+    debt = _finite_number(valuation_inputs.get("total_debt"))
+    cash = _finite_number(valuation_inputs.get("cash_and_equivalents"))
+    enterprise_value = (
+        market_cap + debt - cash
+        if debt is not None and cash is not None
+        else None
+    )
+    net_income = _finite_number(valuation_inputs.get("net_income"))
+    earnings_per_share = _finite_number(
+        valuation_inputs.get("earnings_per_share")
+    )
+    pe_ratio = _divide(market_cap, net_income)
+    if pe_ratio is None:
+        pe_ratio = _divide(normalized_price, earnings_per_share)
 
-                if latest_price > 0:
-                    logger.info(f"Got price ${latest_price:.2f} for {ticker} from {latest_file.name}")
-                    return latest_price
-            except Exception as e:
-                logger.warning(f"Error reading price file {latest_file}: {e}")
-                continue
+    equity = _finite_number(valuation_inputs.get("shareholders_equity"))
+    revenue = _finite_number(valuation_inputs.get("revenue"))
+    ebitda = _finite_number(valuation_inputs.get("ebitda"))
+    free_cash_flow = _finite_number(valuation_inputs.get("free_cash_flow"))
+    earnings_growth = _finite_number(valuation_inputs.get("earnings_growth"))
 
-    logger.warning(f"No IBKR price data found for {ticker} in data/prices/")
-    return None
+    result.update({
+        "market_cap": market_cap,
+        "enterprise_value": enterprise_value,
+        "price_to_earnings_ratio": pe_ratio,
+        "price_to_book_ratio": _divide(market_cap, equity),
+        "price_to_sales_ratio": _divide(market_cap, revenue),
+        "enterprise_value_to_ebitda_ratio": _divide(
+            enterprise_value, ebitda
+        ),
+        "enterprise_value_to_revenue_ratio": _divide(
+            enterprise_value, revenue
+        ),
+        "free_cash_flow_yield": _divide(free_cash_flow, market_cap),
+        "peg_ratio": _divide(pe_ratio, earnings_growth * 100)
+        if earnings_growth is not None
+        else None,
+    })
+    return result
 
 
 @dataclass
@@ -171,7 +186,7 @@ class FinancialMetrics:
 
 class FinancialMetricsCalculator:
     """
-    Calculate all 39 financial metrics from SEC EDGAR + IBKR data.
+    Calculate all 39 financial metrics from SEC EDGAR and an explicit price.
 
     This replaces Financial Datasets API endpoints 11-12 (financial-metrics).
     """
@@ -179,7 +194,6 @@ class FinancialMetricsCalculator:
     def __init__(
         self,
         ticker: str,
-        ibkr_data_path: Optional[Path] = None,
         years_for_growth: int = 2,
     ):
         """
@@ -187,18 +201,10 @@ class FinancialMetricsCalculator:
 
         Args:
             ticker: Stock symbol (e.g., 'AAPL')
-            ibkr_data_path: Path to IBKR fundamentals directory
             years_for_growth: Number of years for growth calculations (default 2 for YoY)
         """
         self.ticker = ticker.upper()
         self.years_for_growth = years_for_growth
-
-        # Set default IBKR data path
-        if ibkr_data_path is None:
-            project_root = Path(__file__).parent.parent
-            self.ibkr_data_path = project_root / "data_lake" / "raw" / "ibkr_fundamentals"
-        else:
-            self.ibkr_data_path = Path(ibkr_data_path)
 
         # Initialize SEC EDGAR client
         self.sec = SECEdgarFinancials()
@@ -207,7 +213,6 @@ class FinancialMetricsCalculator:
         self._income_statements: Optional[List] = None
         self._balance_sheets: Optional[List] = None
         self._cash_flow_statements: Optional[List] = None
-        self._ibkr_data: Optional[Dict] = None
 
     # =========================================================================
     # Data Loading
@@ -233,23 +238,6 @@ class FinancialMetricsCalculator:
             statements = self.sec.get_cash_flow_statement(self.ticker, years=years)
             self._cash_flow_statements = [asdict(s) for s in statements]
         return self._cash_flow_statements
-
-    def _load_ibkr_data(self) -> Optional[Dict]:
-        """Load IBKR fundamentals data."""
-        if self._ibkr_data is None:
-            # Find the most recent IBKR file for this ticker
-            pattern = f"{self.ticker}_*.json"
-            files = sorted(self.ibkr_data_path.glob(pattern), reverse=True)
-
-            if files:
-                with open(files[0]) as f:
-                    self._ibkr_data = json.load(f)
-                logger.info(f"Loaded IBKR data from {files[0]}")
-            else:
-                logger.warning(f"No IBKR data found for {self.ticker}")
-                self._ibkr_data = {}
-
-        return self._ibkr_data
 
     # =========================================================================
     # Helper Methods
@@ -977,105 +965,59 @@ class FinancialMetricsCalculator:
         }
 
     # =========================================================================
-    # Valuation Metrics (9) - Requires IBKR data for market price
+    # Valuation Inputs and Metrics (9)
     # =========================================================================
 
-    def get_valuation_metrics(self) -> Dict[str, Optional[float]]:
-        """
-        Calculate valuation metrics.
-
-        Note: These metrics require current market price from IBKR.
-
-        Metrics:
-            - market_cap: Share Price * Shares Outstanding
-            - enterprise_value: Market Cap + Total Debt - Cash
-            - price_to_earnings_ratio: Market Cap / Net Income
-            - price_to_book_ratio: Market Cap / Book Value
-            - price_to_sales_ratio: Market Cap / Revenue
-            - enterprise_value_to_ebitda_ratio: EV / EBITDA
-            - enterprise_value_to_revenue_ratio: EV / Revenue
-            - free_cash_flow_yield: Free Cash Flow / Market Cap
-            - peg_ratio: P/E Ratio / Earnings Growth Rate
-        """
-        ibkr = self._load_ibkr_data()
+    def get_valuation_inputs(self) -> Dict[str, Optional[float]]:
+        """Return SEC-derived base-unit inputs used by valuation formulas."""
         income = self._load_income_statements(years=2)
         balance = self._load_balance_sheets(years=1)
         cashflow = self._load_cash_flow_statements(years=2)
 
-        if not income or not balance:
-            return {}
-
-        inc = income[0]
-        bal = balance[0]
+        inc = income[0] if income else {}
+        bal = balance[0] if balance else {}
         cf = cashflow[0] if cashflow else {}
 
-        # Get market data from IBKR
-        market_cap = None
-        enterprise_value = None
+        total_debt = bal.get("total_debt")
+        if total_debt is None:
+            current_debt = bal.get("current_debt")
+            non_current_debt = bal.get("non_current_debt")
+            if current_debt is not None or non_current_debt is not None:
+                total_debt = (current_debt or 0) + (non_current_debt or 0)
 
-        if ibkr:
-            # IBKR provides MKTCAP in millions, convert to actual value
-            mktcap_raw = ibkr.get('MKTCAP')
-            if mktcap_raw and mktcap_raw != '':
-                try:
-                    market_cap = float(mktcap_raw) * 1e6  # Convert from millions
-                except (ValueError, TypeError):
-                    pass
-
-            # IBKR provides EV
-            ev_raw = ibkr.get('EV')
-            if ev_raw and ev_raw != '':
-                try:
-                    enterprise_value = float(ev_raw) * 1e6
-                except (ValueError, TypeError):
-                    pass
-
-        # If no IBKR fundamentals data, calculate from IBKR price data + shares outstanding
-        if market_cap is None:
-            shares = bal.get('outstanding_shares')
-            if shares:
-                current_price = _get_current_price_ibkr(self.ticker)
-                if current_price:
-                    market_cap = current_price * shares
-                    logger.info(f"Calculated market cap from IBKR prices: ${market_cap/1e9:.2f}B")
-
-        # Calculate EV if not from IBKR
-        if enterprise_value is None and market_cap is not None:
-            current_debt = bal.get('current_debt') or 0
-            non_current_debt = bal.get('non_current_debt') or 0
-            total_debt = current_debt + non_current_debt
-            cash = bal.get('cash_and_equivalents') or 0
-            enterprise_value = market_cap + total_debt - cash
-
-        # Financial data
-        net_income = inc.get('net_income')
-        revenue = inc.get('revenue')
-        shareholders_equity = bal.get('shareholders_equity')
-        free_cash_flow = cf.get('free_cash_flow')
-        operating_income = inc.get('operating_income')
-
-        # EBITDA
-        da = cf.get('depreciation_and_amortization') or 0
-        ebitda = (operating_income + da) if operating_income else None
-
-        # Growth for PEG
-        growth_metrics = self.get_growth_metrics()
-        earnings_growth = growth_metrics.get('earnings_growth')
-
-        # Calculate valuation ratios
-        pe_ratio = self._safe_divide(market_cap, net_income)
+        operating_income = inc.get("operating_income")
+        depreciation = cf.get("depreciation_and_amortization")
+        ebitda = None
+        if operating_income is not None and depreciation is not None:
+            ebitda = operating_income + depreciation
 
         return {
-            'market_cap': market_cap,
-            'enterprise_value': enterprise_value,
-            'price_to_earnings_ratio': pe_ratio,
-            'price_to_book_ratio': self._safe_divide(market_cap, shareholders_equity),
-            'price_to_sales_ratio': self._safe_divide(market_cap, revenue),
-            'enterprise_value_to_ebitda_ratio': self._safe_divide(enterprise_value, ebitda),
-            'enterprise_value_to_revenue_ratio': self._safe_divide(enterprise_value, revenue),
-            'free_cash_flow_yield': self._safe_divide(free_cash_flow, market_cap),
-            'peg_ratio': self._safe_divide(pe_ratio, earnings_growth * 100) if earnings_growth else None,
+            "outstanding_shares": bal.get("outstanding_shares"),
+            "cash_and_equivalents": bal.get("cash_and_equivalents"),
+            "total_debt": total_debt,
+            "revenue": inc.get("revenue"),
+            "ebitda": ebitda,
+            "free_cash_flow": cf.get("free_cash_flow"),
+            "shareholders_equity": bal.get("shareholders_equity"),
+            "net_income": inc.get("net_income"),
+            "earnings_per_share": inc.get("earnings_per_share"),
+            "earnings_growth": self.get_growth_metrics().get("earnings_growth"),
         }
+
+    def get_valuation_metrics(
+        self,
+        *,
+        price: Optional[float] = None,
+        valuation_inputs: Optional[Mapping[str, Optional[float]]] = None,
+    ) -> Dict[str, Optional[float]]:
+        """Calculate price-dependent metrics from explicit qualified price input."""
+        inputs = valuation_inputs
+        if inputs is None:
+            inputs = self.get_valuation_inputs()
+        return calculate_valuation_metrics(
+            price=price,
+            valuation_inputs=inputs,
+        )
 
     # =========================================================================
     # Tech-Specific Metrics
@@ -1135,66 +1077,57 @@ class FinancialMetricsCalculator:
     # Get All Metrics
     # =========================================================================
 
-    def get_all_metrics(self) -> FinancialMetrics:
+    def get_static_metrics_dict(self) -> Dict[str, Any]:
+        """Return only SEC-derived, price-independent financial metrics."""
+        self._load_income_statements(years=3)
+        self._load_balance_sheets(years=3)
+        self._load_cash_flow_statements(years=3)
+
+        income = self._income_statements
+        static_metrics: Dict[str, Any] = {
+            "ticker": self.ticker,
+            "report_date": income[0].get("report_period", "") if income else "",
+        }
+        static_metrics.update(self.get_profitability_metrics())
+        static_metrics.update(self.get_efficiency_metrics())
+        static_metrics.update(self.get_liquidity_metrics())
+        static_metrics.update(self.get_leverage_metrics())
+        static_metrics.update(self.get_growth_metrics())
+        static_metrics.update(self.get_per_share_metrics())
+        return static_metrics
+
+    def get_all_metrics(self, *, price: Optional[float] = None) -> FinancialMetrics:
         """
         Calculate all 39 financial metrics.
 
         Returns:
             FinancialMetrics dataclass with all metrics populated
         """
-        # Pre-load data with enough years for growth calculations
-        # (This ensures cache has sufficient data before individual methods run)
-        self._load_income_statements(years=3)
-        self._load_balance_sheets(years=3)
-        self._load_cash_flow_statements(years=3)
-
-        # Get report date from latest income statement
-        income = self._income_statements
-        report_date = income[0].get('report_period', '') if income else ''
-
-        # Calculate all metric categories
-        profitability = self.get_profitability_metrics()
-        efficiency = self.get_efficiency_metrics()
-        liquidity = self.get_liquidity_metrics()
-        leverage = self.get_leverage_metrics()
-        growth = self.get_growth_metrics()
-        per_share = self.get_per_share_metrics()
-        valuation = self.get_valuation_metrics()
-
-        # Combine all metrics
+        static_metrics = self.get_static_metrics_dict()
+        valuation = self.get_valuation_metrics(price=price)
         return FinancialMetrics(
-            ticker=self.ticker,
-            report_date=report_date,
-            # Valuation
+            **static_metrics,
             **valuation,
-            # Profitability
-            **profitability,
-            # Efficiency
-            **efficiency,
-            # Liquidity
-            **liquidity,
-            # Leverage
-            **leverage,
-            # Growth
-            **growth,
-            # Per-share
-            **per_share,
         )
 
-    def get_metrics_dict(self) -> Dict[str, Any]:
+    def get_metrics_dict(self, *, price: Optional[float] = None) -> Dict[str, Any]:
         """Get all metrics as a dictionary."""
-        return self.get_all_metrics().to_dict()
+        return self.get_all_metrics(price=price).to_dict()
 
-    def get_snapshot(self) -> Dict[str, Any]:
+    def get_snapshot(self, *, price: Optional[float] = None) -> Dict[str, Any]:
         """Get metrics snapshot matching Financial Datasets API format."""
-        return self.get_all_metrics().get_snapshot()
+        return self.get_all_metrics(price=price).get_snapshot()
 
 
 # =============================================================================
 # Convenience Functions
 # =============================================================================
 
-def get_financial_metrics(ticker: str) -> Dict[str, Any]:
+def get_financial_metrics(
+    ticker: str,
+    *,
+    price: Optional[float] = None,
+) -> Dict[str, Any]:
     """
     Get all financial metrics for a ticker.
 
@@ -1205,10 +1138,14 @@ def get_financial_metrics(ticker: str) -> Dict[str, Any]:
         Dictionary of all 39 metrics
     """
     calc = FinancialMetricsCalculator(ticker)
-    return calc.get_metrics_dict()
+    return calc.get_metrics_dict(price=price)
 
 
-def get_financial_metrics_snapshot(ticker: str) -> Dict[str, Any]:
+def get_financial_metrics_snapshot(
+    ticker: str,
+    *,
+    price: Optional[float] = None,
+) -> Dict[str, Any]:
     """
     Get financial metrics snapshot matching Financial Datasets API format.
 
@@ -1219,7 +1156,7 @@ def get_financial_metrics_snapshot(ticker: str) -> Dict[str, Any]:
         Dictionary matching Financial Datasets /financial-metrics/snapshot format
     """
     calc = FinancialMetricsCalculator(ticker)
-    return calc.get_snapshot()
+    return calc.get_snapshot(price=price)
 
 
 def compare_with_financial_datasets(
@@ -1351,9 +1288,4 @@ if __name__ == '__main__':
 
     print("\nValuation:")
     for k, v in calc.get_valuation_metrics().items():
-        if v and abs(v) > 1e6:
-            print(f"  {k}: ${v/1e9:.2f}B")
-        elif v:
-            print(f"  {k}: {v:.4f}")
-        else:
-            print(f"  {k}: N/A")
+        print(f"  {k}: {v}" if v is not None else f"  {k}: N/A")
