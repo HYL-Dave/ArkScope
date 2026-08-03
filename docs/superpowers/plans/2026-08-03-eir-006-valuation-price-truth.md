@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 1 REVIEW READY - TASK 2 NOT STARTED
+> **Status:** TASK 6 BLOCKED - BOUNDED TEST-SEAM AMENDMENT REVIEW
 >
 > **Date:** 2026-08-03
 >
@@ -1839,7 +1839,54 @@ Record final backend/frontend collection streams and post-cutover census SHA.
 
 - Modify: `docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
+- Bounded amendment only: modify
+  `tests/test_db_backend_retired_prices.py` without changing its node identity
 - Read/test: all product and test owners from Tasks 1-5
+
+#### Task 6 bounded amendment: preserve the FileBackend no-probe witness
+
+Task 5 removed the inert private attributes `FileBackend._prices_dir` and
+`FileBackend._fundamentals_dir` while reconciling the class with its retired
+empty compatibility role. The existing M8 owner still read those attributes to
+construct its monkeypatch guards, so its pre-mutation run failed with
+`AttributeError` before exercising `query_prices()`. That is an unrelated
+wrong-RED under Stop Condition 20, not mutation evidence and not a product
+failure.
+
+The only authorized permanent correction is test-only:
+
+1. construct `FileBackend(base_path=tmp_path)` before installing guards;
+2. remove the two private-attribute reads and the path-conditional wrappers;
+3. monkeypatch `Path.exists`, `Path.glob`, `Path.rglob`, `pd.read_csv`, and
+   `pd.read_parquet` directly to the existing raising sentinel for the four
+   retired price/fundamentals calls under test; and
+4. preserve the exact node ID, assertions, empty return shapes, and all product
+   bytes.
+
+This stronger fixture proves that none of the four calls performs any
+filesystem probe after construction. It may not add a retired path literal,
+rename/parametrize/skip the node, add a helper named `test_*`, change backend
+collection `4581/6e4994bb...`, focused collection `335/58230b54...`, or change
+the `128/a08e7f68...` post-cutover census.
+
+After the corrected owner is GREEN, M8 is made falsifiable by temporarily
+adding this product-side probe before the direct empty return:
+
+```python
+(self._base / "data" / "prices").exists()
+```
+
+The owning node must then fail at the sentinel, the exact mutation diff is
+saved, and contextual restore must return both
+`src/tools/backends/file_backend.py` and the owning node to their pre-mutation
+SHA/GREEN state. A failure at fixture construction remains wrong-RED.
+
+M1-M7 completed before this stop and remain admissible: each changed only its
+specified product owner, killed only the named node for the intended semantic
+reason, restored the pre-mutation product SHA, and returned the owner GREEN.
+The amendment does not authorize M8-M10, focused/protected gates, native
+admission, merge, rollout, manifest construction, or deletion until focused
+review clears this text.
 
 - [ ] **Step 1: Reproduce exact final collection identities**
 
