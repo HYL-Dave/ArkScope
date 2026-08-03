@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 6 BLOCKED - FRONTEND SEARCH-COMPATIBILITY AMENDMENT REVIEW
+> **Status:** TASK 6 BLOCKED - PROTECTED-HASH AMENDMENT REVIEW
 >
 > **Date:** 2026-08-03
 >
@@ -1946,6 +1946,56 @@ then repeat the full Vitest gate before typecheck/build/scanner. No later Task 6
 gate, native admission, merge, manifest, or deletion is authorized by this
 amendment review itself.
 
+#### Task 6 bounded amendment: rebase one protected owner after its planned extraction
+
+Focused review cleared the preceding Settings amendment. The exact prior
+zh-Hant sentence was added only as a hidden search alias, the explicitly frozen
+fixture was restored, and the two owners first failed together and then passed
+together. Product/test commit `b2b05f65` preserves all collection identities;
+full Vitest completed `97 files / 1077 passed`, typecheck and build exited zero,
+and the i18n scanner remained `36 / 20 / 0 / 20`.
+
+The next static gate found that the Task 0 protected-path manifest is exact for
+30 of 31 paths but stale for `src/market_data_direct.py`:
+
+```text
+Task 0 identity:
+  blob 28605175a5ec6dac24642a1dc701dd8ea65e02cc
+  SHA-256 8d6ee8ab36e9d7a1185b2aeb66aa5376f5205981bc562b53acefc5b7ec2549f4
+  bytes 41111
+current identity:
+  blob b516fcf6d55ffe8b2af76091bb1cebafdbdca458
+  SHA-256 412865670c39feff84d9d2216dfd2a727ecc505be250c8de6d7bd3c0fb3ea735
+  bytes 39517
+```
+
+This is the reviewed Task 1 extraction in commit `33a628b0`, not unplanned
+collector drift: the completed-session calendar implementation moved to
+`src/market_sessions.py`, `market_data_direct.py` imports private aliases from
+that shared authority, and all 70 market-data-direct node IDs remained
+byte-identical and GREEN. Task 1 evidence already pins the current SHA above.
+
+The original Task 0 manifest remains immutable dated evidence. Task 6 static
+verification instead uses this adjusted manifest:
+
+```text
+path:
+  /tmp/eir006-valuation-price-truth/protected/task6-protected-after-task1.tsv
+rows: 31
+SHA-256:
+  5408aabaf89661c429e17c5e68f3db4b4a6dd945a57a1125384f47fb6017e609
+relation to Task 0 manifest:
+  exactly one replaced row: src/market_data_direct.py
+current verification:
+  31 / 31 path, blob, SHA-256, and size tuples match
+```
+
+No product or test edit is authorized. The other 30 protected owners remain
+pinned to Task 0; `src/market_data_direct.py` is pinned only to the reviewed
+Task 1 post-extraction identity. Consumer census, production-state comparison,
+native admission, merge, manifest construction, and deletion remain stopped
+until focused review clears this amendment.
+
 - [ ] **Step 1: Reproduce exact final collection identities**
 
 Use the deterministic backend reporter and frontend JSON normalizer. Compare
@@ -2033,7 +2083,8 @@ At minimum prove:
 - provider spies/counters remain empty across owning tests;
 - no PG method is reached from market/fundamentals projections;
 - current quote/provider source files are byte-identical to Task 0;
-- price collector/scheduler partial-truth files are byte-identical;
+- scheduler/runtime partial-truth files remain byte-identical to Task 0, while
+  `src/market_data_direct.py` equals the reviewed Task 1 post-extraction SHA;
 - Financial Datasets spend-policy owners are byte-identical;
 - Tranche B scoring owners are byte-identical;
 - production DB/data/scheduler metadata match Task 0; and
