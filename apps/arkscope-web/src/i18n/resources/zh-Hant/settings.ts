@@ -108,7 +108,7 @@ const settings = {
       dataStorage: {
         title: "市場資料",
         description: "查看已儲存價格、SEC 基本面、財務快取與交易日資料覆蓋。",
-        searchAliases: "market data|市場資料|price|價格|已儲存價格|基本面|SEC 基本面|財務快取|coverage|sqlite|trading-day coverage",
+        searchAliases: "market data|市場資料|price|價格|已儲存價格|基本面|SEC 基本面|財務快取|coverage|sqlite|trading-day coverage|查看價格、基本面與交易日資料覆蓋。",
       },
       newsStorage: {
         title: "新聞資料",
