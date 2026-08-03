@@ -501,7 +501,8 @@ class ToolRegistry:
                 "Get comprehensive financial metrics for valuation: "
                 "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
                 "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
-                "and earnings surprise. IBKR real-time + SEC EDGAR cached."
+                "and earnings surprise. "
+                "Static SEC facts plus a qualified local completed-session price, or typed unavailable."
             ),
             function=get_detailed_financials,
             category="analysis",

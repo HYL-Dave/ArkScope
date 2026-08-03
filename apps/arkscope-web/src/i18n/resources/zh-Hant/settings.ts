@@ -107,8 +107,8 @@ const settings = {
       },
       dataStorage: {
         title: "市場資料",
-        description: "查看價格、基本面與交易日資料覆蓋。",
-        searchAliases: "market data|市場資料|price|價格|基本面|coverage|sqlite|trading-day coverage",
+        description: "查看已儲存價格、SEC 基本面、財務快取與交易日資料覆蓋。",
+        searchAliases: "market data|市場資料|price|價格|已儲存價格|基本面|SEC 基本面|財務快取|coverage|sqlite|trading-day coverage",
       },
       newsStorage: {
         title: "新聞資料",
@@ -619,14 +619,14 @@ const settings = {
   },
   dataStorage: {
     title: "市場資料",
-    description: "顯示價格、新聞、基本面與財務快取的資料量、最新時間及最近更新。資料抓取由 Data Sources 管理。",
+    description: "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。資料抓取由 Data Sources 管理。",
     loading: "載入中…",
     available: "可用",
     empty: "尚無資料",
     labels: {
       prices: "價格",
       news: "新聞",
-      fundamentals: "基本面",
+      fundamentals: "已儲存的 SEC 基本面",
       financialCache: "財務快取",
     },
     summary: {
@@ -638,7 +638,7 @@ const settings = {
     update: {
       title: "最近增量更新",
       never: "尚未增量更新",
-      succeeded: "價格 {{pricesValue}} · 新聞 {{newsValue}} · 基本面 {{fundamentalsValue}}",
+      succeeded: "價格 {{pricesValue}} · 新聞 {{newsValue}}",
       failed: "增量更新失敗",
       generatedAt: "產生於 {{timestamp}}",
     },

@@ -260,7 +260,10 @@ class ValuationPriceBasis(BaseModel):
 
 
 class DetailedFinancials(BaseModel):
-    """Comprehensive financial metrics for valuation analysis."""
+    """Comprehensive metrics for valuation analysis.
+
+    Static SEC facts plus a qualified local completed-session price, or typed unavailable.
+    """
     ticker: str
     report_date: Optional[str] = None
     data_source: str = Field(default="sec_edgar")
@@ -276,7 +279,7 @@ class DetailedFinancials(BaseModel):
     fcf_yield: Optional[float] = Field(None, description="FCF / Market Cap")
     peg_ratio: Optional[float] = Field(None, description="PE / Earnings Growth")
 
-    # Valuation (price-based — IBKR real-time preferred, SEC fallback)
+    # Price-based valuation is populated only when the completed-session selector qualifies.
     pe_ratio: Optional[float] = None
     pb_ratio: Optional[float] = None
     ps_ratio: Optional[float] = None

@@ -27,6 +27,12 @@ const system = {
     status: "Status",
     toolCategories: "Tool categories",
     dataSourcesTickers: "Data sources (tickers)",
+    dataSourceLabels: {
+      newsTickers: "News tickers",
+      priceTickers: "Price tickers",
+      storedSecFundamentals: "Stored SEC fundamentals",
+      unknown: "Unknown data source ({{value}})",
+    },
   },
 } as const;
 

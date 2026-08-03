@@ -95,7 +95,7 @@ describe("bundled i18n resources", () => {
       watchlist: 71,
       universe: 35,
       news: 44,
-      tickerDetail: 85,
+      tickerDetail: 86,
       aiCard: 67,
       tags: 7,
     } as const;
@@ -163,6 +163,7 @@ describe("bundled i18n resources", () => {
             other: "{{title}}（{{count}} 期）",
           },
           retry: "重試",
+          sourceStoredSec: "已儲存的 SEC 基本面",
           kvLabels: {
             latestClose: "最新收盤價",
             changePercent: "漲跌幅",
@@ -210,6 +211,7 @@ describe("bundled i18n resources", () => {
             other: "{{title}} ({{count}} periods)",
           },
           retry: "Retry",
+          sourceStoredSec: "Stored SEC fundamentals",
           kvLabels: {
             latestClose: "Latest close",
             changePercent: "Change %",
@@ -261,7 +263,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(380);
+      expect(flattened.size, `${locale}.explore`).toBe(381);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -292,6 +294,7 @@ describe("bundled i18n resources", () => {
         "tickerDetail.statementSummary.one",
         "tickerDetail.statementSummary.other",
         "tickerDetail.retry",
+        "tickerDetail.sourceStoredSec",
         "aiCard.evidenceSummary",
         "aiCard.daysSuffix.one",
         "aiCard.daysSuffix.other",
@@ -516,6 +519,8 @@ describe("bundled i18n resources", () => {
         coverageReadOnly: "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
         coverageMarketScope: "美國上市股票代理範圍",
         coverageSession: "正規交易時段（RTH）",
+        storedFundamentals: "已儲存的 SEC 基本面",
+        financialCache: "財務快取",
         news: "新聞資料",
         macro: "總經資料",
         investor: "風險意願高於承受能力",
@@ -564,6 +569,8 @@ describe("bundled i18n resources", () => {
         coverageReadOnly: "Read-only diagnostic; does not start a repair or supply planner work.",
         coverageMarketScope: "US-listed equity proxy",
         coverageSession: "Regular trading hours (RTH)",
+        storedFundamentals: "Stored SEC Fundamentals",
+        financialCache: "Financial Cache",
         news: "News Data",
         macro: "Macro Data",
         investor: "Risk appetite above capacity",
@@ -618,6 +625,8 @@ describe("bundled i18n resources", () => {
       expect(t(($) => $.dataStorage.coverage.facts.marketScopeValue))
         .toBe(expected.coverageMarketScope);
       expect(t(($) => $.dataStorage.coverage.facts.sessionValue)).toBe(expected.coverageSession);
+      expect(t(($) => $.dataStorage.labels.fundamentals)).toBe(expected.storedFundamentals);
+      expect(t(($) => $.dataStorage.labels.financialCache)).toBe(expected.financialCache);
       expect(t(($) => $.newsStorage.title)).toBe(expected.news);
       expect(t(($) => $.macroStorage.title)).toBe(expected.macro);
       expect.soft(commonT(($) => $.personalization.mismatch.appetiteAboveCapacity))
@@ -713,9 +722,9 @@ describe("bundled i18n resources", () => {
       shell: 37,
       settings: 706,
       research: 207,
-      explore: 380,
+      explore: 381,
       portfolio: 374,
-      system: 20,
+      system: 24,
     } as const;
 
     const expectedCoveragePaths = [
@@ -779,7 +788,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1785);
+      expect(total, `${locale}.total`).toBe(1790);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(

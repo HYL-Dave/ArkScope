@@ -1938,10 +1938,10 @@ export function getConsensus(ticker: string): Promise<ConsensusSummary> {
 // routing is enabled and fall back to PG otherwise. Shapes mirror the Python
 // FundamentalsResult schema.
 
-// source_path = TRUE per-call origin of the underlying read (local market DB vs PG /
-// file). pg_fallback = local-first miss → PG; pg = PG primary (routing off);
-// file = file-backed dev config; none = no data anywhere.
-export type SourcePath = "local" | "pg_fallback" | "pg" | "file" | "none";
+// source_path = TRUE per-call origin of the underlying read. local_cache is the
+// stored SEC financial-cache projection; pg_fallback = local-first miss → PG;
+// pg = PG primary (routing off); file = file-backed dev config; none = no data.
+export type SourcePath = "local" | "local_cache" | "pg_fallback" | "pg" | "file" | "none";
 
 export interface FinancialStatement {
   report_period: string;

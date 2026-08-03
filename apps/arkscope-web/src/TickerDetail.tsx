@@ -835,6 +835,7 @@ function fmtNum(v: number | null): string {
 function sourceLabel(s: SourcePath | string | undefined, t: ExploreT): string {
   switch (s) {
     case "local": return t(($) => $.tickerDetail.sourceLocal);
+    case "local_cache": return t(($) => $.tickerDetail.sourceStoredSec);
     case "pg_fallback": return t(($) => $.tickerDetail.sourcePgFallback);
     case "pg": return t(($) => $.tickerDetail.sourcePg);
     case "file": return t(($) => $.tickerDetail.sourceLocalFile);

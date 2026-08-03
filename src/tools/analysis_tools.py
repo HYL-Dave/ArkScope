@@ -608,6 +608,8 @@ def get_detailed_financials(
     """
     Combine cached SEC facts with a request-time qualified local price.
 
+    Static SEC facts plus a qualified local completed-session price, or typed unavailable.
+
     Args:
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol

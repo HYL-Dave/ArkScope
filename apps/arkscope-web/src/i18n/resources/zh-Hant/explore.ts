@@ -297,6 +297,7 @@ const explore = {
     sourcePgFallback: "PG（本地缺→回退）",
     sourceLocal: "本地",
     sourceLocalFile: "本地檔案",
+    sourceStoredSec: "已儲存的 SEC 基本面",
     sourceNone: "無資料",
     fundamentalsLocalCoverage: "基本面 · 本地覆蓋",
     fundamentalsCurrentSource: "基本面 · 本次來源",

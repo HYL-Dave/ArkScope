@@ -27,6 +27,12 @@ const system = {
     status: "Status",
     toolCategories: "Tool categories",
     dataSourcesTickers: "Data sources (tickers)",
+    dataSourceLabels: {
+      newsTickers: "新聞標的",
+      priceTickers: "價格標的",
+      storedSecFundamentals: "已儲存的 SEC 基本面",
+      unknown: "未知資料來源（{{value}}）",
+    },
   },
 } as const;
 

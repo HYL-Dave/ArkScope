@@ -28,7 +28,7 @@
 1. Product positioning + 5-layer architecture + non-goals.
 2. Deployment-model invariant (one profile dir, web or desktop both read it).
 3. Local profile directory contract (path, structure, manifest, lock file).
-4. Storage strategy — **two-SQLite split** (`workbench.db` app state + `sa_cache.db` SA ingest, independent writer locks per file) + transient DuckDB on parquet (no persistent DuckDB file in v1) + PG archive/import stance + concrete per-table mapping + SQLite concurrency model.
+4. Storage strategy — two sync-domain SQLite files (`workbench.db` app state + `sa_cache.db` SA ingest, independent writer locks per file), plus device-local `market_data.db` for direct-local market authorities + transient DuckDB on remaining parquet (no persistent DuckDB file in v1) + PG archive/import stance + concrete per-table mapping + SQLite concurrency model.
 5. Sync policy (zip-and-go bundle format with **two sanitized export DBs**, manifest schema, single-writer lock per profile, SA evidence sub-class via cross-DB ATTACH, conflict policy).
 6. Page IA + bidirectional DTO inventory (8 pages, read + future-write actions + DTO triples).
 7. Scheduler storage interface + process interface + deferral trigger (NOT model A/B/C choice).
@@ -157,7 +157,7 @@ The resolver is implemented by `src/workbench/profile.py:ProfileLocator.resolve(
 │   ├── chat_history/              ← Per-session JSONL (already exists at data/chat_history/)
 │   ├── agent_scratchpad/          ← Per-session scratchpad (device-local, excluded from export)
 │   ├── news/                      ← Parquet bulk news (rebuildable; queried via TRANSIENT DuckDB per §4.2)
-│   ├── prices/                    ← Parquet bulk prices (rebuildable; transient DuckDB)
+│   ├── market_data.db             ← SQLite: direct-local prices/news + financial cache authority
 │   ├── cache/                     ← TTL caches (rebuildable, excluded from export)
 │   └── logs/                      ← Diagnostic logs (device-local, excluded from export)
 ├── config/
@@ -237,6 +237,10 @@ External ingest clients — today **SA native host** (`src/sa_native_host.py`) a
 
 SQLite splits into **two independent DB files** so the bulky SA-native-host writes do not contend with the small UI/agent writes. Per-file writer-lock semantics (https://www.sqlite.org/wal.html) means two SQLite files = two independent writer locks; bulk writes to `sa_cache.db` do NOT block writes to `workbench.db` and vice versa.
 
+`data/market_data.db` is a third device-local operational authority, not a third
+sync-domain DB. Direct-local market writers manage it under the market write
+lock, and profile export excludes the live file.
+
 #### 4.1.1 App SQLite (`workbench.db`) — owns user state
 
 Tables under `sql/sqlite/app/0NN_*.sql`:
@@ -315,7 +319,7 @@ Cross-DB writes are not supported and not needed (SA native host writes only `sa
 | Use site | Backed by | Notes |
 |----------|-----------|-------|
 | `news` queries (filter by ticker / date / `LIKE` on title) | `data/news/raw/*.parquet` | Cross-join to `app.news_scores` via ATTACH (`mode=ro` per §4.1.3). **No FTS in v1** — DuckDB `fts` extension requires per-table index materialization, and a transient `:memory:` connection rebuilds the index every query, which conflicts with v1 simplicity. Full-text search lives in `sa_cache.db` SA-side FTS5 (`sa_articles_fts`, `sa_market_news_fts` — trigram per §10.2). News headline filtering uses SQL `LIKE '%query%'` (acceptable at single-user scale). v2 candidate: persistent FTS on a `news_fts` table or via `warehouse.duckdb` (§11.1). Source: https://duckdb.org/docs/current/core_extensions/full_text_search.html. |
-| `prices` queries (OHLCV by ticker / interval / range) | `data/prices/{15min,hourly}/*.parquet` | Time series scans. |
+| `prices` queries (OHLCV by ticker / interval / range) | `market_data.db` | SQLite is the current authority; valuation uses the qualified completed-session selector rather than DuckDB/file fallback. |
 | `iv_history` queries | `data/options/iv_history/` parquet | Time series scans. |
 | `macro_observations` queries | parquet (new path: `data/macro/observations/`) | If observations > 10M rows; otherwise stays in `workbench.db` SQLite. Threshold gated on day-1 measurement. |
 
@@ -336,7 +340,7 @@ con.execute(f"""
 **Conventions** (apply to every transient DuckDB connection):
 - `ATTACH '<profile>/workbench.db' AS app (TYPE sqlite, READ_ONLY);` for app-DB joins.
 - `ATTACH '<profile>/sa_cache.db' AS sa (TYPE sqlite, READ_ONLY);` for SA-DB joins (only when needed; many DuckDB queries don't touch SA).
-- All write paths go through SQLite (`workbench.db` or `sa_cache.db`) or write parquet files; DuckDB transient connections see new data on next query — DuckDB is **never the write-of-record store**.
+- All write paths go through SQLite (`workbench.db`, `sa_cache.db`, or `market_data.db`) or explicitly retained parquet writers; DuckDB transient connections see new data on next query — DuckDB is **never the write-of-record store**.
 
 ### 4.3 Filesystem — owns raw payloads
 
@@ -347,7 +351,7 @@ con.execute(f"""
 | `data/chat_history/*.jsonl` | Syncable | Yes |
 | `data/agent_scratchpad/*` | Device-local | No |
 | `data/news/raw/*.parquet` | Rebuildable | No |
-| `data/prices/{15min,hourly}/*.parquet` | Rebuildable | No |
+| `data/market_data.db` | Device-local authority | No |
 | `data/cache/*` | Rebuildable | No |
 | `data/logs/*` | Device-local | No |
 
@@ -431,11 +435,11 @@ Within each DB file (multi-reader / single-writer), v1 mitigations are mandatory
 
 > Important: NEITHER `workbench.db` NOR `sa_cache.db` is a single sync unit. Tables inside each are classified individually; the bundle uses **two sanitized export DBs** built table-by-table per §5.2, not copies of the live DBs. This means a new device-local table inside `workbench.db` doesn't accidentally leak into the bundle, and `sa_cache.db` (default device-local) only contributes its evidence subset.
 
-- **Device-local** (excluded from bundle): `config/.env`, `data/agent_scratchpad/`, `data/cache/`, `data/logs/`, `data/news/raw/`, `data/prices/`, `agent_queries` (in `workbench.db`), `job_runs` (in `workbench.db`; runtime audit log), `.workbench.lock`, all `*.db-wal` / `*.db-shm` for both DBs, **the entirety of `sa_cache.db` by default** (rebuildable via re-scrape; selective subset travels via the next class), SA refresh meta (extension cookies, last-fetched timestamps).
+- **Device-local** (excluded from bundle): `config/.env`, `data/agent_scratchpad/`, `data/cache/`, `data/logs/`, `data/news/raw/`, `data/market_data.db`, `agent_queries` (in `workbench.db`), `job_runs` (in `workbench.db`; runtime audit log), `.workbench.lock`, all `*.db-wal` / `*.db-shm` for all live DBs, **the entirety of `sa_cache.db` by default** (rebuildable via re-scrape; selective subset travels via the next class), SA refresh meta (extension cookies, last-fetched timestamps).
 - **Syncable** (always included in bundle): `manifest.json`, `data/reports/*.md`, `data/agent_memory/*.md`, `data/chat_history/*.jsonl`, `config/user_profile.yaml`, `config/skills/*.yaml`, plus selected tables inside `workbench.db` — `research_reports`, `agent_memories` (+ junction tables `memory_tickers` / `memory_tags`), `news_scores`, `job_definitions`.
 - **SA evidence (selectively syncable, default-on)**: rows in `sa_cache.db` (`sa_articles` / `sa_article_comments` / `sa_market_news`) whose IDs are referenced by saved `research_reports.referenced_evidence_ids` or `agent_memories.referenced_evidence_ids`. Computed at export time via cross-DB ATTACH (§5.2 step 5). **Default-included** — the user's research is incomplete without the SA articles their reports / memories actually cite.
 - **SA bulk cache (selectively syncable, default-off)**: rest of `sa_cache.db` (rows not referenced by reports/memories) + refresh metadata + cookies. **Default-excluded**. Opt-in via `scripts/profile_export.py --include-sa-cache=all`. Re-scrape on machine B is the alternative.
-- **Rebuildable** (excluded from bundle): all parquet caches (`data/news/raw/`, `data/prices/`, `data/options/iv_history/`), all TTL caches (`data/cache/`), no persistent DuckDB file in v1 (transient connections only — see §4.2).
+- **Rebuildable** (excluded from bundle): parquet caches (`data/news/raw/`, `data/options/iv_history/`), all TTL caches (`data/cache/`), no persistent DuckDB file in v1 (transient connections only — see §4.2). `market_data.db` is separately excluded as a live device-local authority, not treated as a file fallback.
 
 **Schema change required** (lands as part of cut #1 — `research_reports` migration in §8.1, and cut #2 — `agent_memories`): both tables get a `referenced_evidence_ids TEXT NOT NULL DEFAULT '[]'` column (SQLite JSON1 array of objects shaped `{"source": "sa_article" | "sa_market_news" | "sa_comment", "id": <int>}`). Populated at save-time: by the agent when a report cites an article (auto-tracked from tool result chain), or by the user when manually saving a memory tied to an article. The export script joins these to compute the SA evidence subset.
 
@@ -534,7 +538,7 @@ workbench-profile-v1-<host>-<ts>.zip
 10. Bundle BOTH **sanitized** DBs into the zip (NOT the live ones).
 
 **Excluded from bundle entirely** (enforced by allowlist, not denylist):
-- `config/.env`, `data/cache/`, `data/news/`, `data/prices/`, `data/logs/`, `data/agent_scratchpad/`, `workbench.db` (live), `sa_cache.db` (live), `*.db-wal`, `*.db-shm`, `.workbench.lock`, `exports/`. **No persistent DuckDB file exists in v1** — `warehouse.duckdb` is a v2 candidate (see §11) and would be excluded as rebuildable when introduced.
+- `config/.env`, `data/cache/`, `data/news/`, `data/market_data.db`, `data/logs/`, `data/agent_scratchpad/`, `workbench.db` (live), `sa_cache.db` (live), `*.db-wal`, `*.db-shm`, `.workbench.lock`, `exports/`. **No persistent DuckDB file exists in v1** — `warehouse.duckdb` is a v2 candidate (see §11) and would be excluded as rebuildable when introduced.
 
 **Allowlist semantics**: the export script knows exactly what to include; anything not on the list is implicitly excluded. The sanitized export DB construction makes this enforceable at the table level too — a new device-local table doesn't accidentally get bundled because the script's table allowlist would not include it. **Adding a new table to the syncable allowlist is a deliberate spec-touching change** (review forces a sync-class decision per §5.1).
 
@@ -568,7 +572,7 @@ workbench-profile-v1-<host>-<ts>.zip
     "config/.env",
     "data/cache/**",
     "data/news/**",
-    "data/prices/**",
+    "data/market_data.db",
     "data/logs/**",
     "data/agent_scratchpad/**",
     "workbench.db",
@@ -808,7 +812,7 @@ Phase C runner refactor resumes only after **all three**:
 
 ### 8.5 What is NOT migrated (stays on `LegacyPostgresBackend` import-only)
 
-The agent-runtime data — `news`, `prices`, `iv_history`, `fundamentals` — get migrated to **DuckDB-on-parquet**, not SQLite. Existing parquet files in `data/news/raw/` and `data/prices/{15min,hourly}/` are already the source of truth; the PG copy is redundant. Migration step for these is "stop writing to PG; DuckDB reads parquet directly" — much smaller surface than re-importing.
+The current price, normalized-news, and financial-cache authority is `market_data.db`; price readers do not fall back to legacy CSV/parquet snapshots. Bulk news and IV history may still use their explicitly documented file substrates. Stored SEC fundamentals are projected from the versioned annual `financial_cache` key family, while request-time price-dependent valuation requires a qualified completed-session price.
 
 ---
 

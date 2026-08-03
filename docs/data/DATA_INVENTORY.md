@@ -27,10 +27,10 @@
 |----------|------------|------|
 | IBKR 已評分新聞 | 127 | |
 | Polygon 已評分新聞 | 130 | |
-| 15min 股價 | 75 | 需補齊 |
-| IBKR 基本面 | 131 | 最完整 |
+| 15min 股價 | 由 `market_data.db` 查詢 | 現行本地權威 |
+| 已儲存 SEC 基本面 | 由 `market_data.db` 查詢 | `financial_cache` annual v1 |
 
-> ⚠️ **待處理**: 15min 股價只有 75 支，遠少於新聞和基本面覆蓋範圍
+> 覆蓋數量是執行期資料，應從市場資料狀態與 Coverage 介面查詢，不在本文固定。
 
 ---
 
@@ -184,9 +184,9 @@ importance_score    - 重要性分數
 
 ### 2.1 15 分鐘線
 
-**位置**: `data/prices/15min/`
+**位置**: `market_data.db` 的 `prices` 表
 
-**股票數**: 75 支 (105 個文件，部分股票有多年份檔案)
+**股票數**: 由資料庫與 Coverage 介面即時計算
 
 **Schema**:
 ```
@@ -199,25 +199,24 @@ volume      - 成交量
 ticker      - 股票代號
 ```
 
-**範圍**: 2024-2026
+**範圍**: 由資料庫 frontier 決定
 
-**來源**: IBKR API
+**來源**: direct-local provider writer；列本身不宣稱 provider provenance
 
-> ⚠️ 需補齊至與新聞/基本面一致的 ~130 支
+估值選價只接受最近已完成交易日存在的列，不以更舊交易日靜默回退。
 
 ---
 
 ## 3. 基本面數據
 
-### 3.1 IBKR 基本面
+### 3.1 已儲存 SEC 基本面
 
-**位置**: `data_lake/raw/ibkr_fundamentals/`
+**位置**: `market_data.db` 的 `financial_cache` 表
 
-**文件數**: 131 個 JSON (每股票一個)
+**鍵族**: `fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`
 
-**日期**: 2025-12-25 收集
-
-**內容**: 財務比率、估值指標等
+**內容**: SEC 靜態財報事實；價格型估值在請求時以合格的已完成交易日價格計算。
+舊檔案快照不是現行 fallback，也不代表排程式基本面攝入已經完成。
 
 ---
 

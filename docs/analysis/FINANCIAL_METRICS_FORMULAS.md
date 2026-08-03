@@ -786,7 +786,7 @@ all_methods = calc.get_all_growth_methods()
 
 **資料來源最終配置**:
 - 財報數據: SEC EDGAR XBRL
-- 股價數據: IBKR (data/prices/)
-- 市值/EV: 計算得出 (Price × Shares, or IBKR fundamentals)
+- 股價數據: `market_data.db` 的 15 分鐘列；只接受最近已完成交易日的合格價格
+- 市值/EV: 以 SEC 靜態事實與合格價格計算；價格不可證時回傳 typed unavailable
 
 這樣可以完全取代 Financial Datasets API 的 endpoints 11-12。

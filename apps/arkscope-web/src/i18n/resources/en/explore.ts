@@ -297,6 +297,7 @@ const explore = {
     sourcePgFallback: "PG (local missing → fallback)",
     sourceLocal: "Local",
     sourceLocalFile: "Local file",
+    sourceStoredSec: "Stored SEC fundamentals",
     sourceNone: "No data",
     fundamentalsLocalCoverage: "Fundamentals · Local coverage",
     fundamentalsCurrentSource: "Fundamentals · Source this time",

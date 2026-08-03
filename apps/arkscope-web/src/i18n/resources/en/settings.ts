@@ -108,8 +108,8 @@ const settings = {
       },
       dataStorage: {
         title: "Market Data",
-        description: "Review price, fundamentals, and trading-day data coverage.",
-        searchAliases: "market data|price|fundamentals|coverage|sqlite|trading-day coverage",
+        description: "Review stored prices, SEC fundamentals, financial-cache storage, and trading-day coverage.",
+        searchAliases: "market data|price|stored prices|fundamentals|SEC fundamentals|stored SEC fundamentals|financial cache|coverage|sqlite|trading-day coverage",
       },
       newsStorage: {
         title: "News Data",
@@ -620,14 +620,14 @@ const settings = {
   },
   dataStorage: {
     title: "Market Data",
-    description: "Review data volume, latest timestamps, and recent updates for prices, news, fundamentals, and the financial cache. Data collection is managed under Data Sources.",
+    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Data collection is managed under Data Sources.",
     loading: "Loading...",
     available: "Available",
     empty: "No data yet",
     labels: {
       prices: "Prices",
       news: "News",
-      fundamentals: "Fundamentals",
+      fundamentals: "Stored SEC Fundamentals",
       financialCache: "Financial Cache",
     },
     summary: {
@@ -639,7 +639,7 @@ const settings = {
     update: {
       title: "Latest Incremental Update",
       never: "No incremental update yet",
-      succeeded: "Prices {{pricesValue}} · News {{newsValue}} · Fundamentals {{fundamentalsValue}}",
+      succeeded: "Prices {{pricesValue}} · News {{newsValue}}",
       failed: "Incremental update failed",
       generatedAt: "Generated {{timestamp}}",
     },

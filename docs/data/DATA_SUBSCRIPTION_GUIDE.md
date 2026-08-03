@@ -355,10 +355,14 @@
 ```
 數據獲取優先順序:
 
-Spot Price (現價):
-├── 1. IBKR 即時/延遲報價 (reqMktData)
-├── 2. 本地歷史價格 (data/prices/15min/*.csv → resample daily)
-└── 3. IBKR 歷史 bars (reqHistoricalData，fallback)
+Current quote (現價):
+└── IBKR 即時/延遲報價 (reqMktData)；不可證時回傳 unavailable，不以歷史收盤冒充現價
+
+Valuation price basis (估值價格基準):
+└── 本地 `market_data.db` 最近已完成交易日價格；只接受要求日期存在的列，不回退更舊日期
+
+Historical collection (歷史收集):
+└── IBKR 歷史 bars (reqHistoricalData)
 
 HV (歷史波動率):
 ├── 1. 本地 daily parquet/csv

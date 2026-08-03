@@ -583,13 +583,22 @@ describe("Ticker Detail localization", () => {
   });
 
   it("maps reviewed source-path enums and preserves unknown stable IDs", async () => {
-    apiMocks.getStoredFundamentals.mockResolvedValueOnce({ ...FUNDAMENTALS, source_path: "local" });
+    apiMocks.getStoredFundamentals.mockResolvedValueOnce({
+      ...FUNDAMENTALS,
+      source_path: "local_cache" as SourcePath,
+    });
     await mountTicker();
     await click(buttonByText("數據"));
     await waitForCalls(apiMocks.getMarketDataCoverage, 1);
-    expect(host!.textContent).toContain("本地");
+    expect(host!.textContent).toContain("已儲存的 SEC 基本面");
+    expect(host!.textContent).not.toContain("local_cache");
+
+    await switchLocale("en");
+    expect(host!.textContent).toContain("Stored SEC fundamentals");
+    expect(host!.textContent).not.toContain("local_cache");
 
     unmountTicker();
+    await switchLocale("zh-Hant");
     apiMocks.getStoredFundamentals.mockResolvedValueOnce({
       ...FUNDAMENTALS,
       source_path: UNKNOWN_SOURCE_PATH as SourcePath,

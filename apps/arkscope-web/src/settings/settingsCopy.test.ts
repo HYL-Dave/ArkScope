@@ -93,8 +93,8 @@ const BASELINE_SECTIONS: ReadonlyArray<{
   {
     id: "data_storage",
     title: "市場資料",
-    description: "查看價格、基本面與交易日資料覆蓋。",
-    keywords: ["market data", "市場資料", "price", "價格", "基本面", "coverage", "sqlite"],
+    description: "查看已儲存價格、SEC 基本面、財務快取與交易日資料覆蓋。",
+    keywords: ["market data", "市場資料", "price", "價格", "SEC 基本面", "財務快取", "coverage", "sqlite"],
   },
   {
     id: "news_storage",
@@ -148,7 +148,7 @@ describe("Settings static copy authority", () => {
         ["research_runtime", "AI 研究執行限制", "設定 AI 研究 session 與單次執行限制。"],
         ["investor_profile", "投資人設定", "管理投資人輪廓、風險意願與研究個人化。"],
         ["data_sources", "資料來源與排程", "查看資料來源健康度、排程與瀏覽器擴充同步狀態。"],
-        ["data_storage", "市場資料", "查看價格、基本面與交易日資料覆蓋。"],
+        ["data_storage", "市場資料", "查看已儲存價格、SEC 基本面、財務快取與交易日資料覆蓋。"],
         ["news_storage", "新聞資料", "查看新聞資料量、攝入狀態與最近更新。"],
         ["macro_storage", "總經資料", "查看 FRED series、資料快照與總經資料覆蓋。"],
       ],
@@ -159,7 +159,7 @@ describe("Settings static copy authority", () => {
         ["research_runtime", "AI Research Runtime Limits", "Set session and per-run limits for AI Research."],
         ["investor_profile", "Investor Profile", "Manage the investor profile, risk appetite, and research personalization."],
         ["data_sources", "Data Sources and Schedules", "Review data-source health, schedules, and browser extension sync."],
-        ["data_storage", "Market Data", "Review price, fundamentals, and trading-day data coverage."],
+        ["data_storage", "Market Data", "Review stored prices, SEC fundamentals, financial-cache storage, and trading-day coverage."],
         ["news_storage", "News Data", "Review news volume, ingestion status, and recent updates."],
         ["macro_storage", "Macro Data", "Review FRED series, snapshots, and macro-data coverage."],
       ],
@@ -182,6 +182,8 @@ describe("Settings static copy authority", () => {
 
     expect(searchIds("subscription credentials")).toContain("providers");
     expect(searchIds("trading-day coverage")).toContain("data_storage");
+    expect(searchIds("Stored SEC fundamentals")).toContain("data_storage");
+    expect(searchIds("財務快取")).toContain("data_storage");
     expect(searchIds("總體經濟")).toContain("macro_storage");
   });
 

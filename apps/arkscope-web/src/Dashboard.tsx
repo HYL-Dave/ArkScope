@@ -118,6 +118,19 @@ function RuntimePanel({ rt }: { rt: RuntimeConfig }) {
 
 function StatusTiles({ status }: { status: ApiStatus }) {
   const { t } = useTranslation("system");
+  const knownDataSourceLabels = {
+    news_tickers: t(($) => $.status.dataSourceLabels.newsTickers),
+    price_tickers: t(($) => $.status.dataSourceLabels.priceTickers),
+    fundamentals_tickers: t(($) => $.status.dataSourceLabels.storedSecFundamentals),
+  } satisfies Record<"news_tickers" | "price_tickers" | "fundamentals_tickers", string>;
+
+  const dataSourceLabel = (key: string): string => {
+    if (Object.prototype.hasOwnProperty.call(knownDataSourceLabels, key)) {
+      return knownDataSourceLabels[key as keyof typeof knownDataSourceLabels];
+    }
+    return t(($) => $.status.dataSourceLabels.unknown, { value: key });
+  };
+
   return (
     <div className="dashboard">
       <section className="tilerow">
@@ -136,7 +149,7 @@ function StatusTiles({ status }: { status: ApiStatus }) {
       <h2 className="section">{t(($) => $.status.dataSourcesTickers)}</h2>
       <div className="grid">
         {Object.entries(status.data_sources).map(([k, v]) => (
-          <Tile key={k} label={k.replace(/_/g, " ")} value={v} />
+          <Tile key={k} label={dataSourceLabel(k)} value={v} />
         ))}
       </div>
     </div>

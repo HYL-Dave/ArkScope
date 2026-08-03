@@ -36,22 +36,21 @@ function syncLine(status: MarketDataStatus, t: SettingsT): string {
     return `+${m.rows_added.toLocaleString()} @ ${ts}`;
   };
   const s = status.sync;
-  if (!s.prices && !s.news && !s.fundamentals) {
+  if (!s.prices && !s.news) {
     return t(($) => $.dataStorage.update.never);
   }
-  if ([s.prices, s.news, s.fundamentals].some((value) => value?.last_error)) {
+  if ([s.prices, s.news].some((value) => value?.last_error)) {
     return t(($) => $.dataStorage.update.failed);
   }
   return t(($) => $.dataStorage.update.succeeded, {
     pricesValue: fmt(s.prices),
     newsValue: fmt(s.news),
-    fundamentalsValue: fmt(s.fundamentals),
   });
 }
 
 function syncDiagnostics(status: MarketDataStatus): Array<string | null> {
   const sync = status.sync;
-  return [sync.prices, sync.news, sync.fundamentals]
+  return [sync.prices, sync.news]
     .map((value) => value?.last_error ?? null);
 }
 

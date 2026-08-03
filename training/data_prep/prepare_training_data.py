@@ -617,7 +617,7 @@ Examples:
         "--price-source", default="yfinance",
         choices=["yfinance", "ibkr"],
         help="Price data source (default: yfinance). "
-             "'ibkr' reads from data/prices/daily/ (run collect_ibkr_prices.py --daily first).",
+             "'ibkr' uses a direct IBKR TWS/Gateway daily fetch for this run.",
     )
     parser.add_argument(
         "--output-dir", default="training/data_prep/output",

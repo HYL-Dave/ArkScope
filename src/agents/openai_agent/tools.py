@@ -444,6 +444,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_detailed_financials(ticker: str) -> str:
         """Get comprehensive financial metrics: EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), and earnings surprise.
 
+        Static SEC facts plus a qualified local completed-session price, or typed unavailable.
+
         Args:
             ticker: Stock ticker symbol
         """

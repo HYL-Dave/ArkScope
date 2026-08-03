@@ -1,8 +1,8 @@
 """
-FileBackend — reads existing Parquet/CSV/JSON data files on disk.
+FileBackend — reads retained score/news files on disk.
 
-This is the first backend implementation, designed to work immediately
-with the project's existing data without any database setup.
+Price and fundamentals methods are retired empty compatibility surfaces. Current
+price and stored SEC authorities live in ``market_data.db``.
 
 Data path mapping:
     Scored news (IBKR)  : data/news/ibkr_scored_final.parquet
@@ -94,8 +94,8 @@ class FileBackend:
     """
     File-based data backend.
 
-    Reads Parquet, CSV, and JSON files from the project's data directories.
-    Implements the DataBackend protocol.
+    Reads retained score/news files and implements the DataBackend protocol.
+    Retired price and fundamentals methods remain as empty compatibility calls.
     """
 
     def __init__(self, base_path: Optional[Path] = None):
@@ -116,10 +116,8 @@ class FileBackend:
                 )
         self._base = Path(base_path)
 
-        # Data paths
+        # Retained data path
         self._news_dir = self._base / "data" / "news"
-        self._prices_dir = self._base / "data" / "prices"
-        self._fundamentals_dir = self._base / "data_lake" / "raw" / "ibkr_fundamentals"
 
         # Load model priority from config (fallback to default)
         self._model_priority = self._load_model_priority()

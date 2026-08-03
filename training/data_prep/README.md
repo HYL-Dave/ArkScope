@@ -232,20 +232,12 @@ IBKR 回傳的是當時的實際交易價格（unadjusted）。兩者都正確�
 
 **重要**：同一次訓練中所有價格必須來自同一來源，不可混用 adjusted 和 unadjusted。
 
-### 已收集的 IBKR 資料
+### IBKR 價格路徑
 
-```
-data/prices/
-├── 15min/          # 211 files, 135 tickers, 2024-present
-│   ├── AAPL_15min_2024_2026.csv  (853 bars)
-│   └── ...
-├── hourly/         # 75 files, 2023
-│   ├── AAPL_hourly_2023.csv  (1744 bars, ~7 bars/day)
-│   └── ...
-└── collection_summary.json
-```
-
-格式：`datetime,open,high,low,close,volume,ticker`（datetime 含時區 offset）
+`prepare_training_data.py --price-source ibkr` 會在該次執行直接連線至
+IBKR TWS/Gateway 取得日線，不讀取已退役的逐標的 CSV 快照。應用程式內的
+15 分鐘價格權威是 `market_data.db`；訓練資料若要改用該資料庫，必須另行設計
+明確的抽取與調整口徑，不可把兩條路徑靜默混用。
 
 ---
 

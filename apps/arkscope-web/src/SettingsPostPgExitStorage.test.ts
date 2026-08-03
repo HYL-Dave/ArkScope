@@ -258,6 +258,7 @@ describe("post-PG-exit storage panels", () => {
     expect(storage!.textContent).toContain("2027-12-31");
     expect(host!.textContent).toContain("價格");
     expect(host!.textContent).toContain("價格 —");
+    expect(host!.textContent).toContain("已儲存的 SEC 基本面");
     expect(host!.textContent).toContain("財務快取");
     expect(host!.textContent).not.toMatch(
       /PG fallback|SQLite|local authority|本地市場資料庫|本地市場庫|本地路由/,
@@ -392,7 +393,7 @@ describe("post-PG-exit storage panels", () => {
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
     expect(mountedStorage.textContent).toContain(
-      "顯示價格、新聞、基本面與財務快取的資料量、最新時間及最近更新。",
+      "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。資料抓取由 Data Sources 管理。",
     );
     expect(mountedStorage.textContent).not.toContain("隱含波動率");
     expect(mountedStorage.textContent).toContain(
@@ -444,7 +445,7 @@ describe("post-PG-exit storage panels", () => {
     expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
     expect(storage.textContent).toContain(
-      "Review data volume, latest timestamps, and recent updates for prices, news, fundamentals, and the financial cache.",
+      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Data collection is managed under Data Sources.",
     );
     expect(storage.textContent).not.toContain("implied volatility");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))
@@ -452,7 +453,7 @@ describe("post-PG-exit storage panels", () => {
         "Market Data",
         "Prices",
         "News",
-        "Fundamentals",
+        "Stored SEC Fundamentals",
         "Financial Cache",
         "Latest Incremental Update",
         "Universe",
@@ -474,9 +475,8 @@ describe("post-PG-exit storage panels", () => {
     expect(storage.textContent).toContain(
       `News +12 @ ${formatSystemTimestamp("2026-07-20T02:00:00Z")}`,
     );
-    expect(storage.textContent).toContain(
-      `Fundamentals +14 @ ${formatSystemTimestamp("2026-07-20T04:00:00Z")}`,
-    );
+    expect(storage.textContent).not.toContain("Fundamentals +14");
+    expect(storage.textContent).not.toContain(formatSystemTimestamp("2026-07-20T04:00:00Z"));
 
     const coverageHeading = Array.from(storage.querySelectorAll("h2")).find((heading) =>
       heading.textContent === "Trading-day / Price Coverage");
