@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 6 BLOCKED - BOUNDED TEST-SEAM AMENDMENT REVIEW
+> **Status:** TASK 6 BLOCKED - FRONTEND SEARCH-COMPATIBILITY AMENDMENT REVIEW
 >
 > **Date:** 2026-08-03
 >
@@ -1887,6 +1887,64 @@ reason, restored the pre-mutation product SHA, and returned the owner GREEN.
 The amendment does not authorize M8-M10, focused/protected gates, native
 admission, merge, rollout, manifest construction, or deletion until focused
 review clears this text.
+
+#### Task 6 bounded amendment: preserve the frozen Settings search surface
+
+Focused review cleared the preceding FileBackend amendment. The corrected M8
+owner then went GREEN, M8-M10 each killed only its intended contract and
+restored the original product SHA/GREEN, backend focused completed `333 passed
+/ 2 skipped`, and the pinned 314-node protected set completed `313 passed / 1
+skipped` in the native execution context.
+
+The first Task 6 full Vitest runtime gate then stopped with exactly one failure:
+
+```text
+src/settings/settingsRegistry.test.ts > settings workspace registry >
+  keeps bilingual search metadata independent from rendered locale
+zh-Hant / data_storage / 查看價格、基本面與交易日資料覆蓋。
+expected [] to include data_storage
+
+full gate:   96 passed / 1 failed files; 1076 passed / 1 failed tests
+owning file: 14 passed / 1 failed
+owning JSON artifact:
+  /tmp/eir006-valuation-price-truth/task6-frontend-search-red.json
+  5835 bytes
+  d77daef893c8aeb211e3bdea67008919d14301ae9145632132816fcffd6e360f
+```
+
+This is a deterministic Task 5 collateral regression, not locale state or
+parallel-test noise. Task 5 changed the current zh-Hant `data_storage`
+description from the frozen pre-I18N-2 sentence above to the truthful stored
+SEC/cache wording, but did not retain the old complete sentence in
+`registry.sections.dataStorage.searchAliases`. The full-runtime gate had not
+previously run: Task 5 proved the 1,077-node full collection identity and ran
+only the reviewed 46-node frontend focused set. The failure therefore does not
+contradict that evidence.
+
+The controlling I18N-2 contract states that every pre-I18N-2 title,
+description, and keyword remains searchable even when current visible copy
+evolves. Updating or deleting the frozen assertion would weaken that contract.
+The only authorized correction is:
+
+1. in `apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts`, append the
+   exact prior sentence `查看價格、基本面與交易日資料覆蓋。` as one
+   `dataStorage.searchAliases` value without reverting the current visible
+   description;
+2. in `apps/arkscope-web/src/settings/settingsCopy.test.ts`, restore only the
+   `data_storage` entry inside the explicitly frozen `BASELINE_SECTIONS` block
+   to its pre-I18N-2 description and keywords; keep the separate current-copy
+   assertions on the new stored-SEC wording unchanged; and
+3. do not edit `settingsRegistry.test.ts`, rename/add/remove/skip a node, alter
+   any English/current visible copy, or change any backend file.
+
+The restored frozen fixture and existing registry owner must both be RED before
+the alias correction and GREEN afterward. Frontend identities remain exactly
+`97 files / 1077 / 3f5e9f5b...` and focused `5 files / 46 /
+5d64841c...`; backend identities and all ten mutation artifacts remain
+unchanged. After focused review clears this amendment, run both owning files,
+then repeat the full Vitest gate before typecheck/build/scanner. No later Task 6
+gate, native admission, merge, manifest, or deletion is authorized by this
+amendment review itself.
 
 - [ ] **Step 1: Reproduce exact final collection identities**
 
