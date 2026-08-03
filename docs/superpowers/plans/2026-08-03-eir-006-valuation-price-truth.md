@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 6 BLOCKED - PROTECTED-HASH AMENDMENT REVIEW
+> **Status:** IMPLEMENTATION REVIEW READY
 >
 > **Date:** 2026-08-03
 >
@@ -1996,7 +1996,7 @@ Task 1 post-extraction identity. Consumer census, production-state comparison,
 native admission, merge, manifest construction, and deletion remain stopped
 until focused review clears this amendment.
 
-- [ ] **Step 1: Reproduce exact final collection identities**
+- [x] **Step 1: Reproduce exact final collection identities**
 
 Use the deterministic backend reporter and frontend JSON normalizer. Compare
 actual streams byte-for-byte to the preconstructed Task 0 targets:
@@ -2015,7 +2015,7 @@ Also prove:
 - every Section 2.5 existing ID remains exactly once; and
 - all 70 market-data-direct nodes remain exactly present.
 
-- [ ] **Step 2: Run the ten exact mutation cycles**
+- [x] **Step 2: Run the ten exact mutation cycles**
 
 For each cycle: record pre-mutation product SHA, apply the smallest exact diff,
 save `mutation.diff`, run only the owning node/set, require RED for the intended
@@ -2040,7 +2040,7 @@ condition after an empty target set. M5 must mutate the production cache writer,
 not only a test fixture. M10 must mutate the shared projection or one consuming
 authority in a way the multi-consumer node observes.
 
-- [ ] **Step 3: Run backend focused and protected gates**
+- [x] **Step 3: Run backend focused and protected gates**
 
 Run the exact 18-file focused set from Section 2.4. Expected `335 passed` except
 for the repo's unchanged manually skipped/live nodes if any are present in
@@ -2062,7 +2062,7 @@ Tranche B scoring byte boundaries
 Do not run a live/provider-marked test. Record exact node IDs and results rather
 than only file totals.
 
-- [ ] **Step 4: Run frontend full, typecheck, build, and scanner**
+- [x] **Step 4: Run frontend full, typecheck, build, and scanner**
 
 ```bash
 npm test --workspace apps/arkscope-web -- --run
@@ -2075,7 +2075,7 @@ Expected: `97 files / 1077 passed`, zero TypeScript errors, successful Vite
 build, and scanner debt not increased. Record build warnings honestly; do not
 convert an existing non-blocking bundle-size warning into a new failure claim.
 
-- [ ] **Step 5: Run static no-provider/no-PG/protected-byte checks**
+- [x] **Step 5: Run static no-provider/no-PG/protected-byte checks**
 
 At minimum prove:
 
@@ -2094,7 +2094,7 @@ Rerun post-cutover `consumer-census.tsv` and
 `behavior-propagation.tsv` reconstruction. Zero unknowns and no remaining
 current old-data consumer/writer are required before review-ready status.
 
-- [ ] **Step 6: Run fresh native canonical admission**
+- [x] **Step 6: Run fresh native canonical admission**
 
 Create a new exact-tip detached worktree under a new path. Recheck pinned
 wrapper/reporter/probe/toolchain identities and the fresh-worktree boundary.
@@ -2123,7 +2123,7 @@ The base/tip runs use the same native protocol and comparable fresh-worktree
 shape. A sandbox run, partial transcript, focused aggregate, or monolithic run
 with a different environment cannot substitute.
 
-- [ ] **Step 7: Reconcile every generated artifact**
+- [x] **Step 7: Reconcile every generated artifact**
 
 Use the exact EIR-002/Tranche A pre/post protocol:
 
@@ -2137,7 +2137,7 @@ Use the exact EIR-002/Tranche A pre/post protocol:
 Never truncate or restore a production file from this isolated run. Any
 modified pre-existing file is a Stop Condition.
 
-- [ ] **Step 8: Complete evidence and commit review packet**
+- [x] **Step 8: Complete evidence and commit review packet**
 
 Evidence must contain:
 
