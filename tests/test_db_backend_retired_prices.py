@@ -65,37 +65,18 @@ def test_file_backend_prices_and_fundamentals_are_empty_without_path_probes(
     def _must_not_probe(*_args, **_kwargs):
         raise AssertionError("retired repository data paths must not be probed")
 
-    blocked_roots = (str(backend._prices_dir), str(backend._fundamentals_dir))
-    real_exists = Path.exists
-    real_glob = Path.glob
-    real_rglob = Path.rglob
+    with monkeypatch.context() as guards:
+        guards.setattr(Path, "exists", _must_not_probe)
+        guards.setattr(Path, "glob", _must_not_probe)
+        guards.setattr(Path, "rglob", _must_not_probe)
+        guards.setattr(pd, "read_csv", _must_not_probe)
+        guards.setattr(pd, "read_parquet", _must_not_probe)
 
-    def _is_retired_data_path(path):
-        text = str(path)
-        return any(text == root or text.startswith(f"{root}/") for root in blocked_roots)
+        prices = backend.query_prices("AAPL", interval="15min", days=7)
+        fundamentals = backend.query_fundamentals("AAPL")
+        price_tickers = backend.get_available_tickers("prices")
+        fundamental_tickers = backend.get_available_tickers("fundamentals")
 
-    def _guarded_exists(path):
-        if _is_retired_data_path(path):
-            return _must_not_probe(path)
-        return real_exists(path)
-
-    def _guarded_glob(path, pattern):
-        if _is_retired_data_path(path):
-            return _must_not_probe(path, pattern)
-        return real_glob(path, pattern)
-
-    def _guarded_rglob(path, pattern):
-        if _is_retired_data_path(path):
-            return _must_not_probe(path, pattern)
-        return real_rglob(path, pattern)
-
-    monkeypatch.setattr(Path, "exists", _guarded_exists)
-    monkeypatch.setattr(Path, "glob", _guarded_glob)
-    monkeypatch.setattr(Path, "rglob", _guarded_rglob)
-    monkeypatch.setattr(pd, "read_csv", _must_not_probe)
-    monkeypatch.setattr(pd, "read_parquet", _must_not_probe)
-
-    prices = backend.query_prices("AAPL", interval="15min", days=7)
     assert list(prices.columns) == [
         "datetime",
         "open",
@@ -105,6 +86,6 @@ def test_file_backend_prices_and_fundamentals_are_empty_without_path_probes(
         "volume",
     ]
     assert prices.empty
-    assert backend.query_fundamentals("AAPL") == {}
-    assert backend.get_available_tickers("prices") == []
-    assert backend.get_available_tickers("fundamentals") == []
+    assert fundamentals == {}
+    assert price_tickers == []
+    assert fundamental_tickers == []
