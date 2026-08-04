@@ -326,18 +326,17 @@ Each entry records:
     chose to discard rather than migrate.
 - `owner`:
   `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: independent implementation review of the exact RED-first
-  branch and raw Task 6 artifacts recorded in
-  `docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md`.
-  The implementation packet records `4581` collected/seen,
-  `4509 passed / 72 skipped / 0 failed`, all ten mutations, the closed
-  `128`-row consumer census, and the production no-write boundary. Product
-  cutover must merge before an exact deletion manifest is built;
-  physical deletion of 225 15-minute CSVs, 75 hourly CSVs, their stale
-  zero-row collection summary, retired detailed-financial cache rows, and
-  legacy fundamentals rows plus their retired sync row remains a later,
-  separately reviewed exact-source operation requiring explicit user approval
-  of the fresh manifest.
+- `next_action`: build and independently review the fresh Task 8 exact deletion
+  manifest. Product truth cutover tip
+  `ce88f72d9f9d710903533505371789d18cce953e` is merged and its fresh
+  exact-master verification records `4581` collected/seen,
+  `4509 passed / 72 skipped / 0 failed`, all four collection identities, and
+  bounded read-only rollout observations. Physical old data remains present:
+  225 15-minute CSVs, 75 hourly CSVs, their stale zero-row collection summary,
+  19 retired detailed-financial cache rows, 130 legacy fundamentals rows, and
+  one retired fundamentals sync row. Manifest construction is read-only;
+  physical deletion remains a later, separately reviewed exact-source
+  operation requiring explicit user approval of that fresh manifest.
 - `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened

@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** IMPLEMENTATION REVIEW READY
+> **Status:** MERGED ROLLOUT REVIEW READY
 >
 > **Date:** 2026-08-03
 >
@@ -2172,7 +2172,7 @@ Stop. Product merge and deletion manifest remain unauthorized pending review.
 
 ### Task 7: Independent Review, Fast-Forward Merge, And Product Rollout
 
-- [ ] **Step 1: Require independent implementation review**
+- [x] **Step 1: Require independent implementation review**
 
 The reviewer must reconstruct from raw artifacts, not evidence prose:
 
@@ -2191,13 +2191,13 @@ The reviewer must reconstruct from raw artifacts, not evidence prose:
 Any finding returns to a bounded amendment/fix/re-review; do not merge a
 partially cleared tip.
 
-- [ ] **Step 2: Fast-forward master to the exact reviewed product tip**
+- [x] **Step 2: Fast-forward master to the exact reviewed product tip**
 
 Prove linear ancestry from `fd6d1b86` through the reviewed branch tip and use
 `git merge --ff-only`. Do not cherry-pick or synthesize a merge commit. Record
 pre/post master and origin pointers. Do not push unless separately requested.
 
-- [ ] **Step 3: Repeat merged verification from a fresh exact-master worktree**
+- [x] **Step 3: Repeat merged verification from a fresh exact-master worktree**
 
 Use new single-use stage names and repeat:
 
@@ -2209,7 +2209,7 @@ Use new single-use stage names and repeat:
 
 Expected identities/results equal Task 6 exactly. Any mismatch stops rollout.
 
-- [ ] **Step 4: Perform bounded read-only rollout observations**
+- [x] **Step 4: Perform bounded read-only rollout observations**
 
 With no provider or full detailed-financials call:
 
@@ -2238,6 +2238,11 @@ physical old data still present
 no deletion approval has been granted
 EIR-006 remains open
 ```
+
+The merged rollout packet records exact cutover tip
+`ce88f72d9f9d710903533505371789d18cce953e`. This checkbox remains open until
+the focused closeout review clears the docs-only commit. Task 8 and every
+physical data operation remain unauthorized during that review.
 
 ---
 
