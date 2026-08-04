@@ -326,17 +326,26 @@ Each entry records:
     chose to discard rather than migrate.
 - `owner`:
   `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: build and independently review the fresh Task 8 exact deletion
-  manifest. Product truth cutover tip
+- `next_action`: independently review the completed Task 8 exact deletion
+  manifest at
+  `docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/`. Its packet
+  `SHA256SUMS` identity is
+  `af5c090a4da72aa1204c6b8ffc13607b392e49d87acf38098a90f4bd2e24e4b6`,
+  approval authority is
+  `6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce`,
+  and exact controller identity is
+  `cd8980e891b4fb8713d008762d7740fd9f91009a37f501d0ee993557bd9933af`.
+  Product truth cutover tip
   `ce88f72d9f9d710903533505371789d18cce953e` is merged and its fresh
   exact-master verification records `4581` collected/seen,
   `4509 passed / 72 skipped / 0 failed`, all four collection identities, and
   bounded read-only rollout observations. Physical old data remains present:
   225 15-minute CSVs, 75 hourly CSVs, their stale zero-row collection summary,
   19 retired detailed-financial cache rows, 130 legacy fundamentals rows, and
-  one retired fundamentals sync row. Manifest construction is read-only;
-  physical deletion remains a later, separately reviewed exact-source
-  operation requiring explicit user approval of that fresh manifest.
+  one retired fundamentals sync row. Task 8 made no data change. Physical
+  deletion remains Task 9 and is blocked until independent review clears these
+  exact bytes and the user separately approves this exact authority, packet,
+  and controller.
 - `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened

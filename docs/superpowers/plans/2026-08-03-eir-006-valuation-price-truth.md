@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** MERGED ROLLOUT REVIEW READY
+> **Status:** TASK 8 MANIFEST REVIEW READY; TASK 9 BLOCKED
 >
 > **Date:** 2026-08-03
 >
@@ -2227,7 +2227,7 @@ With no provider or full detailed-financials call:
 
 Do not warm a cache, call SEC/FD/IBKR, run a scheduler, or change a row.
 
-- [ ] **Step 5: Record `EIR006_PRODUCT_CUTOVER_TIP`**
+- [x] **Step 5: Record `EIR006_PRODUCT_CUTOVER_TIP`**
 
 Commit docs-only merged rollout evidence after focused review. Keep EIR-006
 `promoted`; set the next action to the fresh deletion manifest. State plainly:
@@ -2240,9 +2240,10 @@ EIR-006 remains open
 ```
 
 The merged rollout packet records exact cutover tip
-`ce88f72d9f9d710903533505371789d18cce953e`. This checkbox remains open until
-the focused closeout review clears the docs-only commit. Task 8 and every
-physical data operation remain unauthorized during that review.
+`ce88f72d9f9d710903533505371789d18cce953e`. Focused review cleared the
+docs-only closeout committed at `657b4aa2c8d67a6e659cba4d0d4c6cd90c8d36f3`.
+That review authorized only read-only Task 8 construction; it did not authorize
+physical data operations.
 
 ---
 
@@ -2251,14 +2252,14 @@ physical data operation remain unauthorized during that review.
 This task begins only after Task 7 closeout is merged. It builds decision
 evidence; it does not move or delete anything.
 
-- [ ] **Step 1: Re-ground current product and writer state**
+- [x] **Step 1: Re-ground current product and writer state**
 
 Record exact merged product/test commit, current consumer-census SHA, scheduler
 enabled/cadence state, sidecar/scheduler PIDs, all current market-data writer
 processes, writable DB holder census, and production DB metadata. If a current
 old-data consumer/writer exists, stop and reopen product implementation.
 
-- [ ] **Step 2: Build exact file manifest without globs in execution output**
+- [x] **Step 2: Build exact file manifest without globs in execution output**
 
 Discovery may enumerate the two reviewed directories, but the result becomes a
 sorted exact relative-path list. For every one of the expected 300 CSVs plus
@@ -2281,7 +2282,7 @@ Require exactly 225 `15min`, 75 `hourly`, and one summary. Any additional file
 or different family stops for review. Record empty-directory cleanup targets
 separately; they are not wildcard authority.
 
-- [ ] **Step 3: Recompute raw and canonical CSV-to-SQLite views**
+- [x] **Step 3: Recompute raw and canonical CSV-to-SQLite views**
 
 Pin the comparison implementation bytes and exact alias input. Normalize all
 timestamps to absolute instants. Produce both views and require the design's
@@ -2309,7 +2310,7 @@ Only the canonical view is deletion admission. A raw-view match cannot
 substitute. If current DB growth changes unrelated row totals but any reviewed
 CSV key is absent, stop. Do not copy differing values into SQLite.
 
-- [ ] **Step 4: Build exact DB-row manifest**
+- [x] **Step 4: Build exact DB-row manifest**
 
 Using `mode=ro` and `PRAGMA query_only=ON`, list exact primary keys and metadata
 for:
@@ -2323,7 +2324,7 @@ Do not use SQL `LIKE` as execution authority. Enumerate exact keys in the
 manifest and require later equality. Record row counts/ticker/snapshot/expiry/
 source metadata without retaining payload contents in tracked evidence.
 
-- [ ] **Step 5: Re-run the final consumer/training/current-doc census**
+- [x] **Step 5: Re-run the final consumer/training/current-doc census**
 
 Require:
 
@@ -2335,7 +2336,7 @@ Require:
 - stored-only route and all stored-SEC projections agree; and
 - every remaining low-level empty compatibility method has an explicit owner.
 
-- [ ] **Step 6: Write a manifest packet and stop for independent review**
+- [x] **Step 6: Write a manifest packet and stop for independent review**
 
 The packet includes only metadata, identities, comparison summaries, exact path
 and row-key authorities, saved operational state, and rollback requirements.
@@ -2355,6 +2356,190 @@ At this gate, amend this plan with:
 Independent review must clear the amendment. Then ask the user for separate
 approval of the exact manifest. Until that approval, Task 9 remains unchecked
 and no destructive command may run.
+
+#### Task 8 Exact-Manifest Amendment (2026-08-04)
+
+Task 8 produced the tracked metadata packet at:
+
+```text
+docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/
+```
+
+Its `SHA256SUMS` file has SHA-256
+`af5c090a4da72aa1204c6b8ffc13607b392e49d87acf38098a90f4bd2e24e4b6`.
+The approval authority is the exact canonical `authority-input.json` bytes:
+
+```text
+6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+```
+
+The manifest pins:
+
+```text
+301 files / 842c3e08ff8ed9cb11c92033cf67ad5950d357cb8cd1e0662b74683ba554b0fc
+3 aliases / 0a8fbbf845b73bab1740d04ffb77ab1e935884f417c2bece20395187f83d9220
+19 old cache keys / a4a8d829eb08553a1223f5240de260955fc48a564f8232b943206e0bf88b39bd
+130 fundamentals IDs / 6b845506f9fce54ac4dba78ebd96bacc20113a7aefef651b877f62892418c219
+1 fundamentals sync key / 5b3736ba19e66b2e427b149b143771fb5625eab426e8af7a6317c29461cd15ff
+46-row cache classification / 62e56fc02f5b8a15aaea9f360eee8bd875e10d6a10c7a017c8d568652beef323
+128-row consumer census / a08e7f683b426c10090f1cb7f6e4f4104f22678147a46639ceaece0bcb088c64
+4-row behavior ledger / 613024acc6568296cb798a2832fb8ca1e67fba05a9857c4e4bd5629755c556ba
+```
+
+The exact destructive controller is 1,110 lines / 41,423 bytes / SHA-256
+`cd8980e891b4fb8713d008762d7740fd9f91009a37f501d0ee993557bd9933af`.
+It is inert unless both the CLI token and environment value equal the authority
+ID. That is an intentional-execution gate, not a security credential and not a
+substitute for the user's separate approval.
+
+Holder checks invoke `lsof -w` with a 15-second bound and accept only exit `0`
+with structured records or exit `1` with no records. Stderr, timeout, any other
+exit, and contradictory output are fail-closed refusals. Scratch probes proved
+the no-holder, active-holder, and invalid-path branches.
+
+The final 191-line census producer also reruns against the completed Task 8
+worktree. It pins the exact ten packet files containing old-authority search
+terms as self-authority and refuses any change to that set. This prevents the
+packet's own manifest/controller prose from being misclassified as a live
+consumer while preserving the original `128/a08e7f68...` product census.
+
+The packet made the unchanged census owner RED before that exclusion existed.
+The bounded test-only amendment adds the same ten exact paths to
+`_EIR006_AUTHORITIES`; both existing nodes then pass without collection delta.
+The controller allows only that reviewed owner file past the cutover-tip diff
+and verifies exact SHA-256
+`de6e192b7e3a233b26d9a43c5dd8608e0ce26cfad3ef79f3d73e882a3f79fb9c`.
+Every other product/test byte remains locked to the product cutover tip.
+
+The exact same-filesystem quarantine root is:
+
+```text
+/mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+```
+
+Before any file move or DB mutation, the controller writes the complete
+rollback rows as canonical JSON Lines to:
+
+```text
+db/legacy-rows.jsonl
+```
+
+The snapshot is exactly 150 records / 875,857 bytes / SHA-256
+`1e3578344dfcac0e445900358265c6606150007a496a71284d87e5ae5821697c`.
+Two read-only previews were byte-identical. Full payload bytes are never added
+to tracked evidence.
+
+The only SQL mutations, all inside one `BEGIN IMMEDIATE` transaction, are:
+
+```sql
+DELETE FROM financial_cache WHERE cache_key IN (19 exact equality parameters);
+DELETE FROM fundamentals WHERE id IN (130 exact equality parameters);
+DELETE FROM market_sync_meta WHERE domain IN (1 exact equality parameter);
+```
+
+The controller compares every row and payload hash to the manifest before the
+transaction, requires affected rows `19/130/1`, verifies every retained cache
+row and unrelated sync row after the statements, and rolls the transaction
+back on any mismatch. SQL `LIKE` is not used. Files move one-by-one by exact
+relative path with `os.replace`; discovery must equal the 301-row authority
+before movement.
+
+Task 9's exact pre-stop identity checks and stop sequence are:
+
+```bash
+cd /mnt/md0/PycharmProjects/ArkScope
+sha256sum -c docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/SHA256SUMS
+python -c 'from pathlib import Path; assert Path("/proc/4041681/cmdline").read_bytes().split(b"\0")[:-1] == [b"node", b"apps/arkscope-desktop/dev.js"]'
+python -c 'from pathlib import Path; assert Path("/proc/4041764/cmdline").read_bytes().split(b"\0")[:-1] == [b"python", b"-m", b"src.api"]'
+kill -TERM 4041681
+sleep 5
+test ! -e /proc/4041681
+test ! -e /proc/4041708
+test ! -e /proc/4041764
+```
+
+The three PIDs are dated Task 8 facts. Any changed PID or command invalidates
+this packet before signaling anything; rerun Task 8 rather than selecting a
+replacement process ad hoc. The desktop launcher is the stop owner because its
+reviewed SIGTERM path terminates Electron, sidecar, and its owned Vite process
+group. A process that remains after five seconds is a stop condition; Task 9
+does not escalate to SIGKILL improvisationally.
+
+After the stop checks, the exact preflight, execution, and pre-restart
+verification commands are:
+
+```bash
+export ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED=6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py preflight --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py execute --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py verify --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+```
+
+The controller's preflight independently requires no DB/file holder, no
+desktop/sidecar/manual writer process, exact product/test bytes since
+`ce88f72d` except for the separately pinned census-owner SHA above, clean
+product/test paths, exact DB device/inodes `2304:127284871` and
+`2304:127284276`, exact aliases/rows/files, exact rollback snapshot SHA, exact
+saved scheduler settings, and an absent quarantine root.
+
+After successful `verify`, the user-owned desktop is restarted in its normal
+foreground terminal with:
+
+```bash
+cd /mnt/md0/PycharmProjects/ArkScope
+npm run dev:desktop
+```
+
+From a second terminal retaining the approval environment, verify runtime
+restoration without quiescing the restarted process:
+
+```bash
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py post-restart --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+unset ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED
+```
+
+`post-restart` requires both desktop and sidecar owners to be live, the saved
+schedule configuration to remain byte-for-byte equal in key/value space, the
+301 source paths and 150 DB rows to remain absent, the exact quarantine and
+snapshot to remain valid, and every retained cache row to remain unchanged.
+
+If rollback is required, stop the newly recorded unique desktop owner through
+the same reviewed SIGTERM path, prove all runtime/holder checks empty, then run:
+
+```bash
+export ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED=6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py rollback --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+unset ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED
+```
+
+Rollback verifies the snapshot SHA, refuses conflicting existing rows or file
+destinations, restores exact primary keys transactionally, moves only the
+remaining exact quarantine paths back, and reruns the full row/file authority.
+It is restartable when already-restored rows equal the snapshot.
+
+Fresh Task 8 stop conditions are:
+
+1. any packet, controller, authority input, source, or producer identity differs;
+2. any Task 8 PID/command, schedule key/value, or DB device/inode differs before stop;
+3. any old file is added, removed, changed, symlinked, held open, or outside the 301-row set;
+4. aliases or any canonical comparison decision fact differ;
+5. any target DB key, metadata, payload hash, or table membership differs;
+6. any current/other retained cache row is added, removed, reclassified, or changed;
+7. any product/test path other than the exact census owner differs from the cutover tip, the census owner differs from its pinned SHA, or any protected path is dirty/untracked;
+8. any DB, file, desktop, sidecar, scheduler, or manual-writer holder remains after stop;
+9. the quarantine root exists, is symlinked, or is not on the repository filesystem;
+10. the rollback snapshot does not reproduce its exact 150/875,857/SHA identity;
+11. any equality delete affects a count other than 19/130/1;
+12. any unrelated sync or retained cache row changes in the delete transaction;
+13. automatic file restoration after a pre-commit failure is incomplete;
+14. a failure occurs after DB commit; files remain quarantined and only reviewed verify/rollback may proceed;
+15. any full archived payload appears in tracked evidence; or
+16. independent review or separate user approval names anything less precise than the authority ID, packet SHA, and controller SHA.
+
+Current price/news table growth and WAL growth before quiescence are allowed
+only when all exact target rows, DB inode identities, aliases, retained cache
+rows, and file authorities remain unchanged. They never authorize copying old
+CSV values into SQLite.
 
 ---
 

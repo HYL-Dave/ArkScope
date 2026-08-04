@@ -92,6 +92,16 @@ _HISTORICAL = {
 }
 _EIR006_AUTHORITIES = {
     "docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/README.md",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/cache-classification.tsv",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/consumer-census.tsv",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/controller_probe.py",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/db-result.json",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/legacy-price-files.tsv",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/old-cache-rows.tsv",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/task8_db_row_manifest.py",
+    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/task8_price_manifest.py",
     "docs/superpowers/plans/2026-08-03-eir-006-valuation-price-truth.md",
     "docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md",
 }
