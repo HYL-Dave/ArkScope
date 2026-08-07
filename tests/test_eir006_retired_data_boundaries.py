@@ -65,6 +65,7 @@ _UNRELATED = {
     "src/service/provider_health.py",
 }
 _HISTORICAL = {
+    "data_sources/PAID_SUBSCRIPTION_EVALUATION.md",
     "data_sources/ibkr_client_id.py",
     "docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md",
     "docs/design/ENGINEERING_ISSUE_REGISTER.md",
