@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth
 
-> **Status:** DRAFT FOR INDEPENDENT REVIEW
+> **Status:** DESIGN REVIEW GREEN; IMPLEMENTATION PLAN WRITTEN FOR INDEPENDENT REVIEW
 > **Date:** 2026-08-08
 > **Base:** `7257699171a81294b74ff8cde61fb90bb065a2b4`
 > **Scope:** subscription credential lifecycle truth, non-secret telemetry, and
