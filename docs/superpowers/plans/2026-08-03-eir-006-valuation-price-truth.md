@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 9 EXECUTED; CLOSEOUT REVIEW READY
+> **Status:** COMPLETE; EIR-006 CLOSED
 >
 > **Date:** 2026-08-03
 >
@@ -2648,7 +2648,7 @@ runtime and exact saved scheduler enablement/cadence before any rollback asset
 is destroyed. Only then run the exact authority-ID, no-glob removal block and
 verify that root is absent. Do not remove rollback assets earlier.
 
-- [ ] **Step 7: Close EIR-006 with independently reviewed evidence**
+- [x] **Step 7: Close EIR-006 with independently reviewed evidence**
 
 Record no data contents. Evidence must prove:
 

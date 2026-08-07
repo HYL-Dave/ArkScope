@@ -286,7 +286,7 @@ Each entry records:
 
 ### EIR-006 - Stop presenting a historical CSV close as a current valuation input
 
-- `status`: `promoted`
+- `status`: `closed`
 - `observed_at`: `2026-07-31`
 - `impact`: The registered `get_detailed_financials` agent tool can calculate
   market cap and related valuation ratios from the last close in a historical
@@ -324,21 +324,35 @@ Each entry records:
     SQLite-authority ruling; and
   - 75 hourly CSVs contain unique 2023 history, which the user explicitly
     chose to discard rather than migrate.
-- `owner`:
-  `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: independently review the Task 9 V3 physical closeout recorded
-  in
-  `docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md`
-  Section 10. Reviewed V3 authority `9bfb3f2a...`, packet `99a813e8...`, and
-  controller `891edbe1...` completed preflight, exact `301`-path movement, the
-  equality-only `19/130/1` transaction, quiesced verification, runtime restart,
-  and post-restart verification. Only then was the exact temporary authority
-  root removed. Final read-only reconstruction finds all approved old paths and
-  rows absent, all 27 retained cache rows exact, the stored SEC projection live,
-  fundamentals sync null, and all seven schedule settings unchanged. Keep this
-  item `promoted` until independent closeout review; after GREEN, commit the
-  docs-only `closed` transition.
-- `closure_evidence`: none.
+- `owner`: closed by the EIR-006 valuation-price-truth and physical-closeout
+  line.
+- `next_action`: none for EIR-006. Scheduled fundamentals ingestion and the
+  Financial Datasets metered-request policy remain separate capability slices;
+  they must not reconnect the retired CSV or legacy-fundamentals authorities.
+- `closure_evidence`:
+  - design authority
+    `124622bc90f240f1e3f4297b5ba8b573e5f7549e` and independently cleared plan
+    `e261abc25de5fdc608feea7bbe68fe230cb05789` define the hard cutover and
+    separately approved deletion boundary;
+  - product cutover `ce88f72d9f9d710903533505371789d18cce953e`
+    received independent review and canonical admission at
+    `4581 collected/seen`, `4509 passed / 72 skipped / 0 failed`;
+  - reviewed V3 execution tip
+    `518ea76b94bba67a2c9b6e091fa5ef7bf3a80e5e` pins authority
+    `9bfb3f2a...`, packet `99a813e8...`, controller `891edbe1...`, and the
+    corrected post-restart rollback-asset order;
+  - execution and closeout evidence commit
+    `ef00f7f78716ff0485b89f46611f84aa07e9a508` records successful
+    preflight/execute/verify/post-restart, exact `301`-file and `19/130/1`-row
+    retirement, preserved 27-row cache classification, restored runtime and
+    schedule, and absent durable rollback archive;
+  - unlocked git-crypt census correction
+    `68dfc1e512288eb6d4a8dbf72e51a23d82a335b3` classifies the sole newly
+    visible dated reference as historical, passes both owner nodes, and keeps
+    collection `4581/6e4994bb...`; focused re-review returned GREEN; and
+  - final read-only review independently reproduced all absent targets, exact
+    retained rows, truthful current/typed-unavailable selector behavior,
+    stored-SEC projection, null retired sync, and zero residual archive.
 
 ## 5. Seed Triage: Items Not Opened
 
