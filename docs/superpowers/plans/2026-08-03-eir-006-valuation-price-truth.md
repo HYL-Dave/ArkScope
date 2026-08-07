@@ -2526,13 +2526,27 @@ restoration without quiescing the restarted process:
 
 ```bash
 python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py post-restart --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7
-unset ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED
 ```
 
 `post-restart` requires both desktop and sidecar owners to be live, the saved
 schedule configuration to remain byte-for-byte equal in key/value space, the
 301 source paths and 150 DB rows to remain absent, the exact quarantine and
 snapshot to remain valid, and every retained cache row to remain unchanged.
+The quarantine and snapshot must therefore remain intact through successful
+`post-restart`. Only after that command succeeds may Task 9 permanently remove
+the rollback assets as its final mutation, using this exact no-glob command:
+
+```bash
+test -d /mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7
+test ! -L /mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7
+rm -rf -- /mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7
+test ! -e /mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7
+unset ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED
+```
+
+No parent path, wildcard, or earlier rollback-asset removal is authorized. If
+`post-restart` fails, the assets remain available and the reviewed rollback
+path above applies.
 
 If rollback is required, stop the newly recorded unique desktop owner through
 the same reviewed SIGTERM path, prove all runtime/holder checks empty, then run:
@@ -2627,9 +2641,12 @@ On any failure: restore exact file paths and DB rows, verify equality to the
 manifest, and only then restore scheduler state. Do not attempt a partial
 forward repair.
 
-On full success: permanently remove the exact temporary file quarantine and
-row snapshot, verify no durable archive remains, then restore the exact saved
-scheduler enablement/cadence and verify readback.
+On full success, the amendment command order above is authoritative: retain
+the exact quarantine and row snapshot through quiesced `verify`, desktop
+restart, and successful `post-restart`. That command verifies the restarted
+runtime and exact saved scheduler enablement/cadence before any rollback asset
+is destroyed. Only then run the exact authority-ID, no-glob removal block and
+verify that root is absent. Do not remove rollback assets earlier.
 
 - [ ] **Step 7: Close EIR-006 with independently reviewed evidence**
 
