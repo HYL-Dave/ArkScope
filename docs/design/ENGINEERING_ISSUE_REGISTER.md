@@ -326,15 +326,22 @@ Each entry records:
     chose to discard rather than migrate.
 - `owner`:
   `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: independently review the completed Task 8 exact deletion
+- `next_action`: independently review the rebuilt Task 8 v2 exact deletion
   manifest at
-  `docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/`. Its packet
-  `SHA256SUMS` identity is
-  `af5c090a4da72aa1204c6b8ffc13607b392e49d87acf38098a90f4bd2e24e4b6`,
+  `docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/`. V1
+  authority `6096b988...d0dce` was separately approved, but execution stopped
+  after moving and automatically restoring all 301 files and before any DB
+  delete: a read-only SQLite context remained open and the controller's own
+  lsof gate refused it. Reviewed rollback verified every file and all 150 rows
+  in place, restored `0/0/0` rows, destroyed the temporary rollback root, and
+  restored desktop/scheduler state. V1 approval is superseded. V2 closes every
+  read-only connection in `finally` and adds a self-holder RED/GREEN probe. Its
+  packet `SHA256SUMS` identity is
+  `7c887ae6908b1087003f0d2990adbf5757f672b63ae4525dcbb9461969ef60dd`,
   approval authority is
-  `6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce`,
+  `4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e`,
   and exact controller identity is
-  `cd8980e891b4fb8713d008762d7740fd9f91009a37f501d0ee993557bd9933af`.
+  `0ddb451f203a274ec08c5dbba79439971f2cd073e1ec8af2bb27398d974f5d2c`.
   Product truth cutover tip
   `ce88f72d9f9d710903533505371789d18cce953e` is merged and its fresh
   exact-master verification records `4581` collected/seen,
@@ -343,9 +350,9 @@ Each entry records:
   225 15-minute CSVs, 75 hourly CSVs, their stale zero-row collection summary,
   19 retired detailed-financial cache rows, 130 legacy fundamentals rows, and
   one retired fundamentals sync row. Task 8 made no data change. Physical
-  deletion remains Task 9 and is blocked until independent review clears these
-  exact bytes and the user separately approves this exact authority, packet,
-  and controller.
+  deletion remains Task 9 and is blocked until independent review clears the
+  v2 bytes and the user separately approves the complete v2 authority ID,
+  packet SHA, and controller SHA.
 - `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened

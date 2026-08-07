@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 8 MANIFEST REVIEW READY; TASK 9 BLOCKED
+> **Status:** TASK 8 V2 MANIFEST REVIEW READY; TASK 9 BLOCKED
 >
 > **Date:** 2026-08-03
 >
@@ -2357,7 +2357,22 @@ Independent review must clear the amendment. Then ask the user for separate
 approval of the exact manifest. Until that approval, Task 9 remains unchecked
 and no destructive command may run.
 
-#### Task 8 Exact-Manifest Amendment (2026-08-04)
+#### Task 8 V2 Exact-Manifest Amendment (2026-08-07)
+
+The 2026-08-04 v1 packet was independently reviewed and separately approved,
+but its first execution stopped before any database delete. Python's
+`sqlite3.Connection` context manager commits or rolls back without closing the
+handle, so the controller's post-move holder gate correctly detected the
+controller's own read-only FD. Automatic recovery moved all 301 files back;
+reviewed rollback verified all files and 150 rows in place, restored `0/0/0`
+rows, and the exact temporary rollback root was destroyed before runtime was
+restored.
+
+V2 makes `_connect_ro` a real closing context manager and adds a probe that
+first reproduced the old self-holder RED and now requires zero lsof records
+after both read contexts. Schema version 2 and Task 8 base `4955e624` create a
+new authority. V1 authority `6096b988...d0dce` and its user approval are
+superseded and may not be reused.
 
 Task 8 produced the tracked metadata packet at:
 
@@ -2366,11 +2381,11 @@ docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/
 ```
 
 Its `SHA256SUMS` file has SHA-256
-`af5c090a4da72aa1204c6b8ffc13607b392e49d87acf38098a90f4bd2e24e4b6`.
+`7c887ae6908b1087003f0d2990adbf5757f672b63ae4525dcbb9461969ef60dd`.
 The approval authority is the exact canonical `authority-input.json` bytes:
 
 ```text
-6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
 ```
 
 The manifest pins:
@@ -2386,8 +2401,8 @@ The manifest pins:
 4-row behavior ledger / 613024acc6568296cb798a2832fb8ca1e67fba05a9857c4e4bd5629755c556ba
 ```
 
-The exact destructive controller is 1,110 lines / 41,423 bytes / SHA-256
-`cd8980e891b4fb8713d008762d7740fd9f91009a37f501d0ee993557bd9933af`.
+The exact destructive controller is 1,114 lines / 41,538 bytes / SHA-256
+`0ddb451f203a274ec08c5dbba79439971f2cd073e1ec8af2bb27398d974f5d2c`.
 It is inert unless both the CLI token and environment value equal the authority
 ID. That is an intentional-execution gate, not a security credential and not a
 substitute for the user's separate approval.
@@ -2414,7 +2429,7 @@ Every other product/test byte remains locked to the product cutover tip.
 The exact same-filesystem quarantine root is:
 
 ```text
-/mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+/mnt/md0/PycharmProjects/.arkscope-eir006-quarantine/4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
 ```
 
 Before any file move or DB mutation, the controller writes the complete
@@ -2448,14 +2463,14 @@ Task 9's exact pre-stop identity checks and stop sequence are:
 
 ```bash
 cd /mnt/md0/PycharmProjects/ArkScope
-sha256sum -c docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/SHA256SUMS
-python -c 'from pathlib import Path; assert Path("/proc/4041681/cmdline").read_bytes().split(b"\0")[:-1] == [b"node", b"apps/arkscope-desktop/dev.js"]'
-python -c 'from pathlib import Path; assert Path("/proc/4041764/cmdline").read_bytes().split(b"\0")[:-1] == [b"python", b"-m", b"src.api"]'
-kill -TERM 4041681
+(cd docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest && sha256sum -c SHA256SUMS)
+python -c 'from pathlib import Path; assert Path("/proc/2847946/cmdline").read_bytes().split(b"\0")[:-1] == [b"node", b"apps/arkscope-desktop/dev.js"]'
+python -c 'from pathlib import Path; assert Path("/proc/2848089/cmdline").read_bytes().split(b"\0")[:-1] == [b"python", b"-m", b"src.api"]'
+kill -TERM 2847946
 sleep 5
-test ! -e /proc/4041681
-test ! -e /proc/4041708
-test ! -e /proc/4041764
+test ! -e /proc/2847946
+test ! -e /proc/2848002
+test ! -e /proc/2848089
 ```
 
 The three PIDs are dated Task 8 facts. Any changed PID or command invalidates
@@ -2469,10 +2484,10 @@ After the stop checks, the exact preflight, execution, and pre-restart
 verification commands are:
 
 ```bash
-export ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED=6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
-python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py preflight --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
-python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py execute --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
-python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py verify --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+export ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED=4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py preflight --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py execute --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py verify --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
 ```
 
 The controller's preflight independently requires no DB/file holder, no
@@ -2494,7 +2509,7 @@ From a second terminal retaining the approval environment, verify runtime
 restoration without quiescing the restarted process:
 
 ```bash
-python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py post-restart --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py post-restart --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
 unset ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED
 ```
 
@@ -2507,8 +2522,8 @@ If rollback is required, stop the newly recorded unique desktop owner through
 the same reviewed SIGTERM path, prove all runtime/holder checks empty, then run:
 
 ```bash
-export ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED=6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
-python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py rollback --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 6096b988428a94d053baddd18493eb29077bc627d725a95fd53f75c4755b0dce
+export ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED=4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
+python docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py rollback --repo-root /mnt/md0/PycharmProjects/ArkScope --approval-token 4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e
 unset ARKSCOPE_EIR006_DESTRUCTIVE_APPROVED
 ```
 
@@ -2534,7 +2549,8 @@ Fresh Task 8 stop conditions are:
 13. automatic file restoration after a pre-commit failure is incomplete;
 14. a failure occurs after DB commit; files remain quarantined and only reviewed verify/rollback may proceed;
 15. any full archived payload appears in tracked evidence; or
-16. independent review or separate user approval names anything less precise than the authority ID, packet SHA, and controller SHA.
+16. independent review or separate user approval names anything less precise than the authority ID, packet SHA, and controller SHA; or
+17. any reviewed read-only connection still has an lsof record after its context exits.
 
 Current price/news table growth and WAL growth before quiescence are allowed
 only when all exact target rows, DB inode identities, aliases, retained cache
