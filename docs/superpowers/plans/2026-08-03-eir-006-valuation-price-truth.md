@@ -5,7 +5,7 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** TASK 8 V3 MANIFEST REVIEW READY; TASK 9 BLOCKED
+> **Status:** TASK 9 EXECUTED; CLOSEOUT REVIEW READY
 >
 > **Date:** 2026-08-03
 >
@@ -2597,33 +2597,33 @@ This task is intentionally blocked at plan publication. Its mechanics become
 executable only through the reviewed Task 8 amendment and explicit user
 approval.
 
-- [ ] **Step 1: Verify approval and exact identities**
+- [x] **Step 1: Verify approval and exact identities**
 
 Require exact approved manifest/controller/product/DB/file identities. A
 changed file, row, alias, writer state, scheduler state, or product commit
 invalidates approval and returns to Task 8.
 
-- [ ] **Step 2: Quiesce writers and preserve exact operational state**
+- [x] **Step 2: Quiesce writers and preserve exact operational state**
 
 Save scheduler enablement/cadence, stop sidecar/scheduler/market writers through
 their reviewed owner, and prove no writable DB holder remains. Read-only
 observer processes are classified; ambiguity stops execution.
 
-- [ ] **Step 3: Establish verified temporary rollback assets**
+- [x] **Step 3: Establish verified temporary rollback assets**
 
 Move only exact approved file paths to a same-filesystem temporary quarantine.
 Create and verify a temporary full-row snapshot of only approved DB rows while
 writers remain stopped. No durable archive is created and no glob determines a
 destructive target.
 
-- [ ] **Step 4: Execute the exact SQLite transaction**
+- [x] **Step 4: Execute the exact SQLite transaction**
 
 Delete only enumerated old cache keys, all enumerated legacy fundamentals rows,
 and the exact retired fundamentals sync row in one explicit transaction.
 Assert affected-row counts equal the approved manifest before commit; otherwise
 rollback immediately.
 
-- [ ] **Step 5: Verify product truth while rollback remains available**
+- [x] **Step 5: Verify product truth while rollback remains available**
 
 With writers still stopped, prove:
 
@@ -2635,7 +2635,7 @@ With writers still stopped, prove:
 - stored SEC projections agree; and
 - current price/news data is unchanged.
 
-- [ ] **Step 6: Restore on any failure, or permanently remove rollback assets**
+- [x] **Step 6: Restore on any failure, or permanently remove rollback assets**
 
 On any failure: restore exact file paths and DB rows, verify equality to the
 manifest, and only then restore scheduler state. Do not attempt a partial

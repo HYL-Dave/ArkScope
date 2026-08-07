@@ -326,36 +326,18 @@ Each entry records:
     chose to discard rather than migrate.
 - `owner`:
   `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: independently review the rebuilt Task 8 V3 exact deletion
-  manifest at
-  `docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/`. V1 and V2
-  each received separate exact authority approval and each failed closed after
-  moving and automatically restoring all 301 files but before any DB delete.
-  V1 exposed a read-only SQLite handle that remained open; V2 exposed a
-  post-move `lsof +D` call against the source directory the controller had just
-  removed. Both reviewed rollbacks verified every file and all 150 rows in
-  place, restored `0/0/0`, destroyed their temporary roots, and restored
-  desktop/sidecar health plus all seven scheduler settings. Neither approval
-  remains valid. V3 explicitly binds holder checks to the source tree before
-  movement, the quarantine tree afterward, and all existing trees during
-  rollback; its scratch probe covers all three phases. Its packet
-  `SHA256SUMS` identity is
-  `99a813e8311a639af3a45b9d1e6f37b0a97a6e40b620fcb92f42a6e96b18bd22`, approval
-  authority is
-  `9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7`,
-  and exact controller identity is
-  `891edbe1fe0c8005f609fee2ed97403180f3498da53668da6175645c97214d37`.
-  Product truth cutover tip
-  `ce88f72d9f9d710903533505371789d18cce953e` is merged and its fresh
-  exact-master verification records `4581` collected/seen,
-  `4509 passed / 72 skipped / 0 failed`, all four collection identities, and
-  bounded read-only rollout observations. Physical old data remains present:
-  225 15-minute CSVs, 75 hourly CSVs, their stale zero-row collection summary,
-  19 retired detailed-financial cache rows, 130 legacy fundamentals rows, and
-  one retired fundamentals sync row. Task 8 made no data change. Physical
-  deletion remains Task 9 and is blocked until independent review clears the
-  V3 bytes and the user separately approves the complete V3 authority ID,
-  packet SHA, and controller SHA.
+- `next_action`: independently review the Task 9 V3 physical closeout recorded
+  in
+  `docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md`
+  Section 10. Reviewed V3 authority `9bfb3f2a...`, packet `99a813e8...`, and
+  controller `891edbe1...` completed preflight, exact `301`-path movement, the
+  equality-only `19/130/1` transaction, quiesced verification, runtime restart,
+  and post-restart verification. Only then was the exact temporary authority
+  root removed. Final read-only reconstruction finds all approved old paths and
+  rows absent, all 27 retained cache rows exact, the stored SEC projection live,
+  fundamentals sync null, and all seven schedule settings unchanged. Keep this
+  item `promoted` until independent closeout review; after GREEN, commit the
+  docs-only `closed` transition.
 - `closure_evidence`: none.
 
 ## 5. Seed Triage: Items Not Opened
