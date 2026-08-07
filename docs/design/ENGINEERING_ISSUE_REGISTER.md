@@ -326,22 +326,25 @@ Each entry records:
     chose to discard rather than migrate.
 - `owner`:
   `docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md`.
-- `next_action`: independently review the rebuilt Task 8 v2 exact deletion
+- `next_action`: independently review the rebuilt Task 8 V3 exact deletion
   manifest at
-  `docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/`. V1
-  authority `6096b988...d0dce` was separately approved, but execution stopped
-  after moving and automatically restoring all 301 files and before any DB
-  delete: a read-only SQLite context remained open and the controller's own
-  lsof gate refused it. Reviewed rollback verified every file and all 150 rows
-  in place, restored `0/0/0` rows, destroyed the temporary rollback root, and
-  restored desktop/scheduler state. V1 approval is superseded. V2 closes every
-  read-only connection in `finally` and adds a self-holder RED/GREEN probe. Its
-  packet `SHA256SUMS` identity is
-  `7c887ae6908b1087003f0d2990adbf5757f672b63ae4525dcbb9461969ef60dd`,
-  approval authority is
-  `4b1d9083ed054387cd00ae253ab055641fc18e55a7a4e718534fb25a23cf413e`,
+  `docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/`. V1 and V2
+  each received separate exact authority approval and each failed closed after
+  moving and automatically restoring all 301 files but before any DB delete.
+  V1 exposed a read-only SQLite handle that remained open; V2 exposed a
+  post-move `lsof +D` call against the source directory the controller had just
+  removed. Both reviewed rollbacks verified every file and all 150 rows in
+  place, restored `0/0/0`, destroyed their temporary roots, and restored
+  desktop/sidecar health plus all seven scheduler settings. Neither approval
+  remains valid. V3 explicitly binds holder checks to the source tree before
+  movement, the quarantine tree afterward, and all existing trees during
+  rollback; its scratch probe covers all three phases. Its packet
+  `SHA256SUMS` identity is
+  `99a813e8311a639af3a45b9d1e6f37b0a97a6e40b620fcb92f42a6e96b18bd22`, approval
+  authority is
+  `9bfb3f2a3e377752d3105c07cf55aceb986ea094314dea8616763046a5e656c7`,
   and exact controller identity is
-  `0ddb451f203a274ec08c5dbba79439971f2cd073e1ec8af2bb27398d974f5d2c`.
+  `891edbe1fe0c8005f609fee2ed97403180f3498da53668da6175645c97214d37`.
   Product truth cutover tip
   `ce88f72d9f9d710903533505371789d18cce953e` is merged and its fresh
   exact-master verification records `4581` collected/seen,
@@ -351,7 +354,7 @@ Each entry records:
   19 retired detailed-financial cache rows, 130 legacy fundamentals rows, and
   one retired fundamentals sync row. Task 8 made no data change. Physical
   deletion remains Task 9 and is blocked until independent review clears the
-  v2 bytes and the user separately approves the complete v2 authority ID,
+  V3 bytes and the user separately approves the complete V3 authority ID,
   packet SHA, and controller SHA.
 - `closure_evidence`: none.
 
