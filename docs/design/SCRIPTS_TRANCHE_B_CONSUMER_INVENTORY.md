@@ -1,6 +1,6 @@
 # Scripts Tranche B Legacy Score Consumer Inventory
 
-> **Status:** READ-ONLY INVENTORY FOR INDEPENDENT REVIEW
+> **Status:** INDEPENDENT REVIEW GREEN; INPUT TO PRODUCT DECISION SPEC
 > **Date:** 2026-08-08
 > **Base:** `7257699171a81294b74ff8cde61fb90bb065a2b4`
 > **Authority boundary:** This document inventories current behavior and proposes
@@ -197,8 +197,21 @@ Tranche B must explicitly supersede/reconcile at least:
 - `DESKTOP_APP_CARRYOVER_ANALYSIS.md` score preserve-adapt ruling;
 - the obsolete 2026-06-23 score-retirement decision inside
   `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`;
+- `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md` Signals section's source-labeled,
+  ephemeral, non-black-box contract;
+- `PROJECT_PRIORITY_MAP.md` signal-validation deferral and its written
+  hypothesis / OOS plan / kill-criteria gate;
 - current layout/governance docs that keep `scripts/scoring`; and
 - model/tool copy in current design authorities.
+
+The signal-subsystem separation authority is also load-bearing: the Workbench
+Product Spec requires source-labeled ephemeral signals rather than a black-box
+composite, while the Priority Map records signal validation as deferred and
+requires a written hypothesis, OOS plan, and kill criteria before that research
+line can claim a validated capability. The older Tool Catalog
+`synthesize_signal = preserve-adapt` ruling is therefore conditional on a clean
+replacement semantic; it is not authority to preserve the current frozen-score
+implementation unchanged.
 
 The affected test family includes, at minimum:
 
