@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASKS 0-4 COMPLETE; TASK 4 EVIDENCE READY FOR INDEPENDENT REVIEW
+> **Status:** PLAN REVIEW GREEN; TASKS 0-5 COMPLETE; TASK 5 EVIDENCE READY FOR INDEPENDENT REVIEW
 >
 > **Date:** 2026-08-08
 >
@@ -527,14 +527,14 @@ copy is not updated merely to follow new copy.
 
 ### Task 5 - Passive Claude RateLimitEvent capture
 
-- [ ] Replace the one broad ignore node with the three explicit nodes from
+- [x] Replace the one broad ignore node with the three explicit nodes from
   Section 2.3; confirm the persistence node RED before implementation.
-- [ ] Continue ignoring ordinary `StreamEvent` and unrelated SDK events.
-- [ ] Persist only allowlisted typed quota/reset fields from an event emitted by
+- [x] Continue ignoring ordinary `StreamEvent` and unrelated SDK events.
+- [x] Persist only allowlisted typed quota/reset fields from an event emitted by
   a normal user request. Absence is unknown and starts no request.
-- [ ] Credential id/auth mode/observed time are required; raw event repr and
+- [x] Credential id/auth mode/observed time are required; raw event repr and
   unknown nested data are forbidden.
-- [ ] Require final backend identities `4607/5180502f...` and
+- [x] Require final backend identities `4607/5180502f...` and
   `272/6c706f9d...`, then focused GREEN and commit.
 
 ### Task 6 - Provider Settings lifecycle and quota UI
