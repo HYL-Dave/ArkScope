@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** RED-FIRST PLAN FOR INDEPENDENT REVIEW
+> **Status:** PLAN REVIEW GREEN; TASK 0 EVIDENCE READY FOR INDEPENDENT REVIEW
 >
 > **Date:** 2026-08-08
 >
@@ -444,16 +444,16 @@ copy is not updated merely to follow new copy.
 
 ### Task 0 - Re-ground and bank the base
 
-- [ ] Verify branch, merge base, clean worktree, git-crypt no-op config, and all
+- [x] Verify branch, merge base, clean worktree, git-crypt no-op config, and all
   pinned tool identities.
-- [ ] Recollect the four base streams and require the exact identities in
+- [x] Recollect the four base streams and require the exact identities in
   Section 2.1.
-- [ ] Run the eight-file backend focused base and require `246 passed`.
-- [ ] Prove product tests have no live provider endpoints, real token-store
+- [x] Run the eight-file backend focused base and require `246 passed`.
+- [x] Prove product tests have no live provider endpoints, real token-store
   paths, real profile paths, or credential inheritance.
-- [ ] Record protected-path SHAs for model routing, agent loops, prompts,
+- [x] Record protected-path SHAs for model routing, agent loops, prompts,
   Financial Datasets policy, Tranche B, and Settings navigation owners.
-- [ ] Stop for independent Task 0 review before product edits.
+- [x] Stop for independent Task 0 review before product edits.
 
 ### Task 1 - Lifecycle projection and bounded store
 
