@@ -10,6 +10,7 @@ from src.api.dependencies import (
     get_credential_store,
     get_dal,
     get_oauth_login_manager,
+    get_oauth_observation_store,
     get_oauth_token_store,
 )
 from src.api.permissions import require_profile_state_write
@@ -194,7 +195,11 @@ def morning_brief(
 
 
 @router.get("/config/runtime")
-def runtime_config(store: CredentialStore = Depends(get_credential_store)):
+def runtime_config(
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
     """What the agent will actually use — models, effort, and which API keys are
     present (booleans only, never the key values). Lets the UI answer "which
     provider/model/key is active" without exposing secrets.
@@ -213,7 +218,9 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
 
     def key_set(name: str) -> bool:
         return bool(os.environ.get(name))
-    credentials = provider_credentials(store)
+    credentials = provider_credentials(
+        store, token_store=token_store, observation_store=observation_store
+    )
 
     return {
         "anthropic": {
@@ -255,7 +262,11 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
 
 
 @router.get("/config/model-catalog")
-def model_catalog(store: CredentialStore = Depends(get_credential_store)):
+def model_catalog(
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
     """Seed model catalog + current task routes for Settings.
 
     The catalog intentionally allows custom model IDs: official docs can lag
@@ -267,7 +278,9 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
         task: task_route(task, route_store=route_store)
         for task in _ROUTE_TASKS
     }
-    credential_inventory = provider_credentials(store)
+    credential_inventory = provider_credentials(
+        store, token_store=token_store, observation_store=observation_store
+    )
     # P2.7/P2.8 additive `effective` block. V2 is computed once for both
     # providers; the legacy task-level alias is folded from that same result.
     # Best-effort: the seed catalog still renders if the cache/resolver hiccups.
@@ -275,7 +288,12 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
         from src.model_effective import effective_model_view_v2, legacy_effective_alias
 
         credentials = {
-            provider: resolve_active_credential(provider, store)
+            provider: resolve_active_credential(
+                provider,
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )
             for provider in ("anthropic", "openai")
         }
         v2 = effective_model_view_v2(
@@ -318,13 +336,21 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
 
 
 @router.get("/config/credentials")
-def list_credentials(store: CredentialStore = Depends(get_credential_store)):
+def list_credentials(
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
     """Masked provider credentials. Secret values are never returned."""
     store = _credential_store(store)
     return {
         "credentials": {
             provider: [c.model_dump() for c in creds]
-            for provider, creds in provider_credentials(store).items()
+            for provider, creds in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            ).items()
         }
     }
 
@@ -333,6 +359,8 @@ def list_credentials(store: CredentialStore = Depends(get_credential_store)):
 def add_credential(
     body: CredentialCreate,
     store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
 ):
     store = _credential_store(store)
     auth_type = body.auth_type.strip()
@@ -360,7 +388,11 @@ def add_credential(
     return {
         "credential": next(
             c.model_dump()
-            for c in provider_credentials(store)[body.provider]
+            for c in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )[body.provider]
             if c.id == f"local:{cred.id}"
         )
     }
@@ -442,6 +474,7 @@ def import_oauth_credential(
     body: OAuthImport,
     store: CredentialStore = Depends(get_credential_store),
     token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
 ):
     """Import a subscription OAuth/setup token. v1: anthropic + claude_code_oauth
     (Claude setup-token) ONLY. Creates a metadata row (secret NULL) then saves the
@@ -486,7 +519,11 @@ def import_oauth_credential(
     return {
         "credential": next(
             c.model_dump()
-            for c in provider_credentials(store)[provider]
+            for c in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )[provider]
             if c.id == cid
         )
     }
@@ -631,6 +668,8 @@ def update_credential(
     credential_id: str,
     body: CredentialUpdate,
     store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
 ):
     store = _credential_store(store)
     if not credential_id.startswith("local:"):
@@ -645,20 +684,27 @@ def update_credential(
             "account_label_set": body.account_label is not None,
         },
     )
-    cred = store.update(
-        credential_id,
-        alias=body.alias,
-        secret=body.secret,
-        active=body.active,
-        expires_at=body.expires_at,
-        account_label=body.account_label,
-    )
+    try:
+        cred = store.update(
+            credential_id,
+            alias=body.alias,
+            secret=body.secret,
+            active=body.active,
+            expires_at=body.expires_at,
+            account_label=body.account_label,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not cred:
         raise HTTPException(status_code=404, detail="credential not found")
     return {
         "credential": next(
             c.model_dump()
-            for c in provider_credentials(store)[cred.provider]
+            for c in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )[cred.provider]
             if c.id == f"local:{cred.id}"
         )
     }

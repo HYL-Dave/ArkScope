@@ -202,6 +202,14 @@ def get_oauth_token_store():
 
 
 @lru_cache(maxsize=1)
+def get_oauth_observation_store():
+    """Singleton no-create view over bounded OAuth lifecycle observations."""
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    return OAuthObservationStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_oauth_login_manager():
     """Singleton in-app ChatGPT-OAuth login orchestrator. Holds in-memory login
     state (pending PKCE/state + results) across the start→status→complete requests,

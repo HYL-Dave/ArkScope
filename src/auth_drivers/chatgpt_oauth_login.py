@@ -386,7 +386,7 @@ def complete_login(
 
     cred = credential_store.add_oauth_credential(
         provider=PROVIDER, auth_mode=AUTH_MODE, alias=alias, make_active=pending.make_active,
-        expires_at=record.expires_at, account_label=label,
+        expires_at=None, account_label=label,
     )
     cid = f"local:{cred.id}"
     try:
@@ -400,7 +400,7 @@ def complete_login(
     return {
         "credential_id": cid,
         "alias": cred.alias,
-        "expires_at": cred.expires_at,
+        "expires_at": record.expires_at,
         "account_label": cred.account_label,
         "plan_type": plan_type,
     }
@@ -446,7 +446,7 @@ def _complete_relogin(
         except Exception:  # noqa: BLE001 — static message; never carry the record via the cause
             raise ChatGPTOAuthLoginError("failed to store the new token; the previous token is unchanged") from None
         try:
-            updated = credential_store.update(target, expires_at=record.expires_at or "", account_label=label)
+            updated = credential_store.update(target, account_label=label)
         except Exception as exc:
             compensated = _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
             # The ORIGINAL metadata error stays the cause; the message is redacted+bounded
@@ -465,7 +465,7 @@ def _complete_relogin(
         return {
             "credential_id": target,
             "alias": updated.alias,
-            "expires_at": updated.expires_at,
+            "expires_at": record.expires_at,
             "account_label": updated.account_label,
             "plan_type": plan_type,
             "relogin": True,

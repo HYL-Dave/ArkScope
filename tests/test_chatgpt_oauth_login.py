@@ -224,6 +224,8 @@ def test_complete_login_writes_credential_and_token_no_echo():
     assert res["credential_id"] == "local:1"
     saved = ts.saved[("openai", "chatgpt_oauth", "local:1")]
     assert saved.access_token == _access() and saved.refresh_token == "refresh-XYZ"
+    assert cs.added[0].expires_at is None                   # token-store is the expiry owner
+    assert res["expires_at"] == saved.expires_at            # response projects token-store truth
     # the response carries NO token material
     assert "access_token" not in res and "refresh_token" not in res
     assert _access() not in json.dumps(res) and "refresh-XYZ" not in json.dumps(res)
@@ -507,7 +509,8 @@ def test_relogin_replaces_token_in_place():
     assert rec.access_token == _access()                    # token replaced
     assert rec.refresh_token == "refresh-XYZ"
     upd = cs.updated[-1]
-    assert upd["expires_at"] and upd["account_label"] == "ChatGPT plus"
+    assert upd["account_label"] == "ChatGPT plus"
+    assert "expires_at" not in upd                          # DB expiry is not a second owner
     assert "alias" not in upd and "active" not in upd       # preserved fields never passed
     row = cs.get("local:1")
     assert row.alias == "My ChatGPT" and row.active is True
@@ -567,8 +570,9 @@ def test_relogin_clears_expiry_when_new_token_has_none():
 
     s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
     _relogin_complete(ss, cs, ts, s, exchange=_noexp_exchange)
-    assert cs.updated[-1]["expires_at"] == ""               # the real store's explicit-NULL form
-    assert cs.get("local:1").expires_at is None
+    assert ts.saved[_KEY].expires_at is None                 # live owner was cleared
+    assert "expires_at" not in cs.updated[-1]                # compatibility DB is not rewritten
+    assert cs.get("local:1").expires_at == "2030-06-01T00:00:00+00:00"
 
 
 def test_relogin_in_place_with_real_credential_store(tmp_path):
@@ -594,7 +598,8 @@ def test_relogin_in_place_with_real_credential_store(tmp_path):
     row = real.get(cid)
     assert row is not None
     assert row.alias == "Sub" and row.active is False       # preserved
-    assert row.expires_at and row.expires_at != "2030-06-01T00:00:00+00:00"  # refreshed from new JWT
+    assert row.expires_at == "2030-06-01T00:00:00+00:00"     # compatibility copy is not rewritten
+    assert out["expires_at"] == ts.saved[("openai", "chatgpt_oauth", cid)].expires_at
     assert real.get(f"local:{cred.id + 1}") is None         # NO second row (AUTOINCREMENT next id)
     assert ts.saved[("openai", "chatgpt_oauth", cid)].refresh_token == "refresh-XYZ"
 

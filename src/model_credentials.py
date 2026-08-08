@@ -32,6 +32,15 @@ logger = logging.getLogger(__name__)
 
 CredentialAuthType = Literal["api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"]
 DiscoveryStatus = Literal["ok", "missing_credential", "unsupported", "error"]
+# API-schema mirror only. State derivation and transition ownership remain in
+# auth_drivers.oauth_status; this DTO never classifies a credential itself.
+OAuthLifecycleValue = Literal[
+    "ready",
+    "refresh_required",
+    "refresh_failed_retryable",
+    "reauth_required",
+    "unverifiable",
+]
 
 # Explicit modes (the target). Legacy generic values are normalized to these on
 # read AND write (S1); they are NOT a stored long-term form.
@@ -68,6 +77,12 @@ class ProviderCredential(BaseModel):
     editable: bool = False
     can_discover_models: bool = False
     can_test_models: bool = False
+    lifecycle_state: OAuthLifecycleValue | None = None
+    lifecycle_error_code: str | None = None
+    last_refresh_attempt_at: str | None = None
+    last_refresh_success_at: str | None = None
+    last_refresh_error_at: str | None = None
+    last_refresh_error_detail: str | None = None
     notes: str = ""
 
 
@@ -409,6 +424,11 @@ class CredentialStore:
                 f"cannot set secret on a {existing.auth_type} credential; "
                 "use a plain api_key row (OAuth tokens live in the token-store)"
             )
+        if expires_at is not None and existing.auth_type == "chatgpt_oauth":
+            raise ValueError(
+                "ChatGPT OAuth expiry is owned by the token store and cannot be written "
+                "to llm_credentials.expires_at"
+            )
         now = _now()
         with self._write_lock, self._connect() as conn:
             if active is True:
@@ -525,7 +545,13 @@ def looks_like_effort_error(exc: Exception) -> bool:
     return any(needle in text for needle in needles)
 
 
-def provider_credentials(store: CredentialStore | None = None) -> dict[Provider, list[ProviderCredential]]:
+def provider_credentials(
+    store: CredentialStore | None = None,
+    *,
+    token_store=None,
+    observation_store=None,
+    now: datetime | None = None,
+) -> dict[Provider, list[ProviderCredential]]:
     """Return masked credential inventory grouped by provider."""
     ensure_env_loaded()
     store = store or CredentialStore()
@@ -548,6 +574,21 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
         # `source` field, not this flag. (Model-test stays api_key-only; OAuth
         # capability is the separate probe route.)
         can_discover = can_use or row.auth_type in ("chatgpt_oauth", "claude_code_oauth")
+        lifecycle = None
+        if row.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
+            from src.auth_drivers.oauth_status import OAuthObservationStore, project_oauth_lifecycle
+
+            if observation_store is None:
+                observation_store = OAuthObservationStore(store.db_path)
+            lifecycle = project_oauth_lifecycle(
+                provider=row.provider,
+                auth_mode=row.auth_type,
+                credential_id=f"local:{row.id}",
+                db_expires_at=row.expires_at,
+                token_store=token_store,
+                observation_store=observation_store,
+                now=now,
+            )
         if row.secret:
             db_secrets_by_provider[row.provider].add(row.secret)
         local_by_provider[row.provider].append(
@@ -557,14 +598,20 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 auth_type=row.auth_type,
                 label=row.alias,
                 account_label=row.account_label,
-                expires_at=row.expires_at,
+                expires_at=lifecycle.expires_at if lifecycle else row.expires_at,
                 source="profile_state.db",
-                available=True,
+                available=lifecycle.available if lifecycle else True,
                 masked=_mask_secret(row.secret) if row.secret else None,  # OAuth rows have no secret here
                 active=row.active,
                 editable=True,
                 can_discover_models=can_discover,
                 can_test_models=can_use,
+                lifecycle_state=lifecycle.lifecycle_state.value if lifecycle else None,
+                lifecycle_error_code=lifecycle.lifecycle_error_code if lifecycle else None,
+                last_refresh_attempt_at=lifecycle.last_refresh_attempt_at if lifecycle else None,
+                last_refresh_success_at=lifecycle.last_refresh_success_at if lifecycle else None,
+                last_refresh_error_at=lifecycle.last_refresh_error_at if lifecycle else None,
+                last_refresh_error_detail=lifecycle.last_refresh_error_detail if lifecycle else None,
                 notes=(
                     "Local Settings credential. Stored in the ignored local SQLite profile DB."
                     if can_use
@@ -976,6 +1023,10 @@ class _ActiveCredentialInfo:
 def resolve_active_credential(
     provider: Provider,
     store: CredentialStore | None = None,
+    *,
+    token_store=None,
+    observation_store=None,
+    now: datetime | None = None,
 ):
     """Resolve the active credential for ``provider`` into a cache-scope key.
 
@@ -989,11 +1040,16 @@ def resolve_active_credential(
 
     ensure_env_loaded()
     store = store or CredentialStore()
-    creds = provider_credentials(store)[provider]
+    creds = provider_credentials(
+        store,
+        token_store=token_store,
+        observation_store=observation_store,
+        now=now,
+    )[provider]
     # ONLY the truly-active credential resolves (review MF3): falling back to
     # "first available" would fabricate an identity the user never selected and
     # build the cache scope / executability answer on it.
-    active = next((c for c in creds if c.active and c.available), None)
+    active = next((c for c in creds if c.active), None)
     if active is None:
         return None
     if active.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
@@ -1001,6 +1057,8 @@ def resolve_active_credential(
             provider=provider, credential_id=active.id,
             auth_mode=active.auth_type, secret_fingerprint="oauth",
         )
+    if not active.available:
+        return None
     # Both api_key and api_key_pool build the scope from the SAME resolution
     # discovery writes with (review round-2 MF1): _resolve_api_credential
     # returns the REAL auth_type (pool never masquerades — executability stays
