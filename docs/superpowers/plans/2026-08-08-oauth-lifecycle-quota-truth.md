@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** TASKS 0-7 VERIFICATION COMPLETE; IMPLEMENTATION REVIEW REQUIRED BEFORE MERGE
+> **Status:** IMPLEMENTATION MERGED; EXACT-MASTER VERIFICATION GREEN; CLOSEOUT REVIEW REQUIRED
 >
 > **Date:** 2026-08-08
 >
@@ -568,7 +568,7 @@ copy is not updated merely to follow new copy.
 - [x] Produce a review packet containing node streams, protocol fixtures,
   process-lock timeline, child cleanup proof, mutation diffs, and secret-absence
   scans. Stop for independent implementation review.
-- [ ] Only after GREEN review: fast-forward merge, fresh exact-master admission,
+- [x] Only after GREEN review: fast-forward merge, fresh exact-master admission,
   and docs-only closeout. Do not push unless requested.
 
 ---
