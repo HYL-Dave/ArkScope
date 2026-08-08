@@ -194,6 +194,37 @@ under a new semantic id after all of these exist:
 
 Removing an unvalidated implementation does not retire the product goal.
 
+### Post-approval implementation ruling - preserve capability, remove the legacy namespace
+
+The user clarified after approving PD 1-PD 8 that retirement must not leave a
+compatibility-shaped architecture tail. The approved PD 5 and PD 6 behaviors
+survive as capabilities, not as an excuse to preserve the old Signals package:
+
+- move deterministic raw news-volume, title-event tagging, and event-sequence
+  logic into the score-free `src/news_analytics.py` owner;
+- expose the two surviving agent contracts from
+  `src/tools/news_event_tools.py`;
+- delete the complete `src/signals/` package and
+  `src/tools/signal_tools.py`, including their README, exports, old scorer
+  recommendations, numeric-impact machinery, and composite helpers;
+- add no compatibility import, re-export, alias module, dead `/signals` route,
+  or old `TestSignalTools` test namespace; and
+- update `evidence_packet.py` comments/current copy that name the retired module
+  while preserving its negative evidence contract.
+
+The replacement core keeps only the behavior PD 5-PD 6 approved. It does not
+carry `LLM_TAGGING_PROMPT`, same-direction sentiment fallback, neutral `3.0`,
+numeric impact thresholds/multipliers, `SentimentAnomaly`, or sector sentiment.
+Event chains remain tool-only unless a later product requirement establishes an
+honest HTTP owner. A future Signals product starts from a new semantic and new
+owners under the six gates above; it does not reopen these namespaces.
+
+The only physical artifacts temporarily unchanged by this code cutover are the
+491,808 production rows and `config/scoring_keys.txt`, because the user
+explicitly reserved their destructive disposition for later exact approval.
+They are not future Signals dependencies, are not runtime compatibility
+surfaces, and may not be read by the cutover.
+
 ### PD 8 - Model-visible and UI-visible contracts leave together
 
 The product cutover must update in one reviewed change:
@@ -230,7 +261,19 @@ table in fresh schemas. Existing `news_article_scores` rows remain physically
 untouched through implementation and merge.
 
 After merged rollout proves zero current consumer/writer, a separate read-only
-Task builds an exact destructive manifest. Physical table/row deletion requires:
+Task first records whether the frozen dataset has any concrete, named research
+use. A claim of possible future usefulness is insufficient: the packet must
+identify its provenance, reproducibility value, semantic limitations, research
+owner/hypothesis, and why raw news plus Git history cannot satisfy that need.
+The user receives those details before choosing one of two closed outcomes:
+
+1. exact deletion, which is the default when no named use survives; or
+2. an independently approved move out of the runtime DB into a versioned,
+   explicitly historical research artifact with no product reader or writer.
+
+Keeping the rows connected to the runtime DB is not an outcome. Neither outcome
+reuses the old score as the semantic basis of the future Signals product.
+Physical table/row deletion requires:
 
 - fresh read-only counts and schema/DB identity;
 - exact retained-table invariants;
@@ -287,7 +330,9 @@ before edits and independently cover at least:
 8. old sentiment anomaly/watcher names are absent;
 9. event chains retain sequence fields and return exact typed unavailable
    impact without numeric substitutes;
-10. composite/factor tools, watcher, routes, prompts, and bridges are absent;
+10. composite/factor tools, watcher, routes, prompts, bridges, the complete
+    `src/signals/` package, and `src/tools/signal_tools.py` are absent with no
+    compatibility re-export;
 11. model-visible capability census contains no score/sentiment/composite claim;
 12. EvidencePacket still rejects generated score/composite input;
 13. fresh schemas do not create `news_article_scores`;
@@ -313,7 +358,7 @@ node RED.
 | event chains | evolve/preserve | sequence remains; impact explicitly unavailable |
 | composite signal/factors/rank | retire | no HOLD/score/recommendation from unvalidated empty inputs |
 | future Signals product | separate | reopens only with new semantic and validation gate |
-| score table rows | separate deletion gate | untouched until exact manifest approval |
+| score table rows | separate disposition gate | runtime-disconnected; exact delete by default unless concrete historical research value earns detailed approval |
 | scoring secret | separate owner/delete gate | contents never enter tracked evidence |
 
 ## 8. Product approval requested
@@ -336,6 +381,10 @@ quietly preserve the old score semantic as a compromise.
 On 2026-08-08 the user explicitly approved `04dd9a67` PD 1 through PD 8 as the
 single section 8 bundle. The normalized authority record is: execute PD 1-8;
 the 491,808 rows and `scoring_keys.txt` still require later separate approval.
+The user then clarified that implementation must remove the legacy Signals
+namespace completely while retaining the future Signals research goal, and
+that deferred data must be assessed by concrete use rather than retained by
+default.
 
 This approval authorizes an exact RED-first implementation plan and, after
 independent plan review, the atomic product cutover described by PD 1-8. It
@@ -351,7 +400,8 @@ part of the product implementation.
 3. Settings navigation/warm-cache may land before Tranche B implementation, but
    it must not add or cache legacy score data.
 4. Merge and verify Tranche B product cutover before any destructive manifest.
-5. Build/review/approve physical score-row and secret disposition separately.
+5. Build/review/approve physical score-row research-use/deletion and secret
+   disposition separately; no row may remain connected to runtime.
 
 Calendar-aware market scheduling, Financial Datasets metered policy, and future
 fundamentals ingestion are independent and do not enter this line.

@@ -6,7 +6,8 @@
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
 > **Product authority:**
 > `docs/superpowers/specs/2026-08-08-scripts-tranche-b-product-decision-design.md`
-> at reviewed commit `04dd9a67`
+> at reviewed commit `04dd9a67`, plus the post-approval no-tail ruling recorded
+> in this plan-gate amendment
 > **User ruling:** PD 1 through PD 8 approved as the section 8 bundle on
 > 2026-08-08. Physical score-row deletion and `config/scoring_keys.txt`
 > disposition remain separately blocked.
@@ -45,9 +46,12 @@ This plan does not authorize any of the following:
 - starting product edits before independent review clears this plan and the
   current OAuth implementation gate has an explicit handoff.
 
-The later deletion manifest for score rows and the later exact-path decision
+The later disposition packet for score rows and the later exact-path decision
 for `config/scoring_keys.txt` are separate work. Neither may be prepared as a
-side effect of this product implementation.
+side effect of this product implementation. The row packet must choose exact
+deletion by default unless it proves a concrete research use worth discussing;
+any approved research retention moves outside the runtime DB under a named,
+historical owner. Runtime reconnection is not an outcome.
 
 ### 0.3 Atomicity and projected stages
 
@@ -57,7 +61,7 @@ suite baselines, or permission to retain a half-removed compatibility surface.
 
 RED tests are written first. The implementation then completes all five
 product phases in one unmerged worktree before canonical admission. Only the
-final `4461/463e864e...` backend and `1078/de1e0c3f...` frontend identities may
+final `4461/c7cb78b2...` backend and `1078/de1e0c3f...` frontend identities may
 be called GREEN. If a module dependency makes an intermediate projection
 uncollectable, stop and finish the owning atomic phase; do not add a shim merely
 to make the intermediate tree look green.
@@ -104,17 +108,20 @@ path manifest before product edits.
 |---|---|
 | score storage/writer | `src/news_normalized/schema.py`, `scores.py`, `score_import.py`, `src/market_data_admin.py`, `src/news_identity.py`, `src/daily_update.py`, all nine tracked `scripts/` paths |
 | raw news protocol | `src/tools/schemas.py`, `data_access.py`, `news_tools.py`, `analysis_tools.py`, `src/analysis/context_builder.py`, `src/tools/backends/{__init__,db_backend,file_backend,local_market_backend,sqlite_backend}.py` |
-| event/signal implementation | `src/signals/README.md`, `src/signals/{__init__,anomaly_detector,event_chain,event_tagger,sector_aggregator,synthesizer}.py`, `src/tools/signal_tools.py`, `src/analysis/pipeline.py`, `src/analysis/strategies/{__init__,decision,sentiment}.py` |
+| event/signal implementation | delete `src/signals/README.md`, `src/signals/{__init__,anomaly_detector,event_chain,event_tagger,sector_aggregator,synthesizer}.py`, and `src/tools/signal_tools.py`; add `src/news_analytics.py` and `src/tools/news_event_tools.py`; retire `src/analysis/pipeline.py` and `src/analysis/strategies/{__init__,decision,sentiment}.py` |
 | HTTP/profile | `src/api/app.py`, `src/api/routes/{news,profile,signals}.py` |
 | monitoring | `src/monitor/{__init__,engine,watchers}.py`, `src/tools/monitor_tools.py`, `config/user_profile.yaml` |
-| model-visible contract | `src/tools/registry.py`, `src/agents/shared/{prompts,subagent}.py`, `src/agents/{anthropic_agent,openai_agent}/tools.py`, and exact tool-count/allowlist owners found by Task 0 |
+| model-visible contract | `src/tools/registry.py`, `src/agents/shared/{prompts,subagent}.py`, `src/agents/{anthropic_agent,openai_agent}/tools.py`, `src/evidence_packet.py` retirement copy only, and exact tool-count/allowlist owners found by Task 0 |
 | frontend DTO fixtures | `apps/arkscope-web/src/api.ts`, `Home.test.tsx`, `Watchlist.test.tsx`, `Universe.test.tsx`, new `legacyScoreRetirement.test.ts` |
 | current authorities | the exact current/historical disposition in section 1.3 below plus this plan/evidence/spec and `PROJECT_PRIORITY_MAP.md` |
 
-`src/signals/` is not renamed merely for namespace aesthetics. Remove
-`sector_aggregator.py` and `synthesizer.py`, retire recommendation/rank exports,
-and retain only honest raw volume/event primitives in the existing internal
-package. The public `/signals` router and model-visible Signals capability leave.
+The surviving PD 5-PD 6 capabilities move to honest news/event owners. Delete
+the complete `src/signals/` package and `src/tools/signal_tools.py`; add no
+compatibility import, re-export, alias module, or old `TestSignalTools`
+namespace. `src/news_analytics.py` owns only deterministic raw news-volume,
+title-event tagging, and event-sequence logic. `src/tools/news_event_tools.py`
+owns the two surviving agent wrappers. The public `/signals` router and every
+model-visible composite Signals capability leave.
 
 ### 1.2 Test owners
 
@@ -131,6 +138,7 @@ tests/test_evidence_packet.py
 tests/test_market_data_admin.py
 tests/test_monitor.py
 tests/test_news_identity.py
+tests/test_news_event_tools.py (new)
 tests/test_news_normalized_schema.py
 tests/test_news_normalized_scores.py
 tests/test_news_pg_unreachable.py
@@ -175,14 +183,18 @@ old implementation.
 ### 1.4 Protected boundaries
 
 Task 0 pins an exact blob/path manifest for these boundaries and Task 6 proves
-byte identity:
+byte identity except for the explicitly bounded EvidencePacket copy delta:
 
 - all tracked `training/` files (current 53-path blob-stream SHA
   `2284c8989f6104979a11a5111de987f5d6f2974e3d2f74f0cf47ed5b4854e14a`);
 - `data_sources/alpha_vantage_source.py`, `data_sources/polygon_source.py`,
   `src/collectors/finnhub_news.py`, and `src/collectors/polygon_news.py`;
 - investor-profile risk owners and tests;
-- `src/evidence_packet.py` plus its negative-contract tests;
+- EvidencePacket output shape, news whitelist, score/composite exclusion, and
+  tests. `src/evidence_packet.py` may change only the docstring/current
+  `_EXCLUSION_NOTE` wording that names the retired `signal_tools` module; it is
+  excluded from the byte-identical path manifest, receives a pre/post blob
+  review, and may not change projection or gather logic;
 - normalized raw-news and Seeking Alpha ingestion/feed owners;
 - OAuth lifecycle worktree/branch and its evidence;
 - production DB bytes except read-only witnesses; and
@@ -202,13 +214,13 @@ newline. They are derived from the deterministic reporter, never terminal prose.
 | State | Nodes | SHA-256 |
 |---|---:|---|
 | reviewed base | 4,581 | `6e4994bb664501cff75cb06dbad18db82ba68cbbe4b2b26c4d480250d7c4699f` |
-| RED tests added, old nodes retained | 4,598 | `3378204c781c0433eafbcacca317cfe82613986fc9b3fb716412729a3aa09938` |
-| final target | 4,461 | `463e864ef9ff0ec0b2b231e31836d52ed3a0ec7763ab654de70cdc41fc400d98` |
+| RED tests added, old nodes retained | 4,599 | `ae382261eddb2b9bbe02e8c15ca2acc48a23a99745d910a28aba8f4ac7e3059b` |
+| final target | 4,461 | `c7cb78b222952e9c1b5b3e18abcf413a14875a84ef7bc01d55ef500d939a74f9` |
 
-Arithmetic: `4581 + 17 - 137 = 4461`. The 137-node retired stream is
-`997fb56be265e28c8f9b990ff2a2315c773d5645af2f7f1c5087a905cc4b2642`.
-The 17-node addition stream is
-`8b309a7af7df5e77cb4ba155fc32b88091305c4b5e7f21f9dd42eddd0b012e61`.
+Arithmetic: `4581 + 18 - 138 = 4461`. The 138-node retired stream is
+`b48b161d573afb37496763c0afe388c2421f06e35eb5cd7de959ba5778c05254`.
+The 18-node addition stream is
+`88ac9e5652c9df79eb42284d6a9c42a2f0f4a60b967badae37524fa127499520`.
 Their intersection with the base/non-base sets must be exact: all retired IDs
 exist once in base; all additions are absent from base.
 
@@ -229,7 +241,7 @@ exist once in base; all additions are absent from base.
 
 ### 2.3 Mixed-file retired nodes
 
-The remaining 35 IDs leave without deleting their containing files:
+The remaining 36 IDs leave without deleting their containing files:
 
 ```text
 tests/test_api.py::TestNewsEndpoints::test_get_news_sentiment
@@ -266,6 +278,7 @@ tests/test_subagent.py::TestAnthropicBridgeIntegration::test_anthropic_tools_cou
 tests/test_subagent.py::TestOpenAiBridgeIntegration::test_openai_tools_count_31
 tests/test_tools.py::TestNewsTools::test_get_news_sentiment_summary
 tests/test_tools.py::TestSignalTools::test_detect_anomalies
+tests/test_tools.py::TestSignalTools::test_detect_event_chains
 tests/test_tools.py::TestSignalTools::test_synthesize_signal
 ```
 
@@ -281,7 +294,7 @@ is `4391 passed / 70 skipped / 0 failed`, not an inferred pass total.
 
 ### 2.4 New backend nodes
 
-The 17 additions are independent named contracts:
+The 18 additions are independent named contracts:
 
 ```text
 tests/test_api.py::test_retired_sentiment_and_signal_routes_are_absent_while_raw_news_remains_reachable
@@ -296,11 +309,12 @@ tests/test_legacy_score_retirement.py::test_scoring_scripts_and_root_package_are
 tests/test_monitor.py::TestNewsVolumeWatcher::test_news_volume_spike_alert
 tests/test_monitor.py::TestNewsVolumeWatcher::test_no_alert_under_volume_threshold
 tests/test_monitor.py::TestNewsVolumeWatcher::test_no_alert_when_disabled
+tests/test_news_event_tools.py::test_detect_event_chains_returns_typed_unavailable_impact
+tests/test_news_event_tools.py::test_detect_news_volume_anomaly
 tests/test_news_identity.py::test_apply_collision_does_not_project_retired_sentiment_fields
 tests/test_subagent.py::TestAnthropicBridgeIntegration::test_anthropic_tools_match_registry
 tests/test_subagent.py::TestOpenAiBridgeIntegration::test_openai_tools_match_registry
 tests/test_tools.py::TestAnalysisTools::test_get_morning_brief_orders_raw_news_deterministically
-tests/test_tools.py::TestSignalTools::test_detect_news_volume_anomaly
 ```
 
 Do not parametrize these into fewer IDs or create helper names beginning with
@@ -322,16 +336,16 @@ must be independently reproducible. They do not authorize intermediate merge.
 | storage/writer/root | 4,537 | `e2a744b8fdcb9cadcaa1a9e68f050805faf36b5e7beae1d033d889a71e2f44af` | `+2/-46` |
 | raw DTO/backend | 4,498 | `55b26b2ea092a378f04eb8f64de248e7c74364544ec1ab00eee2c29fb157324c` | `+4/-43` |
 | raw user behavior | 4,498 | `d6a0793368c7cc68b81bb96863028b46db4cbd3dc6200977b7ec8621d5fda2ba` | `+1/-1` |
-| volume/event/composite | 4,458 | `456d0f54a5f354210fb287ebe4425736bff30f0ae0540d504673b63f60eaa76a` | `+4/-44` |
-| model/API/authority/census final | 4,461 | `463e864ef9ff0ec0b2b231e31836d52ed3a0ec7763ab654de70cdc41fc400d98` | `+6/-3` |
+| volume/event/composite | 4,458 | `3896c617ca5594b30a644bd8cf61f96eea39ba753cf1858049121c626dfc469b` | `+5/-45` |
+| model/API/authority/census final | 4,461 | `c7cb78b222952e9c1b5b3e18abcf413a14875a84ef7bc01d55ef500d939a74f9` | `+6/-3` |
 
 ### 2.6 Backend focused identities
 
 | State | Nodes | SHA-256 |
 |---|---:|---|
 | base | 555 | `ea5d897ca3597ef4edca7583db0b363360ceba9e362e516422f901ff8af004dd` |
-| RED additions present | 572 | `44c969899da478b7a0e7412a32ddc47190205b35419e6031949659489b7bb890` |
-| final | 435 | `0db45120dc5740c9372f07d6a5a9cec7d525a8d66e667fac6d170c99a827db18` |
+| RED additions present | 573 | `5e0a5538c4106ca9b9cf0d701ab719d62c3a4056d1e101864ddb09b6beb9fb75` |
+| final | 435 | `2e5fcb6c22d6a1657e609542138830f2d5fd367a0e353ab30efdfbb8851a7c6a` |
 
 ### 2.7 Frontend identities
 
@@ -356,7 +370,7 @@ Its one-row stream SHA is
 
 ### 2.8 Retained IDs whose assertions evolve
 
-These 26 base IDs remain present exactly once. Their assertions evolve with the
+These 25 base IDs remain present exactly once. Their assertions evolve with the
 approved behavior rather than disappearing under the net node count:
 
 ```text
@@ -385,11 +399,10 @@ tests/test_tools.py::TestNewsTools::test_search_news_by_keyword
 tests/test_tools.py::TestNewsTools::test_search_news_keyword_case_insensitive
 tests/test_tools.py::TestRegistry::test_tool_catalog_live_table_matches_registry
 tests/test_tools.py::TestRegistry::test_tool_names
-tests/test_tools.py::TestSignalTools::test_detect_event_chains
 ```
 
 Their sorted stream SHA is
-`3215e2d46407119ddc3c104dd8edef935158701cfd8c2d1556a45af4f0d8da7f`.
+`2f0e0dd31390f975eb2b4f20244525a0bf09b0bc112f39f0f4cebfe2db76aa08`.
 Task 0 and final review require identity preservation and inspect assertion
 changes against PD 2-8. The two count-bearing bridge IDs are deliberately not
 in this retained set; section 2.4 records their truthful renames.
@@ -421,12 +434,21 @@ in this retained set; section 2.4 records their truthful renames.
 
 - `NewsVolumeWatcher` and `detect_news_volume_anomaly` use raw count windows and
   use no score preload or sentiment threshold.
+- `src/news_analytics.py` is the sole pure owner for raw volume anomaly,
+  deterministic title-event tagging, and event sequence detection;
+  `src/tools/news_event_tools.py` is the sole tool wrapper owner.
 - Event chains retain sequence fields and return exactly
   `impact={status:"unavailable",reason:"legacy_score_retired"}`. They contain no
   numeric impact and no per-event sentiment impact.
+- `src/signals/`, `src/tools/signal_tools.py`, scorer-oriented tagging prompts,
+  sentiment anomaly/sector aggregation, and all compatibility exports are
+  absent.
 - `synthesize_signal`, `get_signal_factors`, `SignalWatcher`, current rank and
   recommendation types, and the public `/signals` router are absent.
 - Future Signals remains a product goal, not a compatibility alias.
+  `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md` and the Priority Map retain that roadmap;
+  this cutover clears the invalid semantic so the later research can start on
+  explicit hypotheses, OOS validation, and kill criteria.
 
 ### 3.4 Model-visible and authority contract
 
@@ -434,7 +456,8 @@ in this retained set; section 2.4 records their truthful renames.
   examples, and current docs advertise only surviving raw capabilities.
 - `get_news_sentiment_summary`, old score filters, `detect_anomalies`, and
   `synthesize_signal` are absent rather than returning typed zeroes.
-- EvidencePacket's existing exclusion remains byte/behavior protected.
+- EvidencePacket's existing exclusion remains behavior protected; only the
+  reviewed retirement wording changes, with output shape and whitelist intact.
 - Historical docs remain historical; current authorities contain no runnable
   scorer or current composite claim.
 
@@ -442,14 +465,14 @@ in this retained set; section 2.4 records their truthful renames.
 
 ### 4.1 RED-first rules
 
-Create all 17 backend nodes and the one frontend node before product edits.
+Create all 18 backend nodes and the one frontend node before product edits.
 Imports of future symbols must occur inside test bodies or use explicit
 `getattr`/route/schema assertions so collection remains clean. Every node must
 fail for its intended missing/legacy contract. SQLite setup errors, missing
 empty `data/`, fixture import errors, or unavailable test tooling are wrong RED.
 
-The RED collection identities are `4598/3378204c...`,
-`572/44c96989...`, and frontend `1078/de1e0c3f...`. Runtime RED evidence names
+The RED collection identities are `4599/ae382261...`,
+`573/5e0a5538...`, and frontend `1078/de1e0c3f...`. Runtime RED evidence names
 each node and expected assertion. A broad static grep alone is not sufficient
 for behavior contracts.
 
@@ -465,8 +488,8 @@ restored SHA before the next cycle.
 | M2 | re-add `scored_only` or a legacy field to the raw backend/DTO contract | raw backend + ordinary DTO nodes |
 | M3 | make morning brief depend on scored rows or reverse its deterministic tie order | two morning-brief behavior nodes (existing positive plus new tie node) |
 | M4 | restore `sentiment_mean`/`bullish_ratio` to profile or frontend DTOs | backend ordinary contract + frontend boundary |
-| M5 | restore the old watcher/tool name or sentiment branch | NewsVolumeWatcher/tool nodes |
-| M6 | restore `fillna(3.0)`, numeric `impact_score`, or event sentiment impact | event-chain exact-payload owner |
+| M5 | restore the old watcher/tool namespace, compatibility export, or sentiment branch | NewsVolumeWatcher/news-event tool nodes |
+| M6 | restore `fillna(3.0)`, numeric `impact_score`, event sentiment impact, or scorer-oriented tag prompt | news-analytics event-chain exact-payload owner |
 | M7 | restore a `/signals` route, composite tool, bridge schema, or prompt claim | API absence + model-visible census |
 | M8 | restore a score writer/import executable | runtime writer census + scripts absence |
 | M9 | restore legacy sentiment fields to `MERGE_FIELDS` | collision projection node |
@@ -508,9 +531,9 @@ No RED test or product byte may be changed in Task 0.
 1. Add `tests/test_legacy_score_retirement.py` with the eight exact IDs in
    section 2.4.
 2. Add the API absence/raw-news node, three NewsVolumeWatcher nodes, one
-   morning-brief tie node, one score-free volume tool node, the collision
-   projection node, and the two truthful bridge-registry IDs under their
-   existing describe/class owners.
+   morning-brief tie node, two score-free news-event tool nodes in the new
+   `test_news_event_tools.py` owner, the collision projection node, and the two
+   truthful bridge-registry IDs under their existing describe/class owners.
 3. Add `legacyScoreRetirement.test.ts` with the exact frontend ID.
 4. Collect and require the RED identities in sections 2.1, 2.6, and 2.7.
 5. Run each owning node separately and record the intended RED reason. Existing
@@ -532,17 +555,21 @@ Complete all five phases before any claim of GREEN:
 3. **Raw user behavior:** remove the sentiment summary contract, rebuild morning
    brief from one raw batch, remove hidden profile/frontend sentiment fields,
    remove one old node, and add the deterministic tie node.
-4. **Volume/event/composite:** rename and preserve raw volume behavior, evolve
-   event chains to exact typed unavailable impact, remove composite/rank/router/
-   strategy/watcher owners and 44 old nodes, and add four raw-volume owners.
+4. **Volume/event/composite:** move approved raw-volume/title-event/sequence
+   behavior into `src/news_analytics.py` plus
+   `src/tools/news_event_tools.py`; delete the complete `src/signals/` and
+   `src/tools/signal_tools.py` namespaces without re-export; evolve event chains
+   to exact typed unavailable impact; remove composite/rank/router/strategy/
+   watcher owners and 45 old nodes; and add five news-volume/event owners.
 5. **Model/API/authority/census:** remove the final sentiment route and all dead
-   model-visible claims, reconcile current authorities, add fail-closed runtime
-   census/API/model/current-doc nodes, replace the two stale bridge count IDs,
-   and remove the final old route node (`+6/-3`).
+   model-visible claims, update only the bounded EvidencePacket retirement copy,
+   reconcile current authorities, add fail-closed runtime census/API/model/
+   current-doc nodes, replace the two stale bridge count IDs, and remove the
+   final old route node (`+6/-3`).
 
 During these phases, reconstruct each projected node stream in section 2.5 from
 the ledger. Do not treat an intermediate projection as a test baseline. At the
-end require exact backend `4461/463e864e...`, focused `435/0db45120...`,
+end require exact backend `4461/c7cb78b2...`, focused `435/2e5fcb6c...`,
 frontend `98/1078/de1e0c3f...`, and focused frontend `4/28/b11cc27b...`.
 
 The runtime census must be structured and fail closed. Every discovered
@@ -575,7 +602,7 @@ No production data or secret byte belongs in the commit.
 
 1. Create a fresh exact-tip detached worktree with the section 0.4 boundary.
 2. Run the wakeup probe in that same native context.
-3. Collect exact backend target `4461/463e864e...` and frontend target
+3. Collect exact backend target `4461/c7cb78b2...` and frontend target
    `1078/de1e0c3f...` before runtime.
 4. Run the native suite through the pinned wrapper/reporter. Require all 4,461
    collected nodes seen, empty non-passing stream, exit zero, and
@@ -591,13 +618,14 @@ No production data or secret byte belongs in the commit.
 The reviewer reconstructs, rather than trusts prose:
 
 - all backend/frontend base, RED, projected, focused, and final streams;
-- exact `+17/-137` and frontend `+1/-0` node identities;
-- the 102 whole-file and 35 mixed-file retirements;
-- all 17 backend additions and the frontend addition;
+- exact `+18/-138` and frontend `+1/-0` node identities;
+- the 102 whole-file and 36 mixed-file retirements;
+- all 18 backend additions and the frontend addition;
 - M1-M10 diffs, RED reasons, and restored blob SHAs;
 - structured consumer/writer/current-authority census;
 - native report, empty non-passing set, and artifact transaction;
-- protected provider-native/training/EvidencePacket bytes; and
+- protected provider-native/training bytes plus the exact EvidencePacket copy
+  delta and unchanged negative-contract behavior; and
 - read-only score-row and metadata-only secret boundaries.
 
 After GREEN, prove linear ancestry and use `git merge --ff-only`. Do not push.
@@ -612,10 +640,15 @@ After GREEN, prove linear ancestry and use `git merge --ff-only`. Do not push.
    volume/event contracts match PD 5-6, and score rows remain untouched.
 3. Record `SCRIPTS_TRANCHE_B_PRODUCT_CUTOVER_TIP` and update authority/evidence/
    priority status in a docs-only closeout commit after focused review.
-4. Only after merged rollout may a new read-only task build an exact score-row
-   deletion manifest and inspect scoring-secret **consumer metadata**. Physical
-   row deletion and exact-path secret disposition each require independent
-   review and a later explicit user approval. They are not Task 6 mutations.
+4. Only after merged rollout may a new read-only task classify concrete
+   research utility, build an exact score-row disposition manifest, and inspect
+   scoring-secret **consumer metadata**. It must present detailed provenance,
+   limitations, owner/hypothesis, and non-reproducible value before proposing an
+   external historical research artifact; absent that evidence, exact deletion
+   is the default. Keeping rows in the runtime DB is forbidden. Physical row
+   deletion, any external research retention, and exact-path secret disposition
+   each require independent review and a later explicit user approval. They are
+   not Task 6 mutations.
 
 ## 6. Stop conditions
 
@@ -627,8 +660,9 @@ Stop immediately and amend/review before continuing if any of these occurs:
 3. RED occurs through collection/import/fixture/tooling failure rather than the
    intended product assertion;
 4. an intermediate projection is described as shippable or full GREEN;
-5. a compatibility shim, permanent zero endpoint, neutral `3.0`, or dead tool
-   advertisement is proposed;
+5. a compatibility shim, permanent zero endpoint, neutral `3.0`, dead tool
+   advertisement, legacy `src/signals/` or `src/tools/signal_tools.py` survivor,
+   compatibility re-export, or old `TestSignalTools` namespace is proposed;
 6. raw news, morning brief, profile counts, volume detection, or event sequence
    is removed rather than evolved as approved;
 7. provider-native sentiment or investor risk is mistaken for the retired
@@ -642,8 +676,10 @@ Stop immediately and amend/review before continuing if any of these occurs:
 12. `config/scoring_keys.txt` contents, bytes, digest, size, or secret values are
     read or recorded;
 13. a deletion manifest is built before product merge and read-only rollout;
-14. `training/`, normalized raw news, Seeking Alpha, EvidencePacket, OAuth, or a
-    protected collector changes outside reviewed scope;
+14. `training/`, normalized raw news, Seeking Alpha, OAuth, or a protected
+    collector changes outside reviewed scope, or EvidencePacket changes beyond
+    the exact retirement-copy delta while its projection/gather logic is not
+    byte-identical;
 15. the runtime census has an unknown, duplicate, or unclassified path;
 16. the census relies only on locked git-crypt ciphertext without explicit path
     classification;
@@ -662,13 +698,18 @@ Stop immediately and amend/review before continuing if any of these occurs:
 The product cutover is complete only when:
 
 - PD 1-8 behavior is live from merged master;
-- backend is exactly `4461/463e864e...`, frontend exactly
+- backend is exactly `4461/c7cb78b2...`, frontend exactly
   `1078/de1e0c3f...`, and native admission is `4391/70/0`;
 - no runtime reader/writer/model-visible/current-authority path exposes the old
   score or composite semantic;
+- `src/signals/` and `src/tools/signal_tools.py` are physically absent, their
+  approved surviving behavior is owned only by the new news analytics/tool
+  modules, and no compatibility import or re-export remains;
 - raw news, morning brief, profile counts, volume, and event sequence contracts
   remain green;
-- protected provider-native/training/EvidencePacket boundaries are unchanged;
+- protected provider-native/training boundaries are unchanged and EvidencePacket
+  differs only by the reviewed retirement copy while preserving its negative
+  contract;
 - production score rows and scoring secret are still physically untouched; and
 - later data/secret disposition remains explicitly blocked behind its own exact
   reviewed authority and user approval.
