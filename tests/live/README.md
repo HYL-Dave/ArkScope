@@ -13,8 +13,12 @@ must not contain files named `test_*.py`.
 | `sdk_driver_smoke.py` | The Claude-subscription SDK driver built through the real factory can call an ArkScope tool while keeping built-ins locked and the token out of output. | Active Anthropic `claude_code_oauth` credential, stored token, network, and provider entitlement. |
 | `sdk_route_smoke.py` | The `/query/stream` Anthropic subscription helper drives the real driver through the route's exact path. | Same Anthropic requirements; one real subscription call. |
 | `smoke_fred.py` | FRED metadata, release dates, vintage reads, catalog loading, and an in-memory ingestion dry run work against the live API. | FRED API key, network, and provider availability. |
+| `smoke_yfinance.py` | A small yfinance response is non-empty, ordered, and contains finite OHLCV data for the requested ticker. | Explicit operator choice, public Yahoo network access, installed yfinance, and acceptance of current Yahoo/yfinance terms and limits. |
 
 The scripts load credentials at runtime and must not embed or print them.
+The yfinance smoke does not require a credential, but it is still a live public
+network request. It is not an admission test, provider adoption decision, or
+promise that Yahoo's current terms, limits, or response shape will remain stable.
 
 Run only by explicit manual choice from the repository root:
 
@@ -22,6 +26,7 @@ Run only by explicit manual choice from the repository root:
 python tests/live/sdk_driver_smoke.py
 python tests/live/sdk_route_smoke.py
 python tests/live/smoke_fred.py
+python tests/live/smoke_yfinance.py AAPL --period 5d --interval 1d
 ```
 
 Exit code `0` means the selected smoke passed. The Claude smoke background is

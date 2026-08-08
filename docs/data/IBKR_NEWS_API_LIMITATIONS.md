@@ -426,8 +426,8 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 | IBKR | 實測數據 | `data/news/raw/ibkr/*.parquet` |
 | EODHD | 程式碼確認 | `data_sources/eodhd_source.py:234` |
 | Polygon | 實測數據 | `data/news/raw/polygon/*.parquet` |
-| Finnhub | API 文檔 + 實測 | `data_sources/test_finnhub.py` |
-| Alpha Vantage | 測試腳本 | `data_sources/test_alpha_vantage.py:78-86` |
+| Finnhub | 現行產品 adapter | `data_sources/finnhub_source.py` |
+| Alpha Vantage | 現行產品 adapter | `data_sources/alpha_vantage_source.py` |
 | Tiingo | QuantConnect 文檔 | [Tiingo News](https://www.quantconnect.com/docs/v2/our-platform/user-guides/alternative-data/tiingo-news) |
 
 ### 關鍵發現

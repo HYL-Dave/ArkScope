@@ -78,6 +78,7 @@ _HISTORICAL = {
     "docs/design/PROJECT_PRIORITY_MAP.md",
     "docs/design/REPO_HYGIENE_AUDIT_2026_07.md",
     "docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md",
+    "docs/superpowers/evidence/2026-08-09-provider-smoke-candidate-truth.md",
     "docs/superpowers/plans/2026-06-27-news-direct-cutover.md",
     "docs/superpowers/plans/2026-07-02-s-b-fundamentals-refetch-cache.md",
     "docs/superpowers/plans/2026-07-06-dead-code-ui-sweep.md",
@@ -87,9 +88,11 @@ _HISTORICAL = {
     "docs/superpowers/plans/2026-07-26-legacy-scheduler-iv-domain-retirement.md",
     "docs/superpowers/plans/2026-07-31-eir-002-green-backend-baseline.md",
     "docs/superpowers/plans/2026-08-01-scripts-retirement-tranche-a.md",
+    "docs/superpowers/plans/2026-08-09-provider-smoke-candidate-truth.md",
     "docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md",
     "docs/superpowers/specs/2026-07-26-legacy-scheduler-iv-domain-retirement-design.md",
     "docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md",
+    "docs/superpowers/specs/2026-08-08-provider-smoke-candidate-truth-design.md",
 }
 _EIR006_AUTHORITIES = {
     "docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md",
@@ -117,7 +120,6 @@ _TEST_FIXTURES = {
     "tests/test_detailed_financials.py",
     "tests/test_eir006_retired_data_boundaries.py",
     "tests/test_financial_metrics_calculator.py",
-    "tests/test_ibkr_fundamentals.py",
     "tests/test_job_runs.py",
     "tests/test_market_data_admin.py",
     "tests/test_market_data_direct.py",
