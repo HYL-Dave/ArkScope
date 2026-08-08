@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASKS 0-3 COMPLETE; TASK 3 EVIDENCE READY FOR INDEPENDENT REVIEW
+> **Status:** PLAN REVIEW GREEN; TASKS 0-4 COMPLETE; TASK 4 EVIDENCE READY FOR INDEPENDENT REVIEW
 >
 > **Date:** 2026-08-08
 >
@@ -510,19 +510,19 @@ copy is not updated merely to follow new copy.
 
 ### Task 4 - Wire refresh, login, delete, and exact invalidation
 
-- [ ] Record refresh attempt before the grant and success/error after it using
+- [x] Record refresh attempt before the grant and success/error after it using
   stable codes; do not persist raw exceptions.
-- [ ] Successful refresh immediately changes lifecycle/expiry projection from
+- [x] Successful refresh immediately changes lifecycle/expiry projection from
   token-store truth without a DB expiry write.
-- [ ] Re-login and import establish the correct mode-scoped expiry owner.
-- [ ] Credential delete removes token, discovery cache, refresh status, and
+- [x] Re-login and import establish the correct mode-scoped expiry owner.
+- [x] Credential delete removes token, discovery cache, refresh status, and
   account snapshot under the one lock; partial failure remains typed and does
   not resurrect state.
-- [ ] Login/re-login/refresh may request account sync only after the token
+- [x] Login/re-login/refresh may request account sync only after the token
   mutation commits. Sync failure cannot roll back valid auth.
-- [ ] Re-run lifecycle, lock, account, existing route, manager, driver, import,
+- [x] Re-run lifecycle, lock, account, existing route, manager, driver, import,
   discovery, and task-canary owners. Collection identity must not change.
-- [ ] Commit wiring separately so lifecycle/store and integration remain
+- [x] Commit wiring separately so lifecycle/store and integration remain
   independently reviewable.
 
 ### Task 5 - Passive Claude RateLimitEvent capture
