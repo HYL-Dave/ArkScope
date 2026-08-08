@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: DRAFT REOPENED - expanded census amendment requires independent review; no implementation is authorized.**
+> **Status: DESIGN REVIEW GREEN; IMPLEMENTATION PLAN WRITTEN FOR INDEPENDENT REVIEW.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -17,7 +17,9 @@
 > commit `e77cf19b` corrected that ownership and passed focused re-review. Plan
 > grounding then enumerated the complete `a8970e64` batch and found fourteen
 > additional files with the same manual-evaluation shape. The user's standing
-> no-tail ruling requires this bounded whole-family amendment before planning.
+> no-tail ruling required this bounded whole-family amendment before planning.
+> Expanded amendment commit `db900ab8` then passed independent review with zero
+> findings. Implementation remains unauthorized until the exact plan is reviewed.
 
 ## 1. Purpose
 
@@ -204,8 +206,12 @@ Implementation must produce two complete unlocked-tree census streams:
 
 - every tracked Tiingo hit receives exactly one of `retire_executable`,
   `update_current_authority`, or `historical_reference`;
-- every tracked reference to any of the fifteen retiring evaluation paths receives
-  exactly one of `update_current_authority` or `historical_reference`.
+- every external tracked reference to any of the fifteen retiring evaluation
+  paths receives exactly one of `update_current_authority` or
+  `historical_reference`. The retiring file's own contents and this slice's
+  spec/plan/evidence are not members of that external-reference ledger; the three
+  authority documents are separately classified by the existing fail-closed
+  EIR-006 consumer census because they preserve dated path evidence.
 
 Unknown, multiply classified, or ownerless paths stop the slice. Current product
 code for Finnhub, Polygon, SEC EDGAR, IBKR, Alpha Vantage, and EODHD is not part of
