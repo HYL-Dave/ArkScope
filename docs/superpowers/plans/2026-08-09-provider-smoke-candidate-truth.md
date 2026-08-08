@@ -1,7 +1,7 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** TASK 4 COMPLETE - INDEPENDENT TASK 4 REVIEW REQUIRED;
-> TASK 5 NOT AUTHORIZED
+> **Status:** TASK 5 COMPLETE - INDEPENDENT IMPLEMENTATION REVIEW REQUIRED;
+> TASK 6 MERGE NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -836,7 +836,7 @@ Stop for independent Task 4 review.
 
 ### Task 5: Canonical native admission and implementation review packet
 
-- [ ] **Step 1: Re-run all static/focused gates**
+- [x] **Step 1: Re-run all static/focused gates**
 
 Require:
 
@@ -854,21 +854,21 @@ evaluation terminal 10 / 0625d122...
 Run `git diff --check`, compile changed Python/live files, and prove no provider
 credential/request command occurred.
 
-- [ ] **Step 2: Run fresh exact-tip native admission**
+- [x] **Step 2: Run fresh exact-tip native admission**
 
 Create a fresh detached exact-tip worktree with the Section 0.4 boundary. Verify
 the wakeup probe, wrapper/reporter/toolchain hashes, no `.env`, empty `data/`,
 absent `src/data`, and clean pre-manifests. Run one new single-use stage through
 the pinned wrapper. Require exact final facts from Section 2.1.
 
-- [ ] **Step 3: Transactionally restore generated artifacts**
+- [x] **Step 3: Transactionally restore generated artifacts**
 
 Manifest every new path with inode/size/mode/mtime/SHA where applicable, quarantine
 by exact path, and prove pre/post ordinary/ignored/symlink/data manifests equal.
 The retired `src/data/cache/risk_free_rate.json` must not be generated. A modified
 pre-existing file or unaccounted artifact stops the task.
 
-- [ ] **Step 4: Complete the review packet and stop**
+- [x] **Step 4: Complete the review packet and stop**
 
 Fill all evidence sections, record product commits and exact artifact/report SHAs,
 mark implementation complete but merge blocked, and add a newest-first priority

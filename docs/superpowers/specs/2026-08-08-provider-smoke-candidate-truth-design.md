@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: IMPLEMENTATION PLAN GREEN; TASK 4 COMPLETE - INDEPENDENT TASK 4 REVIEW REQUIRED; TASK 5 NOT AUTHORIZED.**
+> **Status: IMPLEMENTATION COMPLETE; INDEPENDENT TASK 5 REVIEW REQUIRED; TASK 6 MERGE NOT AUTHORIZED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -42,7 +42,12 @@
 > `50a5c0ac`. Task 4 proved all four structural contracts with independent
 > mutations, exact owner restoration, dual-census and protected-owner closure,
 > exact `4527` collect-only identity, and `280 passed / 1 skipped` focused
-> runtime. Task 5 remains unauthorized until independent Task 4 review.
+> runtime. Independent Task 4 review returned GREEN with zero findings. Task 5
+> then reproduced every static/focused identity, completed fresh exact-tip native
+> admission at `4527 seen / 4488 passed / 39 skipped / 0 failed`, and restored the
+> fresh-worktree artifact boundary exactly without regenerating
+> `risk_free_rate.json`. Independent implementation review is now required before
+> Task 6 merge.
 
 ## 1. Purpose
 
