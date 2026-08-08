@@ -1,9 +1,10 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: IMPLEMENTATION COMPLETE; INDEPENDENT TASK 5 REVIEW REQUIRED; TASK 6 MERGE NOT AUTHORIZED.**
+> **Status: COMPLETE ON MASTER AT `b991f543`; FOCUSED CLOSEOUT REVIEW REQUIRED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
+> **PROVIDER_HYGIENE_CUTOVER_TIP:** `b991f543807751757fc7dd78adcba1ecbda90659`
 > **Scope:** retirement of the complete January provider-evaluation script family,
 > spent yfinance option helpers, one spent provider-comparison diagnostic, the
 > unconsumed Tiingo implementation, and a truthful future-candidate record.
@@ -46,8 +47,13 @@
 > then reproduced every static/focused identity, completed fresh exact-tip native
 > admission at `4527 seen / 4488 passed / 39 skipped / 0 failed`, and restored the
 > fresh-worktree artifact boundary exactly without regenerating
-> `risk_free_rate.json`. Independent implementation review is now required before
-> Task 6 merge.
+> `risk_free_rate.json`. Independent Task 5 implementation review returned GREEN
+> with zero findings and independently reproduced the same native result. Master
+> then fast-forwarded through the reviewed 15-commit, zero-merge lineage to
+> `b991f543`; fresh exact-master admission again returned
+> `4527 seen / 4488 passed / 39 skipped / 0 failed`, with byte-identical reporter
+> JSON and exact artifact restoration. The implementation is complete; only
+> focused review of the docs-only closeout remains.
 
 ## 1. Purpose
 

@@ -1,13 +1,14 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** TASK 5 COMPLETE - INDEPENDENT IMPLEMENTATION REVIEW REQUIRED;
-> TASK 6 MERGE NOT AUTHORIZED
+> **Status:** TASK 6 COMPLETE - FOCUSED CLOSEOUT REVIEW REQUIRED
 >
 > **Date:** 2026-08-09
 >
 > **Design authority:** `db900ab8ad6a8a5651ec61c75587bec81b5ce63c`
 >
 > **Product grounding base:** `6159fc14956800dc04c4d6c944a2941b9c6c12db`
+>
+> **PROVIDER_HYGIENE_CUTOVER_TIP:** `b991f543807751757fc7dd78adcba1ecbda90659`
 
 **Goal:** Remove the complete dated January provider-evaluation family, the
 unconsumed yfinance-backed option-rate API, and the unconsumed Tiingo executable
@@ -879,24 +880,24 @@ unauthorized until GREEN.
 
 ### Task 6: Reviewed fast-forward merge and exact-master closeout
 
-- [ ] **Step 1: Reviewer reconstructs from raw evidence**
+- [x] **Step 1: Reviewer reconstructs from raw evidence**
 
 Independent review must rebuild the base/final streams, exact 80-ID difference,
 all partitions, dual census, AST projections, mutations, protected manifest,
 focused results, and native reporter facts. Prose alone is not evidence.
 
-- [ ] **Step 2: Fast-forward only**
+- [x] **Step 2: Fast-forward only**
 
 Prove `6159fc14` is an ancestor of the exact reviewed tip and the lineage contains
 no merge commit. Fast-forward master with `git merge --ff-only`. Do not push.
 
-- [ ] **Step 3: Re-run exact-master admission**
+- [x] **Step 3: Re-run exact-master admission**
 
 Use a second fresh detached exact-master worktree and new single-use stage. Repeat
 the full Section 0.4 boundary and require the same 4527/4488/39/0 result and empty
 non-passing stream. Restore artifacts exactly.
 
-- [ ] **Step 4: Close out docs**
+- [x] **Step 4: Close out docs**
 
 Record the merged tip, merged report/artifact identities, and candidate-data
 boundary. Mark design/plan/evidence complete. Do not claim Tiingo is permanently
