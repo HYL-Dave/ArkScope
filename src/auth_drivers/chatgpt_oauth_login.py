@@ -29,12 +29,17 @@ import base64
 import hashlib
 import json
 import logging
+import math
+import os
 import re
 import secrets
+import stat
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 from urllib import error, request
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -55,6 +60,8 @@ PROVIDER = "openai"
 AUTH_MODE = "chatgpt_oauth"
 _STATE_TTL = timedelta(minutes=10)
 _EXPIRY_BUFFER = timedelta(minutes=5)
+DEFAULT_OAUTH_LOCK_TIMEOUT_SECONDS = 45.0
+_OAUTH_LOCK_POLL_SECONDS = 0.025
 
 
 logger = logging.getLogger(__name__)
@@ -69,10 +76,18 @@ class ChatGPTOAuthLoginError(RuntimeError):
     missing/unrefreshable stored tokens and invalid-grant-family refresh
     rejections); wiring and transient transport failures stay False."""
 
-    def __init__(self, message: str, *, status_code: int | None = None, reauth_required: bool = False):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        reauth_required: bool = False,
+        error_code: str | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.reauth_required = reauth_required
+        self.error_code = error_code
 
 
 def provider_error_requires_reauth(exc: BaseException) -> bool:
@@ -531,18 +546,117 @@ def _lock_for(credential_id: str) -> threading.Lock:
         return lock
 
 
+def _oauth_lock_path(credential_id: str) -> Path:
+    if not isinstance(credential_id, str) or not credential_id.strip():
+        raise ChatGPTOAuthLoginError(
+            "OAuth credential lifecycle lock is unavailable; retry later",
+            error_code="oauth_lock_busy",
+        )
+    configured = os.environ.get("ARKSCOPE_LOCK_DIR")
+    if configured:
+        root = Path(configured) / "oauth_credentials"
+    else:
+        profile_db = Path(
+            os.environ.get("ARKSCOPE_PROFILE_DB")
+            or Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
+        )
+        root = profile_db.parent / "locks" / "oauth_credentials"
+    digest = hashlib.sha256(credential_id.encode("utf-8")).hexdigest()
+    return root / f"credential-{digest}.lock"
+
+
+def _lock_unavailable() -> ChatGPTOAuthLoginError:
+    return ChatGPTOAuthLoginError(
+        "OAuth credential lifecycle is busy or unavailable; retry later",
+        reauth_required=False,
+        error_code="oauth_lock_busy",
+    )
+
+
+def _open_oauth_lock_fd(path: Path) -> int:
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        parent_mode = path.parent.lstat().st_mode
+        if stat.S_ISLNK(parent_mode) or not stat.S_ISDIR(parent_mode):
+            raise OSError("invalid OAuth lock directory")
+        os.chmod(path.parent, 0o700)
+        flags = os.O_RDWR | os.O_CREAT
+        flags |= getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags, 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("invalid OAuth lock file")
+            os.fchmod(fd, 0o600)
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd
+    except (OSError, ValueError):
+        raise _lock_unavailable() from None
+
+
 @contextmanager
-def oauth_credential_lock(credential_id: str):
+def oauth_credential_lock(
+    credential_id: str,
+    *,
+    timeout: float = DEFAULT_OAUTH_LOCK_TIMEOUT_SECONDS,
+):
     """The per-credential lifecycle lock (plan D2): token refresh, re-login
     completion, and ChatGPT-OAuth credential deletion all serialize on it, so a
     stale in-flight refresh can never clobber a freshly authorized token or
-    resurrect a deleted one. PROCESS-LOCAL ONLY — two sidecars sharing one
-    token store do not share this Python lock (cross-process advisory lock =
-    plan §6 follow-up). Never hold it across browser interaction or the
+    resurrect a deleted one. The thread lock is paired with one profile-local
+    POSIX flock whose filename contains only a credential-id digest. Both layers
+    are bounded and fail closed; an unavailable or busy file lock never degrades
+    to unlocked mutation. Never hold it across browser interaction or the
     authorization-code exchange; it covers completion/storage work only. The
     lock is NOT re-entrant — callers must not nest it for the same id."""
-    with _lock_for(credential_id):
+    try:
+        bounded_timeout = float(timeout)
+    except (TypeError, ValueError):
+        raise _lock_unavailable() from None
+    if bounded_timeout < 0 or not math.isfinite(bounded_timeout):
+        raise _lock_unavailable()
+    try:
+        import fcntl
+    except ImportError:
+        raise _lock_unavailable() from None
+
+    deadline = time.monotonic() + bounded_timeout
+    thread_lock = _lock_for(credential_id)
+    if not thread_lock.acquire(timeout=max(0.0, deadline - time.monotonic())):
+        raise _lock_unavailable()
+
+    fd: int | None = None
+    file_held = False
+    try:
+        path = _oauth_lock_path(credential_id)
+        fd = _open_oauth_lock_fd(path)
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                file_held = True
+                break
+            except BlockingIOError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise _lock_unavailable() from None
+                time.sleep(min(_OAUTH_LOCK_POLL_SECONDS, remaining))
+            except OSError:
+                raise _lock_unavailable() from None
         yield
+    finally:
+        if fd is not None:
+            if file_held:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                except OSError:
+                    logger.warning("OAuth credential file-lock release failed", exc_info=True)
+            try:
+                os.close(fd)
+            except OSError:
+                logger.warning("OAuth credential lock fd close failed", exc_info=True)
+        thread_lock.release()
 
 
 def _is_expired(record: StoredTokenRecord, *, now: datetime) -> bool:
