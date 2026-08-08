@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: IMPLEMENTATION PLAN GREEN; TASK 3 COMPLETE - INDEPENDENT TASK 3 REVIEW REQUIRED; TASK 4 NOT AUTHORIZED.**
+> **Status: IMPLEMENTATION PLAN GREEN; TASK 4 COMPLETE - INDEPENDENT TASK 4 REVIEW REQUIRED; TASK 5 NOT AUTHORIZED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -38,7 +38,11 @@
 > non-implementation candidate record, reproduced exact final collection `4527`,
 > kept the 281-node retained owner union green, and preserved all reviewed shared
 > projections and protected owners. Implementation commit `d1adb954` now awaits
-> independent Task 3 review. Task 4 remains unauthorized.
+> independent Task 3 review. Independent review then returned GREEN at
+> `50a5c0ac`. Task 4 proved all four structural contracts with independent
+> mutations, exact owner restoration, dual-census and protected-owner closure,
+> exact `4527` collect-only identity, and `280 passed / 1 skipped` focused
+> runtime. Task 5 remains unauthorized until independent Task 4 review.
 
 ## 1. Purpose
 

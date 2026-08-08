@@ -1,7 +1,7 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** TASK 3 COMPLETE - INDEPENDENT TASK 3 REVIEW REQUIRED;
-> TASK 4 NOT AUTHORIZED
+> **Status:** TASK 4 COMPLETE - INDEPENDENT TASK 4 REVIEW REQUIRED;
+> TASK 5 NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -802,11 +802,11 @@ Update evidence and stop for independent Task 3 review.
 
 ### Task 4: Mutation self-review and boundary verification
 
-- [ ] **Step 1: Pin current owner SHAs before mutation**
+- [x] **Step 1: Pin current owner SHAs before mutation**
 
 Record the exact current SHA of each mutation owner and require clean status.
 
-- [ ] **Step 2: Run four independent, exact mutations**
+- [x] **Step 2: Run four independent, exact mutations**
 
 Each mutation starts from a clean restored owner, records an exact diff/SHA, must
 turn only its owning gate RED, and restores the pre-mutation SHA before continuing:
@@ -824,7 +824,7 @@ turn only its owning gate RED, and restores the pre-mutation SHA before continui
 An ineffective mutation, a RED from syntax/collection error unrelated to the
 owned contract, or an inexact restore stops the task.
 
-- [ ] **Step 3: Revalidate every protected boundary**
+- [x] **Step 3: Revalidate every protected boundary**
 
 Require the 30-row protected manifest, shared non-Tiingo projections, dual census,
 all three collection streams, and clean worktree. Update evidence with commands,
