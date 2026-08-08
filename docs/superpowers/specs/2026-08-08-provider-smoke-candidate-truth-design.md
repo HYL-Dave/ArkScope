@@ -1,10 +1,12 @@
-# Provider Smoke Hygiene and Tiingo Tail Retirement Design
+# Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: DRAFT AMENDED - focused independent re-review required; no implementation is authorized.**
+> **Status: DRAFT REOPENED - expanded census amendment requires independent review; no implementation is authorized.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
-> **Scope:** canonical-test hygiene, spent yfinance option helpers, one spent provider-comparison diagnostic, retirement of the unconsumed Tiingo implementation, and a truthful future-candidate record.
+> **Scope:** retirement of the complete January provider-evaluation script family,
+> spent yfinance option helpers, one spent provider-comparison diagnostic, the
+> unconsumed Tiingo implementation, and a truthful future-candidate record.
 >
 > **Review history:** commit `156db68c` passed independent design review under
 > the earlier adapter-preservation decision. The user then clarified that future
@@ -12,20 +14,20 @@
 > amendment supersedes only that Tiingo disposition and requires focused re-review
 > before an implementation plan may be written. Focused re-review then found that
 > `tests/test_finnhub_sentiment.py` had been incorrectly assigned to Tranche B;
-> this correction gives that zero-node evaluation script an explicit owner here.
+> commit `e77cf19b` corrected that ownership and passed focused re-review. Plan
+> grounding then enumerated the complete `a8970e64` batch and found fourteen
+> additional files with the same manual-evaluation shape. The user's standing
+> no-tail ruling requires this bounded whole-family amendment before planning.
 
 ## 1. Purpose
 
-The canonical suite currently reports green while thirteen collected provider
-nodes either call public services or return `False` to pytest as a non-failing
-return value. A second path in `tests/test_rate_curve.py` reaches yfinance
-indirectly and creates `src/data/cache/risk_free_rate.json` during native
-admission.
-
-A third file from the same January evaluation batch,
-`tests/test_finnhub_sentiment.py`, is a direct-network command placed under
-`tests/` but contributes zero pytest nodes. It is neither a test contract nor the
-owner of Finnhub's live product capability.
+The canonical suite currently reports green while the January provider-evaluation
+batch still occupies `tests/` as a mixture of collected boolean-returning nodes,
+whole-file skips, and direct-network commands that collect nothing. The batch
+contributes 46 canonical node IDs: 13 pass without a valid assertion contract and
+33 are permanently skipped. Six additional files contribute zero nodes. A second
+path in `tests/test_rate_curve.py` reaches yfinance indirectly and creates
+`src/data/cache/risk_free_rate.json` during native admission.
 
 This slice removes those false contracts and the unconsumed Tiingo executable tail
 without pretending that Tiingo has been permanently rejected. Tiingo remains a
@@ -36,19 +38,40 @@ then-current API, SDK, pricing, licensing, and scheduler evidence.
 
 ## 2. Grounded facts
 
-### 2.1 Canonical provider smokes
+### 2.1 Complete January provider-evaluation batch
 
-1. Current backend collection is exactly `4607` node IDs with SHA-256
-   `5180502f7dfe577ca758db5fb8ebdfe9ca282730a8976adcf65b7ab19c1c2d74`.
-2. `tests/test_yfinance.py` contributes seven nodes and
-   `tests/test_tiingo.py` contributes six. Both files entered in
-   `a8970e64` on 2026-01-10 as API evaluation scripts.
-3. The functions catch provider errors and return booleans. Pytest 8 warns with
-   `PytestReturnNotNoneWarning`; a returned `False` is still counted as a passed
-   node. Tiingo also reads a real key and may load `.env` during collection/import.
-4. The existing `tests/live/` contract is the correct home for explicitly invoked
-   credentialed/network smokes. Files there are not named `test_*.py`, are never
-   part of admission, and must return a meaningful process exit code.
+Current backend collection is exactly `4607` node IDs with SHA-256
+`5180502f7dfe577ca758db5fb8ebdfe9ca282730a8976adcf65b7ab19c1c2d74`.
+Commit `a8970e64` added the following still-tracked files on 2026-01-10:
+
+| File | Canonical nodes | Current shape |
+|---|---:|---|
+| `tests/test_alpha_vantage.py` | 5 | whole-file manual skip |
+| `tests/test_eodhd.py` | 5 | whole-file manual skip |
+| `tests/test_finnhub.py` | 0 | direct-network command |
+| `tests/test_finnhub_sentiment.py` | 0 | direct-network command and duplicate client |
+| `tests/test_ibkr.py` | 6 | whole-file manual skip |
+| `tests/test_ibkr_all_free_apis.py` | 0 | direct Gateway command |
+| `tests/test_ibkr_fundamentals.py` | 3 | whole-file manual skip |
+| `tests/test_ibkr_news.py` | 6 | whole-file manual skip |
+| `tests/test_ibkr_options_greeks.py` | 2 | whole-file manual skip |
+| `tests/test_ibkr_orats.py` | 0 | direct Gateway command |
+| `tests/test_polygon.py` | 0 | direct-network command |
+| `tests/test_sec_edgar.py` | 0 | direct-network command |
+| `tests/test_sec_filings.py` | 6 | whole-file manual skip with import-time third-party side effect |
+| `tests/test_tiingo.py` | 6 | boolean-returning direct-network nodes |
+| `tests/test_yfinance.py` | 7 | boolean-returning public-network nodes |
+
+The seven whole-file skip modules contribute 33 of the existing 72 skips. The
+Tiingo/yfinance functions catch errors and return booleans; pytest warns with
+`PytestReturnNotNoneWarning`, and returned `False` still counts as pass. The six
+zero-node commands provide no admission contract at all.
+
+No tracked runtime imports these files. Filename references outside the batch are
+dated documentation/evidence or current documents that must be reconciled when the
+paths leave. The existing `tests/live/` contract is the only valid home for an
+explicitly maintained operator smoke: it is never collected and must return a
+meaningful process exit code.
 
 ### 2.2 Hidden yfinance path
 
@@ -94,41 +117,61 @@ targets in this slice.
    January evaluation nodes and that spent diagnostic. Retaining these executable
    surfaces would therefore preserve an ownerless integration, not a capability.
 
-### 2.5 The zero-node Finnhub evaluation script is also spent
+### 2.5 Evaluation-script retirement is not provider retirement
 
-1. `tests/test_finnhub_sentiment.py` entered with the yfinance and Tiingo files in
-   `a8970e64` on 2026-01-10. It is a 718-line direct `requests` command that loads
-   local environment values, prints dated free/paid API claims, and can write JSON.
-2. Pytest collection returns `no tests collected`; an uncapped caller census finds
-   no importer or command owner. The file therefore supplies neither admission
-   coverage nor a supported operator surface.
-3. Finnhub itself remains an adopted capability with separate current owners,
-   including the production adapter, calendar client, normalized writer, provider
-   configuration/health surface, API routes, and hermetic tests. Deleting this
-   duplicate evaluation script is test hygiene, not provider retirement.
+The January files directly instantiate provider/Gateway clients instead of testing
+the current product seams. Their providers have one of two independent states:
+
+1. Finnhub, Polygon, SEC EDGAR, and IBKR have current product owners such as
+   adapters, normalized/calendar ingestion, routes, provider configuration/health,
+   scheduler jobs, and hermetic tests. Those owners remain protected.
+2. Alpha Vantage and EODHD retain adapters but have no automatic product path in
+   this slice. Removing skipped evaluation modules neither admits nor retires those
+   adapters; their eventual provider disposition requires its own consumer census.
+
+The direct scripts are not maintained operational checks merely because the
+underlying provider exists. Settings connection tests and current hermetic product
+contracts own supported behavior. If a future deep operator diagnostic is needed,
+it must be created from then-current product seams with explicit request/spend
+controls, rather than preserving January code under `tests/`.
 
 ### 2.6 Exact retirement ledger
 
-The retirement set is exactly 47 existing node IDs:
+The retirement stream is exactly 80 existing node IDs:
 
-| Owner | Nodes | Disposition |
-|---|---:|---|
-| `tests/test_yfinance.py` | 7 | leave canonical; replace with an explicit manual live smoke |
-| `tests/test_tiingo.py` | 6 | retire with the unconsumed Tiingo implementation; no replacement smoke |
-| `tests/test_rate_curve.py` | 34 | retire with the unconsumed rate-curve API |
+| Owner family | Nodes | Admission state | Disposition |
+|---|---:|---|---|
+| January Tiingo + yfinance | 13 | passing without a valid assertion contract | leave canonical; only yfinance gets a new manual smoke |
+| January whole-file manual skips | 33 | skipped | retire with the evaluation scripts |
+| `tests/test_rate_curve.py` | 34 | passing | retire with the unconsumed rate-curve API |
 
-Removing those exact IDs from the reviewed base stream produces:
+The six zero-node January commands also leave physically but do not enter node
+arithmetic. Removing the exact 80 IDs from the reviewed base stream produces:
 
 | Stream | Base | Target | Delta |
 |---|---|---|---:|
-| canonical backend | `4607 / 5180502f7dfe577ca758db5fb8ebdfe9ca282730a8976adcf65b7ab19c1c2d74` | `4560 / 689e3a92ddd1977c381c08ab68eb42fe8a110d54da491e1a7ca50100374f8f71` | `-47/+0` |
-| retired IDs | n/a | `47 / bb82b7aaaefde021c24c9cd8d6234922d9efbf756c507112604c9cf25ada2142` | exact set |
+| canonical backend | `4607 / 5180502f7dfe577ca758db5fb8ebdfe9ca282730a8976adcf65b7ab19c1c2d74` | `4527 / 4eeb117804ad874c83ffe4c04fd25ecd4de4f460801bfbf95d15c1406f32455d` | `-80/+0` |
+| retired IDs | n/a | `80 / a069a5af63bfcb3c6d63ddb4a25ca63bc897f97adde3ef159b83aef7b7be6fb8` | exact set |
 
-All 47 currently pass in native admission. With no other node change, the native
-target is `4488 passed / 72 skipped / 0 failed`.
+Plan construction must also reproduce these independently checkable partitions:
 
-`tests/test_finnhub_sentiment.py` is additionally retired as a zero-node tracked
-file. It does not enter the 47-ID stream or change any collection/hash arithmetic.
+| Partition | Identity |
+|---|---|
+| fifteen January paths | `15 / 2fff01e35f26d25c22ece520b491110b0066cf6fdccf31506fadab9f34fb30f2` |
+| assertion-invalid Tiingo/yfinance nodes | `13 / 3ead0303136ab8742fae3fa15f916b2febda6088deb4f883c9b025db7d577016` |
+| whole-file skipped nodes | `33 / 03f70d140bd4f2990674926904817667ed5f7ef28d10e4afbd71ea36f40aca58` |
+| zero-node command paths | `6 / 9c2780536d4c05c9e40f4bbcab1583fe377565aa6663ba07055c2fcdf556f008` |
+| collection after January family leaves | `4561 / dd127ce5dd34249a364b6a7965517aac66492b3d044ea8cc21e79a9706e58620` |
+
+The 80 nodes comprise 47 current passes and 33 current skips. With no other node
+change, native admission moves from `4535 passed / 72 skipped / 0 failed` to:
+
+```text
+4527 collected and seen
+4488 passed
+39 skipped
+0 failed
+```
 
 ### 2.7 Census execution boundary
 
@@ -141,7 +184,7 @@ it may not silently treat ciphertext as no match.
 
 ### 2.8 Current-authority and historical-reference boundary
 
-The Tiingo cutover has two distinct documentation classes:
+The evaluation/Tiingo cutover has two distinct documentation classes:
 
 1. Current authorities must change with the code: `PROJECT_STRUCTURE.md`,
    `docs/design/ARKSCOPE_PROVIDER_CATALOG.md`,
@@ -153,28 +196,35 @@ The Tiingo cutover has two distinct documentation classes:
    evidence may retain historical Tiingo references. They are not current
    capability authority and are not rewritten to simulate that the experiment
    never existed.
-3. `tests/test_finnhub_sentiment.py` is a spent executable owned and deleted by
-   this slice. Tranche B does not reference, collect, or own it.
+3. Current documents that name a retiring `tests/test_*.py` path must point to a
+   real surviving product owner, the single yfinance live smoke, or remove the
+   obsolete instruction. Closed plans/evidence retain their dated path claims.
 
-Implementation must produce a complete, unlocked-tree reference census with one
-closed verdict per tracked Tiingo hit: `retire_executable`,
-`update_current_authority`, or `historical_reference`. Unknown or multiply
-classified paths stop the slice.
+Implementation must produce two complete unlocked-tree census streams:
+
+- every tracked Tiingo hit receives exactly one of `retire_executable`,
+  `update_current_authority`, or `historical_reference`;
+- every tracked reference to any of the fifteen retiring evaluation paths receives
+  exactly one of `update_current_authority` or `historical_reference`.
+
+Unknown, multiply classified, or ownerless paths stop the slice. Current product
+code for Finnhub, Polygon, SEC EDGAR, IBKR, Alpha Vantage, and EODHD is not part of
+either retirement stream merely because its provider name also appeared in an
+evaluation file.
 
 ## 3. Locked decisions
 
 ### LD 1 - Canonical admission does not perform these provider smokes
 
-The yfinance and Tiingo January evaluation files leave pytest collection. The
-yfinance evaluation is replaced by standalone `tests/live/smoke_yfinance.py`, run
-only by explicit user/operator choice and never by collect-all, full admission,
-import-time hooks, preflight, or Settings page load. There is no Tiingo replacement
-smoke because no current Tiingo implementation remains to exercise.
+All fifteen January evaluation paths leave `tests/`. Delete the spent files; do not
+move their dated clients wholesale into `tests/live/`, add skip/xfail markers, or
+retain zero-node commands as informal tools.
 
-Delete the same-batch zero-node `tests/test_finnhub_sentiment.py` command without a
-replacement smoke. Current Finnhub product owners and Settings connection checks
-remain; preserving a second direct-network client under `tests/` would add no
-contract.
+The sole replacement is a newly written `tests/live/smoke_yfinance.py` for the
+explicitly preserved training dependency. It runs only by user/operator choice and
+never by collect-all, full admission, import-time hooks, preflight, or Settings
+page load. Current providers retain their product-owned Settings/health checks and
+hermetic contracts; Tiingo has no remaining implementation to smoke.
 
 The yfinance command must fail with a non-zero exit code when a requested response
 is empty/malformed or any selected check fails. It may not repeat the pytest
@@ -251,14 +301,14 @@ untracked files requires an exact inventory and separate owner approval.
 
 ## 4. Required implementation gates
 
-1. Structural RED first: the three collected test files, zero-node Finnhub command,
-   retired rate APIs, diagnostic, Tiingo adapter/export/enum/factory/key/profile
-   surfaces, and absent yfinance live-smoke target must exhibit the pre-change state
-   before edits.
+1. Structural RED first: all fifteen January evaluation paths, their exact
+   collect/skip/zero-node distribution, retired rate APIs, diagnostic, Tiingo
+   adapter/export/enum/factory/key/profile surfaces, and absent yfinance live-smoke
+   target must exhibit the pre-change state before edits.
 2. Collection after implementation is exactly
-   `4560 / 689e3a92ddd1977c381c08ab68eb42fe8a110d54da491e1a7ca50100374f8f71`.
-   The 47-ID difference is exactly
-   `bb82b7aaaefde021c24c9cd8d6234922d9efbf756c507112604c9cf25ada2142`.
+   `4527 / 4eeb117804ad874c83ffe4c04fd25ecd4de4f460801bfbf95d15c1406f32455d`.
+   The 80-ID difference is exactly
+   `a069a5af63bfcb3c6d63ddb4a25ca63bc897f97adde3ef159b83aef7b7be6fb8`.
 3. `tests/live/` contributes zero canonical nodes. The new yfinance script compiles
    and its help/argument paths perform no network access. No Tiingo smoke exists.
 4. Python yfinance imports after cutover are confined to paused-preserve training
@@ -266,23 +316,23 @@ untracked files requires an exact inventory and separate owner approval.
    option helper imports it.
 5. Surviving option-pricing/tool tests pass, and no import/re-export of retired rate
    symbols remains outside dated historical documents.
-6. Static census proves the Tiingo adapter, package export, enum, factory
-   registration/environment mapping, credential template, profile fallback,
-   diagnostic, and canonical/live smoke are absent. Current product authorities
-   contain no connected/live/fallback claim; only the bounded candidate
-   re-evaluation record remains. Historical references are classified rather than
-   swept by raw string deletion.
-   The zero-node Finnhub command is absent while current Finnhub product owners are
-   unchanged.
-7. Fresh native canonical admission observes all 4,560 nodes and returns
-   `4488 passed / 72 skipped / 0 failed`; generated-artifact handling follows the
+6. Static census proves all fifteen January paths and the Tiingo adapter, package
+   export, enum, factory registration/environment mapping, credential template,
+   profile fallback,
+   diagnostic, and Tiingo canonical/live smoke are absent. Current product
+   authorities contain no connected/live/fallback Tiingo claim; only the bounded
+   candidate re-evaluation record remains. Historical references are classified
+   rather than swept by raw string deletion. Current product owners for every
+   non-Tiingo provider are byte-accounted and behaviorally unchanged.
+7. Fresh native canonical admission observes all 4,527 nodes and returns
+   `4488 passed / 39 skipped / 0 failed`; generated-artifact handling follows the
    established exact-path transaction.
 8. No provider smoke is executed during implementation or admission. The yfinance
    manual smoke is reviewed structurally and through help/offline paths only.
-9. The post-cutover unlocked-tree Tiingo census is a closed projection of the
-   pre-cutover census: zero unknown paths, zero current authority claiming an
-   installed capability, and only the catalog candidate record and classified
-   dated history remain.
+9. Post-cutover unlocked-tree Tiingo and evaluation-path census streams are closed
+   projections of their pre-cutover inputs: zero unknown/duplicate verdicts, zero
+   stale current instructions, and only the Tiingo catalog candidate record plus
+   classified dated history remain.
 
 ## 5. Protected boundaries
 
@@ -291,8 +341,9 @@ This slice does not change:
 - any scheduler, collector, API route, provider-health projection, or Settings UI;
 - non-Tiingo source-factory registrations, provider enums, package exports, and
   credential templates;
-- current Finnhub adapters, calendar/normalized ingestion, routes, provider
-  configuration/health behavior, and hermetic contracts;
+- current Finnhub, Polygon, SEC EDGAR, IBKR, Alpha Vantage, and EODHD adapters;
+- calendar/normalized ingestion, collectors, schedulers, routes, provider
+  configuration/health behavior, and hermetic contracts for retained providers;
 - paused-preserve training behavior or the yfinance dependency;
 - production databases, credentials, ignored comparison outputs, provider keys, or
   live provider state;
@@ -309,7 +360,7 @@ Stop and amend before continuing if:
 
 1. any non-test consumer of the retired rate APIs is found;
 2. Tiingo is found in a real scheduler/API/UI path not listed here;
-3. collection differs from exact `-47/+0` or any unrelated node changes identity;
+3. collection differs from exact `-80/+0` or any unrelated node changes identity;
 4. a manual smoke becomes auto-run or is collected by pytest;
 5. implementation needs a real key, provider request, or current paid entitlement;
 6. a change would remove training yfinance, an unrelated provider integration, or
@@ -321,13 +372,14 @@ Stop and amend before continuing if:
    the diff; or
 10. a current authority or paused-preserve training guide would retain Tiingo as an
     implemented source after its code/configuration is removed; or
-11. deleting the spent Finnhub command requires changing any current Finnhub
-    product owner or collected node.
+11. deleting an evaluation script requires changing a current provider product
+    owner, or a node outside the exact 80-ID retirement stream.
 
 ## 7. Review and handoff
 
-Focused independent re-review must reconstruct the caller census, unchanged 47-ID
-ledger and target hash, Tiingo product-surface absence, exact executable/config
-retirement set, the zero-node/no-caller Finnhub finding, current Finnhub ownership,
-training authority, and current-authority versus historical-reference boundary from
-the tree. Only after GREEN may an exact RED-first implementation plan be written.
+Independent amendment review must reconstruct the complete fifteen-file batch, its
+46 collected IDs/33 skips/six zero-node commands, exact 80-ID ledger and target
+hash, Tiingo product-surface absence, exact executable/config retirement set,
+current provider ownership, training authority, and current-authority versus
+historical-reference boundary from the tree. Only after GREEN may an exact
+RED-first implementation plan be written.
