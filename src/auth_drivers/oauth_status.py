@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -53,7 +54,7 @@ class OAuthLifecycleProjection(BaseModel):
 
 
 class OAuthRateLimitWindow(BaseModel):
-    used_percent: int
+    used_percent: float | None = Field(default=None, ge=0, le=100)
     window_duration_minutes: int | None = None
     resets_at: int | None = None
 
@@ -81,6 +82,12 @@ class OAuthRateLimitSnapshot(BaseModel):
     credits: OAuthCreditsSnapshot | None = None
     individual_limit: OAuthSpendControlLimit | None = None
     spend_control_reached: bool | None = None
+    status: Literal["allowed", "allowed_warning", "rejected"] | None = None
+    overage_status: Literal["allowed", "allowed_warning", "rejected"] | None = None
+    overage_resets_at: int | None = None
+    overage_disabled_reason: str | None = Field(
+        default=None, max_length=64, pattern=r"^[a-z0-9_]+$"
+    )
 
 
 class OAuthUsageSummary(BaseModel):
@@ -424,6 +431,14 @@ class OAuthObservationStore:
             "refresh_status": max(int(refresh_rows), 0),
             "account_snapshot": max(int(account_rows), 0),
         }
+
+
+def default_oauth_observation_store() -> OAuthObservationStore:
+    """Return the no-create runtime observation sink for the local profile DB."""
+    db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+        Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
+    )
+    return OAuthObservationStore(db_path)
 
 
 def cached_account_usage(

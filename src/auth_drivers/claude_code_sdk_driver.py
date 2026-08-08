@@ -39,15 +39,27 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import json
 import logging
+import math
+import re
 import shutil
 import tempfile
-from typing import Any, AsyncIterator, Optional
+from datetime import datetime, timezone
+from typing import Any, AsyncIterator, Callable, Optional
 
 from src.agents.shared.compressor.reducers import get_reducer  # default = truncate_with_marker
 from src.agents.shared.events import AgentEvent, EventType
 from src.auth_drivers.api_key_drivers import MissingCredentialError
+from src.auth_drivers.oauth_status import (
+    OAuthAccountObservation,
+    OAuthAccountPayload,
+    OAuthObservationStore,
+    OAuthRateLimitSnapshot,
+    OAuthRateLimitWindow,
+    OAuthUsageSummary,
+)
 from src.auth_drivers.probe_harness import redact as _regex_redact
 from src.auth_drivers.protocol import LLMRequest
 from src.model_credentials import ModelDiscoveryResult, ModelTestResult, _seed_models
@@ -57,6 +69,7 @@ from src.model_credentials import ModelDiscoveryResult, ModelTestResult, _seed_m
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    RateLimitEvent,
     ResultMessage,
     ServerToolResultBlock,
     ServerToolUseBlock,
@@ -79,6 +92,16 @@ _PER_TOOL_TIMEOUT_S = 45.0      # NEW — bounds one in-process tool call (§4)
 _BRIDGE_RESULT_BUDGET = 12_000  # = LAYER_5_CHAR_CAP; model-facing result cap (§4)
 _SUMMARY_CAP = 200              # reuse 7A — event/history preview (§4)
 _DEFAULT_MAX_TURNS = 60         # mirrors AgentConfig.max_tool_calls; no hidden 8-turn cap
+
+_RATE_LIMIT_STATUSES = frozenset({"allowed", "allowed_warning", "rejected"})
+_RATE_LIMIT_WINDOWS = {
+    "five_hour": 5 * 60,
+    "seven_day": 7 * 24 * 60,
+    "seven_day_opus": 7 * 24 * 60,
+    "seven_day_sonnet": 7 * 24 * 60,
+    "overage": None,
+}
+_STABLE_REASON_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 
 _MCP_SERVER_NAME = "ark"
 _MCP_PREFIX = "mcp__ark__"
@@ -393,6 +416,21 @@ def _err(request: LLMRequest, message: str, *, code: Optional[str] = None) -> Ag
     return AgentEvent(EventType.error, data)
 
 
+def _bounded_utilization(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    normalized = float(value)
+    if not math.isfinite(normalized) or not 0 <= normalized <= 1:
+        return None
+    return normalized
+
+
+def _unix_timestamp(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 # ===========================================================================
 # The driver
 # ===========================================================================
@@ -409,6 +447,8 @@ class AnthropicClaudeCodeSdkDriver:
         token_store: Any = None,
         registry: Any = None,
         dal: Any = None,
+        observation_store: OAuthObservationStore | None = None,
+        observation_clock: Callable[[], datetime] | None = None,
         max_turns: int = _DEFAULT_MAX_TURNS,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
         per_tool_timeout_s: float = _PER_TOOL_TIMEOUT_S,
@@ -417,6 +457,8 @@ class AnthropicClaudeCodeSdkDriver:
         self._token_store = token_store
         self._registry = registry
         self._dal = dal
+        self._observation_store = observation_store
+        self._observation_clock = observation_clock or (lambda: datetime.now(timezone.utc))
         self._max_turns = max_turns
         self._timeout_s = timeout_s
         self._per_tool_timeout_s = per_tool_timeout_s
@@ -657,8 +699,82 @@ class AnthropicClaudeCodeSdkDriver:
                     ]
             return out
 
-        # RateLimitEvent / StreamEvent / Task*/Mirror*/Hook* / anything else -> IGNORE.
+        if isinstance(msg, RateLimitEvent):
+            self._persist_rate_limit_event(msg)
+            return out
+
+        # StreamEvent / Task*/Mirror*/Hook* / anything else -> IGNORE.
         return out
+
+    def _persist_rate_limit_event(self, event: RateLimitEvent) -> None:
+        if self._observation_store is None or self._credential_id is None:
+            return
+        observation = self._rate_limit_observation(event)
+        if observation is None:
+            return
+        try:
+            self._observation_store.record_account_snapshot(
+                credential_id=self._credential_id,
+                provider=self.provider,
+                auth_mode=self.auth_mode,
+                observation=observation,
+            )
+        except Exception:  # noqa: BLE001 - telemetry must not fail the model request
+            logger.warning("Claude rate-limit observation could not be persisted")
+
+    def _rate_limit_observation(
+        self, event: RateLimitEvent
+    ) -> OAuthAccountObservation | None:
+        info = event.rate_limit_info
+        status = getattr(info, "status", None)
+        if status not in _RATE_LIMIT_STATUSES:
+            return None
+
+        limit_type = getattr(info, "rate_limit_type", None)
+        if limit_type not in _RATE_LIMIT_WINDOWS:
+            limit_type = None
+        utilization = _bounded_utilization(getattr(info, "utilization", None))
+        resets_at = _unix_timestamp(getattr(info, "resets_at", None))
+        window_minutes = _RATE_LIMIT_WINDOWS.get(limit_type)
+        primary = None
+        if any(value is not None for value in (utilization, resets_at, window_minutes)):
+            primary = OAuthRateLimitWindow(
+                used_percent=None if utilization is None else utilization * 100,
+                window_duration_minutes=window_minutes,
+                resets_at=resets_at,
+            )
+
+        overage_status = getattr(info, "overage_status", None)
+        if overage_status not in _RATE_LIMIT_STATUSES:
+            overage_status = None
+        overage_reason = getattr(info, "overage_disabled_reason", None)
+        if not isinstance(overage_reason, str) or not _STABLE_REASON_RE.fullmatch(overage_reason):
+            overage_reason = None
+
+        observed_at = self._observation_clock()
+        if not isinstance(observed_at, datetime) or observed_at.tzinfo is None:
+            return None
+        fingerprint = hashlib.sha256(
+            f"{self.provider}\0{self.auth_mode}\0{self._credential_id}".encode("utf-8")
+        ).hexdigest()
+        return OAuthAccountObservation(
+            account_fingerprint=fingerprint,
+            source="claude_rate_limit_event",
+            observed_at=observed_at.astimezone(timezone.utc).isoformat(timespec="seconds"),
+            payload=OAuthAccountPayload(
+                rate_limits=OAuthRateLimitSnapshot(
+                    limit_id=limit_type,
+                    primary=primary,
+                    status=status,
+                    overage_status=overage_status,
+                    overage_resets_at=_unix_timestamp(
+                        getattr(info, "overage_resets_at", None)
+                    ),
+                    overage_disabled_reason=overage_reason,
+                ),
+                usage_summary=OAuthUsageSummary(),
+            ),
+        )
 
     def _tool_end_event(
         self,

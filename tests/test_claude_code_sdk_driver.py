@@ -22,8 +22,11 @@ Behaviors covered (see the module docstring + BUILD REPORT):
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import os
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 import pytest
@@ -132,16 +135,21 @@ class _FakeDAL:
 def _make_driver(
     *,
     token: Optional[str] = TOKEN,
+    credential_id: int = 1,
     registry: Optional[_FakeRegistry] = None,
+    observation_store: Any = None,
+    observation_clock: Any = None,
     max_turns: int = 60,
     timeout_s: float = 180.0,
     per_tool_timeout_s: float = 45.0,
 ) -> AnthropicClaudeCodeSdkDriver:
     return AnthropicClaudeCodeSdkDriver(
-        credential=_FakeCredential(),
+        credential=_FakeCredential(id=credential_id),
         token_store=_FakeTokenStore(token),
         registry=registry if registry is not None else _full_fake_registry(),
         dal=_FakeDAL(),
+        observation_store=observation_store,
+        observation_clock=observation_clock,
         max_turns=max_turns,
         timeout_s=timeout_s,
         per_tool_timeout_s=per_tool_timeout_s,
@@ -814,18 +822,146 @@ def test_done_answer_not_overredacted(monkeypatch):
     assert chart in events[-1].data["answer"]  # preserved, not [REDACTED]
 
 
-def test_streaming_and_ratelimit_events_ignored(monkeypatch):
-    from claude_agent_sdk import StreamEvent
+def test_stream_event_is_ignored_but_rate_limit_event_is_persisted(monkeypatch, tmp_path):
+    from claude_agent_sdk import RateLimitEvent, RateLimitInfo, StreamEvent
+    from src.auth_drivers.oauth_status import OAuthObservationStore
 
     capture: dict = {}
-    se = StreamEvent(uuid="u", session_id="s", event={"type": "x"}, parent_tool_use_id=None)
-    # RateLimitInfo shape is opaque; building a stand-in is risky, so only assert
-    # StreamEvent is ignored (RateLimitEvent shares the same catch-all-ignore policy).
-    msgs = [se, AssistantMessage(content=[TextBlock(text="hi")], model="m"), _result_msg()]
+    observations = OAuthObservationStore(tmp_path / "profile.db")
+    driver = _make_driver(
+        observation_store=observations,
+        observation_clock=lambda: datetime(2026, 8, 8, 12, 30, tzinfo=timezone.utc),
+    )
+    msgs = [
+        StreamEvent(
+            uuid="stream-uuid", session_id="stream-session",
+            event={"type": "content_block_delta"}, parent_tool_use_id=None,
+        ),
+        RateLimitEvent(
+            rate_limit_info=RateLimitInfo(
+                status="allowed",
+                resets_at=1_786_211_000,
+                rate_limit_type="five_hour",
+                utilization=0.18,
+                overage_status="rejected",
+                overage_resets_at=1_786_297_400,
+                overage_disabled_reason="out_of_credits",
+            ),
+            uuid="rate-limit-uuid",
+            session_id="rate-limit-session",
+        ),
+        AssistantMessage(content=[TextBlock(text="hi")], model="m"),
+        _result_msg(),
+    ]
     _install_fake_query(monkeypatch, msgs, capture)
-    events = asyncio.run(_collect(_make_driver(), _REQ))
-    kinds = [e.type for e in events]
-    assert kinds == [EventType.text, EventType.done]  # StreamEvent produced nothing
+
+    events = asyncio.run(_collect(driver, _REQ))
+
+    assert [event.type for event in events] == [EventType.text, EventType.done]
+    snapshot = observations.read_account_snapshot("local:1")
+    assert snapshot is not None
+    assert snapshot.provider == "anthropic"
+    assert snapshot.auth_mode == "claude_code_oauth"
+    assert snapshot.source == "claude_rate_limit_event"
+    assert snapshot.observed_at == "2026-08-08T12:30:00+00:00"
+    assert snapshot.payload.rate_limits.model_dump() == {
+        "limit_id": "five_hour",
+        "limit_name": None,
+        "plan_type": None,
+        "primary": {
+            "used_percent": 18,
+            "window_duration_minutes": 300,
+            "resets_at": 1_786_211_000,
+        },
+        "secondary": None,
+        "rate_limit_reached_type": None,
+        "credits": None,
+        "individual_limit": None,
+        "spend_control_reached": None,
+        "status": "allowed",
+        "overage_status": "rejected",
+        "overage_resets_at": 1_786_297_400,
+        "overage_disabled_reason": "out_of_credits",
+    }
+
+
+def test_no_rate_limit_event_means_unknown_without_probe(monkeypatch, tmp_path):
+    from claude_agent_sdk import StreamEvent
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    calls = []
+
+    async def fake_query(*, prompt, options):
+        calls.append((prompt, options))
+        yield StreamEvent(
+            uuid="stream-uuid", session_id="stream-session",
+            event={"type": "content_block_delta"}, parent_tool_use_id=None,
+        )
+        yield _result_msg()
+
+    monkeypatch.setattr(mod, "query", fake_query)
+    db_path = tmp_path / "missing" / "profile.db"
+    driver = _make_driver(observation_store=OAuthObservationStore(db_path))
+
+    events = asyncio.run(_collect(driver, _REQ))
+
+    assert [event.type for event in events] == [EventType.done]
+    assert len(calls) == 1
+    assert not db_path.parent.exists()
+
+
+def test_rate_limit_event_snapshot_is_credential_bound_and_redacted(monkeypatch, tmp_path):
+    from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    account_sentinel = "acct_raw_should_never_be_stored"
+    token_sentinel = "sk-ant-secret-raw-event-token"
+    email_sentinel = "private@example.invalid"
+    uuid_sentinel = "private-rate-limit-uuid"
+    session_sentinel = "private-rate-limit-session"
+    observations = OAuthObservationStore(tmp_path / "profile.db")
+    driver = _make_driver(
+        credential_id=7,
+        observation_store=observations,
+        observation_clock=lambda: datetime(2026, 8, 8, 12, 31, tzinfo=timezone.utc),
+    )
+    event = RateLimitEvent(
+        rate_limit_info=RateLimitInfo(
+            status="allowed_warning",
+            resets_at=1_786_211_100,
+            rate_limit_type="seven_day",
+            utilization=0.34,
+            overage_status="allowed",
+            overage_disabled_reason="org_level_disabled",
+            raw={
+                "account_id": account_sentinel,
+                "access_token": token_sentinel,
+                "email": email_sentinel,
+                "unknown": {"nested": "must-not-survive"},
+            },
+        ),
+        uuid=uuid_sentinel,
+        session_id=session_sentinel,
+    )
+    _install_fake_query(monkeypatch, [event, _result_msg()], {})
+
+    asyncio.run(_collect(driver, _REQ))
+
+    snapshot = observations.read_account_snapshot("local:7")
+    assert snapshot is not None
+    assert snapshot.account_fingerprint == hashlib.sha256(
+        b"anthropic\0claude_code_oauth\0local:7"
+    ).hexdigest()
+    serialized = json.dumps(snapshot.model_dump(mode="json"), sort_keys=True)
+    for forbidden in (
+        account_sentinel,
+        token_sentinel,
+        email_sentinel,
+        uuid_sentinel,
+        session_sentinel,
+        "must-not-survive",
+    ):
+        assert forbidden not in serialized
 
 
 # ===========================================================================

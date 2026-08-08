@@ -96,6 +96,7 @@ def build_driver(
     max_turns: Optional[int] = None,
     timeout_s: Optional[float] = None,
     per_tool_timeout_s: Optional[float] = None,
+    observation_store: Optional[Any] = None,
 ) -> NotImplementedDriver:
     """Resolve the driver for a (provider, auth_mode). Skeleton: returns an inert
     placeholder; unknown provider/mode raise ValueError (never silently coerced)."""
@@ -127,9 +128,15 @@ def build_driver(
     # LONGER returned here (`--bare` cannot read CLAUDE_CODE_OAUTH_TOKEN).
     if provider == "anthropic" and auth_mode == "claude_code_oauth":
         from .claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
+        from .oauth_status import default_oauth_observation_store
 
         return AnthropicClaudeCodeSdkDriver(
             credential=credential, token_store=token_store, registry=registry, dal=dal,
+            observation_store=(
+                observation_store
+                if observation_store is not None
+                else default_oauth_observation_store()
+            ),
             **({"max_turns": max_turns} if max_turns is not None else {}),
             **({"timeout_s": timeout_s} if timeout_s is not None else {}),
             **({"per_tool_timeout_s": per_tool_timeout_s} if per_tool_timeout_s is not None else {}),
