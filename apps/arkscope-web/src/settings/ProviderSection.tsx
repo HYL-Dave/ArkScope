@@ -5,15 +5,21 @@ import {
   cancelOpenAIOAuth,
   completeOpenAIOAuthManual,
   deleteCredential,
+  getCredentialAccountUsage,
   importOAuthCredential,
   openAIOAuthStatus,
   probeCredential,
   startOpenAIOAuth,
+  syncCredentialAccountUsage,
   updateCredential,
   type ModelCatalog,
   type ModelDiscoveryResult,
   type ModelProvider,
   type ModelTask,
+  type OAuthAccountSyncView,
+  type OAuthLifecycleState,
+  type OAuthRateLimitStatus,
+  type OAuthRateLimitWindow,
   type ProbeResponse,
   type ProviderCredential,
   type RuntimeConfig,
@@ -61,6 +67,73 @@ type CredentialMetadataDraft = {
   account_label?: string;
   expires_at?: string;
 };
+
+type LocalAccountUsage = {
+  readState: "loading" | "loaded" | "failed";
+  view: OAuthAccountSyncView | null;
+};
+
+const ACCOUNT_USAGE_TTL_MS = 5 * 60 * 1000;
+const ACCOUNT_SYNC_COOLDOWN_MS = 10 * 1000;
+
+function isOAuthCredential(credential: ProviderCredential): boolean {
+  return credential.auth_type === "chatgpt_oauth" || credential.auth_type === "claude_code_oauth";
+}
+
+function lifecycleState(credential: ProviderCredential): OAuthLifecycleState | null {
+  if (!isOAuthCredential(credential)) return null;
+  return credential.lifecycle_state ?? null;
+}
+
+function lifecyclePresentation(
+  credential: ProviderCredential,
+  t: SettingsT,
+): { label: string; ok: boolean } | null {
+  const state = lifecycleState(credential);
+  if (!state) return null;
+  switch (state) {
+    case "ready":
+      return { label: t(($) => $.providers.lifecycle.ready), ok: true };
+    case "refresh_required":
+      return { label: t(($) => $.providers.lifecycle.refreshRequired), ok: false };
+    case "refresh_failed_retryable":
+      return { label: t(($) => $.providers.lifecycle.refreshFailedRetryable), ok: false };
+    case "reauth_required":
+      return { label: t(($) => $.providers.lifecycle.reauthRequired), ok: false };
+    case "unverifiable":
+      return { label: t(($) => $.providers.lifecycle.unverifiable), ok: false };
+  }
+}
+
+function rateLimitStatusLabel(status: OAuthRateLimitStatus | null, t: SettingsT): string {
+  switch (status) {
+    case "allowed":
+      return t(($) => $.providers.accountUsage.allowed);
+    case "allowed_warning":
+      return t(($) => $.providers.accountUsage.allowedWarning);
+    case "rejected":
+      return t(($) => $.providers.accountUsage.rejected);
+    case null:
+      return t(($) => $.providers.accountUsage.unknown);
+  }
+}
+
+function percentage(value: number | null, t: SettingsT): string {
+  if (value === null || !Number.isFinite(value)) return t(($) => $.providers.accountUsage.unknown);
+  return `${Number(value.toFixed(1))}%`;
+}
+
+function resetTimestamp(value: number | null, t: SettingsT): string {
+  if (value === null || !Number.isFinite(value)) return t(($) => $.providers.accountUsage.unknown);
+  return formatSystemTimestamp(new Date(value * 1000).toISOString());
+}
+
+function snapshotIsStale(view: OAuthAccountSyncView | null | undefined, now = Date.now()): boolean {
+  const observedAt = view?.snapshot?.observed_at;
+  if (!observedAt) return true;
+  const observed = new Date(observedAt).getTime();
+  return !Number.isFinite(observed) || now - observed >= ACCOUNT_USAGE_TTL_MS;
+}
 
 type ProviderNotice =
   | { kind: "api_key_added"; provider: ModelProvider; makeActive: boolean }
@@ -228,6 +301,206 @@ export function ProviderSection({
   // stops it immediately (rather than leaving it to run — and pin pollBusy — for the
   // full timeout). A per-login token object; the poll closure reads token.aborted.
   const pollToken = useRef<{ aborted: boolean }>({ aborted: false });
+  const sectionHeadRef = useRef<HTMLDivElement | null>(null);
+  const [documentVisible, setDocumentVisible] = useState(
+    () => typeof document === "undefined" || document.visibilityState !== "hidden",
+  );
+  const [sectionInViewport, setSectionInViewport] = useState(
+    () => typeof window === "undefined" || typeof window.IntersectionObserver === "undefined",
+  );
+  const [accountUsage, setAccountUsage] = useState<Record<string, LocalAccountUsage>>({});
+  const [accountSyncing, setAccountSyncing] = useState<Record<string, boolean>>({});
+  const [accountCooldownUntil, setAccountCooldownUntil] = useState<Record<string, number>>({});
+  const accountReadStarted = useRef(new Set<string>());
+  const accountSyncInFlight = useRef(new Map<string, Promise<void>>());
+  const accountAutoAttempt = useRef(new Map<string, string>());
+  const accountGeneration = useRef(new Map<string, number>());
+  const accountCooldownTimers = useRef(new Map<string, number>());
+
+  const activeOAuthCredentials = catalog.providers
+    .flatMap((provider) => catalog.credentials?.[provider] ?? [])
+    .filter((credential) => credential.active && isOAuthCredential(credential));
+  const activeOAuthKey = activeOAuthCredentials
+    .map((credential) => `${credential.id}\0${credential.auth_type}`)
+    .sort()
+    .join("\0");
+  const activeChatGPTCredentials = activeOAuthCredentials
+    .filter((credential) => credential.auth_type === "chatgpt_oauth");
+  const sectionVisible = documentVisible && sectionInViewport;
+
+  const readCachedAccountUsage = useCallback(async (credentialId: string, force = false) => {
+    if (!force && accountReadStarted.current.has(credentialId)) return;
+    accountReadStarted.current.add(credentialId);
+    const generation = accountGeneration.current.get(credentialId) ?? 0;
+    setAccountUsage((previous) => ({
+      ...previous,
+      [credentialId]: {
+        readState: "loading",
+        view: previous[credentialId]?.view ?? null,
+      },
+    }));
+    try {
+      const view = await getCredentialAccountUsage(credentialId);
+      if (view.credential_id !== credentialId || view.snapshot?.credential_id !== credentialId) {
+        throw new Error("credential-bound account response mismatch");
+      }
+      if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+      setAccountUsage((previous) => ({
+        ...previous,
+        [credentialId]: { readState: "loaded", view },
+      }));
+    } catch {
+      if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+      setAccountUsage((previous) => ({
+        ...previous,
+        [credentialId]: {
+          readState: "failed",
+          view: previous[credentialId]?.view ?? null,
+        },
+      }));
+    }
+  }, []);
+
+  const syncAccountUsage = useCallback((credentialId: string, manual = false): Promise<void> => {
+    const now = Date.now();
+    if (manual && (accountCooldownUntil[credentialId] ?? 0) > now) return Promise.resolve();
+    const existing = accountSyncInFlight.current.get(credentialId);
+    if (existing) return existing;
+
+    if (manual) {
+      const until = now + ACCOUNT_SYNC_COOLDOWN_MS;
+      setAccountCooldownUntil((previous) => ({ ...previous, [credentialId]: until }));
+      const existingTimer = accountCooldownTimers.current.get(credentialId);
+      if (existingTimer !== undefined) window.clearTimeout(existingTimer);
+      const timer = window.setTimeout(() => {
+        accountCooldownTimers.current.delete(credentialId);
+        setAccountCooldownUntil((previous) => {
+          const next = { ...previous };
+          delete next[credentialId];
+          return next;
+        });
+      }, ACCOUNT_SYNC_COOLDOWN_MS);
+      accountCooldownTimers.current.set(credentialId, timer);
+    }
+
+    const generation = accountGeneration.current.get(credentialId) ?? 0;
+    setAccountSyncing((previous) => ({ ...previous, [credentialId]: true }));
+    const request = (async () => {
+      try {
+        const view = await syncCredentialAccountUsage(credentialId);
+        if (view.credential_id !== credentialId || view.snapshot?.credential_id !== credentialId) {
+          throw new Error("credential-bound account response mismatch");
+        }
+        if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+        accountReadStarted.current.add(credentialId);
+        setAccountUsage((previous) => ({
+          ...previous,
+          [credentialId]: { readState: "loaded", view },
+        }));
+      } catch {
+        if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+        setAccountUsage((previous) => ({
+          ...previous,
+          [credentialId]: {
+            readState: "failed",
+            view: previous[credentialId]?.view ?? null,
+          },
+        }));
+      } finally {
+        if ((accountGeneration.current.get(credentialId) ?? 0) === generation) {
+          setAccountSyncing((previous) => {
+            const next = { ...previous };
+            delete next[credentialId];
+            return next;
+          });
+        }
+        accountSyncInFlight.current.delete(credentialId);
+      }
+    })();
+    accountSyncInFlight.current.set(credentialId, request);
+    return request;
+  }, [accountCooldownUntil]);
+
+  const invalidateAccountUsage = useCallback((credentialId: string) => {
+    accountGeneration.current.set(
+      credentialId,
+      (accountGeneration.current.get(credentialId) ?? 0) + 1,
+    );
+    accountReadStarted.current.delete(credentialId);
+    accountAutoAttempt.current.delete(credentialId);
+    const cooldownTimer = accountCooldownTimers.current.get(credentialId);
+    if (cooldownTimer !== undefined) {
+      window.clearTimeout(cooldownTimer);
+      accountCooldownTimers.current.delete(credentialId);
+    }
+    setAccountUsage((previous) => {
+      const next = { ...previous };
+      delete next[credentialId];
+      return next;
+    });
+    setAccountCooldownUntil((previous) => {
+      const next = { ...previous };
+      delete next[credentialId];
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onVisibilityChange = () => setDocumentVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    const target = sectionHeadRef.current;
+    if (!target || typeof window.IntersectionObserver === "undefined") return undefined;
+    const observer = new window.IntersectionObserver((entries) => {
+      setSectionInViewport(entries.some((entry) => entry.isIntersecting));
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => () => {
+    for (const timer of accountCooldownTimers.current.values()) window.clearTimeout(timer);
+    accountCooldownTimers.current.clear();
+  }, []);
+
+  useEffect(() => {
+    for (const credential of activeOAuthCredentials) {
+      void readCachedAccountUsage(credential.id);
+    }
+  }, [activeOAuthKey, readCachedAccountUsage]);
+
+  useEffect(() => {
+    if (!sectionVisible) {
+      for (const credential of activeChatGPTCredentials) {
+        accountAutoAttempt.current.delete(credential.id);
+      }
+      return;
+    }
+    for (const credential of activeChatGPTCredentials) {
+      const local = accountUsage[credential.id];
+      if (!local || local.readState === "loading" || !snapshotIsStale(local.view)) continue;
+      const marker = local.view?.snapshot?.observed_at ?? "missing";
+      if (accountAutoAttempt.current.get(credential.id) === marker) continue;
+      accountAutoAttempt.current.set(credential.id, marker);
+      void syncAccountUsage(credential.id);
+    }
+  }, [accountUsage, activeOAuthKey, sectionVisible, syncAccountUsage]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (!sectionVisible) return;
+      for (const credential of activeChatGPTCredentials) {
+        if (snapshotIsStale(accountUsage[credential.id]?.view)) {
+          void syncAccountUsage(credential.id);
+        }
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [accountUsage, activeOAuthKey, sectionVisible, syncAccountUsage]);
 
   const onCredentialNavigationGuardChange = useCallback(
     (guard: { busy: boolean }) => setCredentialProbeBusy(guard.busy),
@@ -282,6 +555,18 @@ export function ProviderSection({
     setCredentialMutationCount((count) => Math.max(0, count - 1));
   }
 
+  async function refreshAfterCredentialMutation(
+    credential: ProviderCredential | null,
+    deletedCredentialId?: string,
+  ) {
+    const affectedId = credential?.id ?? deletedCredentialId;
+    if (affectedId) invalidateAccountUsage(affectedId);
+    await onRefresh();
+    if (credential?.active && isOAuthCredential(credential)) {
+      void readCachedAccountUsage(credential.id, true);
+    }
+  }
+
   async function addKey(provider: ModelProvider, makeActive: boolean) {
     const alias = (newAlias[provider] ?? "").trim();
     const secret = (newSecret[provider] ?? "").trim();
@@ -293,7 +578,7 @@ export function ProviderSection({
     setProviderMsg(null);
     beginCredentialMutation();
     try {
-      await addCredential({
+      const result = await addCredential({
         provider,
         auth_type: "api_key",
         alias: alias || `${provider} ${t(($) => $.providers.authModes.apiKey)}`,
@@ -303,7 +588,7 @@ export function ProviderSection({
       setNewAlias((prev) => ({ ...prev, [provider]: "" }));
       setNewSecret((prev) => ({ ...prev, [provider]: "" }));
       setProviderMsg({ kind: "api_key_added", provider, makeActive });
-      await onRefresh();
+      await refreshAfterCredentialMutation(result.credential);
     } catch (e) {
       setProviderErr({ kind: "request", error: e });
     } finally {
@@ -321,7 +606,7 @@ export function ProviderSection({
     setProviderMsg(null);
     beginCredentialMutation();
     try {
-      await importOAuthCredential({
+      const result = await importOAuthCredential({
         provider: "anthropic",
         auth_mode: "claude_code_oauth",
         alias: claudeAlias.trim() || t(($) => $.providers.authModes.claudeCodeOAuth),
@@ -333,7 +618,7 @@ export function ProviderSection({
       setClaudeAlias("");
       setClaudeLabel("");
       setProviderMsg({ kind: "claude_imported" });
-      await onRefresh();
+      await refreshAfterCredentialMutation(result.credential);
     } catch (e) {
       setClaudeToken(""); // also clear on failure — don't keep the token around
       setProviderErr({ kind: "request", error: e });
@@ -377,7 +662,7 @@ export function ProviderSection({
       if (res.kind === "success") {
         setOauth(null);
         setProviderMsg({ kind: "oauth_signed_in" });
-        await onRefresh();
+        await refreshAfterCredentialMutation(res.credential);
       } else if (res.kind === "timeout") {
         setOauth((o) => (o ? { ...o, phase: "manual" } : o));
         setProviderErr({ kind: "oauth_timeout" });
@@ -435,12 +720,12 @@ export function ProviderSection({
     setProviderMsg(null);
     setManualBusy(true);
     try {
-      await completeOpenAIOAuthManual(buildManualCompletion(oauth.state, pasted));
+      const result = await completeOpenAIOAuthManual(buildManualCompletion(oauth.state, pasted));
       pollToken.current.aborted = true; // manual won — stop the still-running loopback poll
       setManualValue("");
       setOauth(null);
       setProviderMsg({ kind: "oauth_signed_in_manual" });
-      await onRefresh();
+      await refreshAfterCredentialMutation(result.credential);
     } catch (e) {
       // a bad/expired/forged state or a token-exchange error 400s here — show it, no fallback
       setProviderErr({ kind: "request", error: e });
@@ -454,9 +739,9 @@ export function ProviderSection({
     setProviderMsg(null);
     beginCredentialMutation();
     try {
-      await updateCredential(credentialId, { active: true });
+      const result = await updateCredential(credentialId, { active: true });
       setProviderMsg({ kind: "active_updated" });
-      await onRefresh();
+      await refreshAfterCredentialMutation(result.credential);
     } catch (e) {
       setProviderErr({ kind: "request", error: e });
     } finally {
@@ -480,7 +765,7 @@ export function ProviderSection({
       };
       if (cleanAlias) body.alias = cleanAlias;
       if (expiresAt !== undefined) body.expires_at = expiresAt.trim();
-      await updateCredential(credentialId, body);
+      const result = await updateCredential(credentialId, body);
       setRenames((prev) => {
         const next = { ...prev };
         delete next[credentialId];
@@ -492,7 +777,7 @@ export function ProviderSection({
         return next;
       });
       setProviderMsg({ kind: "display_updated" });
-      await onRefresh();
+      await refreshAfterCredentialMutation(result.credential);
     } catch (e) {
       setProviderErr({ kind: "request", error: e });
     } finally {
@@ -507,7 +792,7 @@ export function ProviderSection({
     try {
       await deleteCredential(credentialId);
       setProviderMsg({ kind: "deleted" });
-      await onRefresh();
+      await refreshAfterCredentialMutation(null, credentialId);
     } catch (e) {
       setProviderErr({ kind: "request", error: e });
     } finally {
@@ -520,7 +805,7 @@ export function ProviderSection({
 
   return (
     <>
-      <div className="settings-section-head">
+      <div className="settings-section-head" ref={sectionHeadRef}>
         <div>
           <h2>{t(($) => $.providers.section.title)}</h2>
           <p className="muted">{t(($) => $.providers.section.description)}</p>
@@ -536,8 +821,11 @@ export function ProviderSection({
             catalog.credentials?.[provider] ??
             (provider === "anthropic" ? runtime?.anthropic.credentials : runtime?.openai.credentials) ??
             [];
-          const activeCred = credentials.find((c) => c.active && c.available) ?? null;
-          const pill = credentialPill(activeCred, t, commonT);
+          const activeCred = credentials.find((c) => c.active) ?? null;
+          const pill = activeCred
+            ? lifecyclePresentation(activeCred, t)
+              ?? credentialPill(activeCred.available ? activeCred : null, t, commonT)
+            : credentialPill(null, t, commonT);
           // Smart-collapse the setup forms: expanded only when the provider has NO
           // usable credential (the empty-state where setup IS the task); a user
           // toggle (setupOpen[provider]) overrides.
@@ -604,6 +892,10 @@ export function ProviderSection({
                 reloginBusy={chatgptLoginBusy}
                 onNavigationGuardChange={onCredentialNavigationGuardChange}
                 developerMode={developerMode}
+                accountUsage={accountUsage}
+                accountSyncing={accountSyncing}
+                accountCooldownUntil={accountCooldownUntil}
+                onSyncAccountUsage={(id) => void syncAccountUsage(id, true)}
               />
               {discoveryState?.result && (
                 <DiscoveryResultView
@@ -862,6 +1154,99 @@ export function SetupDisclosure({
   );
 }
 
+function AccountUsageView({
+  credential,
+  local,
+  syncing,
+  cooldownUntil,
+  onSync,
+}: {
+  credential: ProviderCredential;
+  local: LocalAccountUsage | undefined;
+  syncing: boolean;
+  cooldownUntil: number;
+  onSync?: (credentialId: string) => void;
+}) {
+  const { t } = useTranslation("settings");
+  const snapshot = local?.view?.snapshot ?? null;
+  const limits = snapshot?.payload.rate_limits ?? null;
+  const unknown = t(($) => $.providers.accountUsage.unknown);
+  const syncError = local?.view?.sync_status === "failed"
+    ? local.view.sync_error_code ?? "sync_failed"
+    : local?.readState === "failed"
+      ? "cached_read_failed"
+      : null;
+  const manualSyncDisabled = syncing || cooldownUntil > Date.now();
+
+  function renderWindow(label: string, window: OAuthRateLimitWindow | null) {
+    const used = window?.used_percent ?? null;
+    const remaining = used === null ? unknown : percentage(Math.max(0, 100 - used), t);
+    return (
+      <div>
+        <strong>{label}</strong>
+        <p>{t(($) => $.providers.accountUsage.used, { value: percentage(used, t) })}</p>
+        <p>{t(($) => $.providers.accountUsage.estimatedRemaining, { value: remaining })}</p>
+        <p>{t(($) => $.providers.accountUsage.reset, { value: resetTimestamp(window?.resets_at ?? null, t) })}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-account-usage={credential.id}
+      style={{ gridColumn: "1 / -1", display: "grid", gap: 6 }}
+    >
+      <strong>{t(($) => $.providers.accountUsage.title)}</strong>
+      {snapshot ? (
+        <>
+          {renderWindow(t(($) => $.providers.accountUsage.primaryWindow), limits?.primary ?? null)}
+          {limits?.secondary
+            ? renderWindow(t(($) => $.providers.accountUsage.secondaryWindow), limits.secondary)
+            : null}
+          <p>
+            {t(($) => $.providers.accountUsage.rateStatus, {
+              value: rateLimitStatusLabel(limits?.status ?? null, t),
+            })}
+          </p>
+          <p>
+            {t(($) => $.providers.accountUsage.overage, {
+              value: rateLimitStatusLabel(limits?.overage_status ?? null, t),
+            })}
+          </p>
+          {limits?.overage_disabled_reason ? (
+            <p>{t(($) => $.providers.accountUsage.reason, { value: limits.overage_disabled_reason })}</p>
+          ) : null}
+          <p>{t(($) => $.providers.accountUsage.source, { value: snapshot.source })}</p>
+          <p>
+            {t(($) => $.providers.accountUsage.observedAt, {
+              timestamp: formatSystemTimestamp(snapshot.observed_at),
+            })}
+          </p>
+        </>
+      ) : (
+        <p>{t(($) => $.providers.accountUsage.noObservation)}</p>
+      )}
+      {syncError ? (
+        <p>{t(($) => $.providers.accountUsage.syncFailed, { code: syncError })}</p>
+      ) : null}
+      {credential.auth_type === "chatgpt_oauth" && onSync ? (
+        <div className="credential-actions">
+          <button
+            type="button"
+            className="btn-ghost small"
+            disabled={manualSyncDisabled}
+            onClick={() => onSync(credential.id)}
+          >
+            {syncing
+              ? t(($) => $.providers.accountUsage.syncing)
+              : t(($) => $.providers.accountUsage.sync)}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CredentialList({
   credentials,
   renames,
@@ -877,6 +1262,10 @@ export function CredentialList({
   reloginBusy,
   onNavigationGuardChange,
   developerMode = false,
+  accountUsage = {},
+  accountSyncing = {},
+  accountCooldownUntil = {},
+  onSyncAccountUsage,
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
@@ -894,6 +1283,10 @@ export function CredentialList({
   reloginBusy?: boolean;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   developerMode?: boolean;
+  accountUsage?: Record<string, LocalAccountUsage>;
+  accountSyncing?: Record<string, boolean>;
+  accountCooldownUntil?: Record<string, number>;
+  onSyncAccountUsage?: (credentialId: string) => void;
 }) {
   const { t } = useTranslation("settings");
   // Per-row probe state (claude_code_oauth only). Local — the probe result is
@@ -942,6 +1335,7 @@ export function CredentialList({
         const showExpiry = supportsCredentialExpiry(cred.auth_type);
         const aliasDraft = renames[cred.id] ?? cred.label;
         const accountLabelDraft = metadataDraft.account_label ?? cred.account_label ?? "";
+        const lifecycle = lifecyclePresentation(cred, t);
         // The expiry draft holds the date-picker's native YYYY-MM-DD form; convert
         // the stored ISO for display, and back to a canonical ISO on save.
         const expiresAtDraft = metadataDraft.expires_at ?? isoToDateInput(cred.expires_at);
@@ -958,8 +1352,8 @@ export function CredentialList({
               {cred.active && <span className="active-badge">{t(($) => $.providers.credential.active)}</span>}
               <span>{cred.auth_type}</span>
             </div>
-            <span className={`key-pill credential-status-pill ${cred.available ? "ok" : "missing"}`}>
-              {credentialAvailabilityText(cred, t)}
+            <span className={`key-pill credential-status-pill ${(lifecycle?.ok ?? cred.available) ? "ok" : "missing"}`}>
+              {lifecycle?.label ?? credentialAvailabilityText(cred, t)}
             </span>
             <p className="muted tiny">
               {cred.id.startsWith("local:")
@@ -967,6 +1361,30 @@ export function CredentialList({
                 : t(($) => $.providers.credential.environmentFallback)}
             </p>
             <p>{cred.notes}</p>
+            {cred.last_refresh_attempt_at ? (
+              <p>{t(($) => $.providers.lifecycle.lastAttempt, {
+                timestamp: formatSystemTimestamp(cred.last_refresh_attempt_at),
+              })}</p>
+            ) : null}
+            {cred.last_refresh_success_at ? (
+              <p>{t(($) => $.providers.lifecycle.lastSuccess, {
+                timestamp: formatSystemTimestamp(cred.last_refresh_success_at),
+              })}</p>
+            ) : null}
+            {cred.last_refresh_error_at ? (
+              <p>{t(($) => $.providers.lifecycle.lastError, {
+                timestamp: formatSystemTimestamp(cred.last_refresh_error_at),
+              })}</p>
+            ) : null}
+            {cred.active && isOAuthCredential(cred) ? (
+              <AccountUsageView
+                credential={cred}
+                local={accountUsage[cred.id]}
+                syncing={accountSyncing[cred.id] === true}
+                cooldownUntil={accountCooldownUntil[cred.id] ?? 0}
+                onSync={onSyncAccountUsage}
+              />
+            ) : null}
             {(cred.editable || cred.can_discover_models) && (
               <div className="credential-actions">
                 {cred.editable && (

@@ -176,6 +176,12 @@ export interface ModelCatalog {
 // Explicit auth modes (backend normalizes legacy oauth/setup_token → these; it
 // never returns the legacy values). Matches src/model_credentials.CredentialAuthType.
 export type CredentialAuthType = "api_key" | "api_key_pool" | "chatgpt_oauth" | "claude_code_oauth";
+export type OAuthLifecycleState =
+  | "ready"
+  | "refresh_required"
+  | "refresh_failed_retryable"
+  | "reauth_required"
+  | "unverifiable";
 
 export interface ProviderCredential {
   id: string;
@@ -191,7 +197,92 @@ export interface ProviderCredential {
   editable: boolean;
   can_discover_models: boolean;
   can_test_models: boolean;
+  lifecycle_state?: OAuthLifecycleState | null;
+  lifecycle_error_code?: string | null;
+  last_refresh_attempt_at?: string | null;
+  last_refresh_success_at?: string | null;
+  last_refresh_error_at?: string | null;
+  last_refresh_error_detail?: string | null;
   notes: string;
+}
+
+export type OAuthRateLimitStatus = "allowed" | "allowed_warning" | "rejected";
+export type OAuthAccountSource = "codex_app_server" | "claude_rate_limit_event";
+
+export interface OAuthRateLimitWindow {
+  used_percent: number | null;
+  window_duration_minutes: number | null;
+  resets_at: number | null;
+}
+
+export interface OAuthCreditsSnapshot {
+  balance: string | null;
+  has_credits: boolean;
+  unlimited: boolean;
+}
+
+export interface OAuthSpendControlLimit {
+  limit: string;
+  used: string;
+  remaining_percent: number;
+  resets_at: number;
+}
+
+export interface OAuthRateLimitSnapshot {
+  limit_id: string | null;
+  limit_name: string | null;
+  plan_type: string | null;
+  primary: OAuthRateLimitWindow | null;
+  secondary: OAuthRateLimitWindow | null;
+  rate_limit_reached_type: string | null;
+  credits: OAuthCreditsSnapshot | null;
+  individual_limit: OAuthSpendControlLimit | null;
+  spend_control_reached: boolean | null;
+  status: OAuthRateLimitStatus | null;
+  overage_status: OAuthRateLimitStatus | null;
+  overage_resets_at: number | null;
+  overage_disabled_reason: string | null;
+}
+
+export interface OAuthUsageSummary {
+  lifetime_tokens: number | null;
+  peak_daily_tokens: number | null;
+  longest_running_turn_seconds: number | null;
+  current_streak_days: number | null;
+  longest_streak_days: number | null;
+}
+
+export interface OAuthDailyUsageBucket {
+  start_date: string;
+  tokens: number;
+}
+
+export interface OAuthAccountPayload {
+  rate_limits: OAuthRateLimitSnapshot;
+  rate_limits_by_limit_id: Record<string, OAuthRateLimitSnapshot>;
+  reset_credits_available: number | null;
+  usage_summary: OAuthUsageSummary;
+  daily_usage_buckets: OAuthDailyUsageBucket[];
+}
+
+export interface OAuthAccountSnapshot {
+  credential_id: string;
+  provider: ModelProvider;
+  auth_mode: "chatgpt_oauth" | "claude_code_oauth";
+  account_fingerprint: string;
+  source: OAuthAccountSource;
+  schema_version: 1;
+  observed_at: string;
+  status: "available";
+  payload: OAuthAccountPayload;
+  updated_at: string;
+}
+
+export interface OAuthAccountSyncView {
+  credential_id: string;
+  snapshot: OAuthAccountSnapshot | null;
+  sync_status: "not_requested" | "succeeded" | "failed" | "unsupported";
+  sync_error_code: string | null;
 }
 
 export interface DiscoveredModel {
@@ -1160,6 +1251,22 @@ export function deleteFixedTaskRuntime(): Promise<{
 
 export function listCredentials(): Promise<{ credentials: Record<ModelProvider, ProviderCredential[]> }> {
   return getJSON<{ credentials: Record<ModelProvider, ProviderCredential[]> }>("/config/credentials", 8_000);
+}
+
+export function getCredentialAccountUsage(credentialId: string): Promise<OAuthAccountSyncView> {
+  return getJSON<OAuthAccountSyncView>(
+    `/config/credentials/${encodeURIComponent(credentialId)}/account-usage`,
+    8_000,
+  );
+}
+
+export function syncCredentialAccountUsage(credentialId: string): Promise<OAuthAccountSyncView> {
+  return sendJSON<OAuthAccountSyncView>(
+    `/config/credentials/${encodeURIComponent(credentialId)}/account-usage/sync`,
+    "POST",
+    undefined,
+    40_000,
+  );
 }
 
 // Import a subscription OAuth/setup token. v1: anthropic + claude_code_oauth

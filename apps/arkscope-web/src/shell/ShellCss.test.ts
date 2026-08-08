@@ -86,7 +86,10 @@ describe("responsive application shell CSS", () => {
     );
 
     expect(providerSectionSource).toContain(
-      'className={`key-pill credential-status-pill ${cred.available ? "ok" : "missing"}`}',
+      "const lifecycle = lifecyclePresentation(cred, t);",
+    );
+    expect(providerSectionSource).toContain(
+      'className={`key-pill credential-status-pill ${(lifecycle?.ok ?? cred.available) ? "ok" : "missing"}`}',
     );
     expect(genericPill).toMatch(/max-width:\s*96px/);
     expect(legacyCss).not.toMatch(/\.credential-row > \.credential-status-pill\s*\{/);
