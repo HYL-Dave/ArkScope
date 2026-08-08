@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASK 0 EVIDENCE READY FOR INDEPENDENT REVIEW
+> **Status:** PLAN REVIEW GREEN; TASKS 0-3 COMPLETE; TASK 3 EVIDENCE READY FOR INDEPENDENT REVIEW
 >
 > **Date:** 2026-08-08
 >
@@ -492,20 +492,20 @@ copy is not updated merely to follow new copy.
 
 ### Task 3 - Bounded ChatGPT account adapter and API
 
-- [ ] Add nine adapter/store/route tests from Section 2.3 and confirm RED.
-- [ ] Build redacted fixtures for initialize, account identity,
+- [x] Add nine adapter/store/route tests from Section 2.3 and confirm RED.
+- [x] Build redacted fixtures for initialize, account identity,
   `account/rateLimits/read`, and `account/usage/read`; fixture fields may contain
   obvious sentinels proving raw account ids/tokens never leave the adapter.
-- [ ] Implement the exact `0.147.0` allowlist, isolated `CODEX_HOME`, bounded
+- [x] Implement the exact `0.147.0` allowlist, isolated `CODEX_HOME`, bounded
   JSONL request ids, stdout/stderr limits, timeout, and child/process-group
   cleanup.
-- [ ] Reject thread/turn notifications or methods in the fixture transcript.
-- [ ] Store only validated typed fields and preserve the last good snapshot on
+- [x] Reject thread/turn notifications or methods in the fixture transcript.
+- [x] Store only validated typed fields and preserve the last good snapshot on
   current failure/account mismatch.
-- [ ] Add cached GET and explicit sync POST; inventory GET remains local-only.
-- [ ] Implement per-credential backend single-flight. Manual frontend cooldown
+- [x] Add cached GET and explicit sync POST; inventory GET remains local-only.
+- [x] Implement per-credential backend single-flight. Manual frontend cooldown
   is not a substitute.
-- [ ] Require stage identity `4605/3b6cbd5f...` and
+- [x] Require stage identity `4605/3b6cbd5f...` and
   `270/d9b03cc7...`, then GREEN and commit.
 
 ### Task 4 - Wire refresh, login, delete, and exact invalidation
