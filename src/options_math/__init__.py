@@ -33,7 +33,6 @@ from .option_pricing import (
     calculate_iv_percentile,
     analyze_iv_environment,
     # Utilities
-    get_risk_free_rate,
     calculate_days_to_expiry,
     # Data classes
     VolatilityEstimate,
@@ -41,12 +40,6 @@ from .option_pricing import (
     MispricingSignal,
     IVAnalysis,
     OptionType,
-)
-from .rate_curve import (
-    RateCurve,
-    get_rate_for_dte,
-    get_yield_curve,
-    make_flat_curve,
 )
 
 __all__ = [
@@ -74,13 +67,7 @@ __all__ = [
     'calculate_iv_percentile',
     'analyze_iv_environment',
     # Utilities
-    'get_risk_free_rate',
     'calculate_days_to_expiry',
-    # Rate Curve (B1)
-    'RateCurve',
-    'get_rate_for_dte',
-    'get_yield_curve',
-    'make_flat_curve',
     # Data classes
     'VolatilityEstimate',
     'TheoreticalPrice',
