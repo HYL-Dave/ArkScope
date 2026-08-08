@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASKS 0-5 COMPLETE; TASK 5 EVIDENCE READY FOR INDEPENDENT REVIEW
+> **Status:** PLAN REVIEW GREEN; TASKS 0-6 COMPLETE; TASK 6 EVIDENCE READY FOR INDEPENDENT REVIEW
 >
 > **Date:** 2026-08-08
 >
@@ -539,21 +539,21 @@ copy is not updated merely to follow new copy.
 
 ### Task 6 - Provider Settings lifecycle and quota UI
 
-- [ ] Add seven frontend nodes under the exact describe owner; confirm RED for
+- [x] Add seven frontend nodes under the exact describe owner; confirm RED for
   missing state rendering/cadence/invalidation, not imports or fixture shape.
-- [ ] Extend `api.ts` with closed typed DTOs and the cached/sync split.
-- [ ] Render lifecycle-specific actions/status without one generic green pill.
-- [ ] Render direct used/reset/overage fields, inferred remaining label, source,
+- [x] Extend `api.ts` with closed typed DTOs and the cached/sync split.
+- [x] Render lifecycle-specific actions/status without one generic green pill.
+- [x] Render direct used/reset/overage fields, inferred remaining label, source,
   and `observed_at`; missing means unknown.
-- [ ] Implement visibility/focus five-minute TTL, ten-second manual cooldown,
+- [x] Implement visibility/focus five-minute TTL, ten-second manual cooldown,
   and one local in-flight sync. No hidden interval poll.
-- [ ] On add/import/login/re-login/activate/delete/update, invalidate only the
+- [x] On add/import/login/re-login/activate/delete/update, invalidate only the
   affected credential snapshot and refresh local inventory immediately.
-- [ ] Preserve the setup form/navigation guard, all secret-absence assertions,
+- [x] Preserve the setup form/navigation guard, all secret-absence assertions,
   frozen Settings copy fixtures, and existing model-discovery behavior.
-- [ ] Require focused `15/887a712a...`, full
+- [x] Require focused `15/887a712a...`, full
   `1084/f0e5ecda...`, typecheck, build, and i18n scanner GREEN.
-- [ ] Commit frontend/i18n as one family.
+- [x] Commit frontend/i18n as one family.
 
 ### Task 7 - Mutation, full admission, review, and merge
 
