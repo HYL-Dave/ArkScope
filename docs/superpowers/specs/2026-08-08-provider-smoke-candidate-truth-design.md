@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: IMPLEMENTATION PLAN GREEN; TASK 2 COMPLETE - INDEPENDENT TASK 2 REVIEW REQUIRED.**
+> **Status: IMPLEMENTATION PLAN GREEN; TASK 3 COMPLETE - INDEPENDENT TASK 3 REVIEW REQUIRED; TASK 4 NOT AUTHORIZED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -33,7 +33,12 @@
 > owner runtime. Independent Task 1 review returned GREEN at `ec140ae1`. Task 2
 > then retired the unconsumed rate-curve/cache family, reproduced exact final
 > collection `4527`, and kept the 75-node surviving option owner set green.
-> Task 3 remains unauthorized until independent Task 2 review.
+> Independent Task 2 review returned GREEN at `6bf47673`. Task 3 then removed the
+> complete Tiingo executable/configuration tail, retained only a truthful
+> non-implementation candidate record, reproduced exact final collection `4527`,
+> kept the 281-node retained owner union green, and preserved all reviewed shared
+> projections and protected owners. Implementation commit `d1adb954` now awaits
+> independent Task 3 review. Task 4 remains unauthorized.
 
 ## 1. Purpose
 

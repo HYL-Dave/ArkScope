@@ -1,7 +1,7 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** TASK 2 COMPLETE - INDEPENDENT TASK 2 REVIEW REQUIRED;
-> TASK 3 NOT AUTHORIZED
+> **Status:** TASK 3 COMPLETE - INDEPENDENT TASK 3 REVIEW REQUIRED;
+> TASK 4 NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -759,36 +759,36 @@ Update evidence and stop for independent Task 2 review.
 
 **Files:** Sections 1.3 and 1.4 plus evidence.
 
-- [ ] **Step 1: Capture shared projections before editing**
+- [x] **Step 1: Capture shared projections before editing**
 
 Run the AST projection in Section 3.4 and save its canonical JSON/SHA. Capture exact
 pre-edit hashes of both config files and all current authority documents.
 
-- [ ] **Step 2: Delete Tiingo code/diagnostic and remove shared entries**
+- [x] **Step 2: Delete Tiingo code/diagnostic and remove shared entries**
 
 Delete exactly the two remaining Tiingo-owned executable paths. Remove only the
 Tiingo import/export/enum/registry/env/template/profile surfaces. No shim, disabled
 entry, alias, archived copy, or TODO implementation remains.
 
-- [ ] **Step 3: Reconcile current authorities**
+- [x] **Step 3: Reconcile current authorities**
 
 Apply every terminal statement in Section 1.4. Keep one concise Provider Catalog
 candidate record and no other current implementation claim. Do not update dated
 research to make history disappear.
 
-- [ ] **Step 4: Close shared projections and both censuses**
+- [x] **Step 4: Close shared projections and both censuses**
 
 Require non-Tiingo AST/config projections byte-equivalent, protected 30-row manifest
 unchanged, final Tiingo external stream `13/0ba6820c...`, final evaluation stream
 `10/0625d122...`, zero unknown/duplicate verdicts, and zero executable/config tail.
 Confirm ignored `data_sources/comparison_data/` is byte/metadata untouched.
 
-- [ ] **Step 5: Re-run focused behavior and collection**
+- [x] **Step 5: Re-run focused behavior and collection**
 
 Require final collection still `4527/4eeb1178...`; run the 206 retained-provider
 and 75 option nodes for `280 passed / 1 skipped`. No provider request is allowed.
 
-- [ ] **Step 6: Commit and stop for review**
+- [x] **Step 6: Commit and stop for review**
 
 Suggested product commit:
 
