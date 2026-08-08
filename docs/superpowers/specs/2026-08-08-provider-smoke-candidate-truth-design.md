@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: IMPLEMENTATION PLAN REVIEW BLOCKED - CENSUS AMENDMENT RE-REVIEW REQUIRED.**
+> **Status: IMPLEMENTATION PLAN GREEN; TASK 0 COMPLETE - INDEPENDENT TASK 0 REVIEW REQUIRED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -23,7 +23,11 @@
 > generated from locked git-crypt bytes and omitted two encrypted research files
 > plus the existing project decision log. This bounded amendment corrects only
 > those census identities/classifications. Implementation remains unauthorized
-> until focused re-review.
+> until focused re-review. Focused review of amendment `a9c70262` returned GREEN
+> with zero findings. Task 0 then re-grounded every collection, partition,
+> two-input census, protected-owner, and structural-RED identity without changing
+> product/test/config/data bytes. Task 1 remains unauthorized until independent
+> review of the Task 0 evidence.
 
 ## 1. Purpose
 

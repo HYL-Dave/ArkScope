@@ -1,6 +1,7 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** DRAFT AMENDED - FOCUSED RE-REVIEW REQUIRED; NO IMPLEMENTATION AUTHORIZED
+> **Status:** TASK 0 COMPLETE - INDEPENDENT TASK 0 REVIEW REQUIRED;
+> TASK 1 NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -618,20 +619,20 @@ be rejected before execution. Final review must show:
 
 **Files:** plan/design/map only; then create evidence.
 
-- [ ] **Step 1: Verify branch and authority identities**
+- [x] **Step 1: Verify branch and authority identities**
 
 Require exact branch/worktree/base, clean status, reviewed design commit ancestry,
 reviewed design blob SHA, and all five pinned native/toolchain assets. Verify main
 remains `6159fc14` and no product/test/data path differs from the reviewed branch.
 
-- [ ] **Step 2: Rebuild collection and all partitions without running tests**
+- [x] **Step 2: Rebuild collection and all partitions without running tests**
 
 Use the deterministic reporter with `--collect-only` under a fresh single-use
 stage. Require base `4607/5180502f...`, seen set empty, and no provider call. Derive
 the 15-path, 13-node, 33-node, 6-path, 34-node, 80-node, 4561-stage, and 4527-final
 streams independently from the base JSON. Compare every count/SHA in Section 2.1.
 
-- [ ] **Step 3: Record exact structural RED**
+- [x] **Step 3: Record exact structural RED**
 
 Prove all retiring files/symbols/Tiingo surfaces exist, the manual smoke is absent,
 and the current authorities contain the stale grounded claims. Record the known
@@ -639,7 +640,7 @@ and the current authorities contain the stale grounded claims. Record the known
 the sole failure must be the EIR-006 census node and exact unclassified path in
 Section 0.3. Any other failure is wrong RED and stops.
 
-- [ ] **Step 4: Rebuild both external censuses and protected manifest**
+- [x] **Step 4: Rebuild both external censuses and protected manifest**
 
 Reproduce all Section 2.3 streams through the two-input unlocked/plaintext boundary
 in Section 0.5. The result must include both encrypted research documents and the
@@ -647,7 +648,7 @@ priority-map decision log. Reproduce all 30 protected rows and aggregate in Sect
 2.4. Persist commands, row streams, and SHA files outside the repository under one
 new single-use Task 0 root.
 
-- [ ] **Step 5: Create Task 0 evidence and commit docs only**
+- [x] **Step 5: Create Task 0 evidence and commit docs only**
 
 Create:
 
