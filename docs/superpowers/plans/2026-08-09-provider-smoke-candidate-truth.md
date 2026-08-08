@@ -1,7 +1,7 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** TASK 0 COMPLETE - INDEPENDENT TASK 0 REVIEW REQUIRED;
-> TASK 1 NOT AUTHORIZED
+> **Status:** TASK 1 COMPLETE - INDEPENDENT TASK 1 REVIEW REQUIRED;
+> TASK 2 NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -679,19 +679,19 @@ for independent Task 0 review. Task 1 remains unauthorized until GREEN.
 
 **Create/modify:** the Section 1.1 replacement and owners, plus evidence.
 
-- [ ] **Step 1: Preserve RED evidence and delete exact paths**
+- [x] **Step 1: Preserve RED evidence and delete exact paths**
 
 Use `git rm` on exactly the fifteen files. Do not move their contents. Require the
 deleted path stream to equal the reviewed 15-path stream; a sixteenth path or a
 missing path stops.
 
-- [ ] **Step 2: Write the manual yfinance CLI and live contract**
+- [x] **Step 2: Write the manual yfinance CLI and live contract**
 
 Implement Section 3.1 from scratch. Update `tests/live/README.md` with the explicit
 network/manual/current-terms warning and exact invocation. Run only compile, AST,
 argument-error, and import-blocked `--help`; never invoke a ticker request.
 
-- [ ] **Step 3: Reconcile current path references and EIR census ownership**
+- [x] **Step 3: Reconcile current path references and EIR census ownership**
 
 Update the two current instructions in
 `docs/data/IBKR_NEWS_API_LIMITATIONS.md`. In
@@ -702,14 +702,14 @@ Update the two current instructions in
   owners; and
 - preserve both existing node IDs and every other classification byte.
 
-- [ ] **Step 4: Prove the exact 4561 stage and retained behavior**
+- [x] **Step 4: Prove the exact 4561 stage and retained behavior**
 
 Recollect and require `4561/dd127ce5...`. `comm` against base must equal exactly
 the 46 January IDs; additions are empty. Require zero collected nodes under
 `tests/live/`. With only an empty `data/` marker, run the 206-node retained-provider
 set and require `206 passed`. Remove the marker and verify clean status.
 
-- [ ] **Step 5: Commit and stop for review**
+- [x] **Step 5: Commit and stop for review**
 
 Commit the exact family as one atomic product/test change, then a docs-only evidence
 update if needed. Suggested product commit:

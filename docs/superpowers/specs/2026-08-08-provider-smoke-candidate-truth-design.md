@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: IMPLEMENTATION PLAN GREEN; TASK 0 COMPLETE - INDEPENDENT TASK 0 REVIEW REQUIRED.**
+> **Status: IMPLEMENTATION PLAN GREEN; TASK 1 COMPLETE - INDEPENDENT TASK 1 REVIEW REQUIRED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -27,7 +27,10 @@
 > with zero findings. Task 0 then re-grounded every collection, partition,
 > two-input census, protected-owner, and structural-RED identity without changing
 > product/test/config/data bytes. Task 1 remains unauthorized until independent
-> review of the Task 0 evidence.
+> review of the Task 0 evidence. Task 0 review then returned GREEN at `8c47e994`.
+> Task 1 retired exactly the fifteen-file January family, added one new manual
+> yfinance smoke, and reproduced the exact `4561` stage plus `206/206` retained
+> owner runtime. Task 2 remains unauthorized until independent Task 1 review.
 
 ## 1. Purpose
 
