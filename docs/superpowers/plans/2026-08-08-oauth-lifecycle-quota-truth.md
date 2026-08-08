@@ -457,18 +457,18 @@ copy is not updated merely to follow new copy.
 
 ### Task 1 - Lifecycle projection and bounded store
 
-- [ ] Add all eleven lifecycle nodes first. Imports must be function-level so a
+- [x] Add all eleven lifecycle nodes first. Imports must be function-level so a
   missing new module produces test failures, not collection errors.
-- [ ] Confirm all eleven RED for absent lifecycle/store contracts.
-- [ ] Implement `oauth_status.py`, no-create reads, bounded writes, redaction,
+- [x] Confirm all eleven RED for absent lifecycle/store contracts.
+- [x] Implement `oauth_status.py`, no-create reads, bounded writes, redaction,
   and the five-state projection.
-- [ ] Make OAuth `available` derived and freeze API-key/environment behavior.
-- [ ] Separate runtime OAuth resolution from display availability; do not add
+- [x] Make OAuth `available` derived and freeze API-key/environment behavior.
+- [x] Separate runtime OAuth resolution from display availability; do not add
   provider/credential fallback.
-- [ ] Apply the mode-scoped `expires_at` ruling from Section 1.3.
-- [ ] Require stage identity `4592/7f9d4884...` and
+- [x] Apply the mode-scoped `expires_at` ruling from Section 1.3.
+- [x] Require stage identity `4592/7f9d4884...` and
   `257/b875fd44...`, then run the focused stage GREEN.
-- [ ] Commit lifecycle/store as one reviewed family.
+- [x] Commit lifecycle/store as one reviewed family.
 
 ### Task 2 - Cross-process lifecycle lock
 
