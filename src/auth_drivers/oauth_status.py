@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 MAX_REFRESH_DETAIL_LENGTH = 240
@@ -51,6 +52,83 @@ class OAuthLifecycleProjection(BaseModel):
         return self.lifecycle_state == OAuthLifecycleState.READY
 
 
+class OAuthRateLimitWindow(BaseModel):
+    used_percent: int
+    window_duration_minutes: int | None = None
+    resets_at: int | None = None
+
+
+class OAuthCreditsSnapshot(BaseModel):
+    balance: str | None = None
+    has_credits: bool
+    unlimited: bool
+
+
+class OAuthSpendControlLimit(BaseModel):
+    limit: str
+    used: str
+    remaining_percent: int
+    resets_at: int
+
+
+class OAuthRateLimitSnapshot(BaseModel):
+    limit_id: str | None = None
+    limit_name: str | None = None
+    plan_type: str | None = None
+    primary: OAuthRateLimitWindow | None = None
+    secondary: OAuthRateLimitWindow | None = None
+    rate_limit_reached_type: str | None = None
+    credits: OAuthCreditsSnapshot | None = None
+    individual_limit: OAuthSpendControlLimit | None = None
+    spend_control_reached: bool | None = None
+
+
+class OAuthUsageSummary(BaseModel):
+    lifetime_tokens: int | None = None
+    peak_daily_tokens: int | None = None
+    longest_running_turn_seconds: int | None = None
+    current_streak_days: int | None = None
+    longest_streak_days: int | None = None
+
+
+class OAuthDailyUsageBucket(BaseModel):
+    start_date: str
+    tokens: int
+
+
+class OAuthAccountPayload(BaseModel):
+    rate_limits: OAuthRateLimitSnapshot
+    rate_limits_by_limit_id: dict[str, OAuthRateLimitSnapshot] = Field(default_factory=dict)
+    reset_credits_available: int | None = None
+    usage_summary: OAuthUsageSummary
+    daily_usage_buckets: list[OAuthDailyUsageBucket] = Field(default_factory=list)
+
+
+class OAuthAccountObservation(BaseModel):
+    account_fingerprint: str = Field(
+        min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    )
+    source: Literal["codex_app_server", "claude_rate_limit_event"]
+    schema_version: int = 1
+    observed_at: str
+    status: Literal["available"] = "available"
+    payload: OAuthAccountPayload
+
+
+class OAuthAccountSnapshot(OAuthAccountObservation):
+    credential_id: str
+    provider: str
+    auth_mode: str
+    updated_at: str
+
+
+class OAuthAccountSyncView(BaseModel):
+    credential_id: str
+    snapshot: OAuthAccountSnapshot | None = None
+    sync_status: Literal["not_requested", "succeeded", "failed", "unsupported"]
+    sync_error_code: str | None = None
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS oauth_refresh_status (
     credential_id TEXT PRIMARY KEY,
@@ -61,6 +139,18 @@ CREATE TABLE IF NOT EXISTS oauth_refresh_status (
     last_refresh_error_at TEXT,
     last_refresh_error_code TEXT,
     last_refresh_error_detail TEXT,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oauth_account_snapshot (
+    credential_id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    auth_mode TEXT NOT NULL,
+    account_fingerprint TEXT NOT NULL,
+    source TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 """
@@ -249,6 +339,89 @@ class OAuthObservationStore:
                 (credential_id, provider, auth_mode, timestamp, error_code, safe_detail, timestamp),
             )
             conn.commit()
+
+    def read_account_snapshot(self, credential_id: str) -> OAuthAccountSnapshot | None:
+        with self._read_connection() as conn:
+            if conn is None or not self._has_table(conn, "oauth_account_snapshot"):
+                return None
+            row = conn.execute(
+                "SELECT credential_id, provider, auth_mode, account_fingerprint, source, "
+                "schema_version, observed_at, status, payload_json, updated_at "
+                "FROM oauth_account_snapshot WHERE credential_id = ?",
+                (credential_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        data = dict(row)
+        try:
+            data["payload"] = OAuthAccountPayload.model_validate_json(
+                data.pop("payload_json")
+            )
+            return OAuthAccountSnapshot(**data)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    def record_account_snapshot(
+        self,
+        *,
+        credential_id: str,
+        provider: str,
+        auth_mode: str,
+        observation: OAuthAccountObservation,
+    ) -> OAuthAccountSnapshot:
+        observed_at = _timestamp(observation.observed_at)
+        updated_at = _timestamp()
+        payload_json = json.dumps(
+            observation.payload.model_dump(mode="json"),
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        with self._write_connection() as conn:
+            conn.execute(
+                "INSERT INTO oauth_account_snapshot "
+                "(credential_id, provider, auth_mode, account_fingerprint, source, "
+                "schema_version, observed_at, status, payload_json, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(credential_id) DO UPDATE SET "
+                "provider=excluded.provider, auth_mode=excluded.auth_mode, "
+                "account_fingerprint=excluded.account_fingerprint, source=excluded.source, "
+                "schema_version=excluded.schema_version, observed_at=excluded.observed_at, "
+                "status=excluded.status, payload_json=excluded.payload_json, "
+                "updated_at=excluded.updated_at",
+                (
+                    credential_id,
+                    provider,
+                    auth_mode,
+                    observation.account_fingerprint,
+                    observation.source,
+                    observation.schema_version,
+                    observed_at,
+                    observation.status,
+                    payload_json,
+                    updated_at,
+                ),
+            )
+            conn.commit()
+        snapshot = self.read_account_snapshot(credential_id)
+        if snapshot is None:
+            raise RuntimeError("OAuth account snapshot write could not be verified")
+        return snapshot
+
+
+def cached_account_usage(
+    credential_id: str, observation_store: OAuthObservationStore
+) -> OAuthAccountSyncView:
+    """Return local account truth only; this path never starts a provider read."""
+    try:
+        snapshot = observation_store.read_account_snapshot(credential_id)
+    except Exception:  # noqa: BLE001 - a corrupt/unreadable cache is not live truth
+        snapshot = None
+    return OAuthAccountSyncView(
+        credential_id=credential_id,
+        snapshot=snapshot,
+        sync_status="not_requested",
+    )
 
 def _projection(
     state: OAuthLifecycleState,

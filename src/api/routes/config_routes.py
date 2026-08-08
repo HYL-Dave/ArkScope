@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from src.api.dependencies import (
     get_credential_store,
     get_dal,
+    get_oauth_account_sync_service,
     get_oauth_login_manager,
     get_oauth_observation_store,
     get_oauth_token_store,
@@ -353,6 +354,43 @@ def list_credentials(
             ).items()
         }
     }
+
+
+@router.get("/config/credentials/{credential_id}/account-usage")
+def get_credential_account_usage(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Read one cached credential-bound account snapshot; never start a sync."""
+    from src.auth_drivers.oauth_status import cached_account_usage
+
+    store = _credential_store(store)
+    if store.get(credential_id) is None:
+        raise HTTPException(status_code=404, detail="credential not found")
+    return cached_account_usage(credential_id, observation_store)
+
+
+@router.post("/config/credentials/{credential_id}/account-usage/sync")
+def sync_credential_account_usage(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    sync_service=Depends(get_oauth_account_sync_service),
+):
+    """Explicit bounded ChatGPT account control-plane synchronization."""
+    store = _credential_store(store)
+    credential = store.get(credential_id)
+    if credential is None:
+        raise HTTPException(status_code=404, detail="credential not found")
+    require_profile_state_write(
+        "oauth_account_usage_sync",
+        {"credential_id": credential_id, "provider": credential.provider},
+    )
+    return sync_service.sync(
+        credential_id=credential_id,
+        provider=credential.provider,
+        auth_mode=credential.auth_type,
+    )
 
 
 @router.post("/config/credentials")

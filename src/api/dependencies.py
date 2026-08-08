@@ -8,6 +8,8 @@ that all route handlers share.
 from __future__ import annotations
 
 import os
+import threading
+from concurrent.futures import Future, TimeoutError as FutureTimeoutError
 from functools import lru_cache
 from pathlib import Path
 
@@ -207,6 +209,131 @@ def get_oauth_observation_store():
     from src.auth_drivers.oauth_status import OAuthObservationStore
 
     return OAuthObservationStore(_local_state_db_path())
+
+
+class OAuthAccountSyncService:
+    """One bounded account read per credential, shared by concurrent callers."""
+
+    def __init__(
+        self,
+        *,
+        observation_store,
+        token_store,
+        adapter,
+        wait_timeout_seconds: float = 35.0,
+    ):
+        self.observation_store = observation_store
+        self.token_store = token_store
+        self.adapter = adapter
+        self.wait_timeout_seconds = wait_timeout_seconds
+        self._inflight: dict[str, Future] = {}
+        self._inflight_guard = threading.Lock()
+
+    def sync(self, *, credential_id: str, provider: str, auth_mode: str):
+        from src.auth_drivers.oauth_status import cached_account_usage
+
+        with self._inflight_guard:
+            future = self._inflight.get(credential_id)
+            leader = future is None
+            if future is None:
+                future = Future()
+                self._inflight[credential_id] = future
+
+        if not leader:
+            try:
+                return future.result(timeout=self.wait_timeout_seconds)
+            except FutureTimeoutError:
+                cached = cached_account_usage(credential_id, self.observation_store)
+                return cached.model_copy(
+                    update={"sync_status": "failed", "sync_error_code": "sync_busy"}
+                )
+
+        try:
+            result = self._sync_once(
+                credential_id=credential_id,
+                provider=provider,
+                auth_mode=auth_mode,
+            )
+            future.set_result(result)
+            return result
+        except BaseException as exc:
+            future.set_exception(exc)
+            raise
+        finally:
+            with self._inflight_guard:
+                if self._inflight.get(credential_id) is future:
+                    self._inflight.pop(credential_id, None)
+
+    def _sync_once(self, *, credential_id: str, provider: str, auth_mode: str):
+        from src.auth_drivers.codex_account_usage import CodexAccountUsageError
+        from src.auth_drivers.oauth_status import cached_account_usage
+
+        cached = cached_account_usage(credential_id, self.observation_store)
+        if provider != "openai" or auth_mode != "chatgpt_oauth":
+            return cached.model_copy(
+                update={
+                    "sync_status": "unsupported",
+                    "sync_error_code": "unsupported_auth_mode",
+                }
+            )
+        try:
+            record = self.token_store.load(
+                provider=provider,
+                auth_mode=auth_mode,
+                credential_id=credential_id,
+            )
+        except Exception:  # noqa: BLE001 - token-store diagnostics are secret-adjacent
+            return cached.model_copy(
+                update={
+                    "sync_status": "failed",
+                    "sync_error_code": "token_store_unavailable",
+                }
+            )
+        if record is None or not getattr(record, "access_token", None):
+            return cached.model_copy(
+                update={"sync_status": "failed", "sync_error_code": "missing_token"}
+            )
+        try:
+            observation = self.adapter.read_account_usage(
+                credential_id=credential_id,
+                record=record,
+            )
+            snapshot = self.observation_store.record_account_snapshot(
+                credential_id=credential_id,
+                provider=provider,
+                auth_mode=auth_mode,
+                observation=observation,
+            )
+        except CodexAccountUsageError as exc:
+            return cached.model_copy(
+                update={"sync_status": "failed", "sync_error_code": exc.code}
+            )
+        except Exception:  # noqa: BLE001 - never expose raw adapter/storage diagnostics
+            return cached.model_copy(
+                update={
+                    "sync_status": "failed",
+                    "sync_error_code": "adapter_unavailable",
+                }
+            )
+        return cached.model_copy(
+            update={
+                "snapshot": snapshot,
+                "sync_status": "succeeded",
+                "sync_error_code": None,
+            }
+        )
+
+
+@lru_cache(maxsize=1)
+def get_oauth_account_sync_service():
+    """Singleton account sync coordinator; constructing it starts no process."""
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    return OAuthAccountSyncService(
+        observation_store=get_oauth_observation_store(),
+        token_store=get_oauth_token_store(),
+        adapter=CodexAccountUsageAdapter(),
+    )
 
 
 @lru_cache(maxsize=1)
