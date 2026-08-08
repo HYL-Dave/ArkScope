@@ -1,6 +1,6 @@
 # Scripts Tranche B Legacy Score Product Decision
 
-> **Status:** DRAFT FOR PRODUCT DECISION AND INDEPENDENT REVIEW
+> **Status:** PRODUCT DECISION APPROVED; IMPLEMENTATION PLAN WRITTEN FOR INDEPENDENT REVIEW
 > **Date:** 2026-08-08
 > **Base inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
 > **Scope:** Per-surface disposition of the frozen 1-5 news score contract and
@@ -330,6 +330,18 @@ The recommended approval is one bundle:
 
 If any of items 2-3 is rejected, stop before an implementation plan. Do not
 quietly preserve the old score semantic as a compromise.
+
+### 8.1 Approval record
+
+On 2026-08-08 the user explicitly approved `04dd9a67` PD 1 through PD 8 as the
+single section 8 bundle. The normalized authority record is: execute PD 1-8;
+the 491,808 rows and `scoring_keys.txt` still require later separate approval.
+
+This approval authorizes an exact RED-first implementation plan and, after
+independent plan review, the atomic product cutover described by PD 1-8. It
+does **not** authorize reading or deleting the scoring secret, deleting or
+mutating any production score row, or constructing a destructive manifest as
+part of the product implementation.
 
 ## 9. Sequence after approval
 
