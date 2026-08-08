@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Design
 
-> **Status: DESIGN REVIEW GREEN; IMPLEMENTATION PLAN WRITTEN FOR INDEPENDENT REVIEW.**
+> **Status: IMPLEMENTATION PLAN REVIEW BLOCKED - CENSUS AMENDMENT RE-REVIEW REQUIRED.**
 >
 > **Date:** 2026-08-08
 > **Base:** `6159fc14` (`OAuth lifecycle + subscription usage truth LIVE COMPLETE`)
@@ -19,7 +19,11 @@
 > additional files with the same manual-evaluation shape. The user's standing
 > no-tail ruling required this bounded whole-family amendment before planning.
 > Expanded amendment commit `db900ab8` then passed independent review with zero
-> findings. Implementation remains unauthorized until the exact plan is reviewed.
+> findings. Plan review of `cff928e5` then found that the first census had been
+> generated from locked git-crypt bytes and omitted two encrypted research files
+> plus the existing project decision log. This bounded amendment corrects only
+> those census identities/classifications. Implementation remains unauthorized
+> until focused re-review.
 
 ## 1. Purpose
 
@@ -177,12 +181,21 @@ change, native admission moves from `4535 passed / 72 skipped / 0 failed` to:
 
 ### 2.7 Census execution boundary
 
-Caller and current-authority census was performed against the unlocked main tree.
-The isolated implementation worktree may use locked git-crypt bytes with no-op
-filters, but a text search in that worktree is not authority for encrypted files.
-Every implementation census must enumerate `.gitattributes`-encrypted paths and
-either inspect them in the unlocked tree or classify them explicitly as unreadable;
-it may not silently treat ciphertext as no match.
+Authoritative caller/current-authority census must use the unlocked main tree for
+encrypted paths. The isolated implementation worktree may use locked git-crypt
+bytes with no-op filters, but a text search in that worktree is not authority for
+encrypted files. Every implementation census must enumerate
+`.gitattributes`-encrypted paths and inspect them in the unlocked tree after
+identity checks; it may not silently treat ciphertext as no match.
+
+The original plan-grounding census violated that rule. Unlocked replay adds
+`data_sources/DATA_SOURCES_EVALUATION.md`,
+`data_sources/PAID_SUBSCRIPTION_EVALUATION.md`, and
+`docs/design/PROJECT_PRIORITY_MAP.md` to Tiingo discovery. The first two are dated
+historical research. The map is a `slice_decision_log`: it is included and
+classified in complete discovery but excluded explicitly from the terminal
+external-reference projection. The paid-evaluation document also contributes
+three historical references to retiring IBKR evaluation paths.
 
 ### 2.8 Current-authority and historical-reference boundary
 
@@ -205,7 +218,7 @@ The evaluation/Tiingo cutover has two distinct documentation classes:
 Implementation must produce two complete unlocked-tree census streams:
 
 - every tracked Tiingo hit receives exactly one of `retire_executable`,
-  `update_current_authority`, or `historical_reference`;
+  `update_current_authority`, `historical_reference`, or `slice_decision_log`;
 - every external tracked reference to any of the fifteen retiring evaluation
   paths receives exactly one of `update_current_authority` or
   `historical_reference`. The retiring file's own contents and this slice's
@@ -213,10 +226,13 @@ Implementation must produce two complete unlocked-tree census streams:
   authority documents are separately classified by the existing fail-closed
   EIR-006 consumer census because they preserve dated path evidence.
 
-Unknown, multiply classified, or ownerless paths stop the slice. Current product
-code for Finnhub, Polygon, SEC EDGAR, IBKR, Alpha Vantage, and EODHD is not part of
-either retirement stream merely because its provider name also appeared in an
-evaluation file.
+The complete pre-cutover identities are 27 Tiingo paths and 13 external evaluation
+references. The terminal external projections are 13 Tiingo rows (dated history
+plus the bounded candidate record; the classified decision log is explicitly
+excluded) and 10 historical evaluation-reference rows. Unknown, multiply
+classified, or ownerless paths stop the slice. Current product code for Finnhub,
+Polygon, SEC EDGAR, IBKR, Alpha Vantage, and EODHD is not part of either retirement
+stream merely because its provider name also appeared in an evaluation file.
 
 ## 3. Locked decisions
 

@@ -1,6 +1,6 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** DRAFT - INDEPENDENT PLAN REVIEW REQUIRED; NO IMPLEMENTATION AUTHORIZED
+> **Status:** DRAFT AMENDED - FOCUSED RE-REVIEW REQUIRED; NO IMPLEMENTATION AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -40,23 +40,29 @@ reviewed blob SHA-256:
 729a8e028b06fff3bbbf3533eb7a32cd98aa56bf8c07004eab4b1c6902bdc493
 plan-gate status/ledger-clarification blob SHA-256:
 a6aff86e77d697a04ef3e323b6948126afe12cce0562f9219d4e43b7152e0d50
+census-amended design blob SHA-256:
+93008b2fd05542db872486bac8180aec6573c2fbadf5516e37581765f1092593
 
 worktree: /tmp/arkscope-provider-smoke-hygiene
 branch:   codex/provider-smoke-hygiene
 ```
 
-Independent review returned GREEN with zero findings and reconstructed all five
-partitions in Section 2.1. This plan-gate commit makes only two bounded authority
-clarifications:
+Independent design review returned GREEN with zero findings and reconstructed all
+five partitions in Section 2.1. The first plan-gate commit made two bounded
+authority clarifications:
 
 1. the design status/review history now records that GREEN handoff; and
 2. the evaluation-path ledger is explicitly an *external* reference ledger. A
    retiring file's self-reference is not an external consumer, while this slice's
    own spec/plan/evidence remain separately owned by the existing EIR-006 census.
 
-Neither clarification changes a disposition, path set, node identity, collection
-target, product decision, or native target. Record the resulting plan-gate design
-blob SHA in Task 0 evidence before implementation.
+Plan review then found that the initial census generator had searched locked
+git-crypt bytes. Unlocked replay adds two encrypted historical documents and one
+pre-existing decision-log path. This amendment changes only the census identities
+and classifications in Section 2.3: it does not change a product disposition,
+retirement path, node identity, collection target, protected owner, product
+decision, or native target. Record all three design blob identities in Task 0
+evidence before implementation.
 
 ### 0.2 No-provider execution boundary
 
@@ -99,12 +105,14 @@ failing node:
 tests/test_eir006_retired_data_boundaries.py::test_current_runtime_consumer_census_is_closed_and_exact
 ```
 
-The failure is expected structural RED: the newly reviewed design contains the
-dated path `tests/test_ibkr_fundamentals.py`, and the EIR-006 fail-closed census has
-not yet classified this new authority document. Task 1 must classify this slice's
-spec, plan, and evidence as historical path-evidence owners and remove the retired
-fixture path from `_TEST_FIXTURES`; the node identity remains unchanged. This RED
-must not be described as an OAuth baseline failure or silently excluded.
+The failure is expected structural RED: this slice's authority documents contain
+the dated path `tests/test_ibkr_fundamentals.py`, and the EIR-006 fail-closed census
+has not yet classified them. Before the plan existed, the first sorted unclassified
+path was the design; at committed plan tip `cff928e5`, it is the plan file. Task 1
+must classify this slice's spec, plan, and evidence as historical path-evidence
+owners and remove the retired fixture path from `_TEST_FIXTURES`; the node identity
+remains unchanged. This RED must not be described as an OAuth baseline failure or
+silently excluded.
 
 Fresh worktrees also require an existing empty `data/` directory for FileBackend
 root detection. Create only that empty marker immediately before focused/native
@@ -155,6 +163,16 @@ Text census is authoritative only after `.gitattributes` paths are enumerated.
 Inspect encrypted paths in the unlocked main tree and prove their tracked blobs
 are unchanged; inspect all unencrypted paths in the implementation worktree. A
 locked ciphertext grep is never evidence of absence.
+
+The exact census algorithm therefore has two inputs: unencrypted tracked files at
+the implementation tip, plus plaintext reads of every git-crypt path from the
+unlocked main tree after proving its tracked blob is unchanged. The complete
+discovery also includes `docs/design/PROJECT_PRIORITY_MAP.md`; it receives the
+explicit `slice_decision_log` disposition and is then excluded from the terminal
+external-reference projection. The slice spec/plan/evidence are generated
+authority and remain excluded from that external projection, but Task 1 classifies
+them in the independent EIR-006 census. No path may disappear merely because it is
+encrypted or belongs to a decision log.
 
 ---
 
@@ -360,12 +378,17 @@ and runtime remains `74 passed / 1 skipped`. The union is
 
 ### 2.3 External-reference census identities
 
-Pre-cutover Tiingo census, excluding this slice's authority docs:
+The original locked-worktree identities (`24/8a3b656a...`, disposition
+`4c75ae8d...`; evaluation `10/ae345de1...`, disposition `6c875337...`) are
+superseded and must never be used for admission.
+
+Complete unlocked Tiingo discovery, excluding only the generated slice
+spec/plan/evidence, is:
 
 ```text
-24 paths / 8a3b656ad4e997cedb6ef8c862c91610dac5fed5fcc6936d228886a2d5b6f85f
-24-row disposition TSV /
-4c75ae8de841261ca4d85a9e7d0e3b98d658890f3dcbbaa707052deb497314f0
+27 paths / bb78255d82beddcfa5084159ccfb86d204d89d05e7a4930a90d94837a8c71ba4
+27-row disposition TSV /
+7bd0928bd49e040ffff4d7f3653e2610435ebf63c893b8d76169db2e7d30bcf9
 ```
 
 The disposition rows are fixed:
@@ -376,6 +399,8 @@ The disposition rows are fixed:
 | `config/.env.template` | `retire_executable` |
 | `config/user_profile.yaml` | `retire_executable` |
 | `data_sources/API_SPECIFICATIONS.md` | `historical_reference` |
+| `data_sources/DATA_SOURCES_EVALUATION.md` | `historical_reference` |
+| `data_sources/PAID_SUBSCRIPTION_EVALUATION.md` | `historical_reference` |
 | `data_sources/PAID_SUBSCRIPTION_EVALUATION.tex` | `historical_reference` |
 | `data_sources/__init__.py` | `retire_executable` |
 | `data_sources/base.py` | `retire_executable` |
@@ -390,6 +415,7 @@ The disposition rows are fixed:
 | `docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md` | `update_current_authority` |
 | `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_AUDIT.md` | `historical_reference` |
 | `docs/design/PG_EXIT_REMAINDER_SCOPING.md` | `historical_reference` |
+| `docs/design/PROJECT_PRIORITY_MAP.md` | `slice_decision_log` |
 | `docs/superpowers/evidence/2026-07-25-calibration-anthropic-refusal.md` | `historical_reference` |
 | `docs/superpowers/evidence/2026-08-08-oauth-lifecycle-quota-truth.md` | `historical_reference` |
 | `docs/superpowers/plans/2026-07-02-s-j-provider-config-authority-phase-0-1.md` | `historical_reference` |
@@ -397,26 +423,30 @@ The disposition rows are fixed:
 | `tests/test_tiingo.py` | `retire_executable` |
 | `training/data_prep/README.md` | `update_current_authority` |
 
-Terminal Tiingo external projection is exactly eleven rows: ten dated historical
-references plus one Provider Catalog `candidate_record`:
+Terminal Tiingo external projection explicitly excludes the classified decision
+log and is exactly thirteen rows: twelve dated historical references plus one
+Provider Catalog `candidate_record`:
 
 ```text
-11-row SHA-256:
-8653257c4be9b3927e8d788777c15e08b9d87c8978fe8327cf832688d51d12f8
+13-row SHA-256:
+0ba6820c5b4ce2afdc26fdbb379ea6a44eb38f8c33954ed49b9a2a5b65c6c517
 ```
 
-Pre-cutover external evaluation-path references are:
+Complete unlocked external evaluation-path references are:
 
 ```text
-10 rows / ae345de1ef3decd24dc169256733dc004e9fee3730dc106e953fb1626bdd707a
-10-row disposition TSV /
-6c87533735773411dd1709cd1f0d58058b173f6f09491d3dc07ddec3441c5b3d
+13 rows / 76b31a5c05d6dbe0a2a75af7f2b6d8e61d89bf415a698c8aff1521901b5efde2
+13-row disposition TSV /
+f9f830dd8941ecb2efb1800cf408b1a477af9f137f1c50223aa763f5d09b602f
 ```
 
 The external reference rows are fixed:
 
 | Owner | Retiring path | Disposition |
 |---|---|---|
+| `data_sources/PAID_SUBSCRIPTION_EVALUATION.md` | `tests/test_ibkr_all_free_apis.py` | `historical_reference` |
+| `data_sources/PAID_SUBSCRIPTION_EVALUATION.md` | `tests/test_ibkr_fundamentals.py` | `historical_reference` |
+| `data_sources/PAID_SUBSCRIPTION_EVALUATION.md` | `tests/test_ibkr_options_greeks.py` | `historical_reference` |
 | `docs/data/IBKR_NEWS_API_LIMITATIONS.md` | `tests/test_alpha_vantage.py` | `update_current_authority` |
 | `docs/data/IBKR_NEWS_API_LIMITATIONS.md` | `tests/test_finnhub.py` | `update_current_authority` |
 | `docs/superpowers/evidence/2026-07-29-lifespan-stall-causal-diagnosis.md` | `tests/test_sec_filings.py` | `historical_reference` |
@@ -428,15 +458,15 @@ The external reference rows are fixed:
 | `docs/superpowers/specs/2026-07-29-lifespan-stall-causal-diagnosis-design.md` | `tests/test_sec_filings.py` | `historical_reference` |
 | `tests/test_eir006_retired_data_boundaries.py` | `tests/test_ibkr_fundamentals.py` | `update_current_authority` |
 
-Three current rows leave or change owner; seven dated historical rows remain:
+Three current rows leave or change owner; ten dated historical rows remain:
 
 ```text
-7-row terminal SHA-256:
-2b87c06ae8c92028c5e8baa8b64388621ab64e7fbe7f08fcfd008ec74f072653
+10-row terminal SHA-256:
+0625d1220d4f94110ca84c93bfa951fc4e69fa00f7ccf76ee9004184772d160c
 ```
 
-Persist exact pre/post TSVs in Task 0/5 evidence. Unknown, duplicate, or silently
-dropped rows stop the slice.
+Persist exact pre/post TSVs in Task 0/5 evidence. Unknown, duplicate, encrypted,
+decision-log, or silently dropped rows stop the slice.
 
 ### 2.4 Byte-protected retained owners
 
@@ -552,8 +582,10 @@ from the final tree and proves:
 - every pre-cutover row has one terminal disposition;
 - no new external Tiingo/evaluation-path owner appears;
 - removed executable/current instructions are absent;
-- the terminal Tiingo projection is the exact eleven-row stream in Section 2.3;
-- the terminal evaluation projection is the exact seven-row stream;
+- the terminal Tiingo projection is the exact thirteen-row stream in Section 2.3;
+- the terminal evaluation projection is the exact ten-row stream;
+- the priority map has the explicit `slice_decision_log` disposition and is not
+  silently counted as terminal external capability evidence;
 - slice authority docs are classified in the existing EIR-006 census; and
 - all git-crypt paths were enumerated and examined through the unlocked boundary.
 
@@ -609,9 +641,11 @@ Section 0.3. Any other failure is wrong RED and stops.
 
 - [ ] **Step 4: Rebuild both external censuses and protected manifest**
 
-Reproduce all Section 2.3 streams from unlocked/plaintext authority. Reproduce all
-30 protected rows and aggregate in Section 2.4. Persist commands, row streams, and
-SHA files outside the repository under one new single-use Task 0 root.
+Reproduce all Section 2.3 streams through the two-input unlocked/plaintext boundary
+in Section 0.5. The result must include both encrypted research documents and the
+priority-map decision log. Reproduce all 30 protected rows and aggregate in Section
+2.4. Persist commands, row streams, and SHA files outside the repository under one
+new single-use Task 0 root.
 
 - [ ] **Step 5: Create Task 0 evidence and commit docs only**
 
@@ -744,8 +778,8 @@ research to make history disappear.
 - [ ] **Step 4: Close shared projections and both censuses**
 
 Require non-Tiingo AST/config projections byte-equivalent, protected 30-row manifest
-unchanged, final Tiingo external stream `11/8653257c...`, final evaluation stream
-`7/2b87c06a...`, zero unknown/duplicate verdicts, and zero executable/config tail.
+unchanged, final Tiingo external stream `13/0ba6820c...`, final evaluation stream
+`10/0625d122...`, zero unknown/duplicate verdicts, and zero executable/config tail.
 Confirm ignored `data_sources/comparison_data/` is byte/metadata untouched.
 
 - [ ] **Step 5: Re-run focused behavior and collection**
@@ -812,8 +846,8 @@ retained providers   206 passed
 surviving options    74 passed / 1 skipped
 tests/live nodes     0
 protected paths      30 / 4ca66f0b...
-Tiingo terminal      11 / 8653257c...
-evaluation terminal  7 / 2b87c06a...
+Tiingo terminal      13 / 0ba6820c...
+evaluation terminal 10 / 0625d122...
 ```
 
 Run `git diff --check`, compile changed Python/live files, and prove no provider
@@ -891,7 +925,8 @@ Stop and amend before continuing if:
 11. a protected retained-provider byte in Section 2.4 changes;
 12. a non-Tiingo shared enum/registry/export/env projection changes;
 13. either census has an unknown, duplicate, new unowned row, or silent omission;
-14. locked-worktree ciphertext is used as absence evidence;
+14. locked-worktree ciphertext is used as absence evidence, an encrypted path is
+    omitted, or the priority-map decision log is silently excluded;
 15. current authorities still claim Tiingo is implemented/live/fallback, or claim
     permanent rejection;
 16. ignored comparison output, production data, credentials, scheduler state, or
