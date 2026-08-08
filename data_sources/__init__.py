@@ -2,22 +2,21 @@
 Unified Data Sources Module for ArkScope
 
 This module provides a unified interface for fetching financial data from
-multiple sources (Tiingo, Finnhub, Financial Datasets, etc.)
+multiple sources (Finnhub, SEC EDGAR, Polygon, etc.)
 
 Usage:
-    from data_sources import TiingoDataSource, get_data_source
+    from data_sources import FinnhubDataSource, get_data_source
 
     # Direct usage
-    tiingo = TiingoDataSource()
-    news = tiingo.fetch_news(['AAPL', 'MSFT'], days_back=7)
+    finnhub = FinnhubDataSource()
+    news = finnhub.fetch_news(['AAPL', 'MSFT'], days_back=7)
 
     # Factory pattern
-    source = get_data_source('tiingo')
+    source = get_data_source('finnhub')
     news = source.fetch_news(['AAPL'], days_back=7)
 """
 
 from .base import BaseDataSource, NewsArticle, StockPrice, SECFiling
-from .tiingo_source import TiingoDataSource
 from .finnhub_source import FinnhubDataSource
 from .sec_edgar_source import SECEdgarDataSource
 from .polygon_source import PolygonDataSource
@@ -52,7 +51,6 @@ __all__ = [
     'NewsArticle',
     'StockPrice',
     'SECFiling',
-    'TiingoDataSource',
     'FinnhubDataSource',
     'SECEdgarDataSource',
     'PolygonDataSource',

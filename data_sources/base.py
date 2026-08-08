@@ -15,7 +15,6 @@ import hashlib
 
 class DataSourceType(Enum):
     """Supported data source types."""
-    TIINGO = "tiingo"
     FINNHUB = "finnhub"
     FINANCIAL_DATASETS = "financial_datasets"
     SEC_EDGAR = "sec_edgar"

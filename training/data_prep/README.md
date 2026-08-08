@@ -156,7 +156,7 @@ CPPO (stocktrading_llm_risk.py):
   - 欄位名不同：`ticker`(非 `Stock_symbol`), `published_at`(非 `Date`)
   - **沒有 OHLCV 價格資料** — 需另外下載
   - 一篇文章可能對應多個 ticker（`related_tickers` 欄位）
-- **價格來源**: 需 yfinance 或 Tiingo 下載（日期範圍 2022-2026）
+- **價格來源**: 由 yfinance 下載（日期範圍 2022-2026）
 - **腳本**:
   - PPO: `prepare_training_data.py --source polygon`
   - CPPO: `prepare_training_data.py --source polygon --score-type both`
@@ -167,7 +167,7 @@ CPPO (stocktrading_llm_risk.py):
 
 ```
 Step 1: 取得 OHLCV 價格資料
-  ticker list + 日期範圍 → yfinance / Tiingo → OHLCV DataFrame
+  ticker list + 日期範圍 → yfinance → OHLCV DataFrame
 
 Step 2: 計算技術指標
   OHLCV → FeatureEngineer (stockstats) → 8 個技術指標

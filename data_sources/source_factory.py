@@ -9,7 +9,6 @@ import os
 import logging
 
 from .base import BaseDataSource, DataSourceType
-from .tiingo_source import TiingoDataSource
 from .finnhub_source import FinnhubDataSource
 from .sec_edgar_source import SECEdgarDataSource
 from .polygon_source import PolygonDataSource
@@ -29,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 # Registry of available data sources
 _SOURCE_REGISTRY: Dict[str, Type[BaseDataSource]] = {
-    'tiingo': TiingoDataSource,
     'finnhub': FinnhubDataSource,
     'sec_edgar': SECEdgarDataSource,
     'polygon': PolygonDataSource,
@@ -52,7 +50,7 @@ def get_data_source(
     Factory function to create a data source instance.
 
     Args:
-        source_name: Name of the data source ('tiingo', 'finnhub', etc.)
+        source_name: Name of the data source ('finnhub', 'polygon', etc.)
         api_key: Optional API key (will use env var if not provided)
         **kwargs: Additional arguments to pass to the source constructor
 
@@ -63,7 +61,7 @@ def get_data_source(
         ValueError: If the source name is not recognized.
 
     Example:
-        >>> source = get_data_source('tiingo')
+        >>> source = get_data_source('finnhub')
         >>> news = source.fetch_news(['AAPL'], days_back=7)
     """
     source_name_lower = source_name.lower()
@@ -88,7 +86,6 @@ def get_data_source(
     # Try to get API key from environment if not provided
     if api_key is None:
         env_key_names = {
-            'tiingo': 'TIINGO_API_KEY',
             'finnhub': 'FINNHUB_API_KEY',
             'polygon': 'POLYGON_API_KEY',
             'alpha_vantage': 'ALPHA_VANTAGE_API_KEY',

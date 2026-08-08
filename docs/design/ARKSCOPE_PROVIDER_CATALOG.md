@@ -34,7 +34,7 @@ Three fields use **controlled vocabularies** (added round-2 so future readers do
 | Class | Providers |
 |-------|-----------|
 | **Real-time market data** | IBKR (only in-stack real-time / charting-grade) |
-| **Delayed / historical market data** | Polygon, Tiingo, Alpha Vantage, Finnhub, EODHD |
+| **Delayed / historical market data** | Polygon, Alpha Vantage, Finnhub, EODHD |
 | **Fundamentals** | SEC EDGAR (free), IBKR (snapshot ratios), Financial Datasets (paid), EODHD |
 | **Macro / calendar** | FRED (macro series), Finnhub (earnings/IPO/economic calendar) |
 | **Curated research (scraped)** | Seeking Alpha — Alpha Picks + comments + market news, via browser extension → Native Messaging host (PROTECTED; not an API) |
@@ -47,7 +47,7 @@ The project's **load-bearing sources are the three already in daily use.** The c
 | Tier | Providers | Why |
 |------|-----------|-----|
 | **Foundation (基本盤)** | **IBKR** (everything obtainable, free + paid) · **Seeking Alpha** (everything knowable via capture) · **web search** (Tavily — general world context: politics / international / geopolitics / war, **not finance-only**) | Already in use; the real spine of the product |
-| **Supporting** | Polygon · Finnhub · Tiingo · Alpha Vantage · EODHD · SEC EDGAR · Financial Datasets · FRED | Fallbacks, breadth, free fundamentals, macro — valuable but swappable |
+| **Supporting** | Polygon · Finnhub · Alpha Vantage · EODHD · SEC EDGAR · Financial Datasets · FRED | Fallbacks, breadth, free fundamentals, macro — valuable but swappable |
 
 **Effort priority follows this**: strengthen **IBKR + SA + web-search** coverage first; treat the supporting tier as fallback/enrichment. New providers enter as "supporting" unless they deepen the foundation.
 
@@ -58,16 +58,16 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 | Tier | Definition | Current members | Policy |
 |------|-----------|-----------------|--------|
 | **0 — Foundation** | The basic spine, already in daily use | IBKR (free Gateway access), Seeking Alpha, Tavily | Strengthen stability + UX **first**; everything else is secondary |
-| **1 — Free / Free-Enough** | Fully free, or free quota sufficient for personal use | SEC EDGAR, FRED/ALFRED, Finnhub, Tiingo, Alpha Vantage* | **Prioritise into Settings** — near-zero cost to admit. *(\*Alpha Vantage free = 25 req/day, quota-constrained — admit but flag.)* |
+| **1 — Free / Free-Enough** | Fully free, or free quota sufficient for personal use | SEC EDGAR, FRED/ALFRED, Finnhub, Alpha Vantage* | **Prioritise into Settings** — near-zero cost to admit. *(\*Alpha Vantage free = 25 req/day, quota-constrained — admit but flag.)* |
 | **2 — Cheap High-Value** | Cheap, fills an obvious gap or has hard-to-replace data | Polygon/Massive (~$29), EODHD ($19.99–99), Financial Datasets (PAYG ~$30), **IBKR paid streaming add-on (~$4.50)** | Admit when the gap is real; gate spend via `metered_spend` / paid toggles |
 | **3 — Expensive / Specialist** | Pricey but unique: deep options flow, institutional fundamentals, alt-data, international markets, fixed-income / commodity / crypto | *(none connected yet)* | **Do NOT pre-connect** — pulled only by an explicit feature requirement |
 | **Reject / Defer** | High overlap with existing data, unstable API, licensing friction, free quota too low to use, un-cacheable, or high Settings complexity for low analytic gain | — | Document the reason; revisit only if conditions change |
 
-**Admission principle**: the 11 current providers already cover Tiers 0–2 and are **enough to build the desktop shell + ToolCatalog** — no new survey now. New providers enter as Tier 1/2 "supporting" unless they deepen the foundation (Tier 0).
+**Admission principle**: the 10 current providers already cover Tiers 0–2 and are **enough to build the desktop shell + ToolCatalog** — no new survey now. New providers enter as Tier 1/2 "supporting" unless they deepen the foundation (Tier 0).
 
 ---
 
-## 1. Provider summary table (all 11 connected sources)
+## 1. Provider summary table (all 10 connected sources)
 
 > One-line orientation; full entries below. **Streaming** column shows the §0.1 enum + whether it's charting-grade. **Status** = §0.1 `implementation_status`.
 
@@ -76,7 +76,6 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 | **IBKR** (IB Gateway) | live | US equities, options, futures, FX | `realtime_bars` ✅ **charting-grade (only one)** | 1-min bars ~6mo; news ~1mo | free snapshot-only; RT add-on ≈$4.50/mo | real-time charting; live quotes; options chains+Greeks | 2025-12 |
 | **Polygon** (Massive) | live (free) / optional-live (paid) | US equities, options | `none` free (15-min delayed); `realtime_quote` paid | **news 3+ yr w/ AI sentiment**; prices 2yr free / 10-15yr paid | free 5 calls/min; paid ≈$29/mo | best free **news archive** + AI sentiment | 2025-12 |
 | **Finnhub** | live | US equities | `realtime_quote` (no bars) | **news ~7 days** (claims 1yr) | free; paid Fundamental tiers | earnings/IPO/economic **calendar** | 2025-12 |
-| **Tiingo** | live | US equities | `none` (EOD) | **30+ yr EOD** | free; paid $10+/mo | EOD price **fallback** | 2025-12 |
 | **Alpha Vantage** | live | equities, FX, commodities | `none` (delayed) | EOD; intraday ~7 days | free **25 req/day** | **commodity series** → IBKR futures | 2025-12 |
 | **EODHD** | optional-live (paid) | global equities, fundamentals | `none` (EOD) | long global EOD | paid $19.99–$99 | global EOD + fundamentals breadth | 2025-12 |
 | **SEC EDGAR** | live | US equities (fundamentals) | `none` | full filing history | **free** | authoritative **fundamentals** (XBRL), filings, insider | 2026-01 |
@@ -161,27 +160,18 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 | **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Finnhub, `data_sources/DATA_SOURCE_QUIRKS.md`, `docs/design/P1_2_SPEC.md` (calendar), `docs/design/P1_2_PROVIDER_DISCOVERY.md`. |
 | **app_settings_fields** | `finnhub.enabled` (toggle), `finnhub.api_key` (secret). |
 
-### 3.3 Tiingo
+### 3.3 Tiingo candidate record (not connected)
 
-| Field | Value |
-|-------|-------|
-| **provider** | Tiingo. |
-| **implementation_status** | **live** (price fallback). |
-| **connected_via** | `data_sources/tiingo_source.py` (REST). |
-| **asset_classes** | US equities (EOD prices). |
-| **data_types** | End-of-day OHLCV. |
-| **history_depth** | **30+ years EOD** on the free tier. |
-| **latency** | EOD (not intraday, not real-time). |
-| **streaming** | `none` (EOD only). |
-| **cost** | Free tier (30+ yr EOD). Paid **$10+/mo** for fuller access. |
-| **auth/config** | `TIINGO_API_KEY`. REST. Config role: `data_preferences.prices.fallback`. |
-| **limits** | Free-tier request caps (per Tiingo). |
-| **known_quirks** | EOD-only; no intraday on the path used here. |
-| **best_for** | **EOD price fallback** with long history for backtests (when IBKR is offline). |
-| **not_good_for** | Intraday / real-time / charting. |
-| **verified_at** | 2025-12. |
-| **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Tiingo, `data_sources/API_SPECIFICATIONS.md` §Tiingo. |
-| **app_settings_fields** | `tiingo.enabled` (toggle), `tiingo.api_key` (secret). |
+Tiingo has no current code, configuration, credential field, scheduler, API/UI
+surface, health row, fallback role, or adoption decision. It may be reconsidered
+only when ArkScope has a concrete EOD or historical-data gap. Re-admission must be
+a new implementation against then-current interfaces and must establish: free-tier
+fit for the intended workload; paid cost versus measurable value; unique data or a
+specific reliability gap; limits, freshness, provenance, stability, and error
+semantics; licensing/cache/retention rights; local DB, scheduler, reconciliation,
+and truthful-partial fit; and an explicit enable/spend switch with honest usage
+visibility. Pricing and limits must be re-verified when that future slice opens;
+dated evaluations and git history are context, not runnable integration assets.
 
 ### 3.4 Alpha Vantage
 
@@ -220,7 +210,7 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 | **cost** | Paid **$19.99–$99/mo** by tier. |
 | **auth/config** | `EODHD_API_KEY`. REST. |
 | **limits** | Per-tier request caps. |
-| **known_quirks** | Value is **breadth** (global markets) rather than US-depth; overlaps Tiingo/Polygon for US EOD. |
+| **known_quirks** | Value is **breadth** (global markets) rather than US-depth; overlaps Polygon and other US EOD sources. |
 | **best_for** | Global EOD + fundamentals breadth; dividend/split calendar. |
 | **not_good_for** | Real-time; US-only users may not need it (free options cover US EOD). |
 | **verified_at** | 2025-12. |
@@ -343,7 +333,7 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 
 The providers are **deliberately layered** for fallback + cross-validation — this drives the agent's source-selection and the Settings "which providers do I need?" UX. **Foundation sources (IBKR, SA, Tavily) are the spine; the rest fill specific gaps:**
 
-- **Prices**: realtime = **IBKR** → fallback = Tiingo (config `data_preferences.prices`).
+- **Prices**: real-time = **IBKR**; historical and qualified completed-session bars = local `market_data.db` through the DAL.
 - **Fundamentals**: local IBKR snapshot → SEC EDGAR (free) → Financial Datasets (paid, cached).
 - **News**: **IBKR** (real-time, shallow) + Polygon (deep archive + AI sentiment) + Finnhub (quick, ~7d) — different depth/latency trade-offs.
 - **Macro/calendar**: FRED (series) + Finnhub (events).

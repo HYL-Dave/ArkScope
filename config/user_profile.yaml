@@ -182,7 +182,6 @@ data_preferences:
   price_sources:
     realtime: "ibkr"        # 即時用 IBKR
     historical: "local"     # 歷史用本地 Parquet
-    fallback: "tiingo"      # 備用
 
   # 基本面數據來源
   fundamentals_sources:

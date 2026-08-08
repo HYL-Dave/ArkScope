@@ -41,7 +41,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 | Tool | Registry cat | Params | Backed by | Verdict |
 |------|-------------|--------|-----------|---------|
 | `get_current_quote` | prices | ticker*, source? | IBKR snapshot + local last-bar fallback | keep-current |
-| `get_ticker_prices` | prices | ticker*, interval?, days? | IBKR/Tiingo/Polygon (ProviderCatalog) | keep-current |
+| `get_ticker_prices` | prices | ticker*, interval?, days? | DAL / local market-data store | keep-current |
 | `get_price_change` | prices | ticker*, days? | price providers | keep-current |
 | `get_sector_performance` | prices | sector*, days? | price providers | keep-current |
 | `get_ticker_news` | news | ticker*, days?, source?, limit? | IBKR/Polygon/Finnhub news | keep-current |
