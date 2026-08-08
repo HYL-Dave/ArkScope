@@ -472,22 +472,22 @@ copy is not updated merely to follow new copy.
 
 ### Task 2 - Cross-process lifecycle lock
 
-- [ ] Add four real-process tests first and confirm RED under the current
+- [x] Add four real-process tests first and confirm RED under the current
   process-local lock.
-- [ ] Use two spawned Python processes, a temporary plaintext token store, one
+- [x] Use two spawned Python processes, a temporary plaintext token store, one
   rotating-token test grant, explicit barriers, and bounded joins. A thread-only
   test is not equivalent.
-- [ ] Add one profile-local lock file per credential. Sanitize/hash the file
+- [x] Add one profile-local lock file per credential. Sanitize/hash the file
   name; create lock directories/files with restrictive permissions. Resolve
   the root as `ARKSCOPE_LOCK_DIR/oauth_credentials` when the reviewed test/
   runtime override exists, otherwise `<profile_state.db parent>/locks/oauth_credentials`.
-- [ ] Acquire the existing thread lock and a bounded POSIX `flock` before any
+- [x] Acquire the existing thread lock and a bounded POSIX `flock` before any
   token/cache/telemetry mutation. Missing `fcntl`, timeout, invalid path, or fd
   error fails closed with `refresh_failed_retryable`; never run unlocked.
-- [ ] Cover refresh, re-login completion, and delete with the same critical
+- [x] Cover refresh, re-login completion, and delete with the same critical
   section. Browser wait and code exchange stay outside it.
-- [ ] Prove fd release after success and every raised path.
-- [ ] Require stage identity `4596/b9056110...` and
+- [x] Prove fd release after success and every raised path.
+- [x] Require stage identity `4596/b9056110...` and
   `261/a4b9af29...`, then GREEN and commit.
 
 ### Task 3 - Bounded ChatGPT account adapter and API
