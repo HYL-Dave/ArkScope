@@ -1,6 +1,6 @@
 # OAuth Lifecycle and Subscription Usage Truth Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASKS 0-6 COMPLETE; TASK 6 EVIDENCE READY FOR INDEPENDENT REVIEW
+> **Status:** TASKS 0-7 VERIFICATION COMPLETE; IMPLEMENTATION REVIEW REQUIRED BEFORE MERGE
 >
 > **Date:** 2026-08-08
 >
@@ -557,15 +557,15 @@ copy is not updated merely to follow new copy.
 
 ### Task 7 - Mutation, full admission, review, and merge
 
-- [ ] Run each mutation in Section 4 against only its owning node, capture exact
+- [x] Run each mutation in Section 4 against only its owning node, capture exact
   diff and RED reason, restore exact pre-mutation SHA, and re-run GREEN.
-- [ ] Recollect all four final streams and require exact target identities.
-- [ ] Run backend focused, relevant existing task-canary/discovery tests,
+- [x] Recollect all four final streams and require exact target identities.
+- [x] Run backend focused, relevant existing task-canary/discovery tests,
   frontend focused/full, typecheck, build, scanner, and secret/residue gates.
-- [ ] Run native canonical admission with the pinned wakeup probe/wrapper and
+- [x] Run native canonical admission with the pinned wakeup probe/wrapper and
   require `4607 seen`, `4535 passed / 72 skipped / 0 failed`, empty non-passing.
-- [ ] Manifest/quarantine generated artifacts and prove worktree restoration.
-- [ ] Produce a review packet containing node streams, protocol fixtures,
+- [x] Manifest/quarantine generated artifacts and prove worktree restoration.
+- [x] Produce a review packet containing node streams, protocol fixtures,
   process-lock timeline, child cleanup proof, mutation diffs, and secret-absence
   scans. Stop for independent implementation review.
 - [ ] Only after GREEN review: fast-forward merge, fresh exact-master admission,
