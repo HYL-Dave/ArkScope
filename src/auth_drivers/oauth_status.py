@@ -408,6 +408,23 @@ class OAuthObservationStore:
             raise RuntimeError("OAuth account snapshot write could not be verified")
         return snapshot
 
+    def delete_credential_observations(self, credential_id: str) -> dict[str, int]:
+        """Delete both bounded observation rows for exactly one credential."""
+        with self._write_connection() as conn:
+            refresh_rows = conn.execute(
+                "DELETE FROM oauth_refresh_status WHERE credential_id = ?",
+                (credential_id,),
+            ).rowcount
+            account_rows = conn.execute(
+                "DELETE FROM oauth_account_snapshot WHERE credential_id = ?",
+                (credential_id,),
+            ).rowcount
+            conn.commit()
+        return {
+            "refresh_status": max(int(refresh_rows), 0),
+            "account_snapshot": max(int(account_rows), 0),
+        }
+
 
 def cached_account_usage(
     credential_id: str, observation_store: OAuthObservationStore

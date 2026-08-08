@@ -21,6 +21,12 @@ _ID_TOKEN_SENTINEL = "id-token-fixture-must-not-escape"
 _OBSERVED_AT = "2026-08-08T12:00:00+00:00"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_oauth_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile-state.db"))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+
+
 def _jwt(payload: dict) -> str:
     def encode(value: dict) -> str:
         raw = json.dumps(value, separators=(",", ":")).encode()
@@ -563,6 +569,7 @@ def test_account_routes_split_inventory_cached_read_and_mutating_sync(tmp_path, 
 
 def test_account_sync_is_singleflight_per_credential(tmp_path):
     from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
     from src.auth_drivers.oauth_status import OAuthObservationStore
 
     class BlockingAdapter:
@@ -579,10 +586,12 @@ def test_account_sync_is_singleflight_per_credential(tmp_path):
             assert self.release.wait(timeout=2.0)
             return _snapshot_input(credential_id=credential_id)
 
+    observations = OAuthObservationStore(tmp_path / "profile.db")
+    token_store = _TokenStore(_token_record())
     adapter = BlockingAdapter()
     service = OAuthAccountSyncService(
-        observation_store=OAuthObservationStore(tmp_path / "profile.db"),
-        token_store=_TokenStore(_token_record()),
+        observation_store=observations,
+        token_store=token_store,
         adapter=adapter,
     )
 
@@ -602,6 +611,31 @@ def test_account_sync_is_singleflight_per_credential(tmp_path):
     assert adapter.calls == 1
     assert [result.sync_status for result in results] == ["succeeded", "succeeded"]
     assert results[0] == results[1]
+
+    stale_adapter = BlockingAdapter()
+    stale_service = OAuthAccountSyncService(
+        observation_store=observations,
+        token_store=token_store,
+        adapter=stale_adapter,
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(
+            stale_service.sync,
+            credential_id="local:1",
+            provider="openai",
+            auth_mode="chatgpt_oauth",
+        )
+        assert stale_adapter.started.wait(timeout=2.0)
+        with oauth_credential_lock("local:1"):
+            token_store.record = None
+            observations.delete_credential_observations("local:1")
+        stale_adapter.release.set()
+        stale = pending.result(timeout=2.0)
+
+    assert stale.sync_status == "failed"
+    assert stale.sync_error_code == "credential_changed_during_sync"
+    assert stale.snapshot is None
+    assert observations.read_account_snapshot("local:1") is None
 
 
 def test_listing_credentials_never_refreshes_or_contacts_provider(tmp_path, monkeypatch):

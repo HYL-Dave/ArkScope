@@ -298,25 +298,105 @@ def test_oauth_start_validates_relogin_target(tmp_path, _gate):
 
 
 def test_credential_delete_cascades_oauth_token_and_cache(tmp_path):
+    from src.auth_drivers.oauth_status import (
+        OAuthAccountObservation,
+        OAuthAccountPayload,
+        OAuthObservationStore,
+        OAuthRateLimitSnapshot,
+        OAuthUsageSummary,
+    )
     from src.auth_drivers.token_store import StoredTokenRecord
     from src.model_discovery_cache import ModelDiscoveryCache
 
     store = CredentialStore(tmp_path / "creds.db")
     cid = _oauth_row(store)
+    observations = OAuthObservationStore(store.db_path)
+    observations.record_refresh_error(
+        credential_id=cid,
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        error_code="transport_error",
+        observed_at="2026-08-08T12:00:00+00:00",
+    )
+    observations.record_account_snapshot(
+        credential_id=cid,
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        observation=OAuthAccountObservation(
+            account_fingerprint="b" * 64,
+            source="codex_app_server",
+            observed_at="2026-08-08T12:00:00+00:00",
+            payload=OAuthAccountPayload(
+                rate_limits=OAuthRateLimitSnapshot(),
+                usage_summary=OAuthUsageSummary(),
+            ),
+        ),
+    )
+    observations.record_refresh_error(
+        credential_id="local:999",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        error_code="transport_error",
+        observed_at="2026-08-08T12:01:00+00:00",
+    )
+    observations.record_account_snapshot(
+        credential_id="local:999",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        observation=OAuthAccountObservation(
+            account_fingerprint="c" * 64,
+            source="codex_app_server",
+            observed_at="2026-08-08T12:01:00+00:00",
+            payload=OAuthAccountPayload(
+                rate_limits=OAuthRateLimitSnapshot(),
+                usage_summary=OAuthUsageSummary(),
+            ),
+        ),
+    )
     ModelDiscoveryCache(store.db_path).record_run(
         provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
         secret_fingerprint="oauth", status="seed_only", models=[],
     )
     tok = _RecTok(record=StoredTokenRecord(access_token="T"))
-    out = cr.delete_credential(cid, store=store, token_store=tok)
+    out = cr.delete_credential(
+        cid, store=store, token_store=tok, observation_store=observations
+    )
     assert out == {"deleted": True, "id": cid, "token_deleted": True,
                    "discovery_cache_rows_deleted": 1}
     assert tok.deleted == [("openai", "chatgpt_oauth", cid)]
     assert store.get(cid) is None
+    assert observations.read_refresh_status(cid) is None
+    assert observations.read_account_snapshot(cid) is None
+    assert observations.read_refresh_status("local:999") is not None
+    assert observations.read_account_snapshot("local:999") is not None
+
+    retry_store = CredentialStore(tmp_path / "retry.db")
+    retry_cid = _oauth_row(retry_store)
+    retry_token = _RecTok(record=StoredTokenRecord(access_token="KEEP"))
+
+    class BrokenObservations:
+        def delete_credential_observations(self, credential_id):
+            assert credential_id == retry_cid
+            raise RuntimeError("profile database busy")
+
+    with pytest.raises(HTTPException) as exc_info:
+        cr.delete_credential(
+            retry_cid,
+            store=retry_store,
+            token_store=retry_token,
+            observation_store=BrokenObservations(),
+        )
+    assert exc_info.value.status_code == 502
+    assert retry_store.get(retry_cid) is not None
+    assert retry_token.deleted == []
 
 
 def test_credential_delete_api_key_skips_token_store(tmp_path):
     from src.model_discovery_cache import ModelDiscoveryCache
+
+    class BombObservations:
+        def delete_credential_observations(self, _credential_id):
+            pytest.fail("API-key deletion touched OAuth observations")
 
     store = CredentialStore(tmp_path / "creds.db")
     c = store.add(provider="openai", auth_type="api_key", alias="K", secret="sk-test-" + "a" * 40)
@@ -327,7 +407,12 @@ def test_credential_delete_api_key_skips_token_store(tmp_path):
         models=[{"id": "m", "label": "", "source": "provider_api"}],
     )
     tok = _RecTok()
-    out = cr.delete_credential(cid, store=store, token_store=tok)
+    out = cr.delete_credential(
+        cid,
+        store=store,
+        token_store=tok,
+        observation_store=BombObservations(),
+    )
     assert out["deleted"] is True and out["token_deleted"] is None
     assert out["discovery_cache_rows_deleted"] == 2
     assert tok.deleted == [] and tok.saved == []               # token store never touched

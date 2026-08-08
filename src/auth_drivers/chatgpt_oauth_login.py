@@ -371,6 +371,7 @@ def complete_login(
     state_store: _StateStore | None = None,
     exchange: Callable[..., dict] | None = None,
     invalidate_relogin_cache: Callable[[str], int] | None = None,
+    observation_store: Any | None = None,
 ) -> dict:
     """Finish a login (used by BOTH the loopback callback and the copy-code paste). Returns
     masked metadata only — the token is NEVER echoed. Any failure raises; nothing is left
@@ -397,6 +398,7 @@ def complete_login(
             target=pending.relogin_credential_id, record=record, plan_type=plan_type, label=label,
             credential_store=credential_store, token_store=token_store,
             invalidate_relogin_cache=invalidate_relogin_cache,
+            observation_store=observation_store,
         )
 
     cred = credential_store.add_oauth_credential(
@@ -430,6 +432,7 @@ def _complete_relogin(
     credential_store: Any,
     token_store: Any,
     invalidate_relogin_cache: Callable[[str], int] | None,
+    observation_store: Any | None,
 ) -> dict:
     """In-place token replacement for an EXISTING openai chatgpt_oauth credential
     (plan D2/D3). Ordering inside the lifecycle lock: re-validate the target →
@@ -456,6 +459,14 @@ def _complete_relogin(
             raise ChatGPTOAuthLoginError(
                 "re-login aborted: could not clear the discovery cache; nothing was changed",
             ) from None
+        if observation_store is not None:
+            try:
+                observation_store.delete_credential_observations(target)
+            except Exception:  # noqa: BLE001 - old account observations cannot survive adoption
+                raise ChatGPTOAuthLoginError(
+                    "re-login aborted: could not clear prior OAuth observations; "
+                    "the previous token is unchanged",
+                ) from None
         try:
             token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target, record=record)
         except Exception:  # noqa: BLE001 — static message; never carry the record via the cause
@@ -687,6 +698,66 @@ def _refresh_response_to_record(resp: dict, prev: StoredTokenRecord) -> StoredTo
     )
 
 
+def _runtime_observation_store():
+    from .oauth_status import OAuthObservationStore
+
+    profile_db = Path(
+        os.environ.get("ARKSCOPE_PROFILE_DB")
+        or Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
+    )
+    return OAuthObservationStore(profile_db)
+
+
+def _refresh_error_code(exc: ChatGPTOAuthLoginError) -> str:
+    if exc.error_code in {
+        "invalid_grant",
+        "missing_refresh_token",
+        "missing_token",
+        "oauth_lock_busy",
+        "protocol_incompatible",
+        "token_store_unavailable",
+        "transport_error",
+    }:
+        return exc.error_code
+    if exc.reauth_required or exc.status_code in (400, 401):
+        return "invalid_grant"
+    return "transport_error"
+
+
+def _record_refresh_error(
+    observation_store: Any,
+    *,
+    credential_id: str,
+    error_code: str,
+    detail: str,
+    observed_at: datetime,
+) -> None:
+    try:
+        observation_store.record_refresh_error(
+            credential_id=credential_id,
+            provider=PROVIDER,
+            auth_mode=AUTH_MODE,
+            error_code=error_code,
+            detail=detail,
+            observed_at=observed_at,
+        )
+    except Exception:  # noqa: BLE001 - never replace the classified auth failure
+        logger.warning("OAuth refresh error witness could not be persisted")
+
+
+def _sync_account_after_token_mutation(account_sync: Any | None, credential_id: str) -> None:
+    if account_sync is None:
+        return
+    try:
+        account_sync.sync(
+            credential_id=credential_id,
+            provider=PROVIDER,
+            auth_mode=AUTH_MODE,
+        )
+    except Exception:  # noqa: BLE001 - account telemetry cannot roll back valid auth
+        logger.warning("OAuth account sync failed after token mutation")
+
+
 def refresh_if_needed(
     *,
     credential_id: str,
@@ -694,6 +765,8 @@ def refresh_if_needed(
     now: datetime | None = None,
     force: bool = False,
     refresh: Callable[..., dict] | None = None,
+    observation_store: Any | None = None,
+    account_sync: Any | None = None,
 ) -> StoredTokenRecord:
     """Return a fresh token record, refreshing iff expired (5-min buffer) or forced. Runs
     under a per-credential lock so concurrent agents don't double-refresh. A missing
@@ -705,17 +778,69 @@ def refresh_if_needed(
     Settings/route surface exposes masked metadata only (the credential DTO or
     `token_store.status()`, which omit the secrets)."""
     now = now or datetime.now(timezone.utc)
+    observations = observation_store or _runtime_observation_store()
     with oauth_credential_lock(credential_id):
-        record = token_store.load(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id)
+        try:
+            record = token_store.load(
+                provider=PROVIDER,
+                auth_mode=AUTH_MODE,
+                credential_id=credential_id,
+            )
+        except Exception:  # noqa: BLE001 - token-store diagnostics may contain secrets
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code="token_store_unavailable",
+                detail="token store unavailable",
+                observed_at=now,
+            )
+            raise ChatGPTOAuthLoginError(
+                "OAuth token store is unavailable; retry later",
+                error_code="token_store_unavailable",
+            ) from None
         if record is None:
             # An OAuth row without a stored token is only repairable by re-login.
-            raise ChatGPTOAuthLoginError("no stored token for this credential", reauth_required=True)
+            error = ChatGPTOAuthLoginError(
+                "no stored token for this credential",
+                reauth_required=True,
+                error_code="missing_token",
+            )
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code="missing_token",
+                detail=str(error),
+                observed_at=now,
+            )
+            raise error
         if not force and not _is_expired(record, now=now):
             return record
         if not record.refresh_token:
-            raise ChatGPTOAuthLoginError(
-                "cannot refresh: no refresh_token is stored for this credential", reauth_required=True,
+            error = ChatGPTOAuthLoginError(
+                "cannot refresh: no refresh_token is stored for this credential",
+                reauth_required=True,
+                error_code="missing_refresh_token",
             )
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code="missing_refresh_token",
+                detail=str(error),
+                observed_at=now,
+            )
+            raise error
+        try:
+            observations.record_refresh_attempt(
+                credential_id=credential_id,
+                provider=PROVIDER,
+                auth_mode=AUTH_MODE,
+                observed_at=now,
+            )
+        except Exception:  # noqa: BLE001 - do not spend a rotating grant without a witness
+            raise ChatGPTOAuthLoginError(
+                "OAuth refresh status is unavailable; retry later",
+                error_code="protocol_incompatible",
+            ) from None
         refresh = refresh or _refresh_token_grant
         try:
             resp = refresh(refresh_token=record.refresh_token)  # failure raises — NO silent fallback
@@ -724,7 +849,72 @@ def refresh_if_needed(
             # family — the login itself is stale and only a fresh browser login
             # repairs it. Transport failures (status_code None) stay transient.
             exc.reauth_required = exc.reauth_required or exc.status_code in (400, 401)
+            code = _refresh_error_code(exc)
+            exc.error_code = code
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code=code,
+                detail=str(exc),
+                observed_at=now,
+            )
             raise
-        new_record = _refresh_response_to_record(resp, record)
-        token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id, record=new_record)
-        return new_record
+        except Exception:  # noqa: BLE001 - unknown grant failure stays transient and redacted
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code="transport_error",
+                detail="OAuth refresh transport failed",
+                observed_at=now,
+            )
+            raise ChatGPTOAuthLoginError(
+                "OAuth refresh transport failed; retry later",
+                error_code="transport_error",
+            ) from None
+        try:
+            new_record = _refresh_response_to_record(resp, record)
+        except Exception:  # noqa: BLE001 - malformed provider payload
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code="protocol_incompatible",
+                detail="OAuth refresh response was incompatible",
+                observed_at=now,
+            )
+            raise ChatGPTOAuthLoginError(
+                "OAuth refresh response was incompatible; retry later",
+                error_code="protocol_incompatible",
+            ) from None
+        try:
+            token_store.save(
+                provider=PROVIDER,
+                auth_mode=AUTH_MODE,
+                credential_id=credential_id,
+                record=new_record,
+            )
+        except Exception:  # noqa: BLE001 - storage diagnostics may contain the record
+            _record_refresh_error(
+                observations,
+                credential_id=credential_id,
+                error_code="token_store_unavailable",
+                detail="refreshed token could not be stored",
+                observed_at=now,
+            )
+            raise ChatGPTOAuthLoginError(
+                "failed to store the refreshed token; retry later",
+                error_code="token_store_unavailable",
+            ) from None
+        try:
+            observations.record_refresh_success(
+                credential_id=credential_id,
+                provider=PROVIDER,
+                auth_mode=AUTH_MODE,
+                observed_at=now,
+            )
+        except Exception:  # noqa: BLE001 - the valid token remains committed
+            raise ChatGPTOAuthLoginError(
+                "the token was refreshed but its status could not be recorded",
+                error_code="protocol_incompatible",
+            ) from None
+    _sync_account_after_token_mutation(account_sync, credential_id)
+    return new_record

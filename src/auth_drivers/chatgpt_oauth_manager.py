@@ -37,6 +37,7 @@ from .chatgpt_oauth_login import (
     PROVIDER,
     ChatGPTOAuthLoginError,
     _StateStore,
+    _sync_account_after_token_mutation,
     complete_login,
     start_login,
 )
@@ -59,6 +60,8 @@ class OAuthLoginManager:
         alias: str = "ChatGPT subscription",
         result_ttl: timedelta = _RESULT_TTL,
         result_cap: int = _RESULT_CAP,
+        observation_store: Any | None = None,
+        account_sync: Any | None = None,
     ) -> None:
         self._cs = credential_store
         self._ts = token_store
@@ -72,6 +75,8 @@ class OAuthLoginManager:
         self._alias = alias
         self._result_ttl = result_ttl
         self._result_cap = result_cap
+        self._observation_store = observation_store
+        self._account_sync = account_sync
         self._results: dict[str, dict] = {}
         self._result_ts: dict[str, datetime] = {}  # state -> last-update time (for eviction)
         self._servers: dict[str, Any] = {}
@@ -156,11 +161,16 @@ class OAuthLoginManager:
             self._drop_server(state)
 
     def _complete(self, *, state: str, code: str) -> dict:
-        return complete_login(
+        credential = complete_login(
             state=state, code=code, credential_store=self._cs, token_store=self._ts,
             alias=self._alias, state_store=self._state_store, now=self._clock(), exchange=self._exchange,
             invalidate_relogin_cache=self._invalidate_discovery_cache,
+            observation_store=self._observation_store,
         )
+        _sync_account_after_token_mutation(
+            self._account_sync, credential["credential_id"]
+        )
+        return credential
 
     def _invalidate_discovery_cache(self, credential_id: str) -> int:
         """The re-login discovery-cache invalidator (plan D3). Runs inside the login

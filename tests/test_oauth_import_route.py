@@ -57,6 +57,8 @@ def test_import_token_lands_in_token_store(stores):
     cid = res["credential"]["id"]
     rec = tok.load(provider="anthropic", auth_mode="claude_code_oauth", credential_id=cid)
     assert rec is not None and rec.access_token == _TOKEN  # the token went to the token-store
+    assert rec.expires_at is None  # Claude manual expiry has one owner: the credential row
+    assert cred.get(cid).expires_at == "2027-06-16T00:00:00+00:00"
 
 
 def test_import_response_never_echoes_token(stores):

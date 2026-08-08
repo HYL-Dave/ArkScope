@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import sqlite3
 from datetime import datetime, timezone
@@ -19,6 +21,19 @@ class _TokenStore:
         if self.error is not None:
             raise self.error
         return self.records.get((provider, auth_mode, credential_id))
+
+    def save(self, *, provider: str, auth_mode: str, credential_id: str, record):
+        if self.error is not None:
+            raise self.error
+        self.records[(provider, auth_mode, credential_id)] = record
+
+
+def _access_token_expiring_at(value: str) -> str:
+    expiry = int(datetime.fromisoformat(value).timestamp())
+    payload = base64.urlsafe_b64encode(
+        json.dumps({"exp": expiry}).encode("utf-8")
+    ).rstrip(b"=").decode("ascii")
+    return f"h.{payload}.s"
 
 
 def _clean_provider_env(monkeypatch) -> None:
@@ -202,6 +217,7 @@ def test_retryable_refresh_failure_projects_separately_from_reauth_required(tmp_
 
 
 def test_successful_refresh_projection_uses_token_store_expiry_not_credential_db(tmp_path, monkeypatch):
+    from src.auth_drivers.chatgpt_oauth_login import refresh_if_needed
     from src.auth_drivers.oauth_status import OAuthObservationStore
     from src.auth_drivers.token_store import StoredTokenRecord
     from src.model_credentials import CredentialStore, provider_credentials
@@ -216,19 +232,24 @@ def test_successful_refresh_projection_uses_token_store_expiry_not_credential_db
     )
     credential_id = f"local:{row.id}"
     observations = OAuthObservationStore(store.db_path)
-    observations.record_refresh_success(
-        credential_id=credential_id,
-        provider="openai",
-        auth_mode="chatgpt_oauth",
-        observed_at="2026-08-08T11:58:00+00:00",
-    )
     tokens = _TokenStore({
         ("openai", "chatgpt_oauth", credential_id): StoredTokenRecord(
-            access_token="new-access-secret",
-            refresh_token="new-refresh-secret",
-            expires_at=_FUTURE,
+            access_token="old-access-secret",
+            refresh_token="old-refresh-secret",
+            expires_at=_PAST,
         )
     })
+
+    refresh_if_needed(
+        credential_id=credential_id,
+        token_store=tokens,
+        observation_store=observations,
+        now=_NOW,
+        refresh=lambda **_kwargs: {
+            "access_token": _access_token_expiring_at(_FUTURE),
+            "refresh_token": "new-refresh-secret",
+        },
+    )
 
     cred = provider_credentials(
         store,
@@ -241,6 +262,11 @@ def test_successful_refresh_projection_uses_token_store_expiry_not_credential_db
     assert cred.lifecycle_error_code is None
     assert cred.available is True
     assert cred.expires_at == _FUTURE
+    assert store.get(credential_id).expires_at == _PAST
+    status = observations.read_refresh_status(credential_id)
+    assert status is not None
+    assert status.last_refresh_attempt_at == _NOW.isoformat()
+    assert status.last_refresh_success_at == _NOW.isoformat()
 
 
 def test_api_key_and_environment_availability_remain_unchanged(tmp_path, monkeypatch):

@@ -131,7 +131,22 @@ def test_begin_waits_until_loopback_is_started_before_returning(stores):
 
 def test_loopback_delivers_code_then_status_success_no_token(stores):
     cred, tok = stores
-    mgr = _mgr(stores, lambda state: _FakeServer(lambda s: ("AUTHCODE", state)))
+    sync_calls = []
+
+    class FailingSync:
+        def sync(self, *, credential_id, provider, auth_mode):
+            rec = tok.load(
+                provider=provider, auth_mode=auth_mode, credential_id=credential_id
+            )
+            assert rec is not None and rec.access_token == _ACCESS
+            sync_calls.append((credential_id, provider, auth_mode))
+            raise RuntimeError("account sync cannot roll back a valid login")
+
+    mgr = _mgr(
+        stores,
+        lambda state: _FakeServer(lambda s: ("AUTHCODE", state)),
+        account_sync=FailingSync(),
+    )
     out = mgr.begin()
     st = _wait_status(mgr, out["state"])
     assert st["status"] == "success"
@@ -143,6 +158,7 @@ def test_loopback_delivers_code_then_status_success_no_token(stores):
     blob = json.dumps(st)
     assert _ACCESS not in blob and "refresh-XYZ" not in blob and _IDTOK not in blob
     assert "u@example.com" not in blob  # no email PII
+    assert sync_calls == [(c["credential_id"], "openai", "chatgpt_oauth")]
 
 
 def test_begin_make_active_false_creates_inactive_credential(stores):
@@ -303,15 +319,66 @@ def _seed_relogin_target(stores, *, access="OLD-ACCESS"):
 
 
 def test_begin_threads_relogin_target_to_completion(stores):
+    from src.auth_drivers.oauth_status import (
+        OAuthAccountObservation,
+        OAuthAccountPayload,
+        OAuthObservationStore,
+        OAuthRateLimitSnapshot,
+        OAuthUsageSummary,
+    )
     from src.model_discovery_cache import ModelDiscoveryCache
 
     cred_store, tok_store = stores
     cid = _seed_relogin_target(stores)
+    observations = OAuthObservationStore(cred_store.db_path)
+    observations.record_refresh_error(
+        credential_id=cid,
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        error_code="invalid_grant",
+        observed_at="2026-08-08T12:00:00+00:00",
+    )
+    observations.record_account_snapshot(
+        credential_id=cid,
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        observation=OAuthAccountObservation(
+            account_fingerprint="a" * 64,
+            source="codex_app_server",
+            observed_at="2026-08-08T12:00:00+00:00",
+            payload=OAuthAccountPayload(
+                rate_limits=OAuthRateLimitSnapshot(),
+                usage_summary=OAuthUsageSummary(),
+            ),
+        ),
+    )
     cache = ModelDiscoveryCache(cred_store.db_path)
     cache.record_run(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
                      secret_fingerprint="oauth", status="ok",
                      models=[{"id": "old-model", "label": "Old", "source": "provider_api"}])
-    mgr = _mgr(stores, lambda s: _FakeServer(lambda _srv: ("code-1", None)))
+    sync_calls = []
+
+    class SyncAfterInvalidation:
+        def sync(self, *, credential_id, provider, auth_mode):
+            from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
+
+            with oauth_credential_lock(credential_id, timeout=0.2):
+                assert token_store_record().access_token == _ACCESS
+                assert observations.read_refresh_status(credential_id) is None
+                assert observations.read_account_snapshot(credential_id) is None
+                sync_calls.append((credential_id, provider, auth_mode))
+
+    def token_store_record():
+        return tok_store.load(
+            provider="openai", auth_mode="chatgpt_oauth", credential_id=cid
+        )
+
+    mgr = _mgr(
+        stores,
+        lambda s: _FakeServer(lambda _srv: ("code-1", None)),
+        observation_store=observations,
+        account_sync=SyncAfterInvalidation(),
+    )
     out = mgr.begin(relogin_credential_id=cid)
     st = _wait_status(mgr, out["state"])
     assert st["status"] == "success"
@@ -326,6 +393,7 @@ def test_begin_threads_relogin_target_to_completion(stores):
     assert rec.access_token == _ACCESS                                          # token replaced in place
     row = cred_store.get(cid)
     assert row.alias == "Sub" and row.active is False                           # preserved
+    assert sync_calls == [(cid, "openai", "chatgpt_oauth")]
 
 
 def test_relogin_cache_clear_failure_aborts_before_token_replace(stores, monkeypatch):

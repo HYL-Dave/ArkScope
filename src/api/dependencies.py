@@ -7,6 +7,7 @@ that all route handlers share.
 
 from __future__ import annotations
 
+import hmac
 import os
 import threading
 from concurrent.futures import Future, TimeoutError as FutureTimeoutError
@@ -266,6 +267,7 @@ class OAuthAccountSyncService:
 
     def _sync_once(self, *, credential_id: str, provider: str, auth_mode: str):
         from src.auth_drivers.codex_account_usage import CodexAccountUsageError
+        from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
         from src.auth_drivers.oauth_status import cached_account_usage
 
         cached = cached_account_usage(credential_id, self.observation_store)
@@ -298,12 +300,6 @@ class OAuthAccountSyncService:
                 credential_id=credential_id,
                 record=record,
             )
-            snapshot = self.observation_store.record_account_snapshot(
-                credential_id=credential_id,
-                provider=provider,
-                auth_mode=auth_mode,
-                observation=observation,
-            )
         except CodexAccountUsageError as exc:
             return cached.model_copy(
                 update={"sync_status": "failed", "sync_error_code": exc.code}
@@ -315,12 +311,59 @@ class OAuthAccountSyncService:
                     "sync_error_code": "adapter_unavailable",
                 }
             )
+        try:
+            with oauth_credential_lock(credential_id):
+                current = self.token_store.load(
+                    provider=provider,
+                    auth_mode=auth_mode,
+                    credential_id=credential_id,
+                )
+                if current is None or not self._same_token_generation(record, current):
+                    return cached.model_copy(
+                        update={
+                            "snapshot": None,
+                            "sync_status": "failed",
+                            "sync_error_code": "credential_changed_during_sync",
+                        }
+                    )
+                snapshot = self.observation_store.record_account_snapshot(
+                    credential_id=credential_id,
+                    provider=provider,
+                    auth_mode=auth_mode,
+                    observation=observation,
+                )
+        except Exception as exc:  # noqa: BLE001 - no lock/storage diagnostic leaves this layer
+            error_code = getattr(exc, "error_code", None)
+            return cached.model_copy(
+                update={
+                    "sync_status": "failed",
+                    "sync_error_code": (
+                        "sync_busy" if error_code == "oauth_lock_busy" else "adapter_unavailable"
+                    ),
+                }
+            )
         return cached.model_copy(
             update={
                 "snapshot": snapshot,
                 "sync_status": "succeeded",
                 "sync_error_code": None,
             }
+        )
+
+    @staticmethod
+    def _same_token_generation(before, after) -> bool:
+        def values(record):
+            metadata = getattr(record, "metadata", None) or {}
+            return (
+                str(getattr(record, "access_token", None) or ""),
+                str(getattr(record, "refresh_token", None) or ""),
+                str(metadata.get("account_id") or ""),
+                str(metadata.get("id_token") or ""),
+            )
+
+        return all(
+            hmac.compare_digest(left, right)
+            for left, right in zip(values(before), values(after))
         )
 
 
@@ -347,6 +390,8 @@ def get_oauth_login_manager():
     return OAuthLoginManager(
         credential_store=get_credential_store(),
         token_store=get_oauth_token_store(),
+        observation_store=get_oauth_observation_store(),
+        account_sync=get_oauth_account_sync_service(),
     )
 
 

@@ -75,6 +75,14 @@ def _credential_store(store) -> CredentialStore:
     return store if isinstance(store, CredentialStore) else get_credential_store()
 
 
+def _oauth_observation_store(store: CredentialStore, candidate):
+    if hasattr(candidate, "delete_credential_observations"):
+        return candidate
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    return OAuthObservationStore(store.db_path)
+
+
 def _run_coro(coro):
     """Drive an async driver method from a SYNC route handler. The ONE place this
     pattern lives — sync FastAPI routes run in a threadpool (no running loop), so
@@ -546,7 +554,12 @@ def import_oauth_credential(
     try:
         token_store.save(
             provider=provider, auth_mode=auth_mode, credential_id=cid,
-            record=StoredTokenRecord(access_token=token, expires_at=body.expires_at, account_label=body.account_label),
+            record=StoredTokenRecord(
+                access_token=token,
+                # Claude's optional manual expiry is owned by llm_credentials.
+                expires_at=None,
+                account_label=body.account_label,
+            ),
         )
     except Exception:  # noqa: BLE001 — roll back so no half-built credential remains
         store.delete(cid)
@@ -756,12 +769,12 @@ def delete_credential(
     credential_id: str,
     store: CredentialStore = Depends(get_credential_store),
     token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
 ):
-    """Delete a credential with a FAIL-CLOSED cascade (S3 plan D5): clear the
-    discovery cache first, then (OAuth rows) prove the token is gone, and delete
-    the metadata row LAST — so a failure always leaves a visible retry target and
-    never an orphaned secret. Serialized on the credential lifecycle lock so a
-    process-local in-flight refresh cannot resurrect the token."""
+    """Delete a credential with a fail-closed cascade: clear discovery and OAuth
+    observations first, then prove the token is gone, and delete metadata last.
+    Serialized on the credential lifecycle lock so an in-flight refresh cannot
+    resurrect the token."""
     from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
 
     store = _credential_store(store)
@@ -769,6 +782,7 @@ def delete_credential(
         raise HTTPException(status_code=400, detail="only local credentials can be deleted")
     if store.get(credential_id) is None:
         raise HTTPException(status_code=404, detail="credential not found")
+    observation_store = _oauth_observation_store(store, observation_store)
     require_profile_state_write("credential_delete", {"credential_id": credential_id})
     with oauth_credential_lock(credential_id):
         cred = store.get(credential_id)  # re-read inside the lock
@@ -782,10 +796,25 @@ def delete_credential(
         except Exception:  # noqa: BLE001
             logger.warning("credential delete: discovery-cache clear failed", exc_info=True)
             raise HTTPException(status_code=502, detail="could not clear the discovery cache; nothing was deleted")
-        # 2) OAuth token cleanup, proven before the row goes away.
+        # 2) OAuth observations and token cleanup, proven before the row goes
+        # away. API-key deletion keeps its existing behavior and never writes
+        # the OAuth observation store.
         token_deleted: bool | None = None
         old_record = None
         if cred.auth_type in _OAUTH_AUTH_MODES:
+            try:
+                observation_store.delete_credential_observations(credential_id)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "credential delete: OAuth observation cleanup failed", exc_info=True
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        "OAuth observation cleanup failed; the token and credential row "
+                        "were kept for retry"
+                    ),
+                ) from None
             try:
                 old_record = token_store.load(
                     provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id,

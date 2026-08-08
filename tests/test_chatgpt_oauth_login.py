@@ -37,6 +37,12 @@ _NOW = datetime(2030, 1, 1, tzinfo=timezone.utc)
 _FUTURE_EXP = 4102444800  # 2100-01-01 UTC (epoch, for a JWT exp claim)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_oauth_runtime_paths(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+
+
 def _b64url(d: bytes) -> str:
     return base64.urlsafe_b64encode(d).rstrip(b"=").decode("ascii")
 
@@ -349,17 +355,50 @@ def test_refresh_if_needed_skips_when_not_expired():
     assert calls["n"] == 0 and rec.refresh_token == "refresh-1"
 
 
-def test_refresh_if_needed_refreshes_when_expired():
+def test_refresh_if_needed_refreshes_when_expired(tmp_path):
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
     ts = _TokStore()
     _seed(ts, expires_at="2001-01-01T00:00:00+00:00")  # past
+    observations = OAuthObservationStore(tmp_path / "profile.db")
+    events = []
 
     def refresh(*, refresh_token):
+        status = observations.read_refresh_status("local:1")
+        assert status is not None and status.last_refresh_attempt_at == _NOW.isoformat()
+        assert status.last_refresh_success_at is None
+        events.append("grant")
         assert refresh_token == "refresh-1"
         return {"access_token": _access(), "refresh_token": "refresh-2", "id_token": _id_token()}
 
-    rec = refresh_if_needed(credential_id="local:1", token_store=ts, now=_NOW, refresh=refresh)
+    class FailingSync:
+        def sync(self, *, credential_id, provider, auth_mode):
+            with mod.oauth_credential_lock(credential_id, timeout=0.2):
+                assert (credential_id, provider, auth_mode) == (
+                    "local:1", "openai", "chatgpt_oauth"
+                )
+                assert ts.saved[(provider, auth_mode, credential_id)].refresh_token == "refresh-2"
+                status = observations.read_refresh_status(credential_id)
+                assert status is not None and status.last_refresh_success_at == _NOW.isoformat()
+                events.append("sync")
+            raise RuntimeError("sync failure must not roll back auth")
+
+    rec = refresh_if_needed(
+        credential_id="local:1",
+        token_store=ts,
+        now=_NOW,
+        refresh=refresh,
+        observation_store=observations,
+        account_sync=FailingSync(),
+    )
     assert rec.refresh_token == "refresh-2"
     assert ts.saved[("openai", "chatgpt_oauth", "local:1")].refresh_token == "refresh-2"
+    status = observations.read_refresh_status("local:1")
+    assert status is not None
+    assert status.last_refresh_attempt_at == _NOW.isoformat()
+    assert status.last_refresh_success_at == _NOW.isoformat()
+    assert status.last_refresh_error_at is None
+    assert events == ["grant", "sync"]
 
 
 def test_refresh_if_needed_treats_near_expiry_as_expired_with_buffer():
@@ -384,29 +423,68 @@ def test_refresh_if_needed_force_refreshes_even_if_fresh():
     assert rec.refresh_token == "refresh-9"
 
 
-def test_refresh_if_needed_raises_on_failure_no_silent_fallback():
+def test_refresh_if_needed_raises_on_failure_no_silent_fallback(tmp_path):
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
     ts = _TokStore()
     _seed(ts, expires_at="2001-01-01T00:00:00+00:00")
+    observations = OAuthObservationStore(tmp_path / "profile.db")
 
     def refresh(*, refresh_token):
-        raise ChatGPTOAuthLoginError("refresh failed (401)")
+        raise ChatGPTOAuthLoginError(
+            "refresh failed (401) access_token=SECRET-ACCESS",
+            status_code=401,
+        )
 
     with pytest.raises(ChatGPTOAuthLoginError):
-        refresh_if_needed(credential_id="local:1", token_store=ts, now=_NOW, refresh=refresh)
+        refresh_if_needed(
+            credential_id="local:1",
+            token_store=ts,
+            now=_NOW,
+            refresh=refresh,
+            observation_store=observations,
+        )
     # the stale token is NOT silently overwritten or swallowed
     assert ts.saved[("openai", "chatgpt_oauth", "local:1")].refresh_token == "refresh-1"
+    status = observations.read_refresh_status("local:1")
+    assert status is not None
+    assert status.last_refresh_attempt_at == _NOW.isoformat()
+    assert status.last_refresh_error_at == _NOW.isoformat()
+    assert status.last_refresh_error_code == "invalid_grant"
+    assert "SECRET-ACCESS" not in (status.last_refresh_error_detail or "")
 
 
-def test_refresh_if_needed_no_refresh_token_fails():
+def test_refresh_if_needed_no_refresh_token_fails(tmp_path):
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
     ts = _TokStore()
     _seed(ts, expires_at="2001-01-01T00:00:00+00:00", refresh=None)
+    observations = OAuthObservationStore(tmp_path / "profile.db")
     with pytest.raises(ChatGPTOAuthLoginError):
-        refresh_if_needed(credential_id="local:1", token_store=ts, now=_NOW, force=True)
+        refresh_if_needed(
+            credential_id="local:1",
+            token_store=ts,
+            now=_NOW,
+            force=True,
+            observation_store=observations,
+        )
+    status = observations.read_refresh_status("local:1")
+    assert status is not None and status.last_refresh_error_code == "missing_refresh_token"
 
 
-def test_refresh_if_needed_missing_credential_fails():
+def test_refresh_if_needed_missing_credential_fails(tmp_path):
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    observations = OAuthObservationStore(tmp_path / "profile.db")
     with pytest.raises(ChatGPTOAuthLoginError):
-        refresh_if_needed(credential_id="local:999", token_store=_TokStore(), now=_NOW)
+        refresh_if_needed(
+            credential_id="local:999",
+            token_store=_TokStore(),
+            now=_NOW,
+            observation_store=observations,
+        )
+    status = observations.read_refresh_status("local:999")
+    assert status is not None and status.last_refresh_error_code == "missing_token"
 
 
 # --- HTTP error redaction (must-fix: a backend/proxy could echo the secret) -----
