@@ -1,7 +1,7 @@
 # Provider Evaluation Hygiene and Tiingo Tail Retirement Implementation Plan
 
-> **Status:** TASK 1 COMPLETE - INDEPENDENT TASK 1 REVIEW REQUIRED;
-> TASK 2 NOT AUTHORIZED
+> **Status:** TASK 2 COMPLETE - INDEPENDENT TASK 2 REVIEW REQUIRED;
+> TASK 3 NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -726,24 +726,24 @@ Stop for independent Task 1 review before Task 2.
 
 **Files:** Section 1.2 plus evidence.
 
-- [ ] **Step 1: Reconfirm no consumer and exact reverse-TDD RED**
+- [x] **Step 1: Reconfirm no consumer and exact reverse-TDD RED**
 
 Run the uncapped symbol/import census and require only definitions, package exports,
 and `tests/test_rate_curve.py`. Require all 34 IDs. A new consumer stops the task.
 
-- [ ] **Step 2: Remove the module, exports, and cache-producing fallback**
+- [x] **Step 2: Remove the module, exports, and cache-producing fallback**
 
 Delete the two files and remove only the listed symbols/imports from the two shared
 option files. Do not alter formulas or caller-owned rate inputs.
 
-- [ ] **Step 3: Prove final identity and surviving option behavior**
+- [x] **Step 3: Prove final identity and surviving option behavior**
 
 Require `4527/4eeb1178...`; the stage difference is exactly the 34 rate IDs and no
 additions. Run the 75-node option owner set and require `74 passed / 1 skipped`.
 Compile `src/options_math`. Prove no `risk_free_rate.json` path or retired symbol
 remains in current product/test code.
 
-- [ ] **Step 4: Commit and stop for review**
+- [x] **Step 4: Commit and stop for review**
 
 Suggested product commit:
 
