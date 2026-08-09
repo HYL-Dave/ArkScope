@@ -1,7 +1,7 @@
 # Scripts Tranche B Legacy Score Retirement Implementation Plan
 
-> **Status:** TASK 0 MANIFEST PACKET COMPLETE; INDEPENDENT REVIEW PENDING;
-> USER-AUTHORIZED BATCH CONTINUATION TO TASK 1; CUTOVER NOT YET COMMITTED
+> **Status:** TASKS 0-4 COMPLETE; ATOMIC TIP `8ebf7fae`; NATIVE ADMISSION
+> GREEN; INDEPENDENT IMPLEMENTATION REVIEW PENDING; NOT MERGED
 > **Date:** 2026-08-08
 > **Current branch base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
@@ -16,6 +16,9 @@
 > paused-preserve status and approved direct Git retirement with no archive or
 > preservation branch. Physical score-row deletion and
 > `config/scoring_keys.txt` disposition remain separately blocked.
+> **Implementation review packet:**
+> `/tmp/scripts-tranche-b-task4-8ebf7fae`, 668 entries, manifest
+> `d5917eb703081d80d66b042886c581ba09df7950bc2a7ffb3061a910551b3ce5`
 
 ## 0. Execution contract
 
