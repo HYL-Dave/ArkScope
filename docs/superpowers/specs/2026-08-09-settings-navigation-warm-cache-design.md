@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Design
 
-> **Status: DESIGN WRITTEN - INDEPENDENT REVIEW REQUIRED.**
+> **Status: DESIGN GREEN; IMPLEMENTATION PLAN WRITTEN - INDEPENDENT PLAN REVIEW REQUIRED.**
 >
 > **Date:** 2026-08-09
 >
@@ -9,6 +9,10 @@
 >
 > **Scope:** Settings navigation persistence, a complete section directory,
 > and a bounded app-session cache for existing read-only Settings DTOs.
+>
+> **Design review:** Independent review at `dbd92b86` returned GREEN with zero
+> findings. Product/test implementation remains unauthorized until the exact
+> implementation plan receives independent GREEN review.
 
 ## 1. Problem and grounded facts
 
