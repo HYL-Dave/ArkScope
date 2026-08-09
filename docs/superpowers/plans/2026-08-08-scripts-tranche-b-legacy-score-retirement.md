@@ -1,7 +1,7 @@
 # Scripts Tranche B Legacy Score Retirement Implementation Plan
 
-> **Status:** FULL PLAN AND ONE-TIME REBASE AMENDMENT GREEN; TASK 0 STOPPED ON
-> A BOUNDED NO-TAIL OWNER AMENDMENT; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** USER TRAINING-RETIREMENT RULING RECORDED; EXPANDED PLAN AMENDMENT
+> REVIEW PENDING; TASK 0 PAUSED; IMPLEMENTATION NOT AUTHORIZED
 > **Date:** 2026-08-08
 > **Current branch base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
@@ -9,10 +9,13 @@
 > **Product authority:**
 > `docs/superpowers/specs/2026-08-08-scripts-tranche-b-product-decision-design.md`
 > at reviewed commit `04dd9a67` (rebased byte-equivalent commit `f34463df`),
-> plus the post-approval no-tail ruling recorded in this plan-gate amendment
+> plus the post-approval no-tail and training-retirement rulings recorded in
+> this plan-gate amendment
 > **User ruling:** PD 1 through PD 8 approved as the section 8 bundle on
-> 2026-08-08. Physical score-row deletion and `config/scoring_keys.txt`
-> disposition remain separately blocked.
+> 2026-08-08. On 2026-08-09 the user also superseded `training/`'s
+> paused-preserve status and approved direct Git retirement with no archive or
+> preservation branch. Physical score-row deletion and
+> `config/scoring_keys.txt` disposition remain separately blocked.
 
 ## 0. Execution contract
 
@@ -22,6 +25,10 @@ This plan removes the frozen ArkScope-generated 1-5 news score semantic and the
 unvalidated composite signal built on it. It preserves raw news, raw news
 counts, morning brief, watchlist/profile behavior, score-free news-volume
 detection, and event sequences under the product decisions in the authority.
+It also removes the disconnected offline RL/training implementation, its
+implementation-only tests, manual yfinance smoke, unowned dependency surface,
+and current instructions. Future RL/Signals research remains a new product
+line, not a reason to retain this scaffold.
 
 This is one atomic product cutover. The storage projection, readers, writers,
 DTOs, tools, routes, monitor names, model-visible descriptions, frontend types,
@@ -42,8 +49,8 @@ This plan does not authorize any of the following:
 - reusing the retired table, field names, 1-5 scale, cache identity, or tool
   names for provider-native or future on-demand sentiment;
 - implementing the future Signals product, a recommendation, or a rank;
-- changing `training/` research lineage, provider-native sentiment collection,
-  investor-profile risk semantics, normalized raw news, or Seeking Alpha;
+- changing provider-native sentiment collection, investor-profile risk
+  semantics, normalized raw news, or Seeking Alpha;
 - pushing a branch; or
 - starting product edits before independent review clears this one-time
   absolute-identity amendment. OAuth, provider hygiene, and Settings navigation
@@ -58,13 +65,13 @@ historical owner. Runtime reconnection is not an outcome.
 
 ### 0.3 Atomicity and projected stages
 
-Sections 2.5 and 5 describe five **collection-ledger projections**. They are
+Sections 2.5 and 5 describe six **collection-ledger projections**. They are
 precomputed accounting witnesses only. They are not shippable releases, full
 suite baselines, or permission to retain a half-removed compatibility surface.
 
-RED tests are written first. The implementation then completes all five
+RED tests are written first. The implementation then completes all six
 product phases in one unmerged worktree before canonical admission. Only the
-final `4407/d71b9825...` backend and `1124/da69a294...` frontend identities may
+final `4298/38705c3d...` backend and `1124/da69a294...` frontend identities may
 be called GREEN. If a module dependency makes an intermediate projection
 uncollectable, stop and finish the owning atomic phase; do not add a shim merely
 to make the intermediate tree look green.
@@ -123,9 +130,12 @@ frontend collection by `-1/+47`. Those delta streams have zero intersection
 with the frozen Tranche B retirement and addition streams. All 138 retired IDs
 still occur exactly once; all 18 backend additions and the one frontend
 addition remain absent. Therefore only absolute full/projection identities and
-native arithmetic are re-derived below. Relative `+18/-138`, frontend `+1/-0`,
-all node names, focused identities, phase partitions, product decisions,
-protected boundaries, mutations, and destructive non-authorizations are frozen.
+native arithmetic were re-derived. At that review point, relative `+18/-138`,
+frontend `+1/-0`, all node names, focused identities, phase partitions, product
+decisions, protected boundaries, mutations, and destructive non-authorizations
+were frozen. The later explicit user ruling in section 0.7 supersedes only the
+training protected boundary and expands retirement to `+18/-247`; the old
+relative and final identities remain dated evidence, not current admission.
 
 The product-decision document changes only its status and completed-handoff
 sequence; PD 1-PD 8 are unchanged. Its amendment identity is `411 lines /
@@ -148,8 +158,48 @@ an unowned, non-importable legacy-score migration tail.
 This bounded amendment adds that source module to the phase-1 deletion set. It
 does not change any backend or frontend node ID, collection count, projection,
 native arithmetic, product decision, data/secret boundary, or approved surviving
-capability. Task 0 remains incomplete at its owned/protected-manifest step until
-this amendment receives focused review.
+capability. Focused review cleared this amendment at `a6e99c02` and allowed
+Task 0 to resume at owned/protected-manifest construction without repeating the
+unchanged native base gate.
+
+### 0.7 User ruling: direct retirement of the training lineage
+
+Manifest construction exposed that section 1.4 still protected a 53-path
+offline training tree under the old `paused-preserve` ruling. The user has now
+explicitly superseded that ruling. Grounding establishes:
+
+- all 53 tracked `training/` paths form one disconnected RL research lineage;
+  their current sorted `path<TAB>Git blob SHA-1` stream is
+  `782dd7e42eabaacc814cde180b04f473d6e2433c6dd5e3cc907fa00f96211351`;
+- no `src/`, app, scheduler, service, or current runtime imports `training`;
+- exactly eight external test files import it, contributing 109 canonical
+  nodes (`101 passed / 8 skipped` in the current environment);
+- `tests/live/smoke_yfinance.py` exists only for this lineage and contributes no
+  canonical node;
+- `gymnasium`, `torch`, `datasets`, `mpi4py`, `spinup`, `matplotlib`,
+  `stable-baselines3`, and `yfinance` have no remaining Python owner after this
+  family leaves; these are eight package names but nine exact requirement lines
+  because `torch` is duplicated; `scipy` remains owned by current option
+  pricing; and
+- current instructions/config still name the retired tree, yfinance smoke,
+  `trained_models`, or the old paused status and must change in the same cutover.
+
+The exact direct-deletion path stream contains 62 paths (53 training, eight
+test files, and the manual smoke) and has SHA-256
+`7c552b4940deeb666cd865656e980f9bba392507e6ed3f9b11b1672269b61c7d`.
+The 109-node retirement stream is
+`db3cad74da2ec956e252096948d80631297e9d4e8c731fb6706da7b2976941b2`.
+Combined with the reviewed score/signal ledger, retirement is exact 247 nodes
+with stream SHA
+`149962668e116460f4b88402b1fabb8bb24f0a3409e33d8cade5924dd34ca671`.
+
+Git history is the archive. Do not create a branch, tag, copied directory,
+tarball, compatibility import, or disabled package for this deletion. The
+future research intent is recorded in current product authorities, while any
+future implementation starts from a new design. This ruling changes scope and
+therefore invalidates the prior `-138/+18` implementation authorization; Task 0
+stops for independent review of the expanded exact plan before any RED or
+product byte changes.
 
 ## 1. Owned and protected paths
 
@@ -169,6 +219,7 @@ path manifest before product edits.
 | model-visible contract | `src/tools/registry.py`, `src/agents/shared/{prompts,subagent}.py`, `src/agents/{anthropic_agent,openai_agent}/tools.py`, `src/evidence_packet.py` retirement copy only, and exact tool-count/allowlist owners found by Task 0 |
 | frontend DTO fixtures | `apps/arkscope-web/src/api.ts`, `Home.test.tsx`, `Watchlist.test.tsx`, `Universe.test.tsx`, new `legacyScoreRetirement.test.ts` |
 | current authorities | the exact current/historical disposition in section 1.3 below plus this plan/evidence/spec and `PROJECT_PRIORITY_MAP.md` |
+| retired training lineage | delete all 53 tracked `training/` paths, the eight exact test owners in section 2.2, and `tests/live/smoke_yfinance.py`; remove only dependencies/config/ignore/current-copy entries proven ownerless by their exit |
 
 The surviving PD 5-PD 6 capabilities move to honest news/event owners. Delete
 the complete `src/signals/` package and `src/tools/signal_tools.py`; add no
@@ -222,12 +273,20 @@ The cutover must reconcile current instructions in at least:
 ```text
 docs/design/ARKSCOPE_TOOL_CATALOG.md
 docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md
+docs/design/README.md
+docs/design/RL_COLLAPSE_FINDINGS.md
 docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md
 docs/design/DESKTOP_APP_CARRYOVER_ANALYSIS.md
 docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md
+docs/design/REPO_HYGIENE_AUDIT_2026_07.md
 docs/design/REPO_HYGIENE_B6_MODULE_DISPOSITION.md
 docs/design/SCRIPTS_RETIREMENT_DECISION.md
 docs/design/PROJECT_PRIORITY_MAP.md
+README.md
+PROJECT_STRUCTURE.md
+scripts/scoring/README.md
+tests/live/README.md
+data_sources/API_SPECIFICATIONS.md
 ```
 
 Historical plans, evidence, and migration records keep dated facts. They may
@@ -240,8 +299,6 @@ old implementation.
 Task 0 pins an exact blob/path manifest for these boundaries and Task 6 proves
 byte identity except for the explicitly bounded EvidencePacket copy delta:
 
-- all tracked `training/` files (current 53-path blob-stream SHA
-  `2284c8989f6104979a11a5111de987f5d6f2974e3d2f74f0cf47ed5b4854e14a`);
 - `data_sources/alpha_vantage_source.py`, `data_sources/polygon_source.py`,
   `src/collectors/finnhub_news.py`, and `src/collectors/polygon_news.py`;
 - investor-profile risk owners and tests;
@@ -270,10 +327,10 @@ newline. They are derived from the deterministic reporter, never terminal prose.
 |---|---:|---|
 | rebased reviewed base | 4,527 | `4eeb117804ad874c83ffe4c04fd25ecd4de4f460801bfbf95d15c1406f32455d` |
 | RED tests added, old nodes retained | 4,545 | `e1fa3f7d54d671c984e9800e38850ccb802f06f83d78aa2114b749bb7414f9da` |
-| final target | 4,407 | `d71b9825e727fd7ccac43b79ebb904144a48a9acc66b75ccae002471822ac8bc` |
+| final target | 4,298 | `38705c3d431238f5fecb15d3dd4a668cee41912005bfc883d8b4e7275b5efee6` |
 
-Arithmetic: `4527 + 18 - 138 = 4407`. The 138-node retired stream is
-`b48b161d573afb37496763c0afe388c2421f06e35eb5cd7de959ba5778c05254`.
+Arithmetic: `4527 + 18 - 247 = 4298`. The 247-node retired stream is
+`149962668e116460f4b88402b1fabb8bb24f0a3409e33d8cade5924dd34ca671`.
 The 18-node addition stream is
 `88ac9e5652c9df79eb42284d6a9c42a2f0f4a60b967badae37524fa127499520`.
 Their intersection with the base/non-base sets must be exact: all retired IDs
@@ -292,7 +349,15 @@ exist once in base; all additions are absent from base.
 | `tests/test_score_ibkr_keys.py` | 11 |
 | `tests/test_scoring_continue_from.py` | 17 |
 | `tests/test_scoring_api_routing.py` | 1 |
-| **Total** | **102** |
+| `tests/test_backtest_enhanced.py` | 18 |
+| `tests/test_env_extra_features.py` | 16 |
+| `tests/test_feature_engineering.py` | 36 |
+| `tests/test_inference_offline.py` | 4 |
+| `tests/test_integration_pipeline.py` | 4 |
+| `tests/test_live_features.py` | 8 |
+| `tests/test_state_parity.py` | 4 |
+| `tests/test_train_utils.py` | 19 |
+| **Total** | **211** |
 
 ### 2.3 Mixed-file retired nodes
 
@@ -337,15 +402,17 @@ tests/test_tools.py::TestSignalTools::test_detect_event_chains
 tests/test_tools.py::TestSignalTools::test_synthesize_signal
 ```
 
-Two retired nodes are canonical skips in the blank environment:
+The original score/signal ledger has two canonical skips in the blank
+environment:
 
 - `TestNewsDB::test_query_news_scored_only` is skipped by the existing
   `requires_db` marker;
 - `test_contributions_sum_to_composite_score` in the retired factor file skips
   when the empty fixture emits no factors.
 
-This was directly reproduced as `2 skipped`; therefore the final native target
-is `4370 passed / 37 skipped / 0 failed`, not an inferred pass total.
+The training-only files were separately executed as `101 passed / 8 skipped`.
+Therefore the combined final native target is
+`4269 passed / 29 skipped / 0 failed`, not an inferred pass total.
 
 ### 2.4 New backend nodes
 
@@ -388,11 +455,12 @@ must be independently reproducible. They do not authorize intermediate merge.
 
 | Projection | Nodes | SHA-256 | Delta from prior |
 |---|---:|---|---|
-| storage/writer/root | 4,483 | `a00d996aa45fda19e0a9a473fb2767310b98daf5d2ab8ad1c72754c3b2a080f1` | `+2/-46` |
-| raw DTO/backend | 4,444 | `e71c3b0cfe25931558fe4d01b81fd7a0c653b002c7aa506ace66581b4b0ff458` | `+4/-43` |
-| raw user behavior | 4,444 | `d2dd1b144e3923a60672c23e2f8f8ac9f42c1a42445235b47e83a90d1a51a99e` | `+1/-1` |
-| volume/event/composite | 4,404 | `ebc5563c5d408bf83dd14f643d6a5ffd082f1b02d5159485fdb1e0b2ef00c7a9` | `+5/-45` |
-| model/API/authority/census final | 4,407 | `d71b9825e727fd7ccac43b79ebb904144a48a9acc66b75ccae002471822ac8bc` | `+6/-3` |
+| training lineage retirement | 4,418 | `284db7fe2fac55bb84ea2bfed4b68a9a566b303b132dda0aaabcfd440978cd56` | `+0/-109` |
+| storage/writer/root | 4,374 | `fcd8775f6255b780c68cb0a943031d49b8f357dd2dcd6da1c8def2af268c19bf` | `+2/-46` |
+| raw DTO/backend | 4,335 | `c6a074a3649b515216402b1b868eb588f57f873474f8b5a15934fcaea48c0d95` | `+4/-43` |
+| raw user behavior | 4,335 | `d17b58f518fb48be84087c6c9169a7738baa478be3d55fac6156449fdc366835` | `+1/-1` |
+| volume/event/composite | 4,295 | `6e42c990ca4ce3b8d57159ec24af47c04306f4cf911a705eae0ffdb4184f6725` | `+5/-45` |
+| model/API/authority/census final | 4,298 | `38705c3d431238f5fecb15d3dd4a668cee41912005bfc883d8b4e7275b5efee6` | `+6/-3` |
 
 ### 2.6 Backend focused identities
 
@@ -549,10 +617,13 @@ restored SHA before the next cycle.
 | M8 | restore a score writer/import executable | runtime writer census + scripts absence |
 | M9 | restore legacy sentiment fields to `MERGE_FIELDS` | collision projection node |
 | M10 | restore a current-authority claim that scoring/composite is available | current-authority node |
+| M11 | restore exact base bytes for `training/__init__.py` or the yfinance requirement/smoke | training-retirement structural census + current-authority boundary |
 
-M2, M7, and M8 must mutate the real shared owner, not add a dead condition after
-an empty target set. Mutation diffs are review artifacts; running the full suite
-for each mutation is forbidden because it adds cost without discrimination.
+M2, M7, M8, and M11 must mutate the real shared owner, not add a dead condition
+after an empty target set. M11 must restore an exact base artifact, not merely
+insert the word `training` in unrelated prose. Mutation diffs are review
+artifacts; running the full suite for each mutation is forbidden because it
+adds cost without discrimination.
 
 ## 5. Tasks
 
@@ -577,7 +648,10 @@ for each mutation is forbidden because it adds cost without discrimination.
 8. For `config/scoring_keys.txt`, record only path existence, mode, inode, and
    mtime. Do not read, hash, print, copy, or record content/size.
 9. Build the exact owned-path and protected-path blob manifests. Require the
-   53-path `training/` stream SHA in section 1.4.
+   62-path direct-deletion stream and 109-node training-family stream in
+   section 0.7. Prove the eight named training-only package families (nine
+   requirement lines because `torch` is duplicated), including yfinance, have
+   no surviving Python owner, while `scipy` retains its option-pricing owner.
 10. Record Task 0 evidence, commit docs only, and stop for independent review.
 
 No RED test or product byte may be changed in Task 0.
@@ -599,8 +673,15 @@ No RED test or product byte may be changed in Task 0.
 
 ### Task 2 - Execute the atomic product cutover
 
-Complete all five phases before any claim of GREEN:
+Complete all six phases before any claim of GREEN:
 
+0. **Training lineage:** delete the exact 62-path stream: all 53 tracked
+   `training/` files, eight implementation-only test files, and the manual
+   yfinance smoke. Remove the smoke README entry, `trained_models/` ignore and
+   unread config hint, and only the ownerless requirement entries named in
+   section 0.7. Rewrite current authorities to state that the implementation is
+   retired and recoverable from Git history; do not create an archive copy,
+   branch, tag, placeholder, or replacement scaffold.
 1. **Storage/writer/root:** delete all nine `scripts/` paths, the score importer,
    the now-consumerless `src/news_normalized/score_migration.py` planner, and
    writer-only key/API helpers, remove the daily-update tombstone, stop fresh
@@ -626,7 +707,7 @@ Complete all five phases before any claim of GREEN:
 
 During these phases, reconstruct each projected node stream in section 2.5 from
 the ledger. Do not treat an intermediate projection as a test baseline. At the
-end require exact backend `4407/d71b9825...`, focused `435/2e5fcb6c...`,
+end require exact backend `4298/38705c3d...`, focused `435/2e5fcb6c...`,
 frontend `99/1124/da69a294...`, and focused frontend `4/28/b11cc27b...`.
 
 The runtime census must be structured and fail closed. Every discovered
@@ -648,7 +729,7 @@ No production data or secret byte belongs in the commit.
 3. Run existing raw-news, normalized-news, Seeking Alpha, provider-native
    sentiment, investor-risk, EvidencePacket, profile, and monitor protection
    suites.
-4. Execute M1-M10 exactly as section 4.2. Record diff SHA, owning-node RED,
+4. Execute M1-M11 exactly as section 4.2. Record diff SHA, owning-node RED,
    pre/post blob SHA, and restored GREEN for every cycle.
 5. Re-run the structured runtime census and require zero retired consumer or
    writer and zero unknown classifications.
@@ -659,11 +740,11 @@ No production data or secret byte belongs in the commit.
 
 1. Create a fresh exact-tip detached worktree with the section 0.4 boundary.
 2. Run the wakeup probe in that same native context.
-3. Collect exact backend target `4407/d71b9825...` and frontend target
+3. Collect exact backend target `4298/38705c3d...` and frontend target
    `1124/da69a294...` before runtime.
-4. Run the native suite through the pinned wrapper/reporter. Require all 4,407
+4. Run the native suite through the pinned wrapper/reporter. Require all 4,298
    collected nodes seen, empty non-passing stream, exit zero, and
-   `4370 passed / 37 skipped / 0 failed`.
+   `4269 passed / 29 skipped / 0 failed`.
 5. Record every generated path, quarantine exact paths, and restore pre-run
    ordinary/ignored/data/src-data/symlink/toolchain boundaries byte-for-byte.
 6. Prove protected-path manifests and production read-only witnesses unchanged.
@@ -675,14 +756,16 @@ No production data or secret byte belongs in the commit.
 The reviewer reconstructs, rather than trusts prose:
 
 - all backend/frontend base, RED, projected, focused, and final streams;
-- exact `+18/-138` and frontend `+1/-0` node identities;
-- the 102 whole-file and 36 mixed-file retirements;
+- exact `+18/-247` and frontend `+1/-0` node identities;
+- the 211 whole-file and 36 mixed-file retirements;
 - all 18 backend additions and the frontend addition;
-- M1-M10 diffs, RED reasons, and restored blob SHAs;
+- M1-M11 diffs, RED reasons, and restored blob SHAs;
 - structured consumer/writer/current-authority census;
 - native report, empty non-passing set, and artifact transaction;
-- protected provider-native/training bytes plus the exact EvidencePacket copy
-  delta and unchanged negative-contract behavior; and
+- exact absence of the 62-path training family, its ownerless dependency/config
+  tail, and any archive/compatibility copy; protected provider-native bytes plus
+  the exact EvidencePacket copy delta and unchanged negative-contract behavior;
+  and
 - read-only score-row and metadata-only secret boundaries.
 
 After GREEN, prove linear ancestry and use `git merge --ff-only`. Do not push.
@@ -734,10 +817,12 @@ Stop immediately and amend/review before continuing if any of these occurs:
 12. `config/scoring_keys.txt` contents, bytes, digest, size, or secret values are
     read or recorded;
 13. a deletion manifest is built before product merge and read-only rollout;
-14. `training/`, normalized raw news, Seeking Alpha, OAuth, or a protected
-    collector changes outside reviewed scope, or EvidencePacket changes beyond
-    the exact retirement-copy delta while its projection/gather logic is not
-    byte-identical;
+14. a `training/` path, training-only test, yfinance smoke, ownerless training
+    dependency/config hint, archive copy, preservation branch instruction, or
+    compatibility import survives; normalized raw news, Seeking Alpha, OAuth,
+    or a protected collector changes outside reviewed scope; or EvidencePacket
+    changes beyond the exact retirement-copy delta while its projection/gather
+    logic is not byte-identical;
 15. the runtime census has an unknown, duplicate, or unclassified path;
 16. the census relies only on locked git-crypt ciphertext without explicit path
     classification;
@@ -756,8 +841,8 @@ Stop immediately and amend/review before continuing if any of these occurs:
 The product cutover is complete only when:
 
 - PD 1-8 behavior is live from merged master;
-- backend is exactly `4407/d71b9825...`, frontend exactly
-  `1124/da69a294...`, and native admission is `4370/37/0`;
+- backend is exactly `4298/38705c3d...`, frontend exactly
+  `1124/da69a294...`, and native admission is `4269/29/0`;
 - no runtime reader/writer/model-visible/current-authority path exposes the old
   score or composite semantic;
 - `src/signals/` and `src/tools/signal_tools.py` are physically absent, their
@@ -765,9 +850,10 @@ The product cutover is complete only when:
   modules, and no compatibility import or re-export remains;
 - raw news, morning brief, profile counts, volume, and event sequence contracts
   remain green;
-- protected provider-native/training boundaries are unchanged and EvidencePacket
-  differs only by the reviewed retirement copy while preserving its negative
-  contract;
+- the 62-path training family and its ownerless dependency/config/current-copy
+  tail are absent with no archive/compatibility copy; protected provider-native
+  boundaries are unchanged and EvidencePacket differs only by the reviewed
+  retirement copy while preserving its negative contract;
 - production score rows and scoring secret are still physically untouched; and
 - later data/secret disposition remains explicitly blocked behind its own exact
   reviewed authority and user approval.

@@ -1,12 +1,13 @@
 # Scripts Tranche B Legacy Score Product Decision
 
-> **Status:** PRODUCT DECISION APPROVED; FULL IMPLEMENTATION PLAN GREEN;
-> ONE-TIME IDENTITY REBASE AMENDMENT REVIEW PENDING
+> **Status:** PRODUCT DECISION APPROVED; USER TRAINING-RETIREMENT RULING
+> RECORDED; EXPANDED IMPLEMENTATION PLAN REVIEW PENDING
 > **Date:** 2026-08-08
 > **Base inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
-> **Scope:** Per-surface disposition of the frozen 1-5 news score contract and
-> the remaining `scripts/scoring/` transition layer. This document does not
-> authorize implementation, score-row deletion, or secret deletion.
+> **Scope:** Per-surface disposition of the frozen 1-5 news score contract, the
+> remaining `scripts/scoring/` transition layer, and the separately approved
+> retirement of the disconnected offline `training/` lineage. This document
+> does not authorize implementation, score-row deletion, or secret deletion.
 
 ## 1. Decision to make
 
@@ -387,6 +388,18 @@ namespace completely while retaining the future Signals research goal, and
 that deferred data must be assessed by concrete use rather than retained by
 default.
 
+On 2026-08-09 the user superseded the older `paused-preserve` ruling for
+`training/`. The offline RL implementation has no `src/`, app, scheduler, or
+runtime consumer; its eight external test owners test only that implementation.
+The complete lineage may therefore retire in the same reviewed cutover. The
+authoritative disposition is direct Git deletion: no archive directory, copy,
+compatibility package, disabled scaffold, preservation branch, or dedicated
+tag. The parent commit already preserves the exact bytes, and eventual normal
+repository publication preserves that history remotely. Future RL, options
+estimation, and Signals research remain valid product goals, but must begin from
+their then-current provider/data contracts and a new hypothesis/OOS/kill gate;
+the retired implementation is not their scaffold.
+
 This approval authorizes an exact RED-first implementation plan and, after
 independent plan review, the atomic product cutover described by PD 1-8. It
 does **not** authorize reading or deleting the scoring secret, deleting or
@@ -401,8 +414,10 @@ part of the product implementation.
 2. The exact Tranche B RED-first plan and relative node/disposition ledger are
    independently GREEN. Its one-time post-handoff absolute-identity amendment
    requires focused review before Task 0 or product edits.
-3. After that review, execute the reviewed Task 0 and atomic product cutover
-   gates without compatibility tails.
+3. After focused review of the user-approved training-retirement expansion,
+   finish Task 0 and execute one atomic product cutover without compatibility
+   tails. The training family and legacy score/signal family leave together;
+   neither may be parked in an archive branch or disabled namespace.
 4. Merge and verify Tranche B product cutover before any destructive manifest.
 5. Build, review, and approve physical score-row research-use/deletion and secret
    disposition separately; no row may remain connected to runtime.
