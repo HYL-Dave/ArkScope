@@ -1,6 +1,6 @@
 # OAuth Usage Recovery and Settings Sticky Inset Design
 
-> **Status:** DRAFT; USER-APPROVED DIRECTION; INDEPENDENT DESIGN REVIEW
+> **Status:** DRAFT; USER-APPROVED DIRECTION; INDEPENDENT DESIGN RE-REVIEW
 > PENDING; IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
@@ -104,11 +104,17 @@ objects and stores an allowlisted, credential-bound snapshot with
 `source="claude_rate_limit_event"`. That passive path must remain the normal,
 zero-extra-request path.
 
-A separately grounded OAuth wire shape can obtain the same unified rate-limit
-headers from one bounded Messages request:
+A user-authorized live probe on 2026-08-09 proved that the local
+`claude_code_oauth` token type can obtain the same unified rate-limit headers
+from one bounded Messages request:
 
 ```python
-client = Anthropic(auth_token=token, api_key=None)
+client = Anthropic(
+    auth_token=token,
+    api_key=None,
+    timeout=20.0,
+    max_retries=0,
+)
 raw = client.messages.with_raw_response.create(
     model="claude-sonnet-5",
     max_tokens=8,
@@ -120,6 +126,21 @@ raw = client.messages.with_raw_response.create(
     }],
 )
 ```
+
+The exact one-shot probe script was 147 lines / 4,735 bytes with SHA-256
+`18bc30a82dbf719a9332def3a5e1b649d5e98ff96ca54d06ef5477c61abc65bd`.
+Its redacted JSON artifact at
+`/tmp/arkscope-anthropic-oauth-wire-probe-20260809.json` has SHA-256
+`36fa0d9c588b2a831caa651f05b8a37b75f4012fe44f003f10ea12d5798901d8`.
+At `2026-08-09T12:58:03Z` it recorded exactly one request, HTTP 200, no
+exception, and `wire_shape_accepted=true`. The allowlisted response fields
+reported five-hour utilization `0.05` with reset `2026-08-09T17:00:00Z`,
+seven-day utilization `0.14` with reset `2026-08-14T06:00:00Z`, overall status
+`allowed`, and overage `rejected` with reason `org_level_disabled`. The
+redacted artifact contains no response body, generated text, token, account
+identity, or unfiltered headers; the fixed request shape is documented above.
+This is dated wire-shape evidence, not an implementation artifact or
+permission for automatic probes.
 
 The relevant response headers include direct five-hour and seven-day
 utilization/reset fields plus overage status/reason. A quota-rejected 429 can
@@ -149,6 +170,12 @@ The Settings workflow row is `position: sticky; top: 0`. It sticks to the
 content edge inside that top padding, leaving the padding visible above it.
 Increasing z-index, adding a shadow, or masking the gap cannot make the row
 occupy the scrollport top.
+
+At the existing `max-width: 760px` breakpoint, `.main` top padding becomes 12
+pixels. The same ownership defect therefore exists at both supported viewport
+classes; the responsive transfer must preserve 20 pixels on desktop and 12
+pixels on mobile before scrolling, while leaving zero inset above the sticky
+row after scrolling.
 
 The user-supplied 1201 x 803 screenshot is:
 
@@ -187,7 +214,7 @@ node additions, removals, and protected paths.
 The inherited reviewed identities are:
 
 - backend collection: `4,527` nodes,
-  `4eeb1178789dd886862638a669989b8e92f73e0785c27831ef421932436aa42e`;
+  `4eeb117804ad874c83ffe4c04fd25ecd4de4f460801bfbf95d15c1406f32455d`;
 - backend runtime: `4,488 passed / 39 skipped / 0 failed`;
 - frontend collection: `98 files / 1,123 tests`,
   `9262d7b15a926d7eeb60952e4c351c6c9b944772904fdb82438c62a2a51f6c1c`
@@ -366,6 +393,12 @@ The cached GET remains provider-free. Credential inventory remains network-
 free. Only the explicit POST can use the Anthropic manual adapter, while the
 existing ChatGPT automatic policy may use its non-model control-plane adapter.
 
+Account-usage control belongs only to subscription authentication modes.
+`api_key`, `api_key_pool`, and environment-derived API-key credentials never
+render this usage panel and never trigger either account-usage adapter. Their
+metered billing and transient request-rate headers are different facts and are
+not estimated, persisted, or presented as subscription quota by this slice.
+
 The manual adapter exposes a closed minimum error vocabulary:
 
 | Error code | Evidence |
@@ -404,9 +437,11 @@ present. `unknown` is not rendered as zero, unlimited, healthy, or exhausted.
 ### LD 10 - Remove the sticky inset structurally
 
 Settings becomes a zero-top-padding variant of the shared `.main` scroll
-owner. The initial 20-pixel breathing room moves to the Settings `PageHeader`
-area, so the unscrolled page keeps its current visual spacing while the sticky
-workflow row reaches the actual scrollport top.
+owner. The responsive initial breathing room moves to the Settings
+`PageHeader` area: 20 pixels on desktop and the existing 12 pixels at
+`max-width: 760px`. The unscrolled page therefore keeps its current visual
+spacing while the sticky workflow row reaches the actual scrollport top at
+both viewport classes.
 
 The implementation uses a Settings-scoped class or wrapper. It does not change
 global `.main` padding for other pages. Negative margins, translated sticky
@@ -424,10 +459,15 @@ the user/Fable implementation side owns the RED-first plan and product edits;
 Codex performs an independent code/evidence review and does not patch the
 implementation under review unless the user explicitly changes roles.
 
-This repair merges before Tranche B implementation. Tranche B's reviewed
-relative ledger (`-138/+18`) remains frozen. Its one absolute identity
-re-derivation waits until this repair is merged, so it occurs once against the
-actual final base.
+Tranche B proceeds before this repair. Its reviewed relative ledger
+(`-138/+18`) remains frozen, and rebase amendment `5be77be2` already derived
+its absolute identities against master `814ef2ed`; Task 0 then began and
+produced canonical native evidence before its no-tail owner stop. Invalidating
+that work would require a second Tranche B rebase and Task 0 replay. Therefore
+this repair remains docs-only until Tranche B is merged and closed, then this
+spec and its future implementation plan re-ground once against the resulting
+master. This sequencing ruling supersedes the pre-`5be77be2` statement that
+Tranche B would wait for this repair.
 
 ## 4. Required RED contracts
 
@@ -579,21 +619,27 @@ Stop and amend before continuing if any of these occurs:
     retry, without the actual frontend transport cause being captured and
     reviewed; or
 17. Tranche B relative accounting, product code, or data is changed in this
-    repair.
+    repair; or
+18. an API-key credential renders a subscription-usage panel or triggers an
+    account-usage probe.
 
 ## 8. Review and implementation order
 
-1. Independent review of this docs-only design and all grounded host claims.
-2. User/Fable writes a RED-first implementation plan with exact backend and
+1. Focused independent re-review of this docs-only design amendment and the
+   dated one-request Anthropic wire-shape evidence.
+2. Complete, independently review, fast-forward merge, and close Tranche B
+   from its already reviewed `5be77be2` identity base; this repair performs no
+   product edit while that line is active.
+3. Rebase this docs-only repair onto exact post-Tranche-B master, re-ground all
+   identities, and submit that bounded identity amendment for review.
+4. User/Fable writes a RED-first implementation plan with exact backend and
    frontend node ledgers, current full identities, protected paths, mutation
    recipes, and live-test boundary.
-3. Independent Codex plan review.
-4. Implement Codex launcher/error typing and split frontend recovery states.
-5. Implement the explicit Anthropic adapter, source type, service dispatch,
+5. Independent Codex plan review.
+6. Implement Codex launcher/error typing and split frontend recovery states.
+7. Implement the explicit Anthropic adapter, source type, service dispatch,
    UI copy/action, and authority wording correction.
-6. Implement the Settings top-inset transfer.
-7. Run mutations, complete native/frontend/browser admission, and submit one
+8. Implement the Settings top-inset transfer.
+9. Run mutations, complete native/frontend/browser admission, and submit one
    implementation packet for independent Codex review.
-8. After GREEN, fast-forward merge and exact-master verification.
-9. Re-derive Tranche B absolute identities once against the resulting master;
-   its relative product ledger remains unchanged.
+10. After GREEN, fast-forward merge and exact-master verification.
