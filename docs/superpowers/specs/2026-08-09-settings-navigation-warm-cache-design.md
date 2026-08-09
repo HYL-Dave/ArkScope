@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Design
 
-> **Status: IMPLEMENTATION MERGED; EXACT-MASTER VERIFIED; FOCUSED CLOSEOUT REVIEW PENDING.**
+> **Status: LIVE COMPLETE; FOCUSED CLOSEOUT REVIEW GREEN AT `b4c81e1c`.**
 >
 > **Date:** 2026-08-09
 >
