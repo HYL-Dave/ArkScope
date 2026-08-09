@@ -1,12 +1,14 @@
 # Scripts Tranche B Legacy Score Product Decision
 
-> **Status:** PRODUCT DECISION APPROVED; USER TRAINING-RETIREMENT RULING
-> RECORDED; EXPANDED IMPLEMENTATION PLAN REVIEW PENDING
+> **Status:** PRODUCT DECISION AND TRAINING RULING APPROVED; TASK 0 PHASE D/
+> POSTGRESQL OWNER-CLOSURE AMENDMENT REVIEW PENDING
 > **Date:** 2026-08-08
 > **Base inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
 > **Scope:** Per-surface disposition of the frozen 1-5 news score contract, the
-> remaining `scripts/scoring/` transition layer, and the separately approved
-> retirement of the disconnected offline `training/` lineage. This document
+> remaining `scripts/scoring/` transition layer, the separately approved
+> retirement of the disconnected offline `training/` lineage, and Task 0's
+> proposed no-tail disposition of the current recommendation-shaped Phase D
+> scaffold. This document
 > does not authorize implementation, score-row deletion, or secret deletion.
 
 ## 1. Decision to make
@@ -221,6 +223,25 @@ Event chains remain tool-only unless a later product requirement establishes an
 honest HTTP owner. A future Signals product starts from a new semantic and new
 owners under the six gates above; it does not reopen these namespaces.
 
+Task 0's exact owner census also closed a broader tail that the first plan named
+only partially. The current `src/analysis/` Phase D scaffold is not a generic
+evidence pipeline: its default chain consumes the retired 1-5 sentiment field,
+computes a weighted composite, and emits `buy`/`hold`/`sell` recommendations
+through an enabled API route, scheduled job, and CLI commands. Retiring only
+`pipeline.py`, `DecisionStrategy`, and `SentimentStrategy` would leave the
+factory, service, renderer, route, job, CLI, feature flag, templates, and tests
+broken or ownerless. The cutover therefore retires that complete scaffold and
+its current surfaces. It does not opportunistically replace it with a new
+analysis semantic in this line. A future on-demand analysis product follows the
+same new-design, provenance, validation, and kill-criteria discipline as future
+Signals.
+
+The same census found two executable PostgreSQL authorities omitted from the
+first grouped owner map. `sql/002_add_news_scores.sql` leaves completely, while
+`sql/001_init_schema.sql` remains only after its news score columns, `signals`
+table/index/RLS example, and sentiment-summary function are removed. Existing
+production databases remain outside this source-only cutover.
+
 The only physical artifacts temporarily unchanged by this code cutover are the
 491,808 production rows and `config/scoring_keys.txt`, because the user
 explicitly reserved their destructive disposition for later exact approval.
@@ -335,12 +356,15 @@ before edits and independently cover at least:
 10. composite/factor tools, watcher, routes, prompts, bridges, the complete
     `src/signals/` package, and `src/tools/signal_tools.py` are absent with no
     compatibility re-export;
-11. model-visible capability census contains no score/sentiment/composite claim;
-12. EvidencePacket still rejects generated score/composite input;
-13. fresh schemas do not create `news_article_scores`;
-14. runtime consumer/writer census is closed and fail-closed;
-15. final tracked `scripts/` tree is empty/absent;
-16. production score rows and `scoring_keys.txt` remain byte/row untouched during
+11. the recommendation-shaped Phase D scaffold, `/analysis/run`, its scheduled
+    job, CLI commands, feature flag, and current capability claims are absent;
+12. model-visible capability census contains no score/sentiment/composite claim;
+13. EvidencePacket still rejects generated score/composite input;
+14. fresh SQLite and PostgreSQL source schemas create no legacy score storage,
+    score columns, `signals` table, or sentiment-summary helper;
+15. runtime consumer/writer census is closed and fail-closed;
+16. final tracked `scripts/` tree is empty/absent;
+17. production score rows and `scoring_keys.txt` remain byte/row untouched during
     product implementation.
 
 Mutation tests must prove that reintroducing score projection, neutral `3.0`,
