@@ -66,8 +66,11 @@ any automatic Anthropic probing; model catalog/defaults; Settings groups,
 directory, cache policy, or active-only mounting; Tranche B artifacts;
 score-row and `config/scoring_keys.txt` dispositions.
 
-`apps/arkscope-web/src/api.ts` already exposes the sync POST and cached GET;
-changing it is a stop condition. The existing diagnostic route
+`apps/arkscope-web/src/api.ts` already exposes the sync POST and cached GET.
+Its only authorized change is one exact line: the closed
+`OAuthAccountSource` union at `api.ts:210` gains the single member
+`"anthropic_oauth_probe"`. Every other `api.ts` byte is protected; a second
+`api.ts` hunk is a stop condition. The existing diagnostic route
 `POST /config/credentials/{id}/probe` and `src/auth_drivers/claude_oauth_probe.py`
 (P3b evidence: the token is NOT an `x-api-key`) remain byte-identical; the new
 quota adapter is a separate module and does not touch that route.
@@ -114,7 +117,6 @@ The following paths must remain byte-identical through every task of this
 plan (Git blob comparison against `8cf85597`):
 
 ```text
-apps/arkscope-web/src/api.ts
 apps/arkscope-web/src/ui/Tabs.tsx
 apps/arkscope-web/src/ui/Tabs.test.tsx
 apps/arkscope-web/src/settings/settingsRegistry.ts
@@ -134,6 +136,9 @@ tests/test_claude_code_sdk_driver.py
 tests/test_claude_oauth_probe.py
 ```
 
+`apps/arkscope-web/src/api.ts` is byte-protected except the single
+authorized union-member line above (Tranche B `test_sa_tools` bounded-delta
+precedent: the pre/post file diff must contain exactly that one-line hunk).
 All other Python/backend paths outside the section 1 owners are also
 byte-protected; the backend collection may change only by the exact ledger in
 section 2. Production data, `profile_state.db` bytes outside test fixtures,
@@ -174,11 +179,20 @@ inside the isolated `PATH` (or the absolute path is executable). A missing
 interpreter returns typed `interpreter_unavailable` without spawning. A
 non-shebang binary skips the check.
 
-`version_incompatible` is returned only when the version command exits `0`
-with well-formed output different from `codex-cli 0.147.0`. Spawn failure,
-timeout, interpreter absence, non-zero exit, oversized/malformed output keep
-their existing `adapter_unavailable`/protocol classes. The app-server spawn
-uses the same launcher/PATH composition.
+The version-check outcome classification becomes exact (today
+`codex_account_usage.py:514` collapses every branch into
+`version_incompatible`; this plan splits them and locks each with a node):
+
+| Branch | Typed code |
+|---|---|
+| spawn `OSError` / timeout | `adapter_unavailable` (existing) |
+| shebang interpreter absent from isolated `PATH` | `interpreter_unavailable` (new) |
+| version command exits non-zero | `adapter_unavailable` |
+| stdout > 256 B or stderr > 4,096 B | `protocol_incompatible` (existing default class) |
+| exit 0 but output not matching `^codex-cli [0-9]+\.[0-9]+\.[0-9]+$` | `protocol_incompatible` |
+| exit 0, well-formed, different version | `version_incompatible` |
+
+The app-server spawn uses the same launcher/PATH composition.
 
 ### 1.2 Anthropic manual adapter (design LD 6-LD 8)
 
@@ -211,6 +225,10 @@ adapter's shape:
   `anthropic_oauth_probe` (the `source` Literal in `oauth_status.py:118`
   gains exactly this one member) and the passive driver's
   `sha256(provider + NUL + auth_mode + NUL + credential_id)` fingerprint;
+- an SDK that cannot express the pinned call shape (missing `auth_token`
+  or raw-response support) is typed `sdk_incompatible` without any request;
+  a provider 4xx other than 401/403/429 is typed
+  `provider_request_rejected`; both preserve the last good snapshot;
 - no response body, generated text, token, account identity, or raw header
   map reaches SQLite, logs, DTOs, exceptions, or evidence.
 
@@ -252,7 +270,14 @@ automatic visible/focus sync policy is unchanged and remains ChatGPT-only;
 no automatic path may reach the Anthropic adapter (page load, focus, idle,
 cached read all send zero Anthropic requests).
 
-New i18n keys live under `providers.accountUsage.*` in both language files;
+`OAuthAccountSource` in `api.ts` gains `"anthropic_oauth_probe"` (the one
+authorized line). When the rendered snapshot's source is
+`anthropic_oauth_probe`, the two windows are labeled explicitly as the
+five-hour and seven-day windows ("5 小時視窗" / "7 天視窗"), not the generic
+primary/secondary labels; the rendered source line shows
+`來源：anthropic_oauth_probe`. Both facts are asserted inside the new
+`claude row shows cost labeled manual sync and one click sends one POST`
+node. New i18n keys live under `providers.accountUsage.*` in both language files;
 the frozen `settingsCopy.test.ts` baseline sections are untouched (verified:
 they freeze section copy, not `accountUsage` keys). The i18n literal scanner
 must stay `36 / 20 / 0 / 20`, exit 0.
@@ -284,31 +309,33 @@ the PageHeader equals the pre-change 20/12 pixels.
 | State | Backend | Frontend |
 |---|---|---|
 | base | `4,282 / 281cad976a2df29224f41d7442f39ee6deb5b78165fb9efe3945bee6d520abe3` | `99 files / 1,124 / da69a2942c03e4794e3384e6125936f9f25c1fafbad7d006b67025f8fd97bc39` |
-| after Task 1 (launcher, `+5/-0`) | `4,287 / 5e032b84b8571621d3e6ddf751d54ab204d7a8f64b9e3aa898055fd7ad4b7445` | unchanged |
-| after Task 2 (Anthropic adapter + dispatch, `+12/-0`) | `4,299 / f423de5fc0b2386d7a1b656483e19beefead4aec7010386f717bf206ff2d5bb6` | unchanged |
+| after Task 1 (launcher, `+7/-0`) | `4,289 / 37bc0a597398404de6247e465e44908ccd265798ba66722242bb8807c1614968` | unchanged |
+| after Task 2 (Anthropic adapter + dispatch, `+14/-0`) | `4,303 / 52b862d7bf94f9d4605f8de1b2e92240ea152a41218446c3652b38716af77489` | unchanged |
 | after Task 3 (frontend recovery, `+8/-0`) | unchanged | `1,132 / 778d64be3239dbb94df475e2cccde1b61878af3a627a28a677038191ea6a6e9d` |
 | after Task 4 (sticky inset, `+2/-0`) | unchanged | `99 files / 1,134 / 941067a028c7bb6b15c3e3f64012dcf251995804e3f55c9a712cb230d4a4ba64` |
 
-Final accounting is backend `+17/-0` (4,299 nodes, one new test file) and
+Final accounting is backend `+21/-0` (4,303 nodes, one new test file) and
 frontend `+10/-0` (1,134 nodes; both frontend additions land in existing
 files, so the file count stays 99). Derivation asserts every added ID absent from base, internal
 uniqueness, and `sort(unique(base + added))` reproduction of each hash. No
 node is removed or renamed anywhere in this plan.
 
-The sorted 17-node backend addition stream is
-`c3dadea0ae0661773545c1a5fae7617cd6de02ae4c8070c5bfc14fc369693cc1`; the
+The sorted 21-node backend addition stream is
+`2b540253de6578a71be09a726a11d29cce396a2e0c29421a7f8a5cfa4b3666bd`; the
 sorted 10-row frontend addition stream is
 `e900aa107304d88a41eb9d2443ed525c381f2a985778ef4f416b8a3ae207aafb`.
 
 ### 2.2 Exact backend additions
 
-Task 1 — `tests/test_subscription_account_usage.py` (`+5`):
+Task 1 — `tests/test_subscription_account_usage.py` (`+7`):
 
 ```text
 test_nvm_symlink_launcher_with_env_shebang_passes_exact_version_check
 test_isolated_path_without_launcher_directory_is_interpreter_unavailable
 test_missing_shebang_interpreter_is_interpreter_unavailable_not_version_skew
 test_wrong_version_output_from_executable_launcher_is_version_incompatible
+test_nonzero_version_exit_is_adapter_unavailable_not_version_skew
+test_oversized_or_malformed_version_output_is_protocol_incompatible_not_version_skew
 test_app_server_spawn_uses_launcher_path_with_launcher_and_target_dirs_on_path
 ```
 
@@ -318,7 +345,7 @@ The first node builds a REAL on-disk fixture: a `bin/codex ->
 directory printing `codex-cli 0.147.0`. Faking only a plain executable
 without the symlink+shebang seam is inadmissible (spec stop 3).
 
-Task 2 — new `tests/test_anthropic_account_usage.py` (`+10`):
+Task 2 — new `tests/test_anthropic_account_usage.py` (`+12`):
 
 ```text
 test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_max_tokens_8
@@ -331,6 +358,8 @@ test_malformed_utilization_reset_and_overage_fields_are_nulled_never_zeroed
 test_snapshot_source_is_anthropic_oauth_probe_with_passive_fingerprint_shape
 test_no_token_body_or_raw_header_reaches_snapshot_or_error_detail
 test_timeout_and_transport_errors_are_typed_and_preserve_last_snapshot
+test_sdk_unable_to_express_pinned_call_shape_is_sdk_incompatible
+test_other_provider_4xx_is_provider_request_rejected_and_preserves_last_snapshot
 ```
 
 Task 2 — `tests/test_subscription_account_usage.py` (`+2`):
@@ -390,8 +419,8 @@ Focused files: `tests/test_subscription_account_usage.py`,
 | State | Nodes | SHA-256 |
 |---|---:|---|
 | base | 61 | `b0d56cc5cf46d3dafeaf60b59825bc09be332a91c01c9f54fcfd27096f969e9b` |
-| after Task 1 | 66 | `d0b4fe8679a24fdb5198869896671223214ee660817487a396bc9f40dc1be9e4` |
-| after Task 2 (final) | 78 | `dedf850121421624f7a3b78ad7a7c813b35200d74775487e49ede821cfe1befc` |
+| after Task 1 | 68 | `a76b86a37c2ea415e325b2872d01e72b7588c7e26728d20f1b947fb80042586e` |
+| after Task 2 (final) | 82 | `1c8c9de1e6c1d137aa8db3c39fbff32107db0d42550af81eaa3d120e8a0cac55` |
 
 Grounded baseline runtime: `61 passed / 0 failed` (one command, executed
 2026-08-10).
@@ -416,9 +445,9 @@ projection is `231 / e0bb619016a9355e78ffd97559139744c1b5ec6ffd6e8854c7d0eaac018
 
 ### 2.7 Native target
 
-All 17 backend additions are hermetic (tmp-dir fixtures, injected fakes,
+All 21 backend additions are hermetic (tmp-dir fixtures, injected fakes,
 no network, no skip markers). Native target is therefore
-`4,270 passed / 29 skipped / 0 failed` on 4,299 collected; any other split
+`4,274 passed / 29 skipped / 0 failed` on 4,303 collected; any other split
 stops the line. Frontend native target is `1,134/1,134`.
 
 ---
@@ -471,14 +500,14 @@ Settings focused `221/a2c20d36...` projection and its pinned stage-4
 re-derivation, and the native base (already proven at `252535bf...`; rerun
 only if any product byte differs). Docs-only commit; stop.
 
-**Task 1 — Codex launcher repair.** RED the five launcher nodes at stage-1
-identity; implement §1.1; prove focused 66-node GREEN, no `.pre`-existing
+**Task 1 — Codex launcher repair.** RED the seven launcher nodes at stage-1
+identity; implement §1.1; prove focused 68-node GREEN, no `.pre`-existing
 node broken, protected blobs intact. Commit; stop.
 
-**Task 2 — Anthropic adapter + dispatch.** RED the twelve nodes at stage-2
-identity (ten in the new file may fail on module absence); implement §1.2
+**Task 2 — Anthropic adapter + dispatch.** RED the fourteen nodes at stage-2
+identity (twelve in the new file may fail on module absence); implement §1.2
 plus the `source` Literal member and the §2.4 backend assertion evolution;
-prove focused 78-node GREEN and zero provider/socket use under a
+prove focused 82-node GREEN and zero provider/socket use under a
 network-guard fixture. Commit; stop.
 
 **Task 3 — frontend recovery split.** RED the eight nodes at stage-3
@@ -491,10 +520,10 @@ row top == scrollport top ±1px; initial lede spacing 20/12); prove FE focused
 43-node GREEN. Commit; stop.
 
 **Task 5 — mutations and admission.** MU1-MU6; final collections
-(backend `4299/f423de5f...`, frontend `1134/941067a0...`, both focused
+(backend `4303/52b862d7...`, frontend `1134/941067a0...`, both focused
 finals, Settings focused re-derived pin); full frontend Vitest, typecheck,
 build, i18n scanner; my own native run via the pinned wrapper
-(`4270/29/0` target) plus the §5.1 host-live Codex acceptance; hermetic
+(`4274/29/0` target) plus the §5.1 host-live Codex acceptance; hermetic
 browser matrix per §5.2; protected-blob recheck; artifact
 manifest/cleanup. Docs evidence commit; stop for Codex implementation
 review.
@@ -556,7 +585,8 @@ one `max_tokens=8` request.
 ## 6. Stop conditions
 
 1. any staged/final collection count or hash differs, or a node changes
-   outside the `+17/+10` ledger and the two declared evolutions;
+   outside the `+21/+10` ledger and the two declared evolutions, or a second
+   `api.ts` hunk beyond the one authorized union line;
 2. RED fails for a wrong reason (import error in an existing file, fixture,
    network, timer leak) or a fake-only executable replaces the real
    symlink+shebang fixture;
