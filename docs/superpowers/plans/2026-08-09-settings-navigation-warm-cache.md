@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** TASKS 1-5 COMPLETE; IMPLEMENTATION REVIEW PENDING; TASK 6 NOT STARTED
+> **Status:** TASKS 1-5 COMPLETE; REVIEW F1 FIXED; FOCUSED RE-REVIEW PENDING; TASK 6 NOT STARTED
 >
 > **Date:** 2026-08-09
 >
@@ -761,6 +761,17 @@ or `+7/-0` Task 5 ledger.
 > `/tmp/settings-navigation-warm-cache-task5-21076da7` (`28` payload entries,
 > manifest `6146db48...`). Tasks 1-5 now stop for the single user-authorized
 > implementation review. Task 6 remains unstarted and unauthorized.
+
+> **Post-batch-review F1 amendment:** Review found that the idle-warmup effect
+> ran for the per-`SettingsView` fallback cache even though Section 1.1 limits
+> warmup to an explicitly supplied App-owned cache. Product/test commit
+> `cef07f56` adds that exact gate, keeps the two warmup owners explicit by
+> supplying a cache, and evolves one existing direct-render assertion to prove
+> fallback renders schedule no idle callback. No node is added, removed,
+> renamed, or skipped: final identities remain `1123/9262d7b1...` and
+> `221/a2c20d36...`; focused runtime is `221/221`, protected rows are `10/10`,
+> and typecheck is GREEN. Task 6 remains unauthorized pending focused
+> re-review of this bounded fix.
 
 1. Add seven exact Task 5 nodes and prove final-stage RED.
 2. Integrate schedule/health/config with independent outcomes. Initial visible
