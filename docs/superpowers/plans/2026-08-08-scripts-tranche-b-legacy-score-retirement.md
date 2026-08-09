@@ -1,7 +1,7 @@
 # Scripts Tranche B Legacy Score Retirement Implementation Plan
 
-> **Status:** FULL PLAN GREEN AT REVIEWED `52354806`; ONE-TIME REBASE
-> AMENDMENT AWAITING FOCUSED REVIEW; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** FULL PLAN AND ONE-TIME REBASE AMENDMENT GREEN; TASK 0 STOPPED ON
+> A BOUNDED NO-TAIL OWNER AMENDMENT; IMPLEMENTATION NOT AUTHORIZED
 > **Date:** 2026-08-08
 > **Current branch base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
@@ -135,6 +135,22 @@ sequence; PD 1-PD 8 are unchanged. Its amendment identity is `411 lines /
 The old `4581 -> 4461` backend and `1077 -> 1078` frontend identities are dated
 pre-handoff evidence only and are forbidden for admission after this amendment.
 
+### 0.6 Task 0 no-tail owner amendment
+
+Task 0 at reviewed rebase tip `5be77be2` reproduced every base and projected
+identity plus native base admission before the exact owner census found one
+omitted source path: `src/news_normalized/score_migration.py`. Its only tracked
+importer is `tests/test_news_score_migration.py`, whose five nodes are already in
+the frozen 138-node retirement ledger, and the module itself imports
+`src.news_normalized.scores`, which this cutover deletes. Leaving it would create
+an unowned, non-importable legacy-score migration tail.
+
+This bounded amendment adds that source module to the phase-1 deletion set. It
+does not change any backend or frontend node ID, collection count, projection,
+native arithmetic, product decision, data/secret boundary, or approved surviving
+capability. Task 0 remains incomplete at its owned/protected-manifest step until
+this amendment receives focused review.
+
 ## 1. Owned and protected paths
 
 ### 1.1 Product owners
@@ -145,7 +161,7 @@ path manifest before product edits.
 
 | Group | Owners |
 |---|---|
-| score storage/writer | `src/news_normalized/schema.py`, `scores.py`, `score_import.py`, `src/market_data_admin.py`, `src/news_identity.py`, `src/daily_update.py`, all nine tracked `scripts/` paths |
+| score storage/writer | `src/news_normalized/schema.py`, `scores.py`, `score_import.py`, `score_migration.py`, `src/market_data_admin.py`, `src/news_identity.py`, `src/daily_update.py`, all nine tracked `scripts/` paths |
 | raw news protocol | `src/tools/schemas.py`, `data_access.py`, `news_tools.py`, `analysis_tools.py`, `src/analysis/context_builder.py`, `src/tools/backends/{__init__,db_backend,file_backend,local_market_backend,sqlite_backend}.py` |
 | event/signal implementation | delete `src/signals/README.md`, `src/signals/{__init__,anomaly_detector,event_chain,event_tagger,sector_aggregator,synthesizer}.py`, and `src/tools/signal_tools.py`; add `src/news_analytics.py` and `src/tools/news_event_tools.py`; retire `src/analysis/pipeline.py` and `src/analysis/strategies/{__init__,decision,sentiment}.py` |
 | HTTP/profile | `src/api/app.py`, `src/api/routes/{news,profile,signals}.py` |
@@ -585,8 +601,9 @@ No RED test or product byte may be changed in Task 0.
 
 Complete all five phases before any claim of GREEN:
 
-1. **Storage/writer/root:** delete all nine `scripts/` paths, the score importer
-   and writer-only key/API helpers, remove the daily-update tombstone, stop fresh
+1. **Storage/writer/root:** delete all nine `scripts/` paths, the score importer,
+   the now-consumerless `src/news_normalized/score_migration.py` planner, and
+   writer-only key/API helpers, remove the daily-update tombstone, stop fresh
    score-table/column creation, and remove the corresponding 46 test IDs while
    adding the two storage/root boundaries.
 2. **Raw DTO/backend:** remove score fields/parameters/projection/aggregation
@@ -701,8 +718,9 @@ Stop immediately and amend/review before continuing if any of these occurs:
    intended product assertion;
 4. an intermediate projection is described as shippable or full GREEN;
 5. a compatibility shim, permanent zero endpoint, neutral `3.0`, dead tool
-   advertisement, legacy `src/signals/` or `src/tools/signal_tools.py` survivor,
-   compatibility re-export, or old `TestSignalTools` namespace is proposed;
+   advertisement, legacy `src/signals/`, `src/tools/signal_tools.py`, or
+   `src/news_normalized/score_migration.py` survivor, compatibility re-export,
+   or old `TestSignalTools` namespace is proposed;
 6. raw news, morning brief, profile counts, volume detection, or event sequence
    is removed rather than evolved as approved;
 7. provider-native sentiment or investor risk is mistaken for the retired
