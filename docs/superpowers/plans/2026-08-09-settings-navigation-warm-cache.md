@@ -734,6 +734,7 @@ Task 4 ledger.
 Owned paths:
 
 ```text
+apps/arkscope-web/src/Settings.tsx
 apps/arkscope-web/src/settings/DataSourcesSection.tsx
 apps/arkscope-web/src/settings/DataStorageSection.tsx
 apps/arkscope-web/src/settings/NewsStorageSection.tsx
@@ -743,6 +744,12 @@ apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts
 apps/arkscope-web/src/SettingsNewsStorage.test.ts
 apps/arkscope-web/src/settings/MacroStorageSection.test.tsx
 ```
+
+Bounded Task 5 ownership amendment: `Settings.tsx` already owns the App-root
+cache and the four section render sites. Task 5 may change only those call
+sites to pass the existing cache instance. It may not add module-global or
+section-lifetime fallback caches. This changes no test node, staged identity,
+or `+7/-0` Task 5 ledger.
 
 1. Add seven exact Task 5 nodes and prove final-stage RED.
 2. Integrate schedule/health/config with independent outcomes. Initial visible
