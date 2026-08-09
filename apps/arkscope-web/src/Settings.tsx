@@ -753,6 +753,7 @@ export function SettingsView({
           catalog={catalog}
           runtime={runtime}
           discovery={discovery}
+          settingsReadCache={readCache}
           developerMode={developerMode}
           onRefresh={async () => {
             const refreshed = await fetchCatalogAfterMutation();

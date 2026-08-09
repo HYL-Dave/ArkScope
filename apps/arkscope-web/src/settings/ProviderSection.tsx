@@ -53,6 +53,10 @@ import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { modelReasonLabel, settingsErrorPresentation } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
 import {
+  oauthAccountUsageKey,
+  type SettingsReadCache,
+} from "./settingsReadCache";
+import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
@@ -133,6 +137,19 @@ function snapshotIsStale(view: OAuthAccountSyncView | null | undefined, now = Da
   if (!observedAt) return true;
   const observed = new Date(observedAt).getTime();
   return !Number.isFinite(observed) || now - observed >= ACCOUNT_USAGE_TTL_MS;
+}
+
+function requireCredentialBoundAccountView(
+  credentialId: string,
+  view: OAuthAccountSyncView,
+): OAuthAccountSyncView {
+  if (
+    view.credential_id !== credentialId
+    || (view.snapshot !== null && view.snapshot.credential_id !== credentialId)
+  ) {
+    throw new Error("credential-bound account response mismatch");
+  }
+  return view;
 }
 
 type ProviderNotice =
@@ -248,6 +265,7 @@ export function ProviderSection({
   onDiscover,
   onClearDiscovery,
   onUseModel,
+  settingsReadCache,
   onNavigationGuardChange,
   developerMode = false,
 }: {
@@ -258,6 +276,7 @@ export function ProviderSection({
   onDiscover: (provider: ModelProvider, credentialId: string | null) => Promise<void>;
   onClearDiscovery: (provider: ModelProvider) => void;
   onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
+  settingsReadCache: SettingsReadCache;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   developerMode?: boolean;
 }) {
@@ -311,7 +330,6 @@ export function ProviderSection({
   const [accountUsage, setAccountUsage] = useState<Record<string, LocalAccountUsage>>({});
   const [accountSyncing, setAccountSyncing] = useState<Record<string, boolean>>({});
   const [accountCooldownUntil, setAccountCooldownUntil] = useState<Record<string, number>>({});
-  const accountReadStarted = useRef(new Set<string>());
   const accountSyncInFlight = useRef(new Map<string, Promise<void>>());
   const accountAutoAttempt = useRef(new Map<string, string>());
   const accountGeneration = useRef(new Map<string, number>());
@@ -329,28 +347,39 @@ export function ProviderSection({
   const sectionVisible = documentVisible && sectionInViewport;
 
   const readCachedAccountUsage = useCallback(async (credentialId: string, force = false) => {
-    if (!force && accountReadStarted.current.has(credentialId)) return;
-    accountReadStarted.current.add(credentialId);
+    const key = oauthAccountUsageKey(credentialId);
     const generation = accountGeneration.current.get(credentialId) ?? 0;
+    const retained = settingsReadCache.inspect<OAuthAccountSyncView>(key);
+    let retainedView: OAuthAccountSyncView | null = null;
+    if (retained.status !== "missing") {
+      try {
+        retainedView = requireCredentialBoundAccountView(credentialId, retained.value);
+      } catch {
+        settingsReadCache.invalidate(key);
+      }
+    }
     setAccountUsage((previous) => ({
       ...previous,
       [credentialId]: {
-        readState: "loading",
-        view: previous[credentialId]?.view ?? null,
+        readState: retained.status === "fresh" && retainedView ? "loaded" : "loading",
+        view: retainedView ?? previous[credentialId]?.view ?? null,
       },
     }));
-    try {
-      const view = await getCredentialAccountUsage(credentialId);
-      if (view.credential_id !== credentialId || view.snapshot?.credential_id !== credentialId) {
-        throw new Error("credential-bound account response mismatch");
-      }
-      if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+    const outcome = await settingsReadCache.load(
+      key,
+      async () => requireCredentialBoundAccountView(
+        credentialId,
+        await getCredentialAccountUsage(credentialId),
+      ),
+      { force },
+    );
+    if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+    if (outcome.status === "success") {
       setAccountUsage((previous) => ({
         ...previous,
-        [credentialId]: { readState: "loaded", view },
+        [credentialId]: { readState: "loaded", view: outcome.value },
       }));
-    } catch {
-      if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+    } else if (outcome.status === "error") {
       setAccountUsage((previous) => ({
         ...previous,
         [credentialId]: {
@@ -359,7 +388,7 @@ export function ProviderSection({
         },
       }));
     }
-  }, []);
+  }, [settingsReadCache]);
 
   const syncAccountUsage = useCallback((credentialId: string, manual = false): Promise<void> => {
     const now = Date.now();
@@ -387,12 +416,12 @@ export function ProviderSection({
     setAccountSyncing((previous) => ({ ...previous, [credentialId]: true }));
     const request = (async () => {
       try {
-        const view = await syncCredentialAccountUsage(credentialId);
-        if (view.credential_id !== credentialId || view.snapshot?.credential_id !== credentialId) {
-          throw new Error("credential-bound account response mismatch");
-        }
+        const view = requireCredentialBoundAccountView(
+          credentialId,
+          await syncCredentialAccountUsage(credentialId),
+        );
         if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
-        accountReadStarted.current.add(credentialId);
+        settingsReadCache.replace(oauthAccountUsageKey(credentialId), view);
         setAccountUsage((previous) => ({
           ...previous,
           [credentialId]: { readState: "loaded", view },
@@ -419,14 +448,14 @@ export function ProviderSection({
     })();
     accountSyncInFlight.current.set(credentialId, request);
     return request;
-  }, [accountCooldownUntil]);
+  }, [accountCooldownUntil, settingsReadCache]);
 
   const invalidateAccountUsage = useCallback((credentialId: string) => {
     accountGeneration.current.set(
       credentialId,
       (accountGeneration.current.get(credentialId) ?? 0) + 1,
     );
-    accountReadStarted.current.delete(credentialId);
+    settingsReadCache.invalidateCredentialAccount(credentialId);
     accountAutoAttempt.current.delete(credentialId);
     const cooldownTimer = accountCooldownTimers.current.get(credentialId);
     if (cooldownTimer !== undefined) {
@@ -443,7 +472,7 @@ export function ProviderSection({
       delete next[credentialId];
       return next;
     });
-  }, []);
+  }, [settingsReadCache]);
 
   useEffect(() => {
     const onVisibilityChange = () => setDocumentVisible(document.visibilityState !== "hidden");

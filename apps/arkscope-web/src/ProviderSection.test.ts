@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderSection } from "./Settings";
 import type { ModelCatalog, ProviderCredential } from "./api";
+import {
+  createSettingsReadCache,
+  oauthAccountUsageKey,
+} from "./settings/settingsReadCache";
 import { formatSystemTimestamp } from "./timeDisplay";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
@@ -164,6 +168,7 @@ function renderSection(extra: Record<string, unknown> = {}) {
     catalog: catalog(),
     runtime: null,
     discovery: {},
+    settingsReadCache: createSettingsReadCache(),
     onRefresh: vi.fn().mockResolvedValue(undefined),
     onDiscover: vi.fn().mockResolvedValue(undefined),
     onClearDiscovery: vi.fn(),
@@ -221,8 +226,12 @@ async function flushPromises(rounds = 4) {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
 }
 
 function latestReport(callback: ReturnType<typeof vi.fn>) {
@@ -551,6 +560,112 @@ describe("ProviderSection Settings navigation guard", () => {
 });
 
 describe("ProviderSection OAuth lifecycle and account usage truth", () => {
+  it("renders_retained_account_usage_immediately_and_revalidates_with_cached_GET_only", async () => {
+    const now = Date.now();
+    const cache = createSettingsReadCache({ clock: () => now });
+    const credential = oauthCredential({ active: true });
+    const retained = accountView(accountSnapshot({
+      observedAt: new Date(now - 6 * 60_000).toISOString(),
+      usedPercent: 11,
+    }));
+    const refreshed = accountView(accountSnapshot({
+      observedAt: new Date(now).toISOString(),
+      usedPercent: 12,
+    }));
+    cache.replace(oauthAccountUsageKey(credential.id), retained, now - 6 * 60_000);
+    const response = deferred<Awaited<ReturnType<typeof jsonResponse>>>();
+    const fetchMock = vi.fn(() => response.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const value = catalog();
+    value.credentials.openai = [credential];
+
+    renderSection({ catalog: value, settingsReadCache: cache });
+
+    expect(credentialRow("ChatGPT subscription Plus").textContent).toContain("已用：11%");
+    expect(callsFor(fetchMock, "local%3A7/account-usage", "GET")).toHaveLength(1);
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+
+    response.resolve(await jsonResponse(refreshed));
+    await waitFor(() => (credentialRow("ChatGPT subscription Plus").textContent ?? "").includes("已用：12%"));
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+  });
+
+  it("preserves_retained_account_truth_when_cached_revalidation_fails_without_sync_POST", async () => {
+    const now = Date.now();
+    const cache = createSettingsReadCache({ clock: () => now });
+    const credential = oauthCredential({ active: true });
+    const retained = accountView(accountSnapshot({
+      observedAt: new Date(now - 6 * 60_000).toISOString(),
+      usedPercent: 31,
+    }));
+    cache.replace(oauthAccountUsageKey(credential.id), retained, now - 6 * 60_000);
+    const fetchMock = vi.fn().mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const value = catalog();
+    value.credentials.openai = [credential];
+
+    renderSection({ catalog: value, settingsReadCache: cache });
+    await flushPromises();
+
+    expect(credentialRow("ChatGPT subscription Plus").textContent).toContain("已用：31%");
+    expect(callsFor(fetchMock, "local%3A7/account-usage", "GET")).toHaveLength(1);
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+    expect(cache.inspect(oauthAccountUsageKey(credential.id)).status).toBe("stale");
+  });
+
+  it("manual_sync_replaces_only_the_affected_account_cache_entry", async () => {
+    const now = Date.now();
+    const cache = createSettingsReadCache({ clock: () => now });
+    const first = oauthCredential({ id: "local:7", label: "Account A", active: true });
+    const second = oauthCredential({ id: "local:8", label: "Account B", active: true });
+    const firstBefore = accountView(accountSnapshot({
+      credentialId: first.id,
+      observedAt: new Date(now).toISOString(),
+      usedPercent: 41,
+    }));
+    const secondBefore = accountView(accountSnapshot({
+      credentialId: second.id,
+      observedAt: new Date(now).toISOString(),
+      usedPercent: 52,
+    }));
+    const firstAfter = accountView(accountSnapshot({
+      credentialId: first.id,
+      observedAt: new Date(now + 1_000).toISOString(),
+      usedPercent: 42,
+    }), "succeeded");
+    cache.replace(oauthAccountUsageKey(first.id), firstBefore, now);
+    cache.replace(oauthAccountUsageKey(second.id), secondBefore, now);
+    const loadSpy = vi.spyOn(cache, "load");
+    const replaceSpy = vi.spyOn(cache, "replace");
+    const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
+      if (String(url).includes("local%3A7/account-usage/sync") && init?.method === "POST") {
+        return jsonResponse(firstAfter);
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const value = catalog();
+    value.credentials.openai = [first, second];
+
+    renderSection({ catalog: value, settingsReadCache: cache });
+    await flushPromises();
+    const sync = Array.from(credentialRow("Account A").querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "同步使用量") as HTMLButtonElement;
+    await act(async () => { sync.click(); });
+    await waitFor(() => (credentialRow("Account A").textContent ?? "").includes("已用：42%"));
+
+    const firstCached = cache.inspect<ReturnType<typeof accountView>>(oauthAccountUsageKey(first.id));
+    const secondCached = cache.inspect<ReturnType<typeof accountView>>(oauthAccountUsageKey(second.id));
+    expect(firstCached.status).toBe("fresh");
+    expect(firstCached.status === "missing" ? null : firstCached.value).toEqual(firstAfter);
+    expect(secondCached.status).toBe("fresh");
+    expect(secondCached.status === "missing" ? null : secondCached.value).toEqual(secondBefore);
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
+    expect(JSON.stringify([...loadSpy.mock.calls, ...replaceSpy.mock.calls])).not.toContain("raw-account");
+  });
+
   it("renders retryable refresh failure separately from re-login required", () => {
     const value = catalog();
     value.credentials.openai = [
