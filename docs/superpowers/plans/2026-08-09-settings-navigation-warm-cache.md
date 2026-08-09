@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** TASK 3 COMPLETE; TASKS 4-5 BATCH EXECUTION IN PROGRESS
+> **Status:** TASKS 1-5 COMPLETE; IMPLEMENTATION REVIEW PENDING; TASK 6 NOT STARTED
 >
 > **Date:** 2026-08-09
 >
@@ -750,6 +750,17 @@ cache and the four section render sites. Task 5 may change only those call
 sites to pass the existing cache instance. It may not add module-global or
 section-lifetime fallback caches. This changes no test node, staged identity,
 or `+7/-0` Task 5 ledger.
+
+> Complete at product/test commit `5b134025`. The seven exact nodes produced
+> `7/7` intended RED before product integration and then GREEN. The exact
+> fifteen-file focused owner set is `221/221`; final decoded identities are
+> `1123/9262d7b1...` and focused `221/a2c20d36...`; typecheck and all ten
+> protected rows are GREEN. The native hermetic browser request ledger proved
+> retained remount truth and exact manual-refresh isolation without an
+> unhandled or external request. Raw packet:
+> `/tmp/settings-navigation-warm-cache-task5-21076da7` (`28` payload entries,
+> manifest `6146db48...`). Tasks 1-5 now stop for the single user-authorized
+> implementation review. Task 6 remains unstarted and unauthorized.
 
 1. Add seven exact Task 5 nodes and prove final-stage RED.
 2. Integrate schedule/health/config with independent outcomes. Initial visible
