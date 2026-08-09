@@ -1,7 +1,7 @@
 # Scripts Tranche B Legacy Score Product Decision
 
-> **Status:** PRODUCT CUTOVER MERGED AND VERIFIED; FOCUSED CLOSEOUT REVIEW
-> PENDING; SCORE-ROW/SECRET DISPOSITION BLOCKED
+> **Status:** LIVE COMPLETE; FOCUSED CLOSEOUT REVIEW GREEN AT `e2706592`;
+> SCORE-ROW/SECRET DISPOSITION BLOCKED
 > **Date:** 2026-08-08
 > **Base inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
 > **Scope:** Per-surface disposition of the frozen 1-5 news score contract, the

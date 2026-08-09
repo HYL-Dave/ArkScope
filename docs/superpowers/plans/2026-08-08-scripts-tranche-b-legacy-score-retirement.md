@@ -1,7 +1,6 @@
 # Scripts Tranche B Legacy Score Retirement Implementation Plan
 
-> **Status:** TASKS 0-6 COMPLETE; PRODUCT CUTOVER MERGED AND VERIFIED;
-> FOCUSED CLOSEOUT REVIEW PENDING
+> **Status:** LIVE COMPLETE - FOCUSED CLOSEOUT REVIEW GREEN AT `e2706592`
 > **Date:** 2026-08-08
 > **Current branch base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
