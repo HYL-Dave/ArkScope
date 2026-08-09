@@ -244,6 +244,46 @@ on-demand analysis design prohibited by compatibility rule 4.
 Product bytes remain unchanged. Task 0 stops again before RED or implementation
 until independent review clears this corrected owner map and exact ledger.
 
+### 0.9 Task 3 stale shared registry-count owner amendment
+
+The broad protected-suite gate after the cutover exposed an omitted shared-test
+owner class. The approved registry change removes four legacy score/composite
+tools, adds two honest news-event tools, and moves both surviving event tools to
+the `news` category. The reviewed product truth is therefore registry `50`,
+Anthropic/OpenAI bridge `51` including `delegate_to_subagent`, and news category
+`11`. Ten existing assertions in five files still pinned the pre-cutover values
+`53`, `54`, and `10`:
+
+```text
+tests/test_sa_tools.py::TestBridgeIntegration::test_registry_count
+tests/test_sa_tools.py::TestBridgeIntegration::test_openai_schema_count
+tests/test_sa_tools.py::TestBridgeIntegration::test_anthropic_schema_count
+tests/test_sa_tools.py::TestBridgeIntegration::test_anthropic_bridge_count
+tests/test_sa_tools.py::TestRegistryV3::test_registry_count
+tests/test_sa_tools.py::TestRegistryV3::test_news_category_count
+tests/test_analyst_tools.py::TestBridgeIntegration::test_registry_total_count
+tests/test_memory_tools.py::TestMemoryToolRegistry::test_total_tool_count
+tests/test_sec_tools.py::TestBridgeIntegration::test_registry_23
+tests/test_portfolio_tools.py::TestPortfolioToolRegistration::test_tool_registered
+```
+
+All ten fail on the intended current value; no SA, analyst, memory, SEC, or
+portfolio capability assertion fails. Their sorted node stream has SHA-256
+`3c7e2870264e5959a6418701553af6a8870f2adde30b18b9c35e326056b4c305`.
+Together with section 2.8's original 33 retained/evolved nodes, the exact
+43-node stream has SHA-256
+`7e4f4d2b5290f47c368227223a558043a040304eb6a042af5519e0207a91ed54`.
+
+This amendment authorizes only the ten numeric assertion updates above. It
+does not authorize node renames, collection changes, product changes, or other
+test edits. `tests/test_sa_tools.py` is removed from the byte-identical path
+manifest solely for this bounded delta; the re-pinned remaining 122-row
+`path<TAB>Git blob` stream has SHA-256
+`c174c7d7b7e9731d4cb04bf00a7b40af1fcaacee5c09f6c77c3f2c585d6f9ca2`.
+Every non-authorized assertion in that file remains behavior protected. The
+backend/frontend identities, `+18/-263` ledger, projection streams, and native
+target remain unchanged.
+
 ## 1. Owned and protected paths
 
 ### 1.1 Product owners
@@ -310,6 +350,9 @@ tests/test_legacy_score_retirement.py (new)
 Frontend focused files are `Home.test.tsx`, `Watchlist.test.tsx`,
 `Universe.test.tsx`, and new `legacyScoreRetirement.test.ts`.
 
+The five shared registry-owner files in section 0.9 are outside the focused
+family. Only their ten named assertions may evolve; every node ID remains.
+
 ### 1.3 Current versus historical documents
 
 The cutover must reconcile current instructions in at least:
@@ -358,6 +401,10 @@ byte identity except for the explicitly bounded EvidencePacket copy delta:
 - OAuth lifecycle worktree/branch and its evidence;
 - production DB bytes except read-only witnesses; and
 - `config/scoring_keys.txt` contents and bytes.
+
+The original Task 0 byte-protected manifest remains dated evidence. Section
+0.9 is its sole exception: `tests/test_sa_tools.py` receives only the six named
+numeric assertion changes, while the other 122 paths remain byte-identical.
 
 Provider-native `source_sentiment` and investor `risk_score` are not the retired
 ArkScope 1-5 score. The new boundary test must prove they remain available and
@@ -546,7 +593,7 @@ Its one-row stream SHA is
 
 ### 2.8 Retained IDs whose assertions evolve
 
-These 33 base IDs remain present exactly once. Their assertions evolve with the
+These original 33 base IDs remain present exactly once. Their assertions evolve with the
 approved behavior rather than disappearing under the net node count:
 
 ```text
@@ -587,6 +634,9 @@ tests/test_tools.py::TestRegistry::test_tool_names
 
 Their sorted stream SHA is
 `d9cf7a2826d24f72aeb7db840d19bdb979d077e64b23fdf23ccaa79e2e16f67b`.
+Section 0.9 adds ten shared registry-count owners without changing collection
+identity. The complete 43-node retained/evolved stream is
+`7e4f4d2b5290f47c368227223a558043a040304eb6a042af5519e0207a91ed54`.
 Task 0 and final review require identity preservation and inspect assertion
 changes against PD 2-8. The two count-bearing bridge IDs are deliberately not
 in this retained set; section 2.4 records their truthful renames.
@@ -793,6 +843,10 @@ Complete all six phases before any claim of GREEN:
    current-doc nodes, replace the two stale bridge count IDs, and remove the
    final old route node (`+6/-3`).
 
+After all six phases, evolve only the ten stale shared registry-count
+assertions in section 0.9 to registry `50`, bridge `51`, and news category `11`.
+This is part of the same atomic commit and changes no node identity.
+
 During these phases, reconstruct each projected node stream in section 2.5 from
 the ledger. Do not treat an intermediate projection as a test baseline. At the
 end require exact backend `4282/281cad97...`, focused `421/385d0ac7...`,
@@ -837,7 +891,8 @@ or path-only message is a stop condition:
    the current i18n scanner.
 3. Run existing raw-news, normalized-news, Seeking Alpha, provider-native
    sentiment, investor-risk, EvidencePacket, profile, and monitor protection
-   suites.
+   suites. Require all ten section 0.9 shared registry owners GREEN and verify
+   that the other assertions in those files remain unchanged.
 4. Execute M1-M11 exactly as section 4.2. Record diff SHA, owning-node RED,
    pre/post blob SHA, and restored GREEN for every cycle.
 5. Re-run the structured runtime census and require zero retired consumer or
