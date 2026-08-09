@@ -8,6 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelCatalog, ModelTask, TaskRoute } from "./api";
 import type { SettingsNavigationRequest } from "./shell/navigation";
 import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
+import {
+  createSettingsReadCache,
+  type SettingsReadCache,
+} from "./settings/settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -281,6 +285,7 @@ async function renderSettings(options: {
   narrow?: boolean;
   developerMode?: boolean;
   navigationRequest?: SettingsNavigationRequest | null;
+  settingsReadCache?: SettingsReadCache;
 } = {}) {
   overlay = options.narrow ?? false;
   installViewport();
@@ -294,6 +299,7 @@ async function renderSettings(options: {
         developerMode={options.developerMode ?? false}
         onRuntimeChanged={vi.fn(async () => undefined)}
         navigationRequest={options.navigationRequest}
+        settingsReadCache={options.settingsReadCache}
       />,
     ));
   });
@@ -423,7 +429,7 @@ afterEach(() => {
 
 describe("Settings workspace", () => {
   it("starts_one_idle_warmup_after_first_paint", async () => {
-    await renderSettings();
+    await renderSettings({ settingsReadCache: createSettingsReadCache() });
 
     expect(idleCallbacks.size).toBe(1);
     const callback = [...idleCallbacks.values()][0];
@@ -444,7 +450,7 @@ describe("Settings workspace", () => {
   });
 
   it("cancels_idle_warmup_before_start_when_Settings_unmounts", async () => {
-    await renderSettings();
+    await renderSettings({ settingsReadCache: createSettingsReadCache() });
     const [handle, callback] = [...idleCallbacks.entries()][0];
 
     dispose();
@@ -467,6 +473,7 @@ describe("Settings workspace", () => {
     await act(async () => { await i18n.changeLanguage("en"); });
     await renderSettings();
 
+    expect(idleCallbacks.size).toBe(0);
     expect(host!.querySelector("h1")?.textContent).toBe("Settings");
     expect(Array.from(host!.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent)).toEqual([
       "AI and Models",

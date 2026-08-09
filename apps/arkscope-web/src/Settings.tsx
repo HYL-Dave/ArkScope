@@ -481,22 +481,25 @@ export function SettingsView({
     };
   }, [readCache]);
 
-  useEffect(() => scheduleSettingsIdleWarmup({
-    cache: readCache,
-    loaders: {
-      model_catalog: getModelCatalog,
-      data_schedule: getSchedule,
-      provider_health: getProvidersHealth,
-      provider_config: getProvidersConfig,
-      market_data_status: getMarketDataStatus,
-      "trading_day_coverage:15min:10": () => getTradingDayCoverage(10, "15min"),
-      news_status: getNewsStatus,
-      macro_status: getMacroStatus,
-      macro_snapshot: getMacroSnapshot,
-    },
-    selectActiveOAuthLocalIds: activeOAuthLocalCredentialIds,
-    loadOAuthAccountUsage: getCredentialAccountUsage,
-  }), [readCache]);
+  useEffect(() => {
+    if (settingsReadCache === undefined) return undefined;
+    return scheduleSettingsIdleWarmup({
+      cache: readCache,
+      loaders: {
+        model_catalog: getModelCatalog,
+        data_schedule: getSchedule,
+        provider_health: getProvidersHealth,
+        provider_config: getProvidersConfig,
+        market_data_status: getMarketDataStatus,
+        "trading_day_coverage:15min:10": () => getTradingDayCoverage(10, "15min"),
+        news_status: getNewsStatus,
+        macro_status: getMacroStatus,
+        macro_snapshot: getMacroSnapshot,
+      },
+      selectActiveOAuthLocalIds: activeOAuthLocalCredentialIds,
+      loadOAuthAccountUsage: getCredentialAccountUsage,
+    });
+  }, [readCache, settingsReadCache]);
 
   const modelsByProvider = useMemo(() => {
     const grouped: Record<ModelProvider, ModelOption[]> = { anthropic: [], openai: [] };
