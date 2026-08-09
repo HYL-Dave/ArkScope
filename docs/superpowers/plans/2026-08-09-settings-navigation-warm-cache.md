@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** PLAN GREEN; TASK 0 COMPLETE - INDEPENDENT REVIEW REQUIRED
+> **Status:** TASK 1 COMPLETE; TASKS 2-5 BATCH EXECUTION AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
@@ -524,6 +524,13 @@ family lands as one scoped product/test commit followed by one docs-only
 evidence/status commit. Stop after that pair for independent review; a later
 task is unauthorized until the preceding review is GREEN.
 
+> **Post-Task-0 execution ruling:** Independent review returned GREEN at
+> `8aca8c1a`. The user then authorized Tasks 1-5 as one continuous batch.
+> Per-task RED/GREEN artifacts, staged identities, product/docs commit pairs,
+> and every stop condition remain mandatory; only the intermediate wait for
+> independent review is waived. Any drift stops the batch. Task 2's early
+> browser check, Task 6, and Task 7 remain hard gates.
+
 ### Task 0 - Re-ground and open evidence
 
 No product/test code changes.
@@ -563,6 +570,12 @@ Owned paths:
 apps/arkscope-web/src/settings/settingsReadCache.ts
 apps/arkscope-web/src/settings/settingsReadCache.test.ts
 ```
+
+> Complete at product/test commit `e34aaef8`. Stage 1 reproduced exact
+> `1101/6f77e166...` and focused `199/543ebdff...`; owner `17/17`, focused
+> `199/199`, and typecheck are GREEN. Raw packet:
+> `/tmp/settings-navigation-warm-cache-task1-8aca8c1a` (`38` entries,
+> manifest `b63d5cdf...`).
 
 1. Add all seventeen Task 1 nodes and prove admissible RED at exact stage 1.
 2. Implement the closed policy registry, synchronous inspection, single-flight,

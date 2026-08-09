@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Design
 
-> **Status: DESIGN AND PLAN GREEN; TASK 0 COMPLETE - INDEPENDENT REVIEW REQUIRED.**
+> **Status: TASK 1 COMPLETE; TASKS 2-5 BATCH EXECUTION AUTHORIZED.**
 >
 > **Date:** 2026-08-09
 >
@@ -10,10 +10,10 @@
 > **Scope:** Settings navigation persistence, a complete section directory,
 > and a bounded app-session cache for existing read-only Settings DTOs.
 >
-> **Design and plan reviews:** Independent review returned GREEN with zero
-> findings at `dbd92b86` and `5755ed54`. Task 0 grounding is complete;
-> product/test implementation remains unauthorized until its evidence packet
-> receives independent GREEN review.
+> **Design, plan, and Task 0 reviews:** Independent review returned GREEN with
+> zero findings at `dbd92b86`, `5755ed54`, and `8aca8c1a`. The user authorized
+> continuous Tasks 1-5 execution with per-task RED/GREEN evidence and commits;
+> any stop condition ends the batch, while Tasks 6-7 remain hard-gated.
 
 ## 1. Problem and grounded facts
 
