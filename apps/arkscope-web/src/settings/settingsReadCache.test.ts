@@ -339,7 +339,7 @@ describe("Settings read cache", () => {
     const cache = createSettingsReadCache();
     const catalog = {
       credentials: [
-        { id: "local-oauth", auth_mode: "chatgpt_oauth", active: true },
+        { id: "local:7", auth_mode: "chatgpt_oauth", active: true },
         { id: "local-api", auth_mode: "api_key", active: true },
       ],
     };
@@ -347,7 +347,7 @@ describe("Settings read cache", () => {
     const accountLoader = vi.fn(async (localId: string) => ({ local_id: localId, used: 0.25 }));
     const selectActiveOAuthLocalIds = vi.fn((value: unknown) => {
       expect(value).toEqual(catalog);
-      return ["local-oauth"];
+      return ["local:7"];
     });
 
     scheduleSettingsIdleWarmup({
@@ -367,10 +367,10 @@ describe("Settings read cache", () => {
 
     expect(selectActiveOAuthLocalIds).toHaveBeenCalledOnce();
     expect(accountLoader).toHaveBeenCalledOnce();
-    expect(accountLoader).toHaveBeenCalledWith("local-oauth");
-    expect(cache.inspect(oauthAccountUsageKey("local-oauth"))).toMatchObject({
+    expect(accountLoader).toHaveBeenCalledWith("local:7");
+    expect(cache.inspect(oauthAccountUsageKey("local:7"))).toMatchObject({
       status: "fresh",
-      value: { local_id: "local-oauth", used: 0.25 },
+      value: { local_id: "local:7", used: 0.25 },
     });
     expect(cache.inspect(oauthAccountUsageKey("local-api"))).toEqual({ status: "missing" });
 

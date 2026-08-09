@@ -14,6 +14,15 @@ import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigat
 
 const mocks = vi.hoisted(() => ({
   getModelCatalog: vi.fn(),
+  getSchedule: vi.fn(),
+  getProvidersHealth: vi.fn(),
+  getProvidersConfig: vi.fn(),
+  getMarketDataStatus: vi.fn(),
+  getTradingDayCoverage: vi.fn(),
+  getNewsStatus: vi.fn(),
+  getMacroStatus: vi.fn(),
+  getMacroSnapshot: vi.fn(),
+  getCredentialAccountUsage: vi.fn(),
   saveModelRoutes: vi.fn(),
   importModelRoutes: vi.fn(),
   exportModelRoutes: vi.fn(),
@@ -41,6 +50,15 @@ vi.mock("./api", async (importOriginal) => {
   return {
     ...actual,
     getModelCatalog: mocks.getModelCatalog,
+    getSchedule: mocks.getSchedule,
+    getProvidersHealth: mocks.getProvidersHealth,
+    getProvidersConfig: mocks.getProvidersConfig,
+    getMarketDataStatus: mocks.getMarketDataStatus,
+    getTradingDayCoverage: mocks.getTradingDayCoverage,
+    getNewsStatus: mocks.getNewsStatus,
+    getMacroStatus: mocks.getMacroStatus,
+    getMacroSnapshot: mocks.getMacroSnapshot,
+    getCredentialAccountUsage: mocks.getCredentialAccountUsage,
     saveModelRoutes: mocks.saveModelRoutes,
     importModelRoutes: mocks.importModelRoutes,
     exportModelRoutes: mocks.exportModelRoutes,
@@ -232,6 +250,9 @@ let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 let overlay = false;
 const scrollIntoView = vi.fn();
+let idleCallbacks = new Map<number, IdleRequestCallback>();
+let nextIdleHandle = 0;
+let cancelIdleCallback = vi.fn();
 
 function installViewport() {
   Object.defineProperty(window, "matchMedia", {
@@ -335,6 +356,20 @@ async function setSearch(value: string) {
 beforeEach(() => {
   mocks.getModelCatalog.mockReset();
   mocks.getModelCatalog.mockResolvedValue(emptyCatalog);
+  for (const loader of [
+    mocks.getSchedule,
+    mocks.getProvidersHealth,
+    mocks.getProvidersConfig,
+    mocks.getMarketDataStatus,
+    mocks.getTradingDayCoverage,
+    mocks.getNewsStatus,
+    mocks.getMacroStatus,
+    mocks.getMacroSnapshot,
+    mocks.getCredentialAccountUsage,
+  ]) {
+    loader.mockReset();
+    loader.mockResolvedValue({});
+  }
   mocks.saveModelRoutes.mockReset();
   mocks.saveModelRoutes.mockResolvedValue(undefined);
   mocks.importModelRoutes.mockReset();
@@ -361,6 +396,23 @@ beforeEach(() => {
     configurable: true,
     value: scrollIntoView,
   });
+  idleCallbacks = new Map();
+  nextIdleHandle = 0;
+  cancelIdleCallback = vi.fn((handle: number) => {
+    idleCallbacks.delete(handle);
+  });
+  Object.defineProperty(window, "requestIdleCallback", {
+    configurable: true,
+    value: vi.fn((callback: IdleRequestCallback) => {
+      nextIdleHandle += 1;
+      idleCallbacks.set(nextIdleHandle, callback);
+      return nextIdleHandle;
+    }),
+  });
+  Object.defineProperty(window, "cancelIdleCallback", {
+    configurable: true,
+    value: cancelIdleCallback,
+  });
 });
 
 afterEach(() => {
@@ -370,6 +422,47 @@ afterEach(() => {
 });
 
 describe("Settings workspace", () => {
+  it("starts_one_idle_warmup_after_first_paint", async () => {
+    await renderSettings();
+
+    expect(idleCallbacks.size).toBe(1);
+    const callback = [...idleCallbacks.values()][0];
+    callback({ didTimeout: false, timeRemaining: () => 50 });
+    await flush();
+
+    expect(mocks.getModelCatalog).toHaveBeenCalledOnce();
+    expect(mocks.getSchedule).toHaveBeenCalledOnce();
+    expect(mocks.getProvidersHealth).toHaveBeenCalledOnce();
+    expect(mocks.getProvidersConfig).toHaveBeenCalledOnce();
+    expect(mocks.getMarketDataStatus).toHaveBeenCalledOnce();
+    expect(mocks.getTradingDayCoverage).toHaveBeenCalledOnce();
+    expect(mocks.getTradingDayCoverage).toHaveBeenCalledWith(10, "15min");
+    expect(mocks.getNewsStatus).toHaveBeenCalledOnce();
+    expect(mocks.getMacroStatus).toHaveBeenCalledOnce();
+    expect(mocks.getMacroSnapshot).toHaveBeenCalledOnce();
+    expect(mocks.getCredentialAccountUsage).not.toHaveBeenCalled();
+  });
+
+  it("cancels_idle_warmup_before_start_when_Settings_unmounts", async () => {
+    await renderSettings();
+    const [handle, callback] = [...idleCallbacks.entries()][0];
+
+    dispose();
+    expect(cancelIdleCallback).toHaveBeenCalledWith(handle);
+    callback({ didTimeout: false, timeRemaining: () => 50 });
+    await flush();
+
+    expect(mocks.getModelCatalog).toHaveBeenCalledOnce();
+    expect(mocks.getSchedule).not.toHaveBeenCalled();
+    expect(mocks.getProvidersHealth).not.toHaveBeenCalled();
+    expect(mocks.getProvidersConfig).not.toHaveBeenCalled();
+    expect(mocks.getMarketDataStatus).not.toHaveBeenCalled();
+    expect(mocks.getTradingDayCoverage).not.toHaveBeenCalled();
+    expect(mocks.getNewsStatus).not.toHaveBeenCalled();
+    expect(mocks.getMacroStatus).not.toHaveBeenCalled();
+    expect(mocks.getMacroSnapshot).not.toHaveBeenCalled();
+  });
+
   it("renders English Settings workspace tabs directory and section copy", async () => {
     await act(async () => { await i18n.changeLanguage("en"); });
     await renderSettings();

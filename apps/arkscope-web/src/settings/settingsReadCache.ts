@@ -107,7 +107,13 @@ function hasRunningScheduleSource(value: unknown): boolean {
 
 function requireLocalCredentialId(localCredentialId: string): string {
   const value = localCredentialId.trim();
-  if (!value || value.length > 256 || /[\u0000-\u001f\u007f:]/.test(value)) {
+  const storedLocalId = /^local:[1-9]\d*$/.test(value);
+  if (
+    !value
+    || value.length > 256
+    || /[\u0000-\u001f\u007f]/.test(value)
+    || (value.includes(":") && !storedLocalId)
+  ) {
     throw new Error("invalid local credential id");
   }
   return value;

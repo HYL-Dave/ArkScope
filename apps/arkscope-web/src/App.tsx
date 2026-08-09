@@ -28,6 +28,7 @@ import {
   type ShellView,
 } from "./shell/navigation";
 import { shellViewLabel } from "./shell/shellLabels";
+import { createSettingsReadCache } from "./settings/settingsReadCache";
 import {
   captureSidecarFailure,
   type SystemStatusState,
@@ -53,6 +54,7 @@ export function App() {
   const researchWork = useResearchWorkRegistry();
   const shellOverlay = useShellOverlay();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [settingsReadCache] = useState(() => createSettingsReadCache());
 
   const navigate = useCallback((target: NavigationTarget) => {
     const request = nextNavigationRequest(navigationSequenceRef.current, target);
@@ -176,6 +178,7 @@ export function App() {
       developerMode={developerMode}
       onRuntimeChanged={refreshRuntime}
       navigationRequest={settingsNavigation}
+      settingsReadCache={settingsReadCache}
     />
   );
 

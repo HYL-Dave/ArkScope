@@ -22,6 +22,7 @@ import type {
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const controls = vi.hoisted(() => ({
+  getModelCatalog: vi.fn(),
   saveFixedTaskRuntime: vi.fn(async () => ({ fixed_task_runtime: {} })),
   saveModelRoutes: vi.fn(),
   discoverModels: vi.fn(),
@@ -95,22 +96,40 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    getModelCatalog: vi.fn(async () => {
-      if (controls.catalogPending) return controls.catalogPending;
-      if (controls.catalogError) throw controls.catalogError;
-      return controls.catalogOverride ?? catalog;
-    }),
+    getModelCatalog: controls.getModelCatalog,
     discoverModels: controls.discoverModels,
     saveFixedTaskRuntime: controls.saveFixedTaskRuntime,
     saveModelRoutes: controls.saveModelRoutes,
   };
 });
 
+import { createSettingsReadCache } from "./settings/settingsReadCache";
 import { SettingsView, type SettingsViewProps } from "./Settings";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
+let idleCallbacks: IdleRequestCallback[] = [];
+
+function catalogWithResearchModel(model: string): ModelCatalog {
+  return {
+    ...catalog,
+    routes: {
+      ...catalog.routes,
+      ai_research: { ...catalog.routes.ai_research, model },
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 function TestSettingsView(props: SettingsViewProps) {
   return withTestUiLocale(React.createElement(SettingsView, props));
@@ -121,6 +140,12 @@ beforeEach(async () => {
   controls.catalogPending = null;
   controls.catalogError = null;
   controls.catalogOverride = null;
+  controls.getModelCatalog.mockReset();
+  controls.getModelCatalog.mockImplementation(async () => {
+      if (controls.catalogPending) return controls.catalogPending;
+      if (controls.catalogError) throw controls.catalogError;
+      return controls.catalogOverride ?? catalog;
+  });
   controls.discoverModels.mockReset();
   controls.saveFixedTaskRuntime.mockReset();
   controls.saveFixedTaskRuntime.mockResolvedValue({ fixed_task_runtime: {} });
@@ -139,6 +164,18 @@ beforeEach(async () => {
     },
   });
   Object.defineProperty(window, "cancelAnimationFrame", {
+    configurable: true,
+    value: vi.fn(),
+  });
+  idleCallbacks = [];
+  Object.defineProperty(window, "requestIdleCallback", {
+    configurable: true,
+    value: vi.fn((callback: IdleRequestCallback) => {
+      idleCallbacks.push(callback);
+      return idleCallbacks.length;
+    }),
+  });
+  Object.defineProperty(window, "cancelIdleCallback", {
     configurable: true,
     value: vi.fn(),
   });
@@ -168,6 +205,100 @@ async function click(element: HTMLElement) {
 }
 
 describe("Settings model route save gate", () => {
+  it("renders_retained_catalog_synchronously_and_joins_idle_revalidation", async () => {
+    let now = 0;
+    const settingsReadCache = createSettingsReadCache({ clock: () => now });
+    settingsReadCache.replace("model_catalog", catalogWithResearchModel("cached-model"));
+    now = 61_000;
+    const pending = deferred<ModelCatalog>();
+    controls.catalogPending = pending.promise;
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+        settingsReadCache,
+      }));
+    });
+
+    expect(host.textContent).toContain("cached-model");
+    expect(controls.getModelCatalog).toHaveBeenCalledOnce();
+    expect(idleCallbacks).toHaveLength(1);
+    idleCallbacks[0]({ didTimeout: false, timeRemaining: () => 50 });
+    await flush();
+    expect(controls.getModelCatalog).toHaveBeenCalledOnce();
+
+    pending.resolve(catalogWithResearchModel("fresh-model"));
+    await flush();
+    expect(host.textContent).toContain("fresh-model");
+    expect(host.textContent).not.toContain("cached-model");
+  });
+
+  it("replaces_cached_catalog_after_model_route_mutation", async () => {
+    const settingsReadCache = createSettingsReadCache();
+    settingsReadCache.replace("model_catalog", catalogWithResearchModel("cached-model"));
+    controls.catalogOverride = catalogWithResearchModel("saved-model");
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(async () => undefined),
+        settingsReadCache,
+      }));
+    });
+    await flush();
+    await click(Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!);
+
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+    expect(settingsReadCache.inspect<ModelCatalog>("model_catalog")).toMatchObject({
+      status: "fresh",
+      value: { routes: { ai_research: { model: "saved-model" } } },
+    });
+  });
+
+  it("discards_pre_mutation_catalog_completion_after_route_save", async () => {
+    const settingsReadCache = createSettingsReadCache();
+    settingsReadCache.replace("model_catalog", catalogWithResearchModel("cached-model"));
+    const oldGeneration = deferred<ModelCatalog>();
+    const oldLoad = settingsReadCache.load(
+      "model_catalog",
+      () => oldGeneration.promise,
+      { force: true },
+    );
+    controls.catalogOverride = catalogWithResearchModel("saved-model");
+
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(async () => undefined),
+        settingsReadCache,
+      }));
+    });
+    await flush();
+    await click(Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!);
+
+    oldGeneration.resolve(catalogWithResearchModel("obsolete-model"));
+    await expect(oldLoad).resolves.toMatchObject({ status: "discarded" });
+    expect(settingsReadCache.inspect<ModelCatalog>("model_catalog")).toMatchObject({
+      status: "fresh",
+      value: { routes: { ai_research: { model: "saved-model" } } },
+    });
+  });
+
   it("allows an unchanged missing route but blocks a new draft onto that provider", async () => {
     host = document.createElement("div");
     document.body.append(host);

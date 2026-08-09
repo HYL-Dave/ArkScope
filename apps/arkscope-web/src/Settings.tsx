@@ -5,7 +5,16 @@ import {
   discoverModels,
   deleteModelRoute,
   exportModelRoutes,
+  getCredentialAccountUsage,
+  getMacroSnapshot,
+  getMacroStatus,
+  getMarketDataStatus,
   getModelCatalog,
+  getNewsStatus,
+  getProvidersConfig,
+  getProvidersHealth,
+  getSchedule,
+  getTradingDayCoverage,
   importModelRoutes,
   deleteFixedTaskRuntime,
   deleteResearchRuntime,
@@ -71,6 +80,11 @@ import {
   readActiveSettingsGroup,
   writeActiveSettingsGroup,
 } from "./settings/settingsPreferences";
+import {
+  createSettingsReadCache,
+  scheduleSettingsIdleWarmup,
+  type SettingsReadCache,
+} from "./settings/settingsReadCache";
 import { settingsTaskLabel, type SettingsT } from "./settings/settingsCopy";
 import {
   Button,
@@ -98,6 +112,7 @@ export interface SettingsViewProps {
   developerMode: boolean;
   onRuntimeChanged: () => Promise<void>;
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "settings_section" }>> | null;
+  settingsReadCache?: SettingsReadCache;
 }
 
 type SettingsNavigationIntent = {
@@ -231,16 +246,55 @@ function settingsWorkspaceTabLabel(id: SettingsGroupId, t: SettingsT): string {
   }
 }
 
+function activeOAuthLocalCredentialIds(value: unknown): string[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+  const credentials = (value as { credentials?: unknown }).credentials;
+  if (typeof credentials !== "object" || credentials === null || Array.isArray(credentials)) return [];
+  const ids: string[] = [];
+  for (const providerCredentials of Object.values(credentials)) {
+    if (!Array.isArray(providerCredentials)) return [];
+    for (const credential of providerCredentials) {
+      if (typeof credential !== "object" || credential === null || Array.isArray(credential)) return [];
+      const candidate = credential as Record<string, unknown>;
+      if (
+        candidate.active === true
+        && (candidate.auth_type === "chatgpt_oauth" || candidate.auth_type === "claude_code_oauth")
+        && typeof candidate.id === "string"
+      ) {
+        ids.push(candidate.id);
+      }
+    }
+  }
+  return ids;
+}
+
 export function SettingsView({
   runtime,
   developerMode,
   onRuntimeChanged,
   navigationRequest,
+  settingsReadCache,
 }: SettingsViewProps) {
   const { t } = useTranslation("settings");
-  const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
-  const [draft, setDraft] = useState<Partial<Record<ModelTask, DraftRoute>>>({});
-  const [catalogLoading, setCatalogLoading] = useState(true);
+  const cacheRef = useRef<SettingsReadCache | null>(null);
+  if (cacheRef.current === null) {
+    cacheRef.current = settingsReadCache ?? createSettingsReadCache();
+  }
+  const readCache = cacheRef.current;
+  const initialCatalogRef = useRef<ReturnType<SettingsReadCache["inspect"]> | null>(null);
+  if (initialCatalogRef.current === null) {
+    initialCatalogRef.current = readCache.inspect<ModelCatalog>("model_catalog");
+  }
+  const initialCatalog = initialCatalogRef.current.status === "missing"
+    ? null
+    : initialCatalogRef.current.value as ModelCatalog;
+  const [catalog, setCatalog] = useState<ModelCatalog | null>(initialCatalog);
+  const [draft, setDraft] = useState<Partial<Record<ModelTask, DraftRoute>>>(() => (
+    initialCatalog ? fromRoutes(initialCatalog.routes) : {}
+  ));
+  const [catalogLoading, setCatalogLoading] = useState(
+    initialCatalogRef.current.status !== "fresh",
+  );
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [routeOutcome, setRouteOutcome] = useState<SettingsRouteOutcome | null>(null);
@@ -408,24 +462,41 @@ export function SettingsView({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setCatalogLoading(true);
+      const retained = readCache.inspect<ModelCatalog>("model_catalog");
+      setCatalogLoading(retained.status !== "fresh");
       setCatalogFailed(false);
-      try {
-        const data = await getModelCatalog();
-        if (cancelled) return;
-        setCatalog(data);
-        setDraft(fromRoutes(data.routes));
-      } catch {
-        if (!cancelled) setCatalogFailed(true);
-      } finally {
-        if (!cancelled) setCatalogLoading(false);
+      const outcome = await readCache.load("model_catalog", getModelCatalog);
+      if (cancelled) return;
+      if (outcome.status === "success") {
+        setCatalog(outcome.value);
+        setDraft(fromRoutes(outcome.value.routes));
+      } else if (outcome.status === "error") {
+        setCatalogFailed(true);
       }
+      setCatalogLoading(false);
     }
     void load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [readCache]);
+
+  useEffect(() => scheduleSettingsIdleWarmup({
+    cache: readCache,
+    loaders: {
+      model_catalog: getModelCatalog,
+      data_schedule: getSchedule,
+      provider_health: getProvidersHealth,
+      provider_config: getProvidersConfig,
+      market_data_status: getMarketDataStatus,
+      "trading_day_coverage:15min:10": () => getTradingDayCoverage(10, "15min"),
+      news_status: getNewsStatus,
+      macro_status: getMacroStatus,
+      macro_snapshot: getMacroSnapshot,
+    },
+    selectActiveOAuthLocalIds: activeOAuthLocalCredentialIds,
+    loadOAuthAccountUsage: getCredentialAccountUsage,
+  }), [readCache]);
 
   const modelsByProvider = useMemo(() => {
     const grouped: Record<ModelProvider, ModelOption[]> = { anthropic: [], openai: [] };
@@ -461,6 +532,13 @@ export function SettingsView({
     ) as TestState);
   }
 
+  async function fetchCatalogAfterMutation(): Promise<ModelCatalog> {
+    readCache.invalidate("model_catalog");
+    const outcome = await readCache.load("model_catalog", getModelCatalog, { force: true });
+    if (outcome.status !== "success") throw new Error("model catalog refresh failed");
+    return outcome.value;
+  }
+
   async function save() {
     if (!catalog) return;
     if (routeSaveBlocks.length) return;
@@ -478,7 +556,7 @@ export function SettingsView({
         routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort || "default" };
       }
       await saveModelRoutes(routes);
-      const refreshed = await getModelCatalog();
+      const refreshed = await fetchCatalogAfterMutation();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
@@ -497,7 +575,7 @@ export function SettingsView({
     setRuntimeOutcome(null);
     try {
       const result = await importModelRoutes();
-      const refreshed = await getModelCatalog();
+      const refreshed = await fetchCatalogAfterMutation();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
@@ -521,7 +599,7 @@ export function SettingsView({
     try {
       const result = await exportModelRoutes();
       // the clear branch can drop a task from profile→default, so refresh the badge/draft
-      const refreshed = await getModelCatalog();
+      const refreshed = await fetchCatalogAfterMutation();
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       setTestState({});
@@ -625,7 +703,7 @@ export function SettingsView({
     try {
       await runDiscoveryAndRefreshCatalog({
         discover: () => discoverModels(provider, credentialId),
-        fetchCatalog: getModelCatalog,
+        fetchCatalog: fetchCatalogAfterMutation,
         onResult: (result) =>
           setDiscovery((prev) => ({
             ...prev,
@@ -677,7 +755,7 @@ export function SettingsView({
           discovery={discovery}
           developerMode={developerMode}
           onRefresh={async () => {
-            const refreshed = await getModelCatalog();
+            const refreshed = await fetchCatalogAfterMutation();
             setCatalog(refreshed);
             invalidateAllTaskTests();
             await onRuntimeChanged();
@@ -826,7 +904,7 @@ export function SettingsView({
             setRuntimeOutcome(null);
             try {
               await deleteModelRoute(task);
-              const refreshed = await getModelCatalog();
+              const refreshed = await fetchCatalogAfterMutation();
               setCatalog(refreshed);
               setDraft(fromRoutes(refreshed.routes));
               invalidateTaskTest(task);

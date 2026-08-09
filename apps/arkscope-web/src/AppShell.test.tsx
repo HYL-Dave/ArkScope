@@ -154,6 +154,7 @@ vi.mock("./Settings", () => ({
   SettingsView: (props: {
     developerMode: boolean;
     navigationRequest?: NavigationRequest | null;
+    settingsReadCache?: unknown;
   }) => {
     shellMocks.settingsProps = props as unknown as Record<string, unknown>;
     if (props.navigationRequest) shellMocks.settingsRequests.push(props.navigationRequest);
@@ -305,6 +306,10 @@ function button(text: string, scope: ParentNode = host!): HTMLButtonElement {
   return match;
 }
 
+function capturedSettingsReadCache(): unknown {
+  return shellMocks.settingsProps?.settingsReadCache;
+}
+
 beforeEach(() => {
   shellMocks.statusError = null;
   shellMocks.statusPromise = null;
@@ -330,6 +335,40 @@ afterEach(() => {
 });
 
 describe("App shell integration", () => {
+  it("keeps_one_Settings_cache_across_view_unmount_and_remount", async () => {
+    const host = await renderApp();
+
+    await click(button("設定"));
+    const first = capturedSettingsReadCache();
+    expect(first).toBeTypeOf("object");
+
+    await click(button("工作台"));
+    expect(host.querySelector("[data-testid='settings-surface']")).toBeNull();
+    await click(button("設定"));
+
+    expect(capturedSettingsReadCache()).toBe(first);
+  });
+
+  it("creates_a_fresh_Settings_cache_for_a_new_App_root", async () => {
+    await renderApp();
+    await click(button("設定"));
+    const first = capturedSettingsReadCache();
+    expect(first).toBeTypeOf("object");
+
+    act(() => root!.unmount());
+    root = null;
+    host?.remove();
+    host = null;
+    shellMocks.settingsProps = null;
+
+    await renderApp();
+    await click(button("設定"));
+    const second = capturedSettingsReadCache();
+
+    expect(second).toBeTypeOf("object");
+    expect(second).not.toBe(first);
+  });
+
   it("renders the grouped shipped shell with no planned controls or right rail", async () => {
     const host = await renderApp();
 
