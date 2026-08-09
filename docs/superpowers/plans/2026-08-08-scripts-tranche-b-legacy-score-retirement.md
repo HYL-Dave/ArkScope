@@ -1,7 +1,7 @@
 # Scripts Tranche B Legacy Score Retirement Implementation Plan
 
-> **Status:** TASKS 0-4 COMPLETE; ATOMIC TIP `8ebf7fae`; NATIVE ADMISSION
-> GREEN; INDEPENDENT IMPLEMENTATION REVIEW PENDING; NOT MERGED
+> **Status:** TASKS 0-6 COMPLETE; PRODUCT CUTOVER MERGED AND VERIFIED;
+> FOCUSED CLOSEOUT REVIEW PENDING
 > **Date:** 2026-08-08
 > **Current branch base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
@@ -19,6 +19,9 @@
 > **Implementation review packet:**
 > `/tmp/scripts-tranche-b-task4-8ebf7fae`, 668 entries, manifest
 > `d5917eb703081d80d66b042886c581ba09df7950bc2a7ffb3061a910551b3ce5`
+> **Merged verification packet:**
+> `/tmp/scripts-tranche-b-task6-merged-0c16771b`, 569 payload entries,
+> manifest `7b42a38e67c00e45585b02121344d95d72f8cb01c87849bcbfb251db2149494d`
 
 ## 0. Execution contract
 
@@ -958,6 +961,16 @@ After GREEN, prove linear ancestry and use `git merge --ff-only`. Do not push.
    deletion, any external research retention, and exact-path secret disposition
    each require independent review and a later explicit user approval. They are
    not Task 6 mutations.
+
+Merged execution completed by fast-forwarding exact reviewed tip `0c16771b`
+onto `master` without a merge commit or push. Fresh exact-master verification
+reproduced all final collection identities, focused/protected/rollout gates,
+frontend full/typecheck/build/scanner gates, and canonical native
+`4282 seen / 4253 passed / 29 skipped / 0 failed`. All 113 reviewed direct
+deletion paths and the complete retired runtime roots are absent. Production
+score and metadata-only secret projections remained byte-identical. The 510
+generated files were exactly quarantined, the fresh boundary restored, and the
+worktree removed. The docs-only closeout is now the sole focused review gate.
 
 ## 6. Stop conditions
 

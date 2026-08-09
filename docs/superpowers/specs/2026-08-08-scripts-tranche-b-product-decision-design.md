@@ -1,15 +1,16 @@
 # Scripts Tranche B Legacy Score Product Decision
 
-> **Status:** PRODUCT DECISION AND TRAINING RULING APPROVED; TASK 0 PHASE D/
-> POSTGRESQL OWNER-CLOSURE AMENDMENT REVIEW PENDING
+> **Status:** PRODUCT CUTOVER MERGED AND VERIFIED; FOCUSED CLOSEOUT REVIEW
+> PENDING; SCORE-ROW/SECRET DISPOSITION BLOCKED
 > **Date:** 2026-08-08
 > **Base inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
 > **Scope:** Per-surface disposition of the frozen 1-5 news score contract, the
 > remaining `scripts/scoring/` transition layer, the separately approved
 > retirement of the disconnected offline `training/` lineage, and Task 0's
-> proposed no-tail disposition of the current recommendation-shaped Phase D
-> scaffold. This document
-> does not authorize implementation, score-row deletion, or secret deletion.
+> no-tail disposition of the retired recommendation-shaped Phase D scaffold.
+> Section 8.1 authorized the now-merged implementation. This document does not
+> authorize score-row deletion, external historical retention, or secret
+> disposition.
 
 ## 1. Decision to make
 
@@ -436,6 +437,22 @@ independent plan review, the atomic product cutover described by PD 1-8. It
 does **not** authorize reading or deleting the scoring secret, deleting or
 mutating any production score row, or constructing a destructive manifest as
 part of the product implementation.
+
+### 8.2 Merged implementation record
+
+The approved product cutover is merged from atomic product commit
+`8ebf7fae14bcd1136ae3e9f1c2bfbed05b00da6c`, recorded as
+`SCRIPTS_TRANCHE_B_PRODUCT_CUTOVER_TIP`. Exact-master verification at
+`0c16771bce89c664151918bd2825f0cf4989d263` reproduced backend
+`4282/281cad97...`, frontend `1124/da69a294...`, and native
+`4253 passed / 29 skipped / 0 failed`. The runtime score contract, disconnected
+training lineage, and recommendation-shaped Phase D scaffold are physically
+absent with no compatibility namespace or archive copy.
+
+The 491,808 frozen score rows and `config/scoring_keys.txt` remain physically
+untouched and runtime-disconnected. Their research-use classification,
+possible external retention, exact deletion, and secret disposition remain
+separate read-only/review/user-approval gates.
 
 ## 9. Sequence after approval
 
