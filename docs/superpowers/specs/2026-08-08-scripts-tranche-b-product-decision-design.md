@@ -400,6 +400,13 @@ estimation, and Signals research remain valid product goals, but must begin from
 their then-current provider/data contracts and a new hypothesis/OOS/kill gate;
 the retired implementation is not their scaffold.
 
+The deletion must also be self-explanatory in ordinary Git history. Its atomic
+product commit may not use a generic `cleanup` or `remove old code` description.
+The commit subject/body must identify the disconnected training lineage and
+legacy score/signal contract, the exact retirement ledger, the capabilities
+that remain, the new-design rule for future research, and the production rows
+and scoring secret that were deliberately not touched.
+
 This approval authorizes an exact RED-first implementation plan and, after
 independent plan review, the atomic product cutover described by PD 1-8. It
 does **not** authorize reading or deleting the scoring secret, deleting or

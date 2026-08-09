@@ -718,7 +718,27 @@ unclassified paths fail. Run it in an unlocked tree or explicitly enumerate
 git-crypt files as unsearchable-by-content and classify by path.
 
 Commit the complete product/test/current-authority cutover as one atomic commit.
-No production data or secret byte belongs in the commit.
+No production data or secret byte belongs in the commit. The exact subject is:
+
+```text
+refactor: retire legacy scoring and training lineage
+```
+
+The body must state all of the following facts; a generic `cleanup`, `old code`,
+or path-only message is a stop condition:
+
+- the disconnected offline RL implementation, its eight dedicated test owners,
+  and manual yfinance smoke leave as the exact 62-path training family;
+- total backend retirement is exact 247 nodes, comprising 109 training-only and
+  138 legacy score/signal nodes, with 18 replacement contract nodes;
+- raw news, news volume/event sequences, provider-native sentiment, investor
+  risk, and current caller-supplied options pricing remain;
+- future RL, Signals, or provider-backed options estimation starts from a new
+  reviewed design and current data/provider contracts, not restored compatibility
+  code; and
+- production `news_article_scores` remained read-only and unchanged, while
+  `config/scoring_keys.txt` contents were not read, copied, changed, or deleted
+  by this commit.
 
 ### Task 3 - Prove focused GREEN and mutation sensitivity
 
@@ -831,10 +851,12 @@ Stop immediately and amend/review before continuing if any of these occurs:
 19. frontend identity is parsed from escaped JSON text or terminal prose;
 20. native wakeup preflight fails or full admission runs in the managed sandbox;
 21. full admission does not see every collected node or has any non-passing ID;
-22. a test run modifies a pre-existing repository-relative file;
-23. an artifact cannot be restored by exact path without touching production;
-24. merge is non-fast-forward, contains an unexpected commit, or would push; or
-25. OAuth and Tranche B edit the same owner without an explicit reviewed handoff.
+22. the atomic deletion commit lacks the exact subject or any required body fact
+    in Task 2, or describes the change only as generic cleanup;
+23. a test run modifies a pre-existing repository-relative file;
+24. an artifact cannot be restored by exact path without touching production;
+25. merge is non-fast-forward, contains an unexpected commit, or would push; or
+26. OAuth and Tranche B edit the same owner without an explicit reviewed handoff.
 
 ## 7. Completion criteria
 
