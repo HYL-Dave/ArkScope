@@ -697,9 +697,18 @@ apps/arkscope-web/src/settings/settingsReadCache.test.ts
 Owned paths:
 
 ```text
+apps/arkscope-web/src/Settings.tsx
 apps/arkscope-web/src/settings/ProviderSection.tsx
 apps/arkscope-web/src/ProviderSection.test.ts
 ```
+
+Bounded Task 4 ownership amendment: `Settings.tsx` is an existing Task 3
+owner and the only component that holds the App-owned `SettingsReadCache` at
+the Provider render site. Task 4 may change that call site only to pass the
+same cache instance into `ProviderSection`; it may not add a module-global
+cache, create another App-lifetime owner, or otherwise change Settings
+behavior. This amendment changes no test node, staged identity, or `+3/-0`
+Task 4 ledger.
 
 1. Add three exact Task 4 nodes and prove stage-4 RED.
 2. Replace Provider-local snapshot retention/generation maps with the shared
