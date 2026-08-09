@@ -514,6 +514,8 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 
 ## 10. Decision Log
 
+- **2026-08-09 (SETTINGS TASK 2 STOPPED ON MISSED ASSERTION OWNER; BOUNDED AMENDMENT REVIEW NEXT)**: Task 2 test-first collection reproduced exact stage identities `1106/10965b1c...` and `204/e34c217e...`; direct owners produced the intended five-failure RED and then `35/35` GREEN. The complete focused gate correctly stopped at `199 passed / 5 failed`: four jsdom cases exposed use of unavailable `HTMLElement.scrollTo` (same owned implementation will use semantic `scrollTop`), while one pre-existing `SettingsPostPgExitStorage.test.ts` assertion still required the superseded active-group-only directory. That assertion owner was omitted from Task 2 owned paths. The uncommitted delta was hash-retained and the tree restored before a docs-only amendment added exactly this existing node owner; no node identity or `+40/-1` ledger changes. Focused amendment review is the sole next gate; browser work and Tasks 3-5 have not started.
+
 > **Order**: NEWEST FIRST. New entries go at the TOP of this section,
 > directly under this header. Reverse chronological matches the
 > "what just happened?" reading mode — most recent decisions front-loaded.

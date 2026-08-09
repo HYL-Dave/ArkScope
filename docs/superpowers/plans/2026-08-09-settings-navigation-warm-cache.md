@@ -531,6 +531,17 @@ task is unauthorized until the preceding review is GREEN.
 > independent review is waived. Any drift stops the batch. Task 2's early
 > browser check, Task 6, and Task 7 remain hard gates.
 
+> **Task 2 stop-and-amend ruling:** The exact stage-2 stream matched before
+> implementation, and the intended RED was admissible. The expanded focused
+> GREEN gate then exposed one additional pre-existing assertion owner:
+> `SettingsPostPgExitStorage.test.ts` still required the superseded
+> active-group-only directory. Task 2 therefore stopped before commit or
+> browser work. This amendment adds only that existing test file and its
+> existing node to Task 2 assertion ownership. The node name is unchanged, so
+> every reviewed full/focused identity and the global `+40/-1` ledger remain
+> byte-identical. Independent focused review of this amendment is required
+> before Task 2 resumes; Tasks 3-5 remain unstarted.
+
 ### Task 0 - Re-ground and open evidence
 
 No product/test code changes.
@@ -597,6 +608,7 @@ apps/arkscope-web/src/settings/SettingsDirectory.tsx
 apps/arkscope-web/src/settings/settings.css
 apps/arkscope-web/src/SettingsWorkspace.test.tsx
 apps/arkscope-web/src/SettingsCss.test.ts
+apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts
 ```
 
 1. Replace the superseded directory node and add the other five exact Task 2
@@ -604,7 +616,11 @@ apps/arkscope-web/src/SettingsCss.test.ts
 2. Add a Settings-only sticky wrapper/offset and complete directory rendering.
 3. Make manual-group and exact-anchor navigation two explicit post-mount
    effects. Rejected guards must schedule neither.
-4. Re-run all existing Settings workspace/CSS/registry/copy/active-mount owners.
+4. Evolve the existing
+   `post-PG-exit storage panels > uses_normal_user_outcomes_in_the_enabled_settings_directory`
+   assertion from four active-group links to the complete nine-section
+   registry order. Its node ID must not change. Re-run all existing Settings
+   workspace/CSS/registry/copy/active-mount owners.
 5. Run an early desktop/mobile browser check for sticky overlap, all nine
    entries, group-top restore, and exact anchor focus.
 6. Verify generic Tabs and frozen fixtures byte-identical; commit and stop.
