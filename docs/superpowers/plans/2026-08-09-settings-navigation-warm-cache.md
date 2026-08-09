@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** TASK 2 COMPLETE; TASKS 3-5 BATCH EXECUTION IN PROGRESS
+> **Status:** TASK 3 COMPLETE; TASKS 4-5 BATCH EXECUTION IN PROGRESS
 >
 > **Date:** 2026-08-09
 >
@@ -668,6 +668,17 @@ apps/arkscope-web/src/settings/settingsReadCache.test.ts
 > exclusion, API DTOs, and every protected byte remain unchanged. The user's
 > Tasks 1-5 batch authorization covers this bounded correction without an
 > added review wait; all technical gates remain binding.
+
+> Complete at product/test commit `462bb8af`. The seven exact nodes produced
+> `64P/7F` before product wiring and then GREEN; the Task 3/cache owner group is
+> `88/88`, the wider App/Settings/protected group is `121/121`, typecheck is
+> GREEN, and exact identities are `1113/eefdbdaa...` plus focused
+> `211/d7425506...`. The real `local:7` fixture correction is included without
+> node drift. Packet:
+> `/tmp/settings-navigation-warm-cache-task3-d4e4bc4d` (`11` payload entries,
+> manifest `77e338a2...`). The intentionally wider intermediate focused run is
+> retained as rejected `202P/9F`; Task 5 must remove those duplicate GETs by
+> joining the shared cache, not by weakening call-count owners.
 
 1. Add seven exact Task 3 nodes and prove stage-3 RED.
 2. Create one cache lazily per App root and pass it through `SettingsView`.
