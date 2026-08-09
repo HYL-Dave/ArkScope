@@ -1,11 +1,14 @@
 # OAuth Usage Recovery and Settings Sticky Inset Design
 
-> **Status:** DRAFT; USER-APPROVED DIRECTION; INDEPENDENT DESIGN RE-REVIEW
-> PENDING; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** POST-TRANCHE-B RE-GROUNDING COMPLETE; INDEPENDENT DESIGN
+> RE-REVIEW PENDING; IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-09
 >
-> **Grounding base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
+> **Product grounding base:** `e270659279cd04ab80cc33455080d14cf57677dc`
+>
+> **Closed-line handoff:** `8cf85597` is the docs-only Tranche B status
+> transition; it changes no product or test byte from `e2706592`.
 >
 > **Scope:** repair the ChatGPT account-usage launcher seam, separate local
 > cache-read failures from provider synchronization outcomes, add an explicit
@@ -188,7 +191,11 @@ after scrolling.
 
 ### 2.6 Current identity boundary
 
-These are grounding identities, not future implementation targets. The
+These are post-Tranche-B grounding identities, not future implementation
+targets. All 16 rows were re-read from exact closed-line handoff `8cf85597`;
+their normalized `path<TAB>lines<TAB>sha256` stream is
+`a15d95a129c7e12c17cd2282c9b62765e20035da285a9a09df3b2b76cd27a2fb`.
+Every row is byte-identical to the pre-Tranche-B table. The
 implementation plan must re-read them from its exact base and pre-register all
 node additions, removals, and protected paths.
 
@@ -211,13 +218,13 @@ node additions, removals, and protected paths.
 | `apps/arkscope-web/src/SettingsCss.test.ts` | 117 | `8d195d8f73c05ddce723d067a01c86abd7bda142bfa26a361fdf440278761fef` |
 | `docs/design/LLM_AUTH_DRIVER_PLAN.md` | 735 | `db798f6816c5047e266ee9c77fcce045bdec9aa53d4f3224594129af0e4d88c3` |
 
-The inherited reviewed identities are:
+The inherited reviewed identities are now:
 
-- backend collection: `4,527` nodes,
-  `4eeb117804ad874c83ffe4c04fd25ecd4de4f460801bfbf95d15c1406f32455d`;
-- backend runtime: `4,488 passed / 39 skipped / 0 failed`;
-- frontend collection: `98 files / 1,123 tests`,
-  `9262d7b15a926d7eeb60952e4c351c6c9b944772904fdb82438c62a2a51f6c1c`
+- backend collection: `4,282` nodes,
+  `281cad976a2df29224f41d7442f39ee6deb5b78165fb9efe3945bee6d520abe3`;
+- backend runtime: `4,253 passed / 29 skipped / 0 failed`;
+- frontend collection: `99 files / 1,124 tests`,
+  `da69a2942c03e4794e3384e6125936f9f25c1fafbad7d006b67025f8fd97bc39`
   decoded node stream;
 - frontend focused Settings collection: `221` tests,
   `a2c20d3607e5fd48982b4e1620089a7b59ee7346c23fc2d2709ec2935bdfe16f`
@@ -226,6 +233,35 @@ The inherited reviewed identities are:
 The plan must reproduce the complete frontend hashes from the pinned decoded
 normalizer. None of these design-time identities may be carried forward when
 the implementation base differs; they must be re-derived from exact bytes.
+
+### 2.7 Post-Tranche-B re-grounding
+
+The two existing docs-only design commits were rebased without product edits:
+
+```text
+43ae7ef9 -> feb8403d  original design
+14e360e3 -> 70f86bb9  review amendment
+```
+
+The final design file before this bounded amendment is byte-identical to
+`14e360e3` at SHA-256
+`7d1d140704e6a95b0bfe33655c87fc31d7739ce53b4701c2f8bafd44a470067c`.
+The priority-map conflict was resolved by retaining the complete Tranche B
+history and the amended OAuth entry in newest-first order.
+
+Direct collect-only runs on the rebased docs tip reproduced backend
+`4282/281cad97...` with zero test bodies and decoded frontend
+`1124/da69a294...`. The 15-file Settings projection remains exactly
+`221/a2c20d36...`. These streams are byte-identical to the independently
+reviewed Tranche B and Settings merged streams. The exact-master native report
+`252535bf...` remains the runtime authority because `e2706592..8cf85597`
+and this branch contain no product/test change; it records
+`4253 passed / 29 skipped / 0 failed`. The two fail-closed historical/current
+docs census owners pass `10/10` on the rebased design.
+
+The former `4527/4eeb1178...`, `4488/39/0`, and
+`1123/9262d7b1...` values are dated pre-Tranche-B evidence and are forbidden
+for the implementation plan. The focused Settings identity did not change.
 
 ## 3. Locked decisions
 
@@ -459,15 +495,12 @@ the user/Fable implementation side owns the RED-first plan and product edits;
 Codex performs an independent code/evidence review and does not patch the
 implementation under review unless the user explicitly changes roles.
 
-Tranche B proceeds before this repair. Its reviewed relative ledger
-(`-138/+18`) remains frozen, and rebase amendment `5be77be2` already derived
-its absolute identities against master `814ef2ed`; Task 0 then began and
-produced canonical native evidence before its no-tail owner stop. Invalidating
-that work would require a second Tranche B rebase and Task 0 replay. Therefore
-this repair remains docs-only until Tranche B is merged and closed, then this
-spec and its future implementation plan re-ground once against the resulting
-master. This sequencing ruling supersedes the pre-`5be77be2` statement that
-Tranche B would wait for this repair.
+Tranche B completed first and is LIVE COMPLETE at docs handoff `8cf85597`;
+its product cutover remains `8ebf7fae`. This bounded amendment is the promised
+single post-Tranche-B re-grounding. It changes only this spec and the decision
+log. After independent re-review returns GREEN, the user/Fable implementation
+side writes its RED-first plan against these current identities. The closed
+Tranche B product/data boundary may not be reopened or treated as repair scope.
 
 ## 4. Required RED contracts
 
@@ -625,21 +658,16 @@ Stop and amend before continuing if any of these occurs:
 
 ## 8. Review and implementation order
 
-1. Focused independent re-review of this docs-only design amendment and the
-   dated one-request Anthropic wire-shape evidence.
-2. Complete, independently review, fast-forward merge, and close Tranche B
-   from its already reviewed `5be77be2` identity base; this repair performs no
-   product edit while that line is active.
-3. Rebase this docs-only repair onto exact post-Tranche-B master, re-ground all
-   identities, and submit that bounded identity amendment for review.
-4. User/Fable writes a RED-first implementation plan with exact backend and
+1. Focused independent re-review of this post-Tranche-B docs-only re-grounding,
+   including the dated one-request Anthropic wire-shape evidence.
+2. User/Fable writes a RED-first implementation plan with exact backend and
    frontend node ledgers, current full identities, protected paths, mutation
    recipes, and live-test boundary.
-5. Independent Codex plan review.
-6. Implement Codex launcher/error typing and split frontend recovery states.
-7. Implement the explicit Anthropic adapter, source type, service dispatch,
+3. Independent Codex plan review.
+4. Implement Codex launcher/error typing and split frontend recovery states.
+5. Implement the explicit Anthropic adapter, source type, service dispatch,
    UI copy/action, and authority wording correction.
-8. Implement the Settings top-inset transfer.
-9. Run mutations, complete native/frontend/browser admission, and submit one
+6. Implement the Settings top-inset transfer.
+7. Run mutations, complete native/frontend/browser admission, and submit one
    implementation packet for independent Codex review.
-10. After GREEN, fast-forward merge and exact-master verification.
+8. After GREEN, fast-forward merge and exact-master verification.
