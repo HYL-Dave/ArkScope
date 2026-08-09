@@ -1,13 +1,15 @@
 # Scripts Tranche B Legacy Score Retirement Implementation Plan
 
-> **Status:** DRAFT FOR INDEPENDENT PLAN REVIEW; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** FULL PLAN GREEN AT REVIEWED `52354806`; ONE-TIME REBASE
+> AMENDMENT AWAITING FOCUSED REVIEW; IMPLEMENTATION NOT AUTHORIZED
 > **Date:** 2026-08-08
-> **Branch base:** `04dd9a67d75042aa078bedde1e6dbc2a68e7736a`
+> **Current branch base:** `814ef2edd1b6aa66499145e1a9109d05f5fb0d89`
 > **Reviewed inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
+> (rebased byte-equivalent commit `8c952773`)
 > **Product authority:**
 > `docs/superpowers/specs/2026-08-08-scripts-tranche-b-product-decision-design.md`
-> at reviewed commit `04dd9a67`, plus the post-approval no-tail ruling recorded
-> in this plan-gate amendment
+> at reviewed commit `04dd9a67` (rebased byte-equivalent commit `f34463df`),
+> plus the post-approval no-tail ruling recorded in this plan-gate amendment
 > **User ruling:** PD 1 through PD 8 approved as the section 8 bundle on
 > 2026-08-08. Physical score-row deletion and `config/scoring_keys.txt`
 > disposition remain separately blocked.
@@ -43,8 +45,9 @@ This plan does not authorize any of the following:
 - changing `training/` research lineage, provider-native sentiment collection,
   investor-profile risk semantics, normalized raw news, or Seeking Alpha;
 - pushing a branch; or
-- starting product edits before independent review clears this plan and the
-  current OAuth implementation gate has an explicit handoff.
+- starting product edits before independent review clears this one-time
+  absolute-identity amendment. OAuth, provider hygiene, and Settings navigation
+  have already completed their reviewed handoffs on merged `master`.
 
 The later disposition packet for score rows and the later exact-path decision
 for `config/scoring_keys.txt` are separate work. Neither may be prepared as a
@@ -61,7 +64,7 @@ suite baselines, or permission to retain a half-removed compatibility surface.
 
 RED tests are written first. The implementation then completes all five
 product phases in one unmerged worktree before canonical admission. Only the
-final `4461/c7cb78b2...` backend and `1078/de1e0c3f...` frontend identities may
+final `4407/d71b9825...` backend and `1124/da69a294...` frontend identities may
 be called GREEN. If a module dependency makes an intermediate projection
 uncollectable, stop and finish the owning atomic phase; do not add a shim merely
 to make the intermediate tree look green.
@@ -95,6 +98,42 @@ Every native stage name is single use. Inventory ordinary and ignored status,
 `data/`, `src/data`, symlinks, and toolchain identities before and after. New
 test artifacts are recorded by exact relative path and quarantined; any
 modified pre-existing file is a stop condition.
+
+### 0.5 One-time post-handoff identity rebase
+
+The full plan received independent GREEN review at pre-handoff tip `52354806`.
+After OAuth, provider hygiene, and Settings navigation merged, the four
+docs-only authority commits were rebased exactly once onto `814ef2ed`:
+
+```text
+098dff56 -> 8c952773  inventory
+04dd9a67 -> f34463df  product decision
+d1c5b5a5 -> bda76296  exact implementation plan
+52354806 -> f9958efb  no-tail amendment
+```
+
+Before this amendment, the inventory, decision, plan, and evidence files were
+byte-identical to their reviewed pre-rebase versions. Priority-map differences
+are only the expected intervening merged history plus the same Tranche B
+decision entry in newest-first order. The merged product base is exact backend
+`4527/4eeb1178...` and frontend `98 files / 1123/9262d7b1...`.
+
+The intervening reviewed lines changed backend collection by `-81/+27` and
+frontend collection by `-1/+47`. Those delta streams have zero intersection
+with the frozen Tranche B retirement and addition streams. All 138 retired IDs
+still occur exactly once; all 18 backend additions and the one frontend
+addition remain absent. Therefore only absolute full/projection identities and
+native arithmetic are re-derived below. Relative `+18/-138`, frontend `+1/-0`,
+all node names, focused identities, phase partitions, product decisions,
+protected boundaries, mutations, and destructive non-authorizations are frozen.
+
+The product-decision document changes only its status and completed-handoff
+sequence; PD 1-PD 8 are unchanged. Its amendment identity is `411 lines /
+19,689 bytes / 0b5512e65abc851d5244c1065e2b8b82e3cf92be690b19032a39125670a61cfe`
+(Git blob `51acdf559dcbb44ae01a52c14d583d826fbd0c97`).
+
+The old `4581 -> 4461` backend and `1077 -> 1078` frontend identities are dated
+pre-handoff evidence only and are forbidden for admission after this amendment.
 
 ## 1. Owned and protected paths
 
@@ -213,11 +252,11 @@ newline. They are derived from the deterministic reporter, never terminal prose.
 
 | State | Nodes | SHA-256 |
 |---|---:|---|
-| reviewed base | 4,581 | `6e4994bb664501cff75cb06dbad18db82ba68cbbe4b2b26c4d480250d7c4699f` |
-| RED tests added, old nodes retained | 4,599 | `ae382261eddb2b9bbe02e8c15ca2acc48a23a99745d910a28aba8f4ac7e3059b` |
-| final target | 4,461 | `c7cb78b222952e9c1b5b3e18abcf413a14875a84ef7bc01d55ef500d939a74f9` |
+| rebased reviewed base | 4,527 | `4eeb117804ad874c83ffe4c04fd25ecd4de4f460801bfbf95d15c1406f32455d` |
+| RED tests added, old nodes retained | 4,545 | `e1fa3f7d54d671c984e9800e38850ccb802f06f83d78aa2114b749bb7414f9da` |
+| final target | 4,407 | `d71b9825e727fd7ccac43b79ebb904144a48a9acc66b75ccae002471822ac8bc` |
 
-Arithmetic: `4581 + 18 - 138 = 4461`. The 138-node retired stream is
+Arithmetic: `4527 + 18 - 138 = 4407`. The 138-node retired stream is
 `b48b161d573afb37496763c0afe388c2421f06e35eb5cd7de959ba5778c05254`.
 The 18-node addition stream is
 `88ac9e5652c9df79eb42284d6a9c42a2f0f4a60b967badae37524fa127499520`.
@@ -290,7 +329,7 @@ Two retired nodes are canonical skips in the blank environment:
   when the empty fixture emits no factors.
 
 This was directly reproduced as `2 skipped`; therefore the final native target
-is `4391 passed / 70 skipped / 0 failed`, not an inferred pass total.
+is `4370 passed / 37 skipped / 0 failed`, not an inferred pass total.
 
 ### 2.4 New backend nodes
 
@@ -333,11 +372,11 @@ must be independently reproducible. They do not authorize intermediate merge.
 
 | Projection | Nodes | SHA-256 | Delta from prior |
 |---|---:|---|---|
-| storage/writer/root | 4,537 | `e2a744b8fdcb9cadcaa1a9e68f050805faf36b5e7beae1d033d889a71e2f44af` | `+2/-46` |
-| raw DTO/backend | 4,498 | `55b26b2ea092a378f04eb8f64de248e7c74364544ec1ab00eee2c29fb157324c` | `+4/-43` |
-| raw user behavior | 4,498 | `d6a0793368c7cc68b81bb96863028b46db4cbd3dc6200977b7ec8621d5fda2ba` | `+1/-1` |
-| volume/event/composite | 4,458 | `3896c617ca5594b30a644bd8cf61f96eea39ba753cf1858049121c626dfc469b` | `+5/-45` |
-| model/API/authority/census final | 4,461 | `c7cb78b222952e9c1b5b3e18abcf413a14875a84ef7bc01d55ef500d939a74f9` | `+6/-3` |
+| storage/writer/root | 4,483 | `a00d996aa45fda19e0a9a473fb2767310b98daf5d2ab8ad1c72754c3b2a080f1` | `+2/-46` |
+| raw DTO/backend | 4,444 | `e71c3b0cfe25931558fe4d01b81fd7a0c653b002c7aa506ace66581b4b0ff458` | `+4/-43` |
+| raw user behavior | 4,444 | `d2dd1b144e3923a60672c23e2f8f8ac9f42c1a42445235b47e83a90d1a51a99e` | `+1/-1` |
+| volume/event/composite | 4,404 | `ebc5563c5d408bf83dd14f643d6a5ffd082f1b02d5159485fdb1e0b2ef00c7a9` | `+5/-45` |
+| model/API/authority/census final | 4,407 | `d71b9825e727fd7ccac43b79ebb904144a48a9acc66b75ccae002471822ac8bc` | `+6/-3` |
 
 ### 2.6 Backend focused identities
 
@@ -354,8 +393,8 @@ terminal output, `jq @tsv`, or prose parsing is not an identity authority.
 
 | State | Files / nodes | SHA-256 |
 |---|---:|---|
-| full base | `97 / 1077` | `3f5e9f5bbe88d5ac48015a8c9e9d669dcd649a53a2ac868fc8a98d21f8d7e4eb` |
-| full target | `98 / 1078` | `de1e0c3fccb1fad3574a5089f76164791895e7c5a70bb4a2ce578b38b30d4192` |
+| full base | `98 / 1123` | `9262d7b15a926d7eeb60952e4c351c6c9b944772904fdb82438c62a2a51f6c1c` |
+| full target | `99 / 1124` | `da69a2942c03e4794e3384e6125936f9f25c1fafbad7d006b67025f8fd97bc39` |
 | focused base | `3 / 27` | `c77d25d5bf7c868899d555f099fc245b13d35d4052a6a8242ac3f5c1300fb584` |
 | focused target | `4 / 28` | `b11cc27b90c570b20aeb728c48d39497e7eff555976f0c00a42d6129b26cf1cd` |
 
@@ -471,8 +510,8 @@ Imports of future symbols must occur inside test bodies or use explicit
 fail for its intended missing/legacy contract. SQLite setup errors, missing
 empty `data/`, fixture import errors, or unavailable test tooling are wrong RED.
 
-The RED collection identities are `4599/ae382261...`,
-`573/5e0a5538...`, and frontend `1078/de1e0c3f...`. Runtime RED evidence names
+The RED collection identities are `4545/e1fa3f7d...`,
+`573/5e0a5538...`, and frontend `1124/da69a294...`. Runtime RED evidence names
 each node and expected assertion. A broad static grep alone is not sufficient
 for behavior contracts.
 
@@ -503,8 +542,9 @@ for each mutation is forbidden because it adds cost without discrimination.
 
 ### Task 0 - Re-ground identities and protected state
 
-1. Verify branch ancestry from `72576991` through `04dd9a67`; verify this plan,
-   authority, evidence, and priority entry are the only plan-gate changes.
+1. Verify branch ancestry from current base `814ef2ed` through rebased authority
+   tip `f9958efb`; verify the one-time mapping in section 0.5 and require that
+   this plan, evidence, and priority entry are the only amendment changes.
 2. Verify all pinned assets in section 0.4 by full SHA, not prefix matching.
 3. Collect backend full/focused base streams and frontend full/focused base
    streams. Require exact section 2 identities.
@@ -513,7 +553,7 @@ for each mutation is forbidden because it adds cost without discrimination.
 5. Run the backend focused base suite and the current frontend focused suite.
    Any non-passing node stops the line.
 6. Run native canonical base admission under section 0.4 and require
-   `4581 seen / 4509 passed / 72 skipped / 0 failed`.
+   `4527 seen / 4488 passed / 39 skipped / 0 failed`.
 7. In read-only SQLite URI mode plus `PRAGMA query_only=ON`, record table
    existence, exact current score-row count, min/max article date and scored-at,
    and DB identity. The reviewed 491,808 count is a dated expectation, not a
@@ -569,8 +609,8 @@ Complete all five phases before any claim of GREEN:
 
 During these phases, reconstruct each projected node stream in section 2.5 from
 the ledger. Do not treat an intermediate projection as a test baseline. At the
-end require exact backend `4461/c7cb78b2...`, focused `435/2e5fcb6c...`,
-frontend `98/1078/de1e0c3f...`, and focused frontend `4/28/b11cc27b...`.
+end require exact backend `4407/d71b9825...`, focused `435/2e5fcb6c...`,
+frontend `99/1124/da69a294...`, and focused frontend `4/28/b11cc27b...`.
 
 The runtime census must be structured and fail closed. Every discovered
 consumer/writer/current-authority path receives exactly one disposition:
@@ -586,7 +626,7 @@ No production data or secret byte belongs in the commit.
 
 1. Run the 435-node backend focused suite. Existing allowed skips must be named;
    all other nodes pass.
-2. Run frontend focused `28/28`, full Vitest `1078/1078`, typecheck, build, and
+2. Run frontend focused `28/28`, full Vitest `1124/1124`, typecheck, build, and
    the current i18n scanner.
 3. Run existing raw-news, normalized-news, Seeking Alpha, provider-native
    sentiment, investor-risk, EvidencePacket, profile, and monitor protection
@@ -602,11 +642,11 @@ No production data or secret byte belongs in the commit.
 
 1. Create a fresh exact-tip detached worktree with the section 0.4 boundary.
 2. Run the wakeup probe in that same native context.
-3. Collect exact backend target `4461/c7cb78b2...` and frontend target
-   `1078/de1e0c3f...` before runtime.
-4. Run the native suite through the pinned wrapper/reporter. Require all 4,461
+3. Collect exact backend target `4407/d71b9825...` and frontend target
+   `1124/da69a294...` before runtime.
+4. Run the native suite through the pinned wrapper/reporter. Require all 4,407
    collected nodes seen, empty non-passing stream, exit zero, and
-   `4391 passed / 70 skipped / 0 failed`.
+   `4370 passed / 37 skipped / 0 failed`.
 5. Record every generated path, quarantine exact paths, and restore pre-run
    ordinary/ignored/data/src-data/symlink/toolchain boundaries byte-for-byte.
 6. Prove protected-path manifests and production read-only witnesses unchanged.
@@ -698,8 +738,8 @@ Stop immediately and amend/review before continuing if any of these occurs:
 The product cutover is complete only when:
 
 - PD 1-8 behavior is live from merged master;
-- backend is exactly `4461/c7cb78b2...`, frontend exactly
-  `1078/de1e0c3f...`, and native admission is `4391/70/0`;
+- backend is exactly `4407/d71b9825...`, frontend exactly
+  `1124/da69a294...`, and native admission is `4370/37/0`;
 - no runtime reader/writer/model-visible/current-authority path exposes the old
   score or composite semantic;
 - `src/signals/` and `src/tools/signal_tools.py` are physically absent, their

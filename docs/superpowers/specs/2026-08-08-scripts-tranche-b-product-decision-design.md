@@ -1,6 +1,7 @@
 # Scripts Tranche B Legacy Score Product Decision
 
-> **Status:** PRODUCT DECISION APPROVED; IMPLEMENTATION PLAN WRITTEN FOR INDEPENDENT REVIEW
+> **Status:** PRODUCT DECISION APPROVED; FULL IMPLEMENTATION PLAN GREEN;
+> ONE-TIME IDENTITY REBASE AMENDMENT REVIEW PENDING
 > **Date:** 2026-08-08
 > **Base inventory:** `098dff564faea1fc2617e198414ccde6067f23f8`
 > **Scope:** Per-surface disposition of the frozen 1-5 news score contract and
@@ -394,13 +395,16 @@ part of the product implementation.
 
 ## 9. Sequence after approval
 
-1. OAuth lifecycle/quota implementation remains the active implementation line.
-2. After independent review and explicit product approval, write the exact
-   Tranche B RED-first implementation plan and node/disposition ledger.
-3. Settings navigation/warm-cache may land before Tranche B implementation, but
-   it must not add or cache legacy score data.
+1. OAuth lifecycle/quota, provider hygiene, and Settings navigation/warm-cache
+   are merged and independently closed without adding or caching legacy score
+   data.
+2. The exact Tranche B RED-first plan and relative node/disposition ledger are
+   independently GREEN. Its one-time post-handoff absolute-identity amendment
+   requires focused review before Task 0 or product edits.
+3. After that review, execute the reviewed Task 0 and atomic product cutover
+   gates without compatibility tails.
 4. Merge and verify Tranche B product cutover before any destructive manifest.
-5. Build/review/approve physical score-row research-use/deletion and secret
+5. Build, review, and approve physical score-row research-use/deletion and secret
    disposition separately; no row may remain connected to runtime.
 
 Calendar-aware market scheduling, Financial Datasets metered policy, and future
