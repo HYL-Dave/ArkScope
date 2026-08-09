@@ -651,7 +651,23 @@ apps/arkscope-web/src/Settings.tsx
 apps/arkscope-web/src/AppShell.test.tsx
 apps/arkscope-web/src/SettingsModelRouting.test.ts
 apps/arkscope-web/src/SettingsWorkspace.test.tsx
+apps/arkscope-web/src/settings/settingsReadCache.ts
+apps/arkscope-web/src/settings/settingsReadCache.test.ts
 ```
+
+> **Bounded Task 3 integration amendment:** Wiring the reviewed idle account
+> warmup against the real credential DTO exposed that stored credential IDs
+> are `local:<positive-int>`, while Task 1's key validator rejected every
+> colon. Synthetic `local-oauth` passed the cache-only probe but could not
+> exercise the product shape. Task 3 therefore also owns the existing cache
+> validator and its existing
+> `idle_warmup_primes_account_usage_only_from_validated_active_OAuth_local_ids`
+> node: accept only the exact stored-local-ID shape when a colon is present and
+> replace the synthetic fixture with `local:7`. No test node is added, removed,
+> renamed, or skipped; stage `1113/211`, global `+40/-1`, cache bounds, secret
+> exclusion, API DTOs, and every protected byte remain unchanged. The user's
+> Tasks 1-5 batch authorization covers this bounded correction without an
+> added review wait; all technical gates remain binding.
 
 1. Add seven exact Task 3 nodes and prove stage-3 RED.
 2. Create one cache lazily per App root and pass it through `SettingsView`.
