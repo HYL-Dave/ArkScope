@@ -710,6 +710,13 @@ cache, create another App-lifetime owner, or otherwise change Settings
 behavior. This amendment changes no test node, staged identity, or `+3/-0`
 Task 4 ledger.
 
+> Complete at product/test commit `bbf81adb`. Exact RED was `15P/3F`; the
+> Provider owner is `18/18`, the cross-handoff regression is `106/106`, and
+> typecheck is GREEN. Full/focused identities are exact
+> `1116/09d31fa1...` and `214/d44260d5...`. Raw packet:
+> `/tmp/settings-navigation-warm-cache-task4-bbf81adb` (`10` entries,
+> manifest `307db954...`).
+
 1. Add three exact Task 4 nodes and prove stage-4 RED.
 2. Replace Provider-local snapshot retention/generation maps with the shared
    exact account key. Keep component display state, existing credential-bound
