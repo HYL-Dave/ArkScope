@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** TASK 6 COMPLETE; INDEPENDENT IMPLEMENTATION REVIEW PENDING; TASK 7 NOT STARTED
+> **Status:** TASK 7 MERGED AND EXACT-MASTER VERIFIED; FOCUSED CLOSEOUT REVIEW PENDING
 >
 > **Date:** 2026-08-09
 >
@@ -829,14 +829,29 @@ No feature expansion is allowed.
 
 Only after independent Task 6 GREEN:
 
+> Independent Task 6 review returned GREEN at `cd216665`. Master then
+> fast-forwarded from `3d18e9c0` through 20 linear commits and zero merge
+> commits to `SETTINGS_NAVIGATION_WARM_CACHE_CUTOVER_TIP=cd216665`; origin was
+> not pushed. A fresh detached exact-master tree reproduced frontend
+> `1123/9262d7b1...` and focused `221/a2c20d36...`, runtime `1123/1123` plus
+> `221/221`, typecheck/build/scanner, ten protected rows, all 597
+> Python/backend bytes, backend collect-only `4527/4eeb1178...`, and both
+> browser viewports. The run's 536 generated entries under 32 roots were
+> manifested and removed, restoring the verifier exactly; the detached tree
+> and registration were then removed. Raw packet:
+> `/tmp/settings-navigation-warm-cache-task7-merged-cd216665` (`80` payload
+> entries, manifest `0cdd8236...`). This docs-only closeout now stops for
+> focused review. The line is not yet declared LIVE COMPLETE, and Tranche B
+> identity re-derivation remains unauthorized until that review is GREEN.
+
 1. prove product base/design/implementation ancestry and a clean main tree;
 2. fast-forward merge only; do not push;
 3. use a fresh exact-master worktree and new artifact names to rerun final
    collection, focused/full Vitest, typecheck/build/scanner, protected bytes,
    backend collect-only identity, and browser matrix;
-4. commit docs-only closeout after independent focused review; and
-5. only then re-derive Tranche B's absolute identities once. Its reviewed
-   relative `-138/+18` ledger is not changed by this slice.
+4. commit docs-only closeout and stop for independent focused review; and
+5. only after that review is GREEN, re-derive Tranche B's absolute identities
+   once. Its reviewed relative `-138/+18` ledger is not changed by this slice.
 
 ---
 
