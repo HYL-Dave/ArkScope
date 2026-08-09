@@ -1,9 +1,29 @@
 .settings-workspace {
+  --settings-sticky-offset: calc(var(--control-height-default) + var(--space-2));
+
   min-width: 0;
 }
 
 .settings-workflow-tabs {
   min-width: 0;
+}
+
+.settings-workflow-tabs > .ui-tab-list {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  width: 100%;
+  max-width: 100%;
+  height: var(--settings-sticky-offset);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--bg);
+  overscroll-behavior-inline: contain;
+}
+
+.settings-workflow-tabs > .ui-tab-list > .ui-tab {
+  flex: 0 0 auto;
 }
 
 .settings-workspace-layout {
@@ -15,9 +35,9 @@
 
 .settings-directory-rail {
   position: sticky;
-  top: var(--space-4);
+  top: var(--settings-sticky-offset);
   min-width: 0;
-  max-height: calc(100vh - var(--space-8));
+  max-height: calc(100vh - var(--settings-sticky-offset) - var(--space-4));
   overflow: auto;
 }
 
@@ -182,7 +202,7 @@
   min-width: 0;
   padding: var(--space-4) 0;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  scroll-margin-top: var(--space-8);
+  scroll-margin-top: var(--settings-sticky-offset);
 }
 
 .settings-section-anchor > :first-child {

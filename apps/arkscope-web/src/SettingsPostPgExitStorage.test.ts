@@ -290,6 +290,11 @@ describe("post-PG-exit storage panels", () => {
     const directory = host!.querySelector('nav[aria-label="設定目錄"]');
     expect(Array.from(directory!.querySelectorAll("button")).map((button) => button.textContent?.trim()))
       .toEqual([
+        "Provider 登入與憑證",
+        "模型與任務路由",
+        "固定 AI 任務執行限制",
+        "AI 研究執行限制",
+        "投資人設定",
         "資料來源與排程",
         "市場資料",
         "新聞資料",

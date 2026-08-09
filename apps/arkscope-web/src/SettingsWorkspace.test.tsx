@@ -610,12 +610,20 @@ describe("Settings workspace", () => {
     expect(host!.querySelector('[data-settings-anchor="providers"]')).toBeNull();
   });
 
-  it("searches_all_groups_while_empty_directory_stays_in_active_group", async () => {
+  it("searches_all_groups_and_empty_directory_lists_all_nine_sections", async () => {
     await renderSettings();
     const directory = host!.querySelector('nav[aria-label="設定目錄"]')!;
 
+    expect(Array.from(directory.querySelectorAll(".settings-directory-group > p"))
+      .map((node) => node.textContent?.trim())).toEqual([
+        "AI 與模型",
+        "個人化",
+        "資料與同步",
+      ]);
+    expect(directory.querySelectorAll(".settings-directory-links button")).toHaveLength(9);
     expect(directory.textContent).toContain("Provider 登入與憑證");
-    expect(directory.textContent).not.toContain("總經資料");
+    expect(directory.textContent).toContain("投資人設定");
+    expect(directory.textContent).toContain("總經資料");
     await setSearch("FRED");
     expect(Array.from(directory.querySelectorAll("button")).map((node) => node.textContent?.trim()))
       .toEqual(["總經資料"]);
@@ -623,6 +631,45 @@ describe("Settings workspace", () => {
 
     await setSearch("OAuth");
     expect(directory.textContent).toContain("Provider 登入與憑證");
+  });
+
+  it("manual_tab_switch_restores_group_top_without_stealing_selected_tab_focus", async () => {
+    await renderSettings();
+    const scrollOwner = host!.querySelector<HTMLElement>("main.settings-workspace")!;
+    scrollOwner.scrollTop = 640;
+
+    await click(tabWithText("資料與同步"));
+
+    expect(scrollOwner.scrollTop).toBe(0);
+    expect(document.activeElement).toBe(tabWithText("資料與同步"));
+    expect(host!.querySelector('[data-settings-anchor="data_sources"]')).not.toBeNull();
+  });
+
+  it("confirmed_dirty_discard_restores_new_group_top_and_selected_tab_focus", async () => {
+    await renderSettings();
+    const scrollOwner = host!.querySelector<HTMLElement>("main.settings-workspace")!;
+    scrollOwner.scrollTop = 720;
+    await click(buttonWithText("標記 Provider 草稿", host!));
+
+    await click(tabWithText("資料與同步"));
+    expect(scrollOwner.scrollTop).toBe(720);
+    await click(buttonWithText("捨棄變更並離開", document.querySelector('[role="dialog"]')!));
+
+    expect(scrollOwner.scrollTop).toBe(0);
+    expect(document.activeElement).toBe(tabWithText("資料與同步"));
+  });
+
+  it("busy_rejection_preserves_group_scroll_and_selected_tab_focus", async () => {
+    await renderSettings();
+    const scrollOwner = host!.querySelector<HTMLElement>("main.settings-workspace")!;
+    scrollOwner.scrollTop = 480;
+    await click(buttonWithText("開始 Provider 授權", host!));
+
+    await click(tabWithText("資料與同步"));
+
+    expect(scrollOwner.scrollTop).toBe(480);
+    expect(tabWithText("AI 與模型").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tabWithText("AI 與模型"));
   });
 
   it("selecting_cross_group_result_mounts_group_then_focuses_exact_anchor", async () => {

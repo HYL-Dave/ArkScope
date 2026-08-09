@@ -68,6 +68,32 @@ describe("Settings workspace CSS contract", () => {
     expect(settingsCss).toContain(".settings-workflow-tabs");
   });
 
+  it("keeps_settings_tabs_sticky_nonwrapping_and_horizontally_bounded", () => {
+    const workspace = ruleBody(".settings-workspace");
+    const tabList = ruleBody(".settings-workflow-tabs > .ui-tab-list");
+
+    expect(workspace).toMatch(/--settings-sticky-offset:\s*[^;]+/);
+    expect(tabList).toMatch(/position:\s*sticky/);
+    expect(tabList).toMatch(/top:\s*0/);
+    expect(tabList).toMatch(/z-index:\s*\d+/);
+    expect(tabList).toMatch(/background:\s*var\(--bg\)/);
+    expect(tabList).toMatch(/height:\s*var\(--settings-sticky-offset\)/);
+    expect(tabList).toMatch(/flex-wrap:\s*nowrap/);
+    expect(tabList).toMatch(/overflow-x:\s*auto/);
+    expect(tabList).toMatch(/overflow-y:\s*hidden/);
+  });
+
+  it("shares_one_sticky_offset_with_directory_and_section_anchors", () => {
+    const directoryRail = ruleBody(".settings-directory-rail");
+    const sectionAnchor = ruleBody(".settings-section-anchor");
+
+    expect(directoryRail).toMatch(/top:\s*var\(--settings-sticky-offset\)/);
+    expect(directoryRail).toMatch(
+      /max-height:\s*calc\(100vh\s*-\s*var\(--settings-sticky-offset\)\s*-\s*var\(--space-4\)\)/,
+    );
+    expect(sectionAnchor).toMatch(/scroll-margin-top:\s*var\(--settings-sticky-offset\)/);
+  });
+
   it("defines_every_literal_class_in_extracted_settings_modules", () => {
     const classes = [...new Set(settingsSourcePaths.flatMap((path) =>
       literalClasses(readFileSync(path, "utf8"))))];

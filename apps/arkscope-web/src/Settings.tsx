@@ -250,6 +250,7 @@ export function SettingsView({
   const [directoryQuery, setDirectoryQuery] = useState("");
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [pendingReveal, setPendingReveal] = useState<SettingsAnchorId | null>(null);
+  const [pendingGroupTop, setPendingGroupTop] = useState<SettingsGroupId | null>(null);
   const [pendingIntent, setPendingIntent] = useState<SettingsNavigationIntent | null>(null);
   const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
   const [providerGuard, setProviderGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -262,6 +263,7 @@ export function SettingsView({
   const consumedNavigationSequenceRef = useRef(0);
   const investorSummarySequenceRef = useRef(0);
   const investorPendingRevealSequenceRef = useRef<number | null>(null);
+  const settingsScrollOwnerRef = useRef<HTMLElement>(null);
   const directoryTriggerRef = useRef<HTMLButtonElement>(null);
   const aiModelsTabRef = useRef<HTMLButtonElement>(null);
   const personalizationTabRef = useRef<HTMLButtonElement>(null);
@@ -292,7 +294,13 @@ export function SettingsView({
     writeActiveSettingsGroup(intent.group);
     setSection(intent.anchor);
     setDirectoryOpen(false);
-    setPendingReveal(intent.kind === "exact_anchor" ? intent.anchor : null);
+    if (intent.kind === "exact_anchor") {
+      setPendingGroupTop(null);
+      setPendingReveal(intent.anchor);
+    } else {
+      setPendingReveal(null);
+      setPendingGroupTop(intent.group);
+    }
     setBlockedNotice(null);
   }, []);
 
@@ -327,7 +335,6 @@ export function SettingsView({
   ]);
 
   const requestSettingsNavigation = useCallback((intent: SettingsNavigationIntent): boolean => {
-    if (intent.kind === "manual_group") setPendingReveal(null);
     if (intent.group === activeGroup) {
       applySettingsIntent(intent);
       return true;
@@ -366,6 +373,16 @@ export function SettingsView({
       setPendingReveal((current) => current === "investor_profile" ? null : current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!pendingGroupTop || pendingGroupTop !== activeGroup) return;
+    const scrollOwner = settingsScrollOwnerRef.current;
+    const selectedTab = tabRefFor(pendingGroupTop).current;
+    if (!scrollOwner || !selectedTab) return;
+    scrollOwner.scrollTop = 0;
+    selectedTab.focus({ preventScroll: true });
+    setPendingGroupTop((current) => (current === pendingGroupTop ? null : current));
+  }, [activeGroup, pendingGroupTop, tabRefFor]);
 
   useEffect(() => {
     if (!pendingReveal) return undefined;
@@ -878,7 +895,6 @@ export function SettingsView({
     <SettingsDirectory
       query={directoryQuery}
       currentTarget={section}
-      activeGroup={activeGroup}
       onQueryChange={setDirectoryQuery}
       onSelect={revealSection}
     />
@@ -910,7 +926,11 @@ export function SettingsView({
   const runtimeDiagnostic = runtimeOutcomeDiagnostic(runtimeOutcome);
 
   return (
-    <main className="main settings-workspace" data-settings-overlay={String(shellOverlay)}>
+    <main
+      ref={settingsScrollOwnerRef}
+      className="main settings-workspace"
+      data-settings-overlay={String(shellOverlay)}
+    >
       <PageHeader
         title={t(($) => $.workspace.title)}
         actions={<LocaleSelector />}

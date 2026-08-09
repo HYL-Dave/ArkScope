@@ -6,27 +6,25 @@ import { settingsGroupLabel, settingsSectionCopy } from "./settingsCopy";
 import {
   SETTINGS_GROUPS,
   searchSettings,
-  settingsGroup,
   type SettingsAnchorId,
-  type SettingsGroupId,
 } from "./settingsRegistry";
 
 export function SettingsDirectory({
   query,
   currentTarget,
-  activeGroup,
   onQueryChange,
   onSelect,
 }: {
   query: string;
   currentTarget: SettingsAnchorId;
-  activeGroup: SettingsGroupId;
   onQueryChange: (query: string) => void;
   onSelect: (id: SettingsAnchorId) => void;
 }) {
   const { t } = useTranslation("settings");
   const normalizedQuery = query.normalize("NFKC").trim();
-  const matches = normalizedQuery ? searchSettings(query) : settingsGroup(activeGroup).sections;
+  const matches = normalizedQuery
+    ? searchSettings(query)
+    : SETTINGS_GROUPS.flatMap((group) => group.sections);
   const matchIds = new Set(matches.map((section) => section.id));
 
   return (
