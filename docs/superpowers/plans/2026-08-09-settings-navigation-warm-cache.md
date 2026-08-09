@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** TASK 1 COMPLETE; TASKS 2-5 BATCH EXECUTION AUTHORIZED
+> **Status:** TASK 2 COMPLETE; TASKS 3-5 BATCH EXECUTION IN PROGRESS
 >
 > **Date:** 2026-08-09
 >
@@ -541,6 +541,13 @@ task is unauthorized until the preceding review is GREEN.
 > every reviewed full/focused identity and the global `+40/-1` ledger remain
 > byte-identical. Independent focused review of this amendment is required
 > before Task 2 resumes; Tasks 3-5 remain unstarted.
+>
+> **Batch-authorization clarification:** The preceding extra review wait was an
+> over-conservative interpretation. The user clarified that the existing
+> Tasks 1-5 batch authorization already covers this bounded assertion-owner
+> correction. That clarification waives only the added wait; the stop record,
+> scoped amendment, exact stage identities, full focused rerun, early browser
+> gate, product/docs commit pair, and all later stop conditions remain binding.
 
 ### Task 0 - Re-ground and open evidence
 
@@ -610,6 +617,15 @@ apps/arkscope-web/src/SettingsWorkspace.test.tsx
 apps/arkscope-web/src/SettingsCss.test.ts
 apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts
 ```
+
+> Complete at product/test commit `ecf87f0c`. Stage 2 reproduced exact
+> `1106/10965b1c...` and focused `204/e34c217e...`; direct owners ended
+> `45/45`, the complete focused set ended `204/204`, typecheck and all ten
+> protected rows are GREEN, and the hermetic desktop/mobile browser gate found
+> no sticky overlap, clipping, horizontal overflow, inactive panel retention,
+> or focus/scroll error. Raw packet:
+> `/tmp/settings-navigation-warm-cache-task2-4745b359` (`17` entries,
+> manifest `73f1a4cd...`).
 
 1. Replace the superseded directory node and add the other five exact Task 2
    nodes. Require stage-2 identity and admissible RED.
