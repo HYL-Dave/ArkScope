@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog, ModelTask, NewsStatus, TaskRoute } from "./api";
 import { formatSystemTimestamp } from "./timeDisplay";
+import { createSettingsReadCache, type SettingsReadCache } from "./settings/settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -98,7 +99,10 @@ async function flush() {
   });
 }
 
-async function renderNewsSection(developerMode = false) {
+async function renderNewsSection(
+  developerMode = false,
+  settingsReadCache: SettingsReadCache = createSettingsReadCache(),
+) {
   window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
   document.body.append(host);
@@ -108,6 +112,7 @@ async function renderNewsSection(developerMode = false) {
       runtime: null,
       developerMode,
       onRuntimeChanged: vi.fn(),
+      settingsReadCache,
     })));
   });
   await flush();
@@ -127,6 +132,33 @@ afterEach(() => {
 });
 
 describe("SettingsView news storage copy", () => {
+  it("renders_cached_news_status_while_one_stale_refresh_runs", async () => {
+    const now = Date.parse("2026-08-09T02:00:00Z");
+    const cache = createSettingsReadCache({ clock: () => now });
+    const retained = newsStatus({
+      news: { row_count: 10, source_count: 2, latest_published: "2026-08-08T02:00:00Z" },
+    });
+    const refreshed = newsStatus({
+      news: { row_count: 17, source_count: 3, latest_published: "2026-08-09T01:00:00Z" },
+    });
+    cache.replace("news_status", retained, now - 120_000);
+    let resolveRefresh!: (value: NewsStatus) => void;
+    vi.mocked(getNewsStatus).mockReturnValueOnce(new Promise((resolve) => {
+      resolveRefresh = resolve;
+    }));
+
+    await renderNewsSection(false, cache);
+    expect(host!.textContent).toContain("10 篇 · 2 來源");
+    expect(getNewsStatus).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      resolveRefresh(refreshed);
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("17 篇 · 3 來源");
+    expect(getNewsStatus).toHaveBeenCalledOnce();
+  });
+
   it("renders_normal_news_status_without_migration_narration", async () => {
     mocked.newsStatus = newsStatus();
     await renderNewsSection();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
@@ -24,6 +24,10 @@ import { Button } from "../ui/Button";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { settingsErrorPresentation } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
+import {
+  tradingDayCoverageKey,
+  type SettingsReadCache,
+} from "./settingsReadCache";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
@@ -65,24 +69,34 @@ function coverageDeveloperDiagnostics(coverage: TradingDayCoverage): string[] {
 
 export function DataStorageSection({
   developerMode = false,
+  settingsReadCache,
 }: {
   developerMode?: boolean;
+  settingsReadCache: SettingsReadCache;
 }) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
-  const [status, setStatus] = useState<MarketDataStatus | null>(null);
+  const [status, setStatus] = useState<MarketDataStatus | null>(() => {
+    const inspected = settingsReadCache.inspect<MarketDataStatus>("market_data_status");
+    return inspected.status === "missing" ? null : inspected.value;
+  });
   const [err, setErr] = useState<Error | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setStatus(await getMarketDataStatus());
+  const load = useCallback(async (force = false) => {
+    const result = await settingsReadCache.load(
+      "market_data_status",
+      getMarketDataStatus,
+      { force },
+    );
+    if (result.status === "success") {
+      setStatus(result.value);
       setErr(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e : new Error(String(e)));
+    } else if (result.status === "error") {
+      setErr(result.error instanceof Error ? result.error : new Error(String(result.error)));
     }
-  }, []);
+  }, [settingsReadCache]);
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
   const exists = status?.exists ?? false;
@@ -99,7 +113,7 @@ export function DataStorageSection({
           <h2>{t(($) => $.dataStorage.title)}</h2>
           <p className="muted tiny">{t(($) => $.dataStorage.description)}</p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()}>
+        <button className="btn-ghost" onClick={() => void load(true)}>
           ↻ {t(($) => $.actions.refresh)}
         </button>
       </div>
@@ -158,7 +172,10 @@ export function DataStorageSection({
         </div>
       )}
 
-      <TradingDayCoveragePanel developerMode={developerMode} />
+      <TradingDayCoveragePanel
+        developerMode={developerMode}
+        settingsReadCache={settingsReadCache}
+      />
     </div>
   );
 }
@@ -168,28 +185,45 @@ function coverageToneColor(tone: "ok" | "warn" | "muted" | "bad"): string {
     : tone === "warn" ? "var(--warn, #b8860b)" : "var(--muted, #888)";
 }
 
-function TradingDayCoveragePanel({ developerMode }: { developerMode: boolean }) {
+function TradingDayCoveragePanel({
+  developerMode,
+  settingsReadCache,
+}: {
+  developerMode: boolean;
+  settingsReadCache: SettingsReadCache;
+}) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
-  const [cov, setCov] = useState<TradingDayCoverage | null>(null);
+  const [cov, setCov] = useState<TradingDayCoverage | null>(() => {
+    const inspected = settingsReadCache.inspect<TradingDayCoverage>(tradingDayCoverageKey(10));
+    return inspected.status === "missing" ? null : inspected.value;
+  });
   const [err, setErr] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [lookback, setLookback] = useState(10);
+  const requestSequenceRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    const sequence = ++requestSequenceRef.current;
+    const requestedLookback = lookback;
     setBusy(true);
-    try {
-      setCov(await getTradingDayCoverage(lookback, "15min"));
+    const result = await settingsReadCache.load(
+      tradingDayCoverageKey(requestedLookback),
+      () => getTradingDayCoverage(requestedLookback, "15min"),
+      { force },
+    );
+    if (sequence !== requestSequenceRef.current) return;
+    if (result.status === "success") {
+      setCov(result.value);
       setErr(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e : new Error(String(e)));
-    } finally {
-      setBusy(false);
+    } else if (result.status === "error") {
+      setErr(result.error instanceof Error ? result.error : new Error(String(result.error)));
     }
-  }, [lookback]);
+    setBusy(false);
+  }, [lookback, settingsReadCache]);
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
   const calendarHealthLabels = cov
@@ -223,14 +257,25 @@ function TradingDayCoveragePanel({ developerMode }: { developerMode: boolean }) 
             <select
               value={lookback}
               disabled={busy}
-              onChange={(e) => setLookback(Number(e.target.value))}
+              onChange={(e) => {
+                const nextLookback = Number(e.target.value);
+                const inspected = settingsReadCache.inspect<TradingDayCoverage>(
+                  tradingDayCoverageKey(nextLookback),
+                );
+                requestSequenceRef.current += 1;
+                setLookback(nextLookback);
+                setCov(inspected.status === "missing" ? null : inspected.value);
+                setErr(null);
+                setBusy(false);
+                setExpanded(null);
+              }}
             >
               {[10, 15, 30, 60].map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
           </label>
-          <button className="btn-ghost" onClick={() => void load()} disabled={busy}>
+          <button className="btn-ghost" onClick={() => void load(true)} disabled={busy}>
             ↻ {t(($) => $.actions.refresh)}
           </button>
         </div>

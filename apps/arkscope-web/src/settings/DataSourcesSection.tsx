@@ -15,6 +15,7 @@ import {
   type ProviderConfigSetupState,
   type ProviderHealth,
   type ProviderTestResult,
+  type ProvidersConfigResponse,
   type ProvidersHealthResponse,
   type SAExtensionHealthResponse,
   type ScheduleRunResult,
@@ -57,6 +58,27 @@ import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
+import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
+
+type ScheduleResponse = Awaited<ReturnType<typeof getSchedule>>;
+
+function retainedCacheValue<T>(
+  settingsReadCache: SettingsReadCache,
+  key: SettingsReadKey,
+): T | null {
+  const inspected = settingsReadCache.inspect<T>(key);
+  return inspected.status === "missing" ? null : inspected.value;
+}
+
+function completedScheduleSources(
+  previous: DataSourceScheduleMap | null,
+  next: DataSourceScheduleMap,
+): string[] {
+  if (previous === null) return [];
+  return Object.keys(previous).filter((source) =>
+    previous[source]?.running === true && next[source]?.running === false,
+  );
+}
 
 function shortDate(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : "—";
@@ -161,17 +183,33 @@ type ProviderTestState =
 export function DataSourcesSection({
   onNavigationGuardChange,
   developerMode = false,
+  settingsReadCache,
 }: {
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   developerMode?: boolean;
+  settingsReadCache: SettingsReadCache;
 }) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
-  const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
-  const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
-  const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(null);
-  const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
-  const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
+  const [initialSchedule] = useState(() =>
+    retainedCacheValue<ScheduleResponse>(settingsReadCache, "data_schedule"));
+  const [initialHealth] = useState(() =>
+    retainedCacheValue<ProvidersHealthResponse>(settingsReadCache, "provider_health"));
+  const [initialConfig] = useState(() =>
+    retainedCacheValue<ProvidersConfigResponse>(settingsReadCache, "provider_config"));
+  const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(
+    initialSchedule?.sources ?? null,
+  );
+  const [health, setHealth] = useState<ProvidersHealthResponse | null>(initialHealth);
+  const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(
+    () => retainedCacheValue<SAExtensionHealthResponse>(settingsReadCache, "sa_extension_health"),
+  );
+  const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(
+    initialConfig?.providers ?? null,
+  );
+  const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(
+    initialConfig?.setup ?? null,
+  );
   const [outcome, setOutcome] = useState<DataSourcesOutcome | null>(null);
   const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -184,7 +222,7 @@ export function DataSourcesSection({
     fieldMeta: ProviderConfigField;
   } | null>(null);
   const guardedEditTriggerRef = useRef<HTMLButtonElement>(null);
-  const scheduleRef = useRef<DataSourceScheduleMap | null>(null);
+  const scheduleRef = useRef<DataSourceScheduleMap | null>(initialSchedule?.sources ?? null);
   const scheduleRequestSequenceRef = useRef(0);
   const acceptedScheduleSequenceRef = useRef(0);
   const schedulePollInFlightRef = useRef<Promise<void> | null>(null);
@@ -234,39 +272,57 @@ export function DataSourcesSection({
     };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const scheduleSequence = ++scheduleRequestSequenceRef.current;
-    const [rs, rh, rc] = await Promise.allSettled([
-      getSchedule(), getProvidersHealth(), getProvidersConfig()]);
+    const [rs, rh, rc] = await Promise.all([
+      settingsReadCache.load("data_schedule", getSchedule, { force }),
+      settingsReadCache.load("provider_health", getProvidersHealth, { force }),
+      settingsReadCache.load("provider_config", getProvidersConfig, { force }),
+    ]);
     if (!dataSourcesMountedRef.current) return;
-    if (rs.status === "fulfilled") acceptSchedule(rs.value.sources, scheduleSequence);
-    if (rh.status === "fulfilled") setHealth(rh.value);
-    if (rc.status === "fulfilled") {
+    if (rs.status === "success") acceptSchedule(rs.value.sources, scheduleSequence);
+    if (rh.status === "success") setHealth(rh.value);
+    if (rc.status === "success") {
       setCfg(rc.value.providers);
       setCfgSetup(rc.value.setup);
     }
-    const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    const bad = [rs, rh, rc].filter((result) => result.status === "error");
     setOutcome(bad.length
       ? {
           kind: "error",
           error: new Error(
-            bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+            bad.map((result) => result.status === "error"
+              ? result.error instanceof Error
+                ? result.error.message
+                : String(result.error)
+              : "")
               .join("; "),
           ),
         }
       : null);
-  }, [acceptSchedule]);
+  }, [acceptSchedule, settingsReadCache]);
 
   const pollSchedule = useCallback((): Promise<void> => {
     if (schedulePollInFlightRef.current) return schedulePollInFlightRef.current;
     const sequence = ++scheduleRequestSequenceRef.current;
     const request = (async () => {
       try {
-        const next = await getSchedule();
+        const nextOutcome = await settingsReadCache.load(
+          "data_schedule",
+          getSchedule,
+          { force: true },
+        );
         if (!dataSourcesMountedRef.current) return;
-        const accepted = acceptSchedule(next.sources, sequence);
+        if (nextOutcome.status !== "success") return;
+        const previous = scheduleRef.current;
+        const accepted = acceptSchedule(nextOutcome.value.sources, sequence);
+        if (accepted.accepted) {
+          for (const source of completedScheduleSources(previous, nextOutcome.value.sources)) {
+            settingsReadCache.invalidateDataSource(source);
+          }
+        }
         if (accepted.accepted && accepted.lifecycleChanged) {
-          await load();
+          await load(true);
         }
       } catch {
         // Passive polling preserves the last accepted schedule truth.
@@ -278,10 +334,10 @@ export function DataSourcesSection({
     });
     schedulePollInFlightRef.current = request;
     return request;
-  }, [acceptSchedule, load]);
+  }, [acceptSchedule, load, settingsReadCache]);
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
   // Extension health spawns a native-host subprocess server-side — fetch once
@@ -289,17 +345,17 @@ export function DataSourcesSection({
   // scheduler-status poll.
   useEffect(() => {
     let cancelled = false;
-    getSAExtensionHealth()
-      .then((v) => {
-        if (!cancelled) setSaExtensionHealth(v);
+    settingsReadCache.load("sa_extension_health", getSAExtensionHealth)
+      .then((result) => {
+        if (!cancelled && result.status === "success") setSaExtensionHealth(result.value);
       })
       .catch(() => {
-        if (!cancelled) setSaExtensionHealth(null);
+        // Keep the retained visible truth when the optional health read fails.
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [settingsReadCache]);
 
   // Discover background starts while idle, then observe active runs more closely.
   const anyRunning = !!schedule && Object.values(schedule).some((s) => s.running);
@@ -322,7 +378,9 @@ export function DataSourcesSection({
     setBusy(source);
     try {
       await putSchedule(source, { enabled });
-      await load();
+      settingsReadCache.invalidate("data_schedule");
+      settingsReadCache.invalidateDataSource(source);
+      await load(true);
     } catch (e) {
       setOutcome({ kind: "error", error: e });
     } finally {
@@ -339,7 +397,9 @@ export function DataSourcesSection({
     try {
       await putSchedule(source, { interval_minutes: Math.round(n) });
       setDrafts((d) => ({ ...d, [source]: "" }));
-      await load();
+      settingsReadCache.invalidate("data_schedule");
+      settingsReadCache.invalidateDataSource(source);
+      await load(true);
     } catch (e) {
       setOutcome({ kind: "error", error: e });
     } finally {
@@ -355,7 +415,9 @@ export function DataSourcesSection({
       if (r.status === "skipped") {
         setOutcome({ kind: "schedule", source, result: r });
       }
-      await load();
+      settingsReadCache.invalidate("data_schedule");
+      settingsReadCache.invalidateDataSource(source);
+      await load(true);
     } catch (e) {
       setOutcome({ kind: "error", error: e });
     } finally {
@@ -368,7 +430,9 @@ export function DataSourcesSection({
     setBusy(`import.${provider}.${field}`);
     try {
       await importProviderConfigField(provider, field, sourceEnvVar);
-      await load();
+      settingsReadCache.invalidate("provider_config");
+      settingsReadCache.invalidate("provider_health");
+      await load(true);
     } catch (e) {
       setOutcome({ kind: "error", error: e });
     } finally {
@@ -391,7 +455,9 @@ export function DataSourcesSection({
         fieldMeta?.guarded ? { [field]: true } : undefined,
       );
       setKeyDrafts((d) => ({ ...d, [`${provider}.${field}`]: "" }));
-      await load();
+      settingsReadCache.invalidate("provider_config");
+      settingsReadCache.invalidate("provider_health");
+      await load(true);
       return true;
     } catch (e) {
       setOutcome({ kind: "error", error: e });
@@ -450,7 +516,16 @@ export function DataSourcesSection({
     if (busy) return;
     setBusy("sa.extension-health");
     try {
-      setSaExtensionHealth(await getSAExtensionHealth());
+      const result = await settingsReadCache.load(
+        "sa_extension_health",
+        getSAExtensionHealth,
+        { force: true },
+      );
+      if (result.status === "success") {
+        setSaExtensionHealth(result.value);
+      } else if (result.status === "error") {
+        throw result.error;
+      }
     } catch (e) {
       setOutcome({ kind: "error", error: e });
     } finally {
@@ -676,7 +751,7 @@ export function DataSourcesSection({
             {t(($) => $.dataSources.section.description)}
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>
+        <button className="btn-ghost" onClick={() => void load(true)} disabled={!!busy}>
           ↻ {t(($) => $.actions.refresh)}
           {anyRunning
             ? t(($) => $.dataSources.schedule.autoRefreshing)

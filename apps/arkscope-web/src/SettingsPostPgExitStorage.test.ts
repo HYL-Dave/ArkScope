@@ -14,6 +14,11 @@ import {
   type UiLocaleController,
 } from "./i18n";
 import { formatSystemTimestamp } from "./timeDisplay";
+import {
+  createSettingsReadCache,
+  tradingDayCoverageKey,
+  type SettingsReadCache,
+} from "./settings/settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -180,6 +185,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { getMarketDataStatus, getTradingDayCoverage } from "./api";
 import { SettingsView } from "./Settings";
+import { DataStorageSection } from "./settings/DataStorageSection";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -229,7 +235,72 @@ async function renderSettings(
   await act(async () => { await Promise.resolve(); });
 }
 
+async function renderDataStorage(settingsReadCache: SettingsReadCache) {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root!.render(withTestUiLocale(React.createElement(DataStorageSection, {
+      developerMode: false,
+      settingsReadCache,
+    })));
+  });
+  await act(async () => { await Promise.resolve(); });
+}
+
 describe("post-PG-exit storage panels", () => {
+  it("keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads", async () => {
+    const cache = createSettingsReadCache();
+    const coverage15 = { ...coverage, lookback_days: 15, universe_count: 215 };
+    cache.replace("market_data_status", marketStatus);
+    cache.replace(tradingDayCoverageKey(10), coverage);
+    cache.replace(tradingDayCoverageKey(15), coverage15);
+    cache.replace("news_status", { marker: "news" });
+    cache.replace("macro_status", { marker: "macro" });
+    cache.replace("macro_snapshot", { marker: "snapshot" });
+
+    await renderDataStorage(cache);
+    expect(getMarketDataStatus).not.toHaveBeenCalled();
+    expect(getTradingDayCoverage).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain("149");
+
+    const lookback = host!.querySelector<HTMLSelectElement>("select");
+    if (!lookback) throw new Error("missing coverage lookback");
+    await act(async () => {
+      lookback.value = "15";
+      lookback.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(getTradingDayCoverage).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain("215");
+
+    const headings = Array.from(host!.querySelectorAll<HTMLHeadingElement>("h2"));
+    const coverageRefresh = headings.find((heading) => heading.textContent?.includes("交易日"))
+      ?.closest(".settings-section-head")?.querySelector<HTMLButtonElement>("button");
+    const marketRefresh = headings.find((heading) => heading.textContent === "市場資料")
+      ?.closest(".settings-section-head")?.querySelector<HTMLButtonElement>("button");
+    if (!coverageRefresh || !marketRefresh) throw new Error("missing storage refresh commands");
+
+    mocked.coverage = coverage15;
+    await act(async () => {
+      coverageRefresh.click();
+      await Promise.resolve();
+    });
+    expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+    expect(getTradingDayCoverage).toHaveBeenCalledWith(15, "15min");
+    expect(getMarketDataStatus).not.toHaveBeenCalled();
+
+    await act(async () => {
+      marketRefresh.click();
+      await Promise.resolve();
+    });
+    expect(getMarketDataStatus).toHaveBeenCalledOnce();
+    expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+    expect(cache.inspect("news_status").status).toBe("fresh");
+    expect(cache.inspect("macro_status").status).toBe("fresh");
+    expect(cache.inspect("macro_snapshot").status).toBe("fresh");
+  });
+
   it("shows Data Storage as normal market data status", async () => {
     mocked.marketStatus = {
       ...marketStatus,

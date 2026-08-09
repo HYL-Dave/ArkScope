@@ -962,12 +962,17 @@ export function SettingsView({
         <DataSourcesSection
           onNavigationGuardChange={setDataSourcesGuard}
           developerMode={developerMode}
+          settingsReadCache={readCache}
         />
       );
     }
-    if (id === "data_storage") return <DataStorageSection developerMode={developerMode} />;
-    if (id === "news_storage") return <NewsStorageSection developerMode={developerMode} />;
-    return <MacroStorageSection />;
+    if (id === "data_storage") {
+      return <DataStorageSection developerMode={developerMode} settingsReadCache={readCache} />;
+    }
+    if (id === "news_storage") {
+      return <NewsStorageSection developerMode={developerMode} settingsReadCache={readCache} />;
+    }
+    return <MacroStorageSection settingsReadCache={readCache} />;
   }
 
   const directory = (

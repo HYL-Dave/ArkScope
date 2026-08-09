@@ -5,6 +5,7 @@ import { formatSystemTimestamp } from "../timeDisplay";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { settingsErrorPresentation } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
+import type { SettingsReadCache } from "./settingsReadCache";
 
 function newsSyncStatusLabel(status: NonNullable<NewsStatus["sync"]>["status"] | null, t: SettingsT) {
   switch (status) {
@@ -23,25 +24,31 @@ function newsSyncStatusLabel(status: NonNullable<NewsStatus["sync"]>["status"] |
 
 export function NewsStorageSection({
   developerMode = false,
+  settingsReadCache,
 }: {
   developerMode?: boolean;
+  settingsReadCache: SettingsReadCache;
 }) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
-  const [status, setStatus] = useState<NewsStatus | null>(null);
+  const [status, setStatus] = useState<NewsStatus | null>(() => {
+    const inspected = settingsReadCache.inspect<NewsStatus>("news_status");
+    return inspected.status === "missing" ? null : inspected.value;
+  });
   const [err, setErr] = useState<Error | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setStatus(await getNewsStatus());
+  const load = useCallback(async (force = false) => {
+    const result = await settingsReadCache.load("news_status", getNewsStatus, { force });
+    if (result.status === "success") {
+      setStatus(result.value);
       setErr(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e : new Error(String(e)));
+    } else if (result.status === "error") {
+      setErr(result.error instanceof Error ? result.error : new Error(String(result.error)));
     }
-  }, []);
+  }, [settingsReadCache]);
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
   const sync = status?.sync;
@@ -66,7 +73,7 @@ export function NewsStorageSection({
           <h2>{t(($) => $.newsStorage.title)}</h2>
           <p className="muted tiny">{t(($) => $.newsStorage.description)}</p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()}>
+        <button className="btn-ghost" onClick={() => void load(true)}>
           ↻ {t(($) => $.actions.refresh)}
         </button>
       </div>

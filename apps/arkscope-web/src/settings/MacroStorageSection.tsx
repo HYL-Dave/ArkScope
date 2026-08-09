@@ -14,6 +14,7 @@ import { formatSystemTimestamp } from "../timeDisplay";
 import { Button } from "../ui/Button";
 import { InlineAlert } from "../ui/Status";
 import type { SettingsT } from "./settingsCopy";
+import type { SettingsReadCache } from "./settingsReadCache";
 
 const MACRO_TABLE_KEYS = [
   "macro_series",
@@ -59,43 +60,53 @@ function snapshotValue(item: MacroSnapshotItem): string {
   return item.units ? `${value} ${item.units}` : value;
 }
 
-export function MacroStorageSection() {
+export function MacroStorageSection({
+  settingsReadCache,
+}: {
+  settingsReadCache: SettingsReadCache;
+}) {
   const { t } = useTranslation("settings");
-  const [status, setStatus] = useState<MacroStatus | null>(null);
-  const [snapshot, setSnapshot] = useState<MacroSnapshot | null>(null);
+  const [status, setStatus] = useState<MacroStatus | null>(() => {
+    const inspected = settingsReadCache.inspect<MacroStatus>("macro_status");
+    return inspected.status === "missing" ? null : inspected.value;
+  });
+  const [snapshot, setSnapshot] = useState<MacroSnapshot | null>(() => {
+    const inspected = settingsReadCache.inspect<MacroSnapshot>("macro_snapshot");
+    return inspected.status === "missing" ? null : inspected.value;
+  });
   const [statusUnavailable, setStatusUnavailable] = useState(false);
   const [snapshotUnavailable, setSnapshotUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(false);
   const sequenceRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const sequence = ++sequenceRef.current;
     setLoading(true);
-    const [statusResult, snapshotResult] = await Promise.allSettled([
-      getMacroStatus(),
-      getMacroSnapshot(),
+    const [statusResult, snapshotResult] = await Promise.all([
+      settingsReadCache.load("macro_status", getMacroStatus, { force }),
+      settingsReadCache.load("macro_snapshot", getMacroSnapshot, { force }),
     ]);
     if (!mountedRef.current || sequence !== sequenceRef.current) return;
 
-    if (statusResult.status === "fulfilled") {
+    if (statusResult.status === "success") {
       setStatus(statusResult.value);
       setStatusUnavailable(false);
-    } else {
+    } else if (statusResult.status === "error") {
       setStatusUnavailable(true);
     }
-    if (snapshotResult.status === "fulfilled") {
+    if (snapshotResult.status === "success") {
       setSnapshot(snapshotResult.value);
       setSnapshotUnavailable(false);
-    } else {
+    } else if (snapshotResult.status === "error") {
       setSnapshotUnavailable(true);
     }
     setLoading(false);
-  }, []);
+  }, [settingsReadCache]);
 
   useEffect(() => {
     mountedRef.current = true;
-    void load();
+    void load(false);
     return () => {
       mountedRef.current = false;
     };
@@ -124,7 +135,7 @@ export function MacroStorageSection() {
           size="compact"
           icon={<RefreshCw size={15} />}
           aria-busy={loading || undefined}
-          onClick={() => void load()}
+          onClick={() => void load(true)}
         >
           {t(($) => $.actions.refresh)}
         </Button>

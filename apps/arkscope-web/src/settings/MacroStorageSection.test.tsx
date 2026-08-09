@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MacroSnapshot, MacroStatus } from "../api";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { createSettingsReadCache, type SettingsReadCache } from "./settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -108,12 +109,12 @@ async function flush() {
   });
 }
 
-async function renderMacro() {
+async function renderMacro(settingsReadCache: SettingsReadCache = createSettingsReadCache()) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(<MacroStorageSection />);
+    root!.render(<MacroStorageSection settingsReadCache={settingsReadCache} />);
   });
   await flush();
 }
@@ -148,6 +149,45 @@ afterEach(() => {
 });
 
 describe("MacroStorageSection", () => {
+  it("caches_status_and_snapshot_independently_and_refreshes_only_requested_legs", async () => {
+    const now = Date.parse("2026-08-09T02:00:00Z");
+    const cache = createSettingsReadCache({ clock: () => now });
+    cache.replace("macro_status", statusFixture, now);
+    cache.replace("macro_snapshot", snapshotFixture, now - 120_000);
+    cache.replace("news_status", { marker: "news" }, now);
+    const refreshedSnapshot = {
+      ...snapshotFixture,
+      observation_count: 19,
+      items: [{ ...snapshotFixture.items[0], value: 4.5 }],
+    };
+    const snapshotRefresh = deferred<MacroSnapshot>();
+    controls.snapshotQueue = [snapshotRefresh.promise];
+
+    await renderMacro(cache);
+    expect(host!.textContent).toContain("12 筆已儲存");
+    expect(host!.textContent).toContain("Fed Funds");
+    expect(getMacroStatus).not.toHaveBeenCalled();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      snapshotRefresh.resolve(refreshedSnapshot);
+      await Promise.resolve();
+    });
+    expect(host!.textContent).toContain("4.5");
+    expect(getMacroStatus).not.toHaveBeenCalled();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+
+    vi.mocked(getMacroStatus).mockClear();
+    vi.mocked(getMacroSnapshot).mockClear();
+    await act(async () => {
+      refreshButton().click();
+      await Promise.resolve();
+    });
+    expect(getMacroStatus).toHaveBeenCalledOnce();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+    expect(cache.inspect("news_status").status).toBe("fresh");
+  });
+
   it("loads_status_and_snapshot_independently_and_renders_both_truths", async () => {
     await renderMacro();
 
@@ -252,16 +292,27 @@ describe("MacroStorageSection", () => {
 
     await act(async () => refreshButton().click());
     await flush();
+    expect(getMacroStatus).toHaveBeenCalledOnce();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      oldStatus.resolve(statusFixture);
+      oldSnapshot.resolve(snapshotFixture);
+      await Promise.resolve();
+    });
+    await act(async () => refreshButton().click());
+    await flush();
     expect(getMacroStatus).toHaveBeenCalledTimes(2);
     expect(getMacroSnapshot).toHaveBeenCalledTimes(2);
     expect(host!.textContent).toContain("Newest Fed Funds");
     expect(host!.textContent).toContain("99 筆已儲存");
 
-    await act(async () => {
-      oldStatus.reject(new Error("RAW_LATE_STATUS_EXCEPTION"));
-      oldSnapshot.reject(new Error("RAW_LATE_SNAPSHOT_EXCEPTION"));
-      await Promise.resolve();
-    });
+    controls.statusQueue = [new Error("RAW_LATE_STATUS_EXCEPTION")];
+    controls.snapshotQueue = [new Error("RAW_LATE_SNAPSHOT_EXCEPTION")];
+    await act(async () => refreshButton().click());
+    await flush();
+    expect(getMacroStatus).toHaveBeenCalledTimes(3);
+    expect(getMacroSnapshot).toHaveBeenCalledTimes(3);
     expect(host!.textContent).toContain("Newest Fed Funds");
     expect(host!.textContent).not.toMatch(/RAW_LATE_STATUS_EXCEPTION|RAW_LATE_SNAPSHOT_EXCEPTION/);
   });

@@ -22,6 +22,11 @@ import {
 } from "./api";
 import { formatSystemTimestamp } from "./timeDisplay";
 import type { SettingsNavigationGuardReporter } from "./settings/settingsNavigationGuard";
+import {
+  createSettingsReadCache,
+  tradingDayCoverageKey,
+  type SettingsReadCache,
+} from "./settings/settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -442,17 +447,19 @@ import { withTestUiLocale } from "./test/testUiLocale";
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
+function disposeDataSources() {
+  if (root) act(() => root!.unmount());
+  root = null;
+  host?.remove();
+  host = null;
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage("zh-Hant");
 });
 
 afterEach(() => {
-  if (root) {
-    act(() => root!.unmount());
-    root = null;
-  }
-  host?.remove();
-  host = null;
+  disposeDataSources();
   mocked.importCalls = [];
   mocked.putCalls = [];
   mocked.scheduleRunning = false;
@@ -468,6 +475,7 @@ afterEach(() => {
 async function renderDataSources(
   onNavigationGuardChange?: SettingsNavigationGuardReporter,
   developerMode = false,
+  settingsReadCache = createSettingsReadCache(),
 ) {
   window.localStorage.setItem("arkscope.settings.activeGroup.v1", "data_sync");
   host = document.createElement("div");
@@ -475,11 +483,16 @@ async function renderDataSources(
   root = createRoot(host);
   await act(async () => {
     root!.render(onNavigationGuardChange
-      ? React.createElement(DataSourcesSection, { onNavigationGuardChange, developerMode })
+      ? React.createElement(DataSourcesSection, {
+          onNavigationGuardChange,
+          developerMode,
+          settingsReadCache,
+        })
       : withTestUiLocale(React.createElement(SettingsView, {
           runtime: null,
           developerMode,
           onRuntimeChanged: vi.fn(),
+          settingsReadCache,
         })));
   });
   await act(async () => { await Promise.resolve(); });
@@ -555,6 +568,166 @@ function plantPunctuationFixtures(missingBaseId = false): () => void {
 }
 
 describe("Settings provider config authority", () => {
+  it("renders_cached_schedule_health_and_config_before_one_stale_refresh", async () => {
+    const now = Date.parse("2026-08-09T02:00:00Z");
+    const cache = createSettingsReadCache({ clock: () => now });
+    const scheduleValue = await getSchedule();
+    const healthValue = await getProvidersHealth();
+    const configValue = await getProvidersConfig();
+    cache.replace("data_schedule", scheduleValue, now - 120_000);
+    cache.replace("provider_health", healthValue, now - 120_000);
+    cache.replace("provider_config", configValue, now - 120_000);
+
+    const scheduleRefresh = deferred<typeof scheduleValue>();
+    const healthRefresh = deferred<typeof healthValue>();
+    const configRefresh = deferred<typeof configValue>();
+    vi.mocked(getSchedule).mockReturnValueOnce(scheduleRefresh.promise);
+    vi.mocked(getProvidersHealth).mockReturnValueOnce(healthRefresh.promise);
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(configRefresh.promise);
+    clearDataSourceReadMocks();
+
+    await renderDataSources(vi.fn(), false, cache);
+
+    expect(host!.querySelector("[data-testid='provider-health-scroll'] table")).not.toBeNull();
+    expect(host!.querySelector("[data-testid='provider-config-scroll'] table")).not.toBeNull();
+    expect(host!.querySelector("[data-testid='schedule-scroll'] table")).not.toBeNull();
+    expect(host!.textContent).toContain("config/.env");
+    expect(getSchedule).toHaveBeenCalledOnce();
+    expect(getProvidersHealth).toHaveBeenCalledOnce();
+    expect(getProvidersConfig).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      scheduleRefresh.resolve(scheduleValue);
+      healthRefresh.resolve(healthValue);
+      configRefresh.resolve(configValue);
+      await Promise.resolve();
+    });
+    expect(getSchedule).toHaveBeenCalledOnce();
+    expect(getProvidersHealth).toHaveBeenCalledOnce();
+    expect(getProvidersConfig).toHaveBeenCalledOnce();
+  });
+
+  it("keeps_schedule_polling_mounted_only_with_retained_cache_truth", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime("2026-08-09T02:00:00Z");
+    const cache = createSettingsReadCache();
+    const scheduleValue = structuredClone(await getSchedule());
+    scheduleValue.sources.polygon_news.running = true;
+    const healthValue = await getProvidersHealth();
+    const configValue = await getProvidersConfig();
+    cache.replace("data_schedule", scheduleValue);
+    cache.replace("provider_health", healthValue);
+    cache.replace("provider_config", configValue);
+    vi.mocked(getSchedule).mockResolvedValueOnce(scheduleValue);
+    clearDataSourceReadMocks();
+
+    await renderDataSources(vi.fn(), false, cache);
+    expect(getSchedule).not.toHaveBeenCalled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_999); });
+    expect(getSchedule).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(getSchedule).toHaveBeenCalledOnce();
+
+    disposeDataSources();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(getSchedule).toHaveBeenCalledOnce();
+  });
+
+  it("caches_extension_health_only_after_visible_mount_and_manual_recheck", async () => {
+    const cache = createSettingsReadCache();
+    const first = await getSAExtensionHealth();
+    const second = { ...first, generated_at: "2026-08-09T02:05:00+00:00" };
+    vi.mocked(getSAExtensionHealth)
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(second);
+    clearDataSourceReadMocks();
+    expect(cache.inspect("sa_extension_health").status).toBe("missing");
+
+    await renderDataSources(vi.fn(), false, cache);
+    const afterVisibleMount = cache.inspect<typeof first>("sa_extension_health");
+    clearDataSourceReadMocks();
+    const recheck = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("重新檢查"));
+    if (!recheck) throw new Error("missing extension recheck button");
+    await act(async () => {
+      recheck.click();
+      await Promise.resolve();
+    });
+    expect(getSAExtensionHealth).toHaveBeenCalledOnce();
+    expect(getSchedule).not.toHaveBeenCalled();
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(afterVisibleMount).toMatchObject({ status: "fresh", value: first });
+    expect(cache.inspect<typeof second>("sa_extension_health")).toMatchObject({
+      status: "fresh",
+      value: second,
+    });
+  });
+
+  it("invalidates_price_news_and_unknown_downstream_keys_after_source_completion", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime("2026-08-09T02:00:00Z");
+    const baseSchedule = await getSchedule();
+    const healthValue = await getProvidersHealth();
+    const configValue = await getProvidersConfig();
+    const extensionValue = await getSAExtensionHealth();
+
+    async function runTransition(
+      source: string,
+      check: (cache: SettingsReadCache) => void,
+    ) {
+      disposeDataSources();
+      const cache = createSettingsReadCache();
+      const sourceState = structuredClone(baseSchedule.sources.polygon_news);
+      const running = { sources: { [source]: { ...sourceState, running: true } } };
+      const terminal = { sources: { [source]: { ...sourceState, running: false } } };
+      cache.replace("data_schedule", running);
+      cache.replace("provider_health", healthValue);
+      cache.replace("provider_config", configValue);
+      cache.replace("sa_extension_health", extensionValue);
+      cache.replace("market_data_status", { marker: "market" });
+      cache.replace("news_status", { marker: "news" });
+      cache.replace("macro_status", { marker: "macro" });
+      cache.replace("macro_snapshot", { marker: "snapshot" });
+      cache.replace(tradingDayCoverageKey(10), { marker: "coverage" });
+      const originalSchedule = vi.mocked(getSchedule).getMockImplementation();
+      try {
+        vi.mocked(getSchedule).mockResolvedValue(terminal);
+        await renderDataSources(vi.fn(), false, cache);
+        clearDataSourceReadMocks();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5_000);
+          await Promise.resolve();
+        });
+        check(cache);
+      } finally {
+        if (originalSchedule) vi.mocked(getSchedule).mockImplementation(originalSchedule);
+      }
+    }
+
+    await runTransition("ibkr_prices", (cache) => {
+      expect(cache.inspect("market_data_status").status).toBe("missing");
+      expect(cache.inspect(tradingDayCoverageKey(10)).status).toBe("missing");
+      expect(cache.inspect("news_status").status).toBe("fresh");
+      expect(cache.inspect("macro_status").status).toBe("fresh");
+    });
+    await runTransition("polygon_news", (cache) => {
+      expect(cache.inspect("market_data_status").status).toBe("missing");
+      expect(cache.inspect("news_status").status).toBe("missing");
+      expect(cache.inspect(tradingDayCoverageKey(10)).status).toBe("fresh");
+      expect(cache.inspect("macro_status").status).toBe("fresh");
+    });
+    await runTransition("future_source", (cache) => {
+      expect(cache.inspect("market_data_status").status).toBe("missing");
+      expect(cache.inspect("news_status").status).toBe("missing");
+      expect(cache.inspect(tradingDayCoverageKey(10)).status).toBe("missing");
+      expect(cache.inspect("macro_status").status).toBe("missing");
+      expect(cache.inspect("macro_snapshot").status).toBe("missing");
+      expect(cache.inspect("sa_extension_health").status).toBe("missing");
+    });
+  });
+
   it("renders config-file provenance with per-field import", async () => {
     const restoreFixtures = plantPunctuationFixtures();
     try {
@@ -1175,12 +1348,18 @@ describe("Settings provider config authority", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(getSchedule).toHaveBeenCalledTimes(3);
+    expect(getSchedule).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       resolveOldFull(staleSchedule);
       await Promise.resolve();
     });
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(getSchedule).toHaveBeenCalledTimes(3);
     expect(host!.textContent).toContain("執行中，自動更新");
   });
 
