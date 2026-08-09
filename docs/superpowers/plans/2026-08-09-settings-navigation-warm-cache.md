@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** TASKS 1-5 COMPLETE; REVIEW F1 FIXED; FOCUSED RE-REVIEW PENDING; TASK 6 NOT STARTED
+> **Status:** TASK 6 COMPLETE; INDEPENDENT IMPLEMENTATION REVIEW PENDING; TASK 7 NOT STARTED
 >
 > **Date:** 2026-08-09
 >
@@ -770,8 +770,8 @@ or `+7/-0` Task 5 ledger.
 > fallback renders schedule no idle callback. No node is added, removed,
 > renamed, or skipped: final identities remain `1123/9262d7b1...` and
 > `221/a2c20d36...`; focused runtime is `221/221`, protected rows are `10/10`,
-> and typecheck is GREEN. Task 6 remains unauthorized pending focused
-> re-review of this bounded fix.
+> and typecheck is GREEN. Independent focused re-review returned GREEN at docs
+> tip `140ed1f3`, authorizing Task 6.
 
 1. Add seven exact Task 5 nodes and prove final-stage RED.
 2. Integrate schedule/health/config with independent outcomes. Initial visible
@@ -789,6 +789,20 @@ or `+7/-0` Task 5 ledger.
 ### Task 6 - Mutations and final admission
 
 No feature expansion is allowed.
+
+> Complete against exact implementation tip `140ed1f3`. M1-M5 each turned its
+> semantic owner RED and returned GREEN after byte-exact restoration. Final
+> identities are `1123/9262d7b1...` plus focused `221/a2c20d36...`, with the
+> exact reviewed `+40/-1` ledger; admitted runtime is `221/221` focused and
+> `1123/1123` native full. Typecheck, build, scanner, ten protected rows, all
+> 597 Python/backend paths, and backend collect-only `4527/4eeb1178...` are
+> GREEN. The hermetic 1322x777 and 390x844 browser matrix satisfies every
+> Section 5 DOM/request/process assertion. All 535 generated worktree files
+> were manifested and removed, restoring the pre-gate file and ignored-status
+> streams byte-for-byte. Raw packet:
+> `/tmp/settings-navigation-warm-cache-task6-140ed1f3` (`115` payload entries,
+> manifest `5aa07f0e...`). Task 7 remains unauthorized pending independent
+> implementation review.
 
 1. Run M1-M5 independently with exact mutation diffs and exact restoration.
 2. Rebuild final full/focused streams and require `1123/9262d7b1...` plus
