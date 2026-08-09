@@ -16,12 +16,8 @@ from fastapi.testclient import TestClient
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.analysis.contracts import AnalysisArtifact, AnalysisRequest, IntegrityResult, RenderedReport
-from src.analysis.service import SavedAnalysisReport
 from src.api.app import create_app
 from src.api.dependencies import get_dal
-from src.agents.config import get_agent_config
-from src.api.routes.analysis import AnalysisRunRequest, run_analysis
 from src.tools.data_access import DataAccessLayer
 
 
@@ -54,8 +50,6 @@ _HERMETIC_NEWS_ROWS = [
         "source": "polygon",
         "url": "https://example.test/nvda-earnings",
         "publisher": "Example Wire",
-        "sentiment_score": 5.0,
-        "risk_score": 2.0,
         "description": "NVIDIA reported stronger earnings.",
     },
     {
@@ -65,8 +59,6 @@ _HERMETIC_NEWS_ROWS = [
         "source": "ibkr",
         "url": "https://example.test/nvda-product",
         "publisher": "Example Desk",
-        "sentiment_score": 3.0,
-        "risk_score": 3.0,
         "description": "NVIDIA announced a product update.",
     },
     {
@@ -76,8 +68,6 @@ _HERMETIC_NEWS_ROWS = [
         "source": "finnhub",
         "url": "https://example.test/amd-earnings",
         "publisher": "Example Wire",
-        "sentiment_score": 2.0,
-        "risk_score": 4.0,
         "description": "Analysts preview AMD earnings.",
     },
 ]
@@ -110,17 +100,13 @@ class _HermeticMarketBackend:
         ticker=None,
         days=30,
         source="auto",
-        scored_only=True,
-        model=None,
     ):
-        del days, model
+        del days
         frame = pd.DataFrame(_HERMETIC_NEWS_ROWS)
         if ticker:
             frame = frame[frame["ticker"] == ticker.upper()]
         if source not in ("", "auto", None):
             frame = frame[frame["source"] == source]
-        if scored_only:
-            frame = frame[frame["sentiment_score"].notna()]
         return frame.reset_index(drop=True)
 
     def query_prices(self, ticker, interval="15min", days=30):
@@ -213,6 +199,31 @@ def _install_fundamentals_provider_spies(monkeypatch):
     return calls
 
 
+def test_retired_sentiment_and_signal_routes_are_absent_while_raw_news_remains_reachable(
+    hermetic_market_app,
+):
+    routes = {
+        (getattr(route, "path", None), method)
+        for route in hermetic_market_app.routes
+        for method in (getattr(route, "methods", None) or set())
+    }
+    retired_paths = {
+        "/news/{ticker}/sentiment",
+        "/signals/{ticker}",
+        "/signals/{ticker}/anomalies",
+        "/signals/{ticker}/event-chains",
+        "/signals/factor-rank",
+        "/analysis/run",
+    }
+    assert not {path for path, _method in routes} & retired_paths
+
+    response = _api_get(hermetic_market_app, "/news/NVDA?days=9999")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert set(payload["articles"][0]).isdisjoint({"sentiment_score", "risk_score"})
+
+
 # ============================================================
 # Health
 # ============================================================
@@ -223,7 +234,7 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["tools_registered"] == 53
+        assert data["tools_registered"] == 50
         assert data["data_sources"] == {
             "news_tickers": 2,
             "price_tickers": 2,
@@ -243,16 +254,6 @@ class TestNewsEndpoints:
         assert data["ticker"] == "NVDA"
         assert data["count"] == 2
         assert data["source_breakdown"] == {"polygon": 1, "ibkr": 1}
-
-    def test_get_news_sentiment(self, hermetic_market_app):
-        r = _api_get(hermetic_market_app, "/news/NVDA/sentiment?days=9999")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["ticker"] == "NVDA"
-        assert data["article_count"] == 2
-        assert data["scored_count"] == 2
-        assert data["sentiment_mean"] == 4.0
-        assert data["bullish_ratio"] == 0.5
 
     def test_search_news(self, hermetic_market_app):
         r = _api_get(
@@ -358,31 +359,6 @@ class TestOptionsEndpoints:
 
 
 # ============================================================
-# Signals
-# ============================================================
-
-class TestSignalEndpoints:
-    def test_synthesize_signal(self, client):
-        r = client.get("/signals/NVDA?days=9999")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["ticker"] == "NVDA"
-        assert data["action"] in ("STRONG_BUY", "BUY", "HOLD", "SELL", "STRONG_SELL")
-
-    def test_anomalies(self, client):
-        r = client.get("/signals/NVDA/anomalies?days=9999")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["ticker"] == "NVDA"
-
-    def test_event_chains(self, client):
-        r = client.get("/signals/NVDA/event-chains?days=9999")
-        assert r.status_code == 200
-        data = r.json()
-        assert isinstance(data, list)
-
-
-# ============================================================
 # Fundamentals
 # ============================================================
 
@@ -444,70 +420,6 @@ class TestConfigEndpoints:
         data = r.json()
         assert "date" in data
         assert "holdings" in data
-
-
-class TestAnalysisEndpoint:
-    def test_analysis_run_disabled_by_default(self):
-        original = get_agent_config().analysis_pipeline_enabled
-        get_agent_config().analysis_pipeline_enabled = False
-        try:
-            with pytest.raises(Exception) as exc_info:
-                run_analysis(AnalysisRunRequest(ticker="NVDA"), dal=object())
-        finally:
-            get_agent_config().analysis_pipeline_enabled = original
-        assert getattr(exc_info.value, "status_code", None) == 503
-
-    def test_analysis_run_enabled(self, monkeypatch):
-        artifact = AnalysisArtifact(
-            request=AnalysisRequest(ticker="NVDA"),
-            context_summary={},
-            strategy_results={},
-            final_decision={"action": "buy", "summary": "NVDA: BUY bias"},
-            report_sections={"executive_summary": "NVDA: BUY bias"},
-            degradation_summary=[],
-        )
-
-        def _fake_run_analysis_request(request, *, dal=None, render_format="markdown"):
-            del request, dal, render_format
-            return type(
-                "_Output",
-                (),
-                {
-                    "artifact": artifact,
-                    "integrity": IntegrityResult(artifact=artifact, status="clean"),
-                    "report": RenderedReport(format="markdown", content="# NVDA\n\nNVDA: BUY bias\n"),
-                },
-            )()
-
-        monkeypatch.setattr(
-            "src.api.routes.analysis.run_analysis_request",
-            _fake_run_analysis_request,
-        )
-        monkeypatch.setattr(
-            "src.api.routes.analysis.save_analysis_run",
-            lambda dal, output, title=None: SavedAnalysisReport(
-                id=99,
-                file_path="data/reports/nvda.md",
-                title=title or "NVDA Phase D Analysis",
-                created_at="2026-04-15T00:00:00",
-            ),
-        )
-
-        original = get_agent_config().analysis_pipeline_enabled
-        get_agent_config().analysis_pipeline_enabled = True
-        try:
-            response = run_analysis(
-                AnalysisRunRequest(ticker="NVDA", depth="quick", persist=True),
-                dal=object(),
-            )
-        finally:
-            get_agent_config().analysis_pipeline_enabled = original
-        assert response.ticker == "NVDA"
-        assert response.integrity_status == "clean"
-        assert response.action == "buy"
-        assert response.report.startswith("# NVDA")
-        assert response.saved_report_id == 99
-        assert response.saved_report_path == "data/reports/nvda.md"
 
 
 # ============================================================

@@ -44,15 +44,13 @@ class OptionRight(str, Enum):
 # ============================================================
 
 class NewsArticle(BaseModel):
-    """Single news article with scores."""
+    """Single raw news article."""
     date: str = Field(description="Publication date (YYYY-MM-DD)")
     ticker: str
     title: str
     source: str = Field(description="News source (ibkr, polygon, etc.)")
     url: Optional[str] = None
     publisher: Optional[str] = None
-    sentiment_score: Optional[float] = Field(None, description="1-5 sentiment score")
-    risk_score: Optional[float] = Field(None, description="1-5 risk score")
     description: Optional[str] = None
 
 
@@ -72,13 +70,8 @@ class NewsBrief(BaseModel):
     """Lightweight per-ticker news summary (scout tool output)."""
     ticker: str
     article_count: int = 0
-    scored_count: int = 0
     earliest_date: Optional[str] = None
     latest_date: Optional[str] = None
-    avg_sentiment: Optional[float] = None
-    avg_risk: Optional[float] = None
-    bullish_count: int = 0
-    bearish_count: int = 0
 
 
 # ============================================================
@@ -129,24 +122,6 @@ class CurrentQuoteResult(BaseModel):
     stale: bool = False
     source_note: str = ""
     error: Optional[str] = None
-
-
-# ============================================================
-# Trading Signals
-# ============================================================
-
-class TradingSignal(BaseModel):
-    """Synthesized multi-factor trading signal."""
-    ticker: Optional[str] = None
-    sector: Optional[str] = None
-    action: str = Field(description="BUY, SELL, HOLD, WATCH")
-    confidence: float = Field(description="0-1 confidence score")
-    composite_score: float = Field(description="Weighted composite score")
-    risk_level: int = Field(description="1-5 risk level")
-    reasoning: str = Field(description="Human-readable explanation")
-    factors: Optional[Dict[str, float]] = Field(
-        None, description="Individual factor scores"
-    )
 
 
 # ============================================================

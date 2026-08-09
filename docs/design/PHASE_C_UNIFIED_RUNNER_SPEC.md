@@ -212,7 +212,7 @@ class UnifiedAgentRunner(ABC):
 `AgentConfig.use_unified_runner: bool = False`. Wiring:
 
 - `cli.py::run_anthropic_interactive` and `cli.py::run_openai_interactive` consult the flag and dispatch to either old code or new runner.
-- API routes that build agents (e.g. `/query`, `/analysis/run`) consult the same flag.
+- API routes that build agents (for example `/query`) consult the same flag.
 - `subagent.py::dispatch_subagent` consults the flag.
 
 The flag is **read-only at runtime** — flipping mid-session would split state. CLI startup reads it once.

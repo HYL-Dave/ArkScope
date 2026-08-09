@@ -1,5 +1,5 @@
 """
-Integration tests for the 17 tool functions + ToolRegistry.
+Integration tests for tool functions and ToolRegistry.
 
 Tests run against real data to verify each tool produces correct output.
 """
@@ -20,7 +20,6 @@ from src.tools.schemas import (
     NewsQueryResult,
     PriceQueryResult,
     SECFiling,
-    TradingSignal,
 )
 from src.tools.registry import ToolRegistry, create_default_registry
 
@@ -38,8 +37,6 @@ _HERMETIC_NEWS_ROWS = [
         "source": "polygon",
         "url": "https://example.test/nvda-earnings",
         "publisher": "Example Wire",
-        "sentiment_score": 5.0,
-        "risk_score": 2.0,
         "description": "NVIDIA reported stronger earnings.",
     },
     {
@@ -49,8 +46,6 @@ _HERMETIC_NEWS_ROWS = [
         "source": "ibkr",
         "url": "https://example.test/nvda-product",
         "publisher": "Example Desk",
-        "sentiment_score": 3.0,
-        "risk_score": 3.0,
         "description": "NVIDIA announced a product update.",
     },
     {
@@ -60,8 +55,6 @@ _HERMETIC_NEWS_ROWS = [
         "source": "finnhub",
         "url": "https://example.test/amd-earnings",
         "publisher": "Example Wire",
-        "sentiment_score": 2.0,
-        "risk_score": 4.0,
         "description": "Analysts preview AMD earnings.",
     },
 ]
@@ -94,17 +87,13 @@ class _HermeticMarketBackend:
         ticker=None,
         days=30,
         source="auto",
-        scored_only=True,
-        model=None,
     ):
-        del days, model
+        del days
         frame = pd.DataFrame(_HERMETIC_NEWS_ROWS)
         if ticker:
             frame = frame[frame["ticker"] == ticker.upper()]
         if source not in ("", "auto", None):
             frame = frame[frame["source"] == source]
-        if scored_only:
-            frame = frame[frame["sentiment_score"].notna()]
         return frame.reset_index(drop=True)
 
     def query_prices(self, ticker, interval="15min", days=30):
@@ -189,17 +178,17 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All tools should be registered (incl. P1.2 macro_calendar)."""
-        assert len(registry.list_all()) == 53
+        assert len(registry.list_all()) == 50
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
         names = registry.list_names()
         expected = {
-            "get_ticker_news", "get_news_sentiment_summary", "search_news_by_keyword",
+            "get_ticker_news", "search_news_by_keyword",
             "get_ticker_prices", "get_current_quote", "get_price_change", "get_sector_performance",
             "get_ticker_data_coverage",
             "calculate_greeks", "get_option_chain", "get_iv_skew_analysis",
-            "detect_anomalies", "detect_event_chains", "synthesize_signal",
+            "detect_news_volume_anomaly", "detect_event_chains",
             "get_fundamentals_analysis", "get_sec_filings",
             "get_watchlist_overview", "get_morning_brief",
             "get_portfolio_holdings",
@@ -211,10 +200,10 @@ class TestRegistry:
 
     def test_categories(self, registry):
         """Tools should be properly categorized."""
-        assert len(registry.list_by_category("news")) == 10
+        assert len(registry.list_by_category("news")) == 11
         assert len(registry.list_by_category("prices")) == 4
         assert len(registry.list_by_category("options")) == 3
-        assert len(registry.list_by_category("signals")) == 4
+        assert len(registry.list_by_category("signals")) == 0
         assert len(registry.list_by_category("analysis")) == 13
         assert len(registry.list_by_category("portfolio")) == 7
         assert len(registry.list_by_category("execution")) == 1
@@ -222,7 +211,7 @@ class TestRegistry:
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 53
+        assert len(schema) == 50
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -233,7 +222,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 53
+        assert len(schema) == 50
         for tool in schema:
             assert "name" in tool
             assert "description" in tool
@@ -276,19 +265,6 @@ class TestNewsTools:
         assert result.ticker == "NVDA"
         assert result.count == 2
         assert result.source_breakdown == {"polygon": 1, "ibkr": 1}
-
-    def test_get_news_sentiment_summary(self, hermetic_dal):
-        from src.tools.news_tools import get_news_sentiment_summary
-        result = get_news_sentiment_summary(
-            hermetic_dal,
-            ticker="NVDA",
-            days=9999,
-        )
-        assert result["ticker"] == "NVDA"
-        assert result["article_count"] == 2
-        assert result["scored_count"] == 2
-        assert result["sentiment_mean"] == 4.0
-        assert result["bullish_ratio"] == 0.5
 
     def test_search_news_by_keyword(self, hermetic_dal):
         from src.tools.news_tools import search_news_by_keyword
@@ -379,40 +355,6 @@ class TestOptionsTools:
         assert -1 <= result["delta"] <= 0
 
 # ============================================================
-# Signal Tools (11-13)
-# ============================================================
-
-class TestSignalTools:
-    def test_detect_anomalies(self, dal):
-        from src.tools.signal_tools import detect_anomalies
-        result = detect_anomalies(dal, ticker="NVDA", days=9999)
-        assert isinstance(result, dict)
-        assert result["ticker"] == "NVDA"
-        # Should have either results or error
-        assert "sentiment_anomaly" in result or "error" in result
-
-    def test_detect_event_chains(self, dal):
-        from src.tools.signal_tools import detect_event_chains
-        result = detect_event_chains(dal, ticker="NVDA", days=9999)
-        assert isinstance(result, list)
-        # May or may not have chains depending on data
-        if result:
-            chain = result[0]
-            assert "pattern" in chain
-            assert "impact_score" in chain
-            assert "events" in chain
-
-    def test_synthesize_signal(self, dal):
-        from src.tools.signal_tools import synthesize_signal
-        result = synthesize_signal(dal, ticker="NVDA", days=9999)
-        assert isinstance(result, TradingSignal)
-        assert result.ticker == "NVDA"
-        assert result.action in ("STRONG_BUY", "BUY", "HOLD", "SELL", "STRONG_SELL")
-        assert 0 <= result.confidence <= 1
-        assert 1 <= result.risk_level <= 5
-
-
-# ============================================================
 # Analysis Tools (14-17)
 # ============================================================
 
@@ -455,3 +397,39 @@ class TestAnalysisTools:
         assert "date" in result
         assert "holdings" in result
         assert isinstance(result["holdings"], list)
+
+    def test_get_morning_brief_orders_raw_news_deterministically(self):
+        from unittest.mock import MagicMock
+
+        from types import SimpleNamespace
+
+        from src.tools.analysis_tools import get_morning_brief
+
+        details = [
+            SimpleNamespace(ticker=ticker, group="interested", priority="medium")
+            for ticker in ("ZZZ", "AAA", "BBB", "CCC", "DDD", "EEE")
+        ]
+        dal = MagicMock()
+        dal.get_user_profile.return_value = {"watchlists": {}}
+        dal.get_watchlist.return_value = SimpleNamespace(details=details)
+        dal.get_available_tickers.return_value = []
+        dal.get_news_stats.return_value = [
+            {"ticker": "AAA", "article_count": 4, "latest_date": "2026-08-08"},
+            {"ticker": "ZZZ", "article_count": 4, "latest_date": "2026-08-08"},
+            {"ticker": "BBB", "article_count": 4, "latest_date": "2026-08-09"},
+            {"ticker": "CCC", "article_count": 3, "latest_date": "2026-08-09"},
+            {"ticker": "DDD", "article_count": 2, "latest_date": "2026-08-09"},
+            {"ticker": "EEE", "article_count": 1, "latest_date": "2026-08-09"},
+            {"ticker": "ZERO", "article_count": 0, "latest_date": None},
+        ]
+
+        result = get_morning_brief(dal)
+
+        dal.get_news_stats.assert_called_once_with(days=1)
+        assert result["notable_news"] == [
+            {"ticker": "BBB", "count": 4, "latest_date": "2026-08-09"},
+            {"ticker": "AAA", "count": 4, "latest_date": "2026-08-08"},
+            {"ticker": "ZZZ", "count": 4, "latest_date": "2026-08-08"},
+            {"ticker": "CCC", "count": 3, "latest_date": "2026-08-09"},
+            {"ticker": "DDD", "count": 2, "latest_date": "2026-08-09"},
+        ]

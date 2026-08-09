@@ -1,10 +1,15 @@
 # RL Policy Collapse — Diagnosis and VecNormalize Fix
 
 > **Date**: 2026-04-25
-> **Status**: state-sensitivity restored; OOS predictive value not yet proven
-> **Conclusion**: RL subsystem upgraded from "broken experiment" to "experimental model worth shadow tracking"; **NOT** approved for production investment recommendations
+> **Status**: HISTORICAL RESEARCH RECORD; IMPLEMENTATION RETIRED 2026-08-09
+> **Conclusion**: The experiments found an engineering correction but never
+> established OOS predictive value. The disconnected implementation, dedicated
+> tests, and manual smoke have left the working tree. Git history is the only
+> archive; future RL work starts from a new reviewed design and current data.
 > **Related**: archive/RL_PIPELINE_DESIGN.md (removed 2026-06-07, recoverable via git; see docs/design/archive/README.md) (training-phase design). Inference roadmap (`RL_INFERENCE_SERVICE.md`) retired during Group 3 consolidation — pause rationale lives in this document + priority map P3.1.
-> **Update 2026-06-03**: the RL→agent integration was retired — the 3 `get_rl_*` tools were removed from the registry and both agent bridges (commits `94861f7`, `6b49c74`), and the RL research code (inference + diagnostic probes) was consolidated under `training/` (`training/rl/`, `training/research/`). The pause rationale below is unchanged; RL code is kept offline as reproducible research. §8 below describes the 2026-04-25 service-layer state and is historical.
+> **Update 2026-08-09**: the earlier paused-preserve ruling is superseded. All
+> implementation paths and commands below are dated observations only and must
+> not be used as current instructions or restored as compatibility scaffolding.
 
 ---
 
@@ -18,7 +23,9 @@ Three facts that must stay separate:
 
 **Historical service-layer status (2026-04-25 → 2026-06-03)**: `rl_pipeline.enabled: false`, RL tools labelled EXPERIMENTAL in agent system prompt and tool docstrings. RL output must not enter the main investment-recommendation path. Shadow-mode tracking is permitted; live decision use is not.
 
-**Current status (2026-06-03+)**: RL agent integration retired — no `get_rl_*` tools or `rl_pipeline` config remain (commits 94861f7+6b49c74); RL research code lives offline under `training/`.
+**Current status (2026-08-09+)**: no RL implementation remains in the working
+tree. The findings below explain the retired experiment; they do not imply a
+current runtime, retraining path, or shadow-mode capability.
 
 ---
 

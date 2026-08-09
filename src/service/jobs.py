@@ -9,7 +9,6 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from src.agents.config import AgentConfig, get_agent_config
-from src.analysis import AnalysisRequest, run_analysis_request, save_analysis_run
 from src.monitor.engine import MonitorEngine
 from src.service.job_runs_store import get_job_runs_store
 
@@ -67,14 +66,6 @@ class JobRunResult:
 
 
 _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
-    "analysis_watchlist_batch": JobDefinition(
-        name="analysis_watchlist_batch",
-        description="Run the Phase D analysis pipeline across the configured watchlist or an explicit ticker subset.",
-        source="api",
-        runnable_via_api=True,
-        feature_flag="analysis_pipeline_enabled",
-        default_params={"depth": "standard", "persist_reports": False},
-    ),
     "monitor_watchlist_scan": JobDefinition(
         name="monitor_watchlist_scan",
         description="Run one monitor scan across the watchlist and return alert summaries.",
@@ -240,8 +231,6 @@ def _normalize_tickers(raw: Any) -> List[str]:
 def _availability_reason(job: JobDefinition, config: AgentConfig) -> Optional[str]:
     """Return why a job is unavailable, if applicable."""
     if job.feature_flag and not getattr(config, job.feature_flag):
-        if job.feature_flag == "analysis_pipeline_enabled":
-            return "Enable analysis_pipeline.enabled to run this job."
         if job.feature_flag == "sa_enabled":
             return "Enable seeking_alpha.enabled to expose this job."
         if job.feature_flag == "macro_calendar_enabled":
@@ -344,74 +333,6 @@ def _mark_finished(
     state.last_result = result
 
 
-def _run_analysis_watchlist_batch(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Execute the Phase D pipeline across a ticker batch."""
-    requested = _normalize_tickers(params.get("tickers")) or _watchlist_tickers(dal)
-    limit = params.get("limit")
-    if limit is not None:
-        limit = int(limit)
-        if limit <= 0:
-            raise ValueError("limit must be >= 1")
-        requested = requested[:limit]
-
-    depth = str(params.get("depth", "standard")).lower()
-    if depth not in {"quick", "standard", "full"}:
-        raise ValueError("depth must be one of: quick, standard, full")
-
-    persist_reports = bool(params.get("persist_reports", False))
-    items: List[Dict[str, Any]] = []
-    persisted_count = 0
-    for ticker in requested:
-        try:
-            output = run_analysis_request(
-                AnalysisRequest(
-                    ticker=ticker,
-                    depth=depth,
-                    source="scheduled",
-                    mode="batch",
-                ),
-                dal=dal,
-                render_format="markdown",
-            )
-            item = {
-                "ticker": ticker,
-                "status": "ok",
-                "integrity_status": output.integrity.status,
-                "action": output.artifact.final_decision.get("action"),
-            }
-            if persist_reports:
-                saved = save_analysis_run(
-                    dal,
-                    output,
-                    title=f"{ticker} Scheduled Analysis",
-                )
-                item["saved_report_id"] = saved.id
-                item["saved_report_path"] = saved.file_path
-                persisted_count += 1
-            items.append(item)
-        except Exception as exc:  # pragma: no cover - defensive in batch loop
-            items.append(
-                {
-                    "ticker": ticker,
-                    "status": "failed",
-                    "error": str(exc),
-                }
-            )
-
-    success_count = sum(1 for item in items if item["status"] == "ok")
-    return {
-        "requested_count": len(requested),
-        "processed_count": len(items),
-        "success_count": success_count,
-        "failure_count": len(items) - success_count,
-        "persisted_count": persisted_count,
-        "items": items,
-    }
-
-
 def _serialize_alert(alert: Any) -> Dict[str, Any]:
     """Serialize one monitor alert for API responses."""
     timestamp = getattr(alert, "timestamp", None)
@@ -486,9 +407,7 @@ def run_job(
     )
 
     try:
-        if job.name == "analysis_watchlist_batch":
-            result = _run_analysis_watchlist_batch(dal, payload)
-        elif job.name == "monitor_watchlist_scan":
+        if job.name == "monitor_watchlist_scan":
             result = _run_monitor_watchlist_scan(dal, payload)
         elif job.name == "extract_sa_comment_signals":
             result = _run_extract_sa_comment_signals(dal, payload)
@@ -751,15 +670,6 @@ def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
     """
     if not isinstance(result, dict):
         return "Job completed successfully."
-    if job_name == "analysis_watchlist_batch":
-        ok = result.get("success_count")
-        total = result.get("processed_count")
-        persisted = result.get("persisted_count")
-        if ok is not None and total is not None:
-            base = f"Analysis pipeline ok={ok}/{total}"
-            if persisted:
-                base += f", {persisted} report(s) persisted"
-            return base
     if job_name == "monitor_watchlist_scan":
         alerts = result.get("alert_count")
         if alerts is not None:

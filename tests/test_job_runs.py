@@ -477,8 +477,8 @@ def test_list_jobs_status_uses_db_latest_when_available():
         "status": "succeeded",
         "started_at": "2026-04-25T10:00:00+00:00",
         "finished_at": "2026-04-25T10:01:00+00:00",
-        "message": "Analysis pipeline ok=3/3",
-        "result": {"success_count": 3},
+        "message": "Monitor scan emitted 3 alert(s)",
+        "result": {"alert_count": 3},
         "error": None,
     }
 
@@ -487,15 +487,15 @@ def test_list_jobs_status_uses_db_latest_when_available():
     ), patch.object(
         JobRunsLocalStore,
         "latest_runs_by_name",
-        return_value={"analysis_watchlist_batch": db_row},
+        return_value={"monitor_watchlist_scan": db_row},
     ):
         out = jobs_module.list_jobs_status(dal)
 
     by_name = {j["name"]: j for j in out}
-    pipeline = by_name["analysis_watchlist_batch"]
-    assert pipeline["last_status"] == "succeeded"
-    assert pipeline["last_message"] == "Analysis pipeline ok=3/3"
-    assert pipeline["last_started_at"] == "2026-04-25T10:00:00+00:00"
+    scan = by_name["monitor_watchlist_scan"]
+    assert scan["last_status"] == "succeeded"
+    assert scan["last_message"] == "Monitor scan emitted 3 alert(s)"
+    assert scan["last_started_at"] == "2026-04-25T10:00:00+00:00"
 
 
 def test_list_jobs_status_falls_back_to_process_local_when_db_empty():
@@ -529,23 +529,14 @@ def test_list_jobs_status_falls_back_when_db_error():
     out = jobs_module.list_jobs_status(dal)
     # All jobs should appear with at least the never_run default
     statuses = {j["name"]: j["last_status"] for j in out}
-    assert "analysis_watchlist_batch" in statuses
+    assert "monitor_watchlist_scan" in statuses
     # Either process-local cached value or "never_run" — both acceptable
-    assert statuses["analysis_watchlist_batch"] in {"never_run", "succeeded", "failed", "running"}
+    assert statuses["monitor_watchlist_scan"] in {"never_run", "succeeded", "failed", "running"}
 
 
 # ---------------------------------------------------------------------------
 # _summarize_result heuristics
 # ---------------------------------------------------------------------------
-
-
-def test_summarize_analysis_pipeline_result():
-    msg = jobs_module._summarize_result(
-        "analysis_watchlist_batch",
-        {"success_count": 5, "processed_count": 6, "persisted_count": 2},
-    )
-    assert "ok=5/6" in msg
-    assert "2 report" in msg
 
 
 def test_summarize_monitor_scan_result():
@@ -562,7 +553,7 @@ def test_summarize_unknown_job_falls_back():
 
 
 def test_summarize_handles_non_dict():
-    msg = jobs_module._summarize_result("analysis_watchlist_batch", "not a dict")
+    msg = jobs_module._summarize_result("monitor_watchlist_scan", "not a dict")
     assert msg == "Job completed successfully."
 
 
@@ -586,23 +577,23 @@ def test_run_job_persists_start_and_finish_on_success():
         finish_calls.append((run_id, kwargs))
         return True
 
-    fake_result = {"success_count": 1, "processed_count": 1, "persisted_count": 0, "items": []}
+    fake_result = {"alert_count": 1, "alerts": []}
 
     with patch.object(JobRunsLocalStore, "create_run", fake_create_run), \
          patch.object(JobRunsLocalStore, "finish_run", fake_finish_run), \
-         patch.object(jobs_module, "_run_analysis_watchlist_batch", return_value=fake_result):
+         patch.object(jobs_module, "_run_monitor_watchlist_scan", return_value=fake_result):
         result = jobs_module.run_job(
-            "analysis_watchlist_batch", dal=dal, trigger_source="cli",
+            "monitor_watchlist_scan", dal=dal, trigger_source="cli",
         )
 
     assert result.status == "succeeded"
     assert len(create_calls) == 1
-    assert create_calls[0][0] == "analysis_watchlist_batch"
+    assert create_calls[0][0] == "monitor_watchlist_scan"
     assert create_calls[0][1]["trigger_source"] == "cli"
     assert len(finish_calls) == 1
     assert finish_calls[0][0] == 99
     assert finish_calls[0][1]["status"] == "succeeded"
-    assert "ok=1/1" in finish_calls[0][1]["message"]
+    assert "1 alert" in finish_calls[0][1]["message"]
 
 
 def test_run_job_persists_failure():
@@ -621,11 +612,11 @@ def test_run_job_persists_failure():
     with patch.object(JobRunsLocalStore, "create_run", fake_create_run), \
          patch.object(JobRunsLocalStore, "finish_run", fake_finish_run), \
          patch.object(
-             jobs_module, "_run_analysis_watchlist_batch",
+             jobs_module, "_run_monitor_watchlist_scan",
              side_effect=RuntimeError("boom"),
          ):
         with pytest.raises(RuntimeError, match="boom"):
-            jobs_module.run_job("analysis_watchlist_batch", dal=dal)
+            jobs_module.run_job("monitor_watchlist_scan", dal=dal)
 
     assert len(finish_calls) == 1
     assert finish_calls[0][0] == 100
@@ -638,9 +629,9 @@ def test_run_job_continues_when_create_run_returns_none():
     dal = _make_file_dal()  # store unavailable → create_run returns None
     dal.get_watchlist.return_value = MagicMock(tickers=["NVDA"])
 
-    fake_result = {"success_count": 1, "processed_count": 1, "persisted_count": 0, "items": []}
-    with patch.object(jobs_module, "_run_analysis_watchlist_batch", return_value=fake_result):
-        result = jobs_module.run_job("analysis_watchlist_batch", dal=dal)
+    fake_result = {"alert_count": 0, "alerts": []}
+    with patch.object(jobs_module, "_run_monitor_watchlist_scan", return_value=fake_result):
+        result = jobs_module.run_job("monitor_watchlist_scan", dal=dal)
     assert result.status == "succeeded"
 
 
@@ -795,7 +786,7 @@ def test_local_store_create_finish_and_latest(tmp_path):
     store = JobRunsLocalStore(db)
 
     run_id = store.create_run(
-        "analysis_watchlist_batch",
+        "monitor_watchlist_scan",
         trigger_source="api",
         payload={"tickers": ["NVDA"]},
     )
@@ -808,7 +799,7 @@ def test_local_store_create_finish_and_latest(tmp_path):
         duration_ms=123,
     ) is True
 
-    rows = store.list_runs(job_name="analysis_watchlist_batch", limit=10, offset=0)
+    rows = store.list_runs(job_name="monitor_watchlist_scan", limit=10, offset=0)
     assert len(rows) == 1
     assert rows[0]["payload"] == {"tickers": ["NVDA"]}
     assert rows[0]["result"] == {"processed": 1}
@@ -817,7 +808,7 @@ def test_local_store_create_finish_and_latest(tmp_path):
     assert rows[0]["finished_at"]
 
     latest = store.latest_runs_by_name()
-    assert latest["analysis_watchlist_batch"]["status"] == "succeeded"
+    assert latest["monitor_watchlist_scan"]["status"] == "succeeded"
 
 
 def test_local_store_finish_run_computes_duration_when_omitted(tmp_path):

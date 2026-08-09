@@ -86,13 +86,14 @@ High-level only; for the authoritative structure see
 stub).
 
 - `apps/arkscope-web/` — the workbench GUI (React + Vite); `apps/arkscope-desktop/` — Electron shell
-- `src/` — agent, tools, DAL, API sidecar (`src/api/`), analysis pipeline, monitor, signals, data ingestion (`src/collectors/`, `src/daily_update.py`)
+- `src/` — agent, tools, DAL, API sidecar (`src/api/`), monitor, and data ingestion (`src/collectors/`, `src/daily_update.py`)
 - `data_sources/` — data-source API clients
-- `scripts/` — transitional `scripts/scoring/` owner only; Tranche B removes the
-  root after retiring the legacy score surface (no app runtime paths)
 - `extensions/sa_alpha_picks/` — SA browser extension + native host
 - `docs/design/` — current specs & decision log (`PROJECT_PRIORITY_MAP.md` first)
-- `training/` — RL training (paused; see `docs/design/RL_COLLAPSE_FINDINGS.md`)
+
+The disconnected offline RL, legacy scoring/Signals, and recommendation-shaped
+analysis implementations are retired and recoverable from Git history. Future
+research starts from a new reviewed design and current data contracts.
 
 ## Open data
 

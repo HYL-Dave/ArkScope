@@ -11,16 +11,7 @@ korean-lunar-calendar==0.4.0
 python-dateutil==2.9.0.post0
 pytz==2025.2
 six==1.17.0
-gymnasium
-torch
 scipy
-datasets
-mpi4py
-spinup
-matplotlib
-stable-baselines3
-# Optional, for training wrappers
-torch
 requests
 
 # DAL + Tools layer
@@ -49,6 +40,3 @@ pymupdf>=1.24.0
 
 # Discord Bot (Phase E) — Monitor notifications + Gateway
 discord.py>=2.6.0
-
-# Option pricing — dynamic risk-free rate via ^IRX
-yfinance>=0.2.0

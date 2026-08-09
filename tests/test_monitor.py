@@ -6,7 +6,6 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pandas as pd
 import pytest
 
 from src.monitor.notifiers import (
@@ -16,10 +15,9 @@ from src.monitor.notifiers import (
     NotificationRouter,
 )
 from src.monitor.watchers import (
+    NewsVolumeWatcher,
     PriceWatcher,
     SectorWatcher,
-    SentimentWatcher,
-    SignalWatcher,
 )
 from src.monitor.engine import MonitorEngine, _extract_tickers
 
@@ -166,110 +164,42 @@ class TestPriceWatcher:
         assert len(weekly_alerts) == 1
 
 
-# ── SentimentWatcher ──────────────────────────────────────────
-
-
-class TestSentimentWatcher:
-    def test_sentiment_shift_alert(self):
-        config = {"sentiment_alerts": {"enabled": True, "sentiment_change_threshold": 1.0, "news_volume_spike_multiplier": 3}}
-        watcher = SentimentWatcher(config)
-
+class TestNewsVolumeWatcher:
+    def _dal(self, recent_count: int, baseline_count: int):
         dal = MagicMock()
-        # 7d stats: avg_sentiment 4.2, baseline 30d: avg_sentiment 2.8 → delta 1.4 >= 1.0
         dal.get_news_stats.side_effect = [
-            [{"avg_sentiment": 4.2, "article_count": 10}],  # 7d
-            [{"avg_sentiment": 2.8, "article_count": 30}],  # 30d
+            [{"ticker": "NVDA", "article_count": recent_count}],
+            [{"ticker": "NVDA", "article_count": baseline_count}],
         ]
+        return dal
 
-        alerts = asyncio.run(watcher.check(dal, ["NVDA"]))
-        assert len(alerts) >= 1
-        assert alerts[0].alert_type == "sentiment"
-        assert "improved" in alerts[0].title
+    def test_news_volume_spike_alert(self):
+        watcher = NewsVolumeWatcher({
+            "news_volume_alerts": {"enabled": True, "spike_multiplier": 3.0}
+        })
+        alerts = asyncio.run(watcher.check(self._dal(21, 30), ["NVDA"]))
+
+        assert len(alerts) == 1
+        assert alerts[0].alert_type == "news_volume"
+        assert alerts[0].title == "News volume spike"
+        assert alerts[0].ticker == "NVDA"
+        assert alerts[0].data == {
+            "recent_daily_avg": 3.0,
+            "baseline_daily_avg": 1.0,
+            "spike_multiple": 3.0,
+        }
+
+    def test_no_alert_under_volume_threshold(self):
+        watcher = NewsVolumeWatcher({
+            "news_volume_alerts": {"enabled": True, "spike_multiplier": 3.0}
+        })
+        assert asyncio.run(watcher.check(self._dal(14, 30), ["NVDA"])) == []
 
     def test_no_alert_when_disabled(self):
-        config = {"sentiment_alerts": {"enabled": False}}
-        watcher = SentimentWatcher(config)
-        alerts = asyncio.run(watcher.check(MagicMock(), ["NVDA"]))
-        assert len(alerts) == 0
-
-
-# ── SignalWatcher ─────────────────────────────────────────────
-
-
-class TestSignalWatcher:
-    def test_strong_buy_alert(self):
-        watcher = SignalWatcher({})
         dal = MagicMock()
-
-        mock_signal = MagicMock()
-        mock_signal.action = "STRONG_BUY"
-        mock_signal.confidence = 0.85
-        mock_signal.risk_level = 2
-        mock_signal.reasoning = "High momentum"
-
-        with patch("src.tools.signal_tools.synthesize_signal", return_value=mock_signal):
-            alerts = asyncio.run(watcher.check(dal, ["NVDA"]))
-
-        assert len(alerts) == 1
-        assert alerts[0].severity == "critical"
-        assert "STRONG_BUY" in alerts[0].title
-
-    def test_high_risk_alert(self):
-        watcher = SignalWatcher({})
-        dal = MagicMock()
-
-        mock_signal = MagicMock()
-        mock_signal.action = "BUY"
-        mock_signal.confidence = 0.6
-        mock_signal.risk_level = 4
-        mock_signal.reasoning = "Risky"
-
-        with patch("src.tools.signal_tools.synthesize_signal", return_value=mock_signal):
-            alerts = asyncio.run(watcher.check(dal, ["NVDA"]))
-
-        assert len(alerts) == 1
-        assert "risk" in alerts[0].title.lower()
-
-    def test_hold_no_alert(self):
-        watcher = SignalWatcher({})
-        dal = MagicMock()
-
-        mock_signal = MagicMock()
-        mock_signal.action = "HOLD"
-        mock_signal.confidence = 0.5
-        mock_signal.risk_level = 2
-        mock_signal.reasoning = "Neutral"
-
-        with patch("src.tools.signal_tools.synthesize_signal", return_value=mock_signal):
-            alerts = asyncio.run(watcher.check(dal, ["NVDA"]))
-
-        assert len(alerts) == 0
-
-    def test_reuses_preloaded_news_context_across_tickers(self):
-        watcher = SignalWatcher({})
-        dal = MagicMock()
-        shared_df = pd.DataFrame(
-            [
-                {"ticker": "NVDA", "date": "2026-04-21", "title": "NVDA momentum"},
-                {"ticker": "AMD", "date": "2026-04-21", "title": "AMD momentum"},
-            ]
-        )
-
-        mock_signal = MagicMock()
-        mock_signal.action = "HOLD"
-        mock_signal.confidence = 0.5
-        mock_signal.risk_level = 2
-        mock_signal.reasoning = "Neutral"
-
-        with patch("src.monitor.watchers._preload_signal_news_df", return_value=shared_df) as preload_mock:
-            with patch("src.tools.signal_tools.synthesize_signal", return_value=mock_signal) as synth_mock:
-                alerts = asyncio.run(watcher.check(dal, ["NVDA", "AMD"]))
-
-        assert alerts == []
-        preload_mock.assert_called_once_with(dal, days=14)
-        assert synth_mock.call_count == 2
-        for call in synth_mock.call_args_list:
-            assert call.kwargs["news_df"] is shared_df
+        watcher = NewsVolumeWatcher({"news_volume_alerts": {"enabled": False}})
+        assert asyncio.run(watcher.check(dal, ["NVDA"])) == []
+        dal.get_news_stats.assert_not_called()
 
 
 # ── SectorWatcher ─────────────────────────────────────────────
@@ -346,10 +276,14 @@ class TestExtractTickers:
 class TestMonitorEngine:
     def test_scan_once_returns_alerts(self):
         dal = MagicMock()
+        dal.get_news_stats.side_effect = [
+            [{"ticker": "NVDA", "article_count": 21}],
+            [{"ticker": "NVDA", "article_count": 30}],
+        ]
         config = {
             "alerts": {
                 "price_alerts": {"enabled": False},
-                "sentiment_alerts": {"enabled": False},
+                "news_volume_alerts": {"enabled": True, "spike_multiplier": 3.0},
                 "sector_alerts": {"enabled": False},
                 "notification_channels": [{"type": "log", "enabled": True}],
             },
@@ -357,18 +291,10 @@ class TestMonitorEngine:
         }
 
         engine = MonitorEngine(dal=dal, config=config)
-
-        # Only SignalWatcher is not disabled — mock it
-        mock_signal = MagicMock()
-        mock_signal.action = "STRONG_BUY"
-        mock_signal.confidence = 0.9
-        mock_signal.risk_level = 2
-        mock_signal.reasoning = "Test"
-
-        with patch("src.tools.signal_tools.synthesize_signal", return_value=mock_signal):
-            alerts = asyncio.run(engine.scan_once(notify=False))
+        alerts = asyncio.run(engine.scan_once(notify=False))
 
         assert len(alerts) >= 1
+        assert alerts[0].alert_type == "news_volume"
 
     def test_format_empty_summary(self):
         dal = MagicMock()
@@ -388,12 +314,12 @@ class TestMonitorEngine:
         engine = MonitorEngine(dal=dal, config=config)
         alerts = [
             Alert(alert_type="price", severity="warning", title="Up 6%", message="NVDA +6%", ticker="NVDA"),
-            Alert(alert_type="signal", severity="critical", title="STRONG_BUY", message="High momentum", ticker="NVDA"),
+            Alert(alert_type="news_volume", severity="warning", title="News volume spike", message="3x baseline", ticker="NVDA"),
         ]
         summary = engine.format_scan_summary(alerts)
         assert "2 alert(s)" in summary
         assert "Price Alerts" in summary
-        assert "Signal Alerts" in summary
+        assert "News Volume Alerts" in summary
 
     def test_scan_once_records_watcher_metrics(self):
         dal = MagicMock()

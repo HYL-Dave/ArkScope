@@ -10,6 +10,13 @@
 > make before any batch executes. Recovery rule: delete>archive — git history is the
 > archive; each deletion batch records its pre-deletion sha.
 
+> **2026-08-09 supersession:** The earlier `training/` paused-preserve ruling
+> was explicitly replaced by direct Git retirement. The training lineage,
+> dedicated tests, and manual yfinance smoke are absent; path and regeneration
+> statements below are historical audit evidence only. The scripts survivor
+> table was likewise superseded by the reviewed Tranche A/B retirement
+> authorities.
+
 ## 1. Executive summary
 
 | Area | What it is | Verdict class |

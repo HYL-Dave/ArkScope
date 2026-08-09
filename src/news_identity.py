@@ -13,9 +13,6 @@ MERGE_FIELDS = (
     "description",
     "url",
     "publisher",
-    "sentiment_score",
-    "sentiment_source",
-    "sentiment_scale",
 )
 
 

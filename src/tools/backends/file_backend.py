@@ -1,20 +1,16 @@
 """
-FileBackend — reads retained score/news files on disk.
+FileBackend — reads retained raw-news files on disk.
 
 Price and fundamentals methods are retired empty compatibility surfaces. Current
 price and stored SEC authorities live in ``market_data.db``.
 
-Data path mapping:
-    Scored news (IBKR)  : data/news/ibkr_scored_final.parquet
-    Scored news (Polygon): data/news/polygon_scored_final.csv
-    Prices              : retired; SQLite is authoritative
-    Fundamentals        : retired; stored SEC cache is authoritative
+Raw news lives under ``data/news/raw``. Prices and fundamentals are retired
+empty surfaces; their current authorities live in ``market_data.db``.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 import warnings
 from datetime import date, timedelta
 from pathlib import Path
@@ -24,77 +20,11 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Score column detection utilities
-# ---------------------------------------------------------------------------
-
-# Pattern: sentiment_haiku, risk_gpt_5_2_xhigh, etc.
-_SCORE_COL_PATTERN = re.compile(
-    r"^(sentiment|risk)_(.+?)(?:_(none|minimal|low|medium|high|xhigh))?$"
-)
-_NON_MODEL_SUFFIXES = {"score", "title", "content", "source", "description"}
-
-# Model priority: newest/best first. Used when no specific model is requested.
-# Fallback if config/user_profile.yaml doesn't define model_priority
-_DEFAULT_MODEL_PRIORITY = ["gpt_5_4", "gpt_5_4_mini", "gpt_5_4_nano", "gpt_5_2", "gpt_5"]
-
-
-def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, str]]:
-    """Auto-detect score columns from a DataFrame.
-
-    Returns list of (score_type, model, reasoning_effort, column_name).
-    """
-    results = []
-    for col in df.columns:
-        m = _SCORE_COL_PATTERN.match(col)
-        if m:
-            model = m.group(2)
-            if model in _NON_MODEL_SUFFIXES:
-                continue
-            results.append((m.group(1), model, m.group(3), col))
-    return results
-
-
-def resolve_score_columns(
-    score_cols: list[tuple[str, str, str | None, str]],
-    preferred_model: str | None = None,
-    model_priority: list[str] | None = None,
-) -> tuple[str | None, str | None]:
-    """Pick the best sentiment/risk column pair based on model preference or priority.
-
-    Args:
-        score_cols: Output of detect_score_columns().
-        preferred_model: Model column suffix to prefer (e.g. 'gpt_5_2').
-        model_priority: Ordered list of model suffixes (highest priority first).
-            Falls back to _DEFAULT_MODEL_PRIORITY if None.
-
-    Returns:
-        (sentiment_column_name, risk_column_name) — either may be None.
-    """
-    sentiment_map = {c[1]: c[3] for c in score_cols if c[0] == "sentiment"}
-    risk_map = {c[1]: c[3] for c in score_cols if c[0] == "risk"}
-
-    if preferred_model:
-        suffix = preferred_model.replace("-", "_").replace(".", "_")
-        return sentiment_map.get(suffix), risk_map.get(suffix)
-
-    # Auto-select by priority
-    priority = model_priority or _DEFAULT_MODEL_PRIORITY
-    for m in priority:
-        if m in sentiment_map:
-            return sentiment_map[m], risk_map.get(m)
-
-    # Fallback: first available
-    s = next(iter(sentiment_map.values()), None) if sentiment_map else None
-    r = next(iter(risk_map.values()), None) if risk_map else None
-    return s, r
-
-
 class FileBackend:
     """
     File-based data backend.
 
-    Reads retained score/news files and implements the DataBackend protocol.
+    Reads retained raw-news files and implements the DataBackend protocol.
     Retired price and fundamentals methods remain as empty compatibility calls.
     """
 
@@ -119,118 +49,16 @@ class FileBackend:
         # Retained data path
         self._news_dir = self._base / "data" / "news"
 
-        # Load model priority from config (fallback to default)
-        self._model_priority = self._load_model_priority()
-
-        # Caches for raw data (loaded lazily, large files)
-        self._ibkr_raw: Optional[pd.DataFrame] = None
-        self._polygon_raw: Optional[pd.DataFrame] = None
-
-    def _load_model_priority(self) -> list[str]:
-        """Load model_priority from config/user_profile.yaml."""
-        cfg_path = self._base / "config" / "user_profile.yaml"
-        if not cfg_path.exists():
-            return _DEFAULT_MODEL_PRIORITY
-        try:
-            import yaml
-            with open(cfg_path) as f:
-                cfg = yaml.safe_load(f) or {}
-            priority = cfg.get("llm_preferences", {}).get("model_priority")
-            if isinstance(priority, list) and priority:
-                return priority
-        except Exception:
-            pass
-        return _DEFAULT_MODEL_PRIORITY
-
     # --------------------------------------------------------
     # News
     # --------------------------------------------------------
 
-    def _load_ibkr_news(self, model: Optional[str] = None) -> pd.DataFrame:
-        """Load and normalize IBKR scored news with flexible model selection.
-
-        Dynamically detects all score columns and picks the best pair
-        based on model preference or config model_priority.
-        """
-        if self._ibkr_raw is None:
-            path = self._news_dir / "ibkr_scored_final.parquet"
-            if not path.exists():
-                self._ibkr_raw = pd.DataFrame()
-            else:
-                self._ibkr_raw = pd.read_parquet(path)
-                logger.debug(f"Loaded IBKR news raw: {len(self._ibkr_raw)} rows")
-
-        if self._ibkr_raw.empty:
-            return pd.DataFrame()
-
-        df = self._ibkr_raw.copy()
-
-        # Detect and resolve score columns
-        score_cols = detect_score_columns(df)
-        sent_col, risk_col = resolve_score_columns(
-            score_cols, model, self._model_priority,
-        )
-
-        df["sentiment_score"] = df[sent_col] if sent_col and sent_col in df.columns else None
-        df["risk_score"] = df[risk_col] if risk_col and risk_col in df.columns else None
-
-        # Normalize other columns
-        if "source_api" in df.columns:
-            df = df.rename(columns={"source_api": "source"})
-        df["source"] = "ibkr"
-        df["date"] = pd.to_datetime(df.get("published_at"), errors="coerce").dt.strftime("%Y-%m-%d")
-
-        # Ensure standard column names exist
-        for col in ["ticker", "title", "url", "publisher", "description"]:
-            if col not in df.columns:
-                df[col] = None
-
-        return df
-
-    def _load_polygon_news(self, model: Optional[str] = None) -> pd.DataFrame:
-        """Load and normalize Polygon scored news with flexible model selection."""
-        if self._polygon_raw is None:
-            path = self._news_dir / "polygon_scored_final.csv"
-            if not path.exists():
-                self._polygon_raw = pd.DataFrame()
-            else:
-                self._polygon_raw = pd.read_csv(path)
-                logger.debug(f"Loaded Polygon news raw: {len(self._polygon_raw)} rows")
-
-        if self._polygon_raw.empty:
-            return pd.DataFrame()
-
-        df = self._polygon_raw.copy()
-
-        # Detect and resolve score columns
-        score_cols = detect_score_columns(df)
-        sent_col, risk_col = resolve_score_columns(
-            score_cols, model, self._model_priority,
-        )
-
-        df["sentiment_score"] = df[sent_col] if sent_col and sent_col in df.columns else None
-        df["risk_score"] = df[risk_col] if risk_col and risk_col in df.columns else None
-
-        # Normalize column names
-        if "Stock_symbol" in df.columns:
-            df = df.rename(columns={"Stock_symbol": "ticker"})
-        if "Article_title" in df.columns:
-            df = df.rename(columns={"Article_title": "title"})
-        df["source"] = "polygon"
-        df["date"] = pd.to_datetime(df.get("published_at"), errors="coerce").dt.strftime("%Y-%m-%d")
-
-        for col in ["url", "publisher", "description"]:
-            if col not in df.columns:
-                df[col] = None
-
-        return df
-
     def _load_raw_news(self, days: int = 30) -> pd.DataFrame:
-        """Load unscored news from data/news/raw/ parquet files.
+        """Load raw news from data/news/raw/ parquet files.
 
         Only loads files from year-months overlapping the requested date
         range to avoid scanning all historical data.  Returns a DataFrame
-        with the standard news columns; sentiment/risk scores are NaN.
+        with the standard raw-news columns.
         """
         raw_dir = self._news_dir / "raw"
         if not raw_dir.exists():
@@ -267,14 +95,11 @@ class FileBackend:
                 if df.empty:
                     continue
 
-                # Standardise columns to match scored-file output
+                # Standardise columns to the raw-news output.
                 df["source"] = source_name
                 df["date"] = pd.to_datetime(
                     df.get("published_at"), errors="coerce",
                 ).dt.strftime("%Y-%m-%d")
-                df["sentiment_score"] = float("nan")
-                df["risk_score"] = float("nan")
-
                 for col in ["ticker", "title", "url", "publisher", "description"]:
                     if col not in df.columns:
                         df[col] = None
@@ -298,57 +123,23 @@ class FileBackend:
         ticker: Optional[str] = None,
         days: int = 30,
         source: str = "auto",
-        scored_only: bool = True,
-        model: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Query news articles from local scored + raw files.
-
-        Scored articles (with sentiment/risk scores) are loaded first.
-        Raw articles from data/news/raw/ are merged in to fill gaps
-        (e.g. recently collected but not yet scored).  When an article
-        exists in both scored and raw, the scored version is kept.
+        """Query raw news articles from local files.
 
         Args:
             ticker: Filter by ticker symbol.
             days: Number of days to look back.
             source: Data source filter ('ibkr', 'polygon', 'auto').
-            scored_only: Only return articles with at least one score.
-            model: Specific model to get scores from (e.g. 'gpt-5.2' or 'gpt_5_2').
-                   If None, picks the best available by config model_priority.
         """
-        frames = []
         cutoff = (date.today() - timedelta(days=days)).isoformat()
-
-        if source in ("ibkr", "auto"):
-            df = self._load_ibkr_news(model=model)
-            if not df.empty:
-                frames.append(df)
-
-        if source in ("polygon", "auto"):
-            df = self._load_polygon_news(model=model)
-            if not df.empty:
-                frames.append(df)
-
-        # Also load raw (unscored) articles to fill gaps
-        raw_df = self._load_raw_news(days=days)
-        if not raw_df.empty:
-            if source not in ("auto",):
-                # Filter raw to requested source
-                raw_df = raw_df[raw_df["source"] == source]
-            if not raw_df.empty:
-                frames.append(raw_df)
-
-        if not frames:
+        combined = self._load_raw_news(days=days)
+        if combined.empty:
             return pd.DataFrame(columns=[
                 "date", "ticker", "title", "source", "url",
-                "publisher", "sentiment_score", "risk_score", "description",
+                "publisher", "description",
             ])
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            combined = pd.concat(frames, ignore_index=True)
-
-        # Deduplicate: scored articles (loaded first) take priority
+        if source != "auto":
+            combined = combined[combined["source"] == source]
         if "dedup_hash" in combined.columns:
             combined = combined.drop_duplicates(subset="dedup_hash", keep="first")
         else:
@@ -363,16 +154,10 @@ class FileBackend:
         if ticker:
             combined = combined[combined["ticker"] == ticker.upper()]
 
-        # Scored-only filter
-        if scored_only:
-            combined = combined[
-                combined["sentiment_score"].notna() | combined["risk_score"].notna()
-            ]
-
         # Select and order output columns
         output_cols = [
             "date", "ticker", "title", "source", "url",
-            "publisher", "sentiment_score", "risk_score", "description",
+            "publisher", "description",
         ]
         for col in output_cols:
             if col not in combined.columns:
@@ -435,12 +220,9 @@ class FileBackend:
         tickers = set()
 
         if data_type == "news":
-            ibkr = self._load_ibkr_news(model=None)
-            if not ibkr.empty and "ticker" in ibkr.columns:
-                tickers.update(ibkr["ticker"].dropna().unique())
-            polygon = self._load_polygon_news(model=None)
-            if not polygon.empty and "ticker" in polygon.columns:
-                tickers.update(polygon["ticker"].dropna().unique())
+            news = self._load_raw_news(days=3650)
+            if not news.empty and "ticker" in news.columns:
+                tickers.update(news["ticker"].dropna().unique())
 
         elif data_type in ("prices", "fundamentals"):
             return []

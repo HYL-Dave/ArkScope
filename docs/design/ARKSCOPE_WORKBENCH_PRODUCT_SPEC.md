@@ -48,7 +48,7 @@ ArkScope is a **local-first, BYOK, no-sign-in desktop financial-research agent w
 
 ### 1.4 What ArkScope is NOT (LOCK; extends SPEC §1.4)
 
-Not high-frequency trading. Not an RL trading system (retired; lives offline under `training/`, not surfaced in UI). Not a backtest-farm UI. **Not a re-scoring engine** (§3). Not multi-user / cloud-sync. Not live order entry (informational only). One user, one machine, one writer at a time.
+Not high-frequency trading. Not an RL trading system (the former implementation is retired and recoverable from Git, not surfaced in UI). Not a backtest-farm UI. **Not a re-scoring engine** (§3). Not multi-user / cloud-sync. Not live order entry (informational only). One user, one machine, one writer at a time.
 
 ### 1.5 Terminology (EN / 繁體中文 — both interfaces ship; LOCK)
 
@@ -199,7 +199,8 @@ Rules (LOCK):
 
 ### Signals — opportunity / risk detection (ephemeral capability; not necessarily a v1 page)
 
-Signals are ArkScope's **opportunity/risk detection** capability — the clean replacement for the retired `signal_tools` line (llm_sentiment / news_scores / RL-era coupled → legacy, do not reuse). Locks:
+Signals are ArkScope's future **opportunity/risk detection** capability. The
+retired composite recommendation semantic is not reusable scaffolding. Locks:
 
 - **Independent of the §2 AI card.** Signals are NOT part of the AI-card v1 EvidencePacket (ToolCatalog rule 9 / §2.4). A card may *cite* a signal only once that signal is itself clean, source-labeled, and traceable — never a black-box composite passed off as objective fact.
 - **Provider-coverage-dependent.** A signal's reach scales with *enabled* providers (ProviderCatalog): free sources → basic price / news / calendar / fundamentals signals; IBKR → realtime/near-realtime quote, IV, option-chain, position context; SA → Alpha Picks / article / comment / community; Polygon / Finnhub / Financial Datasets → historical news, analyst, earnings, segment revenue. **Every signal must show which sources support it** — not a single opaque score (same spirit as §2.3 per-claim traceability).
@@ -227,7 +228,7 @@ Three distinct research objects, deliberately not merged:
 
 - **Local-first, BYOK, no-sign-in, telemetry off by default** (VISION Tier A). Single-user, single-writer, one profile dir (SPEC §3, §5).
 - **Current SA ingestion stays**: Chrome/Firefox extension → Native Messaging host → DB is a **protected runtime surface** — do not break it.
-- **RL** = retired/offline under `training/`; the Algo nav entry (if present) stays empty in v1.
+- **RL** = former implementation retired to Git history; the Algo nav entry (if present) stays empty in v1. Any restart requires a new reviewed research design.
 - **Deferred spikes (not v1, not drop-in replacements):**
   - *Embedded/stealth browser* (e.g. CloakBrowser) as an alternative SA-ingestion backend — evaluate bundle size, ToS/compliance, login-profile, platform-publish cost before adopting. Not a v1 extension replacement. Before this can replace the external extension path, complete `SA_EXTENSION_ROADMAP.md` P0: runtime diagnostics, lifecycle cleanup, capture-core extraction, and soak testing.
   - *Code/doc knowledge-graph tooling* (e.g. Understand-Anything) for repo/doc navigation — a dev-tooling spike, **not** a replacement for the agent's research memory.

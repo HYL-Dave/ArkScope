@@ -136,9 +136,6 @@ class AgentConfig(BaseModel):
     sa_comments_backfill_per_full_scan: int = 10
     sa_comments_backfill_per_backfill_scan: int = 50
 
-    # Phase D analysis pipeline scaffold
-    analysis_pipeline_enabled: bool = False
-
     # Free macro/calendar layer (FRED + Finnhub calendars).
     # Gates registration of fetch_fred_series / fetch_fred_release_dates jobs
     # so an environment without FRED_API_KEY doesn't get them surfaced via
@@ -368,11 +365,6 @@ def get_agent_config() -> AgentConfig:
         config.sa_cache_hours = sa_prefs["cache_hours"]
     if "detail_cache_days" in sa_prefs:
         config.sa_detail_cache_days = sa_prefs["detail_cache_days"]
-
-    # Phase D analysis pipeline
-    analysis_prefs = profile.get("analysis_pipeline", {})
-    if "enabled" in analysis_prefs:
-        config.analysis_pipeline_enabled = analysis_prefs["enabled"]
 
     # Free macro/calendar layer
     mc_prefs = profile.get("macro_calendar", {})

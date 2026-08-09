@@ -63,11 +63,12 @@ def test_help_exits_zero_with_full_flag_set():
     assert r.returncode == 0
     for flag in ("--status", "--all", "--news", "--polygon", "--finnhub",
                  "--ibkr-news", "--ibkr-prices", "--dry-run",
-                 "--parallel", "--quiet", "--scores",
+                 "--parallel", "--quiet",
                  "--tickers", "--scope"):
         assert flag in r.stdout, f"flag {flag} missing from --help"
     assert "--iv-history" not in r.stdout
     assert "--sync-db" not in r.stdout
+    assert "--scores" not in r.stdout
 
 
 def test_protected_command_dry_run_plan(universe_dbs):
@@ -105,14 +106,6 @@ def test_no_scope_errors():
     r = _run("--news", "--dry-run")
     assert r.returncode == 1
     assert "explicit ticker scope required" in (r.stdout + r.stderr)
-
-
-def test_scores_flag_is_retired_and_does_not_shell_to_pg_importer():
-    r = _run("--scores", "--dry-run")
-    out = r.stdout + r.stderr
-    assert r.returncode != 0
-    assert "retired" in out.lower()
-    assert "migrate_to_supabase" not in out
 
 
 def test_daily_update_unavailable_scope_exits_before_any_source(

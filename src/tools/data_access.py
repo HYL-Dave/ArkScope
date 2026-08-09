@@ -515,17 +515,10 @@ class DataAccessLayer:
         ticker: Optional[str] = None,
         days: int = 30,
         source: str = "auto",
-        scored_only: bool = True,
-        model: Optional[str] = None,
     ) -> NewsQueryResult:
-        """Query news and return structured result.
-
-        Args:
-            model: Specific scoring model (e.g. 'gpt_5_2'). None = latest/best.
-        """
+        """Query raw news and return a structured result."""
         df = self._backend.query_news(
             ticker=ticker, days=days, source=source,
-            scored_only=scored_only, model=model,
         )
 
         articles = []
@@ -537,8 +530,6 @@ class DataAccessLayer:
                 source=str(row.get("source", "")),
                 url=_safe_str(row.get("url")),
                 publisher=_safe_str(row.get("publisher")),
-                sentiment_score=_safe_float(row.get("sentiment_score")),
-                risk_score=_safe_float(row.get("risk_score")),
                 description=_safe_str(row.get("description")),
             ))
 
@@ -561,7 +552,6 @@ class DataAccessLayer:
         ticker: Optional[str] = None,
         days: int = 30,
         limit: int = 20,
-        scored_only: bool = True,
     ) -> NewsQueryResult:
         """Search news with full-text search (DB) or keyword filtering (file fallback).
 
@@ -571,12 +561,12 @@ class DataAccessLayer:
         if isinstance(self._backend, DatabaseBackend):
             df = self._backend.query_news_search(
                 query=query, ticker=ticker, days=days,
-                limit=limit, scored_only=scored_only,
+                limit=limit,
             )
         else:
             # FileBackend fallback: get all, filter in Python
             df = self._backend.query_news(
-                ticker=ticker, days=days, scored_only=scored_only,
+                ticker=ticker, days=days,
             )
             if query.strip() and not df.empty:
                 q_lower = query.lower()
@@ -595,8 +585,6 @@ class DataAccessLayer:
                 source=str(row.get("source", "")),
                 url=_safe_str(row.get("url")),
                 publisher=_safe_str(row.get("publisher")),
-                sentiment_score=_safe_float(row.get("sentiment_score")),
-                risk_score=_safe_float(row.get("risk_score")),
                 description=_safe_str(row.get("description")),
             ))
 
@@ -619,14 +607,13 @@ class DataAccessLayer:
     ) -> List[dict]:
         """Get lightweight per-ticker news statistics.
 
-        Returns list of dicts, one per ticker, with article_count,
-        scored_count, date_range, avg_sentiment, avg_risk.
+        Returns one raw article count and date range per ticker.
         """
         if isinstance(self._backend, DatabaseBackend):
             df = self._backend.query_news_stats(ticker=ticker, days=days)
         else:
             # FileBackend fallback: compute stats from full data
-            news_result = self.get_news(ticker=ticker, days=days, scored_only=False)
+            news_result = self.get_news(ticker=ticker, days=days)
             if not news_result.articles:
                 return []
             # Group by ticker manually
@@ -636,18 +623,11 @@ class DataAccessLayer:
                 groups[a.ticker].append(a)
             rows = []
             for t, arts in groups.items():
-                sents = [a.sentiment_score for a in arts if a.sentiment_score is not None]
-                risks = [a.risk_score for a in arts if a.risk_score is not None]
                 rows.append({
                     "ticker": t,
                     "article_count": len(arts),
-                    "scored_count": len(sents),
                     "earliest_date": min(a.date for a in arts) if arts else None,
                     "latest_date": max(a.date for a in arts) if arts else None,
-                    "avg_sentiment": round(sum(sents) / len(sents), 2) if sents else None,
-                    "avg_risk": round(sum(risks) / len(risks), 2) if risks else None,
-                    "bullish_count": sum(1 for s in sents if s >= 4),
-                    "bearish_count": sum(1 for s in sents if s <= 2),
                 })
             return rows
 

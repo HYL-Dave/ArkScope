@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 _ROOT = Path(__file__).resolve().parents[1]
-_DISCOVERY_ROOTS = ("src", "data_sources", "apps", "training", "docs", "tests", "config")
+_DISCOVERY_ROOTS = ("src", "data_sources", "apps", "docs", "tests", "config")
 _SEARCH_PATTERNS = (
     "data/prices",
     "prices/15min",
@@ -48,8 +48,6 @@ _RETIRED_CURRENT = {
     "data_sources/financial_metrics_calculator.py",
     "src/daily_update.py",
     "src/tools/backends/file_backend.py",
-    "training/data_prep/README.md",
-    "training/data_prep/prepare_training_data.py",
 }
 _LOW_LEVEL_COMPATIBILITY = {
     "src/tools/backends/__init__.py",
@@ -121,6 +119,7 @@ _TEST_FIXTURES = {
     "tests/test_eir006_retired_data_boundaries.py",
     "tests/test_financial_metrics_calculator.py",
     "tests/test_job_runs.py",
+    "tests/test_legacy_score_retirement.py",
     "tests/test_market_data_admin.py",
     "tests/test_market_data_direct.py",
     "tests/test_sqlite_backend.py",
@@ -190,10 +189,6 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
         "docs/data/DATA_SUBSCRIPTION_GUIDE.md",
         "docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md",
     )
-    current_training = (
-        "training/data_prep/prepare_training_data.py",
-        "training/data_prep/README.md",
-    )
     current_tool_copy = (
         "src/tools/registry.py",
         "src/agents/anthropic_agent/tools.py",
@@ -202,7 +197,7 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
         "src/tools/schemas.py",
     )
 
-    for path in (*current_docs, *current_training):
+    for path in current_docs:
         text = _read(path)
         assert "data/prices" not in text, path
         assert "prices/15min" not in text, path
@@ -221,8 +216,7 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
         assert "IBKR real-time" not in text, path
         assert expected_tool_claim in text, path
 
-    training_script = _read("training/data_prep/prepare_training_data.py")
-    assert "direct IBKR TWS/Gateway daily fetch" in training_script
+    assert not (_ROOT / "training").exists()
     file_backend = _read("src/tools/backends/file_backend.py")
     assert "retired empty compatibility" in file_backend.lower()
 

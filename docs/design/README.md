@@ -75,19 +75,19 @@ contents were removed 2026-06-07, recoverable via git.)
 | `P1_2_PROVIDER_DISCOVERY.md` | **Macro / Calendar Provider Discovery** | FRED/Finnhub free-tier behavior facts (feed → Provider Catalog, then archive). |
 | `P1_3_SPEC.md` | **Seeking Alpha Digest Workflow** | Deterministic SA evidence-pack tool — *reads the existing extension/DB, not a new crawler*. |
 | `P1_4_SPEC.md` | **Context Compression Spec** | In-prompt compression + on-disk retention; agent long-context foundation. |
-| `MULTI_FACTOR_SIGNAL_DETECTION.md` | **Multi-Factor Signal Detection** | `src/signals/` multi-factor signals (shipped P1; kept-but-adapt; AI-card evidence stays pure-objective). |
+| `MULTI_FACTOR_SIGNAL_DETECTION.md` | **Multi-Factor Signal Detection** | Historical design record; implementation retired, future Signals requires new research gates. |
 
 ## DECISION records
 | File | Read as | One-line |
 |---|---|---|
 | `P1_5_S3_OSS_SPIKE_DECISION.md` | **System Health Dashboard Decision** | Why not sqladmin/Superset; repositioned to a small ops/health view *inside* the workbench. |
-| `RL_COLLAPSE_FINDINGS.md` | **RL Collapse Findings** | Why RL is paused/retired (OOS value unproven); current RL-status authority. RL code lives offline under `training/`. |
+| `RL_COLLAPSE_FINDINGS.md` | **RL Collapse Findings** | Why the unvalidated RL implementation was retired; Git history is the code archive. |
 
 ## DEFERRED (v2) / PAUSED
 | File | Read as | Status | One-line |
 |---|---|---|---|
 | `PHASE_A_KNOWLEDGE_GRAPH_SKETCH.md` | **v2: Knowledge-Graph Memory** | DEFERRED | Forward design; not v1 scope (SPEC §11). |
-| `PHASE_D_ANALYSIS_PIPELINE_SKETCH.md` | **v2: Analysis Pipeline** | DEFERRED | Forward design over the `src/analysis/` scaffold; not v1 scope. |
+| `PHASE_D_ANALYSIS_PIPELINE_SKETCH.md` | **Analysis Pipeline History** | RETIRED | Scaffold record and restart conditions; no current implementation. |
 | `PHASE_C_UNIFIED_RUNNER_SPEC.md` | **Unified Runner** | PAUSED | Dual-SDK de-duplication; preserved behind a resume gate. |
 
 ## Agent-layer reference (keep; refresh pre-pivot framing)

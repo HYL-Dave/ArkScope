@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;        -- trigram for text search
 -- Core Tables
 -- =============================================================================
 
--- News articles (scored by LLM)
+-- Raw news articles
 CREATE TABLE IF NOT EXISTS news (
     id            BIGSERIAL PRIMARY KEY,
     ticker        VARCHAR(10)   NOT NULL,
@@ -23,9 +23,6 @@ CREATE TABLE IF NOT EXISTS news (
     publisher     VARCHAR(200),
     source        VARCHAR(50)   NOT NULL,         -- 'ibkr', 'polygon', 'finnhub'
     published_at  TIMESTAMPTZ   NOT NULL,
-    sentiment_score SMALLINT,                     -- 1-5
-    risk_score      SMALLINT,                     -- 1-5
-    scored_model  VARCHAR(50),                    -- 'haiku', 'gpt_5', etc.
     embedding     VECTOR(1536),                   -- for future semantic search
     article_hash  VARCHAR(64)   UNIQUE NOT NULL,  -- dedup key (SHA-256 of title+ticker+date)
     created_at    TIMESTAMPTZ   DEFAULT NOW()
@@ -52,21 +49,6 @@ CREATE TABLE IF NOT EXISTS fundamentals (
     snapshot_date DATE        NOT NULL,
     data          JSONB       NOT NULL,  -- full ReportSnapshot JSON
     UNIQUE(ticker, snapshot_date)
-);
-
--- Generated trading signals (audit trail)
-CREATE TABLE IF NOT EXISTS signals (
-    id              BIGSERIAL PRIMARY KEY,
-    ticker          VARCHAR(10),
-    sector          VARCHAR(50),
-    action          VARCHAR(20),       -- 'BUY', 'SELL', 'HOLD', 'NEUTRAL'
-    confidence      DOUBLE PRECISION,
-    composite_score DOUBLE PRECISION,
-    risk_level      SMALLINT,          -- 1-5
-    reasoning       TEXT,
-    factors         JSONB,
-    strategy        VARCHAR(50),
-    created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Agent query log (for cost tracking + replay)
@@ -104,10 +86,6 @@ CREATE INDEX IF NOT EXISTS idx_news_title_trgm
 -- Prices: primary query pattern is (ticker, interval, datetime range)
 CREATE INDEX IF NOT EXISTS idx_prices_ticker_interval_dt
     ON prices(ticker, interval, datetime DESC);
-
--- Signals
-CREATE INDEX IF NOT EXISTS idx_signals_ticker_date
-    ON signals(ticker, created_at DESC);
 
 -- Agent queries
 CREATE INDEX IF NOT EXISTS idx_queries_date
@@ -165,30 +143,4 @@ AS $$
       AND interval = p_interval
       AND datetime >= NOW() - (p_days || ' days')::INTERVAL
     ORDER BY datetime ASC;
-$$;
-
--- Summary stats for a ticker's news sentiment
-CREATE OR REPLACE FUNCTION news_sentiment_summary(
-    p_ticker VARCHAR(10),
-    p_days INTEGER DEFAULT 7
-)
-RETURNS TABLE(
-    total_articles BIGINT,
-    avg_sentiment NUMERIC,
-    avg_risk NUMERIC,
-    bullish_count BIGINT,
-    bearish_count BIGINT
-)
-LANGUAGE sql STABLE
-AS $$
-    SELECT
-        COUNT(*) AS total_articles,
-        ROUND(AVG(sentiment_score)::NUMERIC, 2) AS avg_sentiment,
-        ROUND(AVG(risk_score)::NUMERIC, 2) AS avg_risk,
-        COUNT(*) FILTER (WHERE sentiment_score >= 4) AS bullish_count,
-        COUNT(*) FILTER (WHERE sentiment_score <= 2) AS bearish_count
-    FROM news
-    WHERE ticker = p_ticker
-      AND published_at >= NOW() - (p_days || ' days')::INTERVAL
-      AND sentiment_score IS NOT NULL;
 $$;

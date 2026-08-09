@@ -3,8 +3,8 @@ LocalMarketDatabaseBackend — DatabaseBackend that serves the market_data domai
 from local SQLite stores.
 
 Why a SUBCLASS of DatabaseBackend rather than a wrapper: the DAL and agents branch
-on ``isinstance(backend, DatabaseBackend)`` in ~30 places to decide "is this a
-SQL/DB backend" (batch summaries, news, sentiment, freshness, …). A wrapper that
+on ``isinstance(backend, DatabaseBackend)`` to decide "is this a SQL/DB backend".
+A wrapper that
 merely forwarded calls would FAIL those isinstance checks → every DB-only path
 short-circuits to empty/file behavior → the cockpit shows wrong/empty data. By
 subclassing, this IS a DatabaseBackend (isinstance passes, ``_get_conn`` + all ~41
@@ -16,12 +16,8 @@ surfaces that must fail closed rather than revive a runtime fallback.
 Overridden market reads:
   - ``query_prices`` (3a) — local-only after P0-C; a miss is an honest empty,
     never a PG fallback;
-  - ``query_news`` (3b) — UNSCORED reads are local-first with PG fallback; a SCORED
-    request (``scored_only`` / a specific ``model``) does NOT fall back to PG —
-    ``news_scores`` is RETIRED (§4 decision 2026-06-23), sentiment is local-first
-    (optional 1-5 ``sentiment_score`` on the local row), so a scored miss is an
-    honest empty. ``query_news_search`` (3b, FTS5) + ``query_news_stats`` (score-free
-    scout stats; no PG fallback on local empty);
+  - ``query_news`` / search / stats (3b) — raw local news only; an empty local
+    result is an honest empty and never revives the PostgreSQL archive;
   - ``get_available_tickers('prices')`` is local-only after P0-C;
     other local domains remain transitional where noted.
 
@@ -77,58 +73,29 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             logger.warning(f"local market query_prices failed ({e})")
             return pd.DataFrame()
 
-    def query_news(self, ticker=None, days=30, source="auto", scored_only=True, model=None):
-        # news_scores RETIRED (DATA_COLLECTION plan §4 decision 2026-06-23): sentiment is
-        # local-first (optional 1-5 sentiment_score on the local news row). A SCORED request
-        # (scored_only / specific model) has NO PG authority to fall back to → return the
-        # honest local result, possibly empty. Only an UNSCORED local miss may still use PG
-        # during the market transition (strict mode / R4 disables that later).
+    def query_news(self, ticker=None, days=30, source="auto"):
         try:
-            df = self._market.query_news(
-                ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
-            )
+            return self._market.query_news(ticker=ticker, days=days, source=source)
         except Exception as e:
             logger.warning(f"local query_news failed ({e})")
-            df = None
-        if df is not None and not df.empty:
-            return df
-        if scored_only or model or self._strict or self._news_strict:
-            return df if df is not None else pd.DataFrame(columns=_NEWS_COLS)
-        return super().query_news(
-            ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
-        )
+            return pd.DataFrame(columns=_NEWS_COLS)
 
-    def query_news_search(self, query="", ticker=None, days=30, limit=20, scored_only=True):
-        # news_scores RETIRED: a SCORED search has no PG authority → honest local result
-        # (possibly empty), never a PG fallback (same contract as query_news). Only an
-        # UNSCORED local miss may still use PG during the market transition.
+    def query_news_search(self, query="", ticker=None, days=30, limit=20):
         try:
-            df = self._market.query_news_search(
-                query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
+            return self._market.query_news_search(
+                query=query, ticker=ticker, days=days, limit=limit
             )
         except Exception as e:
             logger.warning(f"local query_news_search failed ({e})")
-            df = None
-        if df is not None and not df.empty:
-            return df
-        if scored_only or self._strict or self._news_strict:
-            return df if df is not None else pd.DataFrame(columns=_NEWS_SEARCH_COLS)
-        return super().query_news_search(
-            query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
-        )
+            return pd.DataFrame(columns=_NEWS_SEARCH_COLS)
 
     def query_news_stats(self, ticker=None, days=30):
-        # Scout stats must stay local and quick. The local mirror has article counts
-        # and date ranges but not news_scores yet, so score fields are NULL/0. Empty
-        # local results are honest empty results — do NOT fall back to PG, or a ticker
-        # miss can block get_news_brief on the remote score path.
+        # Raw scout stats stay local and quick.
         try:
             return self._market.query_news_stats(ticker=ticker, days=days)
         except Exception as e:
             logger.warning(f"local query_news_stats failed ({e})")
-            if self._strict or self._news_strict:
-                return pd.DataFrame(columns=_NEWS_STATS_COLS)  # local-only: honest empty, no PG
-            return super().query_news_stats(ticker=ticker, days=days)
+            return pd.DataFrame(columns=_NEWS_STATS_COLS)
 
     def query_news_feed(
         self,

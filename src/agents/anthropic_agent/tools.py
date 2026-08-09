@@ -57,24 +57,6 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             }
         },
         {
-            "name": "get_news_sentiment_summary",
-            "description": "Get aggregated sentiment statistics (mean, bullish/bearish ratio) for a ticker.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
-                    },
-                    "days": {
-                        "type": "integer",
-                        "description": "Lookback period in days (default: 7)"
-                    }
-                },
-                "required": ["ticker"]
-            }
-        },
-        {
             "name": "search_news_by_keyword",
             "description": "Search news articles by keyword using full-text search. Returns up to `limit` most recent matches.",
             "input_schema": {
@@ -129,7 +111,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "search_news_advanced",
             "description": (
                 "Advanced news search combining full-text search + multi-ticker + "
-                "date range + score filters. Use for cross-ticker theme searches "
+                "date range. Use for cross-ticker theme searches "
                 "(e.g. 'tariff impact' across AI_CHIPS sector). All filtering at DB level."
             ),
             "input_schema": {
@@ -147,18 +129,6 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "days": {
                         "type": "integer",
                         "description": "Lookback period in days (default: 30)"
-                    },
-                    "scored_only": {
-                        "type": "boolean",
-                        "description": "Only return scored articles (default: false)"
-                    },
-                    "min_sentiment": {
-                        "type": "integer",
-                        "description": "Minimum sentiment score (1-5)"
-                    },
-                    "max_risk": {
-                        "type": "integer",
-                        "description": "Maximum risk score (1-5)"
                     },
                     "limit": {
                         "type": "integer",
@@ -367,10 +337,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["ticker"]
             }
         },
-        # Signal Tools
+        # Raw news event tools
         {
-            "name": "detect_anomalies",
-            "description": "Detect statistical anomalies in sentiment and news volume for a ticker.",
+            "name": "detect_news_volume_anomaly",
+            "description": "Detect a raw news-volume anomaly for a ticker.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -392,7 +362,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "detect_event_chains",
-            "description": "Detect event chain patterns (earnings -> guidance -> analyst reactions).",
+            "description": "Detect deterministic event sequences from raw news titles.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -403,65 +373,6 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "days": {
                         "type": "integer",
                         "description": "Lookback period in days (default: 30)"
-                    }
-                },
-                "required": ["ticker"]
-            }
-        },
-        {
-            "name": "synthesize_signal",
-            "description": "Synthesize a multi-factor trading signal combining sector momentum, events, and sentiment.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
-                    },
-                    "days": {
-                        "type": "integer",
-                        "description": "Lookback period in days (default: 30)"
-                    },
-                    "strategy": {
-                        "type": "string",
-                        "description": "Strategy name for custom weights (from user_profile.yaml)"
-                    },
-                    "as_of_date": {
-                        "type": "string",
-                        "description": "Anchor date YYYY-MM-DD (default: latest date in data)"
-                    }
-                },
-                "required": ["ticker"]
-            }
-        },
-        {
-            "name": "get_signal_factors",
-            "description": (
-                "Return the multi-factor breakdown behind synthesize_signal "
-                "(SECTOR_MOMENTUM / EVENT_CHAIN / SENTIMENT_ANOMALY / "
-                "VOLUME_SPIKE / EXTREME_SENTIMENT) with raw impact / weight / "
-                "contribution plus data_quality (news_count, scored_news_count, "
-                "missing_factors, errors). Recommendation, not prediction. "
-                "SECTOR_MOMENTUM is sector-shared, not ticker-specific."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
-                    },
-                    "days": {
-                        "type": "integer",
-                        "description": "Lookback period in days (default: 30)"
-                    },
-                    "as_of_date": {
-                        "type": "string",
-                        "description": "Anchor date YYYY-MM-DD (default: ticker's latest news date)"
-                    },
-                    "strategy": {
-                        "type": "string",
-                        "description": "Strategy name for custom weights (from user_profile.yaml)"
                     }
                 },
                 "required": ["ticker"]
@@ -1374,7 +1285,6 @@ def execute_tool(
     """
     from src.tools.news_tools import (
         get_ticker_news,
-        get_news_sentiment_summary,
         search_news_by_keyword,
         get_news_brief,
         search_news_advanced,
@@ -1391,11 +1301,9 @@ def execute_tool(
     from src.tools.portfolio_tools import get_portfolio_analysis
     from src.tools.portfolio_holdings_tools import get_portfolio_holdings
     from src.tools.earnings_tools import get_earnings_impact
-    from src.tools.signal_tools import (
-        detect_anomalies,
+    from src.tools.news_event_tools import (
         detect_event_chains,
-        get_signal_factors,
-        synthesize_signal,
+        detect_news_volume_anomaly,
     )
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
@@ -1434,11 +1342,6 @@ def execute_tool(
             source=tool_input.get("source", "auto"),
             limit=tool_input.get("limit", 20),
         ),
-        "get_news_sentiment_summary": lambda: get_news_sentiment_summary(
-            dal,
-            tool_input["ticker"],
-            days=tool_input.get("days", 7)
-        ),
         "search_news_by_keyword": lambda: search_news_by_keyword(
             dal,
             tool_input["keyword"],
@@ -1456,9 +1359,6 @@ def execute_tool(
             query=tool_input.get("query", ""),
             tickers=tool_input.get("tickers"),
             days=tool_input.get("days", 30),
-            scored_only=tool_input.get("scored_only", False),
-            min_sentiment=tool_input.get("min_sentiment"),
-            max_risk=tool_input.get("max_risk"),
             limit=tool_input.get("limit", 20),
         ),
         "get_ticker_prices": lambda: get_ticker_prices(
@@ -1497,7 +1397,7 @@ def execute_tool(
             max_expirations_for_term_structure=tool_input.get(
                 "max_expirations_for_term_structure", 6),
         ),
-        "detect_anomalies": lambda: detect_anomalies(
+        "detect_news_volume_anomaly": lambda: detect_news_volume_anomaly(
             dal,
             tool_input["ticker"],
             days=tool_input.get("days", 30),
@@ -1507,20 +1407,6 @@ def execute_tool(
             dal,
             tool_input["ticker"],
             days=tool_input.get("days", 30)
-        ),
-        "synthesize_signal": lambda: synthesize_signal(
-            dal,
-            tool_input["ticker"],
-            days=tool_input.get("days", 30),
-            strategy=tool_input.get("strategy"),
-            as_of_date=tool_input.get("as_of_date"),
-        ),
-        "get_signal_factors": lambda: get_signal_factors(
-            dal,
-            tool_input["ticker"],
-            days=tool_input.get("days", 30),
-            as_of_date=tool_input.get("as_of_date"),
-            strategy=tool_input.get("strategy"),
         ),
         "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
             dal,

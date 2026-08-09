@@ -129,8 +129,8 @@ def test_news_hard_local_no_dsn_never_calls_pg_for_empty_reads(tmp_path, monkeyp
     dal = DataAccessLayer(base_path=tmp_path, db_dsn="auto")
 
     assert isinstance(dal._backend, LocalMarketDatabaseBackend)
-    assert dal.get_news(ticker="AAPL", scored_only=False).count == 0
-    assert dal.search_news(query="Apple", ticker="AAPL", scored_only=False).count == 0
+    assert dal.get_news(ticker="AAPL").count == 0
+    assert dal.search_news(query="Apple", ticker="AAPL").count == 0
     assert dal.get_news_stats(ticker="AAPL") == []
     feed = dal.get_news_feed(q="Apple", ticker="AAPL")
     assert feed["available"] is True

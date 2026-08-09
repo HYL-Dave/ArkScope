@@ -13,7 +13,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.agents.config import get_agent_config
-from src.analysis.contracts import AnalysisArtifact, AnalysisRequest, IntegrityResult, RenderedReport
 from src.api.routes.jobs import JobRunRequest, jobs_status, run_named_job
 from src.api.routes.reports import report_detail, reports_list
 from src.api.routes.seeking_alpha import (
@@ -37,61 +36,18 @@ class DummyDAL:
 class TestServiceJobs:
     def test_list_jobs_status_includes_external_and_flagged_jobs(self):
         cfg = get_agent_config()
-        original_analysis = cfg.analysis_pipeline_enabled
         original_sa = cfg.sa_enabled
-        cfg.analysis_pipeline_enabled = False
         cfg.sa_enabled = True
         try:
             jobs = list_jobs_status(DummyDAL(), config=cfg)
         finally:
-            cfg.analysis_pipeline_enabled = original_analysis
             cfg.sa_enabled = original_sa
 
         names = {job["name"]: job for job in jobs}
-        assert "analysis_watchlist_batch" in names
-        assert names["analysis_watchlist_batch"]["enabled"] is False
-        assert "analysis_pipeline.enabled" in names["analysis_watchlist_batch"]["availability_reason"]
+        assert names["monitor_watchlist_scan"]["enabled"] is True
+        assert names["monitor_watchlist_scan"]["runnable_via_api"] is True
         assert names["sa_alpha_picks_refresh"]["source"] == "chrome_extension"
         assert names["sa_alpha_picks_refresh"]["runnable_via_api"] is False
-
-    def test_run_analysis_watchlist_batch(self, monkeypatch):
-        artifact = AnalysisArtifact(
-            request=AnalysisRequest(ticker="NVDA", depth="quick"),
-            context_summary={},
-            strategy_results={},
-            final_decision={"action": "buy", "summary": "NVDA bias"},
-            report_sections={"executive_summary": "NVDA bias"},
-            degradation_summary=[],
-        )
-
-        def fake_run_analysis_request(request, *, dal=None, render_format="markdown"):
-            del dal, render_format
-            assert request.depth == "quick"
-            return SimpleNamespace(
-                artifact=artifact,
-                integrity=IntegrityResult(artifact=artifact, status="clean"),
-                report=RenderedReport(format="markdown", content="# Report"),
-            )
-
-        monkeypatch.setattr("src.service.jobs.run_analysis_request", fake_run_analysis_request)
-
-        cfg = get_agent_config()
-        original_analysis = cfg.analysis_pipeline_enabled
-        cfg.analysis_pipeline_enabled = True
-        try:
-            result = run_job(
-                "analysis_watchlist_batch",
-                dal=DummyDAL(),
-                params={"tickers": ["NVDA"], "depth": "quick"},
-                config=cfg,
-            )
-        finally:
-            cfg.analysis_pipeline_enabled = original_analysis
-
-        assert result.status == "succeeded"
-        assert result.result["success_count"] == 1
-        assert result.result["items"][0]["ticker"] == "NVDA"
-        assert result.result["items"][0]["action"] == "buy"
 
     def test_run_monitor_watchlist_scan(self, monkeypatch):
         class FakeMonitorEngine:
@@ -142,13 +98,13 @@ class TestJobsRoutes:
             "src.api.routes.jobs.list_jobs_status",
             lambda dal: [
                 {
-                    "name": "analysis_watchlist_batch",
+                    "name": "monitor_watchlist_scan",
                     "description": "desc",
                     "source": "api",
                     "runnable_via_api": True,
                     "enabled": True,
                     "availability_reason": None,
-                    "default_params": {"depth": "standard"},
+                    "default_params": {"notify": False},
                     "watchlist_ticker_count": 2,
                     "last_status": "never_run",
                     "last_started_at": None,
@@ -161,7 +117,7 @@ class TestJobsRoutes:
 
         response = jobs_status(dal=object())
         assert response.count == 1
-        assert response.jobs[0].name == "analysis_watchlist_batch"
+        assert response.jobs[0].name == "monitor_watchlist_scan"
 
     def test_run_named_job_maps_external_job_to_409(self, monkeypatch):
         monkeypatch.setattr(

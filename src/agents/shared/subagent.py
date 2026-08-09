@@ -124,7 +124,7 @@ You are a deep research analyst in the ArkScope trading system.
 Your job is to perform thorough, multi-tool investigation of a specific topic.
 
 When given a research task:
-1. Gather data from multiple sources (news, prices, fundamentals, options, signals)
+1. Gather data from multiple sources (news, prices, fundamentals, options, events)
 2. Cross-reference findings for consistency
 3. Identify contradictions and data gaps
 4. Synthesize a comprehensive analysis with confidence assessment
@@ -198,21 +198,19 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
         name="deep_researcher",
         description=(
             "Performs thorough multi-source investigation: cross-referencing "
-            "news sentiment, price action, fundamentals, "
-            "and event signals to produce comprehensive analysis."
+            "raw news, price action, fundamentals, "
+            "and event sequences to produce comprehensive analysis."
         ),
         model="gpt-5.4",
         system_prompt=_DEEP_RESEARCHER_PROMPT,
         tool_names=[
             "get_ticker_news",
-            "get_news_sentiment_summary",
             "search_news_by_keyword",
             "get_ticker_prices",
             "get_price_change",
             "get_sector_performance",
-            "detect_anomalies",
+            "detect_news_volume_anomaly",
             "detect_event_chains",
-            "synthesize_signal",
             "get_fundamentals_analysis",
             "get_sec_filings",
             "tavily_search",
@@ -233,7 +231,6 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
         tool_names=[
             "get_news_brief",
             "get_ticker_news",
-            "get_news_sentiment_summary",
             "search_news_advanced",
             "get_price_change",
             "get_sector_performance",

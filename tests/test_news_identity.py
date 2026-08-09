@@ -35,14 +35,11 @@ def _insert(
     url="",
     publisher="",
     source="ibkr",
-    sentiment_score=None,
-    sentiment_source=None,
-    sentiment_scale=None,
 ):
     conn.execute(
         "INSERT INTO news "
-        "(id,ticker,title,description,url,publisher,source,published_at,article_hash,"
-        "sentiment_score,sentiment_source,sentiment_scale) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "(id,ticker,title,description,url,publisher,source,published_at,article_hash) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
         (
             row_id,
             ticker,
@@ -53,9 +50,6 @@ def _insert(
             source,
             published_at,
             article_hash or canonical_article_hash(ticker, title, published_at),
-            sentiment_score,
-            sentiment_source,
-            sentiment_scale,
         ),
     )
     conn.commit()
@@ -167,23 +161,22 @@ def test_apply_never_overwrites_nonempty_canonical_fields(conn):
     assert tuple(row) == (2, "canonical description", "https://canonical")
 
 
-def test_apply_merges_missing_sentiment_fields(conn):
+def test_apply_collision_does_not_project_retired_sentiment_fields(conn):
+    assert ni.MERGE_FIELDS == ("description", "url", "publisher")
+
     _insert(
         conn,
         row_id=1,
         article_hash=canonical_article_hash("LC", "T", "2026-06-01"),
-        sentiment_score=4.0,
-        sentiment_source="local",
-        sentiment_scale="1-5",
+        description="stale description",
+        url="https://stale.example",
     )
     _insert(conn, row_id=2)
 
     ni.apply_news_identity_plan(conn, ni.plan_news_identity_repair(conn))
 
-    row = conn.execute(
-        "SELECT id,sentiment_score,sentiment_source,sentiment_scale FROM news"
-    ).fetchone()
-    assert tuple(row) == (2, 4.0, "local", "1-5")
+    row = conn.execute("SELECT id,description,url FROM news").fetchone()
+    assert tuple(row) == (2, "stale description", "https://stale.example")
 
 
 def test_apply_preserves_canonical_source_and_published_at(conn):

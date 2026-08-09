@@ -63,7 +63,7 @@ These are allowed to change aggressively after an absorption check:
 - Pre-pivot HOW documents: service-first, RL-productionization, PG-first, Supabase-first, Discord-first, CLI-first.
 - One-off scoring / comparison / model-bakeoff research scripts and generated reports.
 - `NewsExtraction` / FNSPID-era batch workflow docs, unless a current import/runtime dependency is found.
-- Training/RL docs and scripts not on the protected runtime path; paused means preserve code/history as needed, not keep active-looking docs.
+- Retired training/RL implementation and docs; Git history is sufficient preservation and no dormant package is protected.
 
 Delete is acceptable when residual facts are already absorbed into canonical docs or can be recovered from git history.
 
@@ -85,13 +85,11 @@ Remaining hits must be historical/runbook/archive references, not executable pat
 
 ### Level 1 -- Shell/script path changes
 
-Use when editing `scripts/`, `training/scripts/`, installer scripts, or path-handling code.
+Use when editing installer scripts or path-handling code.
 
 ```bash
 bash -n extensions/sa_alpha_picks/install.sh
 bash -n extensions/sa_alpha_picks/install_firefox.sh
-bash -n training/scripts/run_polygon_production.sh
-bash -n training/scripts/run_feature_comparison.sh
 python -m src.daily_update --help
 # Plan-only (must list polygon_news/finnhub_news/ibkr_news/ibkr_prices and exit 0
 # without touching IBKR/DB/job_runs):
@@ -170,29 +168,13 @@ Passing evidence is a timestamped `record_extension_job ... status=succeeded` fo
 
 ---
 
-## 6. `scripts/` interim survivor rule (AUTHORITY — revised 2026-08-01)
+## 6. Retired root-package rule (AUTHORITY — revised 2026-08-09)
 
-- **Only the nine paths below may remain under root `scripts/` after Tranche A.**
-  `src/` never imports `scripts/`; the package is not an app runtime surface.
-- **Provider clients stay in `data_sources/` unless deliberately migrated.** Runtime
-  orchestration / domain logic lives in `src/<domain>/...` modules. Do **not** create a
-  second provider layer under `src/providers/`.
-
-**Interim survivor table (anything else appearing under root `scripts/` is residue):**
-
-| Retained | Why (one line) |
-|---|---|
-| `scripts/__init__.py` | Transitional package marker for `scripts.scoring`; Tranche B owns removal |
-| `scripts/scoring/README.md` | Transitional scorer/importer ownership and provenance |
-| `scripts/scoring/__init__.py` | Transitional scoring package marker |
-| `scripts/scoring/import_news_scores_local.py` | Occasional local import into the retained score reader |
-| `scripts/scoring/openai_summary.py` | Transitional OpenAI summary scorer |
-| `scripts/scoring/score_ibkr_news.py` | Transitional IBKR-news scorer |
-| `scripts/scoring/score_risk_anthropic.py` | Transitional Anthropic risk scorer |
-| `scripts/scoring/score_sentiment_anthropic.py` | Transitional Anthropic sentiment scorer |
-| `scripts/scoring/validate_scores.py` | Transitional score validation |
-
-Tranche B owns the atomic retirement of the legacy score writers, readers,
-routes, tests, and this final root package. Manual live checks, including the
-FRED provider evaluation, live under `tests/live/`; they are never
-default-collected.
+- Root `scripts` and `training` packages are absent. Recreating a package marker,
+  compatibility import, disabled scaffold, or informal executable is residue.
+- Provider clients stay in `data_sources/` unless deliberately migrated. Runtime
+  orchestration/domain logic lives under its reviewed `src` owner; do not create
+  a second provider layer.
+- Manual live checks belong under `tests/live/`, are never default-collected, and
+  must correspond to a current product capability.
+- Git history is the archive for retired implementation bytes.

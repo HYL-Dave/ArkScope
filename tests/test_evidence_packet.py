@@ -9,14 +9,13 @@ source degrades into coverage rather than zeroing the packet.
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from src.evidence_packet import EvidencePacket, compute_technical_evidence, gather_evidence
 from src.tools.schemas import (
     FundamentalsResult,
-    NewsArticle,
-    NewsQueryResult,
     PriceBar,
     PriceQueryResult,
 )
@@ -55,20 +54,25 @@ class _FakeDAL:
             )
         return PriceQueryResult(ticker=ticker, interval="15min", count=0, bars=[], date_range=None)
 
-    def get_news(self, ticker, days, scored_only):
-        return NewsQueryResult(
-            ticker=ticker, count=len(self._articles), articles=self._articles, query_days=days,
+    def get_news(self, ticker, days, source="auto"):
+        del source
+        return SimpleNamespace(
+            ticker=ticker,
+            count=len(self._articles),
+            articles=self._articles,
+            query_days=days,
         )
 
 
-def _scored_articles() -> list[NewsArticle]:
+def _scored_articles() -> list[SimpleNamespace]:
+    """Legacy-decorated input proves the packet reads only its raw whitelist."""
     return [
-        NewsArticle(
+        SimpleNamespace(
             date="2026-06-04", ticker="AAPL", title="Headline one", source="polygon",
             url="http://x/1", publisher="Pub", sentiment_score=4.5, risk_score=2.0,
             description="excerpt one",
         ),
-        NewsArticle(
+        SimpleNamespace(
             date="2026-06-03", ticker="AAPL", title="Headline two", source="ibkr",
             url="http://x/2", publisher=None, sentiment_score=1.1, risk_score=4.9,
             description="excerpt two",

@@ -342,8 +342,6 @@ export interface WatchlistRow {
   latest_close: number | null;
   change_7d_pct: number | null;
   news_count_7d: number;
-  sentiment_mean: number | null;
-  bullish_ratio: number;
 }
 
 export interface WatchlistOverview {
@@ -390,8 +388,6 @@ export interface CockpitRow {
   latest_close: number | null;
   change_7d_pct: number | null;
   news_count_7d: number;
-  sentiment_mean: number | null;
-  bullish_ratio: number | null;
   lists: string[];
   archived: boolean;
   tags: TagRef[];
@@ -430,8 +426,6 @@ export interface UniverseRow {
   latest_close: number | null;
   change_7d_pct: number | null;
   news_count_7d: number;
-  sentiment_mean: number | null;
-  bullish_ratio: number | null;
   lists: string[];          // active list memberships
   all_lists: string[];      // active + archived (full provenance)
   archived_lists: string[]; // memberships that are archived

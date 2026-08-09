@@ -8,11 +8,9 @@ No LLM runs here, and ArkScope-generated LLM scores are excluded by design
 (ToolCatalog §3 rule 9):
 
   EXCLUDED from the v1 packet
-    - ``news_scores`` multi-model columns and any ``sentiment_score`` /
-      ``risk_score`` carried on news rows (stripped here)
-    - ``get_news_sentiment_summary`` (sentiment_mean) and ``search_news_advanced``
-    - ``get_signal_factors`` / ``synthesize_signal`` — built on the ``llm_sentiment``
-      pipeline; the whole ``signal_tools`` module is intentionally NOT imported
+    - retired score-storage fields carried by legacy news inputs (stripped here)
+    - retired score-derived summaries and filters
+    - the retired composite recommendation pipeline
     - ``get_earnings_impact`` composed conclusions (directional bias, surprise
       correlation, expected move)
 
@@ -27,8 +25,8 @@ No LLM runs here, and ArkScope-generated LLM scores are excluded by design
     - sa_community: Seeking Alpha digest, opinion-tagged (rule-based, no LLM scores)
     - coverage: which sources had data, which were missing, and the exclusion note
 
-Signals as a richer capability are deliberately a *separate* future surface; the
-old ``signal_tools`` is legacy / needs-redesign and is not the authority here.
+Signals as a richer capability are deliberately a *separate* future surface and
+must start from a new reviewed design rather than this packet.
 """
 
 from __future__ import annotations
@@ -72,9 +70,8 @@ _NEWS_WHITELIST = tuple(_NEWS_FIELD_MAP)
 
 _EXCLUSION_NOTE = (
     "ArkScope-generated LLM scores are excluded by design (ProductSpec §2.4 / "
-    "ToolCatalog rule 9): news_scores, per-row sentiment_score/risk_score, "
-    "get_news_sentiment_summary, and signal_tools composite/sentiment outputs are "
-    "NOT objective evidence and were not gathered."
+    "ToolCatalog rule 9): retired per-row score fields and composite recommendation "
+    "outputs are not objective evidence and were not gathered."
 )
 
 
@@ -357,9 +354,9 @@ def gather_evidence(
         errors["fundamentals"] = str(exc)
         missing.append("fundamentals")
 
-    # 3. Raw news rows — scores STRIPPED (scored_only=False = all news).
+    # 3. Raw news rows. The whitelist also strips decorated legacy inputs.
     try:
-        news = dal.get_news(ticker=tkr, days=news_days, scored_only=False)
+        news = dal.get_news(ticker=tkr, days=news_days)
         rows = []
         latest_date: Optional[str] = None
         for a in news.articles[:max_news]:

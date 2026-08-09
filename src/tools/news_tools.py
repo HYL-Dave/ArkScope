@@ -1,16 +1,7 @@
-"""
-News tool functions (5 tools).
-
-1. get_ticker_news           — Query news articles for a ticker
-2. get_news_sentiment_summary — Aggregate sentiment statistics
-3. search_news_by_keyword    — Search news by keyword (DB full-text search)
-4. get_news_brief            — Lightweight per-ticker news overview (scout tool)
-5. search_news_advanced      — Advanced multi-filter news search
-"""
+"""Raw-news tool functions."""
 
 from __future__ import annotations
 
-from statistics import median
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
@@ -55,65 +46,10 @@ def get_ticker_news(
         NewsQueryResult with articles, count, and source breakdown
     """
     limit = min(max(limit, 1), 500)
-    result = dal.get_news(ticker=ticker, days=days, source=source, scored_only=False)
+    result = dal.get_news(ticker=ticker, days=days, source=source)
     result.articles = _trim_articles(result.articles, limit)
     # count reflects total available; articles is the trimmed subset
     return result
-
-
-def get_news_sentiment_summary(
-    dal: DataAccessLayer,
-    ticker: str,
-    days: int = 7,
-) -> dict:
-    """
-    Get aggregated sentiment statistics for a ticker.
-
-    Args:
-        dal: DataAccessLayer instance
-        ticker: Stock ticker symbol
-        days: Lookback period in days
-
-    Returns:
-        Dict with:
-            ticker, days, article_count,
-            sentiment_mean, sentiment_median,
-            risk_mean, risk_median,
-            bullish_count, bearish_count, neutral_count,
-            bullish_ratio, bearish_ratio
-    """
-    result = dal.get_news(ticker=ticker, days=days, scored_only=True)
-
-    sentiments = [
-        a.sentiment_score for a in result.articles
-        if a.sentiment_score is not None
-    ]
-    risks = [
-        a.risk_score for a in result.articles
-        if a.risk_score is not None
-    ]
-
-    # Classify: on 1-5 scale, >=4 is bullish, <=2 is bearish, 3 is neutral
-    bullish = sum(1 for s in sentiments if s >= 4)
-    bearish = sum(1 for s in sentiments if s <= 2)
-    neutral = sum(1 for s in sentiments if 2 < s < 4)
-    total = len(sentiments)
-
-    return {
-        "ticker": ticker.upper(),
-        "days": days,
-        "article_count": result.count,
-        "scored_count": total,
-        "sentiment_mean": round(sum(sentiments) / total, 2) if total else None,
-        "sentiment_median": round(median(sentiments), 2) if total else None,
-        "risk_mean": round(sum(risks) / len(risks), 2) if risks else None,
-        "risk_median": round(median(risks), 2) if risks else None,
-        "bullish_count": bullish,
-        "bearish_count": bearish,
-        "neutral_count": neutral,
-        "bullish_ratio": round(bullish / total, 3) if total else 0,
-        "bearish_ratio": round(bearish / total, 3) if total else 0,
-    }
 
 
 def search_news_by_keyword(
@@ -142,7 +78,7 @@ def search_news_by_keyword(
     limit = min(max(limit, 1), 500)
     result = dal.search_news(
         query=keyword, ticker=ticker, days=days,
-        limit=limit, scored_only=False,
+        limit=limit,
     )
     # Trim descriptions for LLM context
     result.articles = _trim_articles(result.articles, limit)
@@ -194,13 +130,8 @@ def get_news_brief(
         briefs.append(NewsBrief(
             ticker=s.get("ticker", ""),
             article_count=int(s.get("article_count", 0)),
-            scored_count=int(s.get("scored_count", 0)),
             earliest_date=s.get("earliest_date"),
             latest_date=s.get("latest_date"),
-            avg_sentiment=float(s["avg_sentiment"]) if s.get("avg_sentiment") is not None else None,
-            avg_risk=float(s["avg_risk"]) if s.get("avg_risk") is not None else None,
-            bullish_count=int(s.get("bullish_count", 0)),
-            bearish_count=int(s.get("bearish_count", 0)),
         ).model_dump())
 
     # Sort by article count descending
@@ -218,13 +149,10 @@ def search_news_advanced(
     query: str = "",
     tickers: Optional[List[str]] = None,
     days: int = 30,
-    scored_only: bool = False,
-    min_sentiment: Optional[int] = None,
-    max_risk: Optional[int] = None,
     limit: int = 20,
 ) -> NewsQueryResult:
     """
-    Advanced news search combining full-text search + multi-ticker + score filters.
+    Advanced raw-news search combining full-text search and multiple tickers.
 
     All filtering happens at DB level for efficiency.
 
@@ -233,9 +161,6 @@ def search_news_advanced(
         query: Full-text search query (supports multi-word)
         tickers: Filter by multiple tickers (searched in order)
         days: Lookback period in days
-        scored_only: Only return scored articles
-        min_sentiment: Minimum sentiment score (1-5)
-        max_risk: Maximum risk score (1-5)
         limit: Max articles to return (default 20, max 500)
 
     Returns:
@@ -252,7 +177,7 @@ def search_news_advanced(
         for t in tickers:
             result = dal.search_news(
                 query=query, ticker=t, days=days,
-                limit=per_ticker_limit, scored_only=scored_only,
+                limit=per_ticker_limit,
             )
             all_articles.extend(result.articles)
             for src, cnt in result.source_breakdown.items():
@@ -260,22 +185,10 @@ def search_news_advanced(
     else:
         result = dal.search_news(
             query=query, ticker=None, days=days,
-            limit=limit, scored_only=scored_only,
+            limit=limit,
         )
         all_articles = result.articles
         all_sources = result.source_breakdown
-
-    # Apply score filters (post-DB, lightweight)
-    if min_sentiment is not None:
-        all_articles = [
-            a for a in all_articles
-            if a.sentiment_score is not None and a.sentiment_score >= min_sentiment
-        ]
-    if max_risk is not None:
-        all_articles = [
-            a for a in all_articles
-            if a.risk_score is not None and a.risk_score <= max_risk
-        ]
 
     trimmed = _trim_articles(all_articles, limit)
     ticker_label = ",".join(tickers) if tickers else "ALL"

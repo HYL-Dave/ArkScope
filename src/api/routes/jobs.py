@@ -91,14 +91,10 @@ class JobRunRequest(BaseModel):
     ``src/service/jobs.py`` consume only the keys they recognise.
     """
 
-    # analysis_watchlist_batch / monitor_watchlist_scan
+    # monitor_watchlist_scan
     tickers: Optional[List[str]] = None
-    # limit: per-job semantic. analysis_watchlist_batch caps tickers
-    # processed; fetch_fred_release_dates sets FRED page size (FRED's hard
-    # cap is 1000). le=1000 covers both ranges.
+    # fetch_fred_release_dates sets FRED page size (FRED's hard cap is 1000).
     limit: Optional[int] = Field(default=None, ge=1, le=1000)
-    depth: Literal["quick", "standard", "full"] = "standard"
-    persist_reports: bool = False
     notify: bool = False
     # extract_sa_comment_signals
     batch_size: Optional[int] = Field(default=None, ge=1, le=5000)

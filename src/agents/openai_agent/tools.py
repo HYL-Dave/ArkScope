@@ -54,7 +54,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     """
     from src.tools.news_tools import (
         get_ticker_news,
-        get_news_sentiment_summary,
         search_news_by_keyword,
         get_news_brief,
         search_news_advanced,
@@ -71,11 +70,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     from src.tools.portfolio_tools import get_portfolio_analysis as _get_portfolio_analysis
     from src.tools.portfolio_holdings_tools import get_portfolio_holdings as _get_portfolio_holdings
     from src.tools.earnings_tools import get_earnings_impact as _get_earnings_impact
-    from src.tools.signal_tools import (
-        detect_anomalies,
+    from src.tools.news_event_tools import (
         detect_event_chains,
-        get_signal_factors,
-        synthesize_signal,
+        detect_news_volume_anomaly,
     )
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
@@ -142,19 +139,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_ticker_news")
 
     @function_tool
-    def tool_get_news_sentiment_summary(ticker: str, days: int = 7) -> str:
-        """Get aggregated sentiment statistics for a ticker.
-
-        Args:
-            ticker: Stock ticker symbol
-            days: Lookback period in days (default: 7)
-
-        Returns mean sentiment, bullish/bearish ratio, and scored article count.
-        """
-        result = get_news_sentiment_summary(dal, ticker, days=days)
-        return _serialize_result(result, "get_news_sentiment_summary")
-
-    @function_tool
     def tool_search_news_by_keyword(
         keyword: str,
         days: int = 30,
@@ -195,26 +179,19 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         query: str = "",
         tickers: Optional[List[str]] = None,
         days: int = 30,
-        scored_only: bool = False,
-        min_sentiment: Optional[int] = None,
-        max_risk: Optional[int] = None,
         limit: int = 20,
     ) -> str:
-        """Advanced news search combining full-text search + multi-ticker + date range + score filters. Use for cross-ticker theme searches (e.g. 'tariff impact' across AI_CHIPS sector).
+        """Advanced raw-news search combining full-text search, tickers, and date range.
 
         Args:
             query: Full-text search query
             tickers: Filter by multiple tickers
             days: Lookback period in days (default: 30)
-            scored_only: Only return scored articles (default: false)
-            min_sentiment: Minimum sentiment score (1-5)
-            max_risk: Maximum risk score (1-5)
             limit: Max articles to return (default: 20)
         """
         result = search_news_advanced(
             dal, query=query, tickers=tickers, days=days,
-            scored_only=scored_only, min_sentiment=min_sentiment,
-            max_risk=max_risk, limit=limit,
+            limit=limit,
         )
         return _serialize_result(result, "search_news_advanced")
 
@@ -342,87 +319,37 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_iv_skew_analysis")
 
     # ================================================================
-    # Signal Tools
+    # Raw news event tools
     # ================================================================
 
     @function_tool
-    def tool_detect_anomalies(
+    def tool_detect_news_volume_anomaly(
         ticker: str, days: int = 30, as_of_date: Optional[str] = None
     ) -> str:
-        """Detect statistical anomalies in sentiment and news volume for a ticker.
+        """Detect a raw news-volume anomaly for a ticker.
 
         Args:
             ticker: Stock ticker symbol
             days: Lookback period in days (default: 30)
             as_of_date: Anchor date YYYY-MM-DD (default: latest date in data)
 
-        Returns sentiment_anomaly, volume_anomaly, and their z-scores.
+        Returns the current count, historical mean, and z-score.
         """
-        result = detect_anomalies(dal, ticker, days=days, as_of_date=as_of_date)
-        return _serialize_result(result, "detect_anomalies")
+        result = detect_news_volume_anomaly(dal, ticker, days=days, as_of_date=as_of_date)
+        return _serialize_result(result, "detect_news_volume_anomaly")
 
     @function_tool
     def tool_detect_event_chains(ticker: str, days: int = 30) -> str:
-        """Detect event chain patterns (earnings -> guidance -> analyst reactions).
+        """Detect deterministic event sequences from raw news titles.
 
         Args:
             ticker: Stock ticker symbol
             days: Lookback period in days (default: 30)
 
-        Returns list of detected event chains with confidence scores.
+        Returns sequences with typed unavailable impact.
         """
         result = detect_event_chains(dal, ticker, days=days)
         return _serialize_result(result, "detect_event_chains")
-
-    @function_tool
-    def tool_synthesize_signal(
-        ticker: str,
-        days: int = 30,
-        strategy: Optional[str] = None,
-        as_of_date: Optional[str] = None,
-    ) -> str:
-        """Synthesize a multi-factor trading signal combining sector momentum, events, and sentiment.
-
-        Args:
-            ticker: Stock ticker symbol
-            days: Lookback period in days (default: 30)
-            strategy: Strategy name for custom weights (from user_profile.yaml)
-            as_of_date: Anchor date YYYY-MM-DD (default: latest date in data)
-
-        Returns action (BUY/SELL/HOLD), confidence, composite_score, and reasoning.
-        """
-        result = synthesize_signal(
-            dal, ticker, days=days, strategy=strategy, as_of_date=as_of_date,
-        )
-        return _serialize_result(result, "synthesize_signal")
-
-    @function_tool
-    def tool_get_signal_factors(
-        ticker: str,
-        days: int = 30,
-        as_of_date: Optional[str] = None,
-        strategy: Optional[str] = None,
-    ) -> str:
-        """Return per-factor breakdown for a multi-factor signal recommendation.
-
-        Companion to synthesize_signal that exposes raw impact / weight /
-        contribution per factor (SECTOR_MOMENTUM, EVENT_CHAIN,
-        SENTIMENT_ANOMALY, VOLUME_SPIKE, EXTREME_SENTIMENT) plus a
-        data_quality block with news_count, scored_news_count,
-        missing_factors, errors. This is a recommendation breakdown,
-        NOT a price prediction. SECTOR_MOMENTUM is sector-shared, not
-        ticker-specific conviction.
-
-        Args:
-            ticker: Stock ticker symbol
-            days: Lookback period in days (default: 30)
-            as_of_date: Anchor date YYYY-MM-DD (default: ticker's latest news date)
-            strategy: Optional strategy name for custom weights
-        """
-        result = get_signal_factors(
-            dal, ticker, days=days, as_of_date=as_of_date, strategy=strategy,
-        )
-        return _serialize_result(result, "get_signal_factors")
 
     # ================================================================
     # Analysis Tools
@@ -1132,7 +1059,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
-        tool_get_news_sentiment_summary,
         tool_search_news_by_keyword,
         tool_get_news_brief,
         tool_search_news_advanced,
@@ -1143,10 +1069,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_calculate_greeks,
         tool_get_option_chain,
         tool_get_iv_skew_analysis,
-        tool_detect_anomalies,
+        tool_detect_news_volume_anomaly,
         tool_detect_event_chains,
-        tool_synthesize_signal,
-        tool_get_signal_factors,
         tool_get_fundamentals_analysis,
         tool_get_detailed_financials,
         tool_get_peer_comparison,

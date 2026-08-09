@@ -439,15 +439,3 @@ seeking_alpha:
 
   # 留言快取天數 (Full Scan 時 TTL 過期的留言會重抓)
   comments_cache_days: 7
-
-# ============================================
-# 14. Analysis Pipeline 設定
-# ============================================
-analysis_pipeline:
-  # Phase D 結構化分析管線
-  # false = /analyze 指令回傳「尚未啟用」提示
-  # true  = 啟用 /analyze 和 /analyze-save 指令
-  enabled: true
-
-  # 已訓練模型的存放目錄（相對於專案根目錄）
-  models_dir: "trained_models"

@@ -1,434 +1,57 @@
 # Phase D Analysis Pipeline Sketch
 
-> **Status**: Active v2 candidate / deferred. NOT v1 scope.
-> **Canonical product boundary**: [LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md](./LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md) §11.
-> **Scaffold**: `src/analysis/` (partially implemented — see §Current Scaffold Status below).
-
-Context: implementation-oriented sketch for Phase D (origin: `MAJOR_REFACTORING_PLAN.md`, retired during Group 3 consolidation), informed by:
-
-- archive/DAILY_STOCK_ANALYSIS_FIRST_PASS_NOTES.md (removed 2026-06-07, recoverable via git; see docs/design/archive/README.md)
-- archive/DAILY_STOCK_ANALYSIS_SECOND_PASS_NOTES.md (removed 2026-06-07, recoverable via git; see docs/design/archive/README.md)
-
-This document is not a feature backlog. It defines the boundary, contracts, and assembly order for the future analysis pipeline.
-
-## Current Scaffold Status (2026-04-15)
-
-The initial scaffold is now partially implemented under `src/analysis/`:
-
-- implemented:
-  - `contracts.py`
-  - `context_builder.py`
-  - `factory.py`
-  - `pipeline.py`
-  - `integrity.py`
-  - `renderer.py`
-  - `scheduler_hooks.py`
-  - strategies: `technical`, `fundamental`, `sentiment`, `risk`, `decision`
-- validated:
-  - pipeline execution order
-  - degradation behavior on missing context
-  - integrity placeholder fill
-  - minimal Markdown rendering
-  - scheduled batch rendering
-  - DAL-backed thin context builder via adapter tests
-- not implemented yet:
-  - real runner integration
-  - template-based renderer
-  - cheap-model integrity repair
-  - artifact persistence / delivery wiring
-  - production strategy logic
-
-## 1. Goal
-
-Build a reusable analysis pipeline that:
-
-- accepts one normalized analysis request
-- runs a bounded set of strategies
-- produces a structured artifact before any prose rendering
-- validates/repairs required report fields
-- supports both interactive and scheduled execution
-
-The pipeline should depend on Phase C unified runner, but should not be the runner itself.
-
-## 2. Non-Goals
-
-- Not a replacement for Phase C unified runner.
-- Not a knowledge graph implementation.
-- Not a scheduler/daemon framework.
-- Not a prompt library.
-- Not a UI/dashboard implementation.
-
-## 3. Design Principles
-
-1. Structured artifact first, rendered report second.
-2. Strategies return typed outputs, not final prose.
-3. Partial data failure degrades one strategy, not the whole pipeline.
-4. Interactive and batch paths share strategy modules, but use different budgets and delivery policies.
-5. Integrity repair is a service layer between aggregation and rendering.
-
-## 4. Proposed Module Layout
-
-```text
-src/analysis/
-  __init__.py
-  pipeline.py              # AnalysisPipeline orchestrator
-  contracts.py             # request/result dataclasses
-  context_builder.py       # gathers normalized input context
-  integrity.py             # required-field validation + repair
-  renderer.py              # report rendering facade
-  scheduler_hooks.py       # optional recurring entrypoints / job adapters
-  strategies/
-    __init__.py
-    base.py                # Strategy interface
-    technical.py
-    fundamental.py
-    sentiment.py
-    risk.py
-    decision.py
-  templates/
-    report_markdown.j2
-    report_html.j2
-```
-
-## 5. Core Contracts
-
-### 5.1 `AnalysisRequest`
-
-Single normalized input to the pipeline.
-
-```python
-@dataclass
-class AnalysisRequest:
-    ticker: str
-    as_of: datetime
-    mode: Literal["interactive", "batch"]
-    depth: Literal["quick", "standard", "full"]
-    source: Literal["cli", "discord", "api", "scheduled"]
-    user_query: str | None = None
-    attachments: list[Any] = field(default_factory=list)
-    active_skills: list[str] = field(default_factory=list)
-    run_id: str | None = None
-```
-
-### 5.2 `AnalysisContext`
-
-Built once before strategies run. Holds normalized inputs and pre-fetched facts.
-
-```python
-@dataclass
-class AnalysisContext:
-    request: AnalysisRequest
-    quote: dict | None = None
-    market_data: dict | None = None
-    fundamentals: dict | None = None
-    news: list[dict] = field(default_factory=list)
-    social: list[dict] = field(default_factory=list)
-    memory: dict = field(default_factory=dict)
-    provider_status: dict = field(default_factory=dict)
-```
-
-### 5.3 `StrategyResult`
-
-Each strategy returns a typed payload plus degradation metadata.
-
-```python
-@dataclass
-class StrategyResult:
-    name: str
-    status: Literal["ok", "partial", "failed", "skipped"]
-    score: float | None
-    signals: list[str] = field(default_factory=list)
-    risks: list[str] = field(default_factory=list)
-    evidence: list[dict] = field(default_factory=list)
-    payload: dict = field(default_factory=dict)
-    errors: list[str] = field(default_factory=list)
-    elapsed_ms: int = 0
-```
-
-### 5.4 `AnalysisArtifact`
-
-Pre-render aggregate object. This is the main output of `AnalysisPipeline.run()`.
-
-```python
-@dataclass
-class AnalysisArtifact:
-    request: AnalysisRequest
-    context_summary: dict
-    strategy_results: dict[str, StrategyResult]
-    final_decision: dict
-    report_sections: dict
-    degradation_summary: list[str]
-    integrity_status: Literal["clean", "repaired", "placeholder_filled"]
-    errors: list[str] = field(default_factory=list)
-```
-
-## 6. Pipeline Assembly
-
-### Step 1: Build Context
-
-`context_builder.py`
-
-Responsibilities:
-
-- normalize request inputs
-- fetch or resolve required data blocks
-- annotate provider/degradation status
-- avoid final report formatting
-
-Output:
-
-- `AnalysisContext`
-
-### Step 2: Run Strategies
-
-`strategies/*.py`
-
-Order:
-
-1. `technical`
-2. `fundamental`
-3. `sentiment`
-4. `risk`
-5. `decision`
-
-Guideline:
-
-- upstream strategies may enrich downstream context
-- downstream strategies should not mutate previous results
-- `decision` consumes prior strategy outputs and produces the final recommendation
-
-### Step 3: Aggregate Artifact
-
-`pipeline.py`
-
-Responsibilities:
-
-- collect `StrategyResult`s
-- assemble `context_summary`
-- build `final_decision`
-- map strategy payloads into `report_sections`
-- record degradation summary
-
-Output:
-
-- `AnalysisArtifact`
-
-### Step 4: Integrity Repair
-
-`integrity.py`
-
-Responsibilities:
-
-- check required report fields on `AnalysisArtifact`
-- perform bounded repair before rendering
-
-Recommended order:
-
-1. schema validation
-2. rule-based repair
-3. optional cheap-model repair
-4. placeholder fill
-
-Integrity service should produce:
-
-```python
-@dataclass
-class IntegrityResult:
-    artifact: AnalysisArtifact
-    status: Literal["clean", "repaired", "placeholder_filled"]
-    missing_fields: list[str]
-    repairs_applied: list[str]
-```
-
-### Step 5: Render Report
-
-`renderer.py`
-
-Responsibilities:
-
-- convert validated artifact to Markdown/HTML
-- keep rendering logic thin
-- fail open: return `None` or fallback text if template render fails
-
-Renderer input:
-
-- `IntegrityResult`
-
-Renderer output:
-
-```python
-@dataclass
-class RenderedReport:
-    format: Literal["markdown", "html"]
-    content: str
-    metadata: dict
-```
-
-## 7. Strategy Interface
-
-```python
-class AnalysisStrategy(Protocol):
-    name: str
-
-    def run(
-        self,
-        context: AnalysisContext,
-        upstream: Mapping[str, StrategyResult],
-    ) -> StrategyResult:
-        ...
-```
-
-Rules:
-
-- Strategy input is `AnalysisContext + upstream results`
-- Strategy output is always `StrategyResult`
-- Strategies do not send notifications
-- Strategies do not write final reports
-- Strategies can fail without aborting the whole pipeline
-
-## 8. Interactive vs Batch Paths
-
-### Interactive Path
-
-Used by:
-
-- CLI
-- Discord
-- API immediate requests
-
-Priorities:
-
-- latency
-- explainability
-- bounded retries
-
-Defaults:
-
-- smaller provider budget
-- smaller model budget
-- skip optional enrichments sooner
-- render Markdown first
-
-### Batch Path
-
-Used by:
-
-- recurring jobs
-- nightly maintenance
-- report generation
-- backfill
-
-Priorities:
-
-- throughput
-- graceful degradation
-- artifact persistence
-
-Defaults:
-
-- wider provider budget
-- allow more enrichments
-- persist artifacts and rendered reports
-- optional scheduled delivery hook
-
-## 9. Delivery Boundary
-
-Delivery should not live inside `AnalysisPipeline`.
-
-Recommended split:
-
-- `AnalysisPipeline.run()` -> `AnalysisArtifact`
-- `integrity.validate_and_repair()` -> `IntegrityResult`
-- `renderer.render()` -> `RenderedReport`
-- `delivery.send()` -> side effects
-
-This avoids repeating the `daily_stock_analysis` coupling where pipeline, storage, and notification sit too close together.
-
-## 10. Persistence Boundary
-
-Suggested separation:
-
-- `analysis_runs` table or artifact store for structured artifacts
-- rendered reports as derived artifacts
-- delivery records stored separately
-
-Do not persist only the final prose report.
-Persist the structured artifact first.
-
-## 11. Scheduler Hooks
-
-`scheduler_hooks.py` should be thin.
-
-Responsibilities:
-
-- translate recurring jobs into `AnalysisRequest(mode="batch")`
-- select ticker sets / watchlists
-- invoke pipeline + integrity + renderer + delivery in sequence
-- record job-level success/failure
-
-Do not turn scheduler hooks into a second orchestrator.
-
-## 12. Dependency on Phase C
-
-Phase D assumes Phase C provides:
-
-- unified tool execution
-- provider-neutral runner interface
-- consistent event/usage accounting
-- stable config/model routing layer
-
-Phase D should not embed its own parallel tool loop.
-
-## 13. Minimal Rollout Plan
-
-### D0
-
-- add contracts
-- add empty pipeline skeleton
-- add one renderer skeleton
-
-### D1
-
-- implement `technical` + `decision`
-- produce minimal structured artifact
-- render Markdown only
-
-### D2
-
-- add `fundamental` + `sentiment` + `risk`
-- add integrity validation + placeholder fill
-
-### D3
-
-- add batch path + scheduler hooks
-- add HTML rendering
-- add persistence of structured artifacts
-
-## 14. Validation Checklist
-
-Before calling Phase D usable:
-
-- one request produces one `AnalysisArtifact`
-- one failed strategy does not crash the whole pipeline
-- required report fields are validated before rendering
-- renderer can be swapped without changing strategy code
-- batch and interactive paths share strategies but differ in budgets
-- delivery side effects are outside the pipeline
-
-## 15. Bottom Line
-
-Phase D should borrow from `daily_stock_analysis`:
-
-- orchestrator boundary
-- degradation semantics
-- integrity repair pattern
-- thin renderer pattern
-
-Phase D should not copy:
-
-- monolithic pipeline shape
-- monolithic provider manager shape
-- domain-specific schema/prompt structure
-
-The success criterion is not “rebuild daily_stock_analysis here”.
-The success criterion is “use its strongest architectural moves without inheriting its coupling”.
+> **Status:** HISTORICAL DESIGN RECORD - IMPLEMENTATION RETIRED 2026-08-09
+> **Authority:** The former scaffold, route, CLI entry, and scheduled job are
+> absent. Git history preserves their implementation. This document is not a
+> current runbook or a reusable scaffold.
+
+## 1. Why it was retired
+
+The deferred implementation assembled recommendation-shaped technical,
+fundamental, sentiment, and risk strategies without the evidence and validation
+required for a product decision. It also depended on the retired legacy score
+and composite signal semantics. Keeping only part of the package would leave an
+importable but misleading capability surface.
+
+The entire implementation therefore retired atomically with the legacy scoring
+and training lineage. Generic scheduler, report, raw-data, and agent
+infrastructure remain under their current owners.
+
+## 2. Product goal that remains
+
+ArkScope may still add on-demand or scheduled analysis. A future design should:
+
+1. accept a normalized request with an explicit `as_of` time;
+2. gather source-labelled facts through current data contracts;
+3. distinguish facts, calculations, hypotheses, and unavailable evidence;
+4. produce a typed evidence artifact before prose rendering;
+5. preserve partial failures instead of fabricating placeholders;
+6. record provenance, freshness, source coverage, and evidence references; and
+7. avoid buy/hold/sell output unless a separately reviewed and validated
+   decision product explicitly requires it.
+
+These principles are design input only. No current module, route, command, or
+schedule is implied by this document.
+
+## 3. Restart gate
+
+Future implementation requires a new product spec and RED-first plan based on
+the then-current agent, data, profile, and UI contracts. It must not recover the
+retired package merely to obtain class names or module layout from history.
+
+At minimum, the new spec must decide:
+
+- the user-visible artifact and its edit/export lifecycle;
+- evidence and citation shape;
+- freshness and degradation semantics;
+- interactive versus scheduled ownership;
+- model/provider and spend policy;
+- validation and kill criteria; and
+- how the feature differs from the future Signals research line.
+
+## 4. Historical record
+
+The detailed April 2026 proposal and partial scaffold can be inspected through
+Git history before the Tranche B retirement commit. It remains useful for
+understanding why the original goal existed, but it is not authority for future
+implementation choices.

@@ -158,7 +158,7 @@ class ToolRegistry:
         self._register_news_tools()
         self._register_price_tools()
         self._register_options_tools()
-        self._register_signal_tools()
+        self._register_news_event_tools()
         self._register_analysis_tools()
         self._register_portfolio_tools()
         self._register_report_tools()
@@ -173,7 +173,6 @@ class ToolRegistry:
     def _register_news_tools(self) -> None:
         from .news_tools import (
             get_ticker_news,
-            get_news_sentiment_summary,
             search_news_by_keyword,
             get_news_brief,
             search_news_advanced,
@@ -198,17 +197,6 @@ class ToolRegistry:
         ))
 
         self.register(ToolDefinition(
-            name="get_news_sentiment_summary",
-            description="Get aggregated sentiment statistics (mean, bullish/bearish ratio) for a ticker.",
-            function=get_news_sentiment_summary,
-            category="news",
-            parameters=[
-                ToolParameter("ticker", "string", "Stock ticker symbol"),
-                ToolParameter("days", "integer", "Lookback period in days", required=False, default=7),
-            ],
-        ))
-
-        self.register(ToolDefinition(
             name="search_news_by_keyword",
             description=(
                 "Search news articles by keyword in titles and descriptions using "
@@ -228,7 +216,7 @@ class ToolRegistry:
             name="get_news_brief",
             description=(
                 "Get a lightweight news overview for multiple tickers: "
-                "article count, avg sentiment, avg risk, date range. "
+                "article count and date range. "
                 "Call this FIRST before get_ticker_news() to decide which "
                 "tickers need detailed investigation. Very fast, minimal output."
             ),
@@ -244,7 +232,7 @@ class ToolRegistry:
             name="search_news_advanced",
             description=(
                 "Advanced news search combining full-text search + multi-ticker + "
-                "date range + score filters. Use for cross-ticker theme searches "
+                "date range. Use for cross-ticker theme searches "
                 "(e.g. 'tariff impact' across AI_CHIPS sector). All filtering at DB level."
             ),
             function=search_news_advanced,
@@ -253,9 +241,6 @@ class ToolRegistry:
                 ToolParameter("query", "string", "Full-text search query", required=False, default=""),
                 ToolParameter("tickers", "array", "Filter by multiple tickers", required=False),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
-                ToolParameter("scored_only", "boolean", "Only return scored articles", required=False, default=False),
-                ToolParameter("min_sentiment", "integer", "Minimum sentiment score (1-5)", required=False),
-                ToolParameter("max_risk", "integer", "Maximum risk score (1-5)", required=False),
                 ToolParameter("limit", "integer", "Max articles to return (default: 20)", required=False, default=20),
             ],
         ))
@@ -394,19 +379,14 @@ class ToolRegistry:
             ],
         ))
 
-    def _register_signal_tools(self) -> None:
-        from .signal_tools import (
-            detect_anomalies,
-            detect_event_chains,
-            get_signal_factors,
-            synthesize_signal,
-        )
+    def _register_news_event_tools(self) -> None:
+        from .news_event_tools import detect_event_chains, detect_news_volume_anomaly
 
         self.register(ToolDefinition(
-            name="detect_anomalies",
-            description="Detect statistical anomalies in sentiment and news volume for a ticker.",
-            function=detect_anomalies,
-            category="signals",
+            name="detect_news_volume_anomaly",
+            description="Detect a raw news-volume anomaly for a ticker.",
+            function=detect_news_volume_anomaly,
+            category="news",
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
@@ -416,53 +396,12 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="detect_event_chains",
-            description="Detect event chain patterns (sequences of related events like earnings → guidance → analyst reactions).",
+            description="Detect deterministic event sequences from raw news titles.",
             function=detect_event_chains,
-            category="signals",
+            category="news",
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
-            ],
-        ))
-
-        self.register(ToolDefinition(
-            name="synthesize_signal",
-            description="Synthesize a multi-factor trading signal combining sector momentum, event chains, and sentiment anomalies.",
-            function=synthesize_signal,
-            category="signals",
-            parameters=[
-                ToolParameter("ticker", "string", "Stock ticker symbol"),
-                ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
-                ToolParameter("strategy", "string",
-                              "Strategy name for custom weights (from user_profile.yaml)",
-                              required=False),
-                ToolParameter("as_of_date", "string",
-                              "Anchor date YYYY-MM-DD (default: latest in data)",
-                              required=False),
-            ],
-        ))
-
-        self.register(ToolDefinition(
-            name="get_signal_factors",
-            description=(
-                "Return the multi-factor breakdown that backs synthesize_signal: "
-                "per-factor impact / weight / contribution plus a data_quality "
-                "block (news_count, scored_news_count, missing_factors, errors). "
-                "Recommendation only — not a price prediction. SECTOR_MOMENTUM is "
-                "shared across same-sector tickers, so its contribution is not "
-                "ticker-specific conviction."
-            ),
-            function=get_signal_factors,
-            category="signals",
-            parameters=[
-                ToolParameter("ticker", "string", "Stock ticker symbol"),
-                ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
-                ToolParameter("as_of_date", "string",
-                              "Anchor date YYYY-MM-DD (default: ticker's latest news date)",
-                              required=False),
-                ToolParameter("strategy", "string",
-                              "Strategy name for custom weights (from user_profile.yaml)",
-                              required=False),
             ],
         ))
 

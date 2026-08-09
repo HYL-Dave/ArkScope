@@ -157,12 +157,14 @@ class TestFilterAnthropicTools:
         tools = [
             {"name": "get_ticker_news", "description": "..."},
             {"name": "get_price_change", "description": "..."},
-            {"name": "detect_anomalies", "description": "..."},
+            {"name": "detect_news_volume_anomaly", "description": "..."},
         ]
-        result = _filter_anthropic_tools(tools, ["get_ticker_news", "detect_anomalies"])
+        result = _filter_anthropic_tools(
+            tools, ["get_ticker_news", "detect_news_volume_anomaly"]
+        )
         assert len(result) == 2
         names = {t["name"] for t in result}
-        assert names == {"get_ticker_news", "detect_anomalies"}
+        assert names == {"get_ticker_news", "detect_news_volume_anomaly"}
 
     def test_filter_empty_whitelist(self):
         tools = [{"name": "get_ticker_news", "description": "..."}]
@@ -178,11 +180,11 @@ class TestFilterOpenaiTools:
         mock_tool_b = MagicMock()
         mock_tool_b.name = "tool_get_price_change"
         mock_tool_c = MagicMock()
-        mock_tool_c.name = "tool_detect_anomalies"
+        mock_tool_c.name = "tool_detect_news_volume_anomaly"
 
         result = _filter_openai_tools(
             [mock_tool_a, mock_tool_b, mock_tool_c],
-            ["get_ticker_news", "detect_anomalies"],
+            ["get_ticker_news", "detect_news_volume_anomaly"],
         )
         assert len(result) == 2
 
@@ -521,11 +523,18 @@ class TestAnthropicBridgeIntegration:
         names = {t["name"] for t in tools}
         assert "delegate_to_subagent" in names
 
-    def test_anthropic_tools_count_31(self):
-        """All bridge tools including delegate + freshness."""
+    def test_anthropic_tools_match_registry(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
-        tools = get_anthropic_tools()
-        assert len(tools) == 54
+        from src.tools.registry import create_default_registry
+
+        bridge_names = {tool["name"] for tool in get_anthropic_tools()}
+        registry_names = set(create_default_registry().list_names())
+        retired = {
+            "get_news_sentiment_summary", "detect_anomalies",
+            "synthesize_signal", "get_signal_factors",
+        }
+        assert bridge_names.isdisjoint(retired)
+        assert bridge_names == registry_names | {"delegate_to_subagent"}
 
     def test_delegate_schema_has_enum(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
@@ -548,12 +557,22 @@ class TestAnthropicBridgeIntegration:
 
 
 class TestOpenAiBridgeIntegration:
-    def test_openai_tools_count_31(self):
-        """All bridge tools including delegate + freshness."""
+    def test_openai_tools_match_registry(self):
         from src.agents.openai_agent.tools import create_openai_tools
-        mock_dal = MagicMock()
-        tools = create_openai_tools(mock_dal)
-        assert len(tools) == 54
+        from src.tools.registry import create_default_registry
+
+        tools = create_openai_tools(MagicMock())
+        bridge_names = {
+            name.removeprefix("tool_")
+            for name in (getattr(tool, "name", "") for tool in tools)
+        }
+        registry_names = set(create_default_registry().list_names())
+        retired = {
+            "get_news_sentiment_summary", "detect_anomalies",
+            "synthesize_signal", "get_signal_factors",
+        }
+        assert bridge_names.isdisjoint(retired)
+        assert bridge_names == registry_names | {"delegate_to_subagent"}
 
     def test_openai_tools_includes_delegate(self):
         from src.agents.openai_agent.tools import create_openai_tools

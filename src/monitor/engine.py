@@ -19,10 +19,9 @@ from .dedup import AlertDeduplicator
 from .notifiers import Alert, NotificationRouter
 from .watchers import (
     BaseWatcher,
+    NewsVolumeWatcher,
     PriceWatcher,
     SectorWatcher,
-    SentimentWatcher,
-    SignalWatcher,
 )
 
 if TYPE_CHECKING:
@@ -91,8 +90,7 @@ class MonitorEngine:
         self._router = NotificationRouter(channels_cfg)
         self._watchers: List[BaseWatcher] = [
             PriceWatcher(alerts_cfg),
-            SentimentWatcher(alerts_cfg),
-            SignalWatcher(alerts_cfg),
+            NewsVolumeWatcher(alerts_cfg),
             SectorWatcher(alerts_cfg),
         ]
 
@@ -264,8 +262,7 @@ class MonitorEngine:
 
         type_labels = {
             "price": "Price Alerts",
-            "sentiment": "Sentiment Alerts",
-            "signal": "Signal Alerts",
+            "news_volume": "News Volume Alerts",
             "sector": "Sector Alerts",
         }
 

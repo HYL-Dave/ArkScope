@@ -1,6 +1,6 @@
 # Agent 架構演進追蹤
 
-> **Status: HISTORICAL BUILD LOG** — pre-pivot agent-era phases; paths/flows described here predate the local-first pivot.
+> **Status: HISTORICAL BUILD LOG** — pre-pivot agent-era phases; paths/flows described here predate the local-first pivot. The former offline RL, legacy score/Signals, and Phase D implementation bytes were retired 2026-08-09 and are recoverable from Git only.
 
 > **目的**: 追蹤 agent 系統從 MVP 到成熟架構的演進，記錄設計決策與實作狀態
 > **創建日期**: 2026-02-08
@@ -14,10 +14,10 @@
 > - [SA_COMMENT_INTELLIGENCE_PLAN.md](SA_COMMENT_INTELLIGENCE_PLAN.md) (SA 留言社群訊號提取規劃)
 > - [SA_EXTENSION_ROADMAP.md](SA_EXTENSION_ROADMAP.md) (Seeking Alpha extension 擴充路線)
 > - [PHASE_A_KNOWLEDGE_GRAPH_SKETCH.md](PHASE_A_KNOWLEDGE_GRAPH_SKETCH.md) (KG v2 candidate; extracted from retired MAJOR_REFACTORING_PLAN)
-> - [PHASE_D_ANALYSIS_PIPELINE_SKETCH.md](PHASE_D_ANALYSIS_PIPELINE_SKETCH.md) (Phase D v2 candidate)
+> - [PHASE_D_ANALYSIS_PIPELINE_SKETCH.md](PHASE_D_ANALYSIS_PIPELINE_SKETCH.md) (retired scaffold record; future analysis requires a new design)
 > - [PHASE_C_UNIFIED_RUNNER_SPEC.md](PHASE_C_UNIFIED_RUNNER_SPEC.md) (unified runner, PAUSED)
 > - ARKSCOPE_RENAME_PHASE2.md (穩定後的本地遷移清單) (removed 2026-06-07; see git history + memory project_rename_arkscope.md)
-> - [RL_COLLAPSE_FINDINGS.md](RL_COLLAPSE_FINDINGS.md) (RL collapse 診斷 + 暫停決策；P3)
+> - [RL_COLLAPSE_FINDINGS.md](RL_COLLAPSE_FINDINGS.md) (RL collapse diagnosis and retired-implementation decision)
 >
 > **已歸檔**: `archive/` 包含 daily_stock_analysis 借鑑筆記、RL 線暫停前的設計文件、已完成的部署/收集筆記等（見 [archive/README.md](archive/README.md)）
 
@@ -972,7 +972,7 @@ DB 查詢 → DatabaseBackend → 0 results (2026-01-13 之後無資料) ❌
 - [x] **12-C**: 數據導入 + 驗證 — 138K news + 277K scores + 1.8M prices, 20/20 tests pass
 - [x] **12-D**: MCP PostgreSQL 配置 — crystaldba/postgres-mcp (Docker, stdio), 9 tools
 - [x] **12e: `_load_raw_news()` 決策** — **保留**作為 FileBackend fallback（DB 不可用時自動降級，正常情況是死代碼）
-- [x] **12f: `scored_only` 設計確認** — `get_ticker_news` 保持 `scored_only=False`（通用查詢），`get_news_sentiment_summary` 用 `scored_only=True`（情緒分析）— 設計合理，無需變更
+- [x] **12f: historical scored-news design** — superseded by the 2026-08-09 raw-news cutover; current news tools have no score filter.
 - [x] **12c: 數據管道修復** — `migrate_to_supabase.py` 修復 recursive glob + raw parquet import，DB 更新至 202K news + 385K scores（含 GPT-5.2 xhigh 108K 筆）
 
 **部署詳情**: 見 archive/PHASE12_DATABASE_DEPLOYMENT.md (歷史記錄，已歸檔) (removed 2026-06-07, recoverable via git; see docs/design/archive/README.md)
@@ -1063,7 +1063,7 @@ Phase 6 實作了基礎 3-role pattern，Phase 14 最終決策：
 | Role | 模型 | 職責 | 核心工具 |
 |------|------|------|---------|
 | `code_analyst` | gpt-5.2-codex (xhigh) | 量化 Python 分析 + 自主設計（合併 programmer） | execute_python_analysis, get_ticker_prices, get_fundamentals_analysis, tavily_search |
-| `deep_researcher` | gpt-5.2 (xhigh) | 多源深度調查 (10 tools) | get_ticker_news, get_sector_performance, get_iv_analysis, synthesize_signal, tavily_search, web_browse + more |
+| `deep_researcher` | gpt-5.2 (xhigh) | 多源深度調查 | get_ticker_news, get_sector_performance, get_iv_skew_analysis, detect_event_chains, tavily_search, web_browse + more |
 | `data_summarizer` | claude-sonnet-4-6 (adaptive thinking) | 快速數據摘要 + 多 ticker 掃描 | get_news_brief, get_ticker_news, get_watchlist_overview, get_morning_brief, get_fundamentals_analysis |
 | `reviewer` | claude-opus-4-7 (thinking+max) | 對抗性審查：邏輯漏洞、遺漏風險、數據充分性 | tavily_search, get_ticker_news |
 
@@ -1388,7 +1388,7 @@ Vector search 的增量價值在於語義相似度（如「通膨壓力」匹配
   - 參考: Dexter Token Budget (#7)，品質導向決策：不降質，現有機制已足夠
 
 ### Batch 3: 核心策略 + 平台整合（長期）
-- [P3 PAUSED · agent 整合 RETIRED 2026-06-03] **RL Pipeline** — 端到端整合：特徵工程 → 訓練 → 推論 → ~~Agent 工具~~（訓練暫停 2026-04-25；**agent 整合下架 2026-06-03**：3 個 get_rl_* 工具移出 registry/bridges、config 假開關移除，commits 94861f7+6b49c74；RL 研究碼移至 `training/`；當前狀態見 [RL_COLLAPSE_FINDINGS.md](RL_COLLAPSE_FINDINGS.md)；原設計已歸檔: archive/RL_PIPELINE_DESIGN.md (removed 2026-06-07, recoverable via git; see docs/design/archive/README.md)）
+- [P3 RETIRED 2026-08-09] **RL Pipeline** — the unvalidated offline implementation and dedicated tests were removed; Git history preserves the experiment. Future RL research starts from a new hypothesis, point-in-time dataset, OOS protocol, and kill criteria rather than restoring this lineage.
   - [x] Phase 1c: Agent 整合 — 3 工具 + model registry + config guard（2026-03-01）
   - [x] Phase 1a+1b: 特徵工程 + 回測增強 + 訓練增強（2026-03-02）
     - `feature_engineering.py`: 5 衍生特徵 + FeatureScaler (Z-score, schema version, contract validation)
@@ -1442,7 +1442,7 @@ Vector search 的增量價值在於語義相似度（如「通膨壓力」匹配
 | 2026-04-27 | P1.2 commit 3 + rename: Finnhub calendar client + ingestion + src/p1_2 → src/macro_calendar | `data_sources/finnhub_calendar_client.py`（UTC parse, impact/hour/status normalisation, 60 req/min budget）；`src/macro_calendar/finnhub_ingestion.py`（economic / earnings / IPO，per-symbol earnings dedup on `(symbol,year,quarter)`）；`src/p1_2/` → `src/macro_calendar/`，`p1_2_macro_series.yaml` → `macro_calendar_series.yaml`，`p1_2_enabled` → `macro_calendar_enabled`；142 tests (`d3ec85a`, `5b376aa`, `35e8d4f`) |
 | 2026-04-26 | P1.2 commits 1-2: schema + DAL + FRED ingestion | `sql/013_add_p1_2_macro_calendar.sql`（cal_*_events + revisions, macro_series + observations + release_dates）；`MacroCalendarStore` canonical/revision upsert + as-of read，baseline-on-first-insert + observed-state-not-prior 不變式；`data_sources/fred_client.py`（ALFRED vintage 支援，`output_type=1/4` 鎖定）；`src/macro_calendar/fred_ingestion.py`（`latest_only` + `full_vintages` 兩條策略，`output_type=4` 取首次發布、`=1` 取完整修訂史）；88 tests (`e8fc1db`, `926a81c`, `f03cf86`, `6536652`, `959c589`) |
 | 2026-04-26 | P1.2 provider discovery 完成 | [P1_2_PROVIDER_DISCOVERY.md](P1_2_PROVIDER_DISCOVERY.md) 紀錄 FRED + Finnhub free-tier smoke 結果：FRED ALFRED vintage 可用、`output_type` 行為差異；Finnhub `/calendar/economic` UTC、free tier 含 actual/historical（與初稿假設相反），earnings 永遠不返回 actual、需 per-symbol 才能 cover watchlist；之後 [P1_2_SPEC.md](P1_2_SPEC.md) 設計依此 6-commit 拆分 |
-| 2026-04-23 | 文檔大盤點 + 歸檔整理 | 新增 ARKSCOPE_RENAME_PHASE2.md 正式化遷移清單；`MAJOR_REFACTORING_PLAN` 併入 Service-first 協調、標註 Phase D 骨架狀態；`MULTI_FACTOR_SIGNAL_DETECTION` 補標 `src/signals/` 實作度；歸檔 `AI_AGENT_IMPLEMENTATION_PLAN`、`DEXTER_ISSUES_ANALYSIS`、`DAILY_STOCK_ANALYSIS_CODE_ANALYSIS_CHECKLIST` 到 `archive/` |
+| 2026-04-23 | 文檔大盤點 + 歸檔整理 | 新增 ARKSCOPE_RENAME_PHASE2.md 正式化遷移清單；`MAJOR_REFACTORING_PLAN` 併入 Service-first 協調、標註 Phase D 骨架狀態；補記當時 legacy Signals 實作度；歸檔 `AI_AGENT_IMPLEMENTATION_PLAN`、`DEXTER_ISSUES_ANALYSIS`、`DAILY_STOCK_ANALYSIS_CODE_ANALYSIS_CHECKLIST` 到 `archive/` |
 | 2026-04-23 | 補充 `daily_stock_analysis` 深入讀碼 checklist | 新增 `DAILY_STOCK_ANALYSIS_CODE_ANALYSIS_CHECKLIST.md`（已歸檔到 `archive/`），把第一輪/第二輪筆記收斂成可執行的 code-level walkthrough 清單、分析順序與輸出格式 |
 | 2026-04-23 | SA Market News auto-sync 改為 density-driven ET windows + 補齊分析工具鏈 | `News Catchup` queue 分離（current/backfill），backfill 限縮到最近 24h 已知新聞；新增 `src/service/sa_market_news_density.py`、`scripts/analysis/analyze_sa_market_news_density.py`、`tests/test_sa_market_news_density.py`；修復 extension `Auto` label runtime error |
 | 2026-04-21 | Service-first slice 啟動：API 邊界 + job control 規劃 | 新增 `SERVICE_FIRST_EXPANSION_PLAN.md`（retired during docs consolidation; S1 landed in `src/api/routes/`, S2+ absorbed by priority map P0.2），將下一步聚焦於 SA read APIs、`jobs/status`、`jobs/run` 與多 client 共用的後端能力邊界 |

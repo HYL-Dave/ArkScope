@@ -1,194 +1,129 @@
 # ArkScope Tool Catalog (canonical)
 
-**Date**: 2026-06-04
-**Status**: CANONICAL tool authority — introspection table from live `ToolRegistry` + **gpt-5.5 review folded 2026-06-04**; verdicts locked for every contested tool (web 3-way split, `codex_web_research` retire, CA definition-only narrowing, `synthesize_signal` preserve-adapt, `refresh_sa_alpha_picks` → `profile_state_write`). Third and last canonical doc (ProductSpec → ProviderCatalog → **ToolCatalog**). Code follow-ups now **done**: `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only status (842b5bf); post-catalog drift rows folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`); `get_current_quote` added as read-through quote primitive; `get_portfolio_holdings` added as the local holdings snapshot primitive; the obsolete storage-backed IV analysis/history/mispricing tools were retired with their legacy domain. **Live registry now 53** (bridges 54).
+**Updated**: 2026-08-09
+**Status**: CANONICAL current registry authority
+**Live registry**: 50 tools; agent bridges add `delegate_to_subagent` for 51
 
-**Authority**: this doc owns the **registry tool layer** — what each tool is, which of the four capability classes it belongs to, and its keep/adapt/definition-only/retire verdict + the tool-design rules. Product/agent boundaries = `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`; per-provider facts the tools consume = `ARKSCOPE_PROVIDER_CATALOG.md`; architecture = `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`.
+This document describes the current `ToolRegistry`, not removed implementations
+or possible future products. Historical catalog versions remain recoverable from
+Git. Product boundaries belong to `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`; provider
+facts belong to `ARKSCOPE_PROVIDER_CATALOG.md`.
 
-> 中文摘要：直接從 `ToolRegistry` introspect 出的 **53 個工具**逐一分類（穩定 primitive／composed-analysis／agent-control／retire-adapt）並標 keep/adapt/preserve-adapt/definition-only/retire。**這份是 code-introspection 出來的事實表，不是文件印象**；舊 IV store 所屬三工具已隨該 domain 退役，live option chain、skew 與 Greeks 保留。
+## 0. Rules
 
----
+1. Registry name, category, and parameters come from code introspection.
+2. Raw facts remain distinct from model conclusions and provider-native labels.
+3. A tool that mutates state declares the narrow permission gate for that state.
+4. Web search, browser automation, and deep research are separate capabilities.
+5. Removed recommendation semantics are not compatibility aliases. A future
+   Signals product starts from a reviewed hypothesis, evidence contract, OOS
+   validation, and kill criteria.
 
-## 0. How to read this catalog
+Rebuild the list with:
 
-### 0.1 Source of truth = live introspection (NOT doc impression)
+```text
+python -c "from src.tools.registry import create_default_registry; r=create_default_registry(); print(len(r.list_all())); print(*r.list_names(), sep='\n')"
+```
 
-Every tool below was enumerated by constructing `ToolRegistry` and calling `register_all()` + `list_all()` on **2026-06-04**, then reconciled to the current live registry after later reviewed changes — name, category, and parameters are authoritative from code. **Count: 53 registry tools** (+`delegate_to_subagent` injected at each agent bridge = **54** in bridges), across 11 categories. The legacy store-backed `get_iv_analysis`, `get_iv_history_data`, and `scan_mispricing` capabilities are permanently retired; live option-chain, skew, and pure Greeks tools remain.
+## 1. Live registry
 
-> Re-run to refresh: `python -c "from src.tools.registry import ToolRegistry; r=ToolRegistry(); r.register_all(); print(len(r.list_all()))"`.
+### 1.1 All 50 tools
 
-### 0.2 Capability classes (from ProductSpec §4 reasoning posture)
+| Tool | Category | Parameters | Current role |
+|---|---|---|---|
+| `get_ticker_news` | news | ticker*, days?, source?, limit? | raw ticker news |
+| `search_news_by_keyword` | news | keyword*, days?, ticker?, limit? | raw keyword search |
+| `get_news_brief` | news | tickers?, days? | raw count/date brief |
+| `search_news_advanced` | news | query?, tickers?, days?, limit? | raw multi-ticker search |
+| `detect_news_volume_anomaly` | news | ticker*, days?, as_of_date? | deterministic count-window anomaly |
+| `detect_event_chains` | news | ticker*, days? | deterministic title-event sequence; impact unavailable |
+| `get_sa_market_news` | news | ticker?, keyword?, limit? | captured SA market news |
+| `get_sa_digest` | news | ticker*, days?, max_articles?, max_news?, max_comments?, min_comment_score? | source-labelled SA evidence digest |
+| `list_high_value_comments` | news | window_days?, ticker?, min_score?, limit? | rule-based SA comment ranking |
+| `get_sa_comment_focus` | news | window_days?, min_score?, limit? | rule-based SA comment focus |
+| `get_sa_feed` | news | q?, ticker?, item_type?, days?, limit?, offset? | unified SA evidence feed |
+| `get_current_quote` | prices | ticker*, source? | typed quote or qualified local bar |
+| `get_ticker_prices` | prices | ticker*, interval?, days? | local market-data bars |
+| `get_price_change` | prices | ticker*, days? | deterministic price change |
+| `get_sector_performance` | prices | sector*, days? | deterministic sector performance |
+| `calculate_greeks` | options | S*, K*, T*, r*, sigma*, option_type?, model?, dividend_yield? | pure caller-supplied option math |
+| `get_option_chain` | options | ticker*, expiry?, num_strikes?, max_expirations_for_term_structure? | live IBKR option chain |
+| `get_iv_skew_analysis` | options | ticker*, expiry?, num_strikes? | live-chain skew calculation |
+| `get_fundamentals_analysis` | analysis | ticker*, period? | cached SEC facts with qualified local price |
+| `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
+| `get_sec_filings` | analysis | ticker*, filing_types?, limit? | SEC filings |
+| `get_insider_trades` | analysis | ticker*, limit? | SEC insider transactions |
+| `get_watchlist_overview` | analysis | none | watchlist price and raw-news overview |
+| `get_morning_brief` | analysis | none | deterministic raw-news activity brief |
+| `get_peer_comparison` | analysis | ticker?, tickers?, sector? | deterministic peer metrics |
+| `get_earnings_impact` | analysis | ticker*, quarters? | earnings and price-reaction facts |
+| `get_analyst_consensus` | analysis | ticker* | provider-native analyst consensus |
+| `check_data_freshness` | analysis | none | local freshness evidence |
+| `get_ticker_data_coverage` | analysis | ticker*, target_date? | local coverage diagnostics |
+| `get_economic_calendar` | analysis | country?, importance?, days_back?, days_forward?, as_of?, limit? | Finnhub economic calendar |
+| `get_macro_value` | analysis | series_id*, observation_date*, as_of? | point-in-time FRED value |
+| `get_portfolio_analysis` | portfolio | tickers?, holdings? | deterministic beta/correlation/P&L analysis |
+| `get_portfolio_holdings` | portfolio | account_id?, include_closed? | local holdings snapshot |
+| `get_sa_alpha_picks` | portfolio | status?, sector? | captured Alpha Picks portfolio |
+| `get_sa_pick_detail` | portfolio | symbol*, picked_date? | captured Alpha Pick detail |
+| `refresh_sa_alpha_picks` | portfolio | none | read-only extension refresh status |
+| `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | captured SA article index |
+| `get_sa_article_detail` | portfolio | article_id* | captured SA article detail |
+| `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | permission-gated report write |
+| `list_reports` | reports | ticker?, days?, report_type?, limit? | report index read |
+| `get_report` | reports | report_id?, file_path? | report read |
+| `save_memory` | memory | title*, content*, category?, tickers?, tags?, importance? | permission-gated memory write |
+| `recall_memories` | memory | query?, category?, tickers?, tags?, days?, limit? | memory search |
+| `list_memories` | memory | category?, days?, limit? | memory index read |
+| `delete_memory` | memory | memory_id* | permission-gated memory delete |
+| `tavily_search` | web | query*, max_results?, search_depth?, topic?, days? | public web search API |
+| `tavily_fetch` | web | url*, extract_depth?, offset?, max_chars? | public content fetch API |
+| `web_browse` | web | url*, wait_for?, extract_links?, offset?, max_chars? | browser automation |
+| `execute_python_analysis` | execution | code?, task?, data_json?, timeout?, background? | permission-gated local analysis |
+| `scan_alerts` | monitor | tickers? | current monitor scan |
 
-| Class | Meaning | Tools-as-definitions? |
-|-------|---------|----------------------|
-| **SP — stable primitive** | Fetch/compute a stable fact: query price / fundamentals / macro / filing / SA capture / live options / Greeks. | ❌ **No** — keep a stable implementation; the agent must NOT re-wire these ad-hoc each call. |
-| **CA — composed analysis** | Compose primitives into a higher-order analysis (digest, comparison, multi-factor synthesis). | ✅ **Candidate** — can survive as a *definition / recipe / schema* a strong model composes from primitives. |
-| **AC — agent-control** | Memory, reports, code execution, web access, alerts, subagents — the agent's own machinery. | ❌ No — these are infrastructure with permission gates (ProductSpec §4.3). |
-| **RA — retire-adapt** | Scenario changed: provider/storage assumption wrong, methodology known-flawed, or superseded (RL already retired). | n/a — verdict is adapt or retire. |
+### 1.2 Evidence boundaries
 
-### 0.3 Verdict vocabulary
+- Raw news tools expose title, source, timestamp, URL, excerpt, counts, and date
+  ranges. They do not expose ArkScope legacy 1-5 score fields.
+- `detect_news_volume_anomaly` uses raw count windows.
+- `detect_event_chains` preserves deterministic event order and returns typed
+  unavailable impact rather than manufacturing direction or a numeric score.
+- Provider-native analyst labels, Polygon source sentiment, SA community data,
+  and investor risk preferences remain source-labelled distinct contracts.
+- Option pricing accepts the caller's rate. Provider-backed estimates are a
+  separate future capability, not a hidden network fallback.
 
-`keep-current` (stable, no change) · `adapt` (keep the capability, fix a wrong assumption/output) · `preserve-adapt` (keep the deterministic impl, reframe its *authority/output* — e.g. evidence-not-decision) · `definition-only` (convert to a composable recipe/schema, drop the hardcoded pipeline) · `retire` (remove). Verdicts below are **folded from gpt-5.5's 2026-06-04 review** (no longer open drafts), except the §4 "still open" items.
+### 1.3 Permission boundaries
 
----
+| Capability | Gate |
+|---|---|
+| report or generic DB write | `db_write` |
+| profile/universe mutation | `profile_state_write` |
+| local code execution | `code_execution` |
+| public search/fetch | `external_web_access` and metered approval where needed |
+| browser automation | `external_browser_automation` |
+| future multi-step research | explicit spend and external-access approval |
 
-## 1. Introspection table — all 53 tools (grouped by capability class)
+### 1.4 Retire-adapt
 
-### 1.1 Stable primitives (SP) — 31 tools · verdict: **keep-current** (keep the implementation)
+The former ArkScope scoring, composite recommendation, offline RL, and Phase D
+recommendation-shaped implementations are retired. Git history is their only
+archive. Reintroducing a capability requires a new reviewed semantic and current
+data/provider contract; it must not restore old modules, tables, fields, prompts,
+or aliases.
 
-> gpt-5.5 Q1: "which are stable primitive — keep the implementation, don't let the agent rewrite the wiring." These are the data/compute primitives. DAL/provider-backed; the agent calls them, never re-implements them.
+The following concepts remain intentional future work, without runnable legacy
+scaffolds:
 
-| Tool | Registry cat | Params | Backed by | Verdict |
-|------|-------------|--------|-----------|---------|
-| `get_current_quote` | prices | ticker*, source? | IBKR snapshot + local last-bar fallback | keep-current |
-| `get_ticker_prices` | prices | ticker*, interval?, days? | DAL / local market-data store | keep-current |
-| `get_price_change` | prices | ticker*, days? | price providers | keep-current |
-| `get_sector_performance` | prices | sector*, days? | price providers | keep-current |
-| `get_ticker_news` | news | ticker*, days?, source?, limit? | IBKR/Polygon/Finnhub news | keep-current |
-| `search_news_by_keyword` | news | keyword*, days?, ticker?, limit? | news store | keep-current |
-| `search_news_advanced` | news | query?, tickers?, days?, scored_only?, min_sentiment?, max_risk?, limit? | news store + scores | keep-current |
-| `get_news_brief` | news | tickers?, days? | news store | keep-current |
-| `get_news_sentiment_summary` | news | ticker*, days? | news scores | keep-current |
-| `get_sa_digest` | news | ticker*, days?, max_articles?, max_news?, max_comments?, min_comment_score? | SA capture (deterministic evidence-pack) | keep-current |
-| `get_sa_feed` | news | q?, ticker?, item_type?, days?, limit?, offset? | SA capture unified evidence feed | keep-current |
-| `get_sa_market_news` | news | ticker?, keyword?, limit? | SA capture | keep-current |
-| `list_high_value_comments` | news | window_days?, ticker?, min_score?, limit? | SA comment intelligence | keep-current |
-| `get_sa_comment_focus` | news | window_days?, min_score?, limit? | SA comment signals | keep-current |
-| `get_sa_alpha_picks` | portfolio | status?, sector? | SA capture | keep-current |
-| `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | SA capture | keep-current |
-| `get_sa_article_detail` | portfolio | article_id* | SA capture | keep-current |
-| `get_sa_pick_detail` | portfolio | symbol*, picked_date? | SA capture | keep-current |
-| `get_portfolio_holdings` | portfolio | account_id?, include_closed? | local profile_state.db portfolio | keep-current |
-| `get_detailed_financials` | analysis | ticker* | SEC EDGAR / Financial Datasets | keep-current |
-| `get_fundamentals_analysis` | analysis | ticker*, period? | IBKR→SEC→FinancialDatasets chain | keep-current |
-| `get_sec_filings` | analysis | ticker*, filing_types?, limit? | SEC EDGAR | keep-current |
-| `get_insider_trades` | analysis | ticker*, limit? | SEC EDGAR | keep-current |
-| `get_analyst_consensus` | analysis | ticker* | provider-native analyst data | keep-current |
-| `get_economic_calendar` | analysis | country?, importance?, days_back?, days_forward?, as_of?, limit? | Finnhub calendar | keep-current |
-| `get_macro_value` | analysis | series_id*, observation_date*, as_of? | FRED (point-in-time) | keep-current |
-| `get_ticker_data_coverage` | analysis | ticker*, target_date? | local data coverage diagnostics | keep-current |
-| `get_option_chain` | options | ticker*, expiry?, num_strikes?, max_expirations_for_term_structure? | IBKR options | keep-current |
-| `get_iv_skew_analysis` | options | ticker*, expiry?, num_strikes? | live IBKR option chain | keep-current |
-| `calculate_greeks` | options | S*, K*, T*, r*, sigma*, option_type?, model?, dividend_yield? | pure math (Black-Scholes) | keep-current |
-| `check_data_freshness` | analysis (freshness) | — | freshness meta (truth = data) | keep-current |
+- Signals research with explicit hypotheses, point-in-time data, OOS evaluation,
+  provenance, freshness, source coverage, and kill criteria.
+- Provider-backed option estimates evaluated through the common provider rubric.
+- Provider-neutral deep research that emits the structured evidence/card contract.
 
-### 1.2 Composed analysis (CA) — 9 tools · verdict: **mixed** (2 definition-only · 3 keep-impl/adapt-output · 3 signal keep-current · 1 preserve-adapt)
+## 2. Maintenance
 
-> gpt-5.5 Q2 + review (2026-06-04): only the **thin orchestration** digests (`get_morning_brief`, `get_watchlist_overview`) are true definition-only candidates. `get_peer_comparison` / `get_earnings_impact` / `get_portfolio_analysis` carry **real deterministic computation** (sector resolution + percentile / earnings-drift / beta+correlation+P&L) → **keep the implementation**, adapt only the *output* to the §2 card where they conclude. `synthesize_signal` is **preserve-adapt**, not definition-only (see §1.4).
-
-| Tool | Registry cat | Params | Composes | Verdict |
-|------|-------------|--------|----------|---------|
-| `get_morning_brief` | analysis | — | watchlist + news + signals + macro | **definition-only / adapt-to-card** — thin orchestration; emit §2 card |
-| `get_watchlist_overview` | analysis | — | watchlist + prices + news | **definition-only / adapt-to-card** — thin orchestration |
-| `get_peer_comparison` | analysis | ticker?, tickers?, sector? | fundamentals across peers | **keep-current** (real impl: sector resolution, metric ranking, percentile) — adapt output to §2 where it concludes |
-| `get_earnings_impact` | analysis | ticker*, quarters? | earnings + price reaction | **keep-current** (real impl: earnings-day move / drift / surprise) — adapt output |
-| `get_portfolio_analysis` | portfolio | tickers?, holdings? | prices + fundamentals + signals | **keep-current** (real impl: beta, correlation, P&L, concentration) — adapt output |
-| `detect_anomalies` | signals | ticker*, days?, as_of_date? | price/news/volume anomaly | keep-current (real impl in `src/signals`) |
-| `detect_event_chains` | signals | ticker*, days? | event-chain pattern detection | keep-current |
-| `get_signal_factors` | signals | ticker*, days?, as_of_date?, strategy? | multi-factor decomposition | keep-current (pairs w/ `synthesize_signal` = signal + explainability) |
-| `synthesize_signal` | signals | ticker*, days?, strategy?, as_of_date? | weighted multi-factor synthesis | **preserve-adapt** — keep deterministic impl; surface as *evidence* signal (data_quality + traceability), weaken recommendation authority, not final decision |
-
-### 1.3 Agent-control (AC) — 13 tools · verdict: mostly keep-current; **1 adapt** (save_report). `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only (842b5bf)
-
-> The agent's own machinery; permission-gated per ProductSpec §4.3. Not definition-only (infrastructure, not analysis). Web tools split three ways in §1.5.
-
-| Tool | Registry cat | Params | Permission gate (§4.3) | Verdict |
-|------|-------------|--------|------------------------|---------|
-| `save_memory` | memory | title*, content*, category?, tickers?, tags?, importance? | `db_write` | keep-current |
-| `recall_memories` | memory | query?, category?, tickers?, tags?, days?, limit? | none (read) | keep-current |
-| `list_memories` | memory | category?, days?, limit? | none (read) | keep-current |
-| `delete_memory` | memory | memory_id* | `db_write` | keep-current |
-| `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | `db_write` | **adapt** → accept/store §2 card fields + traceability (it *stores* the card; agent/report composition *generates* it) |
-| `list_reports` | reports | ticker?, days?, report_type?, limit? | none (read) | keep-current |
-| `get_report` | reports | report_id?, file_path? | none (read) | keep-current |
-| `execute_python_analysis` | execution | code?, task?, data_json?, timeout?, background? | `code_execution` | keep-current |
-| `tavily_search` | web | query*, max_results?, search_depth?, topic?, days? | `external_web_access` (+ `metered_spend` by usage) | keep-current — web-search/fetch (§1.5) |
-| `tavily_fetch` | web | url*, extract_depth?, offset?, max_chars? | `external_web_access` (+ `metered_spend` by usage) | keep-current — web-search/fetch (§1.5) |
-| `web_browse` | web | url*, wait_for?, extract_links?, offset?, max_chars? | `external_browser_automation` | **keep/adapt** — browser-automation; backend pluggable (§1.5) |
-| `scan_alerts` | monitor | tickers? | none (read) | keep-current |
-| `refresh_sa_alpha_picks` | portfolio | — | none (read) | **adapt done ✓ (842b5bf)** — the agent tool is pure read-only status. Universe membership is now separately ruled as an automatic DB-derived `sa_alpha_picks_current` source; JSON retirement is governed by the 2026-07-17 mini-design (§1.5). |
-
-*(`codex_web_research` was here — **removed** 2a168e9, see §1.4; the deep-research capability re-homes provider-neutral in §1.5.)*
-
-*(+ `delegate_to_subagent` — injected at each agent bridge, not in the registry's 53; AC class; `subagent_mode`-bounded per ProductSpec §4.1.)*
-
-### 1.4 Retire-adapt (RA) flags — scenario changed
-
-> gpt-5.5 Q3: "which must adapt/retire because the scenario changed." RL tools already retired (2026-06-03, `94861f7`+`6b49c74`). Flags below are **resolved** (gpt-5.5 review 2026-06-04); the two code follow-ups (codex removal, SA-refresh strip) are now **done** — marked ✓ with commit refs:
-
-| Tool | Class | Flag | Why |
-|------|-------|------|-----|
-| `save_report` | reports/AC | **adapt** | Must **accept/store** the ProductSpec §2 card fields (conclusion / counter-thesis / triggers / invalidation / confidence / traceability) + metadata. The card is produced by agent/report composition — `save_report` stores it, it does **not** generate it. |
-| `refresh_sa_alpha_picks` | portfolio/AC | **adapt done ✓ (842b5bf)** | The agent-facing tool is pure read-only status. The protected native host still writes the legacy JSON only during the reviewed readers-first transition; terminal authority is the automatic DB-derived source in the 2026-07-17 retirement design. |
-| `codex_web_research` | web/AC | **retired ✓ (2a168e9)** | Removed: hard-binds external Codex CLI + OpenAI OAuth + `--full-auto --search`; bypassed BYOK and the §2 output contract. Capability re-homed as provider-neutral `deep_research` (§1.5). |
-| `web_browse` | web/AC | **keep/adapt** | Gate locked to `external_browser_automation` (drives a browser). Framed as browser-automation with a pluggable backend (§1.5); seed of the CloakBrowser spike. |
-| `get_morning_brief`, `get_watchlist_overview` | analysis/CA | **definition-only / adapt-to-card** | Thin orchestration digests → composable recipe that emits the §2 card; no heavy impl to preserve. |
-| `synthesize_signal` | signals/CA | **preserve-adapt** | Keep the deterministic multi-factor impl; reframe output as an *evidence* signal (data_quality + traceability), weaken the recommendation authority — not definition-only. |
-
-### 1.5 Web & research capabilities — the 3-way split (gpt-5.5 review, 2026-06-04)
-
-The old "web" category conflated three distinct capabilities with different gates and backends. Lock them apart:
-
-| Capability | What it is | Tools (live → target) | Gate |
-|-----------|-----------|----------------------|------|
-| **web_search / fetch** | search + fetch *public content* via an API — no browser driven | `tavily_search`, `tavily_fetch` (live) → + future OpenAI / Anthropic hosted web-search/fetch | `external_web_access` (+ `metered_spend` by usage) |
-| **browser_automation** | drive a *real/embedded* browser — login, click, read DOM, JS-heavy pages | `web_browse` (live; Playwright now) | `external_browser_automation` |
-| **deep_research** | provider-neutral multi-step research → a §2 card | **no live tool** (`codex_web_research` removed 2a168e9); candidates: OpenAI Responses web-search/deep-research, Anthropic web_search+web_fetch, or ArkScope-orchestrated search/fetch/browser | `metered_spend` + `external_web_access` |
-
-- **`web_browse` backend is pluggable** behind one `external_browser_automation` gate: `playwright_builtin` (today) / `user_chrome` / `cloakbrowser_spike`. CloakBrowser (source-patched Chromium, Playwright/CDP drop-in, persistent profiles) is a **backend spike** (ProductSpec §7) — *not* a v1 replacement for the SA Chrome/Firefox extension pipeline (binary supply-chain, profile/session mgmt, packaging, ToS, CDP security all open).
-- **`deep_research` must be provider-neutral.** `codex_web_research` was removed (2a168e9) because it hard-binds the external Codex CLI + OpenAI OAuth / `--full-auto --search`, bypassing BYOK and the §2 output contract — *not* because the capability is unwanted. Rebuild on OpenAI SDK **and** Anthropic SDK paths, same §2 card out.
-
-**Superseded planned tool:** the earlier
-`sync_sa_alpha_picks_watchlist` / `follow_sa_alpha_picks` proposal is retired by
-the adopted 2026-07-17 data-authority decision. V1 does not add an opt-in
-mutation: every successful capture is retained, and current non-stale Alpha
-Picks automatically contribute source `sa_alpha_picks_current` to the derived
-universe. If the feed is later retired, a visible source-policy action may
-withdraw that source's eligibility without deleting capture history; that
-additive action will require `profile_state_write` when designed.
-
-> Current authority: `docs/superpowers/specs/2026-07-17-db-derived-universe-tickers-core-retirement-design.md`. Runtime readers migrate to one DB-derived accessor before the protected native host stops writing `config/tickers_core.json`; the app then provides only an on-demand generated compatibility export. Alpha Picks event/article reconciliation is a separate reviewed design, not a permission concern.
-
----
-
-## 2. Verdict roll-up
-
-| Verdict | Count | Tools |
-|---------|------:|-------|
-| **keep-current** | 48 | all SP (31) · 3 signal impls (detect_anomalies, detect_event_chains, get_signal_factors) · 3 CA compute tools (get_peer_comparison, get_earnings_impact, get_portfolio_analysis — *adapt output to §2 where they conclude*) · 11 AC (memory R/W ×4, reports R ×2, execute_python_analysis, tavily ×2, scan_alerts, refresh_sa_alpha_picks — read-only, adapt done 842b5bf) |
-| **definition-only / adapt-to-card** | 2 | get_morning_brief, get_watchlist_overview |
-| **preserve-adapt** | 1 | synthesize_signal |
-| **adapt** | 1 | save_report |
-| **keep/adapt** (gate + backend) | 1 | web_browse |
-| **retired ✓** | — | codex_web_research · RL tools · get_iv_analysis · get_iv_history_data · scan_mispricing |
-
-**Total live = 48 + 2 + 1 + 1 + 1 = 53 ✓**
-
----
-
-## 3. Tool-design rules (LOCK candidates — for review)
-
-1. **Data primitives stay implemented.** SP-class tools (price/fundamentals/macro/filing/SA/live options/Greeks) keep stable code. The agent calls them; it does **not** re-author the data wiring per query. (Stability + provider-abstraction via the DAL — ProviderCatalog.)
-2. **"Tools as definitions" applies only to composed-analysis.** A strong model may compose CA recipes from SP primitives; only CA-class tools are candidates to become definition/schema rather than hardcoded pipelines.
-3. **Decision-bearing output conforms to the §2 AI output contract.** Any agent/composition output bearing a conclusion/recommendation (the digests; a saved report's body) is the fixed-schema card + traceability, not free prose. `save_report` **stores** those §2 card fields + traceability metadata — it does **not** generate them.
-4. **Prefer provider-native signals over re-scoring** (ProductSpec §3): analyst consensus / sentiment / factor grades enter as evidence; the LLM integrates, it doesn't re-compute everything.
-5. **New tools declare a capability class + permission gate + provider dependency** at registration, so Settings + the permission model (§4.3) and ProviderCatalog stay in sync.
-6. **Schema/params are part of the contract.** The introspection table is the source of truth; a param change is a catalog-touching change.
-7. **Mutating the research universe / profile state is `profile_state_write`** — gated independently of `db_write` and of storage location (config file *or* DB). A tool that changes the watchlist / ticker universe / provider-or-agent settings / auto-follow rules must not pigg-back on a read or a `db_write`; the side-effect must be explicit and separately approvable.
-8. **Web access, browser automation, and deep research are three separate capabilities** (§1.5) with three separate gates. Never collapse them; auto-approving one never grants another. `deep_research` is provider-neutral by construction (no hard CLI/OAuth binding).
-9. **The AI-card EvidencePacket excludes ArkScope-generated LLM scores by default** (ProductSpec §2.4). `news_scores` multi-model sentiment/risk, the live `score_ibkr_news` / `score_{sentiment,risk}_anthropic` / `openai_summary` outputs, and score-derived tool fields (e.g. `get_news_sentiment_summary`'s `sentiment_mean`) are **not** objective evidence primitives — they are historical / enrichment / fallback signals. They may enter an EvidencePacket only when explicitly labeled `source_type = "arkscope_fallback_score"` / `"arkscope_derived_summary"` (with model · prompt/version · as-of · method), and in v1 are **off by default**. The news-store tools (`search_news_advanced`, `get_news_sentiment_summary`) remain live for history/enrichment/fallback, but their scores must not masquerade as raw or provider-native evidence. Objective inputs are: raw market data (price/volume/OHLC/IV/fundamentals), raw news rows (title · time · source · URL · excerpt), SEC/FRED/calendar facts, deterministic metrics, and provider-native ratings (source-labeled); SA content enters tagged as community/opinion. Triaging which scoring tools are open-dataset provenance vs live-enrichment vs retire is a **later, separate** pass — not a deletion now.
-
----
-
-## 4. Decisions — resolved + still open
-
-**Resolved (gpt-5.5 review, 2026-06-04 — folded above):**
-1. **CA definition-only narrowed** to the two thin digests (`get_morning_brief`, `get_watchlist_overview`). `get_peer_comparison` / `get_earnings_impact` / `get_portfolio_analysis` keep their real impl (adapt output to §2). `synthesize_signal` = **preserve-adapt**, paired with `get_signal_factors`.
-2. **`codex_web_research` → retire**; the *capability* re-homes as provider-neutral `deep_research` (§1.5).
-3. **`web_browse` → `external_browser_automation`**, pluggable backend (§1.5).
-4. **`refresh_sa_alpha_picks` → read-only status**; implicit agent-side mutation remains removed. The later 2026-07-17 ruling supersedes the proposed explicit follow action: current Alpha Picks become an automatic DB-derived universe source after readers-first JSON retirement. A future source-retirement mutation, if needed, uses `profile_state_write` and preserves captured history.
-
-**Still open (build sequencing, not blocking adoption):**
-1. **`deep_research` build path** — OpenAI SDK, Anthropic SDK, or ArkScope-orchestrated first? (spike, ProductSpec §7)
-2. **CloakBrowser backend** — when/whether to wire `cloakbrowser_spike` behind `web_browse` vs stay on `playwright_builtin`. (spike, ProductSpec §7)
-3. **DB-universe follow-up**: execute the reviewed readers-first `tickers_core.json` retirement after P2.8 Slice 3. Do not add the superseded follow/opt-in control; retain only the named future source-retirement action if the Alpha Picks feed is actually discontinued.
+Any registry change must update this table in the same reviewed change and keep
+the executable registry/catalog equality test green. Removed tools leave the
+current table completely; historical rationale remains in Git rather than in
+active-looking rows.

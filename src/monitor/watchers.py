@@ -1,7 +1,7 @@
 """
 Watcher implementations for the monitor system.
 
-Each watcher checks one aspect (price, sentiment, signal, sector)
+Each watcher checks one aspect (price, raw news volume, sector)
 against configured thresholds from user_profile.yaml alerts section.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from .notifiers import Alert
 
@@ -17,26 +17,6 @@ if TYPE_CHECKING:
     from src.tools.data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)
-
-
-def _preload_signal_news_df(
-    dal: "DataAccessLayer",
-    *,
-    days: int,
-) -> Optional[Any]:
-    """Prepare shared signal news context once per scan.
-
-    Signal synthesis needs a full-news DataFrame for sector/anomaly context.
-    Building that dataset for every ticker is extremely expensive during
-    monitor scans, so watchers preload it once and pass it through.
-    """
-    from src.tools.signal_tools import _prepare_news_df_for_signals
-
-    try:
-        return _prepare_news_df_for_signals(dal, ticker=None, days=days)
-    except Exception as exc:  # pragma: no cover - defensive fallback
-        logger.debug("SignalWatcher preload failed, falling back to per-ticker load: %s", exc)
-        return None
 
 
 class BaseWatcher(ABC):
@@ -117,20 +97,14 @@ class PriceWatcher(BaseWatcher):
         return alerts
 
 
-class SentimentWatcher(BaseWatcher):
-    """Detect sentiment score spikes or news volume surges.
-
-    Config keys (alerts.sentiment_alerts):
-        sentiment_change_threshold: 1.5
-        news_volume_spike_multiplier: 3
-    """
+class NewsVolumeWatcher(BaseWatcher):
+    """Detect raw-news volume spikes against a 30-day baseline."""
 
     def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__(config)
-        sa = config.get("sentiment_alerts", {})
-        self.enabled = sa.get("enabled", True)
-        self.sentiment_threshold = sa.get("sentiment_change_threshold", 1.5)
-        self.volume_multiplier = sa.get("news_volume_spike_multiplier", 3)
+        settings = config.get("news_volume_alerts", {})
+        self.enabled = settings.get("enabled", True)
+        self.spike_multiplier = float(settings.get("spike_multiplier", 3.0))
 
     async def check(self, dal: DataAccessLayer, tickers: List[str]) -> List[Alert]:
         if not self.enabled:
@@ -139,132 +113,34 @@ class SentimentWatcher(BaseWatcher):
         alerts: List[Alert] = []
         for ticker in tickers:
             try:
-                # Compare recent (7d) vs baseline (30d) stats
-                recent_stats = dal.get_news_stats(ticker=ticker, days=7)
-                baseline_stats = dal.get_news_stats(ticker=ticker, days=30)
-
-                recent = recent_stats[0] if recent_stats else {}
-                baseline = baseline_stats[0] if baseline_stats else {}
-
-                if not recent or not baseline:
+                recent_rows = dal.get_news_stats(ticker=ticker, days=7)
+                baseline_rows = dal.get_news_stats(ticker=ticker, days=30)
+                recent = recent_rows[0] if recent_rows else {}
+                baseline = baseline_rows[0] if baseline_rows else {}
+                recent_daily = float(recent.get("article_count", 0)) / 7
+                baseline_daily = float(baseline.get("article_count", 0)) / 30
+                if baseline_daily <= 0:
                     continue
-
-                # Sentiment shift: compare 7d avg vs 30d avg
-                recent_sent = recent.get("avg_sentiment")
-                baseline_sent = baseline.get("avg_sentiment")
-                if recent_sent is not None and baseline_sent is not None:
-                    delta = abs(recent_sent - baseline_sent)
-                    if delta >= self.sentiment_threshold:
-                        direction = "improved" if recent_sent > baseline_sent else "deteriorated"
-                        alerts.append(Alert(
-                            alert_type="sentiment",
-                            severity="warning",
-                            title=f"Sentiment {direction}",
-                            message=(
-                                f"{ticker} sentiment shifted by {delta:.1f} "
-                                f"(30d avg {baseline_sent:.1f} → 7d avg {recent_sent:.1f})"
-                            ),
-                            ticker=ticker,
-                            data={
-                                "recent_avg": round(recent_sent, 2),
-                                "baseline_avg": round(baseline_sent, 2),
-                                "delta": round(delta, 2),
-                            },
-                        ))
-
-                # News volume spike: recent 7d count vs 30d daily average
-                recent_count = recent.get("article_count", 0)
-                baseline_count = baseline.get("article_count", 0)
-                baseline_daily_avg = baseline_count / 30 if baseline_count > 0 else 0
-                recent_daily_avg = recent_count / 7 if recent_count > 0 else 0
-
-                if baseline_daily_avg > 0 and recent_daily_avg >= baseline_daily_avg * self.volume_multiplier:
-                    alerts.append(Alert(
-                        alert_type="sentiment",
-                        severity="warning",
-                        title="News volume spike",
-                        message=(
-                            f"{ticker} has {recent_daily_avg:.1f} articles/day (7d) "
-                            f"vs {baseline_daily_avg:.1f}/day baseline "
-                            f"({recent_daily_avg / baseline_daily_avg:.1f}x)"
-                        ),
-                        ticker=ticker,
-                        data={
-                            "recent_daily_avg": round(recent_daily_avg, 1),
-                            "baseline_daily_avg": round(baseline_daily_avg, 1),
-                        },
-                    ))
-
-            except Exception as e:
-                logger.debug("SentimentWatcher failed for %s: %s", ticker, e)
-
-        return alerts
-
-
-class SignalWatcher(BaseWatcher):
-    """Run signal synthesis and alert on strong buy/sell signals.
-
-    Triggers alert when SignalSynthesizer produces STRONG_BUY or STRONG_SELL,
-    or when risk_level >= 4.
-    """
-
-    def __init__(self, config: Dict[str, Any]) -> None:
-        super().__init__(config)
-        self.days = 14
-
-    async def check(self, dal: DataAccessLayer, tickers: List[str]) -> List[Alert]:
-        from src.tools.signal_tools import synthesize_signal
-
-        alerts: List[Alert] = []
-        shared_news_df = _preload_signal_news_df(dal, days=self.days)
-        for ticker in tickers:
-            try:
-                result = synthesize_signal(
-                    dal,
+                multiple = recent_daily / baseline_daily
+                if multiple < self.spike_multiplier:
+                    continue
+                alerts.append(Alert(
+                    alert_type="news_volume",
+                    severity="warning",
+                    title="News volume spike",
+                    message=(
+                        f"{ticker} has {recent_daily:.1f} articles/day (7d) vs "
+                        f"{baseline_daily:.1f}/day baseline ({multiple:.1f}x)"
+                    ),
                     ticker=ticker,
-                    days=self.days,
-                    news_df=shared_news_df,
-                )
-                if not result:
-                    continue
-
-                # result is a TradingSignal Pydantic model (src/tools/schemas.py)
-                action_str = str(result.action)
-                confidence = result.confidence
-                risk_level = result.risk_level
-                reasoning = result.reasoning
-
-                if action_str in ("STRONG_BUY", "STRONG_SELL"):
-                    severity = "critical"
-                    alerts.append(Alert(
-                        alert_type="signal",
-                        severity=severity,
-                        title=f"Signal: {action_str}",
-                        message=f"{ticker} — {action_str} (confidence {confidence:.0%}, risk {risk_level}/5)\n  {reasoning}",
-                        ticker=ticker,
-                        data={
-                            "action": action_str,
-                            "confidence": round(confidence, 3),
-                            "risk_level": risk_level,
-                        },
-                    ))
-                elif risk_level >= 4:
-                    alerts.append(Alert(
-                        alert_type="signal",
-                        severity="warning",
-                        title=f"High risk level ({risk_level}/5)",
-                        message=f"{ticker} — {action_str} (confidence {confidence:.0%})\n  {reasoning}",
-                        ticker=ticker,
-                        data={
-                            "action": action_str,
-                            "confidence": round(confidence, 3),
-                            "risk_level": risk_level,
-                        },
-                    ))
-
-            except Exception as e:
-                logger.debug("SignalWatcher failed for %s: %s", ticker, e)
-
+                    data={
+                        "recent_daily_avg": round(recent_daily, 1),
+                        "baseline_daily_avg": round(baseline_daily, 1),
+                        "spike_multiple": round(multiple, 1),
+                    },
+                ))
+            except Exception as exc:
+                logger.debug("NewsVolumeWatcher failed for %s: %s", ticker, exc)
         return alerts
 
 

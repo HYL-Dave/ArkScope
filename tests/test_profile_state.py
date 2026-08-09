@@ -52,17 +52,14 @@ CANNED_OVERVIEW = {
         {
             "ticker": "AAPL", "group": "Holdings", "priority": "high",
             "latest_close": 200.0, "change_7d_pct": 1.5, "news_count_7d": 0,
-            "sentiment_mean": None, "bullish_ratio": 0,
         },
         {
             "ticker": "MSFT", "group": "Holdings", "priority": "medium",
             "latest_close": 410.0, "change_7d_pct": -2.0, "news_count_7d": 4,
-            "sentiment_mean": 0.3, "bullish_ratio": 0.5,
         },
         {
             "ticker": "TSLA", "group": "Interested", "priority": "low",
             "latest_close": None, "change_7d_pct": None, "news_count_7d": 1,
-            "sentiment_mean": -0.1, "bullish_ratio": 0.25,
         },
     ],
 }
@@ -320,7 +317,7 @@ def test_cockpit_read_does_not_write(api_store):
     row = next(x for x in data["rows"] if x["ticker"] == "AAPL")
     for field in (
         "ticker", "group", "priority", "latest_close", "change_7d_pct",
-        "news_count_7d", "sentiment_mean", "bullish_ratio", "lists",
+        "news_count_7d", "lists",
         "archived", "tags", "note_count", "freshness", "per_ticker_error",
     ):
         assert field in row
@@ -578,8 +575,6 @@ def test_legacy_overview_enriches_but_never_qualifies_universe(
                     "latest_close": 215.0,
                     "change_7d_pct": 2.5,
                     "news_count_7d": 3,
-                    "sentiment_mean": 0.4,
-                    "bullish_ratio": 0.75,
                 },
                 {
                     "ticker": "OVERVIEWONLY",

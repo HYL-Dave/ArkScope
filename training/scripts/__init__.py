@@ -1,1 +1,0 @@
-# Shell scripts for training automation

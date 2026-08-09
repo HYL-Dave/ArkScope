@@ -330,8 +330,7 @@ def get_watchlist_overview(
     """
     Generate a summary of all watchlist tickers' current status.
 
-    For each ticker, includes latest price change, news count,
-    and sentiment if available.
+    For each ticker, includes latest price change and raw news count.
 
     Args:
         dal: DataAccessLayer instance
@@ -366,8 +365,6 @@ def get_watchlist_overview(
             "latest_close": None,
             "change_7d_pct": None,
             "news_count_7d": 0,
-            "sentiment_mean": None,
-            "bullish_ratio": 0,
         }
 
         # Price change (7 days). Avoid a global DISTINCT ticker scan over the
@@ -381,18 +378,11 @@ def get_watchlist_overview(
         except Exception:
             pass
 
-        # News sentiment (7 days), using one batch stats query for the whole
+        # Raw news activity (7 days), using one batch stats query for the whole
         # watchlist instead of one article query per ticker.
         stats = news_by_ticker.get(t.upper())
         if stats:
-            article_count = _as_int(stats.get("article_count"), 0)
-            scored_count = _as_int(stats.get("scored_count"), 0)
-            bullish_count = _as_int(stats.get("bullish_count"), 0)
-            summary["news_count_7d"] = article_count
-            summary["sentiment_mean"] = _as_float(stats.get("avg_sentiment"))
-            summary["bullish_ratio"] = (
-                round(bullish_count / scored_count, 3) if scored_count else 0
-            )
+            summary["news_count_7d"] = _as_int(stats.get("article_count"), 0)
 
         tickers_summary.append(summary)
 
@@ -530,7 +520,6 @@ def get_morning_brief(
             notable_signals, market_context
     """
     from .price_tools import get_sector_performance
-    from .news_tools import get_news_sentiment_summary
 
     profile = dal.get_user_profile()
     today = date.today().isoformat()
@@ -577,21 +566,23 @@ def get_morning_brief(
             pass
 
     # 3. Notable news (high-volume tickers)
-    notable_news: List[dict] = []
-    for info in watchlist.details[:10]:
-        try:
-            sent = get_news_sentiment_summary(dal, info.ticker, days=1)
-            if sent["article_count"] > 0:
-                notable_news.append({
-                    "ticker": info.ticker,
-                    "count": sent["article_count"],
-                    "sentiment_mean": sent["sentiment_mean"],
-                })
-        except Exception:
-            pass
-
-    # Sort by news count descending
-    notable_news.sort(key=lambda x: x["count"], reverse=True)
+    tracked = {info.ticker for info in watchlist.details}
+    stats = dal.get_news_stats(days=1)
+    notable_news = [
+        {
+            "ticker": str(row.get("ticker", "")),
+            "count": int(row.get("article_count", 0)),
+            "latest_date": row.get("latest_date"),
+        }
+        for row in stats
+        if row.get("ticker") in tracked and int(row.get("article_count", 0)) > 0
+    ]
+    # Stable sorts implement count DESC, latest date DESC, ticker ASC.
+    notable_news.sort(key=lambda row: row["ticker"])
+    notable_news.sort(
+        key=lambda row: str(row.get("latest_date") or ""), reverse=True
+    )
+    notable_news.sort(key=lambda row: row["count"], reverse=True)
 
     return {
         "date": today,

@@ -30,9 +30,6 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
     # 模擬執行 (印出 per-source 計畫，不碰 IBKR/DB/job_runs)
     python -m src.daily_update --all --scope active-universe --dry-run
 
-    # 舊 PG news_scores 同步已退役；使用 scripts/scoring/import_news_scores_local.py。
-    python -m src.daily_update --scores
-
 重要限制 — 新 Ticker 的歷史資料:
     --all / --news 底層用 --incremental，以「全域最新文章時間」為起點。
     新加入的 ticker 不會被自動補抓歷史新聞。補抓方式 (Polygon 為例):
@@ -378,17 +375,6 @@ def show_status():
     logger.info("")
 
 
-def _sync_scores(dry_run: bool = False) -> bool:
-    """Retired PG score sync hook.
-
-    Active score imports use scripts/scoring/import_news_scores_local.py.
-    """
-    logger.error(
-        "PG news score sync is retired; use scripts/scoring/import_news_scores_local.py"
-    )
-    return False
-
-
 def main():
     parser = argparse.ArgumentParser(
         description='Daily Data Update - thin CLI wrapper over the app scheduler core',
@@ -410,8 +396,6 @@ Examples:
 
     # Dry run (prints the per-source plan; never touches IBKR/DB)
     python -m src.daily_update --all --scope active-universe --dry-run
-
-    python -m src.daily_update --scores                  # retired; use local score importer
 
 Note: IBKR sources require TWS/Gateway running.
       Every run is the SAME code path as the app's Run now (per-source locks,
@@ -442,8 +426,6 @@ Note: IBKR sources require TWS/Gateway running.
                        help='Run sources concurrently (per-source/IBKR locks still apply)')
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress collector output (for background runs)')
-    parser.add_argument('--scores', action='store_true',
-                       help='Retired PG score sync; use scripts/scoring/import_news_scores_local.py')
     parser.add_argument('--tickers', type=str, default=None,
                        help='Explicit comma-separated ticker scope (overrides --scope)')
     parser.add_argument('--scope', choices=['active-universe'], default=None,
@@ -457,15 +439,9 @@ Note: IBKR sources require TWS/Gateway running.
     if args.quiet:
         logging.getLogger().setLevel(logging.WARNING)
 
-    if args.scores:
-        logger.error(
-            "PG news score sync is retired; use scripts/scoring/import_news_scores_local.py"
-        )
-        sys.exit(2)
-
-    # Default to status if no action specified (--scores is an action).
+    # Default to status if no action is specified.
     if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
-                args.ibkr_news, args.ibkr_prices, args.scores]):
+                args.ibkr_news, args.ibkr_prices]):
         args.status = True
 
     if args.status:
@@ -530,7 +506,7 @@ Note: IBKR sources require TWS/Gateway running.
     telem = _RunTelemetry(enabled=True, payload={
         "flags": {k: bool(getattr(args, k, False)) for k in (
             "all", "news", "polygon", "finnhub", "ibkr_news", "ibkr_prices",
-            "scores", "parallel")},
+            "parallel")},
         "scope": args.scope,
         "tickers": args.tickers,
         "ticker_count": len(tickers or []),
@@ -559,9 +535,6 @@ Note: IBKR sources require TWS/Gateway running.
     else:
         for s in sources:
             results[s] = _run(s)
-
-    if args.scores:
-        results['db_sync_scores'] = telem.timed('db_sync_scores', _sync_scores, False)
 
     # Summary
     end_time = datetime.now()

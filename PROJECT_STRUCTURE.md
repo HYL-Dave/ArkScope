@@ -16,13 +16,14 @@
 
 | Path | What |
 |------|------|
-| `src/` | Agent, tools, DAL, analysis pipeline, monitor, multi-factor signals, data ingestion (`src/collectors/`, `src/daily_update.py` — **protected runtime path**) |
+| `src/` | Agent, tools, DAL, API, monitor, and data ingestion (`src/collectors/`, `src/daily_update.py` — **protected runtime path**) |
 | `data_sources/` | Data-source API clients (Finnhub, SEC EDGAR, Polygon, IBKR, Alpha Vantage, EODHD, …) |
-| `scripts/` | Transitional `scripts/scoring/` owner only; Tranche B removes the root after retiring the legacy score surface — no app runtime paths |
 | `extensions/sa_alpha_picks/` | Seeking Alpha browser extension + Native Messaging host |
-| `training/` | RL training — **paused** (see `docs/design/RL_COLLAPSE_FINDINGS.md`) |
 | `config/` | `.env`, `user_profile.yaml`, watchlists, sectors, skills |
 | `docs/` | Design docs, data/feature guides, project history |
+
+Retired offline RL, legacy scoring/Signals, and Phase D implementation bytes are
+available through Git history, not as dormant top-level packages.
 
 *For anything more detailed than this, read the canonical docs above rather than
 trusting a hand-maintained tree.*

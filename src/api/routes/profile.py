@@ -146,8 +146,6 @@ def cockpit_watchlist(
                 "latest_close": r.get("latest_close"),
                 "change_7d_pct": r.get("change_7d_pct"),
                 "news_count_7d": r.get("news_count_7d", 0),
-                "sentiment_mean": r.get("sentiment_mean"),
-                "bullish_ratio": r.get("bullish_ratio"),
                 "lists": a.lists if a else [],
                 "archived": archived,
                 "tags": tags.get(_norm(ticker), []),
@@ -310,9 +308,6 @@ def universe(
                 "latest_close": latest_close,
                 "change_7d_pct": change_7d,
                 "news_count_7d": news_7d,
-                # sentiment/bullish remain overview-only (curated) for now
-                "sentiment_mean": ov.get("sentiment_mean") if ov else None,
-                "bullish_ratio": ov.get("bullish_ratio") if ov else None,
                 "lists": a.lists if a else [],
                 "all_lists": a.all_lists if a else [],
                 "archived_lists": a.archived_lists if a else [],

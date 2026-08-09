@@ -29,7 +29,6 @@ from src.profile_state import ProfileStateStore
 from src.tools.data_access import DataAccessLayer
 from src.tools.news_tools import (
     get_ticker_news,
-    get_news_sentiment_summary,
     search_news_by_keyword,
 )
 
@@ -194,16 +193,6 @@ def news_for_ticker(
     """Get recent news articles for a ticker."""
     result = get_ticker_news(dal, ticker=ticker, days=days, source=source)
     return result.model_dump()
-
-
-@router.get("/{ticker}/sentiment")
-def news_sentiment(
-    ticker: str,
-    days: int = Query(7, ge=1, le=9999),
-    dal: DataAccessLayer = Depends(get_dal),
-):
-    """Get aggregated sentiment statistics for a ticker."""
-    return get_news_sentiment_summary(dal, ticker=ticker, days=days)
 
 
 @router.get("/search/keyword")

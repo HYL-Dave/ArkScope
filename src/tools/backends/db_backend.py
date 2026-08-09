@@ -345,8 +345,6 @@ class DatabaseBackend:
         ticker: Optional[str] = None,
         days: int = 30,
         source: str = "auto",
-        scored_only: bool = True,
-        model: Optional[str] = None,
     ) -> pd.DataFrame:
         """Retired PG news surface; runtime authority is local SQLite."""
         return pd.DataFrame(columns=_NEWS_COLS)
@@ -371,7 +369,6 @@ class DatabaseBackend:
         ticker: Optional[str] = None,
         days: int = 30,
         limit: int = 20,
-        scored_only: bool = True,
     ) -> pd.DataFrame:
         """Retired PG news search surface."""
         return pd.DataFrame(columns=_NEWS_SEARCH_COLS)
@@ -383,12 +380,6 @@ class DatabaseBackend:
     ) -> pd.DataFrame:
         """Retired PG news stats surface."""
         return pd.DataFrame(columns=_NEWS_STATS_COLS)
-
-    def query_news_scores(self, news_id: int) -> pd.DataFrame:
-        """Retired PG news score surface."""
-        return pd.DataFrame(columns=[
-            "score_type", "model", "reasoning_effort", "score", "scored_at",
-        ])
 
     # --------------------------------------------------------
     # Prices

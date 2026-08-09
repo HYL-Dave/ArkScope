@@ -13,6 +13,14 @@
 > remain. Any future persisted IV line starts from the provider-neutral proof packet
 > with a new semantic ID/schema; it must not revive the old `iv_history` contract.
 
+> **2026-08-09 score-line supersession:** Tranche B retired the legacy 1-5
+> article-score producers, readers, routes, composite recommendation behavior,
+> and training lineage. Any scoring/sentiment-sync instructions or schema
+> proposals below are dated migration history, not current capability. Raw news,
+> provider-native sentiment, deterministic volume/event sequences, and current
+> provider ingestion remain. A future Signals or enrichment line requires a new
+> reviewed design and must not reconnect the disconnected score rows.
+
 ---
 
 ## 0. Status & decision summary

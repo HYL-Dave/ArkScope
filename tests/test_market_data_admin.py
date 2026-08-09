@@ -275,46 +275,6 @@ _PRE_SENTIMENT_NEWS = (
 )
 
 
-def test_ensure_news_sentiment_columns_migrates_pre_existing_in_place(tmp_path):
-    db = tmp_path / "old.db"
-    conn = sqlite3.connect(db)
-    conn.executescript(_PRE_SENTIMENT_NEWS)
-    conn.execute("INSERT INTO news VALUES (1,'AAPL','t','d','u','p','polygon','2026-06-01T12:00:00+0000','h')")
-    conn.commit()
-
-    mda._ensure_news_sentiment_columns(conn)  # the in-place upgrade
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(news)").fetchall()}
-    assert {"sentiment_score", "sentiment_source", "sentiment_scale"} <= cols  # added
-    row = conn.execute("SELECT sentiment_score, ticker FROM news WHERE id=1").fetchone()
-    assert row == (None, "AAPL")  # existing row preserved, score born NULL
-
-    mda._ensure_news_sentiment_columns(conn)  # idempotent — second run is a no-op
-    assert len({r[1] for r in conn.execute("PRAGMA table_info(news)").fetchall()}) == len(cols)
-    conn.close()
-
-
-def test_ensure_news_sentiment_columns_no_news_table_is_safe(tmp_path):
-    conn = sqlite3.connect(tmp_path / "empty.db")
-    mda._ensure_news_sentiment_columns(conn)  # no news table → must not raise
-    conn.close()
-
-
-def test_local_news_sentiment_score_is_check_constrained_to_1_5(tmp_path):
-    # The scale invariant is ENFORCED, not conventional: a provider polarity (-1/0/+1)
-    # CANNOT be written into the 1-5 sentiment_score — the storage rejects it.
-    db = tmp_path / "fresh.db"
-    conn = sqlite3.connect(db)
-    conn.executescript(mda._NEWS_SCHEMA)  # fresh schema carries the CHECK
-    base = "INSERT INTO news (id,ticker,title,source,published_at,sentiment_score) VALUES (?,?,?,?,?,?)"
-    conn.execute(base, (1, "AAPL", "t", "polygon", "2026-06-01T12:00:00+0000", 4.0))   # 1-5 ok
-    conn.execute(base, (2, "AAPL", "t", "polygon", "2026-06-01T12:00:00+0000", None))  # NULL ok
-    conn.commit()
-    for bad in (-1.0, 0.0, 6.0):  # polarity / out-of-range → rejected
-        with pytest.raises(sqlite3.IntegrityError):
-            conn.execute(base, (99, "AAPL", "t", "polygon", "2026-06-01T12:00:00+0000", bad))
-    conn.close()
-
-
 # --- ticker canonicalization (strict-readiness slice #1): aliases + PK-safe reconcile ---
 
 def test_ensure_ticker_aliases_seeds_brk_idempotent(tmp_path):

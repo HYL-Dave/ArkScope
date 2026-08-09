@@ -95,7 +95,7 @@ class TestAnthropicToolSchemas:
         """All bridge tools (registry + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 54
+        assert len(tools) == 51
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -116,7 +116,6 @@ class TestAnthropicToolSchemas:
 
         expected = {
             "get_ticker_news",
-            "get_news_sentiment_summary",
             "search_news_by_keyword",
             "get_news_brief",
             "search_news_advanced",
@@ -125,9 +124,8 @@ class TestAnthropicToolSchemas:
             "get_price_change",
             "get_sector_performance",
             "calculate_greeks",
-            "detect_anomalies",
+            "detect_news_volume_anomaly",
             "detect_event_chains",
-            "synthesize_signal",
             "get_fundamentals_analysis",
             "get_sec_filings",
             "get_watchlist_overview",
@@ -165,7 +163,6 @@ class TestAnthropicToolSchemas:
             "list_high_value_comments",
             "get_sa_comment_focus",
             "get_sa_feed",
-            "get_signal_factors",
             "get_economic_calendar",
             "get_macro_value",
             "get_sa_digest",
@@ -186,10 +183,8 @@ class _HermeticAgentBackend:
         ticker=None,
         days=30,
         source="auto",
-        scored_only=True,
-        model=None,
     ):
-        del days, model
+        del days
         rows = [
             {
                 "date": "2026-07-30T14:00:00+0000",
@@ -198,8 +193,6 @@ class _HermeticAgentBackend:
                 "source": "polygon",
                 "url": "https://example.test/nvda-earnings",
                 "publisher": "Example Wire",
-                "sentiment_score": 5.0,
-                "risk_score": 2.0,
                 "description": "NVIDIA reported stronger earnings.",
             },
             {
@@ -209,8 +202,6 @@ class _HermeticAgentBackend:
                 "source": "ibkr",
                 "url": "https://example.test/nvda-product",
                 "publisher": "Example Desk",
-                "sentiment_score": 3.0,
-                "risk_score": 3.0,
                 "description": "NVIDIA announced a product update.",
             },
         ]
@@ -219,8 +210,6 @@ class _HermeticAgentBackend:
             frame = frame[frame["ticker"] == ticker.upper()]
         if source not in ("", "auto", None):
             frame = frame[frame["source"] == source]
-        if scored_only:
-            frame = frame[frame["sentiment_score"].notna()]
         return frame.reset_index(drop=True)
 
     def query_prices(self, ticker, interval="15min", days=30):
@@ -364,7 +353,7 @@ class TestOpenAIToolCreation:
         """OpenAI bridge tools (registry + delegate_to_subagent)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 54
+        assert len(tools) == 51
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -625,7 +614,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 53
+        assert len(schemas) == 50
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -639,7 +628,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 53
+        assert len(schemas) == 50
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

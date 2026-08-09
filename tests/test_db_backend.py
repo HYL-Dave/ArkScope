@@ -53,7 +53,7 @@ def test_retired_pg_domain_methods_do_not_query_dropped_tables(monkeypatch):
     assert backend.query_news(days=1).empty
     assert backend.query_news_search(query="NVDA").empty
     assert backend.query_news_stats(ticker="NVDA").empty
-    assert backend.query_news_scores(123).empty
+    assert not hasattr(backend, "query_news_scores")
     assert backend.query_fundamentals("NVDA") == {}
     assert backend.get_financial_cache("k") is None
     assert backend.set_financial_cache("k", "NVDA", {"x": 1}) is False
@@ -139,11 +139,6 @@ class TestNewsDB:
     def test_query_news_source_filter(self, backend):
         """PG news source filter is a retired empty surface."""
         df = backend.query_news("AAPL", days=3650, source="ibkr")
-        assert df.empty
-
-    def test_query_news_scored_only(self, backend):
-        """PG news_scores is retired; scored PG reads are empty."""
-        df = backend.query_news("NVDA", days=3650, scored_only=True)
         assert df.empty
 
     def test_news_schema_via_dal(self, dal):

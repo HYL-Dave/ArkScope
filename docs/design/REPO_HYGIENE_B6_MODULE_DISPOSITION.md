@@ -8,6 +8,12 @@
 > deletions now; scripts survivor-table changes = standing-ruling changes.
 > Nothing here executes anything.
 
+> **2026-08-09 supersession:** Tranche B subsequently retired the deferred
+> recommendation-shaped analysis scaffold, the complete training lineage, and
+> the remaining root scripts package. Their references below are dated B6
+> inventory facts, not current owners or preservation instructions. Current
+> options mathematics remains under `src/options_math/`.
+
 > **2026-07-27 scoped supersession:** The merged legacy-IV retirement
 > removes exactly two `scripts/analysis` consumers because they directly depend on
 > the retired store: `compare_bs_vs_american.py` and
