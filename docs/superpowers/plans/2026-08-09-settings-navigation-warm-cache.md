@@ -1,6 +1,6 @@
 # Settings Persistent Navigation and Bounded Warm Cache Implementation Plan
 
-> **Status:** WRITTEN - INDEPENDENT PLAN REVIEW REQUIRED
+> **Status:** PLAN GREEN; TASK 0 COMPLETE - INDEPENDENT REVIEW REQUIRED
 >
 > **Date:** 2026-08-09
 >
@@ -527,6 +527,13 @@ task is unauthorized until the preceding review is GREEN.
 ### Task 0 - Re-ground and open evidence
 
 No product/test code changes.
+
+> Executed at reviewed plan tip `5755ed54`. The 72-entry raw packet is rooted
+> at `/tmp/settings-navigation-warm-cache-task0-5755ed54`; its `SHA256SUMS`
+> identity is
+> `d0da19c1d76153f3ece27281f8948d5a332ce246602a6123c139604923cb19fe`.
+> All Steps 1-8 completed, no product/test byte changed, and Task 1 remains
+> unauthorized pending independent Task 0 review.
 
 1. Verify branch, design authority, product base ancestry, clean main/worktree,
    lockfiles, node_modules identity, Node version, normalizer identity,
