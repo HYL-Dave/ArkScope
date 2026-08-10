@@ -44,8 +44,27 @@ function hasSelector(name: string): boolean {
 }
 
 function ruleBody(selector: string): string {
+  return ruleBodyFrom(settingsCss, selector);
+}
+
+function ruleBodyFrom(source: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return settingsCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+  return source.match(new RegExp(`^\\s*${escaped}\\s*\\{([^}]*)\\}`, "m"))?.[1] ?? "";
+}
+
+function balancedBlock(source: string, marker: string): string {
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex < 0) return "";
+  const openIndex = source.indexOf("{", markerIndex + marker.length);
+  if (openIndex < 0) return "";
+  let depth = 1;
+  for (let index = openIndex + 1; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] !== "}") continue;
+    depth -= 1;
+    if (depth === 0) return source.slice(openIndex + 1, index);
+  }
+  return "";
 }
 
 describe("Settings workspace CSS contract", () => {
@@ -92,6 +111,40 @@ describe("Settings workspace CSS contract", () => {
       /max-height:\s*calc\(100vh\s*-\s*var\(--settings-sticky-offset\)\s*-\s*var\(--space-4\)\)/,
     );
     expect(sectionAnchor).toMatch(/scroll-margin-top:\s*var\(--settings-sticky-offset\)/);
+  });
+
+  it("settings scroll owner drops top inset while lede owns responsive breathing room", () => {
+    const workspace = ruleBody(".main.settings-workspace");
+    const lede = ruleBody(".settings-page-lede");
+    const mobileBlock = balancedBlock(stylesCss, "@media (max-width: 760px)");
+    const mobileLede = ruleBodyFrom(mobileBlock, ".settings-workspace .settings-page-lede");
+
+    expect(workspace).toMatch(/padding-top:\s*0/);
+    expect(lede).toMatch(/padding-top:\s*20px/);
+    expect(settingsSource).toMatch(
+      /<div className="settings-page-lede">\s*<PageHeader[\s\S]*?<\/div>/,
+    );
+    expect(mobileBlock).toMatch(/\.main\s*\{[^}]*padding:\s*12px/);
+    expect(mobileLede.replace(/\s+/g, " ").trim()).toBe("padding-top: 12px;");
+  });
+
+  it("sticky offsets stay shared after the inset transfer", () => {
+    const workspace = ruleBody(".settings-workspace");
+    const lede = ruleBody(".settings-page-lede");
+    const tabList = ruleBody(".settings-workflow-tabs > .ui-tab-list");
+    const directoryRail = ruleBody(".settings-directory-rail");
+    const sectionAnchor = ruleBody(".settings-section-anchor");
+
+    expect(workspace).toMatch(/--settings-sticky-offset:\s*[^;]+/);
+    expect(tabList).toMatch(/top:\s*0/);
+    expect(tabList).toMatch(/height:\s*var\(--settings-sticky-offset\)/);
+    expect(directoryRail).toMatch(/top:\s*var\(--settings-sticky-offset\)/);
+    expect(sectionAnchor).toMatch(/scroll-margin-top:\s*var\(--settings-sticky-offset\)/);
+    expect(lede).not.toBe("");
+    expect(lede).not.toMatch(/margin|position|transform|mask/);
+    const ledeIndex = settingsSource.indexOf('className="settings-page-lede"');
+    expect(ledeIndex).toBeGreaterThanOrEqual(0);
+    expect(ledeIndex).toBeLessThan(settingsSource.indexOf("<Tabs"));
   });
 
   it("defines_every_literal_class_in_extracted_settings_modules", () => {

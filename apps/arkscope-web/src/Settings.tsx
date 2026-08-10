@@ -1018,10 +1018,12 @@ export function SettingsView({
       className="main settings-workspace"
       data-settings-overlay={String(shellOverlay)}
     >
-      <PageHeader
-        title={t(($) => $.workspace.title)}
-        actions={<LocaleSelector />}
-      />
+      <div className="settings-page-lede">
+        <PageHeader
+          title={t(($) => $.workspace.title)}
+          actions={<LocaleSelector />}
+        />
+      </div>
 
       {routeOutcomePresentation?.tone === "error" ? (
         <p className="error-text">{routeOutcomePresentation.message}</p>

@@ -1,7 +1,15 @@
+.main.settings-workspace {
+  padding-top: 0;
+}
+
 .settings-workspace {
   --settings-sticky-offset: calc(var(--control-height-default) + var(--space-2));
 
   min-width: 0;
+}
+
+.settings-page-lede {
+  padding-top: 20px;
 }
 
 .settings-workflow-tabs {

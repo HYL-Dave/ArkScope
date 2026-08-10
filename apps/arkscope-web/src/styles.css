@@ -1084,6 +1084,9 @@ table.wl tbody tr.archived td {
   .main {
     padding: 12px;
   }
+  .settings-workspace .settings-page-lede {
+    padding-top: 12px;
+  }
   .main .muted {
     white-space: normal;
     overflow-wrap: anywhere;
