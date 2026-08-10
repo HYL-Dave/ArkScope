@@ -478,12 +478,11 @@ Focused files: `src/ProviderSection.test.ts`, `src/SettingsCss.test.ts`,
 
 Grounded baseline runtime: `33 passed (3 files)`. The Settings-line focused
 regression set (15 files) contains `ProviderSection.test.ts` and
-`SettingsCss.test.ts`, so it absorbs exactly the ten additions: its stage-4
-projection is `231 / e0bb619016a9355e78ffd97559139744c1b5ec6ffd6e8854c7d0eaac0187677d`
+`SettingsCss.test.ts`, so it absorbs exactly this plan's `+11/-1` frontend
+change: its stage-4 projection is
+`231 / ac2319b0553545b1322ffd898e99ed2bcb8ded4ae442936771697fd6a74b3217`
 (mechanically derived from the stage-4 stream; base remains
 `221/a2c20d36...`). Task 5 runs this 15-file set and requires `231 passed`.
-After the section 2.3a rename the projection identity is
-`231 / ac2319b0553545b1322ffd898e99ed2bcb8ded4ae442936771697fd6a74b3217`.
 
 ### 2.7 Native target
 
