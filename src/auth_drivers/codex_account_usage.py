@@ -275,7 +275,21 @@ def _observed_at(value: str | datetime | None) -> str:
     return current.astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
-def _isolated_environment(executable: Path, codex_home: Path) -> dict[str, str]:
+def _isolated_path_entries(launcher: Path, target: Path) -> list[str]:
+    """Launcher directory first, resolved-target directory when different,
+    then the reviewed system directories. The launcher stays the spawn path;
+    an ``#!/usr/bin/env`` interpreter that ships beside the launcher (the
+    NVM/npm layout) must stay reachable after symlink inspection."""
+    entries = [str(launcher.parent)]
+    if target.parent != launcher.parent:
+        entries.append(str(target.parent))
+    entries.extend(("/usr/bin", "/bin"))
+    return entries
+
+
+def _isolated_environment(
+    launcher: Path, target: Path, codex_home: Path
+) -> dict[str, str]:
     environment: dict[str, str] = {
         "CODEX_HOME": str(codex_home),
         "HOME": str(codex_home),
@@ -283,7 +297,7 @@ def _isolated_environment(executable: Path, codex_home: Path) -> dict[str, str]:
         "XDG_CONFIG_HOME": str(codex_home / "config"),
         "XDG_DATA_HOME": str(codex_home / "data"),
         "TMPDIR": str(codex_home / "tmp"),
-        "PATH": os.pathsep.join((str(executable.parent), "/usr/bin", "/bin")),
+        "PATH": os.pathsep.join(_isolated_path_entries(launcher, target)),
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "LC_ALL": os.environ.get("LC_ALL", "C.UTF-8"),
         "TZ": "UTC",
@@ -483,20 +497,60 @@ class CodexAccountUsageAdapter:
             raise _fail("adapter_unavailable")
         self.timeout_seconds = timeout
 
-    def _resolve_executable(self) -> Path:
+    def _resolve_launcher_and_target(self) -> tuple[Path, Path]:
+        """The launcher (which()/explicit path, symlinks preserved) is what we
+        spawn; the resolved target is inspected only. Resolving before spawn
+        broke NVM installs: ``bin/codex -> ../lib/.../codex.js`` lost the
+        ``bin`` directory that owns ``node``."""
         value = str(self.executable)
         resolved = shutil.which(value) if os.sep not in value else value
         if not resolved:
             raise _fail("adapter_unavailable")
-        path = Path(resolved).resolve()
-        if not path.is_file() or not os.access(path, os.X_OK):
+        launcher = Path(resolved)
+        if not launcher.is_file() or not os.access(launcher, os.X_OK):
             raise _fail("adapter_unavailable")
-        return path
+        target = launcher.resolve()
+        if not target.is_file() or not os.access(target, os.X_OK):
+            raise _fail("adapter_unavailable")
+        return launcher, target
 
-    def _verify_version(self, executable: Path, environment: dict[str, str]) -> None:
+    def _require_shebang_interpreter(
+        self, target: Path, environment: dict[str, str]
+    ) -> None:
+        """For an ``#!`` target, prove the interpreter is reachable inside the
+        isolated PATH before spawning; a missing interpreter is a typed
+        environment fact, not version skew."""
+        try:
+            with target.open("rb") as handle:
+                first_line = handle.readline(4096)
+        except OSError:
+            raise _fail("adapter_unavailable") from None
+        if not first_line.startswith(b"#!"):
+            return
+        tokens = first_line[2:].decode("utf-8", errors="replace").strip().split()
+        if not tokens:
+            raise _fail("interpreter_unavailable")
+        interpreter = tokens[0]
+        if Path(interpreter).name == "env":
+            if len(tokens) < 2:
+                raise _fail("interpreter_unavailable")
+            name = tokens[1]
+            if not re.fullmatch(r"[A-Za-z0-9._-]{1,32}", name):
+                raise _fail("interpreter_unavailable")
+            for entry in environment["PATH"].split(os.pathsep):
+                candidate = Path(entry) / name
+                if candidate.is_file() and os.access(candidate, os.X_OK):
+                    return
+            raise _fail("interpreter_unavailable")
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,32}", Path(interpreter).name):
+            raise _fail("interpreter_unavailable")
+        if not (Path(interpreter).is_file() and os.access(interpreter, os.X_OK)):
+            raise _fail("interpreter_unavailable")
+
+    def _verify_version(self, launcher: Path, environment: dict[str, str]) -> None:
         try:
             process = subprocess.Popen(
-                [str(executable), "--version"],
+                [str(launcher), "--version"],
                 env=environment,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
@@ -511,12 +565,14 @@ class CodexAccountUsageAdapter:
             _terminate_process_group(process)
             raise _fail("adapter_unavailable") from None
         _terminate_process_group(process)
-        if (
-            process.returncode != 0
-            or len(stdout) > 256
-            or len(stderr) > 4096
-            or stdout.decode("utf-8", errors="replace").strip() != _VERSION_OUTPUT
-        ):
+        if process.returncode != 0:
+            raise _fail("adapter_unavailable")
+        if len(stdout) > 256 or len(stderr) > 4096:
+            raise _fail("protocol_incompatible")
+        text = stdout.decode("utf-8", errors="replace").strip()
+        if not re.fullmatch(r"codex-cli [0-9]+\.[0-9]+\.[0-9]+", text):
+            raise _fail("protocol_incompatible")
+        if text != _VERSION_OUTPUT:
             raise _fail("version_incompatible")
 
     def read_account_usage(
@@ -534,14 +590,15 @@ class CodexAccountUsageAdapter:
         if plan_type is not None and not isinstance(plan_type, str):
             raise _fail()
 
-        executable = self._resolve_executable()
+        launcher, target = self._resolve_launcher_and_target()
         with tempfile.TemporaryDirectory(prefix="arkscope-codex-account-") as raw_home:
             codex_home = Path(raw_home)
-            environment = _isolated_environment(executable, codex_home)
-            self._verify_version(executable, environment)
+            environment = _isolated_environment(launcher, target, codex_home)
+            self._require_shebang_interpreter(target, environment)
+            self._verify_version(launcher, environment)
             try:
                 process = subprocess.Popen(
-                    [str(executable), "app-server", "--stdio"],
+                    [str(launcher), "app-server", "--stdio"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,

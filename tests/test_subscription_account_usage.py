@@ -148,6 +148,8 @@ UNEXPECTED = %r
 HANG = %r
 
 if sys.argv[1:] == ["--version"]:
+    version_marker = __import__("pathlib").Path(TRANSCRIPT).parent / "version-ran.marker"
+    version_marker.write_text("ran", encoding="utf-8")
     print(f"codex-cli {VERSION}", flush=True)
     raise SystemExit(0)
 
@@ -161,7 +163,7 @@ for raw in sys.stdin:
     message = json.loads(raw)
     method = message.get("method")
     with open(TRANSCRIPT, "a", encoding="utf-8") as handle:
-        handle.write(json.dumps({"method": method, "codex_home": os.environ.get("CODEX_HOME")}) + "\\n")
+        handle.write(json.dumps({"method": method, "codex_home": os.environ.get("CODEX_HOME"), "argv0": sys.argv[0], "path": os.environ.get("PATH")}) + "\\n")
     if method == HANG:
         while True:
             time.sleep(1)
@@ -664,3 +666,188 @@ def test_listing_credentials_never_refreshes_or_contacts_provider(tmp_path, monk
     rows = result["credentials"]["openai"]
     assert any(row["id"] == credential_id for row in rows)
     assert token_store.loads == 1
+
+
+def _write_nvm_layout(
+    root: Path,
+    *,
+    version: str = "0.147.0",
+    interpreter_name: str = "fakepython",
+    provide_interpreter: bool = True,
+) -> tuple[Path, Path, Path]:
+    """NVM-shaped launcher: bin/codex -> ../lib/pkg/codex-fixture with an
+    ``#!/usr/bin/env <name>`` shebang whose interpreter lives only in bin/."""
+    package_dir = root / "lib" / "pkg"
+    package_dir.mkdir(parents=True)
+    target, transcript, pid_path = _write_codex_fixture(package_dir, version=version)
+    body = target.read_text(encoding="utf-8").splitlines(keepends=True)
+    body[0] = f"#!/usr/bin/env {interpreter_name}\n"
+    target.write_text("".join(body), encoding="utf-8")
+    target.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    bin_dir = root / "bin"
+    bin_dir.mkdir()
+    launcher = bin_dir / "codex"
+    launcher.symlink_to(Path("..") / "lib" / "pkg" / target.name)
+    if provide_interpreter:
+        (bin_dir / interpreter_name).symlink_to(sys.executable)
+    return launcher, transcript, pid_path
+
+
+def test_nvm_symlink_launcher_with_env_shebang_passes_exact_version_check(tmp_path):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    launcher, transcript, pid_path = _write_nvm_layout(tmp_path)
+    observation = CodexAccountUsageAdapter(
+        executable=launcher, timeout_seconds=2.0
+    ).read_account_usage(
+        credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+    )
+    assert observation.source == "codex_app_server"
+    assert (transcript.parent / "version-ran.marker").exists()
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
+def test_isolated_path_without_launcher_directory_is_interpreter_unavailable(
+    tmp_path, monkeypatch
+):
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageAdapter,
+        CodexAccountUsageError,
+    )
+
+    launcher, transcript, _ = _write_nvm_layout(tmp_path, provide_interpreter=False)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "fakepython").symlink_to(sys.executable)
+    monkeypatch.setenv("PATH", f"{elsewhere}{os.pathsep}{os.environ.get('PATH', '')}")
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter(
+            executable=launcher, timeout_seconds=2.0
+        ).read_account_usage(
+            credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+        )
+    assert caught.value.code == "interpreter_unavailable"
+    assert not (transcript.parent / "version-ran.marker").exists()
+
+
+def test_missing_shebang_interpreter_is_interpreter_unavailable_not_version_skew(
+    tmp_path,
+):
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageAdapter,
+        CodexAccountUsageError,
+    )
+
+    launcher, transcript, _ = _write_nvm_layout(
+        tmp_path, interpreter_name="interp-that-exists-nowhere", provide_interpreter=False
+    )
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter(
+            executable=launcher, timeout_seconds=2.0
+        ).read_account_usage(
+            credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+        )
+    assert caught.value.code == "interpreter_unavailable"
+    assert not (transcript.parent / "version-ran.marker").exists()
+
+
+def test_wrong_version_output_from_executable_launcher_is_version_incompatible(
+    tmp_path,
+):
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageAdapter,
+        CodexAccountUsageError,
+    )
+
+    launcher, transcript, _ = _write_nvm_layout(tmp_path, version="0.146.0")
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter(
+            executable=launcher, timeout_seconds=2.0
+        ).read_account_usage(
+            credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+        )
+    assert caught.value.code == "version_incompatible"
+    assert (transcript.parent / "version-ran.marker").exists()
+
+
+def test_nonzero_version_exit_is_adapter_unavailable_not_version_skew(tmp_path):
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageAdapter,
+        CodexAccountUsageError,
+    )
+
+    executable = tmp_path / "codex-broken"
+    executable.write_text(
+        f"#!{sys.executable}\nimport sys\nprint('codex-cli 0.147.0')\nsys.exit(3)\n",
+        encoding="utf-8",
+    )
+    executable.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter(
+            executable=executable, timeout_seconds=2.0
+        ).read_account_usage(
+            credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+        )
+    assert caught.value.code == "adapter_unavailable"
+
+
+def test_oversized_or_malformed_version_output_is_protocol_incompatible_not_version_skew(
+    tmp_path,
+):
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageAdapter,
+        CodexAccountUsageError,
+    )
+
+    oversized = tmp_path / "codex-oversized"
+    oversized.write_text(
+        f"#!{sys.executable}\nprint('x' * 300)\n", encoding="utf-8"
+    )
+    oversized.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter(
+            executable=oversized, timeout_seconds=2.0
+        ).read_account_usage(
+            credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+        )
+    assert caught.value.code == "protocol_incompatible"
+
+    malformed = tmp_path / "codex-malformed"
+    malformed.write_text(
+        f"#!{sys.executable}\nprint('totally-not-a-version')\n", encoding="utf-8"
+    )
+    malformed.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter(
+            executable=malformed, timeout_seconds=2.0
+        ).read_account_usage(
+            credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+        )
+    assert caught.value.code == "protocol_incompatible"
+
+
+def test_app_server_spawn_uses_launcher_path_with_launcher_and_target_dirs_on_path(
+    tmp_path,
+):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    launcher, transcript, pid_path = _write_nvm_layout(tmp_path)
+    CodexAccountUsageAdapter(
+        executable=launcher, timeout_seconds=2.0
+    ).read_account_usage(
+        credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT
+    )
+    _wait_for_process_exit(int(pid_path.read_text()))
+    entries = [
+        json.loads(line)
+        for line in transcript.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert entries, "app-server transcript must not be empty"
+    launcher_dir = str(launcher.parent)
+    target_dir = str((tmp_path / "lib" / "pkg").resolve())
+    for entry in entries:
+        assert entry["argv0"] == str(launcher)
+        path_entries = entry["path"].split(os.pathsep)
+        assert path_entries[0] == launcher_dir
+        assert target_dir in path_entries
