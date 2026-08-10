@@ -593,7 +593,8 @@ EOF
 > 下列 OpenAI CSV scorer（`score_sentiment_openai.py` / `score_risk_openai.py`）已於
 > 2026-05 local-first pivot 移除，**非可執行建議**。當時評分用的 prompt 已保留於
 > [`SCORING_PROMPTS.md`](../history/news-scoring/SCORING_PROMPTS.md)
-> （開源資料集 provenance）。
+> （開源資料集 provenance）。命令引用的 `api_keys_tier5.txt` 亦已於
+> 2026-08-10 刪除；下列內容不可作為現行執行方式。
 ```bash
 # o4-mini 評分命令 (早期版本)
 python score_sentiment_openai.py \

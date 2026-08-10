@@ -157,15 +157,17 @@ Next gate:
 
 **Target:** purpose-specific credential bindings.
 
-Current status:
+Current status (superseded 2026-08-10):
 
-- `config/scoring_keys.txt` is a gitignored bridge for the scorer's rotation pool.
-- It is intentionally outside the main "one active provider credential" model
-  until per-purpose binding is designed.
+- The legacy scorer lineage is retired and `config/scoring_keys.txt` has been
+  deleted. There is no file-backed scoring credential owner in the current
+  product.
+- A future scoring or research product must bind named DB-managed credentials
+  under its own reviewed contract. It must not recreate the retired bridge.
 
 Next gate:
 
-- Add purpose binding after Settings + live-loop credential routing are stable:
+- Add purpose binding only when a concrete product needs it:
   `research`, `scoring`, `summary`, `filtering`, `data_extraction`, etc. The same
   credential may be bound to multiple purposes.
 
