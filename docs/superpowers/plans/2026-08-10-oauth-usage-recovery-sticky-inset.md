@@ -431,9 +431,22 @@ grounded structure authorizes exactly this, and nothing else, in that file:
    `movedModelCount: 23`, the `664` sum, `workspaceCount: 95`, and
    `locale: 3` all stay byte-identical. The additions flow through the
    designated post-baseline channel instead:
-   - the eight exact `providers.accountUsage.*` paths join
-     `postSliceSettingsPaths` (the `physicalPreSliceCount` formula already
-     subtracts that list's length, so 641 is preserved structurally); and
+   - these eight exact paths join `postSliceSettingsPaths` (the
+     `physicalPreSliceCount` formula already subtracts that list's length,
+     so 641 is preserved structurally):
+
+     ```text
+     providers.accountUsage.syncFailedNoSnapshot
+     providers.accountUsage.syncTransportFailed
+     providers.accountUsage.cachedReadFailedStale
+     providers.accountUsage.cachedReadFailedNone
+     providers.accountUsage.retryLocalRead
+     providers.accountUsage.syncClaudeCost
+     providers.accountUsage.fiveHourWindow
+     providers.accountUsage.sevenDayWindow
+     ```
+
+   and
    - `currentSliceDelta` changes from the hardcoded
      `subtree === "dataSources"` special case to a per-subtree prefix count
      over `postSliceSettingsPaths`, so the two existing `dataSources` paths
