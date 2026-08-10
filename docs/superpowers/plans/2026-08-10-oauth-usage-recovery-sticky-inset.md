@@ -4,9 +4,9 @@
 > SYNC RULING GREEN (`59dafdee`/`830164f5`/`ca09fd15`); TASK 3 RECOVERY
 > COMMITS LANDED THROUGH `9bf2b9bd` AND SUPERSEDED AS INTERNALS BY THE
 > §0.1.2 OWNERSHIP-REFACTOR RULING; TASK 3 OWNERSHIP REFACTOR IMPLEMENTED
-> AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 UNBLOCKED BY THE §1.4
-> SPLIT-OWNERSHIP AMENDMENT (PENDING CODEX FOCUSED REVIEW); TASKS 5-7 NOT
-> STARTED
+> AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 SPLIT-OWNERSHIP AMENDMENT
+> CODEX-GREEN THROUGH `7857dd6f`, PRODUCT IMPLEMENTED AT `99ca5441`, FABLE
+> IMPLEMENTATION REVIEW REQUIRED; TASKS 5-7 NOT STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -753,6 +753,12 @@ until Fable reconstructs the Task 3 packet and returns GREEN.
 implement §1.4; run an early dual-viewport browser spot check (deep-scroll
 row top == scrollport top ±1px; initial lede spacing 20/12); prove FE focused
 55-node GREEN. Commit; stop.
+
+Implementation commit `99ca5441` completed this gate at the exact
+`1146/4ed78744...` full and `55/df92b0c0...` focused identities. The
+dual-viewport geometry was `20px/12px` initial inset and `0px` deep-scroll
+sticky delta. Task 5 remains paused until Fable reconstructs the Task 4
+packet and returns GREEN.
 
 **Task 5 — mutations and admission.** MU1-MU6; final collections
 (backend `4303/52b862d7...`, frontend `1146/4ed78744...`, both focused
