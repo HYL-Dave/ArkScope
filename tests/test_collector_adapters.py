@@ -36,16 +36,24 @@ def test_collectors_expose_contract_from_src_package():
             assert hasattr(mod, name)
 
 
-def test_import_is_side_effect_free():
+def test_import_is_side_effect_free(monkeypatch):
     # Importing must not reconfigure root logging (the old module-level
     # basicConfig added a cwd-relative FileHandler at import) — pin that the
-    # config now lives behind _setup_cli_logging(), called only by main().
+    # config now lives behind _setup_cli_logging(), called only by main(). The
+    # CLI setup itself must remain console-only so it cannot recreate root logs.
+    calls = []
+    monkeypatch.setattr(logging, "basicConfig", lambda **kwargs: calls.append(kwargs))
     for mod in (cpn, cfn):
         assert callable(mod.run_incremental)
         assert callable(mod._setup_cli_logging)
         src = open(mod.__file__).read()
         head = src.split("def _setup_cli_logging")[0]
         assert "basicConfig" not in head, f"{mod.__name__}: basicConfig at import time"
+        mod._setup_cli_logging()
+        assert len(calls) == 1
+        handlers = calls.pop()["handlers"]
+        assert len(handlers) == 1
+        assert type(handlers[0]) is logging.StreamHandler
 
 
 def test_paths_are_repo_anchored():

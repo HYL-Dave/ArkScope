@@ -64,14 +64,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 def _setup_cli_logging() -> None:
     """CLI-only logging config — deliberately NOT at import time, so the app can
     import this module (in-process adapter) without the root-logger
-    reconfiguration / cwd-relative FileHandler side effects."""
+    reconfiguration or repo-relative log artifacts."""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('collect_finnhub_news.log', encoding='utf-8')
-        ]
+        handlers=[logging.StreamHandler()]
     )
 
 
