@@ -864,15 +864,20 @@ class _BombCodexAdapter:
         pytest.fail("anthropic dispatch reached the codex adapter")
 
 
-def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(tmp_path):
+def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(
+    tmp_path, monkeypatch
+):
     """Real adapter + fake raw client: the service must satisfy the real
     adapter contract (no observed_at argument -> adapter-generated receipt
-    time), not a hand-rolled fake that fills the seam itself."""
+    time), not a hand-rolled fake that fills the seam itself. Receipt-time
+    discrimination is by EVENT ORDER: the module clock may only be read
+    after the fake raw client has returned the headers."""
     from types import SimpleNamespace
 
     import httpx
 
     from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers import anthropic_account_usage as adapter_module
     from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageAdapter
     from src.auth_drivers.oauth_status import OAuthObservationStore
 
@@ -886,11 +891,23 @@ def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(
         "anthropic-ratelimit-unified-7d-reset": "1786687200",
     }
     create_calls: list[dict] = []
+    events: list[str] = []
 
     class _Raw:
         def create(self, **kwargs):
             create_calls.append(kwargs)
+            events.append("headers_returned")
             return SimpleNamespace(headers=httpx.Headers(headers))
+
+    _real_datetime = datetime
+
+    class _ClockShim:
+        @staticmethod
+        def now(tz=None):
+            events.append("clock_read")
+            return _real_datetime.now(tz)
+
+    monkeypatch.setattr(adapter_module, "datetime", _ClockShim)
 
     class _Client:
         def __init__(self):
@@ -924,6 +941,10 @@ def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(
     observed = datetime.fromisoformat(view.snapshot.observed_at)
     # the adapter stamps with timespec="seconds", so compare at that grain
     assert started_at.replace(microsecond=0) <= observed <= finished_at
+    # order witness: the module clock was read exactly once, and only AFTER
+    # the raw client returned the unified headers — a pre-request stamp
+    # cannot produce this sequence.
+    assert events == ["headers_returned", "clock_read"]
     assert len(create_calls) == 1
     assert client.close_calls == 1
     assert token_store.loads == 2
