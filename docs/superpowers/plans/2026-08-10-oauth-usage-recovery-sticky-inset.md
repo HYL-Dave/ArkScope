@@ -446,10 +446,13 @@ Authorized product delta - exactly ONE frozenset member added:
 
 Everything else stands: `thread/`- and `turn/`-prefixed methods and every
 other unknown method stay rejected; a notification carrying an `id` stays
-rejected; the params-shape check is unchanged; no other adapter byte moves.
-The paired §2.4 evolution replays this notification through the session
-fixture and proves its payload never leaks into any persisted or rendered
-surface.
+rejected; the params-shape check is unchanged. The `thread/started`
+rejection keeps its dedicated test owner; the id-carrying and generic
+unknown-method branches have NO dedicated nodes and are protected by the
+product-diff bound itself - exactly one frozenset member added, every
+other adapter byte unchanged. The paired §2.4 evolution replays this
+notification through the session fixture and proves its payload never
+leaks into the returned observation or the persisted snapshot.
 
 ---
 
@@ -677,9 +680,11 @@ The fourth node evolves only under the §1.5 allowlist amendment: the
 session fixture emits `remoteControl/status/changed` with a sentinel
 payload between `initialized` and the account reads, and the node asserts
 the sync still succeeds end-to-end AND the sentinel appears nowhere in the
-persisted observation, returned snapshot, or any error surface (payload
-non-leak). The `thread/started` rejection node and the id-carrying and
-unknown-method rejections stay regression-protected as-is.
+returned observation or the persisted snapshot (payload non-leak - the
+scope a backend node can actually witness). The `thread/started` rejection
+node stays regression-protected as-is; the id-carrying and unknown-method
+rejection branches carry no dedicated nodes and are protected by the §1.5
+product-diff bound (one frozenset member, no other adapter byte).
 
 These are test-body changes only: no node ID, collection count/hash,
 focused identity, native target changes; the sole product delta is the one
