@@ -5,8 +5,9 @@
 > COMMITS LANDED THROUGH `9bf2b9bd` AND SUPERSEDED AS INTERNALS BY THE
 > §0.1.2 OWNERSHIP-REFACTOR RULING; TASK 3 OWNERSHIP REFACTOR IMPLEMENTED
 > AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 SPLIT-OWNERSHIP AMENDMENT
-> CODEX-GREEN THROUGH `7857dd6f`, PRODUCT IMPLEMENTED AT `99ca5441`, FABLE
-> IMPLEMENTATION REVIEW REQUIRED; TASKS 5-7 NOT STARTED
+> CODEX-GREEN THROUGH `7857dd6f`, PRODUCT `99ca5441` FABLE-REVIEWED GREEN;
+> TASK 5 STARTED AND PAUSED AT THE MU5 REJECTION-FALLBACK OWNER GAP;
+> BOUNDED AMENDMENT REVIEW REQUIRED; TASKS 6-7 NOT STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -613,12 +614,13 @@ sticky offsets stay shared after the inset transfer
 
 ### 2.4 Retained IDs whose assertions evolve
 
-Exactly two existing nodes may change assertion bodies; their IDs are
+Exactly three existing nodes may change assertion bodies; their IDs are
 preserved and every other existing assertion is regression-protected (the
 retired auto-sync owner is a section 2.3a rename, not an evolution):
 
 ```text
 tests/test_subscription_account_usage.py::test_account_routes_split_inventory_cached_read_and_mutating_sync
+tests/test_anthropic_account_usage.py::test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_max_tokens_8
 src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > preserves_retained_account_truth_when_cached_revalidation_fails_without_sync_POST
 ```
 
@@ -626,7 +628,21 @@ The first asserted `anthropic/claude_code_oauth` →
 `unsupported_auth_mode`; it evolved at Task 2 to assert the Anthropic
 dispatch reaches the manual adapter while `api_key` stays unsupported. The
 second evolves only if the three-state split renames its asserted state
-field. Any third existing-node edit is a stop condition.
+field.
+
+The Anthropic node evolves only at Task 5 after the MU5 stop below. Its
+existing success-path assertions remain intact, and one HTTP 400 rejection
+subcase uses the existing recording raw-client seam to assert all of:
+
+- the typed outcome remains `provider_request_rejected`;
+- exactly ONE Messages request was attempted;
+- that request used the pinned `claude-sonnet-5` model and the existing
+  pinned call shape;
+- no fallback model request exists.
+
+This is a test-body strengthening only: no node ID, collection count/hash,
+focused identity, native target, or product behavior changes. Any FOURTH
+existing-node assertion-body edit is a stop condition.
 
 ### 2.5 Backend focused identities
 
@@ -688,9 +704,10 @@ file does not). Fixture, network, timer-leak, or unrelated-node failures are
 wrong RED. RED transcripts and structured lists are retained per task under
 `/tmp/oauth-usage-sticky-impl-<task>-<base>/`.
 
-The two section 2.4 evolutions land in the same commit as their task's GREEN
-(Task 2 for the backend node, Task 3 for the frontend node), each with a
-before/after assertion diff in evidence.
+The three section 2.4 evolutions land with their owning gate: Task 2 for the
+backend route node, Task 3 for the frontend node, and Task 5 for the
+Anthropic one-request strengthening. Each has a before/after assertion diff
+in evidence.
 
 ### 3.2 Required mutations (Task 5, fresh exact-tip copies, one at a time)
 
@@ -700,12 +717,34 @@ before/after assertion diff in evidence.
 | MU2 | map interpreter absence to `version_incompatible` | interpreter-vs-version split node |
 | MU3 | collapse `syncSend=transport_failed` into `cachedRead=failed` | transport-not-cached node |
 | MU4 | add the Anthropic loader to the idle/auto path (fire probe on page load) | zero-anthropic-requests node |
-| MU5 | retry a second model after a probe rejection | one-request node |
+| MU5 | retry a second model after a probe rejection | strengthened one-request node, including its rejection subcase |
 | MU6 | restore `.main.settings-workspace` top padding without moving the lede inset | both new CSS nodes + browser geometry |
 
 Each mutation must hit the live seam (a dead-code edit or one that leaves the
 named owner GREEN is rejected), be restored byte-exactly (whole-file SHA,
 `pre == tip == post`), and never stack.
+
+### 3.2a Task 5 MU5 stop-and-amend (2026-08-11)
+
+MU1-MU4 each hit the declared owner and restored byte-exactly. MU2's first
+context-insufficient candidate changed an empty-shebang-token branch and
+left the named missing-interpreter owner GREEN, so it was rejected before
+the admitted live-seam mutation.
+
+MU5 then exposed a real test gap. A faithful temporary product mutation
+handled the first HTTP 400 rejection by issuing a second request against
+`claude-opus-5`, then preserved the original typed
+`provider_request_rejected` outcome. The raw fake recorded exactly two
+models (`claude-sonnet-5,claude-opus-5`), while BOTH the declared
+one-request node and the existing 4xx node remained GREEN (`2 passed`). The
+mutation was therefore rejected and the product file restored byte-exactly.
+MU6 and every later admission gate stopped.
+
+The bounded §2.4 strengthening above is required before MU5 may be replayed.
+All section 2 identities remain unchanged. Partial raw packet:
+`/tmp/oauth-usage-sticky-impl-task5-4fbf3087` (34 payloads,
+`PARTIAL_SHA256SUMS`
+`fd7d0fdd574d3f69b71aae11d2fdf411c7568fc23e83d115fd061a4bf288e146`).
 
 ---
 
@@ -768,6 +807,13 @@ build, i18n scanner; my own native run via the pinned wrapper
 browser matrix per §5.2; protected-blob recheck; artifact
 manifest/cleanup. Docs evidence commit; stop for Codex implementation
 review.
+
+Task 5 began after Fable returned Task 4 GREEN. It is currently PAUSED after
+MU5 per §3.2a. Product bytes are clean; MU6, native, host-live, final
+frontend runtime/build, and final browser admission have not run. Focused
+review of this docs-only amendment authorizes the exact §2.4 test-body
+strengthening, then a fresh MU5 replay followed by the remaining Task 5
+sequence.
 
 **Task 6 — merge.** After Codex GREEN: ff-merge only, no push; fresh
 exact-master worktree rerun (collections, focused, native, browser); docs
