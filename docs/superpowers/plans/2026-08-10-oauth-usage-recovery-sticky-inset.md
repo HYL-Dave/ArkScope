@@ -415,25 +415,33 @@ claude row shows cost labeled manual sync and one click sends one POST
 claude page load focus and idle send zero anthropic requests
 ```
 
-### 2.3b Shared i18n count owners (Task 3 stop-and-amend)
+### 2.3b Shared i18n inventory owners (Task 3 stop-and-amend, revised)
 
-Task 3's full-suite gate exposed an undeclared shared-owner class (the
-Tranche B registry-count precedent): `src/i18n/resources.test.ts` pins the
-settings-namespace key count and the per-subtree inventory. The eight new
-`providers.accountUsage.*` keys (added identically in both locales) move
-exactly two pinned numbers:
+Task 3's full-suite gate exposed an undeclared shared-owner class:
+`src/i18n/resources.test.ts`. The first amendment draft mis-scoped it; the
+grounded structure authorizes exactly this, and nothing else, in that file:
 
-```text
-src/i18n/resources.test.ts	bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales
-  settings: 733 -> 741 (both locales)
-src/i18n/resources.test.ts	bundled i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move
-  providers subtree: 130 -> 138
-```
+1. Node `contains the reviewed remaining-surface namespace inventory in
+   both locales` is a CURRENT-count owner: `settings: 733 -> 741` and the
+   locale total `1817 -> 1825` (both locales; both deltas are exactly the
+   eight new bilingual `providers.accountUsage.*` keys).
+2. Node `preserves the reviewed pre-Slice-5 Settings-origin inventory
+   across the Common move` is a FROZEN baseline and its frozen numbers may
+   NOT chase the present: `providers: 130`, `physicalPreSliceCount: 641`,
+   `movedModelCount: 23`, the `664` sum, `workspaceCount: 95`, and
+   `locale: 3` all stay byte-identical. The additions flow through the
+   designated post-baseline channel instead:
+   - the eight exact `providers.accountUsage.*` paths join
+     `postSliceSettingsPaths` (the `physicalPreSliceCount` formula already
+     subtracts that list's length, so 641 is preserved structurally); and
+   - `currentSliceDelta` changes from the hardcoded
+     `subtree === "dataSources"` special case to a per-subtree prefix count
+     over `postSliceSettingsPaths`, so the two existing `dataSources` paths
+     and the eight new `providers` paths each offset their own subtree.
 
-Only these two numeric updates are authorized in that file; both node IDs
-are preserved, no collection identity changes, and every other assertion in
-the file stays behavior-protected. This section extends the section 2.4
-allowance by exactly these two count owners.
+Both node IDs are preserved, no collection identity changes, and every
+other assertion in the file stays behavior-protected. This section extends
+the section 2.4 allowance by exactly these two inventory owners.
 
 ### 2.3a Exact frontend rename (Task 3, same RED commit)
 
