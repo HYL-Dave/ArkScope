@@ -415,6 +415,26 @@ claude row shows cost labeled manual sync and one click sends one POST
 claude page load focus and idle send zero anthropic requests
 ```
 
+### 2.3b Shared i18n count owners (Task 3 stop-and-amend)
+
+Task 3's full-suite gate exposed an undeclared shared-owner class (the
+Tranche B registry-count precedent): `src/i18n/resources.test.ts` pins the
+settings-namespace key count and the per-subtree inventory. The eight new
+`providers.accountUsage.*` keys (added identically in both locales) move
+exactly two pinned numbers:
+
+```text
+src/i18n/resources.test.ts	bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales
+  settings: 733 -> 741 (both locales)
+src/i18n/resources.test.ts	bundled i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move
+  providers subtree: 130 -> 138
+```
+
+Only these two numeric updates are authorized in that file; both node IDs
+are preserved, no collection identity changes, and every other assertion in
+the file stays behavior-protected. This section extends the section 2.4
+allowance by exactly these two count owners.
+
 ### 2.3a Exact frontend rename (Task 3, same RED commit)
 
 The old ID encodes the retired automatic-sync policy and is replaced, not
@@ -630,8 +650,9 @@ one `max_tokens=8` request.
 
 1. any staged/final collection count or hash differs, or a node changes
    outside the `+21` backend / `+11/-1` frontend ledger, the one section
-   2.3a rename, and the two declared evolutions, or a second `api.ts` hunk
-   beyond the one authorized union line;
+   2.3a rename, the two declared evolutions, and the two section 2.3b
+   numeric count updates, or a second `api.ts` hunk beyond the one
+   authorized union line;
 2. RED fails for a wrong reason (import error in an existing file, fixture,
    network, timer leak) or a fake-only executable replaces the real
    symlink+shebang fixture;
