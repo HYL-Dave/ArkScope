@@ -4,8 +4,9 @@
 > SYNC RULING GREEN (`59dafdee`/`830164f5`/`ca09fd15`); TASK 3 RECOVERY
 > COMMITS LANDED THROUGH `9bf2b9bd` AND SUPERSEDED AS INTERNALS BY THE
 > §0.1.2 OWNERSHIP-REFACTOR RULING; TASK 3 OWNERSHIP REFACTOR IMPLEMENTED
-> AT `380021b5`, AWAITING FABLE IMPLEMENTATION REVIEW; TASKS 4-7 NOT
-> STARTED (TASK 4 PAUSED PER §0.1.2)
+> AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 UNBLOCKED BY THE §1.4
+> SPLIT-OWNERSHIP AMENDMENT (PENDING CODEX FOCUSED REVIEW); TASKS 5-7 NOT
+> STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -227,7 +228,7 @@ and `config/scoring_keys.txt` are untouched.
 | backend tests | `tests/test_subscription_account_usage.py`, new `tests/test_anthropic_account_usage.py` |
 | frontend recovery + button | `apps/arkscope-web/src/settings/ProviderSection.tsx`, `apps/arkscope-web/src/ProviderSection.test.ts` |
 | ownership refactor | new `apps/arkscope-web/src/settings/oauthAccountUsageReducer.ts`, new `apps/arkscope-web/src/settings/useOAuthAccountUsage.ts`, new `apps/arkscope-web/src/settings/oauthAccountUsage.test.ts`, `apps/arkscope-web/src/Settings.tsx` (idle-warmup account loader only) |
-| sticky inset | `apps/arkscope-web/src/Settings.tsx`, `apps/arkscope-web/src/settings/settings.css`, `apps/arkscope-web/src/SettingsCss.test.ts` |
+| sticky inset | `apps/arkscope-web/src/Settings.tsx`, `apps/arkscope-web/src/settings/settings.css`, `apps/arkscope-web/src/SettingsCss.test.ts`, `apps/arkscope-web/src/styles.css` (bounded: exactly one added declaration inside the existing `@media (max-width: 760px)` block, per §1.4) |
 | bilingual copy | `apps/arkscope-web/src/i18n/resources/en/settings.ts`, `apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts` |
 | authority wording | `docs/design/LLM_AUTH_DRIVER_PLAN.md` (only the C-row/`C ≠ D` overbreadth; the x-api-key fact stays) |
 | plan/evidence | this plan, its evidence file, `PROJECT_PRIORITY_MAP.md` |
@@ -370,18 +371,47 @@ the frozen `settingsCopy.test.ts` baseline sections are untouched (verified:
 they freeze section copy, not `accountUsage` keys). The i18n literal scanner
 must stay `36 / 20 / 0 / 20`, exit 0.
 
-### 1.4 Sticky inset transfer (design LD 10)
+### 1.4 Sticky inset transfer (design LD 10; amended 2026-08-11)
 
-`settings.css` only:
+Amendment: the original text said "`settings.css` only" while requiring the
+narrow-viewport `12px` to live "inside the existing `@media (max-width:
+760px)` block" - a contradiction, because the standing SettingsCss contract
+node forbids any `@media` in `settings.css` (`SettingsCss.test.ts:56`, not
+in the retained-evolve set) and the only existing 760px block (the one
+holding `.main { padding: 12px; }`) lives in `styles.css:1083`. The split
+ownership below replaces it; no JS or viewport-computation workaround is
+permitted.
+
+`settings.css`:
 
 - `.main.settings-workspace { padding-top: 0; }`
 - the Settings lede (the existing PageHeader block wrapped as
   `.settings-page-lede`, a Settings-scoped wrapper added in `Settings.tsx`)
-  owns `padding-top: 20px`, and `12px` inside the existing
-  `@media (max-width: 760px)` block;
+  owns `padding-top: 20px;` - no `@media` is added to this file;
+
+`styles.css` - exactly ONE added declaration, inside the EXISTING
+`@media (max-width: 760px)` block that already holds
+`.main { padding: 12px; }`:
+
+- `.settings-workspace .settings-page-lede { padding-top: 12px; }`
+
+The descendant selector is load-bearing, not stylistic: `main.tsx` imports
+`styles.css` (line 15) BEFORE `settings/settings.css` (line 18), so a bare
+`.settings-page-lede` media rule at specificity (0,1,0) would lose the
+cascade to the later `settings.css` 20px rule at every width and be dead on
+arrival; (0,2,0) wins independent of import order and stays scoped to the
+Settings workspace.
+
+Unchanged:
+
 - the sticky row, `--settings-sticky-offset`, directory rail top, and section
-  `scroll-margin-top` are unchanged;
+  `scroll-margin-top`;
+- every other byte of `styles.css`;
 - no negative margin, transform, mask, overlay, or global `.main` change.
+
+This amendment changes NO ledger number and NO pinned identity: the two
+staged section-2 CSS node IDs, `1146/4ed78744...`, focused `55/df92b0c0...`,
+the addition stream, and the Settings projection all stand.
 
 Post-change invariants: at deep scroll the workflow row's top equals the
 `.main.settings-workspace` scrollport top within one CSS pixel at both
