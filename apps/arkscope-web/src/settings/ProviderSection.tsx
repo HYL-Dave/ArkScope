@@ -5,18 +5,15 @@ import {
   cancelOpenAIOAuth,
   completeOpenAIOAuthManual,
   deleteCredential,
-  getCredentialAccountUsage,
   importOAuthCredential,
   openAIOAuthStatus,
   probeCredential,
   startOpenAIOAuth,
-  syncCredentialAccountUsage,
   updateCredential,
   type ModelCatalog,
   type ModelDiscoveryResult,
   type ModelProvider,
   type ModelTask,
-  type OAuthAccountSyncView,
   type OAuthLifecycleState,
   type OAuthRateLimitStatus,
   type OAuthRateLimitWindow,
@@ -52,14 +49,13 @@ import type { ModelCommonT } from "../modelRoutingUx";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { modelReasonLabel, settingsErrorPresentation } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
-import {
-  oauthAccountUsageKey,
-  type SettingsReadCache,
-} from "./settingsReadCache";
+import type { OAuthAccountUsageState } from "./oauthAccountUsageReducer";
+import type { SettingsReadCache } from "./settingsReadCache";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
+import { useOAuthAccountUsage } from "./useOAuthAccountUsage";
 
 export type DiscoveryState = Partial<Record<ModelProvider, {
   loading: boolean;
@@ -71,28 +67,6 @@ type CredentialMetadataDraft = {
   account_label?: string;
   expires_at?: string;
 };
-
-type LocalAccountUsage = {
-  cachedRead: "idle" | "loading" | "loaded" | "failed";
-  cachedReadError: string | null;
-  syncSend: "idle" | "sending" | "transport_failed";
-  syncSendError: string | null;
-  backendSyncError: string | null;
-  view: OAuthAccountSyncView | null;
-};
-
-const EMPTY_ACCOUNT_USAGE: LocalAccountUsage = {
-  cachedRead: "idle",
-  cachedReadError: null,
-  syncSend: "idle",
-  syncSendError: null,
-  backendSyncError: null,
-  view: null,
-};
-
-const ACCOUNT_READ_RETRY_MS = 1_000;
-
-const ACCOUNT_SYNC_COOLDOWN_MS = 10 * 1000;
 
 function isOAuthCredential(credential: ProviderCredential): boolean {
   return credential.auth_type === "chatgpt_oauth" || credential.auth_type === "claude_code_oauth";
@@ -146,19 +120,6 @@ function resetTimestamp(value: number | null, t: SettingsT): string {
   return formatSystemTimestamp(new Date(value * 1000).toISOString());
 }
 
-
-function requireCredentialBoundAccountView(
-  credentialId: string,
-  view: OAuthAccountSyncView,
-): OAuthAccountSyncView {
-  if (
-    view.credential_id !== credentialId
-    || (view.snapshot !== null && view.snapshot.credential_id !== credentialId)
-  ) {
-    throw new Error("credential-bound account response mismatch");
-  }
-  return view;
-}
 
 type ProviderNotice =
   | { kind: "api_key_added"; provider: ModelProvider; makeActive: boolean }
@@ -328,290 +289,20 @@ export function ProviderSection({
   // stops it immediately (rather than leaving it to run — and pin pollBusy — for the
   // full timeout). A per-login token object; the poll closure reads token.aborted.
   const pollToken = useRef<{ aborted: boolean }>({ aborted: false });
-  const sectionHeadRef = useRef<HTMLDivElement | null>(null);
-  const [documentVisible, setDocumentVisible] = useState(
-    () => typeof document === "undefined" || document.visibilityState !== "hidden",
-  );
-  const [sectionInViewport, setSectionInViewport] = useState(
-    () => typeof window === "undefined" || typeof window.IntersectionObserver === "undefined",
-  );
-  const [accountUsage, setAccountUsage] = useState<Record<string, LocalAccountUsage>>({});
-  const [accountSyncing, setAccountSyncing] = useState<Record<string, boolean>>({});
-  const [accountCooldownUntil, setAccountCooldownUntil] = useState<Record<string, number>>({});
-  const accountSyncInFlight = useRef(new Map<string, Promise<void>>());
-  const accountReadRetry = useRef(new Map<string, number>());
-  const accountReadRetryUsed = useRef(new Map<string, number>());
-  const accountGeneration = useRef(new Map<string, number>());
-  const accountCooldownTimers = useRef(new Map<string, number>());
-
   const activeOAuthCredentials = catalog.providers
     .flatMap((provider) => catalog.credentials?.[provider] ?? [])
     .filter((credential) => credential.active && isOAuthCredential(credential));
-  const activeOAuthKey = activeOAuthCredentials
-    .map((credential) => `${credential.id}\0${credential.auth_type}`)
-    .sort()
-    .join("\0");
-  const sectionVisible = documentVisible && sectionInViewport;
-
-  const readCachedAccountUsage = useCallback(async (credentialId: string, force = false) => {
-    const key = oauthAccountUsageKey(credentialId);
-    const generation = accountGeneration.current.get(credentialId) ?? 0;
-    const retained = settingsReadCache.inspect<OAuthAccountSyncView>(key);
-    let retainedView: OAuthAccountSyncView | null = null;
-    if (retained.status !== "missing") {
-      try {
-        retainedView = requireCredentialBoundAccountView(credentialId, retained.value);
-      } catch {
-        settingsReadCache.invalidate(key);
-      }
-    }
-    setAccountUsage((previous) => ({
-      ...previous,
-      [credentialId]: {
-        ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
-        cachedRead: retained.status === "fresh" && retainedView ? "loaded" : "loading",
-        cachedReadError: null,
-        view: retainedView ?? previous[credentialId]?.view ?? null,
-      },
-    }));
-    const outcome = await settingsReadCache.load(
-      key,
-      async () => requireCredentialBoundAccountView(
-        credentialId,
-        await getCredentialAccountUsage(credentialId),
-      ),
-      { force },
-    );
-    if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
-    if (outcome.status === "success") {
-      accountReadRetryUsed.current.delete(credentialId);
-      setAccountUsage((previous) => ({
-        ...previous,
-        [credentialId]: {
-          ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
-          cachedRead: "loaded",
-          cachedReadError: null,
-          view: outcome.value,
-        },
-      }));
-    } else if (outcome.status === "error") {
-      setAccountUsage((previous) => ({
-        ...previous,
-        [credentialId]: {
-          ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
-          cachedRead: "failed",
-          cachedReadError: "cached_read_failed",
-          view: previous[credentialId]?.view ?? null,
-        },
-      }));
-      // Exactly one bounded automatic retry per credential generation;
-      // unmount, credential change, or a newer generation cancels it.
-      if (accountReadRetryUsed.current.get(credentialId) !== generation
-        && !accountReadRetry.current.has(credentialId)) {
-        accountReadRetryUsed.current.set(credentialId, generation);
-        const handle = window.setTimeout(() => {
-          accountReadRetry.current.delete(credentialId);
-          if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
-          void readCachedAccountUsageRef.current?.(credentialId);
-        }, ACCOUNT_READ_RETRY_MS);
-        accountReadRetry.current.set(credentialId, handle);
-      }
-    }
-  }, [settingsReadCache]);
-  const readCachedAccountUsageRef = useRef<typeof readCachedAccountUsage | null>(null);
-  readCachedAccountUsageRef.current = readCachedAccountUsage;
-
-  const syncAccountUsage = useCallback((credentialId: string, manual = false): Promise<void> => {
-    const now = Date.now();
-    if (manual && (accountCooldownUntil[credentialId] ?? 0) > now) return Promise.resolve();
-    const existing = accountSyncInFlight.current.get(credentialId);
-    if (existing) return existing;
-
-    if (manual) {
-      const until = now + ACCOUNT_SYNC_COOLDOWN_MS;
-      setAccountCooldownUntil((previous) => ({ ...previous, [credentialId]: until }));
-      const existingTimer = accountCooldownTimers.current.get(credentialId);
-      if (existingTimer !== undefined) window.clearTimeout(existingTimer);
-      const timer = window.setTimeout(() => {
-        accountCooldownTimers.current.delete(credentialId);
-        setAccountCooldownUntil((previous) => {
-          const next = { ...previous };
-          delete next[credentialId];
-          return next;
-        });
-      }, ACCOUNT_SYNC_COOLDOWN_MS);
-      accountCooldownTimers.current.set(credentialId, timer);
-    }
-
-    const generation = accountGeneration.current.get(credentialId) ?? 0;
-    setAccountSyncing((previous) => ({ ...previous, [credentialId]: true }));
-    setAccountUsage((previous) => ({
-      ...previous,
-      [credentialId]: {
-        ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
-        syncSend: "sending",
-        syncSendError: null,
-        backendSyncError: null,
-      },
-    }));
-    const request = (async () => {
-      try {
-        const view = requireCredentialBoundAccountView(
-          credentialId,
-          await syncCredentialAccountUsage(credentialId),
-        );
-        if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
-        if (view.sync_status === "succeeded" && view.snapshot !== null) {
-          // Kill any deferred older GET: invalidation flips the cache
-          // generation so its completion is discarded, then the fresh
-          // decoded truth is retained.
-          settingsReadCache.invalidateCredentialAccount(credentialId);
-          settingsReadCache.replace(oauthAccountUsageKey(credentialId), view);
-        }
-        if (
-          view.sync_status === "failed"
-          && view.sync_error_code === "credential_changed_during_sync"
-        ) {
-          // The old observation belongs to a dead credential identity: the
-          // cache entry must die with it, or the next focus revalidation
-          // would resurrect it from the still-fresh cache.
-          settingsReadCache.invalidateCredentialAccount(credentialId);
-        }
-        setAccountUsage((previous) => {
-          const prior = previous[credentialId] ?? EMPTY_ACCOUNT_USAGE;
-          if (view.sync_status === "failed") {
-            // LD 9: retain an observation on a decoded failure — preferring
-            // the AUTHORITATIVE snapshot the failure view itself carries,
-            // falling back to the prior one. The one typed exception clears
-            // it: the credential changed during the sync.
-            const credentialChanged = view.sync_error_code === "credential_changed_during_sync";
-            return {
-              ...previous,
-              [credentialId]: {
-                ...prior,
-                cachedRead: !credentialChanged && view.snapshot !== null ? "loaded" : prior.cachedRead,
-                syncSend: "idle",
-                syncSendError: null,
-                backendSyncError: view.sync_error_code ?? "sync_failed",
-                view: credentialChanged
-                  ? null
-                  : view.snapshot !== null ? view : prior.view,
-              },
-            };
-          }
-          return {
-            ...previous,
-            [credentialId]: {
-              ...prior,
-              cachedRead: view.snapshot !== null ? "loaded" : prior.cachedRead,
-              syncSend: "idle",
-              syncSendError: null,
-              backendSyncError: null,
-              view: view.snapshot !== null ? view : prior.view,
-            },
-          };
-        });
-      } catch {
-        if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
-        setAccountUsage((previous) => ({
-          ...previous,
-          [credentialId]: {
-            ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
-            syncSend: "transport_failed",
-            syncSendError: "sync_transport_failed",
-          },
-        }));
-      } finally {
-        if ((accountGeneration.current.get(credentialId) ?? 0) === generation) {
-          setAccountSyncing((previous) => {
-            const next = { ...previous };
-            delete next[credentialId];
-            return next;
-          });
-        }
-        accountSyncInFlight.current.delete(credentialId);
-      }
-    })();
-    accountSyncInFlight.current.set(credentialId, request);
-    return request;
-  }, [accountCooldownUntil, settingsReadCache]);
-
-  const invalidateAccountUsage = useCallback((credentialId: string) => {
-    accountGeneration.current.set(
-      credentialId,
-      (accountGeneration.current.get(credentialId) ?? 0) + 1,
-    );
-    settingsReadCache.invalidateCredentialAccount(credentialId);
-    const retryTimer = accountReadRetry.current.get(credentialId);
-    if (retryTimer !== undefined) {
-      window.clearTimeout(retryTimer);
-      accountReadRetry.current.delete(credentialId);
-    }
-    accountReadRetryUsed.current.delete(credentialId);
-    const cooldownTimer = accountCooldownTimers.current.get(credentialId);
-    if (cooldownTimer !== undefined) {
-      window.clearTimeout(cooldownTimer);
-      accountCooldownTimers.current.delete(credentialId);
-    }
-    setAccountUsage((previous) => {
-      const next = { ...previous };
-      delete next[credentialId];
-      return next;
-    });
-    setAccountCooldownUntil((previous) => {
-      const next = { ...previous };
-      delete next[credentialId];
-      return next;
-    });
-  }, [settingsReadCache]);
-
-  useEffect(() => {
-    const onVisibilityChange = () => setDocumentVisible(document.visibilityState !== "hidden");
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, []);
-
-  useEffect(() => {
-    const target = sectionHeadRef.current;
-    if (!target || typeof window.IntersectionObserver === "undefined") return undefined;
-    const observer = new window.IntersectionObserver((entries) => {
-      setSectionInViewport(entries.some((entry) => entry.isIntersecting));
-    });
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => () => {
-    for (const timer of accountCooldownTimers.current.values()) window.clearTimeout(timer);
-    accountCooldownTimers.current.clear();
-  }, []);
-
-  useEffect(() => {
-    for (const credential of activeOAuthCredentials) {
-      void readCachedAccountUsage(credential.id);
-    }
-  }, [activeOAuthKey, readCachedAccountUsage]);
-
-  // Manual-only sync ruling (plan §0.1.1): no visible/focus/idle sync POST
-  // for any provider. Focus may only revalidate the LOCAL cached read; the
-  // Settings cache's five-minute freshness gates the actual GET.
-  useEffect(() => {
-    const onFocus = () => {
-      if (!sectionVisible) return;
-      for (const credential of activeOAuthCredentials) {
-        void readCachedAccountUsage(credential.id);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [activeOAuthKey, readCachedAccountUsage, sectionVisible]);
-
-  useEffect(() => () => {
-    for (const handle of accountReadRetry.current.values()) {
-      window.clearTimeout(handle);
-    }
-    accountReadRetry.current.clear();
-  }, []);
+  const {
+    states: accountUsage,
+    cooldownUntil: accountCooldownUntil,
+    sectionRef: sectionHeadRef,
+    readAccountUsage: readCachedAccountUsage,
+    syncAccountUsage,
+    invalidateAccountUsage,
+  } = useOAuthAccountUsage({
+    credentials: activeOAuthCredentials,
+    settingsReadCache,
+  });
 
   const onCredentialNavigationGuardChange = useCallback(
     (guard: { busy: boolean }) => setCredentialProbeBusy(guard.busy),
@@ -1004,9 +695,8 @@ export function ProviderSection({
                 onNavigationGuardChange={onCredentialNavigationGuardChange}
                 developerMode={developerMode}
                 accountUsage={accountUsage}
-                accountSyncing={accountSyncing}
                 accountCooldownUntil={accountCooldownUntil}
-                onSyncAccountUsage={(id) => void syncAccountUsage(id, true)}
+                onSyncAccountUsage={(id) => void syncAccountUsage(id)}
                 onRetryReadAccountUsage={(id) => void readCachedAccountUsage(id, true)}
               />
               {discoveryState?.result && (
@@ -1269,28 +959,27 @@ export function SetupDisclosure({
 function AccountUsageView({
   credential,
   local,
-  syncing,
   cooldownUntil,
   onSync,
   onRetryRead,
 }: {
   credential: ProviderCredential;
-  local: LocalAccountUsage | undefined;
-  syncing: boolean;
+  local: OAuthAccountUsageState | undefined;
   cooldownUntil: number;
   onSync?: (credentialId: string) => void;
   onRetryRead?: (credentialId: string) => void;
 }) {
   const { t } = useTranslation("settings");
-  const snapshot = local?.view?.snapshot ?? null;
+  const snapshot = local?.snapshot ?? null;
   const limits = snapshot?.payload.rate_limits ?? null;
   const unknown = t(($) => $.providers.accountUsage.unknown);
   const isProbeSource = snapshot?.source === "anthropic_oauth_probe";
-  const backendSyncError = local?.backendSyncError ?? null;
-  const transportError = local?.syncSend === "transport_failed"
-    ? local.syncSendError ?? "sync_transport_failed"
+  const backendSyncError = local?.backendSync.errorCode ?? null;
+  const transportError = local?.syncSend.status === "transport_failed"
+    ? local.syncSend.errorCode ?? "sync_transport_failed"
     : null;
-  const cachedReadFailed = local?.cachedRead === "failed";
+  const cachedReadFailed = local?.cachedRead.status === "failed";
+  const syncing = local?.syncSend.status === "sending";
   const manualSyncDisabled = syncing || cooldownUntil > Date.now();
 
   function renderWindow(label: string, window: OAuthRateLimitWindow | null) {
@@ -1362,11 +1051,11 @@ function AccountUsageView({
       {cachedReadFailed ? (
         <p>{snapshot
           ? t(($) => $.providers.accountUsage.cachedReadFailedStale, {
-            code: local?.cachedReadError ?? "cached_read_failed",
+            code: local?.cachedRead.errorCode ?? "cached_read_failed",
             timestamp: formatSystemTimestamp(snapshot.observed_at),
           })
           : t(($) => $.providers.accountUsage.cachedReadFailedNone, {
-            code: local?.cachedReadError ?? "cached_read_failed",
+            code: local?.cachedRead.errorCode ?? "cached_read_failed",
           })}</p>
       ) : null}
       <div className="credential-actions">
@@ -1414,7 +1103,6 @@ export function CredentialList({
   onNavigationGuardChange,
   developerMode = false,
   accountUsage = {},
-  accountSyncing = {},
   accountCooldownUntil = {},
   onSyncAccountUsage,
   onRetryReadAccountUsage,
@@ -1435,8 +1123,7 @@ export function CredentialList({
   reloginBusy?: boolean;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   developerMode?: boolean;
-  accountUsage?: Record<string, LocalAccountUsage>;
-  accountSyncing?: Record<string, boolean>;
+  accountUsage?: Record<string, OAuthAccountUsageState>;
   accountCooldownUntil?: Record<string, number>;
   onSyncAccountUsage?: (credentialId: string) => void;
   onRetryReadAccountUsage?: (credentialId: string) => void;
@@ -1533,7 +1220,6 @@ export function CredentialList({
               <AccountUsageView
                 credential={cred}
                 local={accountUsage[cred.id]}
-                syncing={accountSyncing[cred.id] === true}
                 cooldownUntil={accountCooldownUntil[cred.id] ?? 0}
                 onSync={onSyncAccountUsage}
                 onRetryRead={onRetryReadAccountUsage}

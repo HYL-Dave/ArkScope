@@ -5,7 +5,6 @@ import {
   discoverModels,
   deleteModelRoute,
   exportModelRoutes,
-  getCredentialAccountUsage,
   getMacroSnapshot,
   getMacroStatus,
   getMarketDataStatus,
@@ -85,6 +84,7 @@ import {
   scheduleSettingsIdleWarmup,
   type SettingsReadCache,
 } from "./settings/settingsReadCache";
+import { loadValidatedOAuthAccountSnapshot } from "./settings/useOAuthAccountUsage";
 import { settingsTaskLabel, type SettingsT } from "./settings/settingsCopy";
 import {
   Button,
@@ -497,7 +497,7 @@ export function SettingsView({
         macro_snapshot: getMacroSnapshot,
       },
       selectActiveOAuthLocalIds: activeOAuthLocalCredentialIds,
-      loadOAuthAccountUsage: getCredentialAccountUsage,
+      loadOAuthAccountUsage: loadValidatedOAuthAccountSnapshot,
     });
   }, [readCache, settingsReadCache]);
 

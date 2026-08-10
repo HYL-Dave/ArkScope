@@ -572,10 +572,10 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     const now = Date.now();
     const cache = createSettingsReadCache({ clock: () => now });
     const credential = oauthCredential({ active: true });
-    const retained = accountView(accountSnapshot({
+    const retained = accountSnapshot({
       observedAt: new Date(now - 6 * 60_000).toISOString(),
       usedPercent: 11,
-    }));
+    });
     const refreshed = accountView(accountSnapshot({
       observedAt: new Date(now).toISOString(),
       usedPercent: 12,
@@ -603,10 +603,10 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     const now = Date.now();
     const cache = createSettingsReadCache({ clock: () => now });
     const credential = oauthCredential({ active: true });
-    const retained = accountView(accountSnapshot({
+    const retained = accountSnapshot({
       observedAt: new Date(now - 6 * 60_000).toISOString(),
       usedPercent: 31,
-    }));
+    });
     cache.replace(oauthAccountUsageKey(credential.id), retained, now - 6 * 60_000);
     const fetchMock = vi.fn().mockRejectedValue(new Error("offline"));
     vi.stubGlobal("fetch", fetchMock);
@@ -628,16 +628,16 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     const cache = createSettingsReadCache({ clock: () => now });
     const first = oauthCredential({ id: "local:7", label: "Account A", active: true });
     const second = oauthCredential({ id: "local:8", label: "Account B", active: true });
-    const firstBefore = accountView(accountSnapshot({
+    const firstBefore = accountSnapshot({
       credentialId: first.id,
       observedAt: new Date(now).toISOString(),
       usedPercent: 41,
-    }));
-    const secondBefore = accountView(accountSnapshot({
+    });
+    const secondBefore = accountSnapshot({
       credentialId: second.id,
       observedAt: new Date(now).toISOString(),
       usedPercent: 52,
-    }));
+    });
     const firstAfter = accountView(accountSnapshot({
       credentialId: first.id,
       observedAt: new Date(now + 1_000).toISOString(),
@@ -664,10 +664,10 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     await act(async () => { sync.click(); });
     await waitFor(() => (credentialRow("Account A").textContent ?? "").includes("已用：42%"));
 
-    const firstCached = cache.inspect<ReturnType<typeof accountView>>(oauthAccountUsageKey(first.id));
-    const secondCached = cache.inspect<ReturnType<typeof accountView>>(oauthAccountUsageKey(second.id));
+    const firstCached = cache.inspect<ReturnType<typeof accountSnapshot>>(oauthAccountUsageKey(first.id));
+    const secondCached = cache.inspect<ReturnType<typeof accountSnapshot>>(oauthAccountUsageKey(second.id));
     expect(firstCached.status).toBe("fresh");
-    expect(firstCached.status === "missing" ? null : firstCached.value).toEqual(firstAfter);
+    expect(firstCached.status === "missing" ? null : firstCached.value).toEqual(firstAfter.snapshot);
     expect(secondCached.status).toBe("fresh");
     expect(secondCached.status === "missing" ? null : secondCached.value).toEqual(secondBefore);
     expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
