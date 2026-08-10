@@ -320,13 +320,15 @@ snapshot:    the single authoritative validated OAuthAccountSnapshot | null
 cachedRead:  idle | loading | loaded | failed   (+ failed error code)
 syncSend:    idle | sending | transport_failed  (+ transport error code)
 backendSync: last decoded sync_error_code | null
-epoch:       credential-instance admission counter
 ```
 
-The reducer is side-effect free; `useOAuthAccountUsage.ts` is the only
-caller of the Settings cache, the only owner of epoch/retry/cooldown/
-single-flight, and dispatches facts (decoded outcomes, timer fires, cache
-results) into the reducer. The cache stores validated SNAPSHOTS only — the
+The reducer is side-effect free and holds NO admission counter; per the
+§0.1.2 ownership lock, epoch admission belongs to the hook alone.
+`useOAuthAccountUsage.ts` is the only caller of the Settings cache, the
+only owner of epoch/retry/cooldown/single-flight, and dispatches facts
+(decoded outcomes, timer fires, cache results) into the reducer; a
+completion from a superseded epoch is discarded by the hook BEFORE
+dispatch, so the reducer only ever receives admitted facts. The cache stores validated SNAPSHOTS only — the
 idle-warmup account loader in `Settings.tsx` switches to the hook module's
 exported validated-snapshot loader so every cache write path shares one
 shape (witnessed by the `every cache write stores a validated snapshot
@@ -397,8 +399,8 @@ the PageHeader equals the pre-change 20/12 pixels.
 | after Task 1 (launcher, `+7/-0`) | `4,289 / 37bc0a597398404de6247e465e44908ccd265798ba66722242bb8807c1614968` | unchanged |
 | after Task 2 (Anthropic adapter + dispatch, `+14/-0`) | `4,303 / 52b862d7bf94f9d4605f8de1b2e92240ea152a41218446c3652b38716af77489` | unchanged |
 | after Task 3 recovery commits (landed, `+9/-1`) | unchanged | `1,132 / 0cd20954049f4f9d56a47c8f0f5c21a685928cc0b32afb984ac74a273509fbc4` |
-| after the Task 3 ownership refactor (`+12/-0`) | unchanged | `1,144 / a0eb61df43e303af420dfe60bd84193597e4735297fb630a19058e3ef965d236` |
-| after Task 4 (sticky inset, `+2/-0`) | unchanged | `100 files / 1,146 / 882090ec9f548250bb10ca5f8e6eba520ee2b5453c5b2e507128bc35c262a185` |
+| after the Task 3 ownership refactor (`+12/-0`) | unchanged | `1,144 / c9deb227812c8cb7e1df5584351d6b55ba269696bbffccc4e34aaea372e14769` |
+| after Task 4 (sticky inset, `+2/-0`) | unchanged | `100 files / 1,146 / 4ed7874404b462846ffc51ddd7798633a77fb1a12f46ce4b5f45ae4913d54145` |
 
 Final accounting is backend `+21/-0` (4,303 nodes, one new test file) and
 frontend `+23/-1` (net `+22`, 1,146 nodes; the refactor adds one new test
@@ -411,7 +413,7 @@ or renamed.
 The sorted 21-node backend addition stream is
 `2b540253de6578a71be09a726a11d29cce396a2e0c29421a7f8a5cfa4b3666bd`; the
 sorted 23-row frontend addition stream is
-`bb731773d097a8d7bcc4c32fcdf803ae4b98f1674ade4c5f40cb3bc99f81ec21`; the
+`0fefb1e513bc28482f403f5438cd2969228fff8ef73d86f9814ad45650edf7e6`; the
 one-row frontend removal stream is
 `a1bb6e3c9fc240a2d82b80046e85b7266da305f97a9b27e9d196ae69b31c864d`.
 
@@ -481,7 +483,7 @@ New file `src/settings/oauthAccountUsage.test.ts`. The PURE reducer rows
 test transitions only (no cache, no timers, no DOM); the HOOK rows test the
 side-effect contracts the reducer cannot own:
 
-Describe `OAuth account usage reducer` (`+7`):
+Describe `OAuth account usage reducer` (`+6`):
 
 ```text
 success snapshot replaces the previous observation
@@ -490,10 +492,10 @@ decoded failure without snapshot retains the prior observation
 credential change clears the observation
 read errors and sync errors never clear each other
 transport failure stays distinct from decoded backend failure
-stale epoch completions are rejected
 ```
 
-Describe `useOAuthAccountUsage ownership` (`+5`):
+Describe `useOAuthAccountUsage ownership` (`+6`; epoch admission is the
+hook's, per the §0.1.2 lock):
 
 ```text
 credential change invalidates the cache entry and focus cannot resurrect it
@@ -501,17 +503,18 @@ a read completion from before the last mutation is discarded
 the bounded retry arms once per consecutive failure episode
 mount focus and idle events never emit a provider post
 every cache write stores a validated snapshot only
+stale epoch completions are rejected
 ```
 
 Re-derived identities (frontend ledger becomes `+23/-1`, net `+22`):
 
 | State | Nodes | SHA-256 |
 |---|---:|---|
-| after the refactor (stage 3 final) | 1,144 | `a0eb61df43e303af420dfe60bd84193597e4735297fb630a19058e3ef965d236` |
-| after Task 4 (final, 100 files) | 1,146 | `882090ec9f548250bb10ca5f8e6eba520ee2b5453c5b2e507128bc35c262a185` |
-| focused after refactor (4 files) | 53 | `3bdffadbc44722325bcd12018eb12757efa48134b7baeec0045df0cda9f70b81` |
-| focused final (4 files) | 55 | `e8e0e8cb5e54e1cbc5fb5807ff55a8c64ecd75a0f611f8041ec99c7dc4daf1d3` |
-| 23-row frontend addition stream | - | `bb731773d097a8d7bcc4c32fcdf803ae4b98f1674ade4c5f40cb3bc99f81ec21` |
+| after the refactor (stage 3 final) | 1,144 | `c9deb227812c8cb7e1df5584351d6b55ba269696bbffccc4e34aaea372e14769` |
+| after Task 4 (final, 100 files) | 1,146 | `4ed7874404b462846ffc51ddd7798633a77fb1a12f46ce4b5f45ae4913d54145` |
+| focused after refactor (4 files) | 53 | `92572473783df6738f759de2357ab713b37ff9b2622b5aaa7cd612e7e4cede87` |
+| focused final (4 files) | 55 | `df92b0c026fab6ce100a8f760397240235a882ba4f5091146401dfe9ffcfd4f2` |
+| 23-row frontend addition stream | - | `0fefb1e513bc28482f403f5438cd2969228fff8ef73d86f9814ad45650edf7e6` |
 | Settings 15-file projection | 231 | unchanged `ac2319b0553545b1322ffd898e99ed2bcb8ded4ae442936771697fd6a74b3217` |
 
 The focused family gains `src/settings/oauthAccountUsage.test.ts` as its
@@ -620,8 +623,8 @@ ownership refactor.
 |---|---:|---|
 | base (3 files, historical) | 33 | `fb42f09afe2b1a2ba08eb936220ed5da0dd98f79a19e46ba885c6877fce815bd` |
 | after the landed recovery commits (3 files) | 41 | `82dc004ab10a61a86128d917b1b3f413c912e8e0c9c4522123a8d33ea047c5fd` |
-| after the ownership refactor (4 files) | 53 | `3bdffadbc44722325bcd12018eb12757efa48134b7baeec0045df0cda9f70b81` |
-| after Task 4 (final, 4 files) | 55 | `e8e0e8cb5e54e1cbc5fb5807ff55a8c64ecd75a0f611f8041ec99c7dc4daf1d3` |
+| after the ownership refactor (4 files) | 53 | `92572473783df6738f759de2357ab713b37ff9b2622b5aaa7cd612e7e4cede87` |
+| after Task 4 (final, 4 files) | 55 | `df92b0c026fab6ce100a8f760397240235a882ba4f5091146401dfe9ffcfd4f2` |
 
 Grounded baseline runtime: `33 passed (3 files)`. The Settings-line focused
 regression set (15 files) contains `ProviderSection.test.ts` and
@@ -703,8 +706,8 @@ network-guard fixture. Commit; stop.
 **Task 3 — ownership refactor gate (remaining scope).** The recovery
 commits through `9bf2b9bd` are landed, superseded internals; their nine
 behavior nodes are the frozen regression corpus. Codex now: RED the twelve
-section 2.3c nodes at `1144/a0eb61df...` (the seven reducer rows may fail
-on module absence; the five hook rows on the missing ownership surfaces);
+section 2.3c nodes at `1144/c9deb227...` (the six reducer rows may fail
+on module absence; the six hook rows on the missing ownership surfaces);
 implement the §0.1.2 architecture (pure reducer, hook, snapshot-only cache
 including the Settings.tsx warmup loader swap) without touching backend
 DTOs, adapters, or `settingsReadCache`; keep all 26 ProviderSection nodes
@@ -718,7 +721,7 @@ row top == scrollport top ±1px; initial lede spacing 20/12); prove FE focused
 55-node GREEN. Commit; stop.
 
 **Task 5 — mutations and admission.** MU1-MU6; final collections
-(backend `4303/52b862d7...`, frontend `1146/882090ec...`, both focused
+(backend `4303/52b862d7...`, frontend `1146/4ed78744...`, both focused
 finals, Settings focused re-derived pin); full frontend Vitest, typecheck,
 build, i18n scanner; my own native run via the pinned wrapper
 (`4274/29/0` target) plus the §5.1 host-live Codex acceptance; hermetic
