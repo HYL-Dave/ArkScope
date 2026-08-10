@@ -58,7 +58,7 @@ def _unified_headers(**overrides: str | None) -> dict[str, str]:
 
 class _RecordingRaw:
     def __init__(self, headers: dict[str, str] | None = None, error: Exception | None = None):
-        self.headers = headers or _unified_headers()
+        self.headers = _unified_headers() if headers is None else headers
         self.error = error
         self.calls: list[dict] = []
 
@@ -69,8 +69,17 @@ class _RecordingRaw:
         return SimpleNamespace(headers=httpx.Headers(self.headers))
 
 
-def _client(raw: _RecordingRaw):
-    return SimpleNamespace(messages=SimpleNamespace(with_raw_response=raw))
+class _FakeClient:
+    def __init__(self, raw):
+        self.messages = SimpleNamespace(with_raw_response=raw)
+        self.close_calls = 0
+
+    def close(self):
+        self.close_calls += 1
+
+
+def _client(raw: _RecordingRaw) -> _FakeClient:
+    return _FakeClient(raw)
 
 
 def _status_error(status_code: int, headers: dict[str, str] | None = None):
@@ -82,7 +91,10 @@ def _status_error(status_code: int, headers: dict[str, str] | None = None):
 def _adapter(raw: _RecordingRaw, **kwargs):
     from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageAdapter
 
-    return AnthropicAccountUsageAdapter(client_factory=lambda token: _client(raw), **kwargs)
+    client = _client(raw)
+    adapter = AnthropicAccountUsageAdapter(client_factory=lambda token: client, **kwargs)
+    adapter._test_client = client
+    return adapter
 
 
 def _read(raw: _RecordingRaw, *, credential_id: str = "local:9", record=None):
@@ -105,6 +117,20 @@ def test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_m
         def __init__(self, **kwargs):
             constructed.append(kwargs)
             self.messages = SimpleNamespace(with_raw_response=raw)
+            self.close_calls = 0
+
+        def close(self):
+            self.close_calls += 1
+
+    recorder_clients: list[_RecorderClient] = []
+    _original_new = _RecorderClient.__new__
+
+    def _tracking_new(cls, *args, **kwargs):
+        instance = object.__new__(cls)
+        recorder_clients.append(instance)
+        return instance
+
+    _RecorderClient.__new__ = _tracking_new
 
     monkeypatch.setattr(module.anthropic, "Anthropic", _RecorderClient)
     module.AnthropicAccountUsageAdapter().read_account_usage(
@@ -123,9 +149,26 @@ def test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_m
     assert call["system"][0] == {"type": "text", "text": _IDENTITY_BLOCK}
     assert call["messages"] == [{"role": "user", "content": "Reply with exactly: OK"}]
     assert "tools" not in call and "stream" not in call
+    assert len(recorder_clients) == 1
+    assert recorder_clients[0].close_calls == 1
 
 
 def test_2xx_unified_headers_record_five_hour_and_seven_day_observation():
+    from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageError
+
+    with pytest.raises(AnthropicAccountUsageError) as empty:
+        _read(_RecordingRaw(headers={}))
+    assert empty.value.code == "quota_headers_unavailable"
+    with pytest.raises(AnthropicAccountUsageError) as partial:
+        _read(
+            _RecordingRaw(
+                headers=_unified_headers(
+                    **{"anthropic__ratelimit__unified__7d__utilization": None}
+                )
+            )
+        )
+    assert partial.value.code == "quota_headers_unavailable"
+
     observation = _read(_RecordingRaw())
     limits = observation.payload.rate_limits
     assert limits.primary.used_percent == 5.0
@@ -155,6 +198,12 @@ def test_429_with_unified_headers_records_rejected_quota_observation():
     assert limits.status == "rejected"
     assert limits.primary.used_percent == 100.0
     assert limits.secondary.used_percent == 14.0
+
+    from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageError
+
+    with pytest.raises(AnthropicAccountUsageError) as contradictory:
+        _read(_RecordingRaw(error=_status_error(429, _unified_headers())))
+    assert contradictory.value.code == "quota_headers_unavailable"
 
 
 def test_429_without_unified_headers_is_quota_headers_unavailable_not_a_snapshot():
@@ -200,24 +249,32 @@ def test_missing_token_is_typed_without_provider_contact():
 
 
 def test_malformed_utilization_reset_and_overage_fields_are_nulled_never_zeroed():
-    headers = _unified_headers(
+    from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageError
+
+    aux_malformed = _unified_headers(
         **{
-            "anthropic__ratelimit__unified__5h__utilization": "1.7",
-            "anthropic__ratelimit__unified__5h__reset": "soon",
-            "anthropic__ratelimit__unified__7d__utilization": "abc",
             "anthropic__ratelimit__unified__overage__disabled__reason": "ORG!!!",
             "anthropic__ratelimit__unified__representative__claim": "NOT VALID!",
+            "anthropic__ratelimit__unified__overage__status": "sideways",
         }
     )
-    observation = _read(_RecordingRaw(headers=headers))
+    observation = _read(_RecordingRaw(headers=aux_malformed))
     limits = observation.payload.rate_limits
-    assert limits.primary.used_percent is None
-    assert limits.primary.resets_at is None
-    assert limits.secondary.used_percent is None
-    assert limits.secondary.resets_at == 1786687200
     assert limits.overage_disabled_reason is None
     assert limits.limit_id is None
-    assert limits.primary.used_percent != 0 and limits.secondary.used_percent != 0
+    assert limits.overage_status is None
+    assert limits.primary.used_percent == 5.0
+
+    for name, value in (
+        ("anthropic__ratelimit__unified__5h__utilization", "1.7"),
+        ("anthropic__ratelimit__unified__5h__reset", "soon"),
+        ("anthropic__ratelimit__unified__7d__utilization", "abc"),
+        ("anthropic__ratelimit__unified__status", "sideways"),
+    ):
+        with pytest.raises(AnthropicAccountUsageError) as caught:
+            _read(_RecordingRaw(headers=_unified_headers(**{name: value})))
+        assert caught.value.code == "quota_headers_unavailable"
+        assert "0" not in caught.value.code
 
 
 def test_snapshot_source_is_anthropic_oauth_probe_with_passive_fingerprint_shape():
@@ -266,7 +323,15 @@ def test_sdk_unable_to_express_pinned_call_shape_is_sdk_incompatible():
         AnthropicAccountUsageError,
     )
 
-    bare_client = SimpleNamespace(messages=SimpleNamespace())
+    class _BareClient:
+        def __init__(self):
+            self.messages = SimpleNamespace()
+            self.close_calls = 0
+
+        def close(self):
+            self.close_calls += 1
+
+    bare_client = _BareClient()
     with pytest.raises(AnthropicAccountUsageError) as caught:
         AnthropicAccountUsageAdapter(
             client_factory=lambda token: bare_client
@@ -274,6 +339,7 @@ def test_sdk_unable_to_express_pinned_call_shape_is_sdk_incompatible():
             credential_id="local:9", record=_probe_record(), observed_at=_OBSERVED_AT
         )
     assert caught.value.code == "sdk_incompatible"
+    assert bare_client.close_calls == 1
 
 
 def test_other_provider_4xx_is_provider_request_rejected_and_preserves_last_snapshot():

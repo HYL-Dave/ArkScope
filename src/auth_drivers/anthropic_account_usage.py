@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 import anthropic
@@ -110,24 +111,31 @@ def _snapshot_from_headers(headers: Any) -> OAuthRateLimitSnapshot:
     )
 
 
-def _quota_headers_present(headers: Any) -> bool:
-    required = (
-        f"{_HEADER_PREFIX}-status",
-        f"{_HEADER_PREFIX}-5h-utilization",
-        f"{_HEADER_PREFIX}-5h-reset",
-        f"{_HEADER_PREFIX}-7d-utilization",
-        f"{_HEADER_PREFIX}-7d-reset",
+def _admit_quota_snapshot(
+    headers: Any, *, require_rejected: bool
+) -> OAuthRateLimitSnapshot:
+    """Fail-closed admission: the unified core (overall status plus both
+    windows' utilization and reset) must parse, and a quota-rejected response
+    must actually say ``rejected``. Auxiliary fields (overage, claim) stay
+    None when absent or malformed. Anything else is
+    ``quota_headers_unavailable`` — never an all-unknown fake snapshot."""
+    if headers is None:
+        raise _fail("quota_headers_unavailable")
+    snapshot = _snapshot_from_headers(headers)
+    core_valid = (
+        snapshot.status is not None
+        and snapshot.primary is not None
+        and snapshot.primary.used_percent is not None
+        and snapshot.primary.resets_at is not None
+        and snapshot.secondary is not None
+        and snapshot.secondary.used_percent is not None
+        and snapshot.secondary.resets_at is not None
     )
-    if any(headers.get(name) is None for name in required):
-        return False
-    probe = _snapshot_from_headers(headers)
-    return (
-        probe.status is not None
-        and probe.primary.used_percent is not None
-        and probe.primary.resets_at is not None
-        and probe.secondary.used_percent is not None
-        and probe.secondary.resets_at is not None
-    )
+    if not core_valid:
+        raise _fail("quota_headers_unavailable")
+    if require_rejected and snapshot.status != "rejected":
+        raise _fail("quota_headers_unavailable")
+    return snapshot
 
 
 class AnthropicAccountUsageAdapter:
@@ -150,7 +158,9 @@ class AnthropicAccountUsageAdapter:
         access_token = getattr(record, "access_token", None)
         if not isinstance(access_token, str) or not access_token:
             raise _fail("missing_token")
-        if observed_at is None or not isinstance(observed_at, str):
+        if observed_at is None:
+            observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        elif not isinstance(observed_at, str):
             raise _fail("adapter_unavailable")
 
         try:
@@ -160,56 +170,72 @@ class AnthropicAccountUsageAdapter:
         except Exception:  # noqa: BLE001 - construction diagnostics stay internal
             raise _fail("adapter_unavailable") from None
 
-        raw_surface = getattr(getattr(client, "messages", None), "with_raw_response", None)
-        create = getattr(raw_surface, "create", None)
-        if not callable(create):
-            raise _fail("sdk_incompatible")
-
         try:
-            response = create(
-                model=PROBE_MODEL,
-                max_tokens=PROBE_MAX_TOKENS,
-                system=[{"type": "text", "text": PROBE_IDENTITY_BLOCK}],
-                messages=[{"role": "user", "content": PROBE_USER_MESSAGE}],
-                extra_headers={"anthropic-beta": PROBE_OAUTH_BETA},
+            raw_surface = getattr(
+                getattr(client, "messages", None), "with_raw_response", None
             )
-        except anthropic.APITimeoutError:
-            raise _fail("timeout") from None
-        except anthropic.APIConnectionError:
-            raise _fail("transport_error") from None
-        except anthropic.APIStatusError as error:
-            status_code = getattr(
-                getattr(error, "response", None), "status_code", None
-            )
-            if status_code == 401:
-                raise _fail("provider_auth_rejected") from None
-            if status_code == 403:
-                raise _fail("provider_access_rejected") from None
-            if status_code == 429:
-                headers = getattr(getattr(error, "response", None), "headers", None)
-                if headers is not None and _quota_headers_present(headers):
-                    return self._observation(credential_id, observed_at, headers)
-                raise _fail("quota_headers_unavailable") from None
-            if status_code is not None and 400 <= status_code < 500:
-                raise _fail("provider_request_rejected") from None
-            raise _fail("adapter_unavailable") from None
-        except Exception:  # noqa: BLE001 - never expose SDK/transport internals
-            raise _fail("adapter_unavailable") from None
+            create = getattr(raw_surface, "create", None)
+            if not callable(create):
+                raise _fail("sdk_incompatible")
 
-        headers = getattr(response, "headers", None)
-        if headers is None:
-            raise _fail("quota_headers_unavailable")
-        return self._observation(credential_id, observed_at, headers)
+            try:
+                response = create(
+                    model=PROBE_MODEL,
+                    max_tokens=PROBE_MAX_TOKENS,
+                    system=[{"type": "text", "text": PROBE_IDENTITY_BLOCK}],
+                    messages=[{"role": "user", "content": PROBE_USER_MESSAGE}],
+                    extra_headers={"anthropic-beta": PROBE_OAUTH_BETA},
+                )
+            except anthropic.APITimeoutError:
+                raise _fail("timeout") from None
+            except anthropic.APIConnectionError:
+                raise _fail("transport_error") from None
+            except anthropic.APIStatusError as error:
+                status_code = getattr(
+                    getattr(error, "response", None), "status_code", None
+                )
+                if status_code == 401:
+                    raise _fail("provider_auth_rejected") from None
+                if status_code == 403:
+                    raise _fail("provider_access_rejected") from None
+                if status_code == 429:
+                    headers = getattr(
+                        getattr(error, "response", None), "headers", None
+                    )
+                    snapshot = _admit_quota_snapshot(headers, require_rejected=True)
+                    return self._observation(credential_id, observed_at, snapshot)
+                if status_code is not None and 400 <= status_code < 500:
+                    raise _fail("provider_request_rejected") from None
+                raise _fail("adapter_unavailable") from None
+            except AnthropicAccountUsageError:
+                raise
+            except Exception:  # noqa: BLE001 - never expose SDK/transport internals
+                raise _fail("adapter_unavailable") from None
+
+            snapshot = _admit_quota_snapshot(
+                getattr(response, "headers", None), require_rejected=False
+            )
+            return self._observation(credential_id, observed_at, snapshot)
+        finally:
+            close = getattr(client, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:  # noqa: BLE001 - cleanup never masks the outcome
+                    pass
 
     def _observation(
-        self, credential_id: str, observed_at: str, headers: Any
+        self,
+        credential_id: str,
+        observed_at: str,
+        rate_limits: OAuthRateLimitSnapshot,
     ) -> OAuthAccountObservation:
         return OAuthAccountObservation(
             account_fingerprint=_fingerprint(credential_id),
             source="anthropic_oauth_probe",
             observed_at=observed_at,
             payload=OAuthAccountPayload(
-                rate_limits=_snapshot_from_headers(headers),
+                rate_limits=rate_limits,
                 usage_summary=OAuthUsageSummary(),
             ),
         )

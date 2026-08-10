@@ -853,42 +853,6 @@ def test_app_server_spawn_uses_launcher_path_with_launcher_and_target_dirs_on_pa
         assert target_dir in path_entries
 
 
-class _AnthropicDispatchAdapter:
-    def __init__(self):
-        self.calls = []
-
-    def read_account_usage(self, *, credential_id, record, observed_at=None):
-        from src.auth_drivers.oauth_status import (
-            OAuthAccountObservation,
-            OAuthAccountPayload,
-            OAuthRateLimitSnapshot,
-            OAuthRateLimitWindow,
-            OAuthUsageSummary,
-        )
-
-        self.calls.append((credential_id, getattr(record, "access_token", None)))
-        return OAuthAccountObservation(
-            account_fingerprint="a" * 64,
-            source="anthropic_oauth_probe",
-            observed_at=_OBSERVED_AT,
-            payload=OAuthAccountPayload(
-                rate_limits=OAuthRateLimitSnapshot(
-                    limit_id="five_hour",
-                    primary=OAuthRateLimitWindow(
-                        used_percent=5.0, window_duration_minutes=300, resets_at=1786294800
-                    ),
-                    secondary=OAuthRateLimitWindow(
-                        used_percent=14.0, window_duration_minutes=10080, resets_at=1786687200
-                    ),
-                    status="allowed",
-                    overage_status="rejected",
-                    overage_disabled_reason="org_level_disabled",
-                ),
-                usage_summary=OAuthUsageSummary(),
-            ),
-        )
-
-
 class _BombAnthropicAdapter:
     def read_account_usage(self, **_kwargs):
         pytest.fail("unsupported auth mode reached the anthropic adapter")
@@ -900,17 +864,51 @@ class _BombCodexAdapter:
 
 
 def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(tmp_path):
+    """Real adapter + fake raw client: the service must satisfy the real
+    adapter contract (no observed_at argument -> adapter-generated receipt
+    time), not a hand-rolled fake that fills the seam itself."""
+    from types import SimpleNamespace
+
+    import httpx
+
     from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageAdapter
     from src.auth_drivers.oauth_status import OAuthObservationStore
 
+    headers = {
+        "anthropic-ratelimit-unified-status": "allowed",
+        "anthropic-ratelimit-unified-5h-status": "allowed",
+        "anthropic-ratelimit-unified-5h-utilization": "0.05",
+        "anthropic-ratelimit-unified-5h-reset": "1786294800",
+        "anthropic-ratelimit-unified-7d-status": "allowed",
+        "anthropic-ratelimit-unified-7d-utilization": "0.14",
+        "anthropic-ratelimit-unified-7d-reset": "1786687200",
+    }
+    create_calls: list[dict] = []
+
+    class _Raw:
+        def create(self, **kwargs):
+            create_calls.append(kwargs)
+            return SimpleNamespace(headers=httpx.Headers(headers))
+
+    class _Client:
+        def __init__(self):
+            self.messages = SimpleNamespace(with_raw_response=_Raw())
+            self.close_calls = 0
+
+        def close(self):
+            self.close_calls += 1
+
+    client = _Client()
     observations = OAuthObservationStore(tmp_path / "observations.db")
     token_store = _TokenStore(_token_record())
-    anthropic_adapter = _AnthropicDispatchAdapter()
     view = OAuthAccountSyncService(
         observation_store=observations,
         token_store=token_store,
         adapter=_BombCodexAdapter(),
-        anthropic_adapter=anthropic_adapter,
+        anthropic_adapter=AnthropicAccountUsageAdapter(
+            client_factory=lambda token: client
+        ),
     ).sync(
         credential_id="local:9",
         provider="anthropic",
@@ -920,7 +918,9 @@ def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(
     assert view.snapshot is not None
     assert view.snapshot.source == "anthropic_oauth_probe"
     assert view.snapshot.payload.rate_limits.primary.used_percent == 5.0
-    assert [call[0] for call in anthropic_adapter.calls] == ["local:9"]
+    assert view.snapshot.observed_at
+    assert len(create_calls) == 1
+    assert client.close_calls == 1
     assert token_store.loads == 2
     persisted = observations.read_account_snapshot("local:9")
     assert persisted is not None and persisted.source == "anthropic_oauth_probe"
