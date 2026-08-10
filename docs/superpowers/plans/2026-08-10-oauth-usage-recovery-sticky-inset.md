@@ -65,6 +65,47 @@ Backend numbers are untouched; frontend counts are unchanged
 Settings-projection hashes are re-derived in section 2. The retained-evolve
 set stays at exactly two nodes.
 
+### 0.1.2 Ruling 2026-08-10: bounded state-ownership refactor and role swap
+
+Three review rounds on Task 3 traced every real defect (channel overwrite,
+deferred-GET race, cache resurrection, dropped authoritative snapshot) to
+one causal seam: the account observation has DUPLICATED ownership between
+component state and the Settings read cache, including a second hand-written
+generation layer. Symptom patching stops here; Task 3 concludes with a
+bounded refactor instead:
+
+1. one pure reducer is the only owner of snapshot, read state, and sync
+   state (no side effects inside the reducer);
+2. one `useOAuthAccountUsage` hook is the only owner of cache interaction,
+   epoch admission, retry, cooldown, and the manual POST; it performs cache
+   operations and dispatches facts into the reducer;
+3. the Settings cache stores the durable SNAPSHOT only — never a full
+   `OAuthAccountSyncView` carrying transient sync status;
+4. `ProviderSection` only lists credentials and renders reducer state;
+5. backend DTOs, both adapters, and the generic `settingsReadCache` are
+   frozen — this is not an app-wide rewrite.
+
+Ownership locks (review-enforced):
+- the cache generation governs ONLY cache storage and in-flight loader
+  discard;
+- the hook epoch governs ONLY credential-instance/async event admission;
+- the hook may not hand-write another cache race layer (every mutation
+  invalidates — raising the cache generation — before any replace, so an
+  older in-flight GET always completes as discarded).
+
+Roles for the remainder of Task 3 (executing the standing A/B agreement):
+Fable wrote this amendment and the re-pinned ledger and now STOPS editing
+product code; Codex reviews this amendment, then implements the refactor
+and its tests; Fable performs the implementation review from raw artifacts;
+the user issues the final product ruling. Task 4 (sticky inset) stays
+paused until the refactor is GREEN.
+
+The committed Task 3 symptom fixes (`b757d347`, `d679d95c`, `9bf2b9bd`)
+are SUPERSEDED internals: their nine behavior nodes remain the binding
+regression corpus (IDs frozen; assertion bodies may adapt to the refactored
+internals without weakening the asserted behavior), while their component
+state logic is replaced wholesale.
+
 ### 0.2 Owned and excluded behavior
 
 Owned:
@@ -415,6 +456,40 @@ claude row shows cost labeled manual sync and one click sends one POST
 claude page load focus and idle send zero anthropic requests
 ```
 
+### 2.3c Reducer state-table nodes (refactor, `+10`)
+
+New file `src/settings/oauthAccountUsage.test.ts`, describe
+`OAuth account usage state table` — the state table is the literal
+parametrization; every mandatory row from the review is one node:
+
+```text
+success snapshot replaces the previous observation
+decoded failure with snapshot adopts the authoritative snapshot
+decoded failure without snapshot retains the prior observation
+credential change clears the observation and invalidates its cache entry
+a read completion from before the last mutation is discarded
+read errors and sync errors never clear each other
+mount focus and idle events never emit a provider post
+transport failure stays distinct from decoded backend failure
+the bounded retry arms once per consecutive failure episode
+stale epoch completions are rejected after credential switch
+```
+
+Re-derived identities (frontend ledger becomes `+21/-1`, net `+20`):
+
+| State | Nodes | SHA-256 |
+|---|---:|---|
+| stage 3 (recovery + reducer) | 1,142 | `d7cdf2a315033aed59a50adc2419984e1221b82d41d461b3afb7db462d07aaf2` |
+| stage 4 (final, + sticky CSS) | 1,144 | `16b95d545208792f1ff81fa76fd6f33cff76283b90b6e904a2dbd57ae9749e04` |
+| focused after stage 3 (4 files) | 51 | `c837423ea018b47311a2400d7d8c6b0bca4b3d2dbc2dd688f3968edb44e4e60b` |
+| focused final (4 files) | 53 | `2a0648f48737c8edbd120451311f7328da407bf3a96773eb7c8dbd54f67ad15e` |
+| 21-row frontend addition stream | - | `ec97d989ef4377851c47a5d33619ea7e866472d5e33eb315fb0f743e9747358d` |
+| Settings 15-file projection | 231 | unchanged `ac2319b0553545b1322ffd898e99ed2bcb8ded4ae442936771697fd6a74b3217` |
+
+The focused family gains `src/settings/oauthAccountUsage.test.ts` as its
+fourth file. Backend numbers are untouched. The one 2.3a rename and the two
+2.3b inventory updates are already landed and unchanged.
+
 ### 2.3b Shared i18n inventory owners (Task 3 stop-and-amend, revised)
 
 Task 3's full-suite gate exposed an undeclared shared-owner class:
@@ -670,10 +745,10 @@ one `max_tokens=8` request.
 ## 6. Stop conditions
 
 1. any staged/final collection count or hash differs, or a node changes
-   outside the `+21` backend / `+11/-1` frontend ledger, the one section
-   2.3a rename, the two declared evolutions, and the two section 2.3b
-   numeric count updates, or a second `api.ts` hunk beyond the one
-   authorized union line;
+   outside the `+21` backend / `+21/-1` frontend ledger (section 2.3c
+   included), the one section 2.3a rename, the declared evolutions, and the
+   two section 2.3b numeric count updates, or a second `api.ts` hunk beyond
+   the one authorized union line;
 2. RED fails for a wrong reason (import error in an existing file, fixture,
    network, timer leak) or a fake-only executable replaces the real
    symlink+shebang fixture;
