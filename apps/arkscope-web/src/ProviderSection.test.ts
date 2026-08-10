@@ -1031,11 +1031,13 @@ describe("ProviderSection read and sync recovery states", () => {
     vi.spyOn(Date, "now").mockImplementation(() => realDateNow() + nowOffset);
     const cache = createSettingsReadCache({ clock: () => Date.now() });
     let postCode: string | null = null;
+    let postSnapshot: ReturnType<typeof accountSnapshot> | null = null;
+    let serverView: ReturnType<typeof accountView> | null = null;
     const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
       if ((init?.method ?? "GET") === "POST") {
-        return jsonResponse({ credential_id: "local:7", snapshot: null, sync_status: "failed", sync_error_code: postCode });
+        return jsonResponse({ credential_id: "local:7", snapshot: postSnapshot, sync_status: "failed", sync_error_code: postCode });
       }
-      return jsonResponse(accountView(retained));
+      return jsonResponse(serverView ?? accountView(retained));
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -1066,9 +1068,11 @@ describe("ProviderSection read and sync recovery states", () => {
     expect(host!.textContent).toContain("version_incompatible");
 
     // Phase C: the one typed exception — the credential changed during the
-    // sync, so the stale observation is cleared instead of retained.
+    // sync, so the stale observation is cleared instead of retained, and
+    // the cache entry is invalidated so focus cannot resurrect it.
     nowOffset += 11_000;
     postCode = "credential_changed_during_sync";
+    serverView = { credential_id: "local:7", snapshot: null, sync_status: "not_requested", sync_error_code: null };
     await act(async () => {
       syncButton().click();
       await new Promise((resolve) => setTimeout(resolve, 30));
@@ -1077,6 +1081,36 @@ describe("ProviderSection read and sync recovery states", () => {
     expect(host!.textContent).not.toContain("已用：18%");
     expect(host!.textContent).toContain("帳戶用量：未知");
     expect(host!.textContent).not.toContain("仍顯示");
+
+    // Resurrection guard: focus revalidation must MISS the invalidated
+    // cache (a real GET fires, returning the server's post-change truth)
+    // instead of reviving the dead 18% observation from a fresh cache hit.
+    const getsBefore = callsFor(fetchMock, "/account-usage", "GET").length;
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    expect(callsFor(fetchMock, "/account-usage", "GET").length).toBeGreaterThan(getsBefore);
+    expect(host!.textContent).not.toContain("已用：18%");
+    expect(host!.textContent).toContain("帳戶用量：未知");
+
+    // Phase D: a non-credential-changed failure whose view CARRIES an
+    // authoritative snapshot must display that snapshot, not stay unknown.
+    nowOffset += 11_000;
+    // re-render so the button recomputes its cooldown state at the new time
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    postCode = "version_incompatible";
+    postSnapshot = accountSnapshot({ usedPercent: 21, observedAt: "2026-08-10T03:00:00+00:00" });
+    await act(async () => {
+      syncButton().click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(host!.textContent).toContain("version_incompatible");
+    expect(host!.textContent).toContain("已用：21%");
+    expect(host!.textContent).not.toContain("帳戶用量：未知");
   });
 
   it("first cached read failure schedules exactly one bounded retry and unmount cancels it", async () => {

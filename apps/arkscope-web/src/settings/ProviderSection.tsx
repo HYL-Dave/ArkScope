@@ -468,21 +468,34 @@ export function ProviderSection({
           settingsReadCache.invalidateCredentialAccount(credentialId);
           settingsReadCache.replace(oauthAccountUsageKey(credentialId), view);
         }
+        if (
+          view.sync_status === "failed"
+          && view.sync_error_code === "credential_changed_during_sync"
+        ) {
+          // The old observation belongs to a dead credential identity: the
+          // cache entry must die with it, or the next focus revalidation
+          // would resurrect it from the still-fresh cache.
+          settingsReadCache.invalidateCredentialAccount(credentialId);
+        }
         setAccountUsage((previous) => {
           const prior = previous[credentialId] ?? EMPTY_ACCOUNT_USAGE;
           if (view.sync_status === "failed") {
-            // LD 9: retain the older observation on a decoded failure. The
-            // one typed exception clears it: the credential changed during
-            // the sync, so the old observation belongs to a dead identity.
+            // LD 9: retain an observation on a decoded failure — preferring
+            // the AUTHORITATIVE snapshot the failure view itself carries,
+            // falling back to the prior one. The one typed exception clears
+            // it: the credential changed during the sync.
             const credentialChanged = view.sync_error_code === "credential_changed_during_sync";
             return {
               ...previous,
               [credentialId]: {
                 ...prior,
+                cachedRead: !credentialChanged && view.snapshot !== null ? "loaded" : prior.cachedRead,
                 syncSend: "idle",
                 syncSendError: null,
                 backendSyncError: view.sync_error_code ?? "sync_failed",
-                view: credentialChanged ? null : prior.view,
+                view: credentialChanged
+                  ? null
+                  : view.snapshot !== null ? view : prior.view,
               },
             };
           }
