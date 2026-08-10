@@ -77,6 +77,7 @@ type LocalAccountUsage = {
   cachedReadError: string | null;
   syncSend: "idle" | "sending" | "transport_failed";
   syncSendError: string | null;
+  backendSyncError: string | null;
   view: OAuthAccountSyncView | null;
 };
 
@@ -85,6 +86,7 @@ const EMPTY_ACCOUNT_USAGE: LocalAccountUsage = {
   cachedReadError: null,
   syncSend: "idle",
   syncSendError: null,
+  backendSyncError: null,
   view: null,
 };
 
@@ -449,6 +451,7 @@ export function ProviderSection({
         ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
         syncSend: "sending",
         syncSendError: null,
+        backendSyncError: null,
       },
     }));
     const request = (async () => {
@@ -459,20 +462,42 @@ export function ProviderSection({
         );
         if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
         if (view.sync_status === "succeeded" && view.snapshot !== null) {
+          // Kill any deferred older GET: invalidation flips the cache
+          // generation so its completion is discarded, then the fresh
+          // decoded truth is retained.
+          settingsReadCache.invalidateCredentialAccount(credentialId);
           settingsReadCache.replace(oauthAccountUsageKey(credentialId), view);
         }
-        setAccountUsage((previous) => ({
-          ...previous,
-          [credentialId]: {
-            ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
-            cachedRead: view.snapshot !== null ? "loaded" : (previous[credentialId]?.cachedRead ?? "idle"),
-            syncSend: "idle",
-            syncSendError: null,
-            view: view.snapshot !== null || view.sync_status === "failed"
-              ? view
-              : previous[credentialId]?.view ?? view,
-          },
-        }));
+        setAccountUsage((previous) => {
+          const prior = previous[credentialId] ?? EMPTY_ACCOUNT_USAGE;
+          if (view.sync_status === "failed") {
+            // LD 9: retain the older observation on a decoded failure. The
+            // one typed exception clears it: the credential changed during
+            // the sync, so the old observation belongs to a dead identity.
+            const credentialChanged = view.sync_error_code === "credential_changed_during_sync";
+            return {
+              ...previous,
+              [credentialId]: {
+                ...prior,
+                syncSend: "idle",
+                syncSendError: null,
+                backendSyncError: view.sync_error_code ?? "sync_failed",
+                view: credentialChanged ? null : prior.view,
+              },
+            };
+          }
+          return {
+            ...previous,
+            [credentialId]: {
+              ...prior,
+              cachedRead: view.snapshot !== null ? "loaded" : prior.cachedRead,
+              syncSend: "idle",
+              syncSendError: null,
+              backendSyncError: null,
+              view: view.snapshot !== null ? view : prior.view,
+            },
+          };
+        });
       } catch {
         if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
         setAccountUsage((previous) => ({
@@ -1248,9 +1273,7 @@ function AccountUsageView({
   const limits = snapshot?.payload.rate_limits ?? null;
   const unknown = t(($) => $.providers.accountUsage.unknown);
   const isProbeSource = snapshot?.source === "anthropic_oauth_probe";
-  const backendSyncError = local?.view?.sync_status === "failed"
-    ? local.view.sync_error_code ?? "sync_failed"
-    : null;
+  const backendSyncError = local?.backendSyncError ?? null;
   const transportError = local?.syncSend === "transport_failed"
     ? local.syncSendError ?? "sync_transport_failed"
     : null;

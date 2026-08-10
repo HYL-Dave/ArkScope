@@ -790,13 +790,17 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     value.credentials.openai = [oauthCredential({ active: true })];
     const stale = accountSnapshot({ observedAt: new Date(Date.now() - 6 * 60_000).toISOString() });
     const fresh = accountSnapshot({ observedAt: new Date().toISOString(), usedPercent: 19 });
+    const realDateNow = Date.now.bind(Date);
+    let nowOffset = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realDateNow() + nowOffset);
+    const cache = createSettingsReadCache({ clock: () => Date.now() });
     const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
       if ((init?.method ?? "GET") === "POST") return jsonResponse(accountView(fresh, "succeeded"));
       return jsonResponse(accountView(stale));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    renderSection({ catalog: value });
+    renderSection({ catalog: value, settingsReadCache: cache });
     await waitFor(() => (host!.textContent ?? "").includes("已用：18%"));
     await act(async () => {
       window.dispatchEvent(new Event("focus"));
@@ -814,6 +818,38 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     });
     expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
     await waitFor(() => (host!.textContent ?? "").includes("已用：19%"));
+
+    // Deferred-GET race: an older in-flight cached GET resolving AFTER the
+    // manual sync must not roll the display back (the sync invalidates the
+    // cache generation before replacing).
+    let releaseOldGet: (() => void) | null = null;
+    fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") return jsonResponse(accountView(fresh, "succeeded"));
+      return new Promise((resolveGet) => {
+        releaseOldGet = () => resolveGet({
+          ok: true,
+          status: 200,
+          json: async () => accountView(stale),
+        });
+      });
+    });
+    nowOffset += 6 * 60_000;
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    nowOffset += 11_000;
+    await act(async () => {
+      sync.click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await waitFor(() => (host!.textContent ?? "").includes("已用：19%"));
+    await act(async () => {
+      releaseOldGet?.();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(host!.textContent).toContain("已用：19%");
+    expect(host!.textContent).not.toContain("已用：18%");
   });
 
   it("manual sync bypasses the TTL and observes the ten-second cooldown", async () => {
@@ -989,28 +1025,58 @@ describe("ProviderSection read and sync recovery states", () => {
   it("decoded backend sync failure shows its stable backend code", async () => {
     const value = catalog();
     value.credentials.openai = [oauthCredential({ active: true })];
+    const retained = accountSnapshot();
+    const realDateNow = Date.now.bind(Date);
+    let nowOffset = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realDateNow() + nowOffset);
+    const cache = createSettingsReadCache({ clock: () => Date.now() });
+    let postCode: string | null = null;
     const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
       if ((init?.method ?? "GET") === "POST") {
-        return jsonResponse({ credential_id: "local:7", snapshot: null, sync_status: "failed", sync_error_code: "version_incompatible" });
+        return jsonResponse({ credential_id: "local:7", snapshot: null, sync_status: "failed", sync_error_code: postCode });
       }
-      return jsonResponse({ credential_id: "local:7", snapshot: null, sync_status: "not_requested", sync_error_code: null });
+      return jsonResponse(accountView(retained));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    renderSection({ catalog: value });
-    await flushPromises(6);
-    const sync = Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
+    renderSection({ catalog: value, settingsReadCache: cache });
+    await waitFor(() => (host!.textContent ?? "").includes("已用：18%"));
+    const syncButton = () => Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
       .find((button) => button.textContent?.trim() === "同步使用量") as HTMLButtonElement;
+
+    // Phase A: decoded failure with a retained snapshot keeps BOTH the
+    // observation and the stable backend code (LD 3/9).
+    postCode = "version_incompatible";
     await act(async () => {
-      sync.click();
+      syncButton().click();
       await new Promise((resolve) => setTimeout(resolve, 30));
     });
     expect(host!.textContent).toContain("version_incompatible");
-    // LD 9: with no snapshot present, the copy must not claim a retained
-    // observation is being shown.
-    expect(host!.textContent).not.toContain("仍顯示");
-    expect(host!.textContent).toContain("沒有已確認的觀察");
+    expect(host!.textContent).toContain("已用：18%");
     expect(host!.textContent).not.toContain("provider 結果未知");
+
+    // Phase B: a later successful cached GET must not clear the backend
+    // sync error channel.
+    nowOffset += 6 * 60_000;
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    expect(host!.textContent).toContain("已用：18%");
+    expect(host!.textContent).toContain("version_incompatible");
+
+    // Phase C: the one typed exception — the credential changed during the
+    // sync, so the stale observation is cleared instead of retained.
+    nowOffset += 11_000;
+    postCode = "credential_changed_during_sync";
+    await act(async () => {
+      syncButton().click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(host!.textContent).toContain("credential_changed_during_sync");
+    expect(host!.textContent).not.toContain("已用：18%");
+    expect(host!.textContent).toContain("帳戶用量：未知");
+    expect(host!.textContent).not.toContain("仍顯示");
   });
 
   it("first cached read failure schedules exactly one bounded retry and unmount cancels it", async () => {
