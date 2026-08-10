@@ -1,7 +1,7 @@
 # OAuth Usage Recovery and Settings Sticky Inset Implementation Plan
 
-> **Status:** WRITTEN BY FABLE (IMPLEMENTATION SIDE) - INDEPENDENT CODEX PLAN
-> REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** PLAN GREEN; TASKS 0-2 COMPLETE AND CODEX-GREEN; MANUAL-ONLY
+> SYNC RULING AMENDMENT PENDING CODEX FOCUSED REVIEW; TASK 3 NOT STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -39,6 +39,26 @@ artifact `36fa0d9c588b2a831caa651f05b8a37b75f4012fe44f003f10ea12d5798901d8`),
 and the 16-row §2.6 identity table (normalized stream
 `a15d95a129c7e12c17cd2282c9b62765e20035da285a9a09df3b2b76cd27a2fb`) are
 admission inputs and are not reinterpreted here.
+
+### 0.1.1 User ruling 2026-08-10: manual-only synchronization
+
+After Task 2 review the user ruled that every provider synchronization POST
+is manual-only: the ChatGPT visible/focus automatic sync (design LD 5) is
+retired together with the never-built Anthropic automatic path. Even a
+`max_tokens=8` probe consumes input tokens; the ChatGPT control-plane read
+is provider traffic. Automatic behavior is exactly: the local cached GET,
+its one bounded retry, focus revalidation of the CACHED read under the
+five-minute policy, and passive `RateLimitEvent` observation. Page load,
+focus, visibility, and idle send zero sync POSTs for every provider; the
+per-credential manual button (ten-second cooldown, single-flight) is the
+only sync trigger. This ruling supersedes the design's LD 5
+ChatGPT-automatic clause and this plan's earlier §1.3 carry-over; the
+design text remains dated authority.
+
+Ledger impact: none. The `+21/+10` additions, every staged/focused/
+projection hash in section 2, and the browser-matrix contract are
+unchanged. The retained-evolve set in section 2.4 grows by exactly one
+frontend node (the visible-stale auto-sync owner) to three total.
 
 ### 0.2 Owned and excluded behavior
 
@@ -265,10 +285,11 @@ The manual sync button gate extends from `chatgpt_oauth` to
 `claude_code_oauth`. The Claude button uses distinct bilingual copy
 disclosing cost ("同步用量(會發送一次極小請求,消耗少量訂閱用量)" /
 "Sync usage (sends one minimal request; uses a small amount of subscription
-usage)"). The ten-second cooldown and single-flight are shared. The ChatGPT
-automatic visible/focus sync policy is unchanged and remains ChatGPT-only;
-no automatic path may reach the Anthropic adapter (page load, focus, idle,
-cached read all send zero Anthropic requests).
+usage)"). The ten-second cooldown and single-flight are shared. Per the
+§0.1.1 ruling, the ChatGPT visible/focus automatic sync effects are REMOVED:
+page load, focus, visibility, and idle send zero sync POSTs for every
+provider; the buttons are the only sync triggers. Focus/visibility may still
+revalidate the local cached GET under the existing five-minute policy.
 
 `OAuthAccountSource` in `api.ts` gains `"anthropic_oauth_probe"` (the one
 authorized line). When the rendered snapshot's source is
@@ -395,20 +416,22 @@ sticky offsets stay shared after the inset transfer
 
 ### 2.4 Retained IDs whose assertions evolve
 
-Exactly two existing nodes may change assertion bodies; their IDs are
+Exactly three existing nodes may change assertion bodies; their IDs are
 preserved and every other existing assertion is regression-protected:
 
 ```text
 tests/test_subscription_account_usage.py::test_account_routes_split_inventory_cached_read_and_mutating_sync
 src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > preserves_retained_account_truth_when_cached_revalidation_fails_without_sync_POST
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > syncs a visible stale ChatGPT snapshot once without hidden polling
 ```
 
-The first currently asserts `anthropic/claude_code_oauth` →
-`unsupported_auth_mode` (line ~520); it evolves to assert the Anthropic
+The first asserted `anthropic/claude_code_oauth` →
+`unsupported_auth_mode`; it evolved at Task 2 to assert the Anthropic
 dispatch reaches the manual adapter while `api_key` stays unsupported. The
 second evolves only if the three-state split renames its asserted state
-field; its behavior contract (no POST on cached failure, truth retained) is
-unchanged. Any third existing-node edit is a stop condition.
+field. The third (per §0.1.1) flips from "visible stale snapshot syncs
+once" to "visible/focus/stale never sync automatically; only the manual
+button POSTs". Any fourth existing-node edit is a stop condition.
 
 ### 2.5 Backend focused identities
 
@@ -511,8 +534,10 @@ prove focused 82-node GREEN and zero provider/socket use under a
 network-guard fixture. Commit; stop.
 
 **Task 3 — frontend recovery split.** RED the eight nodes at stage-3
-identity; implement §1.3 with i18n keys in both languages; prove FE focused
-41-node GREEN, i18n scanner `36/20/0/20`, typecheck. Commit; stop.
+identity; implement §1.3 with i18n keys in both languages, REMOVE the
+ChatGPT visible/focus auto-sync effects, and land the §2.4 visible-stale
+node evolution in the same commit; prove FE focused 41-node GREEN, i18n
+scanner `36/20/0/20`, typecheck. Commit; stop.
 
 **Task 4 — sticky inset.** RED the two CSS nodes at stage-4 identity;
 implement §1.4; run an early dual-viewport browser spot check (deep-scroll
@@ -563,8 +588,8 @@ page top and deep Data Sources scroll:
   regressions);
 - provider row: cached-read failure state renders the no-observation copy
   when the account GET fixture fails, the retry action fires exactly one
-  additional GET, and zero Anthropic/OpenAI sync POSTs occur without an
-  explicit click;
+  additional GET, and zero Anthropic/OpenAI sync POSTs occur on load,
+  focus, visibility, or idle — only an explicit button click may POST;
 - request ledger `{GET}`-only during idle; console/page errors zero;
   processes and temp profiles cleaned.
 
@@ -594,7 +619,8 @@ one `max_tokens=8` request.
    section 0.5 blob, the frozen Settings fixtures, the old probe
    route/module, or the passive RateLimitEvent path changes;
 4. any test or non-Task-7 step contacts a provider, or any automatic path
-   (load/focus/idle/cached-read) can reach the Anthropic adapter;
+   (load/focus/visibility/idle/cached-read) can reach ANY sync adapter —
+   Anthropic or ChatGPT; buttons are the only sync triggers;
 5. the adapter stores or logs a token, body, generated text, raw header map,
    email, or raw account id, or a malformed field becomes `0`;
 6. `version_incompatible` is returned for anything other than a well-formed
