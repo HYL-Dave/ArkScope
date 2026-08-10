@@ -6,7 +6,8 @@
 > §0.1.2 OWNERSHIP-REFACTOR RULING; TASK 3 OWNERSHIP REFACTOR IMPLEMENTED
 > AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 SPLIT-OWNERSHIP AMENDMENT
 > CODEX-GREEN THROUGH `7857dd6f`, PRODUCT `99ca5441` FABLE-REVIEWED GREEN;
-> TASK 5 STARTED AND PAUSED AT THE MU5 REJECTION-FALLBACK OWNER GAP;
+> MU5 OWNER AMENDMENT `a16d1b70` FABLE-GREEN, STRENGTHENING `9a704331`
+> LANDED AND MUTANT RED; TASK 5 PAUSED AT THE MU6 OWNER OVERCLAIM;
 > BOUNDED AMENDMENT REVIEW REQUIRED; TASKS 6-7 NOT STARTED
 >
 > **Date:** 2026-08-10
@@ -718,7 +719,7 @@ in evidence.
 | MU3 | collapse `syncSend=transport_failed` into `cachedRead=failed` | transport-not-cached node |
 | MU4 | add the Anthropic loader to the idle/auto path (fire probe on page load) | zero-anthropic-requests node |
 | MU5 | retry a second model after a probe rejection | strengthened one-request node, including its rejection subcase |
-| MU6 | restore `.main.settings-workspace` top padding without moving the lede inset | both new CSS nodes + browser geometry |
+| MU6 | remove `.main.settings-workspace { padding-top: 0; }` without moving the lede inset | `settings scroll owner drops top inset while lede owns responsive breathing room` RED; `sticky offsets stay shared after the inset transfer` stays GREEN; browser geometry later confirms the visible regression |
 
 Each mutation must hit the live seam (a dead-code edit or one that leaves the
 named owner GREEN is rejected), be restored byte-exactly (whole-file SHA,
@@ -745,6 +746,35 @@ All section 2 identities remain unchanged. Partial raw packet:
 `/tmp/oauth-usage-sticky-impl-task5-4fbf3087` (34 payloads,
 `PARTIAL_SHA256SUMS`
 `fd7d0fdd574d3f69b71aae11d2fdf411c7568fc23e83d115fd061a4bf288e146`).
+
+### 3.2b Task 5 MU5 replay and MU6 owner correction (2026-08-11)
+
+Fable independently replayed the MU5 gap and returned amendment `a16d1b70`
+GREEN. The existing one-request node was strengthened in test commit
+`9a704331`; it first passed against the unchanged product, with backend
+focused `82/82`. The exact MU5 fallback mutation was then replayed and the
+same node failed at `len(rejected_raw.calls) == 1` after recording two
+requests. The adapter restored byte-exactly. Mechanical docs erratum
+`26a4be41` corrected section 7's stale evolution count from two to three.
+
+MU6 then exposed a different plan-only overclaim. Its faithful inverse
+removed only `.main.settings-workspace { padding-top: 0; }` while retaining
+the lede's `20px/12px` inset. The seven-node CSS owner file produced exactly
+one RED: `settings scroll owner drops top inset while lede owns responsive
+breathing room`. The adjacent `sticky offsets stay shared after the inset
+transfer` node correctly stayed GREEN because it owns the shared sticky
+offset chain, not scroll-owner padding. Requiring it to fail would force a
+duplicate assertion unrelated to that node's responsibility.
+
+The MU6 row is therefore narrowed to the real static owner plus the already
+required final browser geometry. The adjacent sticky-offset node MUST stay
+GREEN under this isolated mutation. No test body, node ID, collection
+identity, focused identity, native target, product behavior, or browser
+contract changes. CSS restored byte-exactly; every later admission gate
+stopped. Continuation packet:
+`/tmp/oauth-usage-sticky-impl-task5-a16d1b70` (12 payloads,
+`PARTIAL2_SHA256SUMS`
+`8b4ee1a7007780cb205901ec428ec71eca420b5e96c309f405d88e1c4b86666a`).
 
 ---
 
@@ -808,12 +838,13 @@ browser matrix per §5.2; protected-blob recheck; artifact
 manifest/cleanup. Docs evidence commit; stop for Codex implementation
 review.
 
-Task 5 began after Fable returned Task 4 GREEN. It is currently PAUSED after
-MU5 per §3.2a. Product bytes are clean; MU6, native, host-live, final
-frontend runtime/build, and final browser admission have not run. Focused
-review of this docs-only amendment authorizes the exact §2.4 test-body
-strengthening, then a fresh MU5 replay followed by the remaining Task 5
-sequence.
+Task 5 began after Fable returned Task 4 GREEN. The §3.2a amendment passed
+review, its exact test strengthening landed, and MU5 now has a discriminating
+RED owner. Task 5 is currently PAUSED after the MU6 pre-admission replay in
+§3.2b. Product and CSS bytes are clean; native, host-live, final frontend
+runtime/build, and final browser admission have not run. Focused review of
+this docs-only correction authorizes a fresh MU6 replay under its corrected
+owner contract, followed by the remaining Task 5 sequence.
 
 **Task 6 — merge.** After Codex GREEN: ff-merge only, no push; fresh
 exact-master worktree rerun (collections, focused, native, browser); docs
