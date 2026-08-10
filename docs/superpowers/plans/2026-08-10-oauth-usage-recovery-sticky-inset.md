@@ -905,7 +905,7 @@ one `max_tokens=8` request.
 
 Reconstruct from raw artifacts (not prose): all section 2 streams and
 hashes from the addition lists plus base; RED admissibility per task; the
-two assertion evolutions against their before/after diffs; adapter secrecy
+three assertion evolutions against their before/after diffs; adapter secrecy
 (grep artifacts for token/header leakage); MU1-MU6 diffs, RED owners, and
 byte-exact restoration; focused/full/native/browser results; protected-blob
 manifest; i18n scanner; and the Task 6 exact-master rerun. GREEN on Task 5
