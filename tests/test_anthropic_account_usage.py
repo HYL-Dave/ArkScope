@@ -109,6 +109,7 @@ def test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_m
     monkeypatch,
 ):
     from src.auth_drivers import anthropic_account_usage as module
+    from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageError
 
     constructed: list[dict] = []
     raw = _RecordingRaw()
@@ -151,6 +152,22 @@ def test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_m
     assert "tools" not in call and "stream" not in call
     assert len(recorder_clients) == 1
     assert recorder_clients[0].close_calls == 1
+
+    rejected_raw = _RecordingRaw(error=_status_error(400))
+    raw = rejected_raw
+    with pytest.raises(AnthropicAccountUsageError) as rejected:
+        module.AnthropicAccountUsageAdapter().read_account_usage(
+            credential_id="local:9",
+            record=_probe_record(),
+            observed_at=_OBSERVED_AT,
+        )
+    assert rejected.value.code == "provider_request_rejected"
+    assert len(rejected_raw.calls) == 1
+    assert rejected_raw.calls[0] == call
+    assert len(constructed) == 2
+    assert constructed[1] == constructed[0]
+    assert len(recorder_clients) == 2
+    assert recorder_clients[1].close_calls == 1
 
 
 def test_2xx_unified_headers_record_five_hour_and_seven_day_observation():
