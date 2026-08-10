@@ -19,6 +19,7 @@ import pytest
 _ACCOUNT_ID = "acct_fixture_raw_identifier"
 _ACCESS_TOKEN = "access-token-fixture-must-not-escape"
 _ID_TOKEN_SENTINEL = "id-token-fixture-must-not-escape"
+_REMOTE_CONTROL_SENTINEL = "remote-control-fixture-must-not-escape"
 _OBSERVED_AT = "2026-08-08T12:00:00+00:00"
 
 
@@ -127,6 +128,7 @@ def _write_codex_fixture(
     *,
     version: str = "0.147.0",
     unexpected_method: str | None = None,
+    startup_notification: str | None = None,
     hang_method: str | None = None,
 ) -> tuple[Path, Path, Path]:
     executable = root / "codex-fixture"
@@ -146,6 +148,7 @@ PID_PATH = %r
 RATE_LIMITS = json.loads(%r)
 USAGE = json.loads(%r)
 UNEXPECTED = %r
+STARTUP_NOTIFICATION = %r
 HANG = %r
 
 if sys.argv[1:] == ["--version"]:
@@ -169,6 +172,8 @@ for raw in sys.stdin:
         while True:
             time.sleep(1)
     if method == "initialized":
+        if STARTUP_NOTIFICATION:
+            emit({"method": STARTUP_NOTIFICATION, "params": {"status": "connected", "serverName": %r, "installationId": %r, "environmentId": None}})
         continue
     request_id = message["id"]
     if method == "initialize":
@@ -193,7 +198,10 @@ for raw in sys.stdin:
         rate_limits,
         usage,
         unexpected_method,
+        startup_notification,
         hang_method,
+        _REMOTE_CONTROL_SENTINEL,
+        _REMOTE_CONTROL_SENTINEL,
         _ACCOUNT_ID,
     )
     executable.write_text(source, encoding="utf-8")
@@ -269,13 +277,22 @@ def _seed_snapshot(
 
 def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_turn(tmp_path):
     from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+    from src.auth_drivers.oauth_status import OAuthObservationStore
 
-    executable, transcript, pid_path = _write_codex_fixture(tmp_path)
+    executable, transcript, pid_path = _write_codex_fixture(
+        tmp_path, startup_notification="remoteControl/status/changed"
+    )
     adapter = CodexAccountUsageAdapter(executable=executable, timeout_seconds=2.0)
     observation = adapter.read_account_usage(
         credential_id="local:1",
         record=_token_record(),
         observed_at=_OBSERVED_AT,
+    )
+    snapshot = OAuthObservationStore(tmp_path / "observation.db").record_account_snapshot(
+        credential_id="local:1",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        observation=observation,
     )
 
     assert observation.status == "available"
@@ -290,10 +307,17 @@ def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_tu
         f"local:1\0{_ACCOUNT_ID}".encode()
     ).hexdigest()
 
-    serialized = json.dumps(observation.model_dump(), sort_keys=True)
+    serialized = json.dumps(
+        {
+            "observation": observation.model_dump(),
+            "snapshot": snapshot.model_dump(),
+        },
+        sort_keys=True,
+    )
     assert _ACCOUNT_ID not in serialized
     assert _ACCESS_TOKEN not in serialized
     assert _ID_TOKEN_SENTINEL not in serialized
+    assert _REMOTE_CONTROL_SENTINEL not in serialized
     assert "raw@example.invalid" not in serialized
     methods = [json.loads(line)["method"] for line in transcript.read_text().splitlines()]
     assert methods == [
