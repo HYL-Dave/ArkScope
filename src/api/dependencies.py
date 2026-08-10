@@ -221,11 +221,13 @@ class OAuthAccountSyncService:
         observation_store,
         token_store,
         adapter,
+        anthropic_adapter=None,
         wait_timeout_seconds: float = 35.0,
     ):
         self.observation_store = observation_store
         self.token_store = token_store
         self.adapter = adapter
+        self.anthropic_adapter = anthropic_adapter
         self.wait_timeout_seconds = wait_timeout_seconds
         self._inflight: dict[str, Future] = {}
         self._inflight_guard = threading.Lock()
@@ -266,12 +268,21 @@ class OAuthAccountSyncService:
                     self._inflight.pop(credential_id, None)
 
     def _sync_once(self, *, credential_id: str, provider: str, auth_mode: str):
+        from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageError
         from src.auth_drivers.codex_account_usage import CodexAccountUsageError
         from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
         from src.auth_drivers.oauth_status import cached_account_usage
 
         cached = cached_account_usage(credential_id, self.observation_store)
-        if provider != "openai" or auth_mode != "chatgpt_oauth":
+        if provider == "openai" and auth_mode == "chatgpt_oauth":
+            account_adapter = self.adapter
+        elif (
+            provider == "anthropic"
+            and auth_mode == "claude_code_oauth"
+            and self.anthropic_adapter is not None
+        ):
+            account_adapter = self.anthropic_adapter
+        else:
             return cached.model_copy(
                 update={
                     "sync_status": "unsupported",
@@ -296,11 +307,11 @@ class OAuthAccountSyncService:
                 update={"sync_status": "failed", "sync_error_code": "missing_token"}
             )
         try:
-            observation = self.adapter.read_account_usage(
+            observation = account_adapter.read_account_usage(
                 credential_id=credential_id,
                 record=record,
             )
-        except CodexAccountUsageError as exc:
+        except (AnthropicAccountUsageError, CodexAccountUsageError) as exc:
             return cached.model_copy(
                 update={"sync_status": "failed", "sync_error_code": exc.code}
             )
@@ -370,12 +381,14 @@ class OAuthAccountSyncService:
 @lru_cache(maxsize=1)
 def get_oauth_account_sync_service():
     """Singleton account sync coordinator; constructing it starts no process."""
+    from src.auth_drivers.anthropic_account_usage import AnthropicAccountUsageAdapter
     from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
 
     return OAuthAccountSyncService(
         observation_store=get_oauth_observation_store(),
         token_store=get_oauth_token_store(),
         adapter=CodexAccountUsageAdapter(),
+        anthropic_adapter=AnthropicAccountUsageAdapter(),
     )
 
 

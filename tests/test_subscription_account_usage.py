@@ -519,7 +519,7 @@ def test_account_routes_split_inventory_cached_read_and_mutating_sync(tmp_path, 
     ).sync(
         credential_id="local:2",
         provider="anthropic",
-        auth_mode="claude_code_oauth",
+        auth_mode="api_key",
     )
     assert unsupported.sync_status == "unsupported"
     assert unsupported.sync_error_code == "unsupported_auth_mode"
@@ -851,3 +851,100 @@ def test_app_server_spawn_uses_launcher_path_with_launcher_and_target_dirs_on_pa
         path_entries = entry["path"].split(os.pathsep)
         assert path_entries[0] == launcher_dir
         assert target_dir in path_entries
+
+
+class _AnthropicDispatchAdapter:
+    def __init__(self):
+        self.calls = []
+
+    def read_account_usage(self, *, credential_id, record, observed_at=None):
+        from src.auth_drivers.oauth_status import (
+            OAuthAccountObservation,
+            OAuthAccountPayload,
+            OAuthRateLimitSnapshot,
+            OAuthRateLimitWindow,
+            OAuthUsageSummary,
+        )
+
+        self.calls.append((credential_id, getattr(record, "access_token", None)))
+        return OAuthAccountObservation(
+            account_fingerprint="a" * 64,
+            source="anthropic_oauth_probe",
+            observed_at=_OBSERVED_AT,
+            payload=OAuthAccountPayload(
+                rate_limits=OAuthRateLimitSnapshot(
+                    limit_id="five_hour",
+                    primary=OAuthRateLimitWindow(
+                        used_percent=5.0, window_duration_minutes=300, resets_at=1786294800
+                    ),
+                    secondary=OAuthRateLimitWindow(
+                        used_percent=14.0, window_duration_minutes=10080, resets_at=1786687200
+                    ),
+                    status="allowed",
+                    overage_status="rejected",
+                    overage_disabled_reason="org_level_disabled",
+                ),
+                usage_summary=OAuthUsageSummary(),
+            ),
+        )
+
+
+class _BombAnthropicAdapter:
+    def read_account_usage(self, **_kwargs):
+        pytest.fail("unsupported auth mode reached the anthropic adapter")
+
+
+class _BombCodexAdapter:
+    def read_account_usage(self, **_kwargs):
+        pytest.fail("anthropic dispatch reached the codex adapter")
+
+
+def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(tmp_path):
+    from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    observations = OAuthObservationStore(tmp_path / "observations.db")
+    token_store = _TokenStore(_token_record())
+    anthropic_adapter = _AnthropicDispatchAdapter()
+    view = OAuthAccountSyncService(
+        observation_store=observations,
+        token_store=token_store,
+        adapter=_BombCodexAdapter(),
+        anthropic_adapter=anthropic_adapter,
+    ).sync(
+        credential_id="local:9",
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+    )
+    assert view.sync_status == "succeeded"
+    assert view.snapshot is not None
+    assert view.snapshot.source == "anthropic_oauth_probe"
+    assert view.snapshot.payload.rate_limits.primary.used_percent == 5.0
+    assert [call[0] for call in anthropic_adapter.calls] == ["local:9"]
+    assert token_store.loads == 2
+    persisted = observations.read_account_snapshot("local:9")
+    assert persisted is not None and persisted.source == "anthropic_oauth_probe"
+
+
+def test_api_key_and_pool_modes_stay_unsupported_and_render_no_usage_surface(tmp_path):
+    from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    observations = OAuthObservationStore(tmp_path / "observations.db")
+    token_store = _TokenStore(_token_record())
+    service = OAuthAccountSyncService(
+        observation_store=observations,
+        token_store=token_store,
+        adapter=_BombCodexAdapter(),
+        anthropic_adapter=_BombAnthropicAdapter(),
+    )
+    for provider, auth_mode in (
+        ("anthropic", "api_key"),
+        ("openai", "api_key_pool"),
+    ):
+        view = service.sync(
+            credential_id="local:3", provider=provider, auth_mode=auth_mode
+        )
+        assert view.sync_status == "unsupported"
+        assert view.sync_error_code == "unsupported_auth_mode"
+    assert token_store.loads == 0

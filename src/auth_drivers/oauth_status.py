@@ -115,7 +115,7 @@ class OAuthAccountObservation(BaseModel):
     account_fingerprint: str = Field(
         min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
     )
-    source: Literal["codex_app_server", "claude_rate_limit_event"]
+    source: Literal["codex_app_server", "claude_rate_limit_event", "anthropic_oauth_probe"]
     schema_version: int = 1
     observed_at: str
     status: Literal["available"] = "available"
