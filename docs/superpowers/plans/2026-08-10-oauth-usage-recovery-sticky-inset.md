@@ -590,8 +590,9 @@ one `max_tokens=8` request.
 2. RED fails for a wrong reason (import error in an existing file, fixture,
    network, timer leak) or a fake-only executable replaces the real
    symlink+shebang fixture;
-3. `api.ts`, any section 0.5 blob, the frozen Settings fixtures, the old
-   probe route/module, or the passive RateLimitEvent path changes;
+3. `api.ts` changes beyond the one authorized union-member hunk, or any
+   section 0.5 blob, the frozen Settings fixtures, the old probe
+   route/module, or the passive RateLimitEvent path changes;
 4. any test or non-Task-7 step contacts a provider, or any automatic path
    (load/focus/idle/cached-read) can reach the Anthropic adapter;
 5. the adapter stores or logs a token, body, generated text, raw header map,
