@@ -55,10 +55,15 @@ only sync trigger. This ruling supersedes the design's LD 5
 ChatGPT-automatic clause and this plan's earlier §1.3 carry-over; the
 design text remains dated authority.
 
-Ledger impact: none. The `+21/+10` additions, every staged/focused/
-projection hash in section 2, and the browser-matrix contract are
-unchanged. The retained-evolve set in section 2.4 grows by exactly one
-frontend node (the visible-stale auto-sync owner) to three total.
+Ledger impact: the sole automatic-sync owner cannot keep a name that says
+"syncs ... once" while asserting it never auto-syncs; a lying test name is
+inadmissible. It is therefore an exact `-1/+1` rename to the truthful ID
+`does not sync stale ChatGPT usage without an explicit manual click`
+(same describe block, removed and added in the same Task 3 RED commit).
+Backend numbers are untouched; frontend counts are unchanged
+(1,132 / 1,134 / 41 / 43 / 231) while the frontend stage, focused, and
+Settings-projection hashes are re-derived in section 2. The retained-evolve
+set stays at exactly two nodes.
 
 ### 0.2 Owned and excluded behavior
 
@@ -332,19 +337,23 @@ the PageHeader equals the pre-change 20/12 pixels.
 | base | `4,282 / 281cad976a2df29224f41d7442f39ee6deb5b78165fb9efe3945bee6d520abe3` | `99 files / 1,124 / da69a2942c03e4794e3384e6125936f9f25c1fafbad7d006b67025f8fd97bc39` |
 | after Task 1 (launcher, `+7/-0`) | `4,289 / 37bc0a597398404de6247e465e44908ccd265798ba66722242bb8807c1614968` | unchanged |
 | after Task 2 (Anthropic adapter + dispatch, `+14/-0`) | `4,303 / 52b862d7bf94f9d4605f8de1b2e92240ea152a41218446c3652b38716af77489` | unchanged |
-| after Task 3 (frontend recovery, `+8/-0`) | unchanged | `1,132 / 778d64be3239dbb94df475e2cccde1b61878af3a627a28a677038191ea6a6e9d` |
-| after Task 4 (sticky inset, `+2/-0`) | unchanged | `99 files / 1,134 / 941067a028c7bb6b15c3e3f64012dcf251995804e3f55c9a712cb230d4a4ba64` |
+| after Task 3 (frontend recovery, `+9/-1`) | unchanged | `1,132 / 0cd20954049f4f9d56a47c8f0f5c21a685928cc0b32afb984ac74a273509fbc4` |
+| after Task 4 (sticky inset, `+2/-0`) | unchanged | `99 files / 1,134 / 1828df375a647cbb6904f26e360c9740dfad9ad91064ae754f1fb99021ca45c5` |
 
 Final accounting is backend `+21/-0` (4,303 nodes, one new test file) and
-frontend `+10/-0` (1,134 nodes; both frontend additions land in existing
-files, so the file count stays 99). Derivation asserts every added ID absent from base, internal
-uniqueness, and `sort(unique(base + added))` reproduction of each hash. No
-node is removed or renamed anywhere in this plan.
+frontend `+11/-1` (net `+10`, 1,134 nodes; every frontend change lands in
+existing files, so the file count stays 99). Derivation asserts every added
+ID absent from base, the one removed ID present exactly once, internal
+uniqueness, and `sort(unique(base - removed + added))` reproduction of each
+hash. Exactly one node is renamed (section 2.3a); nothing else is removed
+or renamed.
 
 The sorted 21-node backend addition stream is
 `2b540253de6578a71be09a726a11d29cce396a2e0c29421a7f8a5cfa4b3666bd`; the
-sorted 10-row frontend addition stream is
-`e900aa107304d88a41eb9d2443ed525c381f2a985778ef4f416b8a3ae207aafb`.
+sorted 11-row frontend addition stream is
+`ef9933d03ad5f3a1400c4401838de6653211c492e02fac211256513354d893fa`; the
+one-row frontend removal stream is
+`a1bb6e3c9fc240a2d82b80046e85b7266da305f97a9b27e9d196ae69b31c864d`.
 
 ### 2.2 Exact backend additions
 
@@ -406,6 +415,16 @@ claude row shows cost labeled manual sync and one click sends one POST
 claude page load focus and idle send zero anthropic requests
 ```
 
+### 2.3a Exact frontend rename (Task 3, same RED commit)
+
+The old ID encodes the retired automatic-sync policy and is replaced, not
+retained or skipped:
+
+```text
+removed: src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > syncs a visible stale ChatGPT snapshot once without hidden polling
+added:   src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > does not sync stale ChatGPT usage without an explicit manual click
+```
+
 Task 4 — `src/SettingsCss.test.ts`, describe
 `Settings workspace CSS contract` (`+2`):
 
@@ -416,22 +435,20 @@ sticky offsets stay shared after the inset transfer
 
 ### 2.4 Retained IDs whose assertions evolve
 
-Exactly three existing nodes may change assertion bodies; their IDs are
-preserved and every other existing assertion is regression-protected:
+Exactly two existing nodes may change assertion bodies; their IDs are
+preserved and every other existing assertion is regression-protected (the
+retired auto-sync owner is a section 2.3a rename, not an evolution):
 
 ```text
 tests/test_subscription_account_usage.py::test_account_routes_split_inventory_cached_read_and_mutating_sync
 src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > preserves_retained_account_truth_when_cached_revalidation_fails_without_sync_POST
-src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > syncs a visible stale ChatGPT snapshot once without hidden polling
 ```
 
 The first asserted `anthropic/claude_code_oauth` →
 `unsupported_auth_mode`; it evolved at Task 2 to assert the Anthropic
 dispatch reaches the manual adapter while `api_key` stays unsupported. The
 second evolves only if the three-state split renames its asserted state
-field. The third (per §0.1.1) flips from "visible stale snapshot syncs
-once" to "visible/focus/stale never sync automatically; only the manual
-button POSTs". Any fourth existing-node edit is a stop condition.
+field. Any third existing-node edit is a stop condition.
 
 ### 2.5 Backend focused identities
 
@@ -456,8 +473,8 @@ Focused files: `src/ProviderSection.test.ts`, `src/SettingsCss.test.ts`,
 | State | Nodes | SHA-256 |
 |---|---:|---|
 | base | 33 | `fb42f09afe2b1a2ba08eb936220ed5da0dd98f79a19e46ba885c6877fce815bd` |
-| after Task 3 | 41 | `efc6accc536387ec7b6badd1d89a1dbc2c7efa075fc0c4686eecdcf92f9dc7c7` |
-| after Task 4 (final) | 43 | `853c9cefacf8408c8dda768bdbeea4447ab1ae8cc72dba812243e7aeebac0754` |
+| after Task 3 | 41 | `82dc004ab10a61a86128d917b1b3f413c912e8e0c9c4522123a8d33ea047c5fd` |
+| after Task 4 (final) | 43 | `b091c9ed2636040433188872051c6c39513dc1d01d3bb694c95a3bef225ccbe0` |
 
 Grounded baseline runtime: `33 passed (3 files)`. The Settings-line focused
 regression set (15 files) contains `ProviderSection.test.ts` and
@@ -465,6 +482,8 @@ regression set (15 files) contains `ProviderSection.test.ts` and
 projection is `231 / e0bb619016a9355e78ffd97559139744c1b5ec6ffd6e8854c7d0eaac0187677d`
 (mechanically derived from the stage-4 stream; base remains
 `221/a2c20d36...`). Task 5 runs this 15-file set and requires `231 passed`.
+After the section 2.3a rename the projection identity is
+`231 / ac2319b0553545b1322ffd898e99ed2bcb8ded4ae442936771697fd6a74b3217`.
 
 ### 2.7 Native target
 
@@ -533,10 +552,11 @@ plus the `source` Literal member and the §2.4 backend assertion evolution;
 prove focused 82-node GREEN and zero provider/socket use under a
 network-guard fixture. Commit; stop.
 
-**Task 3 — frontend recovery split.** RED the eight nodes at stage-3
-identity; implement §1.3 with i18n keys in both languages, REMOVE the
-ChatGPT visible/focus auto-sync effects, and land the §2.4 visible-stale
-node evolution in the same commit; prove FE focused 41-node GREEN, i18n
+**Task 3 — frontend recovery split.** RED the eight new nodes plus the
+section 2.3a rename (remove+add in the same RED commit; no intermediate
+duplicate or lying-name state) at the re-derived stage-3 identity;
+implement §1.3 with i18n keys in both languages and REMOVE the ChatGPT
+visible/focus auto-sync effects; prove FE focused 41-node GREEN, i18n
 scanner `36/20/0/20`, typecheck. Commit; stop.
 
 **Task 4 — sticky inset.** RED the two CSS nodes at stage-4 identity;
@@ -545,7 +565,7 @@ row top == scrollport top ±1px; initial lede spacing 20/12); prove FE focused
 43-node GREEN. Commit; stop.
 
 **Task 5 — mutations and admission.** MU1-MU6; final collections
-(backend `4303/52b862d7...`, frontend `1134/941067a0...`, both focused
+(backend `4303/52b862d7...`, frontend `1134/1828df37...`, both focused
 finals, Settings focused re-derived pin); full frontend Vitest, typecheck,
 build, i18n scanner; my own native run via the pinned wrapper
 (`4274/29/0` target) plus the §5.1 host-live Codex acceptance; hermetic
@@ -610,8 +630,9 @@ one `max_tokens=8` request.
 ## 6. Stop conditions
 
 1. any staged/final collection count or hash differs, or a node changes
-   outside the `+21/+10` ledger and the two declared evolutions, or a second
-   `api.ts` hunk beyond the one authorized union line;
+   outside the `+21` backend / `+11/-1` frontend ledger, the one section
+   2.3a rename, and the two declared evolutions, or a second `api.ts` hunk
+   beyond the one authorized union line;
 2. RED fails for a wrong reason (import error in an existing file, fixture,
    network, timer leak) or a fake-only executable replaces the real
    symlink+shebang fixture;
