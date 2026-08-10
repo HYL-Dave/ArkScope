@@ -3,8 +3,9 @@
 > **Status:** PLAN GREEN; TASKS 0-2 COMPLETE AND CODEX-GREEN; MANUAL-ONLY
 > SYNC RULING GREEN (`59dafdee`/`830164f5`/`ca09fd15`); TASK 3 RECOVERY
 > COMMITS LANDED THROUGH `9bf2b9bd` AND SUPERSEDED AS INTERNALS BY THE
-> §0.1.2 OWNERSHIP-REFACTOR RULING; REFACTOR AMENDMENT PENDING CODEX
-> FOCUSED RE-REVIEW; TASKS 4-7 NOT STARTED (TASK 4 PAUSED PER §0.1.2)
+> §0.1.2 OWNERSHIP-REFACTOR RULING; TASK 3 OWNERSHIP REFACTOR IMPLEMENTED
+> AT `380021b5`, AWAITING FABLE IMPLEMENTATION REVIEW; TASKS 4-7 NOT
+> STARTED (TASK 4 PAUSED PER §0.1.2)
 >
 > **Date:** 2026-08-10
 >
@@ -714,6 +715,9 @@ DTOs, adapters, or `settingsReadCache`; keep all 26 ProviderSection nodes
 green (bodies may adapt per §0.1.2 without weakening behavior); prove FE
 focused 53-node GREEN (4 files), i18n scanner `36/20/0/20`, typecheck, and
 the protected blobs. Commit; stop for Fable implementation review.
+
+Implementation commit `380021b5` completed this gate. Task 4 remains paused
+until Fable reconstructs the Task 3 packet and returns GREEN.
 
 **Task 4 — sticky inset.** RED the two CSS nodes at stage-4 identity;
 implement §1.4; run an early dual-viewport browser spot check (deep-scroll
