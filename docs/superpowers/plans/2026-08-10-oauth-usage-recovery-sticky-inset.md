@@ -9,8 +9,10 @@
 > MU5 OWNER AMENDMENT `a16d1b70` FABLE-GREEN, STRENGTHENING `9a704331`
 > LANDED AND MUTANT RED; MU6 OWNER CORRECTION `24d231eb` FABLE-GREEN AND
 > MU1-MU6 COMPLETE; FINAL GATES GREEN BUT §5.1 HOST-LIVE STOPPED ON THE
-> SCHEMA-DECLARED `remoteControl/status/changed` NOTIFICATION; §1.5
-> ALLOWLIST AMENDMENT PENDING CODEX FOCUSED REVIEW; TASKS 6-7 NOT STARTED
+> SCHEMA-DECLARED `remoteControl/status/changed` NOTIFICATION; §1.5 FIX
+> `bd32b7fe` FABLE-GREEN BUT THE SECOND HOST-LIVE STOPPED LATER IN THE
+> PROTOCOL; §3.2d SHAPE-ONLY DIAGNOSTIC PENDING CODEX FOCUSED REVIEW;
+> TASKS 6-7 NOT STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -849,6 +851,50 @@ Resume order after this amendment goes GREEN: one product+test commit
 rejection nodes intact, then ONE §5.1 host-live rerun which MUST succeed
 before the §5.2 browser matrix runs; the remaining admission gates follow
 unchanged. All section 2 identities stand.
+
+### 3.2d Second host-live stop: one redacted shape-only diagnostic (2026-08-11)
+
+The §1.5 fix landed as `bd32b7fe` (one frozenset member; the §2.4 fourth
+evolution RED-first with the sentinel non-leak witness; focused `82/82`;
+collection `4303/52b862d7...` held; Fable-reviewed GREEN). The single
+authorized host-live rerun then proved the notification fix works
+(`remoteControl/status/changed` accepted, launcher and initialize passed)
+and stopped AGAIN with typed `protocol_incompatible` at a LATER message
+whose method and shape are unknown, because the strict decoder collapses
+unexpected notifications, response-shape mismatches, and JSON-RPC error
+objects into one code with no detail - by secrecy design. Guess-and-fix
+allowlist churn is rejected; the boundary witness shows zero child
+processes, zero temporary `CODEX_HOME` leftovers, unchanged production
+OAuth/credential tables. Packet:
+`/tmp/oauth-usage-sticky-impl-task5-resume-bd66177a` (15 payloads,
+`PARTIAL3_SHA256SUMS`
+`5b13356cbb5a2388ae96c672c0db4a6980f4e69983f8a77174d5851b002d45e6`).
+
+Authorized next step - exactly ONE redacted shape-only diagnostic run:
+
+- The host-live harness instruments the strict-decode seam IN THE
+  TEMPORARY SIDECAR PROCESS ONLY (runtime wrap; ZERO product bytes
+  change and no diagnostic code is committed to `src/`).
+- For every inbound app-server message until the failure point (cap 50),
+  it records a SHAPE projection: the `method` string if present, `id`
+  PRESENCE as a boolean (never its value), and a recursive projection of
+  `params`/`result`/`error` keeping field NAMES, JSON TYPES
+  (object/array/string/number/boolean/null), and ARRAY LENGTHS only
+  (depth cap 6, per-object key cap 32).
+- Every scalar VALUE is dropped and replaced by its type marker. No
+  token, account identifier, email, URL, timestamp, numeric value, or
+  error-message text may appear in the artifact; the existing
+  stdout/stderr byte caps and cleanup witnesses (child processes,
+  temporary `CODEX_HOME`, token/identity non-persistence, unchanged
+  production tables) apply unchanged.
+- The artifact lands in the diagnostic packet for Fable review and the
+  user's fix ruling. NO validator, allowlist, or fixture change is
+  authorized by this section; the subsequent single bounded fix plus its
+  faithful fixture require their own amendment grounded on the captured
+  shape.
+
+All section 2 identities stand; no test or product byte changes under
+this section.
 
 ---
 
