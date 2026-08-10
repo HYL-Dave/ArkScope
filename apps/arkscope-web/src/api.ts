@@ -207,7 +207,7 @@ export interface ProviderCredential {
 }
 
 export type OAuthRateLimitStatus = "allowed" | "allowed_warning" | "rejected";
-export type OAuthAccountSource = "codex_app_server" | "claude_rate_limit_event";
+export type OAuthAccountSource = "codex_app_server" | "claude_rate_limit_event" | "anthropic_oauth_probe";
 
 export interface OAuthRateLimitWindow {
   used_percent: number | null;

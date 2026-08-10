@@ -78,6 +78,10 @@ function accountSnapshot({
   status = "allowed",
   overageStatus = "rejected",
   overageReason = "out_of_credits",
+  provider = "openai",
+  authMode = "chatgpt_oauth",
+  source = "codex_app_server",
+  secondary = null,
 }: {
   credentialId?: string;
   observedAt?: string;
@@ -86,13 +90,17 @@ function accountSnapshot({
   status?: "allowed" | "allowed_warning" | "rejected" | null;
   overageStatus?: "allowed" | "allowed_warning" | "rejected" | null;
   overageReason?: string | null;
+  provider?: string;
+  authMode?: string;
+  source?: string;
+  secondary?: { used_percent: number | null; window_duration_minutes: number | null; resets_at: number | null } | null;
 } = {}) {
   return {
     credential_id: credentialId,
-    provider: "openai",
-    auth_mode: "chatgpt_oauth",
+    provider,
+    auth_mode: authMode,
     account_fingerprint: "f".repeat(64),
-    source: "codex_app_server",
+    source,
     schema_version: 1,
     observed_at: observedAt,
     status: "available",
@@ -106,7 +114,7 @@ function accountSnapshot({
           window_duration_minutes: 300,
           resets_at: resetsAt,
         },
-        secondary: null,
+        secondary,
         rate_limit_reached_type: null,
         credits: null,
         individual_limit: null,
@@ -774,7 +782,7 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     expect(row.textContent).not.toContain("推算剩餘：100%");
   });
 
-  it("syncs a visible stale ChatGPT snapshot once without hidden polling", async () => {
+  it("does not sync stale ChatGPT usage without an explicit manual click", async () => {
     let visibility: DocumentVisibilityState = "visible";
     vi.spyOn(document, "visibilityState", "get").mockImplementation(() => visibility);
     const intervalSpy = vi.spyOn(window, "setInterval");
@@ -789,17 +797,23 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     renderSection({ catalog: value });
-    await waitFor(() => callsFor(fetchMock, "/account-usage/sync", "POST").length === 1);
-    await waitFor(() => (host!.textContent ?? "").includes("已用：19%"));
-
-    visibility = "hidden";
+    await waitFor(() => (host!.textContent ?? "").includes("已用：18%"));
     await act(async () => {
-      document.dispatchEvent(new Event("visibilitychange"));
       window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
       await new Promise((resolve) => setTimeout(resolve, 80));
     });
-    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
     expect(intervalSpy).not.toHaveBeenCalled();
+
+    const sync = Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "同步使用量") as HTMLButtonElement;
+    await act(async () => {
+      sync.click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
+    await waitFor(() => (host!.textContent ?? "").includes("已用：19%"));
   });
 
   it("manual sync bypasses the TTL and observes the ten-second cooldown", async () => {
@@ -874,5 +888,232 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     await flushPromises();
     expect(callsFor(fetchMock, "local%3A7/account-usage", "GET")).toHaveLength(1);
     expect(credentialRow("Account A").textContent).toContain("已用：11%");
+  });
+});
+
+
+describe("ProviderSection read and sync recovery states", () => {
+  function claudeCredential(overrides: Partial<LifecycleCredential> = {}): LifecycleCredential {
+    return oauthCredential({
+      id: "local:1",
+      provider: "anthropic",
+      auth_type: "claude_code_oauth",
+      label: "Claude subscription",
+      active: true,
+      ...overrides,
+    } as Partial<LifecycleCredential>);
+  }
+
+  function claudeSnapshot(overrides: Parameters<typeof accountSnapshot>[0] = {}) {
+    return accountSnapshot({
+      credentialId: "local:1",
+      provider: "anthropic",
+      authMode: "claude_code_oauth",
+      source: "anthropic_oauth_probe",
+      usedPercent: 5,
+      secondary: { used_percent: 14, window_duration_minutes: 10080, resets_at: 1786687200 },
+      ...overrides,
+    });
+  }
+
+  it("cached read failure without snapshot says no confirmed observation", async () => {
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const fetchMock = vi.fn(() => jsonResponse({ detail: "boom" }, 500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await waitFor(() => (host!.textContent ?? "").includes("無法讀取本地觀察"));
+    expect(host!.textContent).toContain("目前沒有已確認的觀察");
+    expect(host!.textContent).not.toContain("仍顯示");
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+  });
+
+  it("cached read failure with snapshot keeps observation and its observed_at", async () => {
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const retained = accountSnapshot({ observedAt: "2026-08-10T01:00:00+00:00" });
+    let clockNow = Date.now();
+    const cache = createSettingsReadCache({ clock: () => clockNow });
+    let reads = 0;
+    const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "GET" && String(url).includes("/account-usage")) {
+        reads += 1;
+        if (reads === 1) return jsonResponse(accountView(retained));
+        return jsonResponse({ detail: "boom" }, 500);
+      }
+      return jsonResponse({ detail: "unexpected" }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value, settingsReadCache: cache });
+    await waitFor(() => (host!.textContent ?? "").includes("已用：18%"));
+
+    // Push the retained view past the five-minute freshness; the focus
+    // revalidation is now a real GET that fails, and truth must be kept.
+    clockNow += 6 * 60_000;
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    await waitFor(() => reads >= 2);
+    await flushPromises(6);
+    expect(host!.textContent).toContain("已用：18%");
+    expect(host!.textContent).toContain("無法讀取本地觀察");
+    expect(host!.textContent).toContain(formatSystemTimestamp("2026-08-10T01:00:00+00:00"));
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+  });
+
+  it("sync transport failure is never labeled cached_read_failed", async () => {
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") return Promise.reject(new Error("socket down"));
+      return jsonResponse(accountView(accountSnapshot()));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await waitFor(() => (host!.textContent ?? "").includes("已用：18%"));
+    const sync = Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "同步使用量") as HTMLButtonElement;
+    await act(async () => {
+      sync.click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(host!.textContent).toContain("provider 結果未知");
+    expect(host!.textContent).not.toContain("cached_read_failed");
+    expect(host!.textContent).toContain("已用：18%");
+  });
+
+  it("decoded backend sync failure shows its stable backend code", async () => {
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") {
+        return jsonResponse({ credential_id: "local:7", snapshot: null, sync_status: "failed", sync_error_code: "version_incompatible" });
+      }
+      return jsonResponse({ credential_id: "local:7", snapshot: null, sync_status: "not_requested", sync_error_code: null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await flushPromises(6);
+    const sync = Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "同步使用量") as HTMLButtonElement;
+    await act(async () => {
+      sync.click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(host!.textContent).toContain("version_incompatible");
+    // LD 9: with no snapshot present, the copy must not claim a retained
+    // observation is being shown.
+    expect(host!.textContent).not.toContain("仍顯示");
+    expect(host!.textContent).toContain("沒有已確認的觀察");
+    expect(host!.textContent).not.toContain("provider 結果未知");
+  });
+
+  it("first cached read failure schedules exactly one bounded retry and unmount cancels it", async () => {
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const fetchMock = vi.fn(() => jsonResponse({ detail: "boom" }, 500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await flushPromises(6);
+    const before = callsFor(fetchMock, "/account-usage", "GET").length;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    });
+    const afterOne = callsFor(fetchMock, "/account-usage", "GET").length;
+    expect(afterOne).toBe(before + 1);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    });
+    expect(callsFor(fetchMock, "/account-usage", "GET").length).toBe(afterOne);
+
+    const priorCalls = fetchMock.mock.calls.length;
+    renderSection({ catalog: value });
+    await flushPromises(4);
+    await act(async () => {
+      root!.unmount();
+      root = null;
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    });
+    const tail = (fetchMock.mock.calls as unknown as [unknown, RequestInit | undefined][])
+      .slice(priorCalls)
+      .filter((call) => String(call[0]).includes("/account-usage")
+        && (call[1]?.method ?? "GET") === "GET");
+    expect(tail.length).toBe(1);
+  });
+
+  it("manual retry local read performs one GET and zero sync POSTs", async () => {
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const fetchMock = vi.fn(() => jsonResponse({ detail: "boom" }, 500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await waitFor(() => (host!.textContent ?? "").includes("無法讀取本地觀察"));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    });
+    const before = callsFor(fetchMock, "/account-usage", "GET").length;
+    const retry = Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "重試本地讀取") as HTMLButtonElement;
+    expect(retry).toBeTruthy();
+    await act(async () => {
+      retry.click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(callsFor(fetchMock, "/account-usage", "GET").length).toBe(before + 1);
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+  });
+
+  it("claude row shows cost labeled manual sync and one click sends one POST", async () => {
+    const value = catalog();
+    value.credentials.anthropic = [claudeCredential()];
+    const probe = claudeSnapshot({ observedAt: "2026-08-10T02:00:00+00:00" });
+    const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") return jsonResponse({ credential_id: "local:1", snapshot: probe, sync_status: "succeeded", sync_error_code: null });
+      return jsonResponse({ credential_id: "local:1", snapshot: null, sync_status: "not_requested", sync_error_code: null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await flushPromises(6);
+    const row = credentialRow("Claude subscription");
+    const sync = Array.from(row.querySelectorAll("button"))
+      .find((button) => (button.textContent ?? "").includes("同步用量")) as HTMLButtonElement;
+    expect(sync).toBeTruthy();
+    expect(sync.textContent).toContain("消耗少量訂閱用量");
+    await act(async () => {
+      sync.click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
+    await waitFor(() => (host!.textContent ?? "").includes("已用：5%"));
+    expect(host!.textContent).toContain("5 小時視窗");
+    expect(host!.textContent).toContain("7 天視窗");
+    expect(host!.textContent).toContain("來源：anthropic_oauth_probe");
+  });
+
+  it("claude page load focus and idle send zero anthropic requests", async () => {
+    const value = catalog();
+    value.credentials.anthropic = [claudeCredential()];
+    const fetchMock = vi.fn(() => jsonResponse({ credential_id: "local:1", snapshot: null, sync_status: "not_requested", sync_error_code: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSection({ catalog: value });
+    await flushPromises(6);
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+    const posts = (fetchMock.mock.calls as unknown as [unknown, RequestInit | undefined][])
+      .filter((call) => (call[1]?.method ?? "GET") === "POST");
+    expect(posts).toHaveLength(0);
   });
 });

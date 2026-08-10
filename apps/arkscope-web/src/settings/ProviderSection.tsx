@@ -73,11 +73,23 @@ type CredentialMetadataDraft = {
 };
 
 type LocalAccountUsage = {
-  readState: "loading" | "loaded" | "failed";
+  cachedRead: "idle" | "loading" | "loaded" | "failed";
+  cachedReadError: string | null;
+  syncSend: "idle" | "sending" | "transport_failed";
+  syncSendError: string | null;
   view: OAuthAccountSyncView | null;
 };
 
-const ACCOUNT_USAGE_TTL_MS = 5 * 60 * 1000;
+const EMPTY_ACCOUNT_USAGE: LocalAccountUsage = {
+  cachedRead: "idle",
+  cachedReadError: null,
+  syncSend: "idle",
+  syncSendError: null,
+  view: null,
+};
+
+const ACCOUNT_READ_RETRY_MS = 1_000;
+
 const ACCOUNT_SYNC_COOLDOWN_MS = 10 * 1000;
 
 function isOAuthCredential(credential: ProviderCredential): boolean {
@@ -132,12 +144,6 @@ function resetTimestamp(value: number | null, t: SettingsT): string {
   return formatSystemTimestamp(new Date(value * 1000).toISOString());
 }
 
-function snapshotIsStale(view: OAuthAccountSyncView | null | undefined, now = Date.now()): boolean {
-  const observedAt = view?.snapshot?.observed_at;
-  if (!observedAt) return true;
-  const observed = new Date(observedAt).getTime();
-  return !Number.isFinite(observed) || now - observed >= ACCOUNT_USAGE_TTL_MS;
-}
 
 function requireCredentialBoundAccountView(
   credentialId: string,
@@ -331,7 +337,8 @@ export function ProviderSection({
   const [accountSyncing, setAccountSyncing] = useState<Record<string, boolean>>({});
   const [accountCooldownUntil, setAccountCooldownUntil] = useState<Record<string, number>>({});
   const accountSyncInFlight = useRef(new Map<string, Promise<void>>());
-  const accountAutoAttempt = useRef(new Map<string, string>());
+  const accountReadRetry = useRef(new Map<string, number>());
+  const accountReadRetryUsed = useRef(new Map<string, number>());
   const accountGeneration = useRef(new Map<string, number>());
   const accountCooldownTimers = useRef(new Map<string, number>());
 
@@ -342,8 +349,6 @@ export function ProviderSection({
     .map((credential) => `${credential.id}\0${credential.auth_type}`)
     .sort()
     .join("\0");
-  const activeChatGPTCredentials = activeOAuthCredentials
-    .filter((credential) => credential.auth_type === "chatgpt_oauth");
   const sectionVisible = documentVisible && sectionInViewport;
 
   const readCachedAccountUsage = useCallback(async (credentialId: string, force = false) => {
@@ -361,7 +366,9 @@ export function ProviderSection({
     setAccountUsage((previous) => ({
       ...previous,
       [credentialId]: {
-        readState: retained.status === "fresh" && retainedView ? "loaded" : "loading",
+        ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
+        cachedRead: retained.status === "fresh" && retainedView ? "loaded" : "loading",
+        cachedReadError: null,
         view: retainedView ?? previous[credentialId]?.view ?? null,
       },
     }));
@@ -375,20 +382,42 @@ export function ProviderSection({
     );
     if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
     if (outcome.status === "success") {
+      accountReadRetryUsed.current.delete(credentialId);
       setAccountUsage((previous) => ({
         ...previous,
-        [credentialId]: { readState: "loaded", view: outcome.value },
+        [credentialId]: {
+          ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
+          cachedRead: "loaded",
+          cachedReadError: null,
+          view: outcome.value,
+        },
       }));
     } else if (outcome.status === "error") {
       setAccountUsage((previous) => ({
         ...previous,
         [credentialId]: {
-          readState: "failed",
+          ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
+          cachedRead: "failed",
+          cachedReadError: "cached_read_failed",
           view: previous[credentialId]?.view ?? null,
         },
       }));
+      // Exactly one bounded automatic retry per credential generation;
+      // unmount, credential change, or a newer generation cancels it.
+      if (accountReadRetryUsed.current.get(credentialId) !== generation
+        && !accountReadRetry.current.has(credentialId)) {
+        accountReadRetryUsed.current.set(credentialId, generation);
+        const handle = window.setTimeout(() => {
+          accountReadRetry.current.delete(credentialId);
+          if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
+          void readCachedAccountUsageRef.current?.(credentialId);
+        }, ACCOUNT_READ_RETRY_MS);
+        accountReadRetry.current.set(credentialId, handle);
+      }
     }
   }, [settingsReadCache]);
+  const readCachedAccountUsageRef = useRef<typeof readCachedAccountUsage | null>(null);
+  readCachedAccountUsageRef.current = readCachedAccountUsage;
 
   const syncAccountUsage = useCallback((credentialId: string, manual = false): Promise<void> => {
     const now = Date.now();
@@ -414,6 +443,14 @@ export function ProviderSection({
 
     const generation = accountGeneration.current.get(credentialId) ?? 0;
     setAccountSyncing((previous) => ({ ...previous, [credentialId]: true }));
+    setAccountUsage((previous) => ({
+      ...previous,
+      [credentialId]: {
+        ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
+        syncSend: "sending",
+        syncSendError: null,
+      },
+    }));
     const request = (async () => {
       try {
         const view = requireCredentialBoundAccountView(
@@ -421,18 +458,29 @@ export function ProviderSection({
           await syncCredentialAccountUsage(credentialId),
         );
         if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
-        settingsReadCache.replace(oauthAccountUsageKey(credentialId), view);
+        if (view.sync_status === "succeeded" && view.snapshot !== null) {
+          settingsReadCache.replace(oauthAccountUsageKey(credentialId), view);
+        }
         setAccountUsage((previous) => ({
           ...previous,
-          [credentialId]: { readState: "loaded", view },
+          [credentialId]: {
+            ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
+            cachedRead: view.snapshot !== null ? "loaded" : (previous[credentialId]?.cachedRead ?? "idle"),
+            syncSend: "idle",
+            syncSendError: null,
+            view: view.snapshot !== null || view.sync_status === "failed"
+              ? view
+              : previous[credentialId]?.view ?? view,
+          },
         }));
       } catch {
         if ((accountGeneration.current.get(credentialId) ?? 0) !== generation) return;
         setAccountUsage((previous) => ({
           ...previous,
           [credentialId]: {
-            readState: "failed",
-            view: previous[credentialId]?.view ?? null,
+            ...(previous[credentialId] ?? EMPTY_ACCOUNT_USAGE),
+            syncSend: "transport_failed",
+            syncSendError: "sync_transport_failed",
           },
         }));
       } finally {
@@ -456,7 +504,12 @@ export function ProviderSection({
       (accountGeneration.current.get(credentialId) ?? 0) + 1,
     );
     settingsReadCache.invalidateCredentialAccount(credentialId);
-    accountAutoAttempt.current.delete(credentialId);
+    const retryTimer = accountReadRetry.current.get(credentialId);
+    if (retryTimer !== undefined) {
+      window.clearTimeout(retryTimer);
+      accountReadRetry.current.delete(credentialId);
+    }
+    accountReadRetryUsed.current.delete(credentialId);
     const cooldownTimer = accountCooldownTimers.current.get(credentialId);
     if (cooldownTimer !== undefined) {
       window.clearTimeout(cooldownTimer);
@@ -501,35 +554,26 @@ export function ProviderSection({
     }
   }, [activeOAuthKey, readCachedAccountUsage]);
 
-  useEffect(() => {
-    if (!sectionVisible) {
-      for (const credential of activeChatGPTCredentials) {
-        accountAutoAttempt.current.delete(credential.id);
-      }
-      return;
-    }
-    for (const credential of activeChatGPTCredentials) {
-      const local = accountUsage[credential.id];
-      if (!local || local.readState === "loading" || !snapshotIsStale(local.view)) continue;
-      const marker = local.view?.snapshot?.observed_at ?? "missing";
-      if (accountAutoAttempt.current.get(credential.id) === marker) continue;
-      accountAutoAttempt.current.set(credential.id, marker);
-      void syncAccountUsage(credential.id);
-    }
-  }, [accountUsage, activeOAuthKey, sectionVisible, syncAccountUsage]);
-
+  // Manual-only sync ruling (plan §0.1.1): no visible/focus/idle sync POST
+  // for any provider. Focus may only revalidate the LOCAL cached read; the
+  // Settings cache's five-minute freshness gates the actual GET.
   useEffect(() => {
     const onFocus = () => {
       if (!sectionVisible) return;
-      for (const credential of activeChatGPTCredentials) {
-        if (snapshotIsStale(accountUsage[credential.id]?.view)) {
-          void syncAccountUsage(credential.id);
-        }
+      for (const credential of activeOAuthCredentials) {
+        void readCachedAccountUsage(credential.id);
       }
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [accountUsage, activeOAuthKey, sectionVisible, syncAccountUsage]);
+  }, [activeOAuthKey, readCachedAccountUsage, sectionVisible]);
+
+  useEffect(() => () => {
+    for (const handle of accountReadRetry.current.values()) {
+      window.clearTimeout(handle);
+    }
+    accountReadRetry.current.clear();
+  }, []);
 
   const onCredentialNavigationGuardChange = useCallback(
     (guard: { busy: boolean }) => setCredentialProbeBusy(guard.busy),
@@ -925,6 +969,7 @@ export function ProviderSection({
                 accountSyncing={accountSyncing}
                 accountCooldownUntil={accountCooldownUntil}
                 onSyncAccountUsage={(id) => void syncAccountUsage(id, true)}
+                onRetryReadAccountUsage={(id) => void readCachedAccountUsage(id, true)}
               />
               {discoveryState?.result && (
                 <DiscoveryResultView
@@ -1189,22 +1234,27 @@ function AccountUsageView({
   syncing,
   cooldownUntil,
   onSync,
+  onRetryRead,
 }: {
   credential: ProviderCredential;
   local: LocalAccountUsage | undefined;
   syncing: boolean;
   cooldownUntil: number;
   onSync?: (credentialId: string) => void;
+  onRetryRead?: (credentialId: string) => void;
 }) {
   const { t } = useTranslation("settings");
   const snapshot = local?.view?.snapshot ?? null;
   const limits = snapshot?.payload.rate_limits ?? null;
   const unknown = t(($) => $.providers.accountUsage.unknown);
-  const syncError = local?.view?.sync_status === "failed"
+  const isProbeSource = snapshot?.source === "anthropic_oauth_probe";
+  const backendSyncError = local?.view?.sync_status === "failed"
     ? local.view.sync_error_code ?? "sync_failed"
-    : local?.readState === "failed"
-      ? "cached_read_failed"
-      : null;
+    : null;
+  const transportError = local?.syncSend === "transport_failed"
+    ? local.syncSendError ?? "sync_transport_failed"
+    : null;
+  const cachedReadFailed = local?.cachedRead === "failed";
   const manualSyncDisabled = syncing || cooldownUntil > Date.now();
 
   function renderWindow(label: string, window: OAuthRateLimitWindow | null) {
@@ -1228,9 +1278,19 @@ function AccountUsageView({
       <strong>{t(($) => $.providers.accountUsage.title)}</strong>
       {snapshot ? (
         <>
-          {renderWindow(t(($) => $.providers.accountUsage.primaryWindow), limits?.primary ?? null)}
+          {renderWindow(
+            isProbeSource
+              ? t(($) => $.providers.accountUsage.fiveHourWindow)
+              : t(($) => $.providers.accountUsage.primaryWindow),
+            limits?.primary ?? null,
+          )}
           {limits?.secondary
-            ? renderWindow(t(($) => $.providers.accountUsage.secondaryWindow), limits.secondary)
+            ? renderWindow(
+              isProbeSource
+                ? t(($) => $.providers.accountUsage.sevenDayWindow)
+                : t(($) => $.providers.accountUsage.secondaryWindow),
+              limits.secondary,
+            )
             : null}
           <p>
             {t(($) => $.providers.accountUsage.rateStatus, {
@@ -1255,11 +1315,35 @@ function AccountUsageView({
       ) : (
         <p>{t(($) => $.providers.accountUsage.noObservation)}</p>
       )}
-      {syncError ? (
-        <p>{t(($) => $.providers.accountUsage.syncFailed, { code: syncError })}</p>
+      {backendSyncError ? (
+        <p>{snapshot
+          ? t(($) => $.providers.accountUsage.syncFailed, { code: backendSyncError })
+          : t(($) => $.providers.accountUsage.syncFailedNoSnapshot, { code: backendSyncError })}</p>
       ) : null}
-      {credential.auth_type === "chatgpt_oauth" && onSync ? (
-        <div className="credential-actions">
+      {transportError ? (
+        <p>{t(($) => $.providers.accountUsage.syncTransportFailed, { code: transportError })}</p>
+      ) : null}
+      {cachedReadFailed ? (
+        <p>{snapshot
+          ? t(($) => $.providers.accountUsage.cachedReadFailedStale, {
+            code: local?.cachedReadError ?? "cached_read_failed",
+            timestamp: formatSystemTimestamp(snapshot.observed_at),
+          })
+          : t(($) => $.providers.accountUsage.cachedReadFailedNone, {
+            code: local?.cachedReadError ?? "cached_read_failed",
+          })}</p>
+      ) : null}
+      <div className="credential-actions">
+        {cachedReadFailed && onRetryRead ? (
+          <button
+            type="button"
+            className="btn-ghost small"
+            onClick={() => onRetryRead(credential.id)}
+          >
+            {t(($) => $.providers.accountUsage.retryLocalRead)}
+          </button>
+        ) : null}
+        {onSync ? (
           <button
             type="button"
             className="btn-ghost small"
@@ -1268,10 +1352,12 @@ function AccountUsageView({
           >
             {syncing
               ? t(($) => $.providers.accountUsage.syncing)
-              : t(($) => $.providers.accountUsage.sync)}
+              : credential.auth_type === "claude_code_oauth"
+                ? t(($) => $.providers.accountUsage.syncClaudeCost)
+                : t(($) => $.providers.accountUsage.sync)}
           </button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1295,6 +1381,7 @@ export function CredentialList({
   accountSyncing = {},
   accountCooldownUntil = {},
   onSyncAccountUsage,
+  onRetryReadAccountUsage,
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
@@ -1316,6 +1403,7 @@ export function CredentialList({
   accountSyncing?: Record<string, boolean>;
   accountCooldownUntil?: Record<string, number>;
   onSyncAccountUsage?: (credentialId: string) => void;
+  onRetryReadAccountUsage?: (credentialId: string) => void;
 }) {
   const { t } = useTranslation("settings");
   // Per-row probe state (claude_code_oauth only). Local — the probe result is
@@ -1412,6 +1500,7 @@ export function CredentialList({
                 syncing={accountSyncing[cred.id] === true}
                 cooldownUntil={accountCooldownUntil[cred.id] ?? 0}
                 onSync={onSyncAccountUsage}
+                onRetryRead={onRetryReadAccountUsage}
               />
             ) : null}
             {(cred.editable || cred.can_discover_models) && (

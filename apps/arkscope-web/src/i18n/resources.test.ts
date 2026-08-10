@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 733,
+      settings: 741,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -788,7 +788,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1817);
+      expect(total, `${locale}.total`).toBe(1825);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1131,6 +1131,14 @@ describe("bundled i18n resources", () => {
     const postSliceSettingsPaths = [
       "dataSources.schedule.history.priceUnresolved_one",
       "dataSources.schedule.history.priceUnresolved_other",
+      "providers.accountUsage.syncFailedNoSnapshot",
+      "providers.accountUsage.syncTransportFailed",
+      "providers.accountUsage.cachedReadFailedStale",
+      "providers.accountUsage.cachedReadFailedNone",
+      "providers.accountUsage.retryLocalRead",
+      "providers.accountUsage.syncClaudeCost",
+      "providers.accountUsage.fiveHourWindow",
+      "providers.accountUsage.sevenDayWindow",
     ] as const;
     const expectedSubtreeCounts = {
       actions: 18,
@@ -1170,7 +1178,8 @@ describe("bundled i18n resources", () => {
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
-        const currentSliceDelta = subtree === "dataSources" ? postSliceSettingsPaths.length : 0;
+        const currentSliceDelta = postSliceSettingsPaths
+          .filter((path) => path.startsWith(`${subtree}.`)).length;
         expect(
           flattenResource(settings[subtree] as ResourceTree).size - currentSliceDelta,
           `${locale}.${subtree}`,
