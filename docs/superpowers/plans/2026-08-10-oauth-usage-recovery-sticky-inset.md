@@ -7,8 +7,10 @@
 > AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 SPLIT-OWNERSHIP AMENDMENT
 > CODEX-GREEN THROUGH `7857dd6f`, PRODUCT `99ca5441` FABLE-REVIEWED GREEN;
 > MU5 OWNER AMENDMENT `a16d1b70` FABLE-GREEN, STRENGTHENING `9a704331`
-> LANDED AND MUTANT RED; TASK 5 PAUSED AT THE MU6 OWNER OVERCLAIM;
-> BOUNDED AMENDMENT REVIEW REQUIRED; TASKS 6-7 NOT STARTED
+> LANDED AND MUTANT RED; MU6 OWNER CORRECTION `24d231eb` FABLE-GREEN AND
+> MU1-MU6 COMPLETE; FINAL GATES GREEN BUT §5.1 HOST-LIVE STOPPED ON THE
+> SCHEMA-DECLARED `remoteControl/status/changed` NOTIFICATION; §1.5
+> ALLOWLIST AMENDMENT PENDING CODEX FOCUSED REVIEW; TASKS 6-7 NOT STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -420,6 +422,35 @@ Post-change invariants: at deep scroll the workflow row's top equals the
 `1322x777` and `390x844`; at initial scroll the visual breathing room above
 the PageHeader equals the pre-change 20/12 pixels.
 
+### 1.5 Codex app-server notification allowlist (2026-08-11 host-live stop)
+
+The §5.1 host-live acceptance proved the §1.1 launcher repair works on the
+real NVM installation - the true `codex app-server` started and completed
+`initialize`/`initialized` - and then failed honestly: the server's FIRST
+post-`initialized` message was the notification
+`remoteControl/status/changed`, which the strict
+`_ALLOWED_SERVER_NOTIFICATIONS` frozenset
+(`src/auth_drivers/codex_account_usage.py:39`) rejects as
+`protocol_incompatible` before any `account/rateLimits/read` or
+`account/usage/read` was sent. The notification IS declared by the pinned
+CLI's own schema generator (`codex app-server generate-json-schema
+--experimental`, codex-cli `0.147.0`,
+`remote_control_status_changed_is_declared: true`, ServerNotification schema
+`6bf58bdb9d277419148878ea29804231b86b3d3d785076497204c329eabab3bb`, zero
+provider requests, zero threads/turns) - the strict allowlist, not the wire,
+is wrong.
+
+Authorized product delta - exactly ONE frozenset member added:
+
+- `_ALLOWED_SERVER_NOTIFICATIONS` gains `"remoteControl/status/changed"`.
+
+Everything else stands: `thread/`- and `turn/`-prefixed methods and every
+other unknown method stay rejected; a notification carrying an `id` stays
+rejected; the params-shape check is unchanged; no other adapter byte moves.
+The paired §2.4 evolution replays this notification through the session
+fixture and proves its payload never leaks into any persisted or rendered
+surface.
+
 ---
 
 ## 2. Exact node accounting
@@ -615,7 +646,7 @@ sticky offsets stay shared after the inset transfer
 
 ### 2.4 Retained IDs whose assertions evolve
 
-Exactly three existing nodes may change assertion bodies; their IDs are
+Exactly four existing nodes may change assertion bodies; their IDs are
 preserved and every other existing assertion is regression-protected (the
 retired auto-sync owner is a section 2.3a rename, not an evolution):
 
@@ -623,6 +654,7 @@ retired auto-sync owner is a section 2.3a rename, not an evolution):
 tests/test_subscription_account_usage.py::test_account_routes_split_inventory_cached_read_and_mutating_sync
 tests/test_anthropic_account_usage.py::test_manual_sync_sends_one_request_with_auth_token_beta_identity_block_and_max_tokens_8
 src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > preserves_retained_account_truth_when_cached_revalidation_fails_without_sync_POST
+tests/test_subscription_account_usage.py::test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_turn
 ```
 
 The first asserted `anthropic/claude_code_oauth` →
@@ -641,9 +673,18 @@ subcase uses the existing recording raw-client seam to assert all of:
   pinned call shape;
 - no fallback model request exists.
 
-This is a test-body strengthening only: no node ID, collection count/hash,
-focused identity, native target, or product behavior changes. Any FOURTH
-existing-node assertion-body edit is a stop condition.
+The fourth node evolves only under the §1.5 allowlist amendment: the
+session fixture emits `remoteControl/status/changed` with a sentinel
+payload between `initialized` and the account reads, and the node asserts
+the sync still succeeds end-to-end AND the sentinel appears nowhere in the
+persisted observation, returned snapshot, or any error surface (payload
+non-leak). The `thread/started` rejection node and the id-carrying and
+unknown-method rejections stay regression-protected as-is.
+
+These are test-body changes only: no node ID, collection count/hash,
+focused identity, native target changes; the sole product delta is the one
+§1.5 frozenset member. Any FIFTH existing-node assertion-body edit is a
+stop condition.
 
 ### 2.5 Backend focused identities
 
@@ -775,6 +816,34 @@ stopped. Continuation packet:
 `/tmp/oauth-usage-sticky-impl-task5-a16d1b70` (12 payloads,
 `PARTIAL2_SHA256SUMS`
 `8b4ee1a7007780cb205901ec428ec71eca420b5e96c309f405d88e1c4b86666a`).
+
+### 3.2c Task 5 host-live stop: schema-declared notification rejected (2026-08-11)
+
+MU1-MU6 completed under the corrected §3.2 table. The final static and
+runtime gates all ran GREEN first: backend `4303/52b862d7...` (collect and
+focused `82/82`), frontend `1146/4ed78744...` with a clean single-command
+`1146/1146`, typecheck, build, i18n scanner, Settings 15-file projection,
+and the pinned-wrapper native run `4274 passed / 29 skipped / 0 failed`.
+
+The §5.1 host-live ChatGPT sync then stopped exactly as designed: the
+launcher fix worked (real app-server spawned, `initialize`/`initialized`
+completed), the server's first subsequent notification
+`remoteControl/status/changed` was rejected by the strict allowlist, the
+sync returned typed `protocol_incompatible` with `sync_http_status: 200`,
+and NO `account/rateLimits/read`, `account/usage/read`, model thread, or
+turn was reached (zero model usage). The boundary witness records every
+adapter child process exited, the one temporary `CODEX_HOME` was removed,
+no token content or raw account identity persisted, and the production
+OAuth/credential tables are unchanged. Partial packet:
+`/tmp/oauth-usage-sticky-impl-task5-admission-24d231eb` (26 payloads,
+`PARTIAL_SHA256SUMS`
+`1daeb78c30c047c14fa3c0b5d07412e15af8c6abec194f69d05de9eeb6f6f2c6`).
+
+Resume order after this amendment goes GREEN: one product+test commit
+(§1.5 member + §2.4 fourth evolution), backend focused `82/82` with the
+rejection nodes intact, then ONE §5.1 host-live rerun which MUST succeed
+before the §5.2 browser matrix runs; the remaining admission gates follow
+unchanged. All section 2 identities stand.
 
 ---
 
