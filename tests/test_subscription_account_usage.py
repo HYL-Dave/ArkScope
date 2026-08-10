@@ -9,6 +9,7 @@ import sqlite3
 import stat
 import sys
 import time
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -902,6 +903,7 @@ def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(
     client = _Client()
     observations = OAuthObservationStore(tmp_path / "observations.db")
     token_store = _TokenStore(_token_record())
+    started_at = datetime.now(timezone.utc)
     view = OAuthAccountSyncService(
         observation_store=observations,
         token_store=token_store,
@@ -914,11 +916,14 @@ def test_sync_dispatches_anthropic_claude_code_oauth_to_manual_messages_adapter(
         provider="anthropic",
         auth_mode="claude_code_oauth",
     )
+    finished_at = datetime.now(timezone.utc)
     assert view.sync_status == "succeeded"
     assert view.snapshot is not None
     assert view.snapshot.source == "anthropic_oauth_probe"
     assert view.snapshot.payload.rate_limits.primary.used_percent == 5.0
-    assert view.snapshot.observed_at
+    observed = datetime.fromisoformat(view.snapshot.observed_at)
+    # the adapter stamps with timespec="seconds", so compare at that grain
+    assert started_at.replace(microsecond=0) <= observed <= finished_at
     assert len(create_calls) == 1
     assert client.close_calls == 1
     assert token_store.loads == 2

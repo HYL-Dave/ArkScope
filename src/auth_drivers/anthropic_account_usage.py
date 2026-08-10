@@ -114,24 +114,16 @@ def _snapshot_from_headers(headers: Any) -> OAuthRateLimitSnapshot:
 def _admit_quota_snapshot(
     headers: Any, *, require_rejected: bool
 ) -> OAuthRateLimitSnapshot:
-    """Fail-closed admission: the unified core (overall status plus both
-    windows' utilization and reset) must parse, and a quota-rejected response
-    must actually say ``rejected``. Auxiliary fields (overage, claim) stay
-    None when absent or malformed. Anything else is
-    ``quota_headers_unavailable`` — never an all-unknown fake snapshot."""
+    """Fail-closed on the unified AUTHORITY only: the overall
+    ``anthropic-ratelimit-unified-status`` must be present and valid (and a
+    quota-rejected response must actually say ``rejected``). Individual
+    window and auxiliary fields stay None when absent or malformed — a
+    missing field is unknown, not a reason to drop the whole observation
+    (plan §1.2 / design LD 7)."""
     if headers is None:
         raise _fail("quota_headers_unavailable")
     snapshot = _snapshot_from_headers(headers)
-    core_valid = (
-        snapshot.status is not None
-        and snapshot.primary is not None
-        and snapshot.primary.used_percent is not None
-        and snapshot.primary.resets_at is not None
-        and snapshot.secondary is not None
-        and snapshot.secondary.used_percent is not None
-        and snapshot.secondary.resets_at is not None
-    )
-    if not core_valid:
+    if snapshot.status is None:
         raise _fail("quota_headers_unavailable")
     if require_rejected and snapshot.status != "rejected":
         raise _fail("quota_headers_unavailable")
@@ -158,9 +150,7 @@ class AnthropicAccountUsageAdapter:
         access_token = getattr(record, "access_token", None)
         if not isinstance(access_token, str) or not access_token:
             raise _fail("missing_token")
-        if observed_at is None:
-            observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        elif not isinstance(observed_at, str):
+        if observed_at is not None and not isinstance(observed_at, str):
             raise _fail("adapter_unavailable")
 
         try:
@@ -227,9 +217,13 @@ class AnthropicAccountUsageAdapter:
     def _observation(
         self,
         credential_id: str,
-        observed_at: str,
+        observed_at: str | None,
         rate_limits: OAuthRateLimitSnapshot,
     ) -> OAuthAccountObservation:
+        if observed_at is None:
+            # Receipt time: stamped only after the unified headers were
+            # received and admitted, never before the request.
+            observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         return OAuthAccountObservation(
             account_fingerprint=_fingerprint(credential_id),
             source="anthropic_oauth_probe",

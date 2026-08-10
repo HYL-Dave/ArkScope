@@ -159,15 +159,25 @@ def test_2xx_unified_headers_record_five_hour_and_seven_day_observation():
     with pytest.raises(AnthropicAccountUsageError) as empty:
         _read(_RecordingRaw(headers={}))
     assert empty.value.code == "quota_headers_unavailable"
-    with pytest.raises(AnthropicAccountUsageError) as partial:
+    with pytest.raises(AnthropicAccountUsageError) as no_authority:
         _read(
             _RecordingRaw(
                 headers=_unified_headers(
-                    **{"anthropic__ratelimit__unified__7d__utilization": None}
+                    **{"anthropic__ratelimit__unified__status": None}
                 )
             )
         )
-    assert partial.value.code == "quota_headers_unavailable"
+    assert no_authority.value.code == "quota_headers_unavailable"
+
+    partial = _read(
+        _RecordingRaw(
+            headers=_unified_headers(
+                **{"anthropic__ratelimit__unified__7d__utilization": None}
+            )
+        )
+    )
+    assert partial.payload.rate_limits.secondary.used_percent is None
+    assert partial.payload.rate_limits.primary.used_percent == 5.0
 
     observation = _read(_RecordingRaw())
     limits = observation.payload.rate_limits
@@ -265,16 +275,34 @@ def test_malformed_utilization_reset_and_overage_fields_are_nulled_never_zeroed(
     assert limits.overage_status is None
     assert limits.primary.used_percent == 5.0
 
-    for name, value in (
-        ("anthropic__ratelimit__unified__5h__utilization", "1.7"),
-        ("anthropic__ratelimit__unified__5h__reset", "soon"),
-        ("anthropic__ratelimit__unified__7d__utilization", "abc"),
-        ("anthropic__ratelimit__unified__status", "sideways"),
-    ):
-        with pytest.raises(AnthropicAccountUsageError) as caught:
-            _read(_RecordingRaw(headers=_unified_headers(**{name: value})))
-        assert caught.value.code == "quota_headers_unavailable"
-        assert "0" not in caught.value.code
+    window_malformed = _read(
+        _RecordingRaw(
+            headers=_unified_headers(
+                **{
+                    "anthropic__ratelimit__unified__5h__utilization": "1.7",
+                    "anthropic__ratelimit__unified__5h__reset": "soon",
+                    "anthropic__ratelimit__unified__7d__utilization": "abc",
+                }
+            )
+        )
+    )
+    window_limits = window_malformed.payload.rate_limits
+    assert window_limits.primary.used_percent is None
+    assert window_limits.primary.resets_at is None
+    assert window_limits.secondary.used_percent is None
+    assert window_limits.secondary.resets_at == 1786687200
+    assert window_limits.primary.used_percent != 0
+    assert window_limits.secondary.used_percent != 0
+
+    with pytest.raises(AnthropicAccountUsageError) as caught:
+        _read(
+            _RecordingRaw(
+                headers=_unified_headers(
+                    **{"anthropic__ratelimit__unified__status": "sideways"}
+                )
+            )
+        )
+    assert caught.value.code == "quota_headers_unavailable"
 
 
 def test_snapshot_source_is_anthropic_oauth_probe_with_passive_fingerprint_shape():
