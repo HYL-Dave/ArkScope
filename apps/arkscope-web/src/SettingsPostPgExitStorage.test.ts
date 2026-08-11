@@ -51,6 +51,9 @@ const marketStatus: MarketDataStatus = {
   fundamentals: { row_count: 130, ticker_count: 130, latest_date: "2026-06-01" },
   financial_cache: { row_count: 24, valid_count: 7, expired_count: 17, latest_fetched_at: "2026-07-01T00:00:00+00:00" },
   sync: { prices: null, news: null, fundamentals: null },
+  prices_authority: "local",
+  price_mirror_retired: true,
+  fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: false,
   env_override: false,
   local_market_strict_setting: false,
@@ -301,7 +304,38 @@ describe("post-PG-exit storage panels", () => {
     expect(cache.inspect("macro_snapshot").status).toBe("fresh");
   });
 
-  it("shows Data Storage as normal market data status", async () => {
+  it("reloads_mounted_market_and_coverage_status_after_price_invalidation", async () => {
+    const cache = createSettingsReadCache();
+    cache.replace("market_data_status", marketStatus);
+    cache.replace(tradingDayCoverageKey(10), coverage);
+    mocked.marketStatus = {
+      ...marketStatus,
+      prices: {
+        row_count: 2_400_000,
+        ticker_count: 151,
+        latest_datetime: "2026-08-10T19:45:00+0000",
+      },
+    };
+    mocked.coverage = { ...coverage, universe_count: 151 };
+
+    await renderDataStorage(cache);
+    expect(getMarketDataStatus).not.toHaveBeenCalled();
+    expect(getTradingDayCoverage).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain("2,324,487 列 · 149 檔");
+
+    await act(async () => {
+      cache.invalidateDataSource("ibkr_prices");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getMarketDataStatus).toHaveBeenCalledOnce();
+    expect(getTradingDayCoverage).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("2,400,000 列 · 151 檔");
+    expect(host!.textContent).toContain("151");
+  });
+
+  it("shows current market data status without projecting retired sync metadata", async () => {
     mocked.marketStatus = {
       ...marketStatus,
       sync: {
@@ -317,7 +351,8 @@ describe("post-PG-exit storage panels", () => {
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
     expect(storage).not.toBeNull();
     expect(storage!.querySelector("h2")?.textContent).toBe("市場資料");
-    expect(storage!.textContent).toContain("資料抓取由 Data Sources 管理。");
+    expect(storage!.textContent).toContain("價格與新聞抓取由「資料來源與排程」管理");
+    expect(storage!.textContent).toContain("基本面攝入尚未接入 App 排程");
     expect(storage!.textContent).toContain(
       "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
     );
@@ -328,7 +363,7 @@ describe("post-PG-exit storage panels", () => {
     expect(storage!.textContent).toContain("正規交易時段（RTH）");
     expect(storage!.textContent).toContain("2027-12-31");
     expect(host!.textContent).toContain("價格");
-    expect(host!.textContent).toContain("價格 —");
+    expect(storage!.textContent).not.toContain("最近增量更新");
     expect(host!.textContent).toContain("已儲存的 SEC 基本面");
     expect(host!.textContent).toContain("財務快取");
     expect(host!.textContent).not.toMatch(
@@ -341,7 +376,8 @@ describe("post-PG-exit storage panels", () => {
 
     expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
     expect(host!.textContent).toContain("總經資料");
-    expect(host!.textContent).toContain("Provider 健康狀態由 Data Sources 管理。");
+    expect(host!.textContent).toContain("總經攝入尚未接入 App 排程或本頁手動執行");
+    expect(host!.textContent).toContain("重新讀取狀態不會呼叫 provider");
     expect(host!.textContent).toContain("FRED 序列");
     expect(host!.textContent).toContain("Fed Funds");
     expect(host!.textContent).not.toMatch(/Macro \/ Calendar|行事曆|Finnhub 付費方案/);
@@ -469,12 +505,10 @@ describe("post-PG-exit storage panels", () => {
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
     expect(mountedStorage.textContent).toContain(
-      "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。資料抓取由 Data Sources 管理。",
+      "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。價格與新聞抓取由「資料來源與排程」管理；基本面攝入尚未接入 App 排程，本頁只重新讀取狀態。",
     );
     expect(mountedStorage.textContent).not.toContain("隱含波動率");
-    expect(mountedStorage.textContent).toContain(
-      `價格 +11 @ ${formatSystemTimestamp("2026-07-20T01:00:00Z")}`,
-    );
+    expect(mountedStorage.textContent).not.toContain("最近增量更新");
     expect(mountedStorage.textContent).toContain("2,324,487 列 · 149 檔");
     expect(getMarketDataStatus).toHaveBeenCalledOnce();
     expect(getTradingDayCoverage).toHaveBeenCalledOnce();
@@ -521,7 +555,7 @@ describe("post-PG-exit storage panels", () => {
     expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
     expect(storage.textContent).toContain(
-      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Data collection is managed under Data Sources.",
+      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals ingestion is not connected to an App schedule, and this page only reloads status.",
     );
     expect(storage.textContent).not.toContain("implied volatility");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))
@@ -531,7 +565,6 @@ describe("post-PG-exit storage panels", () => {
         "News",
         "Stored SEC Fundamentals",
         "Financial Cache",
-        "Latest Incremental Update",
         "Universe",
         "Interval",
         "Market scope",
@@ -545,12 +578,9 @@ describe("post-PG-exit storage panels", () => {
     expect(storage.textContent).toContain(
       `24 rows (7 valid · 17 expired) · latest fetch ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
     );
-    expect(storage.textContent).toContain(
-      `Prices +11 @ ${formatSystemTimestamp("2026-07-20T01:00:00Z")}`,
-    );
-    expect(storage.textContent).toContain(
-      `News +12 @ ${formatSystemTimestamp("2026-07-20T02:00:00Z")}`,
-    );
+    expect(storage.textContent).not.toContain("Latest Incremental Update");
+    expect(storage.textContent).not.toContain("Prices +11");
+    expect(storage.textContent).not.toContain("News +12");
     expect(storage.textContent).not.toContain("Fundamentals +14");
     expect(storage.textContent).not.toContain(formatSystemTimestamp("2026-07-20T04:00:00Z"));
 
@@ -606,7 +636,8 @@ describe("post-PG-exit storage panels", () => {
       resolve(import.meta.dirname, "./settings/DataStorageSection.tsx"),
       "utf8",
     );
-    expect(dataStorageSource).toContain("$.dataStorage.update.succeeded");
+    expect(dataStorageSource).toContain("$.dataStorage.coverage.generatedAt");
+    expect(dataStorageSource).not.toContain("dataStorage.update");
     expect(dataStorageSource).not.toContain('.join(" · ")');
     expect(dataStorageSource).not.toContain("as unknown as number");
   });
@@ -628,7 +659,7 @@ describe("post-PG-exit storage panels", () => {
     );
   });
 
-  it("hides storage provider errors outside Developer Mode", async () => {
+  it("ignores retired sync errors and scopes coverage diagnostics to Developer Mode", async () => {
     const syncDiagnostic = "RAW_MARKET_SYNC_DETAIL";
     const providerDiagnostic = "RAW_COVERAGE_PROVIDER_DETAIL";
     const unknownTickers = ["PLANTED_UNKNOWN_A", "PLANTED_UNKNOWN_B"];
@@ -676,7 +707,7 @@ describe("post-PG-exit storage panels", () => {
     };
 
     await renderSettings(false);
-    expect(host!.textContent).toContain("增量更新失敗");
+    expect(host!.textContent).not.toContain("增量更新失敗");
     expect(host!.textContent).toContain("市場資料庫無法讀取");
     expect(host!.textContent).toContain("觀測資料無法使用");
     expect(host!.textContent).toContain("供應商問題：1");
@@ -696,7 +727,7 @@ describe("post-PG-exit storage panels", () => {
     expect(coverageDiagnostics?.textContent).toContain(
       `2026-07-18: ${unknownTickers.join(", ")}`,
     );
-    expect(host!.textContent).toContain(syncDiagnostic);
+    expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).toContain(providerDiagnostic);
     expect(getMarketDataStatus).toHaveBeenCalledTimes(2);
     expect(getTradingDayCoverage).toHaveBeenCalledTimes(2);

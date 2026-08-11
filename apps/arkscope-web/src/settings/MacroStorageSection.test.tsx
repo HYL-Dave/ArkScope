@@ -128,7 +128,7 @@ function dispose() {
 
 function refreshButton(): HTMLButtonElement {
   const button = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
-    .find((candidate) => candidate.textContent?.trim() === "重新整理");
+    .find((candidate) => candidate.textContent?.trim() === "重新讀取狀態");
   if (!button) throw new Error("missing refresh command");
   return button;
 }
@@ -186,6 +186,38 @@ describe("MacroStorageSection", () => {
     expect(getMacroStatus).toHaveBeenCalledOnce();
     expect(getMacroSnapshot).toHaveBeenCalledOnce();
     expect(cache.inspect("news_status").status).toBe("fresh");
+  });
+
+  it("reloads_both_mounted_macro_legs_after_data_sync_invalidation", async () => {
+    const cache = createSettingsReadCache();
+    cache.replace("macro_status", statusFixture);
+    cache.replace("macro_snapshot", snapshotFixture);
+    controls.status = {
+      ...statusFixture,
+      tables: {
+        ...statusFixture.tables,
+        macro_observations: { row_count: 99, last_fetched_at: "2026-08-10T03:00:00Z" },
+      },
+    };
+    controls.snapshot = {
+      ...snapshotFixture,
+      items: [{ ...snapshotFixture.items[0], label: "Updated Fed Funds", value: 4.5 }],
+    };
+
+    await renderMacro(cache);
+    expect(getMacroStatus).not.toHaveBeenCalled();
+    expect(getMacroSnapshot).not.toHaveBeenCalled();
+
+    await act(async () => {
+      cache.invalidateAllDataSyncReads();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getMacroStatus).toHaveBeenCalledOnce();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("99 筆已儲存");
+    expect(host!.textContent).toContain("Updated Fed Funds");
   });
 
   it("loads_status_and_snapshot_independently_and_renders_both_truths", async () => {
@@ -261,11 +293,11 @@ describe("MacroStorageSection", () => {
     expect(host!.textContent).not.toMatch(/從未|尚未收集|抓取成功為空/);
   });
 
-  it("keeps_stored_data_neutral_when_auto_refresh_is_off", async () => {
+  it("keeps_stored_data_neutral_when_ingestion_is_disabled", async () => {
     controls.snapshot = { ...snapshotFixture, auto_refresh_enabled: false };
     await renderMacro();
 
-    expect(host!.textContent).toContain("自動刷新關閉");
+    expect(host!.textContent).toContain("攝入功能未啟用");
     expect(host!.textContent).toContain("Fed Funds");
     expect(host!.textContent).toContain("最後抓取");
     expect(host!.querySelector('[data-state="failed"]')).toBeNull();

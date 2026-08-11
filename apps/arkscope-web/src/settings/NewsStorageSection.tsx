@@ -50,6 +50,10 @@ export function NewsStorageSection({
   useEffect(() => {
     void load(false);
   }, [load]);
+  useEffect(() => settingsReadCache.subscribeInvalidation(
+    "news_status",
+    () => { void load(false); },
+  ), [load, settingsReadCache]);
 
   const sync = status?.sync;
   const providerStates = sync ? Object.entries(sync.providers) : [];
@@ -74,7 +78,7 @@ export function NewsStorageSection({
           <p className="muted tiny">{t(($) => $.newsStorage.description)}</p>
         </div>
         <button className="btn-ghost" onClick={() => void load(true)}>
-          ↻ {t(($) => $.actions.refresh)}
+          ↻ {t(($) => $.actions.refreshStatus)}
         </button>
       </div>
 

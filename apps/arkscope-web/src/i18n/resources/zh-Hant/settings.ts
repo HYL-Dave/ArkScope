@@ -7,6 +7,7 @@ const settings = {
   },
   actions: {
     refresh: "重新整理",
+    refreshStatus: "重新讀取狀態",
     save: "儲存",
     saving: "儲存中…",
     clear: "清除",
@@ -449,15 +450,15 @@ const settings = {
     loading: "載入中…",
     section: {
       title: "資料來源與排程",
-      description: "集中檢視各資料來源的健康狀態、連線設定、排程與手動執行。每個來源可獨立設定；IBKR 工作會共用 Gateway 鎖以避免重疊。",
+      description: "集中檢視各資料來源的健康狀態、連線設定與 App 管理的排程。表內來源可獨立設定與手動執行；IBKR 工作會共用 Gateway 鎖以避免重疊。",
     },
     fred: {
       snapshotAvailable: "資料快照可用：{{seriesCount}} 序列 · {{value}} 觀測值",
       noData: "尚無資料",
       latestFetched: "最後抓取 {{timestamp}}",
-      autoEnabled: "自動刷新已啟用",
-      autoDisabled: "自動刷新未啟用",
-      autoUnknown: "自動刷新狀態未知",
+      autoEnabled: "攝入功能已啟用（尚未接入 App 排程）",
+      autoDisabled: "攝入功能未啟用",
+      autoUnknown: "攝入功能狀態未知",
     },
     guard: {
       busy: "資料來源設定更新正在進行。",
@@ -658,7 +659,7 @@ const settings = {
   },
   dataStorage: {
     title: "市場資料",
-    description: "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。資料抓取由 Data Sources 管理。",
+    description: "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。價格與新聞抓取由「資料來源與排程」管理；基本面攝入尚未接入 App 排程，本頁只重新讀取狀態。",
     loading: "載入中…",
     available: "可用",
     empty: "尚無資料",
@@ -674,17 +675,11 @@ const settings = {
       fundamentals: "{{value}} 列 · {{count}} 檔 · 最新 {{timestamp}}",
       financialCache: "{{value}} 列（有效 {{count}} · 過期 {{expiredCount}}）· 最新抓取 {{timestamp}}",
     },
-    update: {
-      title: "最近增量更新",
-      never: "尚未增量更新",
-      succeeded: "價格 {{pricesValue}} · 新聞 {{newsValue}}",
-      failed: "增量更新失敗",
-      generatedAt: "產生於 {{timestamp}}",
-    },
     coverage: {
       title: "交易日 / 價格覆蓋",
       description: "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
       readOnly: "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
+      generatedAt: "產生於 {{timestamp}}",
       lookback: "最近 {{count}} 天",
       lookbackLabel: "天數",
       facts: {
@@ -784,7 +779,7 @@ const settings = {
   },
   macroStorage: {
     title: "總經資料",
-    description: "查看 FRED 序列快照、儲存量與事件資料覆蓋；排程與 Provider 健康狀態由 Data Sources 管理。",
+    description: "查看本地 FRED 序列快照、儲存量與事件資料覆蓋。總經攝入尚未接入 App 排程或本頁手動執行；重新讀取狀態不會呼叫 provider。",
     loading: "載入中…",
     availability: {
       tableUnavailable: "不可用",
@@ -798,8 +793,8 @@ const settings = {
     },
     snapshot: {
       title: "FRED 快照",
-      autoEnabled: "自動刷新開啟",
-      autoDisabled: "自動刷新關閉",
+      autoEnabled: "攝入功能已啟用；尚未接入 App 排程",
+      autoDisabled: "攝入功能未啟用",
     },
     kinds: {
       fredSeries: "FRED 序列",

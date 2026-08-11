@@ -1113,7 +1113,7 @@ describe("Settings provider config authority", () => {
       expect(row.textContent).toContain("App");
       expect(row.textContent).toContain("資料快照可用：— 序列 · 29,571 觀測值");
       expect(row.textContent).not.toContain("資料快照可用：0 序列");
-      expect(row.textContent).toContain("自動刷新未啟用");
+      expect(row.textContent).toContain("攝入功能未啟用");
       expect(row.textContent).not.toContain("未啟用抓取");
       expect(row.textContent).not.toContain("已停用");
       expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);
@@ -1332,7 +1332,7 @@ describe("Settings provider config authority", () => {
     }));
 
     const refresh = Array.from(host!.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("重新整理"));
+      button.textContent?.includes("重新讀取狀態"));
     if (!refresh) throw new Error("missing Data Sources refresh button");
     await act(async () => {
       refresh.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
@@ -1415,7 +1415,7 @@ describe("Settings provider config authority", () => {
       if (!polygonRow) throw new Error("missing Polygon config row");
       expect(polygonRow.textContent).toContain("(External) (config/.env)");
       expect(host!.querySelector(".settings-section-head button")?.textContent)
-        .toContain("Refresh (Running, auto-refreshing)");
+        .toContain("Reload status (Running, auto-refreshing)");
       expect(host!.querySelector(".ds-schedule-protection-note")?.textContent)
         .toContain("Run protection: A data source or IBKR job runs only once at a time.");
       expect(host!.textContent).toContain("Polygon News");
@@ -1465,6 +1465,10 @@ describe("Settings provider config authority", () => {
 
   it("hides planted provider schedule and setup diagnostics in normal mode", async () => {
     await renderDataSources();
+    const ibkrHealthRow = Array.from(
+      host!.querySelectorAll("[data-testid='provider-health-scroll'] tbody tr"),
+    ).find((row) => row.textContent?.includes("IBKR Gateway"));
+    expect(ibkrHealthRow?.textContent).toContain("失敗");
     const polygonConfigRow = Array.from(
       host!.querySelectorAll("[data-testid='provider-config-scroll'] tbody tr"),
     ).find((row) => row.textContent?.includes("Polygon"));

@@ -2350,6 +2350,9 @@ export interface MarketDataStatus {
     news: SyncMeta | null;
     fundamentals: SyncMeta | null;
   };
+  prices_authority: "local";
+  price_mirror_retired: boolean;
+  fundamentals_mode: "local_cache_refetch";
   use_local_market_setting: boolean;
   env_override: boolean;
   local_market_strict_setting: boolean;

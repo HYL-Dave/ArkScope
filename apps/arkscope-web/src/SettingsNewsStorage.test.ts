@@ -43,6 +43,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { getNewsStatus } from "./api";
 import { SettingsView } from "./Settings";
+import { NewsStorageSection } from "./settings/NewsStorageSection";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -119,6 +120,19 @@ async function renderNewsSection(
   await flush();
 }
 
+async function renderNewsPanel(settingsReadCache: SettingsReadCache) {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root!.render(withTestUiLocale(React.createElement(NewsStorageSection, {
+      developerMode: false,
+      settingsReadCache,
+    })));
+  });
+  await flush();
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage("zh-Hant");
   vi.clearAllMocks();
@@ -157,6 +171,29 @@ describe("SettingsView news storage copy", () => {
     });
     expect(host!.textContent).toContain("17 篇 · 3 來源");
     expect(getNewsStatus).toHaveBeenCalledOnce();
+  });
+
+  it("reloads_mounted_news_status_after_a_news_source_is_invalidated", async () => {
+    const cache = createSettingsReadCache();
+    cache.replace("news_status", newsStatus({
+      news: { row_count: 10, source_count: 2, latest_published: "2026-08-08T02:00:00Z" },
+    }));
+    mocked.newsStatus = newsStatus({
+      news: { row_count: 17, source_count: 3, latest_published: "2026-08-09T01:00:00Z" },
+    });
+
+    await renderNewsPanel(cache);
+    expect(getNewsStatus).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain("10 篇 · 2 來源");
+
+    await act(async () => {
+      cache.invalidateDataSource("polygon_news");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getNewsStatus).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("17 篇 · 3 來源");
   });
 
   it("renders_normal_news_status_without_migration_narration", async () => {

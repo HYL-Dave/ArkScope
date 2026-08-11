@@ -753,7 +753,7 @@ export function DataSourcesSection({
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load(true)} disabled={!!busy}>
-          ↻ {t(($) => $.actions.refresh)}
+          ↻ {t(($) => $.actions.refreshStatus)}
           {anyRunning
             ? t(($) => $.dataSources.schedule.autoRefreshing)
             : null}
@@ -801,7 +801,16 @@ export function DataSourcesSection({
                         )}
                       </td>
                       <td>{shortTs(p.last_success_at)}</td>
-                      <td className="muted settings-wrap-text">—</td>
+                      <td className="settings-wrap-text">
+                        {p.last_error ? (
+                          <>
+                            <span className="refresh-err">{t(($) => $.dataSources.states.failed)}</span>
+                            {p.last_attempt_at ? (
+                              <div className="muted tiny">{shortTs(p.last_attempt_at)}</div>
+                            ) : null}
+                          </>
+                        ) : <span className="muted">—</span>}
+                      </td>
                     </tr>
                   );
                 })}

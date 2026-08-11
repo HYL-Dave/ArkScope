@@ -232,6 +232,41 @@ describe("Settings read cache", () => {
     expect(cache.inspect(second)).toMatchObject({ status: "fresh", value: { account: "b" } });
   });
 
+  it("notifies_only_exact_invalidation_subscribers_and_isolates_listener_failures", async () => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    const calls: string[] = [];
+    cache.subscribeInvalidation("market_data_status", () => {
+      calls.push("market:first");
+      throw new Error("subscriber failure must not escape");
+    });
+    const unsubscribe = cache.subscribeInvalidation("market_data_status", () => {
+      calls.push("market:second");
+    });
+    cache.subscribeInvalidation("news_status", () => {
+      calls.push("news");
+    });
+
+    expect(() => cache.invalidate("market_data_status")).not.toThrow();
+    expect(calls).toEqual(["market:first", "market:second"]);
+
+    unsubscribe();
+    cache.invalidate("market_data_status");
+    expect(calls).toEqual(["market:first", "market:second", "market:first"]);
+  });
+
+  it("notifies_subscribed_missing_keys_when_the_cache_is_cleared", async () => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    const listener = vi.fn();
+    cache.subscribeInvalidation("macro_snapshot", listener);
+
+    cache.clear();
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith("macro_snapshot");
+  });
+
   it("maps_price_and_news_sources_to_exact_downstream_keys", async () => {
     const { createSettingsReadCache, tradingDayCoverageKey } = await loadCacheModule();
     const cache = createSettingsReadCache();

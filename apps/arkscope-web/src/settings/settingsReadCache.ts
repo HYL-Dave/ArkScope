@@ -18,6 +18,8 @@ export type SettingsReadKey =
   | `oauth_account_usage:${string}`
   | `trading_day_coverage:15min:${number}`;
 
+export type SettingsReadInvalidationListener = (key: SettingsReadKey) => void;
+
 export type SettingsReadInspection<T> =
   | { status: "missing" }
   | {
@@ -194,6 +196,10 @@ export interface SettingsReadCache {
     options?: { force?: boolean },
   ): Promise<SettingsReadOutcome<T>>;
   replace<T>(key: SettingsReadKey, value: T, now?: number): SettingsReadOutcome<T>;
+  subscribeInvalidation(
+    key: SettingsReadKey,
+    listener: SettingsReadInvalidationListener,
+  ): () => void;
   invalidate(key: SettingsReadKey): void;
   invalidateCredentialAccount(localCredentialId: string): void;
   invalidateDataSource(source: string): void;
@@ -206,6 +212,10 @@ class MemorySettingsReadCache implements SettingsReadCache {
   private readonly generations = new Map<SettingsReadKey, number>();
   private readonly retained = new Map<SettingsReadKey, RetainedEntry>();
   private readonly inFlight = new Map<SettingsReadKey, InFlight>();
+  private readonly invalidationListeners = new Map<
+    SettingsReadKey,
+    Set<SettingsReadInvalidationListener>
+  >();
   private accessSequence = 0;
   private retainedBytes = 0;
 
@@ -284,11 +294,29 @@ class MemorySettingsReadCache implements SettingsReadCache {
     return this.retainCurrentValue(key, value, now);
   }
 
+  subscribeInvalidation(
+    key: SettingsReadKey,
+    listener: SettingsReadInvalidationListener,
+  ): () => void {
+    assertSettingsReadKey(key);
+    const listeners = this.invalidationListeners.get(key) ?? new Set();
+    listeners.add(listener);
+    this.invalidationListeners.set(key, listeners);
+    let subscribed = true;
+    return () => {
+      if (!subscribed) return;
+      subscribed = false;
+      listeners.delete(listener);
+      if (listeners.size === 0) this.invalidationListeners.delete(key);
+    };
+  }
+
   invalidate(key: SettingsReadKey): void {
     assertSettingsReadKey(key);
     this.generations.set(key, this.generation(key) + 1);
     this.removeRetained(key);
     this.inFlight.delete(key);
+    this.notifyInvalidated(key);
   }
 
   invalidateCredentialAccount(localCredentialId: string): void {
@@ -322,6 +350,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
     this.retained.clear();
     this.inFlight.clear();
     this.retainedBytes = 0;
+    for (const key of keys) this.notifyInvalidated(key);
   }
 
   private generation(key: SettingsReadKey): number {
@@ -399,7 +428,20 @@ class MemorySettingsReadCache implements SettingsReadCache {
       ...this.generations.keys(),
       ...this.retained.keys(),
       ...this.inFlight.keys(),
+      ...this.invalidationListeners.keys(),
     ]);
+  }
+
+  private notifyInvalidated(key: SettingsReadKey): void {
+    const listeners = this.invalidationListeners.get(key);
+    if (!listeners) return;
+    for (const listener of [...listeners]) {
+      try {
+        listener(key);
+      } catch {
+        // A status subscriber must not make the owning mutation fail.
+      }
+    }
   }
 
   private coverageKeys(): Set<`trading_day_coverage:15min:${number}`> {

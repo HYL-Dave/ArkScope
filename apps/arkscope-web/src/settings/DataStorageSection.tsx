@@ -5,7 +5,6 @@ import {
   getMarketDataStatus,
   getTradingDayCoverage,
   type MarketDataStatus,
-  type SyncMeta,
   type TradingDayCoverage,
   type TradingDayRow,
 } from "../api";
@@ -32,31 +31,6 @@ import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
-}
-function syncLine(status: MarketDataStatus, t: SettingsT): string {
-  const fmt = (m: SyncMeta | null) => {
-    if (!m) return "—";
-    if (!Number.isFinite(m.rows_added)) return "—";
-    const ts = formatSystemTimestamp(m.last_success);
-    return `+${m.rows_added.toLocaleString()} @ ${ts}`;
-  };
-  const s = status.sync;
-  if (!s.prices && !s.news) {
-    return t(($) => $.dataStorage.update.never);
-  }
-  if ([s.prices, s.news].some((value) => value?.last_error)) {
-    return t(($) => $.dataStorage.update.failed);
-  }
-  return t(($) => $.dataStorage.update.succeeded, {
-    pricesValue: fmt(s.prices),
-    newsValue: fmt(s.news),
-  });
-}
-
-function syncDiagnostics(status: MarketDataStatus): Array<string | null> {
-  const sync = status.sync;
-  return [sync.prices, sync.news]
-    .map((value) => value?.last_error ?? null);
 }
 
 function coverageDeveloperDiagnostics(coverage: TradingDayCoverage): string[] {
@@ -99,6 +73,10 @@ export function DataStorageSection({
   useEffect(() => {
     void load(false);
   }, [load]);
+  useEffect(() => settingsReadCache.subscribeInvalidation(
+    "market_data_status",
+    () => { void load(false); },
+  ), [load, settingsReadCache]);
 
   const exists = status?.exists ?? false;
   const pr = status?.prices;
@@ -115,7 +93,7 @@ export function DataStorageSection({
           <p className="muted tiny">{t(($) => $.dataStorage.description)}</p>
         </div>
         <button className="btn-ghost" onClick={() => void load(true)}>
-          ↻ {t(($) => $.actions.refresh)}
+          ↻ {t(($) => $.actions.refreshStatus)}
         </button>
       </div>
 
@@ -164,12 +142,7 @@ export function DataStorageSection({
                   })
                 : "—"}
             </dd>
-            <dt>{t(($) => $.dataStorage.update.title)}</dt>
-            <dd>{syncLine(status, t)}</dd>
           </dl>
-          {developerMode ? (
-            <DeveloperDiagnostics diagnostics={syncDiagnostics(status)} t={t} />
-          ) : null}
         </div>
       )}
 
@@ -228,6 +201,10 @@ function TradingDayCoveragePanel({
   useEffect(() => {
     void load(false);
   }, [load]);
+  useEffect(() => settingsReadCache.subscribeInvalidation(
+    tradingDayCoverageKey(lookback),
+    () => { void load(false); },
+  ), [load, lookback, settingsReadCache]);
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
   const calendarHealthLabels = cov
     ? coverageCalendarHealthLabels(cov.calendar_health, t)
@@ -279,7 +256,7 @@ function TradingDayCoveragePanel({
             </select>
           </label>
           <button className="btn-ghost" onClick={() => void load(true)} disabled={busy}>
-            ↻ {t(($) => $.actions.refresh)}
+            ↻ {t(($) => $.actions.refreshStatus)}
           </button>
         </div>
       </div>
@@ -310,7 +287,7 @@ function TradingDayCoveragePanel({
             <dd>{" "}{cov.calendar_health.forward_horizon_months.toLocaleString()}</dd>
           </dl>
           <p className="muted tiny">
-            {t(($) => $.dataStorage.update.generatedAt, {
+            {t(($) => $.dataStorage.coverage.generatedAt, {
               timestamp: shortTs(cov.generated_at_et),
             })}
           </p>

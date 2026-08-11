@@ -111,6 +111,15 @@ export function MacroStorageSection({
       mountedRef.current = false;
     };
   }, [load]);
+  useEffect(() => {
+    const reload = () => { void load(false); };
+    const unsubscribeStatus = settingsReadCache.subscribeInvalidation("macro_status", reload);
+    const unsubscribeSnapshot = settingsReadCache.subscribeInvalidation("macro_snapshot", reload);
+    return () => {
+      unsubscribeStatus();
+      unsubscribeSnapshot();
+    };
+  }, [load, settingsReadCache]);
 
   const tables = status?.tables ?? {};
   const statusAvailable = Boolean(
@@ -137,7 +146,7 @@ export function MacroStorageSection({
           aria-busy={loading || undefined}
           onClick={() => void load(true)}
         >
-          {t(($) => $.actions.refresh)}
+          {t(($) => $.actions.refreshStatus)}
         </Button>
       </div>
 

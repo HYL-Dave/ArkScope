@@ -8,6 +8,7 @@ const settings = {
   },
   actions: {
     refresh: "Refresh",
+    refreshStatus: "Reload status",
     save: "Save",
     saving: "Saving...",
     clear: "Clear",
@@ -450,15 +451,15 @@ const settings = {
     loading: "Loading...",
     section: {
       title: "Data Sources and Schedules",
-      description: "Review data-source health, connection settings, schedules, and manual runs in one place. Configure each source independently; IBKR jobs share a Gateway lock to prevent overlap.",
+      description: "Review data-source health, connection settings, and App-managed schedules in one place. Listed sources can be configured and run independently; IBKR jobs share a Gateway lock to prevent overlap.",
     },
     fred: {
       snapshotAvailable: "Snapshot available: {{seriesCount}} series · {{value}} observations",
       noData: "No data yet",
       latestFetched: "Last fetched {{timestamp}}",
-      autoEnabled: "Automatic refresh enabled",
-      autoDisabled: "Automatic refresh disabled",
-      autoUnknown: "Automatic refresh status unknown",
+      autoEnabled: "Ingestion enabled (not connected to an App schedule yet)",
+      autoDisabled: "Ingestion disabled",
+      autoUnknown: "Ingestion status unknown",
     },
     guard: {
       busy: "A data-source settings update is in progress.",
@@ -659,7 +660,7 @@ const settings = {
   },
   dataStorage: {
     title: "Market Data",
-    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Data collection is managed under Data Sources.",
+    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals ingestion is not connected to an App schedule, and this page only reloads status.",
     loading: "Loading...",
     available: "Available",
     empty: "No data yet",
@@ -675,17 +676,11 @@ const settings = {
       fundamentals: "{{value}} rows · {{count}} tickers · latest {{timestamp}}",
       financialCache: "{{value}} rows ({{count}} valid · {{expiredCount}} expired) · latest fetch {{timestamp}}",
     },
-    update: {
-      title: "Latest Incremental Update",
-      never: "No incremental update yet",
-      succeeded: "Prices {{pricesValue}} · News {{newsValue}}",
-      failed: "Incremental update failed",
-      generatedAt: "Generated {{timestamp}}",
-    },
     coverage: {
       title: "Trading-day / Price Coverage",
       description: "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",
       readOnly: "Read-only diagnostic; does not start a repair or supply planner work.",
+      generatedAt: "Generated {{timestamp}}",
       lookback: "Latest {{count}} days",
       lookbackLabel: "Days",
       facts: {
@@ -785,7 +780,7 @@ const settings = {
   },
   macroStorage: {
     title: "Macro Data",
-    description: "Review FRED series snapshots, stored volume, and event-data coverage. Schedules and Provider health are managed under Data Sources.",
+    description: "Review local FRED series snapshots, stored volume, and event-data coverage. Macro ingestion is not connected to an App schedule or a manual run on this page; reloading status does not call a provider.",
     loading: "Loading...",
     availability: {
       tableUnavailable: "Unavailable",
@@ -799,8 +794,8 @@ const settings = {
     },
     snapshot: {
       title: "FRED Snapshot",
-      autoEnabled: "Automatic refresh on",
-      autoDisabled: "Automatic refresh off",
+      autoEnabled: "Ingestion enabled; no App schedule connected",
+      autoDisabled: "Ingestion disabled",
     },
     kinds: {
       fredSeries: "FRED Series",
