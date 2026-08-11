@@ -35,7 +35,6 @@ _VERSION_OUTPUT = f"codex-cli {ALLOWED_CODEX_APP_SERVER_VERSION}"
 _MAX_STDOUT_BYTES = 256 * 1024
 _MAX_STDERR_BYTES = 64 * 1024
 _MAX_RATE_LIMIT_BUCKETS = 16
-_MAX_DAILY_USAGE_BUCKETS = 31
 _ALLOWED_SERVER_NOTIFICATIONS = frozenset(
     {
         "account/login/completed",
@@ -240,7 +239,7 @@ def _usage_payload(value: Any) -> tuple[OAuthUsageSummary, list[OAuthDailyUsageB
     daily_value = result.get("dailyUsageBuckets")
     if daily_value is None:
         return summary, []
-    if not isinstance(daily_value, list) or len(daily_value) > _MAX_DAILY_USAGE_BUCKETS:
+    if not isinstance(daily_value, list):
         raise _fail()
     daily: list[OAuthDailyUsageBucket] = []
     for value_row in daily_value:

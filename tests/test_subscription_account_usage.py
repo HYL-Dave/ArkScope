@@ -9,7 +9,7 @@ import sqlite3
 import stat
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -107,6 +107,8 @@ def _rate_limits_payload() -> dict:
 
 
 def _usage_payload() -> dict:
+    final_day = datetime(2026, 8, 8, tzinfo=timezone.utc)
+    first_day = final_day - timedelta(days=245)
     return {
         "summary": {
             "lifetimeTokens": 14_243_654_879,
@@ -116,8 +118,11 @@ def _usage_payload() -> dict:
             "longestStreakDays": 21,
         },
         "dailyUsageBuckets": [
-            {"startDate": "2026-08-07", "tokens": 1000},
-            {"startDate": "2026-08-08", "tokens": 2000},
+            {
+                "startDate": (first_day + timedelta(days=offset)).date().isoformat(),
+                "tokens": 1000 + offset,
+            }
+            for offset in range(246)
         ],
         "rawToken": _ACCESS_TOKEN,
     }
@@ -302,7 +307,17 @@ def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_tu
     assert observation.payload.rate_limits.credits.balance == "0"
     assert observation.payload.rate_limits.spend_control_reached is True
     assert observation.payload.usage_summary.lifetime_tokens == 14_243_654_879
-    assert [row.tokens for row in observation.payload.daily_usage_buckets] == [1000, 2000]
+    daily = observation.payload.daily_usage_buckets
+    assert len(daily) == 246
+    assert [row.tokens for row in daily] == list(range(1000, 1246))
+    assert [row.start_date for row in daily] == [
+        (datetime(2025, 12, 6, tzinfo=timezone.utc) + timedelta(days=offset))
+        .date()
+        .isoformat()
+        for offset in range(246)
+    ]
+    assert daily[0].model_dump() == {"start_date": "2025-12-06", "tokens": 1000}
+    assert daily[-1].model_dump() == {"start_date": "2026-08-08", "tokens": 1245}
     assert observation.account_fingerprint == hashlib.sha256(
         f"local:1\0{_ACCOUNT_ID}".encode()
     ).hexdigest()
