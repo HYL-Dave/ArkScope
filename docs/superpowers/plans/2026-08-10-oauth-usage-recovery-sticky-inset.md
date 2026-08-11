@@ -11,7 +11,9 @@
 > MU1-MU6 COMPLETE; FINAL GATES GREEN BUT §5.1 HOST-LIVE STOPPED ON THE
 > SCHEMA-DECLARED `remoteControl/status/changed` NOTIFICATION; §1.5 FIX
 > `bd32b7fe` FABLE-GREEN BUT THE SECOND HOST-LIVE STOPPED LATER IN THE
-> PROTOCOL; §3.2d SHAPE-ONLY DIAGNOSTIC PENDING CODEX FOCUSED REVIEW;
+> PROTOCOL; THE §3.2d SHAPE-ONLY DIAGNOSTIC RAN CLEAN AND FOUND THE ROOT
+> CAUSE (246 REAL DAILY BUCKETS VS THE 31-ROW CAP); USER RULED FULL
+> RETENTION; §1.6 GUARD-REMOVAL AMENDMENT PENDING CODEX FOCUSED REVIEW;
 > TASKS 6-7 NOT STARTED
 >
 > **Date:** 2026-08-10
@@ -456,6 +458,38 @@ other adapter byte unchanged. The paired §2.4 evolution replays this
 notification through the session fixture and proves its payload never
 leaks into the returned observation or the persisted snapshot.
 
+### 1.6 Daily-usage history: remove the 31-row count assumption (2026-08-11)
+
+The authorized §3.2d diagnostic ran exactly once, its redaction self-test
+and Fable's independent leak audit both passed, and it found the
+deterministic root cause: the REAL `account/usage/read` result is
+structurally compatible (`dailyUsageBuckets` items are exactly
+`{startDate: string, tokens: number}`) but carries 246 rows - the full
+per-day history since the account began - while
+`_MAX_DAILY_USAGE_BUCKETS = 31`
+(`src/auth_drivers/codex_account_usage.py:38`) makes the `:243` guard
+raise `protocol_incompatible` for every real account older than a month.
+No unknown notification or login issue preceded it. Diagnostic packet:
+`/tmp/oauth-usage-sticky-shape-diagnostic-82eb380b/packet` (8 payloads,
+`SHA256SUMS`
+`ea2deea2d8e5925f8f244c144675a21851fb7072d33192042a63e949c3760962`).
+
+USER RULING (2026-08-11): full retention. The snapshot honestly keeps
+every valid daily row the provider returns; silent truncation and a
+larger fixed cap are both rejected as the same assumption-class defect.
+
+Authorized product delta - exactly two edits in
+`src/auth_drivers/codex_account_usage.py`:
+
+- the `:243` guard drops its length clause (list-type check stays);
+- the now-unused `_MAX_DAILY_USAGE_BUCKETS` constant is deleted.
+
+Everything else stands: per-row validation (bounded `startDate` matching
+`_DATE_RE`, numeric `tokens`) is unchanged, and the existing 256 KiB
+stdout transport cap remains the sole physical size bound (246 rows is
+about 10 KB). The paired §2.4 evolution makes the session fixture
+faithful (246 rows) and witnesses full retention end-to-end.
+
 ---
 
 ## 2. Exact node accounting
@@ -678,12 +712,19 @@ subcase uses the existing recording raw-client seam to assert all of:
   pinned call shape;
 - no fallback model request exists.
 
-The fourth node evolves only under the §1.5 allowlist amendment: the
+The fourth node evolved first under the §1.5 allowlist amendment (the
 session fixture emits `remoteControl/status/changed` with a sentinel
 payload between `initialized` and the account reads, and the node asserts
 the sync still succeeds end-to-end AND the sentinel appears nowhere in the
-returned observation or the persisted snapshot (payload non-leak - the
-scope a backend node can actually witness). The `thread/started` rejection
+returned observation or the persisted snapshot - the scope a backend node
+can actually witness). It evolves a second time under §1.6: the fixture's
+`dailyUsageBuckets` becomes a faithful 246-row array (each row exactly
+`{startDate, tokens}`), RED-first against the current 31-row guard
+(`protocol_incompatible`), and after the guard removal the node asserts
+all 246 rows are retained in order (count, first and last row integrity)
+alongside every existing assertion including the non-leak sentinels. This
+second evolution edits the SAME already-authorized node - the retained
+set stays exactly four. The `thread/started` rejection
 node stays regression-protected as-is; the id-carrying and unknown-method
 rejection branches carry no dedicated nodes and are protected by the §1.5
 product-diff bound (one frozenset member, no other adapter byte).
@@ -895,6 +936,24 @@ Authorized next step - exactly ONE redacted shape-only diagnostic run:
 
 All section 2 identities stand; no test or product byte changes under
 this section.
+
+### 3.2e Diagnostic result and resume order (2026-08-11)
+
+The §3.2d run was clean on every witness: shape policy self-test passed,
+Fable's independent leak audit found no value, identifier, or message
+text; production tables' row projections are byte-identical before and
+after the one POST; child processes and temporary `CODEX_HOME` are zero;
+no validator, allowlist, or fixture byte changed. The finding, ruling,
+and authorized delta live in §1.6.
+
+Resume order after this amendment goes GREEN: one product+test commit
+(§1.6 two-edit delta + the §2.4 second evolution of node four), backend
+focused `82/82` with the rejection nodes intact, then ONE §5.1 host-live
+rerun which MUST succeed before the §5.2 browser matrix; the remaining
+admission gates (final collections, full frontend runtime/build, Settings
+projection, native at the FINAL product tip) follow unchanged. All
+section 2 identities stand; the native target stays
+`4274 passed / 29 skipped / 0 failed`.
 
 ---
 
