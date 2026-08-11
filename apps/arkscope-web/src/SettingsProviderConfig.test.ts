@@ -1113,7 +1113,8 @@ describe("Settings provider config authority", () => {
       expect(row.textContent).toContain("App");
       expect(row.textContent).toContain("資料快照可用：— 序列 · 29,571 觀測值");
       expect(row.textContent).not.toContain("資料快照可用：0 序列");
-      expect(row.textContent).toContain("攝入功能未啟用");
+      expect(row.textContent).toContain("自動擷取設定未開啟");
+      expect(row.textContent).not.toContain("攝入");
       expect(row.textContent).not.toContain("未啟用抓取");
       expect(row.textContent).not.toContain("已停用");
       expect(row.querySelector("td")?.hasAttribute("title")).toBe(false);

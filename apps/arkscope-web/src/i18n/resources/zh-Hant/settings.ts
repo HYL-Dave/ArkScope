@@ -113,8 +113,8 @@ const settings = {
       },
       newsStorage: {
         title: "新聞資料",
-        description: "查看新聞資料量、攝入狀態與最近更新。",
-        searchAliases: "news|新聞|ingestion|文章|polygon|finnhub|ibkr|news data",
+        description: "查看新聞資料量、收集狀態與最近更新。",
+        searchAliases: "news|新聞|ingestion|文章|polygon|finnhub|ibkr|news data|查看新聞資料量、攝入狀態與最近更新。",
       },
       macroStorage: {
         title: "總經資料",
@@ -456,9 +456,9 @@ const settings = {
       snapshotAvailable: "資料快照可用：{{seriesCount}} 序列 · {{value}} 觀測值",
       noData: "尚無資料",
       latestFetched: "最後抓取 {{timestamp}}",
-      autoEnabled: "攝入功能已啟用（尚未接入 App 排程）",
-      autoDisabled: "攝入功能未啟用",
-      autoUnknown: "攝入功能狀態未知",
+      autoEnabled: "自動擷取設定已開啟（尚未接入 App 排程）",
+      autoDisabled: "自動擷取設定未開啟",
+      autoUnknown: "無法確認自動擷取設定",
     },
     guard: {
       busy: "資料來源設定更新正在進行。",
@@ -659,7 +659,7 @@ const settings = {
   },
   dataStorage: {
     title: "市場資料",
-    description: "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。價格與新聞抓取由「資料來源與排程」管理；基本面攝入尚未接入 App 排程，本頁只重新讀取狀態。",
+    description: "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，本頁只會重新讀取狀態。",
     loading: "載入中…",
     available: "可用",
     empty: "尚無資料",
@@ -779,7 +779,7 @@ const settings = {
   },
   macroStorage: {
     title: "總經資料",
-    description: "查看本地 FRED 序列快照、儲存量與事件資料覆蓋。總經攝入尚未接入 App 排程或本頁手動執行；重新讀取狀態不會呼叫 provider。",
+    description: "查看本地 FRED 序列快照、儲存量與事件資料覆蓋。總經資料尚未接入 App 排程，也無法從本頁手動更新；重新讀取狀態不會向 provider 抓取資料。",
     loading: "載入中…",
     availability: {
       tableUnavailable: "不可用",
@@ -793,8 +793,8 @@ const settings = {
     },
     snapshot: {
       title: "FRED 快照",
-      autoEnabled: "攝入功能已啟用；尚未接入 App 排程",
-      autoDisabled: "攝入功能未啟用",
+      autoEnabled: "自動擷取設定已開啟（尚未接入 App 排程）",
+      autoDisabled: "自動擷取設定未開啟",
     },
     kinds: {
       fredSeries: "FRED 序列",
@@ -821,7 +821,7 @@ const settings = {
       snapshotOnly: "本地快照讀取可用；自動刷新未啟用",
       envForced: " · env 強制",
       active: "啟用中（本地{{value}}）",
-      activePending: "啟用中（本地{{value}}）· 待 ingestion 建立",
+      activePending: "啟用中（本地{{value}}）· 待建立資料庫",
     },
   },
   investor: {

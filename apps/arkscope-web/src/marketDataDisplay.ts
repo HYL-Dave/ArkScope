@@ -38,7 +38,7 @@ export function macroRoutingLabel(status: MacroStatus, t: SettingsT): string {
   // local_first_active = (toggle OR env). Routing is local the moment it's on — the store
   // factory creates macro_calendar.db on first use and there is NO PG fallback in the local
   // path. So toggle-on is "本地優先" even before the DB is built (queries return empty until
-  // ingestion fills it) — NOT a PG fallback.
+  // the first collection fills it) — NOT a PG fallback.
   if (!status.local_first_active) return t(($) => $.macroStorage.routing.snapshotOnly);
   const envNote = status.env_override ? t(($) => $.macroStorage.routing.envForced) : "";
   return status.exists

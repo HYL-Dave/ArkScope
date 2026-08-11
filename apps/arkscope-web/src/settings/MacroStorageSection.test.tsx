@@ -297,7 +297,8 @@ describe("MacroStorageSection", () => {
     controls.snapshot = { ...snapshotFixture, auto_refresh_enabled: false };
     await renderMacro();
 
-    expect(host!.textContent).toContain("攝入功能未啟用");
+    expect(host!.textContent).toContain("自動擷取設定未開啟");
+    expect(host!.textContent).not.toContain("攝入");
     expect(host!.textContent).toContain("Fed Funds");
     expect(host!.textContent).toContain("最後抓取");
     expect(host!.querySelector('[data-state="failed"]')).toBeNull();

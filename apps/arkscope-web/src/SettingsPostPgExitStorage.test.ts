@@ -351,8 +351,9 @@ describe("post-PG-exit storage panels", () => {
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
     expect(storage).not.toBeNull();
     expect(storage!.querySelector("h2")?.textContent).toBe("市場資料");
-    expect(storage!.textContent).toContain("價格與新聞抓取由「資料來源與排程」管理");
-    expect(storage!.textContent).toContain("基本面攝入尚未接入 App 排程");
+    expect(storage!.textContent).toContain("價格與新聞的抓取工作由「資料來源與排程」管理");
+    expect(storage!.textContent).toContain("基本面資料尚未接入 App 排程");
+    expect(storage!.textContent).not.toContain("攝入");
     expect(storage!.textContent).toContain(
       "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
     );
@@ -376,8 +377,9 @@ describe("post-PG-exit storage panels", () => {
 
     expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
     expect(host!.textContent).toContain("總經資料");
-    expect(host!.textContent).toContain("總經攝入尚未接入 App 排程或本頁手動執行");
-    expect(host!.textContent).toContain("重新讀取狀態不會呼叫 provider");
+    expect(host!.textContent).toContain("總經資料尚未接入 App 排程，也無法從本頁手動更新");
+    expect(host!.textContent).toContain("重新讀取狀態不會向 provider 抓取資料");
+    expect(host!.textContent).not.toContain("攝入");
     expect(host!.textContent).toContain("FRED 序列");
     expect(host!.textContent).toContain("Fed Funds");
     expect(host!.textContent).not.toMatch(/Macro \/ Calendar|行事曆|Finnhub 付費方案/);
@@ -505,7 +507,7 @@ describe("post-PG-exit storage panels", () => {
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
     expect(mountedStorage.textContent).toContain(
-      "查看已儲存價格、新聞、SEC 基本面與獨立財務快取。價格與新聞抓取由「資料來源與排程」管理；基本面攝入尚未接入 App 排程，本頁只重新讀取狀態。",
+      "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，本頁只會重新讀取狀態。",
     );
     expect(mountedStorage.textContent).not.toContain("隱含波動率");
     expect(mountedStorage.textContent).not.toContain("最近增量更新");
@@ -555,7 +557,7 @@ describe("post-PG-exit storage panels", () => {
     expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
     expect(storage.textContent).toContain(
-      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals ingestion is not connected to an App schedule, and this page only reloads status.",
+      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and this page only reloads status.",
     );
     expect(storage.textContent).not.toContain("implied volatility");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))

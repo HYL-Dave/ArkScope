@@ -103,9 +103,9 @@ describe("macroRoutingLabel", () => {
 
   it("toggle-on but DB not built → local-first, pending ingestion (NOT PG fallback)", () => {
     // the fix: local active even before the DB exists; the factory creates it on first use,
-    // no PG fallback. So this is 'pending ingestion', not 'reads go PG'.
+    // no PG fallback. So the database is pending; reads do not go to PG.
     expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: false })))
-      .toBe("啟用中（本地）· 待 ingestion 建立");
+      .toBe("啟用中（本地）· 待建立資料庫");
   });
 
   it("never suggests PG fallback when local macro is inactive", () => {

@@ -114,8 +114,8 @@ const settings = {
       },
       newsStorage: {
         title: "News Data",
-        description: "Review news volume, ingestion status, and recent updates.",
-        searchAliases: "news|ingestion|articles|polygon|finnhub|ibkr|news data",
+        description: "Review news volume, collection status, and recent updates.",
+        searchAliases: "news|ingestion|articles|polygon|finnhub|ibkr|news data|Review news volume, ingestion status, and recent updates.",
       },
       macroStorage: {
         title: "Macro Data",
@@ -451,15 +451,15 @@ const settings = {
     loading: "Loading...",
     section: {
       title: "Data Sources and Schedules",
-      description: "Review data-source health, connection settings, and App-managed schedules in one place. Listed sources can be configured and run independently; IBKR jobs share a Gateway lock to prevent overlap.",
+      description: "Review data-source health, connection settings, and App-managed schedules in one place. Listed sources can be configured independently and run manually; IBKR jobs share a Gateway lock to prevent overlap.",
     },
     fred: {
       snapshotAvailable: "Snapshot available: {{seriesCount}} series · {{value}} observations",
       noData: "No data yet",
       latestFetched: "Last fetched {{timestamp}}",
-      autoEnabled: "Ingestion enabled (not connected to an App schedule yet)",
-      autoDisabled: "Ingestion disabled",
-      autoUnknown: "Ingestion status unknown",
+      autoEnabled: "Automatic collection setting enabled (not connected to an App schedule yet)",
+      autoDisabled: "Automatic collection setting disabled",
+      autoUnknown: "Automatic collection setting unavailable",
     },
     guard: {
       busy: "A data-source settings update is in progress.",
@@ -660,7 +660,7 @@ const settings = {
   },
   dataStorage: {
     title: "Market Data",
-    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals ingestion is not connected to an App schedule, and this page only reloads status.",
+    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and this page only reloads status.",
     loading: "Loading...",
     available: "Available",
     empty: "No data yet",
@@ -780,7 +780,7 @@ const settings = {
   },
   macroStorage: {
     title: "Macro Data",
-    description: "Review local FRED series snapshots, stored volume, and event-data coverage. Macro ingestion is not connected to an App schedule or a manual run on this page; reloading status does not call a provider.",
+    description: "Review local FRED series snapshots, stored volume, and event-data coverage. Macro data is not connected to an App schedule and cannot be updated manually from this page; reloading status does not request provider data.",
     loading: "Loading...",
     availability: {
       tableUnavailable: "Unavailable",
@@ -794,8 +794,8 @@ const settings = {
     },
     snapshot: {
       title: "FRED Snapshot",
-      autoEnabled: "Ingestion enabled; no App schedule connected",
-      autoDisabled: "Ingestion disabled",
+      autoEnabled: "Automatic collection setting enabled (not connected to an App schedule yet)",
+      autoDisabled: "Automatic collection setting disabled",
     },
     kinds: {
       fredSeries: "FRED Series",
@@ -822,7 +822,7 @@ const settings = {
       snapshotOnly: "Local snapshot reads available; automatic refresh disabled",
       envForced: " · forced by environment",
       active: "Active (local{{value}})",
-      activePending: "Active (local{{value}}) · pending ingestion",
+      activePending: "Active (local{{value}}) · database pending",
     },
   },
   investor: {
