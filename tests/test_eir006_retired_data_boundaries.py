@@ -77,6 +77,7 @@ _HISTORICAL = {
     "docs/design/REPO_HYGIENE_AUDIT_2026_07.md",
     "docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md",
     "docs/superpowers/evidence/2026-08-09-provider-smoke-candidate-truth.md",
+    "docs/superpowers/evidence/2026-08-10-retired-local-assets-and-score-research-export.md",
     "docs/superpowers/plans/2026-06-27-news-direct-cutover.md",
     "docs/superpowers/plans/2026-07-02-s-b-fundamentals-refetch-cache.md",
     "docs/superpowers/plans/2026-07-06-dead-code-ui-sweep.md",

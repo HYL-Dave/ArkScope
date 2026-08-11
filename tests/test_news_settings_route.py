@@ -71,8 +71,9 @@ def test_status_reports_explicit_and_env_rollback(tmp_path, monkeypatch):
     assert out["pg_news_route_available"] is True
 
 
-def test_put_settings_persists_explicit_rollback(monkeypatch):
+def test_put_settings_persists_explicit_rollback(tmp_path, monkeypatch):
     calls = []
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "absent.db"))
     monkeypatch.setattr(routes, "require_profile_state_write", lambda action, detail: calls.append((action, detail)))
     store = _FakeProfileStore()
 
