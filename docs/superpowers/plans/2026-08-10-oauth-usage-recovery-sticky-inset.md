@@ -1,9 +1,8 @@
 # OAuth Usage Recovery and Settings Sticky Inset Implementation Plan
 
-> **Status:** TASKS 0-4 COMPLETE AND REVIEWED; MU1-MU6 COMPLETE; TASK 5
-> COMPLETE AT PRODUCT TIP `ca61992b` WITH FINAL COLLECTIONS, FRONTEND,
-> HOST-LIVE, BROWSER, PROTECTED-BOUNDARY, AND NATIVE ADMISSION GREEN;
-> IMPLEMENTATION REVIEW PENDING; TASKS 6-7 NOT STARTED
+> **Status:** TASKS 0-5 COMPLETE AND REVIEWED; TASK 6 FAST-FORWARD MERGE
+> AND EXACT-MASTER VERIFICATION COMPLETE AT `fdb81913`; CLOSEOUT REVIEW
+> PENDING; TASK 7 NOT STARTED AND STILL REQUIRES EXPLICIT USER AUTHORIZATION
 >
 > **Date:** 2026-08-10
 >
@@ -1021,9 +1020,15 @@ host-live ChatGPT POST, the two-viewport browser matrix, and fresh native
 manifest SHA-256 `11aa165f3962b3ccf7eba8af974629725d7262a8250e985cf626399bc1e44377`.
 Independent Task 5 implementation review is the sole next gate.
 
-**Task 6 — merge.** After Codex GREEN: ff-merge only, no push; fresh
-exact-master worktree rerun (collections, focused, native, browser); docs
-closeout; stop for Codex closeout review.
+**Task 6 — merge.** Complete. After Fable returned Task 5 GREEN, `master`
+fast-forwarded from `8cf85597` to `fdb81913` through 50 linear commits with
+zero merge commit and no push. Fresh exact-master worktrees reproduced all
+four collections/focused gates, Settings `231`, frontend `1146/1146`,
+typecheck/build/scanner, protected bytes, native `4274/29/0`, and the
+two-viewport browser contract. Closeout packet
+`/tmp/oauth-usage-sticky-task6-merged-fdb81913` has 44 payloads; manifest
+SHA-256 `85f3b52f27f8e6560449c4612ce1340dbdd58406abd966fd171b42678c739e2c`.
+Independent closeout review is the sole next gate.
 
 **Task 7 — live acceptance (post-merge, user-gated).** §5.3 below. Its
 results are rollout evidence, not merge preconditions, except that the
