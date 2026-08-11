@@ -1,20 +1,9 @@
 # OAuth Usage Recovery and Settings Sticky Inset Implementation Plan
 
-> **Status:** PLAN GREEN; TASKS 0-2 COMPLETE AND CODEX-GREEN; MANUAL-ONLY
-> SYNC RULING GREEN (`59dafdee`/`830164f5`/`ca09fd15`); TASK 3 RECOVERY
-> COMMITS LANDED THROUGH `9bf2b9bd` AND SUPERSEDED AS INTERNALS BY THE
-> §0.1.2 OWNERSHIP-REFACTOR RULING; TASK 3 OWNERSHIP REFACTOR IMPLEMENTED
-> AT `380021b5` AND FABLE-REVIEWED GREEN; TASK 4 SPLIT-OWNERSHIP AMENDMENT
-> CODEX-GREEN THROUGH `7857dd6f`, PRODUCT `99ca5441` FABLE-REVIEWED GREEN;
-> MU5 OWNER AMENDMENT `a16d1b70` FABLE-GREEN, STRENGTHENING `9a704331`
-> LANDED AND MUTANT RED; MU6 OWNER CORRECTION `24d231eb` FABLE-GREEN AND
-> MU1-MU6 COMPLETE; FINAL GATES GREEN BUT §5.1 HOST-LIVE STOPPED ON THE
-> SCHEMA-DECLARED `remoteControl/status/changed` NOTIFICATION; §1.5 FIX
-> `bd32b7fe` FABLE-GREEN BUT THE SECOND HOST-LIVE STOPPED LATER IN THE
-> PROTOCOL; THE §3.2d SHAPE-ONLY DIAGNOSTIC RAN CLEAN AND FOUND THE ROOT
-> CAUSE (246 REAL DAILY BUCKETS VS THE 31-ROW CAP); USER RULED FULL
-> RETENTION; §1.6 GUARD-REMOVAL AMENDMENT PENDING CODEX FOCUSED REVIEW;
-> TASKS 6-7 NOT STARTED
+> **Status:** TASKS 0-4 COMPLETE AND REVIEWED; MU1-MU6 COMPLETE; TASK 5
+> COMPLETE AT PRODUCT TIP `ca61992b` WITH FINAL COLLECTIONS, FRONTEND,
+> HOST-LIVE, BROWSER, PROTECTED-BOUNDARY, AND NATIVE ADMISSION GREEN;
+> IMPLEMENTATION REVIEW PENDING; TASKS 6-7 NOT STARTED
 >
 > **Date:** 2026-08-10
 >
@@ -1018,12 +1007,19 @@ manifest/cleanup. Docs evidence commit; stop for Codex implementation
 review.
 
 Task 5 began after Fable returned Task 4 GREEN. The §3.2a amendment passed
-review, its exact test strengthening landed, and MU5 now has a discriminating
-RED owner. Task 5 is currently PAUSED after the MU6 pre-admission replay in
-§3.2b. Product and CSS bytes are clean; native, host-live, final frontend
-runtime/build, and final browser admission have not run. Focused review of
-this docs-only correction authorizes a fresh MU6 replay under its corrected
-owner contract, followed by the remaining Task 5 sequence.
+review, its exact test strengthening landed, and MU5 obtained a
+discriminating RED owner. MU6 then passed under the corrected owner contract.
+The two host-live stops and the bounded shape diagnostic are recorded in
+§§3.2c-3.2e; the final §1.6 fix removed only the invalid 31-row cap and
+retained all 246 validated daily rows. Product tip `ca61992b` passed backend
+`4303/52b862d7...`, frontend `1146/4ed78744...`, focused `82/55`, Settings
+projection `231`, full frontend `1146/1146`, typecheck/build/scanner,
+protected `17/17` plus the single authorized `api.ts` hunk, one successful
+host-live ChatGPT POST, the two-viewport browser matrix, and fresh native
+`4274 passed / 29 skipped / 0 failed`. Packet
+`/tmp/oauth-usage-sticky-impl-task5-final2-ca61992b` has 153 payloads and
+manifest SHA-256 `11aa165f3962b3ccf7eba8af974629725d7262a8250e985cf626399bc1e44377`.
+Independent Task 5 implementation review is the sole next gate.
 
 **Task 6 — merge.** After Codex GREEN: ff-merge only, no push; fresh
 exact-master worktree rerun (collections, focused, native, browser); docs
