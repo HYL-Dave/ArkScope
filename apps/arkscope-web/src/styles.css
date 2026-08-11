@@ -1087,6 +1087,10 @@ table.wl tbody tr.archived td {
   .settings-workspace .settings-page-lede {
     padding-top: 12px;
   }
+  .settings-coverage-controls {
+    flex: 1 0 100%;
+    justify-content: flex-end;
+  }
   .main .muted {
     white-space: normal;
     overflow-wrap: anywhere;

@@ -128,6 +128,21 @@ describe("Settings workspace CSS contract", () => {
     expect(mobileLede.replace(/\s+/g, " ").trim()).toBe("padding-top: 12px;");
   });
 
+  it("keeps_coverage_status_controls_horizontal_at_the_mobile_width", () => {
+    const coverageHead = ruleBody(".settings-coverage-head");
+    const controls = ruleBody(".settings-coverage-controls");
+    const refresh = ruleBody(".settings-coverage-controls .btn-ghost");
+    const mobileBlock = balancedBlock(stylesCss, "@media (max-width: 760px)");
+    const mobileControls = ruleBodyFrom(mobileBlock, ".settings-coverage-controls");
+
+    expect(coverageHead).toMatch(/flex-wrap:\s*wrap/);
+    expect(controls).toMatch(/display:\s*flex/);
+    expect(controls).toMatch(/flex-shrink:\s*0/);
+    expect(refresh).toMatch(/white-space:\s*nowrap/);
+    expect(mobileControls).toMatch(/flex:\s*1\s+0\s+100%/);
+    expect(mobileControls).toMatch(/justify-content:\s*flex-end/);
+  });
+
   it("sticky offsets stay shared after the inset transfer", () => {
     const workspace = ruleBody(".settings-workspace");
     const lede = ruleBody(".settings-page-lede");

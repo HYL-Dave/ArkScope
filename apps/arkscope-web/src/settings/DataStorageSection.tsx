@@ -222,7 +222,7 @@ function TradingDayCoveragePanel({
 
   return (
     <div style={{ marginTop: 24, borderTop: "1px solid var(--border, #333)", paddingTop: 16 }}>
-      <div className="settings-section-head">
+      <div className="settings-section-head settings-coverage-head">
         <div>
           <h2>{t(($) => $.dataStorage.coverage.title)}</h2>
           <p className="muted tiny">
@@ -231,7 +231,7 @@ function TradingDayCoveragePanel({
             <strong>{t(($) => $.dataStorage.coverage.readOnly)}</strong>
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="settings-coverage-controls">
           <label className="muted tiny">
             {t(($) => $.dataStorage.coverage.lookbackLabel)}{" "}
             <select
