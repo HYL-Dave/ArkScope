@@ -71,9 +71,13 @@ import {
 import {
   SETTINGS_GROUPS,
   firstSettingsAnchor,
-  settingsGroupFor,
+  settingsGroup,
+  settingsGroupForLocation,
+  settingsParentAnchor,
+  settingsSubsectionsFor,
   type SettingsAnchorId,
   type SettingsGroupId,
+  type SettingsLocationId,
 } from "./settings/settingsRegistry";
 import {
   readActiveSettingsGroup,
@@ -118,6 +122,7 @@ export interface SettingsViewProps {
 type SettingsNavigationIntent = {
   group: SettingsGroupId;
   anchor: SettingsAnchorId;
+  location?: SettingsLocationId;
   kind: "manual_group" | "exact_anchor";
 };
 
@@ -300,10 +305,10 @@ export function SettingsView({
   const [routeOutcome, setRouteOutcome] = useState<SettingsRouteOutcome | null>(null);
   const [runtimeOutcome, setRuntimeOutcome] = useState<SettingsRuntimeOutcome | null>(null);
   const [activeGroup, setActiveGroup] = useState<SettingsGroupId>(() => readActiveSettingsGroup());
-  const [section, setSection] = useState<SettingsAnchorId>(() => firstSettingsAnchor(activeGroup));
+  const [section, setSection] = useState<SettingsLocationId>(() => firstSettingsAnchor(activeGroup));
   const [directoryQuery, setDirectoryQuery] = useState("");
   const [directoryOpen, setDirectoryOpen] = useState(false);
-  const [pendingReveal, setPendingReveal] = useState<SettingsAnchorId | null>(null);
+  const [pendingReveal, setPendingReveal] = useState<SettingsLocationId | null>(null);
   const [pendingGroupTop, setPendingGroupTop] = useState<SettingsGroupId | null>(null);
   const [pendingIntent, setPendingIntent] = useState<SettingsNavigationIntent | null>(null);
   const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
@@ -346,11 +351,12 @@ export function SettingsView({
     }
     setActiveGroup(intent.group);
     writeActiveSettingsGroup(intent.group);
-    setSection(intent.anchor);
+    const location = intent.location ?? intent.anchor;
+    setSection(location);
     setDirectoryOpen(false);
     if (intent.kind === "exact_anchor") {
       setPendingGroupTop(null);
-      setPendingReveal(intent.anchor);
+      setPendingReveal(location);
     } else {
       setPendingReveal(null);
       setPendingGroupTop(intent.group);
@@ -410,11 +416,17 @@ export function SettingsView({
     return true;
   }, [activeGroup, applySettingsIntent, currentNavigationGuard, t, tabRefFor]);
 
-  const revealSection = useCallback((id: SettingsAnchorId) => requestSettingsNavigation({
-    group: settingsGroupFor(id).id,
-    anchor: id,
-    kind: "exact_anchor",
-  }), [requestSettingsNavigation]);
+  const revealLocation = useCallback((id: SettingsLocationId) => {
+    const anchor = settingsParentAnchor(id);
+    return requestSettingsNavigation({
+      group: settingsGroupForLocation(id).id,
+      anchor,
+      location: id,
+      kind: "exact_anchor",
+    });
+  }, [requestSettingsNavigation]);
+
+  const revealSection = useCallback((id: SettingsAnchorId) => revealLocation(id), [revealLocation]);
 
   const handleInvestorSummaryRequest = useCallback((
     sequence: number,
@@ -443,15 +455,71 @@ export function SettingsView({
     if (pendingReveal === "investor_profile" && investorPendingRevealSequence !== null) {
       return undefined;
     }
-    if (settingsGroupFor(pendingReveal).id !== activeGroup) return;
+    if (settingsGroupForLocation(pendingReveal).id !== activeGroup) return;
     const anchor = document.querySelector<HTMLElement>(
-      `[data-settings-anchor="${pendingReveal}"]`,
+      `[data-settings-location="${pendingReveal}"]`,
     );
     if (!anchor) return;
     anchor.scrollIntoView({ block: "start" });
     anchor.focus({ preventScroll: true });
     setPendingReveal((current) => (current === pendingReveal ? null : current));
   }, [activeGroup, investorPendingRevealSequence, pendingReveal]);
+
+  useEffect(() => {
+    const scrollOwner = settingsScrollOwnerRef.current;
+    if (!scrollOwner) return undefined;
+    const activeLocations = new Set<SettingsLocationId>(
+      settingsGroup(activeGroup).sections.flatMap((definition) => [
+        definition.id,
+        ...settingsSubsectionsFor(definition.id).map((subsection) => subsection.id),
+      ]),
+    );
+
+    const updateCurrentLocation = () => {
+      const anchors = Array.from(
+        scrollOwner.querySelectorAll<HTMLElement>("[data-settings-location]"),
+      ).filter((anchor) => activeLocations.has(anchor.dataset.settingsLocation as SettingsLocationId));
+      if (anchors.length === 0) return;
+
+      const measurements = anchors.map((anchor) => ({
+        anchor,
+        top: anchor.getBoundingClientRect().top,
+      }));
+      if (
+        scrollOwner.scrollHeight === 0
+        && scrollOwner.clientHeight === 0
+        && measurements.every((measurement) => measurement.top === 0)
+      ) {
+        return;
+      }
+
+      const ownerTop = scrollOwner.getBoundingClientRect().top;
+      const tabBottom = scrollOwner
+        .querySelector<HTMLElement>(".settings-workflow-tabs > .ui-tab-list")
+        ?.getBoundingClientRect().bottom ?? ownerTop;
+      const threshold = Math.max(ownerTop, tabBottom) + 1;
+      let current = measurements[0].anchor.dataset.settingsLocation as SettingsLocationId;
+      for (const measurement of measurements) {
+        if (measurement.top > threshold) break;
+        current = measurement.anchor.dataset.settingsLocation as SettingsLocationId;
+      }
+      if (
+        scrollOwner.scrollHeight > scrollOwner.clientHeight
+        && scrollOwner.scrollTop + scrollOwner.clientHeight >= scrollOwner.scrollHeight - 1
+      ) {
+        current = measurements.at(-1)!.anchor.dataset.settingsLocation as SettingsLocationId;
+      }
+      setSection((value) => (value === current ? value : current));
+    };
+
+    updateCurrentLocation();
+    scrollOwner.addEventListener("scroll", updateCurrentLocation, { passive: true });
+    window.addEventListener("resize", updateCurrentLocation);
+    return () => {
+      scrollOwner.removeEventListener("scroll", updateCurrentLocation);
+      window.removeEventListener("resize", updateCurrentLocation);
+    };
+  }, [activeGroup]);
 
   useEffect(() => {
     if (!navigationRequest || navigationRequest.sequence <= consumedNavigationSequenceRef.current) return;
@@ -981,9 +1049,10 @@ export function SettingsView({
   const directory = (
     <SettingsDirectory
       query={directoryQuery}
+      activeGroup={activeGroup}
       currentTarget={section}
       onQueryChange={setDirectoryQuery}
-      onSelect={revealSection}
+      onSelect={revealLocation}
     />
   );
 

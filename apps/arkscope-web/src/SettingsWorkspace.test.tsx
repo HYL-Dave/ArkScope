@@ -164,6 +164,10 @@ vi.mock("./settings/DataSourcesSection", async () => {
       }, [onNavigationGuardChange]);
       return (
         <div>
+          <div data-settings-location="provider_health" />
+          <div data-settings-location="sa_extension_health" />
+          <div data-settings-location="provider_connections" />
+          <div data-settings-location="source_schedules" />
           <button
             type="button"
             onClick={() => onNavigationGuardChange?.({
@@ -186,7 +190,12 @@ vi.mock("./settings/DataSourcesSection", async () => {
   };
 });
 vi.mock("./settings/DataStorageSection", () => ({
-  DataStorageSection: () => <p>市場資料內容</p>,
+  DataStorageSection: () => (
+    <div>
+      <p>市場資料內容</p>
+      <div data-settings-location="trading_day_coverage" />
+    </div>
+  ),
 }));
 vi.mock("./settings/MacroStorageSection", () => ({
   MacroStorageSection: () => <p>總經資料內容</p>,
@@ -710,27 +719,118 @@ describe("Settings workspace", () => {
     expect(host!.querySelector('[data-settings-anchor="providers"]')).toBeNull();
   });
 
-  it("searches_all_groups_and_empty_directory_lists_all_nine_sections", async () => {
+  it("shows_only_the_active_group_directory_while_search_remains_cross_group", async () => {
     await renderSettings();
     const directory = host!.querySelector('nav[aria-label="設定目錄"]')!;
 
     expect(Array.from(directory.querySelectorAll(".settings-directory-group > p"))
-      .map((node) => node.textContent?.trim())).toEqual([
-        "AI 與模型",
-        "個人化",
-        "資料與同步",
-      ]);
-    expect(directory.querySelectorAll(".settings-directory-links button")).toHaveLength(9);
+      .map((node) => node.textContent?.trim())).toEqual(["AI 與模型"]);
+    expect(directory.querySelectorAll(".settings-directory-links button")).toHaveLength(4);
     expect(directory.textContent).toContain("Provider 登入與憑證");
-    expect(directory.textContent).toContain("投資人設定");
-    expect(directory.textContent).toContain("總經資料");
+    expect(directory.textContent).not.toContain("投資人設定");
+    expect(directory.textContent).not.toContain("總經資料");
+
+    await click(tabWithText("資料與同步"));
+    expect(Array.from(directory.querySelectorAll(".settings-directory-group > p"))
+      .map((node) => node.textContent?.trim())).toEqual(["資料與同步"]);
+    expect(Array.from(directory.querySelectorAll(".settings-directory-links button"))
+      .map((node) => node.textContent?.trim())).toEqual([
+        "資料來源與排程",
+        "Provider 健康",
+        "SA Extension 健康",
+        "連線與金鑰",
+        "排程（每來源獨立）",
+        "市場資料",
+        "交易日 / 價格覆蓋",
+        "新聞資料",
+        "總經資料",
+      ]);
+
     await setSearch("FRED");
     expect(Array.from(directory.querySelectorAll("button")).map((node) => node.textContent?.trim()))
       .toEqual(["總經資料"]);
-    expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).toBeNull();
+    expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
 
     await setSearch("OAuth");
     expect(directory.textContent).toContain("Provider 登入與憑證");
+  });
+
+  it("tracks_the_visible_data_sync_location_while_the_workspace_scrolls", async () => {
+    await renderSettings();
+    await click(tabWithText("資料與同步"));
+
+    const scrollOwner = host!.querySelector<HTMLElement>("main.settings-workspace")!;
+    const tabList = scrollOwner.querySelector<HTMLElement>(".settings-workflow-tabs > .ui-tab-list")!;
+    const offsets: Record<string, number> = {
+      data_sources: 80,
+      provider_health: 160,
+      sa_extension_health: 430,
+      provider_connections: 700,
+      source_schedules: 1_000,
+      data_storage: 1_500,
+      trading_day_coverage: 1_850,
+      news_storage: 2_250,
+      macro_storage: 2_650,
+    };
+    Object.defineProperties(scrollOwner, {
+      clientHeight: { configurable: true, value: 700 },
+      scrollHeight: { configurable: true, value: 3_200 },
+    });
+    scrollOwner.getBoundingClientRect = vi.fn(() => ({
+      top: 0,
+      bottom: 700,
+      left: 0,
+      right: 1_200,
+      width: 1_200,
+      height: 700,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }));
+    tabList.getBoundingClientRect = vi.fn(() => ({
+      top: 0,
+      bottom: 42,
+      left: 0,
+      right: 1_200,
+      width: 1_200,
+      height: 42,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }));
+    for (const anchor of scrollOwner.querySelectorAll<HTMLElement>("[data-settings-location]")) {
+      const location = anchor.dataset.settingsLocation!;
+      anchor.getBoundingClientRect = vi.fn(() => {
+        const top = offsets[location] - scrollOwner.scrollTop;
+        return {
+          top,
+          bottom: top + 100,
+          left: 250,
+          right: 1_200,
+          width: 950,
+          height: 100,
+          x: 250,
+          y: top,
+          toJSON: () => ({}),
+        };
+      });
+    }
+
+    await act(async () => {
+      scrollOwner.scrollTop = 1_000;
+      scrollOwner.dispatchEvent(new Event("scroll"));
+    });
+    expect(buttonWithText("排程（每來源獨立）", host!.querySelector('nav[aria-label="設定目錄"]')!)
+      .getAttribute("aria-current")).toBe("location");
+
+    await act(async () => {
+      scrollOwner.scrollTop = 1_500;
+      scrollOwner.dispatchEvent(new Event("scroll"));
+    });
+    expect(buttonWithText("市場資料", host!.querySelector('nav[aria-label="設定目錄"]')!)
+      .getAttribute("aria-current")).toBe("location");
+    expect(buttonWithText("排程（每來源獨立）", host!.querySelector('nav[aria-label="設定目錄"]')!)
+      .getAttribute("aria-current")).toBeNull();
   });
 
   it("manual_tab_switch_restores_group_top_without_stealing_selected_tab_focus", async () => {

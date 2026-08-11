@@ -28,6 +28,7 @@ import {
   tradingDayCoverageKey,
   type SettingsReadCache,
 } from "./settingsReadCache";
+import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
@@ -172,10 +173,12 @@ export function DataStorageSection({
         </div>
       )}
 
-      <TradingDayCoveragePanel
-        developerMode={developerMode}
-        settingsReadCache={settingsReadCache}
-      />
+      <SettingsSubsectionAnchor id="trading_day_coverage">
+        <TradingDayCoveragePanel
+          developerMode={developerMode}
+          settingsReadCache={settingsReadCache}
+        />
+      </SettingsSubsectionAnchor>
     </div>
   );
 }

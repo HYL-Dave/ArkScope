@@ -54,6 +54,7 @@ import {
   settingsErrorPresentation,
 } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
+import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
@@ -764,7 +765,8 @@ export function DataSourcesSection({
       )}
       {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}
 
-      <div className="settings-panel">
+      <SettingsSubsectionAnchor id="provider_health">
+        <div className="settings-panel">
         <h4 className="detail-section">{t(($) => $.dataSources.providers.health.title)}</h4>
         {!health ? (
           <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
@@ -807,9 +809,11 @@ export function DataSourcesSection({
             </table>
           </div>
         )}
-      </div>
+        </div>
+      </SettingsSubsectionAnchor>
 
-      <div className="settings-panel" style={{ marginTop: 16 }}>
+      <SettingsSubsectionAnchor id="sa_extension_health">
+        <div className="settings-panel" style={{ marginTop: 16 }}>
         <div className="settings-panel-head">
           <div>
             <h4 className="detail-section">{t(($) => $.dataSources.extension.title)}</h4>
@@ -868,9 +872,11 @@ export function DataSourcesSection({
             </div>
           </>
         )}
-      </div>
+        </div>
+      </SettingsSubsectionAnchor>
 
-      <div className="settings-panel" style={{ marginTop: 16 }}>
+      <SettingsSubsectionAnchor id="provider_connections">
+        <div className="settings-panel" style={{ marginTop: 16 }}>
         <h4 className="detail-section">{t(($) => $.dataSources.providers.config.title)}</h4>
         <p className="muted tiny">
           {t(($) => $.dataSources.providers.config.description)}
@@ -1050,9 +1056,11 @@ export function DataSourcesSection({
           </table>
           </div>
         )}
-      </div>
+        </div>
+      </SettingsSubsectionAnchor>
 
-      <div className="settings-panel" style={{ marginTop: 16 }}>
+      <SettingsSubsectionAnchor id="source_schedules">
+        <div className="settings-panel" style={{ marginTop: 16 }}>
         <h4 className="detail-section">{t(($) => $.dataSources.schedule.title)}</h4>
         {!schedule ? (
           <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
@@ -1140,7 +1148,8 @@ export function DataSourcesSection({
           {t(($) => $.dataSources.schedule.guardTitle)}
           {t(($) => $.dataSources.schedule.protection)}
         </p>
-      </div>
+        </div>
+      </SettingsSubsectionAnchor>
       <ConfirmDialog
         open={pendingGuardedEdit !== null}
         title={t(($) => $.dataSources.providers.config.guardTitle)}

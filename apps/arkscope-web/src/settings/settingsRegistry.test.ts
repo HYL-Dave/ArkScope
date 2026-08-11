@@ -8,12 +8,17 @@ import type { SettingsAnchorId } from "./settingsRegistry";
 import {
   SETTINGS_ANCHOR_IDS,
   SETTINGS_GROUPS,
+  SETTINGS_SUBSECTIONS,
   searchSettings,
   settingsAnchorDomId,
   firstSettingsAnchor,
   settingsGroup,
   settingsGroupFor,
+  settingsGroupForLocation,
+  settingsLocationDomId,
+  settingsParentAnchor,
   settingsSection,
+  settingsSubsectionsFor,
 } from "./settingsRegistry";
 import {
   RETIRED_SETTINGS_COLLAPSE_STORAGE_KEY,
@@ -128,6 +133,28 @@ describe("settings workspace registry", () => {
     expect(flattened.map((id) => settingsSection(id).id)).toEqual(flattened);
     expect(flattened.map((id) => settingsAnchorDomId(id))).toEqual(
       flattened.map((id) => `settings-${id}`),
+    );
+  });
+
+  it("maps_each_data_sync_subsection_to_one_stable_parent", () => {
+    expect(SETTINGS_SUBSECTIONS).toEqual([
+      { id: "provider_health", parent: "data_sources" },
+      { id: "sa_extension_health", parent: "data_sources" },
+      { id: "provider_connections", parent: "data_sources" },
+      { id: "source_schedules", parent: "data_sources" },
+      { id: "trading_day_coverage", parent: "data_storage" },
+    ]);
+    expect(settingsSubsectionsFor("data_sources").map((item) => item.id)).toEqual([
+      "provider_health",
+      "sa_extension_health",
+      "provider_connections",
+      "source_schedules",
+    ]);
+    expect(settingsSubsectionsFor("news_storage")).toEqual([]);
+    expect(settingsParentAnchor("source_schedules")).toBe("data_sources");
+    expect(settingsGroupForLocation("trading_day_coverage").id).toBe("data_sync");
+    expect(settingsLocationDomId("trading_day_coverage")).toBe(
+      "settings-trading_day_coverage",
     );
   });
 

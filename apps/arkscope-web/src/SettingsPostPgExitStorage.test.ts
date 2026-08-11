@@ -356,18 +356,18 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).not.toContain("一次性 PG→本地遷移工具");
   });
 
-  it("uses_normal_user_outcomes_in_the_enabled_settings_directory", async () => {
+  it("lists_the_active_data_group_and_its_stable_subsections", async () => {
     await renderSettings();
     const directory = host!.querySelector('nav[aria-label="設定目錄"]');
     expect(Array.from(directory!.querySelectorAll("button")).map((button) => button.textContent?.trim()))
       .toEqual([
-        "Provider 登入與憑證",
-        "模型與任務路由",
-        "固定 AI 任務執行限制",
-        "AI 研究執行限制",
-        "投資人設定",
         "資料來源與排程",
+        "Provider 健康",
+        "SA Extension 健康",
+        "連線與金鑰",
+        "排程（每來源獨立）",
         "市場資料",
+        "交易日 / 價格覆蓋",
         "新聞資料",
         "總經資料",
       ]);
