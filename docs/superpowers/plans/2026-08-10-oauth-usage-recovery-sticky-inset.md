@@ -1,8 +1,8 @@
 # OAuth Usage Recovery and Settings Sticky Inset Implementation Plan
 
-> **Status:** TASKS 0-5 COMPLETE AND REVIEWED; TASK 6 FAST-FORWARD MERGE
-> AND EXACT-MASTER VERIFICATION COMPLETE AT `fdb81913`; CLOSEOUT REVIEW
-> PENDING; TASK 7 NOT STARTED AND STILL REQUIRES EXPLICIT USER AUTHORIZATION
+> **Status:** TASKS 0-6 COMPLETE; TASK 6 CLOSEOUT AT `a8f91bf8`
+> INDEPENDENTLY FABLE-REVIEWED GREEN; IMPLEMENTATION/CUTOVER LINE CLOSED;
+> TASK 7 NOT STARTED AND STILL REQUIRES EXPLICIT USER AUTHORIZATION
 >
 > **Date:** 2026-08-10
 >
@@ -1028,7 +1028,10 @@ typecheck/build/scanner, protected bytes, native `4274/29/0`, and the
 two-viewport browser contract. Closeout packet
 `/tmp/oauth-usage-sticky-task6-merged-fdb81913` has 44 payloads; manifest
 SHA-256 `85f3b52f27f8e6560449c4612ce1340dbdd58406abd966fd171b42678c739e2c`.
-Independent closeout review is the sole next gate.
+Fable independently reconstructed the merge topology, product-byte boundary,
+four collection streams, native report, frontend runtime, browser contract,
+and packet, then returned closeout GREEN. The implementation/cutover line is
+closed.
 
 **Task 7 — live acceptance (post-merge, user-gated).** §5.3 below. Its
 results are rollout evidence, not merge preconditions, except that the
@@ -1120,5 +1123,6 @@ three assertion evolutions against their before/after diffs; adapter secrecy
 (grep artifacts for token/header leakage); MU1-MU6 diffs, RED owners, and
 byte-exact restoration; focused/full/native/browser results; protected-blob
 manifest; i18n scanner; and the Task 6 exact-master rerun. GREEN on Task 5
-review authorizes merge; GREEN on Task 6 closeout authorizes the Task 7
-user-gated live probe and line closure.
+review authorizes merge; GREEN on Task 6 closeout closes the
+implementation/cutover line. Task 7 remains separate rollout evidence and may
+run only after explicit user authorization in chat.
