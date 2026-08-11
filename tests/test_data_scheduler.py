@@ -2015,6 +2015,33 @@ def test_prices_failed_payload_persists_failed_without_partial(monkeypatch):
     assert finished["error"] == "price_collection_failed"
 
 
+def test_prices_gateway_failure_persists_typed_diagnostic(monkeypatch):
+    store = _install_recording_job_store(monkeypatch)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
+    payload = ds._parse_sanitized_prices_worker_stdout(json.dumps({
+        "status": "failed",
+        "error_class": "PriceCollectionUnavailable",
+        "error": "",
+        "error_code": "ibkr_gateway_unavailable",
+        "retryable": False,
+    }))
+    assert payload is not None
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_prices_worker_subprocess",
+        lambda argv: {"returncode": 1, "payload": payload},
+    )
+
+    result = ds.run_source("ibkr_prices", trigger_source="api")
+
+    assert result["status"] == "failed"
+    assert ds._state_store().get("ibkr_prices")["last_error"] == (
+        "ibkr_gateway_unavailable"
+    )
+    _, finished = store.finished[-1]
+    assert finished["error"] == "ibkr_gateway_unavailable"
+
+
 def test_prices_success_clears_prior_partial_and_preserves_audit_history(monkeypatch):
     store = _install_recording_job_store(monkeypatch)
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "LCID"])
@@ -2257,6 +2284,20 @@ def test_sanitized_ibkr_news_worker_timeout_returns_failed_payload(monkeypatch):
     assert step["payload"]["error_classes"] == ["TimeoutExpired"]
 
 
+def test_sanitized_ibkr_news_worker_parser_preserves_gateway_unavailable_code():
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    payload = ds._parse_sanitized_worker_stdout(json.dumps(
+        sanitize_worker_error(ConnectionError("PRIVATE_PROVIDER_TEXT"))
+    ))
+
+    assert payload is not None
+    assert payload["error_code"] == "ibkr_gateway_unavailable"
+    assert ds._sanitized_worker_failure_message(payload) == (
+        "ibkr_gateway_unavailable"
+    )
+
+
 def test_run_source_refuses_provider_work_when_provider_config_setup_required(monkeypatch):
     import src.provider_config_runtime as runtime
     import src.service.data_scheduler as ds
@@ -2303,6 +2344,22 @@ def test_prices_worker_stdout_parse_preserves_retryable_and_counts():
     assert ok["unresolved_after_fetch_count"] == 0
     assert ok["unresolved_after_fetch_tickers"] == []
     assert ok["provider"] == "ibkr"
+
+
+def test_prices_worker_stdout_parser_preserves_allowlisted_gateway_code():
+    payload = ds._parse_sanitized_prices_worker_stdout(json.dumps({
+        "status": "failed",
+        "error_class": "PriceCollectionUnavailable",
+        "error": "",
+        "error_code": "ibkr_gateway_unavailable",
+        "retryable": False,
+    }))
+
+    assert payload is not None
+    assert payload["error_code"] == "ibkr_gateway_unavailable"
+    assert ds._sanitized_prices_worker_failure_message(payload) == (
+        "ibkr_gateway_unavailable"
+    )
 
 
 def test_prices_worker_stdout_parser_preserves_partial_truth_and_bounded_tickers():

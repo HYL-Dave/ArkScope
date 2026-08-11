@@ -430,6 +430,7 @@ def test_provider_errors_remain_separate_diagnostics(tmp_path):
             "ticker": "AAA",
             "interval": "15min",
             "last_error": "contract unavailable",
+            "reason_code": "unknown",
             "updated_at": "2026-07-13T20:00:00Z",
         }
     ]

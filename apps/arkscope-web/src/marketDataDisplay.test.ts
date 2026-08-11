@@ -358,6 +358,48 @@ describe("coverageStatusLabel", () => {
       providerIssues: "供應商問題：1",
     });
   });
+
+  it("separates security review signals from generic provider issues", () => {
+    const labels = displayFunction<(
+      issues: Array<{
+        ticker: string;
+        interval: string;
+        last_error: string;
+        reason_code: "security_definition_unavailable" | "price_data_unresolved" | "provider_request_failed" | "unknown";
+        updated_at: string | null;
+      }>,
+      t: typeof zhT,
+    ) => string[]>("coverageProviderIssueLabels");
+    const issues = [
+      {
+        ticker: "EA",
+        interval: "15min",
+        last_error: "security_definition_unavailable",
+        reason_code: "security_definition_unavailable" as const,
+        updated_at: null,
+      },
+      {
+        ticker: "LCID",
+        interval: "15min",
+        last_error: "price_day_unresolved_after_fetch",
+        reason_code: "price_data_unresolved" as const,
+        updated_at: null,
+      },
+      {
+        ticker: "AAPL",
+        interval: "15min",
+        last_error: "provider failed",
+        reason_code: "unknown" as const,
+        updated_at: null,
+      },
+    ];
+
+    expect(labels(issues, zhT)).toEqual([
+      "IBKR 無法解析 1 個標的的合約：EA。可能是下市、代號異動或合約設定不完整；請先確認標的狀態。",
+      "1 個標的在完成交易日仍無價格：LCID。可能是停牌、下市或資料來源暫時缺資料；系統不會自動移除。",
+      "供應商問題：1",
+    ]);
+  });
 });
 
 describe("schedulerStateLabel", () => {
@@ -503,6 +545,17 @@ describe("schedulerStateLabel", () => {
     expect(schedulerStateLabel({ last_status: "skipped", continuation: null }).label).toBe("上次已跳過");
     expect(schedulerStateLabel({ last_status: "running", continuation: null }).label).toBe("執行中");
     expect(schedulerStateLabel(null).label).toBe("尚未執行");
+  });
+  it("names an IBKR Gateway failure instead of collapsing it into generic failure", () => {
+    expect(schedulerStateLabel({
+      last_status: "failed",
+      last_error: "ibkr_gateway_unavailable",
+      continuation: null,
+    })).toEqual({
+      label: "IBKR Gateway 無法連線",
+      tone: "bad",
+      needsContinue: false,
+    });
   });
   it("labels stale running as an interrupted/stuck state", () => {
     const r = schedulerStateLabel({

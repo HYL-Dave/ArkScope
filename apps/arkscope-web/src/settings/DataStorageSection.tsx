@@ -14,6 +14,7 @@ import {
   coverageDayReasonLabel,
   coverageMarketScopeLabel,
   coverageObservationHealthLabel,
+  coverageProviderIssueLabels,
   coverageSessionLabel,
   coverageStatusLabel,
   coverageTickerFactsPresentation,
@@ -212,13 +213,9 @@ function TradingDayCoveragePanel({
   const observationHealthLabel = cov
     ? coverageObservationHealthLabel(cov.observation_health, t)
     : null;
-  const providerIssuesLabel = cov
-    ? coverageDataQualityPresentation(
-      { unmatched_rth_row_count: null },
-      cov.provider_errors.length,
-      t,
-    ).providerIssues
-    : null;
+  const providerIssueLabels = cov
+    ? coverageProviderIssueLabels(cov.provider_errors, t)
+    : [];
 
   return (
     <div style={{ marginTop: 24, borderTop: "1px solid var(--border, #333)", paddingTop: 16 }}>
@@ -310,11 +307,11 @@ function TradingDayCoveragePanel({
               {observationHealthLabel}
             </p>
           ) : null}
-          {providerIssuesLabel ? (
-            <p className="tiny refresh-err" data-testid="coverage-provider-issues">
-              {providerIssuesLabel}
+          {providerIssueLabels.map((label) => (
+            <p className="tiny refresh-err" data-testid="coverage-provider-issues" key={label}>
+              {label}
             </p>
-          ) : null}
+          ))}
           {developerMode ? (
             <DeveloperDiagnostics
               diagnostics={coverageDeveloperDiagnostics(cov)}

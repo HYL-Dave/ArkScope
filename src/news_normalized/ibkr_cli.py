@@ -207,6 +207,8 @@ def sanitize_worker_error(exc: BaseException) -> dict[str, Any]:
     payload["error_classes"] = [type(exc).__name__]
     payload["error"] = message if retryable else ""
     payload["retryable"] = retryable
+    if isinstance(exc, ConnectionError):
+        payload["error_code"] = "ibkr_gateway_unavailable"
     return payload
 
 

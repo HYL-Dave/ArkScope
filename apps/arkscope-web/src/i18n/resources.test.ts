@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 738,
+      settings: 741,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -772,6 +772,8 @@ describe("bundled i18n resources", () => {
       "drilldown.unknownDetail",
       "drilldown.unmatched",
       "drilldown.providerIssues",
+      "drilldown.securityDefinition",
+      "drilldown.priceUnresolvedReview",
       "drilldown.sessionWindow",
     ].map((path) => `dataStorage.coverage.${path}`).sort();
 
@@ -789,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1822);
+      expect(total, `${locale}.total`).toBe(1825);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1132,6 +1134,9 @@ describe("bundled i18n resources", () => {
     const postSliceSettingsPaths = [
       "actions.refreshStatus",
       "dataStorage.coverage.generatedAt",
+      "dataStorage.coverage.drilldown.securityDefinition",
+      "dataStorage.coverage.drilldown.priceUnresolvedReview",
+      "dataSources.schedule.history.gatewayUnavailable",
       "dataSources.schedule.history.priceUnresolved_one",
       "dataSources.schedule.history.priceUnresolved_other",
       "providers.accountUsage.syncFailedNoSnapshot",

@@ -523,6 +523,16 @@ def test_sanitize_worker_error_does_not_mark_generic_timeout_retryable():
     assert payload["error"] == ""
 
 
+def test_sanitize_worker_error_classifies_gateway_connection_without_raw_text():
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    payload = sanitize_worker_error(ConnectionError("PRIVATE_PROVIDER_TEXT"))
+
+    assert payload["error_code"] == "ibkr_gateway_unavailable"
+    assert payload["error"] == ""
+    assert "PRIVATE_PROVIDER_TEXT" not in repr(payload)
+
+
 class _WorkerSource:
     def __init__(self, client_id=None):
         self.client_id = client_id

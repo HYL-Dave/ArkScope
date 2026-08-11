@@ -15,6 +15,7 @@ from .models import (
     ObservationHealthReason,
     ObservationReadResult,
     ProviderSyncIssue,
+    ProviderSyncIssueReason,
     RthObservation,
     RthSessionObservations,
 )
@@ -346,6 +347,17 @@ def _read_provider_errors(
                 ticker=ticker,
                 interval=raw_interval,
                 last_error=raw_error,
+                reason_code={
+                    "security_definition_unavailable": (
+                        ProviderSyncIssueReason.SECURITY_DEFINITION_UNAVAILABLE
+                    ),
+                    "price_day_unresolved_after_fetch": (
+                        ProviderSyncIssueReason.PRICE_DATA_UNRESOLVED
+                    ),
+                    "ibkr_historical_data_request_failed": (
+                        ProviderSyncIssueReason.PROVIDER_REQUEST_FAILED
+                    ),
+                }.get(raw_error, ProviderSyncIssueReason.UNKNOWN),
                 updated_at=raw_updated_at,
             )
         )

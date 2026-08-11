@@ -2481,8 +2481,15 @@ export interface ProviderSyncIssue {
   ticker: string;
   interval: string;
   last_error: string;
+  reason_code:
+    | "security_definition_unavailable"
+    | "price_data_unresolved"
+    | "provider_request_failed"
+    | "unknown";
   updated_at: string | null;
 }
+
+export const IBKR_GATEWAY_UNAVAILABLE = "ibkr_gateway_unavailable" as const;
 
 export interface TradingDayRow {
   date: string;

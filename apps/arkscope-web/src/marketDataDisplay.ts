@@ -1,17 +1,19 @@
-import type {
-  CalendarHealthReason,
-  ClosureReasonCode,
-  CoverageCalendarHealth,
-  CoverageDayReason,
-  CoverageObservationHealth,
-  CoverageSession,
-  MacroStatus,
-  MarketScope,
-  MarketDataStatus,
-  NewsStatus,
-  ObservationHealthReason,
-  ScheduleSourceState,
-  TradingDayRow,
+import {
+  IBKR_GATEWAY_UNAVAILABLE,
+  type CalendarHealthReason,
+  type ClosureReasonCode,
+  type CoverageCalendarHealth,
+  type CoverageDayReason,
+  type CoverageObservationHealth,
+  type CoverageSession,
+  type MacroStatus,
+  type MarketScope,
+  type MarketDataStatus,
+  type NewsStatus,
+  type ObservationHealthReason,
+  type ProviderSyncIssue,
+  type ScheduleSourceState,
+  type TradingDayRow,
 } from "./api";
 import {
   providerHealthCopy,
@@ -305,6 +307,46 @@ export function coverageDataQualityPresentation(
   };
 }
 
+function issueTickerList(issues: ProviderSyncIssue[]): string {
+  const tickers = [...new Set(issues.map((issue) => issue.ticker))].sort();
+  const visible = tickers.slice(0, 8);
+  return tickers.length > visible.length
+    ? `${visible.join(", ")} +${tickers.length - visible.length}`
+    : visible.join(", ");
+}
+
+export function coverageProviderIssueLabels(
+  issues: ProviderSyncIssue[],
+  t: SettingsT,
+): string[] {
+  const securityDefinition = issues.filter(
+    (issue) => issue.reason_code === "security_definition_unavailable",
+  );
+  const unresolved = issues.filter(
+    (issue) => issue.reason_code === "price_data_unresolved",
+  );
+  const otherCount = issues.length - securityDefinition.length - unresolved.length;
+  const labels: string[] = [];
+  if (securityDefinition.length > 0) {
+    labels.push(t(($) => $.dataStorage.coverage.drilldown.securityDefinition, {
+      count: securityDefinition.length,
+      tickers: issueTickerList(securityDefinition),
+    }));
+  }
+  if (unresolved.length > 0) {
+    labels.push(t(($) => $.dataStorage.coverage.drilldown.priceUnresolvedReview, {
+      count: unresolved.length,
+      tickers: issueTickerList(unresolved),
+    }));
+  }
+  if (otherCount > 0) {
+    labels.push(t(($) => $.dataStorage.coverage.drilldown.providerIssues, {
+      count: otherCount,
+    }));
+  }
+  return labels;
+}
+
 type SchedulerDurablePresentation = Pick<
   NonNullable<ScheduleSourceState["durable_state"]>,
   | "last_status"
@@ -312,7 +354,7 @@ type SchedulerDurablePresentation = Pick<
   | "last_result"
   | "running_stale"
   | "running_stale_reason"
->;
+> & { last_error?: string | null };
 
 function positiveCount(value: unknown): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) return 0;
@@ -425,7 +467,9 @@ export function schedulerStateLabel(
     }
     case "failed":
       return {
-        label: t(($) => $.dataSources.schedule.history.failed),
+        label: durable?.last_error === IBKR_GATEWAY_UNAVAILABLE
+          ? t(($) => $.dataSources.schedule.history.gatewayUnavailable)
+          : t(($) => $.dataSources.schedule.history.failed),
         tone: "bad",
         needsContinue: false,
       };

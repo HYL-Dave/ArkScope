@@ -101,6 +101,24 @@ def test_prices_worker_prints_sanitized_error_json(monkeypatch, capsys):
     assert "PRIVATE_PROVIDER_PATH" not in json.dumps(private_payload)
 
 
+def test_prices_worker_preserves_allowlisted_gateway_error_code_only():
+    from src import prices_runtime as worker
+
+    class GatewayUnavailable(RuntimeError):
+        error_code = "ibkr_gateway_unavailable"
+
+    payload = worker.sanitize_error(GatewayUnavailable("PRIVATE_PROVIDER_TEXT"))
+
+    assert payload == {
+        "status": "failed",
+        "error_class": "GatewayUnavailable",
+        "error": "",
+        "error_code": "ibkr_gateway_unavailable",
+        "retryable": False,
+    }
+    assert "PRIVATE_PROVIDER_TEXT" not in json.dumps(payload)
+
+
 def test_prices_worker_prints_sanitized_partial_json_and_exits_zero(monkeypatch, capsys):
     from src import prices_runtime as worker
 

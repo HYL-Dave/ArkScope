@@ -78,6 +78,30 @@ class IBKRNewsArticleUnavailable(RuntimeError):
         super().__init__(f"IBKR news article unavailable ({self.error_code})")
 
 
+class IBKRPriceDataError(RuntimeError):
+    """Safe, typed price error that may cross the worker telemetry boundary."""
+
+    error_code: str
+
+    def __init__(self, error_code: str):
+        self.error_code = error_code
+        super().__init__(error_code)
+
+
+class IBKRSecurityDefinitionUnavailable(IBKRPriceDataError):
+    """IBKR could not resolve the requested symbol to a contract."""
+
+    def __init__(self):
+        super().__init__("security_definition_unavailable")
+
+
+class IBKRHistoricalDataRequestFailed(IBKRPriceDataError):
+    """A resolved contract's historical-data request failed."""
+
+    def __init__(self):
+        super().__init__("ibkr_historical_data_request_failed")
+
+
 def _ibkr_equity_end_of_day(trade_date: date) -> str:
     return f"{trade_date:%Y%m%d} 23:59:59 {_IBKR_EQUITY_TIME_ZONE}"
 
@@ -934,7 +958,10 @@ class IBKRDataSource(BaseDataSource):
                     self._rate_limit_wait()
 
                     contract = self._create_contract(ticker)
-                    self._ib.qualifyContracts(contract)
+                    qualified = self._ib.qualifyContracts(contract)
+                    if not qualified:
+                        raise IBKRSecurityDefinitionUnavailable()
+                    contract = qualified[0]
 
                     duration_days = (chunk_end - chunk_start).days + 1
                     end_datetime = _ibkr_equity_end_of_day(chunk_end)
@@ -970,8 +997,11 @@ class IBKRDataSource(BaseDataSource):
 
                     logger.info(f"    Retrieved {len(bars)} bars for chunk")
 
+                except IBKRPriceDataError:
+                    raise
                 except Exception as e:
                     logger.error(f"  Error in chunk {chunk_start}-{chunk_end}: {e}")
+                    raise IBKRHistoricalDataRequestFailed() from e
 
                 chunk_start = chunk_end + timedelta(days=1)
 

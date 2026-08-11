@@ -266,6 +266,7 @@ _SANITIZED_WORKER_COUNT_KEYS = (
     "tickers_scanned",
 )
 _SANITIZED_WORKER_LEG_STATUSES = frozenset({"succeeded", "partial", "failed"})
+_PROVIDER_WORKER_ERROR_CODES = frozenset({"ibkr_gateway_unavailable"})
 
 
 def _make_normalized_news_provider(source: str):
@@ -527,6 +528,11 @@ def _parse_sanitized_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
     error = str(raw.get("error") or "").strip()
     payload["error"] = error[:_ERROR_TAIL] if error else ""
     payload["retryable"] = raw.get("retryable") is True
+    error_code = raw.get("error_code")
+    if error_code is not None:
+        if error_code not in _PROVIDER_WORKER_ERROR_CODES:
+            return None
+        payload["error_code"] = error_code
     classes = raw.get("error_classes")
     if isinstance(classes, list):
         payload["error_classes"] = [
@@ -587,6 +593,9 @@ def _run_sanitized_json_subprocess(argv: List[str]) -> Dict[str, Any]:
 
 
 def _sanitized_worker_failure_message(payload: Dict[str, Any]) -> str:
+    error_code = payload.get("error_code")
+    if error_code in _PROVIDER_WORKER_ERROR_CODES:
+        return str(error_code)
     classes = payload.get("error_classes")
     if isinstance(classes, list) and classes:
         return f"normalized IBKR worker failed ({', '.join(map(str, classes))})"
@@ -641,7 +650,13 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
         error_class if error_class.replace("_", "").isalnum() else ""
     )
     if status == "failed" and not has_structured_counts:
-        return {
+        error_code = raw.get("error_code")
+        if (
+            error_code is not None
+            and error_code not in _PROVIDER_WORKER_ERROR_CODES
+        ):
+            return None
+        payload = {
             "status": "failed",
             "provider": None,
             **{key: 0 for key in _PRICES_WORKER_COUNT_KEYS},
@@ -651,6 +666,9 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
             "error": str(raw.get("error") or "")[:_ERROR_TAIL],
             "retryable": raw.get("retryable") is True,
         }
+        if error_code is not None:
+            payload["error_code"] = error_code
+        return payload
 
     provider = raw.get("provider")
     if provider not in {"ibkr", "polygon"}:
@@ -724,6 +742,9 @@ def _run_sanitized_prices_worker_subprocess(argv: List[str]) -> Dict[str, Any]:
 
 
 def _sanitized_prices_worker_failure_message(payload: Dict[str, Any]) -> str:
+    error_code = payload.get("error_code")
+    if error_code in _PROVIDER_WORKER_ERROR_CODES:
+        return str(error_code)
     error = str(payload.get("error") or "").strip()
     if error:
         return error[:_ERROR_TAIL]
@@ -1121,7 +1142,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                             "skip_kind": "skipped_lock_busy",
                         })
                     else:
-                        raise RuntimeError("price_collection_failed")
+                        error_code = step["payload"].get("error_code")
+                        raise RuntimeError(
+                            str(error_code)
+                            if error_code in _PROVIDER_WORKER_ERROR_CODES
+                            else "price_collection_failed"
+                        )
                 elif price_status != "succeeded" or step["returncode"] != 0:
                     raise RuntimeError(
                         _sanitized_prices_worker_failure_message(step["payload"])

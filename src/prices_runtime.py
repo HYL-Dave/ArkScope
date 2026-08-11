@@ -16,6 +16,7 @@ _PRICE_COUNT_FIELDS = (
     "unresolved_after_fetch_count",
 )
 _SAFE_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9 ._-]{0,11}$")
+_SAFE_ERROR_CODES = frozenset({"ibkr_gateway_unavailable"})
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -101,12 +102,16 @@ def sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
 def sanitize_error(exc: BaseException) -> dict[str, Any]:
     raw = str(exc)
     retryable = _is_retryable_error(raw)
-    return {
+    payload = {
         "status": "failed",
         "error_class": exc.__class__.__name__,
         "error": raw[:MAX_ERROR_LEN] if retryable else "",
         "retryable": retryable,
     }
+    error_code = getattr(exc, "error_code", None)
+    if error_code in _SAFE_ERROR_CODES:
+        payload["error_code"] = error_code
+    return payload
 
 
 def _run_worker(

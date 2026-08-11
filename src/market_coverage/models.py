@@ -38,6 +38,13 @@ class ObservationHealthReason(str, Enum):
     PRICES_SCHEMA_MISSING = "prices_schema_missing"
 
 
+class ProviderSyncIssueReason(str, Enum):
+    SECURITY_DEFINITION_UNAVAILABLE = "security_definition_unavailable"
+    PRICE_DATA_UNRESOLVED = "price_data_unresolved"
+    PROVIDER_REQUEST_FAILED = "provider_request_failed"
+    UNKNOWN = "unknown"
+
+
 class CalendarDayKind(str, Enum):
     OPEN = "open"
     CLOSED = "closed"
@@ -187,6 +194,7 @@ class ProviderSyncIssue:
     ticker: str
     interval: str
     last_error: str
+    reason_code: ProviderSyncIssueReason
     updated_at: str | None
 
     def __post_init__(self) -> None:
@@ -204,6 +212,10 @@ class ProviderSyncIssue:
             raise TypeError("provider issue last_error must be a string")
         if not self.last_error.strip():
             raise ValueError("provider issue last_error must be a non-empty value")
+        if not isinstance(self.reason_code, ProviderSyncIssueReason):
+            raise TypeError(
+                "provider issue reason_code must be ProviderSyncIssueReason"
+            )
         if self.updated_at is not None and not isinstance(self.updated_at, str):
             raise TypeError("provider issue updated_at must be a string or None")
 

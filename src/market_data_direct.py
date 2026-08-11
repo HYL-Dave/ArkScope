@@ -82,6 +82,14 @@ _PRICE_COLLECTION_FAILED = "price_collection_failed"
 _INTERVAL_DB = {"15min": "15min", "15 mins": "15min"}  # provider label → stored label
 
 
+class PriceCollectionUnavailable(RuntimeError):
+    """Safe top-level worker failure with a closed diagnostic code."""
+
+    def __init__(self, error_code: str):
+        self.error_code = error_code
+        super().__init__(error_code)
+
+
 # --- UTC PK normalization (the byte-match invariant) -------------------------------
 
 def _normalize_utc(dt: datetime, exchange_tz: str = _EXCHANGE_TZ) -> str:
@@ -473,19 +481,11 @@ def _fetch_rows_for_gaps(canon, fetch_days, interval, provider, ibkr_src, polygo
     every complete trading day to cover, not just zero-bar gaps). IBKR primary fetches the
     CONTIGUOUS [min,max] span in one request (auto-chunked; INSERT OR IGNORE dedupes).
 
-    Polygon fallback (per day) engages whenever IBKR returns NO bars for the span. Note the
-    failure granularity of ``IBKRDataSource.fetch_historical_intraday`` (verified):
-      - a COLD-CONNECT failure (Gateway down/unreachable at first connect) RAISES
-        ``ConnectionError`` → propagates out → recorded as a per-ticker error (loud). Polygon
-        is NOT reached.
-      - a REQUEST-LEVEL failure once connected (mid-session disconnect, pacing rejection,
-        timeout, no-data/error-162) is swallowed by the adapter (logs + continues) and
-        returns an EMPTY result, NOT a raise. So it is INDISTINGUISHABLE here from "symbol
-        genuinely absent on IBKR" — both fall through to Polygon. A real IBKR hiccup is
-        therefore masked as a Polygon substitution (data stays correct — Polygon rows
-        byte-match the UTC PK + INSERT OR IGNORE — but provider_sync_meta won't flag the IBKR
-        problem). Distinguishing the two needs the adapter to surface per-chunk errors; that
-        observability fix is a DEFERRED follow-up (best done with the recurring scheduler)."""
+    Polygon fallback (per day) engages whenever a successful IBKR request returns NO bars for
+    the span. Connection, contract-resolution, and historical-request failures propagate as
+    typed issues and are recorded per ticker; they never masquerade as a successful Polygon
+    substitution. A genuinely empty response remains ambiguous (halt, delisting, or temporary
+    provider absence), so it may use Polygon and is never treated as proof of delisting."""
     start, end = min(fetch_days), max(fetch_days)
     rows: List[tuple] = []
     if provider == "ibkr" and ibkr_src is not None:
@@ -630,12 +630,9 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
         try:
             ok = ibkr_src.connect()
         except Exception as e:  # noqa: BLE001 — surface as a loud run failure
-            raise RuntimeError(f"IBKR preflight connect failed: {e}") from e
+            raise PriceCollectionUnavailable("ibkr_gateway_unavailable") from e
         if not ok:
-            raise RuntimeError(
-                "IBKR preflight connect failed: Gateway API handshake not established "
-                "(TCP may be open but the API session is down — check login / API enabled / "
-                "client-id). Run aborted before acquiring the market write lock.")
+            raise PriceCollectionUnavailable("ibkr_gateway_unavailable")
 
     now_et = _norm_now_et(now_et)
     end = today or now_et.date()

@@ -740,6 +740,26 @@ def test_backfill_per_ticker_exception_isolated(tmp_path, monkeypatch):
     conn.close()
 
 
+def test_backfill_preserves_typed_security_definition_issue(tmp_path, monkeypatch):
+    from data_sources.ibkr_source import IBKRSecurityDefinitionUnavailable
+
+    ibkr = _FakeIBKR(
+        {"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
+        exceptions_by_ticker={"EA": IBKRSecurityDefinitionUnavailable()},
+    )
+    db, result = _run_one_complete_day(
+        tmp_path, monkeypatch, tickers="AAPL,EA", ibkr=ibkr,
+    )
+
+    assert result["status"] == "partial"
+    assert result["errors"] == {"EA": "security_definition_unavailable"}
+    conn = sqlite3.connect(db)
+    assert conn.execute(
+        "SELECT last_error FROM provider_sync_meta WHERE ticker='EA'"
+    ).fetchone() == ("security_definition_unavailable",)
+    conn.close()
+
+
 def test_backfill_empty_scope_fails_loud(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _backfill_db(tmp_path)
@@ -1020,14 +1040,12 @@ def test_backfill_topup_excludes_in_progress_today(tmp_path, monkeypatch):
     assert today_rows == 0  # in-progress today not fetched/written
 
 
-def test_backfill_ibkr_empty_from_swallowed_request_error_falls_to_polygon(tmp_path, monkeypatch):
-    # 2d review (MED): the real IBKRDataSource SWALLOWS a request-level failure (mid-session
-    # disconnect / pacing / timeout) into an EMPTY result (logs+continues, no raise) — it is
-    # indistinguishable here from "symbol absent", so it falls through to Polygon. This pins
-    # that documented behavior so the contract can't silently drift back to "raises loud".
+def test_backfill_ibkr_successful_empty_response_falls_to_polygon(tmp_path, monkeypatch):
+    # A successful-but-empty IBKR response remains ambiguous and may fall back to Polygon.
+    # Typed connection/contract/request failures are covered separately and must stay loud.
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _backfill_db(tmp_path)
-    ibkr = _FakeIBKR(bars_by_ticker={})  # empty (models the swallowed-error / absent result)
+    ibkr = _FakeIBKR(bars_by_ticker={})
     epoch_ms = int(datetime(2026, 6, 22, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
     poly = _FakePolygon(results_by_day={date(2026, 6, 22): [
         {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
@@ -1037,7 +1055,7 @@ def test_backfill_ibkr_empty_from_swallowed_request_error_falls_to_polygon(tmp_p
     assert res["rows_added"] == 1 and poly.calls          # silently switched to Polygon
     assert res["status"] == "succeeded"
     assert res["unresolved_after_fetch_count"] == 0
-    # masked: NOT recorded as a per-ticker error (the documented MED limitation)
+    # Polygon resolved the empty response, so no provider issue remains.
     conn = sqlite3.connect(db)
     assert conn.execute("SELECT last_error FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()[0] is None
     conn.close()
@@ -1067,10 +1085,14 @@ def test_backfill_preflight_connect_failure_fails_fast_no_lock_no_run(tmp_path, 
     db = _backfill_db(tmp_path)
     ibkr = _FakeIBKRConnect(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
                             connect_ok=False)
-    with pytest.raises(RuntimeError, match="IBKR"):
+    with pytest.raises(
+        mdd.PriceCollectionUnavailable,
+        match="^ibkr_gateway_unavailable$",
+    ) as caught:
         mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
                                    db_path=str(db), ibkr_src=ibkr,
                                    now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    assert caught.value.error_code == "ibkr_gateway_unavailable"
     conn = sqlite3.connect(db)
     # no prices written, no run row created
     assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 0

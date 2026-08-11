@@ -704,6 +704,7 @@ describe("post-PG-exit storage panels", () => {
         ticker: "AAPL",
         interval: "15min",
         last_error: providerDiagnostic,
+        reason_code: "unknown",
         updated_at: "2026-07-20T03:00:00Z",
       }],
     };
@@ -843,6 +844,7 @@ describe("post-PG-exit storage panels", () => {
         ticker: "AAPL",
         interval: "15min",
         last_error: rawProviderDetail,
+        reason_code: "unknown",
         updated_at: "2026-07-24T20:05:00+00:00",
       }],
     };
