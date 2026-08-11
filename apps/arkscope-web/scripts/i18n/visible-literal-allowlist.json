@@ -61,7 +61,7 @@
       "file": "src/marketDataDisplay.ts",
       "kind": "presenter_return",
       "literal": "warn",
-      "count": 9,
+      "count": 10,
       "classification": "stable_identifier",
       "reason": "non-visible tone, enum, form value, or identifier format required by the existing typed domain contract"
     },

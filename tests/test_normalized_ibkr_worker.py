@@ -126,6 +126,111 @@ def test_runtime_gateway_with_successful_empty_provider_set_makes_no_headline_ca
     assert source.fetch_news_calls == []
 
 
+def _runtime_news_article(label: str, published_at: datetime):
+    return SimpleNamespace(
+        ticker="AAPL",
+        title=f"Headline {label}",
+        source="DJ-N",
+        description=f"[Article ID: DJ-N${label}]",
+        published_date=published_at,
+        url="",
+    )
+
+
+def test_runtime_gateway_accepts_has_more_when_page_overlaps_local_cursor():
+    from data_sources.ibkr_source import IBKRNewsPage
+    from src.news_normalized.ibkr_runtime import IBKRRuntimeGateway
+
+    class Source:
+        def fetch_news_page_strict(self, *args, **kwargs):
+            return IBKRNewsPage(
+                articles=(
+                    _runtime_news_article("new", datetime(2026, 8, 12, 10, 0)),
+                    _runtime_news_article("overlap", datetime(2026, 8, 11, 9, 0)),
+                ),
+                has_more=True,
+            )
+
+    gateway = IBKRRuntimeGateway(Source())
+
+    rows = list(gateway.fetch_headlines("AAPL", "2026-08-11T10:00:00Z"))
+
+    assert [row.article_id for row in rows] == ["DJ-N$new", "DJ-N$overlap"]
+    assert gateway.headline_coverage_counts() == {
+        "headline_pages_requested": 1,
+        "headline_saturated_tickers": 1,
+        "headline_incomplete_tickers": 0,
+    }
+
+
+def test_runtime_gateway_yields_page_then_fails_when_cursor_is_not_covered():
+    from data_sources.ibkr_source import IBKRNewsPage
+    from src.news_normalized.ibkr_runtime import (
+        IBKRNewsCoverageIncomplete,
+        IBKRRuntimeGateway,
+    )
+
+    class Source:
+        def fetch_news_page_strict(self, *args, **kwargs):
+            return IBKRNewsPage(
+                articles=(
+                    _runtime_news_article("new", datetime(2026, 8, 12, 10, 0)),
+                ),
+                has_more=True,
+            )
+
+    gateway = IBKRRuntimeGateway(Source())
+    rows = gateway.fetch_headlines("AAPL", "2026-08-10T10:00:00Z")
+
+    assert next(rows).article_id == "DJ-N$new"
+    with pytest.raises(
+        IBKRNewsCoverageIncomplete,
+        match="ibkr_news_window_incomplete",
+    ):
+        next(rows)
+    assert gateway.headline_coverage_counts()["headline_incomplete_tickers"] == 1
+
+
+def test_runtime_gateway_fails_closed_when_has_more_signal_is_missing():
+    from data_sources.ibkr_source import IBKRNewsPage
+    from src.news_normalized.ibkr_runtime import (
+        IBKRNewsCoverageIncomplete,
+        IBKRRuntimeGateway,
+    )
+
+    class Source:
+        def fetch_news_page_strict(self, *args, **kwargs):
+            return IBKRNewsPage(articles=(), has_more=None)
+
+    gateway = IBKRRuntimeGateway(Source())
+
+    with pytest.raises(
+        IBKRNewsCoverageIncomplete,
+        match="ibkr_news_completion_unknown",
+    ):
+        list(gateway.fetch_headlines("AAPL", "2026-08-10T10:00:00Z"))
+
+
+def test_worker_stdout_preserves_only_aggregate_headline_coverage_counts():
+    from src.news_normalized.ibkr_cli import sanitize_worker_result
+
+    payload = sanitize_worker_result(
+        {
+            "status": "partial",
+            "headline_pages_requested": 150,
+            "headline_saturated_tickers": 85,
+            "headline_incomplete_tickers": 2,
+            "errors": {"PRIVATE_TICKER": "PRIVATE_HEADLINE"},
+        }
+    )
+
+    assert payload["headline_pages_requested"] == 150
+    assert payload["headline_saturated_tickers"] == 85
+    assert payload["headline_incomplete_tickers"] == 2
+    assert "PRIVATE_TICKER" not in repr(payload)
+    assert "PRIVATE_HEADLINE" not in repr(payload)
+
+
 def test_ibkr_worker_requires_explicit_tickers():
     from src.news_normalized import ibkr_cli as worker
 
@@ -188,6 +293,9 @@ def test_ibkr_worker_prints_sanitized_json_without_provider_payload(
         "retry_bodies_attempted",
         "retry_bodies_fetched",
         "tickers_scanned",
+        "headline_pages_requested",
+        "headline_saturated_tickers",
+        "headline_incomplete_tickers",
         "error_count",
         "error_classes",
         "continuation",

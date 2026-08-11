@@ -2551,6 +2551,9 @@ def test_worker_stdout_parse_preserves_retry_legs_and_body_backlog():
                 "retry_bodies_attempted": 2,
                 "retry_bodies_fetched": 1,
                 "tickers_scanned": 3,
+                "headline_pages_requested": 3,
+                "headline_saturated_tickers": 2,
+                "headline_incomplete_tickers": 1,
                 "error_count": 0,
                 "error_classes": [],
                 "legs": {"retry": "succeeded", "fresh": "succeeded"},
@@ -2569,6 +2572,9 @@ def test_worker_stdout_parse_preserves_retry_legs_and_body_backlog():
     assert payload["retry_bodies_attempted"] == 2
     assert payload["retry_bodies_fetched"] == 1
     assert payload["tickers_scanned"] == 3
+    assert payload["headline_pages_requested"] == 3
+    assert payload["headline_saturated_tickers"] == 2
+    assert payload["headline_incomplete_tickers"] == 1
     assert payload["legs"] == {"retry": "succeeded", "fresh": "succeeded"}
     assert payload["body_backlog"] == {
         "status": "ok",

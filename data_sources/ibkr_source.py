@@ -78,6 +78,14 @@ class IBKRNewsArticleUnavailable(RuntimeError):
         super().__init__(f"IBKR news article unavailable ({self.error_code})")
 
 
+@dataclass(frozen=True)
+class IBKRNewsPage:
+    """One historical-news response plus IBKR's continuation signal."""
+
+    articles: tuple[NewsArticle, ...]
+    has_more: Optional[bool]
+
+
 class IBKRPriceDataError(RuntimeError):
     """Safe, typed price error that may cross the worker telemetry boundary."""
 
@@ -550,18 +558,20 @@ class IBKRDataSource(BaseDataSource):
             logger.error(f"Error fetching news providers: {e}")
             return []
 
-    def _fetch_news_single_query(
+    def _fetch_news_page(
         self,
         con_id: int,
         providers: str,
         start_dt: datetime,
         end_dt: datetime,
         ticker: str,
-    ) -> List[NewsArticle]:
+    ) -> IBKRNewsPage:
         """
-        Single IBKR news query (max 300 results).
+        Run one IBKR news query without discarding ``historicalNewsEnd.hasMore``.
 
-        Internal helper - use fetch_news() instead.
+        ``ib_insync`` 0.9.86 ends the request but drops the callback's
+        continuation flag. The worker uses that flag together with its local
+        cursor to decide whether the returned 300-row window is complete.
 
         Args:
             start_dt: Start datetime (with time precision)
@@ -571,20 +581,46 @@ class IBKRDataSource(BaseDataSource):
         end_str = end_dt.strftime('%Y%m%d %H:%M:%S')
 
         self._rate_limit_wait()
-
-        headlines = self._ib.reqHistoricalNews(
-            con_id,
-            providers,
-            start_str,
-            end_str,
-            300,  # Always request max to detect if we need to split
+        wrapper = getattr(self._ib, "wrapper", None)
+        previous_callback = getattr(wrapper, "historicalNewsEnd", None)
+        had_instance_callback = bool(
+            wrapper is not None
+            and "historicalNewsEnd" in getattr(wrapper, "__dict__", {})
         )
+        previous_instance_callback = (
+            wrapper.__dict__.get("historicalNewsEnd")
+            if had_instance_callback
+            else None
+        )
+        has_more_values: list[bool] = []
 
-        if not headlines:
-            return []
+        if getattr(self, "_historical_news_capture_active", False):
+            raise RuntimeError("nested IBKR historical-news request")
+        self._historical_news_capture_active = True
+        if wrapper is not None and callable(previous_callback):
+            def capture_historical_news_end(req_id, has_more):
+                has_more_values.append(bool(has_more))
+                return previous_callback(req_id, has_more)
+
+            wrapper.historicalNewsEnd = capture_historical_news_end
+        try:
+            headlines = self._ib.reqHistoricalNews(
+                con_id,
+                providers,
+                start_str,
+                end_str,
+                300,
+            )
+        finally:
+            if wrapper is not None and callable(previous_callback):
+                if had_instance_callback:
+                    wrapper.historicalNewsEnd = previous_instance_callback
+                else:
+                    del wrapper.historicalNewsEnd
+            self._historical_news_capture_active = False
 
         articles = []
-        for h in headlines:
+        for h in headlines or ():
             # Parse the headline metadata
             # Format: {A:conId:L:lang:K:sentiment:C:confidence}headline
             headline_text = h.headline
@@ -625,7 +661,51 @@ class IBKRDataSource(BaseDataSource):
                 data_source='ibkr',
             ))
 
-        return articles
+        return IBKRNewsPage(
+            articles=tuple(articles),
+            has_more=has_more_values[-1] if has_more_values else None,
+        )
+
+    def _fetch_news_single_query(
+        self,
+        con_id: int,
+        providers: str,
+        start_dt: datetime,
+        end_dt: datetime,
+        ticker: str,
+    ) -> List[NewsArticle]:
+        """Compatibility wrapper for callers that only consume headlines."""
+        return list(
+            self._fetch_news_page(
+                con_id, providers, start_dt, end_dt, ticker
+            ).articles
+        )
+
+    def fetch_news_page_strict(
+        self,
+        ticker: str,
+        *,
+        start_dt: datetime,
+        end_dt: datetime,
+        providers: Optional[str] = None,
+    ) -> IBKRNewsPage:
+        """Fetch one ticker page while preserving errors and completeness."""
+        self._ensure_connected()
+        if providers is None:
+            available = self.get_news_providers_strict()
+            if not available:
+                return IBKRNewsPage(articles=(), has_more=False)
+            providers = "+".join(row["code"] for row in available)
+
+        contract = self._create_contract(ticker)
+        self._ib.qualifyContracts(contract)
+        return self._fetch_news_page(
+            contract.conId,
+            providers,
+            start_dt,
+            end_dt,
+            ticker,
+        )
 
     def fetch_news(
         self,

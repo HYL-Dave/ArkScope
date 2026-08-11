@@ -264,6 +264,9 @@ _SANITIZED_WORKER_COUNT_KEYS = (
     "retry_bodies_attempted",
     "retry_bodies_fetched",
     "tickers_scanned",
+    "headline_pages_requested",
+    "headline_saturated_tickers",
+    "headline_incomplete_tickers",
 )
 _SANITIZED_WORKER_LEG_STATUSES = frozenset({"succeeded", "partial", "failed"})
 _PROVIDER_WORKER_ERROR_CODES = frozenset({"ibkr_gateway_unavailable"})

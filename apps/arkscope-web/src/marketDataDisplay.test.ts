@@ -470,6 +470,34 @@ describe("schedulerStateLabel", () => {
     });
   });
 
+  it("names an IBKR headline coverage gap instead of showing generic partial", () => {
+    const durable = {
+      last_status: "partial" as const,
+      continuation: null,
+      last_result: {
+        source: "ibkr_news",
+        status: "partial",
+        collect: {
+          status: "partial" as const,
+          headline_pages_requested: 150,
+          headline_saturated_tickers: 85,
+          headline_incomplete_tickers: 3,
+        },
+      },
+    };
+
+    expect(localizedSchedulerStateLabel(durable, zhT)).toEqual({
+      label: "部分完成（3 個標的的新聞可能有缺漏）",
+      tone: "warn",
+      needsContinue: false,
+    });
+    expect(localizedSchedulerStateLabel(durable, settingsT("en"))).toEqual({
+      label: "Partially completed (news may be missing for 3 tickers)",
+      tone: "warn",
+      needsContinue: false,
+    });
+  });
+
   it.each([
     [
       { deferred_ticker_count: 3, deferred_body_count: 0, has_cursor: false },

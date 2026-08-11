@@ -93,6 +93,29 @@ Operational ruling: keep normal IBKR news scheduling enabled. If IBKR news is di
 
 Methodology caveat: local SQLite counts are a lower bound. Articles already missed because they fell out of IBKR's 300-most-recent provider window cannot be recovered or counted after the fact.
 
+### Incremental completeness contract (2026-08-12)
+
+The normalized worker now preserves `historicalNewsEnd.hasMore`, which
+`ib_insync==0.9.86` otherwise discards. It evaluates the signal against the
+latest local per-ticker cursor:
+
+| Provider result | Worker ruling |
+|-----------------|---------------|
+| `hasMore=false` | The returned provider window is complete. |
+| `hasMore=true` and the oldest returned row reaches the local cursor | The incremental interval is covered; older provider history is not required for this run. |
+| `hasMore=true` and the page does not reach the local cursor | Persist the returned rows, but mark the ticker and run `partial`. |
+| The callback signal is absent | Fail closed as `partial`; do not claim completeness. |
+
+The worker exposes only aggregate telemetry: pages requested, tickers whose
+provider window was saturated, and tickers whose incremental coverage could
+not be proved. It does not emit ticker names, article IDs, headlines, or
+licensed provider content through worker stdout.
+
+This is deliberately not presented as API pagination. The dated empirical
+evidence above shows that changing the request range can return the same 300
+rows, so repeating range requests would spend Gateway capacity without proving
+that an older page was retrieved.
+
 ---
 
 ## Workarounds

@@ -1,4 +1,5 @@
 from contextlib import contextmanager, nullcontext
+from datetime import datetime
 import logging
 import sqlite3
 import traceback
@@ -75,6 +76,31 @@ class NewsProviderClient(BodyClient):
         return self.providers
 
 
+class HistoricalNewsClient(BodyClient):
+    def __init__(self, *, headlines=(), has_more=None):
+        super().__init__()
+        self.headlines = list(headlines)
+        self.has_more = has_more
+        self.end_calls = []
+        self.request_calls = []
+        self.wrapper = SimpleNamespace()
+
+        def historical_news_end(req_id, has_more):
+            self.end_calls.append((req_id, has_more))
+
+        self.wrapper.historicalNewsEnd = historical_news_end
+
+    def reqHistoricalNews(
+        self, con_id, providers, start, end, total_results
+    ):
+        self.request_calls.append(
+            (con_id, providers, start, end, total_results)
+        )
+        if self.has_more is not None:
+            self.wrapper.historicalNewsEnd(41, self.has_more)
+        return list(self.headlines)
+
+
 def body_source(client):
     source = IBKRDataSource.__new__(IBKRDataSource)
     source._ib = client
@@ -103,6 +129,77 @@ def test_ibkr_compat_news_provider_discovery_still_returns_empty_on_failure():
 
     assert body_source(client).get_news_providers() == []
     assert client.provider_calls == 1
+
+
+def test_ibkr_historical_news_page_preserves_has_more_and_restores_callback():
+    from data_sources.ibkr_source import IBKRNewsPage
+
+    row = SimpleNamespace(
+        headline="Headline",
+        providerCode="DJ-N",
+        articleId="DJ-N$one",
+        time=datetime(2026, 8, 12, 10, 0),
+    )
+    client = HistoricalNewsClient(headlines=[row], has_more=True)
+    original_callback = client.wrapper.historicalNewsEnd
+    source = body_source(client)
+
+    page = source._fetch_news_page(
+        123,
+        "DJ-N",
+        datetime(2026, 8, 11),
+        datetime(2026, 8, 12, 23, 59),
+        "AAPL",
+    )
+
+    assert page == IBKRNewsPage(articles=tuple(page.articles), has_more=True)
+    assert [article.title for article in page.articles] == ["Headline"]
+    assert client.end_calls == [(41, True)]
+    assert client.wrapper.historicalNewsEnd is original_callback
+    assert client.request_calls == [
+        (123, "DJ-N", "20260811 00:00:00", "20260812 23:59:00", 300)
+    ]
+
+
+def test_ibkr_historical_news_page_reports_unknown_when_end_callback_is_absent():
+    client = HistoricalNewsClient(has_more=None)
+    original_callback = client.wrapper.historicalNewsEnd
+
+    page = body_source(client)._fetch_news_page(
+        123,
+        "DJ-N",
+        datetime(2026, 8, 11),
+        datetime(2026, 8, 12),
+        "AAPL",
+    )
+
+    assert page.articles == ()
+    assert page.has_more is None
+    assert client.wrapper.historicalNewsEnd is original_callback
+
+
+def test_ibkr_historical_news_page_restores_inherited_wrapper_callback_shape():
+    class InheritedWrapper:
+        def __init__(self):
+            self.end_calls = []
+
+        def historicalNewsEnd(self, req_id, has_more):
+            self.end_calls.append((req_id, has_more))
+
+    client = HistoricalNewsClient(has_more=False)
+    client.wrapper = InheritedWrapper()
+
+    page = body_source(client)._fetch_news_page(
+        123,
+        "DJ-N",
+        datetime(2026, 8, 11),
+        datetime(2026, 8, 12),
+        "AAPL",
+    )
+
+    assert page.has_more is False
+    assert client.wrapper.end_calls == [(41, False)]
+    assert "historicalNewsEnd" not in client.wrapper.__dict__
 
 
 @pytest.mark.parametrize(
@@ -251,6 +348,32 @@ def test_ibkr_adapter_fetches_one_body_for_article_seen_through_many_tickers(
     assert result.articles_inserted == 1
     assert conn.execute("SELECT COUNT(*) FROM news_article_tickers").fetchone()[0] == 2
     assert conn.execute("SELECT content_kind FROM news_articles").fetchone()[0] == "full_text"
+    conn.close()
+
+
+def test_ibkr_incomplete_headline_window_persists_page_and_marks_batch_partial():
+    from src.news_normalized.ibkr_runtime import IBKRNewsCoverageIncomplete
+
+    class IncompleteGateway(FakeGateway):
+        def fetch_headlines(self, ticker, since_iso):
+            yield headline("DJ-N$partial", ticker)
+            raise IBKRNewsCoverageIncomplete("ibkr_news_window_incomplete")
+
+    conn = sqlite3.connect(":memory:")
+    store = NormalizedNewsStore(conn)
+
+    result = write_news_batch(
+        store,
+        IBKRNormalizedProvider(IncompleteGateway(), acquire_gateway_lock=False),
+        ["AAPL"],
+        WriterBudget(10, 0),
+    )
+
+    assert result.status == "partial"
+    assert result.fresh_status == "partial"
+    assert result.articles_inserted == 1
+    assert result.errors == {"AAPL": "ibkr_news_window_incomplete"}
+    assert conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 1
     conn.close()
 
 

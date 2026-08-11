@@ -2743,6 +2743,9 @@ export interface ScheduleRunResult {
     retry_bodies_attempted?: number;
     retry_bodies_fetched?: number;
     tickers_scanned?: number;
+    headline_pages_requested?: number;
+    headline_saturated_tickers?: number;
+    headline_incomplete_tickers?: number;
     succeeded_ticker_count?: number;
     gaps_found?: number;
     rows_added?: number;

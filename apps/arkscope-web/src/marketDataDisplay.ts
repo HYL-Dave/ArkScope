@@ -421,6 +421,23 @@ export function schedulerStateLabel(
             tickers: unresolvedTickers.join(", "),
           });
       }
+      const incompleteNewsTickers =
+        durable?.last_result?.source === "ibkr_news"
+          ? positiveCount(collect?.headline_incomplete_tickers)
+          : 0;
+      if (incompleteNewsTickers > 0) {
+        return {
+          label: incompleteNewsTickers === 1
+            ? t(($) => $.dataSources.schedule.history.newsCoverageIncomplete_one, {
+              count: incompleteNewsTickers,
+            })
+            : t(($) => $.dataSources.schedule.history.newsCoverageIncomplete_other, {
+              count: incompleteNewsTickers,
+            }),
+          tone: "warn",
+          needsContinue: false,
+        };
+      }
       const observed = priceLabel === null ? collect?.continuation : undefined;
       const tickers = positiveCount(observed?.deferred_ticker_count);
       const bodies = collect?.body_backlog === undefined

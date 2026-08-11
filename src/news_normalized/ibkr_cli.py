@@ -26,6 +26,9 @@ _COUNT_KEYS = (
     "retry_bodies_attempted",
     "retry_bodies_fetched",
     "tickers_scanned",
+    "headline_pages_requested",
+    "headline_saturated_tickers",
+    "headline_incomplete_tickers",
 )
 _LEG_STATUSES = frozenset({"succeeded", "partial", "failed"})
 
@@ -303,6 +306,16 @@ def _run_worker(
                 write_lock_factory=market_write_lock,
             )
             data = _mapping(result)
+            coverage_counts = getattr(
+                gateway, "headline_coverage_counts", lambda: {}
+            )()
+            for key in (
+                "headline_pages_requested",
+                "headline_saturated_tickers",
+                "headline_incomplete_tickers",
+            ):
+                if key in coverage_counts:
+                    data[key] = coverage_counts[key]
             errors = dict(data.get("errors") or {})
             if retry_query_failed:
                 data["retry_status"] = "failed"

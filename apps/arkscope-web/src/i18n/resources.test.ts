@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 741,
+      settings: 743,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -791,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1825);
+      expect(total, `${locale}.total`).toBe(1827);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1139,6 +1139,8 @@ describe("bundled i18n resources", () => {
       "dataSources.schedule.history.gatewayUnavailable",
       "dataSources.schedule.history.priceUnresolved_one",
       "dataSources.schedule.history.priceUnresolved_other",
+      "dataSources.schedule.history.newsCoverageIncomplete_one",
+      "dataSources.schedule.history.newsCoverageIncomplete_other",
       "providers.accountUsage.syncFailedNoSnapshot",
       "providers.accountUsage.syncTransportFailed",
       "providers.accountUsage.cachedReadFailedStale",

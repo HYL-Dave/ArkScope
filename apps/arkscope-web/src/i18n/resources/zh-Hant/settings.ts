@@ -639,6 +639,8 @@ const settings = {
         partialActionable: "部分完成（待補抓 {{count}}）",
         priceUnresolved_one: "部分完成（抓取後仍有 {{count}} 個標的無法確認：{{tickers}}）",
         priceUnresolved_other: "部分完成（抓取後仍有 {{count}} 個標的無法確認：{{tickers}}）",
+        newsCoverageIncomplete_one: "部分完成（{{count}} 個標的的新聞可能有缺漏）",
+        newsCoverageIncomplete_other: "部分完成（{{count}} 個標的的新聞可能有缺漏）",
         partialTickersAndBodies: "部分完成（{{count}} 個標的、{{value}} 篇內文待後續處理）",
         partialBodies: "部分完成（{{count}} 篇內文待後續處理）",
         partialTickers: "部分完成（{{count}} 個標的待後續處理）",

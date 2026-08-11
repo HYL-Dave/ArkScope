@@ -56,7 +56,7 @@ const I18N_2_SETTINGS_ALLOWLIST_ENTRIES = [
   ["src/marketDataDisplay.ts", "object_property", "weekend", 1],
   ["src/marketDataDisplay.ts", "presenter_return", "muted", 6],
   ["src/marketDataDisplay.ts", "presenter_return", "bad", 2],
-  ["src/marketDataDisplay.ts", "presenter_return", "warn", 9],
+  ["src/marketDataDisplay.ts", "presenter_return", "warn", 10],
   ["src/marketDataDisplay.ts", "presenter_return", "ok", 2],
   ["src/settings/DataSourcesSection.tsx", "jsx_attribute", "ok", 1],
   ["src/settings/DataSourcesSection.tsx", "jsx_attribute", "warn", 1],
@@ -250,7 +250,7 @@ describe("I18N-0 foundation boundaries", () => {
     };
 
     expect(report).toEqual({
-      candidateCount: 36,
+      candidateCount: 37,
       signatureCount: 20,
       debtSignatureCount: 0,
       allowlistCount: 20,
