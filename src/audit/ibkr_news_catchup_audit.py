@@ -23,9 +23,10 @@ OBSERVED_QUIET_WINDOW = {
 }
 CAVEATS = [
     "Local SQLite counts are a lower bound: articles already missed by a prior "
-    "provider-side 300 cap cannot be counted locally.",
+    "provider-side 300/provider/ticker request cap cannot be counted locally.",
     "A ticker-window below 300 proves only that observed local rows are below "
-    "the cap, not that no historical tail was ever truncated before this audit.",
+    "a conservative aggregate threshold, not that no provider tail was ever "
+    "truncated before this audit.",
     "days_to_300 estimates assume roughly stable article arrival rates and "
     "should be treated as planning guidance, not a guarantee.",
 ]
@@ -239,14 +240,16 @@ def build_report(market_db: str | Path, profile_db: str | Path, *, as_of: str | 
             "caveats": list(CAVEATS),
             "writer_budget_note": (
                 "src.news_normalized.ibkr_cli.DEFAULT_MAX_ARTICLES is 50000; "
-                "the catch-up risk is provider-side 300/ticker, not writer budget."
+                "the residual catch-up risk is provider-side "
+                "300/provider/ticker request, not writer budget."
             ),
             "risk": {
                 "current_cadence": current_cadence,
                 "long_quiet_window": long_quiet,
                 "reason": (
-                "IBKR historical-news endpoint returns only the 300 most-recent "
-                "headlines per ticker"
+                "IBKR historical-news requests return at most 300 headlines; "
+                "the runtime partitions aggregate saturation by provider, but "
+                "one provider can still exceed its own window"
                 ),
             },
         }

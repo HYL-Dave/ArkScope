@@ -191,6 +191,110 @@ def test_runtime_gateway_yields_page_then_fails_when_cursor_is_not_covered():
     assert gateway.headline_coverage_counts()["headline_incomplete_tickers"] == 1
 
 
+def test_runtime_gateway_recovers_aggregate_saturation_by_querying_each_provider():
+    from data_sources.ibkr_source import IBKRNewsPage
+    from src.news_normalized.ibkr_runtime import IBKRRuntimeGateway
+
+    class Source:
+        def __init__(self):
+            self.calls = []
+
+        def get_news_providers_strict(self):
+            return [
+                {"code": "DJ-N", "name": "Dow Jones"},
+                {"code": "FLY", "name": "Fly"},
+            ]
+
+        def fetch_news_page_strict(self, _ticker, **kwargs):
+            providers = kwargs["providers"]
+            self.calls.append(providers)
+            if providers == "DJ-N+FLY":
+                return IBKRNewsPage(
+                    articles=(
+                        _runtime_news_article("shared", datetime(2026, 8, 12, 10, 0)),
+                    ),
+                    has_more=True,
+                )
+            if providers == "DJ-N":
+                return IBKRNewsPage(
+                    articles=(
+                        _runtime_news_article("shared", datetime(2026, 8, 12, 10, 0)),
+                        _runtime_news_article("dj-old", datetime(2026, 8, 10, 9, 0)),
+                    ),
+                    has_more=True,
+                )
+            return IBKRNewsPage(
+                articles=(
+                    SimpleNamespace(
+                        ticker="AAPL",
+                        title="Headline fly-old",
+                        source="FLY",
+                        description="[Article ID: FLY$fly-old]",
+                        published_date=datetime(2026, 8, 11, 8, 0),
+                        url="",
+                    ),
+                ),
+                has_more=False,
+            )
+
+    source = Source()
+    gateway = IBKRRuntimeGateway(source)
+    gateway.discover_news_provider_codes()
+
+    rows = list(gateway.fetch_headlines("AAPL", "2026-08-10T10:00:00Z"))
+
+    assert source.calls == ["DJ-N+FLY", "DJ-N", "FLY"]
+    assert [row.article_id for row in rows] == [
+        "DJ-N$shared",
+        "DJ-N$dj-old",
+        "FLY$fly-old",
+    ]
+    assert gateway.headline_coverage_counts() == {
+        "headline_pages_requested": 3,
+        "headline_saturated_tickers": 1,
+        "headline_incomplete_tickers": 0,
+    }
+
+
+def test_runtime_gateway_stays_partial_when_one_provider_exceeds_its_own_cap():
+    from data_sources.ibkr_source import IBKRNewsPage
+    from src.news_normalized.ibkr_runtime import (
+        IBKRNewsCoverageIncomplete,
+        IBKRRuntimeGateway,
+    )
+
+    class Source:
+        def get_news_providers_strict(self):
+            return [
+                {"code": "DJ-N", "name": "Dow Jones"},
+                {"code": "FLY", "name": "Fly"},
+            ]
+
+        def fetch_news_page_strict(self, _ticker, **kwargs):
+            providers = kwargs["providers"]
+            article = _runtime_news_article(
+                providers.replace("+", "-"), datetime(2026, 8, 12, 10, 0)
+            )
+            return IBKRNewsPage(
+                articles=(article,),
+                has_more=providers != "FLY",
+            )
+
+    gateway = IBKRRuntimeGateway(Source())
+    gateway.discover_news_provider_codes()
+
+    with pytest.raises(
+        IBKRNewsCoverageIncomplete,
+        match="ibkr_news_provider_window_incomplete",
+    ):
+        list(gateway.fetch_headlines("AAPL", "2026-08-10T10:00:00Z"))
+    assert gateway.headline_coverage_counts() == {
+        "headline_pages_requested": 3,
+        "headline_saturated_tickers": 1,
+        "headline_incomplete_tickers": 1,
+    }
+
+
 def test_runtime_gateway_fails_closed_when_has_more_signal_is_missing():
     from data_sources.ibkr_source import IBKRNewsPage
     from src.news_normalized.ibkr_runtime import (

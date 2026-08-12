@@ -79,7 +79,7 @@ articles2 = ibkr._fetch_news_single_query(
 
 ### Post-normalized Scheduler Note (Verified 2026-07-06)
 
-The normalized local scheduler makes regular IBKR news collection operationally safe, but it does not change the provider-side 300-article cap.
+The normalized local scheduler makes regular IBKR news collection operationally safe, but it does not change the provider-side limit of 300 headlines per provider-filter request and ticker.
 
 Read-only local audit result (`--as-of 2026-07-06`):
 
@@ -103,7 +103,9 @@ latest local per-ticker cursor:
 |-----------------|---------------|
 | `hasMore=false` | The returned provider window is complete. |
 | `hasMore=true` and the oldest returned row reaches the local cursor | The incremental interval is covered; older provider history is not required for this run. |
-| `hasMore=true` and the page does not reach the local cursor | Persist the returned rows, but mark the ticker and run `partial`. |
+| `hasMore=true`, the aggregate provider page does not reach the local cursor, and multiple providers are available | Retry once per provider, merge by provider article ID, and evaluate every provider page independently. |
+| Every provider page is exhausted or reaches the local cursor | The requested incremental interval is covered. |
+| One provider page remains saturated before the local cursor | Persist the merged rows, but mark the ticker and run `partial`. |
 | The callback signal is absent | Fail closed as `partial`; do not claim completeness. |
 
 The worker exposes only aggregate telemetry: pages requested, tickers whose
@@ -111,10 +113,13 @@ provider window was saturated, and tickers whose incremental coverage could
 not be proved. It does not emit ticker names, article IDs, headlines, or
 licensed provider content through worker stdout.
 
-This is deliberately not presented as API pagination. The dated empirical
+This provider partitioning raises the recoverable aggregate from one shared
+300-row window to as many as 300 rows per available provider and ticker. It is
+still deliberately not presented as API pagination. The dated empirical
 evidence above shows that changing the request range can return the same 300
 rows, so repeating range requests would spend Gateway capacity without proving
-that an older page was retrieved.
+that an older page was retrieved. A single provider producing more than 300
+headlines before the local cursor remains an explicit completeness gap.
 
 ---
 

@@ -737,7 +737,9 @@ class IBKRDataSource(BaseDataSource):
                       If None, uses all available providers.
 
         Returns:
-            List of NewsArticle objects (max 300 per ticker).
+            List of NewsArticle objects (max 300 per ticker for this
+            compatibility call). The normalized runtime may issue separate
+            provider-filter requests when the aggregate page is saturated.
         """
         self._ensure_connected()
 

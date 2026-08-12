@@ -61,6 +61,31 @@ def _datetime_from_value(value: Any) -> Optional[datetime]:
     return parsed.astimezone(timezone.utc)
 
 
+def _page_covers_since(page: Any, coverage_start: Optional[datetime]) -> bool:
+    if page.has_more is False:
+        return True
+    if page.has_more is not True or coverage_start is None:
+        return False
+    published = tuple(
+        parsed
+        for article in page.articles or ()
+        if (parsed := _datetime_from_value(
+            getattr(article, "published_date", None)
+        )) is not None
+    )
+    return bool(published) and min(published) <= coverage_start
+
+
+def _dedupe_articles(articles: list[Any]) -> list[Any]:
+    unique: dict[tuple[str, str], Any] = {}
+    for article in articles:
+        provider_code = str(getattr(article, "source", "") or "").strip()
+        description = str(getattr(article, "description", "") or "")
+        provider_id = extract_provider_article_id(description, provider_code)
+        unique.setdefault((provider_code, provider_id), article)
+    return list(unique.values())
+
+
 def extract_provider_article_id(description: str, provider_code: str) -> str:
     """Extract and validate the IBKR provider article ID from the headline marker."""
     provider = (provider_code or "").strip()
@@ -114,29 +139,55 @@ class IBKRRuntimeGateway:
     def fetch_headlines(self, ticker: str, since_iso: Optional[str]):
         start_date = _date_from_cursor(since_iso)
         coverage_start: Optional[datetime] = None
+        coverage_error: Optional[str] = None
         if self._provider_codes == frozenset():
             articles = []
-            has_more: bool | None = False
         elif callable(getattr(self.source, "fetch_news_page_strict", None)):
             now = datetime.now(timezone.utc)
             coverage_start = _datetime_from_value(since_iso) or (
                 now - _BOOTSTRAP_LOOKBACK
             )
+            provider_codes = tuple(sorted(self._provider_codes or ()))
             self._headline_pages_requested += 1
             page = self.source.fetch_news_page_strict(
                 ticker,
                 start_dt=coverage_start,
                 end_dt=now,
                 providers=(
-                    "+".join(sorted(self._provider_codes))
+                    "+".join(provider_codes)
                     if self._provider_codes is not None
                     else None
                 ),
             )
-            articles = page.articles
-            has_more = page.has_more
-            if has_more is True:
+            articles = list(page.articles)
+            if page.has_more is True:
                 self._headline_saturated_tickers += 1
+            if page.has_more is None:
+                coverage_error = "ibkr_news_completion_unknown"
+            elif page.has_more is True and not _page_covers_since(page, coverage_start):
+                coverage_error = "ibkr_news_window_incomplete"
+            if coverage_error == "ibkr_news_window_incomplete" and len(provider_codes) > 1:
+                provider_pages = []
+                for provider_code in provider_codes:
+                    self._headline_pages_requested += 1
+                    provider_page = self.source.fetch_news_page_strict(
+                        ticker,
+                        start_dt=coverage_start,
+                        end_dt=now,
+                        providers=provider_code,
+                    )
+                    provider_pages.append(provider_page)
+                    articles.extend(provider_page.articles)
+                articles = _dedupe_articles(articles)
+                if any(page.has_more is None for page in provider_pages):
+                    coverage_error = "ibkr_news_completion_unknown"
+                elif all(
+                    _page_covers_since(provider_page, coverage_start)
+                    for provider_page in provider_pages
+                ):
+                    coverage_error = None
+                else:
+                    coverage_error = "ibkr_news_provider_window_incomplete"
         else:
             kwargs = {
                 "start_date": start_date,
@@ -145,7 +196,6 @@ class IBKRRuntimeGateway:
             if self._provider_codes is not None:
                 kwargs["providers"] = "+".join(sorted(self._provider_codes))
             articles = self.source.fetch_news([ticker], **kwargs)
-            has_more = False
         for article in articles or ():
             provider_code = str(getattr(article, "source", "") or "").strip()
             provider_id = extract_provider_article_id(
@@ -162,28 +212,9 @@ class IBKRRuntimeGateway:
                 ticker=observed_ticker or ticker,
             )
 
-        if has_more is None:
+        if coverage_error is not None:
             self._headline_incomplete_tickers += 1
-            raise IBKRNewsCoverageIncomplete(
-                "ibkr_news_completion_unknown"
-            )
-        if has_more:
-            published = tuple(
-                parsed
-                for article in articles or ()
-                if (parsed := _datetime_from_value(
-                    getattr(article, "published_date", None)
-                )) is not None
-            )
-            if (
-                coverage_start is None
-                or not published
-                or min(published) > coverage_start
-            ):
-                self._headline_incomplete_tickers += 1
-                raise IBKRNewsCoverageIncomplete(
-                    "ibkr_news_window_incomplete"
-                )
+            raise IBKRNewsCoverageIncomplete(coverage_error)
 
     def fetch_news_article_body_strict(
         self, provider_code: str, article_id: str

@@ -216,4 +216,4 @@ def test_report_records_writer_budget_is_not_bottleneck(tmp_path):
     report = build_report(market_db, profile_db, as_of="2026-07-05")
 
     assert "50000" in report["writer_budget_note"]
-    assert "provider-side 300/ticker" in report["writer_budget_note"]
+    assert "provider-side 300/provider/ticker request" in report["writer_budget_note"]
