@@ -91,6 +91,24 @@ def _is_market_lock_busy(exc: BaseException) -> bool:
     return _MARKET_LOCK_BUSY_MARKER in str(exc)
 
 
+def _headline_fetch_cursor(store, source: str, ticker: str) -> Optional[str]:
+    """Return the last completely covered headline frontier.
+
+    A partial iterator may already have persisted newer rows.  Using the article
+    table's MAX(published_at) after that partial run would skip the unresolved
+    interval on the next attempt.  Existing installations without sync metadata
+    retain the historical MAX-based bootstrap exactly once.
+    """
+    row = store.conn.execute(
+        "SELECT last_bar_datetime FROM provider_sync_meta "
+        "WHERE provider=? AND ticker=? AND interval='news'",
+        (source, ticker),
+    ).fetchone()
+    if row is not None:
+        return row[0]
+    return store.latest_cursor(source, ticker)
+
+
 def write_news_batch(
     store,
     provider: NewsProvider,
@@ -195,7 +213,7 @@ def write_news_batch(
                     provider=source,
                     ticker=ticker,
                     interval="news",
-                    last_bar_datetime=article.published_at,
+                    last_bar_datetime=None,
                     rows_added=0,
                     error=error,
                 )
@@ -290,8 +308,9 @@ def write_news_batch(
                 inserted_for_ticker = 0
                 budget_hit = False
                 ticker_error: Optional[str] = None
+                headline_error: Optional[str] = None
                 try:
-                    since = store.latest_cursor(source, ticker)
+                    since = _headline_fetch_cursor(store, source, ticker)
                     candidates = provider.fetch_articles(ticker, since)
                     for candidate in candidates:
                         if articles_seen >= budget.max_articles:
@@ -313,6 +332,7 @@ def write_news_batch(
                             key = candidate.provider_article_id or f"ticker:{ticker}"
                             errors[key] = str(exc)
                             ticker_error = str(exc)
+                            headline_error = str(exc)
                             continue
                         if upsert.quarantined:
                             key = candidate.provider_article_id or f"ticker:{ticker}"
@@ -372,7 +392,16 @@ def write_news_batch(
                             ticker_error = str(exc)
                             still_deferred_bodies.append(provider_id)
 
-                    newest = store.latest_cursor(source, ticker)
+                    frontier_error = ticker_error
+                    if budget_hit:
+                        frontier_error = "news_writer_article_budget_exhausted"
+                    elif headline_error is not None:
+                        frontier_error = headline_error
+                    newest = (
+                        store.latest_cursor(source, ticker)
+                        if not budget_hit and headline_error is None
+                        else None
+                    )
                     with write_lock():
                         _upsert_provider_meta(
                             store.conn,
@@ -381,7 +410,7 @@ def write_news_batch(
                             interval="news",
                             last_bar_datetime=newest,
                             rows_added=inserted_for_ticker,
-                            error=ticker_error,
+                            error=frontier_error,
                         )
                     if not budget_hit and progress_cb:
                         progress_cb(ticker_index + 1, total, ticker)

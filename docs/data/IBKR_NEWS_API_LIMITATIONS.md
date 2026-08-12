@@ -108,6 +108,20 @@ latest local per-ticker cursor:
 | One provider page remains saturated before the local cursor | Persist the merged rows, but mark the ticker and run `partial`. |
 | The callback signal is absent | Fail closed as `partial`; do not claim completeness. |
 
+The incremental cursor is the last **completely covered** per-ticker frontier,
+not `MAX(published_at)` from whatever rows happen to be present. A saturated
+page is persisted because those headlines are useful, but neither that partial
+page nor a local writer-budget interruption advances the frontier. The next run
+therefore retries from the prior proved boundary instead of jumping over the
+unresolved interval. Article-body retry failures likewise cannot advance the
+headline frontier.
+
+The cursor is inclusive. Rows at or before it are not discarded merely because
+their timestamps look old: a same-second sibling or a delayed provider article
+can still be new. Exact deduplication uses the provider code and provider article
+ID. This makes old-row replay bounded and safe; timestamps prove window coverage,
+not article identity.
+
 The worker exposes only aggregate telemetry: pages requested, tickers whose
 provider window was saturated, and tickers whose incremental coverage could
 not be proved. It does not emit ticker names, article IDs, headlines, or

@@ -197,6 +197,80 @@ def test_writer_carries_deferred_tickers_when_article_budget_is_hit(store):
     assert result.continuation is not None
     assert result.continuation.deferred_tickers == ("AAPL", "MSFT")
     assert result.continuation.deferred_body_ids == ("p1",)
+    frontier = store.conn.execute(
+        "SELECT last_bar_datetime,last_error FROM provider_sync_meta "
+        "WHERE provider='fakewire' AND ticker='AAPL' AND interval='news'"
+    ).fetchone()
+    assert tuple(frontier) == (None, "news_writer_article_budget_exhausted")
+
+
+def test_partial_headline_page_keeps_last_complete_cursor_for_next_run(store):
+    first = FakeProvider({"AAPL": [candidate("p1")]})
+    write_news_batch(
+        store,
+        first,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+    )
+
+    class PartialProvider(FakeProvider):
+        def fetch_articles(self, ticker, since_iso):
+            self.events.append(f"metadata:{ticker}:{since_iso}")
+            yield candidate("p2")
+            raise RuntimeError("headline window incomplete")
+
+    partial = PartialProvider({})
+    outcome = write_news_batch(
+        store,
+        partial,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+    )
+
+    assert outcome.status == "partial"
+    assert outcome.articles_inserted == 1
+    frontier = store.conn.execute(
+        "SELECT last_bar_datetime,last_error FROM provider_sync_meta "
+        "WHERE provider='fakewire' AND ticker='AAPL' AND interval='news'"
+    ).fetchone()
+    assert tuple(frontier) == (
+        "2026-06-27T10:00:01Z",
+        "headline window incomplete",
+    )
+
+    retry = FakeProvider({"AAPL": []})
+    write_news_batch(
+        store,
+        retry,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+    )
+    assert "metadata:AAPL:2026-06-27T10:00:01Z" in retry.events
+
+
+def test_first_partial_headline_page_does_not_create_a_false_cursor(store):
+    class PartialProvider(FakeProvider):
+        def fetch_articles(self, ticker, since_iso):
+            self.events.append(f"metadata:{ticker}:{since_iso}")
+            yield candidate("p1")
+            raise RuntimeError("headline window incomplete")
+
+    partial = PartialProvider({})
+    write_news_batch(
+        store,
+        partial,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+    )
+
+    retry = FakeProvider({"AAPL": []})
+    write_news_batch(
+        store,
+        retry,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+    )
+    assert "metadata:AAPL:None" in retry.events
 
 
 def test_writer_isolates_ticker_failures_and_records_local_telemetry(store):
