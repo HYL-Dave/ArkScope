@@ -2378,6 +2378,10 @@ export type SecurityLifecycleState =
   | "inactive_confirmed"
   | "renamed_or_transferred";
 export type CorporateRelationshipStatus = "candidate" | "confirmed" | "rejected";
+export type SecurityLifecycleReviewStatus =
+  | "inactive_confirmed"
+  | "renamed_or_transferred"
+  | "unreviewed";
 
 export interface SecurityLifecycleEvent {
   id: number;
@@ -2385,7 +2389,10 @@ export interface SecurityLifecycleEvent {
   cik: string | null;
   issuer_name: string;
   event_type: SecurityLifecycleEventType;
+  observed_lifecycle_state: SecurityLifecycleState;
   lifecycle_state: SecurityLifecycleState;
+  reviewed_state: Exclude<SecurityLifecycleReviewStatus, "unreviewed"> | null;
+  reviewed_at: string | null;
   filing_date: string;
   effective_date: string | null;
   source: string;
@@ -2425,6 +2432,8 @@ export interface SecurityLifecycleSnapshot {
     event_count: number;
     review_required: number;
     pending_delisting: number;
+    confirmed_inactive: number;
+    renamed_or_transferred: number;
     relationship_candidates: number;
   };
 }
@@ -2441,6 +2450,17 @@ export function reviewCorporateRelationship(
 ): Promise<{ id: number; status: Exclude<CorporateRelationshipStatus, "candidate"> }> {
   return sendJSON(
     `/market-data/security-lifecycle/relationships/${encodeURIComponent(relationshipId)}`,
+    "PUT",
+    { status },
+  );
+}
+
+export function reviewSecurityLifecycleEvent(
+  eventId: number,
+  status: SecurityLifecycleReviewStatus,
+): Promise<{ id: number; status: SecurityLifecycleReviewStatus }> {
+  return sendJSON(
+    `/market-data/security-lifecycle/events/${encodeURIComponent(eventId)}`,
     "PUT",
     { status },
   );

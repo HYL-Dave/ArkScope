@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 777,
+      settings: 783,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -791,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1861);
+      expect(total, `${locale}.total`).toBe(1867);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1155,9 +1155,12 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.description",
       "dataStorage.lifecycle.empty",
       "dataStorage.lifecycle.openEvidence",
+      "dataStorage.lifecycle.reviewBoundary",
       "dataStorage.lifecycle.summary.events",
       "dataStorage.lifecycle.summary.reviewRequired",
       "dataStorage.lifecycle.summary.pendingDelisting",
+      "dataStorage.lifecycle.summary.confirmedInactive",
+      "dataStorage.lifecycle.summary.renamedOrTransferred",
       "dataStorage.lifecycle.summary.relationshipCandidates",
       "dataStorage.lifecycle.headings.ticker",
       "dataStorage.lifecycle.headings.target",
@@ -1177,6 +1180,9 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.events.acquisitionCompleted",
       "dataStorage.lifecycle.events.listingStatusReview",
       "dataStorage.lifecycle.events.listingRemovalNotice",
+      "dataStorage.lifecycle.events.confirmInactiveAction",
+      "dataStorage.lifecycle.events.markTransferredAction",
+      "dataStorage.lifecycle.events.clearReviewAction",
       "dataStorage.lifecycle.relationships.title",
       "dataStorage.lifecycle.relationships.candidate",
       "dataStorage.lifecycle.relationships.confirmed",

@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, ChevronRight, X } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import {
   getMarketDataStatus,
   getSecurityLifecycle,
   getTradingDayCoverage,
   reviewCorporateRelationship,
+  reviewSecurityLifecycleEvent,
   type MarketDataStatus,
   type SecurityLifecycleEvent,
   type SecurityLifecycleSnapshot,
@@ -216,7 +224,8 @@ function SecurityLifecyclePanel({
   });
   const [err, setErr] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [reviewingRelationshipId, setReviewingRelationshipId] = useState<number | null>(null);
+  const [reviewingEventId, setReviewingEventId] = useState<number | null>(null);
   const load = useCallback(async (force = false) => {
     setBusy(true);
     const result = await settingsReadCache.load(
@@ -243,7 +252,7 @@ function SecurityLifecyclePanel({
     relationshipId: number,
     status: "confirmed" | "rejected",
   ) => {
-    setReviewingId(relationshipId);
+    setReviewingRelationshipId(relationshipId);
     try {
       await reviewCorporateRelationship(relationshipId, status);
       settingsReadCache.invalidate("security_lifecycle");
@@ -251,7 +260,22 @@ function SecurityLifecyclePanel({
     } catch (error) {
       setErr(error instanceof Error ? error : new Error(String(error)));
     } finally {
-      setReviewingId(null);
+      setReviewingRelationshipId(null);
+    }
+  }, [load, settingsReadCache]);
+  const reviewEvent = useCallback(async (
+    eventId: number,
+    status: "inactive_confirmed" | "renamed_or_transferred" | "unreviewed",
+  ) => {
+    setReviewingEventId(eventId);
+    try {
+      await reviewSecurityLifecycleEvent(eventId, status);
+      settingsReadCache.invalidate("security_lifecycle");
+      await load(false);
+    } catch (error) {
+      setErr(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      setReviewingEventId(null);
     }
   }, [load, settingsReadCache]);
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
@@ -286,9 +310,16 @@ function SecurityLifecyclePanel({
             <dd>{snapshot.summary.review_required.toLocaleString()}</dd>
             <dt>{t(($) => $.dataStorage.lifecycle.summary.pendingDelisting)}</dt>
             <dd>{snapshot.summary.pending_delisting.toLocaleString()}</dd>
+            <dt>{t(($) => $.dataStorage.lifecycle.summary.confirmedInactive)}</dt>
+            <dd>{snapshot.summary.confirmed_inactive.toLocaleString()}</dd>
+            <dt>{t(($) => $.dataStorage.lifecycle.summary.renamedOrTransferred)}</dt>
+            <dd>{snapshot.summary.renamed_or_transferred.toLocaleString()}</dd>
             <dt>{t(($) => $.dataStorage.lifecycle.summary.relationshipCandidates)}</dt>
             <dd>{snapshot.summary.relationship_candidates.toLocaleString()}</dd>
           </dl>
+          <p className="muted tiny">
+            {t(($) => $.dataStorage.lifecycle.reviewBoundary)}
+          </p>
 
           {snapshot.relationships.length > 0 ? (
             <div style={{ marginTop: 16 }}>
@@ -323,7 +354,7 @@ function SecurityLifecyclePanel({
                               size="compact"
                               tone="secondary"
                               icon={<Check size={14} />}
-                              busy={reviewingId === relationship.id}
+                              busy={reviewingRelationshipId === relationship.id}
                               disabled={relationship.status === "confirmed"}
                               onClick={() => void reviewRelationship(relationship.id, "confirmed")}
                             >
@@ -333,7 +364,7 @@ function SecurityLifecyclePanel({
                               size="compact"
                               tone="ghost"
                               icon={<X size={14} />}
-                              busy={reviewingId === relationship.id}
+                              busy={reviewingRelationshipId === relationship.id}
                               disabled={relationship.status === "rejected"}
                               onClick={() => void reviewRelationship(relationship.id, "rejected")}
                             >
@@ -360,6 +391,7 @@ function SecurityLifecyclePanel({
                     <th>{t(($) => $.dataStorage.lifecycle.headings.status)}</th>
                     <th>{t(($) => $.dataStorage.lifecycle.headings.date)}</th>
                     <th>{t(($) => $.dataStorage.lifecycle.headings.evidence)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.actions)}</th>
                   </tr></thead>
                   <tbody>
                     {snapshot.events.slice(0, 50).map((event) => (
@@ -371,6 +403,44 @@ function SecurityLifecyclePanel({
                         <td><a href={event.evidence_url} target="_blank" rel="noreferrer">
                           {t(($) => $.dataStorage.lifecycle.openEvidence)}
                         </a></td>
+                        <td>
+                          {event.event_type === "listing_status_review"
+                            || event.event_type === "listing_removal_notice" ? (
+                              <div style={{ display: "flex", gap: 6, whiteSpace: "nowrap" }}>
+                                <Button
+                                  size="compact"
+                                  tone="secondary"
+                                  icon={<Check size={14} />}
+                                  busy={reviewingEventId === event.id}
+                                  disabled={event.reviewed_state === "inactive_confirmed"}
+                                  onClick={() => void reviewEvent(event.id, "inactive_confirmed")}
+                                >
+                                  {t(($) => $.dataStorage.lifecycle.events.confirmInactiveAction)}
+                                </Button>
+                                <Button
+                                  size="compact"
+                                  tone="ghost"
+                                  icon={<ArrowRightLeft size={14} />}
+                                  busy={reviewingEventId === event.id}
+                                  disabled={event.reviewed_state === "renamed_or_transferred"}
+                                  onClick={() => void reviewEvent(event.id, "renamed_or_transferred")}
+                                >
+                                  {t(($) => $.dataStorage.lifecycle.events.markTransferredAction)}
+                                </Button>
+                                {event.reviewed_state ? (
+                                  <Button
+                                    size="compact"
+                                    tone="ghost"
+                                    icon={<RotateCcw size={14} />}
+                                    busy={reviewingEventId === event.id}
+                                    onClick={() => void reviewEvent(event.id, "unreviewed")}
+                                  >
+                                    {t(($) => $.dataStorage.lifecycle.events.clearReviewAction)}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : null}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

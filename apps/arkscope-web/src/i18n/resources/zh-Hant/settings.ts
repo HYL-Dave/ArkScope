@@ -687,10 +687,13 @@ const settings = {
       description: "顯示從 SEC 官方申報整理出的上市狀態與併購事件，供人工確認。這些紀錄不會自動從投資範圍移除標的。",
       empty: "尚無需要覆核的公司事件。可到「資料來源與排程」手動執行 SEC 公司事件檢查。",
       openEvidence: "查看 SEC 申報",
+      reviewBoundary: "「待覆核」表示 SEC 申報只提供待確認的線索；「已確認停止上市」代表你已在本機完成確認。兩者都不會自動從投資範圍移除標的。",
       summary: {
         events: "事件",
         reviewRequired: "待覆核",
         pendingDelisting: "下市通知",
+        confirmedInactive: "已確認停止上市",
+        renamedOrTransferred: "代號異動或轉板",
         relationshipCandidates: "併購關係候選",
       },
       headings: {
@@ -716,6 +719,9 @@ const settings = {
         acquisitionCompleted: "併購完成申報",
         listingStatusReview: "上市狀態申報",
         listingRemovalNotice: "下市通知",
+        confirmInactiveAction: "確認已下市",
+        markTransferredAction: "標記代號異動 / 轉板",
+        clearReviewAction: "清除覆核",
       },
       relationships: {
         title: "併購關係",

@@ -688,10 +688,13 @@ const settings = {
       description: "Shows listing-status and M&A events derived from official SEC filings for human review. These records never remove a ticker from the Universe automatically.",
       empty: "No company events require review. Run SEC Company Events manually under Data Sources and Schedules.",
       openEvidence: "View SEC filing",
+      reviewBoundary: "“Review required” means the SEC filing is evidence for review; “Listing ended (confirmed)” records your local decision. Neither changes Universe membership automatically.",
       summary: {
         events: "Events",
         reviewRequired: "Review required",
         pendingDelisting: "Delisting notices",
+        confirmedInactive: "Confirmed listing ended",
+        renamedOrTransferred: "Renamed or transferred",
         relationshipCandidates: "M&A relationship candidates",
       },
       headings: {
@@ -717,6 +720,9 @@ const settings = {
         acquisitionCompleted: "Acquisition completion filing",
         listingStatusReview: "Listing status filing",
         listingRemovalNotice: "Delisting notice",
+        confirmInactiveAction: "Confirm delisted",
+        markTransferredAction: "Mark renamed / transferred",
+        clearReviewAction: "Clear review",
       },
       relationships: {
         title: "M&A relationships",

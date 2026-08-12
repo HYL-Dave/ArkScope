@@ -63,6 +63,8 @@ def test_security_lifecycle_read_is_no_create_on_missing_database(tmp_path):
             "event_count": 0,
             "review_required": 0,
             "pending_delisting": 0,
+            "confirmed_inactive": 0,
+            "renamed_or_transferred": 0,
             "relationship_candidates": 0,
         },
     }
@@ -100,6 +102,8 @@ def test_store_is_idempotent_and_keeps_reviewed_relationship_decision(tmp_path):
         "event_count": 1,
         "review_required": 1,
         "pending_delisting": 0,
+        "confirmed_inactive": 0,
+        "renamed_or_transferred": 0,
         "relationship_candidates": 0,
     }
     assert snapshot["events"][0]["filing_items"] == ["2.01", "3.01"]
@@ -108,6 +112,88 @@ def test_store_is_idempotent_and_keeps_reviewed_relationship_decision(tmp_path):
     assert snapshot["relationships"][0]["status"] == "confirmed"
     assert snapshot["relationships"][0]["reviewed_at"] == "2026-08-06T01:00:00Z"
     assert snapshot["relationships"][0]["last_observed_at"] == "2026-08-07T00:00:00Z"
+
+
+def test_manual_lifecycle_review_survives_sec_rescan_and_can_be_cleared(tmp_path):
+    import sqlite3
+
+    from src.security_lifecycle import SecurityLifecycleStore, read_security_lifecycle
+
+    db_path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        store = SecurityLifecycleStore(conn)
+        store.upsert_observation(
+            _observation(
+                event_type="listing_removal_notice",
+                lifecycle_state="pending_delisting",
+            )
+        )
+        event_id = conn.execute(
+            "SELECT id FROM security_lifecycle_observations"
+        ).fetchone()[0]
+        store.review_observation(
+            event_id,
+            status="inactive_confirmed",
+            reviewed_at="2026-08-06T01:00:00Z",
+        )
+        store.upsert_observation(
+            _observation(
+                event_type="listing_removal_notice",
+                lifecycle_state="pending_delisting",
+                observed_at="2026-08-07T00:00:00Z",
+            )
+        )
+    finally:
+        conn.close()
+
+    snapshot = read_security_lifecycle(str(db_path))
+    assert snapshot["events"][0]["observed_lifecycle_state"] == "pending_delisting"
+    assert snapshot["events"][0]["lifecycle_state"] == "inactive_confirmed"
+    assert snapshot["events"][0]["reviewed_state"] == "inactive_confirmed"
+    assert snapshot["events"][0]["reviewed_at"] == "2026-08-06T01:00:00Z"
+    assert snapshot["summary"]["pending_delisting"] == 0
+    assert snapshot["summary"]["confirmed_inactive"] == 1
+
+    conn = sqlite3.connect(db_path)
+    try:
+        SecurityLifecycleStore(conn).review_observation(
+            event_id,
+            status="unreviewed",
+            reviewed_at="2026-08-08T00:00:00Z",
+        )
+    finally:
+        conn.close()
+    cleared = read_security_lifecycle(str(db_path))
+    assert cleared["events"][0]["lifecycle_state"] == "pending_delisting"
+    assert cleared["events"][0]["reviewed_state"] is None
+    assert cleared["events"][0]["reviewed_at"] is None
+
+
+def test_store_adds_review_columns_to_an_existing_lifecycle_table(tmp_path):
+    import sqlite3
+
+    from src.security_lifecycle import SecurityLifecycleStore
+
+    conn = sqlite3.connect(tmp_path / "market_data.db")
+    try:
+        SecurityLifecycleStore(conn)
+        conn.execute(
+            "ALTER TABLE security_lifecycle_observations DROP COLUMN reviewed_at"
+        )
+        conn.execute(
+            "ALTER TABLE security_lifecycle_observations DROP COLUMN reviewed_state"
+        )
+        SecurityLifecycleStore(conn)
+        columns = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(security_lifecycle_observations)"
+            ).fetchall()
+        }
+        assert {"reviewed_state", "reviewed_at"}.issubset(columns)
+    finally:
+        conn.close()
 
 
 def test_store_rejects_unknown_states_before_sqlite_write(tmp_path):
@@ -128,6 +214,30 @@ def test_store_rejects_unknown_states_before_sqlite_write(tmp_path):
                         "lifecycle_state": "definitely_delisted",
                     }
                 )
+            )
+    finally:
+        conn.close()
+
+
+def test_manual_lifecycle_review_rejects_non_listing_events(tmp_path):
+    import sqlite3
+
+    import pytest
+
+    from src.security_lifecycle import SecurityLifecycleStore
+
+    conn = sqlite3.connect(tmp_path / "market_data.db")
+    try:
+        store = SecurityLifecycleStore(conn)
+        store.upsert_observation(_observation(event_type="acquisition_completed"))
+        event_id = conn.execute(
+            "SELECT id FROM security_lifecycle_observations"
+        ).fetchone()[0]
+        with pytest.raises(ValueError, match="observation_not_reviewable"):
+            store.review_observation(
+                event_id,
+                status="inactive_confirmed",
+                reviewed_at="2026-08-06T01:00:00Z",
             )
     finally:
         conn.close()
@@ -223,6 +333,38 @@ def test_relationship_review_route_is_explicit_and_does_not_touch_profile_state(
     assert profile_path.read_bytes() == b"profile-sentinel"
 
 
+def test_lifecycle_event_review_404_does_not_create_lifecycle_tables(
+    tmp_path,
+    monkeypatch,
+):
+    import sqlite3
+
+    import pytest
+    from fastapi import HTTPException
+
+    import src.api.routes.market_data as route
+
+    db_path = tmp_path / "market_data.db"
+    sqlite3.connect(db_path).close()
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
+    monkeypatch.setattr(route, "require_db_write", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        route.review_security_lifecycle_event(
+            999,
+            route.SecurityLifecycleEventReview(status="inactive_confirmed"),
+        )
+    assert exc_info.value.status_code == 404
+    conn = sqlite3.connect(db_path)
+    try:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE name LIKE '%lifecycle%' "
+            "OR name LIKE 'corporate_action%'"
+        ).fetchall() == []
+    finally:
+        conn.close()
+
+
 def test_relationship_review_404_does_not_create_lifecycle_tables(tmp_path, monkeypatch):
     import sqlite3
 
@@ -248,5 +390,61 @@ def test_relationship_review_404_does_not_create_lifecycle_tables(tmp_path, monk
             "SELECT name FROM sqlite_master WHERE name LIKE '%lifecycle%' "
             "OR name LIKE 'corporate_action%'"
         ).fetchall() == []
+    finally:
+        conn.close()
+
+
+def test_lifecycle_event_review_route_is_explicit_and_keeps_universe_untouched(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+
+    import src.api.routes.market_data as route
+    from src.security_lifecycle import SecurityLifecycleStore
+
+    db_path = tmp_path / "market_data.db"
+    profile_path = tmp_path / "profile_state.db"
+    profile_path.write_bytes(b"profile-sentinel")
+    conn = sqlite3.connect(db_path)
+    try:
+        store = SecurityLifecycleStore(conn)
+        store.upsert_observation(
+            _observation(
+                event_type="listing_removal_notice",
+                lifecycle_state="pending_delisting",
+            )
+        )
+        event_id = conn.execute(
+            "SELECT id FROM security_lifecycle_observations"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    allowed = []
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
+    monkeypatch.setattr(
+        route,
+        "require_db_write",
+        lambda action, payload: allowed.append((action, payload)),
+    )
+
+    result = route.review_security_lifecycle_event(
+        event_id,
+        route.SecurityLifecycleEventReview(status="inactive_confirmed"),
+    )
+
+    assert result == {"id": event_id, "status": "inactive_confirmed"}
+    assert allowed == [
+        (
+            "review_security_lifecycle_event",
+            {"event_id": event_id, "status": "inactive_confirmed"},
+        )
+    ]
+    assert profile_path.read_bytes() == b"profile-sentinel"
+    conn = sqlite3.connect(db_path)
+    try:
+        assert conn.execute(
+            "SELECT reviewed_state FROM security_lifecycle_observations WHERE id=?",
+            (event_id,),
+        ).fetchone()[0] == "inactive_confirmed"
     finally:
         conn.close()

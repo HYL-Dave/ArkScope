@@ -34,6 +34,9 @@ LIFECYCLE_STATES = frozenset(
 )
 ACTION_TYPES = frozenset({"acquisition", "merger"})
 RELATIONSHIP_STATUSES = frozenset({"candidate", "confirmed", "rejected"})
+OBSERVATION_REVIEW_STATES = frozenset(
+    {"inactive_confirmed", "renamed_or_transferred"}
+)
 
 _TICKER_RE = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
 _CIK_RE = re.compile(r"^\d{10}$")
@@ -63,6 +66,8 @@ CREATE TABLE IF NOT EXISTS security_lifecycle_observations (
     description         TEXT NOT NULL,
     first_observed_at   TEXT NOT NULL,
     last_observed_at    TEXT NOT NULL,
+    reviewed_state      TEXT,
+    reviewed_at         TEXT,
     UNIQUE(source, source_ref, ticker, event_type)
 );
 CREATE INDEX IF NOT EXISTS idx_security_lifecycle_ticker_date
@@ -194,6 +199,26 @@ class SecurityLifecycleStore:
         self.conn = conn
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(_SCHEMA)
+        self._ensure_observation_review_columns()
+
+    def _ensure_observation_review_columns(self) -> None:
+        columns = {
+            str(row["name"])
+            for row in self.conn.execute(
+                "PRAGMA table_info(security_lifecycle_observations)"
+            ).fetchall()
+        }
+        with self.conn:
+            if "reviewed_state" not in columns:
+                self.conn.execute(
+                    "ALTER TABLE security_lifecycle_observations "
+                    "ADD COLUMN reviewed_state TEXT"
+                )
+            if "reviewed_at" not in columns:
+                self.conn.execute(
+                    "ALTER TABLE security_lifecycle_observations "
+                    "ADD COLUMN reviewed_at TEXT"
+                )
 
     def upsert_observation(self, value: LifecycleObservation) -> bool:
         ticker = _optional_ticker("ticker", value.ticker)
@@ -316,6 +341,39 @@ class SecurityLifecycleStore:
         if cursor.rowcount != 1:
             raise KeyError("relationship_not_found")
 
+    def review_observation(
+        self,
+        observation_id: int,
+        *,
+        status: str,
+        reviewed_at: str,
+    ) -> None:
+        row = self.conn.execute(
+            "SELECT event_type FROM security_lifecycle_observations WHERE id=?",
+            (int(observation_id),),
+        ).fetchone()
+        if row is None:
+            raise KeyError("observation_not_found")
+        if row["event_type"] not in {
+            "listing_status_review",
+            "listing_removal_notice",
+        }:
+            raise ValueError("observation_not_reviewable")
+        if status == "unreviewed":
+            values = (None, None, int(observation_id))
+        elif status in OBSERVATION_REVIEW_STATES:
+            values = (status, _observed_at(reviewed_at), int(observation_id))
+        else:
+            raise ValueError("status")
+        with self.conn:
+            cursor = self.conn.execute(
+                "UPDATE security_lifecycle_observations "
+                "SET reviewed_state=?, reviewed_at=? WHERE id=?",
+                values,
+            )
+        if cursor.rowcount != 1:
+            raise KeyError("observation_not_found")
+
 
 def _empty_snapshot() -> dict:
     return {
@@ -325,6 +383,8 @@ def _empty_snapshot() -> dict:
             "event_count": 0,
             "review_required": 0,
             "pending_delisting": 0,
+            "confirmed_inactive": 0,
+            "renamed_or_transferred": 0,
             "relationship_candidates": 0,
         },
     }
@@ -352,6 +412,16 @@ def read_security_lifecycle(db_path: str, *, limit: int = 200) -> dict:
         if not _table_exists(conn, "security_lifecycle_observations"):
             return _empty_snapshot()
         bounded_limit = min(max(int(limit), 1), 1000)
+        event_columns = {
+            str(row["name"])
+            for row in conn.execute(
+                "PRAGMA table_info(security_lifecycle_observations)"
+            ).fetchall()
+        }
+        has_review_columns = {
+            "reviewed_state",
+            "reviewed_at",
+        }.issubset(event_columns)
         event_rows = conn.execute(
             "SELECT * FROM security_lifecycle_observations "
             "ORDER BY filing_date DESC, id DESC LIMIT ?",
@@ -371,17 +441,41 @@ def read_security_lifecycle(db_path: str, *, limit: int = 200) -> dict:
             )
         else:
             relationship_candidates = 0
-        summary_row = conn.execute(
-            "SELECT COUNT(*) AS event_count, "
-            "SUM(CASE WHEN lifecycle_state='review_required' THEN 1 ELSE 0 END) "
-            "AS review_required, "
-            "SUM(CASE WHEN lifecycle_state='pending_delisting' THEN 1 ELSE 0 END) "
-            "AS pending_delisting FROM security_lifecycle_observations"
-        ).fetchone()
+        if has_review_columns:
+            summary_row = conn.execute(
+                "SELECT COUNT(*) AS event_count, "
+                "SUM(CASE WHEN reviewed_state IS NULL "
+                "AND lifecycle_state='review_required' THEN 1 ELSE 0 END) "
+                "AS review_required, "
+                "SUM(CASE WHEN reviewed_state IS NULL "
+                "AND lifecycle_state='pending_delisting' THEN 1 ELSE 0 END) "
+                "AS pending_delisting, "
+                "SUM(CASE WHEN reviewed_state='inactive_confirmed' "
+                "THEN 1 ELSE 0 END) AS confirmed_inactive, "
+                "SUM(CASE WHEN reviewed_state='renamed_or_transferred' "
+                "THEN 1 ELSE 0 END) AS renamed_or_transferred "
+                "FROM security_lifecycle_observations"
+            ).fetchone()
+        else:
+            summary_row = conn.execute(
+                "SELECT COUNT(*) AS event_count, "
+                "SUM(CASE WHEN lifecycle_state='review_required' THEN 1 ELSE 0 END) "
+                "AS review_required, "
+                "SUM(CASE WHEN lifecycle_state='pending_delisting' THEN 1 ELSE 0 END) "
+                "AS pending_delisting, 0 AS confirmed_inactive, "
+                "0 AS renamed_or_transferred "
+                "FROM security_lifecycle_observations"
+            ).fetchone()
         events = []
         for row in event_rows:
             item = dict(row)
             item["filing_items"] = list(json.loads(item.pop("filing_items_json")))
+            observed_state = item["lifecycle_state"]
+            reviewed_state = item.get("reviewed_state")
+            item["observed_lifecycle_state"] = observed_state
+            item["reviewed_state"] = reviewed_state
+            item["reviewed_at"] = item.get("reviewed_at")
+            item["lifecycle_state"] = reviewed_state or observed_state
             events.append(item)
         return {
             "events": events,
@@ -390,6 +484,10 @@ def read_security_lifecycle(db_path: str, *, limit: int = 200) -> dict:
                 "event_count": int(summary_row["event_count"] or 0),
                 "review_required": int(summary_row["review_required"] or 0),
                 "pending_delisting": int(summary_row["pending_delisting"] or 0),
+                "confirmed_inactive": int(summary_row["confirmed_inactive"] or 0),
+                "renamed_or_transferred": int(
+                    summary_row["renamed_or_transferred"] or 0
+                ),
                 "relationship_candidates": relationship_candidates,
             },
         }

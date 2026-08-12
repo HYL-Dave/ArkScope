@@ -174,6 +174,60 @@ class CorporateRelationshipReview(BaseModel):
     status: Literal["confirmed", "rejected"]
 
 
+class SecurityLifecycleEventReview(BaseModel):
+    status: Literal["inactive_confirmed", "renamed_or_transferred", "unreviewed"]
+
+
+@router.put("/market-data/security-lifecycle/events/{event_id}")
+def review_security_lifecycle_event(
+    event_id: int,
+    body: SecurityLifecycleEventReview,
+):
+    """Persist an explicit local review without changing Universe membership."""
+    payload = {"event_id": event_id, "status": body.status}
+    require_db_write("review_security_lifecycle_event", payload)
+    db_path = resolve_market_db_path()
+    if not Path(db_path).is_file():
+        raise HTTPException(status_code=404, detail="lifecycle_event_not_found")
+    from datetime import datetime, timezone
+    from src.market_data_direct import market_write_lock
+
+    reviewed_at = (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+    with market_write_lock():
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        try:
+            table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' "
+                "AND name='security_lifecycle_observations'"
+            ).fetchone()
+            if table_exists is None:
+                raise HTTPException(status_code=404, detail="lifecycle_event_not_found")
+            SecurityLifecycleStore(conn).review_observation(
+                event_id,
+                status=body.status,
+                reviewed_at=reviewed_at,
+            )
+        except KeyError:
+            raise HTTPException(
+                status_code=404,
+                detail="lifecycle_event_not_found",
+            ) from None
+        except ValueError as exc:
+            if str(exc) != "observation_not_reviewable":
+                raise
+            raise HTTPException(
+                status_code=409,
+                detail="lifecycle_event_not_reviewable",
+            ) from None
+        finally:
+            conn.close()
+    return {"id": event_id, "status": body.status}
+
+
 @router.put("/market-data/security-lifecycle/relationships/{relationship_id}")
 def review_corporate_relationship(
     relationship_id: int,

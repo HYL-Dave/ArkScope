@@ -126,26 +126,54 @@ const lifecycle: SecurityLifecycleSnapshot = {
     event_count: 2,
     review_required: 1,
     pending_delisting: 1,
+    confirmed_inactive: 0,
+    renamed_or_transferred: 0,
     relationship_candidates: 1,
   },
-  events: [{
-    id: 1,
-    ticker: "EA",
-    cik: "0000712515",
-    issuer_name: "Electronic Arts Inc.",
-    event_type: "acquisition_completed",
-    lifecycle_state: "review_required",
-    filing_date: "2026-08-04",
-    effective_date: "2026-08-04",
-    source: "sec_edgar",
-    source_ref: "0000712515-26-000042",
-    filing_form: "8-K",
-    filing_items: ["2.01", "3.01"],
-    evidence_url: "https://www.sec.gov/Archives/example/ea-8k.htm",
-    description: "Current report",
-    first_observed_at: "2026-08-05T00:00:00Z",
-    last_observed_at: "2026-08-05T00:00:00Z",
-  }],
+  events: [
+    {
+      id: 1,
+      ticker: "EA",
+      cik: "0000712515",
+      issuer_name: "Electronic Arts Inc.",
+      event_type: "acquisition_completed",
+      observed_lifecycle_state: "review_required",
+      lifecycle_state: "review_required",
+      reviewed_state: null,
+      reviewed_at: null,
+      filing_date: "2026-08-04",
+      effective_date: "2026-08-04",
+      source: "sec_edgar",
+      source_ref: "0000712515-26-000042",
+      filing_form: "8-K",
+      filing_items: ["2.01", "3.01"],
+      evidence_url: "https://www.sec.gov/Archives/example/ea-8k.htm",
+      description: "Current report",
+      first_observed_at: "2026-08-05T00:00:00Z",
+      last_observed_at: "2026-08-05T00:00:00Z",
+    },
+    {
+      id: 2,
+      ticker: "DELIST",
+      cik: "0000000002",
+      issuer_name: "Delisting Review Corp.",
+      event_type: "listing_removal_notice",
+      observed_lifecycle_state: "pending_delisting",
+      lifecycle_state: "pending_delisting",
+      reviewed_state: null,
+      reviewed_at: null,
+      filing_date: "2026-08-05",
+      effective_date: null,
+      source: "sec_edgar",
+      source_ref: "0000000002-26-000001",
+      filing_form: "25-NSE",
+      filing_items: [],
+      evidence_url: "https://www.sec.gov/Archives/example/delist-form25.htm",
+      description: "Listing removal notice",
+      first_observed_at: "2026-08-06T00:00:00Z",
+      last_observed_at: "2026-08-06T00:00:00Z",
+    },
+  ],
   relationships: [{
     id: 1,
     action_type: "acquisition",
@@ -245,6 +273,39 @@ vi.mock("./api", async (importOriginal) => {
       };
       return { id, status };
     }),
+    reviewSecurityLifecycleEvent: vi.fn(async (
+      id: number,
+      status: "inactive_confirmed" | "renamed_or_transferred" | "unreviewed",
+    ) => {
+      const events = mocked.lifecycle!.events.map((event) => {
+        if (event.id !== id) return event;
+        const reviewedState = status === "unreviewed" ? null : status;
+        return {
+          ...event,
+          lifecycle_state: reviewedState ?? event.observed_lifecycle_state,
+          reviewed_state: reviewedState,
+          reviewed_at: reviewedState ? "2026-08-12T01:00:00Z" : null,
+        };
+      });
+      mocked.lifecycle = {
+        ...mocked.lifecycle!,
+        events,
+        summary: {
+          ...mocked.lifecycle!.summary,
+          review_required: events.filter((event) =>
+            event.reviewed_state === null
+            && event.observed_lifecycle_state === "review_required").length,
+          pending_delisting: events.filter((event) =>
+            event.reviewed_state === null
+            && event.observed_lifecycle_state === "pending_delisting").length,
+          confirmed_inactive: events.filter((event) =>
+            event.reviewed_state === "inactive_confirmed").length,
+          renamed_or_transferred: events.filter((event) =>
+            event.reviewed_state === "renamed_or_transferred").length,
+        },
+      };
+      return { id, status };
+    }),
     getNewsStatus: vi.fn(async () => newsStatus),
   };
 });
@@ -254,6 +315,7 @@ import {
   getSecurityLifecycle,
   getTradingDayCoverage,
   reviewCorporateRelationship,
+  reviewSecurityLifecycleEvent,
 } from "./api";
 import { SettingsView } from "./Settings";
 import { DataStorageSection } from "./settings/DataStorageSection";
@@ -350,6 +412,39 @@ describe("post-PG-exit storage panels", () => {
       await Promise.resolve();
     });
     expect(getSecurityLifecycle).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers explicit local confirmation only for listing-status events", async () => {
+    const cache = createSettingsReadCache();
+    cache.replace("market_data_status", marketStatus);
+    cache.replace("security_lifecycle", lifecycle);
+    cache.replace(tradingDayCoverageKey(10), coverage);
+
+    await renderDataStorage(cache);
+
+    const rows = Array.from(host!.querySelectorAll("tbody tr"));
+    const listingRow = rows.find((row) => row.textContent?.includes("DELIST"));
+    const acquisitionRow = rows.find((row) => row.textContent?.includes("EA"));
+    if (!listingRow || !acquisitionRow) throw new Error("missing lifecycle event rows");
+    expect(listingRow.textContent).toContain("確認已下市");
+    expect(listingRow.textContent).toContain("標記代號異動 / 轉板");
+    expect(acquisitionRow.textContent).not.toContain("確認已下市");
+    expect(host!.textContent).toContain("兩者都不會自動從投資範圍移除標的");
+
+    const confirm = Array.from(listingRow.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("確認已下市"),
+    );
+    if (!confirm) throw new Error("missing lifecycle confirmation action");
+    await act(async () => confirm.click());
+    expect(reviewSecurityLifecycleEvent).toHaveBeenCalledWith(2, "inactive_confirmed");
+    expect(host!.textContent).toContain("已確認停止上市");
+
+    const clear = Array.from(host!.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("清除覆核"),
+    );
+    if (!clear) throw new Error("missing lifecycle clear-review action");
+    await act(async () => clear.click());
+    expect(reviewSecurityLifecycleEvent).toHaveBeenLastCalledWith(2, "unreviewed");
   });
 
   it("keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads", async () => {
@@ -671,6 +766,8 @@ describe("post-PG-exit storage panels", () => {
         "Events",
         "Review required",
         "Delisting notices",
+        "Confirmed listing ended",
+        "Renamed or transferred",
         "M&A relationship candidates",
         "Universe",
         "Interval",
@@ -711,7 +808,7 @@ describe("post-PG-exit storage panels", () => {
       Array.from(table.querySelectorAll("th"), (node) => node.textContent)))
       .toEqual([
         ["Target", "Acquirer", "Status", "Filing / effective date", "Evidence", "Review"],
-        ["Ticker", "Event", "Status", "Filing / effective date", "Evidence"],
+        ["Ticker", "Event", "Status", "Filing / effective date", "Evidence", "Review"],
         ["Date", "Status", "Expected slots", "Complete", "Partial", "Unknown"],
       ]);
     const coverageRow = Array.from(storage.querySelectorAll<HTMLTableRowElement>("tbody tr"))
