@@ -1,14 +1,15 @@
 # SA Health Truth and Schedule Table Layout Design
 
-> **Status:** DRAFT; USER REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** BASE DESIGN USER-APPROVED; FAILURE-DIAGNOSTICS AMENDMENT REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
-> **Grounding base:** `bea5890f`
+> **Grounding base:** `bea5890f`; diagnostics amendment grounded at `bdd8fc30`
 >
-> **Scope:** correct the Settings SA Extension health semantics and make the
-> existing per-source schedule table readable. This unit does not change SA
-> capture, repair behavior, provider cadence, or scheduler execution.
+> **Scope:** correct the Settings SA Extension health semantics, preserve
+> bounded failure evidence for later diagnosis, and make the existing
+> per-source schedule table readable. This unit does not change SA capture or
+> repair algorithms, provider cadence, retry policy, or scheduler execution.
 
 ## 1. Problem
 
@@ -21,6 +22,10 @@ Two user-visible defects were observed in Settings on 2026-08-12:
 2. Long source descriptions in the schedule table inherited the global
    `.data-table td { white-space: nowrap; }` rule and visually ran into the
    schedule controls in adjacent columns.
+3. A completed Alpha Picks run exposed only `detail_save_failed`. The stored
+   row did not say whether the failure happened in browser navigation, access
+   validation, extraction, native-host transport, or SQLite persistence. That
+   makes a real failure visible but not diagnosable.
 
 The supplied screenshots are the visual authority for these symptoms:
 
@@ -69,6 +74,35 @@ This is not a translation-length problem. Shortening one Chinese sentence
 would leave the same defect for English, future provider names, or narrower
 windows.
 
+### 2.3 The 2026-08-12 failure occurred before local persistence
+
+Production read-only evidence for `job_runs.id=20308` records a degraded
+`sa_alpha_picks_refresh` attempt from `2026-08-12T15:04:05Z` through
+`2026-08-12T15:06:46Z`. Its failed phase is `article_details`, with the generic
+reason `detail_save_failed`; `payload` contains only the extension event
+identity and `error` is null.
+
+The native-host log provides a narrower, non-speculative boundary:
+
+- metadata save completed with 60 articles and requested comments for three;
+- exactly one `save_comments_only` request then reached the native host;
+- that request committed successfully for article `6323722`; and
+- no native-host save request exists for the other two targets before the
+  terminal extension telemetry row was recorded.
+
+The two missing operations therefore did not fail in the SQLite transaction.
+They stopped somewhere in the browser-owned path: navigation/load, access or
+login readiness, script injection, scrolling/parsing, or an extension
+exception. Existing code increments `failed` at each of those branches but
+does not retain the branch or target. `buildAlphaPicksProtocolResult()` then
+collapses the count to `detail_save_failed`, and `protocolProjection()` drops
+all non-canonical fields before persistence.
+
+The extension/native save contract itself is valid: a successful local save
+returns `ok=true` through the backend and native-host envelope, and the
+extension checks that field. This design must not replace that working
+contract based on the generic stored reason.
+
 ## 3. Alternatives
 
 ### A. Change only the copy
@@ -94,6 +128,13 @@ status as a new history surface.
 
 Deferred. That could be useful, but current storage does not provide a reviewed
 failure-to-repair relation. Inferring one from timestamps would invent truth.
+
+### D. Persist raw browser/native logs or exception text
+
+Rejected. Raw logs can contain URLs, page text, account identifiers, provider
+responses, or implementation details; they are also too large and unstable to
+be a product contract. Persist a closed diagnostic projection at the failure
+site instead.
 
 ## 4. Locked decisions
 
@@ -180,6 +221,152 @@ source and last-result columns must remain the two widest columns and total
 No provider label, description, source ID, cadence, enable flag, or execution
 behavior changes in this unit.
 
+### LD 5 - Canonical outcome and diagnostic evidence have separate owners
+
+The existing extension run protocol remains the sole authority for terminal
+outcome, phase states, counts, and retryability. Add a sibling
+`extension_diagnostics` envelope to the telemetry request; diagnostics may
+explain an outcome but can never change it.
+
+The request shape is closed:
+
+```text
+extension_diagnostics:
+  schema_version: 1
+  entries: [diagnostic entry, ...]
+  omitted_count: integer >= 0
+```
+
+Each admitted diagnostic entry has exactly these fields:
+
+```text
+occurred_at: aware UTC ISO-8601 failure-observation timestamp
+stage: closed enum
+reason_code: closed enum
+target_kind: "article_detail" | "article_comments" |
+             "market_news_detail" | "phase"
+target_ref: optional bounded opaque provider identifier
+retryable: boolean
+attempt_count: integer in [1, 1000]
+message: optional sanitized text, at most 240 characters
+```
+
+`occurred_at` must fall within the parent run's `started_at`/`finished_at`
+interval. `target_ref`, when present, matches `[A-Za-z0-9._:-]{1,128}`.
+`omitted_count` is bounded to `[0, 10000]`; it reports entries dropped only
+because the 32-entry cap was reached, never entries rejected for invalid data.
+
+The initial closed `stage` vocabulary is:
+
+- `tab_navigation`
+- `page_readiness`
+- `script_injection`
+- `content_parse`
+- `native_transport`
+- `local_persistence`
+- `reconciliation`
+- `extension_runtime`
+
+`reason_code` reuses the existing extension protocol's failure-capable
+`REASON_CODES` wherever one already describes the observed fact. Diagnostics
+must not create a near-synonym for existing codes such as `login_required`,
+`access_restricted`, `navigation_timeout`, `detail_timeout`, `dom_not_ready`,
+`parser_empty`, `native_host_unavailable`, or `reconciliation_failed`.
+
+The initial diagnostics-only additions are closed to:
+
+- `tab_closed`
+- `browser_api_failed`
+- `script_injection_failed`
+- `comment_scan_unusable`
+- `native_response_invalid`
+- `database_busy`
+- `database_integrity_failed`
+- `database_write_failed`
+- `extension_runtime_error`
+
+Unknown values are rejected rather than persisted as free-form categories.
+`target_ref` is an opaque article/news identifier, never a URL or title.
+
+Diagnostics validation is isolated from result validation. A malformed or
+secret-bearing diagnostics envelope is discarded as a whole, while the valid
+terminal outcome is still persisted with a typed
+`diagnostics_status="rejected"` and
+`diagnostics_error_code="invalid_extension_diagnostics"` marker. A malformed
+diagnostic must never make a completed run disappear. Valid new-client events
+record `diagnostics_status="recorded"`, including an empty entry list on
+success; legacy events without the sibling field record `"absent"`.
+
+### LD 6 - The failing layer classifies the failure before incrementing counts
+
+Every extension branch that increments a failed detail count must first append
+one typed diagnostic. Browser code owns browser stages; the native host owns
+transport-envelope validation; and the local backend owns SQLite error
+classification. A caller must not relabel an unknown browser failure as a
+database write failure.
+
+Native save failures return a stable `error_code` plus a bounded sanitized
+diagnostic. Raw `str(exception)`, stack traces, SQL text, and filesystem paths
+are not telemetry authorities. An unrecognized exception maps to the owning
+stage's generic stable code, not to an invented provider cause.
+
+The diagnostic envelope participates in the immutable extension-event hash.
+A retry with different admitted evidence is therefore not silently deduplicated
+against the earlier event. For a rejected envelope, only the canonical
+rejection marker participates in the hash; rejected raw bytes are never
+retained or hashed into durable state.
+
+### LD 7 - Durable tracking reuses `job_runs` without creating a parallel log
+
+`JobRunsLocalStore.record_extension_event_once()` persists the validated
+envelope, or its rejection/absence marker, under
+`job_runs.payload.extension_diagnostics`. The terminal result continues to live
+in `job_runs.result`; no second outcome table or raw-log table is introduced.
+
+The health service may read at most the latest 20 completed allowlisted SA
+extension rows to derive a bounded recurrence summary by `(job_name, stage,
+reason_code)`. It exposes:
+
+- diagnostics from the latest completed run;
+- the latest occurrence time for each repeated typed cause; and
+- the number of affected runs in that bounded window.
+
+This is an operational history, not failure-to-repair linkage. Rows written by
+older extension versions remain valid and render `原因未記錄（舊版資料）` when
+the terminal outcome is degraded or failed without diagnostics.
+
+### LD 8 - Normal and developer UI expose different diagnostic depth
+
+The normal SA health row renders the precise stable cause when available, for
+example an article page readiness timeout versus a local database write
+failure. It does not show raw exception text.
+
+The UI may name a network cause only when the browser supplies a reviewed,
+stable signal for it. A generic navigation/load timeout remains a browser page
+readiness failure and explicitly says that stored evidence cannot distinguish
+network, provider-page, and browser causes. The product must not guess a more
+specific root cause from elapsed time or a missing native-host call.
+
+Developer mode may additionally show run ID, stage, reason code, target
+reference, occurrence time, retryability, attempt count, sanitized message,
+and recurrence count. This evidence joins the existing Settings developer
+diagnostics surface; it is not rendered as an always-open raw-log panel.
+
+`重新檢查` remains a local GET-only action. It re-reads stored health and
+diagnostics and never retries provider work.
+
+### LD 9 - Diagnostic storage is bounded and secret-safe
+
+One event admits at most 32 entries plus an `omitted_count`; the canonical
+diagnostic JSON is capped at 32 KiB. Invalid entries are rejected atomically
+rather than partially transformed into plausible evidence.
+
+The envelope must never contain URL/query text, title, body, comments, HTML,
+cookie, authorization header, token, email address, full filesystem path, SQL,
+or stack trace. Tests use sentinels for each prohibited class and prove they do
+not cross the extension request, native-host payload, database row, API DTO, or
+rendered developer surface.
+
 ## 5. Verification contract
 
 Backend tests must prove:
@@ -191,6 +378,16 @@ Backend tests must prove:
 4. capture and repair failures never alter chain state;
 5. only the two allowlisted job names cross the API boundary; and
 6. no running state is inferred from absent completion data.
+7. valid diagnostic envelopes round-trip into `job_runs.payload` and alter the
+   immutable event hash;
+8. malformed enums, timestamps, identifiers, oversized envelopes, and secret
+   sentinels never persist, while the canonical terminal outcome does persist
+   with the typed diagnostics-rejected marker;
+9. browser-, transport-, and SQLite-owned failures retain distinct stable
+   codes while unknown exceptions remain generic to their owning stage;
+10. a latest degraded row with no diagnostic renders the typed legacy-absence
+    state rather than an inferred cause; and
+11. the 20-run recurrence projection is bounded, deterministic, and read-only.
 
 Frontend tests must prove:
 
@@ -200,6 +397,17 @@ Frontend tests must prove:
 3. an old repair timestamp cannot be mistaken for current recovery;
 4. source descriptions have the dedicated wrapping class; and
 5. existing schedule controls and source IDs are unchanged.
+6. normal mode distinguishes browser readiness, native transport, and local
+   persistence failures without raw details;
+7. developer mode renders only the admitted diagnostic fields and recurrence
+   count; and
+8. `重新檢查` performs local GETs only and cannot trigger extension/provider
+   work.
+
+Extension tests must prove each existing `failed++` branch emits exactly one
+typed entry before terminal protocol construction, successful saves emit none,
+and a multi-target attempt reports the correct target without retaining page
+content or URL data.
 
 Browser verification uses desktop `1322 x 777` and mobile `390 x 844`:
 
@@ -212,7 +420,9 @@ Browser verification uses desktop `1322 x 777` and mobile `390 x 844`:
 ## 6. Out of scope
 
 - changing extension capture or repair algorithms;
+- changing retry counts, backoff, page-navigation windows, or provider traffic;
 - linking a failure to a later repair without stored relational evidence;
+- persisting raw browser/native logs or adding a generic log viewer;
 - adding polling or automatic rechecks;
 - changing source schedules or provider configuration; and
 - redesigning the complete Settings table system.

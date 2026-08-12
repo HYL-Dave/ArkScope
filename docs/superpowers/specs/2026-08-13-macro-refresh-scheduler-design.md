@@ -1,10 +1,10 @@
 # Macro Data Refresh and Scheduler Integration Design
 
-> **Status:** DRAFT; USER REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** USER APPROVED; IMPLEMENTATION PLAN AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
-> **Grounding base:** `bea5890f`
+> **Grounding base:** `bea5890f`; approved design commit `bdd8fc30`
 >
 > **Scope:** connect the existing FRED and Finnhub macro-calendar collectors to
 > ArkScope's one app-owned scheduler, expose honest automatic/manual controls,
