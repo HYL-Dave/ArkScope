@@ -333,6 +333,11 @@ export function scheduleSourceCopy(
         label: t(($) => $.dataSources.schedule.sources.ibkrPrices.label),
         description: t(($) => $.dataSources.schedule.sources.ibkrPrices.description),
       };
+    case "sec_corporate_actions":
+      return {
+        label: t(($) => $.dataSources.schedule.sources.secCorporateActions.label),
+        description: t(($) => $.dataSources.schedule.sources.secCorporateActions.description),
+      };
     default:
       return {
         label: id,

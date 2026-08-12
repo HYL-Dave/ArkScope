@@ -14,6 +14,8 @@ Sources v1:
     subprocess, serialized behind ONE shared IBKR lock (one Gateway session;
     client-id hygiene + the ib_insync asyncio loop is safer in its own process)
   - ibkr_prices                       — direct-local adapter into market_data.db
+  - sec_corporate_actions             — SEC filing metadata and bounded filing
+    evidence → local lifecycle/M&A review observations
 
 Active writers now write local stores directly. Prices are post-P0-C
 direct-local; news is post-N8a PG-exited: provider fetches write normalized
@@ -142,6 +144,18 @@ SOURCES: Dict[str, SourceDef] = {
             source_badges=("IBKR", "直寫本地"),
             description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
         ),
+        SourceDef(
+            "sec_corporate_actions", "SEC 公司事件",
+            adapter=("src.collectors.sec_corporate_actions", "run_incremental"),
+            universe_tickers=True, default_interval_min=1440,
+            writes_market_db=True,
+            source_mode="direct_local",
+            source_badges=("SEC", "官方申報"),
+            description=(
+                "SEC filings → local delisting/listing-status and M&A review observations; "
+                "never removes an active-universe ticker automatically"
+            ),
+        ),
     )
 }
 
@@ -187,6 +201,7 @@ _SOURCE_PROVIDER_CONFIG = {
     "finnhub_news": "finnhub",
     "ibkr_news": "ibkr",
     "ibkr_prices": "ibkr",
+    "sec_corporate_actions": "sec_edgar",
 }
 
 
@@ -1019,6 +1034,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         writer_continuation = None
         writer_partial = False
         price_partial = False
+        adapter_partial = False
         price_audit_error: Optional[str] = None
         preserve_continuation_on_failure = None
         try:
@@ -1181,6 +1197,10 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     # NOT to re-acquire it (non-reentrant; would self-deadlock).
                     kwargs["acquire_gateway_lock"] = False
                 result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
+                adapter_partial = (
+                    isinstance(result["collect"], dict)
+                    and result["collect"].get("status") == "partial"
+                )
         except Exception as e:  # noqa: BLE001
             lock_busy_reason = (
                 _market_write_lock_busy_reason(e)
@@ -1206,7 +1226,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         continuation = None
         if result.get("status") == "skipped":
             continuation = pending_cont if pending_cont is not None else None
-        elif ok and (writer_partial or price_partial):
+        elif ok and (writer_partial or price_partial or adapter_partial):
             result["status"] = "partial"
             continuation = writer_continuation if writer_partial else None
             if continuation is not None:

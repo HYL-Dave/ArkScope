@@ -118,6 +118,7 @@ class SECEdgarDataSource(BaseDataSource):
 
         # Cache for CIK lookups
         self._cik_cache: Dict[str, str] = TICKER_TO_CIK.copy()
+        self._ticker_map_loaded = False
 
     @property
     def source_name(self) -> str:
@@ -210,34 +211,20 @@ class SECEdgarDataSource(BaseDataSource):
         if ticker in self._cik_cache:
             return self._cik_cache[ticker]
 
-        # Try to look up from SEC's ticker mapping
-        try:
-            response = self._session.get(
-                "https://www.sec.gov/cgi-bin/browse-edgar",
-                params={
-                    'action': 'getcompany',
-                    'CIK': ticker,
-                    'type': '',
-                    'dateb': '',
-                    'owner': 'include',
-                    'count': '1',
-                    'output': 'atom',
-                },
-                timeout=10,
-            )
-
-            if response.status_code == 200:
-                # Parse CIK from response
-                match = re.search(r'CIK=(\d+)', response.text)
-                if match:
-                    cik = match.group(1).zfill(10)
-                    self._cik_cache[ticker] = cik
-                    return cik
-
-        except Exception as e:
-            logger.warning(f"Failed to lookup CIK for {ticker}: {e}")
-
-        return None
+        # Load the official mapping once. A universe run must not make one
+        # legacy CGI lookup per ticker.
+        if not self._ticker_map_loaded:
+            self._ticker_map_loaded = True
+            payload = self._make_request("https://www.sec.gov/files/company_tickers.json")
+            if isinstance(payload, dict):
+                for item in payload.values():
+                    if not isinstance(item, dict):
+                        continue
+                    symbol = str(item.get("ticker") or "").strip().upper()
+                    raw_cik = str(item.get("cik_str") or "").strip()
+                    if re.fullmatch(r"[A-Z0-9][A-Z0-9.\-]{0,19}", symbol) and raw_cik.isdigit():
+                        self._cik_cache[symbol] = raw_cik.zfill(10)
+        return self._cik_cache.get(ticker)
 
     def fetch_news(
         self,
@@ -384,6 +371,60 @@ class SECEdgarDataSource(BaseDataSource):
         logger.info(f"Fetched {len(all_filings)} SEC filings total")
         return all_filings
 
+    def fetch_submissions(self, cik: str) -> Optional[Dict[str, Any]]:
+        """Return one filer's official submissions metadata by 10-digit CIK."""
+        normalized = str(cik or '').strip().zfill(10)
+        if not re.fullmatch(r'\d{10}', normalized):
+            raise ValueError("invalid SEC CIK")
+        result = self._make_request(f"{self.SUBMISSIONS_URL}/CIK{normalized}.json")
+        return result if isinstance(result, dict) else None
+
+    def fetch_filing_document_text(
+        self,
+        url: str,
+        *,
+        max_bytes: int = 1_048_576,
+    ) -> Optional[str]:
+        """Fetch a filing document with a hard response-body bound.
+
+        Corporate-action extraction needs more than the legacy 50,000-character
+        preview, but it must not accept an unbounded filing into memory.
+        """
+        if not str(url).startswith("https://www.sec.gov/Archives/"):
+            raise ValueError("unsupported SEC filing URL")
+        if isinstance(max_bytes, bool) or not 1024 <= int(max_bytes) <= 5_242_880:
+            raise ValueError("invalid max_bytes")
+        self._rate_limit_wait()
+        try:
+            response = self._session.get(url, timeout=30, stream=True)
+            try:
+                if response.status_code != 200:
+                    logger.warning(
+                        "SEC filing document unavailable (%s): %s",
+                        response.status_code,
+                        url,
+                    )
+                    return None
+                chunks = []
+                total = 0
+                for chunk in response.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    remaining = int(max_bytes) - total
+                    if remaining <= 0:
+                        break
+                    chunks.append(chunk[:remaining])
+                    total += min(len(chunk), remaining)
+                    if total >= int(max_bytes):
+                        break
+                encoding = response.encoding or 'utf-8'
+                return b''.join(chunks).decode(encoding, errors='replace')
+            finally:
+                response.close()
+        except requests.RequestException as exc:
+            logger.warning("Failed to fetch SEC filing document: %s", exc)
+            return None
+
     def fetch_company_facts(self, ticker: str) -> Optional[Dict[str, Any]]:
         """
         Fetch structured financial facts for a company.
@@ -451,21 +492,24 @@ class SECEdgarDataSource(BaseDataSource):
             Document text content or None.
         """
         try:
-            self._rate_limit_wait()
-            response = self._session.get(filing.url, timeout=30)
-
-            if response.status_code == 200:
-                content = response.text
-                if len(content) > max_length:
-                    content = content[:max_length] + "\n... [truncated]"
-                return content
-
+            content = self.fetch_filing_document_text(
+                filing.url,
+                max_bytes=max(1024, min(int(max_length) * 4, 5_242_880)),
+            )
+            if content is None:
+                return None
+            if len(content) > max_length:
+                return content[:max_length] + "\n... [truncated]"
+            return content
         except Exception as e:
             logger.warning(f"Failed to fetch filing document: {e}")
+            return None
 
-        return None
+    def close(self) -> None:
+        """Close the underlying HTTP session."""
+        if hasattr(self, '_session'):
+            self._session.close()
 
     def __del__(self):
         """Clean up session on deletion."""
-        if hasattr(self, '_session'):
-            self._session.close()
+        self.close()

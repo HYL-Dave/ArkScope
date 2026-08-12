@@ -7,7 +7,7 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, TaskRoute, TradingDayCoverage } from "./api";
+import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, SecurityLifecycleSnapshot, TaskRoute, TradingDayCoverage } from "./api";
 import {
   LocaleProvider,
   createUiLocaleController,
@@ -31,6 +31,7 @@ const mocked = vi.hoisted(() => ({
   macroError: null as Error | null,
   macroSnapshotError: null as Error | null,
   coverage: null as TradingDayCoverage | null,
+  lifecycle: null as SecurityLifecycleSnapshot | null,
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -120,7 +121,54 @@ const coverage: TradingDayCoverage = {
   provider_errors: [],
 };
 
+const lifecycle: SecurityLifecycleSnapshot = {
+  summary: {
+    event_count: 2,
+    review_required: 1,
+    pending_delisting: 1,
+    relationship_candidates: 1,
+  },
+  events: [{
+    id: 1,
+    ticker: "EA",
+    cik: "0000712515",
+    issuer_name: "Electronic Arts Inc.",
+    event_type: "acquisition_completed",
+    lifecycle_state: "review_required",
+    filing_date: "2026-08-04",
+    effective_date: "2026-08-04",
+    source: "sec_edgar",
+    source_ref: "0000712515-26-000042",
+    filing_form: "8-K",
+    filing_items: ["2.01", "3.01"],
+    evidence_url: "https://www.sec.gov/Archives/example/ea-8k.htm",
+    description: "Current report",
+    first_observed_at: "2026-08-05T00:00:00Z",
+    last_observed_at: "2026-08-05T00:00:00Z",
+  }],
+  relationships: [{
+    id: 1,
+    action_type: "acquisition",
+    target_ticker: "EA",
+    target_cik: "0000712515",
+    target_name: "Electronic Arts Inc.",
+    acquirer_ticker: null,
+    acquirer_cik: null,
+    acquirer_name: "Oak-Eagle, LLC",
+    status: "candidate",
+    effective_date: "2026-08-04",
+    source: "sec_edgar",
+    source_ref: "0000712515-26-000042",
+    evidence_url: "https://www.sec.gov/Archives/example/ea-8k.htm",
+    evidence_excerpt: "The Company became a wholly owned subsidiary of Oak-Eagle, LLC.",
+    first_observed_at: "2026-08-05T00:00:00Z",
+    last_observed_at: "2026-08-05T00:00:00Z",
+    reviewed_at: null,
+  }],
+};
+
 mocked.coverage = coverage;
+mocked.lifecycle = lifecycle;
 
 const newsStatus: NewsStatus = {
   market_db: "/tmp/market.db",
@@ -182,11 +230,31 @@ vi.mock("./api", async (importOriginal) => {
       return mocked.macroSnapshot!;
     }),
     getTradingDayCoverage: vi.fn(async () => mocked.coverage!),
+    getSecurityLifecycle: vi.fn(async () => mocked.lifecycle!),
+    reviewCorporateRelationship: vi.fn(async (id: number, status: "confirmed" | "rejected") => {
+      mocked.lifecycle = {
+        ...mocked.lifecycle!,
+        relationships: mocked.lifecycle!.relationships.map((relationship) =>
+          relationship.id === id ? { ...relationship, status } : relationship),
+        summary: {
+          ...mocked.lifecycle!.summary,
+          relationship_candidates: mocked.lifecycle!.relationships.filter(
+            (relationship) => relationship.id !== id && relationship.status === "candidate",
+          ).length,
+        },
+      };
+      return { id, status };
+    }),
     getNewsStatus: vi.fn(async () => newsStatus),
   };
 });
 
-import { getMarketDataStatus, getTradingDayCoverage } from "./api";
+import {
+  getMarketDataStatus,
+  getSecurityLifecycle,
+  getTradingDayCoverage,
+  reviewCorporateRelationship,
+} from "./api";
 import { SettingsView } from "./Settings";
 import { DataStorageSection } from "./settings/DataStorageSection";
 import { withTestUiLocale } from "./test/testUiLocale";
@@ -215,6 +283,7 @@ afterEach(() => {
   mocked.macroError = null;
   mocked.macroSnapshotError = null;
   mocked.coverage = coverage;
+  mocked.lifecycle = lifecycle;
 });
 
 async function renderSettings(
@@ -252,6 +321,37 @@ async function renderDataStorage(settingsReadCache: SettingsReadCache) {
 }
 
 describe("post-PG-exit storage panels", () => {
+  it("shows SEC lifecycle evidence as review material and reloads it after its source runs", async () => {
+    const cache = createSettingsReadCache();
+    cache.replace("market_data_status", marketStatus);
+    cache.replace("security_lifecycle", lifecycle);
+    cache.replace(tradingDayCoverageKey(10), coverage);
+
+    await renderDataStorage(cache);
+    expect(getSecurityLifecycle).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain("公司狀態與併購");
+    expect(host!.textContent).toContain("EA");
+    expect(host!.textContent).toContain("Oak-Eagle, LLC");
+    expect(host!.textContent).toContain("待確認");
+    expect(host!.textContent).toContain("不會自動從投資範圍移除標的");
+
+    const confirm = Array.from(host!.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("確認關係"),
+    );
+    if (!confirm) throw new Error("missing relationship confirmation action");
+    await act(async () => confirm.click());
+    expect(reviewCorporateRelationship).toHaveBeenCalledWith(1, "confirmed");
+    expect(getSecurityLifecycle).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("已確認");
+
+    await act(async () => {
+      cache.invalidateDataSource("sec_corporate_actions");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(getSecurityLifecycle).toHaveBeenCalledTimes(2);
+  });
+
   it("keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads", async () => {
     const cache = createSettingsReadCache();
     const coverage15 = { ...coverage, lookback_days: 15, universe_count: 215 };
@@ -405,6 +505,7 @@ describe("post-PG-exit storage panels", () => {
         "連線與金鑰",
         "排程（每來源獨立）",
         "市場資料",
+        "公司狀態與併購",
         "交易日 / 價格覆蓋",
         "新聞資料",
         "總經資料",
@@ -567,6 +668,10 @@ describe("post-PG-exit storage panels", () => {
         "News",
         "Stored SEC Fundamentals",
         "Financial Cache",
+        "Events",
+        "Review required",
+        "Delisting notices",
+        "M&A relationship candidates",
         "Universe",
         "Interval",
         "Market scope",
@@ -602,8 +707,13 @@ describe("post-PG-exit storage panels", () => {
     expect(storage.textContent).toContain(
       "Read-only diagnostic; does not start a repair or supply planner work.",
     );
-    expect(Array.from(storage.querySelectorAll("table th")).map((node) => node.textContent))
-      .toEqual(["Date", "Status", "Expected slots", "Complete", "Partial", "Unknown"]);
+    expect(Array.from(storage.querySelectorAll("table"), (table) =>
+      Array.from(table.querySelectorAll("th"), (node) => node.textContent)))
+      .toEqual([
+        ["Target", "Acquirer", "Status", "Filing / effective date", "Evidence", "Review"],
+        ["Ticker", "Event", "Status", "Filing / effective date", "Evidence"],
+        ["Date", "Status", "Expected slots", "Complete", "Partial", "Unknown"],
+      ]);
     const coverageRow = Array.from(storage.querySelectorAll<HTMLTableRowElement>("tbody tr"))
       .find((row) => row.textContent?.includes("2026-07-18"));
     if (!coverageRow) throw new Error("missing English coverage row");
@@ -651,7 +761,7 @@ describe("post-PG-exit storage panels", () => {
     const news = host!.querySelector('[data-settings-anchor="news_storage"]');
     const macro = host!.querySelector('[data-settings-anchor="macro_storage"]');
     expect(Array.from(storage?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
-      .toEqual(["市場資料", "交易日 / 價格覆蓋"]);
+      .toEqual(["市場資料", "公司狀態與併購", "交易日 / 價格覆蓋"]);
     expect(Array.from(news?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
       .toEqual(["新聞資料"]);
     expect(Array.from(macro?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))

@@ -28,6 +28,8 @@ function settingsSubsectionLabel(id: SettingsSubsectionId, t: SettingsT): string
       return t(($) => $.dataSources.providers.config.title);
     case "source_schedules":
       return t(($) => $.dataSources.schedule.title);
+    case "security_lifecycle":
+      return t(($) => $.dataStorage.lifecycle.title);
     case "trading_day_coverage":
       return t(($) => $.dataStorage.coverage.title);
   }

@@ -9,6 +9,7 @@ type FixedSettingsReadKey =
   | "provider_config"
   | "sa_extension_health"
   | "market_data_status"
+  | "security_lifecycle"
   | "news_status"
   | "macro_status"
   | "macro_snapshot";
@@ -77,6 +78,7 @@ const FIXED_POLICIES: Readonly<Record<FixedSettingsReadKey, SettingsReadPolicy>>
   provider_config: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
   sa_extension_health: { freshMs: 5 * MINUTE, hardRetentionMs: 30 * MINUTE, idle: false },
   market_data_status: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
+  security_lifecycle: { freshMs: 5 * MINUTE, hardRetentionMs: 30 * MINUTE, idle: true },
   news_status: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
   macro_status: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
   macro_snapshot: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
@@ -88,6 +90,7 @@ const DATA_SYNC_FIXED_KEYS: readonly FixedSettingsReadKey[] = [
   "provider_config",
   "sa_extension_health",
   "market_data_status",
+  "security_lifecycle",
   "news_status",
   "macro_status",
   "macro_snapshot",
@@ -329,6 +332,10 @@ class MemorySettingsReadCache implements SettingsReadCache {
       for (const key of this.coverageKeys()) this.invalidate(key);
       return;
     }
+    if (source === "sec_corporate_actions") {
+      this.invalidate("security_lifecycle");
+      return;
+    }
     if (NEWS_SOURCES.has(source)) {
       this.invalidate("news_status");
       this.invalidate("market_data_status");
@@ -467,6 +474,7 @@ export type SettingsIdleWarmupKey =
   | "provider_health"
   | "provider_config"
   | "market_data_status"
+  | "security_lifecycle"
   | "trading_day_coverage:15min:10"
   | "news_status"
   | "macro_status"
@@ -478,6 +486,7 @@ const IDLE_WARMUP_KEYS: readonly SettingsIdleWarmupKey[] = [
   "provider_health",
   "provider_config",
   "market_data_status",
+  "security_lifecycle",
   "trading_day_coverage:15min:10",
   "news_status",
   "macro_status",

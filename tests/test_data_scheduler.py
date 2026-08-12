@@ -25,6 +25,7 @@ ACTIVE_SOURCE_IDS = {
     "finnhub_news",
     "ibkr_news",
     "ibkr_prices",
+    "sec_corporate_actions",
 }
 RETIRED_SOURCE_IDS = {"price_backfill", "local_incremental", "iv_history"}
 
@@ -68,10 +69,23 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     import src.collectors.finnhub_news as cfn
     import src.collectors.polygon_news as cpn
+    import src.collectors.sec_corporate_actions as sca
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     monkeypatch.setattr(cfn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
+    monkeypatch.setattr(
+        sca,
+        "run_incremental",
+        lambda *a, **k: {
+            "status": "succeeded",
+            "tickers_scanned": 2,
+            "events_observed": 0,
+            "relationships_observed": 0,
+            "review_required": 0,
+            "errors": {},
+        },
+    )
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: object())
     monkeypatch.setattr(
@@ -1691,6 +1705,10 @@ def test_get_schedule_snapshot_shape():
         assert "normalized SQLite" in out[name]["description"]
         assert "no news PG sync/mirror" in out[name]["description"]
     assert out["ibkr_prices"]["ibkr"] is True
+    assert out["sec_corporate_actions"]["job_name"] == (
+        "collect.sec_corporate_actions"
+    )
+    assert out["sec_corporate_actions"]["provider_fetch"] is True
     for source in out.values():
         assert "control_mode" not in source
         assert "retired" not in source
@@ -1710,6 +1728,7 @@ def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
     assert snap["polygon_news"]["source_badges"] == ["Polygon", "直寫本地"]
     assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
     assert snap["ibkr_news"]["source_badges"] == ["IBKR", "直寫本地"]
+    assert snap["sec_corporate_actions"]["source_badges"] == ["SEC", "官方申報"]
     assert all("control_mode" not in source for source in snap.values())
     assert all("retired" not in source for source in snap.values())
     assert all("retired_reason" not in source for source in snap.values())

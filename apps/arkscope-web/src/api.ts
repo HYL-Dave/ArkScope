@@ -2366,6 +2366,86 @@ export function getMarketDataStatus(): Promise<MarketDataStatus> {
   return getJSON<MarketDataStatus>("/market-data/status");
 }
 
+export type SecurityLifecycleEventType =
+  | "merger_agreement"
+  | "merger_proxy"
+  | "acquisition_completed"
+  | "listing_status_review"
+  | "listing_removal_notice";
+export type SecurityLifecycleState =
+  | "review_required"
+  | "pending_delisting"
+  | "inactive_confirmed"
+  | "renamed_or_transferred";
+export type CorporateRelationshipStatus = "candidate" | "confirmed" | "rejected";
+
+export interface SecurityLifecycleEvent {
+  id: number;
+  ticker: string;
+  cik: string | null;
+  issuer_name: string;
+  event_type: SecurityLifecycleEventType;
+  lifecycle_state: SecurityLifecycleState;
+  filing_date: string;
+  effective_date: string | null;
+  source: string;
+  source_ref: string;
+  filing_form: string;
+  filing_items: string[];
+  evidence_url: string;
+  description: string;
+  first_observed_at: string;
+  last_observed_at: string;
+}
+
+export interface CorporateRelationship {
+  id: number;
+  action_type: "acquisition" | "merger";
+  target_ticker: string | null;
+  target_cik: string | null;
+  target_name: string;
+  acquirer_ticker: string | null;
+  acquirer_cik: string | null;
+  acquirer_name: string;
+  status: CorporateRelationshipStatus;
+  effective_date: string | null;
+  source: string;
+  source_ref: string;
+  evidence_url: string;
+  evidence_excerpt: string;
+  first_observed_at: string;
+  last_observed_at: string;
+  reviewed_at: string | null;
+}
+
+export interface SecurityLifecycleSnapshot {
+  events: SecurityLifecycleEvent[];
+  relationships: CorporateRelationship[];
+  summary: {
+    event_count: number;
+    review_required: number;
+    pending_delisting: number;
+    relationship_candidates: number;
+  };
+}
+
+export function getSecurityLifecycle(limit = 200): Promise<SecurityLifecycleSnapshot> {
+  return getJSON<SecurityLifecycleSnapshot>(
+    `/market-data/security-lifecycle?limit=${encodeURIComponent(limit)}`,
+  );
+}
+
+export function reviewCorporateRelationship(
+  relationshipId: number,
+  status: Exclude<CorporateRelationshipStatus, "candidate">,
+): Promise<{ id: number; status: Exclude<CorporateRelationshipStatus, "candidate"> }> {
+  return sendJSON(
+    `/market-data/security-lifecycle/relationships/${encodeURIComponent(relationshipId)}`,
+    "PUT",
+    { status },
+  );
+}
+
 // News direct-local ingest. After news PG exit, polygon/finnhub/ibkr write
 // normalized SQLite and project the legacy local read surface; PG fallback is closed.
 export function getNewsStatus(): Promise<NewsStatus> {

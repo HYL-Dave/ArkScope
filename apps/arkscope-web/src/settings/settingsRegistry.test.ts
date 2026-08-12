@@ -142,6 +142,7 @@ describe("settings workspace registry", () => {
       { id: "sa_extension_health", parent: "data_sources" },
       { id: "provider_connections", parent: "data_sources" },
       { id: "source_schedules", parent: "data_sources" },
+      { id: "security_lifecycle", parent: "data_storage" },
       { id: "trading_day_coverage", parent: "data_storage" },
     ]);
     expect(settingsSubsectionsFor("data_sources").map((item) => item.id)).toEqual([
@@ -152,6 +153,8 @@ describe("settings workspace registry", () => {
     ]);
     expect(settingsSubsectionsFor("news_storage")).toEqual([]);
     expect(settingsParentAnchor("source_schedules")).toBe("data_sources");
+    expect(settingsParentAnchor("security_lifecycle")).toBe("data_storage");
+    expect(settingsGroupForLocation("security_lifecycle").id).toBe("data_sync");
     expect(settingsGroupForLocation("trading_day_coverage").id).toBe("data_sync");
     expect(settingsLocationDomId("trading_day_coverage")).toBe(
       "settings-trading_day_coverage",

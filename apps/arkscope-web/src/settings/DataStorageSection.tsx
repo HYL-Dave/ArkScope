@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, X } from "lucide-react";
 import {
   getMarketDataStatus,
+  getSecurityLifecycle,
   getTradingDayCoverage,
+  reviewCorporateRelationship,
   type MarketDataStatus,
+  type SecurityLifecycleEvent,
+  type SecurityLifecycleSnapshot,
   type TradingDayCoverage,
   type TradingDayRow,
 } from "../api";
@@ -147,12 +151,235 @@ export function DataStorageSection({
         </div>
       )}
 
+      <SettingsSubsectionAnchor id="security_lifecycle">
+        <SecurityLifecyclePanel
+          developerMode={developerMode}
+          settingsReadCache={settingsReadCache}
+        />
+      </SettingsSubsectionAnchor>
+
       <SettingsSubsectionAnchor id="trading_day_coverage">
         <TradingDayCoveragePanel
           developerMode={developerMode}
           settingsReadCache={settingsReadCache}
         />
       </SettingsSubsectionAnchor>
+    </div>
+  );
+}
+
+function lifecycleEventLabel(event: SecurityLifecycleEvent, t: SettingsT): string {
+  switch (event.event_type) {
+    case "merger_agreement":
+      return t(($) => $.dataStorage.lifecycle.events.mergerAgreement);
+    case "merger_proxy":
+      return t(($) => $.dataStorage.lifecycle.events.mergerProxy);
+    case "acquisition_completed":
+      return t(($) => $.dataStorage.lifecycle.events.acquisitionCompleted);
+    case "listing_status_review":
+      return t(($) => $.dataStorage.lifecycle.events.listingStatusReview);
+    case "listing_removal_notice":
+      return t(($) => $.dataStorage.lifecycle.events.listingRemovalNotice);
+  }
+}
+
+function lifecycleStateLabel(
+  state: SecurityLifecycleEvent["lifecycle_state"],
+  t: SettingsT,
+): string {
+  switch (state) {
+    case "review_required":
+      return t(($) => $.dataStorage.lifecycle.states.reviewRequired);
+    case "pending_delisting":
+      return t(($) => $.dataStorage.lifecycle.states.pendingDelisting);
+    case "inactive_confirmed":
+      return t(($) => $.dataStorage.lifecycle.states.inactiveConfirmed);
+    case "renamed_or_transferred":
+      return t(($) => $.dataStorage.lifecycle.states.renamedOrTransferred);
+  }
+}
+
+function SecurityLifecyclePanel({
+  developerMode,
+  settingsReadCache,
+}: {
+  developerMode: boolean;
+  settingsReadCache: SettingsReadCache;
+}) {
+  const { t } = useTranslation("settings");
+  const { t: commonT } = useTranslation("common");
+  const [snapshot, setSnapshot] = useState<SecurityLifecycleSnapshot | null>(() => {
+    const inspected = settingsReadCache.inspect<SecurityLifecycleSnapshot>(
+      "security_lifecycle",
+    );
+    return inspected.status === "missing" ? null : inspected.value;
+  });
+  const [err, setErr] = useState<Error | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const load = useCallback(async (force = false) => {
+    setBusy(true);
+    const result = await settingsReadCache.load(
+      "security_lifecycle",
+      () => getSecurityLifecycle(200),
+      { force },
+    );
+    if (result.status === "success") {
+      setSnapshot(result.value);
+      setErr(null);
+    } else if (result.status === "error") {
+      setErr(result.error instanceof Error ? result.error : new Error(String(result.error)));
+    }
+    setBusy(false);
+  }, [settingsReadCache]);
+  useEffect(() => {
+    void load(false);
+  }, [load]);
+  useEffect(() => settingsReadCache.subscribeInvalidation(
+    "security_lifecycle",
+    () => { void load(false); },
+  ), [load, settingsReadCache]);
+  const reviewRelationship = useCallback(async (
+    relationshipId: number,
+    status: "confirmed" | "rejected",
+  ) => {
+    setReviewingId(relationshipId);
+    try {
+      await reviewCorporateRelationship(relationshipId, status);
+      settingsReadCache.invalidate("security_lifecycle");
+      await load(false);
+    } catch (error) {
+      setErr(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      setReviewingId(null);
+    }
+  }, [load, settingsReadCache]);
+  const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
+
+  return (
+    <div style={{ marginTop: 24, borderTop: "1px solid var(--border, #333)", paddingTop: 16 }}>
+      <div className="settings-section-head">
+        <div>
+          <h2>{t(($) => $.dataStorage.lifecycle.title)}</h2>
+          <p className="muted tiny">{t(($) => $.dataStorage.lifecycle.description)}</p>
+        </div>
+        <button className="btn-ghost" onClick={() => void load(true)} disabled={busy}>
+          ↻ {t(($) => $.actions.refreshStatus)}
+        </button>
+      </div>
+      {errorPresentation ? (
+        <div className="errorbox"><p className="muted">{errorPresentation.message}</p></div>
+      ) : null}
+      {developerMode ? (
+        <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
+      ) : null}
+      {!snapshot ? (
+        <p className="muted">{t(($) => $.dataStorage.loading)}</p>
+      ) : snapshot.events.length === 0 && snapshot.relationships.length === 0 ? (
+        <p className="muted">{t(($) => $.dataStorage.lifecycle.empty)}</p>
+      ) : (
+        <div className="settings-panel">
+          <dl className="ds-kv">
+            <dt>{t(($) => $.dataStorage.lifecycle.summary.events)}</dt>
+            <dd>{snapshot.summary.event_count.toLocaleString()}</dd>
+            <dt>{t(($) => $.dataStorage.lifecycle.summary.reviewRequired)}</dt>
+            <dd>{snapshot.summary.review_required.toLocaleString()}</dd>
+            <dt>{t(($) => $.dataStorage.lifecycle.summary.pendingDelisting)}</dt>
+            <dd>{snapshot.summary.pending_delisting.toLocaleString()}</dd>
+            <dt>{t(($) => $.dataStorage.lifecycle.summary.relationshipCandidates)}</dt>
+            <dd>{snapshot.summary.relationship_candidates.toLocaleString()}</dd>
+          </dl>
+
+          {snapshot.relationships.length > 0 ? (
+            <div style={{ marginTop: 16 }}>
+              <h3>{t(($) => $.dataStorage.lifecycle.relationships.title)}</h3>
+              <div className="settings-table-scroll">
+                <table className="ds-table">
+                  <thead><tr>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.target)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.acquirer)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.status)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.date)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.evidence)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.actions)}</th>
+                  </tr></thead>
+                  <tbody>
+                    {snapshot.relationships.map((relationship) => (
+                      <tr key={relationship.id}>
+                        <td>{relationship.target_ticker ?? relationship.target_name}</td>
+                        <td>{relationship.acquirer_ticker ?? relationship.acquirer_name}</td>
+                        <td>{relationship.status === "candidate"
+                          ? t(($) => $.dataStorage.lifecycle.relationships.candidate)
+                          : relationship.status === "confirmed"
+                            ? t(($) => $.dataStorage.lifecycle.relationships.confirmed)
+                            : t(($) => $.dataStorage.lifecycle.relationships.rejected)}</td>
+                        <td>{relationship.effective_date ?? "—"}</td>
+                        <td><a href={relationship.evidence_url} target="_blank" rel="noreferrer">
+                          {t(($) => $.dataStorage.lifecycle.openEvidence)}
+                        </a></td>
+                        <td>
+                          <div style={{ display: "flex", gap: 6, whiteSpace: "nowrap" }}>
+                            <Button
+                              size="compact"
+                              tone="secondary"
+                              icon={<Check size={14} />}
+                              busy={reviewingId === relationship.id}
+                              disabled={relationship.status === "confirmed"}
+                              onClick={() => void reviewRelationship(relationship.id, "confirmed")}
+                            >
+                              {t(($) => $.dataStorage.lifecycle.relationships.confirmAction)}
+                            </Button>
+                            <Button
+                              size="compact"
+                              tone="ghost"
+                              icon={<X size={14} />}
+                              busy={reviewingId === relationship.id}
+                              disabled={relationship.status === "rejected"}
+                              onClick={() => void reviewRelationship(relationship.id, "rejected")}
+                            >
+                              {t(($) => $.dataStorage.lifecycle.relationships.rejectAction)}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {snapshot.events.length > 0 ? (
+            <div style={{ marginTop: 16 }}>
+              <h3>{t(($) => $.dataStorage.lifecycle.events.title)}</h3>
+              <div className="settings-table-scroll">
+                <table className="ds-table">
+                  <thead><tr>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.ticker)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.event)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.status)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.date)}</th>
+                    <th>{t(($) => $.dataStorage.lifecycle.headings.evidence)}</th>
+                  </tr></thead>
+                  <tbody>
+                    {snapshot.events.slice(0, 50).map((event) => (
+                      <tr key={event.id}>
+                        <td>{event.ticker}</td>
+                        <td>{lifecycleEventLabel(event, t)}</td>
+                        <td>{lifecycleStateLabel(event.lifecycle_state, t)}</td>
+                        <td>{event.filing_date}</td>
+                        <td><a href={event.evidence_url} target="_blank" rel="noreferrer">
+                          {t(($) => $.dataStorage.lifecycle.openEvidence)}
+                        </a></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

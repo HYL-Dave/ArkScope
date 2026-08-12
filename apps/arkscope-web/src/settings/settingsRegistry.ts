@@ -18,6 +18,7 @@ export type SettingsSubsectionId =
   | "sa_extension_health"
   | "provider_connections"
   | "source_schedules"
+  | "security_lifecycle"
   | "trading_day_coverage";
 
 export type SettingsLocationId = SettingsAnchorId | SettingsSubsectionId;
@@ -100,6 +101,7 @@ export const SETTINGS_SUBSECTIONS: readonly SettingsSubsectionDefinition[] = [
   { id: "sa_extension_health", parent: "data_sources" },
   { id: "provider_connections", parent: "data_sources" },
   { id: "source_schedules", parent: "data_sources" },
+  { id: "security_lifecycle", parent: "data_storage" },
   { id: "trading_day_coverage", parent: "data_storage" },
 ];
 

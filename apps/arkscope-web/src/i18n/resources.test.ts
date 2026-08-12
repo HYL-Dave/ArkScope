@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 743,
+      settings: 777,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -791,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1827);
+      expect(total, `${locale}.total`).toBe(1861);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1149,6 +1149,40 @@ describe("bundled i18n resources", () => {
       "providers.accountUsage.syncClaudeCost",
       "providers.accountUsage.fiveHourWindow",
       "providers.accountUsage.sevenDayWindow",
+      "dataSources.schedule.sources.secCorporateActions.label",
+      "dataSources.schedule.sources.secCorporateActions.description",
+      "dataStorage.lifecycle.title",
+      "dataStorage.lifecycle.description",
+      "dataStorage.lifecycle.empty",
+      "dataStorage.lifecycle.openEvidence",
+      "dataStorage.lifecycle.summary.events",
+      "dataStorage.lifecycle.summary.reviewRequired",
+      "dataStorage.lifecycle.summary.pendingDelisting",
+      "dataStorage.lifecycle.summary.relationshipCandidates",
+      "dataStorage.lifecycle.headings.ticker",
+      "dataStorage.lifecycle.headings.target",
+      "dataStorage.lifecycle.headings.acquirer",
+      "dataStorage.lifecycle.headings.event",
+      "dataStorage.lifecycle.headings.status",
+      "dataStorage.lifecycle.headings.date",
+      "dataStorage.lifecycle.headings.evidence",
+      "dataStorage.lifecycle.headings.actions",
+      "dataStorage.lifecycle.states.reviewRequired",
+      "dataStorage.lifecycle.states.pendingDelisting",
+      "dataStorage.lifecycle.states.inactiveConfirmed",
+      "dataStorage.lifecycle.states.renamedOrTransferred",
+      "dataStorage.lifecycle.events.title",
+      "dataStorage.lifecycle.events.mergerAgreement",
+      "dataStorage.lifecycle.events.mergerProxy",
+      "dataStorage.lifecycle.events.acquisitionCompleted",
+      "dataStorage.lifecycle.events.listingStatusReview",
+      "dataStorage.lifecycle.events.listingRemovalNotice",
+      "dataStorage.lifecycle.relationships.title",
+      "dataStorage.lifecycle.relationships.candidate",
+      "dataStorage.lifecycle.relationships.confirmed",
+      "dataStorage.lifecycle.relationships.rejected",
+      "dataStorage.lifecycle.relationships.confirmAction",
+      "dataStorage.lifecycle.relationships.rejectAction",
     ] as const;
     const retiredMarketSyncPaths = [
       "dataStorage.update.title",
