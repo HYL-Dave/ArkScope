@@ -1,7 +1,7 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASK 0 COMPLETE; TASKS 1-5
-> BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-1 COMPLETE; TASK 2 ACTIVE;
+> TASKS 1-5 BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
