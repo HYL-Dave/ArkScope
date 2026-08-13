@@ -1,6 +1,7 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** DRAFT; PLAN REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** PLAN GREEN AT `f9b69913`; TASK 0 COMPLETE; TASKS 1-5
+> BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
@@ -30,6 +31,15 @@
 > its now-false calendar test ID, pins the exact value-only copy changes, and
 > re-derives the affected frontend identities. Backend identities and the Task 3
 > frontend stage remain unchanged.
+>
+> **2026-08-13 execution ruling:** focused re-review at `f9b69913` returned
+> GREEN. The user then authorized Tasks 0-5 to run continuously on the happy
+> path. Each task still requires its separate product/tests commit and
+> evidence/docs commit, RED/GREEN artifacts, and exact staged identity. Every
+> stop condition remains a hard stop requiring a bounded reviewed amendment.
+> The per-task "stop for review" wording below is superseded only as to review
+> timing: Task 5 remains the combined implementation-review gate, and Task 6,
+> merge, push, and live-provider traffic remain unauthorized.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
