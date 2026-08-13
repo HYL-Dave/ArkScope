@@ -95,6 +95,21 @@
 > changes. Current product/test edits stay uncommitted; Tasks 4-5 are paused for
 > focused review.
 
+> **2026-08-14 Task 4 provider-fixture stop-and-amend:** the single-provider
+> repair turned the authorized six discriminating nodes GREEN and the final
+> focused gate passed `109/109`. The first full-suite run then exposed one
+> deterministic collateral owner: `SettingsWorkspace.test.tsx` mocks every
+> Settings loader with `{}`, so the newly real group provider receives no
+> `sources` field and fails before eleven workspace nodes can exercise their
+> own contracts. This is a stale fake, not a product DTO to tolerate. The
+> bounded repair adds that test file as an owner and changes exactly its shared
+> `getSchedule` fixture to `{ sources: {} }`; no test body, node ID, expected
+> call count, or product behavior changes. The authorized shared-controller
+> node also advances the 30-second clock synchronously and then flushes pending
+> promises, avoiding a Vitest async-timer timeout without weakening its exact
+> `1 -> 2` GET assertion. Current product/test edits stay uncommitted; Tasks 4-5
+> remain paused for focused review.
+
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
 show the same honest controls on Data Sources and Macro Data, and remove the
@@ -173,6 +188,7 @@ apps/arkscope-web/src/settings/settingsReadCache.ts
 apps/arkscope-web/src/settings/settingsReadCache.test.ts
 apps/arkscope-web/src/SettingsProviderConfig.test.ts
 apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts
+apps/arkscope-web/src/SettingsWorkspace.test.tsx
 apps/arkscope-web/src/SettingsCss.test.ts
 apps/arkscope-web/src/api.ts
 apps/arkscope-web/src/i18n/resources/en/settings.ts
@@ -764,6 +780,26 @@ Settings provider config authority > switches locale without resetting drafts po
 
 A new test node, a second controller instance in the mounted `data_sync` group,
 or any production edit outside the provider/context handoff is a stop event.
+
+The full-suite collateral repair is limited to one setup assignment in
+`SettingsWorkspace.test.tsx`:
+
+```text
+mocks.getSchedule.mockResolvedValue({ sources: {} });
+```
+
+It follows the generic `{}` loader setup and supplies the minimum valid
+`ScheduleResponse` for the real provider. All 33 workspace node IDs and bodies,
+especially `unmounts_data_sources_polling_when_leaving_data_sync`, remain
+byte-identical. A product fallback for a missing `sources` field, a changed
+workspace assertion, or a second hunk in that file is a stop event.
+
+Within the already authorized `shares one schedule read across visible
+consumers` body, the idle-clock step may use synchronous fake-timer advancement
+followed by an explicit promise flush. Its behavioral assertions remain one
+initial GET, exactly one GET after the first 30-second interval, and object
+identity equality for both consumers. Raising the timeout or weakening any of
+those assertions is forbidden.
 
 Task 4 has one additional bounded owner in
 `SettingsPostPgExitStorage.test.ts`. Its `MacroSnapshot` fixture removes exactly
