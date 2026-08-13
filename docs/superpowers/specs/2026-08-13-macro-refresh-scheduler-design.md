@@ -1,10 +1,16 @@
 # Macro Data Refresh and Scheduler Integration Design
 
-> **Status:** USER APPROVED; IMPLEMENTATION PLAN AUTHORIZED
+> **Status:** USER APPROVED; REVIEW-FINDING AMENDMENT REQUIRES FOCUSED REVIEW; IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
 > **Grounding base:** `bea5890f`; approved design commit `bdd8fc30`
+>
+> **2026-08-13 review ruling:** the Macro line owns the shared schedule-table
+> layout correction before the SA diagnostics line. A due macro source is
+> deferred before attempt/row creation whenever the shared writer gate is
+> unavailable, including across scheduler ticks and processes. Finnhub health
+> remains unchanged in this slice; no new calendar-automation field is added.
 >
 > **Scope:** connect the existing FRED and Finnhub macro-calendar collectors to
 > ArkScope's one app-owned scheduler, expose honest automatic/manual controls,
@@ -130,14 +136,31 @@ named in-process plus cross-process lock for `macro_calendar.db`.
 - API, manual schedule, automatic schedule, and CLI/job entry points share it.
 - Busy acquisition returns a typed `macro_calendar_busy` skip/failure result;
   it never silently runs unlocked.
-- The scheduler starts at most one due macro writer per tick. Other due macro
-  sources remain due and may run on a later tick; deferral is not recorded as
-  a successful attempt.
+- Before advancing attempt time or creating a job row, the scheduler must
+  acquire the same process-local and file writer gate used by execution. If it
+  is unavailable, the source is purely deferred: no attempt timestamp, no job
+  row, no success/skip record, and no interval backoff.
+- The scheduler starts at most one due macro writer per tick. The gate remains
+  authoritative across later ticks and other processes, so a source deferred
+  behind a long-running writer remains due and is reconsidered on the next
+  scheduler tick rather than slipping by its full interval.
+- The scheduled `run_source()` worker acquires the gate before its own attempt
+  boundary; the supervisor does not acquire a lease in one thread and transfer
+  its lifetime to another.
 - Lock release is proven on success, provider failure, validation failure, and
   cancellation/exception paths.
 
 This lock is separate from the `market_data.db` writer group. A macro write and
 a market-data write may run concurrently because they do not share a database.
+
+The deliberate tradeoff is at most one scheduler-tick (30 seconds) of extra
+latency and no history row for the deferred source, because no attempt occurred.
+The active writer's own canonical row remains the diagnostic witness, due state
+remains visible, and POSIX `flock` is released by descriptor close/process exit.
+Recording a synthetic failed/skip row for every 30-second defer would create
+noise and, more importantly, risk consuming the source's daily or weekly
+interval. A genuinely wedged live process therefore blocks duplicate writes
+until that writer ends or is stopped, which is the safer failure mode.
 
 ### LD 4 - Per-source schedule settings are automation truth
 
@@ -160,6 +183,10 @@ from `macro_calendar.db`. Enabling either schedule may make the FRED row say
 automatic updates are enabled; the legacy flag cannot. Finnhub provider health
 likewise must not imply that its three calendar sources are scheduled merely
 because the legacy macro capability flag is true.
+
+Finnhub's existing news-health DTO remains byte-for-behavior unchanged. This
+slice does not add `calendar_auto_refresh_enabled`; exposing that separate fact
+would require its own consumer contract and test-node ledger.
 
 The Macro page derives automatic status from the actual five schedule rows:
 
@@ -192,6 +219,17 @@ data update.
 Traditional Chinese uses `擷取` or `更新`, not `攝入`. English manual-action
 copy says `run manually` where that is the actual capability.
 
+This line also owns the shared schedule-table layout correction originally
+identified by the SA health design. The source cell receives a dedicated class
+with normal whitespace, anywhere wrapping, top alignment, and stable line
+height. `apps/arkscope-web/src/styles.css` assigns reviewed fixed columns of
+approximately `30 / 11 / 12 / 12 / 35` percent for source, schedule, interval,
+run-now, and last-result. Each value may move by at most two percentage points
+during browser verification, but the source and last-result columns remain the
+two widest and the total remains 100 percent. Other cells retain bounded
+no-wrap behavior, and the table remains horizontally scrollable on narrow
+screens.
+
 ### LD 6 - Exact cache invalidation follows successful writes
 
 On terminal success:
@@ -201,8 +239,13 @@ On terminal success:
 - each Finnhub calendar source invalidates `macro_status`.
 
 Failed, skipped, or busy runs update schedule status but do not claim that
-stored macro data changed. Unknown future macro source IDs fail closed to both
-macro keys until explicitly classified.
+stored macro data changed. A future source is classified as macro by the
+authoritative schedule DTO field `write_target == "macro_calendar.db"`, not by
+a frontend list of five IDs. The shared controller passes that validated field
+to cache invalidation; existing non-schedule callers retain their current
+source-only behavior. An unrecognized source with that write target
+fails closed to both macro keys until explicitly classified; a wholly unknown
+non-macro source retains the existing broad fail-safe.
 
 No provider request is made by page mount, idle warmup, focus, visibility, or
 `重新讀取狀態`. Provider traffic occurs only when an enabled source becomes due
@@ -236,9 +279,10 @@ scheduler or routine UI button.
 - A partial provider result may be shown only if the underlying collector
   returns an authoritative partial result; the scheduler does not infer one.
 - Concurrent clicks for the same source reuse existing same-source protection.
-- Concurrent clicks for different macro sources are serialized by the shared
-  database lock and return a visible busy outcome rather than queueing
-  invisibly.
+- Concurrent explicit clicks for different macro sources are serialized by the
+  shared database lock and return a visible busy outcome rather than queueing
+  invisibly. Automatic scheduler work instead probes/acquires the writer gate
+  before attempt creation and purely defers when it is occupied.
 - Sidecar restart reconciliation must not convert an interrupted run into
   assumed success.
 
@@ -253,7 +297,8 @@ Backend tests must prove:
 4. two real processes cannot write `macro_calendar.db` concurrently and the
    lock file descriptor is released on all terminal paths;
 5. a scheduler tick fires at most one macro writer while preserving due state
-   for the others;
+   for the others, and a writer still running on a later tick or in another
+   process causes the same no-attempt deferral;
 6. disabled sources make zero automatic provider calls but still permit a
    manual run;
 7. neither macro snapshot nor provider health reports
@@ -271,13 +316,18 @@ Frontend tests must prove:
 5. enabling a source updates the one shared schedule cache;
 6. success invalidates only the required macro keys;
 7. failed/busy runs remain visible and do not rewrite stored freshness; and
-8. Traditional Chinese and English copy state automatic/manual capability
-   without using `攝入`.
+8. all-disabled, enabled-count, and schedule-read-unavailable states render
+   distinct truthful automation copy;
+9. future macro sources are classified by `write_target`, not a hardcoded ID
+   list; and
+10. Traditional Chinese and English copy state automatic/manual capability
+    without using `攝入`.
 
 Browser verification uses desktop `1322 x 777` and mobile `390 x 844` and
-checks that all controls fit, labels wrap without overlap, progress cannot
-resize the table incoherently, and request ledgers contain no provider POST
-before an explicit click or a controlled due-scheduler test.
+checks that the source text wraps inside its dedicated cell, the reviewed
+column allocation is present, all controls fit without overlap, progress
+cannot resize the table incoherently, and request ledgers contain no provider
+POST before an explicit click or a controlled due-scheduler test.
 
 A local fixture run must update representative rows in a scratch
 `macro_calendar.db` and prove old rows survive a failed subsequent run. Any

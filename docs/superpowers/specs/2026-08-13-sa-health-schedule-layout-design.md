@@ -1,15 +1,16 @@
 # SA Health Truth and Schedule Table Layout Design
 
-> **Status:** BASE DESIGN USER-APPROVED; FAILURE-DIAGNOSTICS AMENDMENT REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** BASE DESIGN USER-APPROVED; REVIEW FINDINGS AND USER RULINGS RECORDED; FOCUSED REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
 > **Grounding base:** `bea5890f`; diagnostics amendment grounded at `bdd8fc30`
 >
-> **Scope:** correct the Settings SA Extension health semantics, preserve
-> bounded failure evidence for later diagnosis, and make the existing
-> per-source schedule table readable. This unit does not change SA capture or
-> repair algorithms, provider cadence, retry policy, or scheduler execution.
+> **Scope:** correct the Settings SA Extension health semantics and preserve
+> bounded failure evidence for later diagnosis. The Macro scheduler line now
+> owns the shared per-source schedule-table layout correction and lands first;
+> this SA line re-grounds after that merge. This unit does not change SA capture
+> or repair algorithms, provider cadence, retry policy, or scheduler execution.
 
 ## 1. Problem
 
@@ -118,8 +119,10 @@ Make chain state an explicit backend projection over structural segments only.
 Keep the latest operation as a separate, named and timestamped row. Give the
 source cell its own wrapping contract and rebalance table columns.
 
-Selected. This fixes the ownership errors without changing capture or
-scheduler behavior.
+Selected as the combined product direction. The shared table portion is now
+delivered first by the Macro scheduler line; this SA line then implements only
+the chain/outcome/diagnostic portion against that merged baseline. This fixes
+the ownership errors without parallel edits to the same table or scheduler.
 
 ### C. Add a full SA run-history and incident-resolution model
 
@@ -176,6 +179,15 @@ The latest completed capture segment uses the recorded `derived_outcome`:
 Retryable item counts remain counts; they do not turn a structurally healthy
 chain into `interrupted`. A degraded run is not relabeled complete.
 
+The legacy stable code `detail_failures_recorded` is retired atomically from
+the backend projection, frontend display switch, translations, fixtures, and
+tests. It carried no cause beyond the already-present retryable count. A
+degraded run instead uses `capture_degraded` with warning tone while preserving
+its completed/retryable/failed counts. The typed diagnostic stage, reason,
+target, occurrence time, and bounded 20-run recurrence provide strictly more
+diagnostic evidence. Historical rows without diagnostics remain readable as
+legacy absence plus their stored counts; no cause is inferred.
+
 The segment adds a closed, allowlisted `job_name` for exactly
 `sa_alpha_picks_refresh` and `sa_market_news_refresh`. Arbitrary job names or
 backend prose do not enter the DTO.
@@ -200,26 +212,19 @@ Traditional Chinese UI copy uses `擷取`; this unit does not introduce
 `攝入`. English copy uses `capture` or `fetch` according to the existing
 surface.
 
-### LD 4 - Schedule source text owns wrapping
+### LD 4 - Schedule layout is owned by the Macro line
 
-The source cell receives a dedicated class with:
+The user selected one owner for the shared table. The Macro refresh/scheduler
+line lands first and owns the dedicated wrapping class, top alignment, stable
+line height, horizontal-scroll behavior, and reviewed `30 / 11 / 12 / 12 / 35`
+column allocation in `apps/arkscope-web/src/styles.css`. Its browser matrix must
+prove the source text stays inside the source cell and controls do not overlap.
 
-- `white-space: normal`;
-- `overflow-wrap: anywhere`;
-- top alignment for multi-line source rows; and
-- a stable line height for the label and description.
-
-The table remains horizontally scrollable on narrow screens. Controls,
-timestamps, and status badges retain bounded no-wrap behavior.
-
-The fixed column allocation becomes approximately `30 / 11 / 12 / 12 / 35`
-percent for source, schedule, interval, run-now, and last-result. Exact values
-may move by at most two percentage points during browser verification, but the
-source and last-result columns must remain the two widest columns and total
-100 percent.
-
-No provider label, description, source ID, cadence, enable flag, or execution
-behavior changes in this unit.
+This SA line does not edit the schedule table component or CSS. It re-grounds
+its frontend identities after the Macro line closes and inherits that verified
+layout as baseline. SA implementation is limited to chain-state, completed-run
+truth, typed diagnostics, and their UI. Provider labels, source IDs, cadence,
+enable flags, and execution behavior remain unchanged.
 
 ### LD 5 - Canonical outcome and diagnostic evidence have separate owners
 
@@ -278,12 +283,15 @@ The initial diagnostics-only additions are closed to:
 - `tab_closed`
 - `browser_api_failed`
 - `script_injection_failed`
-- `comment_scan_unusable`
 - `native_response_invalid`
 - `database_busy`
 - `database_integrity_failed`
 - `database_write_failed`
-- `extension_runtime_error`
+
+Comment scanning reuses the existing `comment_scan_failed` code with the
+appropriate browser-owned stage. An unclassified extension exception reuses
+the existing `unknown_failure` code with `stage="extension_runtime"`. Neither
+case creates a near-synonym merely to identify the new envelope.
 
 Unknown values are rejected rather than persisted as free-form categories.
 `target_ref` is an opaque article/news identifier, never a URL or title.
@@ -310,11 +318,16 @@ diagnostic. Raw `str(exception)`, stack traces, SQL text, and filesystem paths
 are not telemetry authorities. An unrecognized exception maps to the owning
 stage's generic stable code, not to an invented provider cause.
 
-The diagnostic envelope participates in the immutable extension-event hash.
-A retry with different admitted evidence is therefore not silently deduplicated
-against the earlier event. For a rejected envelope, only the canonical
-rejection marker participates in the hash; rejected raw bytes are never
-retained or hashed into durable state.
+The API/backend is the immutable-event hash authority; the browser extension
+does not supply an authoritative hash. After independent validation, the API
+canonicalizes the accepted terminal event plus admitted diagnostics and hashes
+that document. If diagnostics are malformed or secret-bearing, the API drops
+the entire raw diagnostics envelope, substitutes the fixed canonical rejection
+marker, and hashes/stores only the terminal event plus that marker. Replaying
+the same rejected request therefore derives the same hash and deduplicates;
+the rejected raw bytes never enter durable state. Reusing a
+`client_event_id` with different admitted terminal or diagnostic content still
+derives a different hash and returns `event_conflict` under the existing rule.
 
 ### LD 7 - Durable tracking reuses `job_runs` without creating a parallel log
 
@@ -387,7 +400,12 @@ Backend tests must prove:
    codes while unknown exceptions remain generic to their owning stage;
 10. a latest degraded row with no diagnostic renders the typed legacy-absence
     state rather than an inferred cause; and
-11. the 20-run recurrence projection is bounded, deterministic, and read-only.
+11. the 20-run recurrence projection is bounded, deterministic, and read-only;
+12. retrying the same rejected envelope derives the same canonical marker/hash
+    and deduplicates, while changed admitted evidence for the same client event
+    yields `event_conflict`; and
+13. `detail_failures_recorded` has no producer or frontend case, while degraded
+    counts remain visible under `capture_degraded`.
 
 Frontend tests must prove:
 
@@ -395,27 +413,25 @@ Frontend tests must prove:
 2. a degraded Alpha Picks row includes its workload, occurrence time, and
    counts without claiming the chain is interrupted;
 3. an old repair timestamp cannot be mistaken for current recovery;
-4. source descriptions have the dedicated wrapping class; and
-5. existing schedule controls and source IDs are unchanged.
-6. normal mode distinguishes browser readiness, native transport, and local
+4. existing schedule controls and source IDs remain inherited and unchanged;
+5. normal mode distinguishes browser readiness, native transport, and local
    persistence failures without raw details;
-7. developer mode renders only the admitted diagnostic fields and recurrence
+6. developer mode renders only the admitted diagnostic fields and recurrence
    count; and
-8. `重新檢查` performs local GETs only and cannot trigger extension/provider
+7. `重新檢查` performs local GETs only and cannot trigger extension/provider
    work.
 
 Extension tests must prove each existing `failed++` branch emits exactly one
 typed entry before terminal protocol construction, successful saves emit none,
-and a multi-target attempt reports the correct target without retaining page
-content or URL data.
+a multi-target attempt reports the correct target without retaining page
+content or URL data, and the existing `comment_scan_failed`/`unknown_failure`
+codes are reused at their reviewed stages.
 
-Browser verification uses desktop `1322 x 777` and mobile `390 x 844`:
-
-- no source text crosses a cell boundary;
-- no control or status text overlaps;
-- horizontal scrolling remains available when required;
-- the SA panel fits without incoherent clipping; and
-- no provider request is triggered by either health read or layout rendering.
+Browser verification uses desktop `1322 x 777` and mobile `390 x 844`. The SA
+panel must fit without incoherent clipping, inherited schedule controls must
+remain unchanged, and no provider request may be triggered by a health read or
+diagnostic rendering. Shared schedule-table wrapping and overlap are admission
+gates of the preceding Macro line rather than duplicate owners here.
 
 ## 6. Out of scope
 

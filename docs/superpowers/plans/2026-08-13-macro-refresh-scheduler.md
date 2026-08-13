@@ -6,8 +6,8 @@
 >
 > **Design authority:**
 > `docs/superpowers/specs/2026-08-13-macro-refresh-scheduler-design.md`,
-> user-approved at `bdd8fc30`; the status-only handoff in this docs change does
-> not alter the approved body.
+> user-approved at `bdd8fc30` and amended by the explicit user rulings recorded
+> below. The amended design and this plan require one focused review together.
 >
 > **Product grounding base:**
 > `bdd8fc30dd35ebcd9acc83efde3411b88ab18ed3` (docs-only over product tip
@@ -16,6 +16,13 @@
 > **Roles:** Codex authors this plan and, after independent plan review,
 > implements it RED-first. Fable independently reviews task evidence and
 > product diffs. The user makes product and live-provider rulings.
+>
+> **2026-08-13 review amendment:** Fable's independent reconstruction found
+> F1-F9 plus a shared-layout ownership gap. The user ruled that this line owns
+> the layout fix, macro-writer occupancy defers before attempt creation, the SA
+> line follows after this line, and Finnhub gains no new automation field. The
+> corrected identities and exact owner deltas below supersede the initial plan
+> values; Task 0 remains blocked on focused review of this amendment.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
@@ -93,11 +100,13 @@ apps/arkscope-web/src/settings/MacroStorageSection.test.tsx
 apps/arkscope-web/src/settings/settingsReadCache.ts
 apps/arkscope-web/src/settings/settingsReadCache.test.ts
 apps/arkscope-web/src/SettingsProviderConfig.test.ts
+apps/arkscope-web/src/SettingsCss.test.ts
 apps/arkscope-web/src/api.ts
 apps/arkscope-web/src/i18n/resources/en/settings.ts
 apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts
 apps/arkscope-web/src/i18n/resources.test.ts
 apps/arkscope-web/src/settings/settings.css
+apps/arkscope-web/src/styles.css
 ```
 
 Plan/evidence owners are this file, a new evidence file, and the newest-first
@@ -131,15 +140,16 @@ equivalent and is forbidden; use `--json=<path>`.
 
 ### 0.4 Re-grounded baselines
 
-The plan author collected, but did not execute, the backend suite with the
-pinned reporter and collected the frontend with the pinned decoded normalizer:
+The plan author collected the backend suite with the pinned reporter and the
+frontend suite with the pinned decoded normalizer. The focused suites and the
+separate native control below were also executed:
 
 | Stream | Baseline |
 |---|---|
 | backend full | `4,341 / 883b1148e8759ea8825ffd8b825db0339dc1e6ca5aefe4c04344b868b3ff1264` |
 | backend focused, nine files in §2.5 | `375 / 1c3ce4accfe583b6c059d1c52414376cd1697f24ce8f968afbc844250bd9a1d5` |
-| frontend full | `99 files / 1,159 / f19472dd04c73afd979d37f4c083ff8246a007816d58429a2c12295eaadc5e67` |
-| frontend focused, five existing files in §2.6 | `88 / 9b9d488a9512cf22d60e5482da233b9d035a89b49d72807b00cfb7361461ba39` |
+| frontend full | `100 files / 1,159 / f19472dd04c73afd979d37f4c083ff8246a007816d58429a2c12295eaadc5e67` |
+| frontend focused, six existing files in §2.6 | `96 / 9877be8adf0973c2b749f6460156ae86021cc4a91f3d4caab366bd9ce66da46f` |
 
 Backend raw collect report:
 
@@ -159,7 +169,7 @@ transcript SHA-256 0aaace4aaa8fc73d4f28ac2c96f43edb23cb539b781c8cabb63bec399ff88
 ```
 
 Focused runtime controls on the same tree are `375 passed` backend and
-`88 passed` frontend. Both are provider-free fixture suites.
+`96 passed` frontend. Both are provider-free fixture suites.
 
 Task 0 must reproduce all four streams and run the focused baselines before a
 RED commit. Task 0 may reuse this exact clean native control only while product
@@ -181,7 +191,9 @@ reuse.
    closed.
 4. `tick_once()` currently records market-writer deferrals as transient skips.
    Macro deferral has a different contract: do not start it, do not advance its
-   attempt time, do not write a success/skip row, and leave it due.
+   attempt time, do not write a success/skip row, and leave it due. That
+   contract applies while a writer from an earlier tick or another process is
+   still active, not only after selecting a writer in the current tick.
 5. `MacroSnapshot.auto_refresh_enabled` and FRED provider-health automation are
    currently derived from `macro_calendar_enabled`; both are false authorities.
 6. `DataSourcesSection` currently owns schedule loading, polling, mutation, and
@@ -197,6 +209,10 @@ reuse.
    macro preflight is a canonical failed attempt and enters its own interval
    backoff; a source merely deferred because another macro writer fired does
    neither.
+9. The schedule table inherits global cell `white-space: nowrap` and the old
+   `22/10/16/16/36` fixed widths from `styles.css`. The Macro line owns the
+   shared layout fix; the later SA line must inherit it rather than edit the
+   same component/CSS in parallel.
 
 ---
 
@@ -208,7 +224,7 @@ Create `src/macro_calendar/execution.py` with a closed dispatcher:
 
 ```text
 MACRO_JOB_NAMES
-execute_macro_job(job_name, dal, params) -> dict
+execute_macro_job(job_name, dal, params, *, writer_lease=None) -> dict
 is_macro_job(job_name) -> bool
 ```
 
@@ -236,7 +252,8 @@ Create `src/macro_calendar/write_lock.py`:
 
 ```text
 MacroCalendarBusy(code="macro_calendar_busy")
-macro_calendar_writer(timeout_seconds=0.0)
+MacroCalendarWriterLease
+macro_calendar_writer(timeout_seconds=0.0) -> MacroCalendarWriterLease
 ```
 
 The context manager acquires one process-local `threading.Lock` and one POSIX
@@ -248,9 +265,13 @@ exit path. Failure to import `fcntl`, create or validate the lock file, or
 acquire either layer raises the typed busy error; it never
 logs-and-runs-unlocked.
 
-`execute_macro_job()` holds this lock across the complete provider read and
-SQLite write, as required by the approved design. All six jobs therefore share
-one mutex even when invoked from different processes or entry points.
+`execute_macro_job()` normally acquires and holds this lock across the complete
+provider read and SQLite write. The scheduler may instead pass the active lease
+it acquired before attempt creation; the dispatcher validates that exact lease
+and must not reacquire the non-reentrant lock. A missing, released, foreign, or
+reused lease is rejected. No public unlocked execution function exists. All six
+jobs therefore share one mutex even when invoked from different processes or
+entry points, without a check-then-release race or a double-acquire deadlock.
 
 ### 1.3 Each entry point owns exactly one canonical row
 
@@ -264,15 +285,25 @@ existing `JobState` vocabulary is not widened with a fake fourth status.
 
 1. completes same-source process/file-lock gates; a busy gate is not an
    attempt and creates no row;
-2. advances the source's attempt time and creates one row whose name is the
+2. acquires/reserves the shared process-local and file macro-writer gate before
+   advancing attempt time; an occupied gate is a pure defer with no row, no
+   result, and no interval consumption, including when a writer from an earlier
+   tick or another process is still running;
+3. advances the source's attempt time and creates one row whose name is the
    source's canonical `fetch_*` name;
-3. runs provider/config preflight inside that attempt; a missing configuration
+4. runs provider/config preflight inside that attempt; a missing configuration
    finishes the row failed, performs zero provider work, and waits its normal
    source interval before another automatic attempt;
-4. calls `execute_macro_job()` directly, never `run_job()`;
-5. records successful/failed durable scheduler state; and
-6. maps `MacroCalendarBusy` to a visible scheduler `status="skipped"` result
-   while finishing the already-created canonical job row as non-success.
+5. calls `execute_macro_job()` directly under the reserved writer gate, never
+   `run_job()`;
+6. records successful/failed durable scheduler state; and
+7. treats an unexpected post-reservation `MacroCalendarBusy` as a visible
+   failed terminal attempt rather than fabricating success.
+
+Direct API/job entry points still create one canonical row before attempting
+the gate and may return typed `macro_calendar_busy`. The scheduler's stronger
+pre-attempt deferral contract prevents a 30-second overlap from consuming a
+daily or weekly source interval.
 
 No `collect.fred_*` or `collect.finnhub_*_calendar` job name may be emitted.
 The existing news/price/SEC source names remain `collect.*` byte-for-behavior
@@ -297,8 +328,13 @@ incremental/recent scope without promising provider publication freshness.
 `tick_once()` tracks market and macro writer groups independently. It may fire
 one member of each group in one tick. After one macro writer is selected,
 additional due macro sources are simply deferred: no thread, no `_record_result`,
-no `_LAST_ATTEMPT` update, and no job row. Registry order supplies deterministic
-fairness only within a single tick; subsequent due sources remain eligible.
+no `_LAST_ATTEMPT` update, and no job row. The selected source's worker thread
+then acquires the shared writer lease inside `run_source()` before the attempt
+boundary. If a writer from an earlier tick or another process still owns it,
+that worker returns a pure scheduler defer, also without `_record_result`,
+`_LAST_ATTEMPT`, or a row. Same-tick arbitration prevents a later source from
+being launched in that pass; all remain due for the next tick. No lease crosses
+from the supervisor thread into a worker thread.
 
 The backfill job is absent from `SOURCES`, `/schedule`, Settings rows, and the
 routine run-now path. Scheduled FRED series calls use default
@@ -314,9 +350,8 @@ calendar settings. Provider health uses it as follows:
 
 - FRED `signals.auto_refresh_enabled` is true iff either FRED source is enabled;
 - FRED detail reports the enabled source count, not the legacy flag;
-- Finnhub's existing news health remains unchanged, but its signals may expose
-  a separate `calendar_auto_refresh_enabled` boolean derived from its three
-  schedule rows; and
+- Finnhub's existing news health and DTO remain unchanged; this slice does not
+  add `calendar_auto_refresh_enabled`; and
 - a schedule read failure produces unknown, never enabled.
 
 `macro_calendar_enabled` continues to gate the existing agent/job routes. This
@@ -336,6 +371,12 @@ focus revalidation, stale-response sequence rejection, mutation busy state,
 draft intervals, and run-now lifecycle observation. The table owns the five
 stable columns and accepts an ordered source-ID filter. Unknown requested IDs
 render no fabricated row and produce a typed local error in developer evidence.
+Macro invalidation classifies a future source from the schedule DTO's
+`write_target == "macro_calendar.db"`; it does not hardcode the five current
+source IDs as the domain boundary. The cache API therefore evolves to
+`invalidateDataSource(source, writeTarget?)`. Existing callers may omit the
+second argument and retain current behavior; the shared schedule controller
+must pass the selected row's validated `write_target`.
 
 `DataSourcesSection` delegates its existing schedule block to this owner and
 continues to render every source. `MacroStorageSection` passes the exact five
@@ -350,8 +391,11 @@ Mutation rules:
 - failed/skipped/busy: preserve stored macro status/snapshot truth; and
 - unmount: cancel timers/listeners and reject late state writes.
 
-The old test ID saying `all_four_schedule_rows` is renamed atomically to
-`all_schedule_rows`; retaining the false name to preserve a hash is forbidden.
+The old test ID saying `all_four_schedule_rows` is replaced atomically by a
+node that asserts every registered schedule row, including the existing
+`sec_corporate_actions` row and the five new macro rows. Retaining a false name
+or merely changing its string while preserving the four-row fixture is
+forbidden.
 
 ### 1.7 Exact macro invalidation and copy
 
@@ -363,17 +407,42 @@ fred_release_dates          -> macro_status
 finnhub_economic_calendar   -> macro_status
 finnhub_earnings_calendar   -> macro_status
 finnhub_ipo_calendar        -> macro_status
-unknown future macro source -> macro_status + macro_snapshot (fail closed)
+future source whose write_target is macro_calendar.db
+                            -> macro_status + macro_snapshot (fail closed)
 ```
 
 Existing price/news/SEC mappings remain unchanged. A wholly unknown non-macro
 source retains the current broad fail-safe.
+
+The extracted table adds a dedicated wrapping class to the source cell.
+`styles.css` changes only the schedule-table source wrapping/alignment rules and
+the five reviewed fixed widths from `22/10/16/16/36` to
+`30/11/12/12/35`. The two new `SettingsCss` nodes own those static contracts;
+desktop/mobile browser verification owns rendered overlap and horizontal
+scroll behavior.
 
 The Macro page shows the actual enabled count from the five schedule rows and
 keeps `重新讀取狀態` visibly separate from `立即更新`. Traditional Chinese uses
 `擷取` or `更新`, never `攝入`; English explicitly says `run manually` where
 appropriate. Stored observation dates, fetch receipt times, scheduler outcomes,
 and automation state remain distinct labels.
+
+The bilingual schedule copy changes exactly these Settings paths:
+
+```text
+REMOVE macroStorage.snapshot.autoEnabled
+REMOVE macroStorage.snapshot.autoDisabled
+ADD    macroStorage.schedule.disabled
+ADD    macroStorage.schedule.enabledCount_one
+ADD    macroStorage.schedule.enabledCount_other
+ADD    macroStorage.schedule.unknown
+```
+
+This is net `+2` keys per locale. The current Settings namespace count changes
+`783 -> 785` and each locale total changes `1867 -> 1869`. The four additions
+enter `postSliceSettingsPaths`; the two removals enter the reviewed retired-path
+list so frozen pre-slice counts remain unchanged by formula rather than being
+rewritten to current copy.
 
 ---
 
@@ -418,18 +487,32 @@ test_scheduler_deferral_keeps_other_macro_sources_due_without_success
 test_scheduler_fires_at_most_one_due_macro_writer_per_tick
 ```
 
+`test_scheduler_deferral_keeps_other_macro_sources_due_without_success` has
+three parameterized phases under the same node ID: second due source in the
+same tick, process-local writer still active on the next tick, and a file lock
+held by a second real process. Every phase asserts no `_LAST_ATTEMPT` advance,
+no job row, no result row, and continued due state. Replacing the file-lock
+phase with a process-local fake is not equivalent.
+
 ### 2.2 Frontend additions and truthful rename
 
 Task 3 adds eight `Data schedule controls` nodes plus the truthful replacement
 for the existing `all_four_schedule_rows` node. Task 4 adds four
-`MacroStorageSection` nodes. The final ledger is `+13/-1`, net `+12`:
+`MacroStorageSection` nodes and two CSS contract nodes. The old
+`keeps_stored_data_neutral_when_ingestion_is_disabled` node also leaves because
+the retired snapshot flag no longer owns automation truth. The final ledger is
+`+15/-2`, net `+13`:
 
 ```text
 ADD src/SettingsProviderConfig.test.ts
-  Settings provider config authority > renders_disabled_providers_as_neutral_and_all_schedule_rows_as_controllable
+  Settings provider config authority > renders_disabled_providers_as_neutral_and_every_registered_schedule_row_as_controllable
 
 REMOVE src/SettingsProviderConfig.test.ts
   Settings provider config authority > renders_disabled_providers_as_neutral_and_all_four_schedule_rows_as_controllable
+
+ADD src/SettingsCss.test.ts
+  Settings workspace CSS contract > allocates reviewed schedule columns without overlapping controls
+  Settings workspace CSS contract > wraps schedule source copy inside the source column
 
 ADD src/settings/dataScheduleControls.test.tsx
   Data schedule controls > shares one schedule read across visible consumers
@@ -438,30 +521,35 @@ ADD src/settings/dataScheduleControls.test.tsx
   Data schedule controls > enable and interval mutations invalidate the shared schedule key
   Data schedule controls > successful macro sources invalidate exact stored data keys
   Data schedule controls > failed skipped and busy macro runs do not invalidate stored data keys
-  Data schedule controls > unknown macro source fails closed to both macro keys
-  Data schedule controls > mount focus visibility and local status reload send zero POSTs
+  Data schedule controls > classifies future macro sources by write target and fails closed to both macro keys
+  Data schedule controls > mount idle focus visibility and local status reload send zero POSTs
 
 ADD src/settings/MacroStorageSection.test.tsx
-  MacroStorageSection > renders five macro schedule rows with the actual enabled count
+  MacroStorageSection > renders five macro schedule rows and all three automation states
   MacroStorageSection > labels local status reload separately from provider updates
   MacroStorageSection > keeps failed and busy runs visible without rewriting stored timestamps
   MacroStorageSection > renders bilingual manual update copy without ingestion wording
+
+REMOVE src/settings/MacroStorageSection.test.tsx
+  MacroStorageSection > keeps_stored_data_neutral_when_ingestion_is_disabled
 ```
 
-The 13-row add stream SHA is
-`cadebef997c772368887a12795abdd473471885513bcb2c73b702f6aa8bc1508`;
-the one-row removal SHA is
-`9d9b80d2292f444e63c6a5ec995357821e43591bfa73ef6f52d5f41f942f2110`.
+The globally UTF-8 byte-sorted 15-row add stream SHA is
+`27398d372c57d03bd94265737c391f931253685dc0987e90423f0e21be3fde92`;
+the globally byte-sorted two-row removal SHA is
+`4ae3ea5960456cb8b82613c7496155bede55bfd3747f9b47a00e32bbc4fa5bca`.
+Each stream has exactly one trailing newline. Sorting each file group
+independently and concatenating groups is not equivalent.
 
 ### 2.3 Staged identities
 
 | Stage | Full backend | Focused backend | Full frontend | Focused frontend |
 |---|---|---|---|---|
-| base | `4,341 / 883b1148...` | `375 / 1c3ce4ac...` | `99 files / 1,159 / f19472dd...` | `88 / 9b9d488a...` |
+| base | `4,341 / 883b1148...` | `375 / 1c3ce4ac...` | `100 files / 1,159 / f19472dd...` | `96 / 9877be8a...` |
 | Task 1 | `4,349 / 372fe6ab...` | `383 / de8eb8c4...` | unchanged | unchanged |
 | Task 2 | `4,359 / c100ee5d...` | `393 / 0dd72ab8...` | unchanged | unchanged |
-| Task 3 | unchanged | unchanged | `100 files / 1,167 / c13764c5...` | `96 / 969b26ef...` |
-| Task 4 final | `4,359 / c100ee5d...` | `393 / 0dd72ab8...` | `100 files / 1,171 / 9b2691e6...` | `100 / 8d067ab7...` |
+| Task 3 | unchanged | unchanged | `101 files / 1,167 / 461b3827...` | `104 / 8fd324f0...` |
+| Task 4 final | `4,359 / c100ee5d...` | `393 / 0dd72ab8...` | `101 files / 1,172 / f2106125...` | `109 / da8590cf...` |
 
 Full hashes:
 
@@ -475,13 +563,13 @@ c100ee5de4ad42c490e6048e4b7cf22540e417f579987c676796663608d17afd
 Task 2/final backend focused
 0dd72ab8e64fa0f8324c441b67ad65a10d886692dc41c0d2d487b403aac6a5d5
 Task 3 frontend full
-c13764c5e4a4eb12f927a2ad51d2223e1365ffc8e7bcf1373d686b2b87a0720b
+461b38278c8125f6995e35a883771789d83df6b641236a02bb44b269e039f9bf
 Task 3 frontend focused
-969b26efa0c4df47ec73db004c9a87547fe8f2320d404e4c4ef7b7dbbff2c843
+8fd324f07dbb75d53ce3629a94922ff4b50b244fea8ef0bd40777d36d82c327a
 Task 4/final frontend full
-9b2691e6946921f8571ffa0a32efd4f908d1be9f8c549dbbbfc85aa63de4d4c1
+f210612501ef749095c51862c8cd0b5a30295b1a5b2a699953b4ef8522547e91
 Task 4/final frontend focused
-8d067ab7142e8fe1e80933292818bf4a6e2fb023e3ae98343ad4b4caabac7a89
+da8590cf3cdf126487d80b2fcdb7c116e550bbaff6eef3530e84bbcaf4222b91
 ```
 
 ### 2.4 Existing-node evolution boundary
@@ -499,14 +587,20 @@ tests/test_provider_health.py::test_no_signal_when_nothing_recorded
 tests/test_provider_health.py::test_fred_snapshot_available_when_refresh_is_off
 tests/test_provider_health.py::test_fred_refresh_off_without_snapshot_is_no_signal
 tests/test_macro_calendar_read.py::TestMacroSeriesRoute::test_snapshot_readable_when_refresh_disabled
-apps/arkscope-web/src/settings/MacroStorageSection.test.tsx::MacroStorageSection > keeps_stored_data_neutral_when_ingestion_is_disabled
 apps/arkscope-web/src/SettingsProviderConfig.test.ts::Settings provider config authority > does_not_request_or_render_the_detailed_fred_snapshot
+apps/arkscope-web/src/i18n/resources.test.ts::i18n resources > contains the reviewed remaining-surface namespace inventory in both locales
+apps/arkscope-web/src/i18n/resources.test.ts::i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move
 ```
 
-The exact `-1/+1` rename in §2.2 is separate. Editing a fourth existing backend
-owner family or a second existing frontend node beyond grounded necessity is a
-stop-and-amend event. Frozen Settings baseline blocks and unrelated count
-fixtures are not updated to follow current copy.
+The exact removals/replacements in §2.2 are separate. The first resources owner
+changes only Settings count `783 -> 785` and locale total `1867 -> 1869`. The
+second adds exactly the four `macroStorage.schedule.*` paths from §1.7 to
+`postSliceSettingsPaths`, adds exactly the two retired
+`macroStorage.snapshot.*` paths to the retired-path list, and generalizes no
+other fixture. Frozen constants (`641`, `23`, `664`, locale `3`, workspace
+`95`, and the per-subtree baseline table) remain byte-identical and continue to
+hold through the existing delta formula. Editing any other existing node body
+is a stop-and-amend event.
 
 ### 2.5 Backend focused command
 
@@ -533,6 +627,7 @@ From `apps/arkscope-web`:
 ```bash
 npx vitest run \
   src/SettingsProviderConfig.test.ts \
+  src/SettingsCss.test.ts \
   src/dataSourceSchedulePolling.test.ts \
   src/settings/MacroStorageSection.test.tsx \
   src/settings/settingsReadCache.test.ts \
@@ -540,7 +635,10 @@ npx vitest run \
   src/i18n/resources.test.ts
 ```
 
-Baseline identity excludes the new file and is `88`; final is `100`.
+Baseline identity excludes the new file and is
+`96 / 9877be8adf0973c2b749f6460156ae86021cc4a91f3d4caab366bd9ce66da46f`;
+Task 3 is `104 / 8fd324f07dbb75d53ce3629a94922ff4b50b244fea8ef0bd40777d36d82c327a`;
+final is `109 / da8590cf3cdf126487d80b2fcdb7c116e550bbaff6eef3530e84bbcaf4222b91`.
 
 ---
 
@@ -578,7 +676,7 @@ No RED test or product edit belongs in Task 0.
 1. Add the ten Task 2 nodes and collect `4,359 / c100ee5d...` before product
    edits.
 2. Run the ten nodes RED; exact expected causes are missing source definitions,
-   missing macro-group arbitration/backoff, legacy snapshot flag, or absent
+   missing same-tick/cross-tick writer deferral, legacy snapshot flag, or absent
    no-create projection.
 3. Add the five sources, canonical job names, provider maps, defaults, and
    independent macro tick group.
@@ -589,8 +687,9 @@ No RED test or product edit belongs in Task 0.
 
 ### Task 3 - Shared frontend controller
 
-1. Add the eight controller nodes and atomic truthful test rename. Collect
-   `1,167 / c13764c5...`; the removed old ID must be absent exactly once.
+1. Add the eight controller nodes and atomic truthful replacement. Collect
+   `101 files / 1,167 / 461b3827...`; the removed old ID must be absent exactly
+   once and the replacement fixture must cover every registered schedule row.
 2. Run RED: the new module is absent, Data Sources still owns the controller,
    immediate broad invalidation is observable, and the old false test name is
    gone.
@@ -598,17 +697,19 @@ No RED test or product edit belongs in Task 0.
    polling cadence, provider controls, or SA owner.
 4. Add exact macro cache mappings and preserve all existing price/news/SEC
    mappings.
-5. Run 96 focused nodes, typecheck, and i18n scanner; commit pair and stop for
+5. Run 104 focused nodes, typecheck, and i18n scanner; commit pair and stop for
    review.
 
 ### Task 4 - Macro page controls and copy
 
-1. Add the four Macro page nodes and collect final frontend identity.
-2. Run them RED: no macro rows, false legacy auto label, or ambiguous local
-   refresh copy must be the causes.
+1. Add the four Macro page nodes plus two CSS contract nodes, remove the false
+   legacy snapshot-automation node, and collect final frontend identity.
+2. Run them RED: no macro rows, absent three-state automation truth, ambiguous
+   local refresh copy, or unbounded source-column layout must be the causes.
 3. Mount the filtered shared table, derive enabled count, remove the legacy DTO
-   field, and add reviewed bilingual copy.
-4. Run 100 focused nodes, full frontend, typecheck, build, scanner, and an early
+   field, add reviewed bilingual copy, apply the exact resources-test deltas in
+   §2.4, and land the dedicated source-cell/column CSS contract.
+4. Run 109 focused nodes, full frontend, typecheck, build, scanner, and an early
    desktop/mobile browser check.
 5. Commit pair and stop for review.
 
@@ -625,26 +726,32 @@ turn RED, and restore the entire owner file byte-for-byte before continuing:
 | M4 | allow schedule FRED payload to set `full_refresh=True` | incremental-only node |
 | M5 | derive FRED automation from `macro_calendar_enabled` | provider-health evolved owners |
 | M6 | invalidate macro snapshot on failed/busy run | frontend failure-preservation node |
-| M7 | send run-now POST on mount/focus/local reload | frontend zero-POST node |
+| M7 | send run-now POST on mount/idle/focus/visibility/local reload | frontend zero-POST node |
+| M8 | remove the source-cell wrapping class so global nowrap wins | source-wrapping CSS node + browser geometry replay |
+| M9 | restore the old `22/10/16/16/36` schedule widths | reviewed-column CSS node + browser geometry replay |
 
-A mutation that edits dead code, is killed only by a source-string assertion,
-or leaves its semantic owner GREEN is rejected evidence.
+A mutation that edits dead code, is killed only by an unrelated source-string
+assertion, or leaves its semantic owner GREEN is rejected evidence. M8/M9 must
+also produce the expected computed-style/geometry violation in the hermetic
+browser fixture; a textual CSS delta without rendered effect is rejected.
 
 Final gates:
 
 1. backend full collection `4,359 / c100ee5d...`;
 2. backend focused `393` passing;
-3. frontend full `100 files / 1,171 / 9b2691e6...`;
-4. frontend focused `100` passing;
+3. frontend full `101 files / 1,172 / f2106125...`;
+4. frontend focused `109` passing;
 5. frontend full runtime, typecheck, build, and i18n scanner;
 6. canonical native backend target = `4,359 seen / 4,347 passed / 12 skipped /
    0 failed / exit 0` (the exact `4,329/12/0` baseline plus 18 passing nodes);
 7. hermetic scratch `macro_calendar.db`: one representative success updates
    expected rows and a subsequent provider failure leaves them unchanged;
 8. two-process lock and descriptor-release probes;
-9. desktop `1322 x 777` and mobile `390 x 844` browser matrix: five rows,
-   bounded layout, zero overlap, zero POST before explicit click, exactly one
-   POST after click, and honest terminal state; and
+9. desktop `1322 x 777` and mobile `390 x 844` browser matrix: five macro rows,
+   every Data Sources registry row, source text wrapped inside its cell,
+   reviewed column proportions, bounded horizontal scrolling, zero overlap,
+   zero POST across mount/idle/focus/visibility/local reload before explicit
+   click, exactly one POST after click, and honest terminal state; and
 10. artifact manifest, generated-file cleanup, production DB/config SHA and
     stat equality, and clean worktree.
 
@@ -668,13 +775,14 @@ After independent implementation GREEN:
 Stop before further product edits if any of the following occurs:
 
 1. a staged collection count or SHA differs;
-2. any node outside the `+18/-0` backend or `+13/-1` frontend ledger changes;
+2. any node outside the `+18/-0` backend or `+15/-2` frontend ledger changes;
 3. a second telemetry row appears for one attempt;
 4. any scheduled macro row uses a `collect.*` identity;
 5. lock setup degrades to unlocked execution;
 6. a lock descriptor survives any terminal path;
-7. the second due macro source is marked attempted, skipped-success, or no
-   longer due merely because another macro source fired this tick;
+7. a due macro source is marked attempted, assigned a row, skipped-success, or
+   no longer due merely because another macro writer fired in this or an
+   earlier tick, or is active in another process;
 8. a fired macro source with missing provider configuration remains due on the
    next 30-second tick or prevents another due macro source from being selected;
 9. backfill becomes reachable from Settings or `SOURCES`;
@@ -688,8 +796,10 @@ Stop before further product edits if any of the following occurs:
     or schedule setting changes during ordinary tests;
 16. a frontend copy introduces `攝入` or implies automatic/manual capability
     that the controls do not have;
-17. a frozen Settings baseline/count block is updated to follow current copy;
-18. an unowned path changes;
+17. a frozen Settings baseline/count block changes, or the resources owner
+    differs from the exact §2.4 path/count delta;
+18. an unowned path changes, including a schedule-table CSS edit outside the
+    bounded `styles.css` rules;
 19. a deterministic browser overlap, overflow, duplicate POST, or stale-state
     regression appears;
 20. a test contacts FRED/Finnhub or a live sidecar; or
