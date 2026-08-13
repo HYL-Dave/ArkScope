@@ -1,7 +1,8 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-2 COMPLETE; TASK 3 ACTIVE;
-> TASKS 1-5 BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-2 COMPLETE; TASK 3 STOPPED ON
+> ATTENDED-BUSY VISIBILITY AMENDMENT REVIEW; TASKS 1-5 BATCH-AUTHORIZED;
+> TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
@@ -40,6 +41,23 @@
 > The per-task "stop for review" wording below is superseded only as to review
 > timing: Task 5 remains the combined implementation-review gate, and Task 6,
 > merge, push, and live-provider traffic remain unauthorized.
+>
+> **2026-08-13 Task 3 stop-and-amend:** implementation grounding proved that
+> the macro-writer busy branch in `run_source()` does not distinguish automatic
+> scheduler work from an attended `api`, `cli`, or `manual` invocation. The
+> current branch gives every trigger a pure defer with no telemetry row and no
+> `_LAST_RESULT`, contradicting the approved design's visible-busy contract for
+> explicit actions. Automatic `scheduler` work keeps the existing pure-defer
+> behavior. An attended busy invocation instead records exactly one failed
+> canonical `fetch_*` row and publishes one transient `skipped` result with
+> stable code/reason `macro_calendar_busy`, while leaving `_LAST_ATTEMPT` and
+> durable scheduler state untouched so it cannot consume the automatic
+> interval. The existing lock-busy owner gains this attended subcase; its node
+> ID and every staged identity remain unchanged. Task 3 also strengthens its
+> existing manual-run node so a successful run that completes before the first
+> poll still invalidates exact macro cache keys by terminal revision rather
+> than requiring an observed `running` frame. Product edits remain paused until
+> this bounded amendment receives focused review.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
@@ -304,9 +322,10 @@ existing `JobState` vocabulary is not widened with a fake fourth status.
 1. completes same-source process/file-lock gates; a busy gate is not an
    attempt and creates no row;
 2. acquires/reserves the shared process-local and file macro-writer gate before
-   advancing attempt time; an occupied gate is a pure defer with no row, no
-   result, and no interval consumption, including when a writer from an earlier
-   tick or another process is still running;
+   advancing attempt time; for `trigger_source == "scheduler"`, an occupied
+   gate is a pure defer with no row, no result, and no interval consumption,
+   including when a writer from an earlier tick or another process is still
+   running;
 3. advances the source's attempt time and creates one row whose name is the
    source's canonical `fetch_*` name;
 4. runs provider/config preflight inside that attempt; a missing configuration
@@ -319,9 +338,13 @@ existing `JobState` vocabulary is not widened with a fake fourth status.
    failed terminal attempt rather than fabricating success.
 
 Direct API/job entry points still create one canonical row before attempting
-the gate and may return typed `macro_calendar_busy`. The scheduler's stronger
-pre-attempt deferral contract prevents a 30-second overlap from consuming a
-daily or weekly source interval.
+the gate and may return typed `macro_calendar_busy`. An attended schedule
+invocation (`api`, `cli`, or `manual`) that loses the shared writer race records
+exactly one failed canonical row and one transient `_LAST_RESULT` with status
+`skipped` and code/reason `macro_calendar_busy`; it performs no provider work
+and does not update `_LAST_ATTEMPT` or durable scheduler state. The scheduler's
+stronger pre-attempt deferral contract prevents a 30-second overlap from
+consuming a daily or weekly source interval.
 
 No `collect.fred_*` or `collect.finnhub_*_calendar` job name may be emitted.
 The existing news/price/SEC source names remain `collect.*` byte-for-behavior
@@ -667,6 +690,23 @@ bodies in that file remain byte-identical. Run all 14 nodes in the file as a
 separate Task 4 owner gate; it is intentionally outside the §2.6 focused
 identity. Editing any other existing node body is a stop-and-amend event.
 
+The Task 3 stop amendment permits one additional existing backend owner-body
+evolution, with no node-ID change:
+
+```text
+tests/test_macro_scheduler_integration.py::test_macro_lock_busy_records_one_non_success_row_without_provider_work
+```
+
+Its added phase must hold the real shared macro writer, call
+`run_source(..., trigger_source="api")`, and prove one failed canonical
+`fetch_*` row, one transient `_LAST_RESULT` carrying `status="skipped"` plus
+stable `macro_calendar_busy` code/reason, zero provider work, no
+`_LAST_ATTEMPT`, and no durable attempt/outcome. The existing
+`trigger_source="scheduler"` real-process phase remains pure defer and must stay
+GREEN. The new Task 3 manual-run owner also gains the fast-terminal subcase
+described in the amendment header; because that node is already in the Task 3
+addition ledger, its strengthened body changes no identity.
+
 ### 2.5 Backend focused command
 
 ```bash
@@ -760,8 +800,9 @@ No RED test or product edit belongs in Task 0.
    gone.
 3. Extract the hook/table; migrate Data Sources without changing its source set,
    polling cadence, provider controls, or SA owner.
-4. Add exact macro cache mappings and preserve all existing price/news/SEC
-   mappings.
+4. Add exact macro cache mappings, detect successful terminal revisions even
+   when no `running` frame was observed, and preserve all existing
+   price/news/SEC mappings.
 5. Run 104 focused nodes, typecheck, and i18n scanner; commit pair and stop for
    review.
 
