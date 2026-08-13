@@ -181,6 +181,44 @@ def test_macro_lock_busy_records_one_non_success_row_without_provider_work(
     assert telemetry.finished[0][1]["status"] == "failed"
     assert telemetry.finished[0][1]["error"] == "macro_calendar_busy"
 
+    for trigger_source in ("api", "cli", "manual"):
+        scheduler, source, state = _install_macro_source(monkeypatch, tmp_path)
+        attended_telemetry = _Telemetry()
+        monkeypatch.setattr("src.api.dependencies.get_dal", lambda: object())
+        monkeypatch.setattr(
+            "src.service.job_runs_store.get_job_runs_store",
+            lambda dal: attended_telemetry,
+        )
+
+        with macro_calendar_writer():
+            attended = scheduler.run_source(source, trigger_source=trigger_source)
+
+        assert attended == {
+            "source": source,
+            "status": "skipped",
+            "code": "macro_calendar_busy",
+            "reason": "macro_calendar_busy",
+        }
+        assert {
+            key: scheduler._LAST_RESULT[source][key]
+            for key in ("source", "status", "code", "reason")
+        } == attended
+        assert [name for name, _ in attended_telemetry.created] == ["fetch_fred_series"]
+        assert attended_telemetry.created[0][1] == {
+            "trigger_source": trigger_source,
+            "payload": {"source": source},
+        }
+        assert len(attended_telemetry.finished) == 1
+        assert attended_telemetry.finished[0][1] == {
+            "status": "failed",
+            "message": "macro_calendar_busy",
+            "error": "macro_calendar_busy",
+            "result": attended,
+        }
+        assert provider_calls == []
+        assert scheduler._LAST_ATTEMPT == {}
+        assert state.attempts == [] and state.outcomes == []
+
 
 def test_macro_writer_lock_releases_descriptors_after_success_and_failure(
     tmp_path, monkeypatch

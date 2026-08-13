@@ -4,11 +4,8 @@ import {
   getProvidersConfig,
   getProvidersHealth,
   getSAExtensionHealth,
-  getSchedule,
   importProviderConfigField,
   putProviderConfig,
-  putSchedule,
-  runScheduleNow,
   testProvider,
   type ProviderConfigEntry,
   type ProviderConfigField,
@@ -18,27 +15,15 @@ import {
   type ProvidersConfigResponse,
   type ProvidersHealthResponse,
   type SAExtensionHealthResponse,
-  type ScheduleRunResult,
-  type ScheduleSourceState,
 } from "../api";
 import {
   providerHealthStatusLabel,
-  schedulerBodyBacklogPresentation,
-  schedulerStateLabel,
 } from "../marketDataDisplay";
 import { displaySAExtensionSegments } from "../saExtensionHealthDisplay";
-import { SourceRunProgress } from "../SourceRunProgress";
 import {
-  durableScheduleCommonState,
   providerCommonState,
   saSegmentCommonState,
 } from "../dataSourcesPresentation";
-import {
-  dataSourceScheduleLifecycleChanged,
-  dataSourceSchedulePollMs,
-  type DataSourceScheduleMap,
-} from "../dataSourceSchedulePolling";
-import { formatSystemTimestamp } from "../timeDisplay";
 import { ConfirmDialog, StatusBadge } from "../ui";
 import { shortTs } from "./DataStorageSection";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
@@ -50,7 +35,6 @@ import {
   providerName,
   providerTestCopy,
   scheduleOutcomeCopy,
-  scheduleSourceCopy,
   settingsErrorPresentation,
 } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
@@ -59,9 +43,11 @@ import {
   CLEAR_SETTINGS_NAVIGATION_GUARD,
   type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
+import {
+  DataScheduleTable,
+  useDataScheduleControls,
+} from "./dataScheduleControls";
 import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
-
-type ScheduleResponse = Awaited<ReturnType<typeof getSchedule>>;
 
 function retainedCacheValue<T>(
   settingsReadCache: SettingsReadCache,
@@ -69,16 +55,6 @@ function retainedCacheValue<T>(
 ): T | null {
   const inspected = settingsReadCache.inspect<T>(key);
   return inspected.status === "missing" ? null : inspected.value;
-}
-
-function completedScheduleSources(
-  previous: DataSourceScheduleMap | null,
-  next: DataSourceScheduleMap,
-): string[] {
-  if (previous === null) return [];
-  return Object.keys(previous).filter((source) =>
-    previous[source]?.running === true && next[source]?.running === false,
-  );
 }
 
 function shortDate(iso: string | null | undefined): string {
@@ -172,9 +148,7 @@ function ProviderHealthState({ provider, t }: { provider: ProviderHealth; t: Set
     : <StatusBadge state={state} label={providerHealthStatusLabel(provider, t)} />;
 }
 
-type DataSourcesOutcome =
-  | { kind: "error"; error: unknown }
-  | { kind: "schedule"; source: string; result: ScheduleRunResult };
+type DataSourcesOutcome = { kind: "error"; error: unknown };
 
 type ProviderTestState =
   | { kind: "running" }
@@ -192,15 +166,12 @@ export function DataSourcesSection({
 }) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
-  const [initialSchedule] = useState(() =>
-    retainedCacheValue<ScheduleResponse>(settingsReadCache, "data_schedule"));
+  const scheduleController = useDataScheduleControls(settingsReadCache);
+  const schedule = scheduleController.schedule;
   const [initialHealth] = useState(() =>
     retainedCacheValue<ProvidersHealthResponse>(settingsReadCache, "provider_health"));
   const [initialConfig] = useState(() =>
     retainedCacheValue<ProvidersConfigResponse>(settingsReadCache, "provider_config"));
-  const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(
-    initialSchedule?.sources ?? null,
-  );
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(initialHealth);
   const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(
     () => retainedCacheValue<SAExtensionHealthResponse>(settingsReadCache, "sa_extension_health"),
@@ -212,8 +183,7 @@ export function DataSourcesSection({
     initialConfig?.setup ?? null,
   );
   const [outcome, setOutcome] = useState<DataSourcesOutcome | null>(null);
-  const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string>("");
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
   const [testResults, setTestResults] = useState<Record<string, ProviderTestState>>({});
   const [pendingGuardedEdit, setPendingGuardedEdit] = useState<{
@@ -223,15 +193,12 @@ export function DataSourcesSection({
     fieldMeta: ProviderConfigField;
   } | null>(null);
   const guardedEditTriggerRef = useRef<HTMLButtonElement>(null);
-  const scheduleRef = useRef<DataSourceScheduleMap | null>(initialSchedule?.sources ?? null);
-  const scheduleRequestSequenceRef = useRef(0);
-  const acceptedScheduleSequenceRef = useRef(0);
-  const schedulePollInFlightRef = useRef<Promise<void> | null>(null);
   const dataSourcesMountedRef = useRef(true);
-  const dirty = Object.values(drafts).some((value) => value !== "")
+  const combinedBusy = scheduleController.busy || busy;
+  const dirty = scheduleController.hasDrafts
     || Object.values(keyDrafts).some((value) => value !== "")
     || pendingGuardedEdit !== null;
-  const navigationBusy = busy !== "";
+  const navigationBusy = combinedBusy !== "";
 
   useEffect(() => {
     onNavigationGuardChange?.({
@@ -256,38 +223,18 @@ export function DataSourcesSection({
     };
   }, []);
 
-  const acceptSchedule = useCallback((
-    next: DataSourceScheduleMap,
-    sequence: number,
-  ): { accepted: boolean; lifecycleChanged: boolean } => {
-    if (sequence < acceptedScheduleSequenceRef.current) {
-      return { accepted: false, lifecycleChanged: false };
-    }
-    acceptedScheduleSequenceRef.current = sequence;
-    const previous = scheduleRef.current;
-    scheduleRef.current = next;
-    setSchedule(next);
-    return {
-      accepted: true,
-      lifecycleChanged: dataSourceScheduleLifecycleChanged(previous, next),
-    };
-  }, []);
-
   const load = useCallback(async (force = false) => {
-    const scheduleSequence = ++scheduleRequestSequenceRef.current;
-    const [rs, rh, rc] = await Promise.all([
-      settingsReadCache.load("data_schedule", getSchedule, { force }),
+    const [rh, rc] = await Promise.all([
       settingsReadCache.load("provider_health", getProvidersHealth, { force }),
       settingsReadCache.load("provider_config", getProvidersConfig, { force }),
     ]);
     if (!dataSourcesMountedRef.current) return;
-    if (rs.status === "success") acceptSchedule(rs.value.sources, scheduleSequence);
     if (rh.status === "success") setHealth(rh.value);
     if (rc.status === "success") {
       setCfg(rc.value.providers);
       setCfgSetup(rc.value.setup);
     }
-    const bad = [rs, rh, rc].filter((result) => result.status === "error");
+    const bad = [rh, rc].filter((result) => result.status === "error");
     setOutcome(bad.length
       ? {
           kind: "error",
@@ -301,45 +248,15 @@ export function DataSourcesSection({
           ),
         }
       : null);
-  }, [acceptSchedule, settingsReadCache]);
-
-  const pollSchedule = useCallback((): Promise<void> => {
-    if (schedulePollInFlightRef.current) return schedulePollInFlightRef.current;
-    const sequence = ++scheduleRequestSequenceRef.current;
-    const request = (async () => {
-      try {
-        const nextOutcome = await settingsReadCache.load(
-          "data_schedule",
-          getSchedule,
-          { force: true },
-        );
-        if (!dataSourcesMountedRef.current) return;
-        if (nextOutcome.status !== "success") return;
-        const previous = scheduleRef.current;
-        const accepted = acceptSchedule(nextOutcome.value.sources, sequence);
-        if (accepted.accepted) {
-          for (const source of completedScheduleSources(previous, nextOutcome.value.sources)) {
-            settingsReadCache.invalidateDataSource(source);
-          }
-        }
-        if (accepted.accepted && accepted.lifecycleChanged) {
-          await load(true);
-        }
-      } catch {
-        // Passive polling preserves the last accepted schedule truth.
-      }
-    })().finally(() => {
-      if (schedulePollInFlightRef.current === request) {
-        schedulePollInFlightRef.current = null;
-      }
-    });
-    schedulePollInFlightRef.current = request;
-    return request;
-  }, [acceptSchedule, load, settingsReadCache]);
+  }, [settingsReadCache]);
 
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  useEffect(() => {
+    if (scheduleController.lifecycleVersion > 0) void load(true);
+  }, [load, scheduleController.lifecycleVersion]);
 
   // Extension health spawns a native-host subprocess server-side — fetch once
   // on mount and via the manual 重新檢查 button only, NEVER on the 5s
@@ -358,76 +275,8 @@ export function DataSourcesSection({
     };
   }, [settingsReadCache]);
 
-  // Discover background starts while idle, then observe active runs more closely.
-  const anyRunning = !!schedule && Object.values(schedule).some((s) => s.running);
-  const schedulePollIntervalMs = dataSourceSchedulePollMs(schedule);
-  useEffect(() => {
-    const timer = window.setInterval(
-      () => { void pollSchedule(); },
-      schedulePollIntervalMs,
-    );
-    const onFocus = () => { void pollSchedule(); };
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [pollSchedule, schedulePollIntervalMs]);
-
-  async function setEnabled(source: string, enabled: boolean) {
-    if (busy) return;
-    setBusy(source);
-    try {
-      await putSchedule(source, { enabled });
-      settingsReadCache.invalidate("data_schedule");
-      settingsReadCache.invalidateDataSource(source);
-      await load(true);
-    } catch (e) {
-      setOutcome({ kind: "error", error: e });
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function applyInterval(source: string) {
-    const raw = drafts[source];
-    const n = Number(raw);
-    if (!raw || !Number.isFinite(n)) return;
-    if (busy) return;
-    setBusy(source);
-    try {
-      await putSchedule(source, { interval_minutes: Math.round(n) });
-      setDrafts((d) => ({ ...d, [source]: "" }));
-      settingsReadCache.invalidate("data_schedule");
-      settingsReadCache.invalidateDataSource(source);
-      await load(true);
-    } catch (e) {
-      setOutcome({ kind: "error", error: e });
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function runNow(source: string) {
-    if (busy) return;
-    setBusy(source);
-    try {
-      const r = await runScheduleNow(source);
-      if (r.status === "skipped") {
-        setOutcome({ kind: "schedule", source, result: r });
-      }
-      settingsReadCache.invalidate("data_schedule");
-      settingsReadCache.invalidateDataSource(source);
-      await load(true);
-    } catch (e) {
-      setOutcome({ kind: "error", error: e });
-    } finally {
-      setBusy("");
-    }
-  }
-
   async function importField(provider: string, field: string, sourceEnvVar: string | null) {
-    if (busy) return;
+    if (combinedBusy) return;
     setBusy(`import.${provider}.${field}`);
     try {
       await importProviderConfigField(provider, field, sourceEnvVar);
@@ -447,7 +296,7 @@ export function DataSourcesSection({
     value: string | null,
     fieldMeta?: ProviderConfigField,
   ): Promise<boolean> {
-    if (busy) return false;
+    if (combinedBusy) return false;
     setBusy(`${provider}.${field}`);
     try {
       await putProviderConfig(
@@ -474,7 +323,7 @@ export function DataSourcesSection({
     value: string | null,
     fieldMeta?: ProviderConfigField,
   ) {
-    if (busy) return;
+    if (combinedBusy) return;
     if (fieldMeta?.guarded && value !== null) {
       setPendingGuardedEdit({ provider, field, value, fieldMeta });
       return;
@@ -483,7 +332,7 @@ export function DataSourcesSection({
   }
 
   async function confirmGuardedEdit() {
-    if (!pendingGuardedEdit || busy) return;
+    if (!pendingGuardedEdit || combinedBusy) return;
     const saved = await commitField(
       pendingGuardedEdit.provider,
       pendingGuardedEdit.field,
@@ -494,7 +343,7 @@ export function DataSourcesSection({
   }
 
   async function runTest(provider: string) {
-    if (busy) return;
+    if (combinedBusy) return;
     setBusy(`test.${provider}`);
     setTestResults((results) => ({ ...results, [provider]: { kind: "running" } }));
     try {
@@ -514,7 +363,7 @@ export function DataSourcesSection({
   }
 
   async function reloadSAExtensionHealth() {
-    if (busy) return;
+    if (combinedBusy) return;
     setBusy("sa.extension-health");
     try {
       const result = await settingsReadCache.load(
@@ -624,71 +473,6 @@ export function DataSourcesSection({
     );
   }
 
-  function jobOutcome(jobName: string): string {
-    const row = health?.jobs?.[jobName] as
-      | { status?: string; finished_at?: string; error?: string }
-      | undefined;
-    if (!row) return "—";
-    const ts = shortTs(row.finished_at ?? null);
-    if (row.status === "succeeded") return `✓ ${ts}`;
-    if (row.status === "failed") return `✗ ${ts}`;
-    if (row.status === "running") return t(($) => $.actions.running);
-    return row.status ?? "—";
-  }
-
-  function renderLastRun(source: string, s: ScheduleSourceState) {
-    const skipped = s.last_result?.status === "skipped";
-    const historyState = durableScheduleCommonState(s);
-    const durableSkipped = s.durable_state?.last_status === "skipped";
-    const ss = schedulerStateLabel(s.durable_state ?? null, t);
-    const bodyBacklog = schedulerBodyBacklogPresentation(s.durable_state ?? null, t);
-
-    return (
-      <div className="ds-last-run">
-        <div className="ds-last-run-summary">
-          <span>{jobOutcome(s.job_name)}</span>
-          {skipped && (
-            <StatusBadge
-              state="blocked"
-              label={t(($) => $.dataSources.schedule.triggerSkipped)}
-            />
-          )}
-          {historyState !== null ? (
-            <StatusBadge
-              state={historyState}
-              label={ss.label}
-            />
-          ) : durableSkipped && !skipped ? (
-            <span className="muted tiny">{ss.label}</span>
-          ) : null}
-          {ss.needsContinue && (
-            <button
-              className="btn-ghost"
-              disabled={!!busy || s.running}
-              onClick={() => void runNow(source)}
-              title={t(($) => $.dataSources.schedule.continue.title)}
-            >
-              {t(($) => $.dataSources.schedule.continue.label)}
-            </button>
-          )}
-        </div>
-        {bodyBacklog && (
-          <div className={`tiny ${bodyBacklog.tone === "warn" ? "refresh-err" : "muted"}`}>
-            {bodyBacklog.label}
-            {bodyBacklog.earliestNextRetryAt
-              ? <>
-                  {" · "}
-                  {t(($) => $.dataSources.schedule.backlog.earliest, {
-                    timestamp: formatSystemTimestamp(bodyBacklog.earliestNextRetryAt),
-                  })}
-                </>
-              : ""}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   function providerTestPresentation(provider: string): string | null {
     const state = testResults[provider];
     if (!state) return null;
@@ -704,9 +488,16 @@ export function DataSourcesSection({
   const outcomePresentation = outcome?.kind === "error"
     ? settingsErrorPresentation(outcome.error, t, commonT)
     : null;
-  const outcomeMessage = outcome?.kind === "schedule"
-    ? scheduleOutcomeCopy(outcome.source, outcome.result, t)
-    : outcomePresentation?.message ?? null;
+  const scheduleOutcomePresentation = scheduleController.outcome?.kind === "error"
+    ? settingsErrorPresentation(scheduleController.outcome.error, t, commonT)
+    : null;
+  const outcomeMessage = scheduleController.outcome?.kind === "schedule"
+    ? scheduleOutcomeCopy(
+        scheduleController.outcome.source,
+        scheduleController.outcome.result,
+        t,
+      )
+    : scheduleOutcomePresentation?.message ?? outcomePresentation?.message ?? null;
   const jobDiagnostics = Object.values(health?.jobs ?? {}).map((row) => row.error);
   const providerDiagnostics = (health?.providers ?? []).flatMap((provider) => [
     provider.detail,
@@ -732,7 +523,10 @@ export function DataSourcesSection({
   );
   const diagnostics = [
     outcomePresentation?.diagnostic,
-    outcome?.kind === "schedule" ? outcome.result.reason : null,
+    scheduleOutcomePresentation?.diagnostic,
+    scheduleController.outcome?.kind === "schedule"
+      ? scheduleController.outcome.result.reason
+      : null,
     ...(health?.notes ?? []),
     ...jobDiagnostics,
     ...providerDiagnostics,
@@ -752,9 +546,13 @@ export function DataSourcesSection({
             {t(($) => $.dataSources.section.description)}
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => void load(true)} disabled={!!busy}>
+        <button
+          className="btn-ghost"
+          onClick={() => void Promise.all([load(true), scheduleController.reloadSchedule()])}
+          disabled={Boolean(combinedBusy)}
+        >
           ↻ {t(($) => $.actions.refreshStatus)}
-          {anyRunning
+          {scheduleController.anyRunning
             ? t(($) => $.dataSources.schedule.autoRefreshing)
             : null}
         </button>
@@ -934,7 +732,7 @@ export function DataSourcesSection({
                             <div className="provider-config-actions">
                               {c.testable ? (
                                 <>
-                                  <button className="btn-ghost" disabled={!!busy}
+                                  <button className="btn-ghost" disabled={Boolean(combinedBusy)}
                                     onClick={() => void runTest(pid)}>
                                     {t(($) => $.actions.test)}
                                   </button>
@@ -1042,7 +840,7 @@ export function DataSourcesSection({
                         <td rowSpan={rows.length}>
                           {c.testable ? (
                             <>
-                              <button className="btn-ghost" disabled={!!busy}
+                              <button className="btn-ghost" disabled={Boolean(combinedBusy)}
                                 onClick={() => void runTest(pid)}>
                                 {t(($) => $.actions.test)}
                               </button>
@@ -1071,88 +869,11 @@ export function DataSourcesSection({
       <SettingsSubsectionAnchor id="source_schedules">
         <div className="settings-panel" style={{ marginTop: 16 }}>
         <h4 className="detail-section">{t(($) => $.dataSources.schedule.title)}</h4>
-        {!schedule ? (
-          <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
-        ) : (
-          <div className="settings-table-scroll" data-testid="schedule-scroll">
-          <table className="data-table settings-schedule-table">
-            <thead>
-              <tr>
-                <th>{t(($) => $.dataSources.headings.source)}</th>
-                <th>{t(($) => $.dataSources.headings.schedule)}</th>
-                <th>{t(($) => $.dataSources.headings.intervalMinutes)}</th>
-                <th>{t(($) => $.dataSources.headings.runNow)}</th>
-                <th>{t(($) => $.dataSources.headings.lastRun)}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(schedule).map(([id, s]) => {
-                const sourceCopy = scheduleSourceCopy(id, t);
-                return (
-                  <tr key={id}>
-                  <td>
-                    {sourceCopy.label}
-                    <div className="muted tiny">{sourceCopy.description}</div>
-                  </td>
-                  <td>
-                    <label className="ds-toggle">
-                      <input
-                        type="checkbox"
-                        checked={s.enabled}
-                        disabled={busy === id}
-                        onChange={(e) => void setEnabled(id, e.target.checked)}
-                      />
-                      <span className={s.enabled ? "tiny" : "muted tiny ds-schedule-disabled"}>
-                        {s.enabled
-                          ? t(($) => $.dataSources.labels.scheduleEnabled)
-                          : t(($) => $.dataSources.labels.scheduleDisabled)}
-                      </span>
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      className="ds-interval"
-                      type="number"
-                      min={5}
-                      placeholder={String(s.interval_minutes)}
-                      value={drafts[id] ?? ""}
-                      disabled={busy === id}
-                      onChange={(e) => setDrafts((d) => ({ ...d, [id]: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") void applyInterval(id); }}
-                    />
-                    {drafts[id] && (
-                      <button className="btn-ghost tiny" onClick={() => void applyInterval(id)}>
-                        {t(($) => $.actions.apply)}
-                      </button>
-                    )}
-                  </td>
-                  <td>
-                    {s.running ? (
-                      <SourceRunProgress
-                        sourceLabel={sourceCopy.label}
-                        running={s.running}
-                        progress={s.progress}
-                      />
-                    ) : (
-                      <button
-                        className="btn-ghost"
-                        disabled={!!busy}
-                        onClick={() => void runNow(id)}
-                      >
-                        ▶ {t(($) => $.actions.run)}
-                      </button>
-                    )}
-                  </td>
-                  <td className="muted tiny ds-last-run-cell settings-wrap-text">
-                    {renderLastRun(id, s)}
-                  </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        )}
+        <DataScheduleTable
+          controller={scheduleController}
+          jobs={health?.jobs}
+          externalBusy={busy !== ""}
+        />
         <p className="muted tiny ds-schedule-protection-note" style={{ marginTop: 8 }}>
           {t(($) => $.dataSources.schedule.guardTitle)}
           {t(($) => $.dataSources.schedule.protection)}

@@ -1122,6 +1122,37 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         except MacroCalendarBusy:
             flock.release()
             lock.release()
+            if trigger_source in {"api", "cli", "manual"}:
+                result = {
+                    "source": source,
+                    "status": "skipped",
+                    "code": "macro_calendar_busy",
+                    "reason": "macro_calendar_busy",
+                }
+                try:
+                    from src.api.dependencies import get_dal
+                    from src.service.job_runs_store import get_job_runs_store
+
+                    store = get_job_runs_store(get_dal())
+                    run_id = store.create_run(
+                        job_name(source),
+                        trigger_source=trigger_source,
+                        payload={"source": source},
+                    )
+                    store.finish_run(
+                        run_id,
+                        status="failed",
+                        message="macro_calendar_busy",
+                        error="macro_calendar_busy",
+                        result=result,
+                    )
+                except Exception:  # noqa: BLE001 — visibility remains best-effort
+                    logger.debug(
+                        "attended macro busy telemetry unavailable for %s",
+                        source,
+                        exc_info=True,
+                    )
+                return _record_result(result)
             return {
                 "source": source,
                 "status": "deferred",

@@ -205,7 +205,7 @@ export interface SettingsReadCache {
   ): () => void;
   invalidate(key: SettingsReadKey): void;
   invalidateCredentialAccount(localCredentialId: string): void;
-  invalidateDataSource(source: string): void;
+  invalidateDataSource(source: string, writeTarget?: string): void;
   invalidateAllDataSyncReads(): void;
   clear(): void;
 }
@@ -326,7 +326,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
     this.invalidate(oauthAccountUsageKey(localCredentialId));
   }
 
-  invalidateDataSource(source: string): void {
+  invalidateDataSource(source: string, writeTarget?: string): void {
     if (source === "ibkr_prices") {
       this.invalidate("market_data_status");
       for (const key of this.coverageKeys()) this.invalidate(key);
@@ -334,6 +334,25 @@ class MemorySettingsReadCache implements SettingsReadCache {
     }
     if (source === "sec_corporate_actions") {
       this.invalidate("security_lifecycle");
+      return;
+    }
+    if (source === "fred_series") {
+      this.invalidate("macro_status");
+      this.invalidate("macro_snapshot");
+      return;
+    }
+    if (
+      source === "fred_release_dates"
+      || source === "finnhub_economic_calendar"
+      || source === "finnhub_earnings_calendar"
+      || source === "finnhub_ipo_calendar"
+    ) {
+      this.invalidate("macro_status");
+      return;
+    }
+    if (writeTarget === "macro_calendar.db") {
+      this.invalidate("macro_status");
+      this.invalidate("macro_snapshot");
       return;
     }
     if (NEWS_SOURCES.has(source)) {

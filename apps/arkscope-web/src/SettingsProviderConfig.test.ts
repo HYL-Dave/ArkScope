@@ -410,6 +410,48 @@ vi.mock("./api", async (importOriginal) => {
           } : null,
           job_name: "collect.ibkr_prices",
         },
+        sec_corporate_actions: {
+          label: "PLANTED_SCHEDULE_SEC_LABEL",
+          description: "PLANTED_SCHEDULE_SEC_DESCRIPTION",
+          ibkr: false,
+          provider_fetch: true,
+          source_mode: "direct_local",
+          write_target: "security_lifecycle.db",
+          source_badges: [],
+          enabled: false,
+          interval_minutes: 1440,
+          default_interval_minutes: 1440,
+          running: false,
+          progress: null,
+          last_attempt_at: null,
+          last_result: null,
+          durable_state: null,
+          job_name: "collect.sec_corporate_actions",
+        },
+        ...Object.fromEntries([
+          ["fred_series", "fetch_fred_series", 1440],
+          ["fred_release_dates", "fetch_fred_release_dates", 10080],
+          ["finnhub_economic_calendar", "fetch_economic_calendar_recent", 60],
+          ["finnhub_earnings_calendar", "fetch_earnings_calendar", 240],
+          ["finnhub_ipo_calendar", "fetch_ipo_calendar", 1440],
+        ].map(([sourceId, jobName, intervalMinutes]) => [sourceId, {
+          label: `PLANTED_SCHEDULE_${String(sourceId).toUpperCase()}_LABEL`,
+          description: `PLANTED_SCHEDULE_${String(sourceId).toUpperCase()}_DESCRIPTION`,
+          ibkr: false,
+          provider_fetch: true,
+          source_mode: "direct_local",
+          write_target: "macro_calendar.db",
+          source_badges: [],
+          enabled: false,
+          interval_minutes: intervalMinutes,
+          default_interval_minutes: intervalMinutes,
+          running: false,
+          progress: null,
+          last_attempt_at: null,
+          last_result: null,
+          durable_state: null,
+          job_name: jobName,
+        }])),
       },
     })),
     getProvidersHealth: vi.fn(async () => health),
@@ -1025,7 +1067,7 @@ describe("Settings provider config authority", () => {
     expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("新觸發已略過");
   });
 
-  it("renders_disabled_providers_as_neutral_and_all_four_schedule_rows_as_controllable", async () => {
+  it("renders_disabled_providers_as_neutral_and_every_registered_schedule_row_as_controllable", async () => {
     await renderDataSources();
     const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("retired_provider"));
@@ -1035,14 +1077,10 @@ describe("Settings provider config authority", () => {
     expect(providerRow.querySelector(".ds-chip")).toBeNull();
     expect(providerRow.querySelector(".muted")).not.toBeNull();
 
-    const zhLabels = ["Polygon 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價"];
-    const zhRows = zhLabels.map((label) => {
-      const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-        node.textContent?.includes(label));
-      if (!row) throw new Error(`missing active schedule row: ${label}`);
-      return row;
-    });
-    expect(zhRows).toHaveLength(4);
+    const zhRows = Array.from(
+      host!.querySelectorAll<HTMLTableRowElement>("[data-testid='schedule-scroll'] tbody tr"),
+    );
+    expect(zhRows).toHaveLength(10);
     for (const row of zhRows) {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
@@ -1053,11 +1091,11 @@ describe("Settings provider config authority", () => {
     expect(host!.textContent).not.toMatch(/價格缺口補抓|本地鏡像增量|IV 歷史/);
 
     await act(async () => { await i18n.changeLanguage("en"); });
-    const enLabels = ["Polygon News", "Finnhub News", "IBKR News", "IBKR Prices"];
-    for (const label of enLabels) {
-      const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-        node.textContent?.includes(label));
-      if (!row) throw new Error(`missing active English schedule row: ${label}`);
+    const enRows = Array.from(
+      host!.querySelectorAll<HTMLTableRowElement>("[data-testid='schedule-scroll'] tbody tr"),
+    );
+    expect(enRows).toHaveLength(10);
+    for (const row of enRows) {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
       expect(Array.from(row.querySelectorAll("button")).some((button) =>
