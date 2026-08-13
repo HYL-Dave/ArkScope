@@ -329,6 +329,24 @@ the rejected raw bytes never enter durable state. Reusing a
 `client_event_id` with different admitted terminal or diagnostic content still
 derives a different hash and returns `event_conflict` under the existing rule.
 
+Hash migration is explicit rather than inferred. A request that omits
+`extension_diagnostics` uses the exact pre-amendment terminal-event document
+and hash, without adding an `absent` marker to hash identity. This lets an old
+extension retry an event already stored by the old server and receive the
+existing deduplicated run rather than a migration-created conflict. The server
+may still project `diagnostics_status="absent"` for newly stored legacy-shaped
+events, but that projection is not part of their immutable hash. A request that
+explicitly carries diagnostics uses the extended accepted-or-rejected-marker
+document above.
+
+`event_conflict` is terminal for the extension outbox because retrying an
+immutable ID cannot resolve it. The extension removes that queue item, returns
+`delivery="unavailable"` with `reason_code="event_conflict"`, and retains only
+the existing bounded local delivery summary; it never calls the conflicting
+payload persisted and never retries it forever. This covers both a genuinely
+changed event and any already-mismatched pre-release queue state without
+overwriting the server's existing durable row.
+
 ### LD 7 - Durable tracking reuses `job_runs` without creating a parallel log
 
 `JobRunsLocalStore.record_extension_event_once()` persists the validated
@@ -389,8 +407,8 @@ Backend tests must prove:
 2. each structural fail independently produces `interrupted`;
 3. a structural warning with no fail produces `degraded`;
 4. capture and repair failures never alter chain state;
-5. only the two allowlisted job names cross the API boundary; and
-6. no running state is inferred from absent completion data.
+5. only the two allowlisted job names cross the API boundary;
+6. no running state is inferred from absent completion data;
 7. valid diagnostic envelopes round-trip into `job_runs.payload` and alter the
    immutable event hash;
 8. malformed enums, timestamps, identifiers, oversized envelopes, and secret
@@ -399,13 +417,15 @@ Backend tests must prove:
 9. browser-, transport-, and SQLite-owned failures retain distinct stable
    codes while unknown exceptions remain generic to their owning stage;
 10. a latest degraded row with no diagnostic renders the typed legacy-absence
-    state rather than an inferred cause; and
+    state rather than an inferred cause;
 11. the 20-run recurrence projection is bounded, deterministic, and read-only;
 12. retrying the same rejected envelope derives the same canonical marker/hash
     and deduplicates, while changed admitted evidence for the same client event
-    yields `event_conflict`; and
+    yields `event_conflict`;
 13. `detail_failures_recorded` has no producer or frontend case, while degraded
-    counts remain visible under `capture_degraded`.
+    counts remain visible under `capture_degraded`; and
+14. a legacy request without diagnostics preserves the pre-amendment hash and
+    deduplicates against an already-stored legacy event.
 
 Frontend tests must prove:
 
@@ -425,7 +445,9 @@ Extension tests must prove each existing `failed++` branch emits exactly one
 typed entry before terminal protocol construction, successful saves emit none,
 a multi-target attempt reports the correct target without retaining page
 content or URL data, and the existing `comment_scan_failed`/`unknown_failure`
-codes are reused at their reviewed stages.
+codes are reused at their reviewed stages. They must also prove that
+`event_conflict` drains the matching queue item into a bounded unavailable
+summary and does not retry or claim persistence.
 
 Browser verification uses desktop `1322 x 777` and mobile `390 x 844`. The SA
 panel must fit without incoherent clipping, inherited schedule controls must

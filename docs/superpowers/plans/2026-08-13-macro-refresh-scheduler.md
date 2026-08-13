@@ -23,6 +23,13 @@
 > line follows after this line, and Finnhub gains no new automation field. The
 > corrected identities and exact owner deltas below supersede the initial plan
 > values; Task 0 remains blocked on focused review of this amendment.
+>
+> **2026-08-13 focused-review amendment:** the first amendment omitted one
+> deterministic post-PG Settings owner and left live FRED copy tied to the
+> superseded no-schedule claim. This bounded correction owns that file, replaces
+> its now-false calendar test ID, pins the exact value-only copy changes, and
+> re-derives the affected frontend identities. Backend identities and the Task 3
+> frontend stage remain unchanged.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
@@ -100,6 +107,7 @@ apps/arkscope-web/src/settings/MacroStorageSection.test.tsx
 apps/arkscope-web/src/settings/settingsReadCache.ts
 apps/arkscope-web/src/settings/settingsReadCache.test.ts
 apps/arkscope-web/src/SettingsProviderConfig.test.ts
+apps/arkscope-web/src/SettingsPostPgExitStorage.test.ts
 apps/arkscope-web/src/SettingsCss.test.ts
 apps/arkscope-web/src/api.ts
 apps/arkscope-web/src/i18n/resources/en/settings.ts
@@ -427,6 +435,35 @@ keeps `重新讀取狀態` visibly separate from `立即更新`. Traditional Chi
 appropriate. Stored observation dates, fetch receipt times, scheduler outcomes,
 and automation state remain distinct labels.
 
+The reviewed `macroStorage.description` value is:
+
+```text
+zh-Hant
+查看本地 FRED 序列快照、儲存量與事件資料覆蓋。可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行；「重新讀取狀態」只會讀取本機資料，不會向資料供應商抓取資料。
+
+en
+Review local FRED series snapshots, stored volume, and event-data coverage. Configure automatic schedules for the five sources below or choose Run now for a manual update. Reload status reads local data only and does not contact a provider.
+```
+
+The live FRED provider-detail family is value-only and follows schedule truth:
+
+```text
+dataSources.fred.autoEnabled
+  zh-Hant: App 自動更新已啟用
+  en: App automatic updates enabled
+dataSources.fred.autoDisabled
+  zh-Hant: App 自動更新未啟用
+  en: App automatic updates not enabled
+dataSources.fred.autoUnknown
+  zh-Hant: 無法確認 App 自動更新狀態
+  en: App automatic update status unavailable
+```
+
+These four existing key paths change values only; they do not alter the i18n
+key-count ledger. No Macro/FRED copy may retain `尚未接入 App 排程` after Task
+2 makes the schedule rows authoritative; the independently true fundamentals
+capability boundary is unchanged.
+
 The bilingual schedule copy changes exactly these Settings paths:
 
 ```text
@@ -498,10 +535,11 @@ phase with a process-local fake is not equivalent.
 
 Task 3 adds eight `Data schedule controls` nodes plus the truthful replacement
 for the existing `all_four_schedule_rows` node. Task 4 adds four
-`MacroStorageSection` nodes and two CSS contract nodes. The old
+`MacroStorageSection` nodes, two CSS contract nodes, and a truthful replacement
+for the post-PG macro-copy node. The old
 `keeps_stored_data_neutral_when_ingestion_is_disabled` node also leaves because
 the retired snapshot flag no longer owns automation truth. The final ledger is
-`+15/-2`, net `+13`:
+`+16/-3`, net `+13`:
 
 ```text
 ADD src/SettingsProviderConfig.test.ts
@@ -509,6 +547,12 @@ ADD src/SettingsProviderConfig.test.ts
 
 REMOVE src/SettingsProviderConfig.test.ts
   Settings provider config authority > renders_disabled_providers_as_neutral_and_all_four_schedule_rows_as_controllable
+
+ADD src/SettingsPostPgExitStorage.test.ts
+  post-PG-exit storage panels > shows_macro_data_with_manual_and_scheduled_refresh_boundaries
+
+REMOVE src/SettingsPostPgExitStorage.test.ts
+  post-PG-exit storage panels > shows_total_macro_data_without_claiming_calendar_product
 
 ADD src/SettingsCss.test.ts
   Settings workspace CSS contract > allocates reviewed schedule columns without overlapping controls
@@ -534,10 +578,10 @@ REMOVE src/settings/MacroStorageSection.test.tsx
   MacroStorageSection > keeps_stored_data_neutral_when_ingestion_is_disabled
 ```
 
-The globally UTF-8 byte-sorted 15-row add stream SHA is
-`27398d372c57d03bd94265737c391f931253685dc0987e90423f0e21be3fde92`;
-the globally byte-sorted two-row removal SHA is
-`4ae3ea5960456cb8b82613c7496155bede55bfd3747f9b47a00e32bbc4fa5bca`.
+The globally UTF-8 byte-sorted 16-row add stream SHA is
+`1dddbb0c9fe7974ecc398c39c7450837105cf575b1fc58e48a5e285b6ab884b5`;
+the globally byte-sorted three-row removal SHA is
+`7aeca70cfcd804c65da64c2580eff845813ad1a7c3f7b133fe69cce5dfe50576`.
 Each stream has exactly one trailing newline. Sorting each file group
 independently and concatenating groups is not equivalent.
 
@@ -549,7 +593,7 @@ independently and concatenating groups is not equivalent.
 | Task 1 | `4,349 / 372fe6ab...` | `383 / de8eb8c4...` | unchanged | unchanged |
 | Task 2 | `4,359 / c100ee5d...` | `393 / 0dd72ab8...` | unchanged | unchanged |
 | Task 3 | unchanged | unchanged | `101 files / 1,167 / 461b3827...` | `104 / 8fd324f0...` |
-| Task 4 final | `4,359 / c100ee5d...` | `393 / 0dd72ab8...` | `101 files / 1,172 / f2106125...` | `109 / da8590cf...` |
+| Task 4 final | `4,359 / c100ee5d...` | `393 / 0dd72ab8...` | `101 files / 1,172 / d40a30d5...` | `109 / da8590cf...` |
 
 Full hashes:
 
@@ -567,7 +611,7 @@ Task 3 frontend full
 Task 3 frontend focused
 8fd324f07dbb75d53ce3629a94922ff4b50b244fea8ef0bd40777d36d82c327a
 Task 4/final frontend full
-f210612501ef749095c51862c8cd0b5a30295b1a5b2a699953b4ef8522547e91
+d40a30d5e50690f79b644e0b25122da02441eb0cf54ab02793d02269419e23cb
 Task 4/final frontend focused
 da8590cf3cdf126487d80b2fcdb7c116e550bbaff6eef3530e84bbcaf4222b91
 ```
@@ -599,8 +643,18 @@ second adds exactly the four `macroStorage.schedule.*` paths from §1.7 to
 `macroStorage.snapshot.*` paths to the retired-path list, and generalizes no
 other fixture. Frozen constants (`641`, `23`, `664`, locale `3`, workspace
 `95`, and the per-subtree baseline table) remain byte-identical and continue to
-hold through the existing delta formula. Editing any other existing node body
-is a stop-and-amend event.
+hold through the existing delta formula.
+
+Task 4 has one additional bounded owner in
+`SettingsPostPgExitStorage.test.ts`. Its `MacroSnapshot` fixture removes exactly
+the retired `auto_refresh_enabled` field. The old
+`shows_total_macro_data_without_claiming_calendar_product` ID is removed and
+the §2.2 replacement asserts the exact reviewed description, the manual versus
+scheduled refresh boundary, local-only `重新讀取狀態`, stored FRED evidence, and
+no provider-freshness guarantee or `攝入` wording. The other 13 node IDs and
+bodies in that file remain byte-identical. Run all 14 nodes in the file as a
+separate Task 4 owner gate; it is intentionally outside the §2.6 focused
+identity. Editing any other existing node body is a stop-and-amend event.
 
 ### 2.5 Backend focused command
 
@@ -702,15 +756,18 @@ No RED test or product edit belongs in Task 0.
 
 ### Task 4 - Macro page controls and copy
 
-1. Add the four Macro page nodes plus two CSS contract nodes, remove the false
-   legacy snapshot-automation node, and collect final frontend identity.
+1. Add the four Macro page nodes plus two CSS contract nodes, replace the false
+   post-PG macro-copy node, remove the false legacy snapshot-automation node,
+   and collect final frontend identity.
 2. Run them RED: no macro rows, absent three-state automation truth, ambiguous
    local refresh copy, or unbounded source-column layout must be the causes.
 3. Mount the filtered shared table, derive enabled count, remove the legacy DTO
-   field, add reviewed bilingual copy, apply the exact resources-test deltas in
-   §2.4, and land the dedicated source-cell/column CSS contract.
-4. Run 109 focused nodes, full frontend, typecheck, build, scanner, and an early
-   desktop/mobile browser check.
+   field and the exact post-PG fixture field, add reviewed bilingual copy,
+   apply the exact resources-test deltas in §2.4, and land the dedicated
+   source-cell/column CSS contract.
+4. Run 109 focused nodes, the separate 14-node post-PG owner file, full
+   frontend, typecheck, build, scanner, and an early desktop/mobile browser
+   check.
 5. Commit pair and stop for review.
 
 ### Task 5 - Mutations and final admission
@@ -739,7 +796,7 @@ Final gates:
 
 1. backend full collection `4,359 / c100ee5d...`;
 2. backend focused `393` passing;
-3. frontend full `101 files / 1,172 / f2106125...`;
+3. frontend full `101 files / 1,172 / d40a30d5...`;
 4. frontend focused `109` passing;
 5. frontend full runtime, typecheck, build, and i18n scanner;
 6. canonical native backend target = `4,359 seen / 4,347 passed / 12 skipped /
@@ -775,7 +832,7 @@ After independent implementation GREEN:
 Stop before further product edits if any of the following occurs:
 
 1. a staged collection count or SHA differs;
-2. any node outside the `+18/-0` backend or `+15/-2` frontend ledger changes;
+2. any node outside the `+18/-0` backend or `+16/-3` frontend ledger changes;
 3. a second telemetry row appears for one attempt;
 4. any scheduled macro row uses a `collect.*` identity;
 5. lock setup degrades to unlocked execution;
