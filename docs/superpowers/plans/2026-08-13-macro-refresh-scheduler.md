@@ -1,8 +1,7 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-2 COMPLETE; TASK 3 STOPPED ON
-> ATTENDED-BUSY VISIBILITY AMENDMENT REVIEW; TASKS 1-5 BATCH-AUTHORIZED;
-> TASK 6 NOT AUTHORIZED
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-3 COMPLETE; TASK 4 ACTIVE;
+> TASKS 1-5 BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
@@ -58,6 +57,15 @@
 > poll still invalidates exact macro cache keys by terminal revision rather
 > than requiring an observed `running` frame. Product edits remain paused until
 > this bounded amendment receives focused review.
+>
+> **2026-08-13 Task 3 resume:** focused review returned GREEN at `80e8498a`.
+> Product/tests commit `9fea8f49` implements the trigger-scoped busy contract,
+> shared frontend controller, exact cache invalidation, and fast-terminal
+> revision handling. A final self-review also restored the pre-extraction
+> cross-control busy boundary by passing provider-operation busy state into the
+> shared schedule table; the existing Task 3 node caught the missing disabled
+> state RED before the bounded fix. Backend and frontend staged identities
+> remain exact. Task 4 is active under the existing batch ruling.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
