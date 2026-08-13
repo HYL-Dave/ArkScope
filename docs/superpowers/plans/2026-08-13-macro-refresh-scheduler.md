@@ -66,6 +66,17 @@
 > shared schedule table; the existing Task 3 node caught the missing disabled
 > state RED before the bounded fix. Backend and frontend staged identities
 > remain exact. Task 4 is active under the existing batch ruling.
+>
+> **2026-08-13 Task 4 stop-and-amend:** the first Task 4 owner run reached the
+> exact final collection but exposed one deterministic existing-node collateral.
+> `renders English Macro Data status snapshot and table headings` selects every
+> page-level `th`; after the reviewed schedule table mounts, it sees the five
+> schedule headings before the five FRED headings and fails `1/14` while all six
+> new Task 4 nodes and the post-PG replacement pass. The bounded correction may
+> change only that assertion's selector from all `th` elements to
+> `.settings-fred-table th`. Its expected five-heading array, node ID, body
+> outside that selector, and every collection identity remain unchanged. Task 4
+> product changes stay uncommitted and Tasks 4-5 are paused for focused review.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
@@ -674,6 +685,7 @@ tests/test_provider_health.py::test_fred_refresh_off_without_snapshot_is_no_sign
 tests/test_macro_calendar_read.py::TestMacroSeriesRoute::test_snapshot_readable_when_refresh_disabled
 apps/arkscope-web/src/SettingsProviderConfig.test.ts::Settings provider config authority > does_not_request_or_render_the_detailed_fred_snapshot
 apps/arkscope-web/src/SettingsProviderConfig.test.ts::Settings provider config authority > renders FRED as configured local snapshot with refresh off
+apps/arkscope-web/src/settings/MacroStorageSection.test.tsx::MacroStorageSection > renders English Macro Data status snapshot and table headings
 apps/arkscope-web/src/i18n/resources.test.ts::i18n resources > contains the reviewed remaining-surface namespace inventory in both locales
 apps/arkscope-web/src/i18n/resources.test.ts::i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move
 ```
@@ -686,6 +698,13 @@ second adds exactly the four `macroStorage.schedule.*` paths from §1.7 to
 other fixture. Frozen constants (`641`, `23`, `664`, locale `3`, workspace
 `95`, and the per-subtree baseline table) remain byte-identical and continue to
 hold through the existing delta formula.
+
+The Macro heading owner may evolve by exactly one selector token: its existing
+five-value heading assertion reads `.settings-fred-table th` instead of every
+`th` in the page. This is a scope correction, not an expected-value change: the
+node must still require exactly `Series ID`, `Name`, `Latest value`,
+`Observation date`, and `Last fetch` in order. A second hunk, node-ID change, or
+expected-heading change is a stop condition.
 
 Task 4 has one additional bounded owner in
 `SettingsPostPgExitStorage.test.ts`. Its `MacroSnapshot` fixture removes exactly
