@@ -1,6 +1,6 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-3 COMPLETE; TASK 4 ACTIVE;
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-3 COMPLETE; TASK 4 PAUSED;
 > TASKS 1-5 BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
@@ -78,6 +78,23 @@
 > outside that selector, and every collection identity remain unchanged. Task 4
 > product changes stay uncommitted and Tasks 4-5 are paused for focused review.
 
+> **2026-08-13 Task 4 controller-ownership stop-and-amend:** after the reviewed
+> heading selector correction, the final 109-node focused gate passed 104 and
+> failed five deterministic existing `SettingsProviderConfig` nodes. The active
+> `data_sync` tab mounts every section in its group, so `DataSourcesSection` and
+> `MacroStorageSection` each instantiated `useDataScheduleControls`, installed
+> independent timers/focus listeners, and produced two forced schedule GETs per
+> poll. The prior `shares one schedule read across visible consumers` node saw
+> only the initial in-flight cache coalescing and never advanced the polling
+> clock, so it missed this ownership split. The same full-page fixture also saw
+> ten Data Sources rows plus five Macro rows through an unscoped schedule-table
+> selector. The bounded repair adds one `data_sync`-scoped controller provider,
+> makes both sections consume that single owner, strengthens the existing shared
+> read node across the first idle poll, and scopes the existing ten-row assertion
+> to the `source_schedules` subsection. No node ID, count, or staged identity
+> changes. Current product/test edits stay uncommitted; Tasks 4-5 are paused for
+> focused review.
+
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
 show the same honest controls on Data Sources and Macro Data, and remove the
@@ -146,6 +163,7 @@ tests/test_service_api_slice.py
 Frontend owners:
 
 ```text
+apps/arkscope-web/src/Settings.tsx
 new apps/arkscope-web/src/settings/dataScheduleControls.tsx
 new apps/arkscope-web/src/settings/dataScheduleControls.test.tsx
 apps/arkscope-web/src/settings/DataSourcesSection.tsx
@@ -419,10 +437,13 @@ task does not delete or rename the setting.
 
 ### 1.6 One frontend schedule controller and table
 
-Create `dataScheduleControls.tsx` with one hook and one presentational table:
+Create `dataScheduleControls.tsx` with one hook, one group-scoped provider, and
+one presentational table:
 
 ```text
 useDataScheduleControls(settingsReadCache)
+DataScheduleControlsProvider({ settingsReadCache, children })
+useSharedDataScheduleControls()
 DataScheduleTable({ sourceIds, controller, ...copy })
 ```
 
@@ -438,10 +459,15 @@ source IDs as the domain boundary. The cache API therefore evolves to
 second argument and retain current behavior; the shared schedule controller
 must pass the selected row's validated `write_target`.
 
-`DataSourcesSection` delegates its existing schedule block to this owner and
-continues to render every source. `MacroStorageSection` passes the exact five
-macro IDs. Active-only Settings mounting means only the visible section owns a
-polling subscription; the shared cache still coalesces any overlapping GET.
+The selected `data_sync` tab mounts all four sections in that group. `Settings`
+therefore wraps those sections in exactly one `DataScheduleControlsProvider`;
+the provider is absent while another Settings group is selected because `Tabs`
+mounts only its selected panel. `DataSourcesSection` and `MacroStorageSection`
+consume `useSharedDataScheduleControls()` and must not instantiate their own
+hook, timer, focus listener, mutation guard, or draft state. Data Sources
+continues to render every source and Macro passes the exact five macro IDs.
+The cache may still coalesce overlapping non-controller reads, but cache
+coalescing is not accepted as a substitute for single controller ownership.
 
 Mutation rules:
 
@@ -706,6 +732,39 @@ node must still require exactly `Series ID`, `Name`, `Latest value`,
 `Observation date`, and `Last fetch` in order. A second hunk, node-ID change, or
 expected-heading change is a stop condition.
 
+The second Task 4 stop adds one bounded ownership repair with zero identity
+change:
+
+- `Settings.tsx` may wrap only the selected `data_sync` group sections in one
+  `DataScheduleControlsProvider`; no other Settings group or resource moves;
+- `DataSourcesSection.tsx` and `MacroStorageSection.tsx` replace their local
+  `useDataScheduleControls(settingsReadCache)` calls with the shared-context
+  consumer and otherwise preserve their section behavior;
+- direct-render test helpers in `SettingsProviderConfig.test.ts` and
+  `MacroStorageSection.test.tsx` supply the real provider rather than a fake
+  controller;
+- `Data schedule controls > shares one schedule read across visible consumers`
+  evolves in place to render one real provider with two consumers, assert one
+  initial GET, advance the idle clock once, assert exactly one additional GET,
+  and prove both consumers receive the same controller; and
+- `Settings provider config authority > renders_disabled_providers_as_neutral_and_every_registered_schedule_row_as_controllable`
+  changes only its two locale row selectors to begin at
+  `[data-settings-location='source_schedules']`, keeping the expected ten rows
+  and every per-row assertion unchanged.
+
+The four existing Settings polling owners below are unedited GREEN gates for
+the repair; changing their IDs, bodies, or expected call counts is a stop:
+
+```text
+Settings provider config authority > polls only schedule after thirty idle seconds without a live region
+Settings provider config authority > detects a fast idle-to-idle completion and refreshes related state once
+Settings provider config authority > switches to five second polling while running and back to idle after completion
+Settings provider config authority > switches locale without resetting drafts polling cadence or progress
+```
+
+A new test node, a second controller instance in the mounted `data_sync` group,
+or any production edit outside the provider/context handoff is a stop event.
+
 Task 4 has one additional bounded owner in
 `SettingsPostPgExitStorage.test.ts`. Its `MacroSnapshot` fixture removes exactly
 the retired `auto_refresh_enabled` field. The old
@@ -843,7 +902,8 @@ No RED test or product edit belongs in Task 0.
 3. Mount the filtered shared table, derive enabled count, remove the legacy DTO
    field and the exact post-PG fixture field, add reviewed bilingual copy,
    apply the exact resources-test deltas in §2.4, and land the dedicated
-   source-cell/column CSS contract.
+   source-cell/column CSS contract. Mount one group-scoped schedule controller
+   for the `data_sync` tab and pass it to both visible schedule tables.
 4. Run 109 focused nodes, the separate 14-node post-PG owner file, full
    frontend, typecheck, build, scanner, and an early desktop/mobile browser
    check.
@@ -938,8 +998,10 @@ Stop before further product edits if any of the following occurs:
     bounded `styles.css` rules;
 19. a deterministic browser overlap, overflow, duplicate POST, or stale-state
     regression appears;
-20. a test contacts FRED/Finnhub or a live sidecar; or
-21. a reviewer cannot rebuild an asserted identity from raw artifacts.
+20. a test contacts FRED/Finnhub or a live sidecar;
+21. a reviewer cannot rebuild an asserted identity from raw artifacts; or
+22. the mounted `data_sync` group owns more than one schedule controller,
+    polling timer, or focus listener.
 
 Any stop requires a bounded amendment and independent focused review. Do not
 weaken a test, widen an allowlist, or preserve a false test name to keep the
