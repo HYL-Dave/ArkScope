@@ -632,6 +632,7 @@ tests/test_provider_health.py::test_fred_snapshot_available_when_refresh_is_off
 tests/test_provider_health.py::test_fred_refresh_off_without_snapshot_is_no_signal
 tests/test_macro_calendar_read.py::TestMacroSeriesRoute::test_snapshot_readable_when_refresh_disabled
 apps/arkscope-web/src/SettingsProviderConfig.test.ts::Settings provider config authority > does_not_request_or_render_the_detailed_fred_snapshot
+apps/arkscope-web/src/SettingsProviderConfig.test.ts::Settings provider config authority > renders FRED as configured local snapshot with refresh off
 apps/arkscope-web/src/i18n/resources.test.ts::i18n resources > contains the reviewed remaining-surface namespace inventory in both locales
 apps/arkscope-web/src/i18n/resources.test.ts::i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move
 ```
