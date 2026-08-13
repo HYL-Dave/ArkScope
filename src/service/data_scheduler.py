@@ -96,6 +96,10 @@ class SourceDef:
     # Sources that write market_data.db. Scheduler ticks start at most one of these
     # per pass; other due writers are deferred to avoid local SQLite lock storms.
     writes_market_db: bool = False
+    # Canonical service job used by macro schedule sources. The scheduler calls
+    # the telemetry-free dispatcher directly so it still owns exactly one row.
+    backend_job_name: Optional[str] = None
+    writes_macro_db: bool = False
     # When set ('polygon'|'finnhub'), resolve the Task 1 news write route per source run.
     # NORMALIZED and LEGACY_LOCAL write local DB directly; LEGACY_PG keeps the collector→PG→mirror
     # chain; BLOCKED fails closed before provider work.
@@ -242,6 +246,9 @@ def _clear_progress(source: str) -> None:
 
 
 def job_name(source: str) -> str:
+    definition = SOURCES.get(source)
+    if definition is not None and definition.backend_job_name is not None:
+        return definition.backend_job_name
     return f"collect.{source}"
 
 
@@ -968,6 +975,26 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         return _record_result({"source": source, "status": "skipped",
                                "reason": "already running in another process"})
 
+    macro_writer_context = None
+    macro_writer_lease = None
+    if d.writes_macro_db:
+        from src.macro_calendar.write_lock import (
+            MacroCalendarBusy,
+            macro_calendar_writer,
+        )
+
+        macro_writer_context = macro_calendar_writer()
+        try:
+            macro_writer_lease = macro_writer_context.__enter__()
+        except MacroCalendarBusy:
+            flock.release()
+            lock.release()
+            return {
+                "source": source,
+                "status": "deferred",
+                "reason": "macro_calendar_busy",
+            }
+
     ibkr_held = False
     ibkr_flock_held = False
     started = datetime.now(timezone.utc)
@@ -1018,11 +1045,13 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         # telemetry: running → terminal, visible in /jobs + provider health
         store = None
         run_id = None
+        runtime_dal = None
         try:
             from src.api.dependencies import get_dal
             from src.service.job_runs_store import get_job_runs_store
 
-            store = get_job_runs_store(get_dal())
+            runtime_dal = get_dal()
+            store = get_job_runs_store(runtime_dal)
             run_id = store.create_run(job_name(source), trigger_source=trigger_source,
                                       payload={"source": source})
         except Exception as e:  # noqa: BLE001 — telemetry must not block collection
@@ -1055,7 +1084,21 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         "normalized IBKR news writer"
                     )
 
-            if news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
+            if d.writes_macro_db:
+                from src.api.dependencies import get_dal
+                from src.macro_calendar.execution import execute_macro_job
+
+                if d.backend_job_name is None or macro_writer_lease is None:
+                    raise RuntimeError("macro source missing canonical execution authority")
+                if runtime_dal is None:
+                    runtime_dal = get_dal()
+                result["collect"] = execute_macro_job(
+                    d.backend_job_name,
+                    runtime_dal,
+                    {},
+                    writer_lease=macro_writer_lease,
+                )
+            elif news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
                 pending_writer_continuation = (
                     pending_cont if trigger_source != "scheduler" else None
                 )
@@ -1267,8 +1310,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             _IBKR_FLOCK.release()
         if ibkr_held:
             _IBKR_LOCK.release()
-        flock.release()
-        lock.release()
+        try:
+            if macro_writer_context is not None:
+                macro_writer_context.__exit__(None, None, None)
+        finally:
+            flock.release()
+            lock.release()
 
 
 # --- supervisor loop -------------------------------------------------------------

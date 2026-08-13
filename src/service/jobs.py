@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from src.agents.config import AgentConfig, get_agent_config
@@ -407,22 +407,14 @@ def run_job(
     )
 
     try:
-        if job.name == "monitor_watchlist_scan":
+        from src.macro_calendar.execution import execute_macro_job, is_macro_job
+
+        if is_macro_job(job.name):
+            result = execute_macro_job(job.name, dal, payload)
+        elif job.name == "monitor_watchlist_scan":
             result = _run_monitor_watchlist_scan(dal, payload)
         elif job.name == "extract_sa_comment_signals":
             result = _run_extract_sa_comment_signals(dal, payload)
-        elif job.name == "fetch_fred_release_dates":
-            result = _run_fetch_fred_release_dates(dal, payload)
-        elif job.name == "fetch_fred_series":
-            result = _run_fetch_fred_series(dal, payload)
-        elif job.name == "fetch_economic_calendar_recent":
-            result = _run_fetch_economic_calendar_recent(dal, payload)
-        elif job.name == "fetch_economic_calendar_backfill":
-            result = _run_fetch_economic_calendar_backfill(dal, payload)
-        elif job.name == "fetch_earnings_calendar":
-            result = _run_fetch_earnings_calendar(dal, payload)
-        elif job.name == "fetch_ipo_calendar":
-            result = _run_fetch_ipo_calendar(dal, payload)
         else:  # pragma: no cover - defensive branch
             raise UnknownJobError(job.name)
 
@@ -498,168 +490,60 @@ def _run_fetch_fred_release_dates(
     dal: Any,
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Refresh macro_release_dates from FRED for the curated release_id set."""
-    from src.macro_calendar.fred_ingestion import fetch_fred_release_dates
+    """Compatibility delegate to the shared macro execution authority."""
+    from src.macro_calendar.execution import execute_macro_job
 
-    release_ids = params.get("release_ids")
-    limit_raw = params.get("limit")
-    limit = int(limit_raw) if limit_raw is not None else None
-    if limit is not None and limit <= 0:
-        raise ValueError("limit must be >= 1")
-    stats = fetch_fred_release_dates(
-        dal,
-        release_ids=release_ids,
-        limit=limit,
-    )
-    return stats.to_dict()
+    return execute_macro_job("fetch_fred_release_dates", dal, params)
 
 
 def _run_fetch_fred_series(
     dal: Any,
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Refresh macro_series + macro_observations from FRED."""
-    from src.macro_calendar.fred_ingestion import fetch_fred_series
+    """Compatibility delegate to the shared macro execution authority."""
+    from src.macro_calendar.execution import execute_macro_job
 
-    series_ids = params.get("series_ids")
-    full_refresh = bool(params.get("full_refresh", False))
-    stats = fetch_fred_series(
-        dal,
-        series_ids=series_ids,
-        full_refresh=full_refresh,
-    )
-    return stats.to_dict()
-
-
-def _parse_iso_date_param(raw: Any, name: str) -> Optional[date]:
-    """Parse one optional ISO date param. Empty / None → None.
-
-    Raises ``ValueError`` with the param name on malformed input so the
-    job's error message points the caller at the bad field.
-    """
-    if raw is None or raw == "":
-        return None
-    try:
-        return date.fromisoformat(str(raw))
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{name} must be ISO date (YYYY-MM-DD): {exc}")
-
-
-def _validate_date_window(date_from: date, date_to: date) -> None:
-    if date_to < date_from:
-        raise ValueError(
-            f"to_date ({date_to.isoformat()}) must be >= "
-            f"from_date ({date_from.isoformat()})"
-        )
+    return execute_macro_job("fetch_fred_series", dal, params)
 
 
 def _run_fetch_economic_calendar_recent(
     dal: Any,
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Recent economic-calendar refresh — captures upcoming + just-released."""
-    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_economic_events
+    """Compatibility delegate to the shared macro execution authority."""
+    from src.macro_calendar.execution import execute_macro_job
 
-    today = date.today()
-    date_from = _parse_iso_date_param(params.get("from_date"), "from_date") \
-        or today - timedelta(days=7)
-    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") \
-        or today + timedelta(days=14)
-    _validate_date_window(date_from, date_to)
-    stats = fetch_finnhub_economic_events(
-        dal,
-        date_from=date_from,
-        date_to=date_to,
-    )
-    return stats.to_dict()
+    return execute_macro_job("fetch_economic_calendar_recent", dal, params)
 
 
 def _run_fetch_economic_calendar_backfill(
     dal: Any,
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Historical backfill of cal_economic_events.
+    """Compatibility delegate to the shared macro execution authority."""
+    from src.macro_calendar.execution import execute_macro_job
 
-    Window: explicit from_date / to_date wins; otherwise [today - years_back×365d, today]
-    with years_back defaulting to 1.
-    """
-    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_economic_events
-
-    today = date.today()
-    explicit_from = _parse_iso_date_param(params.get("from_date"), "from_date")
-    if explicit_from is None:
-        years_back = int(params.get("years_back", 1))
-        if years_back <= 0:
-            raise ValueError("years_back must be >= 1")
-        date_from = today - timedelta(days=years_back * 365)
-    else:
-        date_from = explicit_from
-    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") or today
-    _validate_date_window(date_from, date_to)
-    stats = fetch_finnhub_economic_events(
-        dal,
-        date_from=date_from,
-        date_to=date_to,
-    )
-    return stats.to_dict()
+    return execute_macro_job("fetch_economic_calendar_backfill", dal, params)
 
 
 def _run_fetch_earnings_calendar(
     dal: Any,
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Earnings calendar refresh, per-symbol over the watchlist by default.
+    """Compatibility delegate to the shared macro execution authority."""
+    from src.macro_calendar.execution import execute_macro_job
 
-    Symbol selection priority:
-      1. ``symbols`` param (explicit override)
-      2. DAL watchlist tickers
-      3. None → single unfiltered call (best-effort fallback)
-
-    Smoke §5.5 is the reason for the per-symbol default: an unfiltered query
-    over the same window may omit symbols that a per-symbol query returns.
-    """
-    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_earnings_events
-
-    today = date.today()
-    date_from = _parse_iso_date_param(params.get("from_date"), "from_date") or today
-    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") \
-        or today + timedelta(days=30)
-    _validate_date_window(date_from, date_to)
-
-    explicit = _normalize_tickers(params.get("symbols"))
-    if explicit:
-        symbols: Optional[List[str]] = explicit
-    else:
-        watchlist = _watchlist_tickers(dal)
-        symbols = watchlist or None
-    stats = fetch_finnhub_earnings_events(
-        dal,
-        date_from=date_from,
-        date_to=date_to,
-        symbols=symbols,
-    )
-    return stats.to_dict()
+    return execute_macro_job("fetch_earnings_calendar", dal, params)
 
 
 def _run_fetch_ipo_calendar(
     dal: Any,
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """IPO calendar refresh: recent priced + upcoming pipeline."""
-    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_ipo_events
+    """Compatibility delegate to the shared macro execution authority."""
+    from src.macro_calendar.execution import execute_macro_job
 
-    today = date.today()
-    date_from = _parse_iso_date_param(params.get("from_date"), "from_date") \
-        or today - timedelta(days=30)
-    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") \
-        or today + timedelta(days=90)
-    _validate_date_window(date_from, date_to)
-    stats = fetch_finnhub_ipo_events(
-        dal,
-        date_from=date_from,
-        date_to=date_to,
-    )
-    return stats.to_dict()
+    return execute_macro_job("fetch_ipo_calendar", dal, params)
 
 
 def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
