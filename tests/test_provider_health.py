@@ -135,16 +135,27 @@ def test_fd_disabled_is_a_state(monkeypatch):
 
 def test_no_signal_when_nothing_recorded(monkeypatch):
     monkeypatch.setenv("FRED_API_KEY", "k")
-    monkeypatch.setattr("src.agents.config.get_agent_config",
-                        lambda: type("Cfg", (), {"macro_calendar_enabled": True})())
+    monkeypatch.setattr(
+        "src.service.provider_health.read_macro_schedule_automation",
+        lambda: None,
+    )
     dal = _FakeDAL(_FakeBackend())  # no job_runs (fake backend has no _get_conn)
-    assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "fred")["status"] == "no_signal"
+    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "fred")
+    assert p["status"] == "no_signal"
+    assert p["signals"]["auto_refresh_enabled"] is None
+    assert p["signals"]["enabled_schedule_source_count"] is None
+    assert "scheduled-source state unknown" in p["detail"]
 
 
 def test_fred_snapshot_available_when_refresh_is_off(monkeypatch, tmp_path):
     monkeypatch.setenv("FRED_API_KEY", "k")
-    monkeypatch.setattr("src.agents.config.get_agent_config",
-                        lambda: type("Cfg", (), {"macro_calendar_enabled": False})())
+    monkeypatch.setattr(
+        "src.service.provider_health.read_macro_schedule_automation",
+        lambda: {
+            "fred_series": False,
+            "fred_release_dates": False,
+        },
+    )
     monkeypatch.setattr(
         "src.service.provider_health.resolve_macro_calendar_db_path",
         lambda: str(tmp_path / "macro_calendar.db"),
@@ -167,13 +178,18 @@ def test_fred_snapshot_available_when_refresh_is_off(monkeypatch, tmp_path):
     assert p["signals"]["auto_refresh_enabled"] is False
     assert p["signals"]["local_snapshot"]["observation_count"] == 29571
     assert "local snapshot" in p["detail"].lower()
-    assert "auto-refresh off" in p["detail"].lower()
+    assert "0 scheduled source(s) enabled" in p["detail"].lower()
 
 
 def test_fred_refresh_off_without_snapshot_is_no_signal(monkeypatch):
     monkeypatch.setenv("FRED_API_KEY", "k")
-    monkeypatch.setattr("src.agents.config.get_agent_config",
-                        lambda: type("Cfg", (), {"macro_calendar_enabled": False})())
+    monkeypatch.setattr(
+        "src.service.provider_health.read_macro_schedule_automation",
+        lambda: {
+            "fred_series": False,
+            "fred_release_dates": False,
+        },
+    )
     monkeypatch.setattr(
         "src.service.provider_health.read_macro_table_stats",
         lambda path: {},

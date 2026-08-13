@@ -26,6 +26,18 @@ ACTIVE_SOURCE_IDS = {
     "ibkr_news",
     "ibkr_prices",
     "sec_corporate_actions",
+    "fred_series",
+    "fred_release_dates",
+    "finnhub_economic_calendar",
+    "finnhub_earnings_calendar",
+    "finnhub_ipo_calendar",
+}
+MACRO_SOURCE_IDS = {
+    "fred_series",
+    "fred_release_dates",
+    "finnhub_economic_calendar",
+    "finnhub_earnings_calendar",
+    "finnhub_ipo_calendar",
 }
 RETIRED_SOURCE_IDS = {"price_backfill", "local_incremental", "iv_history"}
 
@@ -1709,6 +1721,10 @@ def test_get_schedule_snapshot_shape():
         "collect.sec_corporate_actions"
     )
     assert out["sec_corporate_actions"]["provider_fetch"] is True
+    for source in MACRO_SOURCE_IDS:
+        assert out[source]["provider_fetch"] is True
+        assert out[source]["job_name"] == ds.SOURCES[source].backend_job_name
+        assert out[source]["write_target"] == "macro_calendar.db"
     for source in out.values():
         assert "control_mode" not in source
         assert "retired" not in source
@@ -1729,6 +1745,11 @@ def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
     assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
     assert snap["ibkr_news"]["source_badges"] == ["IBKR", "直寫本地"]
     assert snap["sec_corporate_actions"]["source_badges"] == ["SEC", "官方申報"]
+    for source in MACRO_SOURCE_IDS:
+        assert snap[source]["source_mode"] == "provider_fetch"
+        assert snap[source]["write_target"] == "macro_calendar.db"
+        provider = "FRED" if source.startswith("fred_") else "Finnhub"
+        assert snap[source]["source_badges"] == [provider, "macro_calendar.db"]
     assert all("control_mode" not in source for source in snap.values())
     assert all("retired" not in source for source in snap.values())
     assert all("retired_reason" not in source for source in snap.values())

@@ -159,7 +159,7 @@ def _assert_macro_payload_or_disabled(body: Any) -> None:
 def _assert_macro_snapshot(body: Any) -> None:
     assert isinstance(body, dict)
     assert "items" in body
-    assert "auto_refresh_enabled" in body
+    assert "auto_refresh_enabled" not in body
     assert "available" in body
 
 

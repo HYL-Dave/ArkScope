@@ -160,6 +160,70 @@ SOURCES: Dict[str, SourceDef] = {
                 "never removes an active-universe ticker automatically"
             ),
         ),
+        SourceDef(
+            "fred_series", "FRED 序列",
+            default_interval_min=1440,
+            backend_job_name="fetch_fred_series",
+            writes_macro_db=True,
+            source_mode="provider_fetch",
+            write_target="macro_calendar.db",
+            source_badges=("FRED", "macro_calendar.db"),
+            description=(
+                "FRED series incremental refresh → local macro_calendar.db"
+            ),
+        ),
+        SourceDef(
+            "fred_release_dates", "FRED 發布日期",
+            default_interval_min=10080,
+            backend_job_name="fetch_fred_release_dates",
+            writes_macro_db=True,
+            source_mode="provider_fetch",
+            write_target="macro_calendar.db",
+            source_badges=("FRED", "macro_calendar.db"),
+            description=(
+                "FRED release dates for configured releases → local "
+                "macro_calendar.db"
+            ),
+        ),
+        SourceDef(
+            "finnhub_economic_calendar", "Finnhub 經濟日曆",
+            default_interval_min=60,
+            backend_job_name="fetch_economic_calendar_recent",
+            writes_macro_db=True,
+            source_mode="provider_fetch",
+            write_target="macro_calendar.db",
+            source_badges=("Finnhub", "macro_calendar.db"),
+            description=(
+                "Finnhub economic calendar, 7 days back through 14 days ahead "
+                "→ local macro_calendar.db"
+            ),
+        ),
+        SourceDef(
+            "finnhub_earnings_calendar", "Finnhub 財報日曆",
+            default_interval_min=240,
+            backend_job_name="fetch_earnings_calendar",
+            writes_macro_db=True,
+            source_mode="provider_fetch",
+            write_target="macro_calendar.db",
+            source_badges=("Finnhub", "macro_calendar.db"),
+            description=(
+                "Finnhub earnings calendar for the next 30 days → local "
+                "macro_calendar.db"
+            ),
+        ),
+        SourceDef(
+            "finnhub_ipo_calendar", "Finnhub IPO 日曆",
+            default_interval_min=1440,
+            backend_job_name="fetch_ipo_calendar",
+            writes_macro_db=True,
+            source_mode="provider_fetch",
+            write_target="macro_calendar.db",
+            source_badges=("Finnhub", "macro_calendar.db"),
+            description=(
+                "Finnhub IPO calendar, 30 days back through 90 days ahead → "
+                "local macro_calendar.db"
+            ),
+        ),
     )
 }
 
@@ -206,7 +270,20 @@ _SOURCE_PROVIDER_CONFIG = {
     "ibkr_news": "ibkr",
     "ibkr_prices": "ibkr",
     "sec_corporate_actions": "sec_edgar",
+    "fred_series": "fred",
+    "fred_release_dates": "fred",
+    "finnhub_economic_calendar": "finnhub",
+    "finnhub_earnings_calendar": "finnhub",
+    "finnhub_ipo_calendar": "finnhub",
 }
+
+_MACRO_SCHEDULE_SOURCES = (
+    "fred_series",
+    "fred_release_dates",
+    "finnhub_economic_calendar",
+    "finnhub_earnings_calendar",
+    "finnhub_ipo_calendar",
+)
 
 
 def _record_result(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -227,6 +304,20 @@ def _provider_config_missing_for_source(source: str) -> dict[str, Any] | None:
         return None
     except ProviderConfigMissing as exc:
         return {"source": source, **exc.as_dict()}
+
+
+def _provider_preflight_failure(source: str) -> dict[str, Any] | None:
+    from src.provider_config_runtime import provider_config_setup_state
+
+    setup_state = provider_config_setup_state()
+    if setup_state.required:
+        return {
+            "source": source,
+            "status": "failed",
+            "error": setup_state.reason or "provider config setup required",
+            "code": setup_state.code,
+        }
+    return _provider_config_missing_for_source(source)
 
 # live per-source progress, fed by the in-process adapters' progress_cb (the
 # rough estimate the UI shows: ticker N of TOTAL — only adapter sources have it;
@@ -433,6 +524,57 @@ def source_config(source: str) -> Dict[str, Any]:
     except ValueError:
         interval = d.default_interval_min
     return {"enabled": enabled, "interval_minutes": interval}
+
+
+def read_macro_schedule_automation(
+    profile_db: str | Path | None = None,
+) -> Optional[Dict[str, bool]]:
+    """Read macro schedule enablement without creating the profile database.
+
+    A missing database/table is the default-disabled state. An unreadable
+    database is unknown, represented by ``None`` rather than guessed enabled or
+    disabled.
+    """
+    from src.app_records_store import resolve_profile_state_db_path
+
+    path = Path(profile_db or resolve_profile_state_db_path(None))
+    defaults = {source: False for source in _MACRO_SCHEDULE_SOURCES}
+    try:
+        if not path.exists():
+            return defaults
+        if not path.is_file():
+            return None
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        try:
+            conn.execute("PRAGMA query_only = ON")
+            table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                ("profile_settings",),
+            ).fetchone()
+            if table is None:
+                return defaults
+            keys = tuple(f"schedule.{source}.enabled" for source in _MACRO_SCHEDULE_SOURCES)
+            placeholders = ",".join("?" for _ in keys)
+            rows = conn.execute(
+                f"SELECT key, value FROM profile_settings WHERE key IN ({placeholders})",
+                keys,
+            ).fetchall()
+        finally:
+            conn.close()
+    except (OSError, sqlite3.Error):
+        return None
+
+    for key, value in rows:
+        source = str(key)[len("schedule."):-len(".enabled")]
+        if source in defaults:
+            defaults[source] = str(value or "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+    return defaults
 
 
 def set_source_config(source: str, *, enabled: Optional[bool] = None,
@@ -951,19 +1093,10 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 "reason_code": "unsupported_news_write_mode",
             }
 
-    from src.provider_config_runtime import provider_config_setup_state
-
-    setup_state = provider_config_setup_state()
-    if setup_state.required:
-        return _record_result({
-            "source": source,
-            "status": "failed",
-            "error": setup_state.reason or "provider config setup required",
-            "code": setup_state.code,
-        })
-    missing_config = _provider_config_missing_for_source(source)
-    if missing_config is not None:
-        return _record_result(missing_config)
+    if not d.writes_macro_db:
+        preflight_failure = _provider_preflight_failure(source)
+        if preflight_failure is not None:
+            return _record_result(preflight_failure)
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
@@ -1067,7 +1200,20 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         price_audit_error: Optional[str] = None
         preserve_continuation_on_failure = None
         try:
-            if d.news_direct_source is not None:
+            macro_preflight_failure = (
+                _provider_preflight_failure(source) if d.writes_macro_db else None
+            )
+            if macro_preflight_failure is not None:
+                result.update(macro_preflight_failure)
+                result["status"] = "failed"
+                error = str(
+                    macro_preflight_failure.get("error")
+                    or macro_preflight_failure.get("code")
+                    or "provider preflight failed"
+                )[:_ERROR_TAIL]
+                result["error"] = error
+                ok = False
+            elif d.news_direct_source is not None:
                 if news_execution_mode == "reject" and news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
                 if news_execution_mode == "reject":
@@ -1084,7 +1230,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         "normalized IBKR news writer"
                     )
 
-            if d.writes_macro_db:
+            if d.writes_macro_db and macro_preflight_failure is None:
                 from src.api.dependencies import get_dal
                 from src.macro_calendar.execution import execute_macro_job
 
@@ -1095,7 +1241,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 result["collect"] = execute_macro_job(
                     d.backend_job_name,
                     runtime_dal,
-                    {},
+                    (
+                        {"full_refresh": False}
+                        if d.backend_job_name == "fetch_fred_series"
+                        else {}
+                    ),
                     writer_lease=macro_writer_lease,
                 )
             elif news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
@@ -1464,6 +1614,7 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     now = now or datetime.now(timezone.utc)
     fired = []
     market_writer_fired = False
+    macro_writer_fired = False
     for source, d in SOURCES.items():
         try:
             if _is_due(source, now):
@@ -1475,9 +1626,13 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
                         "skip_kind": "market_writer_backpressure",
                     })
                     continue
+                if d.writes_macro_db and macro_writer_fired:
+                    continue
                 fired.append(source)
                 if d.writes_market_db:
                     market_writer_fired = True
+                if d.writes_macro_db:
+                    macro_writer_fired = True
                 if fire is not None:
                     fire(source)
                 else:
@@ -1554,6 +1709,7 @@ def status_snapshot() -> Dict[str, Any]:
                 d.adapter is not None
                 or d.news_direct_source is not None
                 or d.prices_worker
+                or d.writes_macro_db
             ),
             "source_mode": d.source_mode,
             "write_target": d.write_target,

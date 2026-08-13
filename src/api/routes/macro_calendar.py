@@ -124,9 +124,7 @@ def set_local_macro(body: LocalMacroToggle, store=Depends(get_profile_store)):
 
 @router.get("/snapshot")
 def macro_snapshot():
-    payload = read_macro_snapshot(resolve_macro_calendar_db_path(), MACRO_SNAPSHOT_SERIES)
-    payload["auto_refresh_enabled"] = bool(get_agent_config().macro_calendar_enabled)
-    return payload
+    return read_macro_snapshot(resolve_macro_calendar_db_path(), MACRO_SNAPSHOT_SERIES)
 
 
 def _parse_iso_datetime_impl(

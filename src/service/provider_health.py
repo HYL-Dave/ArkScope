@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from src.macro_calendar.local_store import read_macro_table_stats, resolve_macro_calendar_db_path
+from src.service.data_scheduler import read_macro_schedule_automation
 
 logger = logging.getLogger(__name__)
 
@@ -238,12 +239,13 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     except Exception as e:
         notes.append(f"fd enabled check failed: {e}")
 
-    macro_enabled: Optional[bool] = None
+    macro_schedule: Optional[Dict[str, bool]] = None
     try:
-        from src.agents.config import get_agent_config
-        macro_enabled = bool(get_agent_config().macro_calendar_enabled)
+        macro_schedule = read_macro_schedule_automation()
+        if macro_schedule is None:
+            notes.append("macro schedule read failed")
     except Exception as e:
-        notes.append(f"macro config check failed: {e}")
+        notes.append(f"macro schedule read failed: {e}")
 
     macro_stats: Dict[str, Any] = {}
     try:
@@ -370,7 +372,22 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         "release_dates_count": int(macro_releases.get("row_count") or 0),
         "latest_fetched_at": _iso(snapshot_latest),
     }
-    fred_refresh_enabled = bool(macro_enabled)
+    fred_schedule_sources = ("fred_series", "fred_release_dates")
+    fred_enabled_source_count = (
+        None
+        if macro_schedule is None
+        else sum(bool(macro_schedule.get(source)) for source in fred_schedule_sources)
+    )
+    fred_refresh_enabled = (
+        None
+        if fred_enabled_source_count is None
+        else fred_enabled_source_count > 0
+    )
+    fred_schedule_detail = (
+        "scheduled-source state unknown"
+        if fred_enabled_source_count is None
+        else f"{fred_enabled_source_count} scheduled source(s) enabled"
+    )
     _add(
         "fred", "FRED", "macro",
         _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
@@ -378,16 +395,19 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         enabled=None,
         last_success=snapshot_latest or fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
-        threshold_hours=(_THRESHOLD_HOURS.get("fred") if fred_refresh_enabled else None),
+        threshold_hours=(
+            _THRESHOLD_HOURS.get("fred") if fred_refresh_enabled is True else None
+        ),
         detail=(
             f"local snapshot {fred_snapshot['observation_count']} observations"
             f" · {fred_snapshot['series_count']} series"
             f" · latest fetched {_iso(snapshot_latest) or '—'}"
-            f" · auto-refresh {'on' if fred_refresh_enabled else 'off'}"
+            f" · {fred_schedule_detail}"
         ),
         signals={
             "jobs_prefix": "fetch_fred",
             "auto_refresh_enabled": fred_refresh_enabled,
+            "enabled_schedule_source_count": fred_enabled_source_count,
             "local_snapshot": fred_snapshot,
         },
         disabled_reason=None,

@@ -348,7 +348,7 @@ class TestMacroSeriesRoute:
         finally:
             undo()
         assert result["available"] is True
-        assert result["auto_refresh_enabled"] is False
+        assert "auto_refresh_enabled" not in result
         assert result["series_count"] == 11
         assert result["observation_count"] == 11
         assert result["release_dates_count"] == 1
