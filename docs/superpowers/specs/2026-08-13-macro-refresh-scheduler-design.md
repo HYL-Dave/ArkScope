@@ -1,6 +1,6 @@
 # Macro Data Refresh and Scheduler Integration Design
 
-> **Status:** USER APPROVED; REVIEW-FINDING AMENDMENT REQUIRES FOCUSED REVIEW; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** IMPLEMENTED AND MERGED AT `da7efd9a`; CLOSEOUT REVIEW REQUIRED
 >
 > **Date:** 2026-08-13
 >
@@ -11,6 +11,13 @@
 > deferred before attempt/row creation whenever the shared writer gate is
 > unavailable, including across scheduler ticks and processes. Finnhub health
 > remains unchanged in this slice; no new calendar-automation field is added.
+>
+> **2026-08-14 closeout:** independent implementation review returned GREEN,
+> the reviewed branch fast-forwarded to `master` at `da7efd9a`, and a fresh
+> exact-master worktree reproduced all final identities, runtimes, lock and
+> scratch proofs, plus the desktop/mobile fixture-only browser contract. No
+> push or live-provider request occurred. The line awaits focused closeout
+> review.
 >
 > **Scope:** connect the existing FRED and Finnhub macro-calendar collectors to
 > ArkScope's one app-owned scheduler, expose honest automatic/manual controls,

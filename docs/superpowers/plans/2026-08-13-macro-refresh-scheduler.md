@@ -1,7 +1,7 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-5 COMPLETE; FULL
-> IMPLEMENTATION REVIEW REQUIRED; TASK 6 NOT AUTHORIZED
+> **Status:** TASKS 0-6 COMPLETE; MERGED AT `da7efd9a`; FOCUSED CLOSEOUT
+> REVIEW REQUIRED; NOT PUSHED
 >
 > **Date:** 2026-08-13
 >
@@ -186,6 +186,21 @@
 > `SHA256SUMS` SHA-256
 > `5b7c1fd1cc6448c70dccc85e30d6368e1c3d443a3be0a4f89e994dad246b45c0`.
 > Task 6, merge, push, and live-provider traffic remain unauthorized.
+
+> **2026-08-14 Task 6 complete:** full implementation review returned GREEN at
+> `da7efd9a`. `master` fast-forwarded from `f9b69913` through 16 linear commits
+> with zero merge commits and no push. A fresh detached exact-master worktree
+> reproduced backend `4,359 / c100ee5d...`, frontend `101 files / 1,172 /
+> d40a30d5...`, focused `393/393` and `109/109`, frontend full `1,172/1,172`,
+> canonical native `4,347 passed / 12 skipped / 0 failed`, lock `2/2`, the
+> scratch DB proof, protected `826/826`, typecheck/build/scanner, and the
+> desktop/mobile browser contract. Canonical reporter JSON is byte-identical
+> to Task 5. All 518 generated files were manifested and removed, Vite/Chrome
+> were closed, and the detached worktree was removed. Task 6 packet:
+> `/tmp/macro-refresh-scheduler-task6-da7efd9a`, `74` payloads;
+> `SHA256SUMS` SHA-256
+> `44ca729d205436390ec2319bfda915627c6bf988afc2ee512c7ea77ce3b7eec5`.
+> The line stops for focused closeout review and remains unpushed.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
