@@ -1,10 +1,11 @@
 # SA Health Truth and Schedule Table Layout Design
 
-> **Status:** BASE DESIGN USER-APPROVED; REVIEW FINDINGS AND USER RULINGS RECORDED; FOCUSED REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** USER-APPROVED; POST-MACRO RE-GROUNDED; IMPLEMENTATION PLAN DRAFTED; INDEPENDENT PLAN REVIEW REQUIRED; IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
-> **Grounding base:** `bea5890f`; diagnostics amendment grounded at `bdd8fc30`
+> **Grounding base:** original design at `bea5890f`; diagnostics amendment at
+> `bdd8fc30`; post-Macro re-grounding at `9c9021af`
 >
 > **Scope:** correct the Settings SA Extension health semantics and preserve
 > bounded failure evidence for later diagnosis. The Macro scheduler line now
@@ -34,6 +35,17 @@ The supplied screenshots are the visual authority for these symptoms:
 |---|---:|---|
 | `Screenshot from 2026-08-12 23-33-43.png` | 1111 x 407 | `97854f75eb481d49334e2ce82cc3b2b6a20304510d18d70d2f313d065f9dd4d0` |
 | `Screenshot from 2026-08-12 23-34-28.png` | 1121 x 372 | `f2d567b4e56e7461c25b51bb20b377adaf3cdb065395db5dda87d4411aff07d6` |
+
+The user later supplied a normal-state comparison after the Macro line closed:
+
+| Screenshot | Size | SHA-256 |
+|---|---:|---|
+| `Screenshot from 2026-08-14 13-48-20.png` | 927 x 417 | `3e698db56ffe4765c2859e8429b6833deff504a7a08a321f0be51113abb232b7` |
+
+It shows all six structural rows healthy, the latest capture complete, the
+older Market News repair explicitly separate, and readback healthy. This is a
+normal-state regression witness, not proof that the current failure evidence
+is sufficiently diagnostic.
 
 ## 2. Grounded facts
 
@@ -103,6 +115,22 @@ The extension/native save contract itself is valid: a successful local save
 returns `ok=true` through the backend and native-host envelope, and the
 extension checks that field. This design must not replace that working
 contract based on the generic stored reason.
+
+### 2.4 Post-Macro implementation baseline
+
+The Macro scheduler/layout line is closed. At exact master `9c9021af`, the SA
+line re-grounded to these canonical identities:
+
+- backend `4,359 / c100ee5d...`, with focused SA owners `275 / e6ae1a5a...`;
+- frontend `101 files / 1,172 / d40a30d5...`, with SA owners
+  `74 / 7ec82dcc...` and Settings regression `246 / c1be07c3...`; and
+- native `4,347 passed / 12 skipped / 0 failed`.
+
+The RED-first implementation authority is
+`docs/superpowers/plans/2026-08-14-sa-health-diagnostics.md`. It targets
+backend `4,394 / b0285ee3...`, native `4,382 passed / 12 skipped / 0 failed`,
+and frontend `101 files / 1,177 / 9530dcd9...`. These targets remain
+review-gated; this re-grounding does not itself authorize product edits.
 
 ## 3. Alternatives
 
