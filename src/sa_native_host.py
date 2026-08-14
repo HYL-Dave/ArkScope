@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import struct
 import sys
 import urllib.error
@@ -35,6 +36,10 @@ _MARKET_NEWS_RECOVERY_PATHS = {
     "market_news_recovery_finalize": "/sa/market-news-recovery/finalize",
     "market_news_recovery_cancel": "/sa/market-news-recovery/cancel",
 }
+
+# SQLite base result codes remain stable even when Python does not export names.
+_SQLITE_BUSY_BASE_CODES = frozenset({5, 6})
+_SQLITE_INTEGRITY_BASE_CODES = frozenset({11, 19, 26})
 
 
 def _init_script_runtime():
@@ -455,6 +460,70 @@ def _parse_sa_date(date_str):
         return None
 
 
+def _sqlite_base_error_code(error):
+    code = getattr(error, "sqlite_errorcode", None)
+    return (code & 0xFF) if isinstance(code, int) else None
+
+
+def _native_save_failure(error=None):
+    """Project a local save failure without exposing exception text."""
+
+    base_code = _sqlite_base_error_code(error)
+    detail = str(error or "").lower()
+    if (
+        base_code in _SQLITE_BUSY_BASE_CODES
+        or (
+            isinstance(error, sqlite3.OperationalError)
+            and ("busy" in detail or "locked" in detail)
+        )
+    ):
+        return {
+            "status": "error",
+            "error_code": "database_busy",
+            "retryable": True,
+            "message": "Local database is busy; retry later.",
+        }
+    if (
+        base_code in _SQLITE_INTEGRITY_BASE_CODES
+        or isinstance(error, sqlite3.IntegrityError)
+        or (
+            isinstance(error, sqlite3.DatabaseError)
+            and any(
+                marker in detail
+                for marker in (
+                    "constraint",
+                    "integrity",
+                    "corrupt",
+                    "malformed",
+                    "not a database",
+                )
+            )
+        )
+    ):
+        return {
+            "status": "error",
+            "error_code": "database_integrity_failed",
+            "retryable": False,
+            "message": "Local database integrity validation failed.",
+        }
+    return {
+        "status": "error",
+        "error_code": "database_write_failed",
+        "retryable": True,
+        "message": "Local database write failed; retry later.",
+    }
+
+
+def _native_save_result_failed(result):
+    if not isinstance(result, dict):
+        return True
+    return (
+        result.get("status") == "error"
+        or bool(result.get("error"))
+        or ("ok" in result and result.get("ok") is not True)
+    )
+
+
 def _handle_save_market_news(dal, msg):
     """Persist recent Seeking Alpha market-news metadata."""
     items = msg.get("items", [])
@@ -466,6 +535,8 @@ def _handle_save_market_news(dal, msg):
             detail_current_limit=detail_current_limit,
             detail_backfill_limit=detail_backfill_limit,
         )
+        if _native_save_result_failed(result):
+            return _native_save_failure()
         logger.info(
             "save_market_news: saved=%s items=%s current_limit=%s backfill_limit=%s need_detail=%s",
             result.get("saved"),
@@ -477,7 +548,7 @@ def _handle_save_market_news(dal, msg):
         return result
     except Exception as e:
         logger.error("save_market_news failed: %s", e)
-        return {"status": "error", "error": str(e)}
+        return _native_save_failure(e)
 
 
 def _handle_get_market_news_recent_ids(dal, msg):
@@ -502,10 +573,12 @@ def _handle_save_market_news_detail(dal, msg):
             "save_market_news_detail: %s (%d chars, ok=%s)",
             news_id, len(body_markdown), ok,
         )
-        return {"status": "ok" if ok else "error", "news_id": news_id, "ok": ok}
+        if not ok:
+            return _native_save_failure()
+        return {"status": "ok", "news_id": news_id, "ok": True}
     except Exception as e:
         logger.error("save_market_news_detail failed for %s: %s", news_id, e)
-        return {"status": "error", "news_id": news_id, "error": str(e)}
+        return _native_save_failure(e)
 
 
 def _handle_save_articles_meta(dal, msg):
@@ -518,6 +591,8 @@ def _handle_save_articles_meta(dal, msg):
             a["published_date"] = _parse_sa_date(a.pop("date"))
     try:
         result = dal.save_sa_articles_meta(articles, mode=mode)
+        if _native_save_result_failed(result):
+            return _native_save_failure()
         logger.info(
             "save_articles_meta: saved=%s need_content=%s need_comments=%s unresolved=%s auto_upgrade=%s",
             result.get("saved"), len(result.get("need_content", [])),
@@ -528,7 +603,7 @@ def _handle_save_articles_meta(dal, msg):
         return result
     except Exception as e:
         logger.error("save_articles_meta failed: %s", e)
-        return {"status": "error", "error": str(e)}
+        return _native_save_failure(e)
 
 
 _COMMENT_SPACE_RE = re.compile(r"\s+")
@@ -694,6 +769,8 @@ def _handle_save_article_content(dal, msg):
                 "comment_scan_stable_bottom_rounds", 0
             ),
         )
+        if _native_save_result_failed(result):
+            return _native_save_failure()
         logger.info(
             "save_article_content: %s (%d chars, prepared=%d net_new=%d stored_total=%d reconciliation=%s)",
             article_id, len(body_markdown),
@@ -705,7 +782,7 @@ def _handle_save_article_content(dal, msg):
         return {"status": "ok", "article_id": article_id, **result}
     except Exception as e:
         logger.error("save_article_content failed for %s: %s", article_id, e)
-        return {"status": "error", "article_id": article_id, "error": str(e)}
+        return _native_save_failure(e)
 
 
 def _handle_save_comments_only(dal, msg):
@@ -723,6 +800,8 @@ def _handle_save_comments_only(dal, msg):
                 "comment_scan_stable_bottom_rounds", 0
             ),
         )
+        if _native_save_result_failed(stats):
+            return _native_save_failure()
         logger.info(
             "save_comments_only: %s "
             "(prepared=%d net_new=%d stored_total=%d usable=%s overlap_rate=%.3f)",
@@ -741,7 +820,7 @@ def _handle_save_comments_only(dal, msg):
         }
     except Exception as e:
         logger.error("save_comments_only failed for %s: %s", article_id, e)
-        return {"status": "error", "article_id": article_id, "error": str(e)}
+        return _native_save_failure(e)
 
 
 def _handle_audit_unresolved(dal):
@@ -933,6 +1012,7 @@ def _handle_record_extension_job(dal, msg):
         "started_at",
         "finished_at",
         "result",
+        "extension_diagnostics",
     }
     if set(msg) - allowed_fields:
         return _extension_record_reply(
@@ -960,6 +1040,8 @@ def _handle_record_extension_job(dal, msg):
         "finished_at": msg.get("finished_at"),
         "result": result,
     }
+    if "extension_diagnostics" in msg:
+        sidecar_payload["extension_diagnostics"] = msg["extension_diagnostics"]
     try:
         response = _post_extension_job_to_sidecar(sidecar_payload)
         persisted = response.get("persisted") is True
