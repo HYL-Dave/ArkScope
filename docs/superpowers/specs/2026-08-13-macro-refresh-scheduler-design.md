@@ -1,6 +1,6 @@
 # Macro Data Refresh and Scheduler Integration Design
 
-> **Status:** IMPLEMENTED AND MERGED AT `da7efd9a`; CLOSEOUT REVIEW REQUIRED
+> **Status:** COMPLETE; MERGED AT `da7efd9a`; CLOSEOUT GREEN AT `e508eba9`
 >
 > **Date:** 2026-08-13
 >
@@ -18,6 +18,13 @@
 > scratch proofs, plus the desktop/mobile fixture-only browser contract. No
 > push or live-provider request occurred. The line awaits focused closeout
 > review.
+>
+> **2026-08-14 final closure:** focused closeout review returned GREEN at
+> `e508eba9`. The reviewer independently reproduced the final backend and
+> frontend identities, verified the 74-payload Task 6 packet, and confirmed
+> that the closeout commit changes exactly four documentation files. The
+> previously admitted quiesced production-equality proof remains sufficient;
+> no additional Desktop shutdown or production replay is required.
 >
 > **Scope:** connect the existing FRED and Finnhub macro-calendar collectors to
 > ArkScope's one app-owned scheduler, expose honest automatic/manual controls,

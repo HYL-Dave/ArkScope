@@ -1,7 +1,7 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** TASKS 0-6 COMPLETE; MERGED AT `da7efd9a`; FOCUSED CLOSEOUT
-> REVIEW REQUIRED; NOT PUSHED
+> **Status:** COMPLETE; MERGED AT `da7efd9a`; CLOSEOUT GREEN AT `e508eba9`;
+> NOT PUSHED
 >
 > **Date:** 2026-08-13
 >
@@ -201,6 +201,14 @@
 > `SHA256SUMS` SHA-256
 > `44ca729d205436390ec2319bfda915627c6bf988afc2ee512c7ea77ce3b7eec5`.
 > The line stops for focused closeout review and remains unpushed.
+
+> **2026-08-14 focused closeout GREEN:** the reviewer independently collected
+> backend `4,359 / c100ee5d...`, frontend `101 files / 1,172 / d40a30d5...`,
+> and ran frontend focused `109/109` on exact `master`. Task 6 packet `74/74`
+> verified, `da7efd9a..e508eba9` is exactly four documentation files, and the
+> three native reports remain byte-identical. The line is CLOSED. Production
+> equality does not rerun because Task 6 used an isolated runtime root and the
+> quiesced Task 5 proof remains valid.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
