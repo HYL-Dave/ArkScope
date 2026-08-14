@@ -1,6 +1,6 @@
 # Settings Schedule Surface Ownership Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASKS 0-1 COMPLETE; TASK 2 ACTIVE UNDER BATCH RULING; TASK 3 IS THE COMBINED IMPLEMENTATION-REVIEW GATE
+> **Status:** PLAN REVIEW GREEN; TASKS 0-1 COMPLETE; TASK 2 STOPPED AT MACRO TITLE CONSUMER OWNERSHIP; BOUNDED AMENDMENT REVIEW NEXT
 >
 > **Date:** 2026-08-14
 >
@@ -324,6 +324,11 @@ Macro's enabled count filters `Object.values(schedule)` with
 `dataScheduleSourceMatchesScope(state, "macro")` and counts enabled rows.
 The hard-coded list is physically deleted.
 
+The surrounding Macro schedule heading reads only
+`$.macroStorage.schedule.title`; the Data Sources heading continues to read
+only `$.dataSources.schedule.title`. Reusing the Data Sources title in Macro is
+not an admitted compatibility fallback.
+
 ### 1.4 Exact copy and resource accounting
 
 Value-only replacement:
@@ -492,6 +497,22 @@ retained body edit or an edit to any frozen historical constant is a stop.
 10. Commit messages name the product behavior. Generic `cleanup` or `fix tests`
     subjects are rejected.
 
+### 3.1 Task 2 stop - missing Macro title consumer owner
+
+Task 2's eight reviewed owner bodies produced exact RED `8 failed / 119
+passed`. After applying only the two reviewed locale deltas, five owners turned
+GREEN while three remained RED because `MacroStorageSection.tsx` still read
+`$.dataSources.schedule.title`. The new `macroStorage.schedule.title` resource
+therefore existed but had no product consumer, making both surfaces display the
+Data Sources-specific title.
+
+This is a plan ownership omission, not permission to weaken the three owners.
+The bounded correction adds `MacroStorageSection.tsx` to Task 2 and authorizes
+exactly one consumer-key replacement in its existing heading. The file is
+already a Section 0.4 owner and was changed in Task 1; no overall path boundary,
+node ID, count, staged identity, resource value, or browser contract changes.
+Any second Task 2 product hunk in that file is a new stop event.
+
 ---
 
 ## 4. Execution tasks
@@ -559,6 +580,7 @@ apps/arkscope-web/src/settings/MacroStorageSection.tsx
 ```text
 apps/arkscope-web/src/i18n/resources/en/settings.ts
 apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts
+apps/arkscope-web/src/settings/MacroStorageSection.tsx
 apps/arkscope-web/src/SettingsProviderConfig.test.ts
 apps/arkscope-web/src/settings/MacroStorageSection.test.tsx
 apps/arkscope-web/src/SettingsWorkspace.test.tsx
@@ -570,7 +592,10 @@ apps/arkscope-web/src/i18n/resources.test.ts
    owner-specific copy/resource expectations.
 2. Run those eight owners RED against the generic current title and absent
    Macro title; a name mismatch or unrelated fixture failure is rejected RED.
-3. Apply the exact Section 1.4 bilingual values and no others.
+3. Apply the exact Section 1.4 bilingual values and no others, then replace
+   exactly the existing Macro heading lookup with
+   `$.macroStorage.schedule.title`. No other `MacroStorageSection.tsx` hunk is
+   authorized in Task 2.
 4. Add only `macroStorage.schedule.title` to `postSliceSettingsPaths`; update
    current counts `827 -> 828` and `1911 -> 1912`. Do not alter frozen values.
 5. Require Task 1 identities to remain byte-identical.
