@@ -1,6 +1,6 @@
 # Settings Schedule Surface Ownership Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASK 0 COMPLETE; TASKS 1-3 BATCH EXECUTION ACTIVE; TASK 3 IS THE COMBINED IMPLEMENTATION-REVIEW GATE
+> **Status:** PLAN REVIEW GREEN; TASKS 0-1 COMPLETE; TASK 2 ACTIVE UNDER BATCH RULING; TASK 3 IS THE COMBINED IMPLEMENTATION-REVIEW GATE
 >
 > **Date:** 2026-08-14
 >
@@ -549,7 +549,8 @@ apps/arkscope-web/src/settings/MacroStorageSection.tsx
    `getSchedule`/`getProvidersHealth` caller.
 10. Commit atomically with subject similar to
     `refactor: assign one settings owner per schedule source`.
-11. Append Task 1 evidence, commit docs-only, and stop for review.
+11. Append Task 1 evidence and commit docs-only. Under the batch ruling,
+    continue to Task 2; Task 3 remains the combined review gate.
 
 ### Task 2 - Owner-specific copy and resource truth
 
