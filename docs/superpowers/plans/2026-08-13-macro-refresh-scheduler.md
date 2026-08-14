@@ -1,7 +1,8 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-4 COMPLETE; TASK 5 ACTIVE;
-> TASKS 1-5 BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-4 COMPLETE; TASK 5 FINAL
+> PRODUCTION-EQUALITY GATE STOPPED; FOCUSED REVIEW REQUIRED; TASK 6 NOT
+> AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
@@ -146,6 +147,30 @@
 > is `14/14`, and one sequential full command is `1,172/1,172`. Task 5 is
 > active under the existing batch ruling. Task 6, merge, push, and live
 > provider traffic remain unauthorized.
+
+> **2026-08-14 Task 5 production-writer stop-and-amend:** M1-M9 restored
+> their owners byte-for-byte, every backend/frontend identity and runtime gate
+> matched, canonical native reached `4,347 passed / 12 skipped / 0 failed`, and
+> the desktop/mobile browser matrix passed. Final whole-file production
+> equality then stopped admission: `macro_calendar.db`, `config/.env`, and
+> `config/user_profile.local.yaml` remained exact, while the active production
+> `profile_state.db` gained rows during the run. Read-only evidence attributes
+> the window to the already-running Desktop/sidecar: `job_runs` records the
+> five-minute `sa_market_news_refresh` cadence plus one scheduled
+> `collect.ibkr_news`, and their timestamps align with the production DB mtime.
+> The native wrapper's own profile database is the separate file under its
+> `/tmp/eir002-green-baseline/runtime/...` root. Attribution does not waive
+> stop condition 15. Resume requires focused review, then a user-quiesced
+> Desktop/sidecar writer window. Capture fresh full stat/SHA values for the
+> four protected production assets, rerun the same canonical native command
+> with the ignored `config/.env` visible only through a temporary symlink,
+> remove that symlink, and require all four post values to equal the fresh pre
+> values byte-for-byte. No product/test edit or frontend/browser rerun is
+> authorized by this amendment. Any remaining writer process, production
+> mismatch, or native identity drift is another stop. Partial Task 5 packet:
+> `/tmp/macro-refresh-scheduler-task5-c286d504`, `140` payloads;
+> `PARTIAL_SHA256SUMS` SHA-256
+> `0d8127ec550b857b39a3164b796dc470e7a54696c33e2b17584cdae1efc01f23`.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
@@ -1050,6 +1075,11 @@ Final gates:
     stat equality, and clean worktree.
 
 Stop for full implementation review. No merge is authorized by Task 5.
+
+The production-equality gate is measured only while the Desktop/sidecar writer
+is quiesced. A timestamp-correlated external-writer explanation is useful stop
+evidence but is never a substitute for the exact pre/post equality required to
+complete Task 5.
 
 ### Task 6 - Merge and exact-master verification
 
