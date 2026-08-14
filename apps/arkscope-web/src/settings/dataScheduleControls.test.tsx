@@ -132,12 +132,12 @@ type Harness = {
 async function renderControls({
   cache = createSettingsReadCache(),
   consumers = 1,
-  sourceIds,
+  scopes,
   externalBusy = false,
 }: {
   cache?: SettingsReadCache;
   consumers?: number;
-  sourceIds?: readonly string[];
+  scopes?: Array<"macro" | "non_macro">;
   externalBusy?: boolean;
 } = {}): Promise<Harness> {
   const {
@@ -153,8 +153,16 @@ async function renderControls({
   function Consumer({ index }: { index: number }) {
     const controller = useSharedDataScheduleControls();
     latest[index] = controller;
-    return index === 0 && sourceIds
-      ? React.createElement(DataScheduleTable, { controller, sourceIds, externalBusy })
+    const scope = scopes?.[index];
+    return scope
+      ? React.createElement(
+          "div",
+          { "data-schedule-scope": scope },
+          React.createElement(
+            DataScheduleTable,
+            { controller, scope, externalBusy },
+          ),
+        )
       : null;
   }
 
@@ -266,24 +274,44 @@ describe("Data schedule controls", () => {
     harness.unmount();
   });
 
-  it("filters rows without changing registry truth", async () => {
+  it("partitions schedule rows by write target without changing registry truth", async () => {
+    controls.schedule = response([
+      ["polygon_news", { write_target: "market_data.db" }],
+      ["fred_series", { write_target: "macro_calendar.db" }],
+      ["future_macro_source_v9", { write_target: "macro_calendar.db" }],
+      ["future_local_source_v9", { write_target: "future_local.db" }],
+    ]);
     const harness = await renderControls({
-      sourceIds: ["fred_release_dates", "missing_future_source", "polygon_news"],
-      externalBusy: true,
+      consumers: 2,
+      scopes: ["non_macro", "macro"],
     });
 
-    const rows = Array.from(harness.host.querySelectorAll("tbody tr"));
-    expect(rows.map((row) => row.getAttribute("data-source-id"))).toEqual([
-      "fred_release_dates",
+    const renderedIds = (scope: "macro" | "non_macro") => Array.from(
+      harness.host.querySelectorAll(
+        `[data-schedule-scope='${scope}'] tbody tr`,
+      ),
+      (row) => row.getAttribute("data-source-id"),
+    );
+    const nonMacro = renderedIds("non_macro");
+    const macro = renderedIds("macro");
+    expect(nonMacro).toEqual([
       "polygon_news",
+      "future_local_source_v9",
     ]);
-    expect(Object.keys(harness.current().schedule)).toHaveLength(3);
-    expect(harness.host.querySelector("[data-schedule-error-code='unknown_schedule_source']")
-      ?.getAttribute("data-source-id")).toBe("missing_future_source");
-    expect(Array.from(harness.host.querySelectorAll("button, input"))).not.toHaveLength(0);
-    expect(Array.from(harness.host.querySelectorAll<HTMLButtonElement | HTMLInputElement>(
-      "button, input",
-    )).every((control) => control.disabled)).toBe(true);
+    expect(macro).toEqual([
+      "fred_series",
+      "future_macro_source_v9",
+    ]);
+    expect(nonMacro.filter((sourceId) => macro.includes(sourceId))).toEqual([]);
+    expect([...nonMacro, ...macro].sort()).toEqual(
+      Object.keys(harness.current().schedule).sort(),
+    );
+    expect(harness.current(0)).toBe(harness.current(1));
+    for (const row of harness.host.querySelectorAll("tbody tr")) {
+      expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
+      expect(row.querySelector("input[type='number']")).not.toBeNull();
+      expect(row.querySelector("button")?.hasAttribute("disabled")).toBe(false);
+    }
     harness.unmount();
   });
 

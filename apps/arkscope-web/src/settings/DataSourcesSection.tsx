@@ -182,6 +182,7 @@ export function DataSourcesSection({
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
   const scheduleController = useSharedDataScheduleControls();
+  const { replaceJobFacts } = scheduleController;
   const schedule = scheduleController.schedule;
   const [initialHealth] = useState(() =>
     retainedCacheValue<ProvidersHealthResponse>(settingsReadCache, "provider_health"));
@@ -268,6 +269,10 @@ export function DataSourcesSection({
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  useEffect(() => {
+    if (health !== null) replaceJobFacts(health.jobs);
+  }, [health, replaceJobFacts]);
 
   useEffect(() => {
     if (scheduleController.lifecycleVersion > 0) void load(true);
@@ -888,7 +893,7 @@ export function DataSourcesSection({
         <h4 className="detail-section">{t(($) => $.dataSources.schedule.title)}</h4>
         <DataScheduleTable
           controller={scheduleController}
-          jobs={health?.jobs}
+          scope="non_macro"
           externalBusy={busy !== ""}
         />
         <p className="muted tiny ds-schedule-protection-note" style={{ marginTop: 8 }}>

@@ -13,7 +13,11 @@ import {
 import { formatSystemTimestamp } from "../timeDisplay";
 import { Button } from "../ui/Button";
 import { InlineAlert } from "../ui/Status";
-import { DataScheduleTable, useSharedDataScheduleControls } from "./dataScheduleControls";
+import {
+  DataScheduleTable,
+  dataScheduleSourceMatchesScope,
+  useSharedDataScheduleControls,
+} from "./dataScheduleControls";
 import type { SettingsT } from "./settingsCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
 
@@ -24,14 +28,6 @@ const MACRO_TABLE_KEYS = [
   "cal_economic_events",
   "cal_earnings_events",
   "cal_ipo_events",
-] as const;
-
-const MACRO_SCHEDULE_SOURCE_IDS = [
-  "fred_series",
-  "fred_release_dates",
-  "finnhub_economic_calendar",
-  "finnhub_earnings_calendar",
-  "finnhub_ipo_calendar",
 ] as const;
 
 function macroTableLabel(key: typeof MACRO_TABLE_KEYS[number], t: SettingsT): string {
@@ -143,9 +139,9 @@ export function MacroStorageSection({
     || (snapshot != null && !snapshot.available);
   const enabledScheduleCount = scheduleController.schedule === null
     ? null
-    : MACRO_SCHEDULE_SOURCE_IDS.filter(
-        (source) => scheduleController.schedule?.[source]?.enabled,
-      ).length;
+    : Object.values(scheduleController.schedule)
+        .filter((state) => dataScheduleSourceMatchesScope(state, "macro") && state.enabled)
+        .length;
   const automationStatus = enabledScheduleCount === null
     ? t(($) => $.macroStorage.schedule.unknown)
     : enabledScheduleCount === 0
@@ -215,7 +211,7 @@ export function MacroStorageSection({
         </div>
         <DataScheduleTable
           controller={scheduleController}
-          sourceIds={MACRO_SCHEDULE_SOURCE_IDS}
+          scope="macro"
         />
       </div>
 

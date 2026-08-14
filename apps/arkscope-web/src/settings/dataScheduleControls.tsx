@@ -45,13 +45,19 @@ export type DataScheduleOutcome =
   | { kind: "error"; error: unknown }
   | { kind: "schedule"; source: string; result: ScheduleRunResult };
 
-export type DataScheduleLocalError = {
-  code: "unknown_schedule_source";
-  source: string;
-};
+export type DataScheduleScope = "macro" | "non_macro";
+
+export function dataScheduleSourceMatchesScope(
+  state: Pick<ScheduleSourceState, "write_target">,
+  scope: DataScheduleScope,
+): boolean {
+  const macro = state.write_target === "macro_calendar.db";
+  return scope === "macro" ? macro : !macro;
+}
 
 export type DataScheduleController = {
   schedule: DataSourceScheduleMap | null;
+  jobFacts: ProvidersHealthResponse["jobs"];
   busy: string;
   drafts: Record<string, string>;
   hasDrafts: boolean;
@@ -64,6 +70,7 @@ export type DataScheduleController = {
   runNow(source: string): Promise<void>;
   reloadSchedule(): Promise<void>;
   pollSchedule(): Promise<void>;
+  replaceJobFacts(jobs: ProvidersHealthResponse["jobs"]): void;
 };
 
 const DataScheduleControlsContext = createContext<DataScheduleController | null>(null);
@@ -111,6 +118,7 @@ export function useDataScheduleControls(
   const [schedule, setSchedule] = useState<DataSourceScheduleMap | null>(
     initialSchedule?.sources ?? null,
   );
+  const [jobFacts, setJobFacts] = useState<ProvidersHealthResponse["jobs"]>({});
   const [busy, setBusy] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [outcome, setOutcome] = useState<DataScheduleOutcome | null>(null);
@@ -192,6 +200,10 @@ export function useDataScheduleControls(
     [loadSchedule],
   );
 
+  const replaceJobFacts = useCallback((jobs: ProvidersHealthResponse["jobs"]) => {
+    setJobFacts({ ...jobs });
+  }, []);
+
   const setEnabled = useCallback(async (source: string, enabled: boolean) => {
     if (mutationInFlightRef.current) return;
     mutationInFlightRef.current = true;
@@ -251,6 +263,7 @@ export function useDataScheduleControls(
 
   return {
     schedule,
+    jobFacts,
     busy,
     drafts,
     hasDrafts: Object.values(drafts).some((value) => value !== ""),
@@ -263,6 +276,7 @@ export function useDataScheduleControls(
     runNow,
     reloadSchedule,
     pollSchedule,
+    replaceJobFacts,
   };
 }
 
@@ -308,14 +322,12 @@ function jobOutcome(
 function LastRun({
   source,
   state,
-  jobs,
   controller,
   externalBusy,
   t,
 }: {
   source: string;
   state: ScheduleSourceState;
-  jobs?: ProvidersHealthResponse["jobs"];
   controller: DataScheduleController;
   externalBusy: boolean;
   t: SettingsT;
@@ -328,7 +340,7 @@ function LastRun({
   return (
     <div className="ds-last-run">
       <div className="ds-last-run-summary">
-        <span>{jobOutcome(jobs, state.job_name, t)}</span>
+        <span>{jobOutcome(controller.jobFacts, state.job_name, t)}</span>
         {skipped ? (
           <StatusBadge state="blocked" label={t(($) => $.dataSources.schedule.triggerSkipped)} />
         ) : null}
@@ -367,13 +379,11 @@ function LastRun({
 
 export function DataScheduleTable({
   controller,
-  sourceIds,
-  jobs,
+  scope,
   externalBusy = false,
 }: {
   controller: DataScheduleController;
-  sourceIds?: readonly string[];
-  jobs?: ProvidersHealthResponse["jobs"];
+  scope: DataScheduleScope;
   externalBusy?: boolean;
 }) {
   const { t } = useTranslation("settings");
@@ -381,23 +391,11 @@ export function DataScheduleTable({
   if (schedule === null) {
     return <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>;
   }
-  const requested = sourceIds ?? Object.keys(schedule);
-  const rows = requested.flatMap((source) => schedule[source] ? [[source, schedule[source]] as const] : []);
-  const localErrors: DataScheduleLocalError[] = requested
-    .filter((source) => !Object.hasOwn(schedule, source))
-    .map((source) => ({ code: "unknown_schedule_source", source }));
+  const rows = Object.entries(schedule)
+    .filter(([, state]) => dataScheduleSourceMatchesScope(state, scope));
 
   return (
-    <>
-      {localErrors.map((error) => (
-        <span
-          hidden
-          key={error.source}
-          data-schedule-error-code={error.code}
-          data-source-id={error.source}
-        />
-      ))}
-      <div className="settings-table-scroll" data-testid="schedule-scroll">
+    <div className="settings-table-scroll" data-testid="schedule-scroll">
         <table className="data-table settings-schedule-table">
           <thead>
             <tr>
@@ -476,7 +474,6 @@ export function DataScheduleTable({
                     <LastRun
                       source={source}
                       state={state}
-                      jobs={jobs}
                       controller={controller}
                       externalBusy={externalBusy}
                       t={t}
@@ -488,6 +485,5 @@ export function DataScheduleTable({
           </tbody>
         </table>
       </div>
-    </>
   );
 }

@@ -1090,8 +1090,25 @@ describe("Settings provider config authority", () => {
     expect(row.querySelector(".ds-last-run-cell")?.textContent).toContain("新觸發已略過");
   });
 
-  it("renders_disabled_providers_as_neutral_and_every_registered_schedule_row_as_controllable", async () => {
-    await renderDataSources();
+  it("renders_disabled_providers_as_neutral_and_partitions_every_registered_schedule_row_into_one_controllable_owner", async () => {
+    const now = Date.parse("2026-08-14T03:00:00Z");
+    const oldFinishedAt = "2026-08-14T00:15:00Z";
+    const refreshedFinishedAt = "2026-08-14T01:45:00Z";
+    const staleHealth = structuredClone(health);
+    staleHealth.jobs.fetch_fred_series = {
+      status: "succeeded",
+      finished_at: oldFinishedAt,
+    };
+    const refreshedHealth = structuredClone(staleHealth);
+    refreshedHealth.jobs.fetch_fred_series = {
+      status: "succeeded",
+      finished_at: refreshedFinishedAt,
+    };
+    const cache = createSettingsReadCache({ clock: () => now });
+    cache.replace("provider_health", staleHealth, now - 120_000);
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(refreshedHealth);
+
+    await renderDataSources(undefined, false, cache);
     const providerRow = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("retired_provider"));
     if (!providerRow) throw new Error("missing disabled provider row");
@@ -1100,29 +1117,37 @@ describe("Settings provider config authority", () => {
     expect(providerRow.querySelector(".ds-chip")).toBeNull();
     expect(providerRow.querySelector(".muted")).not.toBeNull();
 
-    const zhRows = Array.from(
+    const rowsAt = (location: "source_schedules" | "macro_storage") => Array.from(
       host!.querySelectorAll<HTMLTableRowElement>(
-        "[data-settings-location='source_schedules'] [data-testid='schedule-scroll'] tbody tr",
+        `[data-settings-location='${location}'] [data-testid='schedule-scroll'] tbody tr`,
       ),
     );
-    expect(zhRows).toHaveLength(10);
-    for (const row of zhRows) {
+    const zhDataRows = rowsAt("source_schedules");
+    const zhMacroRows = rowsAt("macro_storage");
+    expect(zhDataRows).toHaveLength(5);
+    expect(zhMacroRows).toHaveLength(5);
+    const allZhIds = [...zhDataRows, ...zhMacroRows]
+      .map((row) => row.getAttribute("data-source-id"));
+    expect(new Set(allZhIds).size).toBe(10);
+    for (const row of [...zhDataRows, ...zhMacroRows]) {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
       expect(Array.from(row.querySelectorAll("button")).some((button) =>
         button.textContent?.includes("執行"))).toBe(true);
       expect(row.textContent).not.toMatch(/唯讀|已退役/);
     }
+    const fredRow = zhMacroRows.find((row) =>
+      row.getAttribute("data-source-id") === "fred_series");
+    expect(fredRow?.textContent).toContain(formatSystemTimestamp(refreshedFinishedAt));
+    expect(fredRow?.textContent).not.toContain(formatSystemTimestamp(oldFinishedAt));
     expect(host!.textContent).not.toMatch(/價格缺口補抓|本地鏡像增量|IV 歷史/);
 
     await act(async () => { await i18n.changeLanguage("en"); });
-    const enRows = Array.from(
-      host!.querySelectorAll<HTMLTableRowElement>(
-        "[data-settings-location='source_schedules'] [data-testid='schedule-scroll'] tbody tr",
-      ),
-    );
-    expect(enRows).toHaveLength(10);
-    for (const row of enRows) {
+    const enDataRows = rowsAt("source_schedules");
+    const enMacroRows = rowsAt("macro_storage");
+    expect(enDataRows).toHaveLength(5);
+    expect(enMacroRows).toHaveLength(5);
+    for (const row of [...enDataRows, ...enMacroRows]) {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
       expect(Array.from(row.querySelectorAll("button")).some((button) =>
@@ -1130,6 +1155,20 @@ describe("Settings provider config authority", () => {
       expect(row.textContent).not.toMatch(/Read-only|Retired/);
     }
     expect(host!.textContent).not.toMatch(/Price Gap Backfill|Local Mirror Incremental|IV History/);
+
+    disposeDataSources();
+    await i18n.changeLanguage("zh-Hant");
+    const rejectedCache = createSettingsReadCache({ clock: () => now });
+    rejectedCache.replace("provider_health", staleHealth, now - 120_000);
+    vi.mocked(getProvidersHealth).mockRejectedValueOnce(new Error("PLANTED_HEALTH_REFRESH_FAILED"));
+    await renderDataSources(undefined, false, rejectedCache);
+    const retainedFredRow = Array.from(
+      host!.querySelectorAll<HTMLTableRowElement>(
+        "[data-settings-location='macro_storage'] [data-testid='schedule-scroll'] tbody tr",
+      ),
+    ).find((row) => row.getAttribute("data-source-id") === "fred_series");
+    expect(retainedFredRow?.textContent).toContain(formatSystemTimestamp(oldFinishedAt));
+    expect(host!.textContent).not.toContain("PLANTED_HEALTH_REFRESH_FAILED");
   });
 
   it("renders_persisted_skipped_history_as_neutral_instead_of_never_run", async () => {
