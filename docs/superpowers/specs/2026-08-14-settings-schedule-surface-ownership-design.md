@@ -1,7 +1,8 @@
 # Settings Schedule Surface Ownership Design
 
 > **Status:** USER DIRECTION APPROVED; FABLE-REVIEWED GREEN;
-> IMPLEMENTATION PLAN NEXT; IMPLEMENTATION NOT STARTED
+> IMPLEMENTATION PLAN AUTHORED; FABLE PLAN REVIEW NEXT;
+> IMPLEMENTATION NOT STARTED
 >
 > **Date:** 2026-08-14
 >
@@ -60,6 +61,15 @@ flag; Macro does not. The implementation plan must inventory the rendered
 facts before removing duplicate rows. If Data Sources is the only visible
 owner of a Macro fact that the approved Macro surface does not preserve, that
 is a stop-and-amend event rather than permission to lose the fact silently.
+
+The plan-author inventory found one such fact: `jobs` supplies latest terminal
+status and `finished_at`, which the schedule durable state does not fully
+replace. The plan therefore preserves it through the existing group-scoped
+schedule controller. Data Sources remains the sole visible provider-health
+consumer/state owner; the existing Settings idle warmup may still prefill the
+same cache. Macro gains the same presentation facts without another request,
+timer, listener, cache key, or state authority. The provider-operation busy
+flag is not a Macro schedule fact and remains local to Data Sources.
 
 ## 3. Locked Decisions
 
