@@ -1,6 +1,6 @@
 # Settings Schedule Surface Ownership Implementation Plan
 
-> **Status:** DRAFTED; INDEPENDENT PLAN REVIEW NEXT; IMPLEMENTATION NOT STARTED
+> **Status:** PLAN REVIEW GREEN; TASK 0 COMPLETE; TASKS 1-3 BATCH EXECUTION ACTIVE; TASK 3 IS THE COMBINED IMPLEMENTATION-REVIEW GATE
 >
 > **Date:** 2026-08-14
 >
@@ -21,6 +21,13 @@
 > review. Fable independently reconstructs identities and reviews evidence,
 > product diffs, and merge readiness. The user owns product, batching, live,
 > destructive-data, merge, and push rulings.
+
+> **Process ruling (2026-08-14):** after independent plan review returned
+> GREEN at `590ce355`, the user authorized Tasks 0-3 to run continuously.
+> Every task still requires its own commits and evidence packet, and every
+> Section 5 stop condition remains hard. Task 3 replaces the per-task review
+> waits with one combined implementation-review gate. Task 4, merge, push,
+> live traffic, provider calls, and production mutation remain unauthorized.
 
 **Goal:** give every Settings schedule source exactly one editable home: five
 current market/news/company-event rows under Data Sources and five current
@@ -506,7 +513,9 @@ retained body edit or an edit to any frozen historical constant is a stop.
    with the base facts, exact commands, and explicit statement that no product
    byte or test body changed.
 9. Update the plan/map status and commit one docs-only grounding commit.
-10. Stop for independent Task 0 review. Product implementation remains blocked.
+10. Under the user-approved batch ruling, record Task 0 complete and continue
+    to Task 1 without weakening any stop condition. Task 3 remains the combined
+    independent implementation-review gate.
 
 ### Task 1 - Partition ownership and preserve latest-job facts
 
