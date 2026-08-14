@@ -110,6 +110,29 @@
 > `1 -> 2` GET assertion. Current product/test edits stay uncommitted; Tasks 4-5
 > remain paused for focused review.
 
+> **2026-08-14 Task 4 browser-cascade stop-and-amend:** after the provider
+> fixture correction, the focused `109/109`, post-PG `14/14`, typecheck,
+> build, scanner, and one complete sequential full-suite `1172/1172` gate all
+> passed. The required early real-browser check then found a deterministic
+> rendered CSS defect: `.data-table td { white-space: nowrap; }` has greater
+> specificity than `.settings-schedule-source-cell { white-space: normal; }`,
+> so the latter rule is dead despite appearing later in the same stylesheet.
+> Chrome reports `white-space: nowrap` on all five Macro source cells; the
+> Finnhub economic and earnings rows have `scrollWidth 326/320` against
+> `clientWidth 294`. The reviewed `30/11/12/12/35` columns, bounded table
+> scroller, ten-source Data Sources registry, and five-source Macro filter are
+> otherwise exact. The bounded repair changes only that selector to
+> `.settings-schedule-table td.settings-schedule-source-cell`, preserving its
+> declarations, and strengthens the already-added `wraps schedule source copy
+> inside the source column` node to require this effective selector. No node
+> ID, count, staged identity, or other product/test byte is authorized to
+> change. Desktop and mobile computed-style replay must then prove normal
+> wrapping with no cell overflow. Current product/test edits remain
+> uncommitted; Tasks 4-5 stay paused for focused review. Partial packet:
+> `/tmp/macro-refresh-scheduler-task4-stop4-83f881a0`, `12` payloads;
+> `SHA256SUMS` SHA-256
+> `f26131aa40557c89e39eb5dcbb8ade4645a5317c8d15d566ea463f29db9c5cf0`.
+
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
 show the same honest controls on Data Sources and Macro Data, and remove the
@@ -800,6 +823,31 @@ followed by an explicit promise flush. Its behavioral assertions remain one
 initial GET, exactly one GET after the first 30-second interval, and object
 identity equality for both consumers. Raising the timeout or weakening any of
 those assertions is forbidden.
+
+The Task 4 browser-cascade repair is limited to one selector replacement in
+`styles.css`:
+
+```css
+.settings-schedule-table td.settings-schedule-source-cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  line-height: 1.45;
+}
+```
+
+The declarations are unchanged. The existing Task 4 ADD node
+`Settings workspace CSS contract > wraps schedule source copy inside the source
+column` evolves in place to require this exact selector and remains the static
+RED/GREEN owner; its ID does not move. The pre-fix real-browser RED must be
+preserved, and the same desktop `1322 x 777` plus mobile `390 x 844` fixture
+must prove computed `white-space: normal`, `overflow-wrap: anywhere`, source
+cell `scrollWidth <= clientWidth`, at least one long source description
+rendering on multiple line rectangles, exact reviewed column proportions,
+bounded horizontal table scrolling, zero page/main overflow, and zero cell
+overlap. A selector-only textual GREEN without that rendered replay is
+rejected evidence. A second CSS declaration, selector broadening beyond the
+schedule table, or any node-ID/count/identity change is a new stop event.
 
 Task 4 has one additional bounded owner in
 `SettingsPostPgExitStorage.test.ts`. Its `MacroSnapshot` fixture removes exactly
