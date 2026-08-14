@@ -16,13 +16,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
+from src.sa.extension_diagnostics import project_extension_diagnostics
 from src.sa_capture_store import connect as connect_sa_capture
 from src.sa_capture_store import resolve_sa_db_path
 from src.service.job_runs_store import get_job_runs_store
 
 HOST_ID = "com.mindfulrl.sa_alpha_picks"
 _SYNC_JOB_NAMES = ("sa_alpha_picks_refresh", "sa_market_news_refresh")
+_SYNC_JOB_NAME_SET = frozenset(_SYNC_JOB_NAMES)
 _REPAIR_JOB_NAME = "sa_market_news_repair"
+_STRUCTURAL_SEGMENT_KEYS = (
+    "config",
+    "manifests",
+    "launcher",
+    "host_ping",
+    "telemetry_binding",
+    "capture_readback",
+)
 _SAFE_COUNT_KEYS = frozenset(
     {
         "phase_complete",
@@ -229,11 +239,142 @@ def _latest_attempt(summary: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
         if not isinstance(item, Mapping):
             continue
         row = item.get("latest_attempt")
-        if isinstance(row, Mapping):
+        if isinstance(row, Mapping) and row.get("job_name") in _SYNC_JOB_NAME_SET:
             candidates.append(row)
     if not candidates:
         return None
     return max(candidates, key=_row_sort_key)
+
+
+def _derive_chain_state(segments: list[Mapping[str, Any]]) -> str:
+    structural: dict[str, str] = {}
+    for segment in segments:
+        key = segment.get("key")
+        if key not in _STRUCTURAL_SEGMENT_KEYS:
+            continue
+        if key in structural:
+            return "interrupted"
+        state = segment.get("state")
+        if state not in {"ok", "warn", "fail"}:
+            return "interrupted"
+        structural[str(key)] = str(state)
+
+    if set(structural) != set(_STRUCTURAL_SEGMENT_KEYS):
+        return "interrupted"
+    if any(state == "fail" for state in structural.values()):
+        return "interrupted"
+    if any(state == "warn" for state in structural.values()):
+        return "degraded"
+    return "available"
+
+
+def _diagnostics_projection(row: Mapping[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    if not isinstance(payload, Mapping) or "extension_diagnostics" not in payload:
+        return {"status": "absent"}
+
+    stored = payload.get("extension_diagnostics")
+    if stored == {
+        "status": "rejected",
+        "error_code": "invalid_extension_diagnostics",
+    }:
+        return dict(stored)
+    if stored == {"status": "absent"}:
+        return {"status": "absent"}
+    if (
+        not isinstance(stored, Mapping)
+        or set(stored) != {"status", "schema_version", "entries", "omitted_count"}
+        or stored.get("status") != "recorded"
+    ):
+        return {
+            "status": "rejected",
+            "error_code": "invalid_extension_diagnostics",
+        }
+
+    return project_extension_diagnostics(
+        {
+            "schema_version": stored.get("schema_version"),
+            "entries": stored.get("entries"),
+            "omitted_count": stored.get("omitted_count"),
+        },
+        started_at=row.get("started_at"),
+        finished_at=row.get("finished_at"),
+    )
+
+
+def _diagnostic_recurrence(job_store: Any) -> list[dict[str, Any]]:
+    try:
+        completed = job_store.completed_extension_runs_by_name(list(_SYNC_JOB_NAMES))
+    except Exception:
+        return []
+    if not isinstance(completed, list):
+        return []
+
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in completed[:20]:
+        if not isinstance(row, Mapping):
+            continue
+        job_name = row.get("job_name")
+        if (
+            job_name not in _SYNC_JOB_NAME_SET
+            or row.get("trigger_source") != "extension"
+            or row.get("status") not in {"succeeded", "failed"}
+        ):
+            continue
+        diagnostics = _diagnostics_projection(row)
+        if diagnostics.get("status") != "recorded":
+            continue
+
+        affected_groups: dict[tuple[str, str, str], str] = {}
+        for entry in diagnostics["entries"]:
+            group_key = (
+                str(job_name),
+                str(entry["stage"]),
+                str(entry["reason_code"]),
+            )
+            occurred_at = str(entry["occurred_at"])
+            previous = affected_groups.get(group_key)
+            if previous is None or occurred_at > previous:
+                affected_groups[group_key] = occurred_at
+
+        for group_key, occurred_at in affected_groups.items():
+            current = grouped.get(group_key)
+            if current is None:
+                grouped[group_key] = {
+                    "job_name": group_key[0],
+                    "stage": group_key[1],
+                    "reason_code": group_key[2],
+                    "affected_run_count": 1,
+                    "latest_occurred_at": occurred_at,
+                }
+                continue
+            current["affected_run_count"] += 1
+            if occurred_at > current["latest_occurred_at"]:
+                current["latest_occurred_at"] = occurred_at
+
+    result = list(grouped.values())
+    result.sort(key=lambda item: (item["job_name"], item["stage"], item["reason_code"]))
+    result.sort(key=lambda item: item["latest_occurred_at"], reverse=True)
+    return result
+
+
+def _latest_diagnostics_fields(
+    row: Mapping[str, Any], job_store: Any
+) -> dict[str, Any]:
+    projection = _diagnostics_projection(row)
+    status = projection["status"]
+    fields: dict[str, Any] = {
+        "diagnostics_status": status,
+        "diagnostics_error_code": projection.get("error_code"),
+        "diagnostic_recurrence": _diagnostic_recurrence(job_store),
+    }
+    if status == "recorded":
+        fields["diagnostics"] = sorted(
+            projection["entries"],
+            key=lambda entry: entry["occurred_at"],
+        )
+        fields["diagnostics_omitted_count"] = projection["omitted_count"]
+    return fields
 
 
 def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
@@ -256,12 +397,19 @@ def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
             return _seg("telemetry_last", "fail", code="telemetry_unavailable")
         if legacy_rows:
             legacy = max(legacy_rows, key=_row_sort_key)
-            return _seg(
+            segment = _seg(
                 "telemetry_last",
                 "warn",
                 code="legacy_unverified",
+                job_name=(
+                    legacy.get("job_name")
+                    if legacy.get("job_name") in _SYNC_JOB_NAME_SET
+                    else None
+                ),
                 **_run_fields(legacy),
             )
+            segment.update(_latest_diagnostics_fields(legacy, job_store))
+            return segment
         return _seg("telemetry_last", "warn", code="telemetry_not_recorded")
 
     result = latest.get("result") if isinstance(latest.get("result"), Mapping) else {}
@@ -271,16 +419,26 @@ def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
         state, code = "ok", "capture_complete"
     elif outcome == "skipped":
         state, code = "warn", "capture_skipped"
-    elif counts.get("failed_retryable", 0) > 0:
-        state, code = "fail", "detail_failures_recorded"
+    elif outcome == "degraded":
+        state, code = "warn", "capture_degraded"
     else:
         state, code = "fail", "capture_failed"
-    return _seg(
+    segment = _seg(
         "telemetry_last",
         state,
         code=code,
+        job_name=(
+            latest.get("job_name")
+            if latest.get("job_name") in _SYNC_JOB_NAME_SET
+            else None
+        ),
+        outcome=outcome
+        if outcome in {"complete", "skipped", "degraded", "failed"}
+        else None,
         **_run_fields(latest, counts=counts),
     )
+    segment.update(_latest_diagnostics_fields(latest, job_store))
+    return segment
 
 
 def _manifest_hash_prefix(payload: Any) -> Optional[str]:
@@ -365,7 +523,7 @@ def collect_sa_extension_health(
         segments.append(repair_segment)
     segments.append(_capture_readback_segment(paths))
     return {
-        "ok": all(segment["state"] != "fail" for segment in segments),
+        "chain_state": _derive_chain_state(segments),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "segments": segments,
     }
