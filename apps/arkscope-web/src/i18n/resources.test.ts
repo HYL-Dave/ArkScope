@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 785,
+      settings: 827,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -791,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1869);
+      expect(total, `${locale}.total`).toBe(1911);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1149,6 +1149,50 @@ describe("bundled i18n resources", () => {
       "providers.accountUsage.syncClaudeCost",
       "providers.accountUsage.fiveHourWindow",
       "providers.accountUsage.sevenDayWindow",
+      "dataSources.extension.degraded",
+      "dataSources.extension.workloads.alphaPicks",
+      "dataSources.extension.workloads.marketNews",
+      "dataSources.extension.status.captureDegraded",
+      "dataSources.extension.status.legacyCauseAbsent",
+      "dataSources.extension.status.diagnosticsRejected",
+      "dataSources.extension.status.additionalDiagnostics",
+      "dataSources.extension.status.captureCounts",
+      "dataSources.extension.stages.tabNavigation",
+      "dataSources.extension.stages.pageReadiness",
+      "dataSources.extension.stages.scriptInjection",
+      "dataSources.extension.stages.contentParse",
+      "dataSources.extension.stages.nativeTransport",
+      "dataSources.extension.stages.localPersistence",
+      "dataSources.extension.stages.reconciliation",
+      "dataSources.extension.stages.extensionRuntime",
+      "dataSources.extension.reasons.accessRestricted",
+      "dataSources.extension.reasons.loginRequired",
+      "dataSources.extension.reasons.modalBlocked",
+      "dataSources.extension.reasons.navigationTimeout",
+      "dataSources.extension.reasons.detailTimeout",
+      "dataSources.extension.reasons.domNotReady",
+      "dataSources.extension.reasons.parserEmpty",
+      "dataSources.extension.reasons.nativeHostUnavailable",
+      "dataSources.extension.reasons.extensionDependencyMissing",
+      "dataSources.extension.reasons.reconciliationFailed",
+      "dataSources.extension.reasons.commentScanFailed",
+      "dataSources.extension.reasons.unknownFailure",
+      "dataSources.extension.reasons.tabClosed",
+      "dataSources.extension.reasons.browserApiFailed",
+      "dataSources.extension.reasons.scriptInjectionFailed",
+      "dataSources.extension.reasons.nativeResponseInvalid",
+      "dataSources.extension.reasons.databaseBusy",
+      "dataSources.extension.reasons.databaseIntegrityFailed",
+      "dataSources.extension.reasons.databaseWriteFailed",
+      "dataSources.extension.developer.jobName",
+      "dataSources.extension.developer.stage",
+      "dataSources.extension.developer.reason",
+      "dataSources.extension.developer.target",
+      "dataSources.extension.developer.occurredAt",
+      "dataSources.extension.developer.retryable",
+      "dataSources.extension.developer.attemptCount",
+      "dataSources.extension.developer.recurrence",
+      "dataSources.extension.developer.omittedCount",
       "macroStorage.schedule.disabled",
       "macroStorage.schedule.enabledCount_one",
       "macroStorage.schedule.enabledCount_other",
@@ -1202,6 +1246,8 @@ describe("bundled i18n resources", () => {
       "dataStorage.update.generatedAt",
       "macroStorage.snapshot.autoEnabled",
       "macroStorage.snapshot.autoDisabled",
+      "dataSources.extension.status.detailFailuresRecorded_one",
+      "dataSources.extension.status.detailFailuresRecorded_other",
     ] as const;
     const expectedSubtreeCounts = {
       actions: 18,

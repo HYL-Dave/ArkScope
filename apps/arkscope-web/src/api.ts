@@ -2733,6 +2733,77 @@ export function getSAFeed(params: {
   return getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000);
 }
 
+export type SAExtensionChainState = "available" | "degraded" | "interrupted";
+export type SAExtensionCaptureOutcome = "complete" | "skipped" | "degraded" | "failed";
+export type SAExtensionJobName = "sa_alpha_picks_refresh" | "sa_market_news_refresh";
+export type SAExtensionDiagnosticsStatus = "recorded" | "rejected" | "absent";
+export type SAExtensionDiagnosticStage =
+  | "tab_navigation"
+  | "page_readiness"
+  | "script_injection"
+  | "content_parse"
+  | "native_transport"
+  | "local_persistence"
+  | "reconciliation"
+  | "extension_runtime";
+export type SAExtensionDiagnosticTargetKind =
+  | "article_detail"
+  | "article_comments"
+  | "market_news_detail"
+  | "phase";
+export type SAExtensionDiagnosticReason =
+  | "access_restricted"
+  | "login_required"
+  | "modal_blocked"
+  | "navigation_timeout"
+  | "detail_timeout"
+  | "dom_not_ready"
+  | "parser_empty"
+  | "native_host_unavailable"
+  | "detail_save_failed"
+  | "extension_dependency_missing"
+  | "interrupted"
+  | "unknown_failure"
+  | "protocol_invalid"
+  | "manifest_invalid"
+  | "current_scope_failed"
+  | "closed_scope_failed"
+  | "article_metadata_failed"
+  | "article_detail_failed"
+  | "comment_scan_failed"
+  | "reconciliation_failed"
+  | "list_navigation_failed"
+  | "list_scrape_failed"
+  | "metadata_save_failed"
+  | "detail_queue_failed"
+  | "capture_readback_failed"
+  | "tab_closed"
+  | "browser_api_failed"
+  | "script_injection_failed"
+  | "native_response_invalid"
+  | "database_busy"
+  | "database_integrity_failed"
+  | "database_write_failed";
+
+export interface SAExtensionDiagnosticEntry {
+  occurred_at: string;
+  stage: SAExtensionDiagnosticStage;
+  reason_code: SAExtensionDiagnosticReason;
+  target_kind: SAExtensionDiagnosticTargetKind;
+  target_ref?: string;
+  retryable: boolean;
+  attempt_count: number;
+  message?: string;
+}
+
+export interface SAExtensionDiagnosticRecurrence {
+  job_name: SAExtensionJobName;
+  stage: SAExtensionDiagnosticStage;
+  reason_code: SAExtensionDiagnosticReason;
+  affected_run_count: number;
+  latest_occurred_at: string;
+}
+
 export interface SAExtensionHealthSegment {
   key: string;
   state: "ok" | "warn" | "fail";
@@ -2742,10 +2813,17 @@ export interface SAExtensionHealthSegment {
   run_id?: number | null;
   manifest_hash_prefix?: string | null;
   occurred_at?: string | null;
+  job_name?: SAExtensionJobName | null;
+  outcome?: SAExtensionCaptureOutcome | null;
+  diagnostics_status?: SAExtensionDiagnosticsStatus | null;
+  diagnostics_error_code?: "invalid_extension_diagnostics" | null;
+  diagnostics?: SAExtensionDiagnosticEntry[];
+  diagnostics_omitted_count?: number;
+  diagnostic_recurrence?: SAExtensionDiagnosticRecurrence[];
 }
 
 export interface SAExtensionHealthResponse {
-  ok: boolean;
+  chain_state: SAExtensionChainState;
   generated_at: string;
   segments: SAExtensionHealthSegment[];
 }

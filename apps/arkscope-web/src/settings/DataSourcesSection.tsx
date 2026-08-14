@@ -49,6 +49,21 @@ import {
 } from "./dataScheduleControls";
 import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
 
+function saChainPresentation(
+  state: SAExtensionHealthResponse["chain_state"],
+  t: SettingsT,
+) {
+  switch (state) {
+    case "available":
+      return { state: "ready" as const, label: t(($) => $.dataSources.extension.available) };
+    case "degraded":
+      return { state: "partial" as const, label: t(($) => $.dataSources.extension.degraded) };
+    case "interrupted":
+    default:
+      return { state: "interrupted" as const, label: t(($) => $.dataSources.extension.interrupted) };
+  }
+}
+
 function retainedCacheValue<T>(
   settingsReadCache: SettingsReadCache,
   key: SettingsReadKey,
@@ -640,12 +655,14 @@ export function DataSourcesSection({
           <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
         ) : (
           <>
-            <p className="muted tiny">
-              {saExtensionHealth.ok
-                ? t(($) => $.dataSources.extension.available)
-                : t(($) => $.dataSources.extension.interrupted)}
-              {" · "}{shortTs(saExtensionHealth.generated_at)}
-            </p>
+            <div
+              className="muted tiny"
+              data-testid="sa-chain-state"
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <StatusBadge {...saChainPresentation(saExtensionHealth.chain_state, t)} />
+              <span>{shortTs(saExtensionHealth.generated_at)}</span>
+            </div>
             <div className="settings-table-scroll" data-testid="sa-health-scroll">
               <table className="data-table settings-sa-health-table">
                 <thead>

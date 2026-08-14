@@ -456,7 +456,7 @@ vi.mock("./api", async (importOriginal) => {
     })),
     getProvidersHealth: vi.fn(async () => health),
     getSAExtensionHealth: vi.fn(async () => ({
-      ok: false,
+      chain_state: "degraded" as const,
       generated_at: "2026-07-12T00:00:00+00:00",
       segments: [{
         key: "capture_readback",
@@ -689,7 +689,8 @@ describe("Settings provider config authority", () => {
     const second = { ...first, generated_at: "2026-08-09T02:05:00+00:00" };
     vi.mocked(getSAExtensionHealth)
       .mockResolvedValueOnce(first)
-      .mockResolvedValueOnce(second);
+      .mockResolvedValueOnce(second)
+      .mockRejectedValueOnce(new Error("PLANTED_LOCAL_HEALTH_READ_FAILURE"));
     clearDataSourceReadMocks();
     expect(cache.inspect("sa_extension_health").status).toBe("missing");
 
@@ -712,6 +713,21 @@ describe("Settings provider config authority", () => {
       status: "fresh",
       value: second,
     });
+
+    clearDataSourceReadMocks();
+    await act(async () => {
+      recheck.click();
+      await Promise.resolve();
+    });
+    expect(getSAExtensionHealth).toHaveBeenCalledOnce();
+    expect(getSchedule).not.toHaveBeenCalled();
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(cache.inspect<typeof second>("sa_extension_health")).toMatchObject({
+      status: "fresh",
+      value: second,
+    });
+    expect(host!.textContent).not.toContain("PLANTED_LOCAL_HEALTH_READ_FAILURE");
   });
 
   it("invalidates_price_news_and_unknown_downstream_keys_after_source_completion", async () => {
@@ -1581,35 +1597,75 @@ describe("Settings provider config authority", () => {
 
   it("keeps structured SA telemetry raw detail out of normal mode", async () => {
     vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
-      ok: false,
+      chain_state: "available",
       generated_at: "2026-07-25T03:00:00+00:00",
       segments: [{
         key: "telemetry_last",
-        state: "fail",
-        code: "detail_failures_recorded",
-        counts: { failed_retryable: 18, item_total: 18 },
+        state: "warn",
+        code: "capture_degraded",
+        job_name: "sa_market_news_refresh",
+        outcome: "degraded",
+        counts: { repaired: 17, failed_retryable: 1, item_total: 18 },
         run_id: 16417,
         occurred_at: "2026-07-25T03:00:00+00:00",
+        diagnostics_status: "recorded",
+        diagnostics_error_code: null,
+        diagnostics: [{
+          occurred_at: "2026-07-25T02:59:40+00:00",
+          stage: "local_persistence",
+          reason_code: "database_write_failed",
+          target_kind: "market_news_detail",
+          retryable: true,
+          attempt_count: 2,
+          message: "PLANTED_RAW_EXTENSION_TRACEBACK",
+        }],
+        diagnostics_omitted_count: 0,
+        diagnostic_recurrence: [],
         detail: "PLANTED_RAW_EXTENSION_TRACEBACK",
       }],
     });
 
     await renderDataSources(undefined, false);
 
-    expect(host!.textContent).toContain("已記錄 18 筆可重試的詳情失敗");
+    expect(host!.textContent).toContain("市場新聞");
+    expect(host!.textContent).toContain("擷取部分完成");
+    expect(host!.textContent).toContain("本機資料庫寫入失敗");
     expect(host!.textContent).not.toContain("PLANTED_RAW_EXTENSION_TRACEBACK");
     expect(host!.querySelector('[data-testid="developer-diagnostics"]')).toBeNull();
   });
 
-  it("shows only the stable SA health code in Developer Mode", async () => {
+  it("renders only admitted SA diagnostic fields in Developer Mode", async () => {
     vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
-      ok: false,
+      chain_state: "available",
       generated_at: "2026-07-25T03:00:00+00:00",
       segments: [{
         key: "telemetry_last",
-        state: "fail",
-        code: "detail_failures_recorded",
-        counts: { failed_retryable: 3, item_total: 3 },
+        state: "warn",
+        code: "capture_degraded",
+        job_name: "sa_market_news_refresh",
+        outcome: "degraded",
+        counts: { failed_retryable: 1, item_total: 3 },
+        occurred_at: "2026-07-25T03:00:00+00:00",
+        diagnostics_status: "recorded",
+        diagnostics_error_code: null,
+        diagnostics: [{
+          occurred_at: "2026-07-25T02:59:40+00:00",
+          stage: "native_transport",
+          reason_code: "native_host_unavailable",
+          target_kind: "phase",
+          target_ref: "native-save",
+          retryable: true,
+          attempt_count: 3,
+          message: "PLANTED_RAW_EXTENSION_SECRET",
+        }],
+        diagnostics_omitted_count: 1,
+        diagnostic_recurrence: [{
+          job_name: "sa_market_news_refresh",
+          stage: "native_transport",
+          reason_code: "native_host_unavailable",
+          affected_run_count: 2,
+          latest_occurred_at: "2026-07-25T02:59:40+00:00",
+        }],
         detail: "PLANTED_RAW_EXTENSION_SECRET",
       }],
     });
@@ -1617,32 +1673,124 @@ describe("Settings provider config authority", () => {
     await renderDataSources(undefined, true);
 
     const diagnostics = host!.querySelector('[data-testid="developer-diagnostics"]');
-    expect(diagnostics?.textContent).toContain("開發者代碼：detail_failures_recorded");
+    expect(diagnostics?.textContent).toContain("工作：市場新聞");
+    expect(diagnostics?.textContent).toContain("階段：Native 傳輸");
+    expect(diagnostics?.textContent).toContain("原因：Native host 無法使用");
+    expect(diagnostics?.textContent).toContain("目標：phase (native-save)");
+    expect(diagnostics?.textContent).toContain("重複出現：市場新聞 / Native 傳輸 / Native host 無法使用 / 2");
     expect(host!.textContent).not.toContain("PLANTED_RAW_EXTENSION_SECRET");
   });
 
-  it("renders a localized degraded SA health row in English", async () => {
-    await i18n.changeLanguage("en");
+  it("renders all three SA chain states with distinct copy and tone", async () => {
+    const cases = [
+      ["available", "鏈路可用", "ready"],
+      ["degraded", "鏈路部分受限", "partial"],
+      ["interrupted", "鏈路有中斷", "interrupted"],
+    ] as const;
+
+    for (const [chainState, copy, tone] of cases) {
+      disposeDataSources();
+      vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+        chain_state: chainState,
+        generated_at: "2026-07-25T03:00:00+00:00",
+        segments: [],
+      });
+      await renderDataSources(undefined, false);
+      const state = host!.querySelector("[data-testid='sa-chain-state']");
+      expect(state?.textContent).toContain(copy);
+      expect(state?.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe(tone);
+    }
+  });
+
+  it("renders degraded Alpha Picks history without interrupting a healthy chain", async () => {
     vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
-      ok: false,
-      generated_at: "2026-07-25T03:00:00+00:00",
+      chain_state: "available",
+      generated_at: "2026-08-14T01:02:00+00:00",
       segments: [{
-        key: "market_news_repair",
-        state: "fail",
-        code: "repair_retryable",
-        counts: { repaired: 6, failed_retryable: 2 },
-        run_id: 52,
-        manifest_hash_prefix: "123456abcdef",
+        key: "telemetry_last",
+        state: "warn",
+        code: "capture_degraded",
+        job_name: "sa_alpha_picks_refresh",
+        outcome: "degraded",
+        counts: { item_total: 18, repaired: 17, failed_retryable: 1 },
+        occurred_at: "2026-08-14T01:01:00+00:00",
+        diagnostics_status: "recorded",
+        diagnostics_error_code: null,
+        diagnostics: [{
+          occurred_at: "2026-08-14T01:00:40+00:00",
+          stage: "page_readiness",
+          reason_code: "detail_timeout",
+          target_kind: "article_detail",
+          retryable: true,
+          attempt_count: 1,
+        }],
+        diagnostics_omitted_count: 0,
+        diagnostic_recurrence: [],
       }],
     });
 
     await renderDataSources(undefined, false);
 
-    expect(host!.textContent).toContain("market_news_repair");
-    expect(host!.textContent).toContain(
-      "2 items remain retryable · Manifest 123456abcdef",
-    );
-    expect(host!.textContent).toContain("Failed");
+    const chain = host!.querySelector("[data-testid='sa-chain-state']");
+    expect(chain?.textContent).toContain("鏈路可用");
+    expect(chain?.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+    expect(host!.textContent).toContain("Alpha Picks");
+    expect(host!.textContent).toContain("擷取部分完成");
+    expect(host!.textContent).toContain("17 筆完成");
+    expect(host!.textContent).toContain("08-14 09:01 Asia/Taipei");
+  });
+
+  it("labels repair as historical and never as current recovery", async () => {
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      chain_state: "available",
+      generated_at: "2026-08-14T01:02:00+00:00",
+      segments: [{
+        key: "market_news_repair",
+        state: "ok",
+        code: "repair_complete",
+        counts: { repaired: 6, failed_retryable: 0 },
+        occurred_at: "2026-08-12T15:06:00+00:00",
+        manifest_hash_prefix: "93207f170911",
+      }],
+    });
+
+    await renderDataSources(undefined, false);
+
+    expect(host!.textContent).toContain("最近一次歷史修復完成");
+    expect(host!.textContent).not.toContain("修復進行中");
+    expect(host!.textContent).not.toContain("正在修復");
+  });
+
+  it("renders a localized degraded SA health row in English", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      chain_state: "available",
+      generated_at: "2026-07-25T03:00:00+00:00",
+      segments: [{
+        key: "telemetry_last",
+        state: "warn",
+        code: "capture_degraded",
+        job_name: "sa_alpha_picks_refresh",
+        outcome: "degraded",
+        counts: { item_total: 8, repaired: 6, failed_retryable: 2 },
+        occurred_at: "2026-07-25T03:00:00+00:00",
+        diagnostics_status: "absent",
+        diagnostics_error_code: null,
+        diagnostic_recurrence: [],
+      }],
+    });
+
+    await renderDataSources(undefined, false);
+
+    expect(host!.textContent).toContain("Alpha Picks");
+    expect(host!.textContent).toContain("Capture degraded");
+    expect(host!.textContent).toContain("6 completed · 2 retryable · 8 total");
+    expect(host!.textContent).toContain("Cause was not recorded (legacy data)");
+    const telemetryRow = Array.from(
+      host!.querySelectorAll("[data-testid='sa-health-scroll'] tbody tr"),
+    ).find((row) => row.textContent?.includes("Latest telemetry"));
+    expect(telemetryRow?.querySelector(".ui-status-badge")?.getAttribute("data-state"))
+      .toBe("partial");
   });
 
   it("switches locale without resetting drafts polling cadence or progress", async () => {

@@ -112,20 +112,47 @@ describe("displaySAExtensionSegments", () => {
     }
   });
 
-  it("localizes structured detail failure counts in both locales", () => {
+  it("localizes degraded capture counts and typed diagnostic causes in both locales", () => {
     const segment: SAExtensionHealthSegment = {
       key: "telemetry_last",
-      state: "fail",
-      code: "detail_failures_recorded",
-      counts: { failed_retryable: 18, item_total: 18 },
+      state: "warn",
+      code: "capture_degraded",
+      job_name: "sa_alpha_picks_refresh",
+      outcome: "degraded",
+      counts: { repaired: 17, failed_retryable: 1, item_total: 18 },
       run_id: 16417,
       occurred_at: "2026-07-19T11:45:38+00:00",
+      diagnostics_status: "recorded",
+      diagnostics_error_code: null,
+      diagnostics: [{
+        occurred_at: "2026-07-19T11:45:30+00:00",
+        stage: "page_readiness",
+        reason_code: "navigation_timeout",
+        target_kind: "article_detail",
+        target_ref: "opaque-17",
+        retryable: true,
+        attempt_count: 2,
+        message: "PLANTED_RAW_NAVIGATION_DETAIL",
+      }],
+      diagnostics_omitted_count: 0,
+      diagnostic_recurrence: [],
     };
 
-    expect(displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0].copy)
-      .toBe("已記錄 18 筆可重試的詳情失敗");
-    expect(displaySAExtensionSegments([segment], settingsT("en"))[0].copy)
-      .toBe("18 retryable detail failures recorded");
+    const zh = displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0].copy;
+    const en = displaySAExtensionSegments([segment], settingsT("en"))[0].copy;
+    expect(zh).toContain("Alpha Picks");
+    expect(zh).toContain("擷取部分完成");
+    expect(zh).toContain("17 筆完成");
+    expect(zh).toContain("1 筆可重試");
+    expect(zh).toContain("頁面尚未就緒");
+    expect(zh).toContain("無法判定");
+    expect(en).toContain("Alpha Picks");
+    expect(en).toContain("Capture degraded");
+    expect(en).toContain("17 completed");
+    expect(en).toContain("1 retryable");
+    expect(en).toContain("Page not ready");
+    expect(en).toContain("cannot distinguish");
+    expect(JSON.stringify([zh, en])).not.toContain("PLANTED_RAW_NAVIGATION_DETAIL");
   });
 
   it("fails unknown structured codes closed to generic localized copy", () => {
@@ -143,28 +170,99 @@ describe("displaySAExtensionSegments", () => {
     expect(JSON.stringify([zh, en])).not.toContain("PLANTED_RAW_BACKEND_PROSE");
   });
 
-  it("exposes only bounded stable codes as Developer diagnostics", () => {
-    const valid: SAExtensionHealthSegment = {
+  it("exposes only admitted diagnostic fields and bounded recurrence in Developer Mode", () => {
+    const segment: SAExtensionHealthSegment = {
       key: "telemetry_last",
-      state: "fail",
-      code: "detail_failures_recorded",
-      detail: "PLANTED_RAW_DETAIL",
-    };
-    const unsafe: SAExtensionHealthSegment = {
-      key: "market_news_repair",
-      state: "fail",
-      code: "../../home/operator/secret",
-      detail: "PLANTED_UNSAFE_DETAIL",
+      state: "warn",
+      code: "capture_degraded",
+      job_name: "sa_market_news_refresh",
+      outcome: "degraded",
+      occurred_at: "2026-08-14T01:01:00+00:00",
+      diagnostics_status: "recorded",
+      diagnostics_error_code: null,
+      diagnostics: [{
+        occurred_at: "2026-08-14T01:00:40+00:00",
+        stage: "local_persistence",
+        reason_code: "database_busy",
+        target_kind: "market_news_detail",
+        target_ref: "opaque-2",
+        retryable: true,
+        attempt_count: 3,
+        message: "PLANTED_RAW_DATABASE_MESSAGE",
+      }],
+      diagnostics_omitted_count: 2,
+      diagnostic_recurrence: [{
+        job_name: "sa_market_news_refresh",
+        stage: "local_persistence",
+        reason_code: "database_busy",
+        affected_run_count: 4,
+        latest_occurred_at: "2026-08-14T01:00:40+00:00",
+      }],
     };
 
-    const rows = displaySAExtensionSegments(
-      [valid, unsafe],
-      settingsT("en"),
-      true,
-    );
-    expect(rows[0].diagnostic).toBe("Developer code: detail_failures_recorded");
-    expect(rows[1].diagnostic).toBeNull();
-    expect(JSON.stringify(rows)).not.toContain("PLANTED_");
+    const row = displaySAExtensionSegments([segment], settingsT("en"), true)[0];
+    expect(row.diagnostic).toContain("Job: Market News");
+    expect(row.diagnostic).toContain("Stage: Local persistence");
+    expect(row.diagnostic).toContain("Reason: Local database busy");
+    expect(row.diagnostic).toContain("Target: market_news_detail (opaque-2)");
+    expect(row.diagnostic).toContain("Retryable: true");
+    expect(row.diagnostic).toContain("Attempt: 3");
+    expect(row.diagnostic).toContain("Omitted diagnostics: 2");
+    expect(row.diagnostic).toContain("Recurrence: Market News / Local persistence / Local database busy / 4");
+    expect(JSON.stringify(row)).not.toContain("PLANTED_RAW_DATABASE_MESSAGE");
+  });
+
+  it("distinguishes browser readiness native transport and local persistence without raw detail", () => {
+    const cases = [
+      ["page_readiness", "dom_not_ready", "頁面尚未就緒"],
+      ["native_transport", "native_host_unavailable", "Native 傳輸"],
+      ["local_persistence", "database_write_failed", "本機資料庫寫入失敗"],
+    ] as const;
+
+    const copies = cases.map(([stage, reason]) => displaySAExtensionSegments([{
+      key: "telemetry_last",
+      state: "fail",
+      code: "capture_failed",
+      job_name: "sa_market_news_refresh",
+      outcome: "failed",
+      occurred_at: "2026-08-14T01:01:00+00:00",
+      diagnostics_status: "recorded",
+      diagnostics_error_code: null,
+      diagnostics: [{
+        occurred_at: "2026-08-14T01:00:40+00:00",
+        stage,
+        reason_code: reason,
+        target_kind: "phase",
+        retryable: true,
+        attempt_count: 1,
+        message: `PLANTED_RAW_${stage}`,
+      }],
+      diagnostics_omitted_count: 0,
+      diagnostic_recurrence: [],
+    }], settingsT("zh-Hant"))[0].copy);
+
+    cases.forEach(([, , expected], index) => expect(copies[index]).toContain(expected));
+    expect(new Set(copies).size).toBe(3);
+    expect(JSON.stringify(copies)).not.toContain("PLANTED_RAW_");
+  });
+
+  it("renders legacy diagnostic absence without inventing a cause", () => {
+    const row = displaySAExtensionSegments([{
+      key: "telemetry_last",
+      state: "fail",
+      code: "capture_failed",
+      job_name: "sa_market_news_refresh",
+      outcome: "failed",
+      occurred_at: "2026-08-14T02:00:00+00:00",
+      diagnostics_status: "absent",
+      diagnostics_error_code: null,
+      diagnostic_recurrence: [],
+      detail: "PLANTED_INFERRED_NETWORK_CAUSE",
+    }], settingsT("zh-Hant"))[0];
+
+    expect(row.copy).toContain("原因未記錄（舊版資料）");
+    expect(JSON.stringify(row)).not.toContain("PLANTED_INFERRED_NETWORK_CAUSE");
+    expect(row.copy).not.toContain("網路");
   });
 
   it("localizes active and retryable repair state with a bounded manifest prefix", () => {
@@ -185,8 +283,8 @@ describe("displaySAExtensionSegments", () => {
     };
 
     expect(displaySAExtensionSegments([active], settingsT("zh-Hant"))[0].copy)
-      .toBe("修復進行中 · Manifest abcdef123456");
+      .toBe("最近一次歷史修復仍在執行 · Manifest abcdef123456");
     expect(displaySAExtensionSegments([retryable], settingsT("en"))[0].copy)
-      .toBe("2 items remain retryable · Manifest 123456abcdef");
+      .toBe("Latest historical repair has 2 retryable items · Manifest 123456abcdef");
   });
 });
