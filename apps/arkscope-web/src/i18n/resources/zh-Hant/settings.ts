@@ -456,9 +456,9 @@ const settings = {
       snapshotAvailable: "資料快照可用：{{seriesCount}} 序列 · {{value}} 觀測值",
       noData: "尚無資料",
       latestFetched: "最後抓取 {{timestamp}}",
-      autoEnabled: "自動擷取設定已開啟（尚未接入 App 排程）",
-      autoDisabled: "自動擷取設定未開啟",
-      autoUnknown: "無法確認自動擷取設定",
+      autoEnabled: "App 自動更新已啟用",
+      autoDisabled: "App 自動更新未啟用",
+      autoUnknown: "無法確認 App 自動更新狀態",
     },
     guard: {
       busy: "資料來源設定更新正在進行。",
@@ -838,7 +838,7 @@ const settings = {
   },
   macroStorage: {
     title: "總經資料",
-    description: "查看本地 FRED 序列快照、儲存量與事件資料覆蓋。總經資料尚未接入 App 排程，也無法從本頁手動更新；重新讀取狀態不會向 provider 抓取資料。",
+    description: "查看本地 FRED 序列快照、儲存量與事件資料覆蓋。可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行；「重新讀取狀態」只會讀取本機資料，不會向資料供應商抓取資料。",
     loading: "載入中…",
     availability: {
       tableUnavailable: "不可用",
@@ -852,8 +852,12 @@ const settings = {
     },
     snapshot: {
       title: "FRED 快照",
-      autoEnabled: "自動擷取設定已開啟（尚未接入 App 排程）",
-      autoDisabled: "自動擷取設定未開啟",
+    },
+    schedule: {
+      disabled: "App 自動更新未啟用",
+      enabledCount_one: "{{count}} 個資料來源已啟用 App 自動更新",
+      enabledCount_other: "{{count}} 個資料來源已啟用 App 自動更新",
+      unknown: "無法確認 App 自動更新狀態",
     },
     kinds: {
       fredSeries: "FRED 序列",

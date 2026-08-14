@@ -45,7 +45,7 @@ import {
 } from "./settingsNavigationGuard";
 import {
   DataScheduleTable,
-  useDataScheduleControls,
+  useSharedDataScheduleControls,
 } from "./dataScheduleControls";
 import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
 
@@ -166,7 +166,7 @@ export function DataSourcesSection({
 }) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
-  const scheduleController = useDataScheduleControls(settingsReadCache);
+  const scheduleController = useSharedDataScheduleControls();
   const schedule = scheduleController.schedule;
   const [initialHealth] = useState(() =>
     retainedCacheValue<ProvidersHealthResponse>(settingsReadCache, "provider_health"));

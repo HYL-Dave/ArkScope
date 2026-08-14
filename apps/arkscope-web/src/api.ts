@@ -2521,7 +2521,6 @@ export interface MacroSnapshot {
   observation_count: number;
   release_dates_count: number;
   latest_fetched_at: string | null;
-  auto_refresh_enabled: boolean;
   items: MacroSnapshotItem[];
   missing_series: string[];
 }

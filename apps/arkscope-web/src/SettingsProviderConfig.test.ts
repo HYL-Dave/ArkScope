@@ -484,6 +484,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { SettingsView } from "./Settings";
 import { DataSourcesSection } from "./settings/DataSourcesSection";
+import { DataScheduleControlsProvider } from "./settings/dataScheduleControls";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -525,11 +526,17 @@ async function renderDataSources(
   root = createRoot(host);
   await act(async () => {
     root!.render(onNavigationGuardChange
-      ? React.createElement(DataSourcesSection, {
-          onNavigationGuardChange,
-          developerMode,
-          settingsReadCache,
-        })
+      ? React.createElement(
+          DataScheduleControlsProvider,
+          {
+            settingsReadCache,
+            children: React.createElement(DataSourcesSection, {
+              onNavigationGuardChange,
+              developerMode,
+              settingsReadCache,
+            }),
+          },
+        )
       : withTestUiLocale(React.createElement(SettingsView, {
           runtime: null,
           developerMode,
@@ -1078,7 +1085,9 @@ describe("Settings provider config authority", () => {
     expect(providerRow.querySelector(".muted")).not.toBeNull();
 
     const zhRows = Array.from(
-      host!.querySelectorAll<HTMLTableRowElement>("[data-testid='schedule-scroll'] tbody tr"),
+      host!.querySelectorAll<HTMLTableRowElement>(
+        "[data-settings-location='source_schedules'] [data-testid='schedule-scroll'] tbody tr",
+      ),
     );
     expect(zhRows).toHaveLength(10);
     for (const row of zhRows) {
@@ -1092,7 +1101,9 @@ describe("Settings provider config authority", () => {
 
     await act(async () => { await i18n.changeLanguage("en"); });
     const enRows = Array.from(
-      host!.querySelectorAll<HTMLTableRowElement>("[data-testid='schedule-scroll'] tbody tr"),
+      host!.querySelectorAll<HTMLTableRowElement>(
+        "[data-settings-location='source_schedules'] [data-testid='schedule-scroll'] tbody tr",
+      ),
     );
     expect(enRows).toHaveLength(10);
     for (const row of enRows) {
@@ -1151,7 +1162,7 @@ describe("Settings provider config authority", () => {
       expect(row.textContent).toContain("App");
       expect(row.textContent).toContain("資料快照可用：— 序列 · 29,571 觀測值");
       expect(row.textContent).not.toContain("資料快照可用：0 序列");
-      expect(row.textContent).toContain("自動擷取設定未開啟");
+      expect(row.textContent).toContain("App 自動更新未啟用");
       expect(row.textContent).not.toContain("攝入");
       expect(row.textContent).not.toContain("未啟用抓取");
       expect(row.textContent).not.toContain("已停用");

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -57,6 +65,8 @@ export type DataScheduleController = {
   reloadSchedule(): Promise<void>;
   pollSchedule(): Promise<void>;
 };
+
+const DataScheduleControlsContext = createContext<DataScheduleController | null>(null);
 
 function retainedSchedule(cache: SettingsReadCache): ScheduleResponse | null {
   const inspected = cache.inspect<ScheduleResponse>("data_schedule");
@@ -256,6 +266,29 @@ export function useDataScheduleControls(
   };
 }
 
+export function DataScheduleControlsProvider({
+  settingsReadCache,
+  children,
+}: {
+  settingsReadCache: SettingsReadCache;
+  children: ReactNode;
+}) {
+  const controller = useDataScheduleControls(settingsReadCache);
+  return (
+    <DataScheduleControlsContext.Provider value={controller}>
+      {children}
+    </DataScheduleControlsContext.Provider>
+  );
+}
+
+export function useSharedDataScheduleControls(): DataScheduleController {
+  const controller = useContext(DataScheduleControlsContext);
+  if (controller === null) {
+    throw new Error("Data schedule controls require a provider");
+  }
+  return controller;
+}
+
 function jobOutcome(
   jobs: ProvidersHealthResponse["jobs"] | undefined,
   jobName: string,
@@ -380,7 +413,7 @@ export function DataScheduleTable({
               const copy = scheduleSourceCopy(source, t);
               return (
                 <tr key={source} data-source-id={source}>
-                  <td>
+                  <td className="settings-schedule-source-cell">
                     {copy.label}
                     <div className="muted tiny">{copy.description}</div>
                   </td>

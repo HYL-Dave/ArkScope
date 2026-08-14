@@ -13,6 +13,7 @@ import {
 import { formatSystemTimestamp } from "../timeDisplay";
 import { Button } from "../ui/Button";
 import { InlineAlert } from "../ui/Status";
+import { DataScheduleTable, useSharedDataScheduleControls } from "./dataScheduleControls";
 import type { SettingsT } from "./settingsCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
 
@@ -23,6 +24,14 @@ const MACRO_TABLE_KEYS = [
   "cal_economic_events",
   "cal_earnings_events",
   "cal_ipo_events",
+] as const;
+
+const MACRO_SCHEDULE_SOURCE_IDS = [
+  "fred_series",
+  "fred_release_dates",
+  "finnhub_economic_calendar",
+  "finnhub_earnings_calendar",
+  "finnhub_ipo_calendar",
 ] as const;
 
 function macroTableLabel(key: typeof MACRO_TABLE_KEYS[number], t: SettingsT): string {
@@ -66,6 +75,7 @@ export function MacroStorageSection({
   settingsReadCache: SettingsReadCache;
 }) {
   const { t } = useTranslation("settings");
+  const scheduleController = useSharedDataScheduleControls();
   const [status, setStatus] = useState<MacroStatus | null>(() => {
     const inspected = settingsReadCache.inspect<MacroStatus>("macro_status");
     return inspected.status === "missing" ? null : inspected.value;
@@ -131,6 +141,18 @@ export function MacroStorageSection({
     && (statusUnavailable || snapshotUnavailable);
   const domainUnavailable = (status != null && !statusAvailable)
     || (snapshot != null && !snapshot.available);
+  const enabledScheduleCount = scheduleController.schedule === null
+    ? null
+    : MACRO_SCHEDULE_SOURCE_IDS.filter(
+        (source) => scheduleController.schedule?.[source]?.enabled,
+      ).length;
+  const automationStatus = enabledScheduleCount === null
+    ? t(($) => $.macroStorage.schedule.unknown)
+    : enabledScheduleCount === 0
+      ? t(($) => $.macroStorage.schedule.disabled)
+      : enabledScheduleCount === 1
+        ? t(($) => $.macroStorage.schedule.enabledCount_one, { count: enabledScheduleCount })
+        : t(($) => $.macroStorage.schedule.enabledCount_other, { count: enabledScheduleCount });
 
   return (
     <div>
@@ -186,6 +208,17 @@ export function MacroStorageSection({
         </div>
       ) : null}
 
+      <div className="settings-panel">
+        <div className="settings-section-head">
+          <h3>{t(($) => $.dataSources.schedule.title)}</h3>
+          <span className="muted tiny">{automationStatus}</span>
+        </div>
+        <DataScheduleTable
+          controller={scheduleController}
+          sourceIds={MACRO_SCHEDULE_SOURCE_IDS}
+        />
+      </div>
+
       {snapshot?.available ? (
         <div className="settings-panel">
           <div className="settings-section-head">
@@ -204,11 +237,6 @@ export function MacroStorageSection({
                     })}
               </p>
             </div>
-            <span className="muted tiny">
-              {snapshot.auto_refresh_enabled
-                ? t(($) => $.macroStorage.snapshot.autoEnabled)
-                : t(($) => $.macroStorage.snapshot.autoDisabled)}
-            </span>
           </div>
 
           {snapshot.items.length === 0 ? (

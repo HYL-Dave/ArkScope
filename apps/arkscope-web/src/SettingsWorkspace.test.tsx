@@ -385,6 +385,7 @@ beforeEach(() => {
     loader.mockReset();
     loader.mockResolvedValue({});
   }
+  mocks.getSchedule.mockResolvedValue({ sources: {} });
   mocks.saveModelRoutes.mockReset();
   mocks.saveModelRoutes.mockResolvedValue(undefined);
   mocks.importModelRoutes.mockReset();

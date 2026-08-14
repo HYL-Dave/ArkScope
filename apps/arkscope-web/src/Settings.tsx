@@ -45,6 +45,7 @@ import { DataSourcesSection } from "./settings/DataSourcesSection";
 import { DataStorageSection } from "./settings/DataStorageSection";
 import { DeveloperDiagnostics } from "./settings/DeveloperDiagnostics";
 import { MacroStorageSection } from "./settings/MacroStorageSection";
+import { DataScheduleControlsProvider } from "./settings/dataScheduleControls";
 import {
   ModelRoutingSection,
   type DraftRoute,
@@ -1058,23 +1059,30 @@ export function SettingsView({
     />
   );
 
-  const tabItems: readonly TabItem<SettingsGroupId>[] = SETTINGS_GROUPS.map((group) => ({
-    value: group.id,
-    label: settingsWorkspaceTabLabel(group.id, t),
-    tabRef: tabRefFor(group.id),
-    panel: (
-      <div className="settings-workspace-layout">
-        {!shellOverlay ? <aside className="settings-directory-rail">{directory}</aside> : null}
-        <div className="settings-workspace-groups">
-          {group.sections.map((definition) => (
-            <SettingsSectionAnchor id={definition.id} key={definition.id}>
-              {renderSection(definition.id)}
-            </SettingsSectionAnchor>
-          ))}
+  const tabItems: readonly TabItem<SettingsGroupId>[] = SETTINGS_GROUPS.map((group) => {
+    const sections = group.sections.map((definition) => (
+      <SettingsSectionAnchor id={definition.id} key={definition.id}>
+        {renderSection(definition.id)}
+      </SettingsSectionAnchor>
+    ));
+    return {
+      value: group.id,
+      label: settingsWorkspaceTabLabel(group.id, t),
+      tabRef: tabRefFor(group.id),
+      panel: (
+        <div className="settings-workspace-layout">
+          {!shellOverlay ? <aside className="settings-directory-rail">{directory}</aside> : null}
+          <div className="settings-workspace-groups">
+            {group.id === "data_sync" ? (
+              <DataScheduleControlsProvider settingsReadCache={readCache}>
+                {sections}
+              </DataScheduleControlsProvider>
+            ) : sections}
+          </div>
         </div>
-      </div>
-    ),
-  }));
+      ),
+    };
+  });
   const routeOutcomePresentation = routeOutcome
     ? settingsRouteOutcomePresentation(routeOutcome, t)
     : null;

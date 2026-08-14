@@ -162,6 +162,29 @@ describe("Settings workspace CSS contract", () => {
     expect(ledeIndex).toBeLessThan(settingsSource.indexOf("<Tabs"));
   });
 
+  it("allocates reviewed schedule columns without overlapping controls", () => {
+    const expectedWidths = ["30%", "11%", "12%", "12%", "35%"];
+    for (const [index, width] of expectedWidths.entries()) {
+      expect(ruleBodyFrom(
+        stylesCss,
+        `.settings-schedule-table th:nth-child(${index + 1})`,
+      )).toMatch(new RegExp(`width:\\s*${width.replace("%", "\\%")}`));
+    }
+  });
+
+  it("wraps schedule source copy inside the source column", () => {
+    const sourceCell = ruleBodyFrom(
+      stylesCss,
+      ".settings-schedule-table td.settings-schedule-source-cell",
+    );
+
+    expect(settingsSources).toContain('className="settings-schedule-source-cell"');
+    expect(sourceCell).toMatch(/white-space:\s*normal/);
+    expect(sourceCell).toMatch(/overflow-wrap:\s*anywhere/);
+    expect(sourceCell).toMatch(/vertical-align:\s*top/);
+    expect(sourceCell).toMatch(/line-height:\s*1\.45/);
+  });
+
   it("defines_every_literal_class_in_extracted_settings_modules", () => {
     const classes = [...new Set(settingsSourcePaths.flatMap((path) =>
       literalClasses(readFileSync(path, "utf8"))))];

@@ -140,14 +140,18 @@ async function renderControls({
   sourceIds?: readonly string[];
   externalBusy?: boolean;
 } = {}): Promise<Harness> {
-  const { DataScheduleTable, useDataScheduleControls } = await controlsModule();
+  const {
+    DataScheduleControlsProvider,
+    DataScheduleTable,
+    useSharedDataScheduleControls,
+  } = await controlsModule();
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
   const latest: any[] = [];
 
   function Consumer({ index }: { index: number }) {
-    const controller = useDataScheduleControls(cache);
+    const controller = useSharedDataScheduleControls();
     latest[index] = controller;
     return index === 0 && sourceIds
       ? React.createElement(DataScheduleTable, { controller, sourceIds, externalBusy })
@@ -156,8 +160,8 @@ async function renderControls({
 
   await act(async () => {
     root.render(React.createElement(
-      React.Fragment,
-      null,
+      DataScheduleControlsProvider,
+      { settingsReadCache: cache },
       ...Array.from({ length: consumers }, (_, index) =>
         React.createElement(Consumer, { key: index, index })),
     ));
@@ -240,17 +244,23 @@ afterEach(() => {
 
 describe("Data schedule controls", () => {
   it("shares one schedule read across visible consumers", async () => {
+    await controlsModule();
+    vi.useFakeTimers();
     const harness = await renderControls({ consumers: 2 });
     const dataSourcesOwner = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");
 
     expect(getSchedule).toHaveBeenCalledOnce();
-    expect(harness.current(0).schedule).toEqual(harness.current(1).schedule);
+    expect(harness.current(0)).toBe(harness.current(1));
     expect(Object.keys(harness.current(0).schedule)).toEqual([
       "polygon_news",
       "fred_series",
       "fred_release_dates",
     ]);
-    expect(dataSourcesOwner).toContain("useDataScheduleControls(settingsReadCache)");
+    act(() => { vi.advanceTimersByTime(30_000); });
+    await settle();
+    expect(getSchedule).toHaveBeenCalledTimes(2);
+    expect(dataSourcesOwner).toContain("useSharedDataScheduleControls()");
+    expect(dataSourcesOwner).not.toContain("useDataScheduleControls(settingsReadCache)");
     expect(dataSourcesOwner).toContain("<DataScheduleTable");
     expect(dataSourcesOwner).not.toMatch(/\bgetSchedule\b|\bputSchedule\b|\brunScheduleNow\b/);
     harness.unmount();

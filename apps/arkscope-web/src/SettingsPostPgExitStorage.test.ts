@@ -83,7 +83,6 @@ const macroSnapshot: MacroSnapshot = {
   observation_count: 29_571,
   release_dates_count: 3,
   latest_fetched_at: "2026-07-01T00:00:00+00:00",
-  auto_refresh_enabled: false,
   items: [{
     series_id: "FEDFUNDS",
     label: "Fed Funds",
@@ -567,18 +566,25 @@ describe("post-PG-exit storage panels", () => {
     );
   });
 
-  it("shows_total_macro_data_without_claiming_calendar_product", async () => {
+  it("shows_macro_data_with_manual_and_scheduled_refresh_boundaries", async () => {
     await renderSettings();
 
     expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
     expect(host!.textContent).toContain("總經資料");
-    expect(host!.textContent).toContain("總經資料尚未接入 App 排程，也無法從本頁手動更新");
-    expect(host!.textContent).toContain("重新讀取狀態不會向 provider 抓取資料");
+    expect(host!.textContent).toContain(
+      "可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行",
+    );
+    expect(host!.textContent).toContain(
+      "「重新讀取狀態」只會讀取本機資料，不會向資料供應商抓取資料。",
+    );
     expect(host!.textContent).not.toContain("攝入");
     expect(host!.textContent).toContain("FRED 序列");
     expect(host!.textContent).toContain("Fed Funds");
+    expect(host!.textContent).toContain("最後抓取");
     expect(host!.textContent).not.toMatch(/Macro \/ Calendar|行事曆|Finnhub 付費方案/);
-    expect(host!.textContent).not.toMatch(/PostgreSQL|PG|SQLite|local-only|本地總經庫|本地路由/);
+    expect(host!.textContent).not.toMatch(
+      /PostgreSQL|PG|SQLite|local-only|本地總經庫|本地路由|供應商即時資料/,
+    );
   });
 
   it("does not show the completed App Records migration panel in normal settings navigation", async () => {

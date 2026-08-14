@@ -457,9 +457,9 @@ const settings = {
       snapshotAvailable: "Snapshot available: {{seriesCount}} series · {{value}} observations",
       noData: "No data yet",
       latestFetched: "Last fetched {{timestamp}}",
-      autoEnabled: "Automatic collection setting enabled (not connected to an App schedule yet)",
-      autoDisabled: "Automatic collection setting disabled",
-      autoUnknown: "Automatic collection setting unavailable",
+      autoEnabled: "App automatic updates enabled",
+      autoDisabled: "App automatic updates not enabled",
+      autoUnknown: "App automatic update status unavailable",
     },
     guard: {
       busy: "A data-source settings update is in progress.",
@@ -839,7 +839,7 @@ const settings = {
   },
   macroStorage: {
     title: "Macro Data",
-    description: "Review local FRED series snapshots, stored volume, and event-data coverage. Macro data is not connected to an App schedule and cannot be updated manually from this page; reloading status does not request provider data.",
+    description: "Review local FRED series snapshots, stored volume, and event-data coverage. Configure automatic schedules for the five sources below or choose Run now for a manual update. Reload status reads local data only and does not contact a provider.",
     loading: "Loading...",
     availability: {
       tableUnavailable: "Unavailable",
@@ -853,8 +853,12 @@ const settings = {
     },
     snapshot: {
       title: "FRED Snapshot",
-      autoEnabled: "Automatic collection setting enabled (not connected to an App schedule yet)",
-      autoDisabled: "Automatic collection setting disabled",
+    },
+    schedule: {
+      disabled: "App automatic updates not enabled",
+      enabledCount_one: "{{count}} source has App automatic updates enabled",
+      enabledCount_other: "{{count}} sources have App automatic updates enabled",
+      unknown: "App automatic update status unavailable",
     },
     kinds: {
       fredSeries: "FRED Series",

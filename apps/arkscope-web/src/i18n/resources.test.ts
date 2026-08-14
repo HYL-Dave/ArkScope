@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 783,
+      settings: 785,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -791,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1867);
+      expect(total, `${locale}.total`).toBe(1869);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1149,6 +1149,10 @@ describe("bundled i18n resources", () => {
       "providers.accountUsage.syncClaudeCost",
       "providers.accountUsage.fiveHourWindow",
       "providers.accountUsage.sevenDayWindow",
+      "macroStorage.schedule.disabled",
+      "macroStorage.schedule.enabledCount_one",
+      "macroStorage.schedule.enabledCount_other",
+      "macroStorage.schedule.unknown",
       "dataSources.schedule.sources.secCorporateActions.label",
       "dataSources.schedule.sources.secCorporateActions.description",
       "dataStorage.lifecycle.title",
@@ -1190,12 +1194,14 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.relationships.confirmAction",
       "dataStorage.lifecycle.relationships.rejectAction",
     ] as const;
-    const retiredMarketSyncPaths = [
+    const retiredSettingsPaths = [
       "dataStorage.update.title",
       "dataStorage.update.never",
       "dataStorage.update.succeeded",
       "dataStorage.update.failed",
       "dataStorage.update.generatedAt",
+      "macroStorage.snapshot.autoEnabled",
+      "macroStorage.snapshot.autoDisabled",
     ] as const;
     const expectedSubtreeCounts = {
       actions: 18,
@@ -1221,14 +1227,14 @@ describe("bundled i18n resources", () => {
       for (const path of postSliceSettingsPaths) {
         expect(flattenedSettings.has(path), `${locale}.settings.${path}`).toBe(true);
       }
-      for (const path of retiredMarketSyncPaths) {
+      for (const path of retiredSettingsPaths) {
         expect(flattenedSettings.has(path), `${locale}.settings.${path}`).toBe(false);
       }
       const physicalPreSliceCount = flattenedSettings.size
         - workspaceCount
         + 5
         - postSliceSettingsPaths.length
-        + retiredMarketSyncPaths.length;
+        + retiredSettingsPaths.length;
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
@@ -1241,7 +1247,7 @@ describe("bundled i18n resources", () => {
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         const currentAddedCount = postSliceSettingsPaths
           .filter((path) => path.startsWith(`${subtree}.`)).length;
-        const currentRetiredCount = retiredMarketSyncPaths
+        const currentRetiredCount = retiredSettingsPaths
           .filter((path) => path.startsWith(`${subtree}.`)).length;
         expect(
           flattenResource(settings[subtree] as ResourceTree).size

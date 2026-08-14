@@ -5,7 +5,12 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { MacroSnapshot, MacroStatus } from "../api";
+import type {
+  MacroSnapshot,
+  MacroStatus,
+  ScheduleRunResult,
+  ScheduleSourceState,
+} from "../api";
 import { formatSystemTimestamp } from "../timeDisplay";
 import { createSettingsReadCache, type SettingsReadCache } from "./settingsReadCache";
 
@@ -15,8 +20,14 @@ import { createSettingsReadCache, type SettingsReadCache } from "./settingsReadC
 const controls = vi.hoisted(() => ({
   status: null as MacroStatus | null,
   snapshot: null as MacroSnapshot | null,
+  schedule: null as { sources: Record<string, ScheduleSourceState> } | null,
   statusQueue: [] as Array<MacroStatus | Error | Promise<MacroStatus>>,
   snapshotQueue: [] as Array<MacroSnapshot | Error | Promise<MacroSnapshot>>,
+  scheduleQueue: [] as Array<
+    { sources: Record<string, ScheduleSourceState> }
+    | Error
+    | Promise<{ sources: Record<string, ScheduleSourceState> }>
+  >,
 }));
 
 function nextValue<T>(queue: Array<T | Error | Promise<T>>, fallback: T | null): Promise<T> {
@@ -32,10 +43,27 @@ vi.mock("../api", async (importOriginal) => {
     ...actual,
     getMacroStatus: vi.fn(() => nextValue(controls.statusQueue, controls.status)),
     getMacroSnapshot: vi.fn(() => nextValue(controls.snapshotQueue, controls.snapshot)),
+    getSchedule: vi.fn(() => nextValue(controls.scheduleQueue, controls.schedule)),
+    putSchedule: vi.fn(async () => ({
+      source: "fred_series",
+      enabled: true,
+      interval_minutes: 1440,
+    })),
+    runScheduleNow: vi.fn(async (source: string): Promise<ScheduleRunResult> => ({
+      source,
+      status: "started",
+    })),
   };
 });
 
-import { getMacroSnapshot, getMacroStatus } from "../api";
+import {
+  getMacroSnapshot,
+  getMacroStatus,
+  getSchedule,
+  putSchedule,
+  runScheduleNow,
+} from "../api";
+import { DataScheduleControlsProvider } from "./dataScheduleControls";
 import { MacroStorageSection } from "./MacroStorageSection";
 
 const statusFixture: MacroStatus = {
@@ -61,7 +89,6 @@ const snapshotFixture: MacroSnapshot = {
   observation_count: 12,
   release_dates_count: 3,
   latest_fetched_at: "2026-07-19T03:00:00Z",
-  auto_refresh_enabled: true,
   items: [
     {
       series_id: "FEDFUNDS",
@@ -89,6 +116,49 @@ const snapshotFixture: MacroSnapshot = {
   missing_series: [],
 };
 
+const MACRO_SOURCE_IDS = [
+  "fred_series",
+  "fred_release_dates",
+  "finnhub_economic_calendar",
+  "finnhub_earnings_calendar",
+  "finnhub_ipo_calendar",
+] as const;
+
+function scheduleSource(
+  sourceId: typeof MACRO_SOURCE_IDS[number],
+  enabled: boolean,
+): ScheduleSourceState {
+  return {
+    label: sourceId,
+    description: `${sourceId} description`,
+    ibkr: false,
+    provider_fetch: true,
+    source_mode: "direct_local",
+    write_target: "macro_calendar.db",
+    source_badges: [],
+    enabled,
+    interval_minutes: sourceId === "fred_release_dates" ? 10080 : 1440,
+    default_interval_minutes: sourceId === "fred_release_dates" ? 10080 : 1440,
+    running: false,
+    progress: null,
+    last_attempt_at: null,
+    last_result: null,
+    durable_state: null,
+    job_name: `fetch_${sourceId}`,
+  };
+}
+
+function scheduleFixture(
+  enabled: readonly string[] = [],
+): { sources: Record<string, ScheduleSourceState> } {
+  return {
+    sources: Object.fromEntries(MACRO_SOURCE_IDS.map((sourceId) => [
+      sourceId,
+      scheduleSource(sourceId, enabled.includes(sourceId)),
+    ])),
+  };
+}
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
@@ -114,7 +184,11 @@ async function renderMacro(settingsReadCache: SettingsReadCache = createSettings
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(<MacroStorageSection settingsReadCache={settingsReadCache} />);
+    root!.render(
+      <DataScheduleControlsProvider settingsReadCache={settingsReadCache}>
+        <MacroStorageSection settingsReadCache={settingsReadCache} />
+      </DataScheduleControlsProvider>,
+    );
   });
   await flush();
 }
@@ -137,10 +211,15 @@ beforeEach(async () => {
   await i18n.changeLanguage("zh-Hant");
   controls.status = statusFixture;
   controls.snapshot = snapshotFixture;
+  controls.schedule = scheduleFixture();
   controls.statusQueue = [];
   controls.snapshotQueue = [];
+  controls.scheduleQueue = [];
   vi.mocked(getMacroStatus).mockClear();
   vi.mocked(getMacroSnapshot).mockClear();
+  vi.mocked(getSchedule).mockClear();
+  vi.mocked(putSchedule).mockClear();
+  vi.mocked(runScheduleNow).mockClear();
 });
 
 afterEach(() => {
@@ -293,16 +372,89 @@ describe("MacroStorageSection", () => {
     expect(host!.textContent).not.toMatch(/從未|尚未收集|抓取成功為空/);
   });
 
-  it("keeps_stored_data_neutral_when_ingestion_is_disabled", async () => {
-    controls.snapshot = { ...snapshotFixture, auto_refresh_enabled: false };
+  it("renders five macro schedule rows and all three automation states", async () => {
     await renderMacro();
 
-    expect(host!.textContent).toContain("自動擷取設定未開啟");
+    expect(host!.querySelectorAll("[data-testid='schedule-scroll'] tbody tr")).toHaveLength(5);
+    expect(host!.textContent).toContain("App 自動更新未啟用");
+
+    dispose();
+    controls.schedule = scheduleFixture(["fred_series", "finnhub_ipo_calendar"]);
+    await renderMacro();
+    expect(host!.textContent).toContain("2 個資料來源已啟用 App 自動更新");
+
+    dispose();
+    controls.schedule = null;
+    controls.scheduleQueue = [new Error("RAW_SCHEDULE_READ_FAILURE")];
+    await renderMacro();
+    expect(host!.textContent).toContain("無法確認 App 自動更新狀態");
+    expect(host!.textContent).not.toContain("RAW_SCHEDULE_READ_FAILURE");
+  });
+
+  it("labels local status reload separately from provider updates", async () => {
+    await renderMacro();
+    vi.mocked(getMacroStatus).mockClear();
+    vi.mocked(getMacroSnapshot).mockClear();
+    vi.mocked(getSchedule).mockClear();
+
+    await act(async () => refreshButton().click());
+    await flush();
+
+    expect(getMacroStatus).toHaveBeenCalledOnce();
+    expect(getMacroSnapshot).toHaveBeenCalledOnce();
+    expect(getSchedule).not.toHaveBeenCalled();
+    expect(putSchedule).not.toHaveBeenCalled();
+    expect(runScheduleNow).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain(
+      "「重新讀取狀態」只會讀取本機資料，不會向資料供應商抓取資料。",
+    );
+  });
+
+  it("keeps failed and busy runs visible without rewriting stored timestamps", async () => {
+    const schedule = scheduleFixture();
+    schedule.sources.fred_series = {
+      ...schedule.sources.fred_series,
+      last_attempt_at: "2026-08-13T02:00:00Z",
+      durable_state: {
+        last_status: "failed",
+        last_error: "provider_config_missing",
+        continuation: null,
+        last_attempt: "2026-08-13T02:00:00Z",
+        updated_at: "2026-08-13T02:00:01Z",
+      },
+    };
+    schedule.sources.fred_release_dates = {
+      ...schedule.sources.fred_release_dates,
+      last_result: {
+        source: "fred_release_dates",
+        status: "skipped",
+        reason: "macro_calendar_busy",
+      },
+    };
+    controls.schedule = schedule;
+    await renderMacro();
+
+    const failedRow = host!.querySelector("[data-source-id='fred_series']");
+    const busyRow = host!.querySelector("[data-source-id='fred_release_dates']");
+    expect(failedRow?.textContent).toContain("上次失敗");
+    expect(busyRow?.textContent).toContain("新觸發已略過");
+    expect(host!.textContent).toContain(formatSystemTimestamp("2026-07-19T03:00:00Z"));
+    expect(host!.textContent).toContain("12 筆已儲存");
+  });
+
+  it("renders bilingual manual update copy without ingestion wording", async () => {
+    await renderMacro();
+
+    expect(host!.textContent).toContain(
+      "可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行",
+    );
     expect(host!.textContent).not.toContain("攝入");
-    expect(host!.textContent).toContain("Fed Funds");
-    expect(host!.textContent).toContain("最後抓取");
-    expect(host!.querySelector('[data-state="failed"]')).toBeNull();
-    expect(host!.querySelector('[data-state="blocked"]')).toBeNull();
+
+    await act(async () => { await i18n.changeLanguage("en"); });
+    expect(host!.textContent).toContain(
+      "Configure automatic schedules for the five sources below or choose Run now for a manual update.",
+    );
+    expect(host!.textContent).not.toMatch(/ingestion|攝入/i);
   });
 
   it("refresh_reloads_each_leg_once_without_raw_exception_copy", async () => {
@@ -392,7 +544,7 @@ describe("MacroStorageSection", () => {
       expect.soft(host!.textContent).toContain(
         formatSystemTimestamp("2026-07-19T03:00:00Z"),
       );
-      expect.soft(Array.from(host!.querySelectorAll("th")).map((node) => node.textContent))
+      expect.soft(Array.from(host!.querySelectorAll(".settings-fred-table th")).map((node) => node.textContent))
         .toEqual(["Series ID", "Name", "Latest value", "Observation date", "Last fetch"]);
 
       if (scenario.expectedUnavailable === "table") {
