@@ -1,8 +1,7 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-4 COMPLETE; TASK 5 FINAL
-> PRODUCTION-EQUALITY GATE STOPPED; FOCUSED REVIEW REQUIRED; TASK 6 NOT
-> AUTHORIZED
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-5 COMPLETE; FULL
+> IMPLEMENTATION REVIEW REQUIRED; TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
 >
@@ -171,6 +170,22 @@
 > `/tmp/macro-refresh-scheduler-task5-c286d504`, `140` payloads;
 > `PARTIAL_SHA256SUMS` SHA-256
 > `0d8127ec550b857b39a3164b796dc470e7a54696c33e2b17584cdae1efc01f23`.
+
+> **2026-08-14 Task 5 resume complete:** focused review returned GREEN at
+> `d7c59b11`. The Desktop/sidecar writer was absent, `profile_state.db` had no
+> file opener, and three samples across two minutes held the same inode, size,
+> mode, and nanosecond mtime before the fresh manifest was captured. Unchanged
+> canonical native then passed `4,347 / 12 / 0`; its reporter JSON is
+> byte-identical to the previously admitted runtime report. The temporary
+> `config/.env` symlink was removed before the post sample. All four protected
+> production assets are byte-identical across pre/post stat and SHA manifests;
+> both manifest files have SHA-256
+> `0f1c4a2b9feb6608d2a12faef8185f2aec2511cbab273ebf590061464402d376`.
+> Task 5 is complete and stops for full implementation review. Final packet:
+> `/tmp/macro-refresh-scheduler-task5-c286d504`, `152` payloads;
+> `SHA256SUMS` SHA-256
+> `5b7c1fd1cc6448c70dccc85e30d6368e1c3d443a3be0a4f89e994dad246b45c0`.
+> Task 6, merge, push, and live-provider traffic remain unauthorized.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
