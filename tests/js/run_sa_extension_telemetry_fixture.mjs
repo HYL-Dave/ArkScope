@@ -215,19 +215,17 @@ async function run() {
       storage: conflictStorage,
       now: () => Date.UTC(2026, 6, 25, 2),
       uuid: () => "unused",
-      deliver: async () => ({persisted: false}),
+      deliver: async () => ({persisted: false, error_code: "event_conflict"}),
     });
-    await conflictController.enqueue(event("evt-conflict"));
-    const conflict = await conflictController.enqueue(
-      event("evt-conflict", "top_level_ok_with_retryable_details", 1000)
-    );
+    const conflict = await conflictController.submit(event("evt-conflict"));
     return {
       oversize,
       oversizeQueue: oversizeStorage.data[outboxKey] || [],
       storageFailure,
       storageQueue: failedStorage.data[outboxKey] || [],
       conflict,
-      conflictQueue: conflictStorage.data[outboxKey],
+      conflictQueue: conflictStorage.data[outboxKey] || [],
+      conflictSummary: conflictStorage.data[telemetry.LAST_RUN_STORAGE_KEY],
     };
   }
 

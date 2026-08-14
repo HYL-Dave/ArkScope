@@ -6,6 +6,9 @@
 if (typeof SAExtensionRunProtocol === "undefined" && typeof importScripts === "function") {
   importScripts("extension_run_protocol.js");
 }
+if (typeof SAExtensionDiagnostics === "undefined" && typeof importScripts === "function") {
+  importScripts("extension_diagnostics.js");
+}
 if (typeof SAExtensionTelemetry === "undefined" && typeof importScripts === "function") {
   importScripts("extension_telemetry.js");
 }
@@ -315,6 +318,62 @@ function stableExtensionReason(reasonCode, allowed, fallback) {
   return allowed.indexOf(reasonCode) === -1 ? fallback : reasonCode;
 }
 
+function recordExtensionFailure(diagnostics, entry) {
+  if (diagnostics && typeof diagnostics.record === "function") {
+    diagnostics.record(entry);
+  }
+  return 1;
+}
+
+function extensionNativeFailure(response) {
+  var errorCode = response && typeof response.error_code === "string"
+    ? response.error_code
+    : null;
+  if ([
+    "database_busy",
+    "database_integrity_failed",
+    "database_write_failed",
+  ].indexOf(errorCode) !== -1) {
+    return {
+      stage: "local_persistence",
+      reason_code: errorCode,
+      retryable: errorCode !== "database_integrity_failed",
+    };
+  }
+  if (errorCode === "invalid_native_response" || errorCode === "invalid_sidecar_response") {
+    return {
+      stage: "native_transport",
+      reason_code: "native_response_invalid",
+      retryable: true,
+    };
+  }
+  if (response && errorCode !== "native_host_unavailable") {
+    return {
+      stage: "native_transport",
+      reason_code: "native_response_invalid",
+      retryable: true,
+    };
+  }
+  return {
+    stage: "native_transport",
+    reason_code: "native_host_unavailable",
+    retryable: true,
+  };
+}
+
+function recordNativeExtensionFailure(diagnostics, response, targetKind, targetRef) {
+  var mapped = extensionNativeFailure(response);
+  var entry = {
+    stage: mapped.stage,
+    reason_code: mapped.reason_code,
+    target_kind: targetKind,
+    retryable: mapped.retryable,
+    attempt_count: 1,
+  };
+  if (targetRef) entry.target_ref = String(targetRef);
+  return recordExtensionFailure(diagnostics, entry);
+}
+
 function legacyResultIsOk(value) {
   return !!value && typeof value === "object" && (value.status === "ok" || value.ok === true);
 }
@@ -517,8 +576,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       displayName: "Alpha Picks " + mode,
       operation: "alpha_picks_sync",
       mode: mode,
-    }, function () {
-      return doRefresh(mode, { trigger: "manual" });
+    }, function (diagnostics) {
+      return doRefresh(mode, { trigger: "manual", diagnostics: diagnostics });
     }).then(sendResponse);
     return true;
   }
@@ -527,8 +586,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       displayName: "Manual fetch",
       operation: "alpha_picks_manual_fetch",
       mode: "manual",
-    }, function () {
-      return doManualFetch(msg.items || []);
+    }, function (diagnostics) {
+      return doManualFetch(msg.items || [], diagnostics);
     }).then(sendResponse);
     return true;
   }
@@ -538,8 +597,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       displayName: "Market News " + mnMode,
       operation: "market_news_sync",
       mode: mnMode,
-    }, function () {
-      return doMarketNewsRefresh(mnMode, { trigger: "manual" });
+    }, function (diagnostics) {
+      return doMarketNewsRefresh(mnMode, {
+        trigger: "manual",
+        diagnostics: diagnostics,
+      });
     }).then(sendResponse);
     return true;
   }
@@ -619,8 +681,8 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
       displayName: "Alpha Picks quick auto-sync",
       operation: "alpha_picks_sync",
       mode: "quick",
-    }, function () {
-      return doRefresh("quick", { trigger: "alarm" });
+    }, function (diagnostics) {
+      return doRefresh("quick", { trigger: "alarm", diagnostics: diagnostics });
     });
     return;
   }
@@ -629,11 +691,14 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
       displayName: "Market News quick auto-sync",
       operation: "market_news_sync",
       mode: "quick",
-    }, async function () {
+    }, async function (diagnostics) {
       if (!(await shouldRunMarketNewsAutoSync())) {
         return { status: "skipped", reason: "not_due" };
       }
-      var result = await doMarketNewsRefresh("quick", { trigger: "alarm" });
+      var result = await doMarketNewsRefresh("quick", {
+        trigger: "alarm",
+        diagnostics: diagnostics,
+      });
       if (shouldMarkMarketNewsAutoSyncRun(result)) {
         await markMarketNewsAutoSyncStarted();
       }
@@ -659,11 +724,19 @@ function enqueueSaSyncJob(opts, jobFn) {
     }
     saSyncJobInFlight = true;
     var startedAt = new Date().toISOString();
+    var diagnostics = SAExtensionDiagnostics.createCollector();
     var capturedResult = null;
     try {
-      capturedResult = attachExtensionRunProtocol(operation, mode, await jobFn());
+      capturedResult = attachExtensionRunProtocol(operation, mode, await jobFn(diagnostics));
       return capturedResult;
     } catch (err) {
+      recordExtensionFailure(diagnostics, {
+        stage: "extension_runtime",
+        reason_code: "unknown_failure",
+        target_kind: "phase",
+        retryable: true,
+        attempt_count: 1,
+      });
       if (!capturedResult && operation) {
         capturedResult = {
           extension_run: buildFailedExtensionProtocolResult(operation, mode),
@@ -673,10 +746,12 @@ function enqueueSaSyncJob(opts, jobFn) {
     } finally {
       saSyncJobInFlight = false;
       try {
+        var frozenDiagnostics = diagnostics.freeze();
         await extensionTelemetryController.submit({
           started_at: startedAt,
           finished_at: new Date().toISOString(),
           result: capturedResult && capturedResult.extension_run,
+          extension_diagnostics: frozenDiagnostics,
         });
       } catch (_) {
         // Recording must never break the actual sync flow.
@@ -692,9 +767,9 @@ function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
     return Promise.resolve({ status: "skipped", reason: "already_pending" });
   }
   saAutoJobPending[jobKey] = true;
-  return enqueueSaSyncJob(jobOpts, async function () {
+  return enqueueSaSyncJob(jobOpts, async function (diagnostics) {
     try {
-      return await jobFn();
+      return await jobFn(diagnostics);
     } finally {
       saAutoJobPending[jobKey] = false;
     }
@@ -1062,6 +1137,7 @@ async function discoverMarketNewsIncident(tabId, manifest, detailBudget) {
 
 async function doRefresh(mode, options) {
   options = options || {};
+  var diagnostics = options.diagnostics;
   const batchTs = new Date().toISOString();
   const results = { current: null, closed: null, mode: mode, trigger: options.trigger || "manual" };
 
@@ -1077,11 +1153,21 @@ async function doRefresh(mode, options) {
     sendProgress("Waiting for current picks table...");
     let ready = await waitForAlphaPicksTableReady(tabId, SA_CURRENT_URL, "current picks");
     if (!ready.ok) {
+      recordExtensionFailure(diagnostics, {
+        stage: "page_readiness",
+        reason_code: ready.reason_code || "dom_not_ready",
+        target_kind: "phase",
+        retryable: true,
+        attempt_count: 1,
+      });
       results.current = await sendToNativeHost("refresh_failure", "current", [], ready.error, batchTs);
     } else {
       sendProgress("Scraping current picks...");
       const currentPicks = await injectScraper(tabId);
       results.current = await sendToNativeHost("refresh", "current", currentPicks, null, batchTs);
+      if (!legacyResultIsOk(results.current)) {
+        recordNativeExtensionFailure(diagnostics, results.current, "phase", null);
+      }
       results._currentPicks = currentPicks;  // Keep for detail fetch
     }
 
@@ -1092,11 +1178,21 @@ async function doRefresh(mode, options) {
     sendProgress("Waiting for closed picks table...");
     ready = await waitForAlphaPicksTableReady(tabId, SA_CLOSED_URL, "closed picks");
     if (!ready.ok) {
+      recordExtensionFailure(diagnostics, {
+        stage: "page_readiness",
+        reason_code: ready.reason_code || "dom_not_ready",
+        target_kind: "phase",
+        retryable: true,
+        attempt_count: 1,
+      });
       results.closed = await sendToNativeHost("refresh_failure", "closed", [], ready.error, batchTs);
     } else {
       sendProgress("Scraping closed picks...");
       const closedPicks = await injectScraper(tabId);
       results.closed = await sendToNativeHost("refresh", "closed", closedPicks, null, batchTs);
+      if (!legacyResultIsOk(results.closed)) {
+        recordNativeExtensionFailure(diagnostics, results.closed, "phase", null);
+      }
     }
 
     // --- Incremental detail fetch (current picks only) ---
@@ -1108,7 +1204,7 @@ async function doRefresh(mode, options) {
     }
     if (currentPicks && currentPicks.length > 0) {
       sendProgress("Checking detail cache...");
-      var detailResult = await doDetailFetch(tabId, currentPicks, mode);
+      var detailResult = await doDetailFetch(tabId, currentPicks, mode, diagnostics);
       results.details = detailResult;
     }
 
@@ -1116,6 +1212,13 @@ async function doRefresh(mode, options) {
     sendProgress("Done!");
     return results;
   } catch (err) {
+    recordExtensionFailure(diagnostics, {
+      stage: "extension_runtime",
+      reason_code: "unknown_failure",
+      target_kind: "phase",
+      retryable: true,
+      attempt_count: 1,
+    });
     const error = err.message || String(err);
     if (!results.current) {
       results.current = await sendToNativeHost("refresh_failure", "current", [], error, batchTs);
@@ -1138,6 +1241,7 @@ async function doRefresh(mode, options) {
 
 async function doMarketNewsRefresh(mode, options) {
   options = options || {};
+  var diagnostics = options.diagnostics;
   if (marketNewsRefreshInFlight) {
     return {
       status: "busy",
@@ -1161,6 +1265,13 @@ async function doMarketNewsRefresh(mode, options) {
     sendProgress("Waiting for market news...");
     var ready = await waitForMarketNewsReady(tabId);
     if (!ready.ok) {
+      recordExtensionFailure(diagnostics, {
+        stage: "page_readiness",
+        reason_code: ready.reason_code || "navigation_timeout",
+        target_kind: "phase",
+        retryable: true,
+        attempt_count: 1,
+      });
       var failure = {
         status: "error",
         error: ready.error,
@@ -1195,6 +1306,7 @@ async function doMarketNewsRefresh(mode, options) {
       detail_backfill_limit: detailBackfillLimit,
     });
     if (!result || result.status !== "ok") {
+      recordNativeExtensionFailure(diagnostics, result, "phase", null);
       result = {
         status: "error",
         error: (result && result.error) || "save_market_news failed",
@@ -1237,19 +1349,48 @@ async function doMarketNewsRefresh(mode, options) {
         if (saveDetail && saveDetail.ok) {
           detailFetched++;
         } else {
-          detailFailed++;
+          var detailReason = stableExtensionReason(
+            saveDetail && saveDetail.reason_code,
+            EXTENSION_ITEM_RETRYABLE_REASONS,
+            "unknown_failure"
+          );
+          if (saveDetail && saveDetail.native_failure) {
+            detailFailed += recordNativeExtensionFailure(
+              diagnostics,
+              saveDetail.native_failure,
+              "market_news_detail",
+              item.news_id
+            );
+          } else {
+            var detailStage = detailReason === "parser_empty"
+              ? "content_parse"
+              : (detailReason === "unknown_failure"
+                ? "extension_runtime"
+                : "page_readiness");
+            detailFailed += recordExtensionFailure(diagnostics, {
+              stage: detailStage,
+              reason_code: detailReason,
+              target_kind: "market_news_detail",
+              target_ref: item.news_id,
+              retryable: true,
+              attempt_count: 1,
+            });
+          }
           detailFailures.push({
             news_id: item.news_id,
-            reason_code: stableExtensionReason(
-              saveDetail && saveDetail.reason_code,
-              EXTENSION_ITEM_RETRYABLE_REASONS,
-              "unknown_failure"
-            ),
+            reason_code: detailReason,
             error: (saveDetail && saveDetail.error) || "detail_not_saved",
           });
         }
       } catch (err) {
-        detailFailed++;
+        detailFailed += recordExtensionFailure(diagnostics, {
+          stage: "extension_runtime",
+          reason_code: "unknown_failure",
+          target_kind: "market_news_detail",
+          target_ref: item.news_id,
+          retryable: true,
+          attempt_count: 1,
+        });
         detailFailures.push({
           news_id: item.news_id,
           reason_code: "unknown_failure",
@@ -1271,6 +1412,13 @@ async function doMarketNewsRefresh(mode, options) {
     sendProgress("Market news done!");
     return result;
   } catch (err) {
+    recordExtensionFailure(diagnostics, {
+      stage: "extension_runtime",
+      reason_code: "unknown_failure",
+      target_kind: "phase",
+      retryable: true,
+      attempt_count: 1,
+    });
     var reasonByPhase = {
       list_navigation: "list_navigation_failed",
       list_scrape: "list_scrape_failed",
@@ -1882,17 +2030,29 @@ async function waitForAlphaPicksTableReady(tabId, expectedUrl, label, timeoutMs 
     });
 
     if (lastSnapshot.status === "login_redirect") {
-      return { ok: false, error: "Session expired: " + (lastSnapshot.url || "unknown redirect") };
+      return {
+        ok: false,
+        error: "Session expired: " + (lastSnapshot.url || "unknown redirect"),
+        reason_code: "login_required",
+      };
     }
     if (lastSnapshot.status === "paywall") {
-      return { ok: false, error: "Paywall: " + lastSnapshot.marker };
+      return {
+        ok: false,
+        error: "Paywall: " + lastSnapshot.marker,
+        reason_code: "access_restricted",
+      };
     }
     if (lastSnapshot.status === "ready") {
       return { ok: true };
     }
     await sleep(500);
   }
-  return { ok: false, error: formatAlphaPicksReadinessTimeout(label, expectedPath, timeoutMs, lastSnapshot) };
+  return {
+    ok: false,
+    error: formatAlphaPicksReadinessTimeout(label, expectedPath, timeoutMs, lastSnapshot),
+    reason_code: "dom_not_ready",
+  };
 }
 
 async function inspectAlphaPicksReadiness(tabId, expectedPath) {
@@ -2031,9 +2191,15 @@ function sendToNativeHost(action, scope, picks, error, batchTs) {
           status: "error",
           scope,
           error: "Native host error: " + chrome.runtime.lastError.message,
+          error_code: "native_host_unavailable",
         });
       } else {
-        resolve(response || { status: "error", scope, error: "No response from native host" });
+        resolve(response || {
+          status: "error",
+          scope,
+          error: "No response from native host",
+          error_code: "invalid_native_response",
+        });
       }
     });
   });
@@ -2149,7 +2315,7 @@ function normalizeManualFetchItem(item) {
 
 // --- Detail fetch (incremental) ---
 
-async function doDetailFetch(tabId, currentPicks, mode) {
+async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
   // ── Step 1: Load articles page + scroll ──
   sendProgress("Loading articles page...");
   await chrome.tabs.update(tabId, { url: SA_ARTICLES_URL });
@@ -2157,6 +2323,13 @@ async function doDetailFetch(tabId, currentPicks, mode) {
 
   var articlesReady = await waitForArticlesReady(tabId);
   if (!articlesReady.ok) {
+    recordExtensionFailure(diagnostics, {
+      stage: "page_readiness",
+      reason_code: articlesReady.reason_code || "dom_not_ready",
+      target_kind: "phase",
+      retryable: true,
+      attempt_count: 1,
+    });
     return { fetched: 0, failed: 0, error: articlesReady.error };
   }
 
@@ -2179,9 +2352,23 @@ async function doDetailFetch(tabId, currentPicks, mode) {
   sendProgress("Scraping article list...");
   var articleList = await injectArticlesListScraper(tabId);
   if (!articleList || articleList.error) {
+    recordExtensionFailure(diagnostics, {
+      stage: "content_parse",
+      reason_code: "parser_empty",
+      target_kind: "phase",
+      retryable: true,
+      attempt_count: 1,
+    });
     return { fetched: 0, failed: 0, error: articleList ? articleList.error : "No articles found" };
   }
   if (!Array.isArray(articleList) || articleList.length === 0) {
+    recordExtensionFailure(diagnostics, {
+      stage: "content_parse",
+      reason_code: "parser_empty",
+      target_kind: "phase",
+      retryable: true,
+      attempt_count: 1,
+    });
     return { fetched: 0, failed: 0, error: "Empty article list" };
   }
 
@@ -2213,6 +2400,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
   }
 
   if (!metaResult || metaResult.status !== "ok") {
+    recordNativeExtensionFailure(diagnostics, metaResult, "phase", null);
     var metaError = (metaResult && metaResult.error) || "save_articles_meta failed";
     return { fetched: 0, failed: 0, error: metaError };
   }
@@ -2228,8 +2416,16 @@ async function doDetailFetch(tabId, currentPicks, mode) {
   // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0;
   var netNewComments = 0;
-  var reconciliationFailed =
-    metaResult.reconciliation && metaResult.reconciliation.status === "failed" ? 1 : 0;
+  var reconciliationFailed = 0;
+  if (metaResult.reconciliation && metaResult.reconciliation.status === "failed") {
+    reconciliationFailed += recordExtensionFailure(diagnostics, {
+      stage: "reconciliation",
+      reason_code: "reconciliation_failed",
+      target_kind: "phase",
+      retryable: true,
+      attempt_count: 1,
+    });
+  }
   var total = needContent.length + needComments.length;
 
   if (needContent.length > 0) {
@@ -2245,12 +2441,32 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       await chrome.tabs.update(tabId, { url: item.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
       var ready = await waitForArticleReady(tabId);
-      if (!ready.ok) { failed++; continue; }
+      if (!ready.ok) {
+        failed += recordExtensionFailure(diagnostics, {
+          stage: "page_readiness",
+          reason_code: ready.reason_code || "dom_not_ready",
+          target_kind: "article_detail",
+          target_ref: item.article_id,
+          retryable: true,
+          attempt_count: 1,
+        });
+        continue;
+      }
       await settleArticleBeforeScroll(tabId);
 
       // Scrape body
       var detail = await injectDetailScraper(tabId);
-      if (!detail || detail.error) { failed++; continue; }
+      if (!detail || detail.error) {
+        failed += recordExtensionFailure(diagnostics, {
+          stage: "content_parse",
+          reason_code: "parser_empty",
+          target_kind: "article_detail",
+          target_ref: item.article_id,
+          retryable: true,
+          attempt_count: 1,
+        });
+        continue;
+      }
 
       // Scroll down to comments section + load all comments
       // This naturally provides human-like dwell time (10-30s per page)
@@ -2284,13 +2500,32 @@ async function doDetailFetch(tabId, currentPicks, mode) {
           saveResult.reconciliation &&
           saveResult.reconciliation.status === "failed"
         ) {
-          reconciliationFailed++;
+          reconciliationFailed += recordExtensionFailure(diagnostics, {
+            stage: "reconciliation",
+            reason_code: "reconciliation_failed",
+            target_kind: "article_detail",
+            target_ref: item.article_id,
+            retryable: true,
+            attempt_count: 1,
+          });
         }
       } else {
-        failed++;
+        failed += recordNativeExtensionFailure(
+          diagnostics,
+          saveResult,
+          "article_detail",
+          item.article_id
+        );
       }
     } catch (err) {
-      failed++;
+      failed += recordExtensionFailure(diagnostics, {
+        stage: "extension_runtime",
+        reason_code: "unknown_failure",
+        target_kind: "article_detail",
+        target_ref: item.article_id,
+        retryable: true,
+        attempt_count: 1,
+      });
     }
     // No artificial delay — comment scroll provides natural dwell time
   }
@@ -2308,7 +2543,17 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       await chrome.tabs.update(tabId, { url: cItem.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(cItem.url));
       var commentsReady = await waitForArticleReady(tabId);
-      if (!commentsReady.ok) { failed++; continue; }
+      if (!commentsReady.ok) {
+        failed += recordExtensionFailure(diagnostics, {
+          stage: "page_readiness",
+          reason_code: commentsReady.reason_code || "dom_not_ready",
+          target_kind: "article_comments",
+          target_ref: cItem.article_id,
+          retryable: true,
+          attempt_count: 1,
+        });
+        continue;
+      }
       await settleArticleBeforeScroll(tabId);
 
       // Scroll to load comments (natural delay)
@@ -2336,13 +2581,32 @@ async function doDetailFetch(tabId, currentPicks, mode) {
           commentsRefreshed++;
           netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
         } else {
-          failed++;
+          failed += recordExtensionFailure(diagnostics, {
+            stage: "content_parse",
+            reason_code: "comment_scan_failed",
+            target_kind: "article_comments",
+            target_ref: cItem.article_id,
+            retryable: true,
+            attempt_count: 1,
+          });
         }
       } else {
-        failed++;
+        failed += recordNativeExtensionFailure(
+          diagnostics,
+          saveCommentsOnlyResult,
+          "article_comments",
+          cItem.article_id
+        );
       }
     } catch (err) {
-      failed++;
+      failed += recordExtensionFailure(diagnostics, {
+        stage: "extension_runtime",
+        reason_code: "unknown_failure",
+        target_kind: "article_comments",
+        target_ref: cItem.article_id,
+        retryable: true,
+        attempt_count: 1,
+      });
     }
   }
 
@@ -2372,7 +2636,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
 
 // --- Manual fetch (user-provided URLs for missing tickers) ---
 
-async function doManualFetch(items) {
+async function doManualFetch(items, diagnostics) {
   if (items.length === 0) return { fetched: 0, failed: 0 };
 
   var tabId = null;
@@ -2384,7 +2648,13 @@ async function doManualFetch(items) {
   for (var p = 0; p < items.length; p++) {
     var normalized = normalizeManualFetchItem(items[p]);
     if (!normalized) {
-      failed++;
+      failed += recordExtensionFailure(diagnostics, {
+        stage: "extension_runtime",
+        reason_code: "unknown_failure",
+        target_kind: "phase",
+        retryable: false,
+        attempt_count: 1,
+      });
       continue;
     }
     if (normalized.lineage_id == null) {
@@ -2395,7 +2665,14 @@ async function doManualFetch(items) {
         event_anchor_date: normalized.event_anchor_date,
       });
       if (!resolution || resolution.status !== "ok" || !resolution.lineage_id) {
-        failed++;
+        failed += recordExtensionFailure(diagnostics, {
+          stage: "reconciliation",
+          reason_code: "reconciliation_failed",
+          target_kind: "phase",
+          target_ref: normalized.symbol,
+          retryable: true,
+          attempt_count: 1,
+        });
         continue;
       }
       normalized.lineage_id = resolution.lineage_id;
@@ -2423,13 +2700,33 @@ async function doManualFetch(items) {
         }
         await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
         var ready = await waitForArticleReady(tabId);
-        if (!ready.ok) { failed++; continue; }
+        if (!ready.ok) {
+          failed += recordExtensionFailure(diagnostics, {
+            stage: "page_readiness",
+            reason_code: ready.reason_code || "dom_not_ready",
+            target_kind: "article_detail",
+            target_ref: item.article_id,
+            retryable: true,
+            attempt_count: 1,
+          });
+          continue;
+        }
         await settleArticleBeforeScroll(tabId);
 
         var articleId = item.article_id;
 
         var detail = await injectDetailScraper(tabId);
-        if (!detail || detail.error) { failed++; continue; }
+        if (!detail || detail.error) {
+          failed += recordExtensionFailure(diagnostics, {
+            stage: "content_parse",
+            reason_code: "parser_empty",
+            target_kind: "article_detail",
+            target_ref: item.article_id,
+            retryable: true,
+            attempt_count: 1,
+          });
+          continue;
+        }
 
         // Scroll to load comments (v3 path)
         var manualScrollStats = await scrollToComments(tabId, {
@@ -2442,7 +2739,7 @@ async function doManualFetch(items) {
         var report = formatDetailReport(detail);
 
         var pubDate = detail.publish_date || null;
-        await sendNativeMessage2({
+        var manualMetaResult = await sendNativeMessage2({
           action: "save_articles_meta",
           mode: "full",
           articles: [{
@@ -2453,6 +2750,14 @@ async function doManualFetch(items) {
             article_type: "analysis",
           }],
         });
+        if (!manualMetaResult || manualMetaResult.status !== "ok") {
+          recordNativeExtensionFailure(
+            diagnostics,
+            manualMetaResult,
+            "article_detail",
+            articleId
+          );
+        }
         var saveResult = await sendNativeMessage2({
           action: "save_article_content",
           article_id: articleId,
@@ -2494,13 +2799,32 @@ async function doManualFetch(items) {
               candidate: acceptResult.candidate || null,
             });
           } else {
-            failed++;
+            failed += recordExtensionFailure(diagnostics, {
+              stage: "reconciliation",
+              reason_code: "reconciliation_failed",
+              target_kind: "article_detail",
+              target_ref: articleId,
+              retryable: true,
+              attempt_count: 1,
+            });
           }
         } else {
-          failed++;
+          failed += recordNativeExtensionFailure(
+            diagnostics,
+            saveResult,
+            "article_detail",
+            articleId
+          );
         }
       } catch (err) {
-        failed++;
+        failed += recordExtensionFailure(diagnostics, {
+          stage: "extension_runtime",
+          reason_code: "unknown_failure",
+          target_kind: "article_detail",
+          target_ref: item.article_id,
+          retryable: true,
+          attempt_count: 1,
+        });
       }
     }
 
@@ -2789,6 +3113,7 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
 
 async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
   var lastReasonCode = "unknown_failure";
+  var lastNativeFailure = null;
   for (var attempt = 0; attempt < 2; attempt++) {
     if (attempt > 0) {
       sendProgress("Retrying news detail: " + item.news_id);
@@ -2842,8 +3167,13 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
       return { ok: true };
     }
     lastReasonCode = "detail_save_failed";
+    lastNativeFailure = saveDetail;
   }
-  return { ok: false, reason_code: lastReasonCode };
+  return {
+    ok: false,
+    reason_code: lastReasonCode,
+    native_failure: lastNativeFailure,
+  };
 }
 
 async function installMarketNewsPageGuards(tabId) {
@@ -3007,11 +3337,15 @@ async function waitForArticlesReady(tabId, timeoutMs) {
     });
     var check = results[0] && results[0].result;
     if (!check || check.status === "login_redirect")
-      return { ok: false, error: "Session expired" };
+      return { ok: false, error: "Session expired", reason_code: "login_required" };
     if (check.status === "ready") return { ok: true };
     await sleep(500);
   }
-  return { ok: false, error: "Timeout waiting for articles page" };
+  return {
+    ok: false,
+    error: "Timeout waiting for articles page",
+    reason_code: "navigation_timeout",
+  };
 }
 
 function injectArticlesListScraper(tabId) {
@@ -3047,13 +3381,21 @@ async function waitForArticleReady(tabId, timeoutMs) {
     });
     var check = results[0] && results[0].result;
     if (!check || check.status === "login_redirect")
-      return { ok: false, error: "Session expired" };
+      return { ok: false, error: "Session expired", reason_code: "login_required" };
     if (check.status === "paywall")
-      return { ok: false, error: "Paywall: " + check.marker };
+      return {
+        ok: false,
+        error: "Paywall: " + check.marker,
+        reason_code: "access_restricted",
+      };
     if (check.status === "ready") return { ok: true };
     await sleep(500);
   }
-  return { ok: false, error: "Timeout waiting for article" };
+  return {
+    ok: false,
+    error: "Timeout waiting for article",
+    reason_code: "detail_timeout",
+  };
 }
 
 function injectDetailScraper(tabId) {
@@ -3092,9 +3434,17 @@ function sendNativeMessage2(msg) {
   return new Promise(function (resolve) {
     chrome.runtime.sendNativeMessage(NATIVE_HOST, msg, function (response) {
       if (chrome.runtime.lastError) {
-        resolve({ status: "error", error: chrome.runtime.lastError.message });
+        resolve({
+          status: "error",
+          error: chrome.runtime.lastError.message,
+          error_code: "native_host_unavailable",
+        });
       } else {
-        resolve(response || { status: "error", error: "No response" });
+        resolve(response || {
+          status: "error",
+          error: "No response",
+          error_code: "invalid_native_response",
+        });
       }
     });
   });

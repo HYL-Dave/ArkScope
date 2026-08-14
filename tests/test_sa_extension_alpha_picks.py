@@ -57,12 +57,14 @@ def test_background_loads_required_runtime_dependencies_before_registering_jobs(
 
     assert result["imports"] == [
         "extension_run_protocol.js",
+        "extension_diagnostics.js",
         "extension_telemetry.js",
     ]
     assert result["dependencies_before_message_registration"] is True
-    assert manifest["background"]["scripts"][:4] == [
+    assert manifest["background"]["scripts"][:5] == [
         "compat_firefox.js",
         "extension_run_protocol.js",
+        "extension_diagnostics.js",
         "extension_telemetry.js",
         "background.js",
     ]

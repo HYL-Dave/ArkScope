@@ -94,6 +94,6 @@ def test_oversize_storage_failure_or_event_conflict_is_visible_and_never_persist
     assert result["storageQueue"] == []
     assert result["conflict"]["delivery"] == "unavailable"
     assert result["conflict"]["reason_code"] == "event_conflict"
-    assert [row["client_event_id"] for row in result["conflictQueue"]] == [
-        "evt-conflict"
-    ]
+    assert result["conflictQueue"] == []
+    assert result["conflictSummary"]["audit_state"] == "unavailable"
+    assert result["conflictSummary"]["audit_reason_code"] == "event_conflict"

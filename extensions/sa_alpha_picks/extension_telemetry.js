@@ -91,12 +91,16 @@
   }
 
   function immutableRecordValue(record) {
-    return {
+    var value = {
       client_event_id: record.client_event_id,
       started_at: record.started_at,
       finished_at: record.finished_at,
       result: record.result,
     };
+    if (record.extension_diagnostics !== undefined) {
+      value.extension_diagnostics = record.extension_diagnostics;
+    }
+    return value;
   }
 
   function summaryFor(record, auditState, reasonCode, runId) {
@@ -226,7 +230,7 @@
           || typeof event.finished_at !== "string") {
         throw new Error("invalid extension event");
       }
-      return {
+      var record = {
         client_event_id: clientEventId,
         started_at: event.started_at,
         finished_at: event.finished_at,
@@ -235,6 +239,10 @@
         delivery_code: "pending",
         created_at: new Date(now()).toISOString(),
       };
+      if (event.extension_diagnostics !== undefined) {
+        record.extension_diagnostics = canonicalize(event.extension_diagnostics);
+      }
+      return record;
     }
 
     async function enqueue(event) {
@@ -317,6 +325,11 @@
           return candidate.client_event_id !== record.client_event_id;
         });
         result = deliveryResult(record, "persisted", null, response.run_id);
+      } else if (reasonCode === "event_conflict") {
+        queue = current.queue.filter(function (candidate) {
+          return candidate.client_event_id !== record.client_event_id;
+        });
+        result = deliveryResult(record, "unavailable", reasonCode, null);
       } else {
         queue = current.queue.map(function (candidate) {
           if (candidate.client_event_id !== record.client_event_id) return candidate;
@@ -333,7 +346,9 @@
       if (!summary || summary.client_event_id === record.client_event_id) {
         summary = summaryFor(
           record,
-          persisted ? "persisted" : "pending",
+          persisted
+            ? "persisted"
+            : (reasonCode === "event_conflict" ? "unavailable" : "pending"),
           reasonCode,
           persisted ? response.run_id : null
         );
@@ -361,19 +376,25 @@
         var response = null;
         var failureCode = null;
         try {
-          response = await deliver({
+          var deliveryRecord = {
             client_event_id: record.client_event_id,
             started_at: record.started_at,
             finished_at: record.finished_at,
             result: record.result,
-          });
+          };
+          if (record.extension_diagnostics !== undefined) {
+            deliveryRecord.extension_diagnostics = canonicalize(
+              record.extension_diagnostics
+            );
+          }
+          response = await deliver(deliveryRecord);
         } catch (_) {
           failureCode = "sidecar_unavailable";
         }
         try {
           var result = await updateAfterAttempt(record, response, failureCode);
           results.push(result);
-          if (result.delivery !== "persisted") break;
+          if (result.delivery === "pending") break;
         } catch (_) {
           results.push(deliveryResult(record, "pending", "storage_unavailable", null));
           break;
