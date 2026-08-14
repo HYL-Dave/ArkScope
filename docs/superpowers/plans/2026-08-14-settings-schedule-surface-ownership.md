@@ -1,6 +1,6 @@
 # Settings Schedule Surface Ownership Implementation Plan
 
-> **Status:** PLAN REVIEW GREEN; TASKS 0-1 COMPLETE; TASK 2 STOPPED AT MACRO TITLE CONSUMER OWNERSHIP; BOUNDED AMENDMENT REVIEW NEXT
+> **Status:** PLAN REVIEW GREEN; TASKS 0-1 COMPLETE; TASK 2 STOPPED AT SCANNER PREDICTION; BOUNDED AMENDMENT REVIEW NEXT
 >
 > **Date:** 2026-08-14
 >
@@ -513,6 +513,29 @@ already a Section 0.4 owner and was changed in Task 1; no overall path boundary,
 node ID, count, staged identity, resource value, or browser contract changes.
 Any second Task 2 product hunk in that file is a new stop event.
 
+### 3.2 Task 2 stop - scanner prediction was not grounded in its candidate set
+
+After focused review approved Section 3.1, the one authorized heading-key
+replacement made the exact six-file, Settings, and sequential full runtimes
+GREEN at `127/127`, `249/249`, and `1177/1177`; typecheck and build also passed.
+The i18n scanner remained `37/20/0/20`, however, rather than the plan's
+predicted `36/20/0/20`, so execution stopped before either Task 2 commit.
+
+A fresh `scan src` at product base `e2ead437` and at the current Task 2
+worktree each returns 37 candidates. Projecting every row to
+`{file, kind, literal, signature}` removes line-number-only movement and makes
+the two JSON documents byte-identical at SHA-256
+`5dc46070ca18211027f0bf626955b79ca3409331d09e2562fda4250c62612ac3`.
+The removed `DataScheduleLocalError` and local missing-source state were typed
+control structures, not scanner candidates. The `36` prediction therefore
+mistakenly inferred a scanner delta from a product-code deletion without
+grounding the scanner's actual candidate set.
+
+The bounded correction changes only the Task 2 and final Task 3 scanner target
+to `37/20/0/20`. It does not authorize a scanner, allowlist, product, test,
+resource, node-ledger, staged-identity, or protected-byte change. Changing
+unrelated product text merely to manufacture candidate count 36 is rejected.
+
 ---
 
 ## 4. Execution tasks
@@ -601,7 +624,7 @@ apps/arkscope-web/src/i18n/resources.test.ts
 5. Require Task 1 identities to remain byte-identical.
 6. Run six-file focused (`127 passed`), Settings (`249 passed`), frontend full
    sequential (`1177 passed`), typecheck, build, and i18n scanner
-   (`36/20/0/20`).
+   (`37/20/0/20`).
 7. Commit product/tests with subject similar to
    `fix: name settings schedule owners explicitly`.
 8. Append Task 2 evidence, commit docs-only, and stop for review.
@@ -638,7 +661,7 @@ Final admission:
    ee6618dfc755f5ead79f6012967d3dda2c7a33f37ef87f62c5f98deff0f6c5cf`,
    all passing;
 4. single-command sequential frontend full `1177/1177`;
-5. typecheck, build, and i18n scanner `36/20/0/20`;
+5. typecheck, build, and i18n scanner `37/20/0/20`;
 6. protected `13/13`, aggregate
    `b3b3ac3f2151d34bf3ce0e15a772ebb0a655e46fe63a43eccae142d4208602a1`;
 7. backend collect-only `4394 /
