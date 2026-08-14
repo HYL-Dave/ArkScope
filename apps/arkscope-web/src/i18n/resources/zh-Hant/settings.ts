@@ -642,7 +642,7 @@ const settings = {
       },
     },
     schedule: {
-      title: "排程（每來源獨立）",
+      title: "資料來源排程",
       autoRefreshing: "（執行中，自動更新）",
       protection: "同一資料來源與 IBKR 工作同時間只執行一次；若已有工作進行中，新觸發會顯示為已跳過，不會重複抓取。",
       triggerSkipped: "新觸發已略過",
@@ -904,6 +904,7 @@ const settings = {
       title: "FRED 快照",
     },
     schedule: {
+      title: "總經資料排程",
       disabled: "App 自動更新未啟用",
       enabledCount_one: "{{count}} 個資料來源已啟用 App 自動更新",
       enabledCount_other: "{{count}} 個資料來源已啟用 App 自動更新",

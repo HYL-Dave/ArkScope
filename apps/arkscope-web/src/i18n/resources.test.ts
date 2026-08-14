@@ -720,7 +720,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 827,
+      settings: 828,
       research: 207,
       explore: 381,
       portfolio: 374,
@@ -791,7 +791,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1911);
+      expect(total, `${locale}.total`).toBe(1912);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1197,6 +1197,7 @@ describe("bundled i18n resources", () => {
       "macroStorage.schedule.enabledCount_one",
       "macroStorage.schedule.enabledCount_other",
       "macroStorage.schedule.unknown",
+      "macroStorage.schedule.title",
       "dataSources.schedule.sources.secCorporateActions.label",
       "dataSources.schedule.sources.secCorporateActions.description",
       "dataStorage.lifecycle.title",

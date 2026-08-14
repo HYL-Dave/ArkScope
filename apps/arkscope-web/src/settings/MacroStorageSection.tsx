@@ -206,7 +206,7 @@ export function MacroStorageSection({
 
       <div className="settings-panel">
         <div className="settings-section-head">
-          <h3>{t(($) => $.dataSources.schedule.title)}</h3>
+          <h3>{t(($) => $.macroStorage.schedule.title)}</h3>
           <span className="muted tiny">{automationStatus}</span>
         </div>
         <DataScheduleTable

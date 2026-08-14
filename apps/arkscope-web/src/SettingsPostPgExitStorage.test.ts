@@ -571,6 +571,7 @@ describe("post-PG-exit storage panels", () => {
 
     expect(host!.querySelector('[data-settings-anchor="macro_storage"]')).not.toBeNull();
     expect(host!.textContent).toContain("總經資料");
+    expect(host!.textContent).toContain("總經資料排程");
     expect(host!.textContent).toContain(
       "可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行",
     );
@@ -604,7 +605,7 @@ describe("post-PG-exit storage panels", () => {
         "Provider 健康",
         "SA Extension 健康",
         "連線與金鑰",
-        "排程（每來源獨立）",
+        "資料來源排程",
         "市場資料",
         "公司狀態與併購",
         "交易日 / 價格覆蓋",

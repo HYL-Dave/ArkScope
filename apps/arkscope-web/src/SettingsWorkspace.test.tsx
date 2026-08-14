@@ -740,7 +740,7 @@ describe("Settings workspace", () => {
         "Provider 健康",
         "SA Extension 健康",
         "連線與金鑰",
-        "排程（每來源獨立）",
+        "資料來源排程",
         "市場資料",
         "公司狀態與併購",
         "交易日 / 價格覆蓋",
@@ -822,7 +822,7 @@ describe("Settings workspace", () => {
       scrollOwner.scrollTop = 1_000;
       scrollOwner.dispatchEvent(new Event("scroll"));
     });
-    expect(buttonWithText("排程（每來源獨立）", host!.querySelector('nav[aria-label="設定目錄"]')!)
+    expect(buttonWithText("資料來源排程", host!.querySelector('nav[aria-label="設定目錄"]')!)
       .getAttribute("aria-current")).toBe("location");
 
     await act(async () => {
@@ -831,7 +831,7 @@ describe("Settings workspace", () => {
     });
     expect(buttonWithText("市場資料", host!.querySelector('nav[aria-label="設定目錄"]')!)
       .getAttribute("aria-current")).toBe("location");
-    expect(buttonWithText("排程（每來源獨立）", host!.querySelector('nav[aria-label="設定目錄"]')!)
+    expect(buttonWithText("資料來源排程", host!.querySelector('nav[aria-label="設定目錄"]')!)
       .getAttribute("aria-current")).toBeNull();
   });
 

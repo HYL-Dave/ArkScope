@@ -1507,7 +1507,8 @@ describe("Settings provider config authority", () => {
       expect(host!.textContent).toContain("Provider Health");
       expect(host!.textContent).toContain("Connections and Keys");
       expect(host!.textContent).toContain("SA Extension Health");
-      expect(host!.textContent).toContain("Schedules (per source)");
+      expect(host!.textContent).toContain("Data source schedules");
+      expect(host!.textContent).toContain("Macro data schedules");
       expect(host!.textContent).toContain("IBKR Gateway");
       expect(host!.textContent).toContain("Gateway host");
       expect(host!.textContent).toContain("Gateway port");

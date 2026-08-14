@@ -376,6 +376,7 @@ describe("MacroStorageSection", () => {
     await renderMacro();
 
     expect(host!.querySelectorAll("[data-testid='schedule-scroll'] tbody tr")).toHaveLength(5);
+    expect(host!.textContent).toContain("總經資料排程");
     expect(host!.textContent).toContain("App 自動更新未啟用");
 
     dispose();

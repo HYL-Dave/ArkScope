@@ -643,7 +643,7 @@ const settings = {
       },
     },
     schedule: {
-      title: "Schedules (per source)",
+      title: "Data source schedules",
       autoRefreshing: " (Running, auto-refreshing)",
       protection: "A data source or IBKR job runs only once at a time. If work is already in progress, a new trigger is shown as skipped and does not collect duplicate data.",
       triggerSkipped: "New trigger skipped",
@@ -905,6 +905,7 @@ const settings = {
       title: "FRED Snapshot",
     },
     schedule: {
+      title: "Macro data schedules",
       disabled: "App automatic updates not enabled",
       enabledCount_one: "{{count}} source has App automatic updates enabled",
       enabledCount_other: "{{count}} sources have App automatic updates enabled",
