@@ -47,6 +47,15 @@ USE_LOCAL_JOB_RUNS_KEY = "use_local_job_runs"
 ENV_USE_LOCAL_JOB_RUNS = "ARKSCOPE_USE_LOCAL_JOB_RUNS"
 _EXTENSION_EVENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 _MARKET_NEWS_REPAIR_JOB_NAME = "sa_market_news_repair"
+_SA_EXTENSION_DIAGNOSTIC_JOB_NAMES = frozenset(
+    {
+        "sa_alpha_picks_refresh",
+        "sa_extension:manual_fetch",
+        "sa_market_news_refresh",
+        "sa_market_news_retry_recorded",
+        "sa_market_news_incident_recovery",
+    }
+)
 
 _SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS job_runs (
@@ -629,8 +638,13 @@ class JobRunsLocalStore:
         finished_at: Any,
         result: Dict[str, Any],
         duration_ms: Optional[int],
+        extension_diagnostics: Optional[Dict[str, Any]] = None,
     ) -> int:
         """Atomically deduplicate and persist one structured extension event."""
+
+        from src.sa.extension_diagnostics import (
+            is_durable_diagnostics_projection,
+        )
 
         event_id = str(client_event_id or "").strip()
         fingerprint = str(event_hash or "").strip().lower()
@@ -641,6 +655,10 @@ class JobRunsLocalStore:
             or not isinstance(result, dict)
             or result.get("job_name") != job_name
             or result.get("db_status") != status
+            or (
+                extension_diagnostics is not None
+                and not is_durable_diagnostics_projection(extension_diagnostics)
+            )
         ):
             raise ValueError("invalid_extension_event")
         started = _to_iso(started_at)
@@ -652,6 +670,11 @@ class JobRunsLocalStore:
             "client_event_id": event_id,
             "event_hash": fingerprint,
         }
+        payload = {"extension_event": identity}
+        if extension_diagnostics is not None:
+            payload["extension_diagnostics"] = json.loads(
+                json.dumps(extension_diagnostics, sort_keys=True)
+            )
         now = _now_iso()
         conn = self._connect()
         try:
@@ -665,10 +688,10 @@ class JobRunsLocalStore:
                 """
             ).fetchall()
             for row in rows:
-                payload = _json_load(row["payload"])
+                existing_payload = _json_load(row["payload"])
                 existing = (
-                    payload.get("extension_event")
-                    if isinstance(payload, dict)
+                    existing_payload.get("extension_event")
+                    if isinstance(existing_payload, dict)
                     else None
                 )
                 if not isinstance(existing, dict):
@@ -692,7 +715,7 @@ class JobRunsLocalStore:
                 (
                     job_name,
                     status,
-                    _json_dumps({"extension_event": identity}),
+                    _json_dumps(payload),
                     _json_or_none(result),
                     str(result.get("derived_outcome") or ""),
                     started,
@@ -710,6 +733,58 @@ class JobRunsLocalStore:
             raise
         finally:
             conn.close()
+
+    def completed_extension_runs_by_name(
+        self,
+        job_names: Optional[Iterable[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Read at most 20 completed allowlisted extension runs without writes."""
+
+        requested = (
+            _SA_EXTENSION_DIAGNOSTIC_JOB_NAMES
+            if job_names is None
+            else frozenset(str(name) for name in job_names)
+            & _SA_EXTENSION_DIAGNOSTIC_JOB_NAMES
+        )
+        names = tuple(sorted(requested))
+        path = Path(self.db_path).expanduser()
+        if not names or not os.path.lexists(path) or not path.is_file():
+            return []
+
+        conn: Optional[sqlite3.Connection] = None
+        try:
+            conn = sqlite3.connect(
+                f"{path.resolve().as_uri()}?mode=ro",
+                uri=True,
+                timeout=5.0,
+            )
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only = ON")
+            placeholders = ",".join("?" for _ in names)
+            rows = conn.execute(
+                f"""
+                SELECT id, job_name, status, trigger_source, payload, result,
+                       message, error, started_at, finished_at, duration_ms,
+                       created_at, updated_at
+                FROM job_runs
+                WHERE trigger_source = 'extension'
+                  AND status IN ('succeeded', 'failed')
+                  AND job_name IN ({placeholders})
+                ORDER BY started_at DESC, id DESC
+                LIMIT 20
+                """,
+                names,
+            ).fetchall()
+            return [_serialize_local_row(dict(row)) for row in rows]
+        except sqlite3.Error as exc:
+            logger.warning(
+                "JobRunsLocalStore.completed_extension_runs_by_name failed: %s",
+                exc,
+            )
+            return []
+        finally:
+            if conn is not None:
+                conn.close()
 
     def start_market_news_repair(
         self, *, manifest: Dict[str, Any], manifest_hash: str

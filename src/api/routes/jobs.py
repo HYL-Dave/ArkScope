@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dependencies import get_dal
+from src.sa.extension_diagnostics import project_extension_diagnostics
 from src.sa.extension_run_protocol import ProtocolError, derive_run_result
 from src.service.job_runs_store import get_job_runs_store
 from src.service.jobs import (
@@ -157,6 +158,7 @@ class ExtensionJobRecordRequest(BaseModel):
     started_at: str
     finished_at: str
     result: Dict[str, Any]
+    extension_diagnostics: Optional[Any] = None
 
 
 class ExtensionJobRecordResponse(BaseModel):
@@ -266,12 +268,26 @@ def record_extension_job(
         if not client_event_id or started is None or finished is None or finished < started:
             raise ValueError("invalid_extension_event")
         result = derive_run_result(request.result)
+        event_started = started.isoformat(timespec="milliseconds")
+        event_finished = finished.isoformat(timespec="milliseconds")
+        diagnostics_present = "extension_diagnostics" in request.model_fields_set
+        diagnostics_projection = (
+            project_extension_diagnostics(
+                request.extension_diagnostics,
+                started_at=event_started,
+                finished_at=event_finished,
+            )
+            if diagnostics_present
+            else {"status": "absent"}
+        )
         event_document = {
             "client_event_id": client_event_id,
-            "started_at": started.isoformat(timespec="milliseconds"),
-            "finished_at": finished.isoformat(timespec="milliseconds"),
+            "started_at": event_started,
+            "finished_at": event_finished,
             "result": result,
         }
+        if diagnostics_present:
+            event_document["extension_diagnostics"] = diagnostics_projection
         event_hash = hashlib.sha256(
             json.dumps(
                 event_document,
@@ -300,6 +316,7 @@ def record_extension_job(
             finished_at=event_document["finished_at"],
             result=result,
             duration_ms=duration_ms,
+            extension_diagnostics=diagnostics_projection,
         )
     except ValueError as exc:
         code = str(exc)
