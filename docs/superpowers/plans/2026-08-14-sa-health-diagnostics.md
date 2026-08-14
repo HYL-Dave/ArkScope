@@ -1,7 +1,7 @@
 # SA Health Truth and Typed Diagnostics Implementation Plan
 
-> **Status:** PLAN DRAFTED ON POST-MACRO MASTER; INDEPENDENT PLAN REVIEW
-> REQUIRED; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** PLAN REVIEW FINDINGS AMENDED; FOCUSED RE-REVIEW REQUIRED;
+> IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-14
 >
@@ -114,6 +114,30 @@ src/settings/settingsBackendCopy.test.ts                  12
 src/i18n/resources.test.ts                                14
 ```
 
+The Settings regression projection is exactly:
+
+```text
+src/AppShell.test.tsx                                     22
+src/ProviderSection.test.ts                               26
+src/SettingsCss.test.ts                                   10
+src/SettingsInvestorProfileIntegration.test.tsx            3
+src/SettingsModelRouting.test.ts                          17
+src/SettingsNewsStorage.test.ts                            7
+src/SettingsPostPgExitStorage.test.ts                     14
+src/SettingsProviderConfig.test.ts                        41
+src/SettingsStabilizationCss.test.ts                       2
+src/SettingsWorkspace.test.tsx                            33
+src/settings/MacroStorageSection.test.tsx                 14
+src/settings/settingsBackendCopy.test.ts                  12
+src/settings/settingsCopy.test.ts                         10
+src/settings/settingsReadCache.test.ts                    19
+src/settings/settingsRegistry.test.ts                     16
+```
+
+These 15 per-file counts sum to 246. Task 5 changes this projection only
+through the four Provider additions and one Provider removal listed in
+Section 2.4, yielding the pinned final 249-node stream.
+
 ### 0.3 Dated normal-state visual witness
 
 The user supplied a healthy comparison state after Macro closeout:
@@ -196,8 +220,25 @@ product/test path is a stop-and-amend event.
 
 ### 0.6 Byte-protected product boundary
 
-The following 17 paths remain byte-identical. Their sorted `sha256sum`-row
-aggregate is
+The following 17 paths remain byte-identical. The aggregate recipe is exact:
+take these literal paths, UTF-8 byte-sort the path lines, pass them in that
+order to GNU `sha256sum` (standard `<digest><two spaces><path>\n` output), then
+SHA-256 that complete 17-row byte stream including its one final newline.
+Equivalently, from the plan worktree at this document version:
+
+```bash
+awk '
+  /^### 0[.]6 / { in_section = 1 }
+  in_section && /^```text$/ { capture = 1; next }
+  capture && /^```$/ { exit }
+  capture { print }
+' docs/superpowers/plans/2026-08-14-sa-health-diagnostics.md \
+  | LC_ALL=C sort \
+  | xargs sha256sum \
+  | sha256sum
+```
+
+The resulting aggregate is
 `1c5b539a05e51eef3f52e0cad9efa02063db077cfb7e190f20ccdc8b0580e0ae`:
 
 ```text
