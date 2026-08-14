@@ -1,6 +1,6 @@
 # Macro Refresh and Scheduler Integration Implementation Plan
 
-> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-3 COMPLETE; TASK 4 PAUSED;
+> **Status:** PLAN GREEN AT `f9b69913`; TASKS 0-4 COMPLETE; TASK 5 ACTIVE;
 > TASKS 1-5 BATCH-AUTHORIZED; TASK 6 NOT AUTHORIZED
 >
 > **Date:** 2026-08-13
@@ -132,6 +132,20 @@
 > `/tmp/macro-refresh-scheduler-task4-stop4-83f881a0`, `12` payloads;
 > `SHA256SUMS` SHA-256
 > `f26131aa40557c89e39eb5dcbb8ade4645a5317c8d15d566ea463f29db9c5cf0`.
+
+> **2026-08-14 Task 4 complete:** focused review returned GREEN at
+> `6dc7b51c`. Product/tests commit `052c9134` implements the reviewed
+> group-scoped controller, five Macro schedule rows, three-state automation
+> truth, local-only status reload, bilingual copy, and bounded schedule-table
+> layout. The specificity repair is exactly one selector replacement; its
+> four declarations are unchanged. Desktop and mobile Chrome replay prove
+> computed `white-space: normal`, wrapped long source descriptions, exact
+> `30/11/12/12/35` columns, bounded table scrolling, zero page/main overflow,
+> zero overlap, and GET-only fixture traffic. Final frontend identity is
+> `101 files / 1,172 / d40a30d5...`; focused is `109/109`, the post-PG owner
+> is `14/14`, and one sequential full command is `1,172/1,172`. Task 5 is
+> active under the existing batch ruling. Task 6, merge, push, and live
+> provider traffic remain unauthorized.
 
 **Goal:** connect the five existing recurring FRED/Finnhub macro collectors to
 the app-owned per-source scheduler, serialize every `macro_calendar.db` writer,
