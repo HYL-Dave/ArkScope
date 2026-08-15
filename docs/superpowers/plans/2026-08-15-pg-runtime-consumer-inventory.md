@@ -5,10 +5,9 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; ZERO-TRACKED-RESIDUE
-> RE-PIN REVIEW GREEN; TASK 1 LEDGER SUPERSEDED BY VOCABULARY STOP; TASK 1R
-> FOCUSED REVIEW GREEN; TASK 2 STOPPED ON CANDIDATE-KIND SCHEMA; TASK 1S
-> COMPLETE - FOCUSED REVIEW NEXT; TASKS 3-5 NOT STARTED
+> **Status:** ORIGINAL PLAN REVIEW GREEN; TASKS 0-4 COMPLETE; TASK 2
+> CLASSIFICATION REVIEW GREEN; TASK 3 CLOSED; TASK 4 INDEPENDENT ADMISSION
+> COMPLETE; COMBINED IMPLEMENTATION REVIEW NEXT; TASK 5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -1280,7 +1279,7 @@ Stop for Task 1 review unless a recorded batch ruling applies.
   consumer methods, tests/environment, one disposition, follow-up owner, and
   falsifiable stop condition.
 
-- [ ] **Step 1: Adjudicate and trace every candidate**
+- [x] **Step 1: Adjudicate and trace every candidate**
 
 For each candidate, inspect imports, factories, call sites, registrations,
 routes, startup hooks, tests, and current docs. Write exactly one section 0.4
@@ -1292,7 +1291,7 @@ deletion owner; definition-only occurrence is not enough. For excluded text
 candidates, enforce the source-family/path restrictions and write bounded
 line-level evidence rather than raw prose.
 
-- [ ] **Step 2: Measure local capability methods**
+- [x] **Step 2: Measure local capability methods**
 
 For every retained consumer that inherits from, constructs, or type-checks a
 PostgreSQL class, list the exact methods it calls. Verify calls against the
@@ -1302,7 +1301,7 @@ that measured set, record one proposed minimal owner and add-path; do not add
 methods beyond the call-site set. If the measured need implies a broader store
 or domain redesign, stop and amend rather than designing it here.
 
-- [ ] **Step 3: Classify all CLI entrypoints**
+- [x] **Step 3: Classify all CLI entrypoints**
 
 Assign exactly one of `PG-only`, `mixed`, `operator`, or `legacy-agent` based on
 current reachable behavior. `PG-only` and `mixed` candidates classify to PG
@@ -1321,7 +1320,7 @@ owner, and enumerate that behavior and its owner nodes. The replacement name,
 source, comments, and fixtures may not retain PostgreSQL terminology or a
 negative historical contract.
 
-- [ ] **Step 4: Classify tests without preserving false contracts**
+- [x] **Step 4: Classify tests without preserving false contracts**
 
 Map each exact node to the surface it owns, one observed baseline outcome, one
 contract role, and a sorted environment-assumption set:
@@ -1340,7 +1339,7 @@ across all rows. Every node must exist in exactly one of
 inheritance, empty PG tombstones, or DSN routing are candidate retirements, not
 automatic protected coverage.
 
-- [ ] **Step 5: Classify current, historical, and archive documentation**
+- [x] **Step 5: Classify current, historical, and archive documentation**
 
 Wholly PostgreSQL dated plans, evidence, closed migration narratives, archive
 instructions, dump manifests, Docker/SQL support, and historical claims receive
@@ -1351,7 +1350,7 @@ later no-tail slice removes. Record the root README overclaim explicitly as a
 mixed current-authority rewrite rather than silently correcting it. No
 historical or archive candidate receives a preservation disposition.
 
-- [ ] **Step 6: Write both canonical classification authorities**
+- [x] **Step 6: Write both canonical classification authorities**
 
 Write `candidate_adjudications.jsonl` and `surfaces.jsonl`. Use every required
 key from sections 0.3-0.4, only closed vocabulary values,
@@ -1362,7 +1361,7 @@ to exactly one surface. Include dependency rows for both the declared but
 unavailable v3 family and the imported environment-provided v2 family.
 Preserve the installation provenance limit from section 0.7.
 
-- [ ] **Step 7: Validate canonical shape before commit**
+- [x] **Step 7: Validate canonical shape before commit**
 
 A temporary validator must reject:
 
@@ -1397,7 +1396,7 @@ Run one negative self-test for each rejection class against a temporary copy;
 none may alter the admitted ledger. Retain validator source, self-test source,
 transcripts, and full hashes in the Task 2 packet.
 
-- [ ] **Step 8: Commit canonical classification**
+- [x] **Step 8: Commit canonical classification**
 
 ```bash
 git add docs/design/pg_runtime_inventory/surfaces.jsonl \
@@ -1429,7 +1428,7 @@ Stop for Task 2 review unless a recorded batch ruling applies.
   authority, and a manifest that the no-tail plan can consume without another
   discovery pass.
 
-- [ ] **Step 1: Generate every projection from canonical JSONL**
+- [x] **Step 1: Generate every projection from canonical JSONL**
 
 Use one temporary structured generator that parses both canonical JSONL files
 and writes the exact classification formats in section 0.4. Separately copy
@@ -1439,7 +1438,7 @@ grounding paths. No classification projection or grounding witness may be
 manually edited after generation/capture. Retain generator source, invocation,
 and full hash in the Task 3 packet.
 
-- [ ] **Step 2: Build the exact PG-focused node stream**
+- [x] **Step 2: Build the exact PG-focused node stream**
 
 Union every canonical test object, verify each appears exactly once in its
 declared backend/frontend base stream, sort exact node IDs by UTF-8 bytes, and
@@ -1447,7 +1446,7 @@ write `pg_focused_base.nodes`. Record per-suite and per-file counts, total
 count, and full hash in the narrative. No name-pattern approximation is
 accepted.
 
-- [ ] **Step 3: Prove five-way partition algebra**
+- [x] **Step 3: Prove five-way partition algebra**
 
 Project one ID set for each disposition and prove:
 
@@ -1462,7 +1461,7 @@ every follow_up_owner is compatible with its disposition
 removed only by a reviewed design amendment; an empty dumping-ground category
 is forbidden.
 
-- [ ] **Step 4: Build predicted no-tail path sets**
+- [x] **Step 4: Build predicted no-tail path sets**
 
 Create exact delete, modify, add, and protected path sets. Rules:
 
@@ -1489,7 +1488,7 @@ candidate surface universe; the no-tail implementation plan must append their
 exact then-current paths to its closeout delete/modify ledger before product
 execution. They are temporary instructions, not preserved residue.
 
-- [ ] **Step 5: Write the readable inventory authority**
+- [x] **Step 5: Write the readable inventory authority**
 
 `PG_RUNTIME_CONSUMER_INVENTORY.md` must include:
 
@@ -1513,7 +1512,7 @@ execution. They are temporary instructions, not preserved residue.
     private dumps, product DBs, tracked archive mutation, and product
     implementation; none may be restated as a no-tail preservation decision.
 
-- [ ] **Step 6: Build the tracked manifest**
+- [x] **Step 6: Build the tracked manifest**
 
 `MANIFEST.sha256` covers every tracked file in
 `docs/design/pg_runtime_inventory/` except itself. Recipe: UTF-8 byte-sort
@@ -1521,7 +1520,7 @@ literal relative paths, run GNU `sha256sum` in that order from repo root, and
 write the complete standard-output rows with one final newline. Record the
 manifest file's own SHA separately in evidence.
 
-- [ ] **Step 7: Run projection and boundary verification**
+- [x] **Step 7: Run projection and boundary verification**
 
 Rebuild all classification/adjudication projections into a separate temporary
 directory and compare each to the tracked version with `cmp`. Independently
@@ -1530,7 +1529,7 @@ streams, full dynamic routes, and package witness. Verify five partitions, four
 path sets, manifest, design/base hashes, and zero non-doc diff from
 `729d8514ac912b447f1892aefd3e897ea8a843b6`.
 
-- [ ] **Step 8: Commit the closed inventory**
+- [x] **Step 8: Commit the closed inventory**
 
 ```bash
 git add docs/design/PG_RUNTIME_CONSUMER_INVENTORY.md \
@@ -1558,7 +1557,7 @@ Stop for Task 3 review unless a recorded batch ruling applies.
   review surface from which Fable can reconstruct every set without trusting
   prose.
 
-- [ ] **Step 1: Rebuild from a fresh detached worktree**
+- [x] **Step 1: Rebuild from a fresh detached worktree**
 
 Create one detached worktree at exact `CANDIDATE_SOURCE_TIP` for raw candidate
 recapture and another at the exact Task 3 tip for authority/projection review.
@@ -1571,7 +1570,7 @@ backend/frontend, rerun static/dynamic/package/encrypted candidate generation,
 and rebuild every classification projection from `surfaces.jsonl` into a new
 packet root. The executor tools may be rerun as a secondary control only.
 
-- [ ] **Step 2: Compare every artifact byte-for-byte**
+- [x] **Step 2: Compare every artifact byte-for-byte**
 
 Require exact equality for:
 
@@ -1591,7 +1590,7 @@ candidate-union and projection count/hash reports
 
 A prose count match is insufficient.
 
-- [ ] **Step 3: Re-run the safety witnesses**
+- [x] **Step 3: Re-run the safety witnesses**
 
 Verify:
 
@@ -1608,7 +1607,7 @@ Verify:
 - tracked archive/Docker/SQL/dump/manifest candidates are byte-identical during
   this docs-only inventory and are assigned only to the future delete set.
 
-- [ ] **Step 4: Run secret and path leak scans**
+- [x] **Step 4: Run secret and path leak scans**
 
 Scan every packet/tracked inventory artifact for:
 
@@ -1626,14 +1625,14 @@ Allowed literal machine operands are only reviewed key names, module names,
 repo-relative paths, package names/versions, and bounded paraphrases. A leak is
 a stop and packet rejection.
 
-- [ ] **Step 5: Update status without changing authority bytes**
+- [x] **Step 5: Update status without changing authority bytes**
 
 Mark inventory Tasks 0-4 complete, design inventory stage complete, and map
 entry `IMPLEMENTATION REVIEW NEXT`. Do not alter canonical inventory rows or
 projections during status closeout. Any needed authority edit restarts Task 3
 admission.
 
-- [ ] **Step 6: Manifest the admission packet and commit**
+- [x] **Step 6: Manifest the admission packet and commit**
 
 Generate packet `SHA256SUMS` using path-byte order, verify every payload, and
 record its full hash. Then commit only the four status/evidence docs:
@@ -1646,7 +1645,7 @@ git add docs/superpowers/evidence/2026-08-15-pg-runtime-consumer-inventory.md \
 git commit -m "docs: admit PostgreSQL runtime inventory"
 ```
 
-- [ ] **Step 7: Stop for combined implementation review**
+- [x] **Step 7: Stop for combined implementation review**
 
 Fable independently rebuilds all candidate sources, exact ledgers, package
 provenance, five-way algebra, path sets, and docs-only boundary. No-tail plan
