@@ -5,9 +5,9 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** ORIGINAL PLAN REVIEW GREEN; TASKS 0-4 COMPLETE; TASK 2
-> CLASSIFICATION REVIEW GREEN; TASK 3 CLOSED; TASK 4 INDEPENDENT ADMISSION
-> COMPLETE; COMBINED IMPLEMENTATION REVIEW NEXT; TASK 5 NOT STARTED
+> **Status:** ORIGINAL PLAN REVIEW GREEN; TASKS 0-5 COMPLETE; IMPLEMENTATION
+> REVIEW GREEN; LOCALLY FAST-FORWARD MERGED AT `2b2f7fb7`; EXACT-MASTER
+> RECONSTRUCTION COMPLETE; FOCUSED CLOSEOUT REVIEW NEXT; NOT PUSHED
 >
 > **Date:** 2026-08-15
 >
@@ -1669,25 +1669,25 @@ review GREEN and user ruling.
 - Produces: exact-master inventory authority and the only allowed handoff to
   PostgreSQL no-tail implementation-plan authoring.
 
-- [ ] **Step 1: Prove linear ancestry and clean boundaries**
+- [x] **Step 1: Prove linear ancestry and clean boundaries**
 
 Verify `729d8514ac912b447f1892aefd3e897ea8a843b6` is an ancestor of the
 reviewed tip, there are no merge
 commits, both worktrees are clean, and every changed path is under `docs/`.
 
-- [ ] **Step 2: Fast-forward local master without push**
+- [x] **Step 2: Fast-forward local master without push**
 
 Use `git merge --ff-only <reviewed-tip>`. Any master drift is a stop and
 requires re-grounding; do not force or rebase silently.
 
-- [ ] **Step 3: Rebuild exact-master authority**
+- [x] **Step 3: Rebuild exact-master authority**
 
 In a fresh detached exact-master worktree, rerun Task 4's independent
 reconstruction with a new packet name. Every tracked inventory byte, base
 stream, projection, partition, path set, and manifest must match the reviewed
 tip.
 
-- [ ] **Step 4: Commit docs-only closeout**
+- [x] **Step 4: Commit docs-only closeout**
 
 Record merged commit, exact-master hashes, packet manifest, review ruling, no
 push, and the binding next gate: write the separate PostgreSQL no-tail
@@ -1701,7 +1701,7 @@ git add docs/superpowers/evidence/2026-08-15-pg-runtime-consumer-inventory.md \
 git commit -m "docs: close PostgreSQL runtime inventory"
 ```
 
-- [ ] **Step 5: Stop for focused closeout review**
+- [x] **Step 5: Stop for focused closeout review**
 
 Only after focused closeout GREEN may the inventory branch/worktree be removed
 and the no-tail implementation plan begin. No product edit, push, `.env`
