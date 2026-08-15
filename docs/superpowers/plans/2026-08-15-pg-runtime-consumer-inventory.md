@@ -5,16 +5,16 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; BATCH A AUTHORIZED;
-> TASK 1 STOPPED ON EXPECTED LOOPBACK-PROBE HARNESS BOUNDARY;
-> TASKS 2-5 NOT STARTED
+> **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; USER SCOPE SUPERSESSION
+> RECORDED AT DESIGN AMENDMENTS `379227cb..b21b7b28`; TASK 1 STOPPED PENDING FOCUSED
+> REVIEW OF THE ZERO-TRACKED-RESIDUE RE-PIN; TASKS 2-5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
 > **Design authority:**
 > `docs/superpowers/specs/2026-08-15-pg-runtime-inventory-no-tail-design.md`
-> at commit `729d8514ac912b447f1892aefd3e897ea8a843b6`, SHA-256
-> `e5218b58472891891acdc56fa054b07a30cc98905d71941890ad15a438bf3935`.
+> at commit `b21b7b280108d6e1eff2562a204c27501bbda075`, SHA-256
+> `a13418721fbe1abd931d13477a204c1b30d50cec5e1785c38460a133422c3391`.
 >
 > **Roles:** Codex authors and executes the docs-only inventory after
 > independent plan review. Fable independently reconstructs candidate sets,
@@ -23,9 +23,10 @@
 > remote-database, and destructive-data rulings.
 
 **Goal:** Produce a complete, mechanically reconstructable, docs-only census
-of every remaining PostgreSQL runtime, test, dependency, CLI, environment, and
-current-documentation surface, with exactly one reviewed disposition per
-surface and exact inputs for a later no-tail implementation plan.
+of every remaining PostgreSQL runtime, test, dependency, CLI, environment,
+current-documentation, archive, and historical surface, with exactly one
+reviewed disposition per surface and exact inputs for a later no-tail
+implementation plan.
 
 **Architecture:** One canonical `surfaces.jsonl` ledger owns every classified
 surface; `candidate_adjudications.jsonl` closes every raw source hit to either
@@ -68,18 +69,21 @@ pinned normalizer, and Markdown/TSV authority files.
   byte-for-byte; `candidates.jsonl`, full route census, package witness, and
   base node streams are named grounding inputs, not competing classification
   authorities. Manually maintained duplicate truth is forbidden.
-- Every surface has exactly one of the six design dispositions. `pending`,
+- Every surface has exactly one of the five design dispositions. `pending`,
   `unknown`, `cleanup`, `maybe`, and empty dispositions are invalid.
 - Inventory may report unresolved evidence only by stopping and amending the
-  plan. It may not manufacture certainty or add a seventh disposition.
+  plan. It may not manufacture certainty or add a sixth disposition.
 - Dated plan-author counts below are RED flags for grounding drift, not final
   inventory conclusions. Task 0 must reconstruct them at the reviewed plan
   tip.
 - Inventory completion authorizes only a separately reviewed no-tail plan. It
-  does not authorize product deletion or compatibility shims.
+  does not authorize product deletion or compatibility shims. That later plan
+  must remove every tracked archive/history candidate and must self-retire
+  this program's generated governance files at final closeout.
 - The remote three app-record tables, tracked dumps, product SQLite data,
   private `.env`, legacy-agent CLI, and current operator commands remain
-  untouched.
+  untouched during this docs-only inventory. Preserving a tracked dump during
+  inventory is not a final disposition.
 - No push is authorized.
 
 ---
@@ -179,9 +183,13 @@ compact JSON line.
 String arrays are UTF-8 byte-sorted and unique. `test_nodes` objects are sorted
 by `(suite, id)` and unique by that pair. `local_owner` is either `null`, an
 existing tracked `path:symbol`, or a proposed absent `path:symbol` required by
-an exactly measured non-empty method set. A proposed owner is valid only on a
-`rewrite_to_local_capability` row and its path is the sole source of the
-corresponding `no_tail_add.paths` entry. `symbol` is a non-empty string for
+an exactly measured non-empty method set or retained positive operator
+contract. A proposed owner is valid only on a
+`rewrite_to_local_capability` row with a non-empty measured method set, or on a
+`retain_operator_remove_pg_branch` row whose exact positive application
+startup/scheduler/route-census behavior survives while its PostgreSQL-named
+path retires. Its path is the sole source of the corresponding
+`no_tail_add.paths` entry. `symbol` is a non-empty string for
 executable, type, dependency, and test surfaces and may be `null` only for
 whole-file archive, environment, or documentation rows.
 
@@ -247,17 +255,15 @@ Closed `disposition` values are copied verbatim from the design:
 
 ```text
 defer_to_legacy_agent_cli_census
-historical_reference
-retain_archive_asset
 retain_operator_remove_pg_branch
 retire_pg_only
+rewrite_current_authority
 rewrite_to_local_capability
 ```
 
 Closed `follow_up_owner` values:
 
 ```text
-archive_history
 legacy_agent_cli_census
 pg_no_tail
 runtime_owner_css
@@ -269,8 +275,7 @@ Disposition/owner compatibility is exact:
 retire_pg_only                     -> pg_no_tail
 rewrite_to_local_capability        -> pg_no_tail
 retain_operator_remove_pg_branch   -> pg_no_tail
-retain_archive_asset               -> archive_history
-historical_reference               -> archive_history
+rewrite_current_authority          -> pg_no_tail
 defer_to_legacy_agent_cli_census   -> legacy_agent_cli_census
 ```
 
@@ -360,7 +365,12 @@ does not receive a fake PostgreSQL disposition. Only `text_search`,
 `documentation`, or `git_crypt_plaintext` candidates may use the other two
 exclusion reasons. `generated_inventory_authority` is restricted to this plan,
 its design, the priority map, and this inventory's evidence path as they exist
-at the frozen Task 0 candidate-source tip. `lexical_non_surface` requires an
+at the frozen Task 0 candidate-source tip. This exclusion prevents the census
+from recursively classifying its own active instructions; it is not a no-tail
+preservation decision. The later no-tail plan must add every exact generated
+program document/ledger created after `CANDIDATE_SOURCE_TIP` to its final
+delete ledger, and must remove obsolete PostgreSQL entries from any retained
+mixed index such as the priority map. `lexical_non_surface` requires an
 exact line-level explanation and is invalid for any executable symbol, route,
 dependency, environment setting, test contract, CLI, archive asset, or current
 product runtime claim. Every other source family must classify to a surface.
@@ -570,6 +580,12 @@ review. Task 5 remains gated on that combined review. Per-task commits and
 packets, all hard stops, docs-only scope, no squash, no merge, no push, and all
 live/secret/database boundaries remain unchanged.
 
+The later zero-tracked-residue product ruling pauses Batch A at Task 1 until
+the design amendment and this re-pin receive focused review. After GREEN, the
+existing Batch A authorization resumes at Task 1; it does not require Task 0
+to rerun because the amendment is docs-only and `CANDIDATE_SOURCE_TIP` remains
+the immutable current-surface universe.
+
 ### 0.10 Task 0 stop: unpinned `npx` network fallback
 
 The first Task 0 attempt correctly created a ciphertext-only worktree and
@@ -641,6 +657,37 @@ checksummed payloads; its `SHA256SUMS` SHA-256 is
 `f54d8ef505b7cd19a58886e0a16e75c277770c0f7172686cae2cafa3e38c39d1`.
 The candidate source worktree remains at exact `CANDIDATE_SOURCE_TIP` for the
 reviewed resume; no tracked candidate ledger has been created yet.
+
+### 0.12 User scope supersession: zero tracked PostgreSQL residue
+
+The user clarified that a stopped, absent PostgreSQL service is not a product
+capability and does not justify repository residue. Final design amendment
+`b21b7b280108d6e1eff2562a204c27501bbda075` (including the initial ruling at
+`379227cb` and boundary correction at `74b1aba7`) therefore replaces the old
+tracked-archive/scratch-restore terminal state with these binding outcomes:
+
+- every tracked PostgreSQL-only code, test, dependency, config, Docker, SQL,
+  dump, manifest, archive/history document, comment, docstring, test name,
+  fixture, and pre-source-tip governance path is inventoried for exact
+  deletion;
+- mixed current authority is inventoried for bounded rewrite to positive local
+  product truth, with no PostgreSQL historical contrast left behind;
+- `retain_archive_asset`, `historical_reference`, and `archive_history` are
+  removed from the schema rather than left as empty dumping categories;
+- this inventory's generated authorities remain temporarily tracked only to
+  review and drive no-tail, then join the exact final closeout delete/modify
+  ledger; and
+- the later CLI census re-scans surviving entrypoints from post-no-tail master;
+  it does not require this PostgreSQL inventory to remain tracked; and
+- an untracked private dump and the three remote archive tables remain outside
+  this tracked-tree operation and separately destructive-gated.
+
+Existing archive/history files still belong in Task 1's frozen candidate
+universe so their deletion set is complete. The loopback node in section 0.11
+likewise remains a current test candidate; its bounded guard allowance proves
+only the current inventory outcome and does not preserve that test in no-tail.
+Task 1 cannot resume until focused review accepts both section 0.11 and this
+scope re-pin.
 
 ---
 
@@ -1077,6 +1124,14 @@ classify to a surface with `defer_to_legacy_agent_cli_census`; do not recommend
 retirement in this task. A mixed command retains only its non-PG product
 capability in the future no-tail line.
 
+The existing `pg_unreachable_e2e` path is never protected. Classify it
+`retire_pg_only` when no positive behavior survives. If exact current
+application-startup, scheduler, or dynamic-route-census behavior survives,
+use `retain_operator_remove_pg_branch`, name a proposed positive local-runtime
+owner, and enumerate that behavior and its owner nodes. The replacement name,
+source, comments, and fixtures may not retain PostgreSQL terminology or a
+negative historical contract.
+
 - [ ] **Step 4: Classify tests without preserving false contracts**
 
 Map each exact node to the surface it owns, one observed baseline outcome, one
@@ -1096,13 +1151,16 @@ across all rows. Every node must exist in exactly one of
 inheritance, empty PG tombstones, or DSN routing are candidate retirements, not
 automatic protected coverage.
 
-- [ ] **Step 5: Classify current and historical documentation**
+- [ ] **Step 5: Classify current, historical, and archive documentation**
 
-Current runtime claims receive `pg_no_tail` follow-up ownership. Dated plans,
-evidence, and closed migration narratives receive `historical_reference`
-unless they still function as current instructions. Archive restore docs and
-tracked dump manifests receive `retain_archive_asset`. Record the root README
-overclaim explicitly rather than silently correcting it.
+Wholly PostgreSQL dated plans, evidence, closed migration narratives, archive
+instructions, dump manifests, Docker/SQL support, and historical claims receive
+`retire_pg_only` with `pg_no_tail` ownership. A mixed current authority receives
+`rewrite_current_authority` only when the file still owns non-PostgreSQL
+product truth; its row names every PostgreSQL branch/name/prose family that the
+later no-tail slice removes. Record the root README overclaim explicitly as a
+mixed current-authority rewrite rather than silently correcting it. No
+historical or archive candidate receives a preservation disposition.
 
 - [ ] **Step 6: Write both canonical classification authorities**
 
@@ -1139,6 +1197,8 @@ one test node assigned conflicting outcome or environment assumptions
 cli_class/documentation_status/http_methods populated outside their owning kind
 missing cli_class/documentation_status/http_methods on their owning kind
 disposition/follow_up_owner pairs outside the exact section 0.3 table
+proposed local_owner on any disposition other than the two section 0.3 cases,
+or without its required measured methods/positive operator contract
 any row using the reserved runtime_owner_css owner
 empty pg_capabilities outside the exact deferred legacy-agent exception
 more or fewer than one disposition per row
@@ -1175,7 +1235,7 @@ Stop for Task 2 review unless a recorded batch ruling applies.
 **Interfaces:**
 - Consumes: Task 2 canonical `surfaces.jsonl`, Task 0 base node streams, and
   Task 1 `candidates.jsonl` plus dynamic route stream.
-- Produces: all byte-exact projections, six complete disposition partitions,
+- Produces: all byte-exact projections, five complete disposition partitions,
   predicted no-tail path sets, focused PG node stream, readable inventory
   authority, and a manifest that the no-tail plan can consume without another
   discovery pass.
@@ -1198,13 +1258,13 @@ write `pg_focused_base.nodes`. Record per-suite and per-file counts, total
 count, and full hash in the narrative. No name-pattern approximation is
 accepted.
 
-- [ ] **Step 3: Prove six-way partition algebra**
+- [ ] **Step 3: Prove five-way partition algebra**
 
 Project one ID set for each disposition and prove:
 
 ```text
 pairwise intersections are empty
-union of six partitions equals every surfaces.jsonl id
+union of five partitions equals every surfaces.jsonl id
 no partition is empty without an explicit narrative explanation
 every follow_up_owner is compatible with its disposition
 ```
@@ -1221,9 +1281,10 @@ Create exact delete, modify, add, and protected path sets. Rules:
 - modify contains mixed/local-consumer owners that must lose a PG branch,
   inheritance, type gate, DTO, copy, or test contract;
 - add contains only absent proposed `local_owner` paths backed by a measured
-  non-empty method set; no speculative module or test path;
-- protected contains current local/domain/frontend/archive owners whose bytes
-  no-tail must preserve, plus every non-PG operator path from
+  non-empty method set or the exact retained positive local-runtime operator
+  contract from Task 2 Step 3; no speculative module or test path;
+- protected contains current local/domain/frontend owners whose bytes no-tail
+  must preserve, plus every non-PG operator path from
   `cli_handoff_only` that is not already a modify path; and
 - all four sets are pairwise disjoint.
 
@@ -1231,6 +1292,13 @@ If frontend PG DTO/copy consumers are zero, list all current frontend product
 paths as a byte-protected boundary and say so explicitly. If any exist, list
 their exact bounded modify owners; do not infer byte protection from the
 plan-author zero migration-route observation.
+
+Every tracked archive/history/Docker/SQL/dump/manifest path belongs to delete,
+never protected. The active design, plan, evidence, generated inventory
+authority, and PostgreSQL map entries are intentionally outside the frozen
+candidate surface universe; the no-tail implementation plan must append their
+exact then-current paths to its closeout delete/modify ledger before product
+execution. They are temporary instructions, not preserved residue.
 
 - [ ] **Step 5: Write the readable inventory authority**
 
@@ -1243,15 +1311,18 @@ plan-author zero migration-route observation.
 4. complete runtime/startup/route/store/backend maps;
 5. exact consumer method table and minimal-capability ceiling;
 6. test-node and environment-assumption table;
-7. four-way CLI table with no retirement ruling for legacy-agent;
+7. temporary four-way CLI table with no retirement ruling for legacy-agent;
+   no-tail later emits only a neutral surviving `path:symbol` seed and the CLI
+   census independently re-scans post-no-tail master;
 8. current/historical/archive documentation table;
-9. six dispositions with counts/hashes;
+9. five dispositions with counts/hashes;
 10. predicted no-tail delete/modify/add/protected tables;
 11. canonical backend/frontend/focused identities and recipes;
 12. named stop conditions and unresolved facts, which must be empty at
     admission; and
-13. explicit exclusions for secrets, remote tables, product DBs, archive
-    mutation, and product implementation.
+13. explicit inventory-stage exclusions for secrets, remote tables, untracked
+    private dumps, product DBs, tracked archive mutation, and product
+    implementation; none may be restated as a no-tail preservation decision.
 
 - [ ] **Step 6: Build the tracked manifest**
 
@@ -1266,7 +1337,7 @@ manifest file's own SHA separately in evidence.
 Rebuild all classification/adjudication projections into a separate temporary
 directory and compare each to the tracked version with `cmp`. Independently
 recapture and compare `candidates.jsonl` from `CANDIDATE_SOURCE_TIP`, base node
-streams, full dynamic routes, and package witness. Verify six partitions, four
+streams, full dynamic routes, and package witness. Verify five partitions, four
 path sets, manifest, design/base hashes, and zero non-doc diff from
 `729d8514ac912b447f1892aefd3e897ea8a843b6`.
 
@@ -1323,7 +1394,7 @@ candidate adjudication authority
 canonical surfaces.jsonl
 all projection TSVs
 environment package JSON
-six disposition partitions
+five disposition partitions
 four no-tail path sets
 tracked MANIFEST.sha256
 candidate-union and projection count/hash reports
@@ -1345,7 +1416,8 @@ Verify:
 - no production DB opener, provider request, remote socket connection,
   lifespan, or scheduler process occurred;
 - encrypted tracked blobs still match and no plaintext entered artifacts; and
-- archive dumps/manifests are byte-identical.
+- tracked archive/Docker/SQL/dump/manifest candidates are byte-identical during
+  this docs-only inventory and are assigned only to the future delete set.
 
 - [ ] **Step 4: Run secret and path leak scans**
 
@@ -1388,9 +1460,10 @@ git commit -m "docs: admit PostgreSQL runtime inventory"
 - [ ] **Step 7: Stop for combined implementation review**
 
 Fable independently rebuilds all candidate sources, exact ledgers, package
-provenance, six-way algebra, path sets, and docs-only boundary. No-tail plan
-authoring, Task 5 merge, push, product code, `.env` mutation, archive restore,
-and remote access remain unauthorized until review GREEN and user ruling.
+provenance, five-way algebra, path sets, and docs-only boundary. No-tail plan
+authoring, Task 5 merge, push, product code, `.env` mutation, tracked archive
+deletion, private-file mutation, and remote access remain unauthorized until
+review GREEN and user ruling.
 
 ---
 
@@ -1444,7 +1517,8 @@ git commit -m "docs: close PostgreSQL runtime inventory"
 
 Only after focused closeout GREEN may the inventory branch/worktree be removed
 and the no-tail implementation plan begin. No product edit, push, `.env`
-cleanup, archive restore, or remote-table action is part of Task 5.
+cleanup, tracked archive deletion, private-file mutation, or remote-table
+action is part of Task 5.
 
 ---
 
@@ -1484,8 +1558,9 @@ occurs:
 22. frontend byte protection is asserted without completing the frontend
     DTO/status/copy census;
 23. predicted delete/modify/add/protected path sets overlap;
-24. a predicted added path is not the absent proposed `local_owner` of a
-    measured non-empty local capability;
+24. a predicted added path is not the absent proposed `local_owner` of either
+    a measured non-empty local capability or the exact retained positive
+    local-runtime operator contract;
 25. a classification projection cannot be regenerated byte-for-byte from
     `surfaces.jsonl` plus `candidate_adjudications.jsonl`, or a named grounding
     stream cannot be independently recaptured;
@@ -1493,11 +1568,13 @@ occurs:
     paths, or an omitted trailing-newline rule;
 27. the `psycopg2` package source is described as proven manual/transitive
     installation history beyond observable metadata;
-28. an archive asset changes or remote archive access occurs;
+28. a tracked archive/Docker/SQL/dump/manifest asset changes during this
+    docs-only inventory or any remote archive access occurs;
 29. a packet manifest is incomplete or an unmanifested temporary cleanup root
     remains; or
-30. implementation proceeds into no-tail, `.env` cleanup, archive restore,
-    CLI retirement, merge, or push without its explicit later gate; or
+30. implementation proceeds into no-tail, `.env` cleanup, tracked archive
+    deletion, private-file mutation, CLI retirement, merge, or push without
+    its explicit later gate; or
 31. a Task 0 Node command uses `npx`, `npm exec`, installs a dependency,
     reaches a package registry, or runs a Vitest binary other than the pinned
     root `node_modules/.bin/vitest` at exactly `4.1.8`.
@@ -1514,10 +1591,11 @@ Independent plan review must reconstruct and judge at least:
 5. candidate-source union completeness and closed candidate adjudication;
 6. structured route, AST, package, test, CLI, docs, and git-crypt procedures;
 7. projection recipes and single-authority discipline;
-8. six-way disposition algebra;
+8. five-way disposition algebra;
 9. predicted no-tail path-set rules and frontend decision gate;
-10. secret/product/remote/archive safety boundaries; and
+10. secret/product/remote/archive inventory safety boundaries and the absence
+    of any archive/history preservation disposition; and
 11. Task 4 third-party reconstruction and Task 5 merge gates.
 
-Task 0 resumption remains blocked until the section 0.10 amendment review is
-GREEN.
+Task 1 resumption remains blocked until focused review accepts both the
+section 0.11 loopback-harness amendment and section 0.12 scope/schema re-pin.
