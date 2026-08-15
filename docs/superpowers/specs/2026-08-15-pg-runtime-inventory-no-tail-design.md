@@ -1,7 +1,8 @@
 # PostgreSQL Runtime Inventory and No-Tail Program Design
 
-> **Status:** USER-APPROVED SECTIONS 1-4; WHOLE-DOCUMENT REVIEW NEXT;
-> DESIGN ONLY; IMPLEMENTATION NOT AUTHORIZED
+> **Status:** WHOLE-DOCUMENT REVIEW GREEN AT `729d8514`; USER-APPROVED
+> ZERO-TRACKED-POSTGRESQL-RESIDUE AMENDMENT; INVENTORY PLAN RE-PIN NEXT;
+> PRODUCT IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-15
 >
@@ -29,10 +30,11 @@ contains executable PostgreSQL surfaces, however:
   route list, so its GREEN result does not cover these surfaces.
 
 This is a runtime ownership problem, not a data-migration problem. Local stores
-already own current product data. Frozen PostgreSQL dumps own archive history.
-Keeping an executable Python PostgreSQL compatibility layer between those two
-authorities creates no product capability and continues to burden startup,
-tests, dependencies, documentation, and future architecture work.
+already own current product data. The tracked repository does not need a
+second PostgreSQL archive product, compatibility layer, or historical prose
+surface. Keeping those remnants creates no current product capability and
+continues to burden startup, tests, dependencies, documentation, and future
+architecture work. Git history is the repository archive.
 
 The project's early CLI-first direction is no longer a preservation
 constraint. The primary product is the desktop research workbench. A command
@@ -83,33 +85,19 @@ Desktop / FastAPI / scheduler / retained operator command
                        macro_calendar.db
 ```
 
-Archive inspection:
+The final tracked tree has one authority: the current local application. It
+contains no PostgreSQL-only executable, test, dependency, configuration,
+Docker or SQL support, tracked dump or manifest, historical/archive operating
+document, comment, docstring, test name, fixture, compatibility shim, or
+governance narrative. Mixed files retain only current local behavior and are
+rewritten so their names and prose do not describe a nonexistent PostgreSQL
+alternative.
 
-```text
-tracked dump + manifest
-          |
-          v
-pg_restore into an isolated scratch PostgreSQL database
-          |
-          v
-psql verification / inspection
-          |
-          v
-drop the scratch database
-```
-
-These flows do not share Python code, runtime configuration, dependencies, or
-credentials. The archive surface consists only of:
-
-- `docker/` scratch-restore infrastructure;
-- `sql/` schema lineage needed by archive restore;
-- tracked dumps and manifests under `data/pg_archive/`; and
-- concise operating and historical documentation.
-
-There is no retained Python archive CLI, `DatabaseBackend`, PostgreSQL store,
-runtime probe, migration API, or importable compatibility shim. Git history is
-the source for recovering retired implementation if a future reviewed design
-needs it.
+Git history is the source for recovering retired implementation and tracked
+artifacts if a future reviewed design needs them. A private untracked dump, if
+the user keeps one outside the candidate tree, is not a product capability and
+does not justify tracked restore tooling. The separately gated remote archive
+tables also remain outside this program.
 
 ### 1.4 Grounded current facts
 
@@ -146,15 +134,14 @@ not substitutes for its final ledgers:
 10. The current `pg_unreachable_e2e` smoke sets
     `ARKSCOPE_DISABLE_SCHEDULER=1` and checks a manually selected route list.
     It therefore does not prove the intended final runtime property.
-11. The app-record archive
-    `data/pg_archive/app_records_20260706T121127Z/app_records.dump` is paired
-    with a manifest whose recorded SHA-256 is
-    `486f6fae01519794405d88b7180188b615e5dfb7c094bf6071f0853e11ab0e92`.
-    Its reviewed row counts are `agent_queries=2`, `research_reports=2`, and
-    `agent_memories=1`.
-12. `docker/README.md` already documents a two-stage scratch restore with
-    standard PostgreSQL tools. The no-tail line verifies this path instead of
-    adding a custom Python reader.
+11. At the grounding base, the app-record dump and manifest are tracked and
+    have reviewed digests and row counts. They are now exact retirement
+    candidates, not a final admission fixture. Any separately retained private
+    copy is outside the tracked candidate tree and outside this program.
+12. `docker/README.md` currently documents a scratch restore workflow. That
+    tracked workflow and its supporting Docker, SQL, dump, manifest, and
+    historical documentation are now retirement candidates rather than a
+    preserved product surface.
 13. The private `config/.env` currently has a PostgreSQL DSN key. Its value is
     outside repository evidence and must never be printed, copied, hashed into
     an artifact, or committed.
@@ -168,8 +155,8 @@ This program does not:
   or any other production table;
 - call a provider or remote PostgreSQL service;
 - physically delete the three remote app-record archive tables;
-- delete or rewrite tracked archive dumps;
-- add a Python archive inspection utility;
+- delete an untracked private dump outside the candidate tree;
+- add a PostgreSQL archive inspection utility of any kind;
 - redesign all DAL/domain interfaces;
 - retire the legacy-agent CLI before its separate census and user ruling;
 - remove current operator commands merely because they are command-line
@@ -179,6 +166,11 @@ This program does not:
 Physical deletion of the three remote archive tables remains a separate,
 explicitly approved operation. The remote instance may need to be started for
 that operation; this design grants no such access.
+
+The later no-tail slice **does** delete every tracked PostgreSQL-only archive,
+Docker, SQL, dump, manifest, and historical-document path found by the
+inventory. This is repository cleanup, not authorization to mutate untracked
+private files or remote data.
 
 ## 2. PostgreSQL Consumer Inventory
 
@@ -205,7 +197,7 @@ Each discovered surface receives one row with these fields:
 | Actual methods used | Consumer-observed method set; this is the only input to a minimal local capability interface |
 | Tests and environment | Exact owning node IDs plus DSN, package, scheduler, route, or fixture assumptions |
 | Disposition | Exactly one closed value from section 2.3 |
-| Follow-up owner | No-tail, legacy-agent census, archive/history, or a named future slice |
+| Follow-up owner | No-tail, legacy-agent census, or a named future slice |
 | Stop condition | Concrete fact that would invalidate the disposition |
 
 A row cannot use vague values such as `maybe`, `probably dead`, `cleanup`, or
@@ -223,12 +215,17 @@ The only admitted disposition values are:
    measured local capability it actually uses.
 3. `retain_operator_remove_pg_branch` - the current operator command remains,
    while its PostgreSQL-only branch and configuration retire.
-4. `retain_archive_asset` - non-Python dump, manifest, SQL lineage, Docker
-   restore infrastructure, or archive operating documentation remains.
-5. `historical_reference` - a dated statement remains only as history and must
-   not be read as current runtime authority.
-6. `defer_to_legacy_agent_cli_census` - the surface belongs to the later
+4. `rewrite_current_authority` - a mixed current document or surface remains,
+   but all PostgreSQL branches, names, comments, and historical contrast are
+   removed so it describes only the current local application.
+5. `defer_to_legacy_agent_cli_census` - the surface belongs to the later
    legacy-agent product census and cannot be retired in no-tail.
+
+Tracked dumps, manifests, SQL lineage, Docker restore support, archive
+operating documents, and historical PostgreSQL references use
+`retire_pg_only`; they are not preservation categories. Mixed current
+authority documents use `rewrite_current_authority` only when deleting the
+whole file would remove still-valid non-PostgreSQL product documentation.
 
 `pg_unreachable_e2e` uses
 `retain_operator_remove_pg_branch`. Its row names the no-tail slice as owner
@@ -284,7 +281,7 @@ for:
 - all CLI entrypoints and four-way labels;
 - all current product documentation claims;
 - all measured consumer method sets;
-- each of the six disposition partitions;
+- each of the five disposition partitions;
 - predicted no-tail deletion, modification, addition, and protected sets; and
 - canonical backend, frontend, and focused collection identities at the exact
   inventory base.
@@ -363,8 +360,10 @@ No-tail removes:
 5. dead PG branches from retained mixed/operator modules;
 6. PostgreSQL Python dependencies and their lockfile entries when the final
    import census reaches zero; and
-7. product documentation that presents executable PG fallback, migration, or
-   runtime archive access as current behavior.
+7. tracked PostgreSQL-only Docker, SQL, dump, manifest, archive, migration,
+   and historical-document paths; and
+8. PostgreSQL names and claims from retained mixed comments, docstrings, test
+   names, fixtures, current product documents, and governance indexes.
 
 Pure helpers embedded in a retiring module may move to a neutral local module
 only when the inventory proves a retained consumer. Copying an entire class or
@@ -403,10 +402,12 @@ PostgreSQL Python driver is installed or importable. It must:
 8. leave no process, file descriptor, temporary database, environment link, or
    runtime directory behind.
 
-A static repository census accompanies the runtime gate. Its only exclusions
-are named archive assets and named historical documents from the inventory.
-Pattern-wide exclusions such as all `docker/`, all `docs/`, or all `sql/` are
-not accepted unless every excluded path is enumerated and classified.
+A static repository census accompanies the runtime gate. The final tracked
+tree has no archive/history exemptions: every match in the closed
+PostgreSQL term, symbol, path, comment, docstring, test-name, fixture, and
+documentation vocabulary is either removed or is a stop-and-amend event.
+Untracked private files and remote tables are outside the tracked-tree census,
+but they must not be used as justification for a tracked exception.
 
 ### 3.6 Error behavior
 
@@ -421,27 +422,33 @@ Retained local domains preserve their existing reviewed contracts:
 - no `FileBackend` or generic fallback substitutes a different authority; and
 - broad exception swallowing is not introduced to keep old tests GREEN.
 
-### 3.7 Archive capability proof
+### 3.7 Tracked-residue retirement and Git recovery
 
-No-tail preserves archive access through standard tooling and proves it before
-closeout:
+No-tail closes the repository surface rather than preserving a second archive
+workflow:
 
-1. verify the tracked app-record manifest and dump SHA before restore;
-2. start an isolated scratch PostgreSQL instance with archive-only
-   credentials, distinct from any app runtime configuration;
-3. restore
-   `data/pg_archive/app_records_20260706T121127Z/app_records.dump`;
-4. query the restored tables with `psql` and verify exactly
-   `agent_queries=2`, `research_reports=2`, and `agent_memories=1`;
-5. record schema/table sanity without exposing row contents or credentials;
-6. drop the scratch database and stop/remove the scratch instance; and
-7. prove no archive process, volume created for the proof, credential file, or
-   port remains.
+1. derive exact delete, rewrite, and protected path sets from the reviewed
+   inventory;
+2. use `git rm` for every tracked PostgreSQL-only executable, test, dependency,
+   Docker, SQL, dump, manifest, archive, migration, and historical-document
+   path;
+3. rewrite retained mixed current-authority files to remove every PostgreSQL
+   branch, name, comment, docstring, test name, fixture, and historical
+   comparison while preserving current local behavior;
+4. at final closeout, remove this design, its inventory/implementation plans,
+   evidence, generated ledgers, and obsolete PostgreSQL decision-log entries
+   from the tracked worktree; a current mixed index may remain only after its
+   PostgreSQL entries are removed;
+5. run the final closed-vocabulary tracked-tree census with zero matches and
+   no archive/history exemptions; and
+6. record the last commit containing the retired surface in the retirement
+   commit message and external review packet, then prove recovery with
+   `git show <commit>:<path>` without restoring files into the worktree.
 
-The no-tail evidence pins the final commit that still contains the Python
-PostgreSQL executable surface. This makes historical source recovery explicit
-without retaining importable code. The hash is measured at cutover and must
-not be guessed in this design.
+There is no `pg_restore`, `psql`, scratch PostgreSQL credential, process,
+container, or volume admission gate. Git history is the durable repository
+record. The last-containing commit is measured at cutover and must not be
+guessed in this design.
 
 ### 3.8 Configuration and destructive boundaries
 
@@ -450,12 +457,12 @@ private `config/.env`. This is an operator step, not a tracked commit. The
 procedure checks only that the key is absent afterward, never prints or
 records its value, and reminds the user to restart the desktop app/sidecar.
 
-Archive scratch credentials remain local to the Docker restore workflow and
-must not reuse application runtime configuration.
-
 Deletion of the three remote archive tables is excluded. It requires a
 separate manifest, explicit user authorization, remote-instance lifecycle
 handling, and its own pre/post verification.
+
+Deletion of any private untracked dump is likewise excluded. It is an
+operator-owned file decision, not a tracked repository operation.
 
 ## 4. Execution, Verification, and Handoff
 
@@ -470,9 +477,10 @@ The no-tail implementation plan must preserve this dependency order:
 3. **Delete PostgreSQL foundations.** Remove classes, connection helpers,
    dependencies, re-exports, PG-only tests, and compatibility inheritance only
    after they are dead.
-4. **Transform admission and documentation.** Replace the old smoke, prove the
-   archive restore, correct current runtime claims, pin the last PG-surface
-   commit, and close the line.
+4. **Transform admission and retire tracked residue.** Replace the old smoke,
+   delete tracked archive/history support, rewrite mixed current authority,
+   prove the zero-match census, pin the last PG-surface commit, and close the
+   line by removing its temporary governance documents.
 
 This ordering keeps each deletion reviewable and ensures later removals are
 dead-code removal. Phase 1's temporary presence of unreachable PostgreSQL
@@ -514,7 +522,8 @@ At minimum, the final tree must kill these independently restored mutations:
 4. restore the scheduler PostgreSQL reachability probe;
 5. restore a PostgreSQL package import or dependency;
 6. restore a PostgreSQL branch in a retained mixed/operator command;
-7. make product `src/` import archive-only tooling; and
+7. restore any retired PostgreSQL-only path, dependency, comment, docstring,
+   test name, fixture, archive instruction, or historical claim; and
 8. remove the local job-history supplement from scheduler restart seeding.
 
 Each mutation changes active semantics, names its owning node, makes that owner
@@ -543,8 +552,8 @@ No-tail admission requires all of the following on a fresh exact-tip worktree:
    absent;
 9. scratch product databases and sealed provider fakes prove zero provider,
    remote database, and production-data contact;
-10. the real app-record archive restore and exact count proof in section 3.7
-    succeeds; and
+10. the section 3.7 closed-vocabulary census reports zero tracked PostgreSQL
+    residue with no archive/history exemption; and
 11. all temporary environments, links, processes, databases, ports, and
     artifacts are manifested and cleaned.
 
@@ -554,20 +563,16 @@ gate fails.
 
 ### 4.5 Documentation truth
 
-No-tail updates current product authority to state the precise end state:
+No-tail leaves current product authority written positively in terms of the
+local application and its actual capabilities. It does not retain contrastive
+claims about removed PostgreSQL backends, routes, fallbacks, archives, or
+migrations. Current operator commands are listed only by supported behavior.
 
-- normal application runtime is local-only and has no PostgreSQL Python
-  dependency or executable fallback;
-- PostgreSQL exists only as an external scratch tool for inspecting tracked
-  archives;
-- migration preview/apply is no longer a product route;
-- current operator commands are listed by actual supported capability; and
-- historical documents remain historical and cannot be read as current
-  instructions.
-
-The inventory decides which old documents are corrected, retained as dated
-history, or retired. Documentation edits do not silently rewrite historical
-execution evidence.
+Wholly PostgreSQL historical/archive documents retire with `git rm`; mixed
+current authority is rewritten without PostgreSQL prose. The temporary design,
+plans, inventory, evidence, generated ledgers, and obsolete decision-log
+entries for this program also leave the final tracked tree. Their exact bytes
+remain available through Git history and the external review packet.
 
 ### 4.6 Legacy-agent CLI handoff
 
@@ -602,16 +607,19 @@ This design is satisfied only when:
 
 1. the inventory is independently reconstructable, docs-only, and closed over
    every executable, test, dependency, CLI, and current documentation surface;
-2. the no-tail implementation leaves no Python PostgreSQL runtime or archive
-   executable surface;
+2. the no-tail implementation leaves zero tracked PostgreSQL residue across
+   executable code, tests, dependencies, configuration, comments, docstrings,
+   fixtures, names, Docker/SQL support, dumps, manifests, history, and
+   governance documents;
 3. every retained product consumer uses only measured local capabilities;
 4. real app startup and scheduler execution succeed with no PostgreSQL package,
    DSN, probe, route, fallback, or disable flag;
 5. scheduler restart continuity is proven against local job history;
-6. standard `pg_restore`/`psql` tooling restores and verifies the tracked
-   app-record archive in an isolated scratch environment;
-7. product and archive credentials remain separate and secret values never
-   enter evidence;
+6. Git history and the external review packet identify the last commit that
+   contained each retired tracked surface and prove read-only recovery without
+   restoring it into the worktree;
+7. secret values never enter evidence, and no untracked private dump is read,
+   changed, or deleted;
 8. remote archive-table deletion remains unexecuted and separately gated;
 9. the legacy-agent CLI census begins as the binding next product-analysis
    slice, with retirement still gated by user ruling; and
@@ -620,18 +628,20 @@ This design is satisfied only when:
 
 ## 6. Supersession and Authorization
 
-This design narrows and supersedes older statements that accepted importable
+This amendment supersedes older statements that accepted importable
 PostgreSQL compatibility classes, migration routes, DSN-driven construction,
-or a Python PG archive layer after product data became local. It does not
-invalidate historical migration evidence, tracked dumps, SQL lineage, or
-already reviewed local-store contracts.
+a Python PG archive layer, tracked dump/SQL/Docker restore support, or retained
+PostgreSQL historical documentation after product data became local. Earlier
+evidence remains in Git history; it is not a tracked-tree preservation
+exception. Already reviewed local-store behavior remains authoritative and is
+not redesigned by this ruling.
 
-Approval of this design authorizes only:
+Approval of this amendment authorizes only:
 
-1. committing this docs-only design and its priority-map status entry;
-2. independent whole-document review; and, after that review is GREEN,
-3. writing and executing the docs-only PostgreSQL consumer inventory under its
-   own exact plan and stop conditions.
+1. committing the docs-only amendment and priority-map decision entry;
+2. re-pinning the docs-only inventory plan to this exact design; and
+3. after focused review is GREEN, resuming the docs-only PostgreSQL consumer
+   inventory under its exact plan and stop conditions.
 
 It does not authorize no-tail product edits, merge, push, provider traffic,
 remote PostgreSQL access, production database mutation, private `.env`
