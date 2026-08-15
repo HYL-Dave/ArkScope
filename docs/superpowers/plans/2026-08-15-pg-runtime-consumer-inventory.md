@@ -6,9 +6,9 @@
 > checkbox (`- [ ]`) syntax for tracking.
 >
 > **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; ZERO-TRACKED-RESIDUE
-> RE-PIN REVIEW GREEN; TASK 1 LEDGER SUPERSEDED BY VOCABULARY STOP; TASK 2
-> STOPPED BEFORE CLASSIFICATION; TASK 1R AMENDMENT REVIEW NEXT; TASKS 3-5 NOT
-> STARTED
+> RE-PIN REVIEW GREEN; TASK 1 LEDGER SUPERSEDED BY VOCABULARY STOP; TASK 1R
+> COMPLETE - FOCUSED REVIEW NEXT; TASK 2 STOPPED BEFORE CLASSIFICATION; TASKS
+> 3-5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -1162,26 +1162,26 @@ Stop for Task 1 review unless a recorded batch ruling applies.
 
 #### Task 1R: Repair the candidate vocabulary and rebuild Task 1
 
-- [ ] Recreate a read-only detached source worktree at exact
+- [x] Recreate a read-only detached source worktree at exact
   `CANDIDATE_SOURCE_TIP`; regenerate every Task 1 raw source, not only the new
   text rows. Verify route, package, archive, CLI, encrypted-blob, and base-node
   grounding again.
-- [ ] Apply the amended standalone-word, identifier-morphology, and semantic
+- [x] Apply the amended standalone-word, identifier-morphology, and semantic
   path projections. Preserve only bounded path/line/byte-column/token fields;
   never retain source lines, lockfile integrity values, encrypted plaintext,
   DSNs, or arbitrary prose.
-- [ ] Rebuild `candidates.jsonl` from all raw packet inputs in two independent
+- [x] Rebuild `candidates.jsonl` from all raw packet inputs in two independent
   processes. Require unique IDs, pairwise source accounting, one final
   newline, and byte equality. The old `6,902/dcfa6392...` identity is forbidden
   as an admission expectation.
-- [ ] Reproject candidate test paths from the corrected union. Rerun the
+- [x] Reproject candidate test paths from the corrected union. Rerun the
   complete expanded backend and frontend candidate suites with the reviewed
   loopback exception, fail-closed socket/Node guards, explicit Vitest 4.1.8
   binary, and no package-manager fallback. A delta-only runtime is rejected.
-- [ ] Manifest and clean every temporary root. Commit only the corrected
+- [x] Manifest and clean every temporary root. Commit only the corrected
   candidate ledger, evidence, and newest-first map status with subject
   `docs: complete PostgreSQL candidate vocabulary`.
-- [ ] Stop for focused Task 1R review. Task 2 may not consume the corrected
+- [x] Stop for focused Task 1R review. Task 2 may not consume the corrected
   ledger until that review is GREEN.
 
 ---
