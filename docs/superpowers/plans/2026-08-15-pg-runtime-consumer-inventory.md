@@ -8,7 +8,7 @@
 > **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; ZERO-TRACKED-RESIDUE
 > RE-PIN REVIEW GREEN; TASK 1 LEDGER SUPERSEDED BY VOCABULARY STOP; TASK 1R
 > FOCUSED REVIEW GREEN; TASK 2 STOPPED ON CANDIDATE-KIND SCHEMA; TASK 1S
-> AMENDMENT REVIEW NEXT; TASKS 3-5 NOT STARTED
+> COMPLETE - FOCUSED REVIEW NEXT; TASKS 3-5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -1243,23 +1243,23 @@ Stop for Task 1 review unless a recorded batch ruling applies.
 
 #### Task 1S: Normalize semantic-path candidates to the closed kind schema
 
-- [ ] Recreate the Task 1R text source from immutable
+- [x] Recreate the Task 1R text source from immutable
   `CANDIDATE_SOURCE_TIP`. For semantic tracked paths, group all raw matcher
   hits by `(path, candidate_kind(path, token), token)`, write sorted matcher
   names to bounded `detail`, and emit only section 0.3 kind values. Unknown
   candidate kinds or dropping any of the 33 raw matcher hits is a stop.
-- [ ] Rebuild `text_candidates.jsonl` and the complete candidate union in two
+- [x] Rebuild `text_candidates.jsonl` and the complete candidate union in two
   independent processes. Require exactly 22 normalized semantic-path rows,
   10,446 total candidates, the section 0.14 full SHA-256, unique IDs, global
   byte order, one final newline, and zero undeclared candidate kind.
-- [ ] Prove the 375-path stream and backend/frontend candidate file and exact
+- [x] Prove the 375-path stream and backend/frontend candidate file and exact
   node projections are byte-identical to admitted Task 1R artifacts. Runtime
   outcomes carry only under that exact equality; any drift requires the full
   fail-closed candidate runtimes to rerun.
-- [ ] Manifest and clean all temporary roots. Commit only the corrected
+- [x] Manifest and clean all temporary roots. Commit only the corrected
   candidate ledger, evidence, plan status, and newest-first map status with
   subject `docs: normalize PostgreSQL path candidates`.
-- [ ] Stop for focused Task 1S review. Task 2 remains blocked until that review
+- [x] Stop for focused Task 1S review. Task 2 remains blocked until that review
   is GREEN.
 
 ---
