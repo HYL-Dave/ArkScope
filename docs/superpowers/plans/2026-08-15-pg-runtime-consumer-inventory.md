@@ -5,8 +5,9 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** PLAN REVIEW GREEN; TASK 0 COMPLETE; TASK 0 REVIEW NEXT;
-> TASKS 1-5 NOT STARTED
+> **Status:** PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; BATCH A AUTHORIZED;
+> TASK 1 STOPPED ON EXPECTED LOOPBACK-PROBE HARNESS BOUNDARY;
+> TASKS 2-5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -562,6 +563,13 @@ batch ruling may replace intermediate waits but cannot relax commits, packets,
 or stop conditions. Task 4 is always the combined inventory implementation
 review gate. Task 5 requires that review to be GREEN.
 
+Task 0 independent review returned GREEN. The user then authorized two bounded
+batches: Batch A runs Tasks 1-2 and stops for classification review; after that
+review is GREEN, Batch B runs Tasks 3-4 and stops for the combined inventory
+review. Task 5 remains gated on that combined review. Per-task commits and
+packets, all hard stops, docs-only scope, no squash, no merge, no push, and all
+live/secret/database boundaries remain unchanged.
+
 ### 0.10 Task 0 stop: unpinned `npx` network fallback
 
 The first Task 0 attempt correctly created a ciphertext-only worktree and
@@ -588,8 +596,51 @@ Focused review returned GREEN for amendment `da98626d`. The clean rerun used
 the hoisted root Vitest `4.1.8`, reran both base collections and every witness,
 and completed Task 0 without package-manager traffic. The stop record remains
 historical evidence; the complete packet and identities are recorded in the
-Task 0 evidence file. Default per-task review remains in force, so Task 1 has
-not started.
+Task 0 evidence file. Section 0.9's later batch ruling supersedes the original
+per-task wait.
+
+### 0.11 Task 1 stop: intentional loopback refusal probe
+
+Task 1 candidate extraction reached the backend outcome gate with 64 files and
+1,553 exact base-stream nodes. Its first complete runtime was rejected even
+though all 1,553 outcomes were passing or skipped: the fail-closed socket guard
+recorded one attempted call. A diagnostic replay proved the sole owner is the
+existing node
+`tests/test_data_scheduler.py::test_pg_reachable_probe_is_bounded`. That test
+intentionally calls `socket.create_connection(("127.0.0.1", 9), timeout=1.0)`
+to model a bounded PostgreSQL refusal. The guard raised before any operating
+system socket was started, so no network traffic occurred, but the attempt was
+not an admitted exception under Task 1 step 5. Execution therefore stopped
+before frontend runtime, candidate-ledger creation, or Task 2.
+
+After this amendment is independently reviewed GREEN, rerun the exact node and
+the complete 64-file backend candidate runtime from fresh processes. The
+outcome plugin must keep fail-closed replacements for
+`socket.socket.connect`, `socket.socket.connect_ex`, and
+`socket.create_connection`. It may admit exactly one intercepted call only
+when all of these facts hold:
+
+```text
+node = tests/test_data_scheduler.py::test_pg_reachable_probe_is_bounded
+operation = socket.create_connection
+address = loopback 127.0.0.1, port 9
+timeout = 1.0
+result = guard raises ConnectionRefusedError before the operating system call
+```
+
+Artifacts retain only the node ID, operation, count, and the closed environment
+assumption `socket_guarded_loopback_refusal`; they do not retain arbitrary
+socket arguments. Any different node, operation, host, port, timeout, second
+hit, or actual socket call remains a hard stop. The full backend run must still
+contain exactly the 1,553 projected outcomes, and the named node must pass.
+The prior `1,525 passed / 28 skipped` run is rejected evidence and cannot be
+reused. No product or test edit is authorized by this exception.
+
+Partial packet `/tmp/pg-runtime-inventory-task1-4c6b8d44` contains 50
+checksummed payloads; its `SHA256SUMS` SHA-256 is
+`f54d8ef505b7cd19a58886e0a16e75c277770c0f7172686cae2cafa3e38c39d1`.
+The candidate source worktree remains at exact `CANDIDATE_SOURCE_TIP` for the
+reviewed resume; no tracked candidate ledger has been created yet.
 
 ---
 
@@ -935,7 +986,10 @@ is zero. After the candidate test paths close, run the exact backend candidate
 files in the Task 0 no-DSN/socket-guarded environment and the exact frontend
 candidate files sequentially against the pinned toolchain. Record every
 candidate node's `passed`/`skipped` outcome; any unsealed external request or
-outcome absent from the collected base streams is a stop.
+outcome absent from the collected base streams is a stop. The sole bounded
+exception is section 0.11's pre-OS interception of the exact loopback-refusal
+node; record its environment assumption on that node. Any other guard hit or
+any actual socket operation is a stop.
 
 - [ ] **Step 6: Enumerate CLI and documentation candidates**
 
@@ -1406,8 +1460,9 @@ occurs:
 5. `config/.env` value, hash, excerpt, or RHS enters output/artifacts;
 6. a production SQLite path becomes reachable or is opened by an inventory
    process;
-7. a provider, remote DB, remote network socket, lifespan, or scheduler is
-   started;
+7. a provider, remote DB, actual network socket, lifespan, or scheduler is
+   started, or a socket guard is hit outside the exact section 0.11
+   loopback-refusal allowance;
 8. encrypted paths or blob identities differ from section 0.8;
 9. ciphertext search is used as evidence of absence;
 10. plaintext from an encrypted document enters the packet;
