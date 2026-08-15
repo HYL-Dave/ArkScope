@@ -522,6 +522,12 @@ reported:
 }
 ```
 
+Reverse-requirement discovery admits a requirement only when its environment
+marker is absent or evaluates true under
+`packaging.markers.default_environment()` with `extra` explicitly set to the
+empty string; extras-only declarations such as pandas' PostgreSQL requirements
+are excluded.
+
 This proves the imported v2 module is supplied by an undeclared distribution
 in this environment, with installed metadata showing an undeclared
 `news-please` reverse-dependent. It does not prove installation history or
