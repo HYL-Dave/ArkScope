@@ -6,8 +6,9 @@
 > checkbox (`- [ ]`) syntax for tracking.
 >
 > **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; ZERO-TRACKED-RESIDUE
-> RE-PIN REVIEW GREEN; TASK 1 COMPLETE; TASK 2 ACTIVE UNDER BATCH A; TASKS 3-5
-> NOT STARTED
+> RE-PIN REVIEW GREEN; TASK 1 LEDGER SUPERSEDED BY VOCABULARY STOP; TASK 2
+> STOPPED BEFORE CLASSIFICATION; TASK 1R AMENDMENT REVIEW NEXT; TASKS 3-5 NOT
+> STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -586,6 +587,12 @@ existing Batch A authorization resumes at Task 1; it does not require Task 0
 to rerun because the amendment is docs-only and `CANDIDATE_SOURCE_TIP` remains
 the immutable current-surface universe.
 
+Task 2 subsequently stopped before creating any tracked classification
+authority when section 0.13 proved that Task 1's textual vocabulary was not
+closed over the user's zero-residue boundary. The earlier 6,902-row ledger and
+Task 1 packet are dated intermediate evidence and cannot admit Task 2. Batch A
+remains paused until focused review accepts Task 1R and its corrected ledger.
+
 ### 0.10 Task 0 stop: unpinned `npx` network fallback
 
 The first Task 0 attempt correctly created a ciphertext-only worktree and
@@ -688,6 +695,56 @@ likewise remains a current test candidate; its bounded guard allowance proves
 only the current inventory outcome and does not preserve that test in no-tail.
 Task 1 cannot resume until focused review accepts both section 0.11 and this
 scope re-pin.
+
+### 0.13 Task 2 stop: incomplete `PG` vocabulary and identifier closure
+
+Task 2 began only packet-local path summarization. Before any reachability,
+disposition, CLI-class, method, test, or documentation adjudication was
+written, classification grounding found that Task 1's fixed-string set had
+`pg_`, `postgres`, and `postgresql`, but no bounded standalone `PG` token,
+snake suffix, or CamelCase/upper-segment identifier pass. Step 6's instruction
+not to treat every `PG` occurrence as a product claim was incorrectly applied
+as permission not to emit those occurrences as candidates. That contradicts
+section 0.12: Task 2, not Task 1, owns the decision whether a bounded lexical
+hit is PostgreSQL residue or an allowed `lexical_non_surface`.
+
+The first concrete miss is the immutable source-tip docstring at
+`src/macro_calendar/__init__.py:20`, which says the old `PG`
+`MacroCalendarStore` remains importable. The committed candidate ledger has no
+row at all for that path. A bounded source-tip diagnostic then measured:
+
+```text
+existing candidate ledger                 6,902 rows / 317 distinct paths
+standalone ASCII-word PG projection       2,645 hits
+standalone hits on candidate-absent paths   150 hits / 54 paths
+identifier-morphology projection            551 hits
+identifier hits on candidate-absent paths    50 hits / 13 paths
+semantic tracked-path projection             33 hits / 0 uncovered paths
+```
+
+The identifier projection is deliberately lexical: unrelated terms such as a
+Unix `PGID` may enter the candidate universe and must then receive a bounded
+`lexical_non_surface` adjudication. Opaque `package-lock.json` integrity values
+are not identifiers and are excluded from this morphology projection; the
+lockfile remains covered by structured dependency parsing and the original
+fixed PostgreSQL terms. Five tracked PNG files are skipped as binary by the
+text scanner. The three encrypted paths remain excluded from generic scanning
+and retain the section 0.8 dual-tree procedure.
+
+This is hard stop 12. Commit `4a03c7ee` and packet
+`/tmp/pg-runtime-inventory-task1-4c6b8d44` remain immutable evidence of the
+superseded attempt, but their 6,902-row ledger, ten-file frontend runtime, and
+64-file backend runtime cannot be used for classification admission. No
+tracked Task 2 authority was created. No product, test, dependency,
+configuration, provider, database, production SQLite, lifespan, scheduler,
+secret, archive, merge, push, no-tail, or CLI-retirement action occurred.
+
+After focused review GREEN, Task 1R must rebuild the complete candidate
+universe from the unchanged `CANDIDATE_SOURCE_TIP`, recapture every raw source,
+rerun the complete expanded backend and frontend candidate suites, replace the
+tracked ledger in a new docs-only correction commit, and stop for focused
+review. Counts and hashes are outputs; this amendment does not guess them.
+Only that corrected GREEN may resume Task 2 under Batch A.
 
 ---
 
@@ -967,6 +1024,34 @@ sslmode
 use_local_records
 ```
 
+The fixed-string passes are necessary but not sufficient. Run three additional
+bounded projections over the same tracked plaintext universe:
+
+1. standalone ASCII word `PG`, case-insensitive, using
+   `(?i)(?<![A-Za-z0-9_])PG(?![A-Za-z0-9_])`;
+2. identifier tokens first bounded by
+   `(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_])`, then admitted
+   only when the token ends in `_pg` case-insensitively, starts with lowercase
+   `pg` followed by an uppercase letter, or contains `Pg`/`PG` whose preceding
+   character is start/lowercase/digit/underscore and whose following
+   character is end/uppercase/digit/underscore; and
+3. the same standalone/identifier rules plus the existing `pg_` term over
+   tracked path components, requiring every matched path to have at least one
+   candidate from the canonical source union.
+
+The segment rule rejects unrelated substrings such as `UPGRADE`. The
+identifier-morphology pass excludes only opaque integrity values in the exact
+source-tip `package-lock.json`; it does not exclude semantic keys, package
+names, tests, comments, strings, or identifiers from other tracked text.
+Normalize standalone hits to symbol `pg`; retain the exact bounded identifier
+token for identifier hits. Both use `source_family=text_search` and the
+existing path-sensitive `candidate_kind` mapping. A semantic path with no
+candidate is a stop-and-amend event rather than permission to invent an
+unreviewed candidate kind. Keep these projections and scanner SHA values in
+the corrected Task 1 packet. Run the standalone-word and identifier passes on
+the three unlocked encrypted plaintext files only through section 0.8's
+blob-equality/dual-tree procedure; never copy their surrounding lines.
+
 Use the frozen tip's Git-tracked path list/blobs as input so ignored product
 data, `.env`, and later generated inventory files are not searched; remove the
 exact section 0.8 encrypted paths from that generic list.
@@ -1048,9 +1133,11 @@ without deciding them; Task 2 assigns each exactly one future class:
 
 Documentation candidates include current authorities and historical files.
 Record one candidate per path plus claim family, with exact line references.
-Do not treat every occurrence of `PG` as a product claim; distinguish machine
-identifiers, negative tests, history, archive instructions, and current
-runtime assertions explicitly.
+Emit every bounded `PG` word and admitted identifier occurrence as a candidate.
+Do not call every occurrence a product claim: Task 2 must distinguish unrelated
+machine identifiers, negative tests, history, archive instructions, and
+current runtime assertions explicitly, using `lexical_non_surface` only where
+the evidence proves the token is not PostgreSQL-related.
 
 - [x] **Step 7: Prove candidate-union closure and commit evidence**
 
@@ -1072,6 +1159,30 @@ git commit -m "docs: census PostgreSQL runtime candidates"
 ```
 
 Stop for Task 1 review unless a recorded batch ruling applies.
+
+#### Task 1R: Repair the candidate vocabulary and rebuild Task 1
+
+- [ ] Recreate a read-only detached source worktree at exact
+  `CANDIDATE_SOURCE_TIP`; regenerate every Task 1 raw source, not only the new
+  text rows. Verify route, package, archive, CLI, encrypted-blob, and base-node
+  grounding again.
+- [ ] Apply the amended standalone-word, identifier-morphology, and semantic
+  path projections. Preserve only bounded path/line/byte-column/token fields;
+  never retain source lines, lockfile integrity values, encrypted plaintext,
+  DSNs, or arbitrary prose.
+- [ ] Rebuild `candidates.jsonl` from all raw packet inputs in two independent
+  processes. Require unique IDs, pairwise source accounting, one final
+  newline, and byte equality. The old `6,902/dcfa6392...` identity is forbidden
+  as an admission expectation.
+- [ ] Reproject candidate test paths from the corrected union. Rerun the
+  complete expanded backend and frontend candidate suites with the reviewed
+  loopback exception, fail-closed socket/Node guards, explicit Vitest 4.1.8
+  binary, and no package-manager fallback. A delta-only runtime is rejected.
+- [ ] Manifest and clean every temporary root. Commit only the corrected
+  candidate ledger, evidence, and newest-first map status with subject
+  `docs: complete PostgreSQL candidate vocabulary`.
+- [ ] Stop for focused Task 1R review. Task 2 may not consume the corrected
+  ledger until that review is GREEN.
 
 ---
 
@@ -1577,7 +1688,10 @@ occurs:
     its explicit later gate; or
 31. a Task 0 Node command uses `npx`, `npm exec`, installs a dependency,
     reaches a package registry, or runs a Vitest binary other than the pinned
-    root `node_modules/.bin/vitest` at exactly `4.1.8`.
+    root `node_modules/.bin/vitest` at exactly `4.1.8`; or
+32. standalone `PG`, admitted PG identifier morphology, or a semantic tracked
+    path is omitted from the corrected Task 1 projections, or an opaque
+    lockfile integrity value is treated as a semantic identifier.
 
 ## 3. Review Handoff
 
@@ -1597,5 +1711,6 @@ Independent plan review must reconstruct and judge at least:
     of any archive/history preservation disposition; and
 11. Task 4 third-party reconstruction and Task 5 merge gates.
 
-Task 1 resumption remains blocked until focused review accepts both the
-section 0.11 loopback-harness amendment and section 0.12 scope/schema re-pin.
+Task 1R remains blocked until focused review accepts section 0.13. Task 2
+remains blocked until the corrected Task 1R ledger and full candidate runtime
+packet receive a second focused GREEN.
