@@ -7,8 +7,8 @@
 >
 > **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; ZERO-TRACKED-RESIDUE
 > RE-PIN REVIEW GREEN; TASK 1 LEDGER SUPERSEDED BY VOCABULARY STOP; TASK 1R
-> COMPLETE - FOCUSED REVIEW NEXT; TASK 2 STOPPED BEFORE CLASSIFICATION; TASKS
-> 3-5 NOT STARTED
+> FOCUSED REVIEW GREEN; TASK 2 STOPPED ON CANDIDATE-KIND SCHEMA; TASK 1S
+> AMENDMENT REVIEW NEXT; TASKS 3-5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -593,6 +593,13 @@ closed over the user's zero-residue boundary. The earlier 6,902-row ledger and
 Task 1 packet are dated intermediate evidence and cannot admit Task 2. Batch A
 remains paused until focused review accepts Task 1R and its corrected ledger.
 
+Focused review accepted Task 1R's vocabulary and runtime closure. Task 2 then
+stopped again before writing any adjudication or surface row when section 0.14
+found that the semantic-path source encoded matcher labels as candidate
+`kind` values outside section 0.4's closed schema. Batch A remains paused until
+focused review accepts the bounded Task 1S normalization and its corrected
+ledger.
+
 ### 0.10 Task 0 stop: unpinned `npx` network fallback
 
 The first Task 0 attempt correctly created a ciphertext-only worktree and
@@ -745,6 +752,56 @@ rerun the complete expanded backend and frontend candidate suites, replace the
 tracked ledger in a new docs-only correction commit, and stop for focused
 review. Counts and hashes are outputs; this amendment does not guess them.
 Only that corrected GREEN may resume Task 2 under Batch A.
+
+### 0.14 Task 2 stop: semantic-path matcher labels escaped the closed schema
+
+Focused review returned GREEN for Task 1R and authorized Task 2. Before any
+reachability, disposition, CLI-class, consumer-method, test-role,
+documentation-status, adjudication, or surface row was written, a closed-kind
+check found that 33 semantic-path candidates use three undeclared values:
+
+```text
+path_semantic_camel_identifier  12
+path_semantic_snake_prefix      15
+path_semantic_word               6
+```
+
+Section 0.4 requires candidate `kind` to use section 0.3's closed surface-kind
+vocabulary, and the Task 1R amendment explicitly required semantic paths to
+use the existing path-sensitive `candidate_kind(path, token)` mapping. The
+packet scanner instead copied its matcher label into `kind`. Accepting those
+values only in Task 2's validator would make the canonical ledger contradict
+its own schema and is rejected.
+
+The defect is bounded to candidate identity normalization. The 33 raw matcher
+hits describe 22 distinct `(path, token)` observations: eleven documentation
+path tokens match both CamelCase and `pg_` rules. The correction groups raw
+hits by `(path, candidate_kind(path, token), token)`, retains all contributing
+matcher names as a sorted `match_kinds=` list in bounded `detail`, and emits
+one canonical candidate per group. It does not add or remove a candidate path,
+source-tip blob, executable surface, route, dependency, environment witness,
+CLI, test file, or exact test node.
+
+A packet-only prototype over the committed Task 1R ledger proves the expected
+normalization:
+
+```text
+before                         10,457 rows / 33 semantic matcher rows
+after                          10,446 rows / 22 canonical semantic rows
+distinct paths before/after       375 / 375, byte-identical path stream
+represented raw matcher hits       33
+corrected candidate SHA-256
+  d1ab1f1a1c7001799bde2dcedcc2e4424af670e1ec1f2f38737f8a5fb671f8e9
+```
+
+This is a schema/normalization stop before Task 2 authority creation. The
+Task 1R runtime remains valid only if Task 1S independently rebuilds the text
+source and full union, proves the candidate path stream and projected backend
+and frontend node streams byte-identical to Task 1R, and receives focused
+review. No product runtime may be rerun merely to compensate for an unchanged
+test-path set; any path or projected-node drift instead stops and requires a
+full candidate runtime rerun. No Task 2 classification may start before that
+review.
 
 ---
 
@@ -1183,6 +1240,27 @@ Stop for Task 1 review unless a recorded batch ruling applies.
   `docs: complete PostgreSQL candidate vocabulary`.
 - [x] Stop for focused Task 1R review. Task 2 may not consume the corrected
   ledger until that review is GREEN.
+
+#### Task 1S: Normalize semantic-path candidates to the closed kind schema
+
+- [ ] Recreate the Task 1R text source from immutable
+  `CANDIDATE_SOURCE_TIP`. For semantic tracked paths, group all raw matcher
+  hits by `(path, candidate_kind(path, token), token)`, write sorted matcher
+  names to bounded `detail`, and emit only section 0.3 kind values. Unknown
+  candidate kinds or dropping any of the 33 raw matcher hits is a stop.
+- [ ] Rebuild `text_candidates.jsonl` and the complete candidate union in two
+  independent processes. Require exactly 22 normalized semantic-path rows,
+  10,446 total candidates, the section 0.14 full SHA-256, unique IDs, global
+  byte order, one final newline, and zero undeclared candidate kind.
+- [ ] Prove the 375-path stream and backend/frontend candidate file and exact
+  node projections are byte-identical to admitted Task 1R artifacts. Runtime
+  outcomes carry only under that exact equality; any drift requires the full
+  fail-closed candidate runtimes to rerun.
+- [ ] Manifest and clean all temporary roots. Commit only the corrected
+  candidate ledger, evidence, plan status, and newest-first map status with
+  subject `docs: normalize PostgreSQL path candidates`.
+- [ ] Stop for focused Task 1S review. Task 2 remains blocked until that review
+  is GREEN.
 
 ---
 
@@ -1691,7 +1769,9 @@ occurs:
     root `node_modules/.bin/vitest` at exactly `4.1.8`; or
 32. standalone `PG`, admitted PG identifier morphology, or a semantic tracked
     path is omitted from the corrected Task 1 projections, or an opaque
-    lockfile integrity value is treated as a semantic identifier.
+    lockfile integrity value is treated as a semantic identifier; or
+33. a candidate `kind` falls outside section 0.3's closed vocabulary, or a
+    semantic-path matcher label is used as a semantic surface kind.
 
 ## 3. Review Handoff
 
@@ -1711,6 +1791,6 @@ Independent plan review must reconstruct and judge at least:
     of any archive/history preservation disposition; and
 11. Task 4 third-party reconstruction and Task 5 merge gates.
 
-Task 1R remains blocked until focused review accepts section 0.13. Task 2
-remains blocked until the corrected Task 1R ledger and full candidate runtime
-packet receive a second focused GREEN.
+Task 1R received focused GREEN. Task 1S remains blocked until focused review
+accepts section 0.14. Task 2 remains blocked until the normalized Task 1S
+ledger and unchanged path/node projections receive focused GREEN.
