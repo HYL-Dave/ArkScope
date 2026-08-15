@@ -5,8 +5,8 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** PLAN REVIEW GREEN; TASK 0 STOPPED AT UNPINNED NPM NETWORK
-> FALLBACK; BOUNDED AMENDMENT REVIEW NEXT
+> **Status:** PLAN REVIEW GREEN; TASK 0 COMPLETE; TASK 0 REVIEW NEXT;
+> TASKS 1-5 NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -584,6 +584,13 @@ including backend collect-only. Preserve only the bounded rejected-attempt
 summary; raw npm logs are excluded because they contain machine paths and
 registry URLs. No Task 1 work may start from the partial packet.
 
+Focused review returned GREEN for amendment `da98626d`. The clean rerun used
+the hoisted root Vitest `4.1.8`, reran both base collections and every witness,
+and completed Task 0 without package-manager traffic. The stop record remains
+historical evidence; the complete packet and identities are recorded in the
+Task 0 evidence file. Default per-task review remains in force, so Task 1 has
+not started.
+
 ---
 
 ## 1. Execution Tasks
@@ -604,7 +611,7 @@ registry URLs. No Task 1 work may start from the partial packet.
   provenance, encrypted-path witness, runtime-isolation/config metadata, and a
   baseline evidence commit used by every later task.
 
-- [ ] **Step 1: Create an isolated implementation worktree**
+- [x] **Step 1: Create an isolated implementation worktree**
 
 Use `superpowers:using-git-worktrees`. Branch
 `codex/pg-runtime-consumer-inventory` from the exact independently reviewed
@@ -615,7 +622,7 @@ header. Stop if master,
 the implementation worktree, or the main worktree is dirty, if the merge base
 is wrong, or if any product byte differs from the grounding base.
 
-- [ ] **Step 2: Create the Task 0 packet and copy pinned helpers**
+- [x] **Step 2: Create the Task 0 packet and copy pinned helpers**
 
 Use packet root:
 
@@ -655,7 +662,7 @@ that link and reports exactly `vitest/4.1.8`. Links to main `data/`,
 installation, and every package-manager download fallback are forbidden in
 this line; a missing or mismatched local binary is a stop before execution.
 
-- [ ] **Step 3: Recollect backend without running test bodies**
+- [x] **Step 3: Recollect backend without running test bodies**
 
 Run from the implementation worktree:
 
@@ -670,7 +677,7 @@ sort order, uniqueness, exact count `4,394`, and SHA-256
 `b0285ee3a3d124c4bbe380ad0dea022ef09fa46b52b6a14a0375c5f2459a62fb`.
 The reporter JSON must say zero test bodies executed.
 
-- [ ] **Step 4: Recollect frontend without running test bodies**
+- [x] **Step 4: Recollect frontend without running test bodies**
 
 Run with an equals-sign output argument so Vitest cannot interpret a test path
 as the JSON output file:
@@ -690,7 +697,7 @@ normalized row), and SHA-256
 `90f56093290c70a27369296ec8d8c7de99d084a091134994ae6451bc8e45743b`.
 Any tracked-file rewrite is an immediate stop.
 
-- [ ] **Step 5: Capture sanitized installed-package provenance**
+- [x] **Step 5: Capture sanitized installed-package provenance**
 
 Create a temporary script in the packet using `importlib.metadata` and
 `packaging.requirements.Requirement`. It must output exactly the schema in
@@ -698,7 +705,7 @@ section 0.7 and omit paths and environment values. Verify the current values
 shown there. A changed environment is a stop-and-amend event because the dated
 provenance witness must be re-grounded, not silently overwritten.
 
-- [ ] **Step 6: Capture key-name-only and confirm runtime isolation**
+- [x] **Step 6: Capture key-name-only and confirm runtime isolation**
 
 For `config/.env`, output only:
 
@@ -719,7 +726,7 @@ hash, open, or require quiescence of production SQLite files:
 Desktop/sidecar may continue legitimate external writes, and their long-lived
 metadata is not an inventory admission identity.
 
-- [ ] **Step 7: Prove the git-crypt boundary**
+- [x] **Step 7: Prove the git-crypt boundary**
 
 Record the exact three encrypted paths from `git-crypt status -e`; parsing
 plain `git-crypt status` by substring is forbidden because `not encrypted:`
@@ -728,7 +735,7 @@ For each path, record only its base/main Git blob ID and equality result. Do
 not record plaintext or ciphertext bytes. Stop if the set or any blob equality
 differs from section 0.8.
 
-- [ ] **Step 8: Write baseline evidence and commit**
+- [x] **Step 8: Write baseline evidence and commit**
 
 Create the evidence file with exact commands, accepted/rejected artifacts,
 base identities, package provenance boundary, and explicit statement that no
