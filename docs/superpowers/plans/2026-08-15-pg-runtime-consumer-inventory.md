@@ -5,8 +5,8 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** PLAN AUTHORED; INDEPENDENT REVIEW NEXT; IMPLEMENTATION NOT
-> AUTHORIZED
+> **Status:** PLAN REVIEW GREEN; TASK 0 STOPPED AT UNPINNED NPM NETWORK
+> FALLBACK; BOUNDED AMENDMENT REVIEW NEXT
 >
 > **Date:** 2026-08-15
 >
@@ -562,6 +562,28 @@ batch ruling may replace intermediate waits but cannot relax commits, packets,
 or stop conditions. Task 4 is always the combined inventory implementation
 review gate. Task 5 requires that review to be GREEN.
 
+### 0.10 Task 0 stop: unpinned `npx` network fallback
+
+The first Task 0 attempt correctly created a ciphertext-only worktree and
+reconstructed backend collect-only as `4,394/b0285ee3...` with zero executed
+test bodies. It then linked `apps/arkscope-web/node_modules` to the same path in
+the main tree. This repository uses npm workspaces and hoists Vitest to the
+root `node_modules`; the app-local path contains only Vite cache data and no
+`vitest` binary. Running `npx vitest --version` therefore downloaded
+`vitest 4.1.10`, and the later list command failed because that isolated
+package lacked the repository's dependency graph. Sanitized npm-log
+projection records 148 `http fetch GET` rows, including cache misses. This is a
+real violation of stop condition 7, so neither frontend attempt nor any
+pre-stop Task 0 artifact is admitted.
+
+After this amendment is independently reviewed GREEN, Task 0 restarts from
+Step 2 at the exact reviewed amendment tip in the same implementation
+worktree. Delete the rejected npm cache, make
+`$SCRATCH_ROOT/home` empty again, and rerun every Task 0 collection and witness,
+including backend collect-only. Preserve only the bounded rejected-attempt
+summary; raw npm logs are excluded because they contain machine paths and
+registry URLs. No Task 1 work may start from the partial packet.
+
 ---
 
 ## 1. Execution Tasks
@@ -625,8 +647,13 @@ export ARKSCOPE_LOCK_DIR="$SCRATCH_ROOT/locks"
 ```
 
 The worktree's ignored `data/` is an empty real directory. The only permitted
-main-tree link is the recorded frontend `node_modules` toolchain link; links to
-main `data/`, `config/.env`, or runtime files are forbidden.
+main-tree link is a root `node_modules` symlink from the worktree root to the
+main tree's root `node_modules`; an app-local `node_modules` link is forbidden.
+Before any Node command, verify `node_modules/.bin/vitest` resolves through
+that link and reports exactly `vitest/4.1.8`. Links to main `data/`,
+`config/.env`, or runtime files are forbidden. `npx`, `npm exec`, dependency
+installation, and every package-manager download fallback are forbidden in
+this line; a missing or mismatched local binary is a stop before execution.
 
 - [ ] **Step 3: Recollect backend without running test bodies**
 
@@ -650,7 +677,7 @@ as the JSON output file:
 
 ```bash
 cd apps/arkscope-web
-npx vitest list \
+../../node_modules/.bin/vitest list \
   --json=/tmp/pg-runtime-inventory-task0-729d8514/frontend-base.json
 python /tmp/pg-runtime-inventory-task0-729d8514/tools/eir006_vitest_list_normalizer.py \
   --input /tmp/pg-runtime-inventory-task0-729d8514/frontend-base.json \
@@ -1408,7 +1435,10 @@ occurs:
 29. a packet manifest is incomplete or an unmanifested temporary cleanup root
     remains; or
 30. implementation proceeds into no-tail, `.env` cleanup, archive restore,
-    CLI retirement, merge, or push without its explicit later gate.
+    CLI retirement, merge, or push without its explicit later gate; or
+31. a Task 0 Node command uses `npx`, `npm exec`, installs a dependency,
+    reaches a package registry, or runs a Vitest binary other than the pinned
+    root `node_modules/.bin/vitest` at exactly `4.1.8`.
 
 ## 3. Review Handoff
 
@@ -1427,4 +1457,5 @@ Independent plan review must reconstruct and judge at least:
 10. secret/product/remote/archive safety boundaries; and
 11. Task 4 third-party reconstruction and Task 5 merge gates.
 
-Implementation remains blocked until that review is GREEN.
+Task 0 resumption remains blocked until the section 0.10 amendment review is
+GREEN.
