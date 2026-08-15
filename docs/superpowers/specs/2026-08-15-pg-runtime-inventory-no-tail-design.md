@@ -227,10 +227,13 @@ operating documents, and historical PostgreSQL references use
 authority documents use `rewrite_current_authority` only when deleting the
 whole file would remove still-valid non-PostgreSQL product documentation.
 
-`pg_unreachable_e2e` uses
-`retain_operator_remove_pg_branch`. Its row names the no-tail slice as owner
-and records its transformation into a new no-PG admission gate. No additional
-disposition is needed.
+The existing `pg_unreachable_e2e` path and PostgreSQL-specific contract retire.
+If inventory proves that its positive application-startup, scheduler, or route
+census behavior remains useful, that measured behavior may use
+`retain_operator_remove_pg_branch` and move to a positively named local-runtime
+gate. The replacement must contain no PostgreSQL name, comment, fixture, or
+negative historical contract. If no positive behavior survives measurement,
+the whole command uses `retire_pg_only`.
 
 ### 2.4 Mandatory census surface
 
@@ -385,24 +388,26 @@ with no `scheduler_state` row but a qualifying local job-history row is seeded
 from that history and does not fire one interval early. Removing that local
 supplement must be caught by mutation.
 
-### 3.5 New no-PG admission gate
+### 3.5 Local-runtime admission gate
 
-The transformed no-PG gate must run in an isolated environment where no
-PostgreSQL Python driver is installed or importable. It must:
+The final tracked gate is positively named for the current local application,
+not for the removed backend. It runs in an isolated environment containing
+only final declared application dependencies. It must:
 
 1. import the real application and execute the real FastAPI lifespan;
 2. start the real scheduler without `ARKSCOPE_DISABLE_SCHEDULER=1`;
 3. use sealed provider fakes and scratch local SQLite stores;
 4. enumerate the real `app.routes` dynamically rather than compare a
    hand-written allowlist;
-5. prove the migration preview/apply routes are absent;
+5. match the reviewed post-cutover dynamic route identity;
 6. complete startup seeding and at least one provider-free scheduler tick;
-7. fail if any PostgreSQL package import, DSN read, socket probe, backend
-   construction, or fallback occurs; and
+7. fail on any external socket attempt, undeclared dependency import,
+   configuration-selected alternate backend, or authority fallback; and
 8. leave no process, file descriptor, temporary database, environment link, or
    runtime directory behind.
 
-A static repository census accompanies the runtime gate. The final tracked
+A one-time static repository census accompanies final admission but is not
+retained as a PostgreSQL-named test after closeout. The final tracked
 tree has no archive/history exemptions: every match in the closed
 PostgreSQL term, symbol, path, comment, docstring, test-name, fixture, and
 documentation vocabulary is either removed or is a stop-and-amend event.
@@ -537,12 +542,13 @@ No-tail admission requires all of the following on a fresh exact-tip worktree:
 
 1. final backend collection identity and native pass/skip/fail counts match the
    implementation plan's post-inventory ledger;
-2. all retained domain, scheduler, API, DAL, operator, and no-PG focused suites
-   pass;
+2. all retained domain, scheduler, API, DAL, operator, and local-runtime
+   focused suites pass;
 3. frontend collection and product bytes match the post-inventory contract:
    byte-identical when no live PG contract exists, otherwise exactly the
    reviewed bounded ledger;
-4. no PostgreSQL Python driver is installed in the no-PG gate environment;
+4. the local-runtime gate environment contains only final declared
+   dependencies and no retired undeclared package provider;
 5. no product Python import, dependency, constructor, route, probe,
    inheritance, type gate, DSN branch, or fallback survives;
 6. the real FastAPI lifespan and scheduler start and complete the bounded local
