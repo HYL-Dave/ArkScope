@@ -5,9 +5,9 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; USER SCOPE SUPERSESSION
-> RECORDED AT DESIGN AMENDMENTS `379227cb..b21b7b28`; TASK 1 STOPPED PENDING FOCUSED
-> REVIEW OF THE ZERO-TRACKED-RESIDUE RE-PIN; TASKS 2-5 NOT STARTED
+> **Status:** ORIGINAL PLAN REVIEW GREEN; TASK 0 REVIEW GREEN; ZERO-TRACKED-RESIDUE
+> RE-PIN REVIEW GREEN; TASK 1 COMPLETE; TASK 2 ACTIVE UNDER BATCH A; TASKS 3-5
+> NOT STARTED
 >
 > **Date:** 2026-08-15
 >
@@ -871,7 +871,7 @@ Stop for Task 0 review unless the user has issued a recorded batch ruling.
   docs, encrypted claims, and environment packages. Candidates are evidence,
   not disposition authority.
 
-- [ ] **Step 1: Build a temporary structured Python scanner**
+- [x] **Step 1: Build a temporary structured Python scanner**
 
 Create a read-only detached worktree at exact `CANDIDATE_SOURCE_TIP`; all
 repository-file scanners in this task run there. The implementation branch is
@@ -938,7 +938,7 @@ def write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
 
 Keep the script and its full SHA in the Task 1 packet.
 
-- [ ] **Step 2: Run uncapped textual companion searches**
+- [x] **Step 2: Run uncapped textual companion searches**
 
 Use `rg` over all tracked plaintext for the closed term set:
 
@@ -980,7 +980,7 @@ procedure. Parse `rg --json` immediately to
 all unmatched text before writing the packet. Do not retain or commit raw
 encrypted lines, DSN examples, or arbitrary prose.
 
-- [ ] **Step 3: Enumerate the full dynamic FastAPI route surface**
+- [x] **Step 3: Enumerate the full dynamic FastAPI route surface**
 
 In an isolated process, replace `socket.socket.connect`,
 `socket.socket.connect_ex`, and `socket.create_connection` with fail-closed
@@ -1003,7 +1003,7 @@ POST<TAB>/app-records/migration/apply<TAB>src.api.routes.app_records<TAB>migrati
 Cross-check every dynamic route against static decorator/include candidates.
 An unexplained row on either side is a stop.
 
-- [ ] **Step 4: Enumerate dependency, environment, and archive candidates**
+- [x] **Step 4: Enumerate dependency, environment, and archive candidates**
 
 Parse requirements, lockfiles, Python packaging metadata, Dockerfiles, and
 Compose manifests structurally. Record direct PostgreSQL requirements,
@@ -1019,7 +1019,7 @@ non-Python archive asset even when it contains no search term. Do not read dump
 contents; for tracked manifests/dumps, record only repo path, Git blob ID,
 size, and manifest-declared digest/count metadata.
 
-- [ ] **Step 5: Enumerate exact test-node candidates**
+- [x] **Step 5: Enumerate exact test-node candidates**
 
 Project both base streams by every candidate test path plus every node whose ID
 or source body names a candidate symbol, PG DTO, status, copy, or route. Parse
@@ -1038,7 +1038,7 @@ exception is section 0.11's pre-OS interception of the exact loopback-refusal
 node; record its environment assumption on that node. Any other guard hit or
 any actual socket operation is a stop.
 
-- [ ] **Step 6: Enumerate CLI and documentation candidates**
+- [x] **Step 6: Enumerate CLI and documentation candidates**
 
 CLI candidates are the union of AST entrypoints, `pyproject.toml`/setup entry
 points, package.json scripts, executable tracked shell files, and current docs
@@ -1052,7 +1052,7 @@ Do not treat every occurrence of `PG` as a product claim; distinguish machine
 identifiers, negative tests, history, archive instructions, and current
 runtime assertions explicitly.
 
-- [ ] **Step 7: Prove candidate-union closure and commit evidence**
+- [x] **Step 7: Prove candidate-union closure and commit evidence**
 
 Normalize and union the structured scanner, textual search, dynamic route,
 package, test, CLI, documentation, and encrypted-path candidates into tracked
