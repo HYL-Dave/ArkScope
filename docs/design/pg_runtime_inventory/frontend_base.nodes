@@ -1,0 +1,1177 @@
+src/AICard.test.tsx	AI Card localization > keeps explicit translation user-triggered with the existing request payload
+src/AICard.test.tsx	AI Card localization > maps explicit translation failure without raw detail
+src/AICard.test.tsx	AI Card localization > maps generation failure without changing question or advanced controls
+src/AICard.test.tsx	AI Card localization > maps open-Card failure and preserves modal focus recovery
+src/AICard.test.tsx	AI Card localization > maps recent Card and Investor Profile load failures separately
+src/AICard.test.tsx	AI Card localization > maps save failure without changing Card identity
+src/AICard.test.tsx	AI Card localization > preserves a translated Card node and sends no second request on locale switch
+src/AICard.test.tsx	AI Card localization > preserves evidence claims rationale and source values byte for byte
+src/AICard.test.tsx	AI Card localization > preserves question advanced controls modal and in-flight work across locale switch
+src/AICard.test.tsx	AI Card localization > reactively localizes shared stance and trace chrome without changing IDs
+src/AICard.test.tsx	AI Card localization > renders English Card chrome without translating generated content
+src/AICard.test.tsx	AI Card localization > renders reviewed zh-Hant Card chrome and generated content byte for byte
+src/AppShell.test.tsx	App shell integration > creates_a_fresh_Settings_cache_for_a_new_App_root
+src/AppShell.test.tsx	App shell integration > increments delivery when the same exact target is requested twice
+src/AppShell.test.tsx	App shell integration > issues only the locale preference PUT while System copy changes
+src/AppShell.test.tsx	App shell integration > keeps raw sidecar errors apiBase tool and polling diagnostics out of normal shell and System view
+src/AppShell.test.tsx	App shell integration > keeps_one_Settings_cache_across_view_unmount_and_remount
+src/AppShell.test.tsx	App shell integration > limits global background work membership to Research observations
+src/AppShell.test.tsx	App shell integration > opens the exact Research thread from a work row
+src/AppShell.test.tsx	App shell integration > opens the exact enabled Settings section from a status target
+src/AppShell.test.tsx	App shell integration > opens ticker detail from an exact ticker target and returns to the owning view
+src/AppShell.test.tsx	App shell integration > passes Developer Mode and the shared navigation dispatcher to Explore surfaces
+src/AppShell.test.tsx	App shell integration > passes Developer Mode into Settings without adding a second owner
+src/AppShell.test.tsx	App shell integration > preserves the active view focus and status state across locale changes
+src/AppShell.test.tsx	App shell integration > renders English overlay navigation names from the shell namespace
+src/AppShell.test.tsx	App shell integration > renders System sidecar copy from the system namespace in both locales
+src/AppShell.test.tsx	App shell integration > renders the grouped shipped shell with no planned controls or right rail
+src/AppShell.test.tsx	App shell integration > routes an Explore recovery action through the exact existing Settings anchor
+src/AppShell.test.tsx	App shell integration > routes failed sidecar health to System Health
+src/AppShell.test.tsx	App shell integration > shows only reviewed sidecar facts in Developer Mode
+src/AppShell.test.tsx	App shell integration > stores sidecar failures as structured System outcomes without raw Error.message
+src/AppShell.test.tsx	App shell integration > switches locale without closing the background-work drawer
+src/AppShell.test.tsx	App shell integration > switches locale without losing the selected shell view
+src/AppShell.test.tsx	App shell integration > switches locale without replacing the active Explore surface or detail ticker
+src/CardApiTimeout.test.ts	card API timeouts > derives independent task budgets and uses 900 seconds for old sidecars
+src/CardApiTimeout.test.ts	card API timeouts > uses each effective task budget for generation and translation
+src/CredentialList.test.ts	CredentialList > confirms_only_the_selected_credential_delete
+src/CredentialList.test.ts	CredentialList > marks the alias edit field as required so it is not misread as clearable like the optional metadata
+src/CredentialList.test.ts	CredentialList > opens_credential_delete_confirmation_and_cancel_restores_trigger_focus
+src/CredentialList.test.ts	CredentialList > reports_probe_as_navigation_blocking_until_settled
+src/CredentialList.test.ts	CredentialList > saves alias, account label, and OAuth expiry together from one display-info action
+src/CredentialList.test.ts	CredentialList localization > hides probe expected observed and error fields in normal mode
+src/CredentialList.test.ts	CredentialList localization > renders English credential actions while preserving aliases and masked values
+src/CredentialList.test.ts	CredentialList localization > shows planted probe diagnostics only in Developer Mode
+src/CredentialList.test.ts	CredentialList re-login (S3 credential lifecycle) > disables 重新登入 while a login flow is active
+src/CredentialList.test.ts	CredentialList re-login (S3 credential lifecycle) > does not render 重新登入 for api_key or claude_code_oauth rows (scope ruling)
+src/CredentialList.test.ts	CredentialList re-login (S3 credential lifecycle) > renders no 重新登入 without an onRelogin handler (old render sites stay valid)
+src/CredentialList.test.ts	CredentialList re-login (S3 credential lifecycle) > renders 重新登入 on chatgpt_oauth rows and passes the row id
+src/Dashboard.test.tsx	Dashboard stored data-source presentation > renders stored SEC fundamentals in both locales without raw stable ids
+src/DiscoveryResultView.test.ts	DiscoveryResultView > shows the producing credential and can be closed
+src/DiscoveryResultView.test.ts	DiscoveryResultView localization > maps reauthentication by stable error code without raw backend copy
+src/DiscoveryResultView.test.ts	DiscoveryResultView localization > renders English discovery result chrome while preserving model ids
+src/DiscoveryResultView.test.ts	DiscoveryResultView reauth affordance (S3 credential lifecycle) > disables the affordance while a login flow is active
+src/DiscoveryResultView.test.ts	DiscoveryResultView reauth affordance (S3 credential lifecycle) > does not render the affordance for a plain error
+src/DiscoveryResultView.test.ts	DiscoveryResultView reauth affordance (S3 credential lifecycle) > renders the re-login affordance for reauth_required and invokes it
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > disables save for invalid value 
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > disables save for invalid value 3601
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > disables save for invalid value 59
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > disables save for invalid value Infinity
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > disables save for invalid value NaN
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > explains effort sensitivity without changing route quality
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > hides reset only when neither task has a saved DB row
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > renders English fixed-task limits without changing values or dirty state
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > renders independent values and source badges
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > reports_runtime_draft_dirty_and_clears_when_settings_catch_up
+src/FixedTaskRuntimeSection.test.tsx	FixedTaskRuntimeSection > saves both task values atomically
+src/Holdings.test.tsx	Holdings > localizes edit close and validation outcomes by operation
+src/Holdings.test.tsx	Holdings > localizes table headers without changing sorting or row identity
+src/Holdings.test.tsx	Holdings > omits raw mutation details in normal mode
+src/Holdings.test.tsx	Holdings > preserves archived filters selection and scroll position
+src/Holdings.test.tsx	Holdings > preserves open editor draft and focus across locale changes
+src/Holdings.test.tsx	Holdings > renders an in-flight mutation outcome in the active locale
+src/Holdings.test.tsx	Holdings > renders complete holdings chrome in both locales
+src/Holdings.test.tsx	Holdings > replaces only the example ticker placeholder and preserves real symbols
+src/Holdings.test.tsx	HoldingsView > at 959px skips the recent request and renders no panel or reserved width
+src/Holdings.test.tsx	HoldingsView > at 961px renders a non-empty recent response beside positions
+src/Holdings.test.tsx	HoldingsView > can add a manual holding
+src/Holdings.test.tsx	HoldingsView > clears captured review and shows persisted positions after applying
+src/Holdings.test.tsx	HoldingsView > clears manual average cost with explicit null
+src/Holdings.test.tsx	HoldingsView > does not render a close action for ibkr rows
+src/Holdings.test.tsx	HoldingsView > edits manual financial and user fields in one patch
+src/Holdings.test.tsx	HoldingsView > edits notes thesis and tags on an ibkr position without broker fields
+src/Holdings.test.tsx	HoldingsView > holdings_renders_one_capture_control_surface_and_no_legacy_live_sync_buttons
+src/Holdings.test.tsx	HoldingsView > invalidates recent synchronously and only for persisted manual financial changes
+src/Holdings.test.tsx	HoldingsView > keeps_account_summary_visible_above_every_completed_tab
+src/Holdings.test.tsx	HoldingsView > keeps_canonical_positions_usable_when_the_additive_overview_fails
+src/Holdings.test.tsx	HoldingsView > mounts and fetches PortfolioActivity only while the activity tab is selected
+src/Holdings.test.tsx	HoldingsView > mounts_capture_polling_only_while_sync_records_is_active
+src/Holdings.test.tsx	HoldingsView > opens the activity tab from recent activity and removes the side panel
+src/Holdings.test.tsx	HoldingsView > rejects invalid manual numbers without sending a patch
+src/Holdings.test.tsx	HoldingsView > renders account-labelled positions and filters by account
+src/Holdings.test.tsx	HoldingsView > renders_the_exact_completed_portfolio_tabs_without_a_placeholder
+src/Holdings.test.tsx	HoldingsView > shows captured review as review before applying
+src/Holdings.test.tsx	HoldingsView > shows closed rows when include closed is enabled
+src/Holdings.test.tsx	HoldingsView > shows_loading_before_the_first_portfolio_response
+src/Holdings.test.tsx	HoldingsView > soft closes a manual row only after ConfirmDialog approval
+src/Holdings.test.tsx	HoldingsView > states read-only sync and separates options with a risk warning
+src/Holdings.test.tsx	HoldingsView > supports_arrow_home_and_end_keyboard_navigation_between_tabs
+src/Holdings.test.tsx	HoldingsView > switches_between_holdings_activity_account_details_and_sync_records
+src/Holdings.test.tsx	HoldingsView > updates whether an account participates in aggregate totals
+src/Home.test.tsx	Home localization > keeps an open Card modal and source Card identity across locale switch
+src/Home.test.tsx	Home localization > preserves loading empty and operation-specific error triggers
+src/Home.test.tsx	Home localization > renders English Home chrome without translating tickers lists or cards
+src/Home.test.tsx	Home localization > renders the reviewed zh-Hant Home chrome and planted source values
+src/Home.test.tsx	Home localization > retries with the existing request shape and no extra request
+src/Home.test.tsx	Home localization > shows only safe Developer diagnostics for a failed workspace load
+src/Home.test.tsx	Home localization > switches locale without resetting loaded data reading position or focus
+src/InvestorProfileApi.test.ts	Investor Profile guided API > approves with an empty body and never sends profile_patch
+src/InvestorProfileApi.test.ts	Investor Profile guided API > exposes run personalization snapshot without credential identity
+src/InvestorProfileApi.test.ts	Investor Profile guided API > requests an early proposal on the dedicated route
+src/InvestorProfileApi.test.ts	Investor Profile guided API > retries a turn without mutating answer payload
+src/InvestorProfileApi.test.ts	Investor Profile guided API > serializes guided start and turn contracts with stable IDs
+src/InvestorProfileCss.test.ts	Investor Profile workspace CSS > adds no media query breakpoint or nested-card selector
+src/InvestorProfileCss.test.ts	Investor Profile workspace CSS > defines every Slice 5 Investor class
+src/InvestorProfileCss.test.ts	Investor Profile workspace CSS > keeps the Calibration current question intrinsically wrap-safe
+src/InvestorProfileCss.test.ts	Investor Profile workspace CSS > keeps the Summary current-context source intrinsically wrap-safe
+src/InvestorProfileCss.test.ts	Investor Profile workspace CSS > targets Edit labels and toggle through the split-renderer root only
+src/InvestorProfileCss.test.ts	Investor Profile workspace CSS > uses responsive intrinsic grids and wrap-safe command rows
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > approves_calibration_proposal_through_dedicated_endpoint
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > blocks ambiguous turns until manual status refresh resolves authority
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > busy save or approve blocks mode change
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > calibration exit is free and restores command focus
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > confirmed edit discard returns to a fresh summary
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > defaults and reloads to summary while keeping one registry anchor
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > dirty edit exit uses value-free confirm and cancel restores focus
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > disabled_profile_shows_effective_off
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > does not correlate an unrelated draft to a failed proposal request
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > does not treat an existing draft as a new proposal or erase same-session evidence
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > draft save stays in edit without writing or clearing fields
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > draft_button_posts_profile_without_saving
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > enters edit with focus and preserves every profile field
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > failed post-save refresh stays in edit with an honest error
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > full save refetches effective profile before summary
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > hides request diagnostics outside Developer Mode and reveals them inside it
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > keeps a later full save authoritative after approved stale reconciliation
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > keeps conflicted proposal pending with approval disabled
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > keeps reject profile authority through failed and stale refreshes until corroborated
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > keeps successful approve authority across stale advisory GET responses
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > keeps successful reject authority across stale advisory GET responses
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > keeps the approved proposal patch when ambiguous reconciliation reads a stale profile
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > loads profile and calibration independently without inventing empty state
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > loads_default_disabled_profile
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > pending_profile_request_uses_loading_state_not_bare_text
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > preserves calibration messages rationales and custom values as source content
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > preserves calibration source content disclosure answer and focus across locale switch
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > preserves confirmed conflict across a stale non-conflicted draft
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > preserves edit draft disclosure and focus across locale switch
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > preserves proposal source rationale and focus across locale switch
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > proposal mode requires a pending proposal and separates coverage from actions
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > reconciles ambiguous approve and reject outcomes from read-only authority
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > reconciles lost turn responses only from matching assistant evidence
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > refreshes an initially persisted pending turn before retrying the same ID
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > renders backend-ordered coverage and unknown topic without raw ID
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > renders every current Investor Profile field in English
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > renders localized field diffs and source rationales then approves without patch
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > renders summary first with effective stance mismatch and current context
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > request_failure_uses_alert_semantics
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > requests early proposal without synthetic user content
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > resets exact-anchor requests to summary while honoring dirty and busy guards
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > retries interrupted turn with the same ID without duplicate answer
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > returns response-lost draft proposals to summary without replaying the mutation
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > routes calibration provider recovery to the Providers anchor
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > save_button_puts_profile
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > shows_a_running_state_while_a_profile_mutation_is_pending
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > starts with a localizable fixed question without a provider call
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > starts_calibration_sends_message_and_shows_proposal_rationale
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > submits source answer with stable turn ID and preserves journal
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > switches locale without changing draft calibration or proposal state
+src/InvestorProfilePanel.test.tsx	InvestorProfilePanel > withholds derived mismatch until an approved patch is corroborated
+src/MarkdownView.test.ts	MarkdownView > blocks non-https image sources (file:// etc.) — shows alt, no img src
+src/MarkdownView.test.ts	MarkdownView > does NOT inject raw HTML (no rehype-raw)
+src/MarkdownView.test.ts	MarkdownView > localizes blocked-image fallback chrome
+src/MarkdownView.test.ts	MarkdownView > opens links in a new tab with noopener
+src/MarkdownView.test.ts	MarkdownView > preserves Markdown source and rendered source text across locale changes
+src/MarkdownView.test.ts	MarkdownView > renders GFM tables
+src/MarkdownView.test.ts	MarkdownView > renders bold/emphasis
+src/MarkdownView.test.ts	MarkdownView > renders code blocks (selectable text, not executed)
+src/MarkdownView.test.ts	MarkdownView > renders https images
+src/MarkdownView.test.ts	MarkdownView > renders lists and blockquotes
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > degrades honestly against an old sidecar without reviving hidden controls
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > has no advanced checkbox, manual override details, or duplicate seed selector
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > keeps route-pinned unknown models in the current route group
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > maps a reauth result to the credential action without exposing mutation controls
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > marks a changed test snapshot stale and does not show the old result
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > preserves model ids credential labels and selected values across locale change
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > refreshes discovery for the selected provider credential
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > renders English task model effort and thinking copy from semantic ids
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > renders an actual-call success only for the current five-field snapshot
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > renders one selector with four groups and disables ineligible entries with text reasons
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > renders thinking behavior as read-only
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > reveals a clearly marked custom id input
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > shows credential identity/state/time and disables a missing provider
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > shows only the selected model's supported effort values
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > shows provider controls directly and switching clears an incompatible model
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > shows raw model warnings only in Developer Mode
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > shows the selected Anthropic credential and its seed-only state
+src/ModelRoutingSection.test.ts	ModelRoutingSection provider-first UX > uses the task-scoped test and explains subscription billing
+src/ModelRoutingSection.test.ts	ModelRoutingSection reset affordance > calls onReset with the task when the reset button is clicked
+src/ModelRoutingSection.test.ts	ModelRoutingSection reset affordance > shows '重設為 fallback' ONLY for a DB-authoritative route
+src/ModelTaskTestApi.test.ts	testTaskModelAccess > posts the task route and uses a 60 second UI timeout
+src/News.test.tsx	News content availability > changing the content filter replaces page one and sends the selector
+src/News.test.tsx	News content availability > load more preserves the selected content filter
+src/News.test.tsx	News content availability > old-sidecar responses hide the filter and never guess row labels
+src/News.test.tsx	News content availability > resets a selected unknown filter when another facet has no unknown rows
+src/News.test.tsx	News content availability > seeking alpha mode has no market content filter or market content labels
+src/News.test.tsx	News content availability > shows content facet counts and only honest non-full row labels
+src/News.test.tsx	News localization > hides all feed claims and controls for every unavailable SA reason
+src/News.test.tsx	News localization > keeps an in-flight page response and renders completion in the active locale
+src/News.test.tsx	News localization > offers only the reviewed News and Data Sources recovery targets
+src/News.test.tsx	News localization > renders English News chrome while preserving Market source content
+src/News.test.tsx	News localization > renders Market and Seeking Alpha load failures without raw detail
+src/News.test.tsx	News localization > renders typed SA store availability copy in both locales
+src/News.test.tsx	News localization > switches locale without resetting filters pagination items or refetching
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > does_not_invent_daily_total_when_one_provider_leg_is_missing
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > emits_include_toggle_for_each_account
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > keeps_account_details_inside_the_data_table_scroll_owner
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > keeps_manual_subtotal_separate_from_ibkr_net_liquidation
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > labels_daily_total_as_realized_plus_unrealized
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > localizes loading empty partial and error states
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > never_renders_an_unexpected_raw_broker_account_id_property
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > omits raw diagnostics in normal mode
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > preserves account currency and measured values
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > preserves selected account across locale changes
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > renders account and value headers in both locales
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > renders_all_latest_snapshot_fields_in_account_details
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > renders_broker_values_and_both_timestamps
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > renders_every_visible_account_even_without_snapshot
+src/PortfolioAccountOverview.test.tsx	Portfolio account overview > renders_manual_subtotal_by_currency_without_overall_net_worth
+src/PortfolioActivity.test.tsx	Portfolio activity > localizes count grammar without changing pagination
+src/PortfolioActivity.test.tsx	Portfolio activity > maps activity field IDs without printing schema names
+src/PortfolioActivity.test.tsx	Portfolio activity > omits raw details in normal mode
+src/PortfolioActivity.test.tsx	Portfolio activity > preserves execution commission and source values
+src/PortfolioActivity.test.tsx	Portfolio activity > preserves expansion filters focus and scroll across locale changes
+src/PortfolioActivity.test.tsx	Portfolio activity > renders filters statuses and expanded rows in both locales
+src/PortfolioActivity.test.tsx	Portfolio activity > renders late load outcomes in the active locale
+src/PortfolioActivity.test.tsx	PortfolioActivity > appends next cursor once without duplicating activity IDs
+src/PortfolioActivity.test.tsx	PortfolioActivity > clears annotation through ConfirmDialog and retains typed copy after failed DELETE
+src/PortfolioActivity.test.tsx	PortfolioActivity > clears stale append busy state when a full reload supersedes it
+src/PortfolioActivity.test.tsx	PortfolioActivity > does not let a delayed older filter response clobber newer state
+src/PortfolioActivity.test.tsx	PortfolioActivity > encodes all filters and ET dates in the exact GET query
+src/PortfolioActivity.test.tsx	PortfolioActivity > expands immutable fills corrections and commission revisions
+src/PortfolioActivity.test.tsx	PortfolioActivity > exposes manual field changes without execution or PnL claims
+src/PortfolioActivity.test.tsx	PortfolioActivity > exposes unmatched arithmetic window and coverage
+src/PortfolioActivity.test.tsx	PortfolioActivity > keeps failed annotation save authored then updates locally from exact replacement PUT
+src/PortfolioActivity.test.tsx	PortfolioActivity > keeps history-start and coverage-gap markers visible
+src/PortfolioActivity.test.tsx	PortfolioActivity > keeps missing-perm execution rows independent
+src/PortfolioActivity.test.tsx	PortfolioActivity > renders broker direct facts separately from confirmed intent
+src/PortfolioActivity.test.tsx	PortfolioActivity > renders pending commission and realized PnL as unknown never zero or outcome
+src/PortfolioActivity.test.tsx	PortfolioActivity > shows authored read cause and next action without raw exception detail
+src/PortfolioActivity.test.tsx	PortfolioActivity > shows loading then an honest empty history-not-started state
+src/PortfolioActivity.test.tsx	PortfolioActivity > shows market rows in ET first and injected local time second
+src/PortfolioCaptureCss.test.ts	portfolio capture responsive table contract > keeps_account_detail_financial_columns_inside_one_scroll_owner
+src/PortfolioCaptureCss.test.ts	portfolio capture responsive table contract > keeps_financial_columns_stable_inside_the_horizontal_scroll_owner
+src/PortfolioCaptureCss.test.ts	portfolio capture responsive table contract > lets_the_completed_portfolio_tabs_wrap_without_a_new_breakpoint
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > announces a terminal start outcome only once without raw detail
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > keeps terminal and settings race ordering unchanged
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > preserves a poll issue published while settings save is pending without raw detail
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > preserves dirty controls and focus across locale changes
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > renders late polling outcomes in the active locale
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > renders schedule run and review chrome in both locales
+src/PortfolioCapturePanel.test.tsx	Portfolio capture > retries initial status failure on idle cadence with semantic copy
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > accepts_a_terminal_start_response_after_a_poll_saw_the_same_run_running
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > announces_a_terminal_start_detail_only_once
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > clears_a_stale_review_when_post_apply_refresh_fails
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > does_not_clear_a_newer_action_failure_after_an_older_terminal_callback_finishes
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > does_not_clear_a_newer_review_when_an_older_apply_response_arrives_late
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > does_not_let_a_delayed_settings_snapshot_regress_a_newer_terminal_run
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > does_not_let_an_older_poll_clear_a_newer_action_failure
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > does_not_regress_a_terminal_poll_when_the_start_response_arrives_late
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > does_not_restore_an_applied_review_from_a_poll_started_during_apply
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > ignores_an_older_poll_response_after_settings_save
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > keeps_only_one_status_poll_in_flight
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > lets_a_completed_settings_mutation_win_over_a_poll_started_while_it_was_pending
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > manual_capture_starts_then_polls_until_terminal
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > preserves_a_poll_issue_published_while_settings_save_is_pending
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > rejects_out_of_range_interval_without_fetch
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > renders_a_rejected_manual_start_as_blocked
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > renders_default_schedule_and_latest_component_states
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > renders_latest_review_and_applies_that_capture_run
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > renders_partial_blocked_failed_and_interrupted_with_existing_status_badges
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > retries_initial_status_failure_on_the_idle_cadence
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > returns_to_idle_polling_without_repeated_live_announcements_after_terminal
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > saves_enabled_and_interval_as_one_atomic_payload
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > shows_next_due_and_recent_runs_without_raw_account_id
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > shows_nullable_review_values_being_cleared
+src/PortfolioCapturePanel.test.tsx	PortfolioCapturePanel > uses_the_manual_start_run_when_the_follow_up_status_read_fails
+src/PortfolioRecentActivity.test.tsx	Portfolio recent activity > localizes count grammar without changing rows
+src/PortfolioRecentActivity.test.tsx	Portfolio recent activity > preserves source values and identifiers
+src/PortfolioRecentActivity.test.tsx	Portfolio recent activity > preserves state across locale changes
+src/PortfolioRecentActivity.test.tsx	Portfolio recent activity > renders recent activity chrome in both locales
+src/PortfolioRecentActivity.test.tsx	PortfolioRecentActivity > never renders broker raw-id-shaped fixture properties or activity detail authority
+src/PortfolioRecentActivity.test.tsx	PortfolioRecentActivity > renders null when both items and unmatched_count are zero
+src/PortfolioRecentActivity.test.tsx	PortfolioRecentActivity > renders real compact rows plus recent unmatched count and calls onOpenActivity
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > credential mutation invalidates only the affected account snapshot
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > does not sync stale ChatGPT usage without an explicit manual click
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > does not treat an expired OAuth credential as active or collapse setup
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > manual sync bypasses the TTL and observes the ten-second cooldown
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > manual_sync_replaces_only_the_affected_account_cache_entry
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > preserves_retained_account_truth_when_cached_revalidation_fails_without_sync_POST
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > renders direct used percentage and reset time with inferred remaining labeled
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > renders missing account fields as unknown instead of zero
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > renders retryable refresh failure separately from re-login required
+src/ProviderSection.test.ts	ProviderSection OAuth lifecycle and account usage truth > renders_retained_account_usage_immediately_and_revalidates_with_cached_GET_only
+src/ProviderSection.test.ts	ProviderSection Settings navigation guard > reports_credential_and_oauth_form_drafts_without_exposing_secret_values
+src/ProviderSection.test.ts	ProviderSection Settings navigation guard > reports_oauth_and_credential_mutations_as_navigation_blocking_until_settled
+src/ProviderSection.test.ts	ProviderSection localization > hides OAuth backend detail in normal mode and reveals it only in Developer Mode
+src/ProviderSection.test.ts	ProviderSection localization > renders English Provider OAuth and credential setup without changing active work
+src/ProviderSection.test.ts	ProviderSection localization > switches locale during OAuth without cancelling or duplicating the flow
+src/ProviderSection.test.ts	ProviderSection manual fallback gating (F4) > does not offer the dead-end manual paste when the state was consumed
+src/ProviderSection.test.ts	ProviderSection re-login integration (S3 credential lifecycle) > openai setup copy explains subscription task billing without changing active
+src/ProviderSection.test.ts	ProviderSection re-login integration (S3 credential lifecycle) > row re-login opens the OpenAI setup disclosure, starts the flow with the target, and blocks a second trigger
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > cached read failure with snapshot keeps observation and its observed_at
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > cached read failure without snapshot says no confirmed observation
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > claude page load focus and idle send zero anthropic requests
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > claude row shows cost labeled manual sync and one click sends one POST
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > decoded backend sync failure shows its stable backend code
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > first cached read failure schedules exactly one bounded retry and unmount cancels it
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > manual retry local read performs one GET and zero sync POSTs
+src/ProviderSection.test.ts	ProviderSection read and sync recovery states > sync transport failure is never labeled cached_read_failed
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > keeps unknown stable identifiers distinguishable
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > localizes headings token statistics and timing labels in both locales
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > preserves disclosure scroll and focus across locale changes
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > preserves source trace evidence and context bytes
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > renders partial Evidence without claiming completeness
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > retains the existing Developer diagnostic boundary
+src/ResearchEvidenceDrawer.test.tsx	Research Evidence drawer > updates shared model and personalization labels reactively
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > appends deterministic pages without duplicating thread IDs
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > blocks active archive, keeps an archived selected transcript inert, and restores it on unarchive
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > fetches an exact archived out-of-page shell navigation target
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > hydrates only the latest selected transcript and closes the narrow Drawer
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > localizes filters statuses and actions in both locales
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > omits arbitrary diagnostics in normal mode
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > opens a focus-managed history Drawer and loads a bounded metadata page
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > preserves prior rows as stale after refresh failure and retries without an empty result
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > preserves search draft focus and selected thread across locale changes
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > preserves source thread titles exactly
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > renames inline, rejects a blank title locally, and updates the selected heading
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > renders an in-flight rename result in the current locale
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > renders conversation as the only permanent workspace region
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > renders structured 404 and 409 outcomes without parsing messages
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > serializes filters with local-day UTC bounds, resets offset, and ignores an older filter response
+src/ResearchHistoryDrawer.test.tsx	Research history drawer > uses ConfirmDialog and preserves a thread on cancel or 409 before successful delete
+src/ResearchPendingBubble.test.ts	PendingAssistantBubble > renders streamed answer text as normal assistant content, not muted placeholder text
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > distinguishes run context from current Settings context
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > ignores an unresolved prior-run fetch after selecting another run
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > keeps the reopened same-run request authoritative over the closed-cycle promise
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > maps closed stance effect copy without deriving it from context text
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > never exposes the previous run context while a newly selected run is pending
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > renders active exact source text byte for byte
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > renders empty snapshot as disabled
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > renders legacy null as no snapshot
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > selects freshest same-run authority and prefers live observation on ties
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > switches locale without changing source context or disclosure state
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > withholds the no-snapshot claim when matching run detail partially fails
+src/ResearchPersonalizationContext.test.tsx	ResearchPersonalizationContext > withholds the no-snapshot claim while matching run detail is loading
+src/ResearchRunProgress.test.tsx	Research run progress > keeps the completion destination contract unchanged
+src/ResearchRunProgress.test.tsx	Research run progress > maps every bounded run status in both locales
+src/ResearchRunProgress.test.tsx	Research run progress > preserves exact progress and token values
+src/ResearchRunProgress.test.tsx	Research run progress > preserves node identity while locale changes
+src/ResearchRunProgress.test.tsx	Research run progress > renders semantic failure facts without raw detail
+src/ResearchRuntimeSection.test.ts	ResearchRuntimeSection > offers reset only when DB-authoritative
+src/ResearchRuntimeSection.test.ts	ResearchRuntimeSection > renders English Research limits without changing values or dirty state
+src/ResearchRuntimeSection.test.ts	ResearchRuntimeSection > renders current DB-backed runtime limits and the scope note
+src/ResearchRuntimeSection.test.ts	ResearchRuntimeSection > reports_runtime_draft_dirty_and_clears_when_settings_catch_up
+src/ResearchRuntimeSection.test.ts	ResearchRuntimeSection > saves numeric values
+src/ResearchShellNavigation.test.tsx	Research shell navigation > consumes a sequenced thread target after hydration and preserves later local thread selection
+src/ResearchShellNavigation.test.tsx	Research shell navigation > hydrates an exact shell target during the StrictMode effect replay used by the app
+src/ResearchShellNavigation.test.tsx	Research shell navigation > keeps selection failures fail-closed and lets the user retry
+src/ResearchShellNavigation.test.tsx	Research shell navigation > reports a created run before replay and reports the terminal replay DTO
+src/ResearchShellNavigation.test.tsx	Research shell navigation > reports each hydrated active run to the shell observer
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 1. exposes New research, History, and Evidence in PageHeader without fixed side columns
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 10. makes narrow History/Evidence exclusive and permits only wide nonempty Evidence to pin
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 11. auto-closes and unpins empty Evidence and reserves zero width
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 12. preserves a completed transcript and presents partial state when run details fail
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 2. resolves the configured complete tuple once and renders reviewed provenance
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 3. uses effective provider/model/effort blocks and exposes disabled reasons
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 4. distinguishes subscription quota from API-key usage in provider context
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 5. blocks Send for an invalid saved tuple and navigates exactly to Models settings
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 6. requires an explicit effort after changing to a model that rejects the current effort
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 7. includes semantic provider, model, and effort in every create request
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 8. keeps an active draft editable with disabled Send and separate Stop and queues nothing
+src/ResearchWorkspace.test.tsx	Research workspace contracts > 9. shows factual queued/running timing, the configured bound, and confirmation grace
+src/ResearchWorkspace.test.tsx	Research workspace contracts > keeps active progress and error chrome localized in one mounted workspace
+src/ResearchWorkspace.test.tsx	Research workspace contracts > keeps model selection metadata and no decorated-label reverse parsing
+src/ResearchWorkspace.test.tsx	Research workspace contracts > keeps surrounding Research chrome and source model values unchanged
+src/ResearchWorkspace.test.tsx	Research workspace contracts > localizes unselected suggestions and freezes the selected draft across locale changes
+src/ResearchWorkspace.test.tsx	Research workspace contracts > preserves transcript tool model effort and generated answer bytes
+src/ResearchWorkspace.test.tsx	Research workspace contracts > reactively localizes shared stance and trace without remounting Research
+src/ResearchWorkspace.test.tsx	Research workspace contracts > renders late stream outcomes in the current locale without replaying the request
+src/ResearchWorkspace.test.tsx	Research workspace contracts > renders the complete English Research workspace around original source content
+src/ResearchWorkspace.test.tsx	Research workspace contracts > switches locale without remounting the workspace or resetting thread draft focus or drawers
+src/ResearchWorkspace.test.tsx	Research workspace contracts > uses structured thread not-found facts instead of parsing Error.message
+src/SettingsCss.test.ts	Settings workspace CSS contract > allocates reviewed schedule columns without overlapping controls
+src/SettingsCss.test.ts	Settings workspace CSS contract > defines_every_literal_class_in_extracted_settings_modules
+src/SettingsCss.test.ts	Settings workspace CSS contract > keeps_coverage_status_controls_horizontal_at_the_mobile_width
+src/SettingsCss.test.ts	Settings workspace CSS contract > keeps_settings_tabs_sticky_nonwrapping_and_horizontally_bounded
+src/SettingsCss.test.ts	Settings workspace CSS contract > removes_legacy_directory_runtime_band_and_confirm_owners
+src/SettingsCss.test.ts	Settings workspace CSS contract > settings scroll owner drops top inset while lede owns responsive breathing room
+src/SettingsCss.test.ts	Settings workspace CSS contract > shares_one_sticky_offset_with_directory_and_section_anchors
+src/SettingsCss.test.ts	Settings workspace CSS contract > sticky offsets stay shared after the inset transfer
+src/SettingsCss.test.ts	Settings workspace CSS contract > uses_data_driven_shell_overlay_without_numeric_breakpoint_literals
+src/SettingsCss.test.ts	Settings workspace CSS contract > wraps schedule source copy inside the source column
+src/SettingsDisclosure.test.ts	SetupDisclosure > can be closed after being opened without reading a cleared React event
+src/SettingsInvestorProfileIntegration.test.tsx	Settings investor exact-anchor integration > focuses the investor anchor only after clean real-panel modes commit Summary
+src/SettingsInvestorProfileIntegration.test.tsx	Settings investor exact-anchor integration > keeps a busy real panel in place and does not transfer exact-anchor focus
+src/SettingsInvestorProfileIntegration.test.tsx	Settings investor exact-anchor integration > waits for dirty discard before acknowledging and focusing the investor anchor
+src/SettingsModelRouting.test.ts	Settings model route save gate > allows an unchanged missing route but blocks a new draft onto that provider
+src/SettingsModelRouting.test.ts	Settings model route save gate > catalog_failure_stays_inside_ai_group_and_preserves_other_sections
+src/SettingsModelRouting.test.ts	Settings model route save gate > catalog_loading_does_not_hide_personalization_or_data_groups
+src/SettingsModelRouting.test.ts	Settings model route save gate > discards_pre_mutation_catalog_completion_after_route_save
+src/SettingsModelRouting.test.ts	Settings model route save gate > hides raw catalog and mutation diagnostics outside Developer Mode
+src/SettingsModelRouting.test.ts	Settings model route save gate > keeps model route drafts and discovery state through locale change
+src/SettingsModelRouting.test.ts	Settings model route save gate > opens an enabled section from a sequenced shell request
+src/SettingsModelRouting.test.ts	Settings model route save gate > opens_fixed_task_runtime_from_a_sequenced_exact_target
+src/SettingsModelRouting.test.ts	Settings model route save gate > opens_research_runtime_only_when_the_request_sequence_advances
+src/SettingsModelRouting.test.ts	Settings model route save gate > owns save and import export in Models while locale alone occupies PageHeader actions
+src/SettingsModelRouting.test.ts	Settings model route save gate > preserves_discovery_state_across_workflow_tab_unmounts
+src/SettingsModelRouting.test.ts	Settings model route save gate > preserves_model_route_drafts_across_workflow_tab_unmounts
+src/SettingsModelRouting.test.ts	Settings model route save gate > reapplies the same section only when its request sequence advances
+src/SettingsModelRouting.test.ts	Settings model route save gate > renders the model-routing owner in English without backend task labels
+src/SettingsModelRouting.test.ts	Settings model route save gate > renders_retained_catalog_synchronously_and_joins_idle_revalidation
+src/SettingsModelRouting.test.ts	Settings model route save gate > replaces_cached_catalog_after_model_route_mutation
+src/SettingsModelRouting.test.ts	Settings model route save gate > wires the fixed-task panel to one atomic settings request
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > hides provider and sync errors outside Developer Mode
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > hides_both_migration_controls_even_for_a_pre_exit_compatibility_response
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > reloads_mounted_news_status_after_a_news_source_is_invalidated
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > renders English news storage copy without changing counts
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > renders_cached_news_status_while_one_stale_refresh_runs
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > renders_empty_and_failed_news_statuses_as_user_outcomes
+src/SettingsNewsStorage.test.ts	SettingsView news storage copy > renders_normal_news_status_without_migration_narration
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > does not show the completed App Records migration panel in normal settings navigation
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > ignores retired sync errors and scopes coverage diagnostics to Developer Mode
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > keeps calendar degradation separate from reviewed-day coverage
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > keeps corrected single-locale headings without migration narration
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > keeps unmatched rows and provider issues separate from coverage state
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > lists_the_active_data_group_and_its_stable_subsections
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > offers explicit local confirmation only for listing-status events
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > reloads_mounted_market_and_coverage_status_after_price_invalidation
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > renders English market data and storage outcomes
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > renders_market_empty_and_macro_partial_failures_as_user_outcomes
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > shows SEC lifecycle evidence as review material and reloads it after its source runs
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > shows current market data status without projecting retired sync metadata
+src/SettingsPostPgExitStorage.test.ts	post-PG-exit storage panels > shows_macro_data_with_manual_and_scheduled_refresh_boundaries
+src/SettingsProviderConfig.test.ts	Settings provider config authority > caches_extension_health_only_after_visible_mount_and_manual_recheck
+src/SettingsProviderConfig.test.ts	Settings provider config authority > cancels_a_guarded_provider_edit_without_mutation_and_restores_focus
+src/SettingsProviderConfig.test.ts	Settings provider config authority > coalesces timer and focus reads and preserves prior truth on poll failure
+src/SettingsProviderConfig.test.ts	Settings provider config authority > confirms guarded IBKR client id edits
+src/SettingsProviderConfig.test.ts	Settings provider config authority > detects a fast idle-to-idle completion and refreshes related state once
+src/SettingsProviderConfig.test.ts	Settings provider config authority > does not let an older full refresh replace newer schedule truth
+src/SettingsProviderConfig.test.ts	Settings provider config authority > does_not_render_backend_storage_route_badges_for_active_schedule_rows
+src/SettingsProviderConfig.test.ts	Settings provider config authority > does_not_request_or_render_the_detailed_fred_snapshot
+src/SettingsProviderConfig.test.ts	Settings provider config authority > env-controlled client id never shows a save preview (real env wins precedence)
+src/SettingsProviderConfig.test.ts	Settings provider config authority > hides planted provider schedule and setup diagnostics in normal mode
+src/SettingsProviderConfig.test.ts	Settings provider config authority > invalidates_price_news_and_unknown_downstream_keys_after_source_completion
+src/SettingsProviderConfig.test.ts	Settings provider config authority > keeps long last-run messages out of the schedule row summary
+src/SettingsProviderConfig.test.ts	Settings provider config authority > keeps structured SA telemetry raw detail out of normal mode
+src/SettingsProviderConfig.test.ts	Settings provider config authority > keeps_schedule_polling_mounted_only_with_retained_cache_truth
+src/SettingsProviderConfig.test.ts	Settings provider config authority > labels repair as historical and never as current recovery
+src/SettingsProviderConfig.test.ts	Settings provider config authority > marks_long_runtime_content_as_wrap_capable
+src/SettingsProviderConfig.test.ts	Settings provider config authority > polls only schedule after thirty idle seconds without a live region
+src/SettingsProviderConfig.test.ts	Settings provider config authority > refreshes schedule on focus and full-loads only when lifecycle truth changes
+src/SettingsProviderConfig.test.ts	Settings provider config authority > removes idle timers and focus listeners and ignores a finishing poll after unmount
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders English data-source health config and schedule tables
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders FRED as configured local snapshot with refresh off
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders IBKR connection settings as one grouped block with derived ids below the client id
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders a localized degraded SA health row in English
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders all three SA chain states with distinct copy and tone
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders config-file provenance with per-field import
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders degraded Alpha Picks history without interrupting a healthy chain
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders durable IBKR partial counts without a manual continuation action
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders entitlement-blocked bodies as retained headlines without a retry action
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders only admitted SA diagnostic fields in Developer Mode
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders partial retry outcome with backlog and no continuation button
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders price partial facts without a Continue control in both locales
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders succeeded IBKR run and scheduled body backlog as separate facts
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders_cached_schedule_health_and_config_before_one_stale_refresh
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders_disabled_providers_as_neutral_and_partitions_every_registered_schedule_row_into_one_controllable_owner
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders_known_schedule_progress_without_covering_the_last_run_cell
+src/SettingsProviderConfig.test.ts	Settings provider config authority > renders_persisted_skipped_history_as_neutral_instead_of_never_run
+src/SettingsProviderConfig.test.ts	Settings provider config authority > reports_mutations_as_navigation_blocking_and_clears_after_completion
+src/SettingsProviderConfig.test.ts	Settings provider config authority > reports_unsaved_provider_and_schedule_drafts_to_navigation_owner
+src/SettingsProviderConfig.test.ts	Settings provider config authority > reveals the same planted diagnostics only in Developer Mode
+src/SettingsProviderConfig.test.ts	Settings provider config authority > settings_data_sources_does_not_own_portfolio_capture_controls
+src/SettingsProviderConfig.test.ts	Settings provider config authority > shows backend-driven derived IBKR client ids with live draft preview
+src/SettingsProviderConfig.test.ts	Settings provider config authority > switches locale without resetting drafts polling cadence or progress
+src/SettingsProviderConfig.test.ts	Settings provider config authority > switches to five second polling while running and back to idle after completion
+src/SettingsProviderConfig.test.ts	Settings provider config authority > wraps_each_wide_data_source_table_in_an_explicit_scroll_owner
+src/SettingsStabilizationCss.test.ts	Settings stabilization CSS contracts > gives_wide_settings_tables_one_horizontal_scroll_owner_and_reviewed_min_widths
+src/SettingsStabilizationCss.test.ts	Settings stabilization CSS contracts > keeps_detail_cells_wrap_capable_and_normal_sections_free_of_migration_copy
+src/SettingsWorkspace.test.tsx	Settings workspace > busy_rejection_preserves_group_scroll_and_selected_tab_focus
+src/SettingsWorkspace.test.tsx	Settings workspace > busy_section_blocks_group_change_with_visible_reason
+src/SettingsWorkspace.test.tsx	Settings workspace > calibration mode leaves Personalization without discard confirmation
+src/SettingsWorkspace.test.tsx	Settings workspace > cancels_idle_warmup_before_start_when_Settings_unmounts
+src/SettingsWorkspace.test.tsx	Settings workspace > confirmed_dirty_discard_restores_new_group_top_and_selected_tab_focus
+src/SettingsWorkspace.test.tsx	Settings workspace > directory_selection_closes_the_narrow_drawer_and_restores_one_focus_path
+src/SettingsWorkspace.test.tsx	Settings workspace > dirty_section_requires_explicit_discard_before_group_change
+src/SettingsWorkspace.test.tsx	Settings workspace > enter_selects_the_first_deterministic_search_result
+src/SettingsWorkspace.test.tsx	Settings workspace > investor profile guard uses the panel reporter for dirty edit and busy mutation
+src/SettingsWorkspace.test.tsx	Settings workspace > investor provider action reveals the Providers anchor and restores focus
+src/SettingsWorkspace.test.tsx	Settings workspace > keeps busy and dirty navigation guard semantics while labels change
+src/SettingsWorkspace.test.tsx	Settings workspace > manual_tab_change_clears_stale_pending_anchor
+src/SettingsWorkspace.test.tsx	Settings workspace > manual_tab_switch_restores_group_top_without_stealing_selected_tab_focus
+src/SettingsWorkspace.test.tsx	Settings workspace > manual_tab_switch_unmounts_prior_group_and_targets_first_anchor
+src/SettingsWorkspace.test.tsx	Settings workspace > navigation_target_overrides_persisted_active_group
+src/SettingsWorkspace.test.tsx	Settings workspace > omits legacy model and runtime bands while keeping locale as the sole PageHeader action
+src/SettingsWorkspace.test.tsx	Settings workspace > renders English Settings workspace tabs directory and section copy
+src/SettingsWorkspace.test.tsx	Settings workspace > renders one locale selector and no raw planted diagnostic in Settings PageHeader
+src/SettingsWorkspace.test.tsx	Settings workspace > renders_no_empty_advanced_group_or_historical_disabled_section
+src/SettingsWorkspace.test.tsx	Settings workspace > renders_one_directory_trigger_and_transient_drawer_on_narrow_screens
+src/SettingsWorkspace.test.tsx	Settings workspace > renders_one_persistent_searchable_directory_on_wide_screens
+src/SettingsWorkspace.test.tsx	Settings workspace > renders_page_header_tabs_and_only_default_group_anchors
+src/SettingsWorkspace.test.tsx	Settings workspace > renders_three_workflow_tabs_with_one_selected_panel
+src/SettingsWorkspace.test.tsx	Settings workspace > restores_valid_active_group_and_ignores_retired_collapse_key
+src/SettingsWorkspace.test.tsx	Settings workspace > searches Chinese and English aliases in either locale
+src/SettingsWorkspace.test.tsx	Settings workspace > selecting_cross_group_result_mounts_group_then_focuses_exact_anchor
+src/SettingsWorkspace.test.tsx	Settings workspace > shows_neutral_no_match_copy_without_a_disabled_control
+src/SettingsWorkspace.test.tsx	Settings workspace > shows_only_the_active_group_directory_while_search_remains_cross_group
+src/SettingsWorkspace.test.tsx	Settings workspace > signals same-group investor summary requests from search and external navigation
+src/SettingsWorkspace.test.tsx	Settings workspace > starts_one_idle_warmup_after_first_paint
+src/SettingsWorkspace.test.tsx	Settings workspace > switches locale without losing active group search disclosure draft or focus
+src/SettingsWorkspace.test.tsx	Settings workspace > tracks_the_visible_data_sync_location_while_the_workspace_scrolls
+src/SettingsWorkspace.test.tsx	Settings workspace > unmounts_data_sources_polling_when_leaving_data_sync
+src/SourceRunProgress.test.tsx	SourceRunProgress > clamps_the_visual_percentage_without_inventing_a_count
+src/SourceRunProgress.test.tsx	SourceRunProgress > renders English progress chrome without changing real progress values
+src/SourceRunProgress.test.tsx	SourceRunProgress > renders_known_progress_on_separate_lines_with_real_aria_values
+src/SourceRunProgress.test.tsx	SourceRunProgress > renders_missing_progress_as_indeterminate_without_a_live_region
+src/SourceRunProgress.test.tsx	SourceRunProgress > treats_zero_or_negative_totals_as_indeterminate
+src/TickerDetail.test.tsx	Ticker Detail localization > maps reviewed source-path enums and preserves unknown stable IDs
+src/TickerDetail.test.tsx	Ticker Detail localization > preserves note draft and maps note load add and delete failures separately
+src/TickerDetail.test.tsx	Ticker Detail localization > preserves successful price and fundamentals legs while retiring legacy IV requests
+src/TickerDetail.test.tsx	Ticker Detail localization > preserves tag draft and maps catalog add and remove failures separately
+src/TickerDetail.test.tsx	Ticker Detail localization > renders English ticker chrome without translating financial statement rows
+src/TickerDetail.test.tsx	Ticker Detail localization > renders price failure independently from successful detail state
+src/TickerDetail.test.tsx	Ticker Detail localization > renders reviewed zh-Hant ticker chrome and planted source values
+src/TickerDetail.test.tsx	Ticker Detail localization > renders ticker-state failure by operation without raw detail
+src/TickerDetail.test.tsx	Ticker Detail localization > shows only safe ticker diagnostics in Developer Mode
+src/TickerDetail.test.tsx	Ticker Detail localization > switches locale without resetting the active tab day window data or focus
+src/TickerDetail.test.tsx	Ticker Detail localization > updates memoized chrome in place without resetting reading position or refetching
+src/UiLocaleApi.test.ts	UI locale API > GETs the key-specific ui-locale route
+src/UiLocaleApi.test.ts	UI locale API > PUTs only the validated locale field to the key-specific route
+src/Universe.test.tsx	Universe localization > preserves hide confirmation and renders hide failure by operation
+src/Universe.test.tsx	Universe localization > preserves the groups-unavailable import warning without source-tag translation
+src/Universe.test.tsx	Universe localization > preserves unknown facet IDs and filter results across locale switch
+src/Universe.test.tsx	Universe localization > renders English Universe chrome while preserving tickers tags and lists
+src/Universe.test.tsx	Universe localization > renders active-universe failure with the exact Data Sources recovery target
+src/Universe.test.tsx	Universe localization > renders import failure without raw backend detail in normal mode
+src/Universe.test.tsx	Universe localization > renders structured import counts in both locales
+src/Universe.test.tsx	Universe localization > renders the reviewed zh-Hant Universe title and terminology corrections
+src/Universe.test.tsx	Universe localization > switches locale without clearing query list facets outcome or busy ticker
+src/Watchlist.test.tsx	Watchlist localization > does not replay list membership archive or priority mutations on locale switch
+src/Watchlist.test.tsx	Watchlist localization > keeps optimistic priority work in flight and renders completion in the active locale
+src/Watchlist.test.tsx	Watchlist localization > keeps silent list default and search degradation silent
+src/Watchlist.test.tsx	Watchlist localization > preserves create rename and member-search drafts across locale switch
+src/Watchlist.test.tsx	Watchlist localization > preserves list Universe consensus loading and degraded trigger semantics
+src/Watchlist.test.tsx	Watchlist localization > preserves node identity focus and Explore request counts during locale switch
+src/Watchlist.test.tsx	Watchlist localization > preserves selected list archived filter and sort across locale switch
+src/Watchlist.test.tsx	Watchlist localization > renders English Watchlist chrome without translating custom lists tags or tickers
+src/Watchlist.test.tsx	Watchlist localization > renders consensus chrome locally while preserving Provider payload values
+src/Watchlist.test.tsx	Watchlist localization > renders the reviewed zh-Hant Watchlist corrections and source values
+src/Watchlist.test.tsx	Watchlist localization > renders visible Watchlist failures by operation without raw detail
+src/apiError.test.ts	typed API errors > captures string detail as diagnostic without inventing a code
+src/apiError.test.ts	typed API errors > handles malformed and empty error bodies without invented detail
+src/apiError.test.ts	typed API errors > keeps every existing public API error instance compatible with Error
+src/apiError.test.ts	typed API errors > keeps timeout and network failures outside HTTP ApiError classification
+src/apiError.test.ts	typed API errors > preserves the legacy GET message while capturing structured HTTP metadata
+src/apiError.test.ts	typed API errors > preserves the legacy mutation message while exposing a stable code
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > cancelOpenAIOAuth POSTs the state to the cancel route
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > completeOpenAIOAuthManual POSTs the state + code
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > completeOpenAIOAuthManual forwards a redirect_url instead of a code
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > openAIOAuthStatus GETs the status route with the state url-encoded
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > startOpenAIOAuth POSTs make_active to the start route (default false)
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > startOpenAIOAuth carries the relogin target only when provided (S3)
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > startOpenAIOAuth forwards make_active=true when the user opts in
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > surfaces backend detail when an update request is rejected
+src/chatgptOAuth.test.ts	OpenAI OAuth api clients > throws on a non-ok status response
+src/chatgptOAuth.test.ts	buildManualCompletion > sends a bare authorization code as `code`
+src/chatgptOAuth.test.ts	buildManualCompletion > sends a full redirect URL as `redirect_url`
+src/chatgptOAuth.test.ts	buildManualCompletion > treats a value containing ?code= as a redirect URL even without a scheme
+src/chatgptOAuth.test.ts	buildManualCompletion > trims surrounding whitespace
+src/chatgptOAuth.test.ts	localized OAuth probe presentation > keeps OAuth result detail as diagnostic data instead of translated copy
+src/chatgptOAuth.test.ts	localized OAuth probe presentation > renders OAuth probe labels and notes in both locales
+src/chatgptOAuth.test.ts	pollOAuthStatus > defaults manualCompletable to true when the backend omits the flag
+src/chatgptOAuth.test.ts	pollOAuthStatus > polls through pendings until success, sleeping between
+src/chatgptOAuth.test.ts	pollOAuthStatus > re-checks abort AFTER an in-flight status response (round-5 SF)
+src/chatgptOAuth.test.ts	pollOAuthStatus > returns a timeout kind when pending persists past the budget
+src/chatgptOAuth.test.ts	pollOAuthStatus > returns aborted before the first status check when already aborted
+src/chatgptOAuth.test.ts	pollOAuthStatus > returns an error kind carrying the backend detail (no fallback)
+src/chatgptOAuth.test.ts	pollOAuthStatus > returns success with the masked credential
+src/chatgptOAuth.test.ts	pollOAuthStatus > returns unknown and stops (does not spin) when the login is not tracked
+src/chatgptOAuth.test.ts	pollOAuthStatus > stops with aborted when shouldAbort flips during pending polling
+src/chatgptOAuth.test.ts	pollOAuthStatus > threads manual_completable=false through the error result (F4)
+src/chatgptOAuth.test.ts	probe display helpers > extracts model ids from P2c observed text
+src/chatgptOAuth.test.ts	probe display helpers > keeps failed probe detail visible but compact
+src/chatgptOAuth.test.ts	probe display helpers > summarizes P2c as available models instead of raw probe text
+src/chatgptOAuth.test.ts	probe display helpers > uses auth-mode-specific probe notes
+src/chatgptOAuth.test.ts	probe display helpers > uses short stable labels for the ChatGPT OAuth probe steps
+src/coverageV2Contract.test.ts	Coverage v2 contract > accepts the V2 DTO and rejects retired field fixtures
+src/coverageV2Contract.test.ts	Coverage v2 contract > exports the exact closed Coverage v2 enum catalogs
+src/coverageV2Contract.test.ts	Coverage v2 contract > keeps every frontend coverage enum consumer exhaustive and exact
+src/credentialDisplay.test.ts	activeFirst > does not mutate the input + handles empty
+src/credentialDisplay.test.ts	activeFirst > is a no-op when the first is already active or none is active
+src/credentialDisplay.test.ts	activeFirst > moves the active credential to the front, preserving the rest's order
+src/credentialDisplay.test.ts	add API key activation copy > defaults to active only when there is no LOCAL DB credential (env fallback rows don't count)
+src/credentialDisplay.test.ts	add API key activation copy > labels the submit action by whether the new key will become active
+src/credentialDisplay.test.ts	add API key activation copy > reports whether the add switched the active credential
+src/credentialDisplay.test.ts	credential row metadata display > shows an expiry editor ONLY for claude_code_oauth (chatgpt_oauth auto-refreshes; api_key has no expiry)
+src/credentialDisplay.test.ts	credential row metadata display > uses short availability copy so rows don't stretch on non-secret OAuth credentials
+src/credentialDisplay.test.ts	credentialPill > reflects the active credential's auth mode (not just key set/no key)
+src/credentialDisplay.test.ts	credentialPill > says no credential when none active
+src/credentialDisplay.test.ts	discoverButtonLabel > is 查看候選模型 for the seed-only Claude OAuth, else 列模型
+src/credentialDisplay.test.ts	discovery result header copy > labels live vs seed discovery by auth mode
+src/credentialDisplay.test.ts	discovery result header copy > shows which credential produced the result
+src/credentialDisplay.test.ts	discoverySourceLabel > distinguishes OpenAI API vs ChatGPT backend (both provider_api at the data layer)
+src/credentialDisplay.test.ts	discoverySourceLabel > labels Anthropic API
+src/credentialDisplay.test.ts	discoverySourceLabel > labels seed candidates as non-live regardless of provider/mode
+src/credentialDisplay.test.ts	expiry date-input conversion > dateInputToIso: YYYY-MM-DD → canonical UTC-midnight ISO
+src/credentialDisplay.test.ts	expiry date-input conversion > dateInputToIso: empty → empty (clears the expiry; allow留空)
+src/credentialDisplay.test.ts	expiry date-input conversion > isoToDateInput: ISO timestamp → YYYY-MM-DD (date-picker value)
+src/credentialDisplay.test.ts	expiry date-input conversion > isoToDateInput: empty / null / unparseable → empty string
+src/credentialDisplay.test.ts	localized credential presentation > preserves provider auth and credential identifiers as values
+src/credentialDisplay.test.ts	localized credential presentation > renders credential presentation helpers in both locales
+src/dataSourceSchedulePolling.test.ts	Data Sources schedule polling policy > detects starts stops fast completions and source-set changes
+src/dataSourceSchedulePolling.test.ts	Data Sources schedule polling policy > ignores progress and presentation-only changes within one lifecycle revision
+src/dataSourceSchedulePolling.test.ts	Data Sources schedule polling policy > uses a 30 second idle cadence and a 5 second active cadence
+src/dataSourcesPresentation.test.ts	Data Sources common-state mapping > maps_badged_provider_statuses_and_leaves_disabled_neutral
+src/dataSourcesPresentation.test.ts	Data Sources common-state mapping > maps_duplicate_skips_to_blocked_and_other_skips_to_neutral
+src/dataSourcesPresentation.test.ts	Data Sources common-state mapping > maps_durable_schedule_history_without_confusing_disabled_schedule_state
+src/dataSourcesPresentation.test.ts	Data Sources common-state mapping > maps_sa_segments_to_ready_partial_and_failed
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > accepts only bounded integer status and stable error codes
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > accepts only bounded safe single-line diagnostic detail
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > distinguishes read and mutation outcomes without a generic request owner
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > keeps ordinary network failures generic and structured
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > maps every reviewed Explore operation in both locales
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > maps only reviewed queryless API route templates
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > maps only reviewed recovery codes to existing Settings targets
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > never reads legacy ApiError message while capturing structured fields
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > omits invalid dynamic absolute and over-limit API paths
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > rejects secrets tracebacks SQL paths URLs IP HTML controls and long detail
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > renders Developer Mode with safe metadata and an omitted-detail state
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > renders normal mode without diagnostic detail
+src/explore/explorePresentation.test.tsx	Explore presentation boundary > renders structured Universe outcomes in both locales without captured copy
+src/i18n/LocaleProvider.test.tsx	LocaleProvider > exposes locale busy and stable error state without raw detail
+src/i18n/LocaleProvider.test.tsx	LocaleProvider > locale changes rerender labels without remounting child state
+src/i18n/LocaleProvider.test.tsx	LocaleProvider > subscribes to controller state and reconciles once under StrictMode
+src/i18n/bootstrap.test.ts	synchronous locale bootstrap > applies a valid cached locale synchronously before returning
+src/i18n/bootstrap.test.ts	synchronous locale bootstrap > defaults synchronously to zh-Hant without a valid cache
+src/i18n/bootstrap.test.ts	synchronous locale bootstrap > never writes cache or fetches resources during bootstrap
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > bootstraps locale before createRoot and mounts both providers
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > closes remaining localization with global src scope and exact empty-debt arithmetic
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > fixes the Vitest default locale to zh-Hant
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > forbids dynamic Settings keys and direct normal-mode raw diagnostic sinks
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > keeps bootstrap reads separate from authority reconciliation and cache writes
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > keeps the public locale selector scoped to Settings and controller-backed
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > records the exact I18N-1 migrated scopes and sole ArkScope allowlist
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > records the exact I18N-2 migrated scopes and stable-value allowlist
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > renders no language selector autonym or planned locale affordance
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > uses no detector loader Suspense or dynamic resource import
+src/i18n/foundationBoundaries.test.ts	I18N-0 foundation boundaries > uses zh-Hant as the static document fallback
+src/i18n/locale.test.ts	UI locale cache > allowlists exactly zh-Hant and en
+src/i18n/locale.test.ts	UI locale cache > ignores malformed and unknown cache values
+src/i18n/locale.test.ts	UI locale cache > ignores storage read exceptions
+src/i18n/locale.test.ts	UI locale cache > treats a missing cache entry as absent
+src/i18n/locale.test.ts	UI locale cache > writes only valid locale values and tolerates cache write failure
+src/i18n/localeController.test.ts	locale controller > GET failure preserves bootstrap truth and performs no cache write
+src/i18n/localeController.test.ts	locale controller > PUT failure rolls back and exposes only the stable error code
+src/i18n/localeController.test.ts	locale controller > PUT is optimistic but writes cache only after success
+src/i18n/localeController.test.ts	locale controller > authoritative GET corrects runtime document and cache
+src/i18n/localeController.test.ts	locale controller > coalesces coincident and StrictMode-style startup reconciliation
+src/i18n/localeController.test.ts	locale controller > late startup GET cannot override a newer successful PUT
+src/i18n/localeController.test.ts	locale controller > late startup GET cannot override rollback after a newer failed PUT
+src/i18n/localeController.test.ts	locale controller > prevents overlapping locale writes
+src/i18n/localeController.test.ts	locale controller > same-locale GET still refreshes the write-through cache once
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > covers both locales for every closed operation branch
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > exposes only reviewed safe ApiError fields in Developer Mode
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > keeps unknown stable IDs visible and distinguishable
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > maps activity field IDs to local labels
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > maps every Portfolio operation outcome in both locales
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > maps validation and empty states without parsing backend text
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > never returns a raw resource key
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > omits arbitrary error details in normal mode
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > preserves source user and measured values
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > renders late outcomes in the active locale
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > selects reviewed one and other count copy
+src/i18n/portfolioPresentation.test.ts	portfolio presentation > uses only static Portfolio resource selectors
+src/i18n/researchPresentation.test.ts	research presentation > keeps Provider model effort run and error identifiers original
+src/i18n/researchPresentation.test.ts	research presentation > keeps source work and generated content outside the presenter
+src/i18n/researchPresentation.test.ts	research presentation > maps Evidence token and timing labels without changing values
+src/i18n/researchPresentation.test.ts	research presentation > maps empty response disconnect and progress outcomes from semantic IDs
+src/i18n/researchPresentation.test.ts	research presentation > maps run and history statuses without translating stable IDs
+src/i18n/researchPresentation.test.ts	research presentation > maps selection provenance and provider quota chrome in both locales
+src/i18n/researchPresentation.test.ts	research presentation > maps suggested prompts in both locales before they become drafts
+src/i18n/researchPresentation.test.ts	research presentation > preserves unknown stable values instead of collapsing them
+src/i18n/researchPresentation.test.ts	research presentation > renders no raw resource key for every closed presenter branch
+src/i18n/researchPresentation.test.ts	research presentation > uses only static Research resource selectors
+src/i18n/resources.test.ts	bundled i18n resources > contains the exact Explore subtree inventory in both locales
+src/i18n/resources.test.ts	bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales
+src/i18n/resources.test.ts	bundled i18n resources > initializes bundled zh-Hant resources synchronously
+src/i18n/resources.test.ts	bundled i18n resources > keeps Explore resources statically bundled and free of source values
+src/i18n/resources.test.ts	bundled i18n resources > keeps locale namespace and recursive key paths identical
+src/i18n/resources.test.ts	bundled i18n resources > moves shared model chrome to one Common owner without Settings duplicates
+src/i18n/resources.test.ts	bundled i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move
+src/i18n/resources.test.ts	bundled i18n resources > requires every resource leaf to be a non-empty string
+src/i18n/resources.test.ts	bundled i18n resources > resolves the Slice 5 Investor workspace copy in both locales
+src/i18n/resources.test.ts	bundled i18n resources > resolves the reviewed Settings copy inventory in both locales
+src/i18n/resources.test.ts	bundled i18n resources > resolves the reviewed common and shell copy in both locales
+src/i18n/resources.test.ts	bundled i18n resources > returns localized safe copy instead of a raw missing key
+src/i18n/resources.test.ts	bundled i18n resources > supports exactly one reviewed typed translation-key style
+src/i18n/resources.test.ts	bundled i18n resources > switches to bundled English without loading resources
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > allows legacy debt only to shrink and requires zero in migrated scopes
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects and normalizes JSX text through the TypeScript AST
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects aria-label and ariaLabel props
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects direct DataTable header properties including ASCII-only copy
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects label title description and alt props
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects placeholder props
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects tuple-backed static column labels without treating tuple IDs as copy
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects visible expression and template copy
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > detects visible objects message sinks presenter returns and conservative CJK runtime literals
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > ignores Research completion-state operands while retaining visible status labels
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > ignores broker day-gap comparison operands while retaining activity labels
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > ignores calibration transport operands while retaining visible calibration copy
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > ignores comments import paths tests resources and declarations
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > ignores reviewed model reason operands while retaining visible reason presenters
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > keeps real presenter returns visible after machine-operand narrowing
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > rejects dynamic keys while accepting the one reviewed typed key style
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > requires empty debt global src scope and exact allowlist arithmetic
+src/i18n/visibleLiteralScanner.test.ts	visible literal scanner > requires exact current allowlist entries and rejects stale entries
+src/legacyScoreRetirement.test.ts	legacy score retirement boundary > removes score fields from current frontend DTOs and fixtures
+src/marketDataDisplay.test.ts	coverageStatusLabel > keeps partial and unknown ticker facts independent
+src/marketDataDisplay.test.ts	coverageStatusLabel > maps calendar and observation health without parsing diagnostics
+src/marketDataDisplay.test.ts	coverageStatusLabel > maps every Coverage v2 day reason in both locales
+src/marketDataDisplay.test.ts	coverageStatusLabel > maps every Coverage v2 day status in both locales and reserves positive tone for complete
+src/marketDataDisplay.test.ts	coverageStatusLabel > maps non-trading closure reasons without backend prose
+src/marketDataDisplay.test.ts	coverageStatusLabel > renders unmatched RTH rows as a separate data-quality warning
+src/marketDataDisplay.test.ts	coverageStatusLabel > separates security review signals from generic provider issues
+src/marketDataDisplay.test.ts	localized Settings market-data presentations > keeps raw schedule reasons out of semantic status mapping
+src/marketDataDisplay.test.ts	localized Settings market-data presentations > renders Settings market and schedule presentations in both locales
+src/marketDataDisplay.test.ts	macroRoutingLabel > labels local-first active (toggle vs env), DB built
+src/marketDataDisplay.test.ts	macroRoutingLabel > never suggests PG fallback when local macro is inactive
+src/marketDataDisplay.test.ts	macroRoutingLabel > toggle-on but DB not built → local-first, pending ingestion (NOT PG fallback)
+src/marketDataDisplay.test.ts	marketRoutingLabel > keeps pending-db distinct while disabled setting is no longer PG fallback
+src/marketDataDisplay.test.ts	marketRoutingLabel > renders prices as local authority after P0-C
+src/marketDataDisplay.test.ts	news cutover labels > keeps normalized writes visibly pre-exit/test while PG remains available
+src/marketDataDisplay.test.ts	news cutover labels > renders the locked post-exit state
+src/marketDataDisplay.test.ts	newsRoutingLabel > distinguishes default direct routing from explicit rollback
+src/marketDataDisplay.test.ts	newsRoutingLabel > makes env override direction explicit
+src/marketDataDisplay.test.ts	providerHealthStatusLabel > keeps generic disabled providers as disabled
+src/marketDataDisplay.test.ts	providerHealthStatusLabel > labels legacy disabled FRED macro ingestion as generic disabled
+src/marketDataDisplay.test.ts	providerHealthStatusLabel > labels strict missing provider config as not configured
+src/marketDataDisplay.test.ts	schedulerBodyBacklogPresentation > describes due and never-attempted bodies without a manual action
+src/marketDataDisplay.test.ts	schedulerBodyBacklogPresentation > explains entitlement-blocked bodies without calling them permanently missing
+src/marketDataDisplay.test.ts	schedulerBodyBacklogPresentation > fails closed on malformed backlog counts
+src/marketDataDisplay.test.ts	schedulerBodyBacklogPresentation > keeps a succeeded run successful when bodies are scheduled later
+src/marketDataDisplay.test.ts	schedulerBodyBacklogPresentation > renders backlog-query failure as unavailable rather than zero
+src/marketDataDisplay.test.ts	schedulerBodyBacklogPresentation > separates new body backlog from the partial run label
+src/marketDataDisplay.test.ts	schedulerStateLabel > distinguishes succeeded / failed / skipped / running / none
+src/marketDataDisplay.test.ts	schedulerStateLabel > does not turn invalid observed counts into numeric promises
+src/marketDataDisplay.test.ts	schedulerStateLabel > keeps actionable ticker continuation ahead of informational counts
+src/marketDataDisplay.test.ts	schedulerStateLabel > labels stale running as an interrupted/stuck state
+src/marketDataDisplay.test.ts	schedulerStateLabel > names an IBKR Gateway failure instead of collapsing it into generic failure
+src/marketDataDisplay.test.ts	schedulerStateLabel > names an IBKR headline coverage gap instead of showing generic partial
+src/marketDataDisplay.test.ts	schedulerStateLabel > partial with deferred → needs manual continue (補抓)
+src/marketDataDisplay.test.ts	schedulerStateLabel > partial without actionable or observed continuation is generic
+src/marketDataDisplay.test.ts	schedulerStateLabel > renders durable IBKR body counts without promising a manual retry
+src/marketDataDisplay.test.ts	schedulerStateLabel > renders price unresolved count and bounded ticker list without continuation
+src/marketDataDisplay.test.ts	schedulerStateLabel > renders sanitized count/cursor state {"deferred_ticker_count":0,"deferred_body_count":0,"has_cursor":true}
+src/marketDataDisplay.test.ts	schedulerStateLabel > renders sanitized count/cursor state {"deferred_ticker_count":3,"deferred_body_count":0,"has_cursor":false}
+src/marketDataDisplay.test.ts	schedulerStateLabel > renders sanitized count/cursor state {"deferred_ticker_count":3,"deferred_body_count":10,"has_cursor":false}
+src/modelPicker.test.ts	shared model picker authority > applies the provider veto before model capability
+src/modelPicker.test.ts	shared model picker authority > classifies a cache-ok invisible model as model_not_visible
+src/modelPicker.test.ts	shared model picker authority > classifies an ineligible model as task_capability_missing
+src/modelPicker.test.ts	shared model picker authority > gives Settings and Research the same disabled reason for one provider fixture
+src/modelPicker.test.ts	shared model picker authority > keeps a route-pinned unknown model eligible while retaining its warning
+src/modelPicker.test.ts	shared model picker authority > keeps old-sidecar compatibility entries visibly unverified
+src/modelPicker.test.ts	shared model picker authority > preserves visible, disabled, advanced, and route group ordering
+src/modelPicker.test.ts	shared model picker authority > turns a missing active credential into one provider veto for every entry
+src/modelRouteDisplay.test.ts	routeIsOverridable > only a DB-authoritative route can be reset (there is a DB row to remove)
+src/modelRouteDisplay.test.ts	routeIsOverridable > yaml/default/env routes have no DB row → nothing to reset
+src/modelRouteDisplay.test.ts	routeSourceBadge > labels DB authority as the saved/active app setting
+src/modelRouteDisplay.test.ts	routeSourceBadge > labels an env var as an operator override that outranks the DB
+src/modelRouteDisplay.test.ts	routeSourceBadge > labels default as the built-in seed
+src/modelRouteDisplay.test.ts	routeSourceBadge > labels yaml profile as a fallback, not the live authority
+src/modelRouteDisplay.test.ts	routeSourceBadge > renders every route authority in English
+src/modelRouteDisplay.test.ts	routeSourceBadge > uses the active Settings translator instead of captured source copy
+src/modelRoutingUx.test.ts	Models terminology > keeps status, auth, thinking, and group copy in one canonical table
+src/modelRoutingUx.test.ts	Models terminology > resolves every shared model group reason auth mode thinking mode and compatibility context in both locales
+src/modelRoutingUx.test.ts	blockedRouteSaves > blocks only a task freshly drafted onto that provider
+src/modelRoutingUx.test.ts	blockedRouteSaves > compares semantic fields, not object identity
+src/modelRoutingUx.test.ts	blockedRouteSaves > does not block a pre-existing missing-credential route
+src/modelRoutingUx.test.ts	providerContexts > falls back to the active credential on an old sidecar
+src/modelRoutingUx.test.ts	providerContexts > uses the v2 provider summary as authority
+src/modelRoutingUx.test.ts	task test snapshots > requires all five fields and never accepts an explicitly stale result
+src/modelSelect.test.ts	inferProvider (custom model id) > maps claude-* → anthropic
+src/modelSelect.test.ts	inferProvider (custom model id) > maps gpt-*/o-series → openai
+src/modelSelect.test.ts	inferProvider (custom model id) > returns null when ambiguous (keep current provider)
+src/modelSelect.test.ts	model select encode/decode > decodes anthropic models (handles colons only at the split point)
+src/modelSelect.test.ts	model select encode/decode > rejects the custom sentinel + malformed values
+src/modelSelect.test.ts	model select encode/decode > round-trips a catalog option
+src/modelSelect.test.ts	runDiscoveryAndRefreshCatalog (P2.7) > keeps the discovery result when the catalog refetch fails
+src/modelSelect.test.ts	runDiscoveryAndRefreshCatalog (P2.7) > refetches the catalog after a successful discovery
+src/personalizationDisplay.test.ts	personalizationDisplay > falls back safely on unknown keys
+src/personalizationDisplay.test.ts	personalizationDisplay > labels every Assistant Stance in both locales
+src/personalizationDisplay.test.ts	personalizationDisplay > labels mismatch as a guardrail
+src/personalizationDisplay.test.ts	personalizationDisplay > summarizes traces compactly, null-safe
+src/researchErrors.test.tsx	research error presentation > keeps model_refusal distinct from provider_call_failed
+src/researchErrors.test.tsx	research error presentation > maps cancelled and interrupted run codes to interrupted rather than failed
+src/researchErrors.test.tsx	research error presentation > maps missing_credential to provider setup
+src/researchErrors.test.tsx	research error presentation > maps model_timeout to the adjacent runtime-limit settings action
+src/researchErrors.test.tsx	research error presentation > maps reauth_required to a login action without raw primary text
+src/researchErrors.test.tsx	research error presentation > marks tool_limit_reached as partial-preserving and offers simplify or retry
+src/researchErrors.test.tsx	research error presentation > shows bounded sanitized detail only in Developer Mode and never exposes credentials
+src/researchModels.test.ts	activeCredential > returns null when none active or list empty
+src/researchModels.test.ts	activeCredential > returns the active credential
+src/researchModels.test.ts	effortNote > does not warn for Claude subscription effort because the SDK driver applies it
+src/researchModels.test.ts	effortNote > is silent for api_key and other auth modes
+src/researchModels.test.ts	effortNote > is silent for default/no effort on the subscription
+src/researchModels.test.ts	effortOptionsForModel > limits a new-sidecar custom model to provider default
+src/researchModels.test.ts	effortOptionsForModel > uses the selected model contract rather than the provider union
+src/researchReducer.test.ts	exports the exact max-turns sentinel
+src/researchReducer.test.ts	lastRetryCandidate > is null for successful tails and non-final failures
+src/researchReducer.test.ts	lastRetryCandidate > returns the previous user question for the final error assistant turn
+src/researchReducer.test.ts	lastRetryCandidate > returns the previous user question for the final max-turns sentinel
+src/researchReducer.test.ts	reducer · anthropic live > degenerate done with data:{} finalizes gracefully (no throw / no NaN)
+src/researchReducer.test.ts	reducer · anthropic live > done with no prior text/tool clears the indicator (done is in the clear-set)
+src/researchReducer.test.ts	reducer · anthropic live > empty-answer done finalizes normally (not max-turns, not error)
+src/researchReducer.test.ts	reducer · anthropic live > full single-turn happy path: interim replaced, footer reads only total_tokens+turn_count, trace chronological
+src/researchReducer.test.ts	reducer · anthropic live > interim text appends streaming deltas into a readable preview
+src/researchReducer.test.ts	reducer · anthropic live > interim text clears the indicator and holds content; adds no trace row
+src/researchReducer.test.ts	reducer · anthropic live > model badge from thinking equals done.model (no reconciliation)
+src/researchReducer.test.ts	reducer · anthropic live > multiple consecutive thinking_content blocks append in order; none clears the indicator
+src/researchReducer.test.ts	reducer · anthropic live > submit commits user msg, opens pending, sets thinkingActive, creates+titles thread
+src/researchReducer.test.ts	reducer · anthropic live > text then tool_start — only text (the first) flips the indicator; tool_start just opens the row
+src/researchReducer.test.ts	reducer · anthropic live > thinking sets the model badge optimistically, keeps indicator on, adds no trace row
+src/researchReducer.test.ts	reducer · anthropic live > thinking_content appends one inline trace line; indicator stays on
+src/researchReducer.test.ts	reducer · anthropic live > tool_end completes exactly that one open row with result_preview+chars
+src/researchReducer.test.ts	reducer · anthropic live > tool_end missing summary/chars still flips the row done (optional fields tolerated)
+src/researchReducer.test.ts	reducer · anthropic live > tool_start (no prior text) clears the indicator and opens an open trace row
+src/researchReducer.test.ts	reducer · hydrate > MERGES persisted threads WITHOUT clobbering an in-flight turn (mount-fetch race guard)
+src/researchReducer.test.ts	reducer · hydrate > after hydrate, selectThread opens a restored thread and submit appends to it
+src/researchReducer.test.ts	reducer · hydrate > attachRun opens pending without duplicating the persisted user message
+src/researchReducer.test.ts	reducer · hydrate > on a pristine state, hydrate loads persisted threads (active stays null)
+src/researchReducer.test.ts	reducer · hydrate > on navigation remount, hydrate can restore a previously active persisted thread
+src/researchReducer.test.ts	reducer · openai sparse > abort during the silent gap drops pending, keeps user message, clears indicator
+src/researchReducer.test.ts	reducer · openai sparse > agent error frame preserves typed code, partial usage, and trace while rendering data.error
+src/researchReducer.test.ts	reducer · openai sparse > batched tool_end (name only, no tool_start) builds closed name-only rows; indicator stays on
+src/researchReducer.test.ts	reducer · openai sparse > done finalizes normally with provider:openai, clears indicator, maxTurns false
+src/researchReducer.test.ts	reducer · openai sparse > duplicate tool calls → trace longer than deduped done.tools_used (3 rows vs 2 used)
+src/researchReducer.test.ts	reducer · openai sparse > empty-answer done is a normal completion (final_output falsy → '')
+src/researchReducer.test.ts	reducer · openai sparse > identical sentinel string from openai is NOT flagged maxTurns (provider gate)
+src/researchReducer.test.ts	reducer · openai sparse > late frames after abort are no-ops (pending===null discriminator)
+src/researchReducer.test.ts	reducer · openai sparse > lone thinking{turn:1} holds indicator true, leaves trace empty
+src/researchReducer.test.ts	reducer · openai sparse > streamEnd after lone thinking synthesizes 連線中斷
+src/researchReducer.test.ts	reducer · openai sparse > thinkingActive stays TRUE across the whole tool_end batch, flips false only on done
+src/researchReducer.test.ts	reducer · openai sparse > zero-tool turn: empty trace is a valid terminal state
+src/researchReducer.test.ts	reducer · terminal & races > TRUE empty stream — streamEnd before any frame synthesizes 連線中斷
+src/researchReducer.test.ts	reducer · terminal & races > abort after done is a no-op (idempotent; does not corrupt the finalized bubble)
+src/researchReducer.test.ts	reducer · terminal & races > abort after some tool_ends drops the completed-so-far trace too
+src/researchReducer.test.ts	reducer · terminal & races > abort right after submit drops the empty pending, keeps user message
+src/researchReducer.test.ts	reducer · terminal & races > anthropic error frame mid-stream commits isError bubble via data.error, preserves partial trace
+src/researchReducer.test.ts	reducer · terminal & races > done with exact sentinel flags maxTurns, content preserved, isError false
+src/researchReducer.test.ts	reducer · terminal & races > error precedence: data.error wins when both error and message present
+src/researchReducer.test.ts	reducer · terminal & races > frame race: done AFTER error is a no-op (stray done must not overwrite error)
+src/researchReducer.test.ts	reducer · terminal & races > frame race: error AFTER done is a no-op (done already finalized)
+src/researchReducer.test.ts	reducer · terminal & races > near-miss sentinel is a NORMAL done (strict exact-string, not substring)
+src/researchReducer.test.ts	reducer · terminal & races > route {message} error AFTER partial agent frames preserves the completed trace
+src/researchReducer.test.ts	reducer · terminal & races > route-layer error {message} with no error key falls through to data.message
+src/researchReducer.test.ts	reducer · terminal & races > streamEnd after done is a no-op (the normal happy-path close)
+src/researchReducer.test.ts	reducer · terminal & races > streamEnd after error is a no-op (one terminal bubble per turn)
+src/researchReducer.test.ts	reducer · terminal & races > streamEnd with partial trace synthesizes 連線中斷 and preserves the trace
+src/researchReducer.test.ts	reducer · terminal & races > streamError after done is a no-op (reader-close exception after success)
+src/researchReducer.test.ts	reducer · terminal & races > streamError before any frame commits an error bubble (thrown text, not 連線中斷)
+src/researchReducer.test.ts	reducer · terminal & races > submit with empty ticker yields empty tickers[] (never ['']), no NL-parse from answer
+src/researchReducer.test.ts	reducer · terminal & races > thread title derived from first user message (~60), FROZEN after second submit
+src/researchReducer.test.ts	reducer · thread navigation > deleteThread on the last thread clears active selection and footer
+src/researchReducer.test.ts	reducer · thread navigation > deleteThread removes an inactive thread and its messages without changing active
+src/researchReducer.test.ts	reducer · thread navigation > deleteThread removes the active thread and returns to a blank new-thread workspace
+src/researchReducer.test.ts	reducer · thread navigation > newThread resets active to null + clears pending/terminal/footer, preserving threads & messages
+src/researchReducer.test.ts	reducer · thread navigation > newThread/selectThread clear an in-flight pending (defensive; UI blocks first)
+src/researchReducer.test.ts	reducer · thread navigation > re-submitting the active thread's id appends (multi-turn), does not create a new thread
+src/researchReducer.test.ts	reducer · thread navigation > selectThread switches the active thread, preserving both threads' messages
+src/researchReducer.test.ts	reducer · thread navigation > submit after newThread creates a fresh thread under the new client id (no append to the first)
+src/researchReducer.test.ts	reducer · trace assembly > multi-turn two tool cycles: ordered trace + ordered tool_calls; tools_used stays deduped/verbatim
+src/researchReducer.test.ts	reducer · trace assembly > same tool twice → 2 rows matched to own inputs/summaries; tools_used deduped to 1
+src/researchReducer.test.ts	reducer · trace assembly > tool_calls frozen on done even with a still-open row (no tool_end before done)
+src/researchReducer.test.ts	selectFooter > derives total_tokens+turn_count from the active thread's last assistant message
+src/researchReducer.test.ts	selectFooter > keeps cache counters from the active thread's last assistant message
+src/researchReducer.test.ts	selectFooter > restores the SWITCHED-to thread's footer (the bug: footer was cleared on selectThread)
+src/researchReducer.test.ts	selectFooter > returns null when the active thread has no assistant message yet (user-only)
+src/researchReducer.test.ts	selectFooter > returns null when there is no active thread
+src/researchReducer.test.ts	selectFooter > returns null while a turn is pending
+src/researchRunReplay.test.ts	shouldEndResearchReplay > does not end a terminal replay page while more events remain
+src/researchRunReplay.test.ts	shouldEndResearchReplay > does not end active runs
+src/researchRunReplay.test.ts	shouldEndResearchReplay > ends after the final terminal replay page
+src/researchSelection.test.ts	research selection precedence and validation > accepts semantic default as a complete effort
+src/researchSelection.test.ts	research selection precedence and validation > blocks an invalid Settings route
+src/researchSelection.test.ts	research selection precedence and validation > blocks an invalid explicit tuple without falling through
+src/researchSelection.test.ts	research selection precedence and validation > blocks an invalid thread tuple without falling through
+src/researchSelection.test.ts	research selection precedence and validation > blocks an unsupported saved effort instead of resetting it
+src/researchSelection.test.ts	research selection precedence and validation > distinguishes subscription quota from API-key billing
+src/researchSelection.test.ts	research selection precedence and validation > fails closed for absent effective truth and applies SDK veto only afterward
+src/researchSelection.test.ts	research selection precedence and validation > never writes a preference during automatic resolution
+src/researchSelection.test.ts	research selection precedence and validation > uses the Settings route when there is no prior choice
+src/researchSelection.test.ts	research selection precedence and validation > uses the last explicit tuple for a new thread
+src/researchSelection.test.ts	research selection precedence and validation > uses the latest successful tuple for an existing thread
+src/researchSelection.test.ts	research selection precedence and validation > writes a versioned preference for an explicit user action
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > distinguishes browser readiness native transport and local persistence without raw detail
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > exposes only admitted diagnostic fields and bounded recurrence in Developer Mode
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > fails unknown structured codes closed to generic localized copy
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > keeps unknown segment keys visible
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > localizes active and retryable repair state with a bounded manifest prefix
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > localizes degraded capture counts and typed diagnostic causes in both locales
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > maps every known segment and fails unknown health prose closed in both locales
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > renders legacy diagnostic absence without inventing a cause
+src/saExtensionHealthDisplay.test.ts	displaySAExtensionSegments > renders the fixed native-host chain order with zh labels and symbols
+src/settings/LocaleSelector.test.tsx	LocaleSelector > delegates a supported change only through setLocale
+src/settings/LocaleSelector.test.tsx	LocaleSelector > disables while a write is pending and prevents duplicate writes
+src/settings/LocaleSelector.test.tsx	LocaleSelector > ignores invalid and same-locale DOM values
+src/settings/LocaleSelector.test.tsx	LocaleSelector > offers exactly the two supported locale values in reviewed order
+src/settings/LocaleSelector.test.tsx	LocaleSelector > renders fixed-locale autonyms and current-locale labels in both locales
+src/settings/LocaleSelector.test.tsx	LocaleSelector > rolls back to English and clears the error after a successful retry
+src/settings/LocaleSelector.test.tsx	LocaleSelector > rolls back to zh-Hant and renders failure copy in the restored locale
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > caches_status_and_snapshot_independently_and_refreshes_only_requested_legs
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > keeps failed and busy runs visible without rewriting stored timestamps
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > labels local status reload separately from provider updates
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > loads_status_and_snapshot_independently_and_renders_both_truths
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > preserves_snapshot_details_when_status_leg_fails
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > preserves_status_coverage_when_snapshot_leg_fails
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > refresh_reloads_each_leg_once_without_raw_exception_copy
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > reloads_both_mounted_macro_legs_after_data_sync_invalidation
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > renders English Macro Data status snapshot and table headings
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > renders bilingual manual update copy without ingestion wording
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > renders five macro schedule rows and all three automation states
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > renders_missing_database_and_table_as_unavailable_not_empty_success
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > renders_zero_rows_as_zero_stored_without_claiming_never_run
+src/settings/MacroStorageSection.test.tsx	MacroStorageSection > switches locale without refetching either status leg
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > classifies future macro sources by write target and fails closed to both macro keys
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > enable and interval mutations invalidate the shared schedule key
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > failed skipped and busy macro runs do not invalidate stored data keys
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > manual run sends exactly one POST and follows terminal state
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > mount idle focus visibility and local status reload send zero POSTs
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > partitions schedule rows by write target without changing registry truth
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > shares one schedule read across visible consumers
+src/settings/dataScheduleControls.test.tsx	Data schedule controls > successful macro sources invalidate exact stored data keys
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > advances same-second session pointers only with semantic forward evidence
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > applies proposal fields and corroborates them without freezing unrelated values
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > does not regress pending-turn terminal evidence across mixed snapshots
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > keeps session pointers when an older same-session snapshot arrives
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > merges same-session messages by stable ID and keeps coverage monotonic
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > preserves clean conflict and terminal proposal authority
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > recognizes only new matching assistant completion and genuinely new drafts
+src/settings/investor/calibrationStateMerge.test.ts	calibrationStateMerge > resets on session replacement and accepts explicitly observed new authorities
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > maps all proposable field labels without owning topic field policy
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > maps all seven stance effects in both locales
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > maps all topic labels and descriptions in both locales
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > pins exact known topic and prompt ID sets
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > preserves backend topic and proposed-field order without sorting
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > preserves source list and numeric values while localizing semantic IDs
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > relocalizes a known opening prompt and falls back to canonical unknown copy
+src/settings/investor/investorProfileDisplay.test.ts	investor profile display mappings > uses generic topic copy while keeping an unknown raw ID diagnostic-only
+src/settings/oauthAccountUsage.test.ts	OAuth account usage reducer > credential change clears the observation
+src/settings/oauthAccountUsage.test.ts	OAuth account usage reducer > decoded failure with snapshot adopts the authoritative snapshot
+src/settings/oauthAccountUsage.test.ts	OAuth account usage reducer > decoded failure without snapshot retains the prior observation
+src/settings/oauthAccountUsage.test.ts	OAuth account usage reducer > read errors and sync errors never clear each other
+src/settings/oauthAccountUsage.test.ts	OAuth account usage reducer > success snapshot replaces the previous observation
+src/settings/oauthAccountUsage.test.ts	OAuth account usage reducer > transport failure stays distinct from decoded backend failure
+src/settings/oauthAccountUsage.test.ts	useOAuthAccountUsage ownership > a read completion from before the last mutation is discarded
+src/settings/oauthAccountUsage.test.ts	useOAuthAccountUsage ownership > credential change invalidates the cache entry and focus cannot resurrect it
+src/settings/oauthAccountUsage.test.ts	useOAuthAccountUsage ownership > every cache write stores a validated snapshot only
+src/settings/oauthAccountUsage.test.ts	useOAuthAccountUsage ownership > mount focus and idle events never emit a provider post
+src/settings/oauthAccountUsage.test.ts	useOAuthAccountUsage ownership > stale epoch completions are rejected
+src/settings/oauthAccountUsage.test.ts	useOAuthAccountUsage ownership > the bounded retry arms once per consecutive failure episode
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > hides planted diagnostics in normal mode and returns them for Developer Mode
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > keeps unknown provider source and error identifiers stable
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > localizes known and unknown ApiError outcomes
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps durable body backlog counts in both locales
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps every SA Extension segment key
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps every reviewed IBKR client-id domain
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps exactly five active schedule source ids without backend labels
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps known provider and config field ids without backend labels
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps market coverage states without changing formatter values
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps provider health states and setup code in both locales
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps provider test tri-state without raw detail
+src/settings/settingsBackendCopy.test.ts	Settings backend copy boundary > maps schedule history without matching an English reason substring
+src/settings/settingsCopy.test.ts	Settings static copy authority > contains no dynamic translation key or source value
+src/settings/settingsCopy.test.ts	Settings static copy authority > keeps empty search in deterministic registry order
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps every Investor preset and horizon in both locales
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps every Investor stance and mismatch state in both locales
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps every Settings section title and description in both locales
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps every model task without backend labels
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps every route source in both locales
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps every workflow group in both locales
+src/settings/settingsCopy.test.ts	Settings static copy authority > maps reviewed effort and thinking ids with stable unknown fallback
+src/settings/settingsCopy.test.ts	Settings static copy authority > searches both locale alias sets regardless of active locale
+src/settings/settingsReadCache.test.ts	Settings read cache > discards_old_generation_completion_after_invalidation
+src/settings/settingsReadCache.test.ts	Settings read cache > does_not_resurrect_invalidated_success_after_mutation_failure
+src/settings/settingsReadCache.test.ts	Settings read cache > evicts_hard_expired_success_before_render
+src/settings/settingsReadCache.test.ts	Settings read cache > evicts_least_recently_used_entries_at_the_entry_cap
+src/settings/settingsReadCache.test.ts	Settings read cache > evicts_least_recently_used_entries_at_the_total_byte_cap
+src/settings/settingsReadCache.test.ts	Settings read cache > forces_manual_refresh_past_freshness_while_joining_single_flight
+src/settings/settingsReadCache.test.ts	Settings read cache > idle_warmup_calls_only_allowlisted_local_GETs_once
+src/settings/settingsReadCache.test.ts	Settings read cache > idle_warmup_primes_account_usage_only_from_validated_active_OAuth_local_ids
+src/settings/settingsReadCache.test.ts	Settings read cache > invalidates_all_data_sync_reads_for_an_unknown_source
+src/settings/settingsReadCache.test.ts	Settings read cache > invalidates_only_one_local_credential_account_key
+src/settings/settingsReadCache.test.ts	Settings read cache > maps_price_and_news_sources_to_exact_downstream_keys
+src/settings/settingsReadCache.test.ts	Settings read cache > notifies_only_exact_invalidation_subscribers_and_isolates_listener_failures
+src/settings/settingsReadCache.test.ts	Settings read cache > notifies_subscribed_missing_keys_when_the_cache_is_cleared
+src/settings/settingsReadCache.test.ts	Settings read cache > preserves_stale_success_after_ordinary_revalidation_failure
+src/settings/settingsReadCache.test.ts	Settings read cache > refuses_retention_above_the_per_entry_byte_cap
+src/settings/settingsReadCache.test.ts	Settings read cache > renders_a_stale_retained_value_while_one_revalidation_runs
+src/settings/settingsReadCache.test.ts	Settings read cache > returns_a_fresh_retained_value_without_invoking_its_loader
+src/settings/settingsReadCache.test.ts	Settings read cache > returns_but_does_not_retain_non_serializable_values
+src/settings/settingsReadCache.test.ts	Settings read cache > shares_one_loader_across_visible_and_idle_callers
+src/settings/settingsRegistry.test.ts	settings workspace registry > assigns_every_shipped_anchor_exactly_once
+src/settings/settingsRegistry.test.ts	settings workspace registry > best_effort_cleanup_failure_never_blocks_active_group_write
+src/settings/settingsRegistry.test.ts	settings workspace registry > declares_three_nonempty_groups_in_workflow_order
+src/settings/settingsRegistry.test.ts	settings workspace registry > defaults_active_group_to_ai_models_without_storage
+src/settings/settingsRegistry.test.ts	settings workspace registry > excludes_app_records_permissions_and_empty_advanced_groups
+src/settings/settingsRegistry.test.ts	settings workspace registry > fails_closed_to_ai_models_for_malformed_unknown_or_unavailable_storage
+src/settings/settingsRegistry.test.ts	settings workspace registry > indexes_reviewed_chinese_english_and_provider_terms
+src/settings/settingsRegistry.test.ts	settings workspace registry > keeps bilingual search metadata independent from rendered locale
+src/settings/settingsRegistry.test.ts	settings workspace registry > keeps_fixed_and_research_limits_adjacent_to_model_routing
+src/settings/settingsRegistry.test.ts	settings workspace registry > keeps_provider_login_separate_and_before_model_routing
+src/settings/settingsRegistry.test.ts	settings workspace registry > maps_each_data_sync_subsection_to_one_stable_parent
+src/settings/settingsRegistry.test.ts	settings workspace registry > never_reads_or_interprets_the_retired_collapse_key
+src/settings/settingsRegistry.test.ts	settings workspace registry > resolves registry copy through the active locale
+src/settings/settingsRegistry.test.ts	settings workspace registry > returns_deterministic_static_matches_without_dynamic_values
+src/settings/settingsRegistry.test.ts	settings workspace registry > round_trips_only_known_active_group_ids
+src/settings/settingsRegistry.test.ts	settings workspace registry > stores only semantic ids and no visible source-language copy
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > contains no global cancel action and explains that work continues after navigation
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > labels one control with separate active and attention counts
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > marks terminal attention handled only after navigation or explicit dismissal
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > navigates to the exact owning Research thread and optional run
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > never renders raw run errors answers credential identifiers or token usage
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > opens a transient Drawer and returns focus to the trigger on close
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > renders English background-work chrome while preserving source titles
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > renders no control and no reserved drawer width for an empty registry
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > renders queued work without a fabricated stage bound
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > renders running work against the configured Research session bound
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > renders succeeded failed and interrupted rows with common states
+src/shell/BackgroundWorkIndicator.test.tsx	BackgroundWorkIndicator > updates only fallback copy when locale changes with the drawer open
+src/shell/ShellCss.test.ts	responsive application shell CSS > bounds each page root so the page owns vertical scrolling
+src/shell/ShellCss.test.ts	responsive application shell CSS > bounds the Holdings account filter against long source labels
+src/shell/ShellCss.test.ts	responsive application shell CSS > contains no legacy rightrail rail-tab rail-open or rail-closed selector
+src/shell/ShellCss.test.ts	responsive application shell CSS > defines a two-column wide shell and no third rail track
+src/shell/ShellCss.test.ts	responsive application shell CSS > defines every literal app-shell class used by App and shell components
+src/shell/ShellCss.test.ts	responsive application shell CSS > imports shell css from main and keeps the canonical breakpoint in tokens only
+src/shell/ShellCss.test.ts	responsive application shell CSS > keeps the topbar primary row wrap-safe for long localized labels
+src/shell/ShellCss.test.ts	responsive application shell CSS > lets Research conversation titles wrap without truncating source content
+src/shell/ShellCss.test.ts	responsive application shell CSS > lets credential availability status use full localized copy without widening masked keys
+src/shell/ShellCss.test.ts	responsive application shell CSS > stacks narrow surface chrome before localized copy collapses
+src/shell/ShellCss.test.ts	responsive application shell CSS > switches overlay layout through data-shell-overlay without an at-media rule
+src/shell/ShellNavigation.test.tsx	ShellNavigation > contains no disabled Notes or Alerts controls
+src/shell/ShellNavigation.test.tsx	ShellNavigation > dispatches an exact view target and closes an overlay copy
+src/shell/ShellNavigation.test.tsx	ShellNavigation > marks only the current view with aria-current page
+src/shell/ShellNavigation.test.tsx	ShellNavigation > renders eight shipped destinations in canonical order
+src/shell/ShellNavigation.test.tsx	ShellNavigation > renders four noninteractive workflow group labels
+src/shell/ShellNavigation.test.tsx	ShellNavigation > renders one aria-hidden Lucide icon per destination with no literal svg source
+src/shell/ShellNavigation.test.tsx	ShellNavigation > renders the reviewed English navigation without changing structure
+src/shell/ShellTopBar.test.tsx	Developer Mode preference > defaults Developer Mode off when storage is empty or unavailable
+src/shell/ShellTopBar.test.tsx	Developer Mode preference > round trips the versioned Developer Mode preference
+src/shell/ShellTopBar.test.tsx	Developer Mode preference > treats every value except the literal enabled sentinel as off
+src/shell/ShellTopBar.test.tsx	ShellTopBar > does not show apiBase tool count poll time or model diagnostics in normal mode
+src/shell/ShellTopBar.test.tsx	ShellTopBar > keeps developer diagnostics sanitized and labelled as diagnostics
+src/shell/ShellTopBar.test.tsx	ShellTopBar > keeps identity and context in stable named slots when status copy changes
+src/shell/ShellTopBar.test.tsx	ShellTopBar > makes failed sidecar health an actionable System target
+src/shell/ShellTopBar.test.tsx	ShellTopBar > omits the background-work control when both counts are zero
+src/shell/ShellTopBar.test.tsx	ShellTopBar > renders English health and developer diagnostic labels without exposing raw errors
+src/shell/ShellTopBar.test.tsx	ShellTopBar > shows ArkScope current context and healthy sidecar copy in normal mode
+src/shell/ShellTopBar.test.tsx	ShellTopBar > shows a single work control when active or attention count is nonzero
+src/shell/ShellTopBar.test.tsx	ShellTopBar > shows the secondary diagnostics row only in Developer Mode
+src/shell/navigation.test.ts	shell navigation authority > contains every shipped view exactly once
+src/shell/navigation.test.ts	shell navigation authority > does not publish Notes or Alerts as planned controls
+src/shell/navigation.test.ts	shell navigation authority > increments the request sequence even when the exact target repeats
+src/shell/navigation.test.ts	shell navigation authority > publishes the approved four workflow groups in canonical order
+src/shell/navigation.test.ts	shell navigation authority > resolves Research and Settings targets to their owning shipped views
+src/shell/navigation.test.ts	shell navigation authority > resolves a ticker target to ticker detail without inventing a nav item
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > caps persisted identities at the newest 50 records
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > deduplicates the same run observed by Research and shell polling
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > dismisses terminal work without hiding an active run
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > does not discover terminal runs that this desktop session never observed
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > hydrates active runs from thread summaries immediately
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > keeps a missing thread title semantic instead of capturing localized fallback copy
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > maps cancelled and interrupted runs to interrupted attention
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > maps queued and running runs to active work
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > maps succeeded and failed runs to attention work
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > polls observed active runs every five seconds discovers threads every thirty seconds without overlap and disposes both timers
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > preserves prior work when either polling leg fails
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > projects no question answer error token usage credential id or raw provider payload
+src/shell/researchWork.test.tsx	useResearchWorkRegistry > reconciles a session-observed run through getResearchRun after it leaves active summaries
+src/shell/shellLabels.test.ts	shell label authority > maps every shell workflow group in both locales
+src/shell/shellLabels.test.ts	shell label authority > maps every shipped shell view in both locales
+src/sse.test.ts	SSEFrameParser > buffers a frame split inside the \n\n delimiter across chunks
+src/sse.test.ts	SSEFrameParser > buffers a frame split mid-JSON across two chunks
+src/sse.test.ts	SSEFrameParser > flush() emits a trailing frame whose \n\n terminator never arrived
+src/sse.test.ts	SSEFrameParser > flush() returns [] when the buffer holds only whitespace
+src/sse.test.ts	SSEFrameParser > ignores blank and comment/keep-alive segments (no frames)
+src/sse.test.ts	SSEFrameParser > parses one complete frame from a single push
+src/sse.test.ts	SSEFrameParser > parses two frames delivered in one push
+src/sse.test.ts	SSEFrameParser > preserves unicode in data (ensure_ascii=False round-trip)
+src/sse.test.ts	SSEFrameParser > skips a malformed-JSON frame without throwing and keeps parsing
+src/sse.test.ts	SSEFrameParser > tolerates a 'data:' line with no space after the colon
+src/streamQuery.test.ts	streamQuery > POSTs JSON to /query/stream and forwards the abort signal
+src/streamQuery.test.ts	streamQuery > throws on a non-ok response so the consumer can surface an error
+src/streamQuery.test.ts	streamQuery > yields parsed frames in order across awkward chunk boundaries
+src/streamQuery.test.ts	streamQuery assistant_stance transport (Track A) > includes assistant_stance when supplied and omits it when not
+src/tags.test.tsx	Explore tags > keeps unknown interactive facet IDs distinct and visible
+src/tags.test.tsx	Explore tags > maps every known tag facet in both locales
+src/tags.test.tsx	Explore tags > preserves tag keys editability and CSS classes
+src/tags.test.tsx	Explore tags > preserves tag values and source IDs byte for byte
+src/tags.test.tsx	Explore tags > switches tag chrome in place without replacing the value node
+src/timeDisplay.test.ts	formatSystemTimestamp > formats market activity in ET before local time
+src/timeDisplay.test.ts	formatSystemTimestamp > normalizes compact UTC offsets from local market DB mirrors
+src/timeDisplay.test.ts	formatSystemTimestamp > preserves empty and malformed values defensively
+src/timeDisplay.test.ts	formatSystemTimestamp > shows local time plus US market time for UTC ISO timestamps
+src/ui/BoundedProgress.test.tsx	BoundedProgress > does_not_claim_terminal_work_can_still_be_cancelled
+src/ui/BoundedProgress.test.tsx	BoundedProgress > does_not_enter_grace_before_the_stage_bound
+src/ui/BoundedProgress.test.tsx	BoundedProgress > enters_server_confirmation_grace_at_the_stage_bound
+src/ui/BoundedProgress.test.tsx	BoundedProgress > labels_the_bound_as_belonging_to_the_current_stage
+src/ui/BoundedProgress.test.tsx	BoundedProgress > maps_cancelled_work_to_interrupted
+src/ui/BoundedProgress.test.tsx	BoundedProgress > renders English generic progress copy while preserving owner-provided values
+src/ui/BoundedProgress.test.tsx	BoundedProgress > renders_a_typed_terminal_failure_without_a_progress_bar
+src/ui/BoundedProgress.test.tsx	BoundedProgress > shows_navigation_cancel_and_result_ownership_truthfully
+src/ui/BoundedProgress.test.tsx	BoundedProgress > shows_overall_and_stage_elapsed_without_a_fake_percentage
+src/ui/BoundedProgress.test.tsx	BoundedProgress > states_when_running_work_cannot_be_cancelled_here
+src/ui/DataTable.test.tsx	DataTable > escape_closes_the_row_menu_and_restores_its_trigger
+src/ui/DataTable.test.tsx	DataTable > keeps_only_one_row_action_menu_open_and_focuses_the_new_menu
+src/ui/DataTable.test.tsx	DataTable > localizes the action heading without changing columns or cells
+src/ui/DataTable.test.tsx	DataTable > localizes the row action accessible name with source values intact
+src/ui/DataTable.test.tsx	DataTable > opens_a_labelled_row_action_menu_flips_from_viewport_edge_and_runs_one_action
+src/ui/DataTable.test.tsx	DataTable > reacts to locale changes without remounting rows
+src/ui/DataTable.test.tsx	DataTable > renders_an_inline_expansion_directly_after_its_owner_row
+src/ui/DataTable.test.tsx	DataTable > renders_one_full_width_empty_row
+src/ui/DataTable.test.tsx	DataTable > renders_typed_columns_and_rows
+src/ui/Tabs.test.tsx	Tabs > arrow_left_activates_previous_and_wraps
+src/ui/Tabs.test.tsx	Tabs > arrow_right_activates_next_and_wraps
+src/ui/Tabs.test.tsx	Tabs > click_activates_and_roves_tabindex
+src/ui/Tabs.test.tsx	Tabs > home_and_end_activate_boundaries
+src/ui/Tabs.test.tsx	Tabs > renders_accessible_linkage_and_only_the_selected_panel
+src/ui/Tabs.test.tsx	Tabs > vetoed_change_preserves_selected_tab_and_focus
+src/ui/classCoverage.test.ts	migrated component class coverage > defines every literal class used by Holdings
+src/ui/classCoverage.test.ts	migrated component class coverage > defines every literal class used by InvestorProfilePanel
+src/ui/classCoverage.test.ts	migrated component class coverage > keeps investor proposal guardrails wrap-capable on narrow screens
+src/ui/overlays.test.tsx	overlay focus contracts > closed_drawer_renders_nothing_and_reserves_no_width
+src/ui/overlays.test.tsx	overlay focus contracts > confirm_dialog_cancel_does_not_confirm_and_restores_focus
+src/ui/overlays.test.tsx	overlay focus contracts > confirm_dialog_confirms_once_then_uses_fallback_if_the_trigger_disappears
+src/ui/overlays.test.tsx	overlay focus contracts > confirm_dialog_escape_cancels_only_when_not_busy
+src/ui/overlays.test.tsx	overlay focus contracts > confirm_dialog_focuses_cancel_for_a_destructive_action
+src/ui/overlays.test.tsx	overlay focus contracts > drawer_escape_closes_and_restores_the_trigger
+src/ui/overlays.test.tsx	overlay focus contracts > drawer_marks_959px_as_shell_overlay
+src/ui/overlays.test.tsx	overlay focus contracts > drawer_marks_961px_as_wide
+src/ui/overlays.test.tsx	overlay focus contracts > drawer_tabs_between_its_own_focusable_controls
+src/ui/overlays.test.tsx	overlay focus contracts > localizes Drawer controls without remounting the open panel
+src/ui/overlays.test.tsx	overlay focus contracts > localizes the built-in ConfirmDialog cancel label
+src/ui/overlays.test.tsx	overlay focus contracts > open_drawer_close_button_closes_and_restores_its_trigger
+src/ui/overlays.test.tsx	overlay focus contracts > pinned_drawer_uses_modal_contract_at_the_shell_overlay_token
+src/ui/overlays.test.tsx	overlay focus contracts > pinning_keeps_focus_in_the_drawer_then_inline_close_restores_the_trigger
+src/ui/overlays.test.tsx	overlay focus contracts > preserves caller-owned labels focus and keyboard behavior across locale changes
+src/ui/overlays.test.tsx	overlay focus contracts > wide_pinned_drawer_is_inline_without_modal_focus_ownership
+src/ui/primitives.test.tsx	UI primitives > keeps command-button type and disabled state explicit
+src/ui/primitives.test.tsx	UI primitives > renders blocked with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders empty with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders failed with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders interrupted with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders loading with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders one page title with compact context and commands
+src/ui/primitives.test.tsx	UI primitives > renders partial with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders ready with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders running with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > renders stale with a visible domain label
+src/ui/primitives.test.tsx	UI primitives > requires an accessible label and tooltip for an icon button
+src/ui/primitives.test.tsx	UI primitives > uses alert semantics for failed and blocked messages
+src/ui/primitives.test.tsx	UI primitives > uses status semantics for nonterminal information
+src/ui/tokens.test.ts	canonical UI tokens > builds the only shell media query from the reviewed token
+src/ui/tokens.test.ts	canonical UI tokens > classifies 959px on the correct side of the shell boundary
+src/ui/tokens.test.ts	canonical UI tokens > classifies 961px on the correct side of the shell boundary
+src/ui/tokens.test.ts	canonical UI tokens > installs CSS values from the same object before React mounts
+src/ui/tokens.test.ts	canonical UI tokens > pins the sole shell breakpoint and general radius cap
