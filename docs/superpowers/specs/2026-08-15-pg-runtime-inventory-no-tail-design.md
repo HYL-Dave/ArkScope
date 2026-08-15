@@ -1,8 +1,8 @@
 # PostgreSQL Runtime Inventory and No-Tail Program Design
 
 > **Status:** WHOLE-DOCUMENT REVIEW GREEN AT `729d8514`; USER-APPROVED
-> ZERO-TRACKED-POSTGRESQL-RESIDUE AMENDMENT; INVENTORY PLAN RE-PIN NEXT;
-> PRODUCT IMPLEMENTATION NOT AUTHORIZED
+> ZERO-TRACKED-POSTGRESQL-RESIDUE AMENDMENT; INVENTORY PLAN RE-PINNED;
+> FOCUSED REVIEW NEXT; PRODUCT IMPLEMENTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-15
 >
@@ -202,7 +202,7 @@ Each discovered surface receives one row with these fields:
 
 A row cannot use vague values such as `maybe`, `probably dead`, `cleanup`, or
 `future`. An unresolved reachability question is a stop-and-amend event, not a
-seventh disposition.
+sixth disposition.
 
 ### 2.3 Closed disposition vocabulary
 
@@ -583,8 +583,12 @@ remain available through Git history and the external review packet.
 ### 4.6 Legacy-agent CLI handoff
 
 Immediately after the no-tail closeout, a docs-only legacy-agent CLI census
-starts from the exact merged master. It receives the inventory's four-way
-entrypoint map and records:
+starts from the exact merged master. It independently scans every surviving
+command entrypoint. The no-tail external review packet supplies only a neutral
+survivor seed of exact `path:symbol` identities; it carries no PostgreSQL
+history or retired entrypoint. The inventory's four-way map is temporary
+no-tail input and retires with the rest of this program. The CLI census
+records:
 
 - each command and subcommand;
 - every current product, operator, test, documentation, skill, or Discord
