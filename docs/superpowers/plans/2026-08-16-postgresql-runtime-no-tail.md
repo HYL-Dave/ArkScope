@@ -3,7 +3,8 @@
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASKS 0-3 COMPLETE THROUGH
 > PRODUCT TIP `ac2d3395`; SECTIONS 0.7D-0.7E CLASS A COMPLETE;
 > SECTIONS 0.7F-0.7G FOCUSED REVIEW GREEN; TASK 4 COMPLETE AT PRODUCT TIP
-> `c6bafd07`; TASK 5 FINAL ADMISSION ACTIVE; TASK 6 REMAINS THE COMBINED
+> `c6bafd07`; TASK 5 STOPPED AT SECTION 0.7H CLASS B LOOPBACK-OWNER
+> ADMISSION AMENDMENT REVIEW; TASK 6 REMAINS THE COMBINED
 > IMPLEMENTATION-REVIEW GATE; TASK 7, MERGE, PUSH, LIVE TRAFFIC, AND PRIVATE
 > OR REMOTE MUTATION NOT AUTHORIZED
 >
@@ -958,6 +959,56 @@ surfaces have only `test_collection` candidates, are byte-identical to base,
 and reproduce all three new hashes. A tenth reclassification, any test-body
 edit in these files, identity drift, or zero-residue row is a new stop.
 
+### 0.7h Task 5 loopback-owner admission Class B amendment
+
+The first Task 5 canonical runtime installed the packet socket guard across
+all 4,278 nodes. It completed the whole suite at `4,265 passed / 12 skipped /
+1 failed`; the sole nonpassing node was
+`tests/test_chatgpt_oauth_callback_server.py::test_captures_code_and_state`,
+and the guard recorded ten calls across `socket.connect` and
+`socket.create_connection`. This run is rejected admission evidence.
+
+The failure is not a product network regression. The existing callback test
+module says it is the one contract that binds a real ephemeral loopback port,
+uses only `127.0.0.1`, and never reaches an external network. An isolated
+control without the blanket guard passed all six unchanged nodes. Their exact
+stream is `6 /
+b6c3c71819ca38a61ea6f969316b847836fa6f4a9e15cdb0ac73d47bc313a58b`;
+the exact complement is `4,272 /
+805ed70c3a9861bd84cb6969ee93901d08f95223c340f02009de406eb42a536d`.
+The test and product owner bytes remain respectively
+`9004abe4cd6c36edb092977eca7b2b0de73900ee00fc3877a6424448a23175ed`
+and
+`7c5738d5306d62f6f311fb000f74bb63a13b0495a6d31e0f57ff49988cdcd459`.
+
+Resume uses an owner split, not a broad localhost allowlist:
+
+1. run the exact six-node callback stream without the process-wide guard and
+   require `6 passed / 0 failed`; any seventh node or owner-byte drift stops;
+2. run the exact 4,272-node complement under the zero-exception socket guard
+   and require `4,260 passed / 12 skipped / 0 failed`, zero recorded socket
+   attempts, and exact reporter collection/seen sets;
+3. mechanically prove the two streams are disjoint and their union is the
+   exact 4,278-node final collection;
+4. run the full canonical suite twice from independent exact-tip runtime
+   roots without the blanket guard, still with no provider credentials,
+   `.env`, production path, or remote configuration, and require deterministic
+   reporter JSON at `4,266 passed / 12 skipped / 0 failed`; and
+5. keep the socket guard unchanged on sanitized app lifespan, scheduler,
+   route, focused runtime, and complement gates.
+
+No product, test, dependency, collection identity, skip identity, or staged
+hash changes. This is nevertheless Class B because the reviewed admission
+protocol had more than one reasonable correction shape and its blanket
+network-exception wording must change. A destination-based loopback bypass,
+general localhost allowance, test-body edit, owner-ID edit, or guard weakening
+outside the exact complement is a new stop.
+
+The amendment packet is
+`/tmp/arkscope-pg-no-tail-task5-d4677c3d/amendment-0.7h`; its 12 payload rows
+pass `sha256sum -c`, and its manifest is
+`ddb8a88cba2a886a7d7cfa7546709d792fb270e98ba2a6e064ba0d01a0bf4793`.
+
 ### 0.8 Dynamic-route target
 
 Final route identity is the canonical 175-row inventory route stream with
@@ -1846,27 +1897,31 @@ insufficient evidence.
 
 **Step 3: run final backend admission without `.env`**
 
-In a fresh exact Task 4 worktree with empty real `data/`, scratch local DBs,
-sealed providers, socket guard, and no `config/.env` link, run:
+In fresh exact Task 4 worktrees with empty real `data/`, scratch local DBs,
+sealed providers, Section 0.7h's exact socket-guard owner split, and no
+`config/.env` link, run:
 
 1. collect-only `4,278 / ecafdab7...`;
-2. native canonical `4,278 seen / 4,266 passed / 12 skipped / 0 failed` with
-   the pinned reporter;
+2. native canonical `4,278 seen / 4,266 passed / 12 skipped / 0 failed` twice
+   with the pinned reporter and without the blanket socket guard;
 3. final Task 1 focused `472 / 483b6566...`, with `471 passed / 1 skipped`;
 4. Task 2 focused `147/147`;
 5. inventory-focused `1,781 / 6220cb4e...`, with `1,781/1,781` runtime;
 6. real local-runtime lifespan/scheduler gate under the sanitized dependency
-   environment;
+   environment and unchanged socket guard;
 7. routes `173 / e0d8bf3c...`;
-8. scheduler continuity owner and its discriminacy mutation; and
+8. scheduler continuity owner and its discriminacy mutation;
 9. AST/import/dependency/final-path/backlink/complete-bundle gates plus the
-   26-path protected aggregate.
+   26-path protected aggregate; and
+10. the exact six-node callback control plus zero-socket 4,272-node guarded
+    complement from Section 0.7h.
 
 The reporter JSON must be deterministic across two independent exact-tip runs
 apart from timing fields excluded by the pinned reporter. Any skipped node not
 in the exact final 12-row skip stream is a stop. Any need for a private link,
-driver import, scheduler disable flag, network exception, or production DB is
-a failed admission, not an environment workaround.
+driver import, scheduler disable flag, external network exception, broader
+loopback allowance, or production DB is a failed admission, not an
+environment workaround.
 
 **Step 4: run final frontend and safety admission**
 
@@ -1986,8 +2041,9 @@ true:
     present state row is overwritten by supplement data;
 14. the continuity test uses a mocked probe/store rather than real scratch
     local stores;
-15. any scheduler probe, external socket attempt, provider call, or remote DB
-    attempt occurs;
+15. any scheduler probe, external socket attempt, provider call, remote DB
+    attempt, or loopback call outside Section 0.7h's exact six-node owner
+    occurs;
 16. dynamic route census removes/adds any route other than the exact two rows;
 17. the real lifespan/scheduler gate disables scheduler, uses a hand-built
     route list/app, or does not complete one provider-free tick;
