@@ -1,9 +1,10 @@
 # PostgreSQL Runtime No-Tail Implementation Plan
 
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASKS 0-2 COMPLETE THROUGH
-> PRODUCT TIP `3e3cb90b`; TASK 3 STOPPED AT THE LIVE-FRED ALIAS SEAM UNDER
-> SECTION 0.7D; FOCUSED AMENDMENT REVIEW IS NEXT; TASKS 4-7, MERGE, PUSH, LIVE
-> TRAFFIC, AND PRIVATE OR REMOTE MUTATION NOT AUTHORIZED
+> PRODUCT TIP `3e3cb90b`; SECTION 0.7D REVIEW GREEN; USER-APPROVED A/B
+> AMENDMENT CLASSIFICATION ACTIVE; BATCH B TASKS 3-5 RESUMED; TASK 6 REMAINS
+> THE COMBINED IMPLEMENTATION-REVIEW GATE; TASK 7, MERGE, PUSH, LIVE TRAFFIC,
+> AND PRIVATE OR REMOTE MUTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -749,6 +750,33 @@ batch ruling may replace selected waits, but it cannot relax any stop
 condition, commit pair, RED artifact, staged identity, or final review gate.
 No task is authorized by the existence of this draft; independent plan review
 must first return GREEN.
+
+The user has superseded the blanket per-amendment wait with this mechanically
+checkable A/B classification. An amendment is **Class A** only when all four
+conditions hold:
+
+1. every corrected path and coordinate already exists in the reviewed
+   inventory;
+2. collection, focused, survivor, route, protected, and other pinned
+   identities remain byte-identical;
+3. the diff adds no method, branch, parameter, product capability, or new
+   authority and only replaces a dead reference with its reviewed current
+   owner or makes a fixture follow an already-pinned protocol; and
+4. no other hard stop in Section 2 is triggered.
+
+A Class A amendment is still numbered, committed, included in its evidence
+packet, and replayed during Task 6 review, but implementation resumes without
+an intervening focused-review wait. A mistaken Class A classification causes
+that segment to be reverted and reviewed at Task 6.
+
+An amendment is **Class B** and stops for focused review when any identity,
+pair, ledger, or staged hash changes; more than one reasonable correction
+shape exists; a surface absent from inventory is needed; or any unexpected
+provider, network, production, private, or remote contact occurs. External
+contact is always Class B even when its code fix is mechanical. Section 0.7d
+is the accepted reference Class A case. Section 0.7c is Class B; Section 0.7b
+would be Class A on its fixture shape alone but remained Class B because its
+rejected run contacted the provider.
 
 Task 0 has one docs/evidence commit. Tasks 1-4 each have exactly one product
 commit followed by one evidence/status commit. Task 5 has one evidence commit
