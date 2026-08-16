@@ -1,9 +1,9 @@
 # PostgreSQL Runtime No-Tail Implementation Plan
 
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASKS 0-2 COMPLETE THROUGH
-> PRODUCT TIP `3e3cb90b`; BATCH B TASKS 3-5 AUTHORIZED; TASK 6 REMAINS THE
-> COMBINED IMPLEMENTATION-REVIEW GATE; TASK 7, MERGE, PUSH, LIVE TRAFFIC, AND
-> PRIVATE OR REMOTE MUTATION NOT AUTHORIZED
+> PRODUCT TIP `3e3cb90b`; TASK 3 STOPPED AT THE LIVE-FRED ALIAS SEAM UNDER
+> SECTION 0.7D; FOCUSED AMENDMENT REVIEW IS NEXT; TASKS 4-7, MERGE, PUSH, LIVE
+> TRAFFIC, AND PRIVATE OR REMOTE MUTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -608,6 +608,60 @@ The Task 1 owner set is therefore `472` nodes across `26` final paths at
 `cb454b785b7fdfc645a4c5f3765cb8a70dc280ad5f63a76c4dcf0fbd8d246578`.
 Editing a seventh existing node ID, a second body in the freshness test, or a
 second out-of-projection helper is a new stop-and-amend event.
+
+### 0.7d Task 3 live-FRED alias-seam stop amendment
+
+Task 3 removed the seven exact foundation paths, then reproduced backend
+collection `4,278 / 80037a1b...`, backend runtime `1,609 passed / 2 skipped`,
+frontend runtime `170 passed`, the protected aggregate, the declared
+dependency closure, and the packet-local foundation gate. An independent AST
+projection then found one executable alias that the Task 3 retained-owner
+list had assigned too late:
+
+```text
+tests/live/smoke_fred.py:123  real_store_factory = ing.MacroCalendarStore
+```
+
+The same reviewed inventory surface already classifies this path
+`retain_operator_remove_pg_branch`, places it in `no_tail_modify.paths`, and
+enumerates the three stale attribute uses at lines 123, 124, and 144. The
+current ingestion module constructs `MacroCalendarLocalStore()` directly and
+does not expose `MacroCalendarStore`; therefore the tracked live smoke is not
+merely historical prose. Its dry-run injection seam is currently broken.
+
+Task 3's retained mixed-owner list is extended by exactly
+`tests/live/smoke_fred.py`. Its only admitted Task 3 product hunk is this
+three-line current-owner rewrite:
+
+```python
+real_store_factory = ing.MacroCalendarLocalStore
+ing.MacroCalendarLocalStore = lambda: store
+# ... existing dry-run body remains byte-identical ...
+ing.MacroCalendarLocalStore = real_store_factory
+```
+
+The lambda takes no argument because the current ingestion call site invokes
+`MacroCalendarLocalStore()` with no DAL parameter. No provider request,
+prose cleanup, output change, second product hunk, compatibility alias, or
+alternate factory is authorized here. Task 4 still owns the remaining
+tracked-vocabulary rewrite in this file.
+
+The Task 3 AST projection is closed over direct driver/foundation imports,
+retired-symbol imports, class definitions, inheritance, construction calls,
+`isinstance`/`issubclass` gates, executable aliases, and type annotations. An
+arbitrary attribute reference is not itself a Task 3 failure because Task 4
+still owns reviewed current-authority rewrites, but assignment of a retired
+attribute to an alias is. The pre-amendment overbroad projection and the
+alias-specific RED are both retained; after the exact rewrite the alias gate
+must be GREEN.
+
+This body-only operator-script correction changes no pytest/Vitest node ID,
+staged collection, route identity, runtime-survivor stream, protected byte,
+or final native arithmetic. Resume order is: apply the exact three-line
+rewrite, rerun the AST gate and current FRED ingestion owner tests under the
+socket guard, rerun Task 3's already-pinned gates, then complete the Task 3
+commit pair. Any fourth line in the product hunk or any identity drift is a
+new stop.
 
 ### 0.8 Dynamic-route target
 
