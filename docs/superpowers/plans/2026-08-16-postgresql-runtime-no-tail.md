@@ -1,7 +1,8 @@
 # PostgreSQL Runtime No-Tail Implementation Plan
 
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASK 0 GROUNDED COMPLETE;
-> USER-AUTHORIZED BATCH A TASK 1 ACTIVE; TASKS 2-7, MERGE, PUSH, LIVE
+> TASK 1 STOPPED AT A SHARED-FIXTURE SCOPE GAP; BOUNDED AMENDMENT AWAITS
+> FOCUSED REVIEW; TASKS 2-7, MERGE, PUSH, LIVE
 > TRAFFIC, AND PRIVATE OR REMOTE MUTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
@@ -475,6 +476,59 @@ explicit replacements, retirements, and seven additions is a stop-and-amend
 event. Task 0 stores all five literal streams in its packet so review never
 depends on an executor's prose summary.
 
+### 0.7b Task 1 shared-fixture stop amendment
+
+Task 1's first exact owner run collected the pinned `4,382 / c7b9a77a...`
+stream, then finished `438 passed / 1 skipped / 5 failed`. Four failures are
+inside existing Section 0.7a body/module authority: three assertions still
+call removed routing-toggle helpers, and the reviewed SEC-cache fixture must
+return its local cached value from the direct capability rather than raising
+into a provider fallback. The fifth failure exposed an unlisted shared test
+fixture:
+
+```text
+tests/test_tools.py::_HermeticMarketBackend
+```
+
+`DataAccessLayer.search_news()` now correctly calls the measured
+`query_news_search` capability directly. The hermetic backend predates that
+direct contract and implements only `query_news`; changing product code to
+inspect method presence or retain a compatibility fallback would violate
+Sections 0.1.6 and 0.3. Stop condition 19 therefore halted Task 1 before any
+product commit.
+
+This amendment authorizes exactly one addition inside the named helper class:
+`query_news_search(self, query="", ticker=None, days=30, limit=20)`. It must
+derive a fresh frame from the helper's existing `query_news` rows, match the
+case-folded query against title and description, preserve the optional ticker
+filter, clamp the returned frame to `limit`, reset its index, and perform no
+I/O. It may not add another backend method, edit an existing test body, change
+the `hermetic_dal` fixture, or weaken the existing two news-tool assertions.
+Because this is an absent helper method rather than a test node, all Section
+0.11 collection identities and the five Task 0 AST/source streams remain
+unchanged; this paragraph is the sole bounded supplement to their edit
+ceiling.
+
+The pre-amendment native run also proved that the stale SEC fixture could
+reach the real SEC fallback: it returned current AAPL data instead of the
+fixture's `roe=0.33`. That unexpected read-only provider request is rejected
+evidence and does not authorize another request. Before any resumed runtime
+suite, the already-authorized module fixture must return the cached value
+directly. The five new nodes and 444-node owner suite then run under the
+packet socket guard. The `1,885` inventory-focused projection runs every
+backend node except
+`tests/test_data_scheduler.py::test_pg_reachable_probe_is_bounded` under the
+same guard; that one existing bounded loopback-refusal node runs separately
+and is recombined only by exact node-ID accounting. Any other socket attempt
+is a new stop.
+
+The sandboxed FastAPI/AnyIO execution of
+`test_positive_annual_sec_cache_is_the_shared_projection_authority` stalled
+after dependency resolution on both unchanged merged-master and Task 1 bytes,
+while the Task 1 node passed outside the sandbox. The stalled transcript is
+rejected environment evidence. Native execution is admitted for that owner
+only with the socket guard active; it is not a product deadlock waiver.
+
 ### 0.8 Dynamic-route target
 
 Final route identity is the canonical 175-row inventory route stream with
@@ -837,6 +891,11 @@ Run in order:
 5. socket-guarded import controls for app, agents, CLI, scheduler, native host,
    and all four local stores; and
 6. protected 22-path hashes.
+
+Apply Section 0.7b's socket split to steps 1-3. The 444-node owner result must
+be exactly `443 passed / 1 skipped`, and the inventory-focused backend and
+frontend partitions must recombine to the literal `1,885` node set without a
+retry, omission, or unguarded provider-capable run.
 
 No native full-suite claim is made at this intermediate stage. Store complete
 transcripts and exact owner pre/post hashes.
