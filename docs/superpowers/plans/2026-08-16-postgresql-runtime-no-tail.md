@@ -664,6 +664,45 @@ socket guard, rerun Task 3's already-pinned gates, then complete the Task 3
 commit pair. Any fourth line in the product hunk or any identity drift is a
 new stop.
 
+### 0.7e Task 4 presenter fallback Class A amendment
+
+Task 4 reached exact backend collection `4,278 / 80037a1b...`, frontend
+collection `1,177 / 101 / c570a551...`, frontend owners `54/54`, and zero
+product residue. The first sequential frontend full run then produced exactly
+one failure: the visible-literal scanner traced the presenter return value
+`normalized` to `marketDataDisplay.ts`. Direct scanner replay found two
+inventory-owned presenter-boundary defects in the Task 4 rewrite: the raw
+fallback in `newsWriteRouteLabel` and a machine-value comparison placed inside
+the return expression in `newsReadSurfaceLabel`:
+
+```typescript
+default:
+  return status.write_route;
+
+return status.write_route === "normalized" ? translatedA : translatedB;
+```
+
+`apps/arkscope-web/src/marketDataDisplay.ts` is an exact member of
+`no_tail_modify.paths`; the inventory surface enumerates the write-route
+fallback in the same current-authority rewrite. Returning a raw backend value
+as UI text violates the existing localized presenter boundary. The only
+admitted correction keeps the existing default branch, passes its closed-union
+value to `unreachableCoverageValue`, and returns the existing localized
+`newsStorage.routing.write.blocked` label. It also moves the existing
+`write_route === "normalized"` predicate from the return expression into an
+equivalent preceding `if`; both translated returns remain unchanged. These two
+hunks add no translation key, method, semantic branch, parameter, request, or
+capability.
+
+This is Class A under Section 1.1: the path and coordinate are reviewed,
+collection/focused/survivor/route/protected identities do not change, the diff
+only closes an already-owned raw fallback, and no other stop or external
+contact occurred. The complete `1F/1176P` transcript remains rejected RED
+evidence. Apply the exact fallback correction, rerun the two-file owner suite,
+the visible-literal scanner, and the sequential full frontend suite, then
+continue Task 4. A translation addition, third product hunk, changed return
+value, test-ID change, or identity drift is a new stop.
+
 ### 0.8 Dynamic-route target
 
 Final route identity is the canonical 175-row inventory route stream with
