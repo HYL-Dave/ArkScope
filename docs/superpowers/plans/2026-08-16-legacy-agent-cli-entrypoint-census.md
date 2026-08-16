@@ -1,7 +1,7 @@
 # Legacy-Agent CLI and Entrypoint Census Implementation Plan
 
-> **Status:** PLAN REVIEWED GREEN; TASKS 0-2 REVIEWED GREEN; TASK 3 COMPLETE;
-> COMBINED IMPLEMENTATION REVIEW NEXT; TASK 4 NOT AUTHORIZED
+> **Status:** TASKS 0-4 COMPLETE; LOCALLY MERGED AT `e7851975`; EXACT-MASTER
+> VERIFIED; FOCUSED CLOSEOUT REVIEW NEXT; NOT PUSHED; NO RETIREMENT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -1022,7 +1022,8 @@ Stop for Task 2 review unless a recorded batch ruling applies.
 ### Task 3: Independent reconstruction and census admission
 
 **Files:**
-- Modify census evidence, plan/design status, and priority map only
+- Modify census evidence, implementation-plan status, design-spec status,
+  human-census status, and priority map only
 
 **Produces:** independent admission packet and combined implementation-review
 surface. Canonical authority bytes cannot change during this task.
@@ -1075,28 +1076,29 @@ explicit user merge authorization.
 ### Task 4: Fast-forward merge and exact-master closeout
 
 **Files:**
-- Modify census evidence, plan/design status, and priority map only
+- Modify census evidence, implementation-plan status, design-spec status,
+  human-census status, and priority map only
 
 **Produces:** exact-master docs authority and the user decision gate. It does
 not start a retirement plan automatically.
 
-- [ ] **Step 1: Prove linear ancestry and clean boundaries**
+- [x] **Step 1: Prove linear ancestry and clean boundaries**
 
 Verify source base is ancestor of reviewed tip, zero merge commits, clean main
 and implementation trees, and every changed path is one authorized docs path.
 Master drift is a stop and requires re-grounding.
 
-- [ ] **Step 2: Fast-forward local master without push**
+- [x] **Step 2: Fast-forward local master without push**
 
 Use `git merge --ff-only <reviewed-tip>`. No rebase, force, or push.
 
-- [ ] **Step 3: Rebuild from fresh exact master**
+- [x] **Step 3: Rebuild from fresh exact master**
 
 Repeat Task 3 with new tools/packet name from exact master. Require every
 candidate, canonical authority, projection, protected aggregate, and safety
 witness byte-identical to the reviewed tip.
 
-- [ ] **Step 4: Commit docs-only closeout and stop**
+- [x] **Step 4: Commit docs-only closeout and stop**
 
 Record merged commit, exact-master packet manifest, review ruling, no push, and
 the decision state. Commit only status/evidence docs:
