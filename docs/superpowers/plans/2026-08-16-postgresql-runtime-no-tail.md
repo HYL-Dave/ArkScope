@@ -2,7 +2,8 @@
 
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASKS 0-3 COMPLETE THROUGH
 > PRODUCT TIP `ac2d3395`; SECTIONS 0.7D-0.7E CLASS A COMPLETE;
-> SECTION 0.7F CLASS B AMENDMENT AWAITS FOCUSED REVIEW; TASK 4 IS STOPPED WITH
+> SECTION 0.7F FOCUSED REVIEW GREEN; SECTION 0.7G CLASS B AMENDMENT AWAITS
+> FOCUSED REVIEW; TASK 4 IS STOPPED WITH
 > PRODUCT/TEST/DOC REWRITES UNCOMMITTED; TASK 6 REMAINS THE COMBINED
 > IMPLEMENTATION-REVIEW GATE; TASK 7, MERGE, PUSH, LIVE TRAFFIC, AND PRIVATE
 > OR REMOTE MUTATION NOT AUTHORIZED
@@ -52,10 +53,11 @@ Node 22.14.0, Vitest 4.1.8, TypeScript 5.9.3, Vite 5.4.21.
 ### 0.1 Binding implementation decisions
 
 1. This plan consumes the reviewed inventory. It does not run another general
-   discovery pass or reclassify an inventoried surface. Section 0.7f is the
-   sole exact closure supplement discovered when executing the reviewed
-   deletions: it keeps the original authorities immutable and admits only the
-   literal complete-bundle and deleted-backlink path lists recorded there.
+   discovery pass or generally reclassify inventoried surfaces. Sections 0.7f
+   and 0.7g are the exact bounded corrections discovered while executing the
+   reviewed deletions: they keep the inventory inputs immutable, admit the
+   literal complete-bundle and deleted-backlink lists, and protect nine
+   collection-only test paths that require no rewrite.
 2. The four inventory path sets remain byte authorities:
 
    ```text
@@ -70,8 +72,8 @@ Node 22.14.0, Vitest 4.1.8, TypeScript 5.9.3, Vite 5.4.21.
    `protected.paths`. Task 0 byte-compares all four. A changed member or count
    is a stop-and-amend event. These files remain immutable inventory inputs;
    Section 0.7f does not rewrite them. The exact Class B closure supplement in
-   Section 0.7f is a separately reviewable final-path authority from Task 4
-   onward, yielding `183 delete / 191 modify / 1 add / 17 protected`.
+   Sections 0.7f-0.7g are separately reviewable final-path authorities from
+   Task 4 onward, yielding `183 delete / 182 modify / 1 add / 26 protected`.
 3. The only capability addition is
    `src/tools/backends/local_capabilities.py`. It is not permission to add a
    second adapter, compatibility module, or generic repository layer.
@@ -119,12 +121,13 @@ Node 22.14.0, Vitest 4.1.8, TypeScript 5.9.3, Vite 5.4.21.
     dependency declaration, Docker/SQL support, archive/history documents,
     and all `183` final admitted delete paths leave with `git rm`: the original
     `161` plus Section 0.7f's exact `22`-path net supplement.
-12. All `191` final admitted modify paths are rewritten only as required to
+12. All `182` final admitted modify paths are rewritten only as required to
     preserve current local behavior and remove obsolete imports, branches,
     fixtures, names, prose, or backlinks to deleted support: the original
-    `174` plus Section 0.7f's exact `17`-path supplement. Any product redesign
-    beyond the measured 36-method protocol and the inventory's existing
-    domain owners is a stop; it belongs to the later runtime-owner line.
+    `174`, minus Section 0.7g's exact nine protected paths, plus Section
+    0.7f's exact `17`-path supplement. Any product redesign beyond the
+    measured 36-method protocol and the inventory's existing domain owners is
+    a stop; it belongs to the later runtime-owner line.
 13. The final tracked tree also retires the temporary governance listed in
     Section 0.9. That self-retirement is separate from the immutable product
     path sets because the inventory could not include its own later plan and
@@ -843,7 +846,8 @@ when no current owner exists. A path outside this literal list and the prior
 174 modify paths, an 18th supplement, or a behavior hunk is a new Class B
 stop.
 
-From Task 4 onward, the final semantic path authority is therefore exactly:
+At the Section 0.7f amendment generation, the predicted semantic path
+authority was:
 
 ```text
 delete     183  (161 inventory + 22 net bundle supplement)
@@ -852,7 +856,7 @@ add          1
 protected   17
 ```
 
-The final 17 protected paths are the original set minus the five retired
+Those 17 protected paths were the original set minus the five retired
 bundle producers. Their UTF-8 byte-sorted path stream is
 `52944cdb212217833d0124f3b4e109b1314fc50c729816b430b69474b91c4993`;
 the Section 0.10 `sha256sum`-row aggregate is
@@ -878,12 +882,12 @@ tests/test_ibkr_scanner.py
 tests/test_option_pricing.py
 ```
 
-With rename detection disabled, final base-to-tip status is now exactly
+With rename detection disabled, Section 0.7f therefore predicted
 `185 D / 189 M / 3 A`: 183 semantic deletes plus two rename-source deletes,
 191 semantic modify paths minus those two sources, and the capability plus two
 rename destinations. Task 4 deletes 171 paths after the 12 Task 2-3 deletions.
 
-Before Task 4 can resume, focused review must independently rebuild all three
+Before Section 0.7f could resume, focused review had to independently rebuild all three
 replacement identities, both supplement path streams, the 23-path bundle
 split (`1 delete / 5 protected / 17 unclassified`), the final protected
 aggregate, and the final D/M/A algebra. Resume then applies the four bounded
@@ -895,6 +899,65 @@ it does not authorize a general historical-doc sweep. A fourth changed node
 ID, 24th bundle path, 18th supplement path, changed final identity, provider/
 network/private/production contact, or incomplete manifest deletion is a new
 hard stop.
+
+### 0.7g Task 4 collection-only path-account Class B amendment
+
+After Section 0.7f focused review returned GREEN, Task 4 completed the exact
+deletions, rewrites, backlink cleanup, and tracked-tree zero-residue scan. The
+semantic path preflight then produced `185 D / 180 M / 3 A`, not Section
+0.7f's predicted `185 D / 189 M / 3 A`. No product edit is authorized merely
+to make a count match.
+
+The difference is exactly these nine paths. Each was classified
+`rewrite_current_authority` solely because the broad inventory
+`test_collection` family included its current local tests. Each surface has
+no line reference, no measured method, no text/path/import candidate, and no
+Task 1-4 behavior or fixture change. All nine files are byte-identical to
+`d4677c3d` and the zero-residue scanner reports no row for them:
+
+```text
+tests/test_agents.py
+tests/test_analyst_tools.py
+tests/test_chatgpt_oauth_driver.py
+tests/test_compressor_layer5.py
+tests/test_macro_scheduler_integration.py
+tests/test_peer_comparison.py
+tests/test_sa_extension_diagnostics.py
+tests/test_sa_market_news_recovery.py
+tests/test_sec_tools.py
+```
+
+Their UTF-8 byte-sorted, one-final-newline path stream is
+`ea149566cee184fcd2251459afba93a8332c4b7efd6f9ab90b9353ded3cf0dd4`.
+Task 4 protects those bytes instead of manufacturing no-op or unrelated test
+changes. The immutable inventory files remain dated inputs; this amendment
+changes only their final implementation disposition.
+
+The final semantic authority is therefore:
+
+```text
+delete     183
+modify     182  (174 inventory - 9 collection-only + 17 backlink supplement)
+add          1
+protected   26  (17 after bundle retirement + 9 collection-only)
+```
+
+The 182-row final modify stream is
+`cde0cb8efe180dfe05a1c246a23563716e133b2a1459f294d00d5d0431902f48`.
+The 26-row final protected path stream is
+`d36eecf544a4ad184729c9637e7202a49cc1db3f93934f98ad173efa0090e317`;
+its path-ordered `sha256sum`-row aggregate is
+`d567da56ede0dd49a9e9865be308fabcb1cd0bc7ca059bb21864c49c01dae0c3`.
+With the two ownership-preserving rename sources counted as deletes, the
+final product-path `--no-renames` algebra is exactly `185 D / 180 M / 3 A`.
+Temporary governance additions/modifications are excluded from that semantic
+product ledger and retire in Task 5 as already planned.
+
+This changes a reviewed path ledger and is Class B. Product/test/dependency
+bytes remain frozen while focused review independently verifies that the nine
+surfaces have only `test_collection` candidates, are byte-identical to base,
+and reproduce all three new hashes. A tenth reclassification, any test-body
+edit in these files, identity drift, or zero-residue row is a new stop.
 
 ### 0.8 Dynamic-route target
 
@@ -1531,18 +1594,21 @@ Stop for review unless a recorded batch ruling applies.
 - `git rm` the exact 171 final admitted delete paths not already removed by
   Tasks 2-3: 149 remaining inventory members plus Section 0.7f's 22-path net
   bundle supplement;
-- finish the exact 191 semantic modify surfaces: 174 inventory members plus
-  Section 0.7f's literal 17-path current-authority supplement;
+- finish the exact 182 semantic modify surfaces: 174 inventory members minus
+  Section 0.7g's nine collection-only protected paths, plus Section 0.7f's
+  literal 17-path current-authority supplement;
 - add only `src/tools/backends/local_capabilities.py`, already created in
   Task 1;
 - perform only the two exact ownership-preserving path renames; and
-- keep all 17 final protected paths byte-identical.
+- keep all 26 final protected paths byte-identical.
 
-With rename detection disabled, base-to-Task-4 name status must be exactly
-`185 D / 189 M / 3 A`: the semantic 183 deletes plus two modify-source rename
-deletions, 189 retained modify paths, the one capability addition, and two
-rename destinations. With rename detection enabled, Git may report the two
-pairs as renames; admission uses `--no-renames` for deterministic accounting.
+With rename detection disabled, the product-path base-to-Task-4 name status
+must be exactly `185 D / 180 M / 3 A`: the semantic 183 deletes plus two
+modify-source rename deletions, 180 retained modify paths, the one capability
+addition, and two rename destinations. Temporary governance paths are
+excluded from this semantic ledger. With rename detection enabled, Git may
+report the two pairs as renames; admission uses `--no-renames` for
+deterministic accounting.
 
 **Step 1: establish the zero-residue RED gate**
 
@@ -1682,8 +1748,8 @@ Run:
 6. backend collect-only `4,278 / ecafdab7...`;
 7. final Task 1 owners `472 / 483b6566...` and unchanged Task 2 owners;
 8. the complete-bundle and retained-path backlink gates; and
-9. exact `185 D / 189 M / 3 A` base-to-tip algebra plus the 17-path protected
-   aggregate `0bfdd977...`.
+9. exact `185 D / 180 M / 3 A` product-path algebra plus the 26-path protected
+   aggregate `d567da56...`.
 
 The visible-literal scanner's counts are outputs because this task removes
 reviewed value text, but debt must remain zero. Do not edit its scanner or
@@ -1693,7 +1759,7 @@ allowlist to manufacture a target.
 
 The product commit body must state:
 
-- semantic path ledger `183 delete / 191 modify / 1 capability add / 17
+- semantic path ledger `183 delete / 182 modify / 1 capability add / 26
   protected`, identifying the exact EIR-006 bundle and backlink supplements;
 - two bounded ownership-preserving renames;
 - node ledger `101 whole-file + 22 historical` removed, `49` positive
@@ -1795,7 +1861,7 @@ sealed providers, socket guard, and no `config/.env` link, run:
 7. routes `173 / e0d8bf3c...`;
 8. scheduler continuity owner and its discriminacy mutation; and
 9. AST/import/dependency/final-path/backlink/complete-bundle gates plus the
-   17-path protected aggregate.
+   26-path protected aggregate.
 
 The reporter JSON must be deterministic across two independent exact-tip runs
 apart from timing fields excluded by the pinned reporter. Any skipped node not
@@ -1808,7 +1874,7 @@ a failed admission, not an environment workaround.
 Run explicit Vitest 4.1.8 sequential full `1,177/1,177`, the 54-node frontend
 owner projection, typecheck, build, and i18n scanner. Prove Python product
 bytes are unchanged since Task 4, frontend identity is the Section 0.11 final,
-all 17 protected bytes match, no production opener appears, no provider request is
+all 26 protected bytes match, no production opener appears, no provider request is
 made, and all scratch processes/files/links are cleaned.
 
 **Step 5: commit admitted evidence, then retire governance**
@@ -1856,7 +1922,7 @@ Stop. Task 6 is not a code task. Provide Fable with:
 6. M1-M8 patches, owner REDs, and byte restoration hashes;
 7. final native/local-runtime/frontend/route/scheduler reports;
 8. zero-residue scanner plus negative self-tests and zero-row final output;
-9. historical 22-path plus final 17-path protected aggregates and
+9. historical 22-path plus final 26-path protected aggregates and
    production/no-network/no-secret witnesses;
 10. complete last-containing/recovery ledger; and
 11. external packet `SHA256SUMS` and cleanup receipt.
@@ -1897,10 +1963,11 @@ true:
 
 1. master, plan base, inventory authority tip, or merge-base differs;
 2. any of the four immutable inventory path sets differs in bytes, count, or
-   membership, or either Section 0.7f supplement differs;
+   membership, either Section 0.7f supplement differs, or Section 0.7g's
+   nine-path disposition supplement differs;
 3. an implementation path falls outside the inventory sets, Section 0.7f's
    exact bundle/backlink supplements, the two exact rename destinations, and
-   temporary governance;
+   temporary governance; Section 0.7g protects bytes and grants no edit path;
 4. the two rename destinations are treated as general additions, their source
    survives, or a third rename is needed;
 5. a staged collection count/hash or literal add/remove row differs;
@@ -1932,8 +1999,9 @@ true:
     replacing the inventoried obsolete reference with its current local
     contract;
 20. a historical node is preserved under a renamed compatibility assertion;
-21. one of the final 17 protected bytes changes, or a protected path other
-    than Section 0.7f's exact five bundle producers moves to deletion;
+21. one of the final 26 protected bytes changes, a Section 0.7g path is edited,
+    or a protected path other than Section 0.7f's exact five bundle producers
+    moves to deletion;
 22. `file_backend.py`, package lockfiles, app package manifest, remote-table
     state, private dump, production SQLite, or private `.env` changes;
 23. an encrypted-path absence claim comes from ciphertext grep or a blob ID
@@ -1950,7 +2018,7 @@ true:
 28. zero-residue scanner skips an unlisted tracked file/source family, fails a
     negative self-test, or reports any final-tip row;
 29. Task 4 needs a git-crypt path not present in the reviewed modify set;
-30. final `183/191/1/17` semantic path algebra or `185 D / 189 M / 3 A`
+30. final `183/182/1/26` semantic path algebra or `185 D / 180 M / 3 A`
     `--no-renames` count differs;
 31. temporary governance or obsolete map entries survive final tip;
 32. a tracked closeout document reintroduces the retired program narrative;
@@ -1976,8 +2044,9 @@ true:
 
 Plan review must reconstruct, without trusting executor-generated helpers:
 
-1. all four immutable inventory path sets, both Section 0.7f supplements, the
-   complete-bundle split, and historical/final protected aggregates;
+1. all four immutable inventory path sets, both Section 0.7f supplements,
+   Section 0.7g's nine-path disposition correction, the complete-bundle split,
+   and historical/final protected aggregates;
 2. the exact 36-method union assigned to `LocalDataCapabilities`, the seven
    existing domain-owner projections, and all 18 measured surface rows;
 3. 101 whole-file nodes, 22 historical IDs, 46 historical plus three final
@@ -1991,7 +2060,7 @@ Plan review must reconstruct, without trusting executor-generated helpers:
 7. the 173-row dynamic route target;
 8. the two ownership-preserving rename exceptions and why they do not alter the
    capability add set;
-9. phase ordering, exact per-phase delete subsets, final `185 D / 189 M / 3 A`
+9. phase ordering, exact per-phase delete subsets, final `185 D / 180 M / 3 A`
    algebra, and deleted-reference closure;
 10. M1-M8 owner discriminacy, especially M6's real CLI branch and M7's
     ephemeral owner;
