@@ -27,9 +27,10 @@ def _read(relative_path: str) -> str:
 def test_current_runtime_has_no_legacy_iv_storage_or_api_owner():
     runtime_owners = (
         "src/tools/backends/__init__.py",
-        "src/tools/backends/db_backend.py",
         "src/tools/backends/file_backend.py",
+        "src/tools/backends/local_capabilities.py",
         "src/tools/backends/local_market_backend.py",
+        "src/tools/backends/sa_capture_backend.py",
         "src/tools/backends/sqlite_backend.py",
         "src/tools/data_access.py",
         "src/tools/schemas.py",
@@ -98,9 +99,10 @@ def test_sql_init_and_current_backends_have_no_legacy_iv_schema():
     owners = (
         "sql/001_init_schema.sql",
         "src/tools/backends/__init__.py",
-        "src/tools/backends/db_backend.py",
         "src/tools/backends/file_backend.py",
+        "src/tools/backends/local_capabilities.py",
         "src/tools/backends/local_market_backend.py",
+        "src/tools/backends/sa_capture_backend.py",
         "src/tools/backends/sqlite_backend.py",
         "src/tools/data_access.py",
     )

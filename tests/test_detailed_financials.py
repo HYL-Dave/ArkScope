@@ -361,23 +361,16 @@ class TestDetailedFinancialsSchema:
 class TestFinancialCache:
     """Test financial cache read/write in DB backend."""
 
-    def test_cache_miss_returns_none(self):
-        """Mock DB returning no rows."""
-        from src.tools.backends.db_backend import DatabaseBackend
-        backend = DatabaseBackend.__new__(DatabaseBackend)
-        backend._conn = None
-        backend._dsn = "mock"
-        backend._sslmode = "prefer"
+    def test_cache_miss_returns_none(self, tmp_path):
+        """The current local cache returns no value for an unknown key."""
+        from src.tools.backends.local_market_backend import LocalMarketBackend
 
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_cursor.fetchone.return_value = None
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        backend = LocalMarketBackend(
+            market_db=str(tmp_path / "market_data.db"),
+            base_path=tmp_path,
+        )
 
-        with patch.object(backend, '_get_conn', return_value=mock_conn):
-            result = backend.get_financial_cache("metrics_TEST_annual")
-            assert result is None
+        assert backend.get_financial_cache("metrics_TEST_annual") is None
 
 
 

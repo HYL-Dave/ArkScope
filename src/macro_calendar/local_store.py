@@ -19,25 +19,115 @@ no FRED/Finnhub ingestion, no PG migration — those are later slices.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import sqlite3
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from src.macro_calendar.store import (
-    ECONOMIC_TRACKED_FIELDS,
-    EARNINGS_TRACKED_FIELDS,
-    IPO_TRACKED_FIELDS,
-    _clamp_limit,
-    _normalize_str_array,
-    _tracked_payload_differs,
-    economic_event_fingerprint,
-    earnings_event_fingerprint,
-    ipo_event_fingerprint,
+ECONOMIC_TRACKED_FIELDS: Tuple[str, ...] = ("actual", "estimate", "prev")
+EARNINGS_TRACKED_FIELDS: Tuple[str, ...] = (
+    "eps_estimate",
+    "eps_actual",
+    "revenue_estimate",
+    "revenue_actual",
+    "hour",
 )
+IPO_TRACKED_FIELDS: Tuple[str, ...] = (
+    "status",
+    "price",
+    "exchange",
+    "number_of_shares",
+    "total_shares_value",
+)
+
+
+def economic_event_fingerprint(
+    country: str,
+    event_name: str,
+    event_time: datetime,
+) -> str:
+    if event_time.tzinfo is None:
+        raise ValueError("event_time must be timezone-aware")
+    canonical = "|".join(
+        (
+            (country or "").strip().upper(),
+            (event_name or "").strip(),
+            event_time.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z"),
+        )
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def earnings_event_fingerprint(symbol: str, year: int, quarter: int) -> str:
+    canonical = f"{(symbol or '').strip().upper()}|{int(year)}|{int(quarter)}"
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def ipo_event_fingerprint(name: str, ipo_date: date) -> str:
+    canonical = f"{(name or '').strip()}|{ipo_date.isoformat()}"
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _normalize_for_diff(value: Any) -> Any:
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, (Decimal, int, float, str)):
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return value
+    return value
+
+
+def _tracked_payload_differs(
+    existing: Dict[str, Any],
+    new: Dict[str, Any],
+    fields: Iterable[str],
+) -> bool:
+    return any(
+        _normalize_for_diff(existing.get(field))
+        != _normalize_for_diff(new.get(field))
+        for field in fields
+    )
+
+
+def _normalize_str_array(
+    values: Optional[Iterable[str]],
+    *,
+    upper: bool = False,
+    lower: bool = False,
+) -> Optional[List[str]]:
+    if values is None:
+        return None
+    normalized: List[str] = []
+    seen = set()
+    for value in values:
+        if value is None:
+            continue
+        item = str(value).strip()
+        if not item:
+            continue
+        if upper:
+            item = item.upper()
+        elif lower:
+            item = item.lower()
+        if item not in seen:
+            seen.add(item)
+            normalized.append(item)
+    return normalized or None
+
+
+def _clamp_limit(limit: Any, *, hi: int, lo: int = 1) -> int:
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        return hi
+    return max(lo, min(hi, value))
 
 logger = logging.getLogger(__name__)
 

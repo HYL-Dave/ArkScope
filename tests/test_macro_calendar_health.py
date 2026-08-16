@@ -449,8 +449,15 @@ class TestDbUnavailable:
             }
         }
 
-    def test_no_backend_returns_critical_with_full_shape(self):
-        dal = SimpleNamespace(_backend=object())  # no _get_conn
+    def test_no_backend_returns_critical_with_full_shape(self, monkeypatch):
+        from src.service import macro_calendar_health as mod
+
+        dal = SimpleNamespace(_backend=object())
+        monkeypatch.setattr(
+            mod,
+            "_run_local_health_queries",
+            lambda dal: (_ for _ in ()).throw(RuntimeError("local state unavailable")),
+        )
         report = compute_macro_calendar_health(dal, now=WEEKDAY_OFF_HOURS_UTC)
         assert report["ok"] is False
         assert report["severity"] == SEVERITY_CRITICAL
@@ -465,20 +472,20 @@ class TestDbUnavailable:
             assert table["status"] == SEVERITY_CRITICAL
 
     def test_backend_query_failure_degrades_gracefully(self, monkeypatch):
-        """If _run_health_queries raises, the orchestrator returns the
+        """If the local query raises, the orchestrator returns the
         unavailable report rather than propagating."""
         from src.service import macro_calendar_health as mod
 
-        backend = SimpleNamespace(_get_conn=MagicMock())
-        dal = SimpleNamespace(_backend=backend)
+        dal = SimpleNamespace()
         monkeypatch.setattr(
-            mod, "_run_health_queries",
-            lambda dal, b: (_ for _ in ()).throw(RuntimeError("connection lost")),
+            mod,
+            "_run_local_health_queries",
+            lambda dal: (_ for _ in ()).throw(RuntimeError("local read failed")),
         )
         report = compute_macro_calendar_health(dal, now=WEEKDAY_OFF_HOURS_UTC)
         assert report["severity"] == SEVERITY_CRITICAL
         assert any(
-            "connection lost" in r["message"] for r in report["reasons"]
+            "local read failed" in r["message"] for r in report["reasons"]
         )
 
 

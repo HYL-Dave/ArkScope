@@ -136,24 +136,10 @@ def compute_macro_calendar_health(
         now = now.replace(tzinfo=timezone.utc)
     merged_thresholds = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
 
-    # Local-first (§4c slice 2): when use_local_macro is on, table coverage comes from the
-    # local macro_calendar.db; job_runs comes from the active S-H1 store factory.
-    if getattr(dal, "_local_macro_enabled", None) and dal._local_macro_enabled():
-        try:
-            stats = _run_local_health_queries(dal)
-        except Exception as exc:  # pragma: no cover — logged + degraded
-            logger.error("local macro_calendar health query failed: %s", exc)
-            return _db_unavailable_report(now, merged_thresholds, error=str(exc))
-        return evaluate_health(stats, now=now, thresholds=merged_thresholds)
-
-    backend = getattr(dal, "_backend", None)
-    if backend is None or not hasattr(backend, "_get_conn"):
-        return _db_unavailable_report(now, merged_thresholds)
-
     try:
-        stats = _run_health_queries(dal, backend)
+        stats = _run_local_health_queries(dal)
     except Exception as exc:  # pragma: no cover — logged + degraded
-        logger.error("macro_calendar health query failed: %s", exc)
+        logger.error("local macro_calendar health query failed: %s", exc)
         return _db_unavailable_report(now, merged_thresholds, error=str(exc))
 
     return evaluate_health(stats, now=now, thresholds=merged_thresholds)
@@ -444,23 +430,6 @@ def _evaluate_table(
 # ---------------------------------------------------------------------------
 
 
-# One round-trip for all six tables. Each branch coerces COUNT(*) to BIGINT
-# and MAX(fetched_at) to TIMESTAMPTZ so the union-typed columns stay sane.
-_TABLE_STATS_SQL = """
-    SELECT 'cal_economic_events'   AS table_name, MAX(fetched_at) AS last_fetched_at, COUNT(*)::bigint AS row_count FROM cal_economic_events
-    UNION ALL
-    SELECT 'cal_earnings_events',                 MAX(fetched_at), COUNT(*)::bigint FROM cal_earnings_events
-    UNION ALL
-    SELECT 'cal_ipo_events',                      MAX(fetched_at), COUNT(*)::bigint FROM cal_ipo_events
-    UNION ALL
-    SELECT 'macro_series',                        MAX(fetched_at), COUNT(*)::bigint FROM macro_series
-    UNION ALL
-    SELECT 'macro_observations',                  MAX(fetched_at), COUNT(*)::bigint FROM macro_observations
-    UNION ALL
-    SELECT 'macro_release_dates',                 MAX(fetched_at), COUNT(*)::bigint FROM macro_release_dates
-"""
-
-
 def _query_job_runs(dal: Any) -> Dict[str, Dict[str, Any]]:
     """job_runs cadence aggregation through the active S-H1 store factory."""
     from src.service.job_runs_store import get_job_runs_store
@@ -471,29 +440,6 @@ def _query_job_runs(dal: Any) -> Dict[str, Dict[str, Any]]:
     except Exception as exc:
         logger.warning("macro_calendar health: job_runs lookup failed: %s", exc)
         return {}
-
-
-def _run_health_queries(dal: Any, backend: Any) -> Dict[str, Any]:
-    """Aggregate job_runs + 6 macro/cal tables (PG path).
-
-    Each query degrades independently — a missing ``job_runs`` table
-    (pre-P0.2) still leaves the table-level coverage report usable.
-    """
-    from psycopg2 import extras as _pg_extras
-
-    conn = backend._get_conn()
-    jobs = _query_job_runs(dal)
-
-    tables: Dict[str, Dict[str, Any]] = {}
-    with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-        cur.execute(_TABLE_STATS_SQL)
-        for row in cur.fetchall():
-            tables[row["table_name"]] = {
-                "last_fetched_at": row.get("last_fetched_at"),
-                "row_count": int(row.get("row_count") or 0),
-            }
-
-    return {"jobs": jobs, "tables": tables}
 
 
 def _run_local_health_queries(dal: Any) -> Dict[str, Any]:

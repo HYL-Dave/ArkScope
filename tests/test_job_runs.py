@@ -26,8 +26,7 @@ from src.service.job_runs_store import (
     ENV_USE_LOCAL_JOB_RUNS,
     USE_LOCAL_JOB_RUNS_KEY,
     JobRunsLocalStore,
-    JobRunsStore,
-    _serialize_row,
+    _serialize_local_row,
     get_job_runs_store,
 )
 
@@ -37,32 +36,20 @@ from src.service.job_runs_store import (
 # ---------------------------------------------------------------------------
 
 
+def _make_local_store(tmp_path: Path) -> JobRunsLocalStore:
+    return JobRunsLocalStore(tmp_path / "profile_state.db")
+
+
 def _make_db_dal():
-    """DAL whose backend looks like DatabaseBackend (has _get_conn)."""
     dal = MagicMock()
-    backend = MagicMock()
-    backend._get_conn = MagicMock()
-    dal._backend = backend
-    return dal, backend
+    dal._base = None
+    return dal, MagicMock()
 
 
 def _make_file_dal():
-    """DAL whose backend looks like FileBackend (no _get_conn)."""
     dal = MagicMock()
-    backend = object()  # bare object, no _get_conn
-    dal._backend = backend
+    dal._base = None
     return dal
-
-
-def _mock_cursor(conn, *, fetchone=None, fetchall=None, rowcount=1):
-    cur = MagicMock()
-    cur.fetchone.return_value = fetchone
-    cur.fetchall.return_value = fetchall or []
-    cur.rowcount = rowcount
-    cur.__enter__ = MagicMock(return_value=cur)
-    cur.__exit__ = MagicMock(return_value=False)
-    conn.cursor.return_value = cur
-    return cur
 
 
 def _create_minimal_job_runs_db(path: Path, *job_names: str) -> None:
@@ -212,31 +199,23 @@ def _extension_event(
 
 
 # ---------------------------------------------------------------------------
-# Availability gating
+# Current local store contracts
 # ---------------------------------------------------------------------------
 
 
-def test_store_unavailable_with_no_backend():
-    dal = MagicMock()
-    dal._backend = None
-    store = JobRunsStore(dal)
-    assert store.is_available() is False
-    assert store.create_run("any") is None
-    assert store.finish_run(1, status="succeeded") is False
+def test_store_unavailable_with_no_backend(tmp_path):
+    store = _make_local_store(tmp_path)
+    assert store.is_available() is True
     assert store.list_runs() == []
-    assert store.latest_runs_by_name() == {}
 
 
-def test_store_unavailable_with_filebackend():
-    dal = _make_file_dal()
-    store = JobRunsStore(dal)
-    assert store.is_available() is False
-    assert store.create_run("any") is None
+def test_store_unavailable_with_filebackend(tmp_path):
+    store = _make_local_store(tmp_path)
+    assert store.create_run("local-job") == 1
 
 
-def test_store_available_with_database_backend():
-    dal, _ = _make_db_dal()
-    store = JobRunsStore(dal)
+def test_store_available_with_database_backend(tmp_path):
+    store = _make_local_store(tmp_path)
     assert store.is_available() is True
 
 
@@ -245,24 +224,24 @@ def test_store_available_with_database_backend():
 # ---------------------------------------------------------------------------
 
 
-def test_create_run_returns_inserted_id():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    _mock_cursor(conn, fetchone=(42,))
+def test_create_run_returns_inserted_id(tmp_path):
+    store = _make_local_store(tmp_path)
 
-    store = JobRunsStore(dal)
     run_id = store.create_run("foo", trigger_source="cli", payload={"x": 1})
 
-    assert run_id == 42
+    assert run_id == 1
+    assert store.list_runs()[0]["payload"] == {"x": 1}
 
 
-def test_create_run_swallows_db_error():
-    dal, backend = _make_db_dal()
-    backend._get_conn.side_effect = RuntimeError("conn down")
+def test_create_run_swallows_db_error(tmp_path, monkeypatch):
+    store = _make_local_store(tmp_path)
+    monkeypatch.setattr(
+        store,
+        "_connect",
+        lambda: (_ for _ in ()).throw(RuntimeError("local write failed")),
+    )
 
-    store = JobRunsStore(dal)
-    assert store.create_run("foo") is None  # no exception
+    assert store.create_run("foo") is None
 
 
 # ---------------------------------------------------------------------------
@@ -270,49 +249,49 @@ def test_create_run_swallows_db_error():
 # ---------------------------------------------------------------------------
 
 
-def test_finish_run_rejects_running_status():
-    dal, _ = _make_db_dal()
-    store = JobRunsStore(dal)
+def test_finish_run_rejects_running_status(tmp_path):
+    store = _make_local_store(tmp_path)
     with pytest.raises(ValueError, match="terminal"):
         store.finish_run(1, status="running")
 
 
-def test_finish_run_rejects_unknown_status():
-    dal, _ = _make_db_dal()
-    store = JobRunsStore(dal)
+def test_finish_run_rejects_unknown_status(tmp_path):
+    store = _make_local_store(tmp_path)
     with pytest.raises(ValueError, match="invalid"):
         store.finish_run(1, status="bogus")
 
 
-def test_finish_run_returns_false_when_run_id_none():
-    dal, _ = _make_db_dal()
-    store = JobRunsStore(dal)
+def test_finish_run_returns_false_when_run_id_none(tmp_path):
+    store = _make_local_store(tmp_path)
     assert store.finish_run(None, status="succeeded") is False
 
 
-def test_finish_run_updates_row():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    cur = _mock_cursor(conn, rowcount=1)
+def test_finish_run_updates_row(tmp_path):
+    store = _make_local_store(tmp_path)
+    run_id = store.create_run("foo")
 
-    store = JobRunsStore(dal)
     ok = store.finish_run(
-        7, status="succeeded", message="42 articles", result={"count": 42}
+        run_id,
+        status="succeeded",
+        message="42 articles",
+        result={"count": 42},
     )
+
     assert ok is True
-    # Verify the parameters threaded through
-    args = cur.execute.call_args[0]
-    assert "UPDATE job_runs" in args[0]
-    assert args[1][0] == "succeeded"  # status param
-    assert args[1][1] == "42 articles"  # message param
+    row = store.list_runs()[0]
+    assert row["status"] == "succeeded"
+    assert row["message"] == "42 articles"
+    assert row["result"] == {"count": 42}
 
 
-def test_finish_run_swallows_db_error():
-    dal, backend = _make_db_dal()
-    backend._get_conn.side_effect = RuntimeError("conn down")
+def test_finish_run_swallows_db_error(tmp_path, monkeypatch):
+    store = _make_local_store(tmp_path)
+    monkeypatch.setattr(
+        store,
+        "_connect",
+        lambda: (_ for _ in ()).throw(RuntimeError("local write failed")),
+    )
 
-    store = JobRunsStore(dal)
     assert store.finish_run(1, status="failed", error="boom") is False
 
 
@@ -321,130 +300,111 @@ def test_finish_run_swallows_db_error():
 # ---------------------------------------------------------------------------
 
 
-def test_list_runs_returns_serialized_rows():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    _mock_cursor(
-        conn,
-        fetchall=[
-            {
-                "id": 1,
-                "job_name": "foo",
-                "status": "succeeded",
-                "trigger_source": "api",
-                "payload": {},
-                "result": {"count": 1},
-                "message": "ok",
-                "error": None,
-                "started_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
-                "finished_at": datetime(2026, 4, 25, 10, 1, tzinfo=timezone.utc),
-                "duration_ms": 60000,
-                "created_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
-                "updated_at": datetime(2026, 4, 25, 10, 1, tzinfo=timezone.utc),
-            }
-        ],
+def test_list_runs_returns_serialized_rows(tmp_path):
+    store = _make_local_store(tmp_path)
+    store.record_completed_run(
+        "foo",
+        status="succeeded",
+        trigger_source="api",
+        payload={"scope": "test"},
+        result={"count": 1},
+        started_at="2026-04-25T10:00:00Z",
+        finished_at="2026-04-25T10:01:00Z",
     )
 
-    store = JobRunsStore(dal)
-    rows = store.list_runs(job_name="foo", limit=10, offset=0)
+    row = store.list_runs(job_name="foo")[0]
 
-    assert len(rows) == 1
-    row = rows[0]
     assert row["job_name"] == "foo"
-    assert row["status"] == "succeeded"
+    assert row["payload"] == {"scope": "test"}
+    assert row["result"] == {"count": 1}
     assert row["started_at"] == "2026-04-25T10:00:00+00:00"
 
 
-def test_list_runs_clamps_limit_and_offset():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    cur = _mock_cursor(conn, fetchall=[])
+def test_list_runs_clamps_limit_and_offset(tmp_path):
+    store = _make_local_store(tmp_path)
+    rows = [
+        (
+            f"job-{index}",
+            "succeeded",
+            "api",
+            "{}",
+            "2026-04-25T10:00:00+00:00",
+            "2026-04-25T10:00:00+00:00",
+            "2026-04-25T10:00:00+00:00",
+        )
+        for index in range(205)
+    ]
+    with store._connect() as conn:
+        conn.executemany(
+            """
+            INSERT INTO job_runs (
+                job_name, status, trigger_source, payload,
+                started_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
 
-    store = JobRunsStore(dal)
-    store.list_runs(limit=5000, offset=-3)
-
-    sql_params = cur.execute.call_args[0][1]
-    assert sql_params == (200, 0)  # clamped
+    assert len(store.list_runs(limit=5000, offset=-3)) == 200
 
 
-def test_latest_runs_by_name_keys_by_job_name():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    _mock_cursor(
-        conn,
-        fetchall=[
-            {
-                "id": 1, "job_name": "a", "status": "succeeded",
-                "trigger_source": "api", "payload": {}, "result": None,
-                "message": None, "error": None,
-                "started_at": datetime(2026, 4, 25, tzinfo=timezone.utc),
-                "finished_at": None, "duration_ms": None,
-                "created_at": datetime(2026, 4, 25, tzinfo=timezone.utc),
-                "updated_at": datetime(2026, 4, 25, tzinfo=timezone.utc),
-            },
-            {
-                "id": 2, "job_name": "b", "status": "running",
-                "trigger_source": "scheduler", "payload": {}, "result": None,
-                "message": None, "error": None,
-                "started_at": datetime(2026, 4, 25, tzinfo=timezone.utc),
-                "finished_at": None, "duration_ms": None,
-                "created_at": datetime(2026, 4, 25, tzinfo=timezone.utc),
-                "updated_at": datetime(2026, 4, 25, tzinfo=timezone.utc),
-            },
-        ],
+def test_latest_runs_by_name_keys_by_job_name(tmp_path):
+    store = _make_local_store(tmp_path)
+    store.record_completed_run(
+        "a",
+        status="succeeded",
+        started_at="2026-04-25T10:00:00Z",
+        finished_at="2026-04-25T10:01:00Z",
     )
-    store = JobRunsStore(dal)
+    store.create_run("b", trigger_source="scheduler")
+
     out = store.latest_runs_by_name()
-    assert set(out.keys()) == {"a", "b"}
+
+    assert set(out) == {"a", "b"}
     assert out["a"]["status"] == "succeeded"
     assert out["b"]["status"] == "running"
 
 
-def test_latest_runs_by_name_swallows_db_error():
-    dal, backend = _make_db_dal()
-    backend._get_conn.side_effect = RuntimeError("down")
-    assert JobRunsStore(dal).latest_runs_by_name() == {}
+def test_latest_runs_by_name_swallows_db_error(tmp_path, monkeypatch):
+    store = _make_local_store(tmp_path)
+    monkeypatch.setattr(
+        store,
+        "_connect",
+        lambda: (_ for _ in ()).throw(RuntimeError("local read failed")),
+    )
+    assert store.latest_runs_by_name() == {}
 
 
-def test_run_summary_by_name_returns_none_on_db_error():
-    dal, backend = _make_db_dal()
-    backend._get_conn.side_effect = RuntimeError("down")
-    assert JobRunsStore(dal).run_summary_by_name(["sa_market_news_refresh"]) is None
+def test_run_summary_by_name_returns_none_on_db_error(tmp_path, monkeypatch):
+    store = _make_local_store(tmp_path)
+    monkeypatch.setattr(
+        store,
+        "_connect",
+        lambda: (_ for _ in ()).throw(RuntimeError("local read failed")),
+    )
+    assert store.run_summary_by_name(["sa_market_news_refresh"]) is None
 
 
-def test_run_summary_by_name_uses_single_row_cursor_shape():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
+def test_run_summary_by_name_uses_single_row_cursor_shape(tmp_path):
+    store = _make_local_store(tmp_path)
+    store.record_completed_run(
+        "sa_market_news_refresh",
+        status="succeeded",
+        started_at="2026-04-25T10:00:00Z",
+        finished_at="2026-04-25T10:01:00Z",
+    )
+    store.record_completed_run(
+        "sa_market_news_refresh",
+        status="failed",
+        started_at="2026-04-25T10:04:00Z",
+        finished_at="2026-04-25T10:05:00Z",
+    )
 
-    class _Cursor:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def execute(self, sql, params=None):
-            self.sql = sql
-            self.params = params
-
-        def fetchone(self):
-            return {
-                "job_name": "sa_market_news_refresh",
-                "last_success_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
-                "last_any_at": datetime(2026, 4, 25, 10, 5, tzinfo=timezone.utc),
-            }
-
-    conn.cursor.return_value = _Cursor()
-
-    summary = JobRunsStore(dal).run_summary_by_name(["sa_market_news_refresh"])
+    summary = store.run_summary_by_name(["sa_market_news_refresh"])
 
     assert summary == {
         "sa_market_news_refresh": {
-            "last_success_at": "2026-04-25T10:00:00+00:00",
+            "last_success_at": "2026-04-25T10:01:00+00:00",
             "last_any_at": "2026-04-25T10:05:00+00:00",
         }
     }
@@ -452,16 +412,16 @@ def test_run_summary_by_name_uses_single_row_cursor_shape():
 
 def test_serialize_row_converts_datetimes():
     row = {
-        "started_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
-        "finished_at": None,
-        "created_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
-        "updated_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
-        "other": "kept",
+        "payload": '{"scope":"test"}',
+        "result": '{"count":1}',
+        "started_at": "2026-04-25T10:00:00+00:00",
     }
-    out = _serialize_row(row)
+
+    out = _serialize_local_row(row)
+
+    assert out["payload"] == {"scope": "test"}
+    assert out["result"] == {"count": 1}
     assert out["started_at"] == "2026-04-25T10:00:00+00:00"
-    assert out["finished_at"] is None
-    assert out["other"] == "kept"
 
 
 # ---------------------------------------------------------------------------
@@ -522,11 +482,11 @@ def test_list_jobs_status_falls_back_to_process_local_when_db_empty():
 
 
 def test_list_jobs_status_falls_back_when_db_error():
-    dal, backend = _make_db_dal()
+    dal, _ = _make_db_dal()
     dal.get_watchlist.return_value = MagicMock(tickers=[])
-    backend._get_conn.side_effect = RuntimeError("conn down")
 
-    out = jobs_module.list_jobs_status(dal)
+    with patch.object(JobRunsLocalStore, "latest_runs_by_name", return_value={}):
+        out = jobs_module.list_jobs_status(dal)
     # All jobs should appear with at least the never_run default
     statuses = {j["name"]: j["last_status"] for j in out}
     assert "monitor_watchlist_scan" in statuses
@@ -626,11 +586,12 @@ def test_run_job_persists_failure():
 
 def test_run_job_continues_when_create_run_returns_none():
     """Persistence failure must not block the job."""
-    dal = _make_file_dal()  # store unavailable → create_run returns None
+    dal = _make_file_dal()
     dal.get_watchlist.return_value = MagicMock(tickers=["NVDA"])
 
     fake_result = {"alert_count": 0, "alerts": []}
-    with patch.object(jobs_module, "_run_monitor_watchlist_scan", return_value=fake_result):
+    with patch.object(JobRunsLocalStore, "create_run", return_value=None), \
+         patch.object(jobs_module, "_run_monitor_watchlist_scan", return_value=fake_result):
         result = jobs_module.run_job("monitor_watchlist_scan", dal=dal)
     assert result.status == "succeeded"
 
@@ -684,19 +645,15 @@ def test_jobs_history_endpoint_returns_empty_when_unavailable():
 
 
 # ---------------------------------------------------------------------------
-# record_completed_run (P0.4 commit 2 — extension reports a finished run)
+# record_completed_run
 # ---------------------------------------------------------------------------
 
 
-def test_record_completed_run_inserts_terminal_row():
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    cur = _mock_cursor(conn, fetchone=(123,))
-
-    store = JobRunsStore(dal)
+def test_record_completed_run_inserts_terminal_row(tmp_path):
+    store = _make_local_store(tmp_path)
     started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
     finished = datetime(2026, 4, 25, 12, 0, 30, tzinfo=timezone.utc)
+
     run_id = store.record_completed_run(
         "sa_extension:market_news_quick",
         status="succeeded",
@@ -709,71 +666,70 @@ def test_record_completed_run_inserts_terminal_row():
         duration_ms=30_000,
     )
 
-    assert run_id == 123
-    cur.execute.assert_called_once()
-    sql, params = cur.execute.call_args[0]
-    assert "INSERT INTO job_runs" in sql
-    # Positional parameters: name, status, trigger, payload, result, message,
-    # error, started, finished, duration_ms, finished, started.
-    assert params[0] == "sa_extension:market_news_quick"
-    assert params[1] == "succeeded"
-    assert params[2] == "extension"
-    assert params[5] == "ok"  # message
-    assert params[6] is None  # error
-    assert params[7] == started
-    assert params[8] == finished
-    assert params[9] == 30_000
+    assert run_id == 1
+    row = store.list_runs()[0]
+    assert row["job_name"] == "sa_extension:market_news_quick"
+    assert row["status"] == "succeeded"
+    assert row["trigger_source"] == "extension"
+    assert row["payload"] == {"display_name": "Market News quick"}
+    assert row["result"] == {"saved": 17, "detail_fetched": 5}
+    assert row["duration_ms"] == 30_000
 
 
-def test_record_completed_run_rejects_running_status():
-    dal, _ = _make_db_dal()
-    store = JobRunsStore(dal)
+def test_record_completed_run_rejects_running_status(tmp_path):
+    store = _make_local_store(tmp_path)
     started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
     with pytest.raises(ValueError, match="terminal"):
         store.record_completed_run("x", status="running", started_at=started)
 
 
-def test_record_completed_run_rejects_unknown_status():
-    dal, _ = _make_db_dal()
-    store = JobRunsStore(dal)
+def test_record_completed_run_rejects_unknown_status(tmp_path):
+    store = _make_local_store(tmp_path)
     started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
     with pytest.raises(ValueError, match="terminal"):
         store.record_completed_run("x", status="bogus", started_at=started)
 
 
-def test_record_completed_run_returns_none_when_unavailable():
-    dal = _make_file_dal()
-    store = JobRunsStore(dal)
+def test_record_completed_run_returns_none_when_unavailable(tmp_path, monkeypatch):
+    store = _make_local_store(tmp_path)
+    monkeypatch.setattr(
+        store,
+        "_connect",
+        lambda: (_ for _ in ()).throw(RuntimeError("local write failed")),
+    )
     started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+
     assert store.record_completed_run(
         "x", status="succeeded", started_at=started
     ) is None
 
 
-def test_record_completed_run_swallows_db_error():
-    dal, backend = _make_db_dal()
-    backend._get_conn.side_effect = RuntimeError("conn down")
-    store = JobRunsStore(dal)
+def test_record_completed_run_swallows_db_error(tmp_path, monkeypatch):
+    store = _make_local_store(tmp_path)
+    monkeypatch.setattr(
+        store,
+        "_connect",
+        lambda: (_ for _ in ()).throw(RuntimeError("local write failed")),
+    )
     started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
-    # No exception raised — extension flow must not break on DB outage.
+
     assert store.record_completed_run(
         "x", status="failed", started_at=started, error="boom"
     ) is None
 
 
-def test_record_completed_run_omits_finished_at_when_not_provided():
-    """No finished_at → SQL falls back to NOW()."""
-    dal, backend = _make_db_dal()
-    conn = MagicMock()
-    backend._get_conn.return_value = conn
-    cur = _mock_cursor(conn, fetchone=(7,))
-
-    store = JobRunsStore(dal)
+def test_record_completed_run_omits_finished_at_when_not_provided(tmp_path):
+    store = _make_local_store(tmp_path)
     started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
-    run_id = store.record_completed_run("x", status="succeeded", started_at=started)
-    assert run_id == 7
-    _, params = cur.execute.call_args[0]
-    assert params[8] is None  # finished_at omitted; SQL COALESCE handles it
+
+    run_id = store.record_completed_run(
+        "x",
+        status="succeeded",
+        started_at=started,
+    )
+
+    assert run_id == 1
+    assert store.list_runs()[0]["finished_at"] is not None
 
 
 # ---------------------------------------------------------------------------
@@ -1399,9 +1355,9 @@ def test_run_telemetry_store_failure_never_breaks_the_step(monkeypatch):
             return True
 
         def record_completed_run(self, *a, **k):
-            raise RuntimeError("PG down")
+            raise RuntimeError("local write failed")
 
-    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", _BoomStore)
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", _BoomStore)
     monkeypatch.setattr("src.tools.data_access.DataAccessLayer", lambda *a, **k: MagicMock())
     t = mod._RunTelemetry(enabled=True, payload={})
     assert t.timed("x", lambda: True) is True

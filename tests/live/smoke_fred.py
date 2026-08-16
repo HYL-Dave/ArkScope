@@ -120,8 +120,8 @@ def main() -> int:
         )
 
     from src.macro_calendar import fred_ingestion as ing
-    real_store_factory = ing.MacroCalendarStore
-    ing.MacroCalendarStore = lambda dal: store
+    real_store_factory = ing.MacroCalendarLocalStore
+    ing.MacroCalendarLocalStore = lambda: store
 
     # Restrict to one series so the smoke is fast and obvious.
     try:
@@ -141,7 +141,7 @@ def main() -> int:
                   f"value={sample['value']} "
                   f"realtime=[{sample['realtime_start']}, {sample['realtime_end']}]")
     finally:
-        ing.MacroCalendarStore = real_store_factory
+        ing.MacroCalendarLocalStore = real_store_factory
 
     return 0
 
