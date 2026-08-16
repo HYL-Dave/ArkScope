@@ -1,6 +1,6 @@
 # Legacy-Agent CLI and Entrypoint Census Design
 
-> **Status:** DESIGN AUTHORED - INDEPENDENT REVIEW NEXT
+> **Status:** DESIGN REVIEWED GREEN; IMPLEMENTATION PLAN REVIEW NEXT
 > **Date:** 2026-08-16
 > **Product base:** `241ccdba6dc7c2cf1b162dd254ada88f25b6a9b0`
 > **Scope:** docs-only inventory and recommendations; no product or test edits
