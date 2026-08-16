@@ -1,8 +1,8 @@
 # PostgreSQL Runtime No-Tail Implementation Plan
 
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASK 0 GROUNDED COMPLETE;
-> TASK 1 STOPPED AT A SHARED-FIXTURE SCOPE GAP; BOUNDED AMENDMENT AWAITS
-> FOCUSED REVIEW; TASKS 2-7, MERGE, PUSH, LIVE
+> TASK 1 STOPPED AT AN INTERMEDIATE-RUNTIME / FIXTURE-CEILING GAP; SECOND
+> BOUNDED AMENDMENT AWAITS FOCUSED REVIEW; TASKS 2-7, MERGE, PUSH, LIVE
 > TRAFFIC, AND PRIVATE OR REMOTE MUTATION NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
@@ -309,7 +309,7 @@ tests/test_sqlite_backend.py::test_strict_uses_fast_pg_connect_timeout
 
 Each row is `old ID<TAB>new ID`. Task 2 owns the 12 rows whose old path is
 `tests/test_data_scheduler.py`, `tests/test_news_normalized_routing.py`, or
-`tests/test_news_pg_unreachable.py`; Task 1 owns the other 28. Every old ID
+`tests/test_news_pg_unreachable.py`; Task 1 owns the other 34. Every old ID
 occurs exactly once in the canonical base, and every new ID is absent.
 
 ```text
@@ -320,6 +320,7 @@ tests/test_data_scheduler.py::test_normalized_ibkr_news_route_launches_isolated_
 tests/test_data_scheduler.py::test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror	tests/test_data_scheduler.py::test_current_news_route_launches_normalized_worker
 tests/test_data_scheduler.py::test_schedule_status_exposes_post_pg_exit_presentation_metadata	tests/test_data_scheduler.py::test_schedule_status_exposes_current_news_route_metadata
 tests/test_data_scheduler.py::test_seed_skipped_fast_when_pg_unreachable	tests/test_data_scheduler.py::test_missing_scheduler_state_uses_local_job_history_without_early_fire
+tests/test_financial_datasets.py::TestCacheBackendMode::test_backend_without_cache_methods_is_ignored	tests/test_financial_datasets.py::TestCacheBackendMode::test_explicit_cache_capability_is_not_shape_probed
 tests/test_fundamentals_cache.py::test_read_cached_sec_fundamentals_uses_local_market_store_without_pg_fallback	tests/test_fundamentals_cache.py::test_read_cached_sec_fundamentals_uses_local_market_store
 tests/test_fundamentals_sec_cache.py::test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback	tests/test_fundamentals_sec_cache.py::test_sec_cache_hit_uses_local_market_backend
 tests/test_macro_calendar_local_store.py::test_no_pg_dependency	tests/test_macro_calendar_local_store.py::test_imports_with_declared_local_dependencies
@@ -339,6 +340,11 @@ tests/test_research_threads.py::test_local_only_no_pg	tests/test_research_thread
 tests/test_sa_capture_backend.py::test_no_pg_fallback_even_on_empty_results	tests/test_sa_capture_backend.py::test_empty_results_are_honest_local_results
 tests/test_sa_local_readers.py::TestBackfillRouting::test_routes_to_sqlite_not_pg	tests/test_sa_local_readers.py::TestBackfillRouting::test_routes_to_sqlite
 tests/test_sa_local_readers.py::TestHealthSplit::test_non_local_sa_backend_does_not_query_pg	tests/test_sa_local_readers.py::TestHealthSplit::test_local_backend_uses_extension_signal
+tests/test_sa_routing.py::test_baseless_dal_gets_no_implicit_local_routing	tests/test_sa_routing.py::test_baseless_dal_constructs_current_local_owner
+tests/test_sa_routing.py::test_env_override_flips_without_setting	tests/test_sa_routing.py::test_legacy_environment_overrides_do_not_change_local_owner
+tests/test_sa_routing.py::test_market_strict_threads_to_selected_backend	tests/test_sa_routing.py::test_legacy_market_strict_setting_does_not_change_local_owner
+tests/test_sa_routing.py::test_news_exit_threads_news_strict_to_sa_backend_without_market_strict	tests/test_sa_routing.py::test_legacy_news_exit_setting_does_not_change_local_owner
+tests/test_sa_routing.py::test_sa_plus_market_strict_threads_to_single_backend	tests/test_sa_routing.py::test_legacy_strict_settings_keep_single_local_owner
 tests/test_scheduler_state.py::test_no_pg_dependency	tests/test_scheduler_state.py::test_imports_with_declared_local_dependencies
 tests/test_sqlite_backend.py::test_financial_cache_miss_is_honest_empty_without_pg	tests/test_sqlite_backend.py::test_financial_cache_miss_is_honest_empty
 tests/test_sqlite_backend.py::test_fundamentals_mirror_table_retired_no_pg_fallback	tests/test_sqlite_backend.py::test_fundamentals_query_is_honest_empty_without_a_current_snapshot
@@ -415,7 +421,7 @@ exact `CANDIDATE_SOURCE_TIP`
 collections:
 
 ```text
-backend retained node bodies  194  78ea981809b6ef2e2430d6c2b8da49e7790c9bb6c874e76b4799287d32752f76
+backend retained node bodies  192  32d437fb14b93a6b1e083b5a28b054628f97f135918fcd2fe0f5a3ee944dd9de
 backend shared helper scopes    41  0dd3a8c15d575e43294e77fdd9789cd6b01695b362294ff147f9c5328e7f81b8
 backend module-level scopes     34  75be6faa2a3bcd491cfbe7ed2e6e4b423d4e1f265375c9c965c9b973a569c42a
 frontend retained node bodies   10  7ee29bcb1568b80b43eef59297368b92b46d7b2decefcab4a31506aef7e6d290
@@ -447,11 +453,11 @@ expand parameterized instances by exact canonical-base prefix (`node ==
 prefix` or `node` starts with `prefix + "["`). Otherwise emit the exact
 `path::qualname` helper scope, joining every class/function component with
 literal `::`; with no enclosing function emit the path as a module-level
-scope. Remove the 22 historical IDs and the old side of all 40 backend
+scope. Remove the 22 historical IDs and the old side of all 46 backend
 replacements before hashing. The three backend streams together, prefixed
-respectively with `body<TAB>`, `helper<TAB>`, and `module<TAB>`, are 269 rows
+respectively with `body<TAB>`, `helper<TAB>`, and `module<TAB>`, are 267 rows
 at
-`540bcb9f6e85bc5091812826b3804cfb8cd1d1829ea0536782261f0e3600e4a4`.
+`59113f371937f32c63c8e9a09a79b8b8706640a38e8aa1ec7fd44dfb287c0524`.
 
 The frontend projection consumes exactly 74 unique candidate IDs across 11
 paths. It uses TypeScript `5.9.3` to parse only `text_search` candidates in
@@ -529,6 +535,80 @@ while the Task 1 node passed outside the sandbox. The stalled transcript is
 rejected environment evidence. Native execution is admitted for that owner
 only with the socket guard active; it is not a product deadlock waiver.
 
+The unchanged identities and 444/1,885 runtime instructions in this section
+are dated first-stop authority only; Section 0.7c supersedes them for resumed
+execution without changing the facts recorded here.
+
+### 0.7c Task 1 intermediate-runtime and fixture-ceiling stop amendment
+
+After Section 0.7b was applied, all five new contracts passed and the exact
+Task 1 owner set finished `443 passed / 1 skipped`. The next guarded backend
+partition of the literal 1,885-node inventory-focused collection then finished
+`1,639 passed / 19 skipped / 45 failed / 11 errors` across its 1,714 nodes;
+the one reviewed loopback node was not part of that command. The shell wrapper
+used `tee` without `pipefail`, so its shell status is rejected. The pytest
+summary and complete transcript are retained as failure evidence only.
+
+The result exposed two distinct plan defects. First, the Task 1 runtime gate
+still required all 101 nodes from the six whole-file owners in Section 0.4,
+even though Task 1 has already removed helpers those obsolete contracts call
+and Tasks 2-3 delete the files atomically. Adding temporary compatibility code
+or editing tests that are about to retire would contradict the no-tail design.
+The 1,885-node stream remains the Task 1 **collection identity**, but its
+runtime GREEN set is the exact set difference from all 101 whole-file nodes:
+
+```text
+Task 1 runtime survivors           1,784  5bc41848aec5327b042c25248f1d6da46cb28c5e8a21faaf7e681d11bc1db0c5
+Task 1 backend survivors           1,614  a8be4827bb1f4234f96e0b7ad2696c55abc867e0f667b035479221dd8a334dec
+Task 1 frontend survivors            170  0111c3e448596d4387d84173eb14c1900a7ef77e56294bd69d2ee183c8f90c21
+Task 2 runtime survivors           1,781  19443b6f2665d5f1ec677de6430687e8f5a41d39bfe54dcbaba9d748fb46b2d5
+Task 2 backend survivors           1,611  a8122f8de84f6b65834e7515db660fad770f5b017ca64d8a76c5470280684642
+Task 2 frontend survivors            170  0111c3e448596d4387d84173eb14c1900a7ef77e56294bd69d2ee183c8f90c21
+```
+
+Task 2's survivor set analogously subtracts the 71 whole-file nodes that Task
+3 has not yet deleted. The full 1,885 and 1,852 streams remain mandatory
+collect-only identities; no whole-file node may be copied, renamed, or made a
+runtime admission substitute. Task 3 deletes the remaining files and restores
+identity between collection and runtime at 1,781 nodes.
+
+Second, the surviving failures found exact gaps in the edit ceiling. This
+amendment authorizes only these supplements:
+
+1. `tests/test_api.py::_HermeticMarketBackend` receives the same pure
+   `query_news_search` contract specified for the helper in Section 0.7b.
+2. `tests/test_freshness.py::TestCheckDataFreshness::test_no_backend_attr` may
+   replace its obsolete message assertion with the current typed-unavailable
+   local-authority result; its node ID and missing-capability setup stay fixed.
+3. `tests/test_sa_digest.py::_stub_fetch_dicts` may patch the current
+   `_fetch_dicts_local` choke point instead of the removed helper. The already
+   authorized `_fake_backend` exposes only a scratch `_sa_db` path. The exact
+   five direct-patch bodies below may make the same choke-point/signature
+   replacement without changing their behavior assertions:
+
+   ```text
+   tests/test_sa_digest.py::TestCommentsSqlShape::test_comments_sql_uses_layered_cte_with_per_article_cap
+   tests/test_sa_digest.py::TestParamClamping::test_max_clamps
+   tests/test_sa_digest.py::TestParamClamping::test_min_comment_score_clamped
+   tests/test_sa_digest.py::TestParamClamping::test_window_days_clamped
+   tests/test_sa_digest.py::TestTickerUppercase::test_lowercase_input_passes_uppercase_to_sql
+   ```
+
+The FRED module fixture, EIR-006 module census, SA-comment backfill body,
+web-tools body, SA-routing module, and remaining SA-digest helper/body edits
+were already inside Section 0.7a. They receive no wider authority. In
+particular, product method-presence inference, a compatibility fallback, a
+provider request, or a second helper method is still a stop.
+
+Six surviving tests also state contracts that the reviewed architecture
+explicitly removed. Their exact truthful replacements are the six added rows
+in Section 0.6. This changes no count but re-pins the replacement stream to
+`46 / f7ac08c4000baddaa9969d7895054ade3024ea224536bdb68286737891cf36ad`.
+The Task 1 owner set is therefore `472` nodes across `26` final paths at
+`cb454b785b7fdfc645a4c5f3765cb8a70dc280ad5f63a76c4dcf0fbd8d246578`.
+Editing a seventh existing node ID, a second body in the freshness test, or a
+second out-of-projection helper is a new stop-and-amend event.
+
 ### 0.8 Dynamic-route target
 
 Final route identity is the canonical 175-row inventory route stream with
@@ -591,17 +671,17 @@ review-admission identities, not comments:
 | Stage | Backend | Frontend | Inventory-focused union |
 |---|---|---|---|
 | Base | `4,394` / `b0285ee3...` | `1,177` / 101 / `90f56093...` | `1,897` / `57c1b514...` |
-| Task 1 | `4,382` / `c7b9a77afe12aac9b9612d944acf5bca5b7f90915e9caee2210cf618a6859522` | unchanged | `1,885` / `9f166407a6af5232f2086e3d2d95b4676b8b8f2e464bc091d18b8dbe7308e1db` |
-| Task 2 | `4,349` / `d3103ccbb5337e349651ef27f69a17634240d083f769f7bbd7d05e203b35efc9` | unchanged | `1,852` / `a35a3fc10efe2ddb8f66d24e015b48005dbd842c83736f778a87f19ca7cc77fe` |
-| Task 3 | `4,278` / `5ca289af31134688f2bb5158a5556ce235af630ca711d9b10c4213fc3b67b331` | unchanged | `1,781` / `c7231bed7212947333efa14bcd40dbd137c3f3bd3cb21212218bde1cd6415406` |
-| Task 4-final | unchanged | `1,177` / 101 / `c570a551b64ed95155c02f83499e78eb3409f2cba66ea9d46862dffad0ea239b` | `1,781` / `7729fa367446e5dd5219a25d3c04be816e599ec28c50b5db47e47856c1963fc0` |
+| Task 1 | `4,382` / `ce7c045fab7b4fde2598660e98c5e67964ac0c8871b8d8aca7d3d150c3e90cc8` | unchanged | `1,885` / `19ff8f6027ed399b0701fb2840cb3e0658cee860f5de8334f68a6522f826bcca` |
+| Task 2 | `4,349` / `04e93190119d1134903182a61f6ea495d1445ebd5784878196bca2baa49bebc6` | unchanged | `1,852` / `1c7f9a06d9518b48355ac952f4e09352862c6628dfaf0c5ff35cd7ae53ad73e0` |
+| Task 3 | `4,278` / `80037a1bd0d82270eeef633b0b2640c0a7fd2680b51de906811b85d87755f5e3` | unchanged | `1,781` / `19443b6f2665d5f1ec677de6430687e8f5a41d39bfe54dcbaba9d748fb46b2d5` |
+| Task 4-final | unchanged | `1,177` / 101 / `c570a551b64ed95155c02f83499e78eb3409f2cba66ea9d46862dffad0ea239b` | `1,781` / `b73e3ae52db4ebb86813ce5396802c34906a40957184c00e0d30a314f75e3ddb` |
 
 The final native target is `4,266 passed / 12 skipped / 0 failed`: canonical
 base `4,382P/12S`, minus 101 whole-file passing nodes, minus 22 passing
-historical nodes, minus 40 passing old IDs plus their 40 passing replacements,
+historical nodes, minus 46 passing old IDs plus their 46 passing replacements,
 plus seven new passing contracts. The old `.env` symlink is forbidden.
 
-Task 0 must independently reproduce every row above from Sections 0.4-0.7a
+Task 0 must independently reproduce every row above from Sections 0.4-0.7c
 and the three canonical base streams. A count-only match is insufficient.
 
 ---
@@ -680,16 +760,17 @@ contract of this implementation line.
 Run the tracked `MANIFEST.sha256` recipe from repository root and require a
 byte-identical manifest. Verify the exact four path-set counts/hashes in
 Section 0.1, the five base identities in Section 0.2, the 36-row method set in
-Section 0.3, all 101 whole-file node IDs, the 22 historical IDs, all 40
+Section 0.3, all 101 whole-file node IDs, the 22 historical IDs, all 46
 replacement pairs, all seven new IDs, all 18 frontend pairs, all five Section
-0.7a edit-boundary streams, and both rename source blobs.
+0.7a edit-boundary streams, every exact Section 0.7c supplement, and both
+rename source blobs.
 Also require zero product/test/dependency path diff from exact candidate source
 `4c6b8d44ce2e768e95b822b11f618cc40f4bb9f0` to the plan base before trusting
 candidate line coordinates.
 
 For every old ID, require exactly one base occurrence. For every new ID and
 rename destination, require absence. Verify the six deleted-file per-file
-counts and the 17/5, 28/12, 5/2 task partitions. Verify the four path sets are
+counts and the 17/5, 34/12, 5/2 task partitions. Verify the four path sets are
 pairwise disjoint and that the only `add` member is the capability module.
 
 **Step 3: freshly recollect both canonical bases**
@@ -728,7 +809,8 @@ plan itself. It must not contain a hand-copied node list. Apply each task delta
 as set algebra to the freshly collected bases and inventory-focused union,
 then require exact byte equality to every Section 0.11 identity. Independently
 implement Section 0.7a's AST/source projection and require all five streams and
-both aggregates to match. Include negative self-tests for a missing row,
+both aggregates to match, then apply Section 0.7c's exact supplements. Include
+negative self-tests for a missing row,
 duplicate row, wrong task assignment, unauthorized eighth addition, a third
 rename, an unlisted test-body edit, and a shared fixture outside its projected
 scope.
@@ -736,12 +818,12 @@ scope.
 Independently derive and pin the focused projections:
 
 ```text
-Task 1 owners, 24 final paths   444  65e9d731b3dbda415da36273b3ea1ed995a2de5f813aeb77670d56fefdefca3e
+Task 1 owners, 26 final paths   472  cb454b785b7fdfc645a4c5f3765cb8a70dc280ad5f63a76c4dcf0fbd8d246578
 Task 2 owners, 4 final paths    147  7b719fcb09769d6d09b6bb260389092416a2af7c6469f517565aa15229cae5d0
 Task 4 frontend, 2 final paths   54  83d681a7893416f1340d9dcb7eb1064ae664e8fbd0bf98d76b642105ee5590a3
 ```
 
-The Task 1 final paths are the distinct paths owning its 17 retirements, 28
+The Task 1 final paths are the distinct paths owning its 17 retirements, 34
 replacement pairs, and five additions. The Task 2 final paths are
 `tests/test_api.py`, `tests/test_data_scheduler.py`,
 `tests/test_news_normalized_routing.py`, and
@@ -807,15 +889,15 @@ src/tools/sa_digest_tools.py
 src/tools/sa_tools.py
 ```
 
-The exact Task 1 collection owners are the 24 paths derived in Task 0. Retained
+The exact Task 1 collection owners are the 26 paths derived in Task 0. Retained
 body/helper/module edits, including necessary updates in other test paths, are
-limited by Section 0.7a. A path's inventory membership never grants a whole
+limited by Sections 0.7a-0.7c. A path's inventory membership never grants a whole
 test file for unrestricted editing; changing behavior outside the current
 local contract is a stop.
 
 **Step 1: establish RED without breaking collection**
 
-Apply Task 1's 17 historical removals, 28 positive replacements, and five new
+Apply Task 1's 17 historical removals, 34 positive replacements, and five new
 nodes. New tests import the absent protocol dynamically inside test bodies so
 collection succeeds. Recollect first and require the Task 1 full/focused
 identities from Sections 0.11 and Task 0.
@@ -885,17 +967,19 @@ product entrypoint reaches them.
 Run in order:
 
 1. five new owner nodes;
-2. the 444-node/24-path Task 1 focused suite;
-3. the 1,885-node inventory-focused Task 1 projection;
-4. backend collect-only `4,382 / c7b9a77a...`;
+2. the 472-node/26-path Task 1 focused suite;
+3. the 1,784-node inventory-focused Task 1 runtime-survivor projection while
+   retaining the full 1,885-node stream as collect-only identity;
+4. backend collect-only `4,382 / ce7c045f...`;
 5. socket-guarded import controls for app, agents, CLI, scheduler, native host,
    and all four local stores; and
 6. protected 22-path hashes.
 
-Apply Section 0.7b's socket split to steps 1-3. The 444-node owner result must
-be exactly `443 passed / 1 skipped`, and the inventory-focused backend and
-frontend partitions must recombine to the literal `1,885` node set without a
-retry, omission, or unguarded provider-capable run.
+Apply Sections 0.7b-0.7c's socket split to steps 1-3. The 472-node owner result
+must be exactly `471 passed / 1 skipped`. The runtime-survivor backend and
+frontend partitions must recombine to the literal `1,784` node set, while the
+collect-only stream remains exactly `1,885`, without a retry, omission, or
+unguarded provider-capable run.
 
 No native full-suite claim is made at this intermediate stage. Store complete
 transcripts and exact owner pre/post hashes.
@@ -995,9 +1079,10 @@ Run in order:
 1. the dedicated scheduler continuity node with mutation-style removal of its
    local-history supplement as a discriminacy check;
 2. the 147-node/four-final-path Task 2 focused suite;
-3. the 1,852-node inventory-focused Task 2 projection;
+3. the 1,781-node inventory-focused Task 2 runtime-survivor projection while
+   retaining the full 1,852-node stream as collect-only identity;
 4. dynamic routes `173 / e0d8bf3c...`;
-5. backend collect-only `4,349 / d3103ccb...`;
+5. backend collect-only `4,349 / 04e93190...`;
 6. real lifespan/scheduler gate under the socket guard; and
 7. protected hashes and a zero-production-open receipt.
 
@@ -1091,8 +1176,8 @@ Run:
 
 1. the same ephemeral foundation gate, now GREEN;
 2. its negative self-tests;
-3. inventory-focused `1,781 / c7231bed...`;
-4. backend collect-only `4,278 / 5ca289af...`;
+3. inventory-focused `1,781 / 19443b6f...`;
+4. backend collect-only `4,278 / 80037a1b...`;
 5. Task 1 and Task 2 focused suites;
 6. an AST import/inheritance/type-gate projection over every tracked `.py`;
 7. the declared-dependency closure projection, with all five retired
@@ -1202,7 +1287,8 @@ required closures include:
 - the 18 frontend IDs become exactly Section 0.7's positive IDs.
 
 Every retained test edit must also belong to Section 0.7a's exact body or
-shared-fixture projection. The executor records pre/post AST scope hashes and
+shared-fixture projection or an exact Section 0.7c supplement. The executor
+records pre/post AST scope hashes and
 proves that every other retained node body in the same files is byte-identical.
 
 Do not translate technical terms into unnatural Traditional Chinese merely
@@ -1244,8 +1330,8 @@ Run:
 2. frontend full collection `1,177 / 101 / c570a551...`;
 3. frontend full runtime sequential `1,177/1,177`;
 4. TypeScript typecheck, production build, and i18n visible-literal scanner;
-5. inventory-focused final `1,781 / 7729fa36...`;
-6. backend collect-only `4,278 / 5ca289af...`;
+5. inventory-focused final `1,781 / b73e3ae5...`;
+6. backend collect-only `4,278 / 80037a1b...`;
 7. all Task 1/2 focused owners; and
 8. the exact base-to-tip path algebra and protected aggregate.
 
@@ -1260,7 +1346,7 @@ The product commit body must state:
 - semantic path ledger `161 delete / 174 modify / 1 capability add / 22
   protected`;
 - two bounded ownership-preserving renames;
-- node ledger `101 whole-file + 22 historical` removed, `40` positive
+- node ledger `101 whole-file + 22 historical` removed, `46` positive
   replacements, and `7` new contracts;
 - remote tables/private dump/private `.env` untouched; and
 - Git history plus the external packet are the recovery record.
@@ -1348,10 +1434,10 @@ insufficient evidence.
 In a fresh exact Task 4 worktree with empty real `data/`, scratch local DBs,
 sealed providers, socket guard, and no `config/.env` link, run:
 
-1. collect-only `4,278 / 5ca289af...`;
+1. collect-only `4,278 / 80037a1b...`;
 2. native canonical `4,278 seen / 4,266 passed / 12 skipped / 0 failed` with
    the pinned reporter;
-3. Task 1 focused `444/444`;
+3. Task 1 focused `472 seen / 471 passed / 1 skipped`;
 4. Task 2 focused `147/147`;
 5. inventory-focused `1,781/1,781`;
 6. real local-runtime lifespan/scheduler gate under the sanitized dependency
@@ -1487,7 +1573,7 @@ true:
 18. any whole-file test retirement is partial, copied, or expanded past the
     exact 101-node/six-file ledger;
 19. an existing test node name/body or shared test scope outside Sections
-    0.4-0.7a must change, or an in-place evolution changes behavior beyond
+    0.4-0.7c must change, or an in-place evolution changes behavior beyond
     replacing the inventoried obsolete reference with its current local
     contract;
 20. a historical node is preserved under a renamed compatibility assertion;
@@ -1532,9 +1618,10 @@ Plan review must reconstruct, without trusting executor-generated helpers:
 1. all four inventory path sets and protected aggregate;
 2. the exact 36-method union assigned to `LocalDataCapabilities`, the seven
    existing domain-owner projections, and all 18 measured surface rows;
-3. 101 whole-file nodes, 22 historical IDs, 40 replacement pairs, seven new
+3. 101 whole-file nodes, 22 historical IDs, 46 replacement pairs, seven new
    IDs, 18 frontend pairs, and the five retained-test evolution streams;
-4. the 17/5, 28/12, 5/2, and 30/71 task partitions;
+4. the 17/5, 34/12, 5/2, and 30/71 task partitions, plus the exact Task 1 and
+   Task 2 runtime-survivor projections;
 5. every backend/frontend/focused staged identity in Section 0.11;
 6. final native arithmetic and skip inheritance;
 7. the 173-row dynamic route target;
