@@ -1,7 +1,7 @@
 # Legacy-Agent CLI and Entrypoint Census Design
 
-> **Status:** DESIGN + PLAN REVIEWED GREEN; TASKS 0-1 REVIEWED GREEN; TASK 2
-> COMPLETE; INDEPENDENT CLASSIFICATION REVIEW NEXT; TASKS 3-4 NOT AUTHORIZED
+> **Status:** DESIGN + PLAN REVIEWED GREEN; TASKS 0-2 REVIEWED GREEN; TASK 3
+> COMPLETE; COMBINED IMPLEMENTATION REVIEW NEXT; TASK 4 NOT AUTHORIZED
 > **Date:** 2026-08-16
 > **Product base:** `241ccdba6dc7c2cf1b162dd254ada88f25b6a9b0`
 > **Scope:** docs-only inventory and recommendations; no product or test edits

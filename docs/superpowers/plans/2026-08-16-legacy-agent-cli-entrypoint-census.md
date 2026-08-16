@@ -1,7 +1,7 @@
 # Legacy-Agent CLI and Entrypoint Census Implementation Plan
 
-> **Status:** PLAN REVIEWED GREEN; TASKS 0-1 REVIEWED GREEN; TASK 2 COMPLETE;
-> INDEPENDENT CLASSIFICATION REVIEW NEXT; TASKS 3-4 NOT AUTHORIZED
+> **Status:** PLAN REVIEWED GREEN; TASKS 0-2 REVIEWED GREEN; TASK 3 COMPLETE;
+> COMBINED IMPLEMENTATION REVIEW NEXT; TASK 4 NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -1027,7 +1027,7 @@ Stop for Task 2 review unless a recorded batch ruling applies.
 **Produces:** independent admission packet and combined implementation-review
 surface. Canonical authority bytes cannot change during this task.
 
-- [ ] **Step 1: Rebuild with independent tools**
+- [x] **Step 1: Rebuild with independent tools**
 
 Create fresh detached worktrees at exact source base and Task 2 tip. Write a
 second scanner, closure validator, and projection generator directly from this
@@ -1035,28 +1035,28 @@ plan; do not copy/import Task 1-2 executor tools. Recollect backend/frontend,
 rebuild all raw families, consumer edges, test joins, and projection bytes.
 Executor tools may run only as a secondary control.
 
-- [ ] **Step 2: Compare all admitted artifacts byte-for-byte**
+- [x] **Step 2: Compare all admitted artifacts byte-for-byte**
 
 Require equality for candidate observations, per-family streams, overlap
 groups, entrypoints authority, all projections, exclusions, capability floor
 and additions, test joins, current invocations, human-summary count tables, and
 `MANIFEST.sha256`. Count-only equality is insufficient.
 
-- [ ] **Step 3: Re-prove safety and product immutability**
+- [x] **Step 3: Re-prove safety and product immutability**
 
 Rebuild the 942-row protected aggregate; verify every source-base blob/mode.
 Confirm no `src.agents.__main__` import attempt, no CLI/Discord/process launch,
 no test body, no provider/network/production-store/secret action, and no main
 runtime link. Verify git-crypt blob equality and bounded plaintext extraction.
 
-- [ ] **Step 4: Leak-audit packet and tracked artifacts**
+- [x] **Step 4: Leak-audit packet and tracked artifacts**
 
 Scan for home paths, credential values, email addresses, tokens/JWTs, private
 env lines, arbitrary encrypted plaintext, URLs containing credentials, and
 production database paths. Repository-relative paths, public command names,
 package versions, and reviewed fixture values are allowed.
 
-- [ ] **Step 5: Commit status and stop for combined review**
+- [x] **Step 5: Commit status and stop for combined review**
 
 Mark Tasks 0-3 complete and `IMPLEMENTATION REVIEW NEXT` without changing any
 canonical inventory file. Manifest the admission packet and commit status docs:
