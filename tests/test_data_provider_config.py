@@ -28,10 +28,16 @@ def hermetic(monkeypatch, tmp_path):
     monkeypatch.setattr(dpc, "_APP_APPLIED", set())
     monkeypatch.setattr("src.env_keys.reload_var_from_file",
                         lambda name: (os.environ.pop(name, None), False)[1])
-    for var in ("POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
-                "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID",
-                "ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT"):
+    managed_vars = (
+        "POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
+        "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID",
+        "ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT",
+    )
+    for var in managed_vars:
         monkeypatch.delenv(var, raising=False)
+    yield
+    for var in managed_vars:
+        os.environ.pop(var, None)
 
 
 # --- store -----------------------------------------------------------------------
