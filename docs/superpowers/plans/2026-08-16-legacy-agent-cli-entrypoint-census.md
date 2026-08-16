@@ -1,7 +1,7 @@
 # Legacy-Agent CLI and Entrypoint Census Implementation Plan
 
-> **Status:** PLAN AUTHORED; INDEPENDENT REVIEW NEXT; IMPLEMENTATION NOT
-> AUTHORIZED
+> **Status:** PLAN REVIEWED GREEN; TASK 0 COMPLETE; INDEPENDENT TASK 0 REVIEW
+> NEXT; TASKS 1-4 NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -680,14 +680,14 @@ GREEN and remains no-push.
 all Section 0.7 source streams, protected aggregate, import-trap witness, and a
 Task 0 docs commit.
 
-- [ ] **Step 1: Create a fresh implementation worktree**
+- [x] **Step 1: Create a fresh implementation worktree**
 
 Branch `codex/legacy-agent-cli-entrypoint-census` from the exact independently
 reviewed plan tip. Prove that source base `241ccdba..PLAN_TIP` changes only the
 reviewed design, this plan, and priority-map status. Stop on master drift,
 merge-base mismatch, dirty tracked state, or any product-byte difference.
 
-- [ ] **Step 2: Establish the isolated packet and toolchain**
+- [x] **Step 2: Establish the isolated packet and toolchain**
 
 Use packet root `/tmp/legacy-agent-cli-census-task0-241ccdba`. Set scratch
 `HOME`, XDG directories, token/store paths, profile DB paths, and lock paths
@@ -701,7 +701,7 @@ the main root. Confirm app-local `apps/arkscope-web/node_modules` is absent.
 Run the explicit root Vitest binary's `--version`; reject any download/cache
 mutation or version other than 4.1.8.
 
-- [ ] **Step 3: Install a census import blocker**
+- [x] **Step 3: Install a census import blocker**
 
 Create a packet-local pytest plugin whose `MetaPathFinder.find_spec()` raises a
 distinct census error when `fullname == "src.agents.__main__"`. It records only
@@ -712,7 +712,7 @@ Do not preload a harmless replacement into `sys.modules`; that would hide an
 accidental import. Do not import `src.agents.cli` as a probe. Static AST is the
 only admitted product inspection.
 
-- [ ] **Step 4: Recollect backend and frontend without test bodies**
+- [x] **Step 4: Recollect backend and frontend without test bodies**
 
 Run pytest collect-only with both the pinned reporter and import blocker. The
 report must state zero test bodies executed and produce exactly
@@ -723,7 +723,7 @@ From `apps/arkscope-web`, run explicit
 normalizer. Require exactly 1,177 nodes, 101 files, and `c570a551...`.
 Rebuild the 209/92 owner projections from the backend stream.
 
-- [ ] **Step 5: Reconstruct every literal grounding stream**
+- [x] **Step 5: Reconstruct every literal grounding stream**
 
 From exact source-base Git blobs, independently reconstruct Section 0.7's
 16/19 main-guard, 10 parser, 4 shell, 3 package, 2 executable-mode, 2 module,
@@ -737,7 +737,7 @@ single/double quotes, and arbitrary indentation. Parser extraction recognizes
 and `fire.Fire` through resolved import aliases. Regex-only main/parser evidence
 is rejected.
 
-- [ ] **Step 6: Re-prove the dangerous-module and git-crypt facts**
+- [x] **Step 6: Re-prove the dangerous-module and git-crypt facts**
 
 Using AST/call-site search only, confirm line 17's unconditional `main()` and
 line 72's `_load_env()` call; confirm zero importers of
@@ -745,7 +745,7 @@ line 72's `_load_env()` call; confirm zero importers of
 main tree. Extract only normalized command tokens from encrypted plaintext and
 discard source lines immediately.
 
-- [ ] **Step 7: Rebuild protected rows and write evidence**
+- [x] **Step 7: Rebuild protected rows and write evidence**
 
 Recreate the 942-row protected aggregate and compare byte-for-byte. Record
 accepted/rejected artifacts, exact commands, tool versions, no-import witness,
