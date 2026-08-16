@@ -1,8 +1,7 @@
 # Legacy-Agent CLI and Entrypoint Census Implementation Plan
 
-> **Status:** PLAN REVIEWED GREEN; TASKS 0-1 REVIEWED GREEN; TASK 2 STOPPED
-> BEFORE AUTHORITY GENERATION FOR NORMALIZED-AUTHORITY AMENDMENT REVIEW;
-> TASKS 3-4 NOT AUTHORIZED
+> **Status:** PLAN REVIEWED GREEN; TASKS 0-1 REVIEWED GREEN; TASK 2 COMPLETE;
+> INDEPENDENT CLASSIFICATION REVIEW NEXT; TASKS 3-4 NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -902,7 +901,7 @@ Stop for Task 1 review unless a recorded batch ruling applies.
 **Produces:** complete canonical ledger, deterministic projections, human
 census, user decision packet, validator/negative tests, and Task 2 docs commit.
 
-- [ ] **Step 1: Trace every consumer and reachability edge**
+- [x] **Step 1: Trace every consumer and reachability edge**
 
 For every candidate, perform uncapped AST/text/manifest/package/document/test
 caller census. Record concrete call chains and choose the strongest design
@@ -914,13 +913,13 @@ Reproduce the zero-caller facts for `src.agents.__main__` and
 `MindfulDiscordBot.start_bot()`. Treat notifier bot attachment as a consumer
 edge only to the symbols it actually calls; do not infer a bot launcher.
 
-- [ ] **Step 2: Build exact test ownership**
+- [x] **Step 2: Build exact test ownership**
 
 Map direct imports, launch-contract tests, capability tests, and documentation
 tests to exact node IDs. File-level test ownership is forbidden. The 209-node
 projection is only the search ceiling; `tests.tsv` contains exact direct nodes.
 
-- [ ] **Step 3: Build the legacy CLI capability matrix**
+- [x] **Step 3: Build the legacy CLI capability matrix**
 
 Parse all function/class definitions, slash-command dispatch branches, parser
 flags, shared-owner calls, and local writes in `src/agents/cli.py`. Populate
@@ -933,7 +932,7 @@ Do not infer all imported symbols must remain or all local helpers may retire.
 Compatibility re-exports, presentation, import-time env loading, query runners,
 stores, and shared domain functions are distinct ownership questions.
 
-- [ ] **Step 4: Build the Discord capability and liveness matrix**
+- [x] **Step 4: Build the Discord capability and liveness matrix**
 
 Trace Discord query/follow-up/model/effort/skill/notification/admin symbols,
 shared agent owners, notifier seams, config/dependency declarations, and exact
@@ -945,7 +944,7 @@ The skill auto-apply rows for CLI and Discord must both carry
 `decision_gate=track_b_skill_policy`. Wrapper disposition cannot be inferred
 until the user rules.
 
-- [ ] **Step 5: Classify all non-agent entrypoints**
+- [x] **Step 5: Classify all non-agent entrypoints**
 
 Classify current app runtime, operator, integration host/install, dev/build,
 diagnostic, and stale documented surfaces. Operator commands do not become
@@ -953,7 +952,7 @@ retirement candidates merely because the desktop does not invoke them.
 Generated native-host contracts and browser manifests remain external
 contracts with their exact owner chain.
 
-- [ ] **Step 6: Write canonical rows and candidate closure**
+- [x] **Step 6: Write canonical rows and candidate closure**
 
 Create `entrypoints.jsonl`. Persist every admitted raw candidate exactly once as
 candidate evidence on its canonical row; put only true exclusions in the
@@ -963,7 +962,7 @@ and derive `recommendations.tsv` losslessly from the canonical ledger.
 Create `MANIFEST.sha256` over every authority file in path-byte order, excluding
 the manifest itself.
 
-- [ ] **Step 7: Implement validator and negative self-tests**
+- [x] **Step 7: Implement validator and negative self-tests**
 
 The packet-local validator rejects at least:
 
@@ -991,7 +990,7 @@ The packet-local validator rejects at least:
     ledger/detail foreign-key mismatch; and
 21. manifest self-inclusion or missing payload.
 
-- [ ] **Step 8: Write the human census and decision packet**
+- [x] **Step 8: Write the human census and decision packet**
 
 The human document summarizes exact counts and presents:
 
@@ -1006,7 +1005,7 @@ The human document summarizes exact counts and presents:
 It states that census completion is final even if the user defers disposition.
 It must not open or imply an implementation plan.
 
-- [ ] **Step 9: Validate, manifest, and commit**
+- [x] **Step 9: Validate, manifest, and commit**
 
 Run validator plus all negative self-tests, regenerate the entire authority set
 twice,

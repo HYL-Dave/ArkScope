@@ -1,0 +1,21 @@
+candidate_id	reason	evidence
+documented_command:docs/analysis/SCORING_VALIDATION_METHODOLOGY.md:171:1:command:python scripts/analysis/validate_scoring_value.py	historical_or_governance_invocation	docs/analysis/SCORING_VALIDATION_METHODOLOGY.md:171:historical_authority
+documented_command:docs/analysis/SCORING_VALIDATION_METHODOLOGY.md:182:1:command:python scripts/analysis/sentiment_backtest.py	historical_or_governance_invocation	docs/analysis/SCORING_VALIDATION_METHODOLOGY.md:182:historical_authority
+documented_command:docs/data/IBKR_NEWS_API_LIMITATIONS.md:150:34:command:python scripts/collection/collect_ibkr_news.py	historical_or_governance_invocation	docs/data/IBKR_NEWS_API_LIMITATIONS.md:150:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:136:36:command:npm run build	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:136:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:136:5:command:npm install	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:136:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:139:5:command:npm run dev	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:139:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:15:33:command:python -m src.api	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:15:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:23:78:command:python -m src.api	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:23:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:46:75:command:python -m src.api	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:46:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:79:60:command:python -m src.api	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:79:historical_authority
+documented_command:docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:85:31:command:python -m src.api	historical_or_governance_invocation	docs/design/DESKTOP_SHELL_SPIKE_PLAN.md:85:historical_authority
+documented_command:docs/design/P0_1_FULL_V1_SPEC.md:193:230:command:python -m pytest	historical_or_governance_invocation	docs/design/P0_1_FULL_V1_SPEC.md:193:historical_authority
+documented_command:docs/design/P0_1_FULL_V1_SPEC.md:258:4:command:python -m pytest	historical_or_governance_invocation	docs/design/P0_1_FULL_V1_SPEC.md:258:historical_authority
+documented_command:docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md:263:4:command:python -m pytest	historical_or_governance_invocation	docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md:263:historical_authority
+documented_command:docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md:87:21:command:python -m pytest	historical_or_governance_invocation	docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md:87:historical_authority
+documented_command:docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md:88:21:command:python -m pytest	historical_or_governance_invocation	docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md:88:historical_authority
+documented_command:docs/design/PROJECT_PRIORITY_MAP.md:1205:1842:command:python -m src.api	historical_or_governance_invocation	docs/design/PROJECT_PRIORITY_MAP.md:1205:historical_authority
+documented_command:docs/design/PROJECT_PRIORITY_MAP.md:1207:297:command:python -m src.daily_update	historical_or_governance_invocation	docs/design/PROJECT_PRIORITY_MAP.md:1207:historical_authority
+documented_command:docs/design/PROJECT_PRIORITY_MAP.md:1208:879:command:python -m src.	historical_or_governance_invocation	docs/design/PROJECT_PRIORITY_MAP.md:1208:historical_authority
+documented_command:docs/design/PROJECT_PRIORITY_MAP.md:1220:289:command:python -m src.prices_runtime	historical_or_governance_invocation	docs/design/PROJECT_PRIORITY_MAP.md:1220:historical_authority

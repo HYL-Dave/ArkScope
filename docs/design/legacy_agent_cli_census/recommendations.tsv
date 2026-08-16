@@ -1,0 +1,81 @@
+entrypoint_id	product_role	reachability	app_equivalence	recommendation	decision_gate
+README.md::documented_command::npm install	development_or_build_tool	documented_manual	not_applicable	retain_current	none
+apps/arkscope-desktop/dev.js::desktop_launcher::apps/arkscope-desktop/dev.js	development_or_build_tool	documented_manual	not_applicable	retain_current	none
+apps/arkscope-desktop/main.js::desktop_launcher::apps/arkscope-desktop/main.js	current_app_runtime	app_started	not_applicable	retain_current	none
+apps/arkscope-desktop/package.json::npm_script::npm:apps/arkscope-desktop:start	current_app_runtime	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:build	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:check:i18n-literals	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:dev	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:preview	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:test	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:test:watch	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/package.json::npm_script::npm:apps/arkscope-web:typecheck	development_or_build_tool	external_contract	not_applicable	retain_current	none
+apps/arkscope-web/scripts/i18n/visible-literal-scanner.mjs::external_manifest_target::apps/arkscope-web/scripts/i18n/visible-literal-scanner.mjs	development_or_build_tool	external_contract	not_applicable	retain_current	none
+data_sources/IBKR_GUIDE.md::documented_command::./ibgateway-stable-standalone-linux-x64.sh	integration_install_or_host	documented_manual	not_applicable	retain_current	external_integration_confirmation
+data_sources/PAID_SUBSCRIPTION_EVALUATION.md::documented_command::python scripts/collection/collect_ibkr_fundamentals.py	stale_documented_surface	documented_manual	unknown	remove_stale_invocation	none
+data_sources/financial_metrics_calculator.py::python_script::data_sources/financial_metrics_calculator.py	unowned_diagnostic	test_only	not_applicable	retirement_candidate	none
+data_sources/sec_earnings_releases.py::python_script::data_sources/sec_earnings_releases.py	unowned_diagnostic	test_only	not_applicable	retirement_candidate	none
+data_sources/sec_insider_trades.py::python_script::data_sources/sec_insider_trades.py	unowned_diagnostic	test_only	not_applicable	retirement_candidate	none
+docs/data/NEWS_DATA_INVENTORY.md::documented_command::python score_risk_anthropic.py	stale_documented_surface	documented_manual	unknown	remove_stale_invocation	none
+docs/data/NEWS_DATA_INVENTORY.md::documented_command::python score_sentiment_anthropic.py	stale_documented_surface	documented_manual	unknown	remove_stale_invocation	none
+docs/data/NEWS_DATA_INVENTORY.md::documented_command::python score_sentiment_openai.py	stale_documented_surface	documented_manual	unknown	remove_stale_invocation	none
+docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md::documented_command::python -m pytest	development_or_build_tool	documented_manual	not_applicable	retain_current	none
+docs/design/SA_EXTENSION_ROADMAP.md::documented_command::python scripts/analysis/analyze_sa_market_news_density.py	stale_documented_surface	documented_manual	unknown	remove_stale_invocation	none
+extensions/sa_alpha_picks/background.js::external_manifest_target::extensions/sa_alpha_picks/background.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/build_firefox.py::python_script::extensions/sa_alpha_picks/build_firefox.py	development_or_build_tool	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/compat_firefox.js::external_manifest_target::extensions/sa_alpha_picks/compat_firefox.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/extension_diagnostics.js::external_manifest_target::extensions/sa_alpha_picks/extension_diagnostics.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/extension_run_protocol.js::external_manifest_target::extensions/sa_alpha_picks/extension_run_protocol.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/extension_telemetry.js::external_manifest_target::extensions/sa_alpha_picks/extension_telemetry.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/install.sh::external_manifest_target::external:com.mindfulrl.sa_alpha_picks	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/install.sh::shell_script::extensions/sa_alpha_picks/install.sh	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/install_firefox.sh::shell_script::extensions/sa_alpha_picks/install_firefox.sh	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/native_host_launcher.sh::native_host::extensions/sa_alpha_picks/native_host_launcher.sh	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/popup.html::external_manifest_target::extensions/sa_alpha_picks/popup.html	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/popup.js::external_manifest_target::extensions/sa_alpha_picks/popup.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/popup_action_catalog.js::external_manifest_target::extensions/sa_alpha_picks/popup_action_catalog.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/reconciliation_ui.js::external_manifest_target::extensions/sa_alpha_picks/reconciliation_ui.js	integration_install_or_host	external_contract	not_applicable	retain_current	none
+extensions/sa_alpha_picks/uninstall.sh::shell_script::extensions/sa_alpha_picks/uninstall.sh	integration_install_or_host	external_contract	not_applicable	retain_current	none
+package.json::npm_script::npm:.:build	development_or_build_tool	external_contract	not_applicable	retain_current	none
+package.json::npm_script::npm:.:dev:desktop	current_app_runtime	external_contract	not_applicable	retain_current	none
+package.json::npm_script::npm:.:dev:web	development_or_build_tool	external_contract	not_applicable	retain_current	none
+package.json::npm_script::npm:.:start	current_app_runtime	external_contract	not_applicable	retain_current	none
+src/agents/__main__.py::python_module::src.agents	legacy_agent_product	documented_manual	partial	fold_into_app_then_retire	track_b_skill_policy
+src/agents/cli.py::python_script::main	legacy_agent_product	documented_manual	partial	fold_into_app_then_retire	track_b_skill_policy
+src/api/__main__.py::python_module::src.api	current_app_runtime	app_started	not_applicable	retain_current	none
+src/audit/ibkr_news_catchup_audit.py::python_script::src/audit/ibkr_news_catchup_audit.py	current_operator_command	test_only	not_applicable	retain_current	none
+src/audit/sa_article_reconciliation.py::python_script::src/audit/sa_article_reconciliation.py	current_operator_command	unreferenced	not_applicable	retain_current	none
+src/audit/universe_retirement.py::python_script::src/audit/universe_retirement.py	current_operator_command	test_only	not_applicable	retain_current	none
+src/auth_drivers/claude_code_oauth_driver.py::external_manifest_target::external:claude	unowned_diagnostic	test_only	not_applicable	retirement_candidate	none
+src/auth_drivers/claude_oauth_probe.py::external_manifest_target::external:claude	current_app_runtime	app_started	not_applicable	retain_current	none
+src/auth_drivers/codex_account_usage.py::external_manifest_target::external:codex	current_app_runtime	app_started	not_applicable	retain_current	none
+src/collectors/finnhub_news.py::python_script::src/collectors/finnhub_news.py	current_operator_command	test_only	not_applicable	retain_current	none
+src/collectors/polygon_news.py::python_script::src/collectors/polygon_news.py	current_operator_command	test_only	not_applicable	retain_current	none
+src/daily_update.py::external_manifest_target::external:dynamic-run-command	unowned_diagnostic	unreferenced	not_applicable	retirement_candidate	none
+src/daily_update.py::python_script::src/daily_update.py	current_operator_command	documented_manual	not_applicable	retain_current	none
+src/monitor/discord_bot.py::python_script::MindfulDiscordBot	legacy_notification_surface	test_only	partial	fold_into_app_then_retire	track_b_skill_policy
+src/news_normalized/ibkr_cli.py::python_script::src/news_normalized/ibkr_cli.py	current_operator_command	app_started	not_applicable	retain_current	none
+src/options_math/option_pricing.py::python_script::src/options_math/option_pricing.py	unowned_diagnostic	test_only	not_applicable	retirement_candidate	none
+src/prices_runtime.py::python_script::src/prices_runtime.py	current_operator_command	app_started	not_applicable	retain_current	none
+src/sa_native_host.py::native_host::src/sa_native_host.py	integration_install_or_host	app_started	not_applicable	retain_current	none
+src/service/data_scheduler.py::external_manifest_target::external:dynamic-run-subprocess	unowned_diagnostic	unreferenced	not_applicable	retirement_candidate	none
+src/tools/code_executor.py::external_manifest_target::external:python-inline	current_app_runtime	app_started	not_applicable	retain_current	none
+src/tools/code_generator.py::external_manifest_target::external:claude	current_app_runtime	app_started	not_applicable	retain_current	none
+src/tools/code_generator.py::external_manifest_target::external:codex	current_app_runtime	app_started	not_applicable	retain_current	none
+tests/fixtures/sa_extension/packaging/background.js::external_manifest_target::tests/fixtures/sa_extension/packaging/background.js	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/fixtures/sa_extension/packaging/compat_firefox.js::external_manifest_target::tests/fixtures/sa_extension/packaging/compat_firefox.js	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/fixtures/sa_extension/packaging/content.js::external_manifest_target::tests/fixtures/sa_extension/packaging/content.js	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/fixtures/sa_extension/packaging/popup.html::external_manifest_target::tests/fixtures/sa_extension/packaging/popup.html	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/fixtures/sa_extension/packaging/popup.js::external_manifest_target::tests/fixtures/sa_extension/packaging/popup.js	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/fixtures/sa_extension/packaging/shared.js::external_manifest_target::tests/fixtures/sa_extension/packaging/shared.js	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/live/sdk_driver_smoke.py::python_script::tests/live/sdk_driver_smoke.py	current_operator_command	documented_manual	not_applicable	retain_current	none
+tests/live/sdk_route_smoke.py::python_script::tests/live/sdk_route_smoke.py	current_operator_command	documented_manual	not_applicable	retain_current	none
+tests/live/smoke_fred.py::python_script::tests/live/smoke_fred.py	current_operator_command	documented_manual	not_applicable	retain_current	none
+tests/test_data_access.py::external_manifest_target::dynamic:Attribute	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/test_ibkr_scanner.py::python_script::tests/test_ibkr_scanner.py	current_operator_command	test_only	not_applicable	retain_current	none
+tests/test_ibkr_source_import_safety.py::external_manifest_target::external:python-inline	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/test_macro_scheduler_integration.py::external_manifest_target::external:python-inline	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/test_option_pricing.py::python_script::tests/test_option_pricing.py	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/test_sa_article_reconciliation_schema.py::external_manifest_target::external:python-inline	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/test_sa_capture_store.py::external_manifest_target::external:python-inline	development_or_build_tool	test_only	not_applicable	retain_current	none
+tests/test_sa_native_host_telemetry.py::external_manifest_target::external:python-inline	development_or_build_tool	test_only	not_applicable	retain_current	none
