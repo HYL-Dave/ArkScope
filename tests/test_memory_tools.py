@@ -1,7 +1,7 @@
 """Tests for memory tools (Phase 15 — Episodic Memory).
 
-Tests save_memory, recall_memories, list_memories, delete_memory
-with file-based fallback (no DB required).
+Tests save_memory, recall_memories, list_memories, and delete_memory with the
+current local storage owner.
 """
 
 import os
@@ -27,9 +27,7 @@ from src.tools.memory_tools import (
 
 @pytest.fixture
 def mock_dal(tmp_path):
-    """Mock DAL pointing at a tmp base. Post-PG-exit closeout, memory tools always
-    route to the local AppRecordsLocalStore at <base>/data/profile_state.db —
-    there is no PG/backend path left to force."""
+    """Mock DAL pointing at a temporary local profile base."""
     dal = MagicMock()
     dal._base = tmp_path
     del dal._backend  # records tools must not touch dal._backend anymore
@@ -38,9 +36,7 @@ def mock_dal(tmp_path):
 
 @pytest.fixture
 def mock_dal_with_db(tmp_path):
-    """Alias shape kept for the *_with_db test names: same local-store routing.
-    The old MagicMock PG backend is gone — the closeout collapsed records routing
-    to the local store regardless of flags or backend presence."""
+    """Alias fixture preserving the existing local-store test shape."""
     dal = MagicMock()
     dal._base = tmp_path
     del dal._backend

@@ -48,7 +48,7 @@ const SOURCE_CARD_CONCLUSION = 'SOURCE CARD <script>alert("source")</script> CON
 const SOURCE_CARD_TIMESTAMP = "SOURCE_CARD_TIMESTAMP_NOT_A_DATE";
 const UNKNOWN_CONFIDENCE = "future_confidence_v9";
 const SOURCE_AS_OF = "SOURCE_WATCHLIST_AS_OF_NOT_A_DATE";
-const UNSAFE_MESSAGE = "RAW backend workspace failure: postgres://admin:secret@10.0.0.8/private";
+const UNSAFE_MESSAGE = "RAW backend workspace failure: token=secret private";
 const UNSAFE_DIAGNOSTIC = "Authorization: Bearer sk-live-secret\nTraceback /srv/private.py:42";
 const TRANSLATED_CONCLUSION = "PLANTED TRANSLATED RESULT 仍保持";
 

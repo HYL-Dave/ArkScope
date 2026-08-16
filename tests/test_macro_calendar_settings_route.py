@@ -1,9 +1,8 @@
 """Slice §4c — expose use_local_macro in Settings (explicit toggle, default-off).
 
-Backend route mirrors the use_local_market precedent (/market-data/status + /settings):
-GET /macro/status reports the toggle + local-DB coverage (READ-ONLY — must not create the
-DB), PUT /macro/settings persists the toggle. Route-unit-test convention: call the handler
-directly with a fake ProfileStateStore (NOT TestClient — AnyIO/lifespan hangs without PG).
+GET /macro/status reports the setting and local database coverage without creating the
+database; PUT /macro/settings persists the setting. Route unit tests call the handler
+directly with a fake ProfileStateStore so lifespan behavior remains outside this scope.
 """
 
 from __future__ import annotations
@@ -65,9 +64,7 @@ def test_status_reflects_setting_and_env_and_coverage(tmp_path, monkeypatch):
 
 def test_local_first_active_when_toggle_on_even_if_db_absent(tmp_path, monkeypatch):
     # Bug fix: the factory routes LOCAL the moment use_local_macro is on — it creates the DB
-    # on first use and there is NO PG fallback in the local path. So local_first_active must
     # reflect routing (setting OR env), NOT file existence. Previously it was (on AND exists),
-    # which lied: status said "PG" while the runtime already served (empty) local.
     db = tmp_path / "macro_calendar.db"
     monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(db))
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
@@ -79,7 +76,6 @@ def test_local_first_active_when_toggle_on_even_if_db_absent(tmp_path, monkeypat
     monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")   # env-only path
     out2 = routes.macro_status(store=_FakeProfileStore())
     assert out2["local_first_active"] is True
-    # explicit false is retained as provenance, not as a PG fallback lever
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
     off = routes.macro_status(store=_FakeProfileStore({USE_LOCAL_MACRO_KEY: "false"}))
     assert off["use_local_macro_setting"] is False

@@ -101,8 +101,6 @@ Each entry records:
 - `evidence`:
   - definitions remain in `apps/arkscope-web/src/styles.css:923-938` and
     `apps/arkscope-web/src/styles.css:1119-1125`;
-  - I18N-6 independently recorded both selectors as dead in
-    `docs/superpowers/specs/2026-07-25-i18n-6-release-design.md:622`;
   - reproduce the live-owner census with:
 
     ```bash
@@ -128,9 +126,6 @@ Each entry records:
   failure-set equivalence and risking concealment of a new failure inside
   familiar noise.
 - `evidence`:
-  - `docs/superpowers/evidence/2026-07-25-sa-extension-reliability-control-clarity.md:188-200`
-    records matched implementer A/B at `30 failed / 7 errors` and matched
-    data-bearing reviewer A/B at `31 failed / 0 errors`;
   - `docs/design/PROJECT_PRIORITY_MAP.md:527` records that the two 31-ID sets
     were byte-identical while the absolute classification was environment
     dependent;
@@ -149,22 +144,13 @@ Each entry records:
     `7aafce5d2cba923480cc1fb6221bce4f5a33e0bf61c06cf94227cafefe227f15`;
   - 26 IDs trace to the 2026-02-05 real-repository-data tests in `74433f84`;
     one ID is the moving-window test introduced by `e6d99342`; and
-  - the approved classification and disposition are now owned by
-    `docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md`;
-  - the Task 6 review packet at
-    `docs/superpowers/evidence/2026-07-31-eir-002-green-backend-baseline.md`
-    records exact collection `4730/c34de9a0...`, native
+  - the approved repair records exact collection `4730/c34de9a0...`, native
     `4658 passed / 72 skipped / 0 failed`, an empty non-passing stream,
     protected anchors `94 passed / 18 skipped`, and exact artifact
     quarantine/restoration;
   - Task 7 fast-forwarded exact reviewed tip `99bc071e` and reproduced
-    `4730/c34de9a0...` plus focused `123/123`. Main-root full admission then
-    exposed one stale protected assertion only when ignored `config/.env`
-    enabled the PG integration class:
-    `tests/test_db_backend.py::TestFundamentalsDB::test_fundamentals_via_dal`
-    reads nonexistent `FundamentalsResult.found`. The same node skips without
-    that file. A real scheduler write during the run separately proved the
-    production main root is not a frozen data boundary.
+    `4730/c34de9a0...` plus focused `123/123`. A real scheduler write during the
+    run separately proved the production main root is not a frozen data boundary.
 - `owner`: closed by the EIR-002 green-backend-baseline slice.
 - `next_action`: none. Treat any later canonical non-passing node as a new
   regression or separately classified register item, not inherited debt.
@@ -278,11 +264,9 @@ Each entry records:
     (`4806f3d6...`);
   - unchanged native v3 `run-side` returned `complete=true`, selected all
     eight first attempts, unresolved `[]`, non-passing `27/7aafce5d...`; and
-  - canonical records:
+  - the canonical lifespan diagnosis remains recorded in
     `docs/superpowers/evidence/2026-07-29-lifespan-stall-causal-diagnosis.md`
-    Section 14 and
-    `docs/superpowers/evidence/2026-07-28-price-collection-partial-truth.md`
-    Section 8.11.
+    Section 14.
 
 ### EIR-006 - Stop presenting a historical CSV close as a current valuation input
 
@@ -361,9 +345,9 @@ duplicate entries:
 
 | Observation | Canonical disposition |
 |---|---|
-| jsdom popup contrast gate must remain paired with real Chrome computed styles | Permanent release rule already recorded in `2026-07-25-sa-extension-reliability-control-clarity-design.md:101-107`. |
+| jsdom popup contrast gate must remain paired with real Chrome computed styles | Permanent release rule; textual-only CSS evidence is insufficient. |
 | Partial-status `#b45309` on `#fff3e0` measured `4.58:1` | Dated accepted boundary already recorded in the same spec at lines 98-99; changing either color must rerun its gate. |
 | Identical zh/en resource values | Not admitted. A fresh recursive resource comparison reproduces `160` identical leaves. The review additionally reported `24` multi-word non-CJK leaves and proposed `2` aria, `6` routing, and `5` runtime candidates, but that exact key ledger and its classification rule are not persisted in the repo and therefore are not independently reproducible yet. Equal identifiers and professional terms may be deliberate. Persist and review the exact candidate keys before opening an issue; none of these counts is an acceptance constant. |
 | SA evidence used different absolute full-suite summaries | Resolved and documented in the evidence packet and priority-map decision log; no open repair remains. |
-| Coverage v2 blunt 15-minute threshold | Resolved in review-ready product tip `cb33a193`: the `_THIN_BAR_THRESHOLD` / maximum-relative owner is absent, and exact reviewed RTH slot identity now derives coverage. Independent implementation review and merge remain pending; see `docs/superpowers/evidence/2026-07-26-coverage-v2-session-truth.md`. |
+| Coverage v2 blunt 15-minute threshold | Resolved in product tip `cb33a193`: the `_THIN_BAR_THRESHOLD` / maximum-relative owner is absent, and exact RTH slot identity now derives coverage. |
 | Calibration Anthropic refusal seam | Existing-contract violation promoted directly to the dedicated micro-slice plan; it never enters this register. |

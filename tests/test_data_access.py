@@ -104,10 +104,12 @@ def test_local_capability_protocol_matches_inventory_method_set():
 def test_default_data_access_constructs_current_local_authority(tmp_path):
     import inspect
 
-    assert "db_dsn" not in inspect.signature(DataAccessLayer).parameters
+    assert tuple(inspect.signature(DataAccessLayer).parameters) == (
+        "base_path",
+        "backend",
+    )
     local = DataAccessLayer(base_path=tmp_path)
     assert type(local._backend).__name__ == "SACaptureBackend"
-    assert not hasattr(local, "_db_dsn")
 
 
 def test_explicit_capability_injection_needs_no_nominal_type_routing(tmp_path):
@@ -136,19 +138,16 @@ import sys
 sys.path.insert(0, {str(project_root)!r})
 from src.tools.data_access import DataAccessLayer
 local = DataAccessLayer(base_path={str(tmp_path)!r})
-required = {{
+expected = {{
+    'src.tools.backends.file_backend',
     'src.tools.backends.local_capabilities',
     'src.tools.backends.local_market_backend',
+    'src.tools.backends.provenance',
     'src.tools.backends.sa_capture_backend',
     'src.tools.backends.sqlite_backend',
 }}
-forbidden = {{
-    'src.tools.backends.db_backend',
-    'src.tools.backends.db_config',
-    'psycopg2',
-}}
-assert required <= set(sys.modules), sorted(required - set(sys.modules))
-assert not (forbidden & set(sys.modules)), sorted(forbidden & set(sys.modules))
+loaded = {{name for name in sys.modules if name.startswith('src.tools.backends.')}}
+assert loaded == expected, sorted(loaded ^ expected)
 assert type(local._backend).__name__ == 'SACaptureBackend'
 """
     completed = subprocess.run(

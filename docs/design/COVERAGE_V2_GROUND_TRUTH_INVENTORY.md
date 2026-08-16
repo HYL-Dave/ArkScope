@@ -6,9 +6,8 @@
 > **Purpose:** Evidence-only pre-spec inventory. This document does not select a
 > runtime calendar, authorize product changes, or turn observed bar counts into
 > acceptance constants.
-> **Successor:** The reviewed decisions are written at
-> [`2026-07-26-coverage-v2-session-truth-design.md`](../superpowers/specs/2026-07-26-coverage-v2-session-truth-design.md),
-> now LIVE through merged product tip `3f0fb18f`.
+> **Implementation:** The reviewed decisions are LIVE through merged product
+> tip `3f0fb18f`.
 
 ## 1. Executive Finding
 

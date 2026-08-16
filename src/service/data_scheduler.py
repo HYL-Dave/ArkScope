@@ -17,14 +17,12 @@ Sources v1:
   - sec_corporate_actions             — SEC filing metadata and bounded filing
     evidence → local lifecycle/M&A review observations
 
-Active writers now write local stores directly. Prices are post-P0-C
-direct-local; news is post-N8a PG-exited: provider fetches write normalized
-SQLite and project the legacy local read surface directly.
+Active writers write local stores directly. Provider fetches write normalized
+records and project the compatibility read surface where required.
 
 Write-contention guarantees (the user's explicit SQLite concern):
   - provider fetches happen outside market_data.db write locks where possible;
-  - active market writes go through direct-local writers; retired PG mirror
-    domains fail closed before provider work;
+  - active market writes go through direct-local writers;
   - the local SQLite is written by direct-local writers only; financial_cache
     writes are already serialized by _CACHE_WRITE_LOCK;
   - per-source locks make same-source runs skip (never queue), so a slow run
@@ -119,7 +117,7 @@ SOURCES: Dict[str, SourceDef] = {
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
             source_badges=("Polygon", "直寫本地"),
-            description="Polygon news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
+            description="Polygon news incremental → normalized local records + compatibility projection",
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
@@ -127,7 +125,7 @@ SOURCES: Dict[str, SourceDef] = {
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             writes_market_db=True,
             source_badges=("Finnhub", "直寫本地"),
-            description="Finnhub news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
+            description="Finnhub news incremental → normalized local records + compatibility projection",
         ),
         SourceDef(
             "ibkr_news", "IBKR 新聞",
@@ -136,7 +134,7 @@ SOURCES: Dict[str, SourceDef] = {
             news_direct_source="ibkr",
             writes_market_db=True,
             source_badges=("IBKR", "直寫本地"),
-            description="IBKR news incremental (Gateway) → normalized SQLite + legacy local projection (no news PG sync/mirror)",
+            description="IBKR news incremental (Gateway) → normalized local records + compatibility projection",
         ),
         SourceDef(
             "ibkr_prices", "IBKR 股價",
@@ -145,7 +143,7 @@ SOURCES: Dict[str, SourceDef] = {
             source_mode="direct_local",
             write_target="market_data.db",
             source_badges=("IBKR", "直寫本地"),
-            description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
+            description="IBKR/Polygon 15min bars for the active universe → market_data.db",
         ),
         SourceDef(
             "sec_corporate_actions", "SEC 公司事件",
@@ -1248,7 +1246,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 and d.news_direct_source != "ibkr"
             ):
                 # LEGACY_LOCAL keeps the direct-local writer (provider→local news+fts,
-                # NO Parquet, NO PG sync, NO mirror). Cursored against the local DB (newest stored
                 # published_at), not the Parquet timestamp.
                 from src.news_direct import backfill_news_direct
                 from src.news_providers import make_news_provider

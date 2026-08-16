@@ -351,7 +351,7 @@ viewable on the row (today `can_discover_models=False`, `model_credentials.py:51
 Ran with `ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1` (session-only, not persisted) +
 DB-file & `.env` rollback backups (both gitignored, 0600). **All 3 verifications
 passed:** `config/scoring_keys.txt` = 0600 + gitignored + 2 keys; `.env` has
-`OPENAI_API_KEY` (and `ANTHROPIC_API_KEY`/`DATABASE_URL`) but NOT
+`OPENAI_API_KEY` (and `ANTHROPIC_API_KEY`) but NOT
 `OPENAI_API_KEYS`; inventory = **2 named openai rows (`local:2` active +
 `local:3` inactive), no `[0]/[1]`**, Anthropic api_key (`local:4`) inactive,
 Claude OAuth (`local:1`) active; scorer reads `scoring_keys.txt` (2 keys,

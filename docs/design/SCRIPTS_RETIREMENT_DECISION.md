@@ -93,15 +93,7 @@ provenance, scheduling, and spend-control decisions.
 - Any future re-entry is a new capability slice with its own specification,
   RED/GREEN tests, provider/data truth, and user-facing semantics.
 
-## 7. Evidence chain
-
-The exact consumer inventory, product rulings, node streams, mutations, and
-admission artifacts are recorded in:
-
-- [SCRIPTS_TRANCHE_B_CONSUMER_INVENTORY.md](SCRIPTS_TRANCHE_B_CONSUMER_INVENTORY.md)
-- [2026-08-08-scripts-tranche-b-product-decision-design.md](../superpowers/specs/2026-08-08-scripts-tranche-b-product-decision-design.md)
-- [2026-08-08-scripts-tranche-b-legacy-score-retirement.md](../superpowers/plans/2026-08-08-scripts-tranche-b-legacy-score-retirement.md)
-- [2026-08-08-scripts-tranche-b-legacy-score-retirement.md](../superpowers/evidence/2026-08-08-scripts-tranche-b-legacy-score-retirement.md)
+## 7. Retirement record
 
 Git commit history supplies the removed bytes and their review lineage; no
 working-tree archive is needed.

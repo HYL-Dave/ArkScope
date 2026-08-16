@@ -595,8 +595,8 @@ Implementation branch `codex/investor-profile-calibration` implements this as a 
 non-streaming calibration loop with profile-state storage, not research-thread reuse. It is
 review-ready but not merged or live-verified yet. Focused evidence at implementation time:
 backend profile/research/card gate `101 passed`, frontend calibration/personalization gate
-`14 passed`, frontend typecheck passed, and PG-unreachable smoke returned `ok:true` with
-`pg_attempts:[]`. Full virgin A/B remains the merge gate unless reviewer runs it before
+`14 passed`, frontend typecheck passed, and the isolated local-runtime smoke returned
+`ok:true` with zero external storage attempts. Full virgin A/B remains the merge gate unless reviewer runs it before
 merge.
 
 Build:

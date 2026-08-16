@@ -95,9 +95,8 @@ def test_non_migration_scripts_do_not_read_legacy_iv_store():
         assert "data/options/iv_history" not in source, str(path.relative_to(ROOT))
 
 
-def test_sql_init_and_current_backends_have_no_legacy_iv_schema():
+def test_current_backends_have_no_legacy_iv_schema():
     owners = (
-        "sql/001_init_schema.sql",
         "src/tools/backends/__init__.py",
         "src/tools/backends/file_backend.py",
         "src/tools/backends/local_capabilities.py",

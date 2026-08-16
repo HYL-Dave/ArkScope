@@ -214,7 +214,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     db_exists = False
     try:
         from src.market_data_admin import (
-            overlay_price_sync_retired,
+            overlay_price_authority,
             read_sync_meta,
             resolve_market_db_path,
         )
@@ -222,7 +222,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         from src.news_sync_status import read_news_sync_status
 
         db_path = resolve_market_db_path()
-        sync = overlay_price_sync_retired(read_sync_meta(db_path))
+        sync = overlay_price_authority(read_sync_meta(db_path))
         db_exists = Path(db_path).exists()
         direct_news_enabled = use_local_news_enabled()
         if direct_news_enabled:

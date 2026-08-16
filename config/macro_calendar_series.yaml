@@ -1,6 +1,6 @@
 # P1.2 Curated FRED series catalog (v1, 2026-04-26).
 #
-# See docs/design/P1_2_SPEC.md §10 for the rationale behind this list.
+# This file is the current authority for the curated series and revision strategy.
 # Each entry maps a FRED series_id to its revision strategy and a FRED
 # `release_id` (used to populate the macro_release_dates schedule table).
 #

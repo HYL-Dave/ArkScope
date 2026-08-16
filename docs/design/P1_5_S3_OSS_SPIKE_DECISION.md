@@ -32,15 +32,9 @@ candidate that fails any non-negotiable constraint is rejected.
 
 ### 2.1 Non-negotiable
 
-1. **No SQLAlchemy in the codebase.** Repo uses `psycopg2` directly
-   in 8 source files (`src/tools/backends/db_backend.py`,
-   `src/tools/sa_tools.py`, `src/tools/sa_digest_tools.py`,
-   `src/service/job_runs_store.py`, `src/service/sa_market_news_health.py`,
-   `src/service/macro_calendar_health.py`, `src/sa/comment_signal_backfill.py`,
-   `src/macro_calendar/store.py`). Migration to SQLAlchemy ORM models
-   is a multi-day refactor with its own blast radius. **Adding ~14
-   ORM models just to drive a dashboard is a net-negative change** —
-   it duplicates a query layer we already have working.
+1. **No ORM adoption for the dashboard.** ArkScope uses explicit local stores
+   and query capabilities. Adding a parallel model layer just to drive a status
+   screen would duplicate working read contracts and expand the maintenance area.
 2. **JSON API surface already exists** for every read concern the
    dashboard needs (`/jobs/status`, `/jobs/history`,
    `/sa/market-news/health`, `/macro/health`, `/reports`). A tool
@@ -89,8 +83,8 @@ candidate that fails any non-negotiable constraint is rejected.
 
 ### 3.3 Apache Superset
 
-- **Shape**: BI tool. Connects to Postgres via SQLAlchemy (the
-  Superset side, not ours) and lets you build charts / dashboards
+- **Shape**: BI tool. Connects to supported SQL sources through its own
+  model layer and lets you build charts / dashboards
   over arbitrary SQL. Has its own metadata DB + Redis +
   Celery worker for caching.
 - **Verdict**: REJECTED. Fails constraint #3 (separate service,
@@ -108,8 +102,8 @@ candidate that fails any non-negotiable constraint is rejected.
 - **Shape**: Job-queue UIs. Show queued / running / failed tasks
   for their respective queue backends.
 - **Verdict**: REJECTED. We don't have a job queue. `src/service/
-  jobs.py` is an in-process scheduler — `JobRunsStore` writes runs
-  to Postgres, but there's no queue. Migrating to RQ / Prefect is
+  jobs.py` is an in-process scheduler with local run telemetry.
+  Migrating to RQ / Prefect is
   a separate, larger decision (covered briefly in §6 of priority
   map under "future job queue if S2 outgrows in-process
   scheduler"). Out of scope for P1.5.

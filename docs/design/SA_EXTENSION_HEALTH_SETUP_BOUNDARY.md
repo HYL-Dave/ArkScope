@@ -27,11 +27,11 @@ Firefox/Chrome manifest (~/.mozilla/native-messaging-hosts/com.mindfulrl.sa_alph
 Host id `com.mindfulrl.sa_alpha_picks` is **locked** (intentionally lowercase `mindfulrl`).
 Repo moves/renames only ever require editing the config JSON — never the browser manifests.
 
-## Host write path (current; relocated here from `SA_CUTOVER_3D_RUNBOOK.md` 2026-07-06)
+## Host write path
 
 Every message spawns a **fresh, short-lived host process** which builds its own DAL and
 dispatches on `action` (`src/sa_native_host.py` `handle_message`). Storage is
-**`data/sa_capture.db` only** (`SACaptureDatabaseBackend`, HARD local — zero PG); app
+**`data/sa_capture.db` only** (`SACaptureLocalBackend`, hard local); app
 state is never written directly (LOCK #9) — job telemetry goes by best-effort POST to the
 sidecar's `/jobs/extension-record`. Action catalog:
 
@@ -99,8 +99,7 @@ Env-var-only steering of the telemetry target is not a viable mechanism.
 `api_base`/`api_token` on spawn; host prefers config over env defaults) is a small
 standalone slice with no UI — it can ship before the rest of P2.6 whenever prioritized.
 
-**RESOLVED 2026-07-06**: part 1 shipped + live-proven (plan
-`2026-07-06-sa-extension-telemetry-health.md`, map §10 closeout). Both resolution paths
+**RESOLVED 2026-07-06**: part 1 shipped and was live-proven. Both resolution paths
 verified with real Quick Refresh rows in `job_runs`: dev:desktop via `source=config`
 (run_id=13702) and standalone-8420 via `default` (run_id=13703); clean shutdown clears the
 config api fields. Precedence shipped as env > config > default. The health panel covers

@@ -14,7 +14,7 @@ These paths must keep working through docs cleanup, local-first migration, and m
   — protection level since 3e-E / F6 (2026-06-11): **flag-compatible + same effects**,
   NOT byte-identical. daily_update is now a thin CLI wrapper over the app scheduler
   core (`src/service/data_scheduler.run_source`): same flag set, same per-source step
-  set (collect → PG sync → local mirror refresh), exit 0/1 semantics, `--dry-run`
+  set (collect → normalize → local commit), exit 0/1 semantics, `--dry-run`
   prints the plan and never touches IBKR/DB/job_runs. What changed by design:
   per-step telemetry is now the scheduler's `collect.<source>` rows
   (trigger_source='cli') plus one `daily_update.run` summary row; news sources run
@@ -59,8 +59,9 @@ If a module is rewritten, preserve the capability boundary or explicitly record 
 
 These are allowed to change aggressively after an absorption check:
 
-- Root entrypoint prose that still describes RL/CLI/Postgres-first positioning.
-- Pre-pivot HOW documents: service-first, RL-productionization, PG-first, Supabase-first, Discord-first, CLI-first.
+- Root entrypoint prose that still describes retired product positioning.
+- Pre-pivot HOW documents: service-first, RL-productionization, hosted-storage-first,
+  Supabase-first, Discord-first, and CLI-first.
 - One-off scoring / comparison / model-bakeoff research scripts and generated reports.
 - `NewsExtraction` / FNSPID-era batch workflow docs, unless a current import/runtime dependency is found.
 - Retired training/RL implementation and docs; Git history is sufficient preservation and no dormant package is protected.

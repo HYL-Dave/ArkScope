@@ -10,7 +10,6 @@
 - `docs/design/PROJECT_PRIORITY_MAP.md` — §1 current direction, §10 decision log ("what's next?")
 - `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md` — v1 product / storage / sync contract
 - `README.md` — operational quickstart + protected runtime paths
-- `docs/PROJECT_HISTORY.md` — origins, open data, and the 2026-05 pivot
 
 **Top-level layout (high level only):**
 

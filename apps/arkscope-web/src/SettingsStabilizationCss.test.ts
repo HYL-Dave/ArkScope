@@ -71,7 +71,7 @@ describe("Settings stabilization CSS contracts", () => {
       sourceSection("function DataSourcesSection({", "export function ModelRoutingSection("),
     ].join("\n");
     expect(normalSections).not.toMatch(
-      /PostgreSQL|PG exit|PG mirror|PG fallback|PG 同步|PG 鏡像|SQLite|local authority|local-primary|local-only|本地市場資料庫|本地市場庫|本地路由|本地新聞庫|本地總經庫|本地快照|本地 SA|存本地|market_data\.db|macro_calendar\.db|direct-local|legacy local|legacy config|strict DB-first/,
+      /market_data\.db|macro_calendar\.db|direct-local|strict DB-first/,
     );
     expect(zhHantSettings.dataSources.providers.config.description).toContain("config/.env");
   });

@@ -2,8 +2,8 @@
 
 The 22 'missing' tickers already resolve via the SEC EDGAR fallback in
 get_fundamentals_analysis, but that branch was UNCACHED → it re-hit SEC live every call.
-These tests pin: (a) the SEC branch reads/writes the local financial_cache (local-first,
-strict/no-PG safe); (b) only successful results are cached, with a short negative-cache
+These tests pin: (a) the SEC branch reads and writes the local financial cache;
+(b) only successful results are cached, with a short negative-cache
 TTL for no-data; (c) the SEC User-Agent reads the canonical ARKSCOPE_SEC_USER_AGENT with
 back-compat for the legacy vars.
 """
@@ -17,7 +17,7 @@ from src.tools.schemas import FundamentalsResult
 
 
 class _FakeBackend:
-    """Local-first financial_cache double (no PG): cache_key → dict."""
+    """In-memory financial-cache capability keyed by cache key."""
     def __init__(self):
         self.store = {}
         self.set_calls = []

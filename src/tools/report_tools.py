@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
-from src.app_records_store import get_app_records_store  # PG-exit 1b: local-vs-PG routing
+from src.app_records_store import get_app_records_store
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,4 @@
-"""Tests for SA Digest tool (P1.3 commit 1).
-
-Coverage per spec docs/design/P1_3_SPEC.md §8:
+"""Tests for the current SA Digest tool contract:
 
   - Disabled / unavailable backend / empty ticker → helpful payload (1-3)
   - Param clamping for days / max_* / min_comment_score (4-5)

@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 USE_LOCAL_MARKET_KEY = "use_local_market"  # profile_settings key for the persisted toggle
-USE_LOCAL_MARKET_STRICT_KEY = "use_local_market_strict"  # modifier: local market on + DB exists → no PG fallback
+USE_LOCAL_MARKET_STRICT_KEY = "use_local_market_strict"
 _TRUTHY = ("1", "true", "yes", "on")
 
 _PRICES_SCHEMA = """
 CREATE TABLE IF NOT EXISTS prices (
     ticker    TEXT NOT NULL,
-    datetime  TEXT NOT NULL,   -- UTC 'YYYY-MM-DDTHH:MM:SS+0000' (matches PG TO_CHAR)
+    datetime  TEXT NOT NULL,   -- UTC 'YYYY-MM-DDTHH:MM:SS+0000'
     interval  TEXT NOT NULL,   -- '15min' | '1h' | '1d'
     open      REAL,
     high      REAL,
@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS prices (
 CREATE INDEX IF NOT EXISTS idx_prices_ticker_interval_dt ON prices(ticker, interval, datetime);
 """
 
-# News: raw articles only. id mirrors PG's id so
 # it is the rowid the FTS5 external-content index keys on.
 _NEWS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS news (
@@ -88,7 +87,6 @@ def _ensure_ticker_aliases(conn) -> None:
     )
 
 
-# PG-exit 2b — news identity + FTS sync. UNIQUE(article_hash) lets every writer INSERT OR IGNORE
 # to dedup; the external-content news_fts is kept in sync by triggers so NO writer needs a manual
 # fts insert. Triggers are deliberately NOT in _NEWS_SCHEMA: the bulk bootstrap copy uses a one-shot
 # news_fts('rebuild') and would be slowed to a crawl by per-row triggers — bootstrap adds them AFTER
@@ -109,16 +107,15 @@ END;
 
 
 def _ensure_news_hash_unique(conn) -> None:
-    """Idempotent UNIQUE index on news.article_hash so INSERT OR IGNORE dedups (PG-exit 2b).
-    Safe to add to the live table because it has no dup/null article_hash rows (verified)."""
+    """Create the unique article-hash index used by idempotent news writes."""
     conn.execute(_NEWS_HASH_UNIQUE)
 
 
 def _ensure_news_fts_triggers(conn) -> None:
-    """Idempotent AFTER INSERT/DELETE/UPDATE triggers keeping the external-content news_fts in
-    sync (PG-exit 2b) — replaces the per-row manual fts inserts in the direct + mirror writers.
-    NOT part of _NEWS_SCHEMA (see the note above): apply where per-row sync is wanted, never around
-    the bulk bootstrap copy."""
+    """Install triggers that keep the external-content news index synchronized.
+
+    These are applied to incremental writers after bulk bootstrap work.
+    """
     conn.executescript(_NEWS_FTS_TRIGGERS)
 
 
@@ -186,19 +183,16 @@ _PRICE_INSERT = ("INSERT OR IGNORE INTO prices "
                  "(ticker, datetime, interval, open, high, low, close, volume) "
                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
 
-# 3c-C/S-H2: financial_cache — LOCAL-PRIMARY (NOT a PG mirror). SqliteBackend.set
 # writes here; .get is local-only. cache_key-keyed
 # with a TTL via expires_at (UTC ISO 'YYYY-MM-DDTHH:MM:SS+00:00' strings, which are
 # lexicographically comparable so expiry is a string compare). Because it is
-# local-primary it is independent of the retired PG mirror. financial_datasets_client
 # routes its paid-path cache through here via cache_backend — source
-# 'financial_datasets'; standalone/no-backend usage keeps its legacy env-PG+file.)
 _FIN_CACHE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS financial_cache (
     cache_key   TEXT PRIMARY KEY,
     source      TEXT NOT NULL DEFAULT 'financial_datasets',
     ticker      TEXT NOT NULL,
-    data        TEXT NOT NULL,        -- JSON (JSONB in PG)
+    data        TEXT NOT NULL,        -- JSON document
     fetched_at  TEXT NOT NULL,        -- UTC ISO 'YYYY-MM-DDTHH:MM:SS+00:00'
     expires_at  TEXT NOT NULL
 );
@@ -208,45 +202,43 @@ CREATE INDEX IF NOT EXISTS idx_fin_cache_expires ON financial_cache(expires_at);
 # Serializes local-primary financial-cache writes within the sidecar.
 _CACHE_WRITE_LOCK = threading.Lock()
 
-RETIRED_MARKET_MIRROR_DOMAINS = ["news", "iv", "fundamentals"]
-RETIRED_PRICE_MIRROR_MESSAGE = "prices PG mirror retired by P0-C"
+UNSUPPORTED_BULK_DOMAINS = ["news", "iv", "fundamentals"]
+PRICE_UPDATE_UNAVAILABLE_MESSAGE = "price updates use the provider collection workflow"
 
 
-def retired_market_mirror_result(operation: str) -> dict:
+def unavailable_market_admin_result(operation: str) -> dict:
     return {
         "ok": False,
         "match": False,
-        "code": "pg_market_bootstrap_retired",
+        "code": "market_admin_operation_unavailable",
         "operation": operation,
-        "retired_domains": list(RETIRED_MARKET_MIRROR_DOMAINS),
+        "unsupported_domains": list(UNSUPPORTED_BULK_DOMAINS),
         "error": (
-            "The old all-domain PG market mirror bootstrap/validation path is retired. "
-            "News, IV, fundamentals, scores, and financial_cache are local/refetch "
-            "authorities; prices migration remains a separate PG-exit slice."
+            "This bulk market-data operation is unavailable. News, IV, fundamentals, "
+            "scores, and financial_cache use their current local collection paths."
         ),
     }
 
 
-def retired_price_mirror_result(operation: str = "incremental_update") -> dict:
+def unavailable_price_update_result(operation: str = "incremental_update") -> dict:
     return {
         "ok": False,
         "rows_added": 0,
-        "error": RETIRED_PRICE_MIRROR_MESSAGE,
-        "skipped": RETIRED_PRICE_MIRROR_MESSAGE,
+        "error": PRICE_UPDATE_UNAVAILABLE_MESSAGE,
+        "skipped": PRICE_UPDATE_UNAVAILABLE_MESSAGE,
         "operation": operation,
-        "retired_domains": ["prices"],
-        "message": "Use the direct-local IBKR prices writer instead of the PG mirror.",
+        "unsupported_domains": ["prices"],
+        "message": "Use the IBKR price collection workflow.",
     }
 
 
-def overlay_price_sync_retired(sync: dict | None) -> dict:
+def overlay_price_authority(sync: dict | None) -> dict:
     out = dict(sync or {})
     prices = dict(out.get("prices") or {})
     prices.update(
         {
-            "retired": True,
             "authority": "local",
-            "message": "Prices are served from local market_data.db; PG mirror sync is retired.",
+            "message": "Prices are served from local market_data.db.",
         }
     )
     out["prices"] = prices
@@ -280,7 +272,7 @@ def _load_ticker_aliases(conn) -> Dict[str, str]:
         return {}
 
 
-# --- local DB stats (read-only; never needs PG) -------------------------------
+# --- local DB stats -----------------------------------------------------------
 
 def _table_exists(conn, name: str) -> bool:
     return conn.execute(
@@ -289,7 +281,7 @@ def _table_exists(conn, name: str) -> bool:
 
 
 def local_market_stats(out_path: Optional[str] = None) -> dict:
-    """Read-only per-domain stats for the local market DB (does NOT touch PG)."""
+    """Read-only per-domain stats for the local market database."""
     path = out_path or resolve_market_db_path()
     empty = {
         "exists": False,

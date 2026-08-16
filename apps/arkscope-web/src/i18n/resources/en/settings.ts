@@ -845,9 +845,9 @@ const settings = {
       },
     },
     routing: {
-      localAuthority: "Local authority (PG fallback retired)",
+      localAuthority: "Local data authority",
       settingEnabledPendingDatabase: "Setting enabled; database pending",
-      localAuthorityLegacyFlagUnset: "Local authority (legacy flag unset; PG fallback retired)",
+      localAuthorityDefault: "Local data authority",
     },
   },
   newsStorage: {
@@ -864,26 +864,26 @@ const settings = {
     loadFailed: "Could not load News Data status.",
     routing: {
       directEnvOn: "Direct local writes (forced on by environment)",
-      pgMirrorEnvOff: "PG mirror fallback (forced off by environment)",
-      pgSyncLocalMirror: "PG sync and local mirror fallback",
+      directEnvOff: "Local compatibility writer (forced by environment)",
+      localCompatibility: "Local compatibility writer",
       directExplicit: "Direct local writes (configured)",
       directDefault: "Direct local writes (default)",
       write: {
         normalized: "Normalized SQLite + legacy local projection",
-        normalizedPreExit: "Normalized SQLite + legacy local projection (pre-exit test)",
+        normalizedCurrent: "Normalized local writer",
         legacyLocal: "Legacy local direct writer",
-        legacyPg: "Legacy PG sync + local mirror",
+        currentAuthority: "Normalized local writer",
         blocked: "Blocked",
       },
-      postgres: {
-        exited: "Exited (PG fallback unavailable)",
-        available: "Available (not yet exited)",
-        unavailable: "Unavailable",
+      authority: {
+        current: "Current local authority",
+        available: "Local authority available",
+        unavailable: "Local authority unavailable",
       },
       read: {
         compatibility: "Legacy local compatibility surface (N8b pending)",
         localDirect: "Legacy local direct surface",
-        pgMirror: "Legacy PG mirror surface",
+        unavailable: "Local read surface unavailable",
       },
     },
   },

@@ -10,9 +10,9 @@ import pytest
 @pytest.fixture(autouse=True)
 def _disable_app_scheduler(monkeypatch):
     """TestClient(create_app()) runs the real lifespan, which starts the data
-    scheduler — its seed/tick threads reach the real PG/network (FastAPI
-    dependency_overrides don't apply outside request resolution). In a PG-less
-    or TCP-stalling environment the seed thread outlives the test and hangs
+    scheduler — its seed/tick threads can reach external services (FastAPI
+    dependency_overrides don't apply outside request resolution). In a
+    TCP-stalling environment the seed thread outlives the test and hangs
     pytest at the thread-pool atexit join. Hermetic by default; a test that
     really wants the scheduler can monkeypatch.delenv this key.
     """
@@ -61,8 +61,8 @@ def _isolate_macro_calendar_db(tmp_path_factory, monkeypatch):
 def _isolate_sa_db(tmp_path_factory, monkeypatch):
     """SA capture runtime defaults to data/sa_capture.db.
 
-    After the use_local_sa local-default collapse, every DAL construction routes
-    the SA domain to SACaptureDatabaseBackend, so a test that builds a DAL would
+    Every DAL construction routes the SA domain to the current capture backend,
+    so a test that builds a DAL would
     otherwise resolve the developer's real sa_capture.db. Override
     unconditionally like _isolate_macro_calendar_db; tests that need a specific
     DB set it themselves after this autouse fixture.

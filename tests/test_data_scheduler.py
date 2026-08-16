@@ -49,7 +49,6 @@ def hermetic(tmp_path, monkeypatch):
     the real DAL / subprocesses / local market DB — and CRITICALLY, stub both
     in-process news adapters so no test can fire a real provider API call."""
     store = ProfileStateStore(tmp_path / "profile_state.db")
-    # N9 retires the PG news mirror path. Default scheduler tests use the local
     # writer route unless a test explicitly patches the route.
     store.set_setting("use_local_news", None)
     monkeypatch.setattr(ds, "_store", lambda: store)
@@ -313,7 +312,6 @@ def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
 
 def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
-    # NO --news PG sync subprocess, NO local mirror. (OFF path = the test above, unchanged.)
     import src.collectors.polygon_news as cpn
     hermetic.set_setting("use_local_news", None)  # unset resolves to the production default ON
     calls = {"run_incremental": 0, "sync": 0, "direct": 0, "provider": None}
@@ -337,7 +335,7 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     assert res["status"] == "succeeded"
     assert calls["direct"] == 1 and calls["provider"] == "polygon"   # direct writer + provider used
     assert calls["run_incremental"] == 0                             # NOT the Parquet adapter
-    assert calls["sync"] == 0                                        # NO --news PG sync
+    assert calls["sync"] == 0
     assert "local_refresh" not in res
     assert res["collect"]["source"] == "polygon" and res["ticker_count"] == 2
 
@@ -516,7 +514,7 @@ def test_normalized_news_route_calls_writer_under_market_lock(
                             AssertionError("legacy direct writer must not run")))
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
-                            AssertionError("PG sync subprocess must not run")))
+                            AssertionError("unexpected synchronization subprocess")))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     events = []
@@ -635,7 +633,7 @@ def test_normalized_news_route_preserves_writer_partial_continuation(monkeypatch
                             "normalized test route")
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
-                            AssertionError("PG sync subprocess must not run")))
+                            AssertionError("unexpected synchronization subprocess")))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     class FakeConn:
@@ -758,7 +756,7 @@ def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monk
                             AssertionError("normalized writer must not run")))
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
-                            AssertionError("PG sync subprocess must not run")))
+                            AssertionError("unexpected synchronization subprocess")))
     monkeypatch.setattr("src.news_providers.make_news_provider", lambda source, **k: object())
     direct_calls = []
 
@@ -982,7 +980,7 @@ def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch)
                             "normalized test route")
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(
-                            AssertionError("PG sync subprocess must not run")))
+                            AssertionError("unexpected synchronization subprocess")))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     class FakeConn:
@@ -1404,7 +1402,6 @@ def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypat
 
 
 def test_run_source_adapter_failure_short_circuits(monkeypatch):
-    # direct-local writer raising (e.g. missing API key) → failed, PG sync never attempted
     monkeypatch.setattr(
         "src.news_direct.backfill_news_direct",
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("FINNHUB_API_KEY not found")),
@@ -1414,7 +1411,7 @@ def test_run_source_adapter_failure_short_circuits(monkeypatch):
                         lambda argv: (calls.append(argv), {"returncode": 0})[1])
     res = ds.run_source("finnhub_news")
     assert res["status"] == "failed" and "FINNHUB_API_KEY" in res["error"]
-    assert calls == []                                      # PG sync never attempted
+    assert calls == []
 
 
 def test_default_ibkr_legacy_news_route_does_not_launch_collector(monkeypatch):
@@ -1579,7 +1576,6 @@ def test_run_source_releases_file_locks(tmp_path):
     fh.close()
 
 
-# --- startup seed must not depend on PG -------------------------------------------
 
 def test_missing_scheduler_state_uses_local_job_history_without_early_fire(
     tmp_path,
@@ -1633,9 +1629,8 @@ def test_get_schedule_snapshot_shape():
     assert p["enabled"] is False and p["running"] is False
     assert p["provider_fetch"] is True and p["job_name"] == "collect.polygon_news"
     for name in ("polygon_news", "finnhub_news", "ibkr_news"):
-        assert "PG → local mirror" not in out[name]["description"]
-        assert "normalized SQLite" in out[name]["description"]
-        assert "no news PG sync/mirror" in out[name]["description"]
+        assert "normalized local records" in out[name]["description"]
+        assert "compatibility projection" in out[name]["description"]
     assert out["ibkr_prices"]["ibkr"] is True
     assert out["sec_corporate_actions"]["job_name"] == (
         "collect.sec_corporate_actions"
@@ -1803,7 +1798,6 @@ def test_run_source_explicit_tickers_reaches_active_adapter_without_mirror_contr
     monkeypatch,
 ):
     # The daily_update thin wrapper passes an explicit ticker list through the
-    # active direct-local adapter without any PG mirror selector.
     seen = {}
 
     def _fake_direct(tickers, *, source, provider, progress_cb=None, **kw):
@@ -2026,7 +2020,6 @@ def test_price_partial_projection_does_not_change_normalized_news_audit_status(
 
 def test_run_source_persists_attempt_and_outcome_to_local_state(monkeypatch):
     # a real run_source records last_attempt + the succeeded outcome in the LOCAL state store
-    # (recoverable + visible-failure), independently of PG telemetry.
     import src.collectors.polygon_news as cpn
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})

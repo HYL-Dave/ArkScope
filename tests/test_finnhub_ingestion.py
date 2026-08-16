@@ -1010,8 +1010,7 @@ class TestFinnhubJobSummaries:
 
 
 class TestFinnhubIngestionLocalWrite:
-    """Slice 4: with use_local_macro ON, ingestion writes the LOCAL store (real factory +
-    real MacroCalendarLocalStore, no PG). Default-off still writes PG (covered above)."""
+    """Finnhub collection writes through the real local calendar store."""
 
     def test_economic_ingestion_writes_local_macro_calendar_db(self, tmp_path, monkeypatch):
         from src.macro_calendar.local_store import MacroCalendarLocalStore
@@ -1029,7 +1028,6 @@ class TestFinnhubIngestionLocalWrite:
             client=client, observed_at=datetime(2024, 12, 1, tzinfo=timezone.utc),
         )
         assert stats.events_inserted == 1 and not stats.errors
-        # the row landed in the LOCAL db (no PG), readable via the local store
         rows = MacroCalendarLocalStore(db).list_economic_events(
             date_from=datetime(2024, 12, 1, tzinfo=timezone.utc),
             date_to=datetime(2024, 12, 31, tzinfo=timezone.utc))

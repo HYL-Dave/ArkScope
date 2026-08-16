@@ -175,7 +175,7 @@ S7 把右側證據面板畫成幾張**獨立子卡**，不是一坨：
 |---|---|---|
 | 本地知識圖譜（Obsidian 風格 node-link） | S2,S4,S7 | §1.4「Knowledge graph (Phase A — deferred)」；設計在 `PHASE_A_KNOWLEDGE_GRAPH_SKETCH.md` |
 | Backtest 模組 UI | P1,S4 | §1.4「Backtest framework UI（DuckDB 存結果但 v1 無 UI surface）」 |
-| Algo 模組（sidebar 入口） | P2,S3,S4,S7 | RL line paused（見 `RL_COLLAPSE_FINDINGS.md`）；內部內容未畫 |
+| Algo 模組（sidebar 入口） | P2,S3,S4,S7 | 舊實作已退役；未來能力需重新設計，內部內容未畫 |
 | Vector search | — | §1.4 deferred |
 | Reasoning-layer 具名能力（Orchestration / Evidence Synthesis / Summarization / Screening Assistant） | S4 | 僅 S4 層圖出現，S4 自己註記「是 layer map 不是 screen」；decided=false |
 | Strategy 模組（15 個具名策略） | P1 | PDF 自承「每策略需真實欄位/條件/失效/回測邏輯」是**最大未完成區**；現為 analysis templates 非 declarative spec |
@@ -229,24 +229,23 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 
 **Tools（右側 Evidence panel 的後端）**
 - `src/tools/`：`sec_tools` / `earnings_tools` / `news_tools` / `analyst_tools` / `sa_tools` / `macro_calendar_tools` — 直接對應 §5.1 子卡（價格/財報/新聞/分析師/宏觀）
-- `src/tools/report_tools.py` + `sql/003_add_reports.sql` + `data/reports/` — Research Records 列表 + Markdown 報告的現成骨架
-- `src/tools/backends/{file,db}_backend.py` — DAL 抽象，對得上 profile + vault 儲存切分
+- `src/tools/report_tools.py` + `data/reports/` — Research Records 列表 + Markdown 報告的現成骨架
+- `src/tools/backends/local_capabilities.py` — 明確的本地能力介面，對得上 profile + vault 儲存切分
 - `src/tools/freshness.py` — 「真相來源是資料本身」已落地，對應 §3.3 可追溯性
 
 **Agent Layer（reasoning 後端）**
 - `src/agents/{anthropic,openai}_agent` + `shared/model_catalog.py` + `token_tracker.py` — dual-provider scaffolding + token 計帳 → provider switcher（OpenAI/Anthropic 鎖定）
 - `src/agents/shared/skills.py` + `config/skills/*.yaml` — 對應 Plugins 卡；goal-oriented 設計對上 reasoning 能力
-- `src/agents/shared/{attachments,subagent}.py` + `memory_tools.py` + `sql/004` — PDF/圖附件 + 4 角色 subagent + episodic memory
+- `src/agents/shared/{attachments,subagent}.py` + `memory_tools.py` — PDF/圖附件 + 4 角色 subagent + episodic memory
 - `src/agents/shared/replay.py` + `tests/replay_fixtures/` — **重構安全網**：把 tool dispatch 重切進 5 層時防行為漂移
 
 **Service / Signals / Analysis**
 - `src/monitor/`（engine/scheduler/notifiers/watchers/discord_bot）— Alert Center + 背景監控 + Discord 已實作
-- `src/service/job_runs_store.py` + `sql/011` — 對應 S3 live-ops feed + last-sync 指示
+- `src/service/job_runs_store.py` — 對應 S3 live-ops feed + last-sync 指示
 - `src/signals/`（anomaly/event_chain/event_tagger/sector_aggregator/synthesizer）— 餵 S6 gauges + strategy 訊號欄
 - `src/analysis/`（context_builder/factory/pipeline/renderer/...）— 對應結構化卡輸出 + scheduler spine（設計見 `PHASE_D_ANALYSIS_PIPELINE_SKETCH.md`）
-- `src/api/` + routes — 既有 FastAPI 是 UI skeleton 對既有 PG 做唯讀 DTO 的天然層
+- `src/api/` + routes — FastAPI sidecar 將本地能力投影為 UI DTO
 - `config/user_profile.yaml` — workspace 路徑 / BYOK keys / provider 偏好 / skill 優先序的天然落點
-- `sql/`migrations 001–014 — schema 轉譯到 SQLite app DB + sa_cache DB 切分（SPEC §8）
 
 ### 8.2 需重寫（預期內，沒關係）
 
@@ -257,8 +256,8 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 - **互動原語**：右鍵 / 多選 bulk / 右側 detail panel — CLI-only 產品無對應
 - **Soft-delete + trash + restore + archive 過濾** — 現無 soft-delete 模型
 - **Workspace 概念**（若採多 workspace，先解 §6.2 張力）
-- **Sync & Backup 後端**（Git/WebDAV/S3/External mirror）— 現只有 PG + 本地檔
-- **本地 SQLite + DuckDB 取代 PG runtime**（SPEC §8）— schema 在但 workbench.db + sa_cache.db 切分是全新
+- **Sync & Backup 後端**（Git/WebDAV/S3/External mirror）— 目前只有本地 profile 可攜式契約
+- **大型分析儲存**（DuckDB 或獨立分析檔）— 僅在現有 SQLite 分工不足時立案
 - **Plugin 系統 / 擴充框架** — skills 最接近但非 plugin 契約；install/load/sandbox 待設計
 - **Top-bar chips / footer 原則 / dark-mode design system / i18n 字串目錄** — 全新；需完整 design-system pass
 - **Alert 規則 UI 層** — engine 在 `src/monitor/` 但管理 UI + alert-as-lifecycle-object 是新的
@@ -288,7 +287,7 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 
 ## 10. 與 RL / 舊定位的關係
 
-- **RL productionization 不再是主軸**（`RL_COLLAPSE_FINDINGS.md`）。草圖的 Algo nav 入口與此一致——保留入口但內容 deferred。
+- **舊的強化學習實作已退役**。草圖的 Algo nav 入口僅代表未來可能性，內容維持 deferred。
 - **OpenClaw 不是 roadmap**；**Discord 只做 notifier / 輕量 command surface**；未來自動化 = ArkScope 自有 local agent + scheduler 優先，external cowork 次之（PRIORITY_MAP §1 clarified 2026-05-25）。
 - 本桌面 app 就是「local agent + scheduler + workbench」這條線的**產品表面**。
 

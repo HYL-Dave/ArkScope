@@ -53,7 +53,6 @@ const marketStatus: MarketDataStatus = {
   financial_cache: { row_count: 24, valid_count: 7, expired_count: 17, latest_fetched_at: "2026-07-01T00:00:00+00:00" },
   sync: { prices: null, news: null, fundamentals: null },
   prices_authority: "local",
-  price_mirror_retired: true,
   fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: false,
   env_override: false,
@@ -61,7 +60,6 @@ const marketStatus: MarketDataStatus = {
   strict_env_override: false,
   strict_enabled: true,
   routing_enabled: true,
-  pg_fallback_active: false,
 };
 
 const macroStatus: MacroStatus = {
@@ -212,9 +210,6 @@ const newsStatus: NewsStatus = {
   normalized_writes_env_value: null,
   write_route: "normalized",
   write_route_reason: "active",
-  news_pg_exit_completed: true,
-  news_hard_local: true,
-  pg_news_route_available: false,
   sync: null,
 };
 
@@ -381,7 +376,7 @@ async function renderDataStorage(settingsReadCache: SettingsReadCache) {
   await act(async () => { await Promise.resolve(); });
 }
 
-describe("post-PG-exit storage panels", () => {
+describe("local storage panels", () => {
   it("shows SEC lifecycle evidence as review material and reloads it after its source runs", async () => {
     const cache = createSettingsReadCache();
     cache.replace("market_data_status", marketStatus);
@@ -529,7 +524,7 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).toContain("151");
   });
 
-  it("shows current market data status without projecting retired sync metadata", async () => {
+  it("shows current market data status from current local facts", async () => {
     mocked.marketStatus = {
       ...marketStatus,
       sync: {
@@ -561,9 +556,7 @@ describe("post-PG-exit storage panels", () => {
     expect(storage!.textContent).not.toContain("最近增量更新");
     expect(host!.textContent).toContain("已儲存的 SEC 基本面");
     expect(host!.textContent).toContain("財務快取");
-    expect(host!.textContent).not.toMatch(
-      /PG fallback|SQLite|local authority|本地市場資料庫|本地市場庫|本地路由/,
-    );
+    expect(host!.textContent).toContain("市場資料");
   });
 
   it("shows_macro_data_with_manual_and_scheduled_refresh_boundaries", async () => {
@@ -583,17 +576,19 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).toContain("Fed Funds");
     expect(host!.textContent).toContain("最後抓取");
     expect(host!.textContent).not.toMatch(/Macro \/ Calendar|行事曆|Finnhub 付費方案/);
-    expect(host!.textContent).not.toMatch(
-      /PostgreSQL|PG|SQLite|local-only|本地總經庫|本地路由|供應商即時資料/,
-    );
+    expect(host!.textContent).toContain("總經資料");
   });
 
-  it("does not show the completed App Records migration panel in normal settings navigation", async () => {
+  it("renders only current local storage panels in normal settings navigation", async () => {
     await renderSettings();
 
-    expect(host!.textContent).not.toContain("App Records");
-    expect(host!.textContent).not.toContain("App Records 遷移");
-    expect(host!.textContent).not.toContain("一次性 PG→本地遷移工具");
+    expect(Array.from(host!.querySelectorAll("h2"), (node) => node.textContent)).toEqual([
+      "市場資料",
+      "公司狀態與併購",
+      "交易日 / 價格覆蓋",
+      "新聞資料",
+      "總經資料",
+    ]);
   });
 
   it("lists_the_active_data_group_and_its_stable_subsections", async () => {
@@ -612,7 +607,6 @@ describe("post-PG-exit storage panels", () => {
         "新聞資料",
         "總經資料",
       ]);
-    expect(directory!.textContent).not.toMatch(/PG mirror routes|PostgreSQL exit|本地總經|一次性遷移/);
   });
 
   it("renders_market_empty_and_macro_partial_failures_as_user_outcomes", async () => {
@@ -631,7 +625,6 @@ describe("post-PG-exit storage panels", () => {
     expect(host!.textContent).toContain("29,571 筆已儲存");
     expect(host!.querySelector('[data-state="partial"]')).not.toBeNull();
     expect(host!.textContent).not.toContain("RAW_MACRO_SNAPSHOT_TRANSPORT_DETAIL");
-    expect(host!.textContent).not.toMatch(/SQLite|PG fallback|local-only/);
   });
 
   it("renders English market data and storage outcomes", async () => {
@@ -858,7 +851,7 @@ describe("post-PG-exit storage panels", () => {
     expect(dataStorageSource).not.toContain("as unknown as number");
   });
 
-  it("keeps corrected single-locale headings without migration narration", async () => {
+  it("keeps corrected single-locale headings", async () => {
     await renderSettings();
 
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
@@ -870,12 +863,9 @@ describe("post-PG-exit storage panels", () => {
       .toEqual(["新聞資料"]);
     expect(Array.from(macro?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
       .toEqual(["總經資料"]);
-    expect(host!.textContent).not.toMatch(
-      /Market Data|Trading-day coverage|News Data|PG fallback|PostgreSQL exit|SQLite|一次性遷移/,
-    );
   });
 
-  it("ignores retired sync errors and scopes coverage diagnostics to Developer Mode", async () => {
+  it("scopes coverage diagnostics to Developer Mode", async () => {
     const syncDiagnostic = "RAW_MARKET_SYNC_DETAIL";
     const providerDiagnostic = "RAW_COVERAGE_PROVIDER_DETAIL";
     const unknownTickers = ["PLANTED_UNKNOWN_A", "PLANTED_UNKNOWN_B"];

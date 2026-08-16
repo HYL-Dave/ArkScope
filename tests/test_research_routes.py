@@ -1306,7 +1306,6 @@ def test_unknown_provider_persists_error_turn_not_a_dangling_user(store):
 #
 # Handler-direct, NO live: the credential resolution (resolve_live_auth, patched
 # at its source module — the branch imports it lazily) and the driver
-# (q._anthropic_subscription_stream / build_driver) are mocked; nothing hits PG or
 # the network. The api-key-anthropic and openai paths must stay byte-for-byte
 # unchanged in behavior (the subscription path is NOT taken).
 # =====================================================================

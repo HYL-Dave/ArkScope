@@ -4,7 +4,6 @@
 - **Status:** DRAFT for review
 - **Scope:** read-only provider sampling + evidence document. No runtime code, no
   scheduler wiring, no ArkScope DB writes, no provider selection lock.
-- **Parent:** `docs/design/PG_EXIT_REMAINDER_SCOPING.md` §7 / §12.5.
 - **Goal:** Decide which provider payloads can feed ArkScope's provider-neutral IV
   snapshot model before S-D schema lock.
 - **Architecture:** run isolated, runtime-external sampling helpers against temporary
@@ -37,7 +36,7 @@ The packet answers four questions:
 - No edits to `config/.env`.
 - No FieldDefs yet, except after a provider is selected in a later slice.
 - No production collector, scheduler job, UI, or database migration.
-- No attempt to preserve or import the old 24-row PG/local `iv_history`. Its product
+- No attempt to preserve or import the retired 24-row `iv_history`. Its product
   contract is retired by the merged 2026-07-27 product unit; the separately approved
   production migration archived and removed those rows/files on 2026-07-27. The
   rollback archive is evidence only, not a seed. Any future implementation starts
@@ -362,7 +361,6 @@ Steps:
 Files:
 
 - Update: `docs/design/IV_PROVIDER_PROOF_PACKET.md`
-- Optionally update: `docs/design/PG_EXIT_REMAINDER_SCOPING.md`
 
 Steps:
 

@@ -43,7 +43,7 @@ const SOURCE_TICKER = "SRC.TW";
 const SOURCE_TAG_VALUE = "Value:β / RAW%2F";
 const SOURCE_TAG_SOURCE = "provider:RAW/v1";
 const SOURCE_SEARCH_NAME = '來源公司 <script>keep</script>';
-const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/watchlist";
+const RAW_ERROR = "RAW backend failure token=secret watchlist";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 const RAW_PROVIDER_MESSAGE = "RAW provider exception /private/consensus";
 

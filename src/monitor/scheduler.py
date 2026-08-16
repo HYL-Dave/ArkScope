@@ -5,8 +5,7 @@ Uses asyncio tasks (no external scheduler dependency).
 Coordinates MonitorEngine scans at fixed intervals.
 
 Threading model:
-    The watcher scan (DB queries via psycopg2, signal synthesis, etc.)
-    is synchronous and can block for 10+ seconds.  Running it directly
+    The watcher scan is synchronous and can block for 10+ seconds. Running it directly
     on the Discord event-loop thread causes gateway heartbeat timeouts.
 
     Solution: ``_scan_and_notify()`` runs the scan in a *background
@@ -103,13 +102,12 @@ class MonitorScheduler:
     async def _scan_and_notify(self) -> None:
         """Scan in a background thread, then notify on the main event loop.
 
-        This prevents synchronous DB queries (psycopg2) and signal
-        synthesis from blocking the Discord gateway heartbeat.
+        This prevents synchronous data reads and signal synthesis from
+        blocking the Discord gateway heartbeat.
         """
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         logger.info("Scan triggered at %s", now)
         try:
-            # Heavy I/O (psycopg2, HTTP) runs in thread-pool thread.
             alerts = await asyncio.to_thread(self._scan_blocking)
             logger.info("Scan complete: %d alert(s)", len(alerts))
             # Notifications must run on the main event loop because

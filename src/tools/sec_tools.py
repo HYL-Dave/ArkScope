@@ -7,7 +7,6 @@ Decision (2026-02-15):
 - get_sec_filings: replaces empty DAL implementation with direct EDGAR access
 - get_insider_trades: new tool, fully structured Form 4 data (high signal, low tokens)
 - get_earnings_releases: NOT bridged (raw text dump, poor token efficiency)
-  → see AGENT_EVOLUTION_TRACKER.md Phase 11a for full rationale
 """
 
 from __future__ import annotations

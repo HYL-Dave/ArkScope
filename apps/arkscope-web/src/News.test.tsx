@@ -38,7 +38,7 @@ const MARKET_BODY = "SOURCE Market body / 原文 <keep>";
 const MARKET_PUBLISHER = "Provider A / 原值";
 const SA_TITLE = "SOURCE Seeking Alpha analysis / 保留 <keep>";
 const SA_SNIPPET = "SOURCE SA snippet / 原文 <keep>";
-const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/news";
+const RAW_ERROR = "RAW backend failure token=secret news";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 
 let root: ReturnType<typeof createRoot> | null = null;

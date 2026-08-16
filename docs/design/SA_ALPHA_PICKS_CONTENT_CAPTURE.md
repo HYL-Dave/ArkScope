@@ -19,7 +19,7 @@ Relevant code:
 
 - `extensions/sa_alpha_picks/scrape_detail.js`
 - `src/tools/data_access.py`
-- `src/tools/backends/db_backend.py`
+- `src/tools/backends/local_capabilities.py`
 
 ## What is preserved today
 

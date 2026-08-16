@@ -1,7 +1,7 @@
 """Shared IBKR Gateway lock — one TWS/Gateway session at a time, across the whole app.
 
-Extracted from ``data_scheduler`` (PG-exit precursor) so EVERY IBKR consumer serializes on the
-SAME mutex: the scheduler's ``run_source`` (ibkr sources), the standalone direct price backfill
+Every IBKR consumer serializes on the same mutex: the scheduler's ``run_source``
+(IBKR sources), the standalone direct price backfill
 (``market_data_direct.backfill_prices_direct``), and the future intraday-behavior operation. The
 Gateway is single-session — two concurrent ``reqHistoricalData`` storms (e.g. a manual backfill
 racing a scheduled IV pull) corrupt each other; this lock makes that impossible whether the
@@ -51,7 +51,7 @@ class FileLock:
 
     Each instance is only ever acquired while its threading twin is held, so the instance
     itself needs no thread-safety. Non-POSIX (no fcntl) degrades to in-process-only locking
-    with a one-time warning. (Moved verbatim from data_scheduler in the PG-exit lock extraction.)
+    with a one-time warning.
     """
 
     _warned = False

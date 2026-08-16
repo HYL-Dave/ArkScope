@@ -1,16 +1,11 @@
-"""Local scheduler state (scheduler-hardening v1.2) — per-source durable state in profile_state.db.
+"""Per-source durable scheduler state in ``profile_state.db``.
 
-Moves the scheduler's last-attempt / outcome / failure-reason off the PG ``job_runs`` archive into
-a single local SQLite table so restart continuity (interval backoff) and the "why did it fail /
-what's still missing" surface work with NO PG (PG stays an optional archive). One row per source:
+The local table provides restart continuity and exposes the latest outcome:
 
     scheduler_state(source PK, last_attempt, last_status, last_error, continuation, last_result, updated_at)
 
-``last_status`` includes ``partial`` as a FIRST-CLASS local value (a budget-bounded run that saved
-a continuation, v1.3) — deliberately NOT mapped into PG ``job_runs``' status enum, which is left
-untouched. ``continuation`` / ``last_result`` are JSON. Same path + idiom as the other
-profile_state.db stores (CardRunStore, etc.). v1.2 adds the store + wires two scheduler touchpoints;
-it does NOT change scheduling behavior.
+``last_status`` includes ``partial`` for a budget-bounded run that saved a
+continuation. ``continuation`` and ``last_result`` are JSON.
 """
 
 from __future__ import annotations
@@ -60,7 +55,7 @@ def _parse_iso(s: str) -> datetime:
 
 
 class SchedulerStateStore:
-    """Per-source durable scheduler state over ``profile_state.db`` (local-primary; no PG)."""
+    """Per-source durable scheduler state over ``profile_state.db``."""
 
     def __init__(self, db_path: str | Path):
         self.db_path = str(db_path)

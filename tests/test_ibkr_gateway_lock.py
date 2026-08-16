@@ -1,4 +1,4 @@
-"""Shared IBKR Gateway lock (PG-exit precursor) — the one mutex every IBKR consumer uses."""
+"""Shared IBKR Gateway lock used by every IBKR consumer."""
 
 from __future__ import annotations
 

@@ -58,7 +58,7 @@ const SOURCE_FRESHNESS = "SOURCE freshness/raw";
 const SOURCE_COMPLETENESS_NOTE = "SOURCE COMPLETENESS NOTE / 原文";
 const TRANSLATED_CONCLUSION = "TRANSLATED CONCLUSION / 翻譯結果";
 const SOURCE_CONCLUSION_B = "SOURCE CARD B CONCLUSION / 原文";
-const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/cards";
+const RAW_ERROR = "RAW backend failure token=secret cards";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 
 const TRACE: PersonalizationTrace = {

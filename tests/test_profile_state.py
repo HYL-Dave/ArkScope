@@ -865,7 +865,7 @@ def test_import_universe_theme_groups_best_effort(api_store, monkeypatch):
     )
 
     def _boom(dal):
-        raise RuntimeError("PG down")
+        raise RuntimeError("overview unavailable")
 
     monkeypatch.setattr("src.api.routes.profile.get_watchlist_overview", _boom)
     out = import_universe(ImportBody(include_groups=True, include_tiers=True), dal=None, store=api_store)

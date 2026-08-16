@@ -5,8 +5,7 @@ old ArkScope LLM "sentiment" score in the cockpit.
 Finnhub's recommendation endpoint is per-ticker and throttled (~1/sec), so we
 cache each ticker's consensus locally for a day and fill lazily (per visible
 row) — the cockpit never blocks fetching the whole universe at once. This is a
-local data cache (its own SQLite file under data/cache/), NOT user profile state
-and NOT the remote PG.
+local data cache (its own SQLite file under data/cache/), not user profile state.
 
 The summary is derived deterministically from the recommendation distribution
 (a standard 1-5 weighted mean → Strong Buy … Strong Sell), and is always

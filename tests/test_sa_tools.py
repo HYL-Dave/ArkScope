@@ -394,27 +394,16 @@ class TestNativeHost:
 # ============================================================
 
 class TestSAAlphaPicksStorageContract:
-    def test_sql_schema_preserves_dual_tab_membership_and_closed_date(self):
+    def test_local_schema_preserves_dual_tab_membership_and_closed_date(self):
         """Schema models SA's source quirk: same pick may be current and closed."""
-        base_sql = Path("sql/007_add_sa_alpha_picks.sql").read_text()
-        migration_014_sql = Path(
-            "sql/014_sa_alpha_picks_closed_date_and_dual_membership.sql"
-        ).read_text()
-        migration_015_sql = Path(
-            "sql/015_sa_alpha_picks_closed_event_identity.sql"
-        ).read_text()
+        from src.sa_capture_store import _SCHEMA
 
-        assert "closed_date       DATE" in base_sql
-        assert "idx_sa_picks_current_unique" in base_sql
-        assert "WHERE portfolio_status = 'current'" in base_sql
-        assert "idx_sa_picks_closed_unique" in base_sql
-        assert "closed_date)" in base_sql
-        assert "WHERE portfolio_status = 'closed'" in base_sql
-        assert "ADD COLUMN IF NOT EXISTS closed_date DATE" in migration_014_sql
-        assert "sa_alpha_picks_symbol_picked_date_status_key" in migration_014_sql
-        assert "DROP CONSTRAINT IF EXISTS sa_alpha_picks_symbol_picked_date_status_key" in migration_015_sql
-        assert "idx_sa_picks_current_unique" in migration_015_sql
-        assert "idx_sa_picks_closed_unique" in migration_015_sql
+        assert "closed_date         TEXT" in _SCHEMA
+        assert "idx_sa_picks_current_unique" in _SCHEMA
+        assert "WHERE portfolio_status = 'current'" in _SCHEMA
+        assert "idx_sa_picks_closed_unique" in _SCHEMA
+        assert "closed_date)" in _SCHEMA
+        assert "WHERE portfolio_status = 'closed'" in _SCHEMA
 
 
 

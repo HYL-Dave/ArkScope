@@ -460,7 +460,7 @@ class TestGetEconomicCalendarTool:
     def test_filebackend_dal_returns_local_empty_message(self):
         undo = _enable_macro()
         try:
-            dal = SimpleNamespace(_backend=object())  # no _get_conn; still local store
+            dal = SimpleNamespace(_backend=object())
             out = get_economic_calendar(dal=dal)
             assert out.startswith("No economic events in ")
         finally:

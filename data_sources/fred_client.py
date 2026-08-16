@@ -278,8 +278,6 @@ class FREDClient:
             publication realtime window. Used by ``latest_only``
             ingestion.
 
-        See ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6.3 for the
-        live-call evidence behind this mapping.
         """
         params: Dict[str, Any] = {
             "series_id": series_id,

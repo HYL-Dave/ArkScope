@@ -5,8 +5,8 @@
 > (news / Seeking Alpha / macro / prices / fundamentals / signals / options), and a
 > research GUI.
 >
-> Renamed from **MindfulRL-Intraday** on 2026-05-31. The lowercase `mindfulrl` that
-> remains (PostgreSQL DB name + browser native-messaging host id) is intentional.
+> Renamed from **MindfulRL-Intraday** on 2026-05-31. The lowercase `mindfulrl`
+> retained by browser extension identifiers is intentional.
 
 ## What this is
 
@@ -19,12 +19,10 @@ machines.
 - **Current direction & "what's next?"** → `docs/design/PROJECT_PRIORITY_MAP.md` §1
 - **Authoritative doc index (read this first)** → `docs/design/CURRENT_PROJECT_CONTEXT.md`
 - **v1 product contract** (storage / sync / page IA / migration) → `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
-- **Where the project came from + open data** → `docs/PROJECT_HISTORY.md`
 - **LLM auth / Claude-subscription Research driver** (design) → `docs/design/LLM_AUTH_DRIVER_PLAN.md` and `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md`
 
-> **Status**: local-first SQLite storage is **live** — the PG exit completed
-> 2026-07-05. PostgreSQL holds frozen archives only (restore/inspect via
-> `docker/README.md`); the app runtime needs no database server.
+> **Status**: local-first SQLite storage is live. Runtime state is stored under
+> `data/`; no external storage service is required.
 
 ## The workbench GUI (primary surface)
 
@@ -63,8 +61,7 @@ python -m src.daily_update --all --sync-db  # collect everything + sync to DB
 python -m src.agents                           # interactive CLI (--provider openai for GPT-5.x)
 ```
 
-(No database server needed — storage is local SQLite under `data/`. Docker
-exists only for PG **archive** access: `docker/README.md`.)
+All runtime storage is local SQLite under `data/`.
 
 ### Seeking Alpha Alpha Picks (optional)
 
@@ -97,9 +94,8 @@ research starts from a new reviewed design and current data contracts.
 
 ## Open data
 
-We open-sourced a multi-LLM financial-news scoring dataset (127,176 NASDAQ
-articles re-scored by 11 LLMs for sentiment and risk). Details + HuggingFace link:
-**`docs/PROJECT_HISTORY.md`**.
+The project includes research datasets and evidence generated from public market
+data. Published datasets must follow `docs/PUBLICATION_REVIEW.md`.
 
 ## License
 

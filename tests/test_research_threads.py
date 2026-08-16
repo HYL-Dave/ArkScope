@@ -1,7 +1,7 @@
-"""C-2b: ResearchThreadStore — local persistence for AI 研究 threads/messages.
+"""ResearchThreadStore persistence for AI 研究 threads and messages.
 
-Mirrors the shipped CardRunStore (src/card_runs.py): same local profile_state.db
-family, NEVER the remote PG. Thread ids are CLIENT-OWNED (stable unique strings
+The store shares the local ``profile_state.db`` family with CardRunStore.
+Thread ids are client-owned stable strings
 generated at 新對話), so the client (reducer) and server agree on identity with
 no mapping/rekey — ensure_thread is idempotent (the per-turn stream hook calls
 it every turn). Column names match the C-2a in-memory DTO (spec §6a) so
@@ -133,7 +133,7 @@ def test_delete_thread_missing_is_false(store):
 
 def test_local_storage_round_trip(store):
     assert store.db_path.endswith(".db")
-    assert not hasattr(store, "_pg_conn") and not hasattr(store, "_get_conn")
+    assert store.get_thread("missing") is None
 
 
 def test_rename_thread_updates_title_and_timestamp_without_changing_transcript(store):

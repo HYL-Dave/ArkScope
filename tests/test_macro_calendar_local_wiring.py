@@ -1,5 +1,4 @@
-"""Slice 2 — macro/cal local-first wiring: use_local_macro toggle + store factory +
-health local-first. Default OFF (PG store) until the toggle flips. Hermetic, no PG."""
+"""Macro/calendar store factory and local health wiring tests."""
 
 from __future__ import annotations
 
@@ -33,7 +32,6 @@ def test_factory_returns_local_store_when_toggle_on(tmp_path, monkeypatch):
 
 def test_factory_returns_local_store_when_toggle_off_after_n9(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(tmp_path / "macro_calendar.db"))
-    # post-N9 explicit/off legacy state no longer routes back to PG.
     assert isinstance(get_macro_calendar_store(_FakeDal(local=False)), MacroCalendarLocalStore)
 
 
@@ -62,7 +60,6 @@ def test_local_store_table_stats(tmp_path):
 
 
 def test_health_reads_local_calendar_store(tmp_path, monkeypatch):
-    # local toggle ON + a seeded macro_calendar.db + NO PG backend → health computes table
     # coverage from the local DB (does not fall to the db-unavailable report).
     db = tmp_path / "macro_calendar.db"
     monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(db))
@@ -70,5 +67,5 @@ def test_health_reads_local_calendar_store(tmp_path, monkeypatch):
     report = compute_macro_calendar_health(_FakeDal(local=True, backend=None))
     assert isinstance(report.get("tables"), list)
     econ = next(b for b in report["tables"] if b["name"] == "cal_economic_events")
-    assert econ["row_count"] == 1                 # local data reflected without any PG
+    assert econ["row_count"] == 1
     assert econ["status"] != "empty"              # has a fresh fetched_at → evaluated, not empty

@@ -14,9 +14,7 @@ _SATURDAY = datetime(2026, 6, 13, 12, 0, tzinfo=timezone.utc)
 
 
 class _FakeBackend:
-    """Health-signal stub: query_health_stats + get_sa_refresh_meta only.
-    Deliberately has NO _get_conn → JobRunsStore.is_available() is False, so
-    job_runs degrade to {} without monkeypatching."""
+    """Health-signal stub exposing current health and refresh capabilities."""
 
     def __init__(self, stats=None, sa=None):
         self._stats = stats or {}
@@ -139,7 +137,7 @@ def test_no_signal_when_nothing_recorded(monkeypatch):
         "src.service.provider_health.read_macro_schedule_automation",
         lambda: None,
     )
-    dal = _FakeDAL(_FakeBackend())  # no job_runs (fake backend has no _get_conn)
+    dal = _FakeDAL(_FakeBackend())
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "fred")
     assert p["status"] == "no_signal"
     assert p["signals"]["auto_refresh_enabled"] is None
@@ -379,7 +377,7 @@ def test_sa_provider_ignores_legacy_and_skipped_success_rows(monkeypatch):
 
 
 def test_section_failure_degrades_not_raises():
-    dal = _FakeDAL(_FakeBackend(stats=RuntimeError("PG down")))
+    dal = _FakeDAL(_FakeBackend(stats=RuntimeError("health query unavailable")))
     out = compute_provider_health(dal, now=_WEDNESDAY)
     assert any("query_health_stats failed" in n for n in out["notes"])
     assert len(out["providers"]) == 7            # all providers still listed
@@ -429,8 +427,8 @@ def test_p0c_provider_health_marks_price_sync_retired(monkeypatch):
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
 
     prices = out["local_market"]["sync"]["prices"]
-    assert prices["retired"] is True
     assert prices["authority"] == "local"
+    assert prices["message"] == "Prices are served from local market_data.db."
 
 
 def test_route_returns_aggregation(monkeypatch):

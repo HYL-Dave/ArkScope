@@ -1,15 +1,15 @@
-"""Direct-local news writer (PG-exit Step 2a) — provider → market_data.db `news` + `news_fts`.
+"""Provider-to-local news writer for ``market_data.db``.
 
 The first direct-local ingest collector after price_backfill, reusing its machinery: holds
-``market_write_lock`` (serializes vs the PG→local mirror), records ``provider_sync_runs`` /
+``market_write_lock``, records ``provider_sync_runs`` /
 ``provider_sync_meta`` telemetry (``domain='news'``, ``interval='news'``), per-ticker failure
-isolation, and idempotent ``INSERT OR IGNORE``. No PG, no Parquet round-trip for the local read
+isolation, and idempotent ``INSERT OR IGNORE``. There is no Parquet round-trip for the local read
 path. Mirrors `backfill_prices_direct`.
 
-Dedup is on the canonical SHA-256 ``article_hash`` shared by direct ingest and the PG/mirror
-migration. ``published_at`` is normalized to the local UTC format ``'YYYY-MM-DDTHH:MM:SS+0000'``.
+Dedup uses canonical SHA-256 ``article_hash`` values. ``published_at`` is normalized
+to the local UTC format ``'YYYY-MM-DDTHH:MM:SS+0000'``.
 ``news_fts`` (external-content FTS5, ``content_rowid='id'``) is kept in sync by AFTER
-INSERT/UPDATE/DELETE triggers (PG-exit 2b, ``_ensure_news_fts_triggers``) — no manual fts write
+INSERT/UPDATE/DELETE triggers through ``_ensure_news_fts_triggers`` — no manual fts write
 here, so the writer can't double-index. The incremental cursor is the newest local
 ``published_at`` for THIS source (source-scoped, optionally ticker-scoped) so Polygon/Finnhub
 don't clobber each other's frontier.

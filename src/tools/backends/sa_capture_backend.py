@@ -23,7 +23,6 @@ from .sqlite_backend import SqliteBackend
 
 logger = logging.getLogger(__name__)
 
-# PG: body_markdown ~ E'^# .+\n\n# '  (POSIX, '.' does not cross newlines —
 # same semantics as Python re.search without DOTALL; '^' anchors string start).
 _DIRTY_BODY_PATTERN = r"^# .+\n\n# "
 
@@ -71,7 +70,7 @@ def _fts_match(q: str) -> str:
 
 
 def _loads(value: Any) -> Any:
-    """json.loads TEXT → dict/list, matching psycopg2's automatic jsonb decode."""
+    """Decode stored JSON text while preserving already-decoded values."""
     if isinstance(value, str):
         try:
             return json.loads(value)
@@ -370,8 +369,8 @@ class SACaptureBackend(LocalMarketBackend):
         transaction (BEGIN IMMEDIATE). The upsert never touches
         detail_report/detail_fetched_at. Returns count of upserted rows.
 
-        Failure path mirrors the PG version: rollback, then record failure meta in
-        a FRESH transaction (own connection), then re-raise.
+        On failure, roll back, record failure metadata in a fresh transaction,
+        then re-raise.
         """
         attempt = store.canon_ts(attempt_ts) or store.now_ts()
         snapshot = store.canon_ts(snapshot_ts) or store.now_ts()
@@ -449,7 +448,7 @@ class SACaptureBackend(LocalMarketBackend):
                         pick.get("holding_pct"),
                         json.dumps(pick.get("raw_data")) if pick.get("raw_data") else None,
                         snapshot,
-                        now,  # fetched_at (INSERT only — PG column default NOW())
+                        now,
                         now,  # updated_at (INSERT)
                         now,  # updated_at (DO UPDATE)
                     ),
@@ -479,7 +478,6 @@ class SACaptureBackend(LocalMarketBackend):
                 conn.rollback()
             except Exception:
                 pass
-            # Failure meta in a FRESH transaction (PG path: db_backend ~:1321-1329)
             try:
                 self.record_sa_refresh_failure(scope, attempt_ts, str(e))
             except Exception:
@@ -558,8 +556,8 @@ class SACaptureBackend(LocalMarketBackend):
             out = []
             for r in rows:
                 d = dict(r)
-                d["is_stale"] = bool(d["is_stale"])      # PG boolean parity
-                d["has_detail"] = bool(d["has_detail"])  # PG boolean parity
+                d["is_stale"] = bool(d["is_stale"])
+                d["has_detail"] = bool(d["has_detail"])
                 out.append(d)
             return out
         except Exception as e:
@@ -571,8 +569,7 @@ class SACaptureBackend(LocalMarketBackend):
     def get_sa_pick_detail(
         self, symbol: str, picked_date: Optional[str] = None
     ) -> Optional[dict]:
-        """Detail for one pick. picked_date=None → deterministic fallback:
-        current + non-stale first, then stale, then any (PG-identical ordering)."""
+        """Detail for one pick, preferring current non-stale rows."""
         try:
             conn = self._sa_read()
         except Exception as e:
@@ -599,7 +596,7 @@ class SACaptureBackend(LocalMarketBackend):
             d = dict(row)
             d.pop("lineage_id", None)  # internal reconciliation identity, not legacy DTO
             d["is_stale"] = bool(d["is_stale"])
-            d["raw_data"] = _loads(d.get("raw_data"))  # psycopg2 jsonb→dict parity
+            d["raw_data"] = _loads(d.get("raw_data"))
             return d
         except Exception as e:
             logger.error("Failed to get SA pick detail: %s", e)
@@ -631,11 +628,9 @@ class SACaptureBackend(LocalMarketBackend):
             conn.close()
 
     def get_sa_refresh_meta(self) -> dict:
-        """Per-tab refresh metadata: {"current": {...}, "closed": {...}}.
+        """Return per-tab refresh metadata for current and closed picks.
 
-        FIXES the PG version's unguarded ``.isoformat()`` (db_backend ~:1464-1466,
-        AttributeError → silent {}): timestamps here are already canonical TEXT and
-        are returned as-is. ``ok`` is converted back to a Python bool for parity.
+        Timestamps are canonical text and ``ok`` is returned as a Python bool.
         """
         result: dict = {}
         try:
@@ -659,15 +654,11 @@ class SACaptureBackend(LocalMarketBackend):
     # ================================================================
 
     def upsert_sa_market_news(self, items: list) -> int:
-        """Batch upsert market-news metadata. Per-item transaction (PG ran with
-        autocommit per statement, so earlier items persist if a later one fails).
+        """Batch upsert market-news metadata in per-item transactions.
 
-        Conflict semantics (PG parity): bumps updated_at NOT fetched_at; never
-        touches body_markdown/detail_fetched_at; comments_count = GREATEST→max;
-        published_*/category/summary/raw_data COALESCE-keep; the PG
-        ``CASE WHEN array_length(EXCLUDED.tickers,1) > 0`` merge becomes: a
-        non-empty incoming set REPLACES the junction rows (DELETE+INSERT in the
-        same transaction), an empty one keeps the existing rows.
+        Earlier items persist if a later item fails. Conflicts update metadata
+        without replacing stored bodies; non-empty ticker sets replace junction
+        rows while empty sets preserve the existing rows.
         """
         try:
             conn = self._sa_conn()
@@ -706,7 +697,6 @@ class SACaptureBackend(LocalMarketBackend):
                         item.get("summary"),
                         item.get("comments_count", 0),
                         # None → SQL NULL so COALESCE keeps the existing payload.
-                        # (PG passed Json(None) == jsonb 'null', which psycopg2
                         # decodes back to None — read shape is identical.)
                         json.dumps(item.get("raw_data"))
                         if item.get("raw_data") is not None else None,
@@ -745,8 +735,7 @@ class SACaptureBackend(LocalMarketBackend):
 
     @staticmethod
     def _market_news_tickers(conn: sqlite3.Connection, row_ids: list) -> Dict[int, list]:
-        """Junction rows for a set of news row ids, insertion (rowid) order —
-        replaces reading the PG TEXT[] column. One query, not N+1."""
+        """Return ticker junction rows in insertion order with one query."""
         if not row_ids:
             return {}
         placeholders = ",".join("?" * len(row_ids))
@@ -807,7 +796,7 @@ class SACaptureBackend(LocalMarketBackend):
             out = []
             for r in rows:
                 d = dict(r)
-                row_id = d.pop("id")  # internal join key, not part of the PG shape
+                row_id = d.pop("id")
                 out.append({
                     "news_id": d["news_id"],
                     "url": d["url"],
@@ -860,9 +849,11 @@ class SACaptureBackend(LocalMarketBackend):
         exclude_news_ids: list | None = None,
         published_within_hours: int | None = None,
     ) -> list:
-        """Market-news items still needing a detail body fetch. PG's
-        ``NOW() - (N || ' hours')::interval`` becomes Python-computed canonical
-        cutoff strings compared lexicographically."""
+        """Return market-news items that still need a detail body fetch.
+
+        Canonical cutoff strings are computed in Python and compared
+        lexicographically.
+        """
         if limit is not None and int(limit or 0) <= 0:
             return []
         now_dt = datetime.now(timezone.utc)
@@ -1013,8 +1004,7 @@ class SACaptureBackend(LocalMarketBackend):
             raise RuntimeError("sa_market_news_recovery_unavailable") from exc
 
     def invalidate_dirty_sa_market_news_detail(self) -> int:
-        """Drop cached market-news bodies matching known chrome noise. The PG
-        ``~`` regex predicate runs through a per-connection REGEXP function."""
+        """Drop cached market-news bodies matching known browser noise."""
         try:
             conn = self._sa_conn()
         except Exception as e:
@@ -1083,8 +1073,10 @@ class SACaptureBackend(LocalMarketBackend):
     # ================================================================
 
     def upsert_sa_articles_meta(self, articles: list) -> int:
-        """Batch upsert article metadata (no body_markdown). Per-item transaction
-        (PG autocommit parity: earlier items persist if a later one fails)."""
+        """Batch upsert article metadata in per-item transactions.
+
+        Earlier items persist if a later item fails.
+        """
         try:
             conn = self._sa_conn()
         except Exception as e:
@@ -1170,10 +1162,7 @@ class SACaptureBackend(LocalMarketBackend):
         return count
 
     def sanitize_corrupted_sa_comments_counts(self) -> int:
-        """Repair year-prefixed comments_count corruption. PG's
-        EXTRACT(YEAR FROM published_date) → substr(published_date, 1, 4)
-        (published_date is canonical 'YYYY-MM-DD' TEXT);
-        SUBSTRING(x FROM 5) → substr(x, 5)."""
+        """Repair year-prefixed comment counts stored on article rows."""
         try:
             conn = self._sa_conn()
         except Exception as e:
@@ -1207,7 +1196,6 @@ class SACaptureBackend(LocalMarketBackend):
             conn.close()
 
     # -- internal comment helpers (operate on the caller's open connection so
-    #    they stay inside the caller's transaction, like the PG cursor versions) --
 
     def _fetch_existing_article_comments(
         self, conn: sqlite3.Connection, article_id: str
@@ -1255,7 +1243,7 @@ class SACaptureBackend(LocalMarketBackend):
                     comment.get("comment_text"),
                     comment.get("upvotes", 0),
                     store.canon_ts(comment.get("comment_date")),  # write boundary
-                    now,  # fetched_at (INSERT only — PG column default NOW())
+                    now,
                 ),
             )
         cleanup = self._cleanup_article_comment_duplicates(conn, article_id)
@@ -1314,9 +1302,7 @@ class SACaptureBackend(LocalMarketBackend):
         }
 
     def cleanup_mixed_null_date_comment_duplicates(self) -> Dict[str, int]:
-        """Collapse safe duplicate groups where a null-date row matches a dated row.
-        PG's COUNT(*) FILTER (WHERE …) → SUM(CASE WHEN … THEN 1 ELSE 0 END);
-        COUNT(DISTINCT …) already ignores NULLs in both engines."""
+        """Collapse safe duplicate groups where a null-date row matches a dated row."""
         conn = self._sa_conn()
         groups_processed = 0
         comments_deleted = 0
@@ -1831,9 +1817,7 @@ class SACaptureBackend(LocalMarketBackend):
         article_type: str = None,
         limit: int = 10,
     ) -> list:
-        """Query SA articles with optional filters; keyword search runs against the
-        trigger-maintained sa_articles_fts mirror (title + body_markdown, same
-        corpus as the PG GIN expression index)."""
+        """Query SA articles with optional filters and FTS keyword search."""
         conditions = []
         params: list = []
         if ticker:
@@ -1880,7 +1864,7 @@ class SACaptureBackend(LocalMarketBackend):
             out = []
             for r in rows:
                 d = dict(r)
-                d["has_content"] = bool(d["has_content"])  # PG boolean parity
+                d["has_content"] = bool(d["has_content"])
                 out.append(d)
             return out
         except Exception as e:
@@ -1890,9 +1874,7 @@ class SACaptureBackend(LocalMarketBackend):
             conn.close()
 
     def get_sa_article_with_comments(self, article_id: str) -> dict:
-        """Full article + ordered comment list. raw_data is json.loads'd to match
-        psycopg2's jsonb→dict; timestamps are canonical TEXT already (no
-        .isoformat conversion needed)."""
+        """Return a full article and ordered comments with decoded raw data."""
         try:
             conn = self._sa_read()
         except Exception as e:

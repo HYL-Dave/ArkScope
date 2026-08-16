@@ -71,9 +71,6 @@ const newsStatus = (over: Partial<NewsStatus> = {}): NewsStatus => ({
   normalized_writes_env_value: null,
   write_route: "normalized",
   write_route_reason: "test",
-  news_pg_exit_completed: true,
-  news_hard_local: true,
-  pg_news_route_available: false,
   sync: null,
   ...over,
 });
@@ -205,16 +202,11 @@ describe("SettingsView news storage copy", () => {
     expect(host!.textContent).toContain("10 篇 · 2 來源");
     expect(host!.textContent).toContain("最近收集成功");
     expect(host!.textContent).toContain("各來源排程與手動執行由 Data Sources 管理。");
-    expect(host!.textContent).not.toMatch(/PostgreSQL|PG exit|SQLite|legacy|mirror|本地新聞庫/);
+    expect(host!.textContent).not.toMatch(/market_data\.db|direct-local|strict DB-first/);
   });
 
   it("hides_both_migration_controls_even_for_a_pre_exit_compatibility_response", async () => {
-    mocked.newsStatus = newsStatus({
-      news_hard_local: false,
-      news_pg_exit_completed: false,
-      pg_news_route_available: true,
-      direct_active: false,
-    });
+    mocked.newsStatus = newsStatus({ direct_active: false });
     await renderNewsSection();
     const newsAnchor = host!.querySelector('[data-settings-anchor="news_storage"]')!;
     expect(newsAnchor.querySelectorAll("input[type='checkbox']")).toHaveLength(0);

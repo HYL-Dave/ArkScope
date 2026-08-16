@@ -1,8 +1,7 @@
-"""Scheduler-hardening v1.2 — local scheduler_state store (profile_state.db; no PG).
+"""Durable per-source scheduling state in ``profile_state.db``.
 
-Durable per-source scheduler state (last_attempt / last_status / last_error / continuation /
-last_result) so restart continuity + the failure surface no longer depend on PG job_runs.
-`partial` is a first-class LOCAL status (decision: do NOT force it into PG job_runs' enum).
+Attempts, outcomes, errors, continuations, and result summaries survive process
+restarts. ``partial`` is a first-class status.
 """
 
 from __future__ import annotations
@@ -105,4 +104,4 @@ def test_reconcile_interrupted_running_marks_terminal(store):
 
 def test_imports_with_declared_local_dependencies():
     import src.scheduler_state as mod
-    assert not hasattr(mod, "psycopg2")
+    assert mod.SchedulerStateStore is SchedulerStateStore

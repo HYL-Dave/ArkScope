@@ -1,11 +1,4 @@
-"""PG-exit Slice 1a — local app-records store (reports / memories / agent_queries).
-
-These are the PG-only, user/agent-authored, NOT-regenerable records. This store is the local
-twin of db_backend's app-record surface, over profile_state.db, returning the SAME shapes
-(DataFrames with list-typed tickers/tags; created_at as 'YYYY-MM-DDTHH:MM:SS' to match the PG
-TO_CHAR). Hermetic — temp SQLite, no PG, no psycopg2. Slice 1a is the store only: no DAL
-wiring, no migration (those are 1b / 1c).
-"""
+"""Contracts for the local app-records store."""
 
 from __future__ import annotations
 
@@ -13,7 +6,7 @@ import pytest
 
 from src.app_records_store import AppRecordsLocalStore
 
-# column parity with db_backend (the contract report_tools / memory tools consume)
+# Columns consumed by report and memory tools.
 _REPORT_COLS = ["id", "title", "tickers", "report_type", "summary", "conclusion",
                 "confidence", "model", "file_path", "tool_calls", "duration_seconds", "created_at"]
 _MEM_COLS = ["id", "title", "content", "category", "tickers", "tags", "importance", "source", "created_at"]
@@ -120,7 +113,7 @@ def test_memory_meta_excludes_content_and_delete(store):
     assert store.query_memories().empty
 
 
-# --- agent_queries (write-only log, mirrors db_backend) -----------------------------
+# --- agent_queries -----------------------------------------------------------------
 
 def test_agent_query_insert(store):
     qid = store.insert_agent_query(question="what is AFRM?", answer="a fintech",
@@ -131,11 +124,12 @@ def test_agent_query_insert(store):
     assert store.count_agent_queries() == 1
 
 
-# --- hermetic / no-PG --------------------------------------------------------------
+# --- hermetic local behavior -------------------------------------------------------
 
 def test_imports_with_declared_local_dependencies():
+    import sqlite3
     import src.app_records_store as mod
-    assert not hasattr(mod, "psycopg2")
+    assert mod.sqlite3 is sqlite3
 
 
 def test_absent_db_query_is_empty_not_crash(tmp_path):
@@ -146,17 +140,16 @@ def test_absent_db_query_is_empty_not_crash(tmp_path):
     assert s.get_report_metadata(1) is None
 
 
-# --- 1b: factory routing (default-off) + DAL toggle ---------------------------------
+# --- factory routing ---------------------------------------------------------------
 
 from src.app_records_store import (
-    USE_LOCAL_RECORDS_KEY, ENV_USE_LOCAL_RECORDS,
     get_app_records_store, resolve_profile_state_db_path,
 )
 
 
 class _FakeBackend:
-    """Stand-in for dal._backend (PG/File) — distinct from the local store."""
-    def insert_report(self, **k): return -1   # sentinel: came from PG path
+    """Alternate capability used to prove that the factory owns storage."""
+    def insert_report(self, **k): return -1
     def query_reports(self, **k):
         import pandas as pd
         return pd.DataFrame()
@@ -171,8 +164,6 @@ class _FakeDal:
 
 
 def test_factory_explicit_false_still_returns_local_store(tmp_path, monkeypatch):
-    # PG-exit closeout: explicit false is provenance only — records never route back
-    # to the PG backend (the three PG app-record tables are archive-only).
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     store = get_app_records_store(_FakeDal(local=False, backend=_FakeBackend()))
     assert isinstance(store, AppRecordsLocalStore)
@@ -185,8 +176,7 @@ def test_factory_on_returns_local_store(tmp_path, monkeypatch):
 
 
 def test_create_store_makes_missing_parent_dirs(tmp_path):
-    # Fresh-profile safety (PG-exit closeout): default-create store must mkdir absent
-    # parents — a brand-new base without data/ must not OperationalError at construction.
+    # A new profile may not have a data directory yet.
     path = tmp_path / "fresh" / "data" / "profile_state.db"
     store = AppRecordsLocalStore(path)
     mid = store.insert_memory(title="t", content="c", category="note",
@@ -196,8 +186,6 @@ def test_create_store_makes_missing_parent_dirs(tmp_path):
 
 
 def test_factory_toggleless_dal_routes_local(tmp_path, monkeypatch):
-    # A dal lacking the legacy toggle (older/test double) also gets the local store —
-    # fresh/reset profiles must never strand on the retired PG app-record path.
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     class _Bare:  # no _local_records_enabled (older/test double)
         _backend = _FakeBackend()
@@ -216,20 +204,16 @@ def test_resolver_no_api_import_and_env_precedence(tmp_path, monkeypatch):
 
 
 def test_dal_local_records_default_is_local(tmp_path, monkeypatch):
-    # Unset and explicit false are retained provenance only; both resolve local.
     from src.tools.data_access import DataAccessLayer
-    monkeypatch.delenv(ENV_USE_LOCAL_RECORDS, raising=False)
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "empty_profile_state.db"))
     dal = DataAccessLayer(base_path=tmp_path)
     assert isinstance(get_app_records_store(dal), AppRecordsLocalStore)
-    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "false")
-    assert isinstance(get_app_records_store(dal), AppRecordsLocalStore)
+    other = DataAccessLayer(base_path=tmp_path / "other")
+    assert isinstance(get_app_records_store(other), AppRecordsLocalStore)
 
 
 def test_end_to_end_save_report_routes_local_when_on(tmp_path, monkeypatch):
-    # toggle on → save_report's insert lands in the LOCAL store, readable via list_reports.
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
-    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "1")
     from src.tools.data_access import DataAccessLayer
     from src.tools import report_tools
     dal = DataAccessLayer(base_path=str(tmp_path))
@@ -237,22 +221,19 @@ def test_end_to_end_save_report_routes_local_when_on(tmp_path, monkeypatch):
     # route an insert through the tool layer
     out = report_tools.save_report(dal, title="T", content="# body", tickers=["AFRM"],
                                    report_type="entry_analysis", summary="s")
-    # the report id should come from the LOCAL store (not the -1 PG sentinel / not None)
     listed = report_tools.list_reports(dal, days=3650)
     assert any(r["title"] == "T" for r in listed), "local-routed report not found via list_reports"
 
 
 def test_gate4_on_empty_local_is_honest_no_crash(tmp_path, monkeypatch):
-    # gate #4: toggle ON + empty local store → reads are honest-empty, never crash, and the
-    # tools' existing markdown fallback still runs (no markdown files here → []).
+    # Empty local reads are honest and preserve the markdown fallback.
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
-    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "1")
     from src.tools.data_access import DataAccessLayer
     from src.tools import report_tools, memory_tools
     dal = DataAccessLayer(base_path=str(tmp_path))
     assert report_tools.list_reports(dal, days=30) == []          # honest empty, no crash
     assert isinstance(memory_tools.recall_memories(dal, query="x"), (list, str))
-    got = report_tools.get_report(dal, report_id=999999)          # absent id, pre-migration
+    got = report_tools.get_report(dal, report_id=999999)
     assert got is None or isinstance(got, (dict, str))            # honest, not a crash
 
 
@@ -260,7 +241,7 @@ def test_gate4_on_empty_local_is_honest_no_crash(tmp_path, monkeypatch):
 
 def test_create_false_does_not_materialize_db(tmp_path):
     # fix #1: a create=False store over an ABSENT path must NOT create the file, and reads
-    # return empty — so /migration/preview never materializes profile_state.db.
+    # return empty without materializing profile_state.db.
     path = tmp_path / "absent.db"
     s = AppRecordsLocalStore(path, create=False)
     assert s.count("research_reports") == 0 and s.raw_rows("agent_memories") == []

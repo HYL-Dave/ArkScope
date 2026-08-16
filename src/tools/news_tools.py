@@ -62,7 +62,7 @@ def search_news_by_keyword(
     """
     Search news articles by keyword using DB-level full-text search.
 
-    Uses PostgreSQL tsvector/GIN index for efficient matching.
+    Uses the local search capability for matching.
     Falls back to Python-level filtering for FileBackend.
 
     Args:

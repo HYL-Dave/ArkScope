@@ -688,12 +688,10 @@ def test_route_coverage_path_is_pure_local_read_without_provider_or_scheduler(
     monkeypatch.setattr(market_routes, "resolve_market_db_path", lambda: str(path))
 
     forbidden_prefixes = (
-        "psycopg",
         "ib_insync",
         "src.collectors",
         "src.scheduler_planner",
         "src.service.data_scheduler",
-        "src.tools.backends.db_backend",
     )
     real_import = builtins.__import__
 

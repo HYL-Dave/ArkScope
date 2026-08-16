@@ -18,7 +18,7 @@ def fundamentals(
     stored: bool = Query(
         False,
         description="Stored-only: return ONLY a local SEC annual-analysis "
-        "financial_cache snapshot with NO external fetch and NO PG fallback. This "
+        "financial_cache snapshot with no external fetch. This "
         "cache may be empty until the full analysis path has run for the ticker. "
         "Default (false) runs the full analysis (SEC EDGAR → Financial Datasets fallback).",
     ),
@@ -30,7 +30,7 @@ def fundamentals(
     fallback (for agents / on-demand analysis; CAN trigger an external/paid fetch).
 
     ``stored=true`` = read-only: returns ONLY a local positive SEC annual-analysis
-    financial_cache result and NEVER hits SEC/Financial Datasets or PG. Empty result
+    financial_cache result and never hits SEC or Financial Datasets. Empty result
     (data_source 'none') when that cache is absent or expired.
     """
     if stored:

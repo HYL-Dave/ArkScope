@@ -2035,14 +2035,10 @@ export function getConsensus(ticker: string): Promise<ConsensusSummary> {
 }
 
 // --- ticker detail: stored fundamentals and local coverage ---
-// These read through the DAL, so they automatically hit the local market DB when
-// routing is enabled and fall back to PG otherwise. Shapes mirror the Python
-// FundamentalsResult schema.
-
-// source_path = TRUE per-call origin of the underlying read. local_cache is the
-// stored SEC financial-cache projection; pg_fallback = local-first miss → PG;
-// pg = PG primary (routing off); file = file-backed dev config; none = no data.
-export type SourcePath = "local" | "local_cache" | "pg_fallback" | "pg" | "file" | "none";
+// source_path reports the local source used for the read. local_cache is the
+// stored SEC financial-cache projection; file is a file-backed development
+// configuration; none means no stored data was available.
+export type SourcePath = "local" | "local_cache" | "file" | "none";
 
 export interface FinancialStatement {
   report_period: string;
@@ -2090,10 +2086,9 @@ export interface MarketDataCoverage {
   fundamentals: boolean;
 }
 
-// STORED-ONLY fundamentals: DAL local-first + PG, with NO external SEC/Financial-
-// Datasets fetch (?stored=true) — for the read-only 數據 tab, so opening/refreshing it
-// never triggers a provider fetch. The full /fundamentals/{ticker} (provider fallback)
-// stays for agents/analysis.
+// STORED-ONLY fundamentals with no external SEC/Financial Datasets fetch
+// (?stored=true). Opening or refreshing the read-only data tab never contacts a
+// provider; the full /fundamentals/{ticker} route remains available to agents.
 export function getStoredFundamentals(ticker: string): Promise<FundamentalsResult> {
   return getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}?stored=true`);
 }
@@ -2308,7 +2303,7 @@ export interface NewsDirectSync extends SyncMeta {
   providers: Record<string, NewsProviderSync>;
 }
 
-export type NewsWriteRoute = "normalized" | "legacy_local" | "legacy_pg" | "blocked";
+export type NewsWriteRoute = "normalized" | "legacy_local" | "blocked";
 
 export interface NewsStatus {
   market_db: string;
@@ -2325,9 +2320,6 @@ export interface NewsStatus {
   normalized_writes_env_value: boolean | null;
   write_route: NewsWriteRoute;
   write_route_reason: string;
-  news_pg_exit_completed: boolean;
-  news_hard_local: boolean;
-  pg_news_route_available: boolean;
   sync: NewsDirectSync | null;
 }
 
@@ -2338,7 +2330,7 @@ export interface MarketDataStatus {
   prices: { row_count: number; ticker_count: number; latest_datetime: string | null };
   news: { row_count: number; source_count: number; latest_published: string | null };
   fundamentals: { row_count: number; ticker_count: number; latest_date: string | null };
-  // 3c-C local-primary cache (not a PG mirror): valid vs expired by TTL, latest fetch.
+  // Local cache validity and latest fetch time.
   financial_cache: {
     row_count: number;
     valid_count: number;
@@ -2351,7 +2343,6 @@ export interface MarketDataStatus {
     fundamentals: SyncMeta | null;
   };
   prices_authority: "local";
-  price_mirror_retired: boolean;
   fundamentals_mode: "local_cache_refetch";
   use_local_market_setting: boolean;
   env_override: boolean;
@@ -2359,7 +2350,6 @@ export interface MarketDataStatus {
   strict_env_override: boolean;
   strict_enabled: boolean;
   routing_enabled: boolean;
-  pg_fallback_active: boolean;
 }
 
 export function getMarketDataStatus(): Promise<MarketDataStatus> {
@@ -2466,8 +2456,6 @@ export function reviewSecurityLifecycleEvent(
   );
 }
 
-// News direct-local ingest. After news PG exit, polygon/finnhub/ibkr write
-// normalized SQLite and project the legacy local read surface; PG fallback is closed.
 export function getNewsStatus(): Promise<NewsStatus> {
   return getJSON<NewsStatus>("/news/status");
 }
@@ -2650,7 +2638,7 @@ export interface NewsFeedItem {
 }
 
 export interface NewsFeedResponse {
-  available: boolean; // false = no local news table AND PG unavailable
+  available: boolean; // false when the local news table is unavailable
   items: NewsFeedItem[];
   total: number;
   sources: Record<string, number>;
@@ -2882,7 +2870,6 @@ export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
 
 // --- per-source data-collection schedule (3e-D; app-owned, no cron) ---
 // All sources are DISABLED by default; enabling one makes the sidecar collect on its
-// own interval. Post-PG-exit sources are either direct-local writers or explicitly
 // retired mirror routes; the backend owns those presentation labels. Run-now is fire-and-return;
 // poll getSchedule() for the per-source running flag and the job_runs row
 // (collect.<source>, visible in getProvidersHealth().jobs) for the outcome.

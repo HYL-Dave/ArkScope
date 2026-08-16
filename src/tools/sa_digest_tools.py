@@ -2,15 +2,13 @@
 
 Single read-only tool: ``get_sa_digest(ticker, days, max_articles, max_news,
 max_comments, min_comment_score)`` returns a deterministic evidence pack
-composed from three existing SA tables:
+composed from the local SA capture tables:
 
-  - ``sa_articles``                 (sql/008) — Alpha Picks articles
-  - ``sa_market_news``              (sql/009) — market-news feed
-  - ``sa_comment_signals``          (sql/012) — Stage 1 rule-based scores
-    JOIN ``sa_article_comments``    (sql/008) — comment bodies
-    LEFT JOIN ``sa_articles``       (sql/008) — for ``article_url``
-
-Per spec ``docs/design/P1_3_SPEC.md`` §3-§6:
+  - ``sa_articles`` — Alpha Picks articles
+  - ``sa_market_news`` — market-news feed
+  - ``sa_comment_signals`` — Stage 1 rule-based scores
+    JOIN ``sa_article_comments`` — comment bodies
+    LEFT JOIN ``sa_articles`` — for ``article_url``
 
   - Each source has its own try/except so a partial failure does not
     blank the entire digest. Errors land in ``data_quality.errors[]``
@@ -83,8 +81,8 @@ def get_sa_digest(
 ) -> Dict[str, Any]:
     """Return a deterministic SA evidence pack for one ticker.
 
-    See ``docs/design/P1_3_SPEC.md`` §3-§6 for the contract. Output keys
-    are stable; empty sources return ``[]`` rather than being omitted.
+    Output keys are stable; empty sources return ``[]`` rather than being
+    omitted.
 
     Args:
         dal: DAL with the current local SA capture capability.
@@ -377,7 +375,7 @@ def _fetch_dicts_local(sa_db: str, sql: str, params: tuple) -> List[Dict[str, An
 def _query_articles_local(
     sa_db: str, ticker: str, window_start: datetime, max_articles: int
 ) -> List[Dict[str, Any]]:
-    """sa_articles rows from sa_capture.db (PG row shape, incl. body_missing).
+    """Return normalized article rows from ``sa_capture.db``.
 
     published_date is canonical 'YYYY-MM-DD' TEXT — the >= compare and the
     DESC ordering are lexicographic, which equals date order. NULLS LAST is
@@ -408,11 +406,10 @@ def _query_articles_local(
 def _query_news_local(
     sa_db: str, ticker: str, window_start: datetime, max_news: int
 ) -> List[Dict[str, Any]]:
-    """sa_market_news rows from sa_capture.db (PG row shape).
+    """Return normalized market-news rows from ``sa_capture.db``.
 
-    ``%(ticker)s = ANY(tickers)`` → membership in the sa_market_news_tickers
-    junction; the ``tickers`` TEXT[] column is re-assembled into a Python list
-    per row from the same junction (one query, not N+1).
+    Ticker membership comes from the junction table and each result receives
+    its ticker list through one additional query rather than N+1 reads.
     """
     from src import sa_capture_store as _store
 
@@ -464,13 +461,13 @@ def _query_comments_local(
     max_comments: int,
     rule_set_version: str,
 ) -> List[Dict[str, Any]]:
-    """Layered-CTE comments query against sa_capture.db (PG row shape).
+    """Run the layered comment query against ``sa_capture.db``.
 
     Same CTE structure (ROW_NUMBER OVER is fine in SQLite 3.25+); the
     ``= ANY(mentions)`` membership tests — both the mention_kind CASE and the
     WHERE filter — become EXISTS probes on the junction tables. The mention
-    arrays themselves are NOT selected: the digest normalizer never emits
-    them (mention_kind carries the classification), matching the PG output.
+    arrays themselves are not selected because ``mention_kind`` carries the
+    classification used by the digest normalizer.
     """
     import json as _json
 

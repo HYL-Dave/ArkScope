@@ -115,8 +115,7 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
     assert out["fundamentals_mode"] == "local_cache_refetch"
     assert out["use_local_market_setting"] is False
     assert out["prices_authority"] == "local"
-    assert out["pg_fallback_active"] is False
-    assert out["routing_enabled"] is True  # post-PG-exit default local, even before DB creation
+    assert out["routing_enabled"] is True
 
 
 def test_fresh_profile_uses_local_market_backend(tmp_path, monkeypatch):
@@ -148,9 +147,9 @@ def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatc
 
     db = tmp_path / "market_data.db"
     db.write_bytes(b"")
-    mirror = {
+    stored = {
         "prices": {"last_success": "p", "last_error": None, "rows_added": 1, "updated_at": "p"},
-        "news": {"last_success": "mirror", "last_error": None, "rows_added": 2, "updated_at": "mirror"},
+        "news": {"last_success": "stored", "last_error": None, "rows_added": 2, "updated_at": "stored"},
     }
     direct = {
         "status": "partial", "last_success": "direct", "last_attempt": "now",
@@ -162,21 +161,21 @@ def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatc
         "exists": True, "prices": {}, "news": {}, "iv": {}, "fundamentals": {},
         "financial_cache": {},
     })
-    monkeypatch.setattr("src.api.routes.market_data.read_sync_meta", lambda path: mirror)
+    monkeypatch.setattr("src.api.routes.market_data.read_sync_meta", lambda path: stored)
     monkeypatch.setattr("src.news_sync_status.read_news_sync_status", lambda path: direct)
 
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
     off = market_data_status(store=store)
     assert off["fundamentals_mode"] == "local_cache_refetch"
-    assert off["sync"]["news"] == mirror["news"]
+    assert off["sync"]["news"] == stored["news"]
     assert off["sync"]["prices"]["last_success"] == "p"
-    assert off["sync"]["prices"]["retired"] is True
+    assert off["sync"]["prices"]["authority"] == "local"
 
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
     on = market_data_status(store=store)
     assert on["sync"]["news"] == direct
     assert on["sync"]["prices"]["last_success"] == "p"
-    assert on["sync"]["prices"]["retired"] is True
+    assert on["sync"]["prices"]["authority"] == "local"
 
 
 def test_p0c_market_status_reports_prices_local_authority(monkeypatch):
@@ -205,9 +204,6 @@ def test_p0c_market_status_reports_prices_local_authority(monkeypatch):
     out = route.market_data_status(Store())
 
     assert out["prices_authority"] == "local"
-    assert out["price_mirror_retired"] is True
-    assert out["pg_fallback_active"] is False
-    assert out["sync"]["prices"]["retired"] is True
     assert out["sync"]["prices"]["authority"] == "local"
 
 
@@ -215,15 +211,14 @@ def test_toggle_persists_and_dal_reads_it(store, tmp_path, monkeypatch):
     from src.api.routes.market_data import set_local_market, LocalMarketToggle, market_data_status
     set_local_market(LocalMarketToggle(enabled=True), store=store)
     assert store.get_setting("use_local_market") == "true"
-    # status reflects the persisted legacy setting, but routing is local by default
-    # even before the DB is created.
+    # Status reports the stored preference while local routing remains active.
     monkeypatch.setattr("src.api.routes.market_data.resolve_market_db_path",
                         lambda: str(tmp_path / "nope.db"))
     monkeypatch.setattr("src.api.routes.market_data.env_routing_enabled", lambda: False)
     out = market_data_status(store=store)
     assert out["use_local_market_setting"] is True and out["routing_enabled"] is True
 
-    # The DAL remains local by default; the setting is provenance only.
+    # The DAL remains local by default.
     from src.tools.data_access import DataAccessLayer
     from src.tools.backends.local_market_backend import LocalMarketBackend
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
@@ -250,7 +245,6 @@ def test_status_route_reports_strict_local_only_when_enabled(store, tmp_path, mo
     assert out["local_market_strict_setting"] is True
     assert out["strict_env_override"] is False
     assert out["strict_enabled"] is True
-    assert out["pg_fallback_active"] is False
 
 
 def test_toggle_invalidates_dal_cache(store, monkeypatch):
@@ -448,7 +442,6 @@ def test_canonicalize_rename_moves_history_when_canonical_absent(tmp_path):
 
 
 def test_news_fts_triggers_keep_index_in_sync(tmp_path):
-    # PG-exit 2b: external-content news_fts kept in sync by AFTER INSERT/UPDATE/DELETE triggers,
     # so no writer needs a manual fts insert. Triggers are NOT in _NEWS_SCHEMA (bulk bootstrap
     # uses 'rebuild') — applied via _ensure_news_fts_triggers.
     conn = sqlite3.connect(tmp_path / "m.db")

@@ -157,7 +157,7 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 | **best_for** | **Earnings / IPO / economic calendar** (free, well-structured); quick real-time quotes. |
 | **not_good_for** | News backtesting / history (~7 days only). |
 | **verified_at** | 2025-12. |
-| **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Finnhub, `data_sources/DATA_SOURCE_QUIRKS.md`, `docs/design/P1_2_SPEC.md` (calendar), `docs/design/P1_2_PROVIDER_DISCOVERY.md`. |
+| **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Finnhub, `data_sources/DATA_SOURCE_QUIRKS.md`, `src/macro_calendar/finnhub_ingestion.py`. |
 | **app_settings_fields** | `finnhub.enabled` (toggle), `finnhub.api_key` (secret). |
 
 ### 3.3 Tiingo candidate record (not connected)
@@ -280,7 +280,7 @@ dated evaluations and git history are context, not runnable integration assets.
 | **best_for** | Macro context with **correct point-in-time semantics** for backtests; the macro half of the calendar (with Finnhub events). |
 | **not_good_for** | Anything intraday or equity-specific. |
 | **verified_at** | 2026-04. |
-| **source_links** | `docs/design/P1_2_PROVIDER_DISCOVERY.md` §FRED/ALFRED, `docs/design/P1_2_SPEC.md`. |
+| **source_links** | `config/macro_calendar_series.yaml`, `data_sources/fred_client.py`, `src/macro_calendar/fred_ingestion.py`. |
 | **app_settings_fields** | `fred.enabled` (toggle), `fred.api_key` (secret). |
 
 ### 3.9 Seeking Alpha (scraped — PROTECTED pipeline) **[FOUNDATION]**
@@ -291,14 +291,14 @@ dated evaluations and git history are context, not runnable integration assets.
 | **implementation_status** | **protected-pipeline** (foundation tier). |
 | **connected_via** | `extension → src/sa_native_host.py → DB`; reader `data_sources/sa_alpha_picks_client.py` + the SA tool layer. |
 | **asset_classes** | US equities (curated picks + community + news). |
-| **data_types** | **Alpha Picks** (rank/score, open & closed); **comment intelligence** (rule-based community signals, `sql/012`); SA **market news** + article bodies. |
+| **data_types** | **Alpha Picks** (rank/score, open & closed); **comment intelligence** (rule-based community signals, local schema in `src/sa_capture_store.py`); SA **market news** + article bodies. |
 | **history_depth** | Per-capture (whatever has been scraped into the local DB). |
 | **latency** | On-demand (user-triggered Quick Refresh / scheduled). |
 | **streaming** | `extension_capture` (scraped, not a feed). |
 | **cost** | A Seeking Alpha **account/subscription** (user's own); no API key. |
 | **auth/config** | Browser login + installed extension + native-host launcher (`~/.local/share/arkscope/native-hosts/...` + `~/.config/arkscope/sa_native_host.json`). |
 | **limits** | Scraping cadence; site ToS; capture scope limited to what the extension surfaces. |
-| **known_quirks** | Alpha Picks **open/closed dual membership** — same `(symbol, picked_date)` can appear in both tabs; storage preserves tab membership (`sql/014`). Article capture is Markdown-only (no images / no right-rail Factor Grades). |
+| **known_quirks** | Alpha Picks **open/closed dual membership** — same `(symbol, picked_date)` can appear in both tabs; `src/sa_capture_store.py` preserves tab membership. Article capture is Markdown-only (no images / no right-rail Factor Grades). |
 | **best_for** | **Curated picks + community sentiment** unavailable from any API; differentiated research signal. A foundation source — deepen its coverage first. |
 | **not_good_for** | Anything needing an API contract / guaranteed uptime; bulk history. |
 | **verified_at** | 2026-05. |

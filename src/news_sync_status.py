@@ -23,7 +23,7 @@ def read_news_sync_status(db_path: str | Path) -> Optional[dict[str, Any]]:
 
     The connection is opened in SQLite read-only mode. ``None`` means the direct
     writer has no durable telemetry yet; callers use that to replace, rather than
-    accidentally retain, stale PG-mirror news status after cutover.
+    retain stale news status from an earlier collection path.
     """
     path = Path(db_path)
     if not path.exists():

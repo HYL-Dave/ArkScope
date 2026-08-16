@@ -11,7 +11,7 @@
 Design contract:
 
   - **Persistence is best-effort**: a DB outage must NOT fail the job.
-    All store methods catch psycopg2 errors, log, and return ``None`` /
+    Store methods catch database errors, log, and return ``None`` /
     empty results so callers can degrade to process-local state.
   - **FileBackend is a no-op**: when the DAL is on FileBackend the store
     reports ``is_available() == False`` and methods return early.
@@ -952,7 +952,7 @@ def _local_job_runs_enabled(dal: Any) -> bool:
 
     The legacy profile/env value is still read when available so existing
     provenance tests and diagnostics can observe it, but false no longer routes
-    runtime writes back to PG.
+    runtime persists the observation.
     """
     checker = getattr(dal, "_profile_setting_truthy", None)
     if callable(checker):

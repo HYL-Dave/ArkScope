@@ -308,9 +308,8 @@ Operational follow-ups completed after SA-R1:
 - `backfill` is constrained to **known news published within the last 24 hours**
 - Market News auto-sync supports `Auto` cadence with ET windows derived from observed publish density
 
-The 24-hour bound remains the routine product contract. The reliability design
-at `docs/superpowers/specs/2026-07-25-sa-extension-reliability-control-clarity-design.md`
-does not widen routine catch-up. It adds two explicitly different recovery
+The 24-hour bound remains the routine product contract. The implemented
+reliability contract does not widen routine catch-up. It adds two explicitly different recovery
 mechanisms: exact recorded-ID retry with no age predicate, and an audited
 incident operation over the actual gap since the latest derived-complete run,
 capped at 168 hours. The latter is a bounded attempted recovery, reports known
@@ -318,8 +317,6 @@ detail repair separately from metadata rediscovery, and never claims complete
 historical coverage. Arbitrary date ranges and generic lifetime backfill remain
 out of scope.
 
-The corresponding RED-first implementation plan is at
-`docs/superpowers/plans/2026-07-25-sa-extension-reliability-control-clarity.md`.
 Independent implementation review is GREEN at product tip `c85f4bed` with zero
 required changes: packaging closure, derived structured outcomes, durable
 degraded observability, resumable repair, five honest popup controls,
@@ -469,7 +466,7 @@ After that:
 ## Decision summary
 
 - Use a **separate roadmap document** for detailed planning.
-- Keep `docs/design/AGENT_EVOLUTION_TRACKER.md` as a short summary + pointer.
+- Keep this roadmap as the current summary for SA expansion.
 - Prefer **recent-window accumulation** over large immediate backfills for general SA feeds.
 - Treat Factor Grades as a separate structured source, not part of article body scraping.
 - Treat image URL capture as optional enrichment, not a prerequisite for the broader SA expansion.

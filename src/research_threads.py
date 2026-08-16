@@ -6,7 +6,7 @@ reload. Column names match the C-2a in-memory DTO (spec §6a) verbatim, so the
 client→server write is a pure write-through with no UI-state reshape.
 
 Local-first: lives in the same standalone SQLite DB as the profile-state and
-card-run stores (``data/profile_state.db``), NEVER the remote PG. Mirrors
+card-run stores (``data/profile_state.db``). Mirrors
 ``CardRunStore`` (src/card_runs.py): module ``_now``, per-instance ``_write_lock``,
 ``_connect`` with busy_timeout, WAL-best-effort schema init.
 """

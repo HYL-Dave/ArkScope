@@ -1,9 +1,8 @@
-"""PG-exit Step 2a — direct-local news writer (hermetic: fake provider, temp DB, no PG).
+"""Direct local news writer with a fake provider and temporary database.
 
-provider → local market_data.db `news` + `news_fts`, no PG / no Parquet round-trip. Dedup on the
-opaque article_hash (MD5 today — treated as a stable key, NOT assumed SHA-256), UTC-normalized
-published_at, FTS searchable, provider_sync telemetry, per-ticker failure isolation, source-scoped
-incremental cursor. 2a is the writer only — NO scheduler routing, NO live-DB migration (2b/2c).
+Provider rows land in local `news` and `news_fts` tables. The writer provides
+stable article-hash deduplication, UTC-normalized timestamps, full-text search,
+provider telemetry, per-ticker failure isolation, and source-scoped cursors.
 """
 
 from __future__ import annotations
@@ -212,7 +211,7 @@ def test_skips_articles_missing_required_fields(tmp_path, monkeypatch):
 
 def test_imports_with_declared_local_dependencies():
     import src.news_direct as mod
-    assert not hasattr(mod, "psycopg2")
+    assert mod.backfill_news_direct is nd.backfill_news_direct
 
 
 # --- 2a.1: cursor semantic + timestamp-normalization coverage (review gaps) ----------

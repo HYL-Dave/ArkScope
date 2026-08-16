@@ -1,9 +1,7 @@
-"""Direct provider→SQLite market-data backfill (PG-exit slice #2).
+"""Direct provider-to-local market-data collection.
 
-Sibling of ``market_data_admin.py`` — that module's former PG mirror is retired; this is the
-PG→SQLite MIRROR; this module writes the local ``prices`` table DIRECTLY from a
-provider (IBKR primary / Polygon fallback) so local freshness no longer depends on
-PG. No runtime PG dependency lives here.
+This module writes the local ``prices`` table from IBKR or Polygon and records
+provider-sync telemetry.
 
 Slice #2 COMPLETE — #2a (hermetic core) + #2b·1 (write lock) + #2b·2 (provider fetch +
 write path) + #2c (completed-days-only gap rule). The scheduler ``price_backfill`` source
@@ -11,18 +9,17 @@ write path) + #2c (completed-days-only gap rule). The scheduler ``price_backfill
 - ``backup_market_db``        : WAL-safe backup (SQLite backup API, NOT shutil.copyfile);
 - ``preflight_canonicalize``  : local-only create+seed ticker_aliases + fold existing
                                 rows (reuses slice-1 helpers); regularizes the live DB
-                                BEFORE any direct write, without touching PG. Does NOT
+                                before any direct write. Does not
                                 take the write lock — its caller holds it (no nested flock);
 - ``_normalize_utc``          : exchange-local/aware datetime → the byte-identical UTC PK
-                                string PG produces (the load-bearing dedup invariant);
+                                stored UTC key (the load-bearing dedup invariant);
 - ``market_write_lock``       : flocks the shared ``local_refresh.lock`` so a direct
-                                write never races the PG→local mirror (2b·1);
+                                write never races another market writer;
 - ``detect_price_gaps``       : per-ticker MISSING TRADING DAYS among COMPLETE days
                                 (day-presence; weekend + US-holiday aware; the in-progress
                                 ET day is excluded until close — 2c — NOT a per-day
                                 bar-count completeness claim, see the naming note below);
-- ``provider_sync_runs`` / ``provider_sync_meta`` tables + helpers (NEW; never
-  ``market_sync_meta``, which means "PG mirror");
+- ``provider_sync_runs`` / ``provider_sync_meta`` tables + helpers;
 - ``_ibkr_bars_to_rows`` / ``_polygon_results_to_rows`` + ``backfill_prices_direct``
   (2b·2): IBKR-primary / Polygon-fallback fetch → canonicalize-before-insert →
   INSERT OR IGNORE → provider_sync telemetry, under ``market_write_lock``.
@@ -66,13 +63,11 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # SAME flock file the scheduler's _LOCAL_REFRESH_FLOCK uses ("local_refresh") — so a
-# direct backfill and the PG→local mirror (data_scheduler._local_refresh) can NEVER write
 # market_data.db concurrently. flock-per-FD mutexes both same-process and cross-process
 # (verified), so no shared threading.Lock / data_scheduler import is needed.
 _MARKET_WRITE_LOCK_NAME = "local_refresh"
 
 _CANON_DOMAINS = ("prices", "news", "fundamentals")
-# JobRunsStore (PG telemetry) only accepts these — provider_sync_runs mirrors that set
 # so a run status can round-trip without a separate validation contract.
 _VALID_RUN_STATUSES = frozenset({"running", "succeeded", "failed"})
 _PRICE_DAY_UNRESOLVED_AFTER_FETCH = "price_day_unresolved_after_fetch"
@@ -93,8 +88,7 @@ class PriceCollectionUnavailable(RuntimeError):
 # --- UTC PK normalization (the byte-match invariant) -------------------------------
 
 def _normalize_utc(dt: datetime, exchange_tz: str = _EXCHANGE_TZ) -> str:
-    """Return the byte-identical UTC string PG produces via
-    ``TO_CHAR(... AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000')``, e.g.
+    """Return the canonical stored UTC timestamp, for example
     ``'2026-06-22T13:30:00+0000'``.
 
     A NAIVE datetime is assumed exchange-local (IBKR ``formatDate=1`` bars) and
@@ -107,7 +101,6 @@ def _normalize_utc(dt: datetime, exchange_tz: str = _EXCHANGE_TZ) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
 
 
-# --- market-write lock (serialize vs the PG→local mirror) --------------------------
 
 def _market_lock_path() -> Path:
     """The flock file market writes serialize on — identical to data_scheduler._lock_dir()
@@ -119,8 +112,9 @@ def _market_lock_path() -> Path:
 
 @contextmanager
 def market_write_lock(timeout: float = 30.0, poll: float = 0.5):
-    """Serialize market_data.db WRITES (direct backfill, preflight) against the PG→local
-    mirror by flocking the shared ``local_refresh.lock``. flock-per-FD mutexes same-process
+    """Serialize market_data.db writes on the shared ``local_refresh.lock``.
+
+    flock-per-FD mutexes same-process
     AND cross-process; the kernel frees it on close/crash so a dead writer never wedges it.
     Raises TimeoutError if the lock can't be taken within ``timeout``. Degrades to a no-op
     (with a one-time warning) where fcntl is unavailable (non-POSIX), matching _FileLock."""
@@ -194,12 +188,11 @@ def backup_market_db(
 # --- local-only preflight (regularize the live DB; reuse slice-1 helpers) ----------
 
 def preflight_canonicalize(db_path: Optional[str] = None) -> dict:
-    """LOCAL-ONLY (zero PG): create+seed ``ticker_aliases`` and PK-safely fold existing
+    """Create and seed ``ticker_aliases`` and PK-safely fold existing
     rows to canonical in the live market DB, so the read-side ``_canon`` stops being a
     no-op and a direct write can never introduce an alias spelling. Idempotent. Safe on a
     missing DB (no-op success) and a DB that already has aliases. MUST run before the
-    first direct backfill (lock 8) — it does NOT lean on a PG incremental to create the
-    table. Returns ``{ok, exists, created_aliases, folded:{table:count}}``."""
+    first direct backfill. Returns ``{ok, exists, created_aliases, folded:{table:count}}``."""
     path = db_path or resolve_market_db_path()
     if not Path(path).exists():
         return {"ok": True, "exists": False, "created_aliases": False, "folded": {},
@@ -331,8 +324,7 @@ CREATE TABLE IF NOT EXISTS provider_sync_meta (
 
 
 def _ensure_provider_sync_tables(conn) -> None:
-    """Idempotent create of provider_sync_runs + provider_sync_meta. Distinct from
-    market_sync_meta (the PG-mirror status) — these record DIRECT provider→SQLite syncs."""
+    """Idempotently create provider-sync telemetry tables."""
     conn.executescript(_PROVIDER_SYNC_SCHEMA)
 
 
@@ -557,7 +549,7 @@ def backfill_prices_direct(
     acquire_gateway_lock: bool = True,
 ) -> dict:
     """Direct provider→SQLite price backfill (FULL-WINDOW TOP-UP, 2d) — heal sparse/partial
-    days in the local ``prices`` table from a provider (IBKR primary / Polygon fallback), no PG.
+    days in the local ``prices`` table from IBKR or Polygon.
 
     TOP-UP not zero-bar-gap (the canary finding): a day with 1 of 26 bars is day-presence
     "present" yet actually broken (IBKR has the full day). So this fetches EVERY COMPLETE
@@ -598,7 +590,6 @@ def backfill_prices_direct(
     elif provider == "polygon" and polygon_src is None:
         polygon_src = _default_polygon_src()
 
-    # PG-exit: a standalone IBKR backfill serializes on the SHARED Gateway lock so it can't race
     # the scheduler's IBKR jobs or a future intraday op (one TWS/Gateway session total). The
     # scheduler's price_backfill adapter ALREADY holds it (run_source) → passes
     # acquire_gateway_lock=False to avoid re-acquiring the non-reentrant lock (self-deadlock).

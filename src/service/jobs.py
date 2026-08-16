@@ -159,8 +159,8 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         description=(
             "Refresh cal_earnings_events from Finnhub /calendar/earnings. "
             "Default: watchlist symbols × today→today+30d, one API call "
-            "per symbol (unfiltered queries under-sample the universe — "
-            "see P1_2_PROVIDER_DISCOVERY §5.5). Override: symbols list, "
+            "per symbol because unfiltered queries under-sample the universe. "
+            "Override: symbols list, "
             "from_date / to_date (ISO YYYY-MM-DD)."
         ),
         source="api",
@@ -247,10 +247,10 @@ def list_jobs_status(
 ) -> List[Dict[str, Any]]:
     """Return job metadata merged with last known execution state.
 
-    Last-state preference: DB-backed ``job_runs`` (sql/011) when available,
-    falling back to the process-local ``_JOB_STATE`` cache when the store
-    cannot be reached. This keeps the UI honest after process restarts and
-    when other processes (Chrome extension, scheduler) record runs.
+    Last-state preference: durable local job history when available, falling
+    back to the process-local ``_JOB_STATE`` cache when the store cannot be
+    reached. This keeps the UI honest after process restarts and when other
+    processes (Chrome extension, scheduler) record runs.
     """
     cfg = config or get_agent_config()
     watchlist_count = len(_watchlist_tickers(dal))
@@ -285,7 +285,7 @@ def _resolve_last_state(
     job_name: str,
     db_latest: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Pick DB-backed last state if present, else fall back to process-local."""
+    """Pick durable local state if present, else fall back to process-local."""
     db_row = db_latest.get(job_name)
     if db_row:
         return {

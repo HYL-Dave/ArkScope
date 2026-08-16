@@ -89,7 +89,6 @@ def main() -> int:
 
     # 5. Tiny in-memory ingestion run — single CPIAUCNS observation pulled live.
     # We don't write to the real DB; we use a fake store so the smoke
-    # script stays read-only against PG.
     print("\n=== ingestion dry-run (FakeStore, no DB write) ===")
 
     class FakeStore:

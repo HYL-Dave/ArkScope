@@ -80,7 +80,7 @@ def test_legacy_strict_settings_keep_single_local_owner(env):
 
 
 def test_legacy_news_exit_setting_does_not_change_local_owner(env):
-    env.profile.set_setting("news_pg_exit_completed", "true")
+    env.profile.set_setting("unused_news_route_marker", "true")
     _assert_current_owner(env, _make(env))
 
 

@@ -1,13 +1,10 @@
 """
 Local user profile-state store (SQLite).
 
-ArkScope keeps market / collection data in PostgreSQL (via the DAL), but the
-user's *research-universe state* — which named lists exist, which tickers
+The user's *research-universe state* — which named lists exist, which tickers
 belong to them, soft archive/restore, free-text notes, per-ticker priority,
 and classification tags — is local-first and lives here in a small standalone
-SQLite database. It is intentionally NOT a DAL backend and NOT in the remote
-PG: the desktop app must manage the research universe with no remote-DB
-dependency.
+SQLite database. It is intentionally independent from market-data storage.
 
 The substrate (ProductSpec §168) has two decoupled axes:
   - **lists** — the user's work-lists (``watchlists`` + ``watchlist_memberships``,

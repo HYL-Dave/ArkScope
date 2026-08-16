@@ -122,7 +122,6 @@ def test_use_local_news_env_true_overrides_profile_false(tmp_path, monkeypatch):
 
 
 def test_article_to_raw_uses_canonical_sha256_hash():
-    # S3.0: the direct path must produce the SAME article_hash as the PG/mirror canonical scheme
     # (sha256(f"{ticker}|{title}|{published_at[:10]}"), ticker/title VERBATIM) so INSERT OR IGNORE
     # dedups direct-origin vs mirror-origin rows for the same article. NOT the collector's MD5.
     a = _article(title="Massive News for Apple Stock Investors!",

@@ -188,20 +188,18 @@ Next gate:
 - Move keys and schedules incrementally, source by source, with the same
   retirement gate.
 
-### Local Storage and PG Retirement
+### Local Storage Authority
 
-**Target:** runtime storage selection should be DB/local-first, with PG fallback
-only where explicitly retained.
+**Target:** every runtime storage selection resolves to a named local capability.
 
 Current status:
 
-- SA capture has completed the hard cutover to SQLite.
-- Broader PG retirement is tracked in storage docs, not here.
+- SA capture and the other runtime stores use explicit SQLite owners.
 
 Next gate:
 
-- Use this doc's authority rules for config flags and migration switches, while
-  storage topology remains governed by `LOCAL_STORAGE_TOPOLOGY.md`.
+- Use this doc's authority rules for config flags. Storage topology remains
+  governed by `LOCAL_STORAGE_TOPOLOGY.md`.
 
 ---
 

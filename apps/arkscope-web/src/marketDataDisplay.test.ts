@@ -8,7 +8,7 @@ import {
   coverageStatusLabel as localizedCoverageStatusLabel,
   macroRoutingLabel as localizedMacroRoutingLabel,
   marketRoutingLabel as localizedMarketRoutingLabel,
-  newsPostgresRouteLabel as localizedNewsPostgresRouteLabel,
+  newsAuthorityLabel as localizedNewsAuthorityLabel,
   newsReadSurfaceLabel as localizedNewsReadSurfaceLabel,
   newsRoutingLabel as localizedNewsRoutingLabel,
   newsWriteRouteLabel as localizedNewsWriteRouteLabel,
@@ -35,7 +35,7 @@ function displayFunction<T extends (...args: never[]) => unknown>(name: string):
 }
 const macroRoutingLabel = (value: MacroStatus) => localizedMacroRoutingLabel(value, zhT);
 const marketRoutingLabel = (value: MarketDataStatus) => localizedMarketRoutingLabel(value, zhT);
-const newsPostgresRouteLabel = (value: NewsStatus) => localizedNewsPostgresRouteLabel(value, zhT);
+const newsAuthorityLabel = (value: NewsStatus) => localizedNewsAuthorityLabel(value, zhT);
 const newsReadSurfaceLabel = (value: NewsStatus) => localizedNewsReadSurfaceLabel(value, zhT);
 const newsRoutingLabel = (value: NewsStatus) => localizedNewsRoutingLabel(value, zhT);
 const newsWriteRouteLabel = (value: NewsStatus) => localizedNewsWriteRouteLabel(value, zhT);
@@ -55,12 +55,10 @@ const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
   financial_cache: { row_count: 0, valid_count: 0, expired_count: 0, latest_fetched_at: null },
   sync: { prices: null, news: null, fundamentals: null },
   prices_authority: "local",
-  price_mirror_retired: true,
   fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: false,
   env_override: false,
   routing_enabled: false,
-  pg_fallback_active: false,
   local_market_strict_setting: false,
   strict_env_override: false,
   strict_enabled: false,
@@ -69,17 +67,17 @@ const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
 
 describe("marketRoutingLabel", () => {
   it("renders prices as local authority after P0-C", () => {
-    expect(marketRoutingLabel(status({ routing_enabled: true, pg_fallback_active: false, strict_enabled: true })))
-      .toBe("本地權威（PG fallback 已退役）");
-    expect(marketRoutingLabel(status({ routing_enabled: true, pg_fallback_active: true, strict_enabled: false })))
-      .toBe("本地權威（PG fallback 已退役）");
+    expect(marketRoutingLabel(status({ routing_enabled: true, strict_enabled: true })))
+      .toBe("本地資料");
+    expect(marketRoutingLabel(status({ routing_enabled: true, strict_enabled: false })))
+      .toBe("本地資料");
   });
 
-  it("keeps pending-db distinct while disabled setting is no longer PG fallback", () => {
+  it("keeps pending local database distinct from a disabled setting", () => {
     expect(marketRoutingLabel(status({ use_local_market_setting: true, routing_enabled: false })))
       .toBe("設定已開，待建立資料庫");
     expect(marketRoutingLabel(status({ use_local_market_setting: false, routing_enabled: false })))
-      .toBe("本地權威（legacy flag 未設定；PG fallback 已退役）");
+      .toBe("本地資料");
   });
 });
 
@@ -101,14 +99,12 @@ describe("macroRoutingLabel", () => {
       .toBe("啟用中（本地 · env 強制）");
   });
 
-  it("toggle-on but DB not built → local-first, pending ingestion (NOT PG fallback)", () => {
-    // the fix: local active even before the DB exists; the factory creates it on first use,
-    // no PG fallback. So the database is pending; reads do not go to PG.
+  it("labels enabled macro with missing local database as pending collection", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: false })))
       .toBe("啟用中（本地）· 待建立資料庫");
   });
 
-  it("never suggests PG fallback when local macro is inactive", () => {
+  it("labels inactive local macro state without an alternate authority", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: false })))
       .toBe("本地快照讀取可用；自動刷新未啟用");
   });
@@ -129,9 +125,6 @@ const newsStatus = (over: Partial<NewsStatus>): NewsStatus => ({
   normalized_writes_env_value: null,
   write_route: "legacy_local",
   write_route_reason: "test",
-  news_pg_exit_completed: false,
-  news_hard_local: false,
-  pg_news_route_available: true,
   sync: null,
   ...over,
 });
@@ -141,14 +134,14 @@ describe("newsRoutingLabel", () => {
     expect(newsRoutingLabel(newsStatus({}))).toBe("直寫本地（預設）");
     expect(newsRoutingLabel(newsStatus({ setting_explicit: true }))).toBe("直寫本地（已設定）");
     expect(newsRoutingLabel(newsStatus({ direct_active: false, use_local_news_setting: false, setting_explicit: true })))
-      .toBe("回退至 PG 同步／本地鏡像");
+      .toBe("本地相容寫入");
   });
 
   it("makes env override direction explicit", () => {
     expect(newsRoutingLabel(newsStatus({ env_override: true, env_value: true })))
       .toBe("直寫本地（env 強制開啟）");
     expect(newsRoutingLabel(newsStatus({ direct_active: false, env_override: true, env_value: false })))
-      .toBe("回退 PG 鏡像（env 強制關閉）");
+      .toBe("本地相容寫入（env 強制關閉）");
   });
 });
 
@@ -156,30 +149,26 @@ describe("news cutover labels", () => {
   it("renders the locked post-exit state", () => {
     const postExit = newsStatus({
       write_route: "normalized",
-      news_pg_exit_completed: true,
-      news_hard_local: true,
-      pg_news_route_available: false,
     } as Partial<NewsStatus>);
 
     expect(newsWriteRouteLabel(postExit)).toBe("Normalized SQLite + legacy local projection");
-    expect(newsPostgresRouteLabel(postExit)).toBe("已退出（不可回退到 PG）");
+    expect(newsAuthorityLabel(postExit)).toBe("目前的本地資料");
     expect(newsReadSurfaceLabel(postExit)).toBe("Legacy local compatibility surface (N8b pending)");
-    expect(newsRoutingLabel(postExit)).toBe("Normalized SQLite + legacy local projection");
+    expect(newsRoutingLabel(postExit)).toBe("直寫本地（預設）");
   });
+});
 
-  it("keeps normalized writes visibly pre-exit/test while PG remains available", () => {
-    const preExit = newsStatus({
+describe("news routing labels", () => {
+  it("renders normalized writes as the current local authority", () => {
+    const current = newsStatus({
       normalized_writes_setting: true,
       normalized_writes_setting_explicit: true,
       write_route: "normalized",
-      news_pg_exit_completed: false,
-      news_hard_local: false,
-      pg_news_route_available: true,
     } as Partial<NewsStatus>);
 
-    expect(newsWriteRouteLabel(preExit)).toBe("Normalized SQLite + legacy local projection（pre-exit test）");
-    expect(newsPostgresRouteLabel(preExit)).toBe("可用（尚未退出）");
-    expect(newsReadSurfaceLabel(preExit)).toBe("Legacy local direct surface");
+    expect(newsWriteRouteLabel(current)).toBe("Normalized SQLite + legacy local projection");
+    expect(newsAuthorityLabel(current)).toBe("目前的本地資料");
+    expect(newsReadSurfaceLabel(current)).toBe("Legacy local compatibility surface (N8b pending)");
   });
 });
 
@@ -828,12 +817,12 @@ describe("localized Settings market-data presentations", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        market: "本地權威（PG fallback 已退役）",
+        market: "本地資料",
         macro: "啟用中（本地 · env 強制）",
         news: "直寫本地（env 強制開啟）",
-        write: "Normalized SQLite + legacy local projection（pre-exit test）",
-        postgres: "可用（尚未退出）",
-        read: "Legacy local direct surface",
+        write: "Normalized SQLite + legacy local projection",
+        authority: "目前的本地資料",
+        read: "Legacy local compatibility surface (N8b pending)",
         coverage: "部分",
         provider: "已停用",
         scheduler: "部分完成（待補抓 2）",
@@ -841,12 +830,12 @@ describe("localized Settings market-data presentations", () => {
       },
       {
         locale: "en" as const,
-        market: "Local authority (PG fallback retired)",
+        market: "Local data authority",
         macro: "Active (local · forced by environment)",
         news: "Direct local writes (forced on by environment)",
-        write: "Normalized SQLite + legacy local projection (pre-exit test)",
-        postgres: "Available (not yet exited)",
-        read: "Legacy local direct surface",
+        write: "Normalized SQLite + legacy local projection",
+        authority: "Current local authority",
+        read: "Legacy local compatibility surface (N8b pending)",
         coverage: "Partial",
         provider: "Disabled",
         scheduler: "Partially completed (2 remaining)",
@@ -859,13 +848,13 @@ describe("localized Settings market-data presentations", () => {
       const market = status({ routing_enabled: true });
       const macro = macroStatus({ local_first_active: true, exists: true, env_override: true });
       const news = newsStatus({ env_override: true, env_value: true });
-      const preExit = newsStatus({ write_route: "normalized" });
+      const current = newsStatus({ write_route: "normalized" });
       expect(localizedMarketRoutingLabel(market, t)).toBe(expected.market);
       expect(localizedMacroRoutingLabel(macro, t)).toBe(expected.macro);
       expect(localizedNewsRoutingLabel(news, t)).toBe(expected.news);
-      expect(localizedNewsWriteRouteLabel(preExit, t)).toBe(expected.write);
-      expect(localizedNewsPostgresRouteLabel(preExit, t)).toBe(expected.postgres);
-      expect(localizedNewsReadSurfaceLabel(preExit, t)).toBe(expected.read);
+      expect(localizedNewsWriteRouteLabel(current, t)).toBe(expected.write);
+      expect(localizedNewsAuthorityLabel(current, t)).toBe(expected.authority);
+      expect(localizedNewsReadSurfaceLabel(current, t)).toBe(expected.read);
       expect(localizedCoverageStatusLabel({
         coverage_status: "partial",
         closure_reason_code: null,

@@ -844,9 +844,9 @@ const settings = {
       },
     },
     routing: {
-      localAuthority: "本地權威（PG fallback 已退役）",
+      localAuthority: "本地資料",
       settingEnabledPendingDatabase: "設定已開，待建立資料庫",
-      localAuthorityLegacyFlagUnset: "本地權威（legacy flag 未設定；PG fallback 已退役）",
+      localAuthorityDefault: "本地資料",
     },
   },
   newsStorage: {
@@ -863,26 +863,26 @@ const settings = {
     loadFailed: "無法載入新聞資料狀態。",
     routing: {
       directEnvOn: "直寫本地（env 強制開啟）",
-      pgMirrorEnvOff: "回退 PG 鏡像（env 強制關閉）",
-      pgSyncLocalMirror: "回退至 PG 同步／本地鏡像",
+      directEnvOff: "本地相容寫入（env 強制關閉）",
+      localCompatibility: "本地相容寫入",
       directExplicit: "直寫本地（已設定）",
       directDefault: "直寫本地（預設）",
       write: {
         normalized: "Normalized SQLite + legacy local projection",
-        normalizedPreExit: "Normalized SQLite + legacy local projection（pre-exit test）",
+        normalizedCurrent: "Normalized local writer",
         legacyLocal: "Legacy local direct writer",
-        legacyPg: "Legacy PG sync + local mirror",
+        currentAuthority: "Normalized local writer",
         blocked: "Blocked",
       },
-      postgres: {
-        exited: "已退出（不可回退到 PG）",
-        available: "可用（尚未退出）",
-        unavailable: "不可用",
+      authority: {
+        current: "目前的本地資料",
+        available: "本地資料可用",
+        unavailable: "本地資料不可用",
       },
       read: {
         compatibility: "Legacy local compatibility surface (N8b pending)",
         localDirect: "Legacy local direct surface",
-        pgMirror: "Legacy PG mirror surface",
+        unavailable: "本地讀取不可用",
       },
     },
   },

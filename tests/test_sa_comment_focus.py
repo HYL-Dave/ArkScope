@@ -3,8 +3,8 @@ SA comment-attention aggregation over sa_capture.db.
 
 Verifies accurate GROUP BY counts, deterministic ranking, traceable samples
 (comment/article ids + url), keyword-bucket aggregation, candidate_watch, the
-empty_reason taxonomy (backlog vs min_score vs no-comments), PG-mode degrade,
-and param clamping.
+empty_reason taxonomy (backlog vs min_score vs no-comments), typed degraded
+outcomes, and parameter clamping.
 """
 
 from __future__ import annotations
@@ -58,7 +58,6 @@ def _dal(db_path, tickers=("NVDA", "AMD")):
     dal = MagicMock()
     backend = MagicMock()
     backend._sa_db = str(db_path)
-    backend._get_conn.side_effect = AssertionError("focus must not touch PG in SA-local mode")
     dal._backend = backend
     wl = MagicMock()
     wl.tickers = list(tickers)
@@ -69,9 +68,7 @@ def _dal(db_path, tickers=("NVDA", "AMD")):
 def _focus(db_path, **kw):
     dal, backend = _dal(db_path)
     bf.run_backfill(dal)  # populate signals first
-    backend._get_conn.reset_mock()  # only assert PG-untouched for the focus call
     res = sa_tools.get_sa_comment_focus(dal, **kw)
-    backend._get_conn.assert_not_called()
     return res
 
 

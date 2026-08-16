@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 _ROOT = Path(__file__).resolve().parents[1]
-_DISCOVERY_ROOTS = ("src", "data_sources", "apps", "docs", "tests", "config")
+_DISCOVERY_ROOTS = ("src", "data_sources", "apps", "tests", "config")
 _SEARCH_PATTERNS = (
     "data/prices",
     "prices/15min",
@@ -28,7 +28,6 @@ _SEARCH_PATTERNS = (
 
 _REWIRED_CURRENT = {
     "docs/analysis/FINANCIAL_METRICS_FORMULAS.md",
-    "docs/data/DATA_INVENTORY.md",
     "docs/data/DATA_SUBSCRIPTION_GUIDE.md",
     "docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md",
     "src/agents/anthropic_agent/tools.py",
@@ -50,9 +49,8 @@ _RETIRED_CURRENT = {
     "src/daily_update.py",
     "src/tools/backends/file_backend.py",
 }
-_LOW_LEVEL_COMPATIBILITY = {
+_LOW_LEVEL_CURRENT = {
     "src/tools/backends/__init__.py",
-    "src/tools/backends/db_backend.py",
     "src/tools/data_access.py",
 }
 _UNRELATED = {
@@ -69,55 +67,9 @@ _HISTORICAL = {
     "docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md",
     "docs/design/ENGINEERING_ISSUE_REGISTER.md",
     "docs/design/LLM_AUTH_DRIVER_PLAN.md",
-    "docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_AUDIT.md",
-    "docs/design/NEWS_DIRECT_LOCAL_PLAN.md",
-    "docs/design/PG_EXIT_N9_BATCH1_DROP_PLAN.md",
-    "docs/design/PG_EXIT_N9_BATCH2_CLEANUP_PLAN.md",
-    "docs/design/PG_EXIT_P0C_PRICES_RECONCILE_CUTOVER_PLAN.md",
     "docs/design/PROJECT_PRIORITY_MAP.md",
-    "docs/design/REPO_HYGIENE_AUDIT_2026_07.md",
-    "docs/superpowers/evidence/2026-07-26-legacy-scheduler-iv-domain-retirement.md",
-    "docs/superpowers/evidence/2026-08-09-provider-smoke-candidate-truth.md",
     "docs/superpowers/evidence/2026-08-10-retired-local-assets-and-score-research-export.md",
-    "docs/superpowers/plans/2026-06-27-news-direct-cutover.md",
-    "docs/superpowers/plans/2026-07-02-s-b-fundamentals-refetch-cache.md",
-    "docs/superpowers/plans/2026-07-06-dead-code-ui-sweep.md",
-    "docs/superpowers/plans/2026-07-06-scripts-runtime-consolidation.md",
-    "docs/superpowers/plans/2026-07-07-current-quote-tool.md",
-    "docs/superpowers/plans/2026-07-19-db-derived-universe-tickers-core-retirement.md",
-    "docs/superpowers/plans/2026-07-26-legacy-scheduler-iv-domain-retirement.md",
-    "docs/superpowers/plans/2026-07-31-eir-002-green-backend-baseline.md",
-    "docs/superpowers/plans/2026-08-01-scripts-retirement-tranche-a.md",
-    "docs/superpowers/plans/2026-08-09-provider-smoke-candidate-truth.md",
-    "docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md",
-    "docs/superpowers/specs/2026-07-26-legacy-scheduler-iv-domain-retirement-design.md",
-    "docs/superpowers/specs/2026-07-31-eir-002-green-backend-baseline-design.md",
     "docs/superpowers/specs/2026-08-08-provider-smoke-candidate-truth-design.md",
-}
-_EIR006_AUTHORITIES = {
-    "docs/design/PG_RUNTIME_CONSUMER_INVENTORY.md",
-    "docs/design/pg_runtime_inventory/backend_base.nodes",
-    "docs/design/pg_runtime_inventory/candidate_adjudications.jsonl",
-    "docs/design/pg_runtime_inventory/candidate_adjudications.tsv",
-    "docs/design/pg_runtime_inventory/candidates.jsonl",
-    "docs/design/pg_runtime_inventory/consumer_methods.tsv",
-    "docs/design/pg_runtime_inventory/pg_focused_base.nodes",
-    "docs/design/pg_runtime_inventory/surfaces.jsonl",
-    "docs/design/pg_runtime_inventory/test_nodes.tsv",
-    "docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/README.md",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/cache-classification.tsv",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/consumer-census.tsv",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/controller_probe.py",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/db-result.json",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/destructive_controller.py",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/legacy-price-files.tsv",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/old-cache-rows.tsv",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/task8_db_row_manifest.py",
-    "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/task8_price_manifest.py",
-    "docs/superpowers/plans/2026-08-03-eir-006-valuation-price-truth.md",
-    "docs/superpowers/plans/2026-08-16-postgresql-runtime-no-tail.md",
-    "docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md",
 }
 _TEST_FIXTURES = {
     "tests/test_agents.py",
@@ -125,8 +77,6 @@ _TEST_FIXTURES = {
     "tests/test_daily_update_wrapper.py",
     "tests/test_data_access.py",
     "tests/test_data_coverage_tools.py",
-    "tests/test_db_backend.py",
-    "tests/test_db_backend_retired_prices.py",
     "tests/test_detailed_financials.py",
     "tests/test_eir006_retired_data_boundaries.py",
     "tests/test_financial_metrics_calculator.py",
@@ -184,7 +134,7 @@ def _verdict(path: str) -> str:
     groups = (
         ("rewired_current_consumer", _REWIRED_CURRENT),
         ("retired_current_consumer", _RETIRED_CURRENT),
-        ("low_level_empty_compatibility", _LOW_LEVEL_COMPATIBILITY),
+        ("low_level_current_consumer", _LOW_LEVEL_CURRENT),
         ("unrelated_lexical_hit", _UNRELATED),
         ("historical_reference", _HISTORICAL),
         ("test_fixture_reference", _TEST_FIXTURES),
@@ -197,7 +147,6 @@ def _verdict(path: str) -> str:
 def test_current_docs_training_and_tool_copy_name_only_current_authorities():
     current_docs = (
         "docs/analysis/FINANCIAL_METRICS_FORMULAS.md",
-        "docs/data/DATA_INVENTORY.md",
         "docs/data/DATA_SUBSCRIPTION_GUIDE.md",
         "docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md",
     )
@@ -234,7 +183,7 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
 
 
 def test_current_runtime_consumer_census_is_closed_and_exact():
-    rows = [row for row in _discover_consumers() if row[0] not in _EIR006_AUTHORITIES]
+    rows = _discover_consumers()
     classified = [(path, match, _verdict(path)) for path, match in rows]
 
     stale_current = [

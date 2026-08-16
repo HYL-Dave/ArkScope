@@ -555,7 +555,7 @@ def _log_agent_query(
 ) -> None:
     """Log a completed query to agent_queries table (best-effort, no errors)."""
     try:
-        from src.app_records_store import get_app_records_store  # PG-exit 1b: local-vs-PG routing
+        from src.app_records_store import get_app_records_store
         _store = get_app_records_store(dal)
         if not hasattr(_store, 'insert_agent_query'):
             return

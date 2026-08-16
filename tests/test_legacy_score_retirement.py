@@ -16,7 +16,6 @@ def test_current_authorities_make_no_legacy_capability_claim():
     current_authorities = (
         "README.md",
         "PROJECT_STRUCTURE.md",
-        "docs/design/AGENT_EVOLUTION_TRACKER.md",
         "docs/design/ARKSCOPE_TOOL_CATALOG.md",
         "docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md",
         "docs/design/DESKTOP_APP_CARRYOVER_ANALYSIS.md",
@@ -51,8 +50,7 @@ def test_fresh_schemas_create_no_legacy_score_storage():
     from src.market_data_admin import _NEWS_SCHEMA
     from src.news_normalized.schema import ARTICLE_SCHEMA
 
-    postgres_schema = _read("sql/001_init_schema.sql")
-    combined = "\n".join((_NEWS_SCHEMA, ARTICLE_SCHEMA, postgres_schema)).lower()
+    combined = "\n".join((_NEWS_SCHEMA, ARTICLE_SCHEMA)).lower()
     forbidden = (
         "news_article_scores",
         "sentiment_score",

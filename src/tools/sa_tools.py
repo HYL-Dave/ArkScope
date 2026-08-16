@@ -744,7 +744,7 @@ def get_sa_feed(
     Score-free, newest-first, with accurate total + per-type/per-day facets over
     the same filters — for the News (新聞·事件) surface and as an agent evidence
     primitive (NO summary; the agent composes). Reads the local sa_capture.db
-    (SA is local-first after the 3d cutover; PG mode degrades clearly).
+    (SA reads the current local capture store and reports unavailable state clearly).
 
     Args:
         q: search terms. Empty → pure time sort. len < 3 (incl. 2-char CJK) or any

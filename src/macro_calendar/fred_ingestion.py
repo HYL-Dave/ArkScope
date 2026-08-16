@@ -22,8 +22,7 @@ Two callable entry points the job runner wraps:
       * ``full_vintages``: explicitly request the full ALFRED window
         (``realtime_start='1776-07-04'``, ``realtime_end='9999-12-31'``)
         so revising series like GDP return one row per vintage. Default
-        FRED requests collapse to today's vintage only — see
-        docs/design/P1_2_PROVIDER_DISCOVERY.md §6.
+        FRED requests collapse to today's vintage only.
 
 Both entry points are pure-Python coroutines of the FRED HTTP client
 and the current local macro calendar store. No FastAPI / agent tool
@@ -351,8 +350,8 @@ def _ingest_latest_only(
         output_type=OUTPUT_TYPE_INITIAL_RELEASE,
     )
     for row in obs:
-        # No dedupe needed — see P1_2_PROVIDER_DISCOVERY.md §6.3; the upsert
-        # PK absorbs any realtime-window boundary overlap from bisection.
+        # The upsert PK absorbs any realtime-window boundary overlap from
+        # bisection, so no separate dedupe pass is needed.
         ok = store.upsert_macro_observation(
             series_id=entry.series_id,
             observation_date=row.observation_date,
@@ -382,8 +381,7 @@ def _ingest_full_vintages(
 
     The full ALFRED window (``realtime_start='1776-07-04'``,
     ``realtime_end='9999-12-31'``) ensures FRED returns every revision
-    instead of just today's vintage. See
-    ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6.3 for the spike.
+    instead of just today's vintage.
     """
     # Adaptive realtime fetch (same FRED vintage-date cap as _ingest_latest_only). Low-freq
     # full_vintages series finish in one call; this keeps a daily full_vintages series (none
@@ -413,7 +411,7 @@ ALFRED_FULL_HISTORY_END = date(9999, 12, 31)
 
 # FRED /series/observations output_type values. We pin the two we use
 # explicitly so a future API default change can't silently change our
-# row shape. See P1_2_PROVIDER_DISCOVERY.md §6.3 for the spike.
+# row shape.
 OUTPUT_TYPE_REAL_TIME_PERIOD = 1   # full revision history, our parser format
 OUTPUT_TYPE_INITIAL_RELEASE = 4    # first publication only
 

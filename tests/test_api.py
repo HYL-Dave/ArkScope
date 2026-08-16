@@ -167,7 +167,6 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
     assert len(observed["routes"]) == 173
-    assert not any("/app-records/migration/" in row for row in observed["routes"])
     assert observed["active_owners"] == {
         "data-scheduler",
         "portfolio-capture-scheduler",
@@ -615,7 +614,7 @@ def test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch(monke
             return self.rows.get(cache_key)
 
     class _FakeDAL:
-        backend_type = "LocalMarketDatabaseBackend"
+        backend_type = "LocalMarketBackend"
 
         def __init__(self):
             self._backend = _Backend()
@@ -683,7 +682,7 @@ def test_fundamentals_stored_source_path_mapping(monkeypatch):
 
     class _CachedDAL(_FakeDALBT):
         def __init__(self):
-            super().__init__("LocalMarketDatabaseBackend")
+            super().__init__("LocalMarketBackend")
             self._backend = self
 
         def get_financial_cache(self, cache_key):
@@ -698,7 +697,7 @@ def test_fundamentals_stored_source_path_mapping(monkeypatch):
 
     class _EmptyDAL(_FakeDALBT):
         def __init__(self):
-            super().__init__("LocalMarketDatabaseBackend")
+            super().__init__("LocalMarketBackend")
             self._backend = self
 
         def get_financial_cache(self, cache_key):
@@ -740,7 +739,7 @@ def test_fundamentals_stored_expired_cache_is_honest_empty(tmp_path):
 
     class _DAL(_FakeDALBT):
         def __init__(self):
-            super().__init__("LocalMarketDatabaseBackend")
+            super().__init__("LocalMarketBackend")
             self._backend = backend
 
     out = fr.fundamentals("AAPL", stored=True, dal=_DAL())

@@ -36,7 +36,7 @@ _DISABLED_MSG = (
 )
 _BACKEND_MSG = (
     "macro_calendar local store is unavailable for this DAL/profile; "
-    "no PostgreSQL fallback exists after PG-exit."
+    "the current local macro store is unavailable."
 )
 
 
@@ -57,7 +57,7 @@ def get_economic_calendar(
     """Return a Markdown summary of economic-calendar events in a window.
 
     Args:
-        dal: DAL whose ``_backend`` exposes ``_get_conn``.
+        dal: DAL exposing the current local capability protocol.
         country: ISO 2-letter (e.g. "US"). CSV like "US,CN" supported.
         importance: "low" / "medium" / "high". CSV supported.
         days_back: window start = today - days_back (default 7).

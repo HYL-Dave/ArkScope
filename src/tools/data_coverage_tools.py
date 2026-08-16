@@ -1,8 +1,8 @@
 """Local market-data coverage diagnostics for ticker-level research.
 
 This module is intentionally read-only and local-only. It answers whether the
-local market mirror has data for a ticker and why a requested price date may be
-missing; it never triggers provider fetches or PostgreSQL fallback.
+local market store has data for a ticker and why a requested price date may be
+missing; it never triggers provider fetches.
 """
 
 from __future__ import annotations

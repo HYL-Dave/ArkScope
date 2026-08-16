@@ -12,18 +12,18 @@ goal is **honest, clean public docs** — not hiding work.
 ---
 
 ## 1. Secrets & PII hygiene (hard floor — never publish)
-- **No secrets.** No API keys, tokens, passwords, or DSNs with embedded creds.
-  Use the env-var **name** only (`POSTGRES_PASSWORD`, `FRED_API_KEY`, …); real
-  values live in `config/.env` (gitignored).
-- **No internal infra.** Generalize internal IPs/hosts: `<postgres-host>:<port>`,
-  `<ibkr-gateway-host>:<port>`. (Generic, public port conventions are fine.)
+- **No secrets.** No API keys, tokens, passwords, or connection strings with
+  embedded credentials. Use generic environment-variable names only; real values
+  live in `config/.env` (gitignored).
+- **No internal infra.** Generalize internal IPs and hosts as
+  `<internal-host>:<port>`. Generic public port conventions are fine.
 - **No personal absolute paths.** `~/…` for runnable snippets; `<repo-root>` /
   `<workspace>` / `<data-root>` for layout references — keep the meaningful suffix
   so "where things live" still reads.
 - **No personal identifiers** (OS username, personal email, real name).
 - Intentional public identifiers are fine to keep: the native-messaging host id
-  `com.mindfulrl.sa_alpha_picks`, addon id `sa-alpha-picks@mindfulrl.local`, the
-  bare DB name `mindfulrl`, the local dev port `8420`.
+  `com.mindfulrl.sa_alpha_picks`, addon id `sa-alpha-picks@mindfulrl.local`, and
+  the local dev port `8420`.
 - Paid-provider pricing must carry a `verified_at:` date (prices go stale).
 
 ## 2. Maturity labeling (the real point)
@@ -59,14 +59,7 @@ the `filter=git-crypt` line from `.gitattributes` and `git add --renormalize`.
 
 ## 5. Known incidents
 
-- **Dev DB password (pre-2026-07)**: the docker-compose default password was
-  published in plaintext (docker/, config/.env.template) and is COMPROMISED —
-  it remains readable in git history forever. 2026-07-06 (hygiene B4a): all
-  tracked copies purged; compose now requires `ARKSCOPE_ARCHIVE_PG_PASSWORD`
-  with no default. **RESOLVED 2026-07-06 (B4b, option A — stop, not rotate)**:
-  the three app-record archive tables were dumped locally with restore proof
-  (`data/pg_archive/app_records_20260706T121127Z/`, dump sha256
-  `486f6fae01519794405d88b7180188b615e5dfb7c094bf6071f0853e11ab0e92`, 5 rows
-  total) and the remote PG container was stopped (connection-refused verified).
-  No live service carries the compromised credential. Any future archive access
-  = start a fresh PG via `docker/README.md` and restore the dumps.
+- A historical development credential was once tracked in plaintext and must be
+  treated as permanently compromised because Git retains prior blobs. It is not
+  used by any current service. Publication review must reject any reintroduction
+  of that value or any credential derived from it.

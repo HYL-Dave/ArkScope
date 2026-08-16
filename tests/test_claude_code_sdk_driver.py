@@ -1,9 +1,8 @@
 """Slice 7B-4 — tests for AnthropicClaudeCodeSdkDriver (SDK-backed, subscription).
 
-NO LIVE CALLS. We monkeypatch ``claude_agent_sdk.query`` with an async generator
-that yields canned SDK message objects (the REAL dataclasses), and we use a FAKE
-ToolRegistry + FAKE DAL — the real ToolRegistry/DAL would hit PG/network and hang
-the sandbox.
+No live calls are made. ``claude_agent_sdk.query`` is replaced with an async
+generator of real SDK message dataclasses, and ToolRegistry plus DAL use
+hermetic fakes.
 
 Behaviors covered (see the module docstring + BUILD REPORT):
   - happy-path mapping (AssistantMessage/UserMessage/ResultMessage -> events)
@@ -52,7 +51,6 @@ from src.auth_drivers.protocol import LLMRequest
 
 
 # ---------------------------------------------------------------------------
-# Fakes — a token store, a tool registry, and a DAL. NONE touch PG/network.
 # ---------------------------------------------------------------------------
 TOKEN = "sk-ant-oat01-FAKEoauthTOKENvalue1234567890abcdefABCDEF"
 

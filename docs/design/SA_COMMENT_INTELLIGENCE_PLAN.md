@@ -113,7 +113,7 @@
 |-----------|----------|
 | Extractor (pure logic) | `src/sa/comment_signals.py` — `CommentSignalExtractor` |
 | Universe loader + backfill runner | `src/sa/comment_signal_backfill.py` |
-| DB schema | `sql/012_add_sa_comment_signals.sql` (FK to `sa_article_comments(id)`, GIN on tickers) |
+| Local schema | `src/sa_capture_store.py` (FK to `sa_article_comments(id)`, indexed ticker mentions) |
 | Job runner | `extract_sa_comment_signals` registered in `src/service/jobs.py` (gated on `sa_enabled`, observable via S2 `job_runs`) |
 | Agent tool | `list_high_value_comments` — `src/tools/sa_tools.py` + registry + Anthropic / OpenAI bridges |
 | Tests | `tests/test_sa_comment_signals.py` (38 unit + integration tests) |

@@ -1,8 +1,8 @@
 """Layer A of follow-up #1: SA comment-signal extraction ported to sa_capture.db.
 
 Verifies the SQLite twin of run_backfill (routed when backend._sa_db is set):
-writes the scalar row + BOTH mention junctions through the sa_capture_store
-choke-point, never touches PG, is idempotent, respects rule_set_version, and
+writes the scalar row and both mention junctions through the capture-store
+choke point, is idempotent, respects rule_set_version, and
 re-extraction replaces a comment's mention set (delete/reinsert, no stale rows).
 """
 
@@ -42,8 +42,6 @@ def _dal(db_path, tickers=("NVDA", "AMD")):
     dal = MagicMock()
     backend = MagicMock()
     backend._sa_db = str(db_path)
-    # Proof of no split-brain: the SA-local path must NEVER open a PG connection.
-    backend._get_conn.side_effect = AssertionError("PG must not be touched in SA-local mode")
     dal._backend = backend
     wl = MagicMock()
     wl.tickers = list(tickers)
@@ -66,7 +64,6 @@ def test_writes_signals_and_junctions_to_sqlite(tmp_path):
     assert res["total_pending"] == 4
     assert res["batch_count"] >= 2
     assert res["sample_high_score"] > 0
-    backend._get_conn.assert_not_called()  # NEVER touched PG
 
     conn = _ro(db)
     try:

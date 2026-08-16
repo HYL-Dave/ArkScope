@@ -1,20 +1,15 @@
-"""SQLite-backed twin of MacroCalendarStore — macro/cal local store (PG-exit §4c slice 1).
+"""SQLite-backed macro and calendar store.
 
-Same public method surface as ``MacroCalendarStore`` (upsert_economic/earnings/ipo_event +
-read_*_as_of, upsert_macro_series/get_macro_series, upsert_macro_observation/
-get_macro_value_as_of, upsert_release_date/get_release_dates, list_*), backed by its own
-``macro_calendar.db`` (topology decision) with ZERO PostgreSQL. The canonical+revision
-upsert semantics, fingerprints, and tracked-field change detection are REUSED from
-``store.py`` (imported, not re-derived) so parity is structural, not hand-copied.
+Owns the complete local read/write surface for economic, earnings, IPO, macro
+series, observation, and release-date records in ``macro_calendar.db``.
+Canonical and revision upserts, fingerprints, and tracked-field change
+detection live in this module.
 
-PG-ism port (vs sql/013): BIGSERIAL → INTEGER PRIMARY KEY AUTOINCREMENT; TIMESTAMPTZ/DATE →
-TEXT (UTC ISO); JSONB → TEXT (json.dumps); ``%s`` → ``?``; RealDictCursor → sqlite3.Row;
-``NOW()`` → CURRENT_TIMESTAMP; partial-index ``WHERE`` recreated as real partial indexes;
-FK ``ON DELETE CASCADE`` kept (PRAGMA foreign_keys=ON per connection). The ``9999-12-31``
-open-vintage sentinel for macro_observations.realtime_end is preserved verbatim.
+Temporal values use UTC ISO text, structured values use JSON text, and
+connections enable foreign-key enforcement. The ``9999-12-31`` open-vintage
+sentinel for ``macro_observations.realtime_end`` is preserved.
 
-This is slice 1: store + schema + hermetic parity tests only. No runtime wiring, no toggle,
-no FRED/Finnhub ingestion, no PG migration — those are later slices.
+The store exposes canonical and as-of read methods used by FRED and Finnhub ingestion.
 """
 
 from __future__ import annotations
@@ -201,7 +196,7 @@ CREATE TABLE IF NOT EXISTS cal_ipo_events (
     exchange           TEXT,
     status             TEXT NOT NULL CHECK (status IN ('priced','filed','expected','withdrawn')),
     number_of_shares   REAL,
-    price              TEXT,   -- PG is NUMERIC; TEXT here tolerates Finnhub range strings ("18-20")
+    price              TEXT,   -- TEXT tolerates Finnhub range strings ("18-20")
     total_shares_value REAL,
     fingerprint        TEXT NOT NULL UNIQUE,
     fetched_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
@@ -236,7 +231,7 @@ CREATE TABLE IF NOT EXISTS macro_series (
     updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 CREATE TABLE IF NOT EXISTS macro_observations (
-    observation_id   INTEGER PRIMARY KEY AUTOINCREMENT,   -- surrogate (PG BIGSERIAL parity)
+    observation_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     series_id        TEXT NOT NULL REFERENCES macro_series(series_id) ON DELETE CASCADE,
     observation_date TEXT NOT NULL,
     value            REAL,
@@ -262,8 +257,8 @@ def _iso(v: Any) -> Any:
     SQLite has no native datetime, so all temporal columns are lexicographically
     comparable ISO strings (the same discipline as market_data.db's UTC PK).
     Datetimes carry MICROSECOND precision so a default observed_at (NOW) for two
-    back-to-back upserts differs — matching PG's per-statement NOW() and respecting
-    UNIQUE(id, observed_at) on the revision log (PG uses COALESCE(%s, NOW())); a
+    back-to-back upserts differs and respects
+    UNIQUE(id, observed_at) on the revision log; a
     second-resolution stamp would collide on a fast insert→mutate."""
     if isinstance(v, datetime):
         if v.tzinfo is not None:
@@ -275,15 +270,15 @@ def _iso(v: Any) -> Any:
 
 
 def _now_observed() -> str:
-    """Default observed_at when the caller passes None — the local twin of PG's
-    COALESCE(observed_at, NOW()). Microsecond-precise so back-to-back revisions on one
+    """Default ``observed_at`` when the caller passes None.
+
+    Microsecond precision ensures back-to-back revisions on one
     event don't violate UNIQUE(id, observed_at)."""
     return _iso(datetime.now(timezone.utc))
 
 
 def _in_clause(col: str, values: Optional[List[str]]) -> Tuple[str, list]:
-    """Build an ``' AND col IN (?,?,…)'`` fragment + params, or ``('', [])`` when there's
-    no filter — the SQLite twin of PG's ``%(arr)s::text[] IS NULL OR col = ANY(...)``."""
+    """Build an optional ``AND col IN (...)`` fragment and parameters."""
     if not values:
         return "", []
     placeholders = ",".join("?" * len(values))
@@ -298,14 +293,14 @@ def resolve_macro_calendar_db_path(db_path: str | Path | None = None) -> str:
 
 
 class MacroCalendarLocalStore:
-    """SQLite twin of MacroCalendarStore over ``macro_calendar.db`` (no PG)."""
+    """Macro-calendar store over ``macro_calendar.db``."""
 
     def __init__(self, db_path: str | Path | None = None):
         self._db_path = resolve_macro_calendar_db_path(db_path)
         self._ensure_schema()
 
     def is_available(self) -> bool:
-        return True  # local store is always available (unlike the PG-gated twin)
+        return True
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, timeout=10.0)
@@ -322,7 +317,7 @@ class MacroCalendarLocalStore:
         finally:
             conn.close()
 
-    # --- shared canonical+revision upsert (mirrors store._upsert_calendar_event) ----
+    # --- shared canonical and revision upsert --------------------------------------
 
     def _upsert_calendar_event(
         self, *, canonical_table: str, id_column: str, fingerprint: str,
@@ -332,8 +327,8 @@ class MacroCalendarLocalStore:
     ) -> Tuple[Optional[int], str]:
         """First insert → canonical + baseline revision (one txn). Re-ingest with a tracked
         change → update canonical + append revision. Unchanged → no-op (no fetched_at bump).
-        Atomic per the connection's implicit transaction; identical action semantics to the
-        PG store, with the change detection reused from store._tracked_payload_differs."""
+        Atomic per the connection's implicit transaction, with shared tracked-field
+        change detection."""
         conn = self._connect()
         try:
             tracked = ", ".join(tracked_fields)
@@ -574,10 +569,8 @@ class MacroCalendarLocalStore:
         finally:
             conn.close()
 
-    # --- list reads (canonical + as-of), parity with store.list_* / get_macro_observations
+    # --- list reads (canonical + as-of) --------------------------------------------
     # NOTE on shape: temporal columns come back as ISO-TEXT (not datetime objects like the
-    # PG RealDictCursor) and NUMERIC as float — consistent with SQLite storage; slice 2's
-    # wiring maps these to the route DTOs. Keys match the PG result (incl. as_of_observed_at).
 
     def _list_query(self, conn, sql: str, params: list) -> List[Dict[str, Any]]:
         try:
@@ -604,7 +597,6 @@ class MacroCalendarLocalStore:
                 sql += cc + ci + " ORDER BY event_time ASC LIMIT ?"; params += pc + pi + [lim]
             else:
                 # INNER JOIN the latest revision <= as_of (MAX subquery → events with no
-                # revision <= as_of yield NULL → excluded, matching PG's INNER JOIN LATERAL).
                 sql = ("SELECT e.event_id,e.country,e.event_name,e.event_time,e.impact,e.unit,"
                        "rev.actual,rev.estimate,rev.prev,rev.observed_at AS as_of_observed_at "
                        "FROM cal_economic_events e JOIN cal_economic_event_revisions rev "
@@ -711,14 +703,14 @@ class MacroCalendarLocalStore:
         finally:
             conn.close()
 
-    # --- health support (local twin of macro_calendar_health._TABLE_STATS_SQL) ---------
+    # --- health support --------------------------------------------------------------
 
     _HEALTH_TABLES = ("cal_economic_events", "cal_earnings_events", "cal_ipo_events",
                       "macro_series", "macro_observations", "macro_release_dates")
 
     def table_stats(self) -> Dict[str, Dict[str, Any]]:
         """Per-table MAX(fetched_at) + COUNT(*) for the 6 macro/cal tables — the local twin
-        of the PG health ``_TABLE_STATS_SQL``. Returns ``{table: {last_fetched_at: str|None,
+        Returns ``{table: {last_fetched_at: str|None,
         row_count: int}}`` (last_fetched_at is ISO-TEXT; the health evaluator's _coerce_dt
         parses it)."""
         return read_macro_table_stats(self._db_path)

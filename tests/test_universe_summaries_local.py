@@ -1,5 +1,4 @@
-"""get_universe_summaries must read the LOCAL market DB — the PG path died with
-N9 batch-1 (PG `news` dropped) and its single try aborted price summaries too."""
+"""Universe summaries read prices and news from the current local market store."""
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -56,7 +55,6 @@ def test_missing_db_returns_empty(tmp_path, monkeypatch):
 
 
 def test_news_failure_keeps_price_summaries(tmp_path, monkeypatch):
-    # Independent degradation — the old PG path returned {} for EVERYTHING when
     # the news query failed (the exact live incident after the N9 drop).
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(_seed(tmp_path, with_news_table=False)))
     out = get_universe_summaries(None, days=7)

@@ -1,4 +1,4 @@
-"""Slice #2a — market_data_direct hermetic core (PG-free, no live Gateway).
+"""Slice
 
 Covers: WAL-safe backup, preflight_canonicalize, _normalize_utc (the byte-match
 invariant + DST), detect_price_gaps (day-presence, weekend/holiday aware), and the
@@ -19,7 +19,6 @@ import src.market_data_direct as mdd
 from src.active_universe import ActiveUniverseUnavailable
 
 
-# --- _normalize_utc: byte-identical to PG TO_CHAR + DST-correct (THE invariant) ----
 
 def test_normalize_utc_edt_summer():
     # naive ET summer (EDT, UTC-4): 09:30 → 13:30Z
@@ -104,10 +103,8 @@ def test_preflight_idempotent_second_run_noop(tmp_path):
 
 
 def test_preflight_reads_only_local_state(tmp_path):
-    # local-only (lock 8): a PG dial must never happen on this path.
     db = tmp_path / "m.db"
     _live_shaped_db(db)
-    assert not hasattr(mda, "_pg_conn")
     res = mdd.preflight_canonicalize(str(db))
     assert res["ok"] is True
 
@@ -214,7 +211,7 @@ def test_provider_sync_tables_idempotent(tmp_path):
     mdd._ensure_provider_sync_tables(conn)  # second run no error
     tbls = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
     assert {"provider_sync_runs", "provider_sync_meta"} <= tbls
-    assert "market_sync_meta" not in tbls  # must NOT touch the PG-mirror table
+    assert "market_sync_meta" not in tbls
     conn.close()
 
 
@@ -339,7 +336,6 @@ def test_provider_sync_runs_status_check_enforced_at_schema(tmp_path):
     conn.close()
 
 
-# --- market_write_lock: serializes market_data.db writes vs the PG mirror (2b step 1) ---
 
 def test_market_write_lock_acquires_and_releases(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
@@ -1179,7 +1175,6 @@ def test_backfill_fetches_provider_rows_outside_market_write_lock(tmp_path, monk
     assert reconciliation_observed_lock == [True]
 
 
-# --- PG-exit: standalone backfill acquires the shared IBKR Gateway lock -------------
 
 def test_backfill_acquires_gateway_lock_by_default(tmp_path, monkeypatch):
     # a standalone backfill must hold the SHARED gateway lock during the IBKR work, so it

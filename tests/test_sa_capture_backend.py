@@ -102,7 +102,7 @@ def test_isinstance_gate_and_lazy_construction(backend):
     assert type(backend) is SACaptureBackend
     assert isinstance(backend, LocalMarketBackend)
     assert not hasattr(backend, "_dsn")
-    assert not hasattr(backend, "_get_conn")
+    assert callable(backend._sa_read)
 
 
 # --- (2) apply_sa_refresh end-to-end + canon_ts mark-stale ordering ----------------

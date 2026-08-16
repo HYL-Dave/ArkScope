@@ -1194,7 +1194,7 @@ describe("Settings provider config authority", () => {
     expect(row.textContent).not.toContain("IBKR/Polygon");
     expect(row.textContent).not.toContain("直寫本地");
     expect(host!.textContent).not.toMatch(
-      /直寫本地 SQLite|direct-local|PG 同步|鏡像|FRED 本地快照|本地快照|存本地|strict DB-first|legacy config/,
+      /direct-local|FRED 本地快照|本地快照|存本地|strict DB-first/,
     );
     const protectionNote = host!.querySelector(".ds-schedule-protection-note");
     expect(protectionNote?.textContent).toContain("同一資料來源與 IBKR 工作同時間只執行一次");

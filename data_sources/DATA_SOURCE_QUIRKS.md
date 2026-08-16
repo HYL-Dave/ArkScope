@@ -16,10 +16,9 @@ doc。
 - **Implication**: This is a source-state inconsistency, not an extension
   scraper bug. Storage must preserve tab membership instead of treating
   `(symbol, picked_date)` as globally unique.
-- **Workaround / Fix**: PostgreSQL migration
-  `sql/014_sa_alpha_picks_closed_date_and_dual_membership.sql` adds
-  `closed_date` and changes the uniqueness contract to
-  `(symbol, picked_date, portfolio_status)`.
+- **Storage contract**: The local capture schema records `closed_date` and
+  identifies picks by `(symbol, picked_date, portfolio_status)` so both
+  memberships remain visible.
 
 ---
 

@@ -131,7 +131,7 @@ C-2a holds threads in React state; **field names MUST equal the proposed `profil
 ```sql
 -- C-2b (NEW — to build): a SEPARATE store class (e.g. ResearchThreadStore) over data/profile_state.db,
 -- modelled on the shipped CardRunStore (src/card_runs.py:79) — its own _write_lock / _connect / module _now;
--- do NOT bloat ProfileStateStore. Same local DB, NOT remote PG (card_runs.py:13).
+-- do NOT bloat ProfileStateStore. Use a separate owner in the same local file (card_runs.py:13).
 CREATE TABLE IF NOT EXISTS research_threads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,            -- client truncates first user message (~60 chars)
@@ -168,7 +168,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_thread ON research_messages(thread_id, i
 
 An assistant `messages` row maps **1:1** onto the SSE `done` payload + the client-assembled tool trace (the same information `ChatHistory.append` already records in CLI JSONL).
 
-**C-2a ↔ C-2b boundary:** C-2a leaves `QueryRequest` and the SSE wire shape UNCHANGED and persists nothing (multi-turn continuity, if any, = client-side history folded into `question`). C-2b is **additive**: add optional `{thread_id?, ticker?}` to `QueryRequest`; `/query/stream` calls `store.append_message(role='user',…)` before streaming and `store.append_message(role='assistant',…)` on `done` (best-effort, never fails the stream — same try/except posture as the CLI helper `_log_agent_query`, used here as an analogy, not a route call); add a `get_thread_store` dependency factory + `list_threads`/`list_messages` GET routes — mirroring the shipped `get_card_store` factory (`src/api/dependencies.py:50`) + `analysis_cards.py` route module. **No SSE event-shape change.** Keep threads LOCAL-only (never remote PG); do NOT create a second history store parallel to `data/chat_history/*.jsonl`.
+**C-2a ↔ C-2b boundary:** C-2a leaves `QueryRequest` and the SSE wire shape UNCHANGED and persists nothing (multi-turn continuity, if any, = client-side history folded into `question`). C-2b is **additive**: add optional `{thread_id?, ticker?}` to `QueryRequest`; `/query/stream` calls `store.append_message(role='user',…)` before streaming and `store.append_message(role='assistant',…)` on `done` (best-effort, never fails the stream — same try/except posture as the CLI helper `_log_agent_query`, used here as an analogy, not a route call); add a `get_thread_store` dependency factory + `list_threads`/`list_messages` GET routes — mirroring the shipped `get_card_store` factory (`src/api/dependencies.py:50`) + `analysis_cards.py` route module. **No SSE event-shape change.** Keep threads local-only and do not create a second history store parallel to `data/chat_history/*.jsonl`.
 
 ## 7. Out of scope (C-2a) / deferred (C-2b+)
 

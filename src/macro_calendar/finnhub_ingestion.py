@@ -10,8 +10,8 @@ Three callable entry points the job runner wraps (commit 4):
   - ``fetch_finnhub_ipo_events(dal, ...)`` — refresh ``cal_ipo_events``
     for a date window.
 
-All three follow the canonical/revision upsert contract from the
-``MacroCalendarStore`` (see ``src/macro_calendar/store.py``):
+All three follow the canonical/revision upsert contract from
+``MacroCalendarLocalStore`` in ``src/macro_calendar/local_store.py``:
 
   - First ingestion of a fingerprint → ``"inserted"`` (canonical row +
     baseline revision in one transaction).

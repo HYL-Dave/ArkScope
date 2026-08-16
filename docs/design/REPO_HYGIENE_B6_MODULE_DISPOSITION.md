@@ -2,7 +2,7 @@
 
 > **Status: ✅ EXECUTED — B7 merged 2026-07-06 (`cf4ec92`; A/B 37=37 + passed 3730=3730);
 > rulings 2 (survivor table stands) + 3 (config/skills → skills design line) confirmed.** Third table of the hygiene line (after
-> `REPO_HYGIENE_AUDIT_2026_07.md` + `DOCS_SWEEP_DISPOSITION_2026_07.md`).
+> the completed repository and documentation census).
 > Boundary defaults come from the 2026-07-06 review ruling: analysis→src is a TDD slice;
 > resources/skills = packaged data, never into src/; config = future db-ification, no
 > deletions now; scripts survivor-table changes = standing-ruling changes.

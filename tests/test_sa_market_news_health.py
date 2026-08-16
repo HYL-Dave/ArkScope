@@ -400,7 +400,6 @@ class TestOrchestrator:
             captured["now"] = now
             return _healthy_stats(now)
 
-        # _sa_db satisfies the local-backend guard (PG health path is retired);
         # the test's subject is now-threading through the orchestrator.
         backend = SimpleNamespace(_sa_db="sa_capture.db")
         dal = SimpleNamespace(_backend=backend)

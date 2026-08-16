@@ -23,7 +23,6 @@ def db(tmp_path):
 # --- canonical encoding ---------------------------------------------------------
 
 def test_canon_ts_one_format_lexicographic():
-    # JS Z-string, PG '+00', naive, aware non-UTC — ALL land in the one format,
     # and lexicographic order == time order (mark-stale depends on this).
     a = scs.canon_ts("2026-06-13T01:00:00Z")
     b = scs.canon_ts("2026-06-13 03:00:00+00")
@@ -121,7 +120,6 @@ def test_closed_identity_allows_distinct_close_events(db):
     with pytest.raises(sqlite3.IntegrityError):
         _pick(conn, "TSLA", "closed", closed="2026-02-01")  # same event: rejected
     conn.rollback()
-    # NULL closed_date stays NULL-distinct (same semantics as PG — documented hole)
     _pick(conn, "NVDA", "closed", closed=None)
     _pick(conn, "NVDA", "closed", closed=None)
     assert conn.execute("SELECT COUNT(*) FROM sa_alpha_picks "

@@ -47,17 +47,11 @@ else
     PYTHON_PATH="$(command -v python3 || true)"
 fi
 
-if [ -n "$PYTHON_PATH" ] && "$PYTHON_PATH" -c "import psycopg2" 2>/dev/null; then
-    echo "Python: $PYTHON_PATH (psycopg2 OK)"
-else
-    echo "WARNING: ${PYTHON_PATH:-python3} cannot import psycopg2."
-    echo "Enter the full path to the virtualenv python3 used by this project:"
-    read -r -p "Python path: " PYTHON_PATH
-    if ! "$PYTHON_PATH" -c "import psycopg2" 2>/dev/null; then
-        echo "ERROR: $PYTHON_PATH still cannot import psycopg2."
-        exit 1
-    fi
+if [ -z "$PYTHON_PATH" ] || [ ! -x "$PYTHON_PATH" ]; then
+    echo "ERROR: no usable Python interpreter found."
+    exit 1
 fi
+echo "Python: $PYTHON_PATH"
 
 "$PYTHON_PATH" "$SCRIPT_DIR/build_firefox.py" --source "$SCRIPT_DIR" --output "$BUILD_DIR"
 

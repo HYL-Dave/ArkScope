@@ -70,7 +70,6 @@ def _require_enabled() -> None:
 
 
 # ---------------------------------------------------------------------------
-# use_local_macro Settings (legacy PG-exit provenance) — mirrors /market-data/{status,settings}.
 # Config endpoints: intentionally NOT gated by macro_calendar_enabled (you need them to
 # configure the feature), matching market-data's ungated status/settings.
 # ---------------------------------------------------------------------------
@@ -88,13 +87,13 @@ def _macro_setting_enabled(store) -> bool:
 
 @router.get("/status")
 def macro_status(store=Depends(get_profile_store)):
-    """Local macro/cal status (PURE READ; does not touch PG, does not create the local DB).
+    """Return local macro/calendar status without creating the database.
 
     Reports the persisted legacy ``use_local_macro`` value, the env override, and — when
     ``macro_calendar.db`` exists — per-table coverage (read-only).
 
-    ``local_first_active`` is always true after N9: macro/calendar routing is local by
-    default, creates ``macro_calendar.db`` on first use, and never falls back to PG.
+    ``local_first_active`` is always true: macro/calendar routing creates
+    ``macro_calendar.db`` on first write.
     ``exists`` is the separate "DB built yet?" signal the UI composes with this."""
     path = resolve_macro_calendar_db_path()
     setting_on = _macro_setting_enabled(store)
@@ -111,12 +110,11 @@ def macro_status(store=Depends(get_profile_store)):
 
 @router.put("/settings")
 def set_local_macro(body: LocalMacroToggle, store=Depends(get_profile_store)):
-    """Persist the legacy ``use_local_macro`` value for provenance.
+    """Persist the macro-data setting used by the status surface.
 
-    Runtime routing is local by default after N9; this endpoint no longer provides
-    a PG fallback lever. Until ingestion populates ``macro_calendar.db``, local
-    reads simply return empty (status: ``local_first_active`` true, ``exists``
-    possibly still false)."""
+    Runtime routing remains local. Until collection populates
+    ``macro_calendar.db``, reads return an honest empty result.
+    """
     require_profile_state_write("set_use_local_macro", {"enabled": body.enabled})
     store.set_setting(USE_LOCAL_MACRO_KEY, "true" if body.enabled else "false")
     return {"use_local_macro_setting": body.enabled}

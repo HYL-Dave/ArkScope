@@ -554,7 +554,7 @@ def adjust_volatility_for_smile(
 ❌ 財報前期權很貴
    → 這是不確定性溢價，不是錯價
 
-❌ TSLA 期權比 PG 期權貴
+❌ TSLA 期權比 KO 期權貴
    → 這是因為 TSLA 確實波動更大
 ```
 
@@ -735,7 +735,7 @@ S - K ≤ C - P ≤ S - K·e^(-rT)
 |------|------|------|
 | 定價引擎 | `analysis/option_pricing.py` | B-S、HV、IV、Greeks |
 | 錯價掃描 | `scripts/analysis/scan_option_mispricing.py` | 期權錯價檢測 |
-| 異常活動候選 | [`SCRIPTS_RETIREMENT_TRANCHE_A.md`](../history/SCRIPTS_RETIREMENT_TRANCHE_A.md#4-unusual-options-candidate) | 舊 wrapper 已退役；保留 scanner primitives |
+| 異常活動候選 | Git history | 舊 wrapper 已退役；保留 scanner primitives |
 | IBKR 數據源 | `data_sources/ibkr_source.py` | Option Chain / Quote |
 | 單元測試 | `tests/test_option_pricing.py` | 定價引擎測試 |
 

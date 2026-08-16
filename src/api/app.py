@@ -127,9 +127,7 @@ async def lifespan(app: FastAPI):
         logger.debug("interrupted scheduler/provider reconciliation failed: %s", e)
 
     # Test hygiene: TestClient(create_app()) runs this lifespan, and the scheduler's
-    # seed/tick threads reach the real PG/network — tests/conftest.py disables it so
     # unit tests stay hermetic (a stalled seed thread otherwise hangs pytest at the
-    # executor's atexit join in PG-less environments).
     scheduler_enabled = (
         os.environ.get("ARKSCOPE_DISABLE_SCHEDULER", "").strip().lower()
         not in ("1", "true", "yes", "on")

@@ -1,10 +1,4 @@
-"""
-Market-data lifecycle routes (slice 3a.1) — local SQLite bootstrap/status/validate.
-
-Reports and controls the local market_data.db authority. The old PG
-bootstrap/update/validate mirror endpoints are fail-closed; active collection now
-uses direct-local providers.
-"""
+"""Market-data status, coverage, review, and fail-closed admin routes."""
 
 from __future__ import annotations
 
@@ -24,7 +18,7 @@ from src.market_data_admin import (
     env_strict_enabled,
     local_market_stats,
     local_ticker_coverage,
-    overlay_price_sync_retired,
+    overlay_price_authority,
     read_sync_meta,
     resolve_market_db_path,
 )
@@ -57,30 +51,22 @@ def _strict_setting_enabled(store: ProfileStateStore) -> bool:
 
 @router.get("/market-data/status")
 def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
-    """Local market-data status (PURE READ; does not touch PG).
-
-    Reports the local per-domain stats (prices + news + fundamentals + the
-    local-primary financial_cache). Post-PG-exit local authority is the default:
-    the legacy persisted/env routing fields are exposed for provenance only, not
-    as live PG fallback controls.
-    """
+    """Return current local market-data facts without provider work."""
     path = resolve_market_db_path()
     stats = local_market_stats(path)
     setting_on = _setting_enabled(store)
     env_on = env_routing_enabled()
     strict_setting_on = _strict_setting_enabled(store)
     strict_env_on = env_strict_enabled()
-    # Local authority is the post-PG-exit default even before the DB file exists.
-    # The SQLite layer returns honest-empty rows until ingestion creates it.
+    # The local layer returns honest-empty rows until collection creates the file.
     routing_enabled = True
     strict_enabled = True
-    sync = overlay_price_sync_retired(overlay_news_sync_status(read_sync_meta(path), path))
+    sync = overlay_price_authority(overlay_news_sync_status(read_sync_meta(path), path))
     return {
         "market_db": path,
         "exists": stats["exists"],
         "prices": stats["prices"],
         "prices_authority": "local",
-        "price_mirror_retired": True,
         "news": stats["news"],
         "fundamentals": stats["fundamentals"],
         "financial_cache": stats["financial_cache"],  # 3c-C local-primary cache (rows/valid/expired)
@@ -92,43 +78,30 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "strict_env_override": strict_env_on,
         "strict_enabled": strict_enabled,
         "routing_enabled": routing_enabled,
-        "pg_fallback_active": False,
     }
 
 
 @router.post("/market-data/bootstrap")
 def bootstrap_route():
-    """Reject the retired all-domain PG mirror rebuild path.
-
-    N9 batch-1 retires the old PG ``news``/``iv_history``/``fundamentals`` mirror
-    tables. Prices migration is a separate PG-exit slice, so this route must not
-    start the legacy all-domain bootstrap.
-    """
+    """Reject unsupported bulk bootstrap requests."""
     require_db_write("market_bootstrap", {"db": resolve_market_db_path()})
-    raise _retired_market_mirror_http_error("bootstrap_route")
+    raise _unavailable_market_admin_http_error("bootstrap_route")
 
 
 @router.post("/market-data/update")
 def update_route(store: ProfileStateStore = Depends(get_profile_store)):
-    """Reject the retired PG incremental mirror path.
-
-    P0-C routes scheduled price collection through the direct-local IBKR writer.
-    The legacy manual update endpoint used the PG mirror path, so it must fail
-    closed instead of creating a background mirror job.
-    """
+    """Reject unsupported bulk update requests."""
     require_db_write("market_update", {"db": resolve_market_db_path()})
     _manual_update_domains(store)
-    raise _retired_market_update_http_error()
+    raise _unavailable_market_update_http_error()
 
 
 @router.get("/market-data/coverage/{ticker}")
 def market_data_coverage(ticker: str):
     """Per-domain LOCAL coverage for ``ticker`` (PURE READ; routing-independent).
 
-    Reports whether the local market DB actually holds rows for this ticker in each
-    domain — a fact about the local DB, NOT a claim about where a given read was
-    served (per-call local-vs-PG provenance is a separate future signal). Powers the
-    detail page's honest "本地覆蓋：有/無" hint.
+    Reports whether the local market database holds rows for this ticker in each
+    domain. This is independent of the source used for an individual read.
     """
     return local_ticker_coverage(ticker)
 
@@ -270,25 +243,25 @@ def review_corporate_relationship(
 
 @router.post("/market-data/validate")
 def validate_route():
-    """Reject the retired all-domain PG mirror validation path."""
+    """Reject unsupported bulk validation requests."""
     require_db_write("market_validate", {"db": resolve_market_db_path()})
-    raise _retired_market_mirror_http_error("validate_route")
+    raise _unavailable_market_admin_http_error("validate_route")
 
 
-def _retired_market_mirror_http_error(operation: str) -> HTTPException:
-    from src.market_data_admin import retired_market_mirror_result
+def _unavailable_market_admin_http_error(operation: str) -> HTTPException:
+    from src.market_data_admin import unavailable_market_admin_result
 
     return HTTPException(
         status_code=409,
-        detail=retired_market_mirror_result(operation),
+        detail=unavailable_market_admin_result(operation),
     )
 
 
-def _retired_market_update_http_error() -> HTTPException:
-    from src.market_data_admin import retired_price_mirror_result
+def _unavailable_market_update_http_error() -> HTTPException:
+    from src.market_data_admin import unavailable_price_update_result
 
-    detail = retired_price_mirror_result("update_route")
-    detail["code"] = "pg_market_update_retired"
+    detail = unavailable_price_update_result("update_route")
+    detail["code"] = "market_update_unavailable"
     return HTTPException(status_code=409, detail=detail)
 
 
@@ -301,11 +274,7 @@ def set_local_market(
     body: LocalMarketToggle,
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    """Persist the "use local market data" toggle (read by the DAL at startup).
-
-    Note: routing only engages once ``market_data.db`` exists — enabling the
-    toggle without a bootstrap simply keeps PG (status reflects that).
-    """
+    """Persist the local market-data preference."""
     require_profile_state_write("set_use_local_market", {"enabled": body.enabled})
     store.set_setting(USE_LOCAL_MARKET_KEY, "true" if body.enabled else "false")
     # The DAL reads this setting at construction and is an lru_cache singleton, so

@@ -94,9 +94,7 @@ reused an earlier output path. The surviving statuses were:
 
 This run is rejected admission evidence. Those responses do not classify
 price, entitlement, endpoint availability, account spend, or product support.
-They are retained only in the
-[Tranche A evidence](../superpowers/evidence/2026-08-01-scripts-retirement-tranche-a.md)
-as an explanation of why default collection must not contain live probes.
+They explain why default collection must not contain live probes.
 
 ### 2.3 Official observations rechecked on 2026-08-01
 

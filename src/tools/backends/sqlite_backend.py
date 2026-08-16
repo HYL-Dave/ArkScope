@@ -136,8 +136,7 @@ class SqliteBackend:
 
     @staticmethod
     def _rollup(df: pd.DataFrame, db_interval: str) -> pd.DataFrame:
-        """Aggregate 15min bars up to 1d/1h by UTC-string prefix (SQLite analogue
-        of PG ``date_trunc``). datetime strings are ``YYYY-MM-DDTHH:MM:SS+0000``."""
+        """Aggregate 15-minute bars to daily or hourly UTC buckets."""
         if df.empty:
             return df
         prefix = 10 if db_interval == "1d" else 13  # 'YYYY-MM-DD' | 'YYYY-MM-DDTHH'
@@ -183,9 +182,9 @@ class SqliteBackend:
         """Recompute freshness/health stats from market_data.db.
 
         The shape is ``{news,prices,financial_cache}``,
-        each ``{"rows": [positional tuples], "error": str|None}``), so provider-health /
-        freshness stop needing PG. A missing optional table is an honest empty (error None),
-        not a failure — same 'tolerate a pre-X DB' stance as the rest of the local backend."""
+        each ``{"rows": [positional tuples], "error": str|None}``. A missing
+        optional table is an honest empty result rather than a failure.
+        """
         from datetime import datetime, timedelta, timezone
 
         now = datetime.now(timezone.utc)
@@ -280,8 +279,7 @@ class SqliteBackend:
         days: int = 30,
         limit: int = 20,
     ) -> pd.DataFrame:
-        """Local full-text news search via SQLite FTS5 (bm25 ranking), with a LIKE
-        fallback for <3-char queries — mirroring the PG tsvector + ILIKE-fallback path.
+        """Local full-text news search via SQLite FTS5 with a short-query LIKE path.
 
         The result contains only raw article fields."""
         cutoff = (date.today() - timedelta(days=days)).isoformat()
@@ -329,8 +327,8 @@ class SqliteBackend:
     def _fts_match(q: str) -> str:
         """Tokenized-AND FTS5 MATCH expression: each whitespace token is quoted
         (neutralizing operator syntax — quotes, AND/OR, parens) and AND-joined.
-        Parity with PG ``plainto_tsquery`` (which ANDs lexemes) instead of the
-        narrower exact-phrase match the first version used."""
+        This uses tokenized AND rather than an exact phrase match.
+        """
         tokens = [t.replace('"', '""') for t in q.split()]
         return " AND ".join(f'"{t}"' for t in tokens)
 
@@ -343,9 +341,9 @@ class SqliteBackend:
         (total / per-source / per-day counts over the SAME filters). Search uses
         FTS5 tokenized-AND (≥3 chars) or LIKE for shorter queries.
 
-        ``available`` is False when the local DB/table is missing (pre-3b DB) so
-        the router can fall back to PG; an available-but-empty result is an
-        honest zero, NOT a fallback trigger."""
+        ``available`` is false when the local database or table is missing; an
+        available but empty result is an honest zero.
+        """
         empty = {
             "available": False,
             "items": [],
@@ -465,9 +463,11 @@ class SqliteBackend:
             conn.close()
 
     def query_fundamentals(self, ticker: str) -> dict:
-        """Latest local fundamentals snapshot for ``ticker``. Returns the same dict
-        shape as the PG path (``snapshot`` / ``fin_summary`` / ``ownership`` pulled
-        out of the stored ReportSnapshot JSON). Empty ``{}`` on any miss (PG fallback)."""
+        """Return the latest local fundamentals snapshot for ``ticker``.
+
+        The result exposes ``snapshot``, ``fin_summary``, and ``ownership`` from
+        stored report data. Any miss returns an empty dictionary.
+        """
         ticker = self._canon(ticker)
         try:
             conn = self._connect()
@@ -475,7 +475,6 @@ class SqliteBackend:
             return {}
         try:
             row = conn.execute(
-                # id DESC tiebreaks same-day snapshots → deterministic latest (== PG path)
                 "SELECT data, snapshot_date FROM fundamentals "
                 "WHERE ticker = ? ORDER BY snapshot_date DESC, id DESC LIMIT 1",
                 (ticker,),

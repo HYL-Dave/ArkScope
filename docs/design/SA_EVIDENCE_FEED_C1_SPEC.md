@@ -10,7 +10,7 @@ Follow-up #1 made SA *comment* intelligence agent-queryable (`get_sa_comment_foc
 
 ## 2. Backend — `GET /sa/feed` + `get_sa_feed` tool
 
-- New tool `get_sa_feed(dal, q=None, ticker=None, item_type=None, days=30, limit=50, offset=0)` in `src/tools/sa_tools.py`; SA-local dispatch on `backend._sa_db` (mirrors the other SA readers); PG mode → `requires_local_sa` degraded shape (same as `get_sa_comment_focus`).
+- New tool `get_sa_feed(dal, q=None, ticker=None, item_type=None, days=30, limit=50, offset=0)` in `src/tools/sa_tools.py`; SA-local dispatch uses the dedicated capture capability and returns `requires_local_sa` when that capability is unavailable.
 - **DEDICATED query — do NOT compose `get_sa_articles` + `get_sa_market_news`.** A two-reader merge gives unreliable total/ordering/pagination. UNION-normalize `sa_articles` + `sa_market_news` in one query.
 - `item_type ∈ {article, market_news, None=both}`. Alpha-Picks-specific articles are NOT a third type in v1 — surface as `article` + a badge; revisit only if the data model reliably distinguishes them.
 - **Normalized item shape:**
@@ -56,7 +56,7 @@ Register `get_sa_feed` in all THREE places (see `reference_agent_tool_registrati
 
 ## 5. Tests (backend — app-free)
 
-- `get_sa_feed` unit on a seeded `sa_capture.db`: item_type filter; ticker filter (column + junction); q FTS path + LIKE-fallback path + short-token/symbol path; days window; pagination (limit/offset + **accurate total**); facets (by_type/by_day); has_detail/comments_count/detail_route correctness per type; no-PG (SA-local poison-`_get_conn`); empty + PG-mode `requires_local_sa`.
+- `get_sa_feed` unit on a seeded `sa_capture.db`: item_type filter; ticker filter (column + junction); q FTS path + LIKE-fallback path + short-token/symbol path; days window; pagination (limit/offset + **accurate total**); facets (by_type/by_day); has_detail/comments_count/detail_route correctness per type; unavailable local capability; empty result.
 - `/sa/feed` route: **handler-level** smoke (call the route handler directly with a fake DAL — NOT TestClient; see `feedback_route_unit_tests`).
 
 ## 6. Execution order (one clean round)

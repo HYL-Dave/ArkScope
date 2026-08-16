@@ -215,7 +215,6 @@ def get_fundamentals_analysis(
     # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies). LOCAL-FIRST
     # CACHE (#3): the SEC fetch is free but live + rate-limited (10 req/s, declared UA),
     # so cache the built result in the local financial_cache (3c-C, local-primary → works
-    # under strict/no-PG) keyed by ticker+period. A positive hit serves from local; a
     # NEGATIVE (no-data: non-US / CIK miss) is cached with a SHORT TTL so we don't hammer
     # SEC for a symbol it doesn't cover.
     from src.fundamentals.cache import (
@@ -394,9 +393,7 @@ def get_universe_summaries(dal: DataAccessLayer, days: int = 7) -> Dict[str, dic
     """Batch market summary for the whole tracked universe from the LOCAL market DB.
 
     Returns ``{TICKER: {latest_close, change_pct, total_volume, bars, news_count_7d}}``
-    via two aggregate queries over local ``market_data.db``. Post-P0-C/N9 this must
-    never touch PG: the PG ``news`` table no longer exists, and the old raw-PG path
-    aborted the WHOLE summary when that one query failed (live incident 2026-07-04).
+    via two aggregate queries over local ``market_data.db``.
     The two domains degrade independently — a news failure keeps price summaries.
 
     ``dal`` is unused (kept for caller signature compatibility).

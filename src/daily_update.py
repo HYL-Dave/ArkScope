@@ -5,8 +5,8 @@ Daily Data Update - thin CLI wrapper over the app scheduler core (3e-E)
 定位 (2026-06, F6 落定): 這是 app scheduler 的 CLI 薄包裝，不再自帶編排。每個
 source 都走 src/service/data_scheduler.run_source() —— 與 app Settings 的
 「Run now」完全同一條路：同 per-source 鎖（重疊直接 skip）、同 IBKR Gateway 鎖
-（序列化）、同 job_runs telemetry（collect.<source>，trigger='cli'）。PG data
-sync 已退役；active sources 直寫本地 store。news 來源在進程內跑（adapter），IBKR
+（序列化）、同 job_runs telemetry（collect.<source>，trigger='cli'）。Active
+sources 直寫本地 store。news 來源在進程內跑（adapter），IBKR
 來源維持 subprocess（進程隔離）。
 
 CLI 與 app 跨進程共用 file lock（data/locks/，flock）：同一 source 重疊會直接

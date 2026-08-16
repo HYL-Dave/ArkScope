@@ -1,7 +1,7 @@
 """
 Profile-state (research-universe lifecycle) + cockpit watchlist routes.
 
-Reads merge PostgreSQL market data (via the DAL) with the local SQLite user
+Reads merge local market data with the local user
 state (``ProfileStateStore``). Writes funnel through the ``profile_state_write``
 permission choke-point.
 
@@ -200,7 +200,6 @@ def import_universe(
     tag_groups: list[dict] = []
     groups_ok = True
     if opts.include_groups:
-        # Theme groups come from the overview (DAL/PG). Best-effort: a DB outage
         # must NOT abort the stored category/provenance projection below.
         try:
             overview = get_watchlist_overview(dal)

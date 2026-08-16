@@ -4,7 +4,7 @@ Verifies the dedicated UNION query: both types newest-first, item_type/ticker
 filters, FTS5 vs LIKE-fallback search routing, the per-column-type days cutoff
 (date-only articles not dropped by a timestamp cutoff), accurate total +
 by_type/by_day facets, the item shape (has_detail/comments_count/detail_route),
-no-PG in SA-local mode, and the degraded shapes.
+and typed degraded outcomes.
 """
 
 from __future__ import annotations
@@ -68,7 +68,6 @@ def _dal(db_path):
     dal = MagicMock()
     backend = MagicMock()
     backend._sa_db = str(db_path)
-    backend._get_conn.side_effect = AssertionError("SA feed must not touch PG in SA-local mode")
     dal._backend = backend
     return dal, backend
 
@@ -76,7 +75,6 @@ def _dal(db_path):
 def _feed(db_path, **kw):
     dal, backend = _dal(db_path)
     res = sa_tools.get_sa_feed(dal, **kw)
-    backend._get_conn.assert_not_called()
     return res
 
 
@@ -84,7 +82,6 @@ def _missing_store_dal(db_path):
     dal = MagicMock()
     backend = MagicMock()
     backend._sa_db = str(db_path)
-    backend._get_conn.side_effect = AssertionError("SA feed must not touch PG")
     dal._backend = backend
     return dal, backend
 
@@ -110,7 +107,6 @@ def _assert_activity_history_marks_missing(tmp_path, monkeypatch, job_name):
 
         result = sa_tools.get_sa_feed(dal, days=30)
 
-        backend._get_conn.assert_not_called()
         assert result["available"] is False, (job_name, status, result)
         assert result["empty_reason"] == "store_missing", (job_name, status, result)
         assert not sa_db.exists()
@@ -128,7 +124,6 @@ def test_missing_store_without_profile_is_not_created_and_creates_nothing(
         dal, q="  private query  ", days=99999, limit=99999, offset=-5
     )
 
-    backend._get_conn.assert_not_called()
     assert result["available"] is False
     assert result["empty_reason"] == "store_not_created"
     assert result["days"] == 3650
@@ -151,7 +146,6 @@ def test_missing_store_with_empty_profile_is_not_created_without_mutation(
     result = sa_tools.get_sa_feed(dal)
 
     after = profile_db.stat()
-    backend._get_conn.assert_not_called()
     assert result["available"] is False
     assert result["empty_reason"] == "store_not_created"
     assert (after.st_size, after.st_mtime_ns) == (before.st_size, before.st_mtime_ns)
@@ -217,7 +211,6 @@ def test_missing_store_with_unreadable_history_fails_closed_as_missing(
 
     result = sa_tools.get_sa_feed(dal)
 
-    backend._get_conn.assert_not_called()
     assert result["available"] is False
     assert result["empty_reason"] == "store_missing"
     assert not sa_db.exists()
@@ -314,7 +307,6 @@ def test_directory_sa_store_is_unreadable(tmp_path, monkeypatch):
 
     result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_unreadable")
 
 
@@ -326,7 +318,6 @@ def test_broken_symlink_sa_store_is_unreadable(tmp_path, monkeypatch):
 
     result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_unreadable")
     assert sa_db.is_symlink()
 
@@ -339,7 +330,6 @@ def test_malformed_sa_store_is_unreadable(tmp_path, monkeypatch):
 
     result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_unreadable")
 
 
@@ -357,7 +347,6 @@ def test_sa_store_open_failure_is_unreadable_and_sanitized(tmp_path, monkeypatch
 
     result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_unreadable")
     assert marker not in repr(result)
     assert str(sa_db) not in repr(result)
@@ -389,7 +378,6 @@ def test_missing_required_feed_table_is_schema_incompatible(
 
     result = sa_tools.get_sa_feed(dal, q=None, days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_schema_incompatible", query=None)
 
 
@@ -400,7 +388,6 @@ def test_missing_required_feed_column_is_schema_incompatible(tmp_path):
 
     result = sa_tools.get_sa_feed(dal, q=None, days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_schema_incompatible", query=None)
 
 
@@ -411,7 +398,6 @@ def test_extra_feed_schema_remains_compatible(tmp_path):
 
     result = sa_tools.get_sa_feed(dal, days=30)
 
-    backend._get_conn.assert_not_called()
     assert result["available"] is True
     assert result["empty_reason"] == "no_items_in_window"
     assert result["total"] == 0
@@ -435,7 +421,6 @@ def test_post_validation_query_failure_is_typed_sanitized_and_preserves_request(
 
     result = sa_tools.get_sa_feed(dal, q="  private query  ", days=99999)
 
-    backend._get_conn.assert_not_called()
     _assert_store_failure(result, "store_query_failed")
     assert marker not in repr(result)
     assert str(sa_db) not in repr(result)
@@ -445,9 +430,6 @@ def test_unexpected_internal_failure_is_typed_sanitized_and_preserves_request():
     marker = "private failure at /tmp/sa-outer-catch.db"
 
     class UnexpectedBackend:
-        def _get_conn(self):
-            raise AssertionError("outer fallback must not touch PG")
-
         @property
         def _sa_db(self):
             raise RuntimeError(marker)

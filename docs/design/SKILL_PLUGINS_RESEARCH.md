@@ -5,8 +5,6 @@
 > **目的**: 研究 Anthropic Financial Services Plugins 架構，評估如何將類似能力整合到本專案
 > **調研日期**: 2026-03-23
 > **來源**: [anthropics/financial-services-plugins](https://github.com/anthropics/financial-services-plugins) (Apache 2.0, 6.7k stars)
-> **前置**: [AGENT_EVOLUTION_TRACKER.md](AGENT_EVOLUTION_TRACKER.md) Phase 13 (現有 Skills System)
-
 ---
 
 ## 1. Anthropic Financial Services Plugins 概覽
@@ -187,7 +185,7 @@ Deal sourcing, due diligence, IC memos, KPI monitoring 等 — 全部 PE 專用�
 
 | Skill | 適用? | 說明 |
 |-------|-------|------|
-| `portfolio-rebalancing` | ⚠️ | 再平衡分析 → RL pipeline 未來可能需要（註：RL→agent 整合 2026-06 已下架，見 RL_COLLAPSE_FINDINGS.md） |
+| `portfolio-rebalancing` | ⚠️ | 再平衡分析；目前未列入核心範圍。 |
 | `tax-loss-harvesting` | ⚠️ | 稅務虧損收割 → 與 CPPO risk 相關但目前非核心 |
 | `client-meeting-prep` | ❌ | 客戶會議 → 不適用 |
 | `financial-planning` | ❌ | 財務規劃 → 不適用 |
@@ -247,8 +245,6 @@ class SkillDefinition:
 2. **本地工具層** — 49 tools 直接可用，不依賴外部付費 MCP
 3. **Episodic Memory** — skill 分析結論可持久化（`save_memory()`），Anthropic plugins 沒有
 4. **Subagent 協作** — skill 可觸發 subagent delegation（reviewer, deep_researcher）
-5. ~~**RL Pipeline 整合** — skill 可讀取 RL 模型預測（`get_rl_prediction`）~~ — **歷史（2026-06-03）**：RL→agent 整合已下架（`get_rl_*` 工具移除，commits 94861f7+6b49c74），此優勢不再適用；見 RL_COLLAPSE_FINDINGS.md。
-
 ---
 
 ## 5. 升級設計建議

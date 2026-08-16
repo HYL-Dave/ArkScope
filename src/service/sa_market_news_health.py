@@ -125,7 +125,7 @@ def compute_market_news_health(
         return _db_unavailable_report(
             now,
             merged_thresholds,
-            error="SA capture local backend unavailable; PG sa_* health path is retired.",
+            error="SA capture local backend unavailable.",
         )
 
     try:
@@ -522,7 +522,7 @@ def _is_us_market_hours(now: datetime) -> bool:
 
 
 def _coerce_dt(value: Any) -> Optional[datetime]:
-    """Accept psycopg2 datetimes, ISO strings, or None."""
+    """Accept datetime values, ISO strings, or None."""
     if value is None:
         return None
     if isinstance(value, datetime):

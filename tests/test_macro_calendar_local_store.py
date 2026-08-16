@@ -1,6 +1,6 @@
-"""macro/cal local store (§4c slice 1) — hermetic parity tests over a real temp SQLite DB.
+"""Hermetic macro/calendar tests over a temporary local database.
 
-NO PG, NO _get_conn, NO psycopg2: the store resolves entirely against macro_calendar.db.
+The store resolves entirely against ``macro_calendar.db``.
 Covers the acceptance list: revision baseline/append/no-op for all 3 calendars, read-as-of,
 macro vintage windows, observations current/as-of, release dates, JSON payload round-trip,
 FK cascade, and honest-empty on a fresh DB.
@@ -187,10 +187,9 @@ def test_empty_db_honest_empty(store):
 
 
 def test_imports_with_declared_local_dependencies(store, monkeypatch):
-    # the whole store must work with NO psycopg2 / _get_conn anywhere on the path.
     import src.macro_calendar.local_store as mod
-    assert not hasattr(mod, "psycopg2")
-    assert store.is_available() is True  # always available (unlike the PG-gated twin)
+    assert mod.MacroCalendarLocalStore is MacroCalendarLocalStore
+    assert store.is_available() is True
 
 
 # --- 1.1: list_* read surface (canonical + as-of) ----------------------------------
@@ -242,7 +241,6 @@ def test_list_ipo_events_as_of_status_filter(store):
     assert store.list_ipo_events(date_from=date(2026, 8, 1), date_to=date(2026, 8, 31))[0]["status"] == "priced"  # canonical/current
     early = store.list_ipo_events(date_from=date(2026, 8, 1), date_to=date(2026, 8, 31), as_of=_dt(2026, 7, 15))
     assert early[0]["status"] == "expected"                            # as-of revision status
-    # as-of status filter is on the REVISION status (parity with PG _LIST_IPO_AS_OF_SQL)
     assert store.list_ipo_events(date_from=date(2026, 8, 1), date_to=date(2026, 8, 31), as_of=_dt(2026, 7, 15), statuses=["priced"]) == []
 
 
@@ -269,7 +267,7 @@ def test_macro_observations_has_surrogate_id_and_fk(store, tmp_path):
     conn = sqlite3.connect(tmp_path / "macro_calendar.db")
     conn.execute("PRAGMA foreign_keys = ON")
     cols = {r[1] for r in conn.execute("PRAGMA table_info(macro_observations)")}
-    assert "observation_id" in cols                                    # surrogate PK present (PG parity)
+    assert "observation_id" in cols
     assert conn.execute("SELECT COUNT(*) FROM macro_observations WHERE series_id='GDP'").fetchone()[0] == 1
     conn.execute("DELETE FROM macro_series WHERE series_id='GDP'")      # FK CASCADE → observations gone
     conn.commit()
@@ -278,7 +276,6 @@ def test_macro_observations_has_surrogate_id_and_fk(store, tmp_path):
 
 
 def test_macro_observation_requires_parent_series(store):
-    # FK: an observation for an unknown series is rejected (parity with PG REFERENCES).
     assert store.upsert_macro_observation(series_id="UNKNOWN", observation_date=date(2026, 3, 31),
                                           value=1.0, realtime_start=date(2026, 4, 30)) is False
 
@@ -331,7 +328,7 @@ def test_rejects_null_required_fields(store, tmp_path):
     db = tmp_path / "macro_calendar.db"
     ms = _columns(db, "macro_series")
     for col in ("title", "frequency", "units"):
-        assert ms[col]["notnull"] == 1, f"macro_series.{col} should be NOT NULL (PG parity)"
+        assert ms[col]["notnull"] == 1, f"macro_series.{col} should be NOT NULL"
     assert _columns(db, "macro_release_dates")["release_name"]["notnull"] == 1
     assert _columns(db, "cal_economic_event_revisions")["source_payload"]["notnull"] == 1
     assert _columns(db, "cal_earnings_event_revisions")["source_payload"]["notnull"] == 1

@@ -33,14 +33,12 @@ export function marketRoutingLabel(status: MarketDataStatus, t: SettingsT): stri
   if (status.use_local_market_setting) {
     return t(($) => $.dataStorage.routing.settingEnabledPendingDatabase);
   }
-  return t(($) => $.dataStorage.routing.localAuthorityLegacyFlagUnset);
+  return t(($) => $.dataStorage.routing.localAuthorityDefault);
 }
 
 export function macroRoutingLabel(status: MacroStatus, t: SettingsT): string {
-  // local_first_active = (toggle OR env). Routing is local the moment it's on — the store
-  // factory creates macro_calendar.db on first use and there is NO PG fallback in the local
-  // path. So toggle-on is "本地優先" even before the DB is built (queries return empty until
-  // the first collection fills it) — NOT a PG fallback.
+  // The store is created on first use. Until the first collection completes,
+  // reads return an honest empty result from the local store.
   if (!status.local_first_active) return t(($) => $.macroStorage.routing.snapshotOnly);
   const envNote = status.env_override ? t(($) => $.macroStorage.routing.envForced) : "";
   return status.exists
@@ -49,46 +47,40 @@ export function macroRoutingLabel(status: MacroStatus, t: SettingsT): string {
 }
 
 export function newsRoutingLabel(status: NewsStatus, t: SettingsT): string {
-  if (status.news_hard_local) return newsWriteRouteLabel(status, t);
   if (status.env_override) {
     return status.direct_active
       ? t(($) => $.newsStorage.routing.directEnvOn)
-      : t(($) => $.newsStorage.routing.pgMirrorEnvOff);
+      : t(($) => $.newsStorage.routing.directEnvOff);
   }
-  if (!status.direct_active) return t(($) => $.newsStorage.routing.pgSyncLocalMirror);
+  if (!status.direct_active) return t(($) => $.newsStorage.routing.localCompatibility);
   return status.setting_explicit
     ? t(($) => $.newsStorage.routing.directExplicit)
     : t(($) => $.newsStorage.routing.directDefault);
 }
 
 export function newsWriteRouteLabel(status: NewsStatus, t: SettingsT): string {
-  if (status.news_hard_local) return t(($) => $.newsStorage.routing.write.normalized);
   switch (status.write_route) {
     case "normalized":
-      return t(($) => $.newsStorage.routing.write.normalizedPreExit);
+      return t(($) => $.newsStorage.routing.write.normalized);
     case "legacy_local":
       return t(($) => $.newsStorage.routing.write.legacyLocal);
-    case "legacy_pg":
-      return t(($) => $.newsStorage.routing.write.legacyPg);
     case "blocked":
       return t(($) => $.newsStorage.routing.write.blocked);
     default:
-      return status.write_route;
+      unreachableCoverageValue(status.write_route);
+      return t(($) => $.newsStorage.routing.write.blocked);
   }
 }
 
-export function newsPostgresRouteLabel(status: NewsStatus, t: SettingsT): string {
-  if (status.news_hard_local) return t(($) => $.newsStorage.routing.postgres.exited);
-  return status.pg_news_route_available
-    ? t(($) => $.newsStorage.routing.postgres.available)
-    : t(($) => $.newsStorage.routing.postgres.unavailable);
+export function newsAuthorityLabel(_status: NewsStatus, t: SettingsT): string {
+  return t(($) => $.newsStorage.routing.authority.current);
 }
 
 export function newsReadSurfaceLabel(status: NewsStatus, t: SettingsT): string {
-  if (status.news_hard_local) return t(($) => $.newsStorage.routing.read.compatibility);
-  return status.direct_active
-    ? t(($) => $.newsStorage.routing.read.localDirect)
-    : t(($) => $.newsStorage.routing.read.pgMirror);
+  if (status.write_route === "normalized") {
+    return t(($) => $.newsStorage.routing.read.compatibility);
+  }
+  return t(($) => $.newsStorage.routing.read.localDirect);
 }
 
 function unreachableCoverageValue(value: never): void {

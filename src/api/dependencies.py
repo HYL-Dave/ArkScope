@@ -35,7 +35,7 @@ def get_profile_store():
     """Singleton local profile-state store (SQLite).
 
     Holds user research-universe state (followed / archived / notes) — local,
-    never the remote PG. Path overridable via ``ARKSCOPE_PROFILE_DB``; defaults
+    in the local profile store. Path overridable via ``ARKSCOPE_PROFILE_DB``; defaults
     to ``<repo>/data/profile_state.db``.
     """
     from src.profile_state import ProfileStateStore
@@ -48,7 +48,7 @@ def get_card_store():
     """Singleton local store for generated §2 AI card runs (same local SQLite).
 
     Auto-cached generated cards live alongside profile state in the local DB,
-    never the remote PG. Path overridable via ``ARKSCOPE_PROFILE_DB``.
+    in the local profile store. Path overridable via ``ARKSCOPE_PROFILE_DB``.
     """
     from src.card_runs import CardRunStore
 
@@ -60,7 +60,7 @@ def get_investor_profile_store():
     """Singleton Investor Profile store (same local SQLite as profile state).
 
     Track A personalization: durable investor profile + assistant stance live
-    in the local profile DB, never the remote PG. Path overridable via
+    in the local profile database. Path overridable via
     ``ARKSCOPE_PROFILE_DB``.
     """
     from src.investor_profile import InvestorProfileStore
@@ -152,7 +152,7 @@ def _portfolio_capture_write_allowed(action: str, detail: dict) -> bool:
 @lru_cache(maxsize=1)
 def get_thread_store():
     """Singleton local store for AI 研究 conversation threads/messages (same local
-    SQLite). Threads live alongside profile state in the local DB, never PG."""
+    SQLite). Threads live alongside profile state in the local database."""
     from src.research_threads import ResearchThreadStore
 
     return ResearchThreadStore(_local_state_db_path())

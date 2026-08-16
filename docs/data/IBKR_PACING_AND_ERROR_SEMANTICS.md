@@ -432,7 +432,6 @@ unknown for the current 15-minute collector.
 - `src/ibkr_gateway_lock.py`
 - installed `ib_insync` 0.9.86:
   `ib.py`, `wrapper.py`, and `client.py`
-- `docs/superpowers/specs/2026-07-28-price-collection-partial-truth-design.md`
 
 This rewrite deliberately excludes practitioner throughput claims. The prior
 draft's secondary-source survey did not establish a controlled

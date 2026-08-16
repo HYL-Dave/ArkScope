@@ -1,12 +1,7 @@
-"""
-sa_capture_store — schema + connection discipline for data/sa_capture.db (slice 3d).
+"""Schema and connection discipline for ``data/sa_capture.db``.
 
-The local WRITE-TARGET store for the Seeking-Alpha capture domain (sql/007-015
-ported). Unlike market_data.db (a PG read mirror), sa_capture.db becomes the
-AUTHORITY at cutover: captures land here first and PG never sees them again —
-so there is deliberately NO "rebuild from PG" affordance anywhere (it would
-destroy post-cutover captures), no PG read fallback, and validation against PG
-is one-shot at migration time only (locked runbook L1/L5).
+This is the write authority for Seeking Alpha captures. Captures land here
+first and all reads use the same local store.
 
 Writer process model: the native messaging host is a FRESH OS process per
 browser message, and the sidecar/CLI may read concurrently — so in-process
@@ -16,19 +11,17 @@ CASCADE is load-bearing for comment dedupe), and schema setup is cross-process
 safe (PRAGMA user_version fast-path; first-run DDL is fully idempotent, while
 versioned rebuilds are serialized and transactional — see ensure_schema).
 
-Type conventions (runbook §1 / SPEC §4.1.4):
-  - TIMESTAMPTZ → TEXT, ONE canonical format: UTC ISO-8601 seconds
+Type conventions:
+  - Timestamps use one canonical text format: UTC ISO-8601 seconds
     'YYYY-MM-DDTHH:MM:SS+00:00' (mark-stale becomes a lexicographic TEXT
     compare — format uniformity is correctness-critical; see canon_ts()).
-  - DATE → TEXT 'YYYY-MM-DD'; BOOLEAN → INTEGER 0/1; NUMERIC → REAL;
-    JSONB → TEXT (json.dumps); BIGSERIAL → INTEGER PRIMARY KEY (ids preserved
-    verbatim by the migration; AUTOINCREMENT-free rowid continues past max).
-  - TEXT[] → JUNCTION TABLES (locked L8 — queryable fields are never JSON
-    arrays): sa_market_news.tickers → sa_market_news_tickers;
+  - Dates use 'YYYY-MM-DD' text, booleans use INTEGER 0/1, numeric values use
+    REAL, structured data uses JSON text, and identifiers use INTEGER PRIMARY KEY.
+  - Queryable lists use junction tables rather than JSON arrays:
+    sa_market_news.tickers → sa_market_news_tickers;
     sa_comment_signals.ticker_mentions/candidate_mentions →
     sa_signal_ticker_mentions / sa_signal_candidate_mentions.
-  - PG tsvector GIN search → FTS5 external-content mirrors kept in sync by
-    triggers (porter+unicode61, the shipped 3b news precedent).
+  - Full-text search uses FTS5 external-content tables kept in sync by triggers.
 """
 
 from __future__ import annotations
@@ -50,8 +43,7 @@ USE_LOCAL_SA_KEY = "use_local_sa"  # profile_settings key for the persisted flip
 
 
 def resolve_sa_db_path() -> str:
-    """``ARKSCOPE_SA_DB`` or the default ``<repo>/data/sa_capture.db`` (runbook L1:
-    plan naming; absolute — the native host chdir's, but never rely on cwd)."""
+    """Return ``ARKSCOPE_SA_DB`` or the absolute default capture path."""
     return os.environ.get("ARKSCOPE_SA_DB") or str(_PROJECT_ROOT / "data" / "sa_capture.db")
 
 
@@ -67,7 +59,6 @@ def canon_ts(value) -> Optional[str]:
         s = value.strip().replace("Z", "+00:00")
         if not s:
             return None
-        # PG text dumps use short offsets ('+00', '+0530'); Python 3.10's
         # fromisoformat needs '+HH:MM' — normalize before parsing.
         if len(s) >= 3 and s[-3] in "+-" and s[-2:].isdigit():
             s += ":00"
@@ -549,7 +540,6 @@ def connect(db_path: Optional[str] = None, *, read_only: bool = False) -> sqlite
         if not Path(path).exists():
             # Fresh profile: the capture DB does not exist yet. Serve an empty
             # in-memory schema so readers get honest-empty rows without creating
-            # the file or falling back to the dropped PG sa_* tables.
             conn = sqlite3.connect(":memory:", timeout=10.0)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA busy_timeout = 10000")
@@ -685,8 +675,6 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 #
 # All sa_comment_signals writes for sa_capture.db go through upsert_comment_signal
 # so rule re-runs, the scheduler/job trigger, and tests share ONE path (instead of
-# SQL scattered through comment_signal_backfill). The PG equivalents stay in
-# comment_signal_backfill (raw psycopg2) for non-local mode; this is the local twin.
 # ---------------------------------------------------------------------------
 
 

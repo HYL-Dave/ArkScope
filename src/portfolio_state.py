@@ -1,6 +1,6 @@
 """Local portfolio/holdings state.
 
-Holdings are profile state: local SQLite, never PG, and never broker-authoritative
+Holdings are local profile state and are never broker-authoritative
 without an explicit sync path.
 """
 

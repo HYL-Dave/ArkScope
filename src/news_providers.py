@@ -1,4 +1,4 @@
-"""PG-exit 2c — Parquet-free news provider adapters + the use_local_news routing toggle.
+"""Parquet-free news provider adapters and the local-news routing toggle.
 
 The direct-local writer (`news_direct.backfill_news_direct`) wants a provider with
 ``fetch_news(ticker, since_iso) -> list[raw article dict]``. These adapters wrap the EXISTING
@@ -9,7 +9,7 @@ path writes only the local SQLite ``news`` table, no Parquet, and is cursored ag
 ``get_latest_timestamp``.
 
 The collector ``NewsArticle`` is mapped to the local news-row contract using the canonical SHA-256
-identity shared with the PG/mirror migration; ``description`` falls back to ``content``. Also here:
+identity used by the local store; ``description`` falls back to ``content``. Also here:
 ``use_local_news_enabled()`` — the default-ON routing toggle with explicit env/profile rollback,
 read standalone (no DAL) so the scheduler can consult it per source-run.
 """
@@ -58,7 +58,7 @@ def use_local_news_enabled() -> bool:
 
     Both true and false are explicit overrides. Unset defaults ON; setting either
     ``ARKSCOPE_USE_LOCAL_NEWS=false`` or profile ``use_local_news=false`` restores
-    the collector -> PG sync -> local mirror path.
+    collector storage path.
     """
     env_value = os.environ.get(ENV_USE_LOCAL_NEWS)
     if parse_news_toggle(env_value) is not None:

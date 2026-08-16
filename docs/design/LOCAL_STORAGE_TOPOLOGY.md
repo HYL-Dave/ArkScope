@@ -108,7 +108,7 @@ Default decisions:
 | High-frequency stream or bursty capture | Source DB/inbox first; canonical read model updates in batches. |
 | Paid-provider response | Must have a secondary cache or durable local write before returning success. |
 
-This keeps the app from slowly recreating a PG-style central write bottleneck inside one SQLite file.
+This keeps the app from slowly recreating a central write bottleneck inside one SQLite file.
 
 ---
 
@@ -142,18 +142,19 @@ The app can later support IBKR streaming or frequent polling, but that should no
 
 Do **not** start a broad source-DB split now.
 
-This does **not** defer PostgreSQL runtime retirement. These are separate decisions:
+The runtime is already local-only. More source files remain conditional: add
+`ibkr_capture.db`, `polygon_capture.db`, `finnhub_capture.db`, and similar owners
+only if writer contention, replay needs, or raw-capture isolation justify them.
 
-- **PG retirement is required:** normal app/runtime reads and writes should end in local stores; PG becomes archive/import/legacy.
-- **More source DBs are conditional:** add `ibkr_capture.db`, `polygon_capture.db`, `finnhub_capture.db`, etc. only if writer contention, replay needs, or raw-capture isolation justify them.
-
-The current split (`profile_state.db`, `market_data.db`, `sa_capture.db`) is enough to continue removing PG as long as the lock-safety rule above holds. If it stops holding, the answer is not to keep PG as the safety valve; the answer is to introduce the next local isolation boundary.
+The current split (`profile_state.db`, `market_data.db`, `sa_capture.db`) remains
+adequate while the lock-safety rule above holds. If it stops holding, introduce
+the next explicit local isolation boundary.
 
 So the immediate stance is:
 
-1. Continue PG runtime retirement.
-2. Require every new provider/collector to pass the provider-growth rule.
-3. Promote source DBs from "deferred" to implementation when lock telemetry, writer shape, or stream requirements justify it.
+1. Require every new provider or collector to pass the provider-growth rule.
+2. Promote source files from "deferred" to implementation when lock telemetry,
+   writer shape, or stream requirements justify it.
 
 Current priorities stay:
 
@@ -188,7 +189,7 @@ Until then, this remains a decision record and review checklist, not a broad imm
 ## 8. Related docs
 
 - `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` — active storage migration and collection plan.
-- `SA_CUTOVER_3D_RUNBOOK.md` — Seeking Alpha hard cutover to `sa_capture.db`.
+- `SA_EXTENSION_HEALTH_SETUP_BOUNDARY.md` — current Seeking Alpha native-host and local-storage boundary.
 - `SA_EXTENSION_ROADMAP.md` — SA capture source expansion plus runtime/embedded-browser prerequisite.
 - `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md` — storage architecture authority.
 - `ARKSCOPE_PROVIDER_CATALOG.md` — provider facts, streaming modes, cost/latency.

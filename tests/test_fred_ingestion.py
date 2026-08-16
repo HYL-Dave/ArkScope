@@ -354,7 +354,7 @@ class TestLatestOnlyIngestion:
         _patch_store(store, monkeypatch)
 
         stats = fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -385,7 +385,7 @@ class TestLatestOnlyIngestion:
         _patch_store(store, monkeypatch)
 
         fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -426,7 +426,7 @@ class TestLatestOnlyIngestion:
         _patch_store(store, monkeypatch)
 
         stats = fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -455,7 +455,7 @@ class TestLatestOnlyIngestion:
         _patch_store(store, monkeypatch)
 
         fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -488,7 +488,7 @@ class TestFullVintagesIngestion:
         _patch_store(store, monkeypatch)
 
         stats = fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -518,7 +518,7 @@ class TestFullVintagesIngestion:
         _patch_store(store, monkeypatch)
 
         fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -551,7 +551,7 @@ class TestFullVintagesIngestion:
         _patch_store(store, monkeypatch)
 
         fetch_fred_series(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             full_refresh=True,
         )
@@ -578,7 +578,7 @@ class TestReleaseDateIngestion:
 
         client.get_release_dates.side_effect = _release_dates
         stats = fetch_fred_release_dates(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
         )
         assert stats.release_dates_upserted == 2
@@ -596,7 +596,7 @@ class TestReleaseDateIngestion:
         ), monkeypatch)
         client = MagicMock(spec=FREDClient)
         stats = fetch_fred_release_dates(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
         )
         assert stats.release_dates_upserted == 0
@@ -615,7 +615,7 @@ class TestReleaseDateIngestion:
         client = MagicMock(spec=FREDClient)
         client.get_release_dates.return_value = []
         fetch_fred_release_dates(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
         )
         kwargs = client.get_release_dates.call_args.kwargs
@@ -630,7 +630,7 @@ class TestReleaseDateIngestion:
         client = MagicMock(spec=FREDClient)
         client.get_release_dates.return_value = []
         fetch_fred_release_dates(
-            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            dal=MagicMock(),
             client=client,
             limit=42,
         )
@@ -640,7 +640,6 @@ class TestReleaseDateIngestion:
 
 class TestUnavailableDal:
     def test_filebackend_uses_local_macro_store_not_unavailable(self, monkeypatch):
-        # After N9 batch-2, FileBackend/no _get_conn no longer makes macro
         # ingestion unavailable; the factory returns a local macro store.
         store = _FakeStore()
         _patch_store(store, monkeypatch)
@@ -854,7 +853,7 @@ class TestRealtimeChunking:
             entries=(CatalogEntry(series_id="DGS10", revision_strategy="latest_only", release_id=53),),
             observation_start=date(1990, 1, 1), release_date_lookback_years=10), monkeypatch)
 
-        stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+        stats = fetch_fred_series(dal=MagicMock(),
                                   series_ids=["DGS10"], client=fred, full_refresh=True)
 
         assert stats.errors == [], stats.errors           # adaptive bisection → no cap error
@@ -876,7 +875,7 @@ class TestRealtimeChunking:
             entries=(CatalogEntry(series_id="DGS10", revision_strategy="latest_only", release_id=53),),
             observation_start=date(1990, 1, 1), release_date_lookback_years=10), monkeypatch)
 
-        stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+        stats = fetch_fred_series(dal=MagicMock(),
                                   series_ids=["DGS10"], client=fred, full_refresh=True)
 
         assert stats.errors == [], stats.errors            # empty pre-ALFRED windows tolerated
@@ -897,7 +896,7 @@ class TestRealtimeChunking:
             entries=(CatalogEntry(series_id="DGS10", revision_strategy="latest_only", release_id=53),),
             observation_start=date(1990, 1, 1), release_date_lookback_years=10), monkeypatch)
 
-        stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+        stats = fetch_fred_series(dal=MagicMock(),
                                   series_ids=["DGS10"], client=fred, full_refresh=True)
 
         assert stats.errors == [], stats.errors
@@ -912,14 +911,13 @@ class TestRealtimeChunking:
         _patch_store(store, monkeypatch)
         _patch_catalog(_tiny_catalog(CatalogEntry(
             series_id="DGS10", revision_strategy="latest_only", release_id=53)), monkeypatch)
-        fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+        fetch_fred_series(dal=MagicMock(),
                           series_ids=["DGS10"], client=fred, full_refresh=False)
         assert len(fred.windows) == 1                      # narrow range → no bisection
 
 
 class TestFredIngestionLocalWrite:
-    """Slice 4 gap-closer: with use_local_macro ON, FRED ingestion writes the REAL local
-    store (factory + MacroCalendarLocalStore, no PG) — the FRED twin of the finnhub e2e."""
+    """FRED collection writes through the real local calendar store."""
 
     def test_fred_series_ingestion_writes_local_store(self, tmp_path, monkeypatch):
         from src.macro_calendar.local_store import MacroCalendarLocalStore
@@ -943,7 +941,6 @@ class TestFredIngestionLocalWrite:
         dal = DataAccessLayer()                            # toggle from env → local store
         stats = fetch_fred_series(dal=dal, client=client, full_refresh=True)
         assert stats.observations_upserted == 1 and not stats.errors
-        # observation + series metadata landed in the LOCAL db (no PG)
         got = MacroCalendarLocalStore(db).get_macro_observations("CPIAUCNS")
         assert got is not None and got["title"] == "CPI"
         assert [o["value"] for o in got["observations"]] == [312.332]

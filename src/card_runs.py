@@ -10,7 +10,7 @@ durable report (``research_reports`` via save_report) and flips status to
 pool of every generated card.
 
 Local-first: this lives in the same standalone SQLite DB as the profile-state
-store (``data/profile_state.db``), NOT the remote PG.
+store (``data/profile_state.db``).
 """
 
 from __future__ import annotations

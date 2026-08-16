@@ -22,8 +22,7 @@ evidence-oriented data layer. The following capabilities remain current:
   current desktop Settings surfaces.
 
 Storage-specific owners must continue to follow the current local SQLite and
-profile contracts. PostgreSQL remains an archive/import boundary, not an
-application runtime authority.
+profile contracts. Imported data must enter through a named local capability.
 
 ## 2. Retired implementations
 
@@ -83,4 +82,3 @@ exists.
 - [ARKSCOPE_TOOL_CATALOG.md](ARKSCOPE_TOOL_CATALOG.md)
 - [SCRIPTS_RETIREMENT_DECISION.md](SCRIPTS_RETIREMENT_DECISION.md)
 - [PHASE_D_ANALYSIS_PIPELINE_SKETCH.md](PHASE_D_ANALYSIS_PIPELINE_SKETCH.md)
-- [RL_COLLAPSE_FINDINGS.md](RL_COLLAPSE_FINDINGS.md)

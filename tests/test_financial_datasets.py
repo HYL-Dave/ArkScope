@@ -321,10 +321,8 @@ class TestCacheBackendMode:
         assert len(stmts) == 1 and stmts[0].revenue == 416161000000.0
 
     @patch("data_sources.financial_datasets_client.requests.get")
-    def test_api_result_written_to_backend_only(self, mock_get, tmp_path, monkeypatch):
-        # backend+file miss → API → the write goes ONLY to the backend (no file, and
-        # the client's own env-PG path must not be touched even if DATABASE_URL set).
-        monkeypatch.setenv("DATABASE_URL", "postgresql://must-not-be-used/db")
+    def test_api_result_written_to_backend_only(self, mock_get, tmp_path):
+        # Backend and file miss: the API result is written only to the backend.
         mock_resp = MagicMock()
         mock_resp.json.return_value = MOCK_INCOME_RESPONSE
         mock_resp.raise_for_status = MagicMock()
@@ -332,7 +330,6 @@ class TestCacheBackendMode:
         backend = _FakeCacheBackend()
         with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
             client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
-            client._db_upsert = lambda *a, **k: (_ for _ in ()).throw(AssertionError("env-PG used"))
             stmts = client.get_income_statements("AAPL", period="annual", limit=1)
         assert len(stmts) == 1
         assert backend.set_calls == [{"cache_key": "income_AAPL_annual", "ticker": "AAPL",

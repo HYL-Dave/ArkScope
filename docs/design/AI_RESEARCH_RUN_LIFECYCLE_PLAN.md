@@ -388,7 +388,7 @@ Build the backend store and API with tests:
 - `research_runs` / `research_run_events`;
 - create/status/events/cancel routes;
 - idempotent and local-only behavior;
-- no PG writes;
+- local-only writes;
 - active-run summary on thread list.
 
 Use polling replay first if SSE tailing adds too much risk. Polling every 1-2s

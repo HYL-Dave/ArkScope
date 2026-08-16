@@ -1,26 +1,8 @@
-"""Local-primary store for app-records — research_reports / agent_memories / agent_queries.
+"""Local store for research reports, agent memories, and agent queries.
 
-PG-exit Slice 1: these are the PG-only, user/agent-authored, NOT-regenerable records (unlike
-market data, which is re-fetchable). This SQLite store lives in ``profile_state.db`` (the local
-app-state DB — same home + path helper as ProfileStateStore / CardRunStore / CredentialStore) and
-is the local twin of ``db_backend``'s app-record surface, returning the SAME shapes so it is a
-drop-in once the DAL routes to it (Slice 1b):
-
-- ``query_reports`` / ``query_memories`` / ``list_memories_meta`` → pandas DataFrames with the
-  exact columns db_backend returns; ``tickers`` / ``tags`` are Python lists (JSON-text ↔ list, the
-  parity psycopg2 gives for ``TEXT[]``); ``created_at`` is ``'YYYY-MM-DDTHH:MM:SS'`` (matches the
-  PG ``TO_CHAR`` reads).
-- inserts return the new id (``INTEGER PRIMARY KEY AUTOINCREMENT`` ↔ ``BIGSERIAL``).
-
-PG-ism port: BIGSERIAL→AUTOINCREMENT; TEXT[]→JSON text; JSONB→TEXT; TIMESTAMPTZ→ISO TEXT;
-``= ANY(arr)`` / ``arr && arr`` overlap filters → applied in Python after the SQL date/category
-filter (app-records are low-volume); PG full-text (``to_tsvector``/``plainto_tsquery``) → a
-case-insensitive substring match over title+content (documented v1 simplification — ranked FTS can
-come later if volume warrants). Inserts accept an optional ``created_at`` (keyword) so the Slice-1c
-PG→local migration can preserve each record's ORIGINAL timestamp; it defaults to now (parity with
-``DEFAULT NOW()``).
-
-Slice 1a is the store only — no DAL wiring, no migration.
+Records live in ``profile_state.db``. List-valued fields are stored as JSON text,
+timestamps use second-resolution UTC text, and low-volume search uses a
+case-insensitive substring match over title and content.
 """
 
 from __future__ import annotations
@@ -37,11 +19,6 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Legacy provenance key for app-records routing. Runtime defaults local after
-# PG-exit closeout; retained to record old profile state rather than to gate routing.
-USE_LOCAL_RECORDS_KEY = "use_local_records"
-ENV_USE_LOCAL_RECORDS = "ARKSCOPE_USE_LOCAL_RECORDS"
-
 _REPORT_COLS = ["id", "title", "tickers", "report_type", "summary", "conclusion",
                 "confidence", "model", "file_path", "tool_calls", "duration_seconds", "created_at"]
 _MEM_COLS = ["id", "title", "content", "category", "tickers", "tags", "importance", "source", "created_at"]
@@ -51,7 +28,7 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS research_reports (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     title            TEXT NOT NULL,
-    tickers          TEXT,            -- JSON array (TEXT[] in PG)
+    tickers          TEXT,            -- JSON array
     report_type      TEXT,
     summary          TEXT,
     conclusion       TEXT,
@@ -59,7 +36,7 @@ CREATE TABLE IF NOT EXISTS research_reports (
     provider         TEXT,
     model            TEXT,
     file_path        TEXT,
-    tools_used       TEXT,            -- JSON array (JSONB in PG)
+    tools_used       TEXT,            -- JSON array
     tool_calls       INTEGER,
     duration_seconds REAL,
     tokens_in        INTEGER,
@@ -101,7 +78,7 @@ CREATE TABLE IF NOT EXISTS agent_queries (
 
 
 def _now_iso() -> str:
-    """UTC now in the PG TO_CHAR read format ('YYYY-MM-DDTHH:MM:SS', no tz/micros)."""
+    """UTC timestamp with second precision and no offset suffix."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
@@ -110,7 +87,7 @@ def _json_or_none(v: Optional[List[str]]) -> Optional[str]:
 
 
 def _list(v: Any) -> List[str]:
-    """JSON-text → list (parity with psycopg2's TEXT[] → list); tolerant of NULL / bad JSON."""
+    """Decode a JSON list, tolerating null and malformed values."""
     if not v:
         return []
     if isinstance(v, list):
@@ -123,7 +100,7 @@ def _list(v: Any) -> List[str]:
 
 
 class AppRecordsLocalStore:
-    """SQLite app-records store over ``profile_state.db`` (local-primary; no PG)."""
+    """SQLite app-records store over ``profile_state.db``."""
 
     def __init__(self, db_path: str | Path, *, create: bool = True):
         self._db_path = str(db_path)
@@ -195,7 +172,7 @@ class AppRecordsLocalStore:
         vals: tuple = (title, _json_or_none(tickers), report_type, summary, conclusion, confidence,
                        provider, model, file_path, _json_or_none(tools_used), tool_calls,
                        duration_seconds, tokens_in, tokens_out, created_at or _now_iso())
-        if id is not None:  # id-preserving (PG→local migration, gate #2)
+        if id is not None:
             cols, vals = "id," + cols, (id,) + vals
         return self._exec_insert("research_reports", cols, vals, id, conn)
 
@@ -263,7 +240,7 @@ class AppRecordsLocalStore:
             clause, params = "created_at >= ?", [self._cutoff(days, today)]
             if category:
                 clause += " AND category = ?"; params.append(category)
-            if query.strip():  # substring over title+content (v1 simplification vs PG FTS)
+            if query.strip():
                 clause += " AND (lower(title) LIKE ? OR lower(content) LIKE ?)"
                 like = f"%{query.strip().lower()}%"; params += [like, like]
             rows = conn.execute(
@@ -321,7 +298,7 @@ class AppRecordsLocalStore:
         finally:
             conn.close()
 
-    # --- agent_queries (write-only log, mirrors db_backend) -------------------------
+    # --- agent_queries --------------------------------------------------------------
 
     def insert_agent_query(self, question: str, answer: Optional[str] = None,
                            provider: Optional[str] = None, model: Optional[str] = None,
@@ -372,7 +349,7 @@ class AppRecordsLocalStore:
     def raw_rows(self, table: str) -> List[Dict[str, Any]]:
         """All rows of ``table`` as raw column dicts (for migration hashing / collision guard).
         Raw means stored representation (tickers/tags as JSON text) — NOT the list-decoded read
-        shape — so a PG source row and the migrated local row hash identically. No-create-safe:
+        shape so equivalent local rows hash identically. No-create-safe:
         absent DB or table → [] (never materializes the file)."""
         if table not in self.MIGRATE_TABLES:
             raise ValueError(f"unknown table: {table}")
@@ -421,12 +398,5 @@ def resolve_profile_state_db_path(dal: Any = None) -> str:
 
 
 def get_app_records_store(dal: Any):
-    """Return the post-PG-exit local app-records store.
-
-    Closeout ruling (2026-07-05): the three PG app-record tables (agent_queries /
-    research_reports / agent_memories) are accepted as archive-only — never a runtime
-    target. Routing therefore always resolves to ``AppRecordsLocalStore`` over
-    profile_state.db, including for dals with the legacy flag unset/false and for
-    older/test doubles lacking the flag entirely (no fresh-profile PG stranding).
-    The legacy ``use_local_records`` value is provenance only."""
+    """Return the app-records store in ``profile_state.db``."""
     return AppRecordsLocalStore(resolve_profile_state_db_path(dal))

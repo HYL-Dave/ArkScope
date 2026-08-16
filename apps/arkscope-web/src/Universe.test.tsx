@@ -32,7 +32,7 @@ const SOURCE_THEME = "theme:Momentum/RAW";
 const UNKNOWN_FACET = "source_custom_axis";
 const UNKNOWN_VALUE = "UNKNOWN VALUE / %2F";
 const UNKNOWN_SOURCE = "provider:RAW/v1";
-const RAW_ERROR = "RAW backend failure postgres://admin:secret@10.0.0.8/universe";
+const RAW_ERROR = "RAW backend failure token=secret universe";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 
 const LISTS: WatchlistSummary[] = [

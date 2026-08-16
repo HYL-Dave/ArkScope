@@ -235,8 +235,8 @@ def jobs_history(
 ):
     """Paginated history of recorded job runs (newest first).
 
-    Reads from the ``job_runs`` table (sql/011). When DB is unavailable
-    or the DAL is on FileBackend, returns an empty list with count=0.
+    Reads from durable local job history. When that store is unavailable,
+    returns an empty list with count=0.
     """
     store = get_job_runs_store(dal)
     rows = [

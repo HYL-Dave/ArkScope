@@ -59,7 +59,7 @@ const SOURCE_NEWER_STATE_LIST = "SOURCE NEWER STATE LIST / 保留";
 const SOURCE_NEWER_NOTE_BODY = "SOURCE NEWER NOTE READ / 保留";
 const SOURCE_NEWER_TAG_VALUE = "SOURCE NEWER TAG CATALOG / 保留";
 const UNKNOWN_SOURCE_PATH = "future_source_v9";
-const RAW_ERROR = "RAW postgres://admin:secret@10.0.0.8/ticker";
+const RAW_ERROR = "RAW backend failure token=secret ticker";
 const RAW_DIAGNOSTIC = "Authorization: Bearer sk-private\nTraceback /srv/private.py:42";
 
 const ZH_OVERVIEW_KV_LABELS = [
@@ -194,7 +194,7 @@ const FUNDAMENTALS: FundamentalsResult = {
   balance_sheet: [{ ...STATEMENT, data: { "SOURCE Total assets / 資產": 999 } }],
   cash_flow_statements: [{ ...STATEMENT, data: { "SOURCE Free cash flow / 現金": 888 } }],
   snapshot: { SOURCE_SNAPSHOT_KEY: "SOURCE_SNAPSHOT_VALUE" },
-  source_path: "pg_fallback",
+  source_path: "local_cache",
 };
 
 const COVERAGE: MarketDataCoverage = {
@@ -213,7 +213,6 @@ const STATUS: MarketDataStatus = {
   financial_cache: { row_count: 1, valid_count: 1, expired_count: 0, latest_fetched_at: "SOURCE_FETCH_TIME" },
   sync: { prices: null, news: null, fundamentals: null },
   prices_authority: "local",
-  price_mirror_retired: true,
   fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: true,
   env_override: false,
@@ -221,7 +220,6 @@ const STATUS: MarketDataStatus = {
   strict_env_override: false,
   strict_enabled: false,
   routing_enabled: true,
-  pg_fallback_active: true,
 };
 
 const NOTES: Note[] = [
@@ -830,7 +828,7 @@ describe("Ticker Detail localization", () => {
     const sourceLabel = Array.from(host!.querySelectorAll("dt"))
       .find((node) => node.textContent === "基本面 · 本次來源")!;
     const sourceValue = sourceLabel.nextElementSibling;
-    expect(sourceValue?.textContent).toBe("PG（本地缺→回退）");
+    expect(sourceValue?.textContent).toBe("已儲存的 SEC 基本面");
     main.scrollTop = 411;
     refreshButton.focus();
     const before = requestCounts();
@@ -841,7 +839,7 @@ describe("Ticker Detail localization", () => {
     expect(buttonByText("Refresh")).toBe(refreshButton);
     expect(sourceLabel.textContent).toBe("Fundamentals · Source this time");
     expect(sourceLabel.nextElementSibling).toBe(sourceValue);
-    expect(sourceValue?.textContent).toBe("PG (local missing → fallback)");
+    expect(sourceValue?.textContent).toBe("Stored SEC fundamentals");
     expect(document.activeElement).toBe(refreshButton);
     expect(main.scrollTop).toBe(411);
     expect(requestCounts()).toEqual(before);

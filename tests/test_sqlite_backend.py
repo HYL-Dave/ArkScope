@@ -382,12 +382,11 @@ def test_provenance_fundamentals_records_none_after_mirror_retirement(
     assert provenance.read("fundamentals") == "none"
 
 
-def test_inherited_vs_overridden_methods(market_db):
+def test_local_backend_exposes_required_methods(market_db):
     db, _ = market_db
     b = _make(db)
     assert type(b) is LocalMarketBackend
     assert not hasattr(b, "_dsn")
-    assert not hasattr(b, "_get_conn")
     assert callable(b.query_prices)
     assert callable(b.query_news)
     assert callable(b.query_news_search)

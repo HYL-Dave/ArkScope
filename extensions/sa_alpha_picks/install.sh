@@ -50,18 +50,11 @@ else
     PYTHON_PATH="$(which python3 2>/dev/null)"
 fi
 
-# Verify the interpreter can import psycopg2 (needed by DAL)
-if [ -n "$PYTHON_PATH" ] && "$PYTHON_PATH" -c "import psycopg2" 2>/dev/null; then
-    echo "Python: $PYTHON_PATH (psycopg2 OK)"
-else
-    echo "WARNING: $PYTHON_PATH cannot import psycopg2."
-    echo "  Enter the full path to your virtualenv's python3:"
-    read -p "  Python path: " PYTHON_PATH
-    if ! "$PYTHON_PATH" -c "import psycopg2" 2>/dev/null; then
-        echo "ERROR: $PYTHON_PATH still cannot import psycopg2."
-        exit 1
-    fi
+if [ -z "$PYTHON_PATH" ] || [ ! -x "$PYTHON_PATH" ]; then
+    echo "ERROR: no usable Python interpreter found."
+    exit 1
 fi
+echo "Python: $PYTHON_PATH"
 
 # Install stable launcher and repo-specific config.
 mkdir -p "$LAUNCHER_DIR" "$CONFIG_DIR"

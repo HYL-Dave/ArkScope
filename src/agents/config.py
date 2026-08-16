@@ -139,8 +139,8 @@ class AgentConfig(BaseModel):
     # Free macro/calendar layer (FRED + Finnhub calendars).
     # Gates registration of fetch_fred_series / fetch_fred_release_dates jobs
     # so an environment without FRED_API_KEY doesn't get them surfaced via
-    # /jobs/status. Calendar tables in sql/013 always exist; the flag only
-    # controls the ingestion jobs.
+    # /jobs/status. Local calendar storage is always available; the flag only
+    # controls ingestion jobs.
     macro_calendar_enabled: bool = False
 
     # P1.4 Phase B client-side compaction (separate from server_compaction).

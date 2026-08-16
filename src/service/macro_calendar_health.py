@@ -63,8 +63,7 @@ _SEVERITY_RANK = {
 }
 
 
-# Per-job expected cadence (seconds). Derived from the cadences documented
-# in P1_2_SPEC.md §4. backfill is one-shot — no cadence — so health rules
+# Per-job expected cadence (seconds). Backfill is one-shot, so health rules
 # only flag never_run for it.
 _JOB_CADENCES_SECONDS: Dict[str, Optional[int]] = {
     "fetch_economic_calendar_recent": 3600,           # hourly

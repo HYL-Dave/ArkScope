@@ -1,13 +1,11 @@
 # Design Docs — Index & Status Map
 
-The problem this fixes: filenames like `P1_2_SPEC.md` don't tell you whether a doc
-is **current authority, a shipped-feature reference, a decision record, deferred
-v2 design, or a process journal**. This index maps every `docs/design/*.md` to a
-**readable title + status + one-line**, so you don't guess from the filename.
+This index distinguishes current authority, shipped-feature references,
+decision records, deferred designs, and process journals so filenames are not
+mistaken for status.
 
-**Maintenance rule:** when you add/retire/repurpose a design doc, update its row
-here in the same commit. (`docs/design/archive/` is a provenance stub — its
-contents were removed 2026-06-07, recoverable via git.)
+**Maintenance rule:** when you add, retire, or repurpose a design doc, update
+its row here in the same commit. Git history is the recovery record.
 
 ### Status legend
 | Status | Meaning |
@@ -48,7 +46,7 @@ contents were removed 2026-06-07, recoverable via git.)
 | `DESKTOP_APP_VISION_DRAFT.md` | **Desktop App Vision** | ACTIVE | UI/UX + product-surface intent above the SPEC. |
 | `DESKTOP_APP_CARRYOVER_ANALYSIS.md` | **Desktop Carryover Matrix** | ACTIVE | 87-component preserve/adapt/concept/defer/drop matrix for the migration. |
 | `DESKTOP_SHELL_SPIKE_PLAN.md` | **Desktop Shell Spike Plan** | ACTIVE | Electron+React shell over the FastAPI sidecar (repo layout, lifecycle). |
-| `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE (DRAFT) | 3 collection modes · 3-way SQLite split · explicit PG runtime-retirement track · price tiers · scheduler/data-update repositioning. |
+| `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE | Collection modes · explicit SQLite ownership · provider completeness · scheduler/data-update contracts. |
 | `LOCAL_STORAGE_TOPOLOGY.md` | **Local Storage Topology** | DECISION | Source DB vs canonical DB principle; provider-growth review rule for deciding when a new source needs its own DB/inbox. |
 | `LLM_AUTH_DRIVER_PLAN.md` | **LLM Auth Driver Plan** | ACTIVE | API-key vs OAuth/setup-token driver realities, token-store rules, Slice 7 Claude subscription driver, and why Claude setup-token needs a tool bridge. |
 | `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md` | **AI Research Context & Memory Plan** | ACTIVE | C-2c thread-context principles: complete transcript, no silent truncation, configurable memory policies, strategy/skill/tool extensibility roadmap. |
@@ -61,7 +59,6 @@ contents were removed 2026-06-07, recoverable via git.)
 |---|---|---|---|
 | `SA_ALPHA_PICKS_CONTENT_CAPTURE.md` | **SA Article Capture** | REFERENCE | How the extension scrapes SA articles → markdown via the native host. |
 | `SA_COMMENT_INTELLIGENCE_PLAN.md` | **SA Comment Intelligence** | SHIPPED (stage 1) | Turning SA comments into community signal. |
-| `SA_CUTOVER_3D_RUNBOOK.md` | **SA Cutover 3d Runbook** | SHIPPED | PG → `data/sa_capture.db` hard cutover (executed 2026-06-13) + follow-up #1 (comment-signal port, `get_sa_comment_focus`, v1.2 stopwords). |
 | `SA_EVIDENCE_FEED_C1_SPEC.md` | **SA Evidence Feed (C-1)** | SHIPPED | `GET /sa/feed` + `get_sa_feed` tool + News-surface SA filter. |
 | `SA_EXTENSION_ROADMAP.md` | **SA Extension Roadmap** | ACTIVE | Incremental roadmap for SA extension data coverage. |
 
@@ -71,9 +68,6 @@ contents were removed 2026-06-07, recoverable via git.)
 | File | Read as | One-line |
 |---|---|---|
 | `P0_1_FULL_V1_SPEC.md` | **Replay Harness Spec** | Dual-provider replay safety net (`tests/test_replay_fixtures.py`) that protects refactors. |
-| `P1_2_SPEC.md` | **Macro / Calendar Spec** | FRED+Finnhub macro/calendar data layer + as-of/lookahead semantics (delivered). |
-| `P1_2_PROVIDER_DISCOVERY.md` | **Macro / Calendar Provider Discovery** | FRED/Finnhub free-tier behavior facts (feed → Provider Catalog, then archive). |
-| `P1_3_SPEC.md` | **Seeking Alpha Digest Workflow** | Deterministic SA evidence-pack tool — *reads the existing extension/DB, not a new crawler*. |
 | `P1_4_SPEC.md` | **Context Compression Spec** | In-prompt compression + on-disk retention; agent long-context foundation. |
 | `MULTI_FACTOR_SIGNAL_DETECTION.md` | **Multi-Factor Signal Detection** | Historical design record; implementation retired, future Signals requires new research gates. |
 
@@ -81,7 +75,6 @@ contents were removed 2026-06-07, recoverable via git.)
 | File | Read as | One-line |
 |---|---|---|
 | `P1_5_S3_OSS_SPIKE_DECISION.md` | **System Health Dashboard Decision** | Why not sqladmin/Superset; repositioned to a small ops/health view *inside* the workbench. |
-| `RL_COLLAPSE_FINDINGS.md` | **RL Collapse Findings** | Why the unvalidated RL implementation was retired; Git history is the code archive. |
 
 ## DEFERRED (v2) / PAUSED
 | File | Read as | Status | One-line |
@@ -93,18 +86,8 @@ contents were removed 2026-06-07, recoverable via git.)
 ## Agent-layer reference (keep; refresh pre-pivot framing)
 | File | Read as | Status | One-line |
 |---|---|---|---|
-| `AGENT_EVOLUTION_TRACKER.md` | **Agent Evolution Tracker** | REFERENCE | Historical record of agent-system phases/decisions (predates canon — point at canon). |
 | `AI_AGENT_ARCHITECTURE_PATTERNS.md` | **Agent Architecture Patterns** | REFERENCE | Dexter-derived reusable patterns (scratchpad, token budget, subagents). |
 | `SKILL_PLUGINS_RESEARCH.md` | **Skills & Plugins Research** | REFERENCE | Research on Anthropic financial plugins vs our Skills system. |
-
-## MERGE candidates (process journals — fold into canon/history, don't treat as authority)
-| File | Read as | One-line |
-|---|---|---|
-| `LOCAL_FIRST_RESEARCH_WORKBENCH_AUDIT.md` | **Pre-Spec Pivot Audit** | Factual base that fed the SPEC; SPEC now supersedes. |
-
-*(2026-07 docs sweep: the two 2026-05/06 docs-cleanup journals were folded into
-`docs/PROJECT_HISTORY.md` §"Docs governance lineage" and deleted — git history is the
-archive. Current sweep records: `REPO_HYGIENE_AUDIT_2026_07.md` + `DOCS_SWEEP_DISPOSITION_2026_07.md`.)*
 
 ---
 
