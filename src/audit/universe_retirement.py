@@ -911,7 +911,7 @@ def _load_production_overview_tickers() -> tuple[str, ...]:
         from src.tools.analysis_tools import get_watchlist_overview
         from src.tools.data_access import DataAccessLayer
 
-        overview = get_watchlist_overview(DataAccessLayer(db_dsn="auto"))
+        overview = get_watchlist_overview(DataAccessLayer())
         rows = overview.get("tickers") if isinstance(overview, Mapping) else None
         if not isinstance(rows, list):
             raise OverviewUnavailable

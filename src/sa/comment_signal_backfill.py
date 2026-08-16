@@ -1,7 +1,7 @@
 """Backfill / incremental extraction job for SA comment signals.
 
 Reads ``sa_article_comments``, applies ``CommentSignalExtractor``, writes
-to ``sa_comment_signals`` (sql/012). Default mode extracts only the
+to ``sa_comment_signals``. Default mode extracts only the
 pending tail (comments without a signal row at the current rule-set
 version), so incremental runs are cheap.
 
@@ -10,16 +10,13 @@ Alpha Picks symbols (current and closed). Symbols outside this universe
 become ``candidate_mentions`` rather than ``ticker_mentions``.
 
 Wired into ``src/service/jobs.py`` as the ``extract_sa_comment_signals``
-job so each run lands in ``job_runs`` (sql/011) for observability.
+job so each run lands in the local ``job_runs`` store for observability.
 """
 
 from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional, Set
-
-import psycopg2
-import psycopg2.extras
 
 from src.sa.comment_signals import (
     RULE_SET_VERSION,
@@ -51,13 +48,11 @@ def build_ticker_universe(dal: Any) -> Set[str]:
         logger.warning("build_ticker_universe: watchlist read failed: %s", exc)
 
     backend = getattr(dal, "_backend", None)
-    sa_db = getattr(backend, "_sa_db", None)
-    if isinstance(sa_db, str) and sa_db:
-        # SA-local: read Alpha Picks symbols from sa_capture.db, NOT the frozen PG.
+    if backend is not None:
         try:
             from src import sa_capture_store as store
 
-            conn = store.connect(sa_db, read_only=True)
+            conn = store.connect(backend._sa_db, read_only=True)
             try:
                 rows = conn.execute(
                     "SELECT DISTINCT symbol FROM sa_alpha_picks WHERE symbol IS NOT NULL"
@@ -68,20 +63,7 @@ def build_ticker_universe(dal: Any) -> Set[str]:
                 if row[0]:
                     universe.add(row[0].upper())
         except Exception as exc:
-            logger.warning("build_ticker_universe: alpha picks (sqlite) read failed: %s", exc)
-    elif backend is not None and hasattr(backend, "_get_conn"):
-        try:
-            conn = backend._get_conn()
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT DISTINCT symbol FROM sa_alpha_picks WHERE symbol IS NOT NULL"
-                )
-                rows = cur.fetchall()
-            for row in rows:
-                if row[0]:
-                    universe.add(row[0].upper())
-        except Exception as exc:
-            logger.warning("build_ticker_universe: alpha picks read failed: %s", exc)
+            logger.warning("build_ticker_universe: local Alpha Picks read failed: %s", exc)
 
     return universe
 
@@ -101,9 +83,8 @@ def run_backfill(
     """Extract signals for all pending comments and upsert into the table.
 
     Args:
-        dal: DataAccessLayer; must be backed by a DatabaseBackend.
-        batch_size: rows per fetch loop. 500 is a sweet spot for psycopg2
-            on the remote DB (low memory, low round-trip count).
+        dal: DataAccessLayer backed by the current local capability.
+        batch_size: rows per local transaction.
         max_extracted: optional cap so an ad-hoc CLI run can short-circuit
             after N rows for testing.
         rule_set_version: pins the run; pending = comments without a row
@@ -115,20 +96,9 @@ def run_backfill(
         seen this run, for sanity checking).
     """
     backend = getattr(dal, "_backend", None)
-    # follow-up #1 (was the locked-3d L3 paused second writer): when use_local_sa is
-    # on, route to the sa_capture.db (SQLite) twin. Writes go through the
-    # sa_capture_store choke-point — never the frozen PG, so no split-brain.
-    # (_sa_db is duck-typed as the sa_capture.db path string; the isinstance check
-    # keeps non-str test doubles / mock attributes from tripping this.)
-    sa_db = getattr(backend, "_sa_db", None)
-    if isinstance(sa_db, str) and sa_db:
-        return _run_backfill_sqlite(
-            dal, sa_db, batch_size=batch_size,
-            max_extracted=max_extracted, rule_set_version=rule_set_version,
-        )
-    if backend is None or not hasattr(backend, "_get_conn"):
+    if backend is None:
         return {
-            "error": "DB unavailable (DAL is not on DatabaseBackend)",
+            "error": "SA capture local backend unavailable",
             "extracted_count": 0,
             "total_pending": 0,
             "universe_size": 0,
@@ -136,69 +106,28 @@ def run_backfill(
             "batch_count": 0,
         }
 
-    universe = build_ticker_universe(dal)
-    extractor = CommentSignalExtractor(
-        universe=universe, rule_set_version=rule_set_version,
-    )
-
-    conn = backend._get_conn()
-    total_pending = _count_pending(conn, rule_set_version)
-    if total_pending == 0:
+    try:
+        sa_db = backend._sa_db
+    except AttributeError:
         return {
+            "error": "SA capture local backend unavailable",
             "extracted_count": 0,
             "total_pending": 0,
-            "universe_size": len(universe),
+            "universe_size": 0,
             "rule_set_version": rule_set_version,
             "batch_count": 0,
-            "sample_high_score": 0.0,
         }
-
-    extracted = 0
-    batch_count = 0
-    sample_high_score = 0.0
-    last_id = 0
-
-    cap_reached = False
-    while not cap_reached:
-        rows = _fetch_pending_batch(
-            conn, last_id=last_id, limit=batch_size,
-            rule_set_version=rule_set_version,
-        )
-        if not rows:
-            break
-
-        for row in rows:
-            row_id, article_id, comment_id, text, upvotes = row
-            signals = extractor.extract(text or "", upvotes=upvotes or 0)
-            _upsert_signal(
-                conn,
-                row_id=row_id,
-                article_id=article_id,
-                comment_id=comment_id,
-                signals=signals,
-            )
-            extracted += 1
-            sample_high_score = max(sample_high_score, signals.high_value_score)
-            last_id = max(last_id, row_id)
-            if max_extracted is not None and extracted >= max_extracted:
-                logger.info("run_backfill: max_extracted=%d reached", max_extracted)
-                cap_reached = True
-                break
-
-        batch_count += 1
-
-    return {
-        "extracted_count": extracted,
-        "total_pending": total_pending,
-        "universe_size": len(universe),
-        "rule_set_version": rule_set_version,
-        "batch_count": batch_count,
-        "sample_high_score": sample_high_score,
-    }
+    return _run_backfill_sqlite(
+        dal,
+        sa_db,
+        batch_size=batch_size,
+        max_extracted=max_extracted,
+        rule_set_version=rule_set_version,
+    )
 
 
 # ---------------------------------------------------------------------------
-# SA-local twin (follow-up #1): extract into sa_capture.db via the store choke-point
+# Extract into sa_capture.db through the store choke point
 # ---------------------------------------------------------------------------
 
 
@@ -210,11 +139,14 @@ def _run_backfill_sqlite(
     max_extracted: Optional[int],
     rule_set_version: str,
 ) -> Dict[str, Any]:
-    """SA-local twin of run_backfill — same loop shape, but reads/writes
+    """Read and write comment signals through the local capture store.
+
+    The loop
     sa_capture.db through the sa_capture_store signal API. Each batch is one
     transaction (``with conn:``) so scalar + junction writes commit together;
     a crash rolls back the whole batch (re-extracted on rerun), never a
-    half-updated comment. Never opens a PG connection."""
+    half-updated comment.
+    """
     from src import sa_capture_store as store
 
     universe = build_ticker_universe(dal)
@@ -275,81 +207,3 @@ def _run_backfill_sqlite(
         }
     finally:
         conn.close()
-
-
-# ---------------------------------------------------------------------------
-# Internals (PG mode)
-# ---------------------------------------------------------------------------
-
-
-def _count_pending(conn, rule_set_version: str) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT COUNT(*) FROM sa_article_comments c
-            WHERE NOT EXISTS (
-                SELECT 1 FROM sa_comment_signals s
-                WHERE s.comment_row_id = c.id
-                  AND s.rule_set_version = %s
-            )
-            """,
-            (rule_set_version,),
-        )
-        return int(cur.fetchone()[0])
-
-
-def _fetch_pending_batch(conn, *, last_id: int, limit: int, rule_set_version: str):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT c.id, c.article_id, c.comment_id, c.comment_text, c.upvotes
-            FROM sa_article_comments c
-            WHERE c.id > %s
-              AND NOT EXISTS (
-                  SELECT 1 FROM sa_comment_signals s
-                  WHERE s.comment_row_id = c.id
-                    AND s.rule_set_version = %s
-              )
-            ORDER BY c.id
-            LIMIT %s
-            """,
-            (last_id, rule_set_version, limit),
-        )
-        return cur.fetchall()
-
-
-def _upsert_signal(
-    conn,
-    *,
-    row_id: int,
-    article_id: str,
-    comment_id: str,
-    signals,
-) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO sa_comment_signals (
-                comment_row_id, article_id, comment_id,
-                ticker_mentions, candidate_mentions, keyword_buckets,
-                high_value_score, needs_verification, rule_set_version
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (comment_row_id) DO UPDATE SET
-                ticker_mentions    = EXCLUDED.ticker_mentions,
-                candidate_mentions = EXCLUDED.candidate_mentions,
-                keyword_buckets    = EXCLUDED.keyword_buckets,
-                high_value_score   = EXCLUDED.high_value_score,
-                needs_verification = EXCLUDED.needs_verification,
-                rule_set_version   = EXCLUDED.rule_set_version,
-                extracted_at       = NOW()
-            """,
-            (
-                row_id, article_id, comment_id,
-                signals.ticker_mentions,
-                signals.candidate_mentions,
-                psycopg2.extras.Json(signals.keyword_buckets),
-                float(signals.high_value_score),
-                bool(signals.needs_verification),
-                signals.rule_set_version,
-            ),
-        )

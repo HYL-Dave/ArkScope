@@ -210,7 +210,7 @@ def test_skips_articles_missing_required_fields(tmp_path, monkeypatch):
     assert [r["title"] for r in _rows(db)] == ["good"]
 
 
-def test_no_pg_dependency():
+def test_imports_with_declared_local_dependencies():
     import src.news_direct as mod
     assert not hasattr(mod, "psycopg2")
 

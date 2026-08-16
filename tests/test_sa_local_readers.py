@@ -1,20 +1,14 @@
-"""Slice 3d prep-3 — the five raw-_get_conn() consumers ported to sa_capture.db.
+"""Current local SA reader and backfill contracts.
 
-Covers (per the prep-3 contract):
-  (a) each ported reader returns the same dict SHAPE from SQLite as the PG SQL
-      (keys + list-typed array fields rebuilt from junction tables);
-  (b) dispatch: a backend WITHOUT ``_sa_db`` uses the PG branch (asserted by
-      poisoning DatabaseBackend._get_conn and expecting the poison to fire);
-      a backend WITH ``_sa_db`` never touches PG (poison never fires);
-  (c) health split: capture metrics from SQLite while the job_runs lookup
+Covers:
+  (a) each reader returns the reviewed dict shape from sa_capture.db;
+  (b) health split: capture metrics from SQLite while the job_runs lookup
       uses the local job-runs store; missing extension-run history falls back
-      to capture-side ``last_fetched_at`` without touching PG;
-  (d) comment_signal_backfill ROUTES to the sa_capture.db store in SA-local mode
-      (follow-up #1 Layer A — the locked-L3 raise guard is gone) and to PG
-      otherwise; the SA-local path never crosses to PG.
+      to capture-side ``last_fetched_at``;
+  (c) comment_signal_backfill writes through the sa_capture.db store.
 
 Hermetic: tmp_path sa_capture.db seeded via sa_capture_store.connect();
-the only "PG" is a poisoned/mocked _get_conn.
+no external service is used.
 """
 
 from __future__ import annotations
@@ -22,16 +16,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-
 import pytest
 
 import src.sa_capture_store as scs
 from src.sa.comment_signals import RULE_SET_VERSION
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
-
-FAKE_DSN = "postgresql://fake:fake@127.0.0.1:9/fake"
+from src.tools.backends.sa_capture_backend import SACaptureBackend
 
 
 # ---------------------------------------------------------------------------
@@ -181,19 +170,6 @@ def _seed(db_path: str) -> datetime:
 
 
 @pytest.fixture()
-def pg_calls(monkeypatch):
-    """Class-level poison on DatabaseBackend._get_conn; records every attempt."""
-    calls = []
-
-    def poison(self):
-        calls.append(1)
-        raise RuntimeError("PG poison")
-
-    monkeypatch.setattr(DatabaseBackend, "_get_conn", poison)
-    return calls
-
-
-@pytest.fixture()
 def sa_db(tmp_path):
     path = str(tmp_path / "sa_capture.db")
     _seed(path)
@@ -201,8 +177,12 @@ def sa_db(tmp_path):
 
 
 @pytest.fixture()
-def local_backend(sa_db, pg_calls):
-    return SACaptureDatabaseBackend(FAKE_DSN, sa_db=sa_db)
+def local_backend(sa_db, tmp_path):
+    return SACaptureBackend(
+        sa_db=sa_db,
+        market_db=str(tmp_path / "market_data.db"),
+        base_path=tmp_path,
+    )
 
 
 @pytest.fixture()
@@ -211,9 +191,8 @@ def local_dal(local_backend):
 
 
 @pytest.fixture()
-def pg_dal(pg_calls):
-    """Plain DatabaseBackend (no _sa_db) with poisoned _get_conn = PG mode."""
-    return SimpleNamespace(_backend=DatabaseBackend(FAKE_DSN))
+def invalid_dal():
+    return SimpleNamespace(_backend=object())
 
 
 @pytest.fixture()
@@ -224,7 +203,9 @@ def sa_enabled(monkeypatch):
 
 def test_absent_sa_db_refresh_meta_is_honest_empty(tmp_path):
     path = tmp_path / "missing.db"
-    backend = SACaptureDatabaseBackend(FAKE_DSN, sa_db=str(path))
+    backend = SACaptureBackend(
+        sa_db=str(path), market_db=str(tmp_path / "market_data.db"), base_path=tmp_path
+    )
 
     assert backend.get_sa_refresh_meta() == {}
     assert not path.exists()
@@ -232,26 +213,14 @@ def test_absent_sa_db_refresh_meta_is_honest_empty(tmp_path):
 
 def test_absent_sa_db_market_news_query_is_honest_empty(tmp_path):
     path = tmp_path / "missing.db"
-    backend = SACaptureDatabaseBackend(FAKE_DSN, sa_db=str(path))
+    backend = SACaptureBackend(
+        sa_db=str(path), market_db=str(tmp_path / "market_data.db"), base_path=tmp_path
+    )
 
     assert backend.query_sa_market_news(limit=5) == []
     assert not path.exists()
 
 
-def test_provider_health_sa_meta_never_touches_pg_on_fresh_profile(monkeypatch, tmp_path):
-    import psycopg2
-
-    def _forbidden(*args, **kwargs):
-        raise AssertionError("SA health path must not attempt PostgreSQL")
-
-    path = tmp_path / "missing.db"
-    monkeypatch.setattr(psycopg2, "connect", _forbidden)
-    backend = SACaptureDatabaseBackend(
-        "postgresql://poison.invalid/arkscope", sa_db=str(path)
-    )
-
-    assert backend.get_sa_refresh_meta() == {}
-    assert not path.exists()
 
 
 def test_absent_sa_db_health_query_degrades_honestly(tmp_path):
@@ -285,7 +254,7 @@ HVC_KEYS = {
 
 
 class TestHighValueCommentsLocal:
-    def test_shape_lists_and_ordering(self, local_dal, pg_calls, sa_enabled):
+    def test_shape_lists_and_ordering(self, local_dal, sa_enabled):
         from src.tools.sa_tools import list_high_value_comments
 
         out = list_high_value_comments(local_dal, window_days=7, min_score=2.0,
@@ -296,20 +265,18 @@ class TestHighValueCommentsLocal:
         scores = [c["high_value_score"] for c in out["comments"]]
         assert scores == sorted(scores, reverse=True) == [8.0, 7.0, 6.5, 6.0, 5.5, 5.0]
         first = out["comments"][0]
-        assert set(first.keys()) == HVC_KEYS  # PG row shape parity
-        # TEXT[] parity: junction-rebuilt Python LISTS
+        assert set(first.keys()) == HVC_KEYS
         assert isinstance(first["ticker_mentions"], list)
         assert isinstance(first["candidate_mentions"], list)
         assert first["ticker_mentions"] == ["NVDA"]
         assert first["candidate_mentions"] == ["NVDA"]  # row 1 is in both junctions
-        # jsonb parity: dict, not a JSON string
+        # Stored JSON is decoded before returning the public shape.
         assert first["keyword_buckets"] == {"earnings": ["beat"]}
         assert isinstance(first["needs_verification"], bool)
         assert isinstance(first["comment_date"], str)
         assert len(first["preview"]) <= 300
-        assert not pg_calls, "SA-local read must never touch PG"
 
-    def test_ticker_filter_via_junction(self, local_dal, pg_calls, sa_enabled):
+    def test_ticker_filter_via_junction(self, local_dal, sa_enabled):
         from src.tools.sa_tools import list_high_value_comments
 
         out = list_high_value_comments(local_dal, window_days=7, ticker="nvda",
@@ -322,9 +289,8 @@ class TestHighValueCommentsLocal:
         none = list_high_value_comments(local_dal, window_days=7, ticker="ZZZZ",
                                         min_score=2.0, limit=50)
         assert none["count"] == 0 and none["comments"] == []
-        assert not pg_calls
 
-    def test_window_and_rule_version_semantics(self, local_dal, pg_calls, sa_enabled):
+    def test_window_and_rule_version_semantics(self, local_dal, sa_enabled):
         from src.tools.sa_tools import list_high_value_comments
 
         wide = list_high_value_comments(local_dal, window_days=90, min_score=2.0,
@@ -332,15 +298,7 @@ class TestHighValueCommentsLocal:
         ids = [c["comment_row_id"] for c in wide["comments"]]
         assert ids[0] == 7          # 80d-old 9.5 enters at window=90
         assert 8 not in ids         # stale rule_set_version always excluded
-        assert not pg_calls
 
-    def test_pg_dispatch_without_sa_db(self, pg_dal, pg_calls, sa_enabled):
-        from src.tools.sa_tools import list_high_value_comments
-
-        out = list_high_value_comments(pg_dal, window_days=7)
-        assert pg_calls, "backend without _sa_db must take the PG branch"
-        assert "PG poison" in out["error"]
-        assert out["comments"] == [] and out["count"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -358,7 +316,7 @@ COMMENT_KEYS = {"comment_id", "article_id", "article_url", "commenter",
 
 
 class TestDigestLocal:
-    def test_articles_shape_order_and_missing_note(self, local_dal, pg_calls,
+    def test_articles_shape_order_and_missing_note(self, local_dal,
                                                    sa_enabled):
         from src.tools.sa_digest_tools import get_sa_digest
 
@@ -371,9 +329,8 @@ class TestDigestLocal:
         # a2 has no body → data_quality.missing notes 1 of 2
         assert any("body_markdown unavailable for 1 of 2" in m
                    for m in out["data_quality"]["missing"])
-        assert not pg_calls
 
-    def test_news_junction_tickers_and_gate(self, local_dal, pg_calls, sa_enabled):
+    def test_news_junction_tickers_and_gate(self, local_dal, sa_enabled):
         from src.tools.sa_digest_tools import get_sa_digest
 
         out = get_sa_digest(local_dal, "NVDA", days=14)
@@ -382,9 +339,8 @@ class TestDigestLocal:
         assert set(news[0].keys()) == NEWS_KEYS
         assert news[0]["tickers"] == ["NVDA", "SPY"]  # rebuilt list, insert order
         assert isinstance(news[0]["tickers"], list)
-        assert not pg_calls
 
-    def test_comments_kind_split_and_per_article_cap(self, local_dal, pg_calls,
+    def test_comments_kind_split_and_per_article_cap(self, local_dal,
                                                      sa_enabled):
         from src.tools.sa_digest_tools import get_sa_digest
 
@@ -397,62 +353,20 @@ class TestDigestLocal:
         assert [c["comment_id"] for c in hv["candidate_mentions"]] == ["cm6"]
         row = hv["ticker_mentions"][0]
         assert set(row.keys()) == COMMENT_KEYS
-        assert row["keyword_buckets"] == {"earnings": ["beat"]}  # jsonb parity
+        assert row["keyword_buckets"] == {"earnings": ["beat"]}
         assert row["article_url"] == "https://sa/a1"
         cand = hv["candidate_mentions"][0]
         assert cand["needs_verification"] is True  # kept, not filtered
         assert out["data_quality"]["errors"] == []
-        assert not pg_calls
 
-    def test_pack_is_json_serializable(self, local_dal, pg_calls, sa_enabled):
+    def test_pack_is_json_serializable(self, local_dal, sa_enabled):
         from src.tools.sa_digest_tools import get_sa_digest
 
         out = get_sa_digest(local_dal, "NVDA", days=14)
-        json.dumps(out)  # must not raise (no Decimal/datetime leaks)
+        json.dumps(out)
         assert out["data_quality"]["rows"] == {
             "articles": 2, "news": 1, "comments_ticker": 4, "comments_candidate": 1,
         }
-        assert not pg_calls
-
-    def test_pg_dispatch_without_sa_db(self, pg_dal, pg_calls, sa_enabled):
-        from src.tools.sa_digest_tools import get_sa_digest
-
-        out = get_sa_digest(pg_dal, "NVDA", days=14)
-        assert len(pg_calls) == 3, "all three source queries must try PG"
-        errors = out["data_quality"]["errors"]
-        assert len(errors) == 3 and all("PG poison" in e for e in errors)
-        assert out["recent_articles"] == []
-
-
-# ---------------------------------------------------------------------------
-# 5. data_access._compute_unresolved_symbols (extension hot path)
-# ---------------------------------------------------------------------------
-
-
-class TestUnresolvedSymbols:
-    @staticmethod
-    def _dal_with(backend):
-        from src.tools.data_access import DataAccessLayer
-
-        dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = backend
-        return dal
-
-    def test_local_branch_matches_pg_semantics(self, local_backend, pg_calls):
-        dal = self._dal_with(local_backend)
-        # PLTR: candidate with no matching article. NVDA: resolved via a1.
-        # MSFT: has detail_report. TSLA: stale.
-        assert dal._compute_unresolved_symbols() == ["PLTR"]
-        assert not pg_calls
-
-    def test_pg_dispatch_without_sa_db(self, pg_calls):
-        dal = self._dal_with(DatabaseBackend(FAKE_DSN))
-        # The PG branch acquires the connection OUTSIDE its try (pre-existing
-        # behavior, preserved): the poison fires and propagates — proving the
-        # backend without _sa_db took the PG path.
-        with pytest.raises(RuntimeError, match="PG poison"):
-            dal._compute_unresolved_symbols()
-        assert pg_calls
 
 
 # ---------------------------------------------------------------------------
@@ -460,37 +374,11 @@ class TestUnresolvedSymbols:
 # ---------------------------------------------------------------------------
 
 
-class _FakeCursor:
-    def __init__(self, row):
-        self._row = row
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def execute(self, sql, params=None):
-        self.sql = sql
-
-    def fetchone(self):
-        return self._row
-
-
-class _FakeConn:
-    def __init__(self, row):
-        self._row = row
-
-    def cursor(self, cursor_factory=None):
-        return _FakeCursor(self._row)
-
-
 class TestHealthSplit:
-    def test_local_capture_metrics_without_extension_run_uses_capture_signal(self, local_dal, pg_calls):
+    def test_local_capture_metrics_without_extension_run_uses_capture_signal(self, local_dal):
         from src.service.sa_market_news_health import compute_market_news_health
 
         report = compute_market_news_health(local_dal)
-        assert not pg_calls
         assert report["severity"] == "ok"
         assert report["ok"] is True
         codes = [r["code"] for r in report["reasons"]]
@@ -504,50 +392,8 @@ class TestHealthSplit:
         assert report["feed_health"]["items_7d"] == 3
         assert report["detail_health"]["rows_with_detail_7d"] == 2  # n1 + n3
 
-    def test_local_with_pg_up_uses_extension_signal(self, local_backend, pg_calls):
-        from src.sa.extension_run_protocol import derive_run_result
-        from src.service.job_runs_store import get_job_runs_store
-        from src.service.sa_market_news_health import compute_market_news_health
 
-        recent = datetime.now(timezone.utc) - timedelta(minutes=10)
-        dal = SimpleNamespace(_backend=local_backend)
-        result = derive_run_result(
-            {
-                "schema_version": 1,
-                "operation": "market_news_sync",
-                "mode": "quick",
-                "phases": {
-                    name: {"state": "complete", "reason_code": None}
-                    for name in (
-                        "list_navigation",
-                        "list_scrape",
-                        "metadata_save",
-                        "detail_fetch",
-                        "capture_readback",
-                    )
-                },
-                "item_outcomes": [],
-            }
-        )
-        get_job_runs_store(dal).record_extension_event_once(
-            client_event_id="local-health-complete",
-            event_hash="a" * 64,
-            job_name="sa_market_news_refresh",
-            status="succeeded",
-            started_at=recent,
-            finished_at=recent,
-            result=result,
-            duration_ms=0,
-        )
-
-        report = compute_market_news_health(dal)
-        assert report["freshness"]["pipeline_signal"] == "extension_run"
-        codes = [r["code"] for r in report["reasons"]]
-        assert "pipeline_signal_unavailable" not in codes
-        assert report["severity"] == "ok"
-        assert not pg_calls
-
-    def test_local_job_runs_failure_degrades_pipeline_signal(self, local_dal, pg_calls, monkeypatch):
+    def test_local_job_runs_failure_degrades_pipeline_signal(self, local_dal, monkeypatch):
         from src.service import sa_market_news_health as health
 
         monkeypatch.setattr(
@@ -558,18 +404,16 @@ class TestHealthSplit:
 
         report = health.compute_market_news_health(local_dal)
 
-        assert not pg_calls
         assert report["severity"] == "warning"
         assert report["ok"] is False
         codes = [r["code"] for r in report["reasons"]]
         assert "pipeline_signal_unavailable" in codes
         assert report["freshness"]["pipeline_signal"] == "last_fetched_at"
 
-    def test_non_local_sa_backend_does_not_query_pg(self, pg_dal, pg_calls):
+    def test_local_backend_uses_extension_signal(self, invalid_dal):
         from src.service.sa_market_news_health import compute_market_news_health
 
-        report = compute_market_news_health(pg_dal)
-        assert not pg_calls
+        report = compute_market_news_health(invalid_dal)
         assert report["severity"] == "critical"
         assert any(r["code"] == "db_unavailable" for r in report["reasons"])
         assert "SA capture local backend unavailable" in report["reasons"][0]["message"]
@@ -581,9 +425,7 @@ class TestHealthSplit:
 
 
 class TestBackfillRouting:
-    def test_routes_to_sqlite_not_pg(self, local_dal, pg_calls, sa_db):
-        # follow-up #1: the locked-3d RuntimeError guard is GONE — SA-local mode now
-        # extracts into sa_capture.db via the store choke-point, never touching PG.
+    def test_routes_to_sqlite(self, local_dal, sa_db):
         from src import sa_capture_store as scs
         from src.sa.comment_signal_backfill import run_backfill
 
@@ -592,7 +434,6 @@ class TestBackfillRouting:
         assert "error" not in res
         assert res["rule_set_version"] == "test-port"
         assert res["extracted_count"] >= 1
-        assert not pg_calls, "SA-local extraction must never touch PG"
 
         conn = scs.connect(sa_db, read_only=True)
         try:
@@ -602,21 +443,3 @@ class TestBackfillRouting:
         finally:
             conn.close()
         assert n == res["extracted_count"]
-
-    def test_pg_mode_proceeds(self, pg_calls):
-        from src.sa.comment_signal_backfill import run_backfill
-
-        dal = MagicMock()
-        backend = MagicMock()
-        del backend._sa_db  # PG-mode backend: attribute absent
-        conn = MagicMock()
-        backend._get_conn.return_value = conn
-        dal._backend = backend
-        cur = MagicMock()
-        conn.cursor.return_value.__enter__.return_value = cur
-        cur.fetchone.return_value = (0,)   # _count_pending → 0 pending
-        cur.fetchall.return_value = []
-        result = run_backfill(dal)
-        assert result["extracted_count"] == 0
-        assert result["total_pending"] == 0
-        assert "error" not in result

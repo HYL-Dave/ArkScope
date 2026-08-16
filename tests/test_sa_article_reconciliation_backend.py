@@ -7,22 +7,18 @@ import pytest
 
 import src.sa_article_reconciliation_store as reconciliation_store
 import src.sa_capture_store as capture_store
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
+from src.tools.backends.sa_capture_backend import SACaptureBackend
 
 
-FAKE_DSN = "postgresql://disabled"
 NOW = "2026-07-18T01:00:00Z"
 
 
 @pytest.fixture()
-def backend(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "_get_conn",
-        lambda self: (_ for _ in ()).throw(AssertionError("PG touched")),
+def backend(tmp_path):
+    return SACaptureBackend(
+        sa_db=str(tmp_path / "sa_capture.db"),
+        market_db=str(tmp_path / "market_data.db"),
     )
-    return SACaptureDatabaseBackend(FAKE_DSN, sa_db=str(tmp_path / "sa_capture.db"))
 
 
 def _pick(

@@ -20,9 +20,8 @@ import yaml
 
 from src.news_content_availability import ContentFilter, empty_content_counts
 
-from .backends import DataBackend
-from .backends.file_backend import FileBackend
-from .backends.db_backend import DatabaseBackend
+from .backends.local_capabilities import LocalDataCapabilities
+from .backends.sa_capture_backend import SACaptureBackend
 from .schemas import (
     FundamentalsResult,
     NewsArticle,
@@ -161,9 +160,8 @@ class DataAccessLayer:
     Unified data access entry point.
 
     Usage:
-        dal = DataAccessLayer()                    # FileBackend auto-detected
-        dal = DataAccessLayer(backend=my_backend)  # Custom backend
-        dal = DataAccessLayer(db_dsn="postgresql://...")  # Future DB backend
+        dal = DataAccessLayer()
+        dal = DataAccessLayer(backend=my_local_capability)
 
     All data methods delegate to the backend, then wrap results
     in Pydantic schemas for consistent output.
@@ -172,14 +170,12 @@ class DataAccessLayer:
     def __init__(
         self,
         base_path: Optional[Path] = None,
-        backend: Optional[DataBackend] = None,
-        db_dsn: Optional[str] = None,
+        backend: Optional[LocalDataCapabilities] = None,
     ):
         """
         Args:
             base_path: Project root. Auto-detected if None.
-            backend: Explicit backend instance (takes priority).
-            db_dsn: Database DSN. Use "auto" to detect from config/.env.
+            backend: Explicit structural local capability.
         """
         # Resolve project root
         if base_path is None:
@@ -188,36 +184,24 @@ class DataAccessLayer:
                 if (parent / "config").is_dir() and (parent / "data").is_dir():
                     base_path = parent
                     break
-        self._base = Path(base_path) if base_path else None
+        self._base = Path(base_path) if base_path else Path(__file__).resolve().parents[2]
 
-        # Initialize backend
         if backend is not None:
             self._backend = backend
-        elif db_dsn == "auto":
-            # Auto-detect from config/.env
-            env_dsn = self._load_env_db_dsn()
-            if env_dsn:
-                from src.tools.db_config import infer_sslmode, load_sslmode
-                # Fresh checkout: _base can be None (no data/ found) — there is
-                # no config/.env to read, which is exactly load_sslmode's
-                # missing-file fallback. Same baseless-DAL family as the
-                # market_db/SA guards.
-                sslmode = (
-                    load_sslmode(self._base / "config" / ".env", env_dsn)
-                    if self._base is not None
-                    else infer_sslmode(env_dsn)
-                )
-                self._backend = self._make_db_backend(env_dsn, sslmode)
-            else:
-                # No DSN: still try local composite routing first so completed news
-                # exit and other local-first desktop modes can boot without PG.
-                self._backend = self._make_db_backend(
-                    "", "prefer", allow_plain_pg=False
-                ) or FileBackend(base_path=self._base)
-        elif db_dsn:
-            self._backend = DatabaseBackend(dsn=db_dsn)
         else:
-            self._backend = FileBackend(base_path=self._base)
+            import os
+
+            market_db = os.environ.get("ARKSCOPE_MARKET_DB") or str(
+                self._base / "data" / "market_data.db"
+            )
+            sa_db = os.environ.get("ARKSCOPE_SA_DB") or str(
+                self._base / "data" / "sa_capture.db"
+            )
+            self._backend = SACaptureBackend(
+                sa_db=sa_db,
+                market_db=market_db,
+                base_path=self._base,
+            )
 
         # Config cache
         self._config_cache: Dict[str, Any] = {}
@@ -226,185 +210,10 @@ class DataAccessLayer:
         self._cache: Dict[str, tuple] = {}
         self._cache_ttl_seconds: int = 3600  # 1 hour default
 
-    def _make_db_backend(self, dsn: str, sslmode: str, *, allow_plain_pg: bool = True):
-        """Construct the PG backend, layered with the enabled local routings.
-        Subclasses keep ``isinstance(backend, DatabaseBackend)`` True everywhere, so
-        DB-only code paths behave exactly as on plain PG.
-
-        Selection matrix after N9 batch-2/S-J follow-up local-default collapse:
-          - SA (always)        → SACaptureDatabaseBackend (3d): sa_* domain served
-            from data/sa_capture.db — HARD cutover, no PG fallback for sa_*; it
-            extends LocalMarketDatabaseBackend, so when local-market is ALSO on the
-            same instance serves both routings (market_db="" keeps market inert).
-          - market path known   → LocalMarketDatabaseBackend (3a-3c): market reads
-            hard-local. The DB file may be absent on a fresh profile; reads return
-            honest empty local results until ingestion creates it.
-          - no local path       → plain DatabaseBackend only for pathological/test
-            callers that explicitly request PG.
-        Default runtime = local authority; persisted legacy toggles are provenance
-        and rollback documentation, not live PG fallback levers."""
-        import os
-
-        market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
-            str(self._base / "data" / "market_data.db") if self._base else None
-        )
-        local_market_requested = self._local_market_enabled()
-        news_strict = self._news_pg_exit_completed(market_db)
-        market_on = bool(market_db) and (local_market_requested or news_strict)
-
-        sa_db = None
-        if self._local_sa_enabled() and self._base is not None:
-            from src.sa_capture_store import resolve_sa_db_path
-
-            # SA domain is hard-local after N9 batch-1. A missing sa_capture.db
-            # must still route local: PG sa_* was dropped, so the local store is
-            # the only authority and an absent file reads as honest empty.
-            # The `_base is not None` gate mirrors market_db above: a DAL with no
-            # detected project root gets NO implicit local routing, preserving the
-            # pre-collapse loud FileBackend failure instead of a half-built DAL
-            # whose _base-dependent config reads crash later.
-            sa_db = resolve_sa_db_path()
-
-        # Post-P0-C/N9 market mode is hard-local. The legacy strict flag remains
-        # exposed for provenance, but no longer controls whether market reads may
-        # fall back to PG.
-        strict = bool(market_on and local_market_requested)
-        if sa_db:
-            from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
-
-            logger.info(
-                f"Using SACaptureDatabaseBackend (sa_capture → {sa_db}, HARD local"
-                f"{'; market_data → ' + market_db + (' STRICT' if strict else '') if market_on else ''}"
-                f"{'; news HARD local' if news_strict else ''})")
-            return SACaptureDatabaseBackend(
-                dsn, sslmode, sa_db=sa_db, market_db=market_db if market_on else "",
-                strict=strict, news_strict=news_strict)
-        if market_on:
-            from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
-
-            logger.info(f"Using LocalMarketDatabaseBackend (market_data → {market_db}, "
-                        f"{'STRICT local-only' if strict else 'PG fallback'}"
-                        f"{'; news HARD local' if news_strict else ''})")
-            return LocalMarketDatabaseBackend(
-                dsn, sslmode, market_db=market_db, strict=strict, news_strict=news_strict)
-        if not allow_plain_pg:
-            return None
-        logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
-        return DatabaseBackend(dsn=dsn, sslmode=sslmode)
-
-    def _profile_setting_value(self, key: str) -> Optional[str]:
-        """Read one persisted profile setting without creating or migrating the DB."""
-        import os
-        import sqlite3
-
-        profile_db = os.environ.get("ARKSCOPE_PROFILE_DB") or (
-            str(self._base / "data" / "profile_state.db") if self._base else None
-        )
-        if not profile_db or not Path(profile_db).exists():
-            return None
-        try:
-            uri = f"{Path(profile_db).resolve().as_uri()}?mode=ro"
-            conn = sqlite3.connect(uri, uri=True)
-            try:
-                row = conn.execute(
-                    "SELECT value FROM profile_settings WHERE key = ?", (key,)
-                ).fetchone()
-            finally:
-                conn.close()
-            return str(row[0]) if row else None
-        except sqlite3.Error:
-            return None
-
-    def _news_pg_exit_completed(self, market_db: Optional[str]) -> bool:
-        """Whether news has completed PG exit, from profile state or audit marker."""
-        import sqlite3
-
-        from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
-        from src.news_providers import parse_news_toggle
-
-        if parse_news_toggle(self._profile_setting_value(NEWS_PG_EXIT_COMPLETED_KEY)) is True:
-            return True
-
-        if not market_db:
-            return False
-        path = Path(market_db)
-        if not path.exists():
-            return False
-        try:
-            uri = f"{path.resolve().as_uri()}?mode=ro"
-            conn = sqlite3.connect(uri, uri=True)
-            try:
-                exists = conn.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-                    ("news_pg_exit_runs",),
-                ).fetchone()
-                if not exists:
-                    return False
-                row = conn.execute(
-                    "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
-                ).fetchone()
-                return row is not None
-            finally:
-                conn.close()
-        except sqlite3.Error:
-            return False
-
-    def _profile_setting_truthy(self, key: str, env_var: str) -> bool:
-        """Shared toggle reader: env override OR the persisted profile_settings key,
-        via a light read-only SQLite query (no ProfileStateStore import / no
-        migration — fresh native-host processes re-read this every spawn)."""
-        import os
-
-        truthy = ("1", "true", "yes", "on")
-        if os.environ.get(env_var, "").strip().lower() in truthy:
-            return True
-        value = self._profile_setting_value(key)
-        return value is not None and value.strip().lower() in truthy
-
-    def _local_market_enabled(self) -> bool:
-        return True
-
-    def _local_market_strict_enabled(self) -> bool:
-        """Legacy strict toggle reader kept for status/provenance.
-
-        After P0-C/N9, market reads are hard-local by default. This flag no longer
-        controls whether market reads may fall back to PG.
-        """
-        return self._profile_setting_truthy("use_local_market_strict", "ARKSCOPE_LOCAL_MARKET_STRICT")
-
-    def _local_sa_enabled(self) -> bool:
-        """SA capture domain → local sa_capture.db by default.
-
-        PG sa_* tables were dropped in N9 batch-1, so unset and explicit false
-        both resolve local, matching market/macro/job_runs/records collapse
-        semantics. The legacy use_local_sa flag and ARKSCOPE_USE_LOCAL_SA are
-        provenance only.
-        """
-        return True
-
-    def _local_macro_enabled(self) -> bool:
-        """Macro/calendar domain → local macro_calendar.db by default after N9."""
-        return True
-
-    def _local_records_enabled(self) -> bool:
-        """App-records domain (reports/memories/agent_queries) → local profile_state.db by
-        default after the PG-exit closeout (2026-07-05 ruling): the three PG app-record
-        tables are archive-only, so unset AND explicit false both resolve local — same
-        collapse semantics as market/macro/job_runs (N9 batch-2). The legacy
-        use_local_records flag is provenance only."""
-        return True
-
     @property
     def backend_type(self) -> str:
         """Return the active backend type name."""
         return type(self._backend).__name__
-
-    def _load_env_db_dsn(self) -> Optional[str]:
-        """Try to load DATABASE_URL (or legacy SUPABASE_DB_URL) from config/.env."""
-        if self._base is None:
-            return None
-        from src.tools.db_config import load_database_url
-        return load_database_url(self._base / "config" / ".env")
 
     # ============================================================
     # Config Access
@@ -553,28 +362,13 @@ class DataAccessLayer:
         days: int = 30,
         limit: int = 20,
     ) -> NewsQueryResult:
-        """Search news with full-text search (DB) or keyword filtering (file fallback).
-
-        Uses PostgreSQL tsvector/GIN for DB backend, falls back to Python-level
-        filtering for FileBackend.
-        """
-        if isinstance(self._backend, DatabaseBackend):
-            df = self._backend.query_news_search(
-                query=query, ticker=ticker, days=days,
-                limit=limit,
-            )
-        else:
-            # FileBackend fallback: get all, filter in Python
-            df = self._backend.query_news(
-                ticker=ticker, days=days,
-            )
-            if query.strip() and not df.empty:
-                q_lower = query.lower()
-                mask = (
-                    df["title"].str.lower().str.contains(q_lower, na=False)
-                    | df.get("description", pd.Series(dtype=str)).str.lower().str.contains(q_lower, na=False)
-                )
-                df = df[mask].head(limit)
+        """Search the current local news authority."""
+        df = self._backend.query_news_search(
+            query=query,
+            ticker=ticker,
+            days=days,
+            limit=limit,
+        )
 
         articles = []
         for _, row in df.iterrows():
@@ -609,27 +403,7 @@ class DataAccessLayer:
 
         Returns one raw article count and date range per ticker.
         """
-        if isinstance(self._backend, DatabaseBackend):
-            df = self._backend.query_news_stats(ticker=ticker, days=days)
-        else:
-            # FileBackend fallback: compute stats from full data
-            news_result = self.get_news(ticker=ticker, days=days)
-            if not news_result.articles:
-                return []
-            # Group by ticker manually
-            from collections import defaultdict
-            groups: dict = defaultdict(list)
-            for a in news_result.articles:
-                groups[a.ticker].append(a)
-            rows = []
-            for t, arts in groups.items():
-                rows.append({
-                    "ticker": t,
-                    "article_count": len(arts),
-                    "earliest_date": min(a.date for a in arts) if arts else None,
-                    "latest_date": max(a.date for a in arts) if arts else None,
-                })
-            return rows
+        df = self._backend.query_news_stats(ticker=ticker, days=days)
 
         if df.empty:
             return []
@@ -679,26 +453,16 @@ class DataAccessLayer:
         offset=0,
         content: ContentFilter = "all",
     ) -> dict:
-        """Score-free news feed (新聞·事件 surface) — local-first via the backend.
-        FileBackend has no feed → empty shape."""
-        if hasattr(self._backend, "query_news_feed"):
-            return self._backend.query_news_feed(
-                q=q,
-                ticker=ticker,
-                source=source,
-                content=content,
-                days=days,
-                limit=limit,
-                offset=offset,
-            )
-        return {
-            "available": False,
-            "items": [],
-            "total": 0,
-            "sources": {},
-            "days": {},
-            "content_counts": empty_content_counts(),
-        }
+        """Return the score-free local news feed."""
+        return self._backend.query_news_feed(
+            q=q,
+            ticker=ticker,
+            source=source,
+            content=content,
+            days=days,
+            limit=limit,
+            offset=offset,
+        )
 
     def get_fundamentals(self, ticker: str) -> FundamentalsResult:
         """Query fundamentals and return structured result."""
@@ -792,13 +556,11 @@ class DataAccessLayer:
         include_stale: bool = False,
     ) -> List[Dict]:
         """Get SA Alpha Picks portfolio data."""
-        if isinstance(self._backend, DatabaseBackend):
-            return self._backend.query_sa_picks(
-                portfolio_status=portfolio_status,
-                symbol=symbol,
-                include_stale=include_stale,
-            )
-        return self._load_sa_file_cache(portfolio_status, symbol, include_stale)
+        return self._backend.query_sa_picks(
+            portfolio_status=portfolio_status,
+            symbol=symbol,
+            include_stale=include_stale,
+        )
 
     def apply_sa_refresh(
         self,
@@ -811,10 +573,7 @@ class DataAccessLayer:
 
         Success path: overwrites all meta fields.
         """
-        if isinstance(self._backend, DatabaseBackend):
-            count = self._backend.apply_sa_refresh(scope, picks, attempt_ts, snapshot_ts)
-        else:
-            count = len(picks)
+        count = self._backend.apply_sa_refresh(scope, picks, attempt_ts, snapshot_ts)
 
         # File cache: always write (dual storage when DB available)
         try:
@@ -842,8 +601,7 @@ class DataAccessLayer:
         Failure path: only updates last_attempt_at, ok, last_error.
         Preserves: last_success_at, snapshot_ts, row_count.
         """
-        if isinstance(self._backend, DatabaseBackend):
-            self._backend.record_sa_refresh_failure(scope, attempt_ts, error)
+        self._backend.record_sa_refresh_failure(scope, attempt_ts, error)
 
         # File cache meta
         try:
@@ -862,10 +620,9 @@ class DataAccessLayer:
         self, symbol: str, picked_date: Optional[str] = None
     ) -> Optional[Dict]:
         """Get detail for a specific SA pick."""
-        if isinstance(self._backend, DatabaseBackend):
-            result = self._backend.get_sa_pick_detail(symbol, picked_date)
-            if result:
-                return result
+        result = self._backend.get_sa_pick_detail(symbol, picked_date)
+        if result:
+            return result
 
         # File fallback: check file cache
         if picked_date:
@@ -908,47 +665,31 @@ class DataAccessLayer:
     ) -> bool:
         """Save detail report for a specific SA pick.
 
-        Returns True if the primary backend write succeeded:
-        - DB mode: DB update must succeed (file is best-effort backup)
-        - File-only mode: file write must succeed
+        Returns True when the current local store update succeeds. The report
+        file remains a best-effort secondary representation.
         """
-        db_ok = True  # default for file-only mode
-        if isinstance(self._backend, DatabaseBackend):
-            try:
-                db_ok = self._backend.update_sa_pick_detail(
-                    symbol, picked_date, content
-                )
-                if not db_ok:
-                    logger.warning(
-                        "No DB row found for %s/%s — detail not saved to DB",
-                        symbol, picked_date,
-                    )
-            except Exception as e:
-                logger.error(
-                    "DB detail save failed for %s/%s: %s", symbol, picked_date, e
-                )
-                db_ok = False
+        local_ok = False
+        try:
+            local_ok = self._backend.update_sa_pick_detail(
+                symbol, picked_date, content
+            )
+            if not local_ok:
+                logger.warning("No local row found for %s/%s", symbol, picked_date)
+        except Exception as exc:
+            logger.error("Local detail save failed for %s/%s: %s", symbol, picked_date, exc)
 
-        file_ok = False
         try:
             self._save_sa_file_detail(symbol, picked_date, content)
-            file_ok = True
-        except Exception as e:
-            logger.warning("File detail save failed: %s", e)
-
-        # DB mode: DB must succeed; file-only mode: file must succeed
-        if isinstance(self._backend, DatabaseBackend):
-            return db_ok
-        return file_ok
+        except Exception as exc:
+            logger.warning("File detail save failed: %s", exc)
+        return local_ok
 
     def get_sa_refresh_meta(self) -> Dict[str, Any]:
         """Get per-tab refresh metadata."""
-        if isinstance(self._backend, DatabaseBackend):
-            return self._backend.get_sa_refresh_meta()
-        return self._load_sa_file_meta() or {}
+        return self._backend.get_sa_refresh_meta()
 
 
-    # ── SA Market News (SA-R1, DB-only) ──
+    # ── SA Market News ──
 
     def save_sa_market_news(
         self,
@@ -957,8 +698,6 @@ class DataAccessLayer:
         detail_backfill_limit: int = 0,
     ) -> Dict[str, Any]:
         """Persist recent Seeking Alpha market-news metadata."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"error": "DB required for market news"}
         normalized = [
             _normalize_sa_market_news_item(item)
             for item in items
@@ -1008,62 +747,45 @@ class DataAccessLayer:
         limit: int = 20,
     ) -> List[Dict]:
         """Query recent Seeking Alpha market-news metadata."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return []
         return self._backend.query_sa_market_news(
             ticker=ticker, keyword=keyword, limit=limit
         )
 
     def get_sa_market_news_recent_ids(self, limit: int = 200) -> List[str]:
         """Return recent market-news IDs for duplicate-aware list scanning."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return []
         return self._backend.query_sa_market_news_recent_ids(limit=limit)
 
     def get_sa_market_news_recovery_rows(self, news_ids: List[str]) -> List[Dict]:
         """Return the exact, privacy-minimal rows used to freeze repair targets."""
-        if not isinstance(self._backend, DatabaseBackend):
-            raise RuntimeError("sa_market_news_recovery_unavailable")
         return self._backend.query_sa_market_news_recovery_rows(news_ids)
 
     def get_sa_market_news_body_presence(self, news_ids: List[str]) -> Dict[str, bool]:
         """Read body presence for frozen repair IDs without an age predicate."""
-        if not isinstance(self._backend, DatabaseBackend):
-            raise RuntimeError("sa_market_news_recovery_unavailable")
         return self._backend.query_sa_market_news_body_presence(news_ids)
 
     def get_sa_market_news_missing_detail_interval(
         self, start_at: str, end_at: str
     ) -> List[Dict]:
         """Return missing-detail rows in an inclusive recovery interval."""
-        if not isinstance(self._backend, DatabaseBackend):
-            raise RuntimeError("sa_market_news_recovery_unavailable")
         return self._backend.query_sa_market_news_missing_detail_interval(start_at, end_at)
 
     def save_sa_market_news_detail(self, news_id: str, body_markdown: str) -> bool:
         """Persist a single market-news body Markdown payload."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return False
         return self._backend.save_sa_market_news_detail(news_id, body_markdown)
 
     def invalidate_dirty_sa_market_news_detail(self) -> int:
         """Invalidate cached market-news body content that matches known noisy captures."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return 0
         return self._backend.invalidate_dirty_sa_market_news_detail()
 
-    # ── SA Articles + Comments (Phase 11c-v3, DB-only) ──
+    # ── SA Articles + Comments ──
 
     def save_sa_articles_meta(
         self, articles: List[Dict], mode: str = "quick"
     ) -> Dict[str, Any]:
         """Batch upsert article metadata. Returns need_content + unresolved info.
 
-        DB-only — returns error in file-only mode.
+        The current local capture store owns this operation.
         """
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"error": "DB required for articles"}
-
         # Auto-upgrade: check if first run (empty DB)
         try:
             existing = self._backend.query_sa_articles(limit=1)
@@ -1256,8 +978,6 @@ class DataAccessLayer:
         comment_scan_stable_bottom_rounds=0,
     ) -> Dict:
         """Capture body/comments first, then reconcile in a separate transaction."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"error": "DB required"}
         captured = self._backend.save_article_with_comments(
             article_id,
             body_markdown,
@@ -1291,8 +1011,6 @@ class DataAccessLayer:
         comment_scan_stable_bottom_rounds=0,
     ) -> Dict[str, Any]:
         """Update comments only (refresh run). Returns refresh stats."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"prepared_comments": 0, "stored_comments_total": 0, "net_new_comments": 0}
         return self._backend.update_article_comments(
             article_id,
             comments,
@@ -1303,34 +1021,22 @@ class DataAccessLayer:
         )
 
     def audit_sa_unresolved_symbols(self) -> Dict:
-        """Compatibility projection of the read-only reconciliation queue."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"unresolved_symbols": [], "resolved_by_fulltext": 0}
+        """Return the read-only reconciliation queue projection."""
         return self._backend.audit_unresolved_symbols()
 
     def reconcile_sa_articles(self, **kwargs) -> Dict[str, Any]:
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"status": "unavailable", "reason": "DB required", "enrichment": []}
         return self._backend.reconcile_sa_articles(**kwargs)
 
     def query_sa_article_review_queue(self, limit: int = 50) -> Dict[str, Any]:
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"events": [], "total": 0}
         return self._backend.query_sa_article_review_queue(limit=limit)
 
     def resolve_sa_reconciliation_event(self, **kwargs) -> Dict[str, Any]:
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"status": "unavailable", "reason": "DB required"}
         return self._backend.resolve_sa_reconciliation_event(**kwargs)
 
     def accept_sa_article_link(self, **kwargs) -> Dict[str, Any]:
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"status": "unavailable", "reason": "DB required"}
         return self._backend.accept_sa_article_link(**kwargs)
 
     def reject_sa_article_candidate(self, **kwargs) -> Dict[str, Any]:
-        if not isinstance(self._backend, DatabaseBackend):
-            return {"status": "unavailable", "reason": "DB required"}
         return self._backend.reject_sa_article_candidate(**kwargs)
 
     def get_sa_articles(
@@ -1341,100 +1047,18 @@ class DataAccessLayer:
         limit: int = 10,
     ) -> List[Dict]:
         """Query SA articles with filters."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return []
         return self._backend.query_sa_articles(
             ticker=ticker, keyword=keyword, article_type=article_type, limit=limit
         )
 
     def get_sa_article_detail(self, article_id: str) -> Optional[Dict]:
         """Get full article content + comments."""
-        if not isinstance(self._backend, DatabaseBackend):
-            return None
         return self._backend.get_sa_article_with_comments(article_id)
 
     def _compute_unresolved_symbols(self) -> List[str]:
-        """Current picks truly missing detail, after metadata-level article matching.
-
-        Checks: no canonical, no detail_report, AND no matching article in sa_articles
-        (exact/prefix ticker match on analysis/removal type).
-
-        3d prep-3 dispatch (extension HOT PATH — runs in every save_articles_meta):
-        SA-local mode is duck-typed via ``backend._sa_db`` (None/absent = PG mode,
-        SQL below untouched). This raw ``_get_conn()`` bypasses the backend method
-        layer, so post-cutover it would silently read the FROZEN PG. The pure-read
-        SQLite variant lives in ``_compute_unresolved_symbols_local`` (the backend's
-        ``audit_unresolved_symbols`` is a different, WRITING audit — not reused here).
-        """
-        if not isinstance(self._backend, DatabaseBackend):
-            return []
-        sa_db = getattr(self._backend, "_sa_db", None)
-        if sa_db is not None:
-            return self._compute_unresolved_symbols_local(sa_db)
-        conn = self._backend._get_conn()
-        try:
-            with conn.cursor() as cur:
-                # Get picks without canonical and without detail_report
-                cur.execute(
-                    "SELECT DISTINCT symbol FROM sa_alpha_picks "
-                    "WHERE portfolio_status = 'current' AND is_stale = false "
-                    "AND canonical_article_id IS NULL "
-                    "AND detail_report IS NULL"
-                )
-                candidates = [r[0] for r in cur.fetchall()]
-
-                # Filter: only truly unresolved (no matching article exists)
-                unresolved = []
-                for symbol in candidates:
-                    cur.execute(
-                        "SELECT 1 FROM sa_articles "
-                        "WHERE (ticker = %s OR (ticker LIKE %s AND LENGTH(ticker) <= LENGTH(%s) * 2)) "
-                        "AND article_type IN ('analysis', 'removal') "
-                        "LIMIT 1",
-                        (symbol, symbol + "%", symbol),
-                    )
-                    if not cur.fetchone():
-                        unresolved.append(symbol)
-                return unresolved
-        except Exception as e:
-            logger.warning("_compute_unresolved_symbols failed: %s", e)
-            return []
-
-    def _compute_unresolved_symbols_local(self, sa_db: str) -> List[str]:
-        """SQLite (sa_capture.db) variant of _compute_unresolved_symbols.
-
-        Pure read-only twin of the PG SQL above (same candidate filter, same
-        exact/prefix article match): %s → ?, ``is_stale = false`` → ``= 0``.
-        Best-effort like the PG branch — failures log and return [].
-        """
-        try:
-            from src import sa_capture_store as store
-
-            conn = store.connect(sa_db, read_only=True)
-            try:
-                candidates = [r[0] for r in conn.execute(
-                    "SELECT DISTINCT symbol FROM sa_alpha_picks "
-                    "WHERE portfolio_status = 'current' AND is_stale = 0 "
-                    "AND canonical_article_id IS NULL "
-                    "AND detail_report IS NULL"
-                ).fetchall()]
-                unresolved = []
-                for symbol in candidates:
-                    row = conn.execute(
-                        "SELECT 1 FROM sa_articles "
-                        "WHERE (ticker = ? OR (ticker LIKE ? AND LENGTH(ticker) <= LENGTH(?) * 2)) "
-                        "AND article_type IN ('analysis', 'removal') "
-                        "LIMIT 1",
-                        (symbol, symbol + "%", symbol),
-                    ).fetchone()
-                    if not row:
-                        unresolved.append(symbol)
-                return unresolved
-            finally:
-                conn.close()
-        except Exception as e:
-            logger.warning("_compute_unresolved_symbols failed: %s", e)
-            return []
+        """Return symbols admitted by the current local reconciliation owner."""
+        result = self._backend.audit_unresolved_symbols()
+        return list(result.get("unresolved_symbols") or [])
 
     # ── SA file I/O private methods ──
 

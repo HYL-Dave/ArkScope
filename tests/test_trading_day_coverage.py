@@ -674,7 +674,7 @@ def test_route_registered():
     }
 
 
-def test_route_coverage_path_is_pure_read_without_provider_scheduler_or_pg(
+def test_route_coverage_path_is_pure_local_read_without_provider_or_scheduler(
     tmp_path,
     monkeypatch,
 ):

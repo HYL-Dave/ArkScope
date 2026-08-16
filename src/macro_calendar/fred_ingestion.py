@@ -26,7 +26,7 @@ Two callable entry points the job runner wraps:
         docs/design/P1_2_PROVIDER_DISCOVERY.md §6.
 
 Both entry points are pure-Python coroutines of the FRED HTTP client
-and the ``MacroCalendarStore`` from commit 1. No FastAPI / agent tool
+and the current local macro calendar store. No FastAPI / agent tool
 wiring lives here.
 """
 
@@ -47,7 +47,7 @@ from data_sources.fred_client import (
     FREDReleaseDate,
     FREDSeriesMetadata,
 )
-from src.macro_calendar import get_macro_calendar_store
+from src.macro_calendar.local_store import MacroCalendarLocalStore
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ def fetch_fred_release_dates(
     via the offset parameter if we discover it matters).
     """
     stats = IngestionStats()
-    store = get_macro_calendar_store(dal)
+    store = MacroCalendarLocalStore()
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
@@ -243,7 +243,7 @@ def fetch_fred_series(
     configured ``observation_start``.
     """
     stats = IngestionStats()
-    store = get_macro_calendar_store(dal)
+    store = MacroCalendarLocalStore()
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
@@ -285,7 +285,7 @@ def _select_entries(
 
 def _ingest_one(
     fred: FREDClient,
-    store: Any,   # PG MacroCalendarStore or the SQLite twin (get_macro_calendar_store)
+    store: MacroCalendarLocalStore,
     entry: CatalogEntry,
     catalog: Catalog,
     stats: IngestionStats,
@@ -320,7 +320,7 @@ def _ingest_one(
 
 def _ingest_latest_only(
     fred: FREDClient,
-    store: MacroCalendarStore,
+    store: MacroCalendarLocalStore,
     entry: CatalogEntry,
     obs_start: date,
     stats: IngestionStats,
@@ -366,7 +366,7 @@ def _ingest_latest_only(
 
 def _ingest_full_vintages(
     fred: FREDClient,
-    store: MacroCalendarStore,
+    store: MacroCalendarLocalStore,
     entry: CatalogEntry,
     obs_start: date,
     stats: IngestionStats,

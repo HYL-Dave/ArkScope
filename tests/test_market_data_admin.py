@@ -119,16 +119,12 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
     assert out["routing_enabled"] is True  # post-PG-exit default local, even before DB creation
 
 
-def test_fresh_profile_without_market_db_uses_local_backend_not_pg(tmp_path, monkeypatch):
-    from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+def test_fresh_profile_uses_local_market_backend(tmp_path, monkeypatch):
+    from src.tools.backends.local_market_backend import LocalMarketBackend
     from src.tools.data_access import DataAccessLayer
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    (config_dir / ".env").write_text(
-        "DATABASE_URL=postgresql://invalid.invalid/arkscope\n",
-        encoding="utf-8",
-    )
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     profile = data_dir / "profile_state.db"
@@ -139,9 +135,10 @@ def test_fresh_profile_without_market_db_uses_local_backend_not_pg(tmp_path, mon
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MARKET", raising=False)
     monkeypatch.delenv("ARKSCOPE_MARKET_DB", raising=False)
 
-    dal = DataAccessLayer(base_path=tmp_path, db_dsn="auto")
+    dal = DataAccessLayer(base_path=tmp_path)
 
-    assert isinstance(dal._backend, LocalMarketDatabaseBackend)
+    assert isinstance(dal._backend, LocalMarketBackend)
+    assert not hasattr(dal._backend, "_dsn")
     assert not (data_dir / "market_data.db").exists()
     assert dal.get_prices("NVDA").bars == []
 
@@ -226,13 +223,15 @@ def test_toggle_persists_and_dal_reads_it(store, tmp_path, monkeypatch):
     out = market_data_status(store=store)
     assert out["use_local_market_setting"] is True and out["routing_enabled"] is True
 
-    # the DAL remains local by default; the setting is provenance, not a PG fallback lever.
+    # The DAL remains local by default; the setting is provenance only.
     from src.tools.data_access import DataAccessLayer
+    from src.tools.backends.local_market_backend import LocalMarketBackend
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market_data.db"))
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MARKET", raising=False)
-    dal = DataAccessLayer.__new__(DataAccessLayer)
-    dal._base = tmp_path
-    assert dal._local_market_enabled() is True
+    dal = DataAccessLayer(base_path=tmp_path)
+    assert isinstance(dal._backend, LocalMarketBackend)
+    assert dal._backend._market_db == str(tmp_path / "market_data.db")
 
 
 def test_status_route_reports_strict_local_only_when_enabled(store, tmp_path, monkeypatch):

@@ -1,6 +1,7 @@
 """Tests for Data Freshness Registry."""
 
 from datetime import datetime, timezone, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -64,7 +65,7 @@ class TestFreshnessRegistryScan:
                 "error": None,
             },
         }
-        fr = FreshnessRegistry(db_backend=self._make_backend(stats))
+        fr = FreshnessRegistry(local_capability=self._make_backend(stats))
         result = fr.scan(force=True)
 
         assert "news" in result
@@ -83,7 +84,7 @@ class TestFreshnessRegistryScan:
             "prices": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
-        fr = FreshnessRegistry(db_backend=self._make_backend(stats))
+        fr = FreshnessRegistry(local_capability=self._make_backend(stats))
         result = fr.scan(force=True)
 
         assert result["news"].is_stale is True
@@ -95,7 +96,7 @@ class TestFreshnessRegistryScan:
             "prices": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
-        fr = FreshnessRegistry(db_backend=self._make_backend(stats))
+        fr = FreshnessRegistry(local_capability=self._make_backend(stats))
         result = fr.scan(force=True)
 
         assert result["news"].is_stale is True
@@ -107,7 +108,7 @@ class TestFreshnessRegistryScan:
             "prices": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
-        fr = FreshnessRegistry(db_backend=self._make_backend(stats))
+        fr = FreshnessRegistry(local_capability=self._make_backend(stats))
         result = fr.scan(force=True)
 
         assert result["news"].is_stale is True
@@ -120,7 +121,7 @@ class TestFreshnessRegistryScan:
             "financial_cache": {"rows": [], "error": None},
         }
         backend = self._make_backend(stats)
-        fr = FreshnessRegistry(db_backend=backend)
+        fr = FreshnessRegistry(local_capability=backend)
 
         fr.scan(force=True)
         fr.scan()  # should use cache
@@ -135,7 +136,7 @@ class TestFreshnessRegistryScan:
             "financial_cache": {"rows": [], "error": None},
         }
         backend = self._make_backend(stats)
-        fr = FreshnessRegistry(db_backend=backend)
+        fr = FreshnessRegistry(local_capability=backend)
 
         fr.scan(force=True)
         fr.scan(force=True)
@@ -143,7 +144,7 @@ class TestFreshnessRegistryScan:
         assert backend.query_health_stats.call_count == 2
 
     def test_scan_no_backend(self):
-        fr = FreshnessRegistry(db_backend=None)
+        fr = FreshnessRegistry(local_capability=None)
         result = fr.scan(force=True)
         assert result == {}
 
@@ -151,7 +152,7 @@ class TestFreshnessRegistryScan:
         """When query_health_stats() itself raises, all sources marked stale."""
         backend = MagicMock()
         backend.query_health_stats.side_effect = RuntimeError("connection lost")
-        fr = FreshnessRegistry(db_backend=backend)
+        fr = FreshnessRegistry(local_capability=backend)
         result = fr.scan(force=True)
 
         # Should have all current sources, all stale
@@ -189,7 +190,7 @@ class TestFreshnessFormat:
                 "error": None,
             },
         }
-        fr = FreshnessRegistry(db_backend=backend)
+        fr = FreshnessRegistry(local_capability=backend)
         fr.scan(force=True)
         return fr
 
@@ -201,7 +202,7 @@ class TestFreshnessFormat:
         assert "Fundamentals:" in summary
 
     def test_format_summary_empty(self):
-        fr = FreshnessRegistry(db_backend=None)
+        fr = FreshnessRegistry(local_capability=None)
         assert fr.format_summary() == ""
 
     def test_format_detailed(self):
@@ -212,7 +213,7 @@ class TestFreshnessFormat:
         assert "news" in detailed
 
     def test_format_detailed_empty(self):
-        fr = FreshnessRegistry(db_backend=None)
+        fr = FreshnessRegistry(local_capability=None)
         assert "No data sources" in fr.format_detailed()
 
 
@@ -222,19 +223,19 @@ class TestFreshnessFormat:
 class TestSingleton:
     def test_get_registry_creates(self):
         backend = MagicMock()
-        fr = get_registry(db_backend=backend)
+        fr = get_registry(local_capability=backend)
         assert fr is not None
         assert isinstance(fr, FreshnessRegistry)
 
     def test_get_registry_reuses(self):
         backend = MagicMock()
-        fr1 = get_registry(db_backend=backend)
-        fr2 = get_registry(db_backend=backend)
+        fr1 = get_registry(local_capability=backend)
+        fr2 = get_registry(local_capability=backend)
         assert fr1 is fr2
 
     def test_get_registry_none_returns_current(self):
         backend = MagicMock()
-        get_registry(db_backend=backend)
+        get_registry(local_capability=backend)
         fr = get_registry()  # No backend → return existing
         assert fr is not None
 
@@ -244,7 +245,7 @@ class TestSingleton:
 
     def test_reset_for_tests(self):
         backend = MagicMock()
-        get_registry(db_backend=backend)
+        get_registry(local_capability=backend)
         reset_for_tests()
         fr = get_registry()
         assert fr is None
@@ -255,15 +256,19 @@ class TestSingleton:
 
 class TestCheckDataFreshness:
     def test_file_backend(self):
-        dal = MagicMock()
-        dal._backend = MagicMock()  # Not a DatabaseBackend
+        def unavailable():
+            raise RuntimeError("local health unavailable")
+
+        dal = SimpleNamespace(
+            _backend=SimpleNamespace(query_health_stats=unavailable)
+        )
         result = check_data_freshness(dal)
-        assert "file" in result.lower() or "File" in result
+        assert "query failed: local health unavailable" in result
 
     def test_no_backend_attr(self):
         dal = MagicMock(spec=[])
         result = check_data_freshness(dal)
-        assert "requires" in result.lower()
+        assert result == "Data freshness is unavailable from the current local authority."
 
 
 # ── Timestamp parsing ───────────────────────────────────────

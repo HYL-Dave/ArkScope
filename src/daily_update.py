@@ -138,7 +138,7 @@ class _RunTelemetry:
             from src.service.job_runs_store import get_job_runs_store
             from src.tools.data_access import DataAccessLayer
 
-            store = get_job_runs_store(DataAccessLayer(db_dsn="auto"))
+            store = get_job_runs_store(DataAccessLayer())
             if store.is_available():
                 self._store = store
             else:

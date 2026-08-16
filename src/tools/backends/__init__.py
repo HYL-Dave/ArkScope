@@ -1,15 +1,12 @@
-"""
-Backend abstraction for data access.
-
-Defines the DataBackend Protocol that both FileBackend and DatabaseBackend implement.
-This allows the DataAccessLayer to be backend-agnostic.
-"""
+"""Backend protocols for current local data access."""
 
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Protocol, runtime_checkable
 
 import pandas as pd
+
+from .local_capabilities import LocalDataCapabilities
 
 
 @runtime_checkable
@@ -101,4 +98,4 @@ class DataBackend(Protocol):
         ...
 
 
-__all__ = ["DataBackend"]
+__all__ = ["DataBackend", "LocalDataCapabilities"]

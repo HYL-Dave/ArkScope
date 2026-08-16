@@ -63,8 +63,7 @@ _DISABLED_MSG = (
     "config/user_profile.yaml to use get_sa_digest."
 )
 _BACKEND_MSG = (
-    "get_sa_digest requires the PostgreSQL DAL backend; current DAL has "
-    "no _get_conn (probably FileBackend)."
+    "get_sa_digest requires the current local SA capture capability."
 )
 
 
@@ -88,7 +87,7 @@ def get_sa_digest(
     are stable; empty sources return ``[]`` rather than being omitted.
 
     Args:
-        dal: DAL whose ``_backend`` exposes ``_get_conn``.
+        dal: DAL with the current local SA capture capability.
         ticker: Symbol (case-insensitive); upper-cased internally.
         days: Lookback window 1..90 (default 14).
         max_articles: Cap on ``recent_articles[]`` 1..20 (default 5).
@@ -102,9 +101,13 @@ def get_sa_digest(
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
 
-    # 2. Backend availability — non-Postgres DAL gracefully degrades
+    # 2. Backend availability
     backend = getattr(dal, "_backend", None)
-    if backend is None or not hasattr(backend, "_get_conn"):
+    if backend is None:
+        return _empty_pack(ticker, days, error=_BACKEND_MSG)
+    try:
+        backend._sa_db
+    except AttributeError:
         return _empty_pack(
             ticker, days,
             error=_BACKEND_MSG,
@@ -198,42 +201,11 @@ def _query_articles(
     errors: List[str],
     missing: List[str],
 ) -> List[Dict[str, Any]]:
-    """SELECT from sa_articles. Best-effort; appends to errors on failure.
-
-    3d prep-3 dispatch: SA-local mode (``backend._sa_db`` set) reads
-    sa_capture.db; None/absent = PG mode with the SQL below untouched.
-    """
-    sql = f"""
-        SELECT
-            article_id,
-            title,
-            author,
-            published_date,
-            url,
-            article_type,
-            comments_count,
-            LEFT(COALESCE(body_markdown, title), {EXCERPT_LEN}) AS summary_excerpt,
-            (body_markdown IS NULL) AS body_missing
-        FROM sa_articles
-        WHERE UPPER(ticker) = %(ticker)s
-          AND published_date >= %(window_start_date)s
-        ORDER BY published_date DESC NULLS LAST, fetched_at DESC
-        LIMIT %(max_articles)s
-    """
-    sa_db = getattr(backend, "_sa_db", None)
+    """Read current local SA articles; append a typed error on failure."""
     try:
-        if sa_db is not None:
-            rows = _query_articles_local(sa_db, ticker, window_start, max_articles)
-        else:
-            rows = _fetch_dicts(
-                backend,
-                sql,
-                {
-                    "ticker": ticker,
-                    "window_start_date": window_start.date(),
-                    "max_articles": max_articles,
-                },
-            )
+        rows = _query_articles_local(
+            backend._sa_db, ticker, window_start, max_articles
+        )
     except Exception as exc:
         logger.error("get_sa_digest articles query failed: %s", exc)
         errors.append(f"articles: query failed ({exc})")
@@ -256,43 +228,9 @@ def _query_news(
     max_news: int,
     errors: List[str],
 ) -> List[Dict[str, Any]]:
-    """SELECT from sa_market_news with comments_count >= NEWS_DISCUSSION_GATE.
-
-    3d prep-3 dispatch: SA-local mode (``backend._sa_db`` set) reads
-    sa_capture.db; None/absent = PG mode with the SQL below untouched.
-    """
-    sql = f"""
-        SELECT
-            news_id,
-            title,
-            url,
-            published_at,
-            tickers,
-            category,
-            comments_count,
-            LEFT(summary, {EXCERPT_LEN}) AS summary_excerpt
-        FROM sa_market_news
-        WHERE %(ticker)s = ANY(tickers)
-          AND published_at >= %(window_start)s
-          AND comments_count >= %(gate)s
-        ORDER BY comments_count DESC, published_at DESC
-        LIMIT %(max_news)s
-    """
-    sa_db = getattr(backend, "_sa_db", None)
+    """Read current local SA news above the discussion gate."""
     try:
-        if sa_db is not None:
-            rows = _query_news_local(sa_db, ticker, window_start, max_news)
-        else:
-            rows = _fetch_dicts(
-                backend,
-                sql,
-                {
-                    "ticker": ticker,
-                    "window_start": window_start,
-                    "gate": NEWS_DISCUSSION_GATE,
-                    "max_news": max_news,
-                },
-            )
+        rows = _query_news_local(backend._sa_db, ticker, window_start, max_news)
     except Exception as exc:
         logger.error("get_sa_digest news query failed: %s", exc)
         errors.append(f"news: query failed ({exc})")
@@ -318,82 +256,15 @@ def _query_comments(
         errors.append(f"comments: import error ({exc})")
         return [], []
 
-    sql = """
-        WITH base AS (
-            SELECT
-                c.id AS comment_row_id,
-                c.article_id,
-                c.comment_id,
-                c.commenter,
-                c.upvotes,
-                c.comment_date,
-                LEFT(c.comment_text, %(excerpt_len)s) AS preview,
-                s.high_value_score,
-                s.ticker_mentions,
-                s.candidate_mentions,
-                s.keyword_buckets,
-                s.needs_verification,
-                a.url AS article_url,
-                CASE
-                  WHEN %(ticker)s = ANY(s.ticker_mentions) THEN 'ticker'
-                  ELSE 'candidate'
-                END AS mention_kind
-            FROM sa_comment_signals s
-            JOIN sa_article_comments c ON c.id = s.comment_row_id
-            LEFT JOIN sa_articles a    ON a.article_id = c.article_id
-            WHERE c.comment_date >= NOW() - (%(days)s || ' days')::INTERVAL
-              AND s.high_value_score >= %(min_score)s
-              AND s.rule_set_version  = %(version)s
-              AND (
-                %(ticker)s = ANY(s.ticker_mentions)
-                OR %(ticker)s = ANY(s.candidate_mentions)
-              )
-        ),
-        per_article AS (
-            SELECT *,
-                ROW_NUMBER() OVER (
-                    PARTITION BY mention_kind, article_id
-                    ORDER BY high_value_score DESC, comment_date DESC
-                ) AS rn_per_article
-            FROM base
-        ),
-        ranked AS (
-            SELECT *,
-                ROW_NUMBER() OVER (
-                    PARTITION BY mention_kind
-                    ORDER BY high_value_score DESC, comment_date DESC
-                ) AS rn_per_kind
-            FROM per_article
-            WHERE rn_per_article <= %(per_article_cap)s
-        )
-        SELECT *
-        FROM ranked
-        WHERE rn_per_kind <= %(max_comments)s
-        ORDER BY mention_kind, high_value_score DESC, comment_date DESC
-    """
-    # 3d prep-3 dispatch: SA-local mode (backend._sa_db set) reads
-    # sa_capture.db; None/absent = PG mode with the SQL above untouched.
-    sa_db = getattr(backend, "_sa_db", None)
     try:
-        if sa_db is not None:
-            rows = _query_comments_local(
-                sa_db, ticker, days, min_comment_score, max_comments,
-                _CURRENT_VERSION,
-            )
-        else:
-            rows = _fetch_dicts(
-                backend,
-                sql,
-                {
-                    "ticker": ticker,
-                    "days": days,
-                    "min_score": min_comment_score,
-                    "version": _CURRENT_VERSION,
-                    "excerpt_len": EXCERPT_LEN,
-                    "per_article_cap": PER_ARTICLE_COMMENT_CAP,
-                    "max_comments": max_comments,
-                },
-            )
+        rows = _query_comments_local(
+            backend._sa_db,
+            ticker,
+            days,
+            min_comment_score,
+            max_comments,
+            _CURRENT_VERSION,
+        )
     except Exception as exc:
         logger.error("get_sa_digest comments query failed: %s", exc)
         errors.append(f"comments: query failed ({exc})")
@@ -483,35 +354,17 @@ def _build_source_notes(
 
 
 # ---------------------------------------------------------------------------
-# Helpers — cursor wrapper, normalization, clamping
+# Helpers — normalization and clamping
 # ---------------------------------------------------------------------------
 
 
-def _fetch_dicts(backend: Any, sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Run query and return list-of-dicts. RealDictCursor pattern."""
-    from psycopg2 import extras as _pg_extras
-
-    conn = backend._get_conn()
-    with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-        cur.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
-
-
 # ---------------------------------------------------------------------------
-# SA-local (sa_capture.db) variants — slice 3d prep-3.
-#
-# Dispatch: each _query_* checks ``getattr(backend, "_sa_db", None)``;
-# None/absent = PG mode (the SQL above, byte-identical). The variants below
-# return rows in the SAME dict shape the PG queries produced, so the shared
-# normalizers run unchanged. Dialect sweep (runbook §1): named %(x)s → ?;
-# LEFT(s,n) → substr(s,1,n); NOW()-INTERVAL / date params → Python-computed
-# canonical TEXT cutoffs (lexicographic == time order); TEXT[] ``= ANY()`` →
-# junction joins; jsonb → json.loads; RealDictCursor → sqlite3.Row.
+# Current local SA capture queries. These return the shared normalized shapes.
 # ---------------------------------------------------------------------------
 
 
 def _fetch_dicts_local(sa_db: str, sql: str, params: tuple) -> List[Dict[str, Any]]:
-    """SQLite twin of _fetch_dicts: read-only sa_capture.db, positional params."""
+    """Read rows from sa_capture.db with positional parameters."""
     from src import sa_capture_store as _store
 
     conn = _store.connect(sa_db, read_only=True)
@@ -702,7 +555,7 @@ def _query_comments_local(
             max_comments,
         ),
     )
-    # jsonb → dict parity (psycopg2 decoded keyword_buckets automatically).
+    # Decode the stored JSON object before normalization.
     for r in rows:
         kb = r.get("keyword_buckets")
         if isinstance(kb, str):

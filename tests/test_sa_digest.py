@@ -57,8 +57,8 @@ def _disable_sa(monkeypatch):
 
 
 def _fake_backend() -> SimpleNamespace:
-    """Backend object with a `_get_conn` attr the tool will recognise."""
-    return SimpleNamespace(_get_conn=lambda: object())
+    """Backend object exposing only the current local SA capture path."""
+    return SimpleNamespace(_sa_db="unused-sa-capture.db")
 
 
 def _dal_with(backend) -> SimpleNamespace:
@@ -66,14 +66,14 @@ def _dal_with(backend) -> SimpleNamespace:
 
 
 def _stub_fetch_dicts(monkeypatch, mapping):
-    """Patch _fetch_dicts with a per-source dispatcher.
+    """Patch the current local query seams with a per-source dispatcher.
 
     `mapping` is a dict keyed by a substring expected in the SQL
     (e.g. "sa_articles", "sa_market_news", "sa_comment_signals") to
     either a list of rows OR an Exception instance to raise.
     """
 
-    def fake(backend, sql, params):
+    def fake(_sa_db, sql, params):
         for key, value in mapping.items():
             if key in sql:
                 if isinstance(value, BaseException):
@@ -81,7 +81,14 @@ def _stub_fetch_dicts(monkeypatch, mapping):
                 return value
         return []
 
-    monkeypatch.setattr(sd, "_fetch_dicts", fake)
+    def fake_news(_sa_db, _ticker, _window_start, _max_news):
+        value = mapping.get("sa_market_news", [])
+        if isinstance(value, BaseException):
+            raise value
+        return value
+
+    monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
+    monkeypatch.setattr(sd, "_query_news_local", fake_news)
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +104,7 @@ class TestDisabledOrUnavailable:
 
     def test_unavailable_dal_returns_pack_with_error(self, monkeypatch):
         _enable_sa(monkeypatch)
-        # FileBackend has no _get_conn
+        # A value without the current local SA path is unavailable.
         dal = SimpleNamespace(_backend=SimpleNamespace())
         out = get_sa_digest(dal=dal, ticker="NVDA")
         assert out["ticker"] == "NVDA"
@@ -105,8 +112,10 @@ class TestDisabledOrUnavailable:
         assert out["data_quality"]["rows"] == {
             "articles": 0, "news": 0, "comments_ticker": 0, "comments_candidate": 0,
         }
-        assert any("PostgreSQL" in e or "_get_conn" in e
-                   for e in out["data_quality"]["errors"])
+        assert any(
+            "local SA capture capability" in e
+            for e in out["data_quality"]["errors"]
+        )
 
     def test_empty_ticker_returns_pack_with_error(self, monkeypatch):
         _enable_sa(monkeypatch)
@@ -126,12 +135,14 @@ class TestParamClamping:
 
         captured = {}
 
-        def fake(backend, sql, params):
+        def fake(_sa_db, sql, params):
             if "sa_comment_signals" in sql:
-                captured["days"] = params["days"]
+                cutoff = datetime.fromisoformat(params[2])
+                elapsed = datetime.now(timezone.utc) - cutoff
+                captured["days"] = round(elapsed.total_seconds() / 86400)
             return []
 
-        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
         out_lo = get_sa_digest(
             dal=_dal_with(_fake_backend()), ticker="NVDA", days=0,
         )
@@ -148,16 +159,19 @@ class TestParamClamping:
 
         captured = {}
 
-        def fake(backend, sql, params):
+        def fake(_sa_db, sql, params):
             if "sa_articles\n" in sql or "FROM sa_articles" in sql and "JOIN sa_article_comments" not in sql:
-                captured["max_articles"] = params.get("max_articles")
-            if "sa_market_news" in sql:
-                captured["max_news"] = params.get("max_news")
+                captured["max_articles"] = params[2]
             if "sa_comment_signals" in sql:
-                captured["max_comments"] = params.get("max_comments")
+                captured["max_comments"] = params[8]
             return []
 
-        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        def fake_news(_sa_db, _ticker, _window_start, max_news):
+            captured["max_news"] = max_news
+            return []
+
+        monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
+        monkeypatch.setattr(sd, "_query_news_local", fake_news)
         get_sa_digest(
             dal=_dal_with(_fake_backend()),
             ticker="NVDA", max_articles=0, max_news=0, max_comments=0,
@@ -181,12 +195,12 @@ class TestParamClamping:
         _enable_sa(monkeypatch)
         captured = {}
 
-        def fake(backend, sql, params):
+        def fake(_sa_db, sql, params):
             if "sa_comment_signals" in sql:
-                captured["min_score"] = params.get("min_score")
+                captured["min_score"] = params[3]
             return []
 
-        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
         get_sa_digest(
             dal=_dal_with(_fake_backend()), ticker="NVDA", min_comment_score=-5.0,
         )
@@ -207,13 +221,13 @@ class TestCommentsSqlShape:
         _enable_sa(monkeypatch)
         captured = {}
 
-        def fake(backend, sql, params):
+        def fake(_sa_db, sql, params):
             if "sa_comment_signals" in sql:
                 captured["sql"] = sql
                 captured["params"] = params
             return []
 
-        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
         get_sa_digest(dal=_dal_with(_fake_backend()), ticker="NVDA")
 
         sql = captured["sql"]
@@ -227,7 +241,7 @@ class TestCommentsSqlShape:
         idx_kind_cap = sql.index("rn_per_kind <=")
         assert idx_filter < idx_kind_cap, "per-article filter must come before per-kind cap"
 
-        assert captured["params"]["per_article_cap"] == 3
+        assert captured["params"][7] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -600,11 +614,14 @@ class TestTickerUppercase:
         _enable_sa(monkeypatch)
         captured = []
 
-        def fake(backend, sql, params):
-            captured.append(params.get("ticker"))
+        def fake(_sa_db, sql, params):
+            if "FROM sa_articles" in sql:
+                captured.append(params[0])
+            elif "sa_comment_signals" in sql:
+                captured.append(params[1])
             return []
 
-        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
         get_sa_digest(dal=_dal_with(_fake_backend()), ticker="nvda")
         # Three sources were queried (articles, news, comments)
         assert captured  # at least one

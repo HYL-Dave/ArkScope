@@ -97,7 +97,7 @@ def test_sec_cache_miss_then_hit_round_trips_result(monkeypatch):
     assert r1.roe == r2.roe == 0.21 and r2.data_source == "sec_edgar"
 
 
-def test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback(monkeypatch):
+def test_sec_cache_hit_uses_local_market_backend(monkeypatch):
     from src.tools.schemas import FundamentalsResult
 
     class _Market:
@@ -116,11 +116,11 @@ def test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback(monkeypatc
     class _LocalMarketLike:
         def __init__(self):
             self._market = _Market()
-            self.pg_calls = []
+            self.cache_calls = []
 
         def get_financial_cache(self, cache_key):
-            self.pg_calls.append(cache_key)
-            raise AssertionError("PG cache fallback must not be used for fundamentals")
+            self.cache_calls.append(cache_key)
+            return self._market.get_financial_cache(cache_key)
 
         def set_financial_cache(self, *args, **kwargs):
             raise AssertionError("cache hit must not write")
@@ -142,7 +142,9 @@ def test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback(monkeypatc
     assert dal._backend._market.calls == [
         "fundamentals_analysis:sec_edgar:AAPL:annual:v1"
     ]
-    assert dal._backend.pg_calls == []
+    assert dal._backend.cache_calls == [
+        "fundamentals_analysis:sec_edgar:AAPL:annual:v1"
+    ]
 
 
 def test_sec_cache_miss_writes_with_shared_cache_key(monkeypatch):

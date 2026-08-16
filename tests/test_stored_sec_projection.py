@@ -15,8 +15,7 @@ from src.api.dependencies import get_dal, get_registry
 from src.api.routes import fundamentals as fundamentals_routes
 from src.api.routes import health as health_routes
 from src.fundamentals.cache import fundamentals_analysis_cache_key
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+from src.tools.backends.local_market_backend import LocalMarketBackend
 from src.tools.backends.sqlite_backend import SqliteBackend
 from src.tools.data_access import DataAccessLayer
 from src.tools.data_coverage_tools import get_ticker_data_coverage
@@ -219,18 +218,10 @@ def test_positive_annual_sec_cache_is_the_shared_projection_authority(
 ):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(stored_sec_db))
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "get_available_tickers",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("fundamentals projection must not fall back to PG")
-        ),
-    )
-
     sqlite_backend = SqliteBackend(stored_sec_db)
-    local_backend = LocalMarketDatabaseBackend(
-        "postgresql://unused/db",
+    local_backend = LocalMarketBackend(
         market_db=str(stored_sec_db),
+        base_path=stored_sec_db.parent,
     )
     dal = DataAccessLayer(base_path=stored_sec_db.parent, backend=local_backend)
 

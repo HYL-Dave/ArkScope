@@ -3,8 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.api.routes.news import news_feed
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+from src.tools.backends.local_market_backend import LocalMarketBackend
 
 
 def _empty_feed(*, available: bool = True) -> dict:
@@ -55,26 +54,18 @@ def test_news_feed_route_forwards_content_to_dal() -> None:
     }
 
 
-def test_local_backend_propagates_content_without_postgres_fallback(
+def test_local_backend_propagates_content_filter(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    backend = LocalMarketDatabaseBackend(
-        "postgresql://poisoned/arkscope",
-        market_db=str(tmp_path / "market.db"),
-        strict=True,
-    )
+    backend = LocalMarketBackend(market_db=str(tmp_path / "market.db"))
     recorded: dict = {}
 
     def local_feed(**kwargs):
         recorded.update(kwargs)
         return _empty_feed()
 
-    def pg_boom(self, **kwargs):
-        raise AssertionError("PostgreSQL fallback called")
-
     monkeypatch.setattr(backend._market, "query_news_feed", local_feed)
-    monkeypatch.setattr(DatabaseBackend, "query_news_feed", pg_boom)
 
     result = backend.query_news_feed(
         q="apple",

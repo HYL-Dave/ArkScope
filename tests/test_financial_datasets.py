@@ -361,10 +361,10 @@ class TestCacheBackendMode:
         assert promo["source"] == "financial_datasets" and promo["ticker"] == "AAPL"
         assert promo["ttl_days"] == 150  # 180 - 30 elapsed → remaining TTL preserved
 
-    def test_backend_without_cache_methods_is_ignored(self):
-        # e.g. a FileBackend (no get/set_financial_cache) → legacy mode, not a crash
-        client = FinancialDatasetsClient(api_key="k", cache_backend=object())
-        assert client._cache_backend is None
+    def test_explicit_cache_capability_is_not_shape_probed(self):
+        capability = object()
+        client = FinancialDatasetsClient(api_key="k", cache_backend=capability)
+        assert client._cache_backend is capability
 
     @patch("data_sources.financial_datasets_client.requests.get")
     def test_backend_write_failure_falls_back_to_file(self, mock_get, tmp_path, caplog):

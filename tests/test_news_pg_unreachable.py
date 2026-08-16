@@ -6,8 +6,7 @@ from pathlib import Path
 import pytest
 
 from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+from src.tools.backends.local_market_backend import LocalMarketBackend
 from src.tools.data_access import DataAccessLayer
 
 
@@ -90,19 +89,6 @@ def isolated_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def _poison_pg_news(monkeypatch) -> None:
-    def boom(self, *args, **kwargs):
-        raise AssertionError("PG called")
-
-    for name in (
-        "query_news",
-        "query_news_search",
-        "query_news_stats",
-        "query_news_feed",
-    ):
-        monkeypatch.setattr(DatabaseBackend, name, boom)
-
-
 def test_no_dsn_completed_news_exit_selects_local_backend_with_market_strict(tmp_path):
     seed_profile(
         tmp_path,
@@ -110,25 +96,22 @@ def test_no_dsn_completed_news_exit_selects_local_backend_with_market_strict(tmp
     )
     seed_market_db(tmp_path)
 
-    dal = DataAccessLayer(base_path=tmp_path, db_dsn="auto")
+    dal = DataAccessLayer(base_path=tmp_path)
 
-    assert isinstance(dal._backend, LocalMarketDatabaseBackend)
-    assert dal._backend._news_strict is True
-    assert dal._backend._strict is True
-    assert dal._backend._dsn == ""
+    assert isinstance(dal._backend, LocalMarketBackend)
+    assert dal._backend._market_db == str(tmp_path / "data" / "market_data.db")
+    assert not hasattr(dal._backend, "_dsn")
 
 
-def test_news_hard_local_no_dsn_never_calls_pg_for_empty_reads(tmp_path, monkeypatch):
+def test_news_hard_local_no_dsn_never_calls_pg_for_empty_reads(tmp_path):
     seed_profile(
         tmp_path,
         **{NEWS_PG_EXIT_COMPLETED_KEY: "true", "use_local_market": "false"},
     )
     seed_market_db(tmp_path)
-    _poison_pg_news(monkeypatch)
+    dal = DataAccessLayer(base_path=tmp_path)
 
-    dal = DataAccessLayer(base_path=tmp_path, db_dsn="auto")
-
-    assert isinstance(dal._backend, LocalMarketDatabaseBackend)
+    assert isinstance(dal._backend, LocalMarketBackend)
     assert dal.get_news(ticker="AAPL").count == 0
     assert dal.search_news(query="Apple", ticker="AAPL").count == 0
     assert dal.get_news_stats(ticker="AAPL") == []
@@ -148,24 +131,15 @@ def test_completed_audit_marker_forces_news_hard_local_without_profile_exit_sett
     seed_profile(tmp_path, use_local_market="false")
     seed_market_db(tmp_path, completed=True)
 
-    dal = DataAccessLayer(base_path=tmp_path, db_dsn="auto")
+    dal = DataAccessLayer(base_path=tmp_path)
 
-    assert isinstance(dal._backend, LocalMarketDatabaseBackend)
-    assert dal._backend._news_strict is True
-    assert dal._backend._strict is True
+    assert isinstance(dal._backend, LocalMarketBackend)
+    assert dal._backend._market_db == str(tmp_path / "data" / "market_data.db")
 
 
-def test_no_dsn_get_conn_fails_before_psycopg(monkeypatch):
-    called = []
+def test_no_dsn_get_conn_fails_before_psycopg(tmp_path):
+    seed_market_db(tmp_path)
+    dal = DataAccessLayer(base_path=tmp_path)
 
-    def connect_boom(*args, **kwargs):
-        called.append((args, kwargs))
-        raise AssertionError("psycopg2 called")
-
-    monkeypatch.setattr("src.tools.backends.db_backend.psycopg2.connect", connect_boom)
-    backend = DatabaseBackend("")
-
-    with pytest.raises(RuntimeError, match="PostgreSQL is not configured"):
-        backend._get_conn()
-
-    assert called == []
+    assert isinstance(dal._backend, LocalMarketBackend)
+    assert not hasattr(dal._backend, "_get_conn")

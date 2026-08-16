@@ -37,7 +37,7 @@ def _seed(tmp_path, *, with_news_table: bool = True):
     return db
 
 
-def test_summaries_read_local_db_never_pg(tmp_path, monkeypatch):
+def test_summaries_read_local_database(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(_seed(tmp_path)))
     out = get_universe_summaries(None, days=7)  # dal unused — must not touch any backend
 

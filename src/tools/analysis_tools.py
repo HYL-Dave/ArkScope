@@ -254,7 +254,7 @@ def get_fundamentals_analysis(
         sec_result = _build_result_from_statements(
             ticker, "sec_edgar", income_stmts, balance_sheets, cashflow_stmts,
         )
-        if _cache_be is not None and hasattr(_cache_be, "set_financial_cache"):
+        if _cache_be is not None:
             try:  # cache only SUCCESS; never let a cache write break the analysis
                 _cache_be.set_financial_cache(
                     _sec_key, ticker.upper(), sec_result.model_dump(),
@@ -266,8 +266,7 @@ def get_fundamentals_analysis(
     # SEC returned nothing → short negative cache (avoid re-hitting SEC for an uncovered
     # symbol every call); the FD branch below still gets a chance THIS call. Skip the write
     # if we already short-circuited on a cached negative.
-    if (not _sec_negative_cached and _cache_be is not None
-            and hasattr(_cache_be, "set_financial_cache")):
+    if not _sec_negative_cached and _cache_be is not None:
         try:
             _cache_be.set_financial_cache(
                 _sec_key, ticker.upper(), {"_negative": True}, ttl_days=1, source="sec_edgar")
@@ -279,9 +278,7 @@ def get_fundamentals_analysis(
         try:
             from data_sources.financial_datasets_client import FinancialDatasetsClient
             cache_days = _get_fd_cache_days(dal)
-            # Route the paid cache through the DAL backend (LocalMarketDatabaseBackend
-            # → local-primary; plain DatabaseBackend → PG): one unified financial
-            # cache instead of the client's own PG connection + file writes.
+            # Route the paid cache through the current local capability.
             backend = getattr(dal, "_backend", None)
             fd = FinancialDatasetsClient(cache_days=cache_days, cache_backend=backend)
 
@@ -310,8 +307,8 @@ def get_sec_filings(
     Get SEC filing metadata for a ticker.
 
     Returns filing metadata (type, date, URL), not full text content.
-    With FileBackend this returns empty; will be populated when
-    DatabaseBackend or SEC Edgar API integration is active.
+    The current local capability returns an honest empty list when no filing
+    metadata has been stored.
 
     Args:
         dal: DataAccessLayer instance
@@ -624,11 +621,10 @@ def get_detailed_financials(
     backend = getattr(dal, "_backend", None)
     payload = None
 
-    reader = getattr(backend, "get_financial_cache", None)
     try:
-        if callable(reader):
+        if backend is not None:
             payload = validate_detailed_financials_static_payload(
-                reader(cache_key),
+                backend.get_financial_cache(cache_key),
                 ticker=ticker,
             )
     except Exception as e:
@@ -656,10 +652,9 @@ def get_detailed_financials(
                 ticker=ticker,
             )
 
-            writer = getattr(backend, "set_financial_cache", None)
-            if payload is not None and callable(writer):
+            if payload is not None and backend is not None:
                 try:
-                    writer(
+                    backend.set_financial_cache(
                         cache_key,
                         ticker,
                         payload,

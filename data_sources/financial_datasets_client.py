@@ -8,18 +8,15 @@ rarely change (quarterly updates), so long TTLs are appropriate.
 Cache modes (3c-C unification — the paid path uses the SAME cache contract as the
 SEC metrics path):
   - ``cache_backend`` provided (the DAL's backend, normal app path): reads go
-    ``cache_backend.get_financial_cache`` — which LocalMarketDatabaseBackend makes
-    LOCAL-PRIMARY (local market DB first, PG legacy fallback + read-through
-    promotion) — then the legacy file cache (read-only; a hit is promoted into the
-    backend with its remaining TTL), then the API. Writes go to
-    ``cache_backend.set_financial_cache`` (local-primary; never the client's own PG
-    connection). The healthy path writes no files — but if the backend write FAILS
+    ``cache_backend.get_financial_cache`` in the local market DB, then the legacy
+    file cache (read-only; a hit is promoted into the backend with its remaining
+    TTL), then the API. Writes go to ``cache_backend.set_financial_cache``. The
+    healthy path writes no files — but if the backend write FAILS
     (False/raise), the legacy file cache is written as a deliberate fallback: the
     response is PAID, and with a single sink a silent write failure would mean every
     subsequent call re-pays. Do NOT remove that fallback; the next read self-heals
     it into the backend via the file→backend promotion.
-  - ``cache_backend=None`` (standalone scripts/tests): legacy behavior unchanged —
-    env-``DATABASE_URL`` PG → file → API, writes to PG + file.
+  - ``cache_backend=None`` (standalone scripts/tests): file → API, with file writes.
 
 Usage:
     from data_sources.financial_datasets_client import FinancialDatasetsClient
@@ -69,18 +66,9 @@ class FinancialDatasetsClient:
         cache_days: Optional[Dict[str, int]] = None,
         cache_backend: Optional[Any] = None,
     ):
-        """``cache_backend`` is the DAL's data backend (duck-typed:
-        ``get_financial_cache(cache_key)`` + ``set_financial_cache(...)``). When set,
-        ALL cache writes go through it (local-primary via LocalMarketDatabaseBackend)
-        and the client's own env-PG connection is never used. When None, the legacy
-        standalone behavior (env-PG + file) is unchanged."""
+        """Use the explicitly supplied local cache owner when present."""
         self.api_key = api_key or os.getenv("FINANCIAL_DATASETS_API_KEY")
-        self._db_url = os.getenv("DATABASE_URL")
-        self._cache_backend = cache_backend if (
-            cache_backend is not None
-            and hasattr(cache_backend, "get_financial_cache")
-            and hasattr(cache_backend, "set_financial_cache")
-        ) else None
+        self._cache_backend = cache_backend
         self._cache_days = {**_DEFAULT_TTL, **(cache_days or {})}
 
     # ------------------------------------------------------------------
@@ -179,10 +167,7 @@ class FinancialDatasetsClient:
         return data
 
     def _get_cache(self, cache_key: str, period: str) -> Optional[Dict]:
-        """Backend (local-primary) → file (legacy, promoted) → None; or the legacy
-        env-PG → file order when no cache_backend was provided."""
-        # 1. The DAL backend cache (local market DB first w/ PG legacy fallback +
-        #    promotion when routing is on — see LocalMarketDatabaseBackend).
+        """Local cache owner → file fallback → miss."""
         if self._cache_backend is not None:
             try:
                 row = self._cache_backend.get_financial_cache(cache_key)
@@ -190,15 +175,7 @@ class FinancialDatasetsClient:
                     return row
             except Exception as e:
                 logger.debug(f"backend cache read failed: {e}")
-        elif self._db_url:  # legacy standalone: the client's own PG connection
-            try:
-                row = self._db_get(cache_key)
-                if row is not None:
-                    return row
-            except Exception as e:
-                logger.debug(f"DB cache read failed: {e}")
-
-        # 2. File cache (legacy). With a cache_backend this is READ-ONLY fallback for
+        # File cache. With a cache_backend this is a read-only fallback for
         #    pre-unification entries; a hit is promoted into the backend with its
         #    remaining TTL so the file cache migrates into the local-primary store.
         ttl_days = self._cache_days.get(period, 90)
@@ -238,14 +215,12 @@ class FinancialDatasetsClient:
         self, cache_key: str, period: str, ticker: str, data: Dict,
     ) -> None:
         """Cache a fresh API response (best-effort). With a cache_backend the write
-        goes through it (local-primary; never the client's own PG) — the local
-        market DB plays the file cache's old offline role. The legacy file write
+        goes through the local market DB. The legacy file write
         happens ONLY if the backend write fails: the response is PAID, and with a
         single sink a silent write failure would mean every subsequent call re-pays
         (legacy mode had two independent sinks). The file fallback restores that
         second failure domain, and the next read self-heals it back into the
-        backend via the file→backend promotion. Legacy standalone mode keeps the
-        old PG + file dual write."""
+        backend via the file→backend promotion. Standalone mode writes the file."""
         ttl_days = self._cache_days.get(period, 90)
         now = datetime.now(timezone.utc)
         expires = now + timedelta(days=ttl_days)
@@ -267,12 +242,6 @@ class FinancialDatasetsClient:
             self._write_file_cache(cache_key, ticker, data, now, expires)
             return
 
-        # legacy standalone: PG + file dual write
-        if self._db_url:
-            try:
-                self._db_upsert(cache_key, ticker, data, now, expires)
-            except Exception as e:
-                logger.debug(f"DB cache write failed: {e}")
         self._write_file_cache(cache_key, ticker, data, now, expires)
 
     def _write_file_cache(
@@ -290,59 +259,6 @@ class FinancialDatasetsClient:
             }, indent=2, default=str))
         except Exception as e:
             logger.debug(f"File cache write failed: {e}")
-
-    # ------------------------------------------------------------------
-    # DB helpers
-    # ------------------------------------------------------------------
-
-    def _db_get(self, cache_key: str) -> Optional[Dict]:
-        """Get cached data from DB if not expired."""
-        import psycopg2
-        import psycopg2.extras
-
-        with psycopg2.connect(self._db_url) as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT data FROM financial_data_cache "
-                    "WHERE cache_key = %s AND expires_at > NOW()",
-                    [cache_key],
-                )
-                row = cur.fetchone()
-                return row["data"] if row else None
-
-    def _db_upsert(
-        self,
-        cache_key: str,
-        ticker: str,
-        data: Dict,
-        fetched_at: datetime,
-        expires_at: datetime,
-    ) -> None:
-        """Insert or update cache entry."""
-        import psycopg2
-        import psycopg2.extras
-
-        with psycopg2.connect(self._db_url) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO financial_data_cache
-                        (cache_key, source, ticker, data, fetched_at, expires_at)
-                    VALUES (%s, 'financial_datasets', %s, %s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        data = EXCLUDED.data,
-                        fetched_at = EXCLUDED.fetched_at,
-                        expires_at = EXCLUDED.expires_at
-                    """,
-                    [
-                        cache_key,
-                        ticker.upper(),
-                        psycopg2.extras.Json(data),
-                        fetched_at,
-                        expires_at,
-                    ],
-                )
-            conn.commit()
 
     # ------------------------------------------------------------------
     # HTTP

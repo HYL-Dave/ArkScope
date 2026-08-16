@@ -1,10 +1,4 @@
-"""Tests for SACaptureDatabaseBackend (slice 3d prep-2).
-
-Hermetic: tmp_path SQLite DBs only. The fixture POISONS DatabaseBackend._get_conn
-for every test, so ANY sa_* code path that touches PostgreSQL fails loudly with
-AssertionError('PG touched') — the hard-cutover (no-PG-fallback, locked L1)
-guarantee is therefore enforced suite-wide, not just in the dedicated test.
-"""
+"""Hermetic contracts for the current local SA capture backend."""
 
 from __future__ import annotations
 
@@ -13,27 +7,22 @@ import sqlite3
 import pytest
 
 import src.sa_capture_store as scs
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
-from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
-
-FAKE_DSN = "postgresql://fake:fake@127.0.0.1:9/fake"
+from src.tools.backends.local_market_backend import LocalMarketBackend
+from src.tools.backends.sa_capture_backend import SACaptureBackend
 
 T1 = "2026-06-13T01:00:00Z"            # JS-style Z suffix
-T2 = "2026-06-13 02:00:00+00"          # PG-style short offset (canon_ts must unify)
+T2 = "2026-06-13 02:00:00+00"
 T1_CANON = "2026-06-13T01:00:00+00:00"
 T2_CANON = "2026-06-13T02:00:00+00:00"
 
 
-def _poison_get_conn(self):
-    raise AssertionError("PG touched")
-
-
 @pytest.fixture()
-def backend(tmp_path, monkeypatch):
-    # No sa_* call may ever reach PG — not even on empty local results (L1).
-    monkeypatch.setattr(DatabaseBackend, "_get_conn", _poison_get_conn)
-    return SACaptureDatabaseBackend(FAKE_DSN, sa_db=str(tmp_path / "sa_capture.db"))
+def backend(tmp_path):
+    return SACaptureBackend(
+        sa_db=str(tmp_path / "sa_capture.db"),
+        market_db=str(tmp_path / "market_data.db"),
+        base_path=tmp_path,
+    )
 
 
 def _pick(symbol="AAPL", picked="2026-01-02", **kw):
@@ -106,15 +95,14 @@ def _comment(comment_id: str) -> dict:
     }
 
 
-# --- (1) isinstance gate + lazy PG -------------------------------------------------
+# --- (1) direct local composition ---------------------------------------------------
 
 
 def test_isinstance_gate_and_lazy_construction(backend):
-    # The ~10 DAL gates require a real DatabaseBackend; construction with a fake
-    # DSN + poisoned _get_conn proves PG is only ever contacted lazily (never for
-    # sa_* on this class).
-    assert isinstance(backend, DatabaseBackend)
-    assert isinstance(backend, LocalMarketDatabaseBackend)
+    assert type(backend) is SACaptureBackend
+    assert isinstance(backend, LocalMarketBackend)
+    assert not hasattr(backend, "_dsn")
+    assert not hasattr(backend, "_get_conn")
 
 
 # --- (2) apply_sa_refresh end-to-end + canon_ts mark-stale ordering ----------------
@@ -261,7 +249,7 @@ def test_market_news_query_by_ticker_and_fts_keyword(backend):
         _news("n2", tickers=["NVDA"], title="Nvidia datacenter surge", summary="AI capex",
               published_at="2026-06-11T12:00:00Z"),
     ])
-    by_ticker = backend.query_sa_market_news(ticker="nvda")  # upper-cased like PG path
+    by_ticker = backend.query_sa_market_news(ticker="nvda")
     assert [r["news_id"] for r in by_ticker] == ["n2"]
     assert by_ticker[0]["tickers"] == ["NVDA"]
 
@@ -759,19 +747,10 @@ def test_audit_unresolved_symbols_exact_and_like_fallback(backend):
     assert after == before
 
 
-# --- (9) NO-PG-FALLBACK proof -------------------------------------------------------
+# --- (9) honest local empty results -------------------------------------------------
 
 
-def test_no_pg_fallback_even_on_empty_results(backend, monkeypatch):
-    # Belt-and-braces on top of the fixture's _get_conn poison: poison the base
-    # class sa_* methods themselves; empty local results must NEVER reach them.
-    def _raise(self, *a, **k):
-        raise AssertionError("PG touched")
-
-    for name in ("query_sa_picks", "get_sa_pick_detail", "query_sa_market_news",
-                 "get_sa_refresh_meta", "query_sa_articles"):
-        monkeypatch.setattr(DatabaseBackend, name, _raise)
-
+def test_empty_results_are_honest_local_results(backend):
     scs.connect(backend._sa_db).close()  # create the (empty) schema
 
     assert backend.query_sa_picks() == []
@@ -793,78 +772,3 @@ def test_no_pg_fallback_even_on_empty_results(backend, monkeypatch):
     assert backend.sanitize_corrupted_sa_comments_counts() == 0
     assert backend.cleanup_mixed_null_date_comment_duplicates() == {
         "groups_processed": 0, "comments_deleted": 0, "parent_links_repointed": 0}
-
-
-# --- (10) read shapes match the PG methods (key-set parity) ------------------------
-
-# Key sets transcribed from the PG method sources in db_backend.py.
-PG_QUERY_SA_PICKS_KEYS = {
-    "symbol", "company", "picked_date", "closed_date", "portfolio_status",
-    "is_stale", "return_pct", "sector", "sa_rating", "holding_pct",
-    "has_detail", "last_seen_snapshot", "fetched_at", "updated_at",
-}
-# get_sa_pick_detail is SELECT * — PG table columns (sql/007 + canonical_article_id)
-PG_PICK_DETAIL_KEYS = {
-    "id", "symbol", "company", "picked_date", "closed_date", "portfolio_status",
-    "is_stale", "return_pct", "sector", "sa_rating", "holding_pct",
-    "detail_report", "detail_fetched_at", "raw_data", "last_seen_snapshot",
-    "canonical_article_id", "fetched_at", "updated_at",
-}
-PG_MARKET_NEWS_KEYS = {
-    "news_id", "url", "title", "published_at", "published_text", "tickers",
-    "category", "summary", "comments_count", "body_markdown",
-    "detail_fetched_at", "fetched_at", "updated_at",
-}
-PG_QUERY_SA_ARTICLES_KEYS = {
-    "article_id", "url", "title", "ticker", "published_date", "article_type",
-    "comments_count", "has_content", "detail_fetched_at", "comments_fetched_at",
-    "stored_comments_count", "comments_count_observed_at",
-    "provider_comments_count_at_last_scan", "comment_recovery_state",
-    "comment_recovery_started_at", "comment_recovery_baseline_max_row_id",
-    "comment_recovery_full_miss_count", "comment_recovery_parked_at",
-    "comment_recovery_last_terminal_at", "comment_recovery_last_terminal_reason",
-}
-# get_sa_article_with_comments is SELECT * plus the injected "comments"; v2 adds
-# source-specific provider observations while preserving every legacy key.
-PG_ARTICLE_WITH_COMMENTS_KEYS = {
-    "id", "article_id", "url", "title", "ticker", "author", "published_date",
-    "article_type", "body_markdown", "comments_count", "detail_fetched_at",
-    "comments_fetched_at", "raw_data", "fetched_at", "updated_at", "comments",
-    "list_ticker", "list_ticker_observed_at", "detail_ticker",
-    "detail_ticker_observed_at", "comments_count_observed_at",
-    "provider_comments_count_at_last_scan", "comment_recovery_state",
-    "comment_recovery_started_at", "comment_recovery_baseline_max_row_id",
-    "comment_recovery_full_miss_count", "comment_recovery_parked_at",
-    "comment_recovery_last_terminal_at", "comment_recovery_last_terminal_reason",
-}
-PG_COMMENT_KEYS = {
-    "comment_id", "parent_comment_id", "commenter", "comment_text",
-    "upvotes", "comment_date",
-}
-PG_REFRESH_META_KEYS = {
-    "scope", "last_attempt_at", "last_success_at", "snapshot_ts",
-    "row_count", "ok", "last_error", "updated_at",
-}
-
-
-def test_read_shapes_match_pg_key_sets(backend):
-    backend.apply_sa_refresh("current", [_pick("NVDA", picked="2026-06-01")], T1, T1)
-    backend.upsert_sa_market_news([_news()])
-    backend.upsert_sa_articles_meta([_article("a1")])
-    backend.save_article_with_comments("a1", "body", _comments())
-
-    assert set(backend.query_sa_picks()[0]) == PG_QUERY_SA_PICKS_KEYS
-    assert set(backend.get_sa_pick_detail("NVDA")) == PG_PICK_DETAIL_KEYS
-
-    news = backend.query_sa_market_news()[0]
-    assert set(news) == PG_MARKET_NEWS_KEYS
-    assert isinstance(news["tickers"], list)                 # PG TEXT[] → Python list
-
-    assert set(backend.query_sa_articles()[0]) == PG_QUERY_SA_ARTICLES_KEYS
-
-    art = backend.get_sa_article_with_comments("a1")
-    assert set(art) == PG_ARTICLE_WITH_COMMENTS_KEYS
-    assert isinstance(art["raw_data"], dict)                 # jsonb→dict parity
-    assert set(art["comments"][0]) == PG_COMMENT_KEYS
-
-    assert set(backend.get_sa_refresh_meta()["current"]) == PG_REFRESH_META_KEYS

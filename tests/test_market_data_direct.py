@@ -36,11 +36,6 @@ def test_normalize_utc_already_aware_utc_idempotent():
     assert mdd._normalize_utc(aware) == "2026-06-22T13:30:00+0000"
 
 
-def test_normalize_utc_format_matches_pg_literal():
-    # the exact shape PG's TO_CHAR(... 'YYYY-MM-DD"T"HH24:MI:SS+0000') produces:
-    # 'T' separator, '+0000' (no colon) offset.
-    s = mdd._normalize_utc(datetime(2026, 6, 22, 9, 30, 0))
-    assert s[10] == "T" and s.endswith("+0000") and ":" not in s.split("T")[1][8:]
 
 
 def test_normalize_utc_polygon_epoch_matches_ibkr_path():
@@ -108,7 +103,7 @@ def test_preflight_idempotent_second_run_noop(tmp_path):
     assert all(v == 0 for v in res2["folded"].values())  # nothing left to fold
 
 
-def test_preflight_touches_no_pg(tmp_path):
+def test_preflight_reads_only_local_state(tmp_path):
     # local-only (lock 8): a PG dial must never happen on this path.
     db = tmp_path / "m.db"
     _live_shaped_db(db)

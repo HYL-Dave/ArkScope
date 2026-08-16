@@ -40,16 +40,14 @@ def test_factory_returns_local_store_when_toggle_off_after_n9(tmp_path, monkeypa
 def test_dal_local_macro_toggle_default_off_and_env(monkeypatch, tmp_path):
     from src.tools.data_access import DataAccessLayer
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
-    # Hermetic: point at an EMPTY tmp profile DB — deleting the var would fall back
-    # to the real data/profile_state.db, whose use_local_macro=true breaks the
-    # default-OFF assertion on a configured host.
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(tmp_path / "macro_calendar.db"))
     (tmp_path / "config").mkdir()
     (tmp_path / "data").mkdir(exist_ok=True)
-    dal = DataAccessLayer(base_path=tmp_path)     # FileBackend, no PG
-    assert dal._local_macro_enabled() is True     # post-N9 default local
+    dal = DataAccessLayer(base_path=tmp_path)
+    assert isinstance(get_macro_calendar_store(dal), MacroCalendarLocalStore)
     monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")
-    assert dal._local_macro_enabled() is True      # env override
+    assert isinstance(get_macro_calendar_store(dal), MacroCalendarLocalStore)
 
 
 def test_local_store_table_stats(tmp_path):
@@ -63,7 +61,7 @@ def test_local_store_table_stats(tmp_path):
     assert stats["macro_series"]["row_count"] == 0
 
 
-def test_health_local_first_without_pg(tmp_path, monkeypatch):
+def test_health_reads_local_calendar_store(tmp_path, monkeypatch):
     # local toggle ON + a seeded macro_calendar.db + NO PG backend → health computes table
     # coverage from the local DB (does not fall to the db-unavailable report).
     db = tmp_path / "macro_calendar.db"

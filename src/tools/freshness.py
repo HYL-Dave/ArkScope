@@ -44,17 +44,17 @@ class SourceHealth:
 class FreshnessRegistry:
     """Track freshness of all data sources.
 
-    Uses db_backend.query_health_stats() for DB queries.
+    Uses the injected local capability's ``query_health_stats()`` method.
     Internal cache (5 min) avoids repeated scans.
     Thread-safe via _scan_lock.
     """
 
     def __init__(
         self,
-        db_backend=None,
+        local_capability=None,
         thresholds: Optional[Dict[str, int]] = None,
     ) -> None:
-        self._backend = db_backend
+        self._backend = local_capability
         self._thresholds = thresholds or _DEFAULT_THRESHOLDS
         self._scan_lock = threading.Lock()
         self._cache: Dict[str, SourceHealth] = {}
@@ -307,16 +307,16 @@ _registry_lock = threading.Lock()
 _registry_backend_id: Optional[int] = None
 
 
-def get_registry(db_backend=None) -> Optional[FreshnessRegistry]:
+def get_registry(local_capability=None) -> Optional[FreshnessRegistry]:
     """Get or create the process-level singleton FreshnessRegistry.
 
-    Thread-safe. If db_backend changes (different instance), rebuilds.
+    Thread-safe. If the capability instance changes, rebuilds.
     """
     global _registry_instance, _registry_backend_id
-    if db_backend is None:
+    if local_capability is None:
         return _registry_instance
 
-    backend_id = id(db_backend)
+    backend_id = id(local_capability)
     if _registry_instance is not None and _registry_backend_id == backend_id:
         return _registry_instance
 
@@ -324,7 +324,7 @@ def get_registry(db_backend=None) -> Optional[FreshnessRegistry]:
         # Double-check under lock
         if _registry_instance is not None and _registry_backend_id == backend_id:
             return _registry_instance
-        _registry_instance = FreshnessRegistry(db_backend=db_backend)
+        _registry_instance = FreshnessRegistry(local_capability=local_capability)
         _registry_backend_id = backend_id
         return _registry_instance
 
@@ -343,25 +343,14 @@ def check_data_freshness(dal) -> str:
     """Check health and freshness of all data sources.
 
     Returns detailed report of each source's status.
-    Requires database backend; returns informational message for file backend.
     """
     try:
-        from src.tools.backends.db_backend import DatabaseBackend
-    except ImportError:
-        return "Data freshness check requires database backend (psycopg2 not available)."
-
-    if not hasattr(dal, "_backend") or not isinstance(dal._backend, DatabaseBackend):
-        return (
-            "Data freshness check requires database backend. "
-            "File-based backend does not support health queries."
-        )
-
-    registry = get_registry(db_backend=dal._backend)
-    if registry is None:
-        return "Failed to initialize freshness registry."
-
-    registry.scan(force=True)
-    return registry.format_detailed()
+        registry = get_registry(local_capability=dal._backend)
+        registry.scan(force=True)
+        return registry.format_detailed()
+    except Exception as exc:
+        logger.warning("Freshness check unavailable: %s", exc)
+        return "Data freshness is unavailable from the current local authority."
 
 
 # ── Utility ───────────────────────────────────────────────────

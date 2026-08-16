@@ -131,7 +131,7 @@ def test_delete_thread_missing_is_false(store):
     assert store.delete_thread("missing") is False
 
 
-def test_local_only_no_pg(store):
+def test_local_storage_round_trip(store):
     assert store.db_path.endswith(".db")
     assert not hasattr(store, "_pg_conn") and not hasattr(store, "_get_conn")
 

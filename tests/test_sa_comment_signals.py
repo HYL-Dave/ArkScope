@@ -363,69 +363,33 @@ def test_chinese_hedges_still_work():
 
 def test_backfill_max_extracted_caps_inside_batch():
     """max_extracted=3 with batch_size=10 must stop at row 3, not row 10."""
+    from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
     from src.sa.comment_signal_backfill import run_backfill
 
-    # Fake DAL with DatabaseBackend-shaped backend
-    dal = MagicMock()
-    backend = MagicMock()
+    dal = SimpleNamespace(_backend=SimpleNamespace(_sa_db="unused-sa-capture.db"))
     conn = MagicMock()
-    backend._get_conn.return_value = conn
-    dal._backend = backend
-    # No watchlist / alpha picks
-    dal.get_watchlist.return_value = MagicMock(tickers=[])
-
-    # Build a stream of fake batch rows (10 per batch, 3 batches available)
-    rows_per_batch = [
-        [
-            (i, f"art-{i}", f"cm-{i}", f"NVDA earnings update #{i}", 0)
-            for i in range(1, 11)
-        ],
-        [
-            (i, f"art-{i}", f"cm-{i}", f"AMD beat #{i}", 0)
-            for i in range(11, 21)
-        ],
-        [],  # exhausted
+    rows = [
+        (i, f"art-{i}", f"cm-{i}", f"NVDA earnings update #{i}", 0)
+        for i in range(1, 11)
     ]
-    cursors = []
 
-    def cursor_factory(**_kwargs):
-        cur = MagicMock()
-        cur.__enter__ = MagicMock(return_value=cur)
-        cur.__exit__ = MagicMock(return_value=False)
-        cursors.append(cur)
-        return cur
+    with (
+        patch(
+            "src.sa.comment_signal_backfill.build_ticker_universe",
+            return_value={"NVDA"},
+        ),
+        patch("src.sa_capture_store.connect", return_value=conn),
+        patch("src.sa_capture_store.count_pending_signals", return_value=30),
+        patch("src.sa_capture_store.fetch_pending_comments", return_value=rows) as fetch,
+        patch("src.sa_capture_store.upsert_comment_signal") as upsert,
+    ):
+        result = run_backfill(dal, batch_size=10, max_extracted=3)
 
-    conn.cursor.side_effect = cursor_factory
-
-    # First call: alpha picks SELECT (universe build) → empty
-    # Second call: count pending → 30
-    # Third call: fetch first batch → rows
-    # ... etc. The pattern is loose; we control fetchone/fetchall via side_effect.
-    fetchone_results = iter([
-        (30,),  # count_pending
-    ])
-    fetchall_results = iter([
-        [],            # alpha picks SELECT (universe)
-        rows_per_batch[0],
-        rows_per_batch[1],
-        rows_per_batch[2],
-    ])
-
-    def make_cursor():
-        cur = MagicMock()
-        cur.__enter__ = MagicMock(return_value=cur)
-        cur.__exit__ = MagicMock(return_value=False)
-        cur.fetchone.side_effect = lambda: next(fetchone_results, None)
-        cur.fetchall.side_effect = lambda: next(fetchall_results, [])
-        cur.execute = MagicMock()
-        return cur
-
-    conn.cursor.side_effect = lambda *a, **k: make_cursor()
-
-    result = run_backfill(dal, batch_size=10, max_extracted=3)
     # Cap must apply inside the batch — only 3 rows extracted, not 10.
     assert result["extracted_count"] == 3
+    assert fetch.call_count == 1
+    assert upsert.call_count == 3
 
 
 # ---------------------------------------------------------------------------

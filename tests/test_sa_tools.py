@@ -30,12 +30,12 @@ from src.tools.sa_tools import (
     _is_sa_enabled,
 )
 from src.tools.data_access import DataAccessLayer, _sanitize_sa_comments_count
-from src.tools.backends.db_backend import (
-    DatabaseBackend,
+from src.tools.backends.local_capabilities import LocalDataCapabilities
+from src.tools.backends.sa_capture_backend import (
+    SACaptureBackend,
     _plan_comment_duplicate_cleanup,
     _prepare_comments_for_upsert,
 )
-from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
 from src.tools.registry import create_default_registry
 
 
@@ -481,7 +481,7 @@ class TestStaleReconciliation:
         """Reconciliation marks old picks not in new set as stale."""
         from src.tools.data_access import DataAccessLayer
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock()  # Not DatabaseBackend
+        dal._backend = MagicMock()
 
         old_picks = [
             {"symbol": "NVDA", "picked_date": "2025-01-15", "is_stale": False},
@@ -535,7 +535,7 @@ class TestDALDualBackend:
                 ], f)
 
             dal = DataAccessLayer.__new__(DataAccessLayer)
-            dal._backend = MagicMock()  # Not DatabaseBackend
+            dal._backend = MagicMock()
             dal._SA_CACHE_DIR = cache_dir
 
             result = dal._load_sa_file_cache("current")
@@ -820,10 +820,8 @@ class TestSaveDetailContract:
     def test_db_success_returns_true(self):
         """save_sa_pick_detail returns True when DB update succeeds."""
         from src.tools.data_access import DataAccessLayer
-        from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
-
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.update_sa_pick_detail.return_value = True
         dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
 
@@ -834,10 +832,8 @@ class TestSaveDetailContract:
     def test_db_failure_returns_false(self):
         """save_sa_pick_detail returns False when DB row not found (not masked by file save)."""
         from src.tools.data_access import DataAccessLayer
-        from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
-
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.update_sa_pick_detail.return_value = False  # No row found
         dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
 
@@ -847,10 +843,8 @@ class TestSaveDetailContract:
     def test_db_exception_returns_false(self):
         """save_sa_pick_detail returns False when DB throws exception."""
         from src.tools.data_access import DataAccessLayer
-        from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
-
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.update_sa_pick_detail.side_effect = RuntimeError("conn lost")
         dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
 
@@ -864,7 +858,8 @@ class TestGetDetailFileMerge:
         from src.tools.data_access import DataAccessLayer
 
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock()  # Not DatabaseBackend
+        dal._backend = MagicMock()
+        dal._backend.get_sa_pick_detail.return_value = None
         dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
 
         # Mock file loaders
@@ -890,7 +885,8 @@ class TestGetDetailFileMerge:
         from src.tools.data_access import DataAccessLayer
 
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock()  # Not DatabaseBackend
+        dal._backend = MagicMock()
+        dal._backend.get_sa_pick_detail.return_value = None
         dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
 
         dal._load_sa_file_detail = MagicMock(return_value={
@@ -906,15 +902,10 @@ class TestGetDetailFileMerge:
 class TestDataAccessMarketNews:
     @staticmethod
     def _recovery_dal(tmp_path, monkeypatch):
-        monkeypatch.setattr(
-            DatabaseBackend,
-            "_get_conn",
-            lambda _self: (_ for _ in ()).throw(AssertionError("PG touched")),
-        )
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = SACaptureDatabaseBackend(
-            "postgresql://fake:fake@127.0.0.1:9/fake",
+        dal._backend = SACaptureBackend(
             sa_db=str(tmp_path / "sa_capture.db"),
+            market_db=str(tmp_path / "market_data.db"),
         )
         return dal
 
@@ -942,7 +933,7 @@ class TestDataAccessMarketNews:
     def test_save_sa_market_news_normalizes_items(self):
         """Market-news persistence normalizes IDs, tickers, and comment counts."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.upsert_sa_market_news.return_value = 1
         dal._backend.query_sa_market_news_need_detail.return_value = [
             {"news_id": "1234567-fed-update", "url": "https://seekingalpha.com/news/1234567-fed-update"}
@@ -977,7 +968,7 @@ class TestDataAccessMarketNews:
     def test_save_sa_market_news_includes_backfill_candidates(self):
         """Market-news save can append backlog detail candidates without duplicates."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.upsert_sa_market_news.return_value = 2
         dal._backend.query_sa_market_news_need_detail.side_effect = [
             [{"news_id": "123", "url": "https://seekingalpha.com/news/123"}],
@@ -1022,7 +1013,7 @@ class TestDataAccessMarketNews:
     def test_save_sa_market_news_respects_current_limit(self):
         """Market-news save forwards a separate current-detail quota."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.upsert_sa_market_news.return_value = 2
         dal._backend.query_sa_market_news_need_detail.side_effect = [
             [{"news_id": "123", "url": "https://seekingalpha.com/news/123"}],
@@ -1053,7 +1044,7 @@ class TestDataAccessMarketNews:
     def test_get_sa_market_news_queries_backend(self):
         """Market-news read path delegates to DB backend."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.query_sa_market_news.return_value = [{"news_id": "123"}]
 
         result = dal.get_sa_market_news(ticker="NVDA", keyword="earnings", limit=3)
@@ -1066,7 +1057,7 @@ class TestDataAccessMarketNews:
     def test_get_sa_market_news_recent_ids_queries_backend(self):
         """Recent market-news id lookup delegates to DB backend."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.query_sa_market_news_recent_ids.return_value = ["123", "124"]
 
         result = dal.get_sa_market_news_recent_ids(limit=150)
@@ -1077,7 +1068,7 @@ class TestDataAccessMarketNews:
     def test_save_sa_market_news_detail_updates_backend(self):
         """Market-news detail body persistence delegates to DB backend."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.save_sa_market_news_detail.return_value = True
 
         result = dal.save_sa_market_news_detail("123", "# Headline\n\nBody")
@@ -1214,15 +1205,10 @@ class TestDataAccessMarketNews:
     def test_market_news_recovery_queries_fail_closed_when_local_db_is_unavailable(
         self, tmp_path, monkeypatch
     ):
-        monkeypatch.setattr(
-            DatabaseBackend,
-            "_get_conn",
-            lambda _self: (_ for _ in ()).throw(AssertionError("PG touched")),
-        )
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = SACaptureDatabaseBackend(
-            "postgresql://fake:fake@127.0.0.1:9/fake",
+        dal._backend = SACaptureBackend(
             sa_db=str(tmp_path / "missing" / "sa_capture.db"),
+            market_db=str(tmp_path / "market_data.db"),
         )
 
         with pytest.raises(RuntimeError, match="sa_market_news_recovery_unavailable"):
@@ -1441,7 +1427,7 @@ class TestArticleTools:
 class TestDataAccessArticleMeta:
     def _make_dal(self):
         dal = DataAccessLayer.__new__(DataAccessLayer)
-        dal._backend = DatabaseBackend("postgresql://example")
+        dal._backend = MagicMock(spec=LocalDataCapabilities)
         dal._backend.sanitize_corrupted_sa_comments_counts = MagicMock(return_value=0)
         dal._compute_unresolved_symbols = MagicMock(return_value=[])
         return dal

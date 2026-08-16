@@ -21,7 +21,7 @@ from src.tools.registry import ToolRegistry, create_default_registry
 @lru_cache(maxsize=1)
 def get_dal() -> DataAccessLayer:
     """Singleton DataAccessLayer instance. Auto-detects Supabase from .env."""
-    return DataAccessLayer(db_dsn="auto")
+    return DataAccessLayer()
 
 
 @lru_cache(maxsize=1)

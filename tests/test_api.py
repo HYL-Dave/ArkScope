@@ -109,6 +109,18 @@ class _HermeticMarketBackend:
             frame = frame[frame["source"] == source]
         return frame.reset_index(drop=True)
 
+    def query_news_search(self, query="", ticker=None, days=30, limit=20):
+        frame = self.query_news(ticker=ticker, days=days, source="auto")
+        needle = str(query or "").casefold()
+        if needle:
+            haystack = (
+                frame["title"].fillna("").astype(str)
+                + "\n"
+                + frame["description"].fillna("").astype(str)
+            ).str.casefold()
+            frame = frame[haystack.str.contains(needle, regex=False)]
+        return frame.head(max(0, int(limit))).reset_index(drop=True)
+
     def query_prices(self, ticker, interval="15min", days=30):
         del days
         rows = _HERMETIC_PRICE_ROWS.get((ticker.upper(), interval), [])

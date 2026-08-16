@@ -103,7 +103,7 @@ def get_price_change(
     result = dal.get_prices(ticker=ticker, interval="1d", days=days)
 
     if not result.bars:
-        # DatabaseBackend may not have daily data; use 15min and resample
+        # Some local datasets only contain native 15-minute bars.
         result_15m = dal.get_prices(ticker=ticker, interval="15min", days=days)
         if result_15m.bars:
             result = _resample_to_daily_result(result_15m)

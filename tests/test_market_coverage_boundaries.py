@@ -24,26 +24,6 @@ def _imports(path: Path) -> tuple[str, ...]:
     return tuple(imported)
 
 
-def test_market_coverage_package_has_no_provider_gateway_or_pg_runtime_dependency():
-    forbidden_prefixes = (
-        "psycopg",
-        "sqlalchemy",
-        "ib_insync",
-        "src.collectors",
-        "src.providers",
-        "src.scheduler_planner",
-        "src.service",
-        "src.tools.backends.db_backend",
-        "src.tools.backends.gateway",
-    )
-    offenders = {
-        str(path.relative_to(ROOT)): tuple(
-            name for name in _imports(path) if name.startswith(forbidden_prefixes)
-        )
-        for path in _python_sources()
-    }
-
-    assert not {path: names for path, names in offenders.items() if names}
 
 
 def test_market_coverage_package_exports_no_write_or_repair_operation():

@@ -1,9 +1,4 @@
-"""Local-only fundamentals cache helpers.
-
-S-H2 makes the generic LocalMarketDatabaseBackend financial-cache path local-only.
-This helper still matters because stored fundamentals must also bypass plain
-PG DatabaseBackend rows and return an honest miss when no local SQLite cache exists.
-"""
+"""Current local fundamentals-cache helpers."""
 
 from __future__ import annotations
 
@@ -201,32 +196,17 @@ def stored_annual_sec_fundamentals(
     return projected
 
 
-def _local_cache_reader(backend: Any):
-    if backend is None:
-        return None
-    market = getattr(backend, "_market", None)
-    if market is not None and hasattr(market, "get_financial_cache"):
-        return market.get_financial_cache
-    module = type(backend).__module__
-    if module == "src.tools.backends.db_backend":
-        return None
-    if hasattr(backend, "get_financial_cache"):
-        return backend.get_financial_cache
-    return None
-
-
 def read_cached_sec_fundamentals(
     backend: Any,
     ticker: str,
     period: str = "annual",
 ) -> Tuple[Optional[FundamentalsResult], bool]:
     """Return (cached_result, negative_cached) from local cache only."""
-    reader = _local_cache_reader(backend)
-    if reader is None:
+    if backend is None:
         return None, False
     cache_key = fundamentals_analysis_cache_key(ticker, period)
     try:
-        payload = reader(cache_key)
+        payload = backend.get_financial_cache(cache_key)
     except Exception as exc:  # noqa: BLE001 - cache read must not break callers.
         logger.debug("local fundamentals cache read failed for %s: %s", cache_key, exc)
         return None, False

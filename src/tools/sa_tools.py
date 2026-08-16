@@ -268,9 +268,9 @@ def list_high_value_comments(
         return {"message": _DISABLED_MSG}
 
     backend = getattr(dal, "_backend", None)
-    if backend is None or not hasattr(backend, "_get_conn"):
+    if backend is None:
         return {
-            "error": "DB unavailable; high-value comments require the database backend.",
+            "error": "SA capture local backend unavailable.",
             "comments": [],
             "count": 0,
         }
@@ -281,57 +281,14 @@ def list_high_value_comments(
         limit = max(1, min(int(limit), 50))
         min_score = float(min_score)
 
-        # 3d prep-3 dispatch: SA-local mode is duck-typed via backend._sa_db
-        # (None/absent = PG mode, existing SQL untouched). Raw _get_conn()
-        # bypasses the DatabaseBackend method layer, so after the SA cutover
-        # this PG query would silently read the FROZEN PG — route it locally.
-        sa_db = getattr(backend, "_sa_db", None)
-        if sa_db is not None:
-            rows = _query_high_value_comments_local(
-                sa_db,
-                window_days=window_days,
-                min_score=min_score,
-                rule_set_version=_CURRENT_VERSION,
-                ticker=ticker,
-                limit=limit,
-            )
-        else:
-            conn = backend._get_conn()
-            params: List[Any] = [window_days, min_score, _CURRENT_VERSION]
-            ticker_clause = ""
-            if ticker:
-                ticker_clause = " AND %s = ANY(s.ticker_mentions)"
-                params.append(ticker.upper())
-            params.append(limit)
-
-            sql = f"""
-                SELECT
-                    c.id AS comment_row_id,
-                    c.article_id,
-                    c.comment_id,
-                    c.commenter,
-                    c.upvotes,
-                    c.comment_date,
-                    LEFT(c.comment_text, 300) AS preview,
-                    s.high_value_score,
-                    s.ticker_mentions,
-                    s.candidate_mentions,
-                    s.keyword_buckets,
-                    s.needs_verification,
-                    s.rule_set_version
-                FROM sa_comment_signals s
-                JOIN sa_article_comments c ON c.id = s.comment_row_id
-                WHERE c.comment_date >= NOW() - (%s || ' days')::INTERVAL
-                  AND s.high_value_score >= %s
-                  AND s.rule_set_version = %s
-                  {ticker_clause}
-                ORDER BY s.high_value_score DESC, c.comment_date DESC
-                LIMIT %s
-            """
-            from psycopg2 import extras as _pg_extras
-            with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-                cur.execute(sql, tuple(params))
-                rows = cur.fetchall()
+        rows = _query_high_value_comments_local(
+            backend._sa_db,
+            window_days=window_days,
+            min_score=min_score,
+            rule_set_version=_CURRENT_VERSION,
+            ticker=ticker,
+            limit=limit,
+        )
 
         comments: List[Dict[str, Any]] = []
         for r in rows:
@@ -366,19 +323,10 @@ def _query_high_value_comments_local(
     ticker: Optional[str],
     limit: int,
 ) -> List[Dict[str, Any]]:
-    """SQLite (sa_capture.db) variant of the high-value-comments query (3d prep-3).
+    """Read high-value comments from sa_capture.db.
 
-    PG-isms translated (runbook §1):
-      - ``%s = ANY(s.ticker_mentions)`` → junction membership on
-        sa_signal_ticker_mentions (TEXT[] columns were replaced by junctions, L8);
-      - ``NOW() - (N || ' days')::INTERVAL`` → Python-computed canonical cutoff
-        (comment_date is canonical UTC ISO TEXT; lexicographic == time order);
-      - LEFT(s, n) → substr(s, 1, n); RealDictCursor → sqlite3.Row.
-
-    Returns rows in the PG dict shape: ticker_mentions / candidate_mentions are
-    re-assembled into Python LISTS from the junction tables (psycopg2 TEXT[]
-    parity), keyword_buckets json.loads'd (jsonb parity), needs_verification a
-    Python bool. RULE_SET_VERSION filter + ordering semantics are identical.
+    Mention junctions are returned as Python lists, keyword buckets as decoded
+    objects, and ``needs_verification`` as a bool.
     """
     from src import sa_capture_store as store
 
@@ -423,8 +371,7 @@ def _query_high_value_comments_local(
             tuple(params),
         ).fetchall()
 
-        # Re-assemble the TEXT[] columns as Python lists (one query per junction,
-        # not N+1) — returned dicts must carry LISTS like psycopg2 did.
+        # Reassemble mention junctions with one query per table, not per row.
         row_ids = [r["comment_row_id"] for r in rows]
         mentions: Dict[str, Dict[int, List[str]]] = {"ticker": {}, "candidate": {}}
         if row_ids:
@@ -535,16 +482,15 @@ def get_sa_comment_focus(
         min_score = max(0.0, float(min_score))
 
         backend = getattr(dal, "_backend", None)
-        if backend is None or not hasattr(backend, "_get_conn"):
+        if backend is None:
             return _empty_focus(
                 window_days, min_score, rule_set_version=ver,
                 empty_reason="backend_unavailable",
-                error="DB unavailable; SA comment focus requires the database backend.")
+                error="SA capture local backend unavailable.")
 
-        sa_db = getattr(backend, "_sa_db", None)
-        if sa_db is None:
-            # SA is local-only; a backend without _sa_db is an invalid caller
-            # shape left from the retired PG routing path.
+        try:
+            sa_db = backend._sa_db
+        except AttributeError:
             return _empty_focus(
                 window_days, min_score, rule_set_version=ver,
                 empty_reason="requires_local_sa",
@@ -826,12 +772,13 @@ def get_sa_feed(
         tkr = ticker.strip().upper() if ticker else None
 
         backend = getattr(dal, "_backend", None)
-        if backend is None or not hasattr(backend, "_get_conn"):
+        if backend is None:
             return _empty_feed(
                 days, query=q, empty_reason="backend_unavailable"
             )
-        sa_db = getattr(backend, "_sa_db", None)
-        if sa_db is None:
+        try:
+            sa_db = backend._sa_db
+        except AttributeError:
             return _empty_feed(
                 days, query=q, empty_reason="requires_local_sa"
             )

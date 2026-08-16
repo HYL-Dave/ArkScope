@@ -22,7 +22,7 @@ Key presence is READ-ONLY (locked fork F5): presence + source
 may suggest importing file-backed values into the app-managed provider store.
 
 Signal sources merged (all already persisted; each degrades independently):
-  - DatabaseBackend.query_health_stats()  — news per source / prices /
+  - local capability ``query_health_stats()`` — news per source / prices /
     financial_cache per source (+ MAX(fetched_at))
   - sa_refresh_meta (get_sa_refresh_meta) — SA capture per-scope success/error
   - job_runs (get_job_runs_store(...).latest_runs_by_name) — latest run per job
@@ -74,7 +74,7 @@ def _is_us_weekend(now: datetime) -> bool:
 
 
 def _to_dt(value: Any) -> Optional[datetime]:
-    """psycopg2 datetime / ISO string / None → aware UTC datetime."""
+    """Datetime / ISO string / None -> aware UTC datetime."""
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -179,14 +179,14 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
 
     # --- signal collection (each best-effort) ---------------------------------
     stats: Dict[str, Any] = {}
-    if backend is not None and hasattr(backend, "query_health_stats"):
+    if backend is not None:
         try:
             stats = backend.query_health_stats() or {}
         except Exception as e:
             notes.append(f"query_health_stats failed: {e}")
 
     sa_meta: Dict[str, Any] = {}
-    if backend is not None and hasattr(backend, "get_sa_refresh_meta"):
+    if backend is not None:
         try:
             sa_meta = backend.get_sa_refresh_meta() or {}
         except Exception as e:

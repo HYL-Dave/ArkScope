@@ -96,21 +96,6 @@ def test_put_normalized_writes_persists_with_permission(monkeypatch):
     assert calls == [("set_normalized_news_writes", {"enabled": True})]
 
 
-def test_post_exit_profile_marker_rejects_pg_selecting_toggles(monkeypatch):
-    calls = []
-    monkeypatch.setattr(routes, "require_profile_state_write", lambda action, detail: calls.append((action, detail)))
-    store = _FakeProfileStore({NEWS_PG_EXIT_COMPLETED_KEY: "true"})
-
-    with pytest.raises(HTTPException) as local_exc:
-        routes.set_local_news(routes.LocalNewsToggle(enabled=False), store=store)
-    with pytest.raises(HTTPException) as normalized_exc:
-        routes.set_normalized_news_writes(routes.NormalizedNewsWritesToggle(enabled=False), store=store)
-
-    assert local_exc.value.status_code == 409
-    assert normalized_exc.value.status_code == 409
-    assert store.get_setting("use_local_news") is None
-    assert store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY) is None
-    assert calls == []
 
 
 def _write_completed_exit_run(path):

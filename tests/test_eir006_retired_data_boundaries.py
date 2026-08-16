@@ -38,6 +38,7 @@ _REWIRED_CURRENT = {
     "src/api/routes/market_data.py",
     "src/market_data_admin.py",
     "src/tools/analysis_tools.py",
+    "src/tools/backends/local_capabilities.py",
     "src/tools/backends/local_market_backend.py",
     "src/tools/backends/sqlite_backend.py",
     "src/tools/data_coverage_tools.py",
@@ -94,6 +95,15 @@ _HISTORICAL = {
     "docs/superpowers/specs/2026-08-08-provider-smoke-candidate-truth-design.md",
 }
 _EIR006_AUTHORITIES = {
+    "docs/design/PG_RUNTIME_CONSUMER_INVENTORY.md",
+    "docs/design/pg_runtime_inventory/backend_base.nodes",
+    "docs/design/pg_runtime_inventory/candidate_adjudications.jsonl",
+    "docs/design/pg_runtime_inventory/candidate_adjudications.tsv",
+    "docs/design/pg_runtime_inventory/candidates.jsonl",
+    "docs/design/pg_runtime_inventory/consumer_methods.tsv",
+    "docs/design/pg_runtime_inventory/pg_focused_base.nodes",
+    "docs/design/pg_runtime_inventory/surfaces.jsonl",
+    "docs/design/pg_runtime_inventory/test_nodes.tsv",
     "docs/superpowers/evidence/2026-08-03-eir-006-valuation-price-truth.md",
     "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/README.md",
     "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/cache-classification.tsv",
@@ -106,6 +116,7 @@ _EIR006_AUTHORITIES = {
     "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/task8_db_row_manifest.py",
     "docs/superpowers/evidence/2026-08-04-eir-006-deletion-manifest/task8_price_manifest.py",
     "docs/superpowers/plans/2026-08-03-eir-006-valuation-price-truth.md",
+    "docs/superpowers/plans/2026-08-16-postgresql-runtime-no-tail.md",
     "docs/superpowers/specs/2026-08-01-eir-006-valuation-price-truth-design.md",
 }
 _TEST_FIXTURES = {

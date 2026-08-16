@@ -621,20 +621,6 @@ def test_feed_empty_window(tmp_path):
     assert res["empty_reason"] == "no_items_in_window"
 
 
-def test_feed_pg_mode_requires_local(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        sa_tools,
-        "read_job_activity_if_exists",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("history inspected before local-SA routing")
-        ),
-        raising=False,
-    )
-    dal = MagicMock()
-    dal._backend = MagicMock(spec=["_get_conn"])  # no _sa_db
-    res = sa_tools.get_sa_feed(dal, days=30)
-    assert res["available"] is False and res["empty_reason"] == "requires_local_sa"
-    assert "error" not in res
 
 
 def test_feed_clamps_params(tmp_path):

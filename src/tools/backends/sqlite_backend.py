@@ -1,25 +1,19 @@
 """
-SqliteBackend — local-first market-data backend.
+SqliteBackend — current local market-data storage.
 
-Part of the PostgreSQL → local SQLite migration (see
-``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §3/§4). This backend
-serves the *market_data* domain from a local ``market_data.db`` (SQLite, WAL).
-It is NOT a full ``DataBackend`` — only the methods used by
-:class:`~src.tools.backends.local_market_backend.LocalMarketDatabaseBackend` are
-implemented: 3a = ``query_prices``; 3b = ``query_news`` (unscored) +
+This backend serves the *market_data* domain from ``market_data.db`` (SQLite,
+WAL). It implements the storage methods used by ``LocalMarketBackend``:
+3a = ``query_prices``; 3b = ``query_news`` (unscored) +
 ``query_news_search`` (FTS5); 3c-A = ``query_fundamentals``;
 3c-C = ``get_financial_cache`` + ``set_financial_cache`` (LOCAL-PRIMARY cache);
 plus ``get_available_tickers('prices'|'news'|'fundamentals')``.
-Score-dependent reads (news_scores deferred) and everything else stay on PostgreSQL.
+Score-dependent reads remain outside this storage surface.
 
 Reads open the DB **read-only** (``mode=ro``); the data tables are written only by
 the migration/lifecycle (market_data_admin), never here — with ONE exception:
 ``set_financial_cache`` is the local-primary cache's single writable path (opens a
-WAL + busy_timeout connection). The on-disk ``datetime`` is stored as the same UTC
-string PostgreSQL emits (``YYYY-MM-DDTHH:MM:SS+0000``) so 15min rows pass through
-unchanged and 1h/1d roll up by string-prefix grouping in pandas — the SQLite
-analogue of the PG ``date_trunc`` aggregation (no ``date_trunc`` in SQLite),
-matching the FileBackend resample contract.
+WAL + busy_timeout connection). Datetimes use canonical UTC strings so 15-minute
+rows pass through unchanged and 1h/1d roll up by string-prefix grouping in pandas.
 """
 
 from __future__ import annotations
@@ -101,8 +95,7 @@ class SqliteBackend:
 
         Returns native rows at the requested interval; for 1d/1h with no native
         rows, rolls up from stored 15min bars (first-open / max-high / min-low /
-        last-close / sum-volume) — same definition as the PG path. Empty frame on
-        any miss (LocalMarketDatabaseBackend then falls back to PG).
+        last-close / sum-volume). A miss returns an honest empty frame.
         """
         ticker = self._canon(ticker)
         db_interval = _INTERVAL_MAP.get(interval, interval)
@@ -114,7 +107,7 @@ class SqliteBackend:
         try:
             conn = self._connect()
         except sqlite3.OperationalError:
-            return empty  # db missing/unreadable → caller falls back to PG
+            return empty
         try:
             native = conn.execute(
                 "SELECT datetime, open, high, low, close, volume FROM prices "
@@ -187,8 +180,9 @@ class SqliteBackend:
         return self._news_df(sql, params, _NEWS_COLS)
 
     def query_health_stats(self) -> dict:
-        """Local recompute of freshness/health stats from market_data.db — SAME shape as
-        DatabaseBackend.query_health_stats (``{news,prices,financial_cache}``,
+        """Recompute freshness/health stats from market_data.db.
+
+        The shape is ``{news,prices,financial_cache}``,
         each ``{"rows": [positional tuples], "error": str|None}``), so provider-health /
         freshness stop needing PG. A missing optional table is an honest empty (error None),
         not a failure — same 'tolerate a pre-X DB' stance as the rest of the local backend."""
@@ -530,8 +524,7 @@ class SqliteBackend:
 
     def get_financial_cache(self, cache_key: str) -> Optional[dict]:
         """LOCAL financial_cache read (cache_key-keyed), expiry-checked against now.
-        Returns None on miss / expired / missing table (pre-3c-C DB) so
-        LocalMarketDatabaseBackend can fall back to PG."""
+        Returns None on miss, expiry, or a missing table."""
         try:
             conn = self._connect()  # read-only
         except sqlite3.OperationalError:
@@ -558,7 +551,7 @@ class SqliteBackend:
                             expires_at: Optional[str] = None) -> bool:
         """LOCAL-only financial_cache write — the single writable entry point of this
         backend. ``fetched_at``/``expires_at`` may be passed explicitly to promote an
-        existing PG row verbatim (preserving its TTL); otherwise derived from
+        existing local row verbatim (preserving its TTL); otherwise derived from
         ``ttl_days`` at now. Best-effort: returns False on any failure.
 
         Serialized against a bootstrap rebuild via ``_CACHE_WRITE_LOCK`` so a write
@@ -625,5 +618,6 @@ class SqliteBackend:
         finally:
             conn.close()
 
-    def close(self) -> None:  # symmetry with DatabaseBackend; nothing persistent to close
+    def close(self) -> None:
+        """No persistent connection is held by this backend."""
         pass

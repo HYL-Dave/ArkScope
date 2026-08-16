@@ -6,8 +6,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import src.sa_native_host as host
-from src.tools.backends.db_backend import DatabaseBackend
-from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
+from src.tools.backends.sa_capture_backend import SACaptureBackend
 from src.tools.data_access import DataAccessLayer
 
 
@@ -103,7 +102,7 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
 
     meta_calls = []
 
-    class MetaBackend(DatabaseBackend):
+    class MetaBackend:
         def __init__(self):
             self.query_count = 0
 
@@ -151,7 +150,7 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
 def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok():
     calls = []
 
-    class Backend(DatabaseBackend):
+    class Backend:
         def __init__(self):
             pass
 
@@ -283,8 +282,10 @@ def test_get_reconciliation_queue_action_is_read_only_and_sanitized(
     conn = sqlite3.connect(path)
     conn.executescript(_V1_MINIMAL_SCHEMA)
     conn.close()
-    backend = SACaptureDatabaseBackend(
-        "postgresql://poison.invalid/arkscope", sa_db=str(path)
+    backend = SACaptureBackend(
+        sa_db=str(path),
+        market_db=str(tmp_path / "market_data.db"),
+        base_path=tmp_path,
     )
     dal = _dal_with_backend(backend)
     monkeypatch.setattr(
@@ -294,7 +295,6 @@ def test_get_reconciliation_queue_action_is_read_only_and_sanitized(
     first = host.handle_message({"action": "get_reconciliation_queue", "limit": 50})
     assert first["status"] == "ok"
     assert first["total"] == 1
-    assert "poison.invalid" not in json.dumps(first)
 
     check = sqlite3.connect(path)
     try:
@@ -474,29 +474,3 @@ def test_compatibility_audit_returns_queue_without_mutation():
     assert result["unresolved_symbols"] == ["BTSG"]
     assert result["resolved_by_fulltext"] == 0
     assert result["review_queue"]["total"] == 1
-
-
-def test_retired_pg_reconciliation_methods_never_connect():
-    class NoPG(DatabaseBackend):
-        def __init__(self):
-            pass
-
-        def _get_conn(self):
-            raise AssertionError("retired PG method attempted a connection")
-
-    backend = NoPG()
-    assert backend.reconcile_sa_articles(article_ids=["6316639"]) == {
-        "status": "unavailable", "reason": "pg_sa_retired", "enrichment": [],
-    }
-    assert backend.query_sa_article_review_queue() == {"events": [], "total": 0}
-    assert backend.resolve_sa_reconciliation_event(
-        symbol="BTSG", role="entry", event_anchor_date="2026-07-15"
-    ) == {"status": "unavailable", "reason": "pg_sa_retired"}
-    assert backend.accept_sa_article_link(
-        lineage_id=7, role="entry", event_anchor_date="2026-07-15",
-        article_id="6316639",
-    ) == {"status": "unavailable", "reason": "pg_sa_retired"}
-    assert backend.reject_sa_article_candidate(
-        lineage_id=7, role="entry", event_anchor_date="2026-07-15",
-        article_id="6316639", reason_code="user_rejected",
-    ) == {"status": "unavailable", "reason": "pg_sa_retired"}

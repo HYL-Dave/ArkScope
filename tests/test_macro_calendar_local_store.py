@@ -186,7 +186,7 @@ def test_empty_db_honest_empty(store):
     assert store.read_economic_event_as_of(123, _dt(2026, 1, 1)) is None
 
 
-def test_no_pg_dependency(store, monkeypatch):
+def test_imports_with_declared_local_dependencies(store, monkeypatch):
     # the whole store must work with NO psycopg2 / _get_conn anywhere on the path.
     import src.macro_calendar.local_store as mod
     assert not hasattr(mod, "psycopg2")
@@ -327,7 +327,7 @@ def test_fetched_at_present_on_all_health_tables(store, tmp_path):
         assert "fetched_at" in _columns(db, t), f"{t} missing fetched_at (health MAX(fetched_at) needs it)"
 
 
-def test_not_null_parity_with_pg(store, tmp_path):
+def test_rejects_null_required_fields(store, tmp_path):
     db = tmp_path / "macro_calendar.db"
     ms = _columns(db, "macro_series")
     for col in ("title", "frequency", "units"):

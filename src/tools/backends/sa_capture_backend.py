@@ -1,49 +1,7 @@
-"""
-SACaptureDatabaseBackend — slice 3d prep-2: every Seeking-Alpha (sa_*) method of
-the PostgreSQL DatabaseBackend re-implemented against data/sa_capture.db.
+"""Current local Seeking Alpha capture and market data capabilities.
 
-HARD CUTOVER SEMANTICS (runbook L1 / SPEC LOCK #9): every sa_* override hits
-ONLY sa_capture.db. NEVER super() for sa_* methods, never a PG fallback — not
-even on empty results (an empty local read is an honest zero; PG is frozen at
-flip, and a fallback would resurrect stale rows and mask un-ported readers).
-Rollback = flip the toggle back, not a fallback.
-
-Why a subclass of LocalMarketDatabaseBackend: ~10 SA DAL methods gate on
-``isinstance(backend, DatabaseBackend)`` (data_access.py) — a wrapper would fail
-them and SILENTLY DROP SA WRITES (runbook risk #1). Extending LMDB lets this one
-class also serve the use_local_market + use_local_sa both-on case; with
-``market_db=""`` LMDB's market overrides degrade safely to PG through their
-existing per-call try/except (SqliteBackend only opens the file at query time).
-All non-SA methods inherit unchanged.
-
-Connection + value discipline comes from src/sa_capture_store.py exclusively:
-``store.connect()`` (WAL + busy_timeout + foreign_keys=ON + schema ensured +
-sqlite3.Row) / ``store.connect(read_only=True)`` for pure reads, and
-``canon_ts()/canon_date()/now_ts()`` at EVERY write boundary — ONE on-disk
-timestamp format, because apply_sa_refresh's mark-stale is a lexicographic TEXT
-compare. Never SQL CURRENT_TIMESTAMP/NOW(). FTS5 mirrors are maintained by
-schema TRIGGERS — write methods never touch the *_fts tables.
-
-Dialect sweep (runbook §1 PG-isms):
-  - %s / %(x)s → ?; RealDictCursor → sqlite3.Row; NOW()/INTERVAL arithmetic →
-    Python-computed canonical strings passed as parameters;
-  - TEXT[] → junction tables (writes replace = DELETE+INSERT inside the parent
-    row's transaction; reads re-assemble Python lists under the same dict key);
-  - JSONB → TEXT (json.dumps on write, json.loads on read — matching psycopg2's
-    automatic jsonb→dict conversion);
-  - to_tsvector @@ plainto_tsquery → FTS5 MATCH on the trigger-maintained
-    mirrors, tokenized-AND with phrase-quoting (sqlite_backend._fts_match);
-  - GREATEST → max(); FILTER (WHERE …) → SUM(CASE …); SUBSTRING/EXTRACT(YEAR) →
-    substr; IS NOT DISTINCT FROM → IS; ``ORDER BY col DESC NULLS LAST`` →
-    ``ORDER BY (col IS NULL), col DESC``; boolean columns are 0/1 on disk and
-    converted back to Python bools on read for PG shape parity;
-  - the PG regex operator ``~`` → a per-connection REGEXP function (Python re).
-
-NOT ported on purpose:
-  - sa_comment_signals WRITES (comment_signal_backfill / extract job) — paused
-    second writer, follow-up #1 (runbook L3). db_backend.py contains NO
-    sa_comment_signals read helpers (the signal readers are raw ``_get_conn()``
-    bypassers in sa_tools/sa_digest_tools → prep-3, not this class).
+Every SA read and write uses ``sa_capture.db``. Empty local results remain
+honest empty results; there is no alternate storage authority.
 """
 
 from __future__ import annotations
@@ -52,6 +10,7 @@ import json
 import logging
 import re
 import sqlite3
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -59,12 +18,7 @@ from urllib.parse import unquote, urlsplit
 
 from ... import sa_capture_store as store
 from ... import sa_article_reconciliation_store as reconciliation_store
-from .db_backend import (
-    DatabaseBackend,  # noqa: F401  (re-exported for isinstance users/tests)
-    _plan_comment_duplicate_cleanup,
-    _prepare_comments_for_upsert,
-)
-from .local_market_backend import LocalMarketDatabaseBackend
+from .local_market_backend import LocalMarketBackend
 from .sqlite_backend import SqliteBackend
 
 logger = logging.getLogger(__name__)
@@ -161,17 +115,233 @@ def _stable_bottom_rounds(value: Any) -> int:
     return max(value, 0)
 
 
-class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
-    """DatabaseBackend whose SA domain lives in data/sa_capture.db (hard cutover)."""
+_COMMENT_SPACE_RE = re.compile(r"\s+")
 
-    def __init__(self, dsn: str, sslmode: str = "prefer", *, sa_db: str,
-                 market_db: str = "", strict: bool = False, news_strict: bool = False):
-        # DatabaseBackend connects lazily (_get_conn), so constructing this with a
-        # dead/fake PG DSN must not touch the network. ``strict`` threads to the market
-        # overrides (local-only, no PG fallback); SA reads are already hard-local.
-        super().__init__(
-            dsn, sslmode, market_db=market_db, strict=strict, news_strict=news_strict
+
+def _normalize_comment_identity_value(value: Any) -> str:
+    return _COMMENT_SPACE_RE.sub(" ", str(value or "")).strip()
+
+
+def _normalize_comment_identity_key(commenter: Any, comment_text: Any) -> tuple[str, str]:
+    return (
+        _normalize_comment_identity_value(commenter).lower(),
+        _normalize_comment_identity_value(comment_text).lower(),
+    )
+
+
+def _canonicalize_comment_date(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return text
+    else:
+        return str(value)
+
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc).isoformat()
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _merge_comment_record(target: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+    if not target.get("commenter") and incoming.get("commenter"):
+        target["commenter"] = incoming.get("commenter")
+    if len(_normalize_comment_identity_value(incoming.get("comment_text"))) > len(
+        _normalize_comment_identity_value(target.get("comment_text"))
+    ):
+        target["comment_text"] = incoming.get("comment_text")
+    target["upvotes"] = max(
+        int(target.get("upvotes") or 0),
+        int(incoming.get("upvotes") or 0),
+    )
+    if not target.get("comment_date") and incoming.get("comment_date"):
+        target["comment_date"] = incoming.get("comment_date")
+    if not target.get("parent_comment_id") and incoming.get("parent_comment_id"):
+        target["parent_comment_id"] = incoming.get("parent_comment_id")
+    return target
+
+
+def _comment_duplicate_sort_key(row: Dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        0 if row.get("comment_date") is not None else 1,
+        0 if row.get("parent_comment_id") else 1,
+        row.get("comment_date") or datetime.max.replace(tzinfo=timezone.utc),
+        row.get("id") or 0,
+        row.get("comment_id") or "",
+    )
+
+
+
+def _plan_comment_duplicate_cleanup(rows: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
+    if len(rows) <= 1:
+        return {"delete_ids": [], "parent_rewrites": []}
+
+    normalized_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        row_copy = dict(row)
+        row_copy["comment_date"] = _canonicalize_comment_date(row_copy.get("comment_date"))
+        if row_copy.get("comment_date"):
+            row_copy["comment_date"] = datetime.fromisoformat(
+                row_copy["comment_date"].replace("Z", "+00:00")
+            )
+        normalized_rows.append(row_copy)
+
+    delete_ids: List[Any] = []
+    parent_rewrites: Dict[str, str] = {}
+    grouped_by_date: Dict[Optional[str], List[Dict[str, Any]]] = defaultdict(list)
+    for row in normalized_rows:
+        key = row["comment_date"].isoformat() if row.get("comment_date") else None
+        grouped_by_date[key].append(row)
+
+    kept_rows: List[Dict[str, Any]] = []
+    for date_rows in grouped_by_date.values():
+        date_rows.sort(key=_comment_duplicate_sort_key)
+        keeper = date_rows[0]
+        kept_rows.append(keeper)
+        for duplicate in date_rows[1:]:
+            if duplicate.get("comment_id") and keeper.get("comment_id"):
+                parent_rewrites[duplicate["comment_id"]] = keeper["comment_id"]
+            delete_ids.append(duplicate["id"])
+
+    null_rows = [row for row in kept_rows if row.get("comment_date") is None]
+    dated_rows = [row for row in kept_rows if row.get("comment_date") is not None]
+    if len(dated_rows) == 1 and null_rows:
+        canonical = dated_rows[0]
+        for duplicate in null_rows:
+            if duplicate.get("comment_id") and canonical.get("comment_id"):
+                parent_rewrites[duplicate["comment_id"]] = canonical["comment_id"]
+            delete_ids.append(duplicate["id"])
+        kept_rows = [canonical]
+
+    filtered_rows = [
+        row for row in kept_rows
+        if row.get("id") not in set(delete_ids) and row.get("comment_date") is not None
+    ]
+    filtered_rows.sort(key=_comment_duplicate_sort_key)
+    removed_indexes = set()
+    for i, left in enumerate(filtered_rows):
+        if i in removed_indexes:
+            continue
+        left_dt = left.get("comment_date")
+        if left_dt is None:
+            continue
+        for j in range(i + 1, len(filtered_rows)):
+            if j in removed_indexes:
+                continue
+            right = filtered_rows[j]
+            right_dt = right.get("comment_date")
+            if right_dt is None:
+                continue
+            delta = right_dt - left_dt
+            if delta == timedelta(hours=8):
+                if left.get("comment_id") and right.get("comment_id"):
+                    parent_rewrites[left["comment_id"]] = right["comment_id"]
+                delete_ids.append(left["id"])
+                removed_indexes.add(i)
+                break
+            if delta > timedelta(hours=8):
+                break
+
+    unique_delete_ids = list(dict.fromkeys(delete_ids))
+    unique_parent_rewrites = [(src, dst) for src, dst in parent_rewrites.items() if src and dst and src != dst]
+    return {"delete_ids": unique_delete_ids, "parent_rewrites": unique_parent_rewrites}
+
+
+def _select_existing_comment_match(
+    candidates: List[Dict[str, Any]], incoming_date: Optional[str]
+) -> Optional[Dict[str, Any]]:
+    if not candidates:
+        return None
+
+    same_date = [
+        c for c in candidates if incoming_date and c.get("comment_date") == incoming_date
+    ]
+    if same_date:
+        return same_date[0]
+
+    null_date = [c for c in candidates if not c.get("comment_date")]
+    dated = [c for c in candidates if c.get("comment_date")]
+
+    if incoming_date:
+        if len(candidates) == 1 and len(null_date) == 1:
+            return null_date[0]
+        return None
+
+    if len(dated) == 1:
+        return dated[0]
+    if not dated and len(null_date) == 1:
+        return null_date[0]
+    return None
+
+
+def _prepare_comments_for_upsert(
+    existing_rows: List[Dict[str, Any]], incoming_comments: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    existing_by_key: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+    for row in existing_rows:
+        row_copy = dict(row)
+        row_copy["comment_date"] = _canonicalize_comment_date(row_copy.get("comment_date"))
+        key = _normalize_comment_identity_key(
+            row_copy.get("commenter"), row_copy.get("comment_text")
         )
+        existing_by_key[key].append(row_copy)
+
+    prepared: List[Dict[str, Any]] = []
+    prepared_by_id: Dict[str, Dict[str, Any]] = {}
+    id_map: Dict[str, str] = {}
+
+    for incoming in incoming_comments:
+        item = dict(incoming)
+        item["comment_date"] = _canonicalize_comment_date(item.get("comment_date"))
+        key = _normalize_comment_identity_key(item.get("commenter"), item.get("comment_text"))
+        candidates = existing_by_key.get(key, [])
+        match = _select_existing_comment_match(candidates, item.get("comment_date"))
+
+        if match:
+            item["comment_id"] = match.get("comment_id")
+            item["comment_date"] = item.get("comment_date") or match.get("comment_date")
+            if not item.get("parent_comment_id") and match.get("parent_comment_id"):
+                item["parent_comment_id"] = match.get("parent_comment_id")
+            _merge_comment_record(match, item)
+        else:
+            existing_by_key[key].append(dict(item))
+
+        original_id = incoming.get("comment_id")
+        canonical_id = item.get("comment_id")
+        if original_id and canonical_id:
+            id_map[original_id] = canonical_id
+
+        if canonical_id in prepared_by_id:
+            _merge_comment_record(prepared_by_id[canonical_id], item)
+            continue
+
+        prepared_item = dict(item)
+        prepared_by_id[canonical_id] = prepared_item
+        prepared.append(prepared_item)
+
+    for item in prepared:
+        parent = item.get("parent_comment_id")
+        if parent and parent in id_map:
+            item["parent_comment_id"] = id_map[parent]
+        if item.get("parent_comment_id") == item.get("comment_id"):
+            item["parent_comment_id"] = None
+
+    return prepared
+
+
+
+class SACaptureBackend(LocalMarketBackend):
+    """Local composition whose SA domain lives in ``sa_capture.db``."""
+
+    def __init__(self, *, sa_db: str, market_db: str, base_path: Optional[Path] = None):
+        super().__init__(market_db=market_db, base_path=base_path)
         self._sa_db = sa_db
 
     # ------------------------------------------------------------------

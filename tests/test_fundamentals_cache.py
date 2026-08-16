@@ -20,11 +20,9 @@ class _LocalStore:
 class _LocalMarketBackend:
     def __init__(self, rows):
         self._market = _LocalStore(rows)
-        self.pg_calls = []
 
     def get_financial_cache(self, cache_key):
-        self.pg_calls.append(cache_key)
-        raise AssertionError("generic LocalMarketDatabaseBackend cache getter must not run")
+        return self._market.get_financial_cache(cache_key)
 
 
 def test_fundamentals_analysis_cache_key_is_stable():
@@ -38,7 +36,7 @@ def test_fundamentals_analysis_cache_key_is_stable():
     )
 
 
-def test_read_cached_sec_fundamentals_uses_local_market_store_without_pg_fallback():
+def test_read_cached_sec_fundamentals_uses_local_market_store():
     key = fundamentals_analysis_cache_key("AAPL")
     backend = _LocalMarketBackend({
         key: FundamentalsResult(
@@ -57,7 +55,6 @@ def test_read_cached_sec_fundamentals_uses_local_market_store_without_pg_fallbac
     assert result.data_source == "sec_edgar"
     assert result.roe == 0.21
     assert backend._market.calls == [key]
-    assert backend.pg_calls == []
 
 
 def test_read_cached_sec_fundamentals_returns_empty_on_miss():

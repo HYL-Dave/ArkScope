@@ -1,4 +1,4 @@
-"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend."""
+"""Tests for SqliteBackend and the current local market composition."""
 
 from __future__ import annotations
 
@@ -8,9 +8,8 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
-from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.backends.sqlite_backend import SqliteBackend
-from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+from src.tools.backends.local_market_backend import LocalMarketBackend
 from src.news_normalized.schema import ensure_news_normalized_schema
 
 _COLS = ["datetime", "open", "high", "low", "close", "volume"]
@@ -114,7 +113,7 @@ def test_rollup_1d(market_db):
 
 def test_empty_and_missing(market_db, tmp_path):
     db, _ = market_db
-    # unknown ticker → empty frame (caller falls back to PG)
+    # Unknown ticker returns an honest empty frame.
     assert SqliteBackend(db).query_prices("NOPE", days=30).empty
     # out-of-window (days=0 → cutoff today, bars are 2 days old) → empty
     assert SqliteBackend(db).query_prices("AAPL", days=0).empty
@@ -202,14 +201,14 @@ def test_query_fundamentals_partial_and_empty(market_db, tmp_path):
     nvda = SqliteBackend(db).query_fundamentals("NVDA")
     assert nvda["snapshot"] == {"Name": "NVIDIA"}
     assert nvda["fin_summary"] == {} and nvda["ownership"] == {}
-    # unknown ticker / missing DB → empty dict (caller falls back to PG)
+    # Unknown ticker or missing storage returns an honest empty dict.
     assert SqliteBackend(db).query_fundamentals("NOPE") == {}
     assert SqliteBackend(str(tmp_path / "nope.db")).query_fundamentals("AAPL") == {}
 
 
 def test_query_fundamentals_same_day_tiebreak_by_id(market_db):
     # Two snapshots on the SAME snapshot_date → the higher id wins deterministically
-    # (ORDER BY snapshot_date DESC, id DESC), matching the PG path.
+    # (ORDER BY snapshot_date DESC, id DESC).
     db, _ = market_db
     conn = sqlite3.connect(db)
     conn.executemany("INSERT INTO fundamentals VALUES (?,?,?,?)", [
@@ -238,7 +237,7 @@ def test_financial_cache_roundtrip(market_db):
 def test_financial_cache_expiry(market_db):
     db, _ = market_db
     b = SqliteBackend(db)
-    # explicit past expiry → reads as a miss (caller falls back to PG)
+    # Explicit past expiry reads as a miss.
     assert b.set_financial_cache("k", "AAPL", {"x": 1}, expires_at="2000-01-01T00:00:00+00:00") is True
     assert b.get_financial_cache("k") is None
 
@@ -276,14 +275,11 @@ def test_set_financial_cache_serialized_by_lock(market_db):
     assert b.get_financial_cache("LOCKED") == {"v": 1}
 
 
-# --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
-
-_PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)
+# --- LocalMarketBackend composition ------------------------------------------
 
 
 def _make(db):
-    # Constructing does NOT connect to PG (DatabaseBackend connects lazily).
-    return LocalMarketDatabaseBackend("postgresql://fake/db", market_db=db)
+    return LocalMarketBackend(market_db=db)
 
 
 def _store_positive_sec_fundamentals(backend, *tickers):
@@ -305,55 +301,31 @@ def _store_positive_sec_fundamentals(backend, *tickers):
         )
 
 
-def test_is_databasebackend_subclass(market_db):
-    # REGRESSION (the "enable local market → all data wrong" bug): the DAL/agents
-    # branch on isinstance(backend, DatabaseBackend) in ~30 places to gate every
-    # DB-only path (batch summaries / news / sentiment / freshness). The
-    # local-market backend MUST satisfy isinstance or those paths silently fall to
-    # empty/file behaviour and the cockpit shows wrong/empty data.
-    db, _ = market_db
-    assert isinstance(_make(db), DatabaseBackend) is True
 
 
-def test_prices_local_when_present(market_db, monkeypatch):
+def test_prices_local_when_present(market_db):
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend, "query_prices",
-        lambda self, ticker, interval="15min", days=30: (hit.append(ticker), _PG_SENTINEL)[1],
-    )
     df = _make(db).query_prices("AAPL", interval="15min", days=30)
-    assert len(df) == 8 and "PGSENTINEL" not in df["datetime"].values
-    assert hit == []  # PG (super) never hit when local has data
+    assert len(df) == 8
 
 
-def test_p0c_prices_miss_is_honest_empty_no_pg(market_db, monkeypatch):
+def test_prices_miss_is_honest_empty(market_db):
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend, "query_prices",
-        lambda self, ticker, interval="15min", days=30: (
-            hit.append(ticker),
-            (_ for _ in ()).throw(AssertionError("PG fallback forbidden")),
-        )[1],
-    )
-    df = _make(db).query_prices("UNKNOWN", days=30)  # not in local → honest empty
+    df = _make(db).query_prices("UNKNOWN", days=30)
     assert df.empty
-    assert hit == []
 
 
-def test_available_tickers_routing(market_db, monkeypatch):
+def test_available_tickers_routing(market_db):
     db, _ = market_db
-    monkeypatch.setattr(DatabaseBackend, "get_available_tickers", lambda self, data_type: ["PGONLY"])
     b = _make(db)
     _store_positive_sec_fundamentals(b, "AAPL", "NVDA")
     assert b.get_available_tickers("prices") == ["AAPL"]              # local
     assert b.get_available_tickers("news") == ["AAPL", "NVDA"]        # local (3b)
     assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # local (3c-A)
-    assert b.get_available_tickers("options") == ["PGONLY"]          # non-local → PG (super)
+    assert b.get_available_tickers("options") == []
 
 
-def test_p0c_available_price_tickers_empty_is_honest_empty_no_pg(tmp_path, monkeypatch):
+def test_available_price_tickers_empty_is_honest_empty(tmp_path):
     db = tmp_path / "market_data.db"
     conn = sqlite3.connect(db)
     conn.execute(
@@ -361,87 +333,45 @@ def test_p0c_available_price_tickers_empty_is_honest_empty_no_pg(tmp_path, monke
         "open REAL, high REAL, low REAL, close REAL, volume INTEGER)"
     )
     conn.close()
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "get_available_tickers",
-        lambda self, data_type: (hit.append(data_type), ["PGONLY"])[1],
-    )
-
     assert _make(str(db)).get_available_tickers("prices") == []
-    assert hit == []
 
 
-def test_fundamentals_mirror_table_retired_no_pg_fallback(market_db, monkeypatch):
+def test_fundamentals_query_is_honest_empty_without_a_current_snapshot(market_db):
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_fundamentals",
-        lambda self, ticker: (
-            hit.append(ticker),
-            {"ticker": ticker, "snapshot": "PG"},
-        )[1],
-    )
     b = _make(db)
 
     assert b.query_fundamentals("AAPL") == {}
     assert b.query_fundamentals("UNKNOWN") == {}
-    assert hit == []
 
 
-def test_financial_cache_set_is_local_only(market_db, monkeypatch):
-    # local-PRIMARY: set writes the local cache and must NEVER write PG.
+def test_financial_cache_set_is_local_only(market_db):
     db, _ = market_db
-    pg_set = []
-    monkeypatch.setattr(DatabaseBackend, "set_financial_cache",
-                        lambda self, *a, **k: pg_set.append(1) or True)
     b = _make(db)
     assert b.set_financial_cache("mk", "AAPL", {"v": 1}, ttl_days=30, source="sec_edgar") is True
-    assert pg_set == []                                       # PG never written
-    assert b._market.get_financial_cache("mk") == {"v": 1}    # written local
+    assert b._market.get_financial_cache("mk") == {"v": 1}
 
 
-def test_financial_cache_get_local_first(market_db, monkeypatch):
+def test_financial_cache_get_local_first(market_db):
     db, _ = market_db
-    pg_get = []
-    monkeypatch.setattr(DatabaseBackend, "get_financial_cache",
-                        lambda self, k: pg_get.append(k) or {"v": "PG"})
     b = _make(db)
     b._market.set_financial_cache("mk", "AAPL", {"v": "LOCAL"})
-    assert b.get_financial_cache("mk") == {"v": "LOCAL"} and pg_get == []  # PG skipped on local hit
+    assert b.get_financial_cache("mk") == {"v": "LOCAL"}
 
 
-def test_financial_cache_miss_is_honest_empty_without_pg(market_db, monkeypatch):
-    # S-H2: financial_cache is local-only in the desktop runtime. A local miss must
-    # not query PG or promote legacy rows, even when strict=False.
+def test_financial_cache_miss_is_honest_empty(market_db):
     db, _ = market_db
-    pg_get = []
-
-    def _pg_called(self, cache_key):
-        pg_get.append(cache_key)
-        raise AssertionError("financial_cache miss must not fall back to PG")
-
-    monkeypatch.setattr(DatabaseBackend, "get_financial_cache", _pg_called)
     b = _make(db)
 
     assert b.get_financial_cache("mk_NVDA") is None
-    assert pg_get == []
     assert b._market.get_financial_cache("mk_NVDA") is None
 
 
 def test_provenance_fundamentals_records_none_after_mirror_retirement(
-    market_db, monkeypatch
+    market_db,
 ):
     from src.tools.backends import provenance
 
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_fundamentals",
-        lambda self, t: hit.append(t) or {"ticker": t, "snapshot": {"x": 1}},
-    )
     b = _make(db)
 
     provenance.reset()
@@ -450,37 +380,26 @@ def test_provenance_fundamentals_records_none_after_mirror_retirement(
     provenance.reset(); b.query_fundamentals("UNKNOWN")
     assert b.query_fundamentals("UNKNOWN") == {}
     assert provenance.read("fundamentals") == "none"
-    assert hit == []
 
 
 def test_inherited_vs_overridden_methods(market_db):
-    # market-domain reads + the local-primary financial_cache are overridden;
-    # app-records/SA/job-runs now have separate local stores, while remaining
-    # inherited PG methods are archive/tombstone surfaces.
     db, _ = market_db
     b = _make(db)
-    assert type(b).query_prices is not DatabaseBackend.query_prices
-    assert type(b).query_news is not DatabaseBackend.query_news
-    assert type(b).query_news_search is not DatabaseBackend.query_news_search
-    assert type(b).query_fundamentals is not DatabaseBackend.query_fundamentals   # 3c-A
-    assert type(b).get_financial_cache is not DatabaseBackend.get_financial_cache  # 3c-C
-    assert type(b).set_financial_cache is not DatabaseBackend.set_financial_cache  # 3c-C
-    assert type(b).query_news_stats is not DatabaseBackend.query_news_stats  # local scout stats
+    assert type(b) is LocalMarketBackend
+    assert not hasattr(b, "_dsn")
+    assert not hasattr(b, "_get_conn")
+    assert callable(b.query_prices)
+    assert callable(b.query_news)
+    assert callable(b.query_news_search)
+    assert callable(b.query_fundamentals)
+    assert callable(b.get_financial_cache)
+    assert callable(b.set_financial_cache)
+    assert callable(b.query_news_stats)
 
 
-def test_news_stats_local_when_present_does_not_hit_pg(market_db, monkeypatch):
+def test_news_stats_reads_local_rows_when_present(market_db):
     db, day = market_db
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_news_stats",
-        lambda self, ticker=None, days=30: hit.append(ticker) or pd.DataFrame(
-            [("PGONLY", 99, "2000-01-01", "2000-01-01")],
-            columns=["ticker", "article_count", "earliest_date", "latest_date"],
-        ),
-    )
     df = _make(db).query_news_stats(ticker="AAPL", days=30)
-    assert hit == []
     assert len(df) == 1
     row = df.iloc[0]
     assert row["ticker"] == "AAPL"
@@ -488,27 +407,17 @@ def test_news_stats_local_when_present_does_not_hit_pg(market_db, monkeypatch):
     assert row["earliest_date"] == day.isoformat()
 
 
-def test_news_stats_local_empty_does_not_fallback_to_pg(market_db, monkeypatch):
+def test_news_stats_local_empty_is_honest_empty(market_db):
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_news_stats",
-        lambda self, ticker=None, days=30: hit.append(ticker) or pd.DataFrame(
-            [("PGONLY", 99, "2000-01-01", "2000-01-01")],
-            columns=["ticker", "article_count", "earliest_date", "latest_date"],
-        ),
-    )
     df = _make(db).query_news_stats(ticker="SNEX", days=30)
-    assert hit == []
     assert df.empty
 
 
 # --- 新聞·事件 feed (score-free browse/search + facets) ------------------------
 
 def test_fts_search_is_tokenized_and(market_db):
-    # Multi-word queries AND the tokens (parity with PG plainto_tsquery) instead
-    # of the old exact-phrase match: "earnings apple" matches "Apple earnings
+    # Multi-word queries AND the tokens instead of exact-phrase matching:
+    # "earnings apple" matches "Apple earnings
     # beat estimates" even though the words are not adjacent / ordered.
     db, _ = market_db
     b = SqliteBackend(db)
@@ -570,23 +479,17 @@ def test_news_feed_missing_table_not_available(tmp_path):
     }
 
 
-def test_news_feed_local_authoritative_vs_pre3b_fallback(market_db, monkeypatch):
-    # Local DB with a news table is AUTHORITATIVE: zero matches is an honest
-    # zero, not a PG-fallback trigger. Only available=False (pre-3b DB) falls back.
+def test_news_feed_local_authoritative_vs_pre3b_fallback(market_db):
+    # A readable local table is authoritative; zero matches is an honest zero.
     db, _ = market_db
-    pg_called = []
-    monkeypatch.setattr(
-        DatabaseBackend, "query_news_feed",
-        lambda self, **k: (pg_called.append(1),
-                           {"available": True, "items": [], "total": 99,
-                            "sources": {}, "days": {}})[1])
     b = _make(db)
     f = b.query_news_feed(q="zzz_no_match_zzz", days=30)
-    assert f["total"] == 0 and pg_called == []   # honest zero, PG not consulted
+    assert f["total"] == 0
 
-    b2 = LocalMarketDatabaseBackend("postgresql://fake/db", market_db="/nonexistent/x.db")
+    b2 = LocalMarketBackend(market_db="/nonexistent/x.db")
     f2 = b2.query_news_feed(days=30)
-    assert f2["total"] == 99 and pg_called == [1]  # pre-3b → PG fallback
+    assert f2["available"] is False
+    assert f2["total"] == 0
 
 
 def test_news_feed_search_relevance_title_weighted(tmp_path):
@@ -647,11 +550,11 @@ def test_news_feed_description_html_cleaned(tmp_path):
     assert desc == "By Al Root Rivian has started."
 
 
-# --- health_stats local recompute (sub-slice B: PG-exit for provider health) ----
+# --- health_stats local recompute --------------------------------------------
 
 def test_query_health_stats_local_shape(market_db):
     # SqliteBackend recomputes the current health shape
-    # query_health_stats returns, from market_data.db — so provider health stops needing PG.
+    # query_health_stats returns directly from market_data.db.
     db, _ = market_db
     stats = SqliteBackend(db).query_health_stats()
     assert set(stats) == {"news", "prices", "financial_cache"}
@@ -662,99 +565,42 @@ def test_query_health_stats_local_shape(market_db):
     assert stats["financial_cache"]["rows"] == []                 # fixture has no fin cache → honest empty
 
 
-def test_health_stats_local_first(market_db, monkeypatch):
+def test_health_stats_local_first(market_db):
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(DatabaseBackend, "query_health_stats", lambda self: (hit.append("PG"), {})[1])
     stats = _make(db).query_health_stats()
-    assert hit == []                                             # served locally, PG NOT hit
     assert set(stats) == {"news", "prices", "financial_cache"}
 
 
-# --- strict (local-only) mode: market reads NEVER dial PG (desktop-app boot-without-PG) ---
-
-_MARKET_PG_METHODS = (
-    "query_prices", "query_news", "query_news_search", "query_news_stats", "query_news_feed",
-    "query_fundamentals", "get_financial_cache", "query_health_stats",
-    "get_available_tickers",
-)
+# --- local-only composition --------------------------------------------------
 
 
-def _poison_pg(monkeypatch):
-    """Make every market read on the PG base RAISE — so any strict-mode fallback is caught."""
-    def boom(self, *a, **k):
-        raise AssertionError("PG dialed in strict mode")
-    for m in _MARKET_PG_METHODS:
-        monkeypatch.setattr(DatabaseBackend, m, boom)
-
-
-def test_strict_market_serves_local_without_pg(market_db, monkeypatch):
+def test_local_market_serves_local_rows(market_db):
     db, _ = market_db
-    _poison_pg(monkeypatch)
-    b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
-    # local HITS resolve from SQLite, PG never touched
+    b = LocalMarketBackend(market_db=db)
     assert len(b.query_prices("AAPL", days=30)) == 8
     assert b.get_available_tickers("prices") == ["AAPL"]
     assert not b.query_news(ticker="AAPL").empty
     assert set(b.query_health_stats()) == {"news", "prices", "financial_cache"}
 
 
-def test_strict_market_local_miss_is_honest_empty_not_pg(market_db, monkeypatch):
+def test_local_market_miss_is_honest_empty(market_db):
     db, _ = market_db
-    _poison_pg(monkeypatch)
-    b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
-    # local MISS → honest empty / unavailable, NOT a PG fallback (no AssertionError raised)
+    b = LocalMarketBackend(market_db=db)
     assert b.query_prices("ZZZZ", days=30).empty
     assert b.query_fundamentals("ZZZZ") in ({}, None)
     assert b.get_financial_cache("nope:key") is None
-    assert b.get_available_tickers("options") == []   # non-local type → strict empty, not PG
+    assert b.get_available_tickers("options") == []
 
 
-def test_p0c_non_strict_prices_still_do_not_fallback_to_pg(market_db, monkeypatch):
+def test_price_reads_are_local_regardless_of_provenance_toggle(market_db):
     db, _ = market_db
-    hit = []
-    monkeypatch.setattr(DatabaseBackend, "query_prices",
-                        lambda self, ticker, interval="15min", days=30: (
-                            hit.append(ticker),
-                            (_ for _ in ()).throw(AssertionError("PG fallback forbidden")),
-                        )[1])
-    b = LocalMarketDatabaseBackend("postgresql://fake/db", market_db=db, strict=False)  # default
+    b = LocalMarketBackend(market_db=db)
     assert b.query_prices("UNKNOWN").empty
-    assert hit == []
 
 
-def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
+def test_news_hard_local_does_not_make_market_strict(market_db):
     db, _ = market_db
-
-    def news_boom(self, *args, **kwargs):
-        raise AssertionError("PG called")
-
-    for name in ("query_news", "query_news_search", "query_news_feed", "query_news_stats"):
-        monkeypatch.setattr(DatabaseBackend, name, news_boom)
-
-    price_hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_prices",
-        lambda self, ticker, interval="15min", days=30:
-            (price_hit.append(ticker), _PG_SENTINEL)[1],
-    )
-    fund_hit = []
-    monkeypatch.setattr(
-        DatabaseBackend,
-        "query_fundamentals",
-        lambda self, ticker: (
-            fund_hit.append(ticker),
-            {"ticker": ticker, "snapshot": {"source": "PG"}},
-        )[1],
-    )
-
-    b = LocalMarketDatabaseBackend(
-        "postgresql://fake/db", market_db=db, strict=False, news_strict=True
-    )
-
-    assert b._strict is False
-    assert b._news_strict is True
+    b = LocalMarketBackend(market_db=db)
     assert b.query_news(ticker="ZZZZ").empty
     assert b.query_news_search(query="notpresent").empty
     assert b.query_news_feed(q="notpresent")["total"] == 0
@@ -762,11 +608,9 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
 
     assert b.query_prices("UNKNOWN").empty
     assert b.query_fundamentals("UNKNOWN") == {}
-    assert price_hit == []
-    assert fund_hit == []
 
 
-def test_news_strict_available_news_tickers_empty_does_not_hit_pg(tmp_path, monkeypatch):
+def test_news_available_tickers_empty_is_honest_empty(tmp_path):
     db = tmp_path / "empty_news.db"
     conn = sqlite3.connect(db)
     conn.execute(
@@ -777,27 +621,14 @@ def test_news_strict_available_news_tickers_empty_does_not_hit_pg(tmp_path, monk
     conn.commit()
     conn.close()
 
-    def ticker_boom(self, data_type):
-        raise AssertionError("PG called")
-
-    monkeypatch.setattr(DatabaseBackend, "get_available_tickers", ticker_boom)
-    b = LocalMarketDatabaseBackend(
-        "postgresql://fake/db", market_db=str(db), strict=False, news_strict=True
-    )
+    b = LocalMarketBackend(market_db=str(db))
 
     assert b.get_available_tickers("news") == []
 
 
-def test_news_strict_feed_local_exception_does_not_hit_pg(market_db, monkeypatch):
+def test_news_feed_local_exception_returns_typed_unavailable(market_db, monkeypatch):
     db, _ = market_db
-
-    def pg_feed_boom(self, *args, **kwargs):
-        raise AssertionError("PG called")
-
-    monkeypatch.setattr(DatabaseBackend, "query_news_feed", pg_feed_boom)
-    b = LocalMarketDatabaseBackend(
-        "postgresql://fake/db", market_db=db, strict=False, news_strict=True
-    )
+    b = LocalMarketBackend(market_db=db)
     monkeypatch.setattr(
         b._market,
         "query_news_feed",
@@ -817,22 +648,15 @@ def test_news_strict_feed_local_exception_does_not_hit_pg(market_db, monkeypatch
 
 
 def test_sa_capture_backend_threads_strict(market_db, tmp_path, monkeypatch):
-    from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
+    from src.tools.backends.sa_capture_backend import SACaptureBackend
     db, _ = market_db
-    _poison_pg(monkeypatch)
     sa_db = tmp_path / "sa.db"  # empty SA db is fine; we exercise the market path
     sqlite3.connect(sa_db).close()
-    b = SACaptureDatabaseBackend("postgresql://unreachable/db", sa_db=str(sa_db), market_db=db, strict=True)
-    assert len(b.query_prices("AAPL", days=30)) == 8       # market served local
-    assert b.query_prices("ZZZZ", days=30).empty           # miss → honest empty, no PG
+    b = SACaptureBackend(sa_db=str(sa_db), market_db=db, base_path=tmp_path)
+    assert len(b.query_prices("AAPL", days=30)) == 8
+    assert b.query_prices("ZZZZ", days=30).empty
 
 
-def test_strict_uses_fast_pg_connect_timeout(market_db):
-    # boot-without-PG: a residual non-market PG path (app-records, a deferred slice) must
-    # FAIL FAST, not hang ~15s, when PG is unreachable. Strict → short connect_timeout.
-    db, _ = market_db
-    assert LocalMarketDatabaseBackend("postgresql://x/db", market_db=db, strict=True)._connect_timeout == 3
-    assert LocalMarketDatabaseBackend("postgresql://x/db", market_db=db, strict=False)._connect_timeout == 15
 
 
 def test_strict_news_feed_exception_returns_full_shape_not_thin(market_db, monkeypatch):
@@ -840,8 +664,7 @@ def test_strict_news_feed_exception_returns_full_shape_not_thin(market_db, monke
     # CANONICAL full shape — News.tsx reads feed.total/feed.sources BEFORE the available
     # guard, so a thin {available:false} would crash the News tab.
     db, _ = market_db
-    _poison_pg(monkeypatch)  # PG must NOT be dialed in strict
-    b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
+    b = LocalMarketBackend(market_db=db)
 
     def _boom(**k):
         raise RuntimeError("corrupt local db")

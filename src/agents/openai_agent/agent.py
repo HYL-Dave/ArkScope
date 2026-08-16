@@ -405,7 +405,7 @@ async def run_query(
     # Get or create DAL
     if dal is None:
         from src.tools.data_access import DataAccessLayer
-        dal = DataAccessLayer(db_dsn="auto")
+        dal = DataAccessLayer()
 
     # Get config
     config = get_agent_config()
@@ -577,7 +577,7 @@ def run_query_sync(
     # Get or create DAL
     if dal is None:
         from src.tools.data_access import DataAccessLayer
-        dal = DataAccessLayer(db_dsn="auto")
+        dal = DataAccessLayer()
 
     # Get config
     config = get_agent_config()
@@ -748,7 +748,7 @@ async def run_query_stream(
     # Get or create DAL
     if dal is None:
         from src.tools.data_access import DataAccessLayer
-        dal = DataAccessLayer(db_dsn="auto")
+        dal = DataAccessLayer()
 
     # Get config
     config = get_agent_config()
@@ -893,18 +893,15 @@ async def run_query_stream(
 # ── Freshness prompt helper ──────────────────────────────────
 
 def _get_freshness_prompt(dal, personalization_context: str = "") -> Optional[str]:
-    """Build system prompt with freshness summary if DB backend available."""
+    """Build a system prompt with the current local freshness summary."""
     try:
-        from src.tools.backends.db_backend import DatabaseBackend
-        if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
-            from src.tools.freshness import get_registry
-            from ..shared.prompts import build_system_prompt
-            fr = get_registry(db_backend=dal._backend)
-            if fr:
-                fr.scan()
-                summary = fr.format_summary()
-                if summary:
-                    return build_system_prompt(summary, personalization_context=personalization_context)
+        from src.tools.freshness import get_registry
+        from ..shared.prompts import build_system_prompt
+        fr = get_registry(local_capability=dal._backend)
+        fr.scan()
+        summary = fr.format_summary()
+        if summary:
+            return build_system_prompt(summary, personalization_context=personalization_context)
     except Exception as e:
         logger.debug("Freshness prompt build failed: %s", e)
     return None

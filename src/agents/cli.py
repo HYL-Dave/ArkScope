@@ -687,13 +687,10 @@ def run_anthropic_interactive(
     freshness_summary = ""
     if config.freshness_in_prompt and dal:
         try:
-            from src.tools.backends.db_backend import DatabaseBackend
-            if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
-                from src.tools.freshness import get_registry
-                fr = get_registry(db_backend=dal._backend)
-                if fr:
-                    fr.scan()
-                    freshness_summary = fr.format_summary() or ""
+            from src.tools.freshness import get_registry
+            fr = get_registry(local_capability=dal._backend)
+            fr.scan()
+            freshness_summary = fr.format_summary() or ""
         except Exception as e:
             logger.debug("CLI freshness injection failed: %s", e)
     effective_prompt = build_system_prompt(freshness_summary)
@@ -1205,7 +1202,7 @@ def handle_skill_command(state: SessionState, arg: str) -> Optional[str]:
     return expanded
 
 
-def handle_save_command(state: "SessionState", arg: str) -> None:
+def handle_save_command(state: "SessionState", arg: str, local_capability: Any) -> None:
     """Handle /save command — save session exchanges as a report.
 
     /save              Show preview, ask for range + title
@@ -1375,11 +1372,8 @@ def handle_save_command(state: "SessionState", arg: str) -> None:
     report_id = None
     try:
         if hasattr(state, 'chat_history') and state.chat_history:
-            # Access DAL through lazy import for DB insert
-            from src.tools.data_access import DataAccessLayer
-            from src.app_records_store import get_app_records_store  # PG-exit 1b
-            dal = DataAccessLayer()
-            _store = get_app_records_store(dal)
+            from src.app_records_store import get_app_records_store
+            _store = get_app_records_store(local_capability)
             if hasattr(_store, 'insert_report'):
                 report_id = _store.insert_report(
                     title=title,
@@ -2564,7 +2558,7 @@ def main():
     # Initialize DAL
     from src.tools.data_access import DataAccessLayer
     with console.status("[cyan]Loading data...", spinner="dots"):
-        dal = DataAccessLayer(db_dsn="auto")
+        dal = DataAccessLayer()
 
     backend_type = dal.backend_type
     ticker_count = len(dal.get_available_tickers("prices"))
@@ -2672,7 +2666,7 @@ def main():
             elif cmd in ("/attach", "/at"):
                 handle_attach_command(state, arg)
             elif cmd in ("/save", "/sv"):
-                handle_save_command(state, arg)
+                handle_save_command(state, arg, dal)
             elif cmd in ("/reports", "/rp"):
                 handle_reports_command(dal, arg)
             elif cmd in ("/memory", "/mem"):

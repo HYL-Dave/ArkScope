@@ -133,7 +133,7 @@ def test_agent_query_insert(store):
 
 # --- hermetic / no-PG --------------------------------------------------------------
 
-def test_no_pg_dependency():
+def test_imports_with_declared_local_dependencies():
     import src.app_records_store as mod
     assert not hasattr(mod, "psycopg2")
 
@@ -216,17 +216,14 @@ def test_resolver_no_api_import_and_env_precedence(tmp_path, monkeypatch):
 
 
 def test_dal_local_records_default_is_local(tmp_path, monkeypatch):
-    # PG-exit closeout: unset AND explicit false both resolve local — matches the
-    # batch-2 collapse semantics of use_local_market / use_local_macro / use_local_job_runs.
+    # Unset and explicit false are retained provenance only; both resolve local.
     from src.tools.data_access import DataAccessLayer
     monkeypatch.delenv(ENV_USE_LOCAL_RECORDS, raising=False)
-    # hermetic: empty tmp profile DB so the host's persisted use_local_records=true
-    # cannot leak in — "unset" must mean truly unset (macro-toggle a5b0496 lesson)
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "empty_profile_state.db"))
-    dal = DataAccessLayer()
-    assert dal._local_records_enabled() is True
+    dal = DataAccessLayer(base_path=tmp_path)
+    assert isinstance(get_app_records_store(dal), AppRecordsLocalStore)
     monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "false")
-    assert dal._local_records_enabled() is True
+    assert isinstance(get_app_records_store(dal), AppRecordsLocalStore)
 
 
 def test_end_to_end_save_report_routes_local_when_on(tmp_path, monkeypatch):

@@ -50,6 +50,117 @@ class TestBackendProtocol:
         assert isinstance(file_backend, DataBackend)
 
 
+def test_local_capability_protocol_matches_inventory_method_set():
+    import importlib
+
+    module = importlib.import_module("src.tools.backends.local_capabilities")
+    protocol = module.LocalDataCapabilities
+    public_callables = {
+        name
+        for name, value in vars(protocol).items()
+        if not name.startswith("_") and callable(value)
+    }
+    assert public_callables == {
+        "accept_sa_article_link",
+        "apply_sa_refresh",
+        "audit_unresolved_symbols",
+        "get_available_tickers",
+        "get_sa_article_with_comments",
+        "get_sa_pick_detail",
+        "get_sa_refresh_meta",
+        "invalidate_dirty_sa_market_news_detail",
+        "query_fundamentals",
+        "query_health_stats",
+        "query_news",
+        "query_news_feed",
+        "query_news_search",
+        "query_news_stats",
+        "query_prices",
+        "query_sa_article_review_queue",
+        "query_sa_articles",
+        "query_sa_market_news",
+        "query_sa_market_news_body_presence",
+        "query_sa_market_news_missing_detail_interval",
+        "query_sa_market_news_need_detail",
+        "query_sa_market_news_recent_ids",
+        "query_sa_market_news_recovery_rows",
+        "query_sa_picks",
+        "query_sec_filings",
+        "reconcile_sa_articles",
+        "record_sa_refresh_failure",
+        "reject_sa_article_candidate",
+        "resolve_sa_reconciliation_event",
+        "sanitize_corrupted_sa_comments_counts",
+        "save_article_with_comments",
+        "save_sa_market_news_detail",
+        "update_article_comments",
+        "update_sa_pick_detail",
+        "upsert_sa_articles_meta",
+        "upsert_sa_market_news",
+    }
+    assert not getattr(protocol, "_is_runtime_protocol", False)
+
+
+def test_default_data_access_constructs_current_local_authority(tmp_path):
+    import inspect
+
+    assert "db_dsn" not in inspect.signature(DataAccessLayer).parameters
+    local = DataAccessLayer(base_path=tmp_path)
+    assert type(local._backend).__name__ == "SACaptureBackend"
+    assert not hasattr(local, "_db_dsn")
+
+
+def test_explicit_capability_injection_needs_no_nominal_type_routing(tmp_path):
+    class StructuralCapability:
+        def __init__(self):
+            self.calls = []
+
+        def query_sa_market_news(self, **kwargs):
+            self.calls.append(kwargs)
+            return [{"news_id": "local-1"}]
+
+    capability = StructuralCapability()
+    local = DataAccessLayer(base_path=tmp_path, backend=capability)
+
+    assert local.get_sa_market_news(ticker="NVDA", limit=3) == [
+        {"news_id": "local-1"}
+    ]
+    assert capability.calls == [{"ticker": "NVDA", "keyword": None, "limit": 3}]
+
+
+def test_runtime_backend_module_graph_matches_current_local_modules(tmp_path):
+    import subprocess
+
+    code = f"""
+import sys
+sys.path.insert(0, {str(project_root)!r})
+from src.tools.data_access import DataAccessLayer
+local = DataAccessLayer(base_path={str(tmp_path)!r})
+required = {{
+    'src.tools.backends.local_capabilities',
+    'src.tools.backends.local_market_backend',
+    'src.tools.backends.sa_capture_backend',
+    'src.tools.backends.sqlite_backend',
+}}
+forbidden = {{
+    'src.tools.backends.db_backend',
+    'src.tools.backends.db_config',
+    'psycopg2',
+}}
+assert required <= set(sys.modules), sorted(required - set(sys.modules))
+assert not (forbidden & set(sys.modules)), sorted(forbidden & set(sys.modules))
+assert type(local._backend).__name__ == 'SACaptureBackend'
+"""
+    completed = subprocess.run(
+        [sys.executable, "-I", "-c", code],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
 # ============================================================
 # Config Access
 # ============================================================

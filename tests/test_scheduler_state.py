@@ -103,6 +103,6 @@ def test_reconcile_interrupted_running_marks_terminal(store):
     assert store.get("polygon_news")["last_status"] == "succeeded"
 
 
-def test_no_pg_dependency():
+def test_imports_with_declared_local_dependencies():
     import src.scheduler_state as mod
     assert not hasattr(mod, "psycopg2")

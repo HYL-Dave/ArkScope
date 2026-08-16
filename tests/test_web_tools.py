@@ -370,7 +370,7 @@ class TestBridgeIntegration:
         """create_openai_tools() should include web tools when config enables them."""
         from src.tools.data_access import DataAccessLayer
         from src.agents.openai_agent.tools import create_openai_tools
-        dal = DataAccessLayer(db_dsn="auto")
+        dal = DataAccessLayer()
         tools = create_openai_tools(dal)
         names = [getattr(t, "name", "") for t in tools]
         assert "tool_tavily_search" in names

@@ -234,7 +234,7 @@ async def run_query_stream(
     # Get or create DAL
     if dal is None:
         from src.tools.data_access import DataAccessLayer
-        dal = DataAccessLayer(db_dsn="auto")
+        dal = DataAccessLayer()
 
     # Get config
     config = get_agent_config()
@@ -658,13 +658,10 @@ def run_query(
 def _get_freshness_summary(dal) -> str:
     """Get freshness summary string from singleton registry."""
     try:
-        from src.tools.backends.db_backend import DatabaseBackend
-        if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
-            from src.tools.freshness import get_registry
-            fr = get_registry(db_backend=dal._backend)
-            if fr:
-                fr.scan()
-                return fr.format_summary()
+        from src.tools.freshness import get_registry
+        fr = get_registry(local_capability=dal._backend)
+        fr.scan()
+        return fr.format_summary()
     except Exception as e:
         logger.debug("Freshness scan failed: %s", e)
     return ""

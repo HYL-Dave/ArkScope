@@ -305,8 +305,8 @@ def _client_with_canned(metadata=None, observations=None, release_dates=None):
 
 
 def _patch_store(store, monkeypatch):
-    """Patch the store factory inside fred_ingestion to return our fake."""
-    monkeypatch.setattr(ing, "get_macro_calendar_store", lambda dal: store)
+    """Patch the direct local-store constructor used by ingestion."""
+    monkeypatch.setattr(ing, "MacroCalendarLocalStore", lambda: store)
 
 
 def _tiny_catalog(*entries):
