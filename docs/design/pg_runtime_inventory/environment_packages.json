@@ -1,1 +1,0 @@
-{"import_providers":{"psycopg":[],"psycopg2":["psycopg2-binary"]},"installed":{"news-please":"1.6.15","psycopg2-binary":"2.9.10"},"observed_reverse_requirements":{"psycopg2-binary":["news-please"]},"repository_direct_requirements":["psycopg[binary]>=3.1"]}
