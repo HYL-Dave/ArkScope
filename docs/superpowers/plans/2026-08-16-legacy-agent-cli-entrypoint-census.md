@@ -1,7 +1,8 @@
 # Legacy-Agent CLI and Entrypoint Census Implementation Plan
 
-> **Status:** PLAN REVIEWED GREEN; TASK 0 REVIEWED GREEN; TASK 1 COMPLETE;
-> INDEPENDENT TASK 1 REVIEW NEXT; TASKS 2-4 NOT AUTHORIZED
+> **Status:** PLAN REVIEWED GREEN; TASKS 0-1 REVIEWED GREEN; TASK 2 STOPPED
+> BEFORE AUTHORITY GENERATION FOR NORMALIZED-AUTHORITY AMENDMENT REVIEW;
+> TASKS 3-4 NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -30,9 +31,11 @@ without importing product modules. One canonical `entrypoints.jsonl` ledger owns
 logical entrypoints and their present role, reachability, owner, tests, side
 effects, app equivalence, recommendation, and decision gate. Raw candidate
 observations live in manifested packets and close to either one canonical row or
-one closed exclusion. Deterministic TSV projections and a human census derive
-from the ledger. CLI/Discord capabilities are analyzed by symbol and call site,
-not inferred from file ownership or test presence.
+one closed exclusion. Normalized consumer, capability, test, and invocation
+authorities are generated in the same deterministic pass and cross-reference the
+ledger; `recommendations.tsv` is its lossless projection. CLI/Discord capabilities
+are analyzed by symbol and call site, not inferred from file ownership or test
+presence.
 
 **Tech stack:** Git, Python 3.10.12 standard-library `ast`/`json`/`tokenize`,
 structured JSON/package/extension-manifest parsing, ripgrep, GNU `sha256sum`,
@@ -322,8 +325,33 @@ Status is `current`, `stale`, `historical`, or `test_fixture`.
 entrypoint_id	product_role	reachability	app_equivalence	recommendation	decision_gate
 ```
 
-Every projection is regenerated solely from `entrypoints.jsonl` plus the
-packet-local candidate join where required. It is not separately edited.
+#### 0.5a Normalized-authority amendment (2026-08-17)
+
+The original sentence claimed every TSV could be regenerated solely from
+`entrypoints.jsonl` plus the candidate join. That is impossible under the fixed
+schema: the JSON ledger stores consumer, capability, and test IDs, but not the
+detail columns required by those TSVs (`consumer_kind`, capability owners and
+loss, or test relationship). Pretending otherwise would make validator item 20
+non-discriminating and violate stop condition 30.
+
+The authority model is therefore:
+
+- `entrypoints.jsonl` is canonical for one-row-per-logical-entrypoint facts;
+- `consumers.tsv`, `capabilities.tsv`, `tests.tsv`, and
+  `current_invocations.tsv` are normalized detail authorities generated in the
+  same pass from the exact source base, Task 1 candidates/test joins, and the
+  reviewed classification rules;
+- `candidate_exclusions.tsv` is the closed candidate-closure authority;
+- `recommendations.tsv` is the only pure lossless projection of
+  `entrypoints.jsonl`; and
+- every detail row must foreign-key to the ledger, while each ledger ID array
+  must equal the corresponding normalized-authority projection.
+
+No authority file is hand-edited. Two independent complete generation runs must
+be byte-identical, and Task 3 independently reconstructs all normalized
+authorities from source facts rather than trusting the Task 2 generator. This
+amendment changes no schema, candidate ID, candidate count, source base, tracked
+file set, product byte, or recommendation authority.
 
 ### 0.6 Exact base and tool identities
 
@@ -929,7 +957,9 @@ contracts with their exact owner chain.
 
 Create `entrypoints.jsonl`. Persist every admitted raw candidate exactly once as
 candidate evidence on its canonical row; put only true exclusions in the
-tracked exclusions TSV. Generate all TSV projections from the canonical ledger.
+tracked exclusions TSV. Generate the four normalized detail authorities in the
+same deterministic pass, enforce both directions of every ledger foreign-key,
+and derive `recommendations.tsv` losslessly from the canonical ledger.
 Create `MANIFEST.sha256` over every authority file in path-byte order, excluding
 the manifest itself.
 
@@ -956,7 +986,9 @@ The packet-local validator rejects at least:
 17. `src.agents` missing `credential_read` or `long_running_process`;
 18. historical command exclusion applied to a current stale authority;
 19. admitted candidate evidence absent from tracked canonical authority;
-20. projection bytes not reproducible from canonical authority; and
+20. recommendation bytes not reproducible from canonical authority, normalized
+    detail bytes not reproducible from exact source/candidate inputs, or a
+    ledger/detail foreign-key mismatch; and
 21. manifest self-inclusion or missing payload.
 
 - [ ] **Step 8: Write the human census and decision packet**
@@ -976,7 +1008,8 @@ It must not open or imply an implementation plan.
 
 - [ ] **Step 9: Validate, manifest, and commit**
 
-Run validator plus all negative self-tests, regenerate every projection twice,
+Run validator plus all negative self-tests, regenerate the entire authority set
+twice,
 verify protected rows, leak scan artifacts, and commit only authorized docs:
 
 ```bash
@@ -1125,7 +1158,9 @@ Stop immediately and write a bounded docs-only amendment if any occurs:
 28. an operator/integration command becomes a retirement candidate solely
     because desktop does not invoke it;
 29. a recommendation is represented as user authorization;
-30. a projection cannot regenerate byte-for-byte from canonical authority;
+30. recommendations cannot regenerate byte-for-byte from canonical authority,
+    any normalized detail authority cannot regenerate byte-for-byte from exact
+    source/candidate inputs, or a ledger/detail foreign key does not close;
 31. protected aggregate, packet manifest, or leak audit fails;
 32. canonical authority is edited during Task 3 status closeout;
 33. execution proceeds into product fixes, Track B, retirement, merge, push,
