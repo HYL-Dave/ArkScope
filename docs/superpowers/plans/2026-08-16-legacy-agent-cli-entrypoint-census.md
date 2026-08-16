@@ -1,7 +1,7 @@
 # Legacy-Agent CLI and Entrypoint Census Implementation Plan
 
-> **Status:** PLAN REVIEWED GREEN; TASK 0 COMPLETE; INDEPENDENT TASK 0 REVIEW
-> NEXT; TASKS 1-4 NOT AUTHORIZED
+> **Status:** PLAN REVIEWED GREEN; TASK 0 REVIEWED GREEN; TASK 1 COMPLETE;
+> INDEPENDENT TASK 1 REVIEW NEXT; TASKS 2-4 NOT AUTHORIZED
 >
 > **Date:** 2026-08-16
 >
@@ -773,7 +773,7 @@ Stop for Task 0 review unless a recorded batch ruling applies.
 coverage joins, negative self-tests, and a Task 1 docs status commit. It does
 not yet create recommendations or edit product bytes.
 
-- [ ] **Step 1: Write the structured Python scanner from the plan**
+- [x] **Step 1: Write the structured Python scanner from the plan**
 
 In a detached read-only worktree at exact source base, parse tracked Python
 blobs with `ast.parse`. Emit module wrappers, every direct main guard, parser
@@ -784,7 +784,7 @@ dynamic targets to a candidate whose `detail` names the unresolved AST shape.
 An unresolved reachable dynamic launch is a stop in Task 2, not silently
 excluded.
 
-- [ ] **Step 2: Parse mode, shebang, shell, packages, and manifests**
+- [x] **Step 2: Parse mode, shebang, shell, packages, and manifests**
 
 Read executable mode from `git ls-tree`, first-line shebangs from exact Git
 blobs, shell paths from the tracked path set, package scripts with `json`, and
@@ -798,7 +798,7 @@ manifest's host ID and stable launcher/host target. Do not execute shell,
 generate a manifest, inspect the user's installed browser manifests, or access
 `~/.config`/`~/.mozilla`.
 
-- [ ] **Step 3: Extract JavaScript and subprocess launch targets**
+- [x] **Step 3: Extract JavaScript and subprocess launch targets**
 
 Use a bounded lexical/AST-like scanner over tracked JS/MJS/TS/TSX for
 `spawn`, `execFile`, and package-script delegations. Require the five launch
@@ -810,7 +810,7 @@ Search Python and JavaScript call sites without a result cap. A wrapper such as
 to the wrapper call. Dynamic-only target construction requires a concrete
 consumer trace or a stop.
 
-- [ ] **Step 4: Extract current-document command observations**
+- [x] **Step 4: Extract current-document command observations**
 
 Scan tracked Markdown outside `docs/superpowers/{plans,evidence,specs}` from
 the exact source base. Use the pinned command-token grammar for Python module,
@@ -820,14 +820,14 @@ consumer evidence. Historical decision-log/spec examples remain raw candidates
 until Task 2 gives the exact closed exclusion; stale commands in current
 authority become rows, not exclusions.
 
-- [ ] **Step 5: Discover test consumers without promoting helpers**
+- [x] **Step 5: Discover test consumers without promoting helpers**
 
 Join AST imports, patch targets, subprocess invocations, and documentation
 assertions in tests to candidates already discovered by Steps 1-4. Tests do
 not independently promote arbitrary helpers into entrypoints. Every test ID
 must join exactly to the pinned backend/frontend collection streams.
 
-- [ ] **Step 6: Run extractor negative self-tests**
+- [x] **Step 6: Run extractor negative self-tests**
 
 Packet-local synthetic fixtures must prove at least:
 
@@ -848,7 +848,7 @@ Packet-local synthetic fixtures must prove at least:
 Each mutation of a required extractor branch must make the corresponding
 self-test fail. Self-tests use synthetic packet files only.
 
-- [ ] **Step 7: Close raw-source coverage and commit status**
+- [x] **Step 7: Close raw-source coverage and commit status**
 
 Run two independent scanner processes and require byte-identical candidate
 JSONL. Emit per-family counts/hashes, overlap groups, unresolved-dynamic rows,
