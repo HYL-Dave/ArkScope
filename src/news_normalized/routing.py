@@ -14,7 +14,6 @@ from src.news_providers import (
     parse_news_toggle,
 )
 
-NEWS_PG_EXIT_COMPLETED_KEY = "news_pg_exit_completed"
 USE_NORMALIZED_NEWS_WRITES_KEY = "use_normalized_news_writes"
 
 ENV_PROFILE_DB = "ARKSCOPE_PROFILE_DB"
@@ -24,7 +23,6 @@ ENV_USE_NORMALIZED_NEWS_WRITES = "ARKSCOPE_USE_NORMALIZED_NEWS_WRITES"
 class NewsWriteMode(str, Enum):
     NORMALIZED = "normalized"
     LEGACY_LOCAL = "legacy_local"
-    LEGACY_PG = "legacy_pg"
     BLOCKED = "blocked"
 
 
@@ -43,33 +41,46 @@ def _resolved_toggle(profile_value: Any, env_value: Any) -> Optional[bool]:
     return env if env is not None else parse_news_toggle(profile_value)
 
 
+def _malformed_toggle(profile_value: Any, env_value: Any) -> bool:
+    if env_value is not None:
+        return parse_news_toggle(env_value) is None
+    return profile_value is not None and parse_news_toggle(profile_value) is None
+
+
 def resolve_news_write_route(
-    exit_completed: Any,
+    normalized_required: Any,
     normalized_value: Any,
     local_value: Any,
     normalized_env: Any = None,
     local_env: Any = None,
 ) -> NewsWriteRoute:
     """Resolve the writer route without reading external state."""
-    parsed_exit = parse_news_toggle(exit_completed)
-    if exit_completed is not None and parsed_exit is None:
+    if not isinstance(normalized_required, bool):
         return NewsWriteRoute(
             NewsWriteMode.BLOCKED,
-            "News PG exit marker is malformed; refusing to select a write route.",
+            "Normalized-writer requirement is malformed; refusing to select a route.",
         )
-    exit_done = parsed_exit is True
+    if _malformed_toggle(normalized_value, normalized_env):
+        return NewsWriteRoute(
+            NewsWriteMode.BLOCKED,
+            "Normalized-writer setting is malformed; refusing to select a route.",
+        )
+    if _malformed_toggle(local_value, local_env):
+        return NewsWriteRoute(
+            NewsWriteMode.BLOCKED,
+            "Direct-local writer setting is malformed; refusing to select a route.",
+        )
     normalized = _resolved_toggle(normalized_value, normalized_env)
-    local = _resolved_toggle(local_value, local_env)
 
-    if exit_done:
+    if normalized_required:
         if normalized is False:
             return NewsWriteRoute(
                 NewsWriteMode.BLOCKED,
-                "PG news write route is retired after exit; normalized writes cannot be disabled.",
+                "This source requires normalized writes; they cannot be disabled.",
             )
         return NewsWriteRoute(
             NewsWriteMode.NORMALIZED,
-            "PG exit is complete; normalized writes are required.",
+            "This source requires normalized writes.",
         )
 
     if normalized is True:
@@ -77,14 +88,9 @@ def resolve_news_write_route(
             NewsWriteMode.NORMALIZED,
             "Normalized news writes are explicitly enabled.",
         )
-    if local is not False:
-        return NewsWriteRoute(
-            NewsWriteMode.LEGACY_LOCAL,
-            "Normalized writes are disabled or unset; legacy local writes are enabled by default.",
-        )
     return NewsWriteRoute(
-        NewsWriteMode.LEGACY_PG,
-        "Normalized and legacy local writes are disabled; use the pre-exit PG route.",
+        NewsWriteMode.LEGACY_LOCAL,
+        "Normalized writes are disabled or unset; the direct-local writer is selected.",
     )
 
 
@@ -101,9 +107,8 @@ def _read_profile_values(profile_db: Union[str, Path]) -> Mapping[str, Any]:
         conn = sqlite3.connect(uri, uri=True)
         try:
             rows = conn.execute(
-                "SELECT key, value FROM profile_settings WHERE key IN (?, ?, ?)",
+                "SELECT key, value FROM profile_settings WHERE key IN (?, ?)",
                 (
-                    NEWS_PG_EXIT_COMPLETED_KEY,
                     USE_NORMALIZED_NEWS_WRITES_KEY,
                     USE_LOCAL_NEWS_KEY,
                 ),
@@ -120,6 +125,8 @@ def _read_profile_values(profile_db: Union[str, Path]) -> Mapping[str, Any]:
 def read_news_write_route(
     profile_db: Optional[Union[str, Path]] = None,
     environ: Optional[Mapping[str, str]] = None,
+    *,
+    normalized_required: bool = False,
 ) -> NewsWriteRoute:
     """Read profile/env settings without creating or modifying the profile database."""
     env = os.environ if environ is None else environ
@@ -129,7 +136,7 @@ def read_news_write_route(
     except NewsWriteConfigError as exc:
         return NewsWriteRoute(NewsWriteMode.BLOCKED, str(exc))
     return resolve_news_write_route(
-        exit_completed=values.get(NEWS_PG_EXIT_COMPLETED_KEY),
+        normalized_required=normalized_required,
         normalized_value=values.get(USE_NORMALIZED_NEWS_WRITES_KEY),
         local_value=values.get(USE_LOCAL_NEWS_KEY),
         normalized_env=env.get(ENV_USE_NORMALIZED_NEWS_WRITES),

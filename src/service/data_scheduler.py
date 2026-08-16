@@ -100,9 +100,8 @@ class SourceDef:
     # the telemetry-free dispatcher directly so it still owns exactly one row.
     backend_job_name: Optional[str] = None
     writes_macro_db: bool = False
-    # When set ('polygon'|'finnhub'), resolve the Task 1 news write route per source run.
-    # NORMALIZED and LEGACY_LOCAL write local DB directly; LEGACY_PG keeps the collector→PG→mirror
-    # chain; BLOCKED fails closed before provider work.
+    # When set ('polygon'|'finnhub'), resolve the current local news route per run.
+    # NORMALIZED and LEGACY_LOCAL write locally; BLOCKED fails before provider work.
     news_direct_source: Optional[str] = None
     # Presentation-only status metadata for Settings/Data Sources. These fields
     # do not affect execution.
@@ -952,96 +951,11 @@ def _resolve_price_scope() -> List[str]:
     return resolve_active_universe()
 
 
-def _news_pg_exit_audit_state(db_path: str) -> Optional[bool]:
-    """Read the market DB audit marker without creating or mutating it.
+def _read_news_write_route_for_scheduler(source: str):
+    """Resolve the current local writer policy for one scheduler source."""
+    from src.news_normalized.routing import read_news_write_route
 
-    Returns None when the marker cannot be read. News scheduling treats that as
-    fail-closed so a transient/corrupt audit read never re-enables PG news.
-    """
-    path = Path(db_path)
-    if not path.exists():
-        return False
-    try:
-        uri = f"{path.resolve().as_uri()}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True)
-        try:
-            exists = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-                ("news_pg_exit_runs",),
-            ).fetchone()
-            if not exists:
-                return False
-            row = conn.execute(
-                "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
-            ).fetchone()
-            return row is not None
-        finally:
-            conn.close()
-    except sqlite3.Error:
-        return None
-
-
-def _blocked_news_audit_route():
-    from src.news_normalized.routing import NewsWriteMode, NewsWriteRoute
-
-    return NewsWriteRoute(
-        NewsWriteMode.BLOCKED,
-        "News PG-exit audit marker could not be read; refusing legacy PG news route.",
-    )
-
-
-def _read_profile_news_write_values() -> Optional[dict]:
-    from src.news_normalized.routing import (
-        NEWS_PG_EXIT_COMPLETED_KEY,
-        USE_NORMALIZED_NEWS_WRITES_KEY,
-    )
-    from src.news_providers import USE_LOCAL_NEWS_KEY
-
-    try:
-        store = _store()
-        return {
-            NEWS_PG_EXIT_COMPLETED_KEY: store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY),
-            USE_NORMALIZED_NEWS_WRITES_KEY: store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY),
-            USE_LOCAL_NEWS_KEY: store.get_setting(USE_LOCAL_NEWS_KEY),
-        }
-    except Exception:  # noqa: BLE001 — caller decides whether audit can cover this
-        return None
-
-
-def _read_news_write_route_for_scheduler():
-    """Resolve news writer routing with the local market DB audit marker included."""
-    from src.market_data_admin import resolve_market_db_path
-    from src.news_normalized.routing import (
-        ENV_USE_NORMALIZED_NEWS_WRITES,
-        NEWS_PG_EXIT_COMPLETED_KEY,
-        NewsWriteMode,
-        USE_NORMALIZED_NEWS_WRITES_KEY,
-        read_news_write_route,
-        resolve_news_write_route,
-    )
-    from src.news_providers import ENV_USE_LOCAL_NEWS, USE_LOCAL_NEWS_KEY
-
-    market_db = resolve_market_db_path()
-    audit_state = _news_pg_exit_audit_state(market_db)
-    if audit_state is False:
-        return read_news_write_route()
-    values = _read_profile_news_write_values()
-    if values is None and audit_state is None:
-        return _blocked_news_audit_route()
-    values = values or {}
-    exit_completed = values.get(NEWS_PG_EXIT_COMPLETED_KEY)
-    normalized = values.get(USE_NORMALIZED_NEWS_WRITES_KEY)
-    local = values.get(USE_LOCAL_NEWS_KEY)
-    route = resolve_news_write_route(
-        exit_completed=True if audit_state is True else exit_completed,
-        normalized_value=normalized,
-        local_value=local,
-        normalized_env=os.environ.get(ENV_USE_NORMALIZED_NEWS_WRITES),
-        local_env=os.environ.get(ENV_USE_LOCAL_NEWS),
-    )
-    if audit_state is None and route.mode not in (NewsWriteMode.NORMALIZED, NewsWriteMode.BLOCKED):
-        return _blocked_news_audit_route()
-    return route
+    return read_news_write_route(normalized_required=source == "ibkr_news")
 
 
 NewsExecutionMode = Literal["direct_local", "reject"]
@@ -1058,8 +972,6 @@ def _classify_news_write_mode(mode: object) -> NewsExecutionMode:
         return "direct_local"
     if mode is NewsWriteMode.LEGACY_LOCAL:
         return "direct_local"
-    if mode is NewsWriteMode.LEGACY_PG:
-        return "reject"
     if mode is NewsWriteMode.BLOCKED:
         return "reject"
     raise UnsupportedNewsWriteMode("unsupported_news_write_mode")
@@ -1082,7 +994,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     if d.news_direct_source is not None:
         from src.news_normalized.routing import NewsWriteMode
 
-        news_route = _read_news_write_route_for_scheduler()
+        news_route = _read_news_write_route_for_scheduler(source)
         try:
             news_execution_mode = _classify_news_write_mode(news_route.mode)
         except UnsupportedNewsWriteMode:
@@ -1247,18 +1159,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             elif d.news_direct_source is not None:
                 if news_execution_mode == "reject" and news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
-                if news_execution_mode == "reject":
-                    raise RuntimeError(
-                        "legacy PG news sync route retired by N9; use normalized/local "
-                        "news writers"
-                    )
                 if (
-                    news_route.mode == NewsWriteMode.LEGACY_LOCAL
-                    and d.news_direct_source == "ibkr"
+                    d.news_direct_source == "ibkr"
+                    and news_route.mode is not NewsWriteMode.NORMALIZED
                 ):
                     raise RuntimeError(
-                        "legacy local IBKR news collector route retired by N9; use "
-                        "normalized IBKR news writer"
+                        "IBKR news requires the normalized writer policy"
                     )
 
             if d.writes_macro_db and macro_preflight_failure is None:
@@ -1557,37 +1463,35 @@ def reconcile_interrupted_runtime_state(
     return {"scheduler_sources": scheduler_sources, "provider_run_ids": provider_run_ids}
 
 
-def _pg_reachable(timeout: float = 3.0) -> bool:
-    """Fast TCP probe of the PG host before the seed touches job_runs.
+def _seed_from_local_job_history(missing_sources: tuple[str, ...]) -> None:
+    if not missing_sources:
+        return
+    from src.app_records_store import resolve_profile_state_db_path
+    from src.service.job_runs_store import JobRunsLocalStore
 
-    psycopg2.connect has NO default timeout — an unreachable/filtered PG host can
-    hang for the full OS TCP retry window (~2 min), and the seed must never make
-    app startup or the scheduler loop depend on PG availability."""
-    try:
-        from src.tools.db_config import load_database_url
-
-        dsn = load_database_url(_REPO_ROOT / "config" / ".env")
-        if not dsn:
-            return False
-        import socket
-
-        from psycopg2.extensions import parse_dsn
-
-        params = parse_dsn(dsn)
-        host = params.get("host") or "localhost"
-        port = int(params.get("port") or 5432)
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except Exception:  # noqa: BLE001 — any failure = treat as unreachable
-        return False
+    latest = JobRunsLocalStore(
+        resolve_profile_state_db_path(None)
+    ).latest_runs_by_name()
+    for source in missing_sources:
+        candidates = []
+        for name in (job_name(source), _DAILY_UPDATE_ALIAS.get(source)):
+            row = latest.get(name) if name else None
+            if row:
+                timestamp = row.get("finished_at") or row.get("started_at")
+                if isinstance(timestamp, str):
+                    try:
+                        candidates.append(
+                            datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                        )
+                    except ValueError:
+                        pass
+        if candidates:
+            with _LAST_ATTEMPT_LOCK:
+                _LAST_ATTEMPT[source] = max(candidates)
 
 
 def _seed_last_attempts() -> None:
-    """Continuity across restarts: seed last-attempt from the LOCAL scheduler_state store first
-    (v1.2 — works PG-unreachable), then SUPPLEMENT from PG job_runs for any source without local
-    state (transition continuity + manual daily_update runs via the alias map). STRICTLY
-    best-effort: losing the seed only means a source may fire one interval early after a restart."""
-    # 1. local-primary seed (no PG needed)
+    """Seed restart continuity from current local stores, in authority order."""
     try:
         for source, ts in _state_store().last_attempts().items():
             if source in SOURCES:
@@ -1596,36 +1500,14 @@ def _seed_last_attempts() -> None:
     except Exception as e:  # noqa: BLE001 — local seed best-effort
         logger.debug(f"scheduler local seed skipped: {e}")
 
-    # 2. PG supplement (optional, only for sources still missing a local last_attempt)
-    if not _pg_reachable():
-        logger.info("scheduler PG seed skipped: PG unreachable (local state used; "
-                    "any source without local state may fire one interval early)")
-        return
+    with _LAST_ATTEMPT_LOCK:
+        missing_sources = tuple(
+            source for source in SOURCES if source not in _LAST_ATTEMPT
+        )
     try:
-        from src.api.dependencies import get_dal
-        from src.service.job_runs_store import get_job_runs_store
-
-        latest = get_job_runs_store(get_dal()).latest_runs_by_name()
+        _seed_from_local_job_history(missing_sources)
     except Exception as e:  # noqa: BLE001
-        logger.debug(f"scheduler PG seed skipped: {e}")
-        return
-    for source in SOURCES:
-        with _LAST_ATTEMPT_LOCK:
-            if source in _LAST_ATTEMPT:
-                continue  # local state already covers it — PG is only a supplement
-        candidates = []
-        for name in (job_name(source), _DAILY_UPDATE_ALIAS.get(source)):
-            row = latest.get(name) if name else None
-            if row:
-                ts = row.get("finished_at") or row.get("started_at")
-                if isinstance(ts, str):
-                    try:
-                        candidates.append(datetime.fromisoformat(ts.replace("Z", "+00:00")))
-                    except ValueError:
-                        pass
-        if candidates:
-            with _LAST_ATTEMPT_LOCK:
-                _LAST_ATTEMPT[source] = max(candidates)
+        logger.debug(f"scheduler job-history seed skipped: {e}")
 
 
 def _is_due(source: str, now: datetime) -> bool:
@@ -1685,8 +1567,7 @@ async def scheduler_loop() -> None:
         ensure_env_loaded()  # collector subprocesses inherit the keys
     except Exception:  # noqa: BLE001
         pass
-    # Bounded: the loop must start even if PG hangs past the probe (belt and
-    # suspenders — an abandoned seed thread finishes harmlessly in the background).
+    # Bounded: a damaged local store must not block scheduler startup.
     try:
         await asyncio.wait_for(asyncio.to_thread(_seed_last_attempts), timeout=15)
     except asyncio.TimeoutError:

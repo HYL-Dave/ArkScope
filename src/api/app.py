@@ -202,7 +202,6 @@ def create_app() -> FastAPI:
     from .routes.schedule import router as schedule_router
     from .routes.providers_config import router as providers_config_router
     from .routes.research import router as research_router
-    from .routes.app_records import router as app_records_router
     from .routes.portfolio import router as portfolio_router
     from .routes.portfolio_capture import router as portfolio_capture_router
     from .routes.portfolio_activity import router as portfolio_activity_router
@@ -228,7 +227,6 @@ def create_app() -> FastAPI:
     app.include_router(schedule_router)
     app.include_router(providers_config_router)
     app.include_router(research_router)
-    app.include_router(app_records_router)
     app.include_router(portfolio_router)
     app.include_router(portfolio_capture_router)
     app.include_router(portfolio_activity_router)

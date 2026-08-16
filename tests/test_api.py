@@ -6,6 +6,8 @@ Uses FastAPI TestClient to test all endpoints against real data.
 
 import sys
 import asyncio
+import socket
+import threading
 from pathlib import Path
 
 import httpx
@@ -33,6 +35,157 @@ def test_fixed_task_runtime_routes_mount_on_real_app():
     }
     assert ("/config/fixed-task-runtime", "PUT") in routes
     assert ("/config/fixed-task-runtime", "DELETE") in routes
+
+
+def _run_local_runtime_lifespan(monkeypatch, tmp_path):
+    from src.api import dependencies
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import data_scheduler
+
+    runtime_root = tmp_path / "runtime"
+    runtime_root.mkdir()
+    for name, filename in {
+        "ARKSCOPE_PROFILE_DB": "profile_state.db",
+        "ARKSCOPE_MARKET_DB": "market_data.db",
+        "ARKSCOPE_SA_DB": "sa_capture.db",
+        "ARKSCOPE_MACRO_CALENDAR_DB": "macro_calendar.db",
+        "ARKSCOPE_CONSENSUS_DB": "consensus.db",
+        "ARKSCOPE_TOKEN_STORE_PATH": "token_store.json",
+    }.items():
+        monkeypatch.setenv(name, str(runtime_root / filename))
+    monkeypatch.delenv("ARKSCOPE_DISABLE_SCHEDULER", raising=False)
+
+    monkeypatch.setattr(
+        "src.data_provider_config.apply_env",
+        lambda store: frozenset(),
+    )
+
+    class _CaptureService:
+        def __init__(self):
+            self.events = []
+
+        def reconcile_startup(self):
+            self.events.append("reconciled")
+
+        def scheduler_tick(self, *, startup):
+            self.events.append(("tick", startup))
+
+    capture_service = _CaptureService()
+    monkeypatch.setattr(
+        dependencies,
+        "get_portfolio_capture_service",
+        lambda: capture_service,
+    )
+    dependencies.get_data_provider_store.cache_clear()
+    dependencies.get_dal.cache_clear()
+
+    monkeypatch.setattr(
+        data_scheduler,
+        "_SCHED_STATE",
+        SchedulerStateStore(runtime_root / "profile_state.db"),
+    )
+    monkeypatch.setattr(data_scheduler, "_LAST_ATTEMPT", {})
+    monkeypatch.setattr(data_scheduler, "_LAST_RESULT", {})
+
+    tick_seen = threading.Event()
+    ticks = []
+    provider_calls = []
+    real_tick_once = data_scheduler.tick_once
+
+    def _observed_tick():
+        fired = real_tick_once(fire=provider_calls.append)
+        ticks.append(fired)
+        tick_seen.set()
+        return fired
+
+    monkeypatch.setattr(data_scheduler, "tick_once", _observed_tick)
+
+    network_attempts = []
+
+    def _blocked_network(*args, **kwargs):
+        del args, kwargs
+        network_attempts.append("blocked")
+        raise OSError("external network denied by local-runtime gate")
+
+    monkeypatch.setattr(socket.socket, "connect", _blocked_network)
+    monkeypatch.setattr(socket.socket, "connect_ex", _blocked_network)
+    monkeypatch.setattr(socket, "create_connection", _blocked_network)
+
+    async def _exercise():
+        app = create_app()
+        active_owner_names = set()
+        async with app.router.lifespan_context(app):
+            observed = await asyncio.wait_for(
+                asyncio.to_thread(tick_seen.wait, 3.0),
+                timeout=4.0,
+            )
+            assert observed is True
+            active_owner_names = {
+                task.get_name()
+                for task in asyncio.all_tasks()
+                if not task.done()
+                and task.get_name() in {
+                    "data-scheduler",
+                    "portfolio-capture-scheduler",
+                }
+            }
+            route_rows = sorted(
+                f"{','.join(sorted(getattr(route, 'methods', None) or ())) }\t"
+                f"{route.path}\t{route.endpoint.__module__}\t{route.endpoint.__qualname__}"
+                for route in app.routes
+            )
+        await asyncio.sleep(0)
+        leaked_owner_names = {
+            task.get_name()
+            for task in asyncio.all_tasks()
+            if not task.done()
+            and task.get_name() in {
+                "data-scheduler",
+                "portfolio-capture-scheduler",
+            }
+        }
+        return route_rows, active_owner_names, leaked_owner_names
+
+    route_rows, active_owner_names, leaked_owner_names = asyncio.run(_exercise())
+    dependencies.get_data_provider_store.cache_clear()
+    dependencies.get_dal.cache_clear()
+    return {
+        "routes": route_rows,
+        "active_owners": active_owner_names,
+        "leaked_owners": leaked_owner_names,
+        "ticks": ticks,
+        "provider_calls": provider_calls,
+        "network_attempts": network_attempts,
+        "capture_events": capture_service.events,
+    }
+
+
+def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
+    monkeypatch,
+    tmp_path,
+):
+    observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
+
+    assert len(observed["routes"]) == 173
+    assert not any("/app-records/migration/" in row for row in observed["routes"])
+    assert observed["active_owners"] == {
+        "data-scheduler",
+        "portfolio-capture-scheduler",
+    }
+    assert observed["ticks"] == [[]]
+
+
+def test_local_runtime_gate_rejects_external_network_and_cleans_owners(
+    monkeypatch,
+    tmp_path,
+):
+    observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
+
+    assert observed["network_attempts"] == []
+    assert observed["provider_calls"] == []
+    assert observed["leaked_owners"] == set()
+    assert observed["capture_events"][0] == "reconciled"
+    assert ("tick", True) in observed["capture_events"]
 
 
 @pytest.fixture(scope="module")

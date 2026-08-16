@@ -17,6 +17,7 @@ from src import prices_runtime
 import src.service.data_scheduler as ds
 from src.active_universe import ActiveUniverseUnavailable
 from src.profile_state import ProfileStateStore
+from src.service.job_runs_store import JobRunsLocalStore as _REAL_JOB_RUNS_LOCAL_STORE
 
 _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
 _REAL_RESOLVE_PRICE_SCOPE = ds._resolve_price_scope
@@ -310,38 +311,6 @@ def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
     assert ds._LAST_RESULT["polygon_news"]["status"] == "not_configured"
 
 
-def test_stale_legacy_pg_news_route_is_retired_before_sync(monkeypatch):
-    import src.news_normalized.routing as routing
-    import src.collectors.polygon_news as cpn
-    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_PG,
-                            "legacy PG test route")
-    monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: (_ for _ in ()).throw(
-                            AssertionError("legacy PG news route must not collect")))
-    calls = []
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
-    finished = {}
-
-    class _Store:
-        def create_run(self, name, **kw):
-            finished["name"] = name
-            finished["trigger"] = kw.get("trigger_source")
-            return 7
-
-        def finish_run(self, run_id, **kw):
-            finished["status"] = kw.get("status")
-            return True
-
-    monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", lambda profile_db: _Store())
-    res = ds.run_source("polygon_news", trigger_source="api")
-    assert res["status"] == "failed"
-    assert "legacy PG news sync route retired" in res["error"]
-    assert calls == []
-    assert finished == {"name": "collect.polygon_news", "trigger": "api",
-                        "status": "failed"}
-
-
 def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
     # NO --news PG sync subprocess, NO local mirror. (OFF path = the test above, unchanged.)
@@ -395,7 +364,6 @@ def test_news_write_mode_classifier_is_exhaustive_for_current_modes():
     } == {
         routing.NewsWriteMode.NORMALIZED: "direct_local",
         routing.NewsWriteMode.LEGACY_LOCAL: "direct_local",
-        routing.NewsWriteMode.LEGACY_PG: "reject",
         routing.NewsWriteMode.BLOCKED: "reject",
     }
 
@@ -457,7 +425,7 @@ def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_teleme
     monkeypatch.setattr(
         ds,
         "_read_news_write_route_for_scheduler",
-        lambda: SimpleNamespace(mode=object(), reason="future unreviewed mode"),
+        lambda source: SimpleNamespace(mode=object(), reason="future unreviewed mode"),
     )
     monkeypatch.setattr(
         "src.provider_config_runtime.provider_config_setup_state",
@@ -1066,8 +1034,7 @@ def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch)
     assert row["last_result"]["collect"]["errors"] == {"AAPL": "provider err"}
 
 
-def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkeypatch):
-    # LEGACY_LOCAL is the pre-exit rollback/current local path: provider→news_direct only.
+def test_local_news_route_keeps_single_direct_writer(monkeypatch):
     import src.collectors.polygon_news as cpn
     import src.news_normalized.routing as routing
 
@@ -1105,36 +1072,7 @@ def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkey
     assert "local_refresh" not in res
 
 
-def test_legacy_news_route_pg_fails_before_collector_sync_and_mirror(monkeypatch):
-    # LEGACY_PG was the old collector→PG sync→local mirror chain; N9 retires it.
-    import src.collectors.finnhub_news as cfn
-    import src.news_normalized.routing as routing
-
-    route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_PG,
-                                          "legacy PG test route")
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
-    monkeypatch.setattr("src.news_direct.backfill_news_direct",
-                        lambda *a, **k: (_ for _ in ()).throw(
-                            AssertionError("legacy direct writer must not run")))
-    seen = {}
-
-    def _run_incremental(**kwargs):
-        raise AssertionError("legacy PG route must fail before collector work")
-
-    monkeypatch.setattr(cfn, "run_incremental", _run_incremental)
-    sync_calls = []
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (sync_calls.append(argv), {"returncode": 0})[1])
-    res = ds.run_source("finnhub_news", trigger_source="api")
-
-    assert res["status"] == "failed"
-    assert "legacy PG news sync route retired" in res["error"]
-    assert len(route_calls) == 1
-    assert seen == {}
-    assert sync_calls == []
-
-
-def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirror(
+def test_normalized_ibkr_news_route_launches_isolated_worker(
     tmp_path,
     monkeypatch,
 ):
@@ -1189,22 +1127,10 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     assert "local_refresh" not in res
 
 
-def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
+def test_current_news_route_launches_normalized_worker(
     tmp_path,
     monkeypatch,
 ):
-    market_db = tmp_path / "market_data.db"
-    conn = sqlite3.connect(market_db)
-    try:
-        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
-        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
-        conn.commit()
-    finally:
-        conn.close()
-
-    import src.market_data_admin as mda
-
-    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
     calls = []
 
     def _subprocess(argv, cwd=None, capture_output=False, text=False, timeout=None):
@@ -1245,18 +1171,6 @@ def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailabl
     tmp_path,
     monkeypatch,
 ):
-    market_db = tmp_path / "market_data.db"
-    conn = sqlite3.connect(market_db)
-    try:
-        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
-        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
-        conn.commit()
-    finally:
-        conn.close()
-
-    import src.market_data_admin as mda
-
-    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
     monkeypatch.setattr(ds, "_store", lambda: (_ for _ in ()).throw(RuntimeError("profile down")))
     calls = []
 
@@ -1291,16 +1205,13 @@ def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailabl
     assert "collect_ibkr_news.py" not in rendered_calls
 
 
-def test_ibkr_news_fails_closed_when_pg_exit_audit_cannot_be_read(
+def test_ibkr_news_fails_closed_when_local_route_state_cannot_be_read(
     tmp_path,
     monkeypatch,
 ):
-    market_db = tmp_path / "market_data.db"
-    market_db.write_text("not sqlite", encoding="utf-8")
-
-    import src.market_data_admin as mda
-
-    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
+    profile_db = tmp_path / "profile_state.db"
+    profile_db.write_text("not sqlite", encoding="utf-8")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
     calls = []
     monkeypatch.setattr(
         ds,
@@ -1311,13 +1222,13 @@ def test_ibkr_news_fails_closed_when_pg_exit_audit_cannot_be_read(
         ds.subprocess,
         "run",
         lambda *a, **k: (_ for _ in ()).throw(
-            AssertionError("normalized worker should not run when audit is unreadable")
+            AssertionError("normalized worker should not run with unreadable route state")
         ),
     )
     res = ds.run_source("ibkr_news", trigger_source="api")
 
     assert res["status"] == "failed"
-    assert "audit marker could not be read" in res["error"]
+    assert "profile settings could not be read" in res["error"].lower()
     assert calls == []
 
 
@@ -1461,7 +1372,7 @@ def test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror(
     assert res["status"] == "failed"
     assert len(route_calls) == 1
     assert calls == []
-    assert "legacy local IBKR news collector route retired" in res["error"]
+    assert res["error"] == "IBKR news requires the normalized writer policy"
 
 
 def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypatch):
@@ -1492,18 +1403,6 @@ def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypat
     assert "blocked test route" in row["last_error"]
 
 
-def test_default_ibkr_legacy_news_route_fails_before_pg_sync(monkeypatch):
-    # A fresh profile without the normalized-writer marker must fail closed, not
-    # run the old collect_ibkr_news.py → PG sync → mirror chain.
-    calls = []
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
-    res = ds.run_source("ibkr_news")
-    assert res["status"] == "failed"
-    assert calls == []
-    assert "legacy local IBKR news collector route retired" in res["error"]
-
-
 def test_run_source_adapter_failure_short_circuits(monkeypatch):
     # direct-local writer raising (e.g. missing API key) → failed, PG sync never attempted
     monkeypatch.setattr(
@@ -1521,15 +1420,16 @@ def test_run_source_adapter_failure_short_circuits(monkeypatch):
 def test_default_ibkr_legacy_news_route_does_not_launch_collector(monkeypatch):
     calls = []
 
-    def _sub(argv):
+    def _sub(argv, **kwargs):
+        del kwargs
         calls.append(argv)
-        return {"returncode": 1, "error_tail": "boom"}
+        return SimpleNamespace(returncode=1, stdout="", stderr="boom")
 
-    monkeypatch.setattr(ds, "_run_subprocess", _sub)
+    monkeypatch.setattr(ds.subprocess, "run", _sub)
     res = ds.run_source("ibkr_news")
     assert res["status"] == "failed"
-    assert "legacy local IBKR news collector route retired" in res["error"]
-    assert calls == []
+    assert res["error"] == "normalized IBKR worker failed"
+    assert len(calls) == 1
 
 
 def test_run_source_skips_when_already_running():
@@ -1681,26 +1581,46 @@ def test_run_source_releases_file_locks(tmp_path):
 
 # --- startup seed must not depend on PG -------------------------------------------
 
-def test_seed_skipped_fast_when_pg_unreachable(monkeypatch):
-    import time as _time
-    monkeypatch.setattr(ds, "_pg_reachable", lambda timeout=3.0: False)
-    constructed = []
-    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore",
-                        lambda dal: constructed.append(1))
-    t0 = _time.monotonic()
-    ds._seed_last_attempts()                                  # must return, not hang
-    assert _time.monotonic() - t0 < 1.0
-    assert constructed == []                                  # PG never touched
+def test_missing_scheduler_state_uses_local_job_history_without_early_fire(
+    tmp_path,
+    monkeypatch,
+):
+    from types import MappingProxyType
 
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import job_runs_store as job_runs_module
 
-def test_pg_reachable_probe_is_bounded(monkeypatch):
-    # closed local port → refused immediately → False (never the ~2min TCP hang)
-    import time as _time
-    monkeypatch.setattr("src.tools.db_config.load_database_url",
-                        lambda p: "postgresql://u:p@127.0.0.1:9/db")
-    t0 = _time.monotonic()
-    assert ds._pg_reachable(timeout=1.0) is False
-    assert _time.monotonic() - t0 < 5.0
+    profile_db = tmp_path / "continuity.db"
+    state_store = SchedulerStateStore(profile_db)
+    history_store = _REAL_JOB_RUNS_LOCAL_STORE(profile_db)
+    completed_at = datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc)
+    completed_iso = completed_at.isoformat(timespec="seconds")
+    monkeypatch.setattr(job_runs_module, "_now_iso", lambda: completed_iso)
+    run_id = history_store.create_run(
+        ds.job_name("polygon_news"),
+        trigger_source="scheduler",
+    )
+    assert history_store.finish_run(run_id, status="succeeded", result={})
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    monkeypatch.setattr(ds, "_SCHED_STATE", state_store)
+    monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
+    monkeypatch.setattr(
+        ds,
+        "SOURCES",
+        MappingProxyType({"polygon_news": ds.SOURCES["polygon_news"]}),
+    )
+    monkeypatch.setattr(job_runs_module, "JobRunsLocalStore", _REAL_JOB_RUNS_LOCAL_STORE)
+    monkeypatch.setattr(
+        ds,
+        "source_config",
+        lambda source: {"enabled": source == "polygon_news", "interval_minutes": 60},
+    )
+
+    ds._seed_last_attempts()
+
+    assert ds._LAST_ATTEMPT == {"polygon_news": completed_at}
+    assert ds._is_due("polygon_news", completed_at + timedelta(minutes=30)) is False
 
 
 # --- routes ----------------------------------------------------------------------
@@ -1731,7 +1651,7 @@ def test_get_schedule_snapshot_shape():
         assert "retired_reason" not in source
 
 
-def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
+def test_schedule_status_exposes_current_news_route_metadata():
     snap = ds.status_snapshot()
 
     assert set(snap) == ACTIVE_SOURCE_IDS
@@ -1973,36 +1893,6 @@ def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
     assert "local_refresh" not in res
 
 
-def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["NVDA"])
-    def _fake_worker(argv):
-        seen["argv"] = argv
-        return {
-            "returncode": 0,
-            "payload": {
-                **_scheduled_price_payload(scanned=1),
-                "rows_added": 2,
-            },
-        }
-
-    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", _fake_worker)
-    monkeypatch.setattr(
-        ds,
-        "_run_subprocess",
-        lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync subprocess")),
-    )
-    res = ds.run_source("ibkr_prices")
-
-    assert res["status"] == "succeeded"
-    argv = seen["argv"]
-    assert argv[:3] == [sys.executable, "-m", "src.prices_runtime"]
-    assert "--tickers" in argv and "NVDA" in argv
-    assert "--gateway-lock-held" in argv
-    assert "--source" not in argv
-    assert "local_refresh" not in res
-
-
 def test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation(
     monkeypatch,
 ):
@@ -2207,11 +2097,10 @@ def test_prices_worker_retryable_lock_busy_is_skip_not_failure(monkeypatch):
 
 
 def test_seed_last_attempts_from_local_state(monkeypatch):
-    # seed continuity from the LOCAL store (no PG): a recorded attempt seeds _LAST_ATTEMPT.
+    # A durable scheduler-state attempt remains the first restart authority.
     from datetime import datetime, timezone
     when = datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc)
     ds._state_store().record_attempt("polygon_news", when)
-    monkeypatch.setattr(ds, "_pg_reachable", lambda timeout=3.0: False)  # PG down → local only
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     ds._seed_last_attempts()
     assert ds._LAST_ATTEMPT.get("polygon_news") == when
@@ -2439,7 +2328,7 @@ def test_normalized_news_lock_busy_is_retryable_skip(monkeypatch):
     monkeypatch.setattr(
         ds,
         "_read_news_write_route_for_scheduler",
-        lambda: routing.NewsWriteRoute(
+        lambda source: routing.NewsWriteRoute(
             mode=routing.NewsWriteMode.NORMALIZED,
             reason="normalized",
         ),
@@ -2547,7 +2436,7 @@ def test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure(monkeypatch):
     monkeypatch.setattr(
         ds,
         "_read_news_write_route_for_scheduler",
-        lambda: routing.NewsWriteRoute(
+        lambda source: routing.NewsWriteRoute(
             mode=routing.NewsWriteMode.NORMALIZED,
             reason="normalized",
         ),

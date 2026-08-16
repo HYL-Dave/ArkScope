@@ -5,29 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
 from src.tools.backends.local_market_backend import LocalMarketBackend
 from src.tools.data_access import DataAccessLayer
 
 
-def seed_profile(base: Path, **settings: str) -> Path:
-    data_dir = base / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    db = data_dir / "profile_state.db"
-    conn = sqlite3.connect(db)
-    try:
-        conn.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
-        conn.executemany(
-            "INSERT INTO profile_settings (key, value) VALUES (?, ?)",
-            sorted(settings.items()),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    return db
-
-
-def seed_market_db(base: Path, *, completed: bool = True) -> Path:
+def seed_market_db(base: Path) -> Path:
     data_dir = base / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     db = data_dir / "market_data.db"
@@ -62,14 +44,8 @@ def seed_market_db(base: Path, *, completed: bool = True) -> Path:
             CREATE TABLE fundamentals (
                 id INTEGER PRIMARY KEY, ticker TEXT, snapshot_date TEXT, data TEXT
             );
-            CREATE TABLE news_pg_exit_runs (
-                id INTEGER PRIMARY KEY,
-                status TEXT NOT NULL
-            );
             """
         )
-        if completed:
-            conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
         conn.commit()
     finally:
         conn.close()
@@ -89,11 +65,7 @@ def isolated_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_no_dsn_completed_news_exit_selects_local_backend_with_market_strict(tmp_path):
-    seed_profile(
-        tmp_path,
-        **{NEWS_PG_EXIT_COMPLETED_KEY: "true", "use_local_market": "false"},
-    )
+def test_local_news_authority_uses_strict_market_store(tmp_path):
     seed_market_db(tmp_path)
 
     dal = DataAccessLayer(base_path=tmp_path)
@@ -103,11 +75,7 @@ def test_no_dsn_completed_news_exit_selects_local_backend_with_market_strict(tmp
     assert not hasattr(dal._backend, "_dsn")
 
 
-def test_news_hard_local_no_dsn_never_calls_pg_for_empty_reads(tmp_path):
-    seed_profile(
-        tmp_path,
-        **{NEWS_PG_EXIT_COMPLETED_KEY: "true", "use_local_market": "false"},
-    )
+def test_local_news_empty_reads_are_honest(tmp_path):
     seed_market_db(tmp_path)
     dal = DataAccessLayer(base_path=tmp_path)
 
@@ -125,11 +93,8 @@ def test_news_hard_local_no_dsn_never_calls_pg_for_empty_reads(tmp_path):
     }
 
 
-def test_completed_audit_marker_forces_news_hard_local_without_profile_exit_setting(
-    tmp_path,
-):
-    seed_profile(tmp_path, use_local_market="false")
-    seed_market_db(tmp_path, completed=True)
+def test_local_news_authority_is_default_without_profile_toggle(tmp_path):
+    seed_market_db(tmp_path)
 
     dal = DataAccessLayer(base_path=tmp_path)
 
@@ -137,9 +102,9 @@ def test_completed_audit_marker_forces_news_hard_local_without_profile_exit_sett
     assert dal._backend._market_db == str(tmp_path / "data" / "market_data.db")
 
 
-def test_no_dsn_get_conn_fails_before_psycopg(tmp_path):
+def test_local_news_authority_initializes_with_declared_dependencies(tmp_path):
     seed_market_db(tmp_path)
     dal = DataAccessLayer(base_path=tmp_path)
 
     assert isinstance(dal._backend, LocalMarketBackend)
-    assert not hasattr(dal._backend, "_get_conn")
+    assert dal._backend._market_db == str(tmp_path / "data" / "market_data.db")
