@@ -3,7 +3,7 @@
 > **Status:** PLAN REVIEW GREEN AT `05e15926`; TASKS 0-3 COMPLETE THROUGH
 > PRODUCT TIP `ac2d3395`; SECTIONS 0.7D-0.7E CLASS A COMPLETE;
 > SECTIONS 0.7F-0.7G FOCUSED REVIEW GREEN; TASK 4 COMPLETE AT PRODUCT TIP
-> `c6bafd07`; TASK 5 STOPPED AT SECTION 0.7H CLASS B LOOPBACK-OWNER
+> `c6bafd07`; TASK 5 STOPPED AT SECTION 0.7I CLASS B PROVIDER-ENV FIXTURE
 > ADMISSION AMENDMENT REVIEW; TASK 6 REMAINS THE COMBINED
 > IMPLEMENTATION-REVIEW GATE; TASK 7, MERGE, PUSH, LIVE TRAFFIC, AND PRIVATE
 > OR REMOTE MUTATION NOT AUTHORIZED
@@ -1009,6 +1009,79 @@ The amendment packet is
 pass `sha256sum -c`, and its manifest is
 `ddb8a88cba2a886a7d7cfa7546709d792fb270e98ba2a6e064ba0d01a0bf4793`.
 
+### 0.7i Task 5 provider-env fixture lifecycle Class B amendment
+
+Focused review accepted Section 0.7h. Its exact six-node callback control then
+passed `6/6`, but the first 4,272-node complement replay was rejected because
+the operator over-sanitized `PATH` and passed the sorted node stream as
+individual arguments. That changed intra-file execution order and removed
+Node 22.14.0, producing `63` environment failures. It made no external
+contact because the guard remained installed, and it is not admission
+evidence.
+
+The corrected natural-order complement used canonical Node 22.14.0. All
+product tests passed at `4,260 passed / 12 skipped`, and collected/seen sets
+were the exact `4,272 / 805ed70c...` complement, but the socket guard recorded
+seven blocked `public_ip` connections. The entire run is rejected. A
+node-aware packet-only guard, which records only node ID, socket function, and
+destination class, reproduced the exact seven attempts:
+
+```text
+4  tests/test_market_data_direct.py::test_backfill_progress_cb_shape
+2  tests/test_market_data_direct.py::test_backfill_fatal_path_finish_failure_does_not_mask_original
+1  tests/test_market_data_direct.py::test_backfill_topup_excludes_in_progress_today
+```
+
+All three tests pass and make zero socket attempts in isolation. Their shared
+product path is therefore not the fixed leak. The upstream transition is
+`tests/test_data_provider_config.py::test_apply_env_injects_and_tracks`: a
+packet-only whole-protocol tracker ran that module `44/44` under the socket
+guard and proved `POLYGON_API_KEY` changes from absent to present at that node
+and remains present after all fixture teardowns. No key value was recorded.
+
+The autouse `hermetic` fixture currently calls `monkeypatch.delenv(...,
+raising=False)` while each managed key is absent. Pytest consequently has no
+old mapping entry to restore if `apply_env()` later assigns directly to
+`os.environ`. The stored Polygon test value then survives into later tests;
+the three empty fake-IBKR cases construct the real Polygon fallback, whose
+per-ticker error isolation swallows the guard exception and leaves the tests
+apparently GREEN.
+
+The only admitted test edit is one fixture-lifecycle hunk in
+`tests/test_data_provider_config.py`: bind the existing managed-key tuple once,
+use it for the current setup deletions, yield, then `os.environ.pop(var, None)`
+for that same tuple. The dependent `monkeypatch` fixture subsequently restores
+any true pre-test ambient value. Do not edit any test body or ID, the three
+downstream nodes, `apply_env()`, provider construction, network handling, or
+product code.
+
+This adds one test-only commit before the two already reviewed Task 5 commits:
+
+```text
+test: close provider env fixture lifecycle
+docs: record local runtime final admission
+docs: close retired runtime program authorities
+```
+
+Before resuming full admission, require the 44-node provider-config module to
+leave `final_present=false` under the packet tracker with zero sockets; then
+require the provider-config plus market-data-direct sequence and the exact
+4,272-node natural-order complement to pass under the unchanged zero-exception
+guard with zero attempts. Collection, focused, route, protected, skip, and
+native identities remain byte-identical.
+
+This is Class B because public-IP contact would have occurred without the
+guard, an existing shared fixture changes, and Task 5's commit protocol gains
+a test-only commit. The raw contact was blocked before transmission; no
+provider, production, private, or remote state was reached. A product hunk,
+test-body edit, key-value artifact, destination allowlist, swallowed guard
+attempt, or second fixture hunk is a new stop.
+
+The bounded packet is
+`/tmp/arkscope-pg-no-tail-task5-d4677c3d/amendment-0.7i`; all 25 payload rows
+pass `sha256sum -c`, and its manifest is
+`7c49d1529704ad7b259532e25124c564353d0fb2301d78e3c7c35baecd327090`.
+
 ### 0.8 Dynamic-route target
 
 Final route identity is the canonical 175-row inventory route stream with
@@ -1133,10 +1206,11 @@ would be Class A on its fixture shape alone but remained Class B because its
 rejected run contacted the provider.
 
 Task 0 has one docs/evidence commit. Tasks 1-4 each have exactly one product
-commit followed by one evidence/status commit. Task 5 has one evidence commit
-followed by the governance-retirement commit. Commits are linear and are never
-squashed. Task 6 is the combined implementation-review stop. Task 7 is
-fast-forward merge only after Task 6 GREEN. Push is never authorized here.
+commit followed by one evidence/status commit. Section 0.7i gives Task 5 one
+bounded test-only commit, followed by its evidence commit and the governance-
+retirement commit. Commits are linear and are never squashed. Task 6 is the
+combined implementation-review stop. Task 7 is fast-forward merge only after
+Task 6 GREEN. Push is never authorized here.
 
 All packet roots use `/tmp/arkscope-pg-no-tail-task<N>-<plan-base>` and contain
 a complete `SHA256SUMS`. Generated scripts, RED/GREEN transcripts, node
@@ -1897,23 +1971,26 @@ insufficient evidence.
 
 **Step 3: run final backend admission without `.env`**
 
-In fresh exact Task 4 worktrees with empty real `data/`, scratch local DBs,
-sealed providers, Section 0.7h's exact socket-guard owner split, and no
-`config/.env` link, run:
+In fresh exact Section 0.7i test-tip worktrees whose product bytes equal Task
+4, with empty real `data/`, scratch local DBs, sealed providers, Section
+0.7h's exact socket-guard owner split, and no `config/.env` link, run:
 
-1. collect-only `4,278 / ecafdab7...`;
-2. native canonical `4,278 seen / 4,266 passed / 12 skipped / 0 failed` twice
+1. Section 0.7i's 44-node provider-config lifecycle gate, followed by the
+   provider-config plus market-data-direct sequence, with zero sockets and no
+   retained managed provider key;
+2. collect-only `4,278 / ecafdab7...`;
+3. native canonical `4,278 seen / 4,266 passed / 12 skipped / 0 failed` twice
    with the pinned reporter and without the blanket socket guard;
-3. final Task 1 focused `472 / 483b6566...`, with `471 passed / 1 skipped`;
-4. Task 2 focused `147/147`;
-5. inventory-focused `1,781 / 6220cb4e...`, with `1,781/1,781` runtime;
-6. real local-runtime lifespan/scheduler gate under the sanitized dependency
+4. final Task 1 focused `472 / 483b6566...`, with `471 passed / 1 skipped`;
+5. Task 2 focused `147/147`;
+6. inventory-focused `1,781 / 6220cb4e...`, with `1,781/1,781` runtime;
+7. real local-runtime lifespan/scheduler gate under the sanitized dependency
    environment and unchanged socket guard;
-7. routes `173 / e0d8bf3c...`;
-8. scheduler continuity owner and its discriminacy mutation;
-9. AST/import/dependency/final-path/backlink/complete-bundle gates plus the
+8. routes `173 / e0d8bf3c...`;
+9. scheduler continuity owner and its discriminacy mutation;
+10. AST/import/dependency/final-path/backlink/complete-bundle gates plus the
    26-path protected aggregate; and
-10. the exact six-node callback control plus zero-socket 4,272-node guarded
+11. the exact six-node callback control plus zero-socket 4,272-node guarded
     complement from Section 0.7h.
 
 The reporter JSON must be deterministic across two independent exact-tip runs
@@ -1932,6 +2009,12 @@ all 26 protected bytes match, no production opener appears, no provider request 
 made, and all scratch processes/files/links are cleaned.
 
 **Step 5: commit admitted evidence, then retire governance**
+
+First commit only Section 0.7i's bounded fixture lifecycle hunk:
+
+```bash
+git commit -m "test: close provider env fixture lifecycle"
+```
 
 Commit the complete Task 5 evidence/status update first:
 
@@ -2042,15 +2125,15 @@ true:
 14. the continuity test uses a mocked probe/store rather than real scratch
     local stores;
 15. any scheduler probe, external socket attempt, provider call, remote DB
-    attempt, or loopback call outside Section 0.7h's exact six-node owner
-    occurs;
+    attempt, retained provider key after Section 0.7i's fixture teardown, or
+    loopback call outside Section 0.7h's exact six-node owner occurs;
 16. dynamic route census removes/adds any route other than the exact two rows;
 17. the real lifespan/scheduler gate disables scheduler, uses a hand-built
     route list/app, or does not complete one provider-free tick;
 18. any whole-file test retirement is partial, copied, or expanded past the
     exact 101-node/six-file ledger;
 19. an existing test node name/body or shared test scope outside Sections
-    0.4-0.7f must change, or an in-place evolution changes behavior beyond
+    0.4-0.7i must change, or an in-place evolution changes behavior beyond
     replacing the inventoried obsolete reference with its current local
     contract;
 20. a historical node is preserved under a renamed compatibility assertion;
