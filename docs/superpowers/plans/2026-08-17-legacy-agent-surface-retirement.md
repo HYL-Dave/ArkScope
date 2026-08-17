@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASKS 0-1 INDEPENDENTLY REVIEWED GREEN; TASK 2 IMPLEMENTED;
-> INDEPENDENT TASK 2 REVIEW NEXT; TASK 3 BLOCKED
+> **Status:** TASKS 0-2 INDEPENDENTLY REVIEWED GREEN; TASK 3 IMPLEMENTED;
+> INDEPENDENT TASK 3 REVIEW NEXT; TASK 4 BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -500,6 +500,25 @@ contains 54 manifested payloads with `SHA256SUMS` SHA-256
 Task 2 now stops for independent implementation review; Task 3, merge, push,
 live/provider/Discord/document actions, and destructive operations remain
 unauthorized.
+
+Task 3 is implemented in product/tests commit `c3cc0f03`. The final test bytes
+were replayed against the unmodified `ff32044d` product and produced exact RED
+`3 failed / 302 passed`; final runtime is `305/305` with zero socket attempts.
+The backend collection is byte-identical to `4139/bec7fb2e...`, the frontend
+remains `1177` / 101 files / `c570a551...`, the 23 protected rows remain
+`8843a3f1...`, and all 12 changed paths equal the Task 3 ownership set. The
+implementation removes terminal Skill matching/application/rendering and the
+one-shot Layer 5 force path while retaining `trigger`/`auto_apply` metadata,
+registry/resources, automatic threshold-driven compaction, and its circuit
+breaker. An initial negative-test matcher that confused `/skill` with the
+legitimate `/skills` path segment was superseded before GREEN; accepted RED
+uses the corrected final test patch in a clean old-product replay worktree.
+Packet `/tmp/legacy-agent-surface-retirement-task3-ff32044d` contains 71
+manifested payloads with `SHA256SUMS` SHA-256
+`cf61f51bede07d0dc5ec2083efa1930adf5fb8fbfd6318b638364e972d080589`.
+Task 3 stops for independent implementation review; Task 4, merge, push,
+live/provider/Discord/document actions, private configuration edits, and
+destructive operations remain unauthorized.
 
 ### Task 3: Retire terminal Skills and one-shot force controls
 
