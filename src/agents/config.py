@@ -5,7 +5,6 @@ Models can be configured via:
 1. Default values in AgentConfig
 2. config/user_profile.yaml under llm_preferences
 3. Runtime override via model parameter in queries
-4. CLI flags (--model, --reasoning)
 """
 
 from __future__ import annotations
@@ -152,10 +151,8 @@ class AgentConfig(BaseModel):
     compaction_layer_2_threshold_chars: int = 100_000
     compaction_layer_3_threshold_chars: int = 150_000
     compaction_overflow_dir: str = "data/overflow"
-    # Layer 5 (LLM full compact, commit 5). Default OFF — explicit opt-in.
-    # /compact CLI command bypasses this flag and the threshold but still
-    # honours compaction_enabled, summary_caller availability, and the
-    # circuit breaker.
+    # Layer 5 (LLM full compact, commit 5). Default OFF; when enabled it
+    # remains threshold-driven and protected by the circuit breaker.
     compaction_layer_5_enabled: bool = False
     compaction_layer_5_threshold_chars: int = 250_000
     compaction_layer_5_model_anthropic: str = "claude-sonnet-4-6"

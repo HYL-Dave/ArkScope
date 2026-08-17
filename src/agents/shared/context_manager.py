@@ -291,25 +291,6 @@ class ContextManager:
         """Underlying ContextCompressor (None when compaction disabled)."""
         return self._compressor
 
-    def request_force_layer_5(self) -> bool:
-        """Mark next compact_messages as a forced Layer 5 trigger.
-
-        Returns ``True`` on success. Returns ``False`` (and does NOT set
-        the flag) when the compressor is not instantiated — there's no
-        L5 to force in legacy / disabled paths, so silently swallowing
-        would mask user error. CLI ``/compact`` should print a clear
-        message in that case.
-
-        Per commit-5 lock #2, the flag is auto-cleared by the next
-        ``ContextCompressor.compact_pre_call`` regardless of whether
-        Layer 5 actually fires (caller missing / circuit open / master
-        disabled paths still consume + clear the flag).
-        """
-        if self._compressor is None:
-            return False
-        self._compressor.force_layer_5_once = True
-        return True
-
     # ── Legacy single-layer path (Phase 3, behaviour-frozen) ─────
 
     def _compact_messages_legacy(
@@ -766,7 +747,7 @@ def _project_for_compression(
         to count this as a user turn — Anthropic flow only has 1 natural
         user turn, but each tool_result group is a turn boundary), then
         1 ``{role:"tool_result", ...}`` per tool_result block.
-      - user(list with non-tool_result blocks, e.g. attachments + text):
+      - user(list with non-tool_result blocks, e.g. image + text):
         1 ``{role:"user", content:<text>}`` extracted from the text blocks.
       - assistant: 1 ``{role:"assistant", content:<text>}`` (used only for
         boundary counting; never patched back).

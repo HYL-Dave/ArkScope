@@ -80,7 +80,7 @@ class CompressorConfig:
 
 @dataclass
 class CompressionEvent:
-    """Per-trigger telemetry. Useful for replay fixtures + /compaction status."""
+    """Per-trigger telemetry for replay fixtures and runtime diagnostics."""
 
     layer: int
     before_chars: int
@@ -115,11 +115,6 @@ class ContextCompressor:
         # Layer 5 / 6 dependencies — None disables those layers cleanly.
         self._summary_caller = summary_caller
         self._anchor_data_provider = anchor_data_provider
-        # /compact one-shot bypass (commit 5). Set externally; cleared
-        # UNCONDITIONALLY at the top of every compact_pre_call so a
-        # threshold-bypass attempt that fails (caller missing / circuit
-        # open / master disabled) doesn't leak state into the next turn.
-        self.force_layer_5_once: bool = False
 
     # -----------------------------------------------------------------
     # Properties
@@ -192,18 +187,7 @@ class ContextCompressor:
             anchor block.
           - ``layers_fired``: which layer numbers fired this call.
 
-        ``force_layer_5_once`` (set externally by ``/compact``) is
-        consumed at the TOP of this method and cleared UNCONDITIONALLY,
-        regardless of whether Layer 5 actually fires (master disabled,
-        caller missing, circuit open all leave the flag cleared so a
-        rejected /compact doesn't leak state into the next turn).
         """
-        # Consume the one-shot flag immediately. Per commit-5 lock #2:
-        # clear regardless of L5 success / failure / threshold bypass /
-        # caller missing / circuit open.
-        force_layer_5 = self.force_layer_5_once
-        self.force_layer_5_once = False
-
         if not self.config.enabled or not messages:
             return CompactionResult(messages=list(messages))
 
@@ -257,24 +241,18 @@ class ContextCompressor:
         # Layer 4 (provider native) is an agent-adapter flag, not a
         # transformation we apply here.
 
-        # Layer 5: LLM full compact. Gating per commit-5 lock #3:
+        # Layer 5: LLM full compact.
         #   - master config.enabled MUST be on (already checked above)
         #   - summary_caller MUST be supplied (None disables L5)
         #   - circuit MUST be closed
-        #   - either force_layer_5 (one-shot /compact) OR
-        #     (layer_5_enabled AND threshold)
+        #   - layer_5_enabled MUST be on and threshold exceeded
         replace_prefix_to: Optional[int] = None
         l5_fired = False
         if (
             self._summary_caller is not None
             and not self.layer_5_circuit_open
-            and (
-                force_layer_5
-                or (
-                    self.config.layer_5_enabled
-                    and total_chars(messages) > self.config.layer_5_threshold_chars
-                )
-            )
+            and self.config.layer_5_enabled
+            and total_chars(messages) > self.config.layer_5_threshold_chars
         ):
             before_5 = total_chars(messages)
             new_msgs, prefix_to, outcome = apply_layer_5(
@@ -290,8 +268,7 @@ class ContextCompressor:
                 self._events.append(CompressionEvent(
                     layer=5, before_chars=before_5,
                     after_chars=total_chars(messages),
-                    note="llm_full_compact"
-                          + (" (forced)" if force_layer_5 else ""),
+                    note="llm_full_compact",
                 ))
                 layers_fired.append(5)
                 l5_fired = True
@@ -310,8 +287,8 @@ class ContextCompressor:
             # outcome == "noop": boundary check failed (not enough turns
             # or only prior summary was old). Caller was NEVER invoked,
             # so this is silent — no event, no counter increment, no
-            # layers_fired entry. Forced /compact attempts on a too-short
-            # history will simply do nothing rather than burn the breaker.
+            # layers_fired entry. A too-short history simply does nothing
+            # rather than burn the breaker.
 
         # Layer 6: post-compact anchor recovery. Runs only after L4 / L5
         # mutated the cached prefix. spec §3.7.
@@ -341,7 +318,7 @@ class ContextCompressor:
         )
 
     # -----------------------------------------------------------------
-    # CLI / test helper — NOT agent-exposed in v1 (see spec §5.1)
+    # Diagnostic/test helper — NOT agent-exposed in v1 (see spec §5.1)
     # -----------------------------------------------------------------
 
     def get_overflow_payload(self, record_id: str) -> Optional[str]:
@@ -349,7 +326,7 @@ class ContextCompressor:
 
         Returns ``None`` if not found / invalid id / corrupt /
         tampered. **Not registered as an agent tool in v1** —
-        callers are CLI debug + tests only (spec §5.1).
+        diagnostic and test callers treat it as unavailable (spec §5.1).
         """
         record = self._overflow_store.read(record_id)
         return record.original_payload if record else None

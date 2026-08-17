@@ -9,9 +9,8 @@ Locks the new contracts:
     (back up only when target is a user-tool_result group).
   * Boundary edge cases: ``replace_prefix_to == 0`` → no-op;
     ``replace_prefix_to >= len(anchors)`` → no-op + warn (lock #1).
-  * Force-flag (``/compact`` one-shot): consumed + cleared
-    UNCONDITIONALLY at top of every ``compact_pre_call`` (lock #2).
-  * /compact rejected when ``compaction.enabled=False`` (lock #2 + #3).
+  * Automatic Layer 5 compaction fires only when explicitly enabled and its
+    threshold is exceeded.
   * Layer 6 anchor: appended only when L5 fired AND
     ``anchor_data_provider`` returned non-empty; ≤ 1KB; not counted as
     a user turn by ``find_recent_boundary``; replaced (not stacked) on
@@ -56,7 +55,6 @@ from src.agents.shared.compressor import (
     wrap_compaction_summary,
 )
 from src.agents.shared.context_manager import (
-    ContextManager,
     _apply_layer_5_prefix_replacement,
     _detach_anchor_msg,
     _detach_summary_msg,
@@ -379,11 +377,9 @@ class TestLayer5Firing:
         assert c.layer_5_circuit_open is False
 
     def test_noop_does_not_burn_circuit_breaker(self, tmp_path):
-        """Forced /compact on a too-short history must not count toward
-        the circuit. apply_layer_5 returns ``"noop"`` (caller never
-        invoked) and the orchestrator MUST NOT increment failures —
-        otherwise three rapid /compact attempts would open the circuit
-        with zero real LLM faults.
+        """An automatic attempt on short history must not count toward the
+        circuit. apply_layer_5 returns ``"noop"`` (caller never invoked),
+        so repeated threshold checks cannot manufacture LLM failures.
         """
         c = _make_compressor(
             tmp_path,
@@ -402,82 +398,11 @@ class TestLayer5Firing:
             {"role": "assistant", "content": "a1"},
         ]
         for _ in range(5):  # well past circuit_breaker_max_failures=3
-            c.force_layer_5_once = True
             res = c.compact_pre_call(msgs)
             assert res.replace_prefix_to is None  # nothing fired
         assert c._layer_5_consecutive_failures == 0  # not counted
         assert c.layer_5_circuit_open is False  # circuit still closed
         assert c._summary_caller.calls == []  # caller never invoked
-
-
-# ============================================================
-# Force-flag — lock #2 (consume + clear UNDER ALL CONDITIONS)
-# ============================================================
-
-
-class TestForceLayer5Flag:
-    def _msgs(self):
-        return [
-            {"role": "user", "content": "Q1"},
-            {"role": "assistant", "content": "a1"},
-            {"role": "user", "content": "Q2"},
-            {"role": "assistant", "content": "a2"},
-            {"role": "user", "content": "Q3"},
-        ]
-
-    def test_force_flag_consumed_on_success(self, tmp_path):
-        c = _make_compressor(
-            tmp_path, layer_1_enabled=False,
-            layer_5_enabled=False,  # auto path off
-            layer_5_threshold_chars=10**9,  # auto path also off
-        )
-        c._summary_caller = FakeSummaryCaller(["forced summary"])
-        c.force_layer_5_once = True
-        result = c.compact_pre_call(self._msgs())
-        assert result.replace_prefix_to is not None  # forced fire happened
-        assert c.force_layer_5_once is False  # cleared
-
-    def test_force_flag_cleared_when_caller_missing(self, tmp_path):
-        """Lock #2: caller missing → flag still consumed + cleared."""
-        c = _make_compressor(
-            tmp_path, layer_1_enabled=False,
-            layer_5_enabled=False, layer_5_threshold_chars=10**9,
-        )
-        # No summary_caller set — c._summary_caller stays None
-        assert c._summary_caller is None
-        c.force_layer_5_once = True
-        result = c.compact_pre_call(self._msgs())
-        assert result.replace_prefix_to is None  # didn't fire
-        assert c.force_layer_5_once is False  # but flag cleared
-
-    def test_force_flag_cleared_when_circuit_open(self, tmp_path):
-        c = _make_compressor(
-            tmp_path, layer_1_enabled=False,
-            layer_5_enabled=False, layer_5_threshold_chars=10**9,
-            circuit_breaker_max_failures=1,
-        )
-        c._summary_caller = FakeSummaryCaller([None, "should-not-fire"])
-        # Trigger one failure to open circuit
-        c.force_layer_5_once = True
-        c.compact_pre_call(self._msgs())
-        assert c.layer_5_circuit_open is True
-        # Re-arm — flag should still be cleared even though circuit blocks fire
-        c.force_layer_5_once = True
-        result = c.compact_pre_call(self._msgs())
-        assert result.replace_prefix_to is None
-        assert c.force_layer_5_once is False
-
-    def test_force_flag_cleared_when_master_disabled(self, tmp_path):
-        c = _make_compressor(
-            tmp_path, enabled=False,  # master OFF
-            layer_5_enabled=False, layer_5_threshold_chars=10**9,
-        )
-        c._summary_caller = FakeSummaryCaller(["should-not-fire"])
-        c.force_layer_5_once = True
-        result = c.compact_pre_call(self._msgs())
-        assert result.replace_prefix_to is None
-        assert c.force_layer_5_once is False  # cleared even on master-off path
-
 
 # ============================================================
 # Boundary edge cases — lock #1
@@ -552,9 +477,9 @@ class TestSafeNativeCut:
         cut = _find_safe_native_cut(msgs, 1)
         assert cut == 1  # cut AT the user message, no back-up
 
-    def test_no_back_up_for_attachment_user_msg(self):
-        """User messages with attachments + text (list-content but NO
-        tool_result blocks) should NOT trigger the back-up rule."""
+    def test_no_back_up_for_multiblock_user_msg(self):
+        """User messages with multiple non-tool-result content blocks should
+        not trigger the back-up rule."""
         msgs = [
             {"role": "assistant", "content": "intro"},
             {"role": "user", "content": [
@@ -928,33 +853,3 @@ class TestAnthropicSummaryCaller:
         caller = AnthropicSummaryCaller(client=_Client())
         result = caller(system_prompt="s", user_prompt="u")
         assert result == "part 1 part 2"
-
-
-# ============================================================
-# /compact CLI handler — gating
-# ============================================================
-
-
-
-
-# ============================================================
-# ContextManager — request_force_layer_5 helper
-# ============================================================
-
-
-class TestRequestForceLayer5:
-    def test_returns_false_when_no_compressor(self):
-        """ContextManager without compaction → can't force L5."""
-        cm = ContextManager()
-        assert cm.compressor is None
-        assert cm.request_force_layer_5() is False
-
-    def test_returns_true_and_sets_flag(self, tmp_path):
-        cm = ContextManager(
-            session_id="t",
-            overflow_dir=tmp_path,
-            compaction_config=CompressorConfig(enabled=True),
-        )
-        assert cm.compressor is not None
-        assert cm.request_force_layer_5() is True
-        assert cm.compressor.force_layer_5_once is True

@@ -172,8 +172,7 @@ class OverflowStore:
         / **tampered**.
 
         Never raises for normal not-found or malformed-id scenarios —
-        callers (Layer 5 transcript renderer, CLI debug, etc.) treat
-        ``None`` as "no overflow available".
+        callers treat ``None`` as "no overflow available".
 
         Integrity validation (mismatch → return None, no raise):
 

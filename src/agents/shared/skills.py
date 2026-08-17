@@ -2,15 +2,12 @@
 Skills system — predefined goal-oriented analysis workflows.
 
 Phase 13: Basic skills (4 builtin, YAML custom).
-Phase G:  Rich SKILL.md format, tiered registry, auto-trigger matching.
+Phase G:  Rich SKILL.md format and tiered registry.
 
-Skills are NOT subagents or execution engines. They are structured prompt
-injections that define goals, minimum data sources, and output requirements.
-The LLM decides tool selection, call order, and analysis strategy on its own.
-
-Usage:
-    /skill full_analysis NVDA   → expands to goal-oriented prompt → fed to agent
-    /skill portfolio_scan       → no params needed
+Skills are NOT subagents or execution engines. They are registered workflow
+definitions that preserve goals, minimum data sources, output requirements,
+and future automation metadata. Product workflows may explicitly expand a
+definition; this module does not select or apply one automatically.
 """
 
 from __future__ import annotations
@@ -56,22 +53,8 @@ class SkillDefinition:
     category: Optional[str] = None      # "financial-analysis"
     data_sources: Optional[Dict] = None # {"required": [...], "optional": [...]}
     output: Optional[str] = None        # "report" or None
-    auto_apply: bool = True             # False → UI suggestion only
+    auto_apply: bool = True             # Future automation policy metadata
     source_path: Optional[str] = None   # SKILL.md path (debug)
-
-    def can_auto_apply(self) -> bool:
-        """True only if paramless AND auto_apply enabled."""
-        return self.auto_apply and not self.required_params
-
-
-@dataclass
-class SkillMatchResult:
-    """Result of trigger matching against a user query."""
-
-    skill: Optional[SkillDefinition] = None
-    candidates: List[str] = field(default_factory=list)
-    reason: str = "none"  # "none" | "unique" | "multiple"
-
 
 # ── SKILL.md parser ──────────────────────────────────────────
 
@@ -202,7 +185,6 @@ def _parse_skill_md(
 
 SKILL_REGISTRY: Dict[str, SkillDefinition] = {}
 _ALIAS_MAP: Dict[str, str] = {}
-_TRIGGER_INDEX: List[Tuple[str, SkillDefinition]] = []
 
 # Built-in skill names (canonical list)
 _BUILTIN_SKILL_NAMES = frozenset({
@@ -323,7 +305,7 @@ def _scan_legacy_yaml(custom_dir: Path) -> Dict[str, SkillDefinition]:
     return results
 
 
-# ── Alias + trigger rebuild ──────────────────────────────────
+# ── Alias rebuild ────────────────────────────────────────────
 
 def _rebuild_alias_map() -> None:
     """Build _ALIAS_MAP from final SKILL_REGISTRY. Builtin aliases are protected."""
@@ -354,30 +336,10 @@ def _rebuild_alias_map() -> None:
                 continue
             _ALIAS_MAP[alias] = name
 
-
-def _rebuild_trigger_index() -> None:
-    """Build _TRIGGER_INDEX from final SKILL_REGISTRY.
-
-    Sorted by (-phrase_length, insertion_order) for longest-match-first.
-    """
-    _TRIGGER_INDEX.clear()
-
-    entries: List[Tuple[int, int, str, SkillDefinition]] = []
-    for idx, skill in enumerate(SKILL_REGISTRY.values()):
-        if not skill.trigger:
-            continue
-        phrases = [p.strip() for p in skill.trigger.split("|") if p.strip()]
-        for phrase in phrases:
-            entries.append((-len(phrase), idx, phrase.lower(), skill))
-
-    entries.sort(key=lambda e: (e[0], e[1]))
-    _TRIGGER_INDEX.extend((phrase, skill) for _, _, phrase, skill in entries)
-
-
 # ── Registry rebuild (single entry point) ────────────────────
 
 def rebuild_skill_registry() -> int:
-    """Complete rebuild: tiered scan → final winners → aliases → triggers.
+    """Complete rebuild: tiered scan → final winners → aliases.
 
     Scan order (last-write-wins across tiers):
         3b (legacy YAML) → 2 (packaged) → 3a (custom) → 1 (builtin)
@@ -386,7 +348,6 @@ def rebuild_skill_registry() -> int:
     """
     SKILL_REGISTRY.clear()
     _ALIAS_MAP.clear()
-    _TRIGGER_INDEX.clear()
 
     # Tier 3b: legacy YAML (lowest priority)
     tier3b = _scan_legacy_yaml(_CUSTOM_DIR)
@@ -421,7 +382,6 @@ def rebuild_skill_registry() -> int:
 
     # Rebuild derived state
     _rebuild_alias_map()
-    _rebuild_trigger_index()
 
     count = len(SKILL_REGISTRY)
     if count:
@@ -431,14 +391,6 @@ def rebuild_skill_registry() -> int:
 
 # Initialize at import time
 rebuild_skill_registry()
-
-
-# ── Backward-compat shim ─────────────────────────────────────
-# load_custom_skills() is still called from some paths; redirect to rebuild.
-
-def load_custom_skills() -> int:
-    """Legacy entry point — triggers full rebuild."""
-    return rebuild_skill_registry() - len(_BUILTIN_SKILL_NAMES)
 
 
 # ── Public API ───────────────────────────────────────────────
@@ -484,142 +436,6 @@ def expand_skill(name: str, params: Dict[str, str]) -> Optional[str]:
         if p in params:
             result = result.replace(f"{{{p}}}", params[p])
     return result
-
-
-def parse_skill_command(arg: str) -> Tuple[Optional[str], Dict[str, str]]:
-    """Parse a /skill command argument string.
-
-    Examples:
-        "full_analysis NVDA"  → ("full_analysis", {"ticker": "NVDA"})
-        "scan"                → ("portfolio_scan", {})
-        "ep TSLA"             → ("earnings_prep", {"ticker": "TSLA"})
-        ""                    → (None, {})
-
-    Returns (skill_name, params_dict). skill_name is None if empty input.
-    """
-    parts = arg.strip().split()
-    if not parts:
-        return None, {}
-
-    name_or_alias = parts[0].lower()
-
-    # Resolve alias
-    resolved = _ALIAS_MAP.get(name_or_alias, name_or_alias)
-    skill = SKILL_REGISTRY.get(resolved)
-    if skill is None:
-        return name_or_alias, {}  # Return unresolved name for error reporting
-
-    # Map positional args to required_params
-    params: Dict[str, str] = {}
-    remaining = parts[1:]
-    for i, param_name in enumerate(skill.required_params):
-        if i < len(remaining):
-            params[param_name] = remaining[i].upper()  # Tickers are uppercase
-
-    return resolved, params
-
-
-# ── Auto-trigger matching ────────────────────────────────────
-
-def match_skill_trigger(question: str) -> SkillMatchResult:
-    """Match user question against skill trigger phrases.
-
-    Three-stage matching (strict → loose):
-    1. Exact phrase match (boundary-aware)
-    2. Ordered words match (boundary-aware)
-
-    Returns SkillMatchResult with reason: "none", "unique", or "multiple".
-    """
-    if not _TRIGGER_INDEX or not question.strip():
-        return SkillMatchResult()
-
-    q_lower = question.lower()
-
-    # Collect all matches with their best match stage + phrase length
-    # Key: skill name → (stage_priority, -phrase_len)
-    matches: Dict[str, Tuple[int, int, SkillDefinition]] = {}
-
-    for phrase, skill in _TRIGGER_INDEX:
-        candidate: Optional[Tuple[int, int, SkillDefinition]] = None
-
-        # Stage 1: exact phrase match
-        pattern = r"\b" + re.escape(phrase) + r"\b"
-        if re.search(pattern, q_lower):
-            candidate = (1, -len(phrase), skill)
-        else:
-            # Stage 2: ordered words match
-            words = phrase.split()
-            if len(words) >= 2:
-                ordered_pattern = r"\b" + r"\b.*?\b".join(
-                    re.escape(w) for w in words
-                ) + r"\b"
-                if re.search(ordered_pattern, q_lower):
-                    candidate = (2, -len(phrase), skill)
-
-        if candidate is None:
-            continue
-
-        best = matches.get(skill.name)
-        if best is None or candidate[:2] < best[:2]:
-            matches[skill.name] = candidate
-
-    if not matches:
-        return SkillMatchResult()
-
-    if len(matches) == 1:
-        name, (_, _, skill) = next(iter(matches.items()))
-        return SkillMatchResult(skill=skill, candidates=[name], reason="unique")
-
-    # Multiple matches — check if one is strictly best
-    sorted_matches = sorted(matches.items(), key=lambda kv: (kv[1][0], kv[1][1]))
-    best_key = (sorted_matches[0][1][0], sorted_matches[0][1][1])
-    second_key = (sorted_matches[1][1][0], sorted_matches[1][1][1])
-
-    if best_key < second_key:
-        # Unique best match
-        name, (_, _, skill) = sorted_matches[0]
-        return SkillMatchResult(
-            skill=skill,
-            candidates=[kv[0] for kv in sorted_matches],
-            reason="unique",
-        )
-
-    # Tied — return multiple
-    return SkillMatchResult(
-        candidates=[kv[0] for kv in sorted_matches],
-        reason="multiple",
-    )
-
-
-def build_auto_apply_context(skill: SkillDefinition, question: str) -> str:
-    """Build context for auto-apply skills (paramless + auto_apply=True).
-
-    Prepends full skill body to the user's question.
-    Only call this when skill.can_auto_apply() is True.
-    """
-    assert skill.can_auto_apply(), "Must check can_auto_apply() before calling"
-    expanded = expand_skill(skill.name, {})
-    return f"[Auto-matched skill: {skill.name}]\n{expanded}\n\n[User query]\n{question}"
-
-
-def render_skill_suggestion_cli(result: SkillMatchResult) -> str:
-    """Render CLI-only text hint for skill suggestion (Rich markup).
-
-    Discord has its own embed logic in discord_bot.py.
-    """
-    if result.reason == "unique" and result.skill:
-        params = " ".join(f"<{p.upper()}>" for p in result.skill.required_params)
-        name = result.skill.name
-        hint = f"[dim]Skill suggestion: {name} — use /skill {name}"
-        if params:
-            hint += f" {params}"
-        hint += "[/dim]"
-        return hint
-    elif result.reason == "multiple":
-        names = ", ".join(result.candidates)
-        return f"[dim]Multiple skills match: {names}. Use /skill <name> to choose.[/dim]"
-    return ""
-
 
 # ── Validation (optional, for --check-skills) ────────────────
 

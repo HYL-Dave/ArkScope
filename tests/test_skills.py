@@ -1,8 +1,8 @@
 """
 Tests for the Skills system (Phase 13 + Phase G).
 
-Verifies skill definitions, template expansion, command parsing, listing,
-custom skill loading, SKILL.md parsing, auto-trigger matching, and CLI hints.
+Verifies skill definitions, template expansion, listing, custom skill loading,
+SKILL.md parsing, registry rebuilding, aliases, and resources.
 """
 
 import os
@@ -13,20 +13,14 @@ import pytest
 from src.agents.shared.skills import (
     SKILL_REGISTRY,
     SkillDefinition,
-    SkillMatchResult,
     _ALIAS_MAP,
     _BUILTIN_SKILL_NAMES,
     _CUSTOM_DIR,
     _parse_skill_md,
     _scan_builtin,
-    build_auto_apply_context,
     expand_skill,
     list_skills,
-    load_custom_skills,
-    match_skill_trigger,
-    parse_skill_command,
     rebuild_skill_registry,
-    render_skill_suggestion_cli,
 )
 
 
@@ -142,50 +136,6 @@ class TestExpandSkill:
 
 
 # ============================================================
-# Parse Skill Command Tests
-# ============================================================
-
-class TestParseSkillCommand:
-    def test_parse_name_and_ticker(self):
-        name, params = parse_skill_command("full_analysis NVDA")
-        assert name == "full_analysis"
-        assert params == {"ticker": "NVDA"}
-
-    def test_parse_alias_and_ticker(self):
-        name, params = parse_skill_command("fa aapl")
-        assert name == "full_analysis"
-        assert params == {"ticker": "AAPL"}  # uppercased
-
-    def test_parse_name_only_no_params(self):
-        name, params = parse_skill_command("portfolio_scan")
-        assert name == "portfolio_scan"
-        assert params == {}
-
-    def test_parse_alias_only(self):
-        name, params = parse_skill_command("scan")
-        assert name == "portfolio_scan"
-
-    def test_parse_empty_string(self):
-        name, params = parse_skill_command("")
-        assert name is None
-        assert params == {}
-
-    def test_parse_unknown_name(self):
-        name, params = parse_skill_command("unknown_skill")
-        assert name == "unknown_skill"  # unresolved, returned for error message
-        assert params == {}
-
-    def test_parse_earnings_prep_alias(self):
-        name, params = parse_skill_command("ep TSLA")
-        assert name == "earnings_prep"
-        assert params == {"ticker": "TSLA"}
-
-    def test_parse_sector_rotation_alias(self):
-        name, params = parse_skill_command("sr")
-        assert name == "sector_rotation"
-
-
-# ============================================================
 # List Skills Tests
 # ============================================================
 
@@ -208,7 +158,7 @@ class TestListSkills:
 # ============================================================
 
 class TestCustomSkillsLoading:
-    """Tests for load_custom_skills() / rebuild_skill_registry() YAML loading."""
+    """Tests for rebuild_skill_registry() YAML loading."""
 
     def _rebuild_with_custom_dir(self, custom_dir, monkeypatch):
         """Helper: rebuild registry with a custom dir override."""
@@ -592,190 +542,6 @@ class TestRegistryRebuild:
         (tmp_path / "missing-skill-md").mkdir()
         with pytest.raises(RuntimeError, match="Builtin skill missing SKILL.md"):
             _scan_builtin(tmp_path)
-
-
-# ============================================================
-# Auto-Trigger Matching Tests (Phase G)
-# ============================================================
-
-class TestAutoTrigger:
-    """Test match_skill_trigger() matching logic."""
-
-    def test_exact_phrase_match(self):
-        r = match_skill_trigger("run a full analysis on NVDA")
-        assert r.reason == "unique"
-        assert r.skill is not None
-        assert r.skill.name == "full_analysis"
-
-    def test_ordered_words_match(self):
-        r = match_skill_trigger("do a comprehensive market analysis please")
-        assert r.reason == "unique"
-        assert r.skill is not None
-        assert r.skill.name == "full_analysis"
-
-    def test_case_insensitive(self):
-        r = match_skill_trigger("SECTOR ROTATION overview")
-        assert r.reason == "unique"
-        assert r.skill is not None
-        assert r.skill.name == "sector_rotation"
-
-    def test_no_match(self):
-        r = match_skill_trigger("what is the weather today")
-        assert r.reason == "none"
-        assert r.skill is None
-        assert r.candidates == []
-
-    def test_multi_match_returns_candidates(self):
-        """A query matching multiple skills should return candidates."""
-        # "earnings" appears in both earnings_prep and earnings_analysis triggers
-        r = match_skill_trigger("earnings analysis report")
-        if r.reason == "multiple":
-            assert len(r.candidates) >= 2
-        # If only one matches due to specificity, that's also valid
-        elif r.reason == "unique":
-            assert r.skill is not None
-
-    def test_packaged_skill_trigger(self):
-        r = match_skill_trigger("build a dcf model for AAPL")
-        assert r.reason == "unique"
-        assert r.skill is not None
-        assert r.skill.name == "dcf_model"
-
-    def test_catalyst_calendar_trigger(self):
-        r = match_skill_trigger("show me the catalyst calendar for TSLA")
-        assert r.reason == "unique"
-        assert r.skill is not None
-        assert r.skill.name == "catalyst_calendar"
-
-    def test_empty_query_no_match(self):
-        r = match_skill_trigger("")
-        assert r.reason == "none"
-
-    def test_prefers_best_phrase_for_same_skill(self, monkeypatch):
-        import src.agents.shared.skills as skills_mod
-        original = list(skills_mod._TRIGGER_INDEX)
-        try:
-            skill_a = SkillDefinition(
-                name="skill_a",
-                description="A",
-                prompt_template="A",
-                trigger="alpha beta gamma|beta",
-            )
-            skill_b = SkillDefinition(
-                name="skill_b",
-                description="B",
-                prompt_template="B",
-                trigger="alpha beta gamma",
-            )
-            monkeypatch.setattr(
-                skills_mod,
-                "_TRIGGER_INDEX",
-                [
-                    ("alpha beta gamma", skill_a),
-                    ("alpha beta gamma", skill_b),
-                    ("beta", skill_a),
-                ],
-            )
-            r = match_skill_trigger("alpha xxx beta yyy gamma beta")
-            assert r.reason == "unique"
-            assert r.skill is not None
-            assert r.skill.name == "skill_a"
-        finally:
-            monkeypatch.setattr(skills_mod, "_TRIGGER_INDEX", original)
-
-
-# ============================================================
-# Auto-Apply Context Tests (Phase G)
-# ============================================================
-
-class TestAutoApplyContext:
-    """Test build_auto_apply_context() for paramless auto-apply skills."""
-
-    def test_auto_apply_injects_skill_body(self):
-        """Paramless + auto_apply skill should inject full body."""
-        # portfolio_scan has auto_apply=False, so let's find one that can auto-apply
-        # or test with a mock
-        skill = SkillDefinition(
-            name="_auto_test",
-            description="Auto test",
-            prompt_template="Do the auto thing.",
-            auto_apply=True,
-        )
-        assert skill.can_auto_apply()
-        # Test via direct insertion
-        import src.agents.shared.skills as skills_mod
-        old = SKILL_REGISTRY.get("_auto_test")
-        SKILL_REGISTRY["_auto_test"] = skill
-        try:
-            ctx = build_auto_apply_context(skill, "run auto scan")
-            assert "[Auto-matched skill: _auto_test]" in ctx
-            assert "Do the auto thing." in ctx
-            assert "[User query]" in ctx
-            assert "run auto scan" in ctx
-        finally:
-            if old is None:
-                SKILL_REGISTRY.pop("_auto_test", None)
-            else:
-                SKILL_REGISTRY["_auto_test"] = old
-
-    def test_can_auto_apply_with_params_is_false(self):
-        skill = SkillDefinition(
-            name="_param_skill",
-            description="Needs params",
-            prompt_template="Analyze {ticker}.",
-            required_params=["ticker"],
-            auto_apply=True,
-        )
-        assert not skill.can_auto_apply()
-
-    def test_can_auto_apply_with_auto_apply_false(self):
-        skill = SkillDefinition(
-            name="_no_auto",
-            description="No auto",
-            prompt_template="Just prompt.",
-            auto_apply=False,
-        )
-        assert not skill.can_auto_apply()
-
-
-# ============================================================
-# CLI Suggestion Rendering Tests (Phase G)
-# ============================================================
-
-class TestRenderSuggestionCli:
-    """Test render_skill_suggestion_cli() output format."""
-
-    def test_unique_with_params_suggestion(self):
-        skill = SkillDefinition(
-            name="test_skill",
-            description="Test",
-            prompt_template="Do {ticker}.",
-            required_params=["ticker"],
-            aliases=["ts"],
-        )
-        result = SkillMatchResult(skill=skill, candidates=["test_skill"], reason="unique")
-        text = render_skill_suggestion_cli(result)
-        assert "test_skill" in text
-        assert "/skill test_skill" in text
-        assert "<TICKER>" in text
-        assert "[dim]" in text
-
-    def test_multiple_candidates_text(self):
-        result = SkillMatchResult(
-            candidates=["skill_a", "skill_b", "skill_c"],
-            reason="multiple",
-        )
-        text = render_skill_suggestion_cli(result)
-        assert "skill_a" in text
-        assert "skill_b" in text
-        assert "skill_c" in text
-        assert "Multiple skills match" in text
-        assert "[dim]" in text
-
-    def test_none_reason_empty(self):
-        result = SkillMatchResult(reason="none")
-        text = render_skill_suggestion_cli(result)
-        assert text == ""
 
 
 # ============================================================

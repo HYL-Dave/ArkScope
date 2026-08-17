@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 
@@ -269,3 +270,105 @@ def test_model_registry_has_no_terminal_catalog_membership_axis():
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
     }
     assert "in_cli_catalog" not in fields
+
+
+def test_automatic_compaction_remains_without_one_shot_force_controls(tmp_path):
+    compressor_source = (
+        _ROOT / "src/agents/shared/compressor/context_compressor.py"
+    ).read_text(encoding="utf-8")
+    context_source = (_ROOT / "src/agents/shared/context_manager.py").read_text(
+        encoding="utf-8"
+    )
+    config_source = (_ROOT / "src/agents/config.py").read_text(encoding="utf-8")
+    current_source = "\n".join((compressor_source, context_source, config_source))
+    assert "force_layer_5_once" not in current_source
+    assert "request_force_layer_5" not in current_source
+    assert "/compact" not in current_source
+
+    from src.agents.shared.compressor import (
+        CompressorConfig,
+        ContextCompressor,
+        FakeSummaryCaller,
+    )
+
+    compressor = ContextCompressor(
+        session_id="automatic-layer-5-contract",
+        overflow_dir=tmp_path,
+        config=CompressorConfig(
+            layer_1_enabled=False,
+            layer_5_enabled=True,
+            layer_5_threshold_chars=1,
+        ),
+    )
+    compressor._summary_caller = FakeSummaryCaller(["automatic summary"])
+    result = compressor.compact_pre_call(
+        [
+            {"role": "user", "content": "Q1"},
+            {"role": "assistant", "content": "a1"},
+            {"role": "user", "content": "Q2"},
+            {"role": "assistant", "content": "a2"},
+            {"role": "user", "content": "Q3"},
+        ]
+    )
+    assert result.replace_prefix_to is not None
+    assert 5 in result.layers_fired
+    assert compressor.layer_5_circuit_open is False
+
+
+def test_skill_registry_has_no_terminal_command_or_auto_apply_helpers():
+    skills_source = (_ROOT / "src/agents/shared/skills.py").read_text(
+        encoding="utf-8"
+    )
+    skills_tree = ast.parse(skills_source)
+    skill_definition = _class(skills_tree, "SkillDefinition")
+    fields = {
+        node.target.id
+        for node in skill_definition.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    assert {"trigger", "auto_apply"} <= fields
+
+    top_level_functions = {
+        node.name
+        for node in skills_tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert {
+        "expand_skill",
+        "list_skills",
+        "rebuild_skill_registry",
+        "validate_skills",
+    } <= top_level_functions
+    assert {
+        "build_auto_apply_context",
+        "load_custom_skills",
+        "match_skill_trigger",
+        "parse_skill_command",
+        "render_skill_suggestion_cli",
+    }.isdisjoint(top_level_functions)
+
+    class_names = {
+        node.name for node in skills_tree.body if isinstance(node, ast.ClassDef)
+    }
+    assert "SkillMatchResult" not in class_names
+    assert not any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "can_auto_apply"
+        for node in skill_definition.body
+    )
+    assert "_TRIGGER_INDEX" not in skills_source
+    assert "_rebuild_trigger_index" not in skills_source
+    assert re.search(r"/skill(?!s)", skills_source) is None
+    assert "load_custom_skills" not in (
+        _ROOT / "src/agents/shared/__init__.py"
+    ).read_text(encoding="utf-8")
+
+
+def test_system_prompt_does_not_advertise_terminal_skill_commands():
+    from src.agents.shared.prompts import build_system_prompt
+
+    prompt = build_system_prompt()
+    assert "Registered workflow definitions" in prompt
+    assert "They are not automatically applied." in prompt
+    assert "Available skills" not in prompt
+    assert "/skill" not in prompt

@@ -33,8 +33,8 @@ class AgentEvent:
     """
     A single event emitted during agent execution.
 
-    Used by ``run_query_stream()`` to yield progress updates.
-    Consumers include the HTTP SSE endpoint and potentially the CLI.
+    Used by ``run_query_stream()`` to yield progress updates to the HTTP SSE
+    endpoint and current run orchestration.
     """
 
     type: EventType

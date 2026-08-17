@@ -338,7 +338,7 @@ def dispatch_subagent(
 
     config = SUBAGENT_REGISTRY[subagent_name]
 
-    # Apply model override from AgentConfig (user_profile.yaml or CLI runtime)
+    # Apply model override from stored or request-time AgentConfig.
     config = _apply_config_overrides(config)
 
     provider = _detect_provider(config.model)

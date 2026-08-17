@@ -254,10 +254,11 @@ Be selective — save meaningful conclusions and insights, not raw data lookups.
 
 ─── SKILLS (Analysis Workflows) ───
 
-Users can trigger predefined analysis workflows via /skill commands.
-When a skill prompt is active, it defines the goal, minimum data sources,
-and required output elements. You decide the best tools, order, and strategy
-to achieve the goal — the skill is a guide, not a rigid script.
+Registered workflow definitions
+They are not automatically applied.
+When an explicit product workflow supplies a selected definition, it sets the
+goal, minimum data sources, and required output elements. You decide the best
+tools, order, and strategy — the definition is a guide, not a rigid script.
 
 {skills_list}
 
@@ -288,7 +289,7 @@ def _get_skills_list() -> str:
     """Generate dynamic skills list for the system prompt."""
     from .skills import list_skills
 
-    lines = ["Available skills:"]
+    lines = []
     for s in list_skills():
         rp = s["required_params"]
         params = f" <{rp}>" if rp and rp != "(none)" else ""
