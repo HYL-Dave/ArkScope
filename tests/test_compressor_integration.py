@@ -339,9 +339,8 @@ class TestProjectionAdapter:
             # Native block keys still hygienic
             assert set(block.keys()) == {"type", "tool_use_id", "content"}
 
-    def test_user_question_with_attachments_projected_as_text(self, tmp_path):
-        """Initial user message with image+text content blocks should project
-        as a single user-role item with the text portion only."""
+    def test_user_multiblock_content_projected_as_text(self, tmp_path):
+        """A multiblock user message projects as one text-only user item."""
         msgs = [
             {"role": "user", "content": [
                 {"type": "image", "source": {"type": "base64", "data": "..."}},
@@ -569,125 +568,6 @@ class TestIdempotency:
 # ============================================================
 
 
-class TestOverflowCommandIntegrity:
-    """``/overflow show <id>`` MUST gate on OverflowStore.read() so the
-    5-invariant tamper detection from commit 1 protects the CLI surface.
-
-    Three tamper modes (mirror the on-disk regression set in
-    ``tests/test_compressor_overflow_store.py``):
-
-      1. ``args_hash`` field corrupted but payload + record_id intact
-      2. ``original_size`` field lies (re-encoded payload size differs)
-      3. ``original_payload`` swapped for a different string (recomputed
-         id mismatches the filename / JSON record_id)
-
-    Each must cause the CLI to print an integrity-failure message and
-    NOT surface the original_payload bytes.
-    """
-
-    @staticmethod
-    def _capture_overflow_show(tmp_path, record_id, monkeypatch, *, agent_config_overflow_dir):
-        """Run ``/overflow show <id>`` against ``tmp_path`` as the overflow
-        root, capturing the recorded text output. Returns the captured
-        string."""
-        from rich.console import Console as _RichConsole
-        recording_console = _RichConsole(record=True, force_terminal=False, width=120)
-
-        # Patch cli.console with our recording instance
-        import src.agents.cli as cli_mod
-        monkeypatch.setattr(cli_mod, "console", recording_console)
-
-        # Patch the overflow_dir resolution so handle_overflow_command picks
-        # up tmp_path instead of data/overflow.
-        monkeypatch.setattr(
-            cli_mod, "_get_compaction_overflow_dir",
-            lambda: str(agent_config_overflow_dir),
-        )
-
-        cli_mod.handle_overflow_command(f"show {record_id}")
-        return recording_console.export_text()
-
-    def test_show_intact_record_displays_payload(self, tmp_path, monkeypatch):
-        """Sanity check: untampered record renders payload preview."""
-        from src.agents.shared.compressor import OverflowStore
-
-        store = OverflowStore(tmp_path, session_id="sess1")
-        payload = "the quick brown fox " * 100
-        record = store.write("get_x", {"q": "x"}, payload)
-
-        out = self._capture_overflow_show(
-            tmp_path, record.record_id, monkeypatch,
-            agent_config_overflow_dir=tmp_path,
-        )
-        assert "the quick brown fox" in out
-        assert "Payload preview" in out
-        assert "integrity verification" not in out
-
-    def _tamper_field(self, record_path: Path, **mutations):
-        """Mutate top-level keys in the on-disk JSON."""
-        data = json.loads(record_path.read_text(encoding="utf-8"))
-        data.update(mutations)
-        record_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-
-    def test_show_tampered_args_hash_rejects(self, tmp_path, monkeypatch):
-        from src.agents.shared.compressor import OverflowStore
-
-        store = OverflowStore(tmp_path, session_id="sess1")
-        payload = "secret data " * 100
-        record = store.write("get_x", {"q": "x"}, payload)
-        record_path = tmp_path / "sess1" / f"{record.record_id}.json"
-        self._tamper_field(record_path, args_hash="0" * 64)
-
-        out = self._capture_overflow_show(
-            tmp_path, record.record_id, monkeypatch,
-            agent_config_overflow_dir=tmp_path,
-        )
-        assert "integrity verification" in out
-        assert "secret data" not in out  # payload NOT surfaced
-
-    def test_show_tampered_original_size_rejects(self, tmp_path, monkeypatch):
-        from src.agents.shared.compressor import OverflowStore
-
-        store = OverflowStore(tmp_path, session_id="sess1")
-        payload = "leaked content " * 100
-        record = store.write("get_x", {"q": "x"}, payload)
-        record_path = tmp_path / "sess1" / f"{record.record_id}.json"
-        self._tamper_field(record_path, original_size=99)
-
-        out = self._capture_overflow_show(
-            tmp_path, record.record_id, monkeypatch,
-            agent_config_overflow_dir=tmp_path,
-        )
-        assert "integrity verification" in out
-        assert "leaked content" not in out
-
-    def test_show_tampered_payload_rejects(self, tmp_path, monkeypatch):
-        """Tamper the payload (swap for different bytes) but keep filename
-        and JSON record_id. Recomputed sha256 mismatches → invariant 5
-        fails."""
-        from src.agents.shared.compressor import OverflowStore
-
-        store = OverflowStore(tmp_path, session_id="sess1")
-        payload = "original honest payload " * 50
-        record = store.write("get_x", {"q": "x"}, payload)
-        record_path = tmp_path / "sess1" / f"{record.record_id}.json"
-        # Swap original_payload for something else, but keep all other fields
-        # including original_size matching the new bytes (so invariant 4 alone
-        # passes — we want to demonstrate invariant 5 catches it).
-        injected = "ATTACKER INJECTED PAYLOAD" * 10
-        self._tamper_field(
-            record_path,
-            original_payload=injected,
-            original_size=len(injected.encode("utf-8")),
-        )
-
-        out = self._capture_overflow_show(
-            tmp_path, record.record_id, monkeypatch,
-            agent_config_overflow_dir=tmp_path,
-        )
-        assert "integrity verification" in out
-        assert "ATTACKER INJECTED PAYLOAD" not in out
-        assert "original honest payload" not in out
 
 
 class TestLayer5L6Integration:
@@ -942,16 +822,6 @@ class TestL0CallgraphRegression:
             "(or maybe_apply_layer_0) between execute_tool and tool_results.append"
         )
 
-    def test_cli_invokes_l0_hook(self):
-        path = project_root / "src" / "agents" / "cli.py"
-        hits = self._find_method_calls(
-            path.read_text(encoding="utf-8"),
-            {"compress_tool_result", "maybe_apply_layer_0"},
-        )
-        assert hits, (
-            "cli.py must call ctx.compress_tool_result "
-            "(or maybe_apply_layer_0) between execute_tool and tool_results.append"
-        )
 
     def test_anthropic_agent_forwards_compression_to_pad(self):
         """If the L0 hook ran but log_tool_result didn't get the metadata,
@@ -968,11 +838,6 @@ class TestL0CallgraphRegression:
             "agent.py: capture.record_tool_call must receive compression= kwarg"
         )
 
-    def test_cli_forwards_compression_to_pad(self):
-        src = (project_root / "src" / "agents" / "cli.py").read_text(encoding="utf-8")
-        assert self._find_call_with_kwarg(src, "log_tool_result", "compression"), (
-            "cli.py: pad.log_tool_result must receive compression= kwarg"
-        )
 
     def test_compress_tool_result_called_with_raw_payload(self, tmp_path, monkeypatch):
         """Behavior-level: simulate the call chain with mocks and verify
@@ -1006,36 +871,6 @@ class TestL0CallgraphRegression:
         assert compression["compressed"] is True
 
 
-class TestSharedL0Helper:
-    def test_agent_and_cli_get_identical_l0_output(self, tmp_path):
-        """Both agent.py and cli.py call ``ctx.maybe_apply_layer_0(...)``.
-        Two ContextManager instances with the same config and the same
-        session_id produce byte-identical L0 output for the same input
-        (modulo overflow_dir partitioning by session)."""
-        wrapped = _wrapped(json.dumps({"results": [{"url": "u", "content": "z" * 9_000}]}),
-                           "tavily_search")
-        ctx_agent = ContextManager(
-            model="claude-opus-4-7",
-            keep_recent_turns=2,
-            session_id="shared-session",
-            overflow_dir=tmp_path / "agent",
-            compaction_config=CompressorConfig(
-                enabled=True, layer_0_budget_chars=2_000,
-            ),
-        )
-        ctx_cli = ContextManager(
-            model="claude-opus-4-7",
-            keep_recent_turns=2,
-            session_id="shared-session",
-            overflow_dir=tmp_path / "cli",
-            compaction_config=CompressorConfig(
-                enabled=True, layer_0_budget_chars=2_000,
-            ),
-        )
-        out_agent = ctx_agent.maybe_apply_layer_0("tavily_search", {}, wrapped)
-        out_cli = ctx_cli.maybe_apply_layer_0("tavily_search", {}, wrapped)
-        # Same compressed body (record_id is content-derived → deterministic)
-        assert out_agent == out_cli
 
 
 # ============================================================

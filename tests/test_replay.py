@@ -27,10 +27,7 @@ from src.agents.shared.replay import (
     _SERVER_TOOL_KINDS_BY_PROVIDER,
     _canonical_tool_name,
     _currently_wired_server_tools,
-    _size_class,
-    classify_attachments,
     compute_shape,
-    digest_bytes,
     digest_json,
     hash_text,
     is_capture_enabled,
@@ -45,7 +42,6 @@ ONE_TOOL_FIXTURE = FIXTURE_DIR / "one_tool_turn.json"
 # P0.1 full-v1 commit 2 fixtures
 OPENAI_NO_TOOL_FIXTURE = FIXTURE_DIR / "openai_no_tool_turn.json"
 OPENAI_ONE_TOOL_FIXTURE = FIXTURE_DIR / "openai_one_tool_turn.json"
-ATTACHMENT_FIXTURE = FIXTURE_DIR / "attachment_turn.json"
 SUBAGENT_FIXTURE = FIXTURE_DIR / "subagent_turn.json"
 
 
@@ -709,7 +705,6 @@ def test_existing_fixtures_load_with_new_fields_as_none():
         trace = load_trace(path)
         assert trace.subagent_traces is None, f"{path}: subagent_traces should default None"
         assert trace.pinned_tool_names is None, f"{path}: pinned_tool_names should default None"
-        assert trace.attachments_shape is None, f"{path}: attachments_shape should default None"
 
 
 def test_load_openai_no_tool_fixture():
@@ -718,7 +713,6 @@ def test_load_openai_no_tool_fixture():
     assert trace.tool_calls == []
     assert trace.subagent_traces is None
     assert trace.pinned_tool_names is None
-    assert trace.attachments_shape is None
 
 
 def test_load_openai_one_tool_fixture():
@@ -731,19 +725,6 @@ def test_load_openai_one_tool_fixture():
     assert call.provider_tool_name == "tool_get_ticker_news"
     # pinned_tool_names locks only the tool the fixture's behaviour depends on
     assert trace.pinned_tool_names == ["get_ticker_news"]
-
-
-def test_load_attachment_fixture_carries_shape():
-    trace = load_trace(ATTACHMENT_FIXTURE)
-    assert trace.attachments_shape is not None
-    assert len(trace.attachments_shape) == 2
-    pdf, img = trace.attachments_shape
-    # Provider-native block kinds match what to_anthropic_blocks emits.
-    assert pdf["type"] == "pdf" and pdf["block_kind"] == "document"
-    assert img["type"] == "image" and img["block_kind"] == "image"
-    # Required schema keys present for both entries
-    for shape in trace.attachments_shape:
-        assert {"type", "size_class", "mime", "content_digest", "block_kind"} <= shape.keys()
 
 
 def test_load_subagent_fixture_anchors_delegate_at_parent():
@@ -786,176 +767,33 @@ def test_load_subagent_fixture_carries_nested_traces():
 
 
 def test_replay_capture_round_trips_new_fields(tmp_path):
-    """White-box: ``set_initial`` accepts the new opt-in kwargs and they
-    survive the JSON save/load round-trip. Regression guard for commit 2."""
+    """The remaining opt-in capture field survives a JSON round trip."""
     cap = ReplayCapture(
         provider="anthropic",
         model="claude-opus-4-7",
         entrypoint="test",
         output_dir=tmp_path,
     )
-    shape = [
-        {"type": "pdf", "size_class": "small", "mime": "application/pdf",
-         "content_digest": "abc", "block_kind": "document"},
-    ]
     cap.set_initial(
         question="q",
         system_prompt="sys",
         tools_available=["get_ticker_news"],
-        attachments_shape=shape,
         pinned_tool_names=["get_ticker_news"],
     )
     cap.record_final("ok", {})
     trace = load_trace(cap.save())
-    assert trace.attachments_shape == shape
     assert trace.pinned_tool_names == ["get_ticker_news"]
     # subagent_traces is hand-crafted only in v1 — capture path leaves it None.
     assert trace.subagent_traces is None
 
 
-def test_size_class_thresholds():
-    # Per spec §2.2.1
-    assert _size_class(0) == "small"
-    assert _size_class(32 * 1024) == "small"
-    assert _size_class(32 * 1024 + 1) == "medium"
-    assert _size_class(512 * 1024) == "medium"
-    assert _size_class(512 * 1024 + 1) == "large"
-    assert _size_class(8 * 1024 * 1024) == "large"
-    assert _size_class(8 * 1024 * 1024 + 1) == "huge"
-
-
-class _FakeAttachment:
-    """Stand-in for ``shared.attachments.Attachment`` — the classifier
-    only consults ``data`` / ``media_type`` / ``is_pdf`` / ``is_image``
-    / ``is_text`` so a SimpleNamespace would also work; defining a class
-    keeps the test self-documenting."""
-    def __init__(self, *, data, media_type, is_pdf=False, is_image=False, is_text=False):
-        self.data = data
-        self.media_type = media_type
-        self.is_pdf = is_pdf
-        self.is_image = is_image
-        self.is_text = is_text
-
-
-def test_classify_attachments_anthropic_pdf_image_text():
-    """Anthropic mapping mirrors ``to_anthropic_blocks`` exactly:
-    pdf → document, image → image, text → text. Reviewer's directive:
-    derive from real provider block shape, not a guess."""
-    pdf = _FakeAttachment(data=b"%PDF-1.4..." * 100, media_type="application/pdf", is_pdf=True)
-    img = _FakeAttachment(data=b"\x89PNG" + b"x" * 1000, media_type="image/png", is_image=True)
-    txt = _FakeAttachment(data=b"hello world", media_type="text/plain", is_text=True)
-
-    out = classify_attachments("anthropic", [pdf, img, txt])
-    assert out is not None and len(out) == 3
-    assert out[0]["type"] == "pdf" and out[0]["block_kind"] == "document"
-    assert out[1]["type"] == "image" and out[1]["block_kind"] == "image"
-    assert out[2]["type"] == "text" and out[2]["block_kind"] == "text"
-
-
-def test_classify_attachments_openai_image_text_pdf_as_text():
-    """OpenAI mirrors ``to_openai_blocks``: image → input_image,
-    text → input_text, pdf → input_text (extracted, not native)."""
-    pdf = _FakeAttachment(data=b"%PDF-1.4..." * 100, media_type="application/pdf", is_pdf=True)
-    img = _FakeAttachment(data=b"\x89PNG" + b"x" * 1000, media_type="image/png", is_image=True)
-    txt = _FakeAttachment(data=b"hello world", media_type="text/plain", is_text=True)
-
-    out = classify_attachments("openai", [pdf, img, txt])
-    assert out is not None and len(out) == 3
-    # pdf falls through to input_text on OpenAI (no native PDF support)
-    assert out[0]["type"] == "pdf" and out[0]["block_kind"] == "input_text"
-    assert out[1]["type"] == "image" and out[1]["block_kind"] == "input_image"
-    assert out[2]["type"] == "text" and out[2]["block_kind"] == "input_text"
-
-
-def test_classify_attachments_returns_none_for_empty_or_missing():
-    """Empty / None inputs leave ``attachments_shape`` unset — the field
-    stays out of the JSON for the common no-attachment trace, keeping
-    fixture diffs minimal."""
-    assert classify_attachments("anthropic", None) is None
-    assert classify_attachments("openai", []) is None
-
-
-def test_classify_attachments_handles_unknown_kind_gracefully():
-    """An attachment that's neither pdf/image/text is recorded as
-    ``unknown`` rather than crashing. Mirrors the fallback path in
-    ``AttachmentManager.to_anthropic_blocks`` which tries text decode."""
-    weird = _FakeAttachment(
-        data=b"\x00\x01\x02binary blob",
-        media_type="application/octet-stream",
-    )
-    out = classify_attachments("anthropic", [weird])
-    assert out is not None and len(out) == 1
-    assert out[0]["type"] == "unknown"
-    # Per attachments.py fallback, unknowns ride on the text block kind.
-    assert out[0]["block_kind"] == "text"
-
-
-def test_digest_bytes_matches_hashlib_prefix():
-    """``digest_bytes`` must hash raw bytes via SHA256 — NOT the
-    str(b'...') repr (the former-bug that ``digest_json(bytes)``
-    silently fell into via ``default=str``).
-    """
-    import hashlib
-    raw = b"hello world"
-    expected = hashlib.sha256(raw).hexdigest()[:DIGEST_LEN]
-    assert digest_bytes(raw) == expected
-
-
-def test_digest_bytes_stable_and_distinguishes_content():
-    """Same bytes → same digest; different bytes → different digest;
-    digest length matches ``DIGEST_LEN``."""
-    assert digest_bytes(b"abc") == digest_bytes(b"abc")
-    assert digest_bytes(b"abc") != digest_bytes(b"abd")
-    assert len(digest_bytes(b"x")) == DIGEST_LEN
-    # bytearray accepted (caller may have mutable buffer)
-    assert digest_bytes(bytearray(b"abc")) == digest_bytes(b"abc")
-
-
-def test_digest_bytes_handles_non_bytes_safely():
-    """Non-bytes input returns empty string rather than crashing —
-    matches the rest of the capture path's exception-swallowing."""
-    assert digest_bytes(None) == ""
-    assert digest_bytes("string not bytes") == ""
-    assert digest_bytes(42) == ""
-
-
-def test_classify_attachments_uses_raw_byte_digest():
-    """Regression guard for the Medium finding: ``content_digest`` must
-    reflect the raw file bytes, NOT a serialized form. A future refactor
-    that swapped ``digest_bytes`` back to ``digest_json`` would change
-    the digest on the same bytes — this assertion catches that drift.
-    """
-    import hashlib
-    raw = b"\x89PNG\r\n\x1a\n" + b"x" * 200
-    img = _FakeAttachment(data=raw, media_type="image/png", is_image=True)
-    out = classify_attachments("anthropic", [img])
-    expected = hashlib.sha256(raw).hexdigest()[:DIGEST_LEN]
-    assert out[0]["content_digest"] == expected
-
-
-def test_classify_attachments_empty_bytes_uses_sha256_of_empty():
-    """An attachment with ``data=b''`` must still produce a stable digest
-    (SHA256 of the empty byte string), NOT a blank string. Blank string
-    is ``digest_bytes``'s sentinel for non-bytes input — conflating "empty
-    file" with "non-bytes" loses the ability to distinguish them.
-    """
-    import hashlib
-    empty = _FakeAttachment(data=b"", media_type="text/plain", is_text=True)
-    out = classify_attachments("anthropic", [empty])
-    assert out is not None and len(out) == 1
-    expected = hashlib.sha256(b"").hexdigest()[:DIGEST_LEN]
-    assert out[0]["content_digest"] == expected
-    assert out[0]["size_class"] == "small"
-
-
 def test_validate_all_new_fixtures_clean(real_registry):
-    """All 4 commit-2 fixtures must validate clean against commit 3's
-    unified resolver — including ``subagent_turn`` whose
+    """All remaining commit-2 fixtures validate against the unified
+    resolver, including ``subagent_turn`` whose
     ``delegate_to_subagent`` resolves through the bridge-surface branch.
     Warnings such as "tools newly registered" are allowed; errors are not.
     """
-    for path in (OPENAI_NO_TOOL_FIXTURE, OPENAI_ONE_TOOL_FIXTURE,
-                 ATTACHMENT_FIXTURE, SUBAGENT_FIXTURE):
+    for path in (OPENAI_NO_TOOL_FIXTURE, OPENAI_ONE_TOOL_FIXTURE, SUBAGENT_FIXTURE):
         trace = load_trace(path)
         result = validate_trace_against_registry(trace, real_registry)
         assert result.passed, f"{path.name} did not validate clean: {result.render()}"
@@ -1104,80 +942,6 @@ def test_bridge_arg_shape_unknown_arg_fails(real_registry):
     ), f"Expected unknown-arg error for 'obsolete_arg'; got: {result.render()}"
 
 
-def test_attachment_pair_passes_clean(real_registry):
-    """``attachment_turn`` ships ``("pdf", "document")`` and
-    ``("image", "image")`` pairs — both are produced by the current
-    Anthropic ``AttachmentManager.to_anthropic_blocks``, so the
-    validator must accept the fixture clean.
-    """
-    trace = load_trace(ATTACHMENT_FIXTURE)
-    result = validate_trace_against_registry(trace, real_registry)
-    assert result.passed, result.render()
-
-
-def test_attachment_pair_fails_when_pair_removed(monkeypatch, real_registry):
-    """Spec §4.2 attachment-fail acceptance: monkeypatching the
-    supported-pair helper to drop ``("pdf", "document")`` makes
-    ``attachment_turn`` fail with an attachment-shape diff. The pair
-    granularity (NOT just block_kind) is what catches mis-classified
-    entries — see ``test_attachment_pair_check_is_pair_not_just_block_kind``.
-    """
-    from src.agents.shared import replay as replay_mod
-
-    monkeypatch.setattr(
-        replay_mod,
-        "_supported_attachment_pairs",
-        lambda provider: {("image", "image"), ("text", "text")},  # drops pdf/document
-    )
-    trace = load_trace(ATTACHMENT_FIXTURE)
-    result = validate_trace_against_registry(trace, real_registry)
-    assert result.passed is False
-    assert any(
-        "attachments_shape" in e and "'pdf'" in e and "'document'" in e
-        for e in result.errors
-    ), f"Expected pair-mismatch error for (pdf, document); got: {result.render()}"
-
-
-def test_attachment_pair_check_is_pair_not_just_block_kind(real_registry):
-    """A fixture-style entry with mismatched type/block_kind
-    (``{"type":"pdf","block_kind":"image"}``) must fail — even though
-    "image" is a valid block_kind on its own. Validates that the gate
-    is on the PAIR, not on each axis independently.
-    """
-    trace = load_trace(ATTACHMENT_FIXTURE)
-    # Forge a mis-classified entry: pdf with image block_kind.
-    trace.attachments_shape = [{
-        "type": "pdf",
-        "size_class": "small",
-        "mime": "application/pdf",
-        "content_digest": "0" * 16,
-        "block_kind": "image",
-    }]
-    result = validate_trace_against_registry(trace, real_registry)
-    assert result.passed is False
-    assert any(
-        "attachments_shape" in e and "'pdf'" in e and "'image'" in e
-        for e in result.errors
-    ), f"Expected pair-mismatch error; got: {result.render()}"
-
-
-def test_attachment_unknown_type_opts_out(real_registry):
-    """Per spec §6 risk register: ``type == "unknown"`` is the explicit
-    opt-out — the validator skips the pair check rather than failing.
-    Reviewers reject ``unknown`` fixtures unless intentional.
-    """
-    trace = load_trace(ATTACHMENT_FIXTURE)
-    trace.attachments_shape = [{
-        "type": "unknown",
-        "size_class": "small",
-        "mime": "application/octet-stream",
-        "content_digest": "0" * 16,
-        "block_kind": "definitely_not_real",
-    }]
-    result = validate_trace_against_registry(trace, real_registry)
-    assert result.passed, result.render()
-
-
 def test_availability_diff_excludes_bridge_resolved_names(real_registry):
     """Resolver-aware availability diff: ``delegate_to_subagent`` is
     bridge-only and lives outside ToolRegistry, so it MUST NOT appear
@@ -1295,90 +1059,3 @@ def test_bridge_helper_stays_in_sync_with_openai_surface(real_registry):
         f"OpenAI bridge surface drift — surface_only={bridge_only}, "
         f"helper={helper_names}. Update shared/bridge_tools.py to match."
     )
-
-
-def _probe_attachments():
-    """Build canonical PDF / PNG / text ``Attachment`` instances for
-    forward-safeguard tests. ``AttachmentManager`` accepts pre-built
-    ``Attachment`` objects; the bytes are minimal-valid since
-    ``to_anthropic_blocks`` only base64-encodes them, and
-    ``to_openai_blocks``'s PDF extraction is monkeypatched at call site.
-    """
-    from src.agents.shared.attachments import Attachment
-
-    return [
-        Attachment(
-            path="/tmp/probe.pdf",
-            filename="probe.pdf",
-            media_type="application/pdf",
-            data=b"%PDF-1.4\n" + b"x" * 100,
-        ),
-        Attachment(
-            path="/tmp/probe.png",
-            filename="probe.png",
-            media_type="image/png",
-            data=b"\x89PNG\r\n\x1a\n" + b"x" * 100,
-        ),
-        Attachment(
-            path="/tmp/probe.txt",
-            filename="probe.txt",
-            media_type="text/plain",
-            data=b"hello world",
-        ),
-    ]
-
-
-def test_supported_attachment_pairs_match_anthropic_attachment_manager():
-    """Forward safeguard for the (type, block_kind) registry: every
-    pair the live ``AttachmentManager.to_anthropic_blocks`` actually
-    produces must appear in ``_supported_attachment_pairs("anthropic")``.
-
-    Drift in ``attachments.py`` (e.g. PDF moves from ``document`` to
-    ``url``) breaks this test before any fixture silently passes.
-    """
-    from src.agents.shared.attachments import AttachmentManager
-    from src.agents.shared.replay import _supported_attachment_pairs
-
-    blocks = AttachmentManager.to_anthropic_blocks(_probe_attachments())
-    supported = _supported_attachment_pairs("anthropic")
-    # Probe order tracks emitted order. Anthropic emits a block per
-    # attachment (no decoding required), so all 3 are present.
-    assert len(blocks) == 3
-    expected_types = ["pdf", "image", "text"]
-    for canonical_type, block in zip(expected_types, blocks):
-        block_kind = block.get("type")
-        assert (canonical_type, block_kind) in supported, (
-            f"Anthropic block ({canonical_type!r}, {block_kind!r}) emitted "
-            f"by AttachmentManager but not in _supported_attachment_pairs."
-        )
-
-
-def test_supported_attachment_pairs_match_openai_attachment_manager(monkeypatch):
-    """Symmetric forward safeguard for OpenAI. PDF on OpenAI extracts
-    to ``input_text`` via ``PDFProcessor.extract_text`` — we patch the
-    extractor to a stub since the probe bytes aren't a real PDF; the
-    test gates on the BLOCK KIND, not the extracted content.
-    """
-    from src.agents.shared import attachments as attachments_mod
-    from src.agents.shared.attachments import AttachmentManager
-    from src.agents.shared.replay import _supported_attachment_pairs
-
-    monkeypatch.setattr(
-        attachments_mod.PDFProcessor,
-        "extract_text",
-        staticmethod(lambda data, pages="": "stub-extracted text"),
-    )
-
-    blocks = AttachmentManager.to_openai_blocks(_probe_attachments())
-    # OpenAI emit order: image-first PDF/text fallthrough — the manager
-    # iterates in the original list order, so emission order = probe
-    # order = pdf, image, text.
-    assert len(blocks) == 3
-    supported = _supported_attachment_pairs("openai")
-    expected_types = ["pdf", "image", "text"]
-    for canonical_type, block in zip(expected_types, blocks):
-        block_kind = block.get("type")
-        assert (canonical_type, block_kind) in supported, (
-            f"OpenAI block ({canonical_type!r}, {block_kind!r}) emitted "
-            f"by AttachmentManager but not in _supported_attachment_pairs."
-        )

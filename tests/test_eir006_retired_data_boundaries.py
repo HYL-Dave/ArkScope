@@ -31,7 +31,6 @@ _REWIRED_CURRENT = {
     "docs/data/DATA_SUBSCRIPTION_GUIDE.md",
     "docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md",
     "src/agents/anthropic_agent/tools.py",
-    "src/agents/cli.py",
     "src/agents/openai_agent/tools.py",
     "src/api/routes/health.py",
     "src/api/routes/market_data.py",

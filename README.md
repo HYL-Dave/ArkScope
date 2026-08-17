@@ -57,8 +57,6 @@ cp config/.env.template config/.env            # then fill in API keys
 python -m src.daily_update --status         # check data freshness
 python -m src.daily_update --all --sync-db  # collect everything + sync to DB
 
-# 3. run the agent
-python -m src.agents                           # interactive CLI (--provider openai for GPT-5.x)
 ```
 
 All runtime storage is local SQLite under `data/`.

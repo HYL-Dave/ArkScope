@@ -1137,16 +1137,6 @@ class TestModelCatalogShared:
         from src.agents.shared.model_catalog import get_effort_options
         assert get_effort_options("gpt-5.2") is None
 
-    def test_cli_reexports(self):
-        """CLI re-exports should still work."""
-        from src.agents.cli import (
-            ModelEntry, MODEL_CATALOG, find_model,
-            VALID_REASONING, VALID_ANTHROPIC_EFFORT,
-        )
-        assert len(MODEL_CATALOG) >= 4
-        assert find_model("sonnet") is not None
-        assert "xhigh" in VALID_REASONING
-        assert "max" in VALID_ANTHROPIC_EFFORT
 
 
 class TestIsAdmin:

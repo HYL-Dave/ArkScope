@@ -179,42 +179,6 @@ def _install_fundamentals_provider_spies(monkeypatch):
     return calls
 
 
-def test_cli_save_command_uses_injected_local_capability(tmp_path, monkeypatch):
-    from src.agents.cli import handle_save_command
-    from src import app_records_store
-
-    class History:
-        def read_session(self):
-            return [
-                {
-                    "timestamp": "2026-08-16T00:00:00Z",
-                    "model": "local-test",
-                    "userMessage": "Review NVDA",
-                    "agentResponse": "No provider request was made.",
-                }
-            ]
-
-    class Store:
-        def insert_report(self, **kwargs):
-            seen["insert"] = kwargs
-            return 7
-
-    capability = object()
-    seen = {}
-
-    def get_store(owner):
-        seen["owner"] = owner
-        return Store()
-
-    monkeypatch.setattr(app_records_store, "get_app_records_store", get_store)
-    monkeypatch.chdir(tmp_path)
-    state = SimpleNamespace(chat_history=History())
-
-    handle_save_command(state, '1 "Local report"', capability)
-
-    assert seen["owner"] is capability
-    assert seen["insert"]["title"] == "Local report"
-    assert len(list((tmp_path / "data" / "reports").glob("*.md"))) == 1
 
 
 @pytest.fixture(scope="module")

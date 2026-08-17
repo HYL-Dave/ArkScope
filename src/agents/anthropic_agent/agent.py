@@ -21,7 +21,7 @@ from ..shared.compressor import (
 from ..shared.context_manager import ContextManager, build_anchor_from_messages
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
-from ..shared.replay import ReplayCapture, classify_attachments, is_capture_enabled
+from ..shared.replay import ReplayCapture, is_capture_enabled
 from ..shared.server_tools import anthropic_server_tools
 from ..shared.scratchpad import Scratchpad
 from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
@@ -199,7 +199,6 @@ async def run_query_stream(
     dal: Optional[Any] = None,
     effort: Optional[str] = None,
     thinking: Optional[bool] = None,
-    attachments: list | None = None,
     history: list | None = None,
     max_tool_calls: Optional[int] = None,
     personalization_context: str = "",
@@ -268,15 +267,7 @@ async def run_query_stream(
         )
     cached_system = _prepare_cached_system(effective_prompt)
 
-    # Initial messages = prior thread history (if any) + this turn's user message
-    # (with optional attachment content blocks).
-    if attachments:
-        from ..shared.attachments import AttachmentManager
-        content_blocks = AttachmentManager.to_anthropic_blocks(attachments)
-        content_blocks.append({"type": "text", "text": question})
-        messages: List[dict] = [*_hist, {"role": "user", "content": content_blocks}]
-    else:
-        messages: List[dict] = [*_hist, {"role": "user", "content": question}]
+    messages: List[dict] = [*_hist, {"role": "user", "content": question}]
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
@@ -287,16 +278,12 @@ async def run_query_stream(
             capture = ReplayCapture(
                 provider="anthropic",
                 model=model_name,
-                entrypoint="cli",
+                entrypoint="api",
             )
-            # P0.1 full-v1 commit 2: classify attachments at install time
-            # so attachments_shape reflects what to_anthropic_blocks WILL
-            # produce. Same pattern as the OpenAI side's _install_capture.
             capture.set_initial(
                 question=question,
                 system_prompt=effective_prompt,
                 tools_available=[t.get("name", "") for t in tools if t.get("name")],
-                attachments_shape=classify_attachments("anthropic", attachments),
             )
         except Exception as exc:
             logger.warning("Replay capture init failed: %s", exc)

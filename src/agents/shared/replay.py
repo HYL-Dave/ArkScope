@@ -62,32 +62,12 @@ def digest_json(value: Any) -> str:
     Sorts dict keys, uses tight separators, falls back to ``str()`` for
     non-JSON-native types (e.g. datetime, numpy types). Stable across
     runs given the same logical value.
-
-    NOTE: do NOT use this for raw byte content (e.g. attachment file
-    bytes) — JSON serialisation of ``bytes`` falls through ``default=str``
-    and hashes the ``str(b'...')`` repr, NOT the bytes themselves. Use
-    ``digest_bytes`` for that case.
     """
     try:
         canon = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     except (TypeError, ValueError):
         canon = repr(value)
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:DIGEST_LEN]
-
-
-def digest_bytes(data: Any) -> str:
-    """SHA256 prefix of raw bytes.
-
-    Used for the ``content_digest`` field on ``attachments_shape`` —
-    the digest must reflect the file content itself so it stays stable
-    across base64 reshaping, provider-block reformatting, or any other
-    transport-layer changes. Falls back to an empty string for
-    non-bytes input rather than raising, matching the rest of the
-    capture path's exception-swallowing pattern.
-    """
-    if not isinstance(data, (bytes, bytearray)):
-        return ""
-    return hashlib.sha256(bytes(data)).hexdigest()[:DIGEST_LEN]
 
 
 def compute_shape(value: Any, depth: int = 0) -> Any:
@@ -206,105 +186,6 @@ def _currently_wired_server_tools(provider: str) -> Set[str]:
 
 
 # ---------------------------------------------------------------------------
-# P0.1 full-v1 commit 2: attachments_shape classifier
-# ---------------------------------------------------------------------------
-
-# Size class thresholds (per spec §2.2.1). The boundaries are inclusive on
-# the lower side — bytes are integers, fractional sizes never apply.
-_SIZE_CLASS_BOUNDARIES = (
-    (32 * 1024, "small"),         # ≤ 32 KB
-    (512 * 1024, "medium"),       # ≤ 512 KB
-    (8 * 1024 * 1024, "large"),   # ≤ 8 MB
-    # > 8 MB → "huge" (catch-all below)
-)
-
-
-def _size_class(num_bytes: int) -> str:
-    for boundary, label in _SIZE_CLASS_BOUNDARIES:
-        if num_bytes <= boundary:
-            return label
-    return "huge"
-
-
-# Provider-native block kinds derived from `AttachmentManager.to_anthropic_blocks`
-# (Anthropic) and `to_openai_blocks` (OpenAI) in `src/agents/shared/attachments.py`.
-# The classifier mirrors those block-construction paths exactly — if the
-# attachment-handling code changes (e.g. switches PDF-as-document to URL),
-# this classifier needs to track it.
-def classify_attachments(provider: str, attachments: Any) -> Optional[List[Dict[str, Any]]]:
-    """Convert an iterable of ``Attachment`` objects to the
-    ``attachments_shape`` field shape.
-
-    Each output entry: ``{type, size_class, mime, content_digest, block_kind}``.
-
-    - ``type``: canonical kind (``pdf`` / ``image`` / ``text`` / ``unknown``)
-    - ``size_class``: ``small`` / ``medium`` / ``large`` / ``huge``
-    - ``mime``: provider-reported media type
-    - ``content_digest``: SHA256 prefix of raw bytes (stable across base64
-      and provider-block reshaping)
-    - ``block_kind``: provider-native block ``type`` field — what the
-      real content block emits (``document`` / ``image`` / ``text`` for
-      Anthropic; ``input_image`` / ``input_text`` for OpenAI)
-
-    Returns ``None`` when ``attachments`` is None or empty so the field
-    stays unset on traces with no attachments. Best-effort: any exception
-    while inspecting an attachment yields an ``unknown``-typed entry
-    rather than raising, matching the rest of the capture path's
-    exception-swallowing pattern.
-    """
-    if not attachments:
-        return None
-    out: List[Dict[str, Any]] = []
-    for att in attachments:
-        try:
-            data = getattr(att, "data", b"") or b""
-            mime = getattr(att, "media_type", None)
-            # Always digest — an empty attachment hashes to SHA256(b'')
-            # which is a stable, distinguishable value. Returning ""
-            # for empty would conflate "no content" with "non-bytes
-            # input" (which ``digest_bytes`` reserves "" for).
-            digest = digest_bytes(data)
-            size = len(data)
-            sclass = _size_class(size)
-
-            is_pdf = bool(getattr(att, "is_pdf", False))
-            is_image = bool(getattr(att, "is_image", False))
-            is_text = bool(getattr(att, "is_text", False))
-
-            if is_pdf:
-                canonical = "pdf"
-                block_kind = "document" if provider == "anthropic" else "input_text"
-            elif is_image:
-                canonical = "image"
-                block_kind = "image" if provider == "anthropic" else "input_image"
-            elif is_text:
-                canonical = "text"
-                block_kind = "text" if provider == "anthropic" else "input_text"
-            else:
-                canonical = "unknown"
-                # Fallback path in attachments.py also lands as text/input_text.
-                block_kind = "text" if provider == "anthropic" else "input_text"
-
-            out.append({
-                "type": canonical,
-                "size_class": sclass,
-                "mime": mime,
-                "content_digest": digest,
-                "block_kind": block_kind,
-            })
-        except Exception as exc:  # noqa: BLE001 — best-effort, mirror capture path
-            logger.warning("classify_attachments: skipping malformed attachment: %s", exc)
-            out.append({
-                "type": "unknown",
-                "size_class": "small",
-                "mime": None,
-                "content_digest": "",
-                "block_kind": "unknown",
-            })
-    return out
-
-
-# ---------------------------------------------------------------------------
 # Trace dataclass
 # ---------------------------------------------------------------------------
 
@@ -335,7 +216,7 @@ class CapturedToolCall:
 class ReplayTrace:
     schema_version: int
     captured_at: str
-    entrypoint: str  # cli | api | discord | test
+    entrypoint: str  # api | discord | test
     provider: str  # anthropic | openai
     model: str
     session_id: str
@@ -370,13 +251,6 @@ class ReplayTrace:
     # depends on (e.g. the one tool actually called); do NOT mirror
     # the full ``tools_available``.
     pinned_tool_names: Optional[List[str]] = None
-    # ``attachments_shape``: per-attachment classification produced at
-    # capture time. Each entry: ``{type, size_class, mime, content_digest,
-    # block_kind}``. Validator (commit 3) asserts the current code path
-    # can produce a block of the same ``type`` + ``block_kind`` for the
-    # trace's provider — i.e. attachment handling is still wired.
-    attachments_shape: Optional[List[Dict[str, Any]]] = None
-
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         return d
@@ -392,7 +266,7 @@ class ReplayCapture:
 
     Lifecycle:
 
-        cap = ReplayCapture(provider="anthropic", model="...", entrypoint="cli")
+        cap = ReplayCapture(provider="anthropic", model="...", entrypoint="api")
         cap.set_initial(question, system_prompt, [t["name"] for t in tools])
         # ... per tool call:
         cap.record_tool_call(name, arguments, result_str)
@@ -406,7 +280,7 @@ class ReplayCapture:
         *,
         provider: str,
         model: str,
-        entrypoint: str = "cli",
+        entrypoint: str,
         session_id: Optional[str] = None,
         turn_id: int = 1,
         output_dir: Optional[Path] = None,
@@ -428,7 +302,6 @@ class ReplayCapture:
         self._tool_call_index = 0
         # P0.1 full-v1 commit 2: opt-in trace fields. None when unused so
         # the trace's JSON stays small for the common case.
-        self._attachments_shape: Optional[List[Dict[str, Any]]] = None
         self._pinned_tool_names: Optional[List[str]] = None
         self._subagent_traces: Optional[List[Dict[str, Any]]] = None
 
@@ -440,15 +313,11 @@ class ReplayCapture:
         system_prompt: str,
         tools_available: Sequence[str],
         *,
-        attachments_shape: Optional[List[Dict[str, Any]]] = None,
         pinned_tool_names: Optional[Sequence[str]] = None,
     ) -> None:
         self._user_input = question
         self._system_prompt_hash = hash_text(system_prompt)
         self._tools_available = sorted(tools_available)
-        # P0.1 full-v1 commit 2: opt-in. ``None`` keeps the trace's JSON
-        # free of empty arrays — easier to diff hand-crafted fixtures.
-        self._attachments_shape = attachments_shape if attachments_shape else None
         self._pinned_tool_names = (
             sorted(pinned_tool_names) if pinned_tool_names else None
         )
@@ -508,7 +377,6 @@ class ReplayCapture:
             # subagent-capture wiring exists in v1.
             subagent_traces=self._subagent_traces,
             pinned_tool_names=self._pinned_tool_names,
-            attachments_shape=self._attachments_shape,
         )
 
     def save(self, output_dir: Optional[Path] = None) -> Path:
@@ -607,44 +475,12 @@ def load_trace(path: Path) -> ReplayTrace:
         # captured before these fields landed.
         subagent_traces=data.get("subagent_traces"),
         pinned_tool_names=data.get("pinned_tool_names"),
-        attachments_shape=data.get("attachments_shape"),
     )
 
 
 # ---------------------------------------------------------------------------
-# P0.1 full-v1 commit 3: unified resolver + attachment pair gate
+# P0.1 full-v1 commit 3: unified resolver
 # ---------------------------------------------------------------------------
-
-# Supported (canonical type, provider-native block_kind) pairs. Validating
-# the PAIR (not just block_kind) catches provider mis-classification — e.g.
-# {"type": "pdf", "block_kind": "image"} would be flagged because that
-# combination is not produced by AttachmentManager. Source of truth:
-# ``src/agents/shared/attachments.py::AttachmentManager.to_anthropic_blocks``
-# and ``to_openai_blocks``. Forward safeguard test in tests/test_replay.py
-# runs canonical fake attachments through both methods and asserts every
-# emitted (canonical_type, block_kind) pair appears here.
-_SUPPORTED_ATTACHMENT_PAIRS_BY_PROVIDER: Dict[str, Set[Tuple[str, str]]] = {
-    "anthropic": {
-        ("pdf", "document"),
-        ("image", "image"),
-        ("text", "text"),
-    },
-    "openai": {
-        ("pdf", "input_text"),
-        ("image", "input_image"),
-        ("text", "input_text"),
-    },
-}
-
-
-def _supported_attachment_pairs(provider: str) -> Set[Tuple[str, str]]:
-    """Return a fresh copy of the (type, block_kind) pairs the current
-    attachment-handling code path can emit for ``provider``.
-
-    Returning a copy keeps tests that monkeypatch this helper from
-    poisoning the module-level table.
-    """
-    return set(_SUPPORTED_ATTACHMENT_PAIRS_BY_PROVIDER.get(provider, set()))
 
 
 # Resolver kinds. ``"server"`` and ``"bridge"`` shapes mean "name resolves;
@@ -830,7 +666,7 @@ def validate_trace_against_registry(
     *,
     current_system_prompt: Optional[str] = None,
 ) -> ValidationResult:
-    """Static diff: tool existence + argument shape + attachment shape.
+    """Static diff: tool existence and argument shape.
 
     Does NOT call any LLM. Does NOT compare full tool results.
 
@@ -838,11 +674,6 @@ def validate_trace_against_registry(
     subagent trace): ToolRegistry → server-tools (``server:*``) → bridge
     tools. ``pinned_tool_names`` is REQUIRED-RESOLUTION through that
     same resolver, never a skip-list.
-
-    Attachment shape gate: when ``trace.attachments_shape`` is set,
-    every entry's ``(type, block_kind)`` pair must be producible by the
-    current ``AttachmentManager`` for ``trace.provider``. Entries with
-    ``type == "unknown"`` opt out (per spec §6 risk register).
     """
     errors: List[str] = []
     warnings: List[str] = []
@@ -889,27 +720,6 @@ def validate_trace_against_registry(
             )
             errors.extend(sub_errs)
             warnings.extend(sub_warns)
-
-    # Attachment shape gate: (type, block_kind) pair must be producible
-    # by the current attachment-handling code path. The pair-level check
-    # rejects mis-classified entries like {"type":"pdf","block_kind":"image"}
-    # which a block_kind-only check would miss.
-    if trace.attachments_shape:
-        supported_pairs = _supported_attachment_pairs(trace.provider)
-        for i, entry in enumerate(trace.attachments_shape):
-            atype = entry.get("type")
-            block_kind = entry.get("block_kind")
-            if atype == "unknown":
-                # Per spec §6 risk register: 'unknown' opts out of
-                # attachment validation (intentional escape hatch).
-                continue
-            if (atype, block_kind) not in supported_pairs:
-                errors.append(
-                    f"attachments_shape[{i}]: pair "
-                    f"({atype!r}, {block_kind!r}) is not produced by "
-                    f"current {trace.provider!r} attachment-handling code; "
-                    f"supported pairs: {sorted(supported_pairs)}"
-                )
 
     # System prompt drift (warning only)
     if current_system_prompt is not None:

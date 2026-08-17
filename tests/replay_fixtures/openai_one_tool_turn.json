@@ -49,6 +49,5 @@
   "subagent_traces": null,
   "pinned_tool_names": [
     "get_ticker_news"
-  ],
-  "attachments_shape": null
+  ]
 }

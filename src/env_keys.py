@@ -1,11 +1,9 @@
 """
 Idempotent loader for API keys from ``config/.env`` into ``os.environ``.
 
-The CLI loads keys via ``src.agents.cli._load_env`` at import, but that module
-drags in heavy TUI deps (rich / prompt_toolkit). The API sidecar and the §2 card
-pipeline need ANTHROPIC_API_KEY / OPENAI_API_KEY / FINNHUB_API_KEY without that
-weight, so this provides the same "set only if absent" behaviour resolved from
-the repo root (cwd-independent) and guarded so repeated calls are free.
+The API sidecar and card pipeline need ANTHROPIC_API_KEY / OPENAI_API_KEY /
+FINNHUB_API_KEY through a lightweight, cwd-independent path. This loader keeps
+the existing "set only if absent" behavior and guards repeated calls.
 """
 
 from __future__ import annotations

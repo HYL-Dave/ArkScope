@@ -4,9 +4,9 @@ This module IS the spec's main contribution — it re-validates every
 fixture under ``tests/replay_fixtures/`` against the live
 ``ToolRegistry`` whenever pytest runs. A PR that renames a tool,
 deletes a registry entry used by a fixture, drops
-``delegate_to_subagent`` from the bridge surface, or removes an
-attachment block-kind handler fails this gate with a message naming
-the offending fixture and drift.
+``delegate_to_subagent`` from the bridge surface, or changes a pinned
+tool contract fails this gate with a message naming the offending
+fixture and drift.
 
 There is no automatic CI / pre-commit infrastructure today (per spec
 §2.3). When future CI lands, wiring this module is a one-line

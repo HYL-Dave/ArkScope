@@ -21,6 +21,5 @@
   },
   "notes": "Hand-crafted OpenAI counterpart of no_tool_turn.json. Symmetric coverage so the validator sees the same shape on both providers.",
   "subagent_traces": null,
-  "pinned_tool_names": null,
-  "attachments_shape": null
+  "pinned_tool_names": null
 }
