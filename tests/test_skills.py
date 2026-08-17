@@ -24,6 +24,23 @@ from src.agents.shared.skills import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _restore_skill_registry():
+    """Restore the real skill registry after every test in this file.
+
+    Tests that rebuild from a temporary ``_CUSTOM_DIR`` mutate module-global
+    state and otherwise make later tests order-dependent. Restore the directory
+    explicitly before rebuilding so cleanup does not depend on fixture
+    finalizer order.
+    """
+    import src.agents.shared.skills as skills_mod
+
+    real_custom_dir = skills_mod._CUSTOM_DIR
+    yield
+    skills_mod._CUSTOM_DIR = real_custom_dir
+    rebuild_skill_registry()
+
+
 # ============================================================
 # Skill Registry Tests
 # ============================================================
