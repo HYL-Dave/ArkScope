@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASK 0 INDEPENDENTLY REVIEWED GREEN; TASK 1 PRE-EDIT STOP;
-> REPLAY-FIXTURE OWNER AMENDMENT REVIEW NEXT; PRODUCT/TEST EDITS BLOCKED
+> **Status:** TASK 0 INDEPENDENTLY REVIEWED GREEN; TASK 1 IMPLEMENTED;
+> INDEPENDENT TASK 1 REVIEW NEXT; TASK 2 BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -386,8 +386,8 @@ The default per-task review cadence remains in force. Independent Task 0
 review returned GREEN. Task 1 pre-edit grounding then found one retained replay
 owner whose explicit fixture tuple still names the Task 1-deleted attachment
 fixture. No product or test byte had changed. Section 0.5 now admits only that
-bounded fifth Task 1 evolution, and Task 1 remains blocked pending focused
-review of this amendment.
+bounded fifth Task 1 evolution. Focused review returned GREEN for amendment
+`d8891e50` and unlocked Task 1.
 
 ### Task 1: Retire CLI and the attachment stack
 
@@ -411,6 +411,26 @@ review of this amendment.
 6. Recheck the 23 protected paths and unchanged frontend stream.
 7. Commit product/tests atomically, then commit plan/map status separately;
    evidence remains in the manifested packet.
+
+**Execution status (2026-08-17):** implemented at product/tests commit
+`ae0856c8`. The staged collection is byte-identical to
+`4211/51731bfd...`; exact RED is `4 failed / 373 passed`, with only the three
+planned absence owners and evolved EIR-006 owner failing. The product commit
+changes exactly the 22 Task 1 owned paths. Final focused runtime is `377/377`
+with zero socket attempts, final backend collection remains
+`4211/51731bfd...`, frontend remains `1177` / 101 files /
+`c570a551...`, and the 23 protected rows remain byte-identical at aggregate
+`8843a3f1...`. Self-review strengthened the new signature owner to inspect all
+five public provider query functions; a bounded OpenAI `run_query` parameter
+mutation made that owner RED, and the product file was restored byte-exactly
+before all final gates reran. The Task 2 Discord/model-view product consumers
+remain byte-exact. Packet
+`/tmp/legacy-agent-surface-retirement-task1-d8891e50` contains 73 manifested
+payloads with `SHA256SUMS` SHA-256
+`cc9783e315c06921ca0702b95537334092c617349c84dd4e86752db693dc0ea2`.
+Task 1 now stops for independent implementation review; Task 2, merge, push,
+live/provider/Discord/document actions, and destructive operations remain
+unauthorized.
 
 ### Task 2: Retire Discord implementation, transport, and terminal model view
 
