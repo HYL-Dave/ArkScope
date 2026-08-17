@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASKS 0-2 INDEPENDENTLY REVIEWED GREEN; TASK 3 IMPLEMENTED;
-> INDEPENDENT TASK 3 REVIEW NEXT; TASK 4 BLOCKED
+> **Status:** TASKS 0-3 INDEPENDENTLY REVIEWED GREEN; TASK 4 IMPLEMENTED;
+> INDEPENDENT TASK 4 REVIEW NEXT; TASK 5 BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -520,6 +520,12 @@ Task 3 stops for independent implementation review; Task 4, merge, push,
 live/provider/Discord/document actions, private configuration edits, and
 destructive operations remain unauthorized.
 
+Independent Task 3 implementation review returned GREEN and unlocked Task 4.
+The reviewer independently reproduced final backend/focused identities,
+`305/305` runtime with zero socket attempts, exact 12-path ownership, retained
+automatic compaction/Skills authorities, and unchanged protected/frontend
+bytes.
+
 ### Task 3: Retire terminal Skills and one-shot force controls
 
 1. Add the four Task 3 identities and apply the one Task 3 body evolution
@@ -590,6 +596,36 @@ destructive operations remain unauthorized.
    launcher references a removed module and no dead dependency remains.
 5. Commit current-authority changes, then plan/map status separately; evidence
    remains in the manifested packet.
+
+**Execution status (2026-08-17):** implemented at current-authority commit
+`752de20c80972e4d58d9cadc5f8c727eb4b34b79`. The commit changes exactly the
+ten Task 4 documentation paths: three stale implementation narratives now
+state current replay/compression/paused-runner contracts; Skills Track B,
+Desktop alerts/model facts, repository-hygiene wording, the design index, and
+the Anthropic streaming note are re-grounded; the dated wrapper-oriented
+Skills research document is deleted; and only current sections of the
+priority map change while its decision log remains historical.
+
+The final 28-token three-axis scan classifies all 241 findings as completed
+census authority (128), temporary governance (86), negative contracts (21),
+or dated decision-log history (6), with zero unclassified findings or
+backlinks. Three git-crypt documents were read only from the unlocked main
+worktree and recorded as path/size/digest receipts; no plaintext entered the
+packet. A separate AST/literal check parsed 260 product Python files and found
+zero removed-module imports, launcher/file references, or retired dependency
+entries. The EIR current-authority owner passes `2/2`; accepted focused runtime
+collects the exact reviewed `305/581f6d41...` stream and passes `305/305` with
+zero socket attempts. A rejected individual-node invocation reproduces the
+known test-order registry leak at `304P/1F`; the accepted file-level invocation
+preserves pytest source order without changing the collected node set.
+Backend collection remains `4139/bec7fb2e...`, frontend remains 101 files /
+`1177/c570a551...`, and the 23 protected rows remain `8843a3f1...`.
+Packet `/tmp/legacy-agent-surface-retirement-task4-a2b9988a` contains 115
+manifested payloads with `SHA256SUMS` SHA-256
+`9a5b557a76f1203e294e0c3f1d7e40aab132c0442fd5f4155942ca423e2e08c1`.
+Task 4 stops for independent implementation review; Task 5, merge, push,
+private configuration, provider/network/document, and destructive actions
+remain unauthorized.
 
 ### Task 5: Mutations and final admission
 
