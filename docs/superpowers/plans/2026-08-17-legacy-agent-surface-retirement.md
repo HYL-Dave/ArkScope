@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASKS 0-3 INDEPENDENTLY REVIEWED GREEN; TASK 4 IMPLEMENTED;
-> INDEPENDENT TASK 4 REVIEW NEXT; TASK 5 BLOCKED
+> **Status:** TASKS 0-4 INDEPENDENTLY REVIEWED GREEN; TASK 5 COMPLETE;
+> INDEPENDENT TASK 5 IMPLEMENTATION REVIEW NEXT; TASKS 6-7 BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -627,6 +627,12 @@ Task 4 stops for independent implementation review; Task 5, merge, push,
 private configuration, provider/network/document, and destructive actions
 remain unauthorized.
 
+Independent Task 4 implementation review returned GREEN and unlocked Task 5.
+The reviewer independently reproduced the exact final backend/focused
+identities and runtime, the 10-path documentation boundary, all 241 classified
+no-tail findings, the 260-file call-graph result, decision-log preservation,
+and unchanged protected/frontend bytes.
+
 ### Task 5: Mutations and final admission
 
 For each mutation, save the diff, run its named owner to RED, restore every
@@ -663,6 +669,34 @@ Then run:
 
 Commit plan/map status only. Evidence remains in the manifested packet. Stop
 for complete implementation review.
+
+**Execution status (2026-08-17):** complete at exact product/test tip
+`104a7deadf6eeafea5d3270aa232bf789a81c9da`. M1-M10 each killed its named
+owner, made zero socket attempts, and restored every mutated byte. Final
+collection is `4139/bec7fb2e...`; focused runtime is `305/305`; unchanged
+frontend runtime is sequential `1177/1177` across 101 files at
+`c570a551...`; the protected aggregate remains `8843a3f1...`; and the
+sanitized 173-route startup gate has zero banned imports/distributions,
+provider calls, or network attempts.
+
+Canonical native A and B ran in independent scratch roots, each at exact
+`4127P/12S/0F`, and produced byte-identical reporter and socket-ledger JSON.
+The first production equality comparison was rejected because the still-live
+browser extension wrote only `data/sa_capture.db` at 17:56:10 while both
+canonical runs recorded zero production-file syscalls. After Firefox and
+Chrome were closed, two stable pre-manifests were followed by an additional
+full canonical C replay at the same `4127P/12S/0F`; A/B/C reports are all
+byte-identical. Both pre-manifests, post-C, and delayed post-stability manifests
+are byte-identical at `294c3ca1...`, with zero production-store openers and
+zero production-file syscalls. All runtime roots, generated data, links, and
+the detached verification worktree were removed.
+
+Packet `/tmp/legacy-agent-surface-retirement-task5-104a7dea` contains 166
+manifested payloads with `SHA256SUMS` SHA-256
+`52be1fa247bed26ac3c0c957702d21bba0152c70004eb5cc9ef1b8a1bb28e417`.
+Task 5 stops for complete independent implementation review. Task 6, merge,
+push, private configuration, provider/network/document, and destructive
+actions remain unauthorized.
 
 ### Task 6: Independent implementation review
 
