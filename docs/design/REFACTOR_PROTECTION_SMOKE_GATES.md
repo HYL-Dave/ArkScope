@@ -10,17 +10,16 @@
 
 These paths must keep working through docs cleanup, local-first migration, and module-level refactors:
 
-- `python -m src.daily_update --all --scope active-universe --sync-db`
-  — protection level since 3e-E / F6 (2026-06-11): **flag-compatible + same effects**,
-  NOT byte-identical. daily_update is now a thin CLI wrapper over the app scheduler
-  core (`src/service/data_scheduler.run_source`): same flag set, same per-source step
-  set (collect → normalize → local commit), exit 0/1 semantics, `--dry-run`
+- `python -m src.daily_update --all --scope active-universe`
+  — `daily_update` is a thin operator wrapper over the app scheduler core
+  (`src/service/data_scheduler.run_source`): the current per-source step set is
+  collect → normalize → local commit, with exit 0/1 semantics. `--dry-run`
   prints the plan and never touches IBKR/DB/job_runs. What changed by design:
   per-step telemetry is now the scheduler's `collect.<source>` rows
   (trigger_source='cli') plus one `daily_update.run` summary row; news sources run
   in-process (adapters), IBKR sources stay subprocesses; runs share the app's
-  per-source/IBKR locks (an app-scheduled run in the same sidecar makes the CLI
-  skip, not double-fetch — separate processes still can't see each other's locks).
+  cross-process per-source/IBKR file locks (an overlapping run skips rather than
+  fetching the same source twice; IBKR work is serialized).
   The gate when refactoring: `--help` exits 0, the protected command's `--dry-run`
   lists the same sources, no-scope invocations error with exit 1, and a real run
   produces the same collected/synced data.
@@ -28,7 +27,7 @@ These paths must keep working through docs cleanup, local-first migration, and m
   and made price scope explicit; 3e-B / 2026-06-10 added per-step telemetry;
   3e-E / 2026-06-11 extended the explicit-scope requirement to EVERY source —
   `config/tickers_core.json` no longer serves any runtime default, in daily_update
-  or in the collectors themselves. `--scores` stays a separate opt-in subprocess.)
+  or in the collectors themselves.)
 - Chrome SA Alpha Picks extension -> Native Messaging host -> DB
 - Firefox SA Alpha Picks extension -> Native Messaging host -> DB
 - SA native host stable launcher:
@@ -48,8 +47,8 @@ These can be moved, adapted, or re-wrapped, but should not be casually deleted:
 - `DataAccessLayer` / backend protocol boundaries.
 - SA ingestion, comment intelligence, article/market-news capture, and job recording.
 - Tools registry and financial tool surface used by agents.
-- Reports, memory, attachments, replay, compression, subagents, and structured output contracts.
-- Macro/news/signals/options functionality that supports the local-first workbench.
+- Reports, memory, replay, compression, subagents, and structured output contracts.
+- Macro, news, and options functionality that supports the local-first workbench.
 
 If a module is rewritten, preserve the capability boundary or explicitly record what replaces it.
 
@@ -94,7 +93,7 @@ bash -n extensions/sa_alpha_picks/install_firefox.sh
 python -m src.daily_update --help
 # Plan-only (must list polygon_news/finnhub_news/ibkr_news/ibkr_prices and exit 0
 # without touching IBKR/DB/job_runs):
-python -m src.daily_update --all --scope active-universe --sync-db --dry-run
+python -m src.daily_update --all --scope active-universe --dry-run
 ```
 
 ### Level 2 -- SA/native-host/API/DB-touching changes
@@ -139,9 +138,8 @@ Expected: both responses have `"status": "ok"` and `ping` returns `project_root=
 Use before/after storage migration cuts, collection refactors, installer changes, or browser-extension recovery.
 
 ```bash
-# News + prices (prices need an explicit scope since slice 2). Add --scores to
-# also push news_scores (now a separate opt-in).
-python -m src.daily_update --all --scope active-universe --sync-db
+# News + prices. Every source requires an explicit scope.
+python -m src.daily_update --all --scope active-universe
 ```
 
 For browser extension validation:

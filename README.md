@@ -1,94 +1,108 @@
 # ArkScope
 
-> **Local-first financial research agent workbench** — a single-user research
-> environment combining an LLM agent (Anthropic + OpenAI), a financial data layer
-> (news / Seeking Alpha / macro / prices / fundamentals / signals / options), and a
-> research GUI.
+> **Local-first financial research workbench** — a single-user desktop environment
+> combining Anthropic and OpenAI research workflows with local financial data
+> (news, Seeking Alpha, macro, prices, fundamentals, portfolios, and options).
 >
 > Renamed from **MindfulRL-Intraday** on 2026-05-31. The lowercase `mindfulrl`
 > retained by browser extension identifiers is intentional.
 
-## What this is
+## Overview
 
-ArkScope is being repositioned (2026-05) from an RL + LLM intraday-trading research
-repo into a **local-first financial research agent workbench**: the agent reads its
-own accumulated knowledge across sessions and machines, the user sees and edits
-everything via a research GUI, and zipping the profile directory moves work between
-machines.
+ArkScope is a local-first financial research workbench. The Electron shell runs a
+React interface and starts a local FastAPI sidecar on an ephemeral loopback port.
+Primary app state, job history, and collected data are stored in local SQLite files
+under `data/`; the app does not require an external database server.
 
-- **Current direction & "what's next?"** → `docs/design/PROJECT_PRIORITY_MAP.md` §1
-- **Authoritative doc index (read this first)** → `docs/design/CURRENT_PROJECT_CONTEXT.md`
-- **v1 product contract** (storage / sync / page IA / migration) → `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
-- **LLM auth / Claude-subscription Research driver** (design) → `docs/design/LLM_AUTH_DRIVER_PLAN.md` and `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md`
+The current GUI contains Home, Watchlist, Universe, News, AI Research, Holdings,
+System, and Settings. AI Research owns persisted threads and model runs; Settings
+owns provider configuration, model credentials and routing, collection schedules,
+storage status, and investor-profile calibration.
 
-> **Status**: local-first SQLite storage is live. Runtime state is stored under
-> `data/`; no external storage service is required.
+Alerts and Notes remain planned product surfaces. They are not yet shipped and
+therefore are intentionally absent from the current navigation rather than shown
+as disabled placeholders.
 
-## The workbench GUI (primary surface)
+Canonical project information:
 
-The product is a desktop research workbench: an Electron shell (or browser dev
-mode) over a local FastAPI sidecar. Current surfaces (as of 2026-07-10): 工作台
-(Home overview) · 自選股 (Watchlist) · 全部標的 (Universe) · **AI 研究** (research
-threads with per-run model/effort/stance) · **持倉** (Holdings — manual + read-only
-IBKR sync) · 新聞·事件 (News, incl. Seeking Alpha capture) · System health ·
-Settings (data providers, model routing, credentials, 投資人設定 incl. the
-calibration chat). Alerts and Notes are planned (nav present, disabled).
+- **Current context and authority order** → `docs/design/CURRENT_PROJECT_CONTEXT.md`
+- **Product contract** → `docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`
+- **Architecture and storage contract** → `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
+- **Current priorities and decision log** → `docs/design/PROJECT_PRIORITY_MAP.md`
+- **Design-document status index** → `docs/design/README.md`
 
-```bash
-# desktop app (starts its own sidecar on an ephemeral port)
-npm install && npm run dev:desktop
-
-# or: browser dev mode against a manually-run sidecar on :8420
-python -m src.api            # FastAPI sidecar
-npm run dev:web              # Vite dev server
-```
-
-## Operational quickstart (CLI / data paths)
-
-Currently-supported runtime paths. These are **protected** during refactors — see
-`docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`.
+## Run locally
 
 ```bash
-# 1. install + configure
+# one-time setup
+python -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
-cp config/.env.template config/.env            # then fill in API keys
+npm install
 
-# 2. data collection
-python -m src.daily_update --status         # check data freshness
-python -m src.daily_update --all --sync-db  # collect everything + sync to DB
-
+# desktop app: starts Vite, Electron, and its own FastAPI sidecar
+npm run dev:desktop
 ```
 
-All runtime storage is local SQLite under `data/`.
+Configure credentials, provider settings, and schedules from Settings. The private
+`config/.env` file remains an optional operator/import surface, not the default app
+configuration authority.
 
-### Seeking Alpha Alpha Picks (optional)
-
-Reads the Alpha Picks portfolio via a browser extension → Native Messaging host →
-DB. Requires an SA Alpha Picks subscription; disabled by default.
+Browser development uses two terminals:
 
 ```bash
-bash extensions/sa_alpha_picks/install.sh          # Chrome
-bash extensions/sa_alpha_picks/install_firefox.sh  # Firefox
-# then set seeking_alpha.enabled: true in config/user_profile.yaml
+python -m src.api  # FastAPI sidecar on 127.0.0.1:8420
+npm run dev:web    # Vite dev server on 127.0.0.1:8430
 ```
 
-Extension design + code: `docs/design/SA_EXTENSION_ROADMAP.md` and `extensions/sa_alpha_picks/`.
+## Operator checks and collection
+
+Routine schedules and manual runs belong in Settings. `src.daily_update` remains a
+thin operator wrapper over the same scheduler services:
+
+```bash
+python -m src.daily_update --status
+python -m src.daily_update --all --scope active-universe --dry-run
+python -m src.daily_update --all --scope active-universe  # provider calls + local writes
+```
+
+The wrapper requires an explicit ticker scope. Its `--all` flag covers the Polygon,
+Finnhub, and IBKR news sources plus IBKR prices; macro and SEC schedules are managed
+separately by the app.
+
+### Seeking Alpha browser collector (optional)
+
+The browser extension captures Alpha Picks, articles, comments, and Market News
+through a Native Messaging host into `data/sa_capture.db`. It requires a compatible
+Seeking Alpha subscription and a signed-in browser session.
+
+```bash
+# Chrome: first load extensions/sa_alpha_picks/ as an unpacked extension.
+bash extensions/sa_alpha_picks/install.sh
+
+# Firefox: builds the Firefox variant and registers its native host.
+bash extensions/sa_alpha_picks/install_firefox.sh
+```
+
+Follow `extensions/sa_alpha_picks/FIREFOX.md` for the temporary add-on steps. Runtime
+health and capture history are visible in Settings. Design and implementation live
+in `docs/design/SA_EXTENSION_ROADMAP.md` and `extensions/sa_alpha_picks/`.
 
 ## Project layout
 
-High-level only; for the authoritative structure see
-`docs/design/CURRENT_PROJECT_CONTEXT.md` (or `PROJECT_STRUCTURE.md` for the pointer
-stub).
+High-level only; use `docs/design/CURRENT_PROJECT_CONTEXT.md` for authority and
+`PROJECT_STRUCTURE.md` for the short structure pointer.
 
-- `apps/arkscope-web/` — the workbench GUI (React + Vite); `apps/arkscope-desktop/` — Electron shell
-- `src/` — agent, tools, DAL, API sidecar (`src/api/`), monitor, and data ingestion (`src/collectors/`, `src/daily_update.py`)
-- `data_sources/` — data-source API clients
-- `extensions/sa_alpha_picks/` — SA browser extension + native host
-- `docs/design/` — current specs & decision log (`PROJECT_PRIORITY_MAP.md` first)
+- `apps/arkscope-web/` — React/Vite workbench; `apps/arkscope-desktop/` — Electron shell
+- `src/` — research runtimes, tools, local data access, API sidecar, monitoring, and collection
+- `data_sources/` — provider API clients
+- `extensions/sa_alpha_picks/` — Seeking Alpha browser extension and native host
+- `config/` — reviewed defaults plus ignored private overrides
+- `data/` — ignored local SQLite stores, logs, and runtime artifacts
+- `docs/design/` — product and architecture authorities, plans, and decision records
 
-The disconnected offline RL, legacy scoring/Signals, and recommendation-shaped
-analysis implementations are retired and recoverable from Git history. Future
-research starts from a new reviewed design and current data contracts.
+Retired implementations are recovered from Git history rather than kept as dormant
+compatibility surfaces.
 
 ## Open data
 
@@ -97,4 +111,7 @@ data. Published datasets must follow `docs/PUBLICATION_REVIEW.md`.
 
 ## License
 
-Released under the **MIT License**.
+Unless otherwise noted, project-authored source code and documentation are
+licensed under the [Apache License, Version 2.0](LICENSE). Third-party
+components, assets, and data remain subject to their respective licenses and
+terms.
