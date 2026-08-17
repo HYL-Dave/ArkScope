@@ -7,7 +7,7 @@ Provides:
 - MonitorEngine to orchestrate scans and dispatch alerts
 """
 
-from .notifiers import Alert, ConsoleNotifier, DiscordNotifier, LogNotifier, NotificationRouter, Notifier
+from .notifiers import Alert, ConsoleNotifier, LogNotifier, NotificationRouter, Notifier
 from .watchers import (
     BaseWatcher,
     NewsVolumeWatcher,
@@ -19,7 +19,6 @@ from .engine import MonitorEngine
 __all__ = [
     "Alert",
     "ConsoleNotifier",
-    "DiscordNotifier",
     "LogNotifier",
     "NotificationRouter",
     "Notifier",

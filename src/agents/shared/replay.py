@@ -216,7 +216,7 @@ class CapturedToolCall:
 class ReplayTrace:
     schema_version: int
     captured_at: str
-    entrypoint: str  # api | discord | test
+    entrypoint: str  # api | test
     provider: str  # anthropic | openai
     model: str
     session_id: str

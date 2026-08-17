@@ -6,11 +6,11 @@ Coordinates MonitorEngine scans at fixed intervals.
 
 Threading model:
     The watcher scan is synchronous and can block for 10+ seconds. Running it directly
-    on the Discord event-loop thread causes gateway heartbeat timeouts.
+    on the scheduler event loop would block other asynchronous work.
 
     Solution: ``_scan_and_notify()`` runs the scan in a *background
     thread* via ``asyncio.to_thread``, then dispatches notifications
-    back on the main event loop where the Discord bot lives.
+    back on the scheduler event loop.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ class MonitorScheduler:
         logger.info("Scheduler stopped")
 
     async def run_once(self) -> None:
-        """Run a single scan (useful for /scan command or testing).
+        """Run a single scan (useful for attended calls or testing).
 
         Runs directly on the current event loop — fine for one-off calls
         but NOT suitable for the periodic loop (use _scan_and_notify).
@@ -103,15 +103,14 @@ class MonitorScheduler:
         """Scan in a background thread, then notify on the main event loop.
 
         This prevents synchronous data reads and signal synthesis from
-        blocking the Discord gateway heartbeat.
+        blocking the scheduler event loop.
         """
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         logger.info("Scan triggered at %s", now)
         try:
             alerts = await asyncio.to_thread(self._scan_blocking)
             logger.info("Scan complete: %d alert(s)", len(alerts))
-            # Notifications must run on the main event loop because
-            # the Discord bot connection is bound to it.
+            # Dispatch notifications after returning to the scheduler event loop.
             if alerts:
                 await self._engine.notify(alerts)
         except Exception:
@@ -122,8 +121,7 @@ class MonitorScheduler:
 
         Creates a fresh event loop in the thread because the watchers
         are declared ``async def`` (even though their I/O is sync).
-        ``notify=False`` so we don't try to send Discord messages from
-        a non-main event loop.
+        ``notify=False`` keeps notification dispatch on the scheduler event loop.
         """
         return asyncio.run(
             self._engine.scan_once(tickers=self._tickers, notify=False)

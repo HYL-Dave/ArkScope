@@ -50,7 +50,6 @@ def test_registry_and_helpers_agree_for_every_pre_consolidation_id():
     from src.agents.openai_agent.agent import _get_openai_max_output
     from src.agents.shared.context_manager import get_model_context_limit
     from src.agents.shared.subagent import _1M_GA_MODELS, _1M_BETA_MODELS
-    from src.agents.shared.model_catalog import get_effort_options
 
     for mid in sorted(_PRE_CONSOLIDATION_IDS):
         cap = capability_for(mid)
@@ -59,13 +58,10 @@ def test_registry_and_helpers_agree_for_every_pre_consolidation_id():
             assert _get_model_max_output(mid) == cap.max_output, mid
             assert _supports_adaptive_thinking(mid) == cap.thinking_mode.startswith("adaptive"), mid
             assert _supports_compaction(mid) == cap.supports_compaction, mid
-            expected_tuple = tuple(cap.effort_options) if cap.effort_options else None
-            assert get_effort_options(mid) == expected_tuple, mid
             assert (mid in _1M_GA_MODELS) == (cap.context_mode == "ga_1m"), mid
             assert (mid in _1M_BETA_MODELS) == (cap.context_mode == "beta_1m"), mid
         else:
             assert _get_openai_max_output(mid) == cap.max_output, mid
-            assert get_effort_options(mid) is None, mid
 
 
 def test_ruled_fixes_absolute_values():
@@ -94,18 +90,11 @@ def test_openai_models_record_model_specific_effort_sets():
     )
 
 
-def test_view_flags_pin_exact_current_memberships():
+def test_routing_seed_flags_pin_exact_current_membership():
     routing = {c.id for c in all_models() if c.in_routing_seed}
-    cli = {c.id for c in all_models() if c.in_cli_catalog}
-    # pre-consolidation memberships + the ruled Task-5 additions (both flags)
     assert routing == {
         "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
         "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
-        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-    }
-    assert cli == {
-        "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.5", "gpt-5.4-mini",
-        "gpt-5.4-nano", "gpt-5.4", "gpt-5.2", "gpt-5.2-codex",
         "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
 
@@ -200,13 +189,16 @@ def test_build_thinking_param_wire_shapes_pinned():
     assert _build_thinking_param("claude-haiku-4-5", False, _Cfg()) == (None, 8192)
 
 
-def test_cli_effort_helper_contract_preserved_plus_fix_a():
-    from src.agents.shared.model_catalog import get_effort_options
-    assert get_effort_options("claude-opus-4-8") == ("max", "xhigh", "high", "medium", "low")  # Fix A
-    assert get_effort_options("claude-opus-4-7") == ("max", "xhigh", "high", "medium", "low")
-    assert get_effort_options("claude-sonnet-4-6") == ("max", "high", "medium", "low")  # ruled Fix E
-    for openai_id in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.2"):
-        assert get_effort_options(openai_id) is None     # anthropic-only contract kept
+def test_anthropic_effort_options_are_registry_owned():
+    assert capability_for("claude-opus-4-8").effort_options == (
+        "max", "xhigh", "high", "medium", "low",
+    )
+    assert capability_for("claude-opus-4-7").effort_options == (
+        "max", "xhigh", "high", "medium", "low",
+    )
+    assert capability_for("claude-sonnet-4-6").effort_options == (
+        "max", "high", "medium", "low",
+    )
 
 
 def test_route_wire_effort_values_untouched():
@@ -219,23 +211,14 @@ def test_route_wire_effort_values_untouched():
     ]
 
 
-def test_derived_views_keep_exact_membership_and_aliases():
+def test_routing_view_keeps_exact_membership_and_capability_facts():
     from src.model_routing import MODEL_CATALOG as ROUTING_VIEW, is_seed_model
-    from src.agents.shared.model_catalog import MODEL_CATALOG as CLI_VIEW, find_model
 
     assert {m.id for m in ROUTING_VIEW} == {
         "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
         "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
         "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
-    assert {m.id for m in CLI_VIEW} == {
-        "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.5", "gpt-5.4-mini",
-        "gpt-5.4-nano", "gpt-5.4", "gpt-5.2", "gpt-5.2-codex",
-        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-    }
-    assert find_model("opus").id == "claude-opus-4-7"    # exact, not startswith
-    assert find_model("mini").id == "gpt-5.4-mini"
-    assert find_model("codex").id == "gpt-5.2-codex"
     assert is_seed_model("openai", "gpt-5.5")
 
     for option in ROUTING_VIEW:
@@ -271,7 +254,7 @@ def test_new_generation_entries_present_with_task0_facts():
     assert fable.context_limit == 1_000_000 and fable.max_output == 128_000
     assert fable.effort_options == ("max", "xhigh", "high", "medium", "low")
     assert fable.supports_compaction is True and fable.context_mode == "ga_1m"
-    assert fable.in_routing_seed and fable.in_cli_catalog
+    assert fable.in_routing_seed
 
     sonnet5 = capability_for("claude-sonnet-5")
     assert sonnet5.thinking_mode == "adaptive_default_on"
@@ -288,7 +271,7 @@ def test_new_generation_entries_present_with_task0_facts():
         assert cap.context_limit == 1_050_000 and cap.max_output == 128_000, mid
         assert cap.effort_options == ("none", "low", "medium", "high", "xhigh", "max"), mid
         assert cap.cost_tier == cost, mid
-        assert cap.in_routing_seed and cap.in_cli_catalog, mid
+        assert cap.in_routing_seed, mid
 
 
 def test_official_alias_gpt56_routes_to_sol():
@@ -315,10 +298,9 @@ def test_model_provider_classifies_new_ids():
         assert model_provider(mid) == "openai", mid
 
 
-def test_find_model_fable_resolves():
-    from src.agents.shared.model_catalog import find_model
-
-    assert find_model("fable").id == "claude-fable-5"
+def test_capability_alias_fable_resolves():
+    assert capability_for("claude-fable-5").id == "claude-fable-5"
+    assert capability_for("claude-fable-5-2026-x").id == "claude-fable-5"
 
 
 def test_prefix_precedence_for_gpt56_family():

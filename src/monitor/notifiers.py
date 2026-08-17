@@ -80,32 +80,11 @@ class LogNotifier(Notifier):
         return True
 
 
-class DiscordNotifier(Notifier):
-    """Send alerts to Discord via MindfulDiscordBot.
-
-    Requires a running bot instance to be injected after construction.
-    """
-
-    def __init__(self) -> None:
-        self._bot = None
-
-    def set_bot(self, bot) -> None:
-        """Inject the Discord bot instance (called when bot is ready)."""
-        self._bot = bot
-
-    async def send(self, alert: Alert) -> bool:
-        if self._bot is None:
-            logger.debug("DiscordNotifier: bot not connected, skipping")
-            return False
-        return await self._bot.send_alert(alert)
-
-
 class NotificationRouter:
     """Load notification channels from config and dispatch alerts."""
 
     def __init__(self, channels_config: List[Dict[str, Any]]) -> None:
         self._notifiers: List[Notifier] = []
-        self._discord_notifier: Optional[DiscordNotifier] = None
 
         for ch in channels_config:
             if not ch.get("enabled", False):
@@ -115,22 +94,8 @@ class NotificationRouter:
                 self._notifiers.append(ConsoleNotifier())
             elif ch_type == "log":
                 self._notifiers.append(LogNotifier())
-            elif ch_type == "discord":
-                self._discord_notifier = DiscordNotifier()
-                self._notifiers.append(self._discord_notifier)
             else:
                 logger.debug("Skipping unimplemented channel type: %s", ch_type)
-
-    def set_discord_bot(self, bot) -> None:
-        """Inject Discord bot into the DiscordNotifier.
-
-        If no DiscordNotifier was created from config (e.g. enabled=false),
-        this creates one on-the-fly so --discord CLI flag always works.
-        """
-        if not self._discord_notifier:
-            self._discord_notifier = DiscordNotifier()
-            self._notifiers.append(self._discord_notifier)
-        self._discord_notifier.set_bot(bot)
 
     @property
     def active_channels(self) -> int:

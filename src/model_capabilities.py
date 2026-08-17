@@ -49,10 +49,7 @@ class ModelCapability:
     supports_tool_calling: bool = True
     runtime_ready: bool = True
     in_routing_seed: bool = False
-    in_cli_catalog: bool = False
-    aliases: tuple[str, ...] = ()      # OFFICIAL aliases only (e.g. "gpt-5.6"→Sol);
-                                       # CLI nicknames live in the CLI view, so
-                                       # runtime helpers can never alias-match "claude".
+    aliases: tuple[str, ...] = ()      # OFFICIAL aliases only (e.g. "gpt-5.6"→Sol)
     quality: str = "high"             # frontier | high | balanced | fast
     speed: str = "medium"             # slow | medium | fast
     cost_tier: str = "medium"         # high | medium | low
@@ -70,7 +67,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         aliases=(),
         quality="frontier", speed="slow", cost_tier="high",
         recommended_for=(),
@@ -86,7 +83,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         aliases=(),
         quality="balanced", speed="fast", cost_tier="medium",
         recommended_for=(),
@@ -116,7 +113,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         quality="high", speed="slow", cost_tier="high",
         recommended_for=("card_synthesis",),
         source_url=_ANTHROPIC_DOCS, verified_at="2026-06-06",
@@ -129,7 +126,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000,
         max_output=128_000,                    # Fix D (was 64_000; models table)
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         quality="balanced", speed="medium", cost_tier="medium",
         recommended_for=("card_translation",),
         source_url=_ANTHROPIC_OVERVIEW, verified_at="2026-07-10",
@@ -171,7 +168,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         aliases=("gpt-5.6",),   # official: the gpt-5.6 alias routes to Sol
         quality="frontier", speed="medium", cost_tier="high",
         recommended_for=(),
@@ -184,7 +181,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         aliases=(),
         quality="high", speed="medium", cost_tier="medium",
         recommended_for=(),
@@ -198,7 +195,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         aliases=(),
         quality="balanced", speed="fast", cost_tier="low",
         recommended_for=(),
@@ -212,7 +209,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         quality="frontier", speed="medium", cost_tier="high",
         recommended_for=("card_synthesis",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
@@ -223,7 +220,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         quality="balanced", speed="fast", cost_tier="low",
         recommended_for=("card_translation",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
@@ -234,7 +231,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
-        in_cli_catalog=True,
         quality="fast", speed="fast", cost_tier="low",
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
@@ -243,7 +239,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
+        in_routing_seed=True,
         quality="high", speed="medium", cost_tier="medium",
         recommended_for=("card_synthesis",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
@@ -253,7 +249,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
-        in_cli_catalog=True,
         quality="high", speed="medium", cost_tier="medium",
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
@@ -262,7 +257,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_CODEX_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
-        in_cli_catalog=True,
         quality="high", speed="medium", cost_tier="medium",
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),

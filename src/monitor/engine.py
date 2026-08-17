@@ -223,10 +223,9 @@ class MonitorEngine:
     async def notify(self, alerts: List[Alert]) -> int:
         """Dispatch alerts via notification channels.
 
-        Separated from scan_once() so the scheduler can run the scan in a
-        background thread (to avoid blocking Discord heartbeat) and then
-        dispatch notifications on the main event loop where the Discord
-        bot lives.
+        Separated from scan_once() so the scheduler can run synchronous data
+        work in a background thread and dispatch notifications back on the
+        scheduler's event loop.
         """
         return await self._router.dispatch_many(alerts)
 
