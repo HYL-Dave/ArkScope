@@ -48,6 +48,86 @@ _NAMED_SUBSIDIARY_RE = re.compile(
 )
 
 
+# A Form 25 strikes one named class of securities, so the issuer's equity is
+# only implicated when that class is the equity. Both shapes SEC serves place
+# the class immediately before the `(Description of class of securities)`
+# caption: the exchange notice rendered through `xslF25X02`, and the
+# issuer-filed HTML notice. The raw XML exposes it as a single element instead.
+_FORM25_CLASS_TAG = re.compile(
+    r"<descriptionClassSecurity>(?P<value>.*?)</descriptionClassSecurity>",
+    re.IGNORECASE | re.DOTALL,
+)
+_FORM25_CLASS_CAPTION = re.compile(
+    r"\(\s*Description of class of securities\s*\)", re.IGNORECASE
+)
+_FORM25_ADDRESS_CAPTION = re.compile(
+    r"principal executive offices\s*\)", re.IGNORECASE
+)
+# Layout furniture only. Punctuation that can legitimately end a class name,
+# such as `.` or `:`, is deliberately left alone.
+_FORM25_SEPARATORS = " \t\r\n_—–-*"
+# Checked first: a class that names the equity is the equity even when the same
+# phrase also carries a series or par-value qualifier.
+_FORM25_EQUITY_TERMS = re.compile(
+    r"\b(?:common stock|common shares?|ordinary shares?|capital stock|"
+    r"class\s+[A-Z]\s+(?:common|ordinary))\b",
+    re.IGNORECASE,
+)
+_FORM25_OTHER_SECURITY_TERMS = re.compile(
+    r"\b(?:notes?|bonds?|debentures?|warrants?|units?|rights?|preferred|"
+    r"depositary shares?)\b",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class Form25Security:
+    """The class of securities a Form 25 removes.
+
+    ``description`` is the verbatim caption text, empty when the filing body was
+    unavailable or did not carry one. ``covers_other_security`` is true only on a
+    positive non-equity match, so an undetermined filing stays reportable rather
+    than being silently dismissed.
+    """
+
+    description: str
+    covers_other_security: bool
+
+
+def classify_form25_security(document: Optional[str]) -> Form25Security:
+    description = _form25_class_description(document)
+    if not description:
+        return Form25Security(description="", covers_other_security=False)
+    if _FORM25_EQUITY_TERMS.search(description):
+        return Form25Security(description=description, covers_other_security=False)
+    return Form25Security(
+        description=description,
+        covers_other_security=bool(_FORM25_OTHER_SECURITY_TERMS.search(description)),
+    )
+
+
+def _form25_class_description(document: Optional[str]) -> str:
+    raw = str(document or "")
+    if not raw.strip():
+        return ""
+    tagged = _FORM25_CLASS_TAG.search(raw)
+    if tagged is not None:
+        return _clean_entity(_plain_text(tagged.group("value")))[:240]
+    text = _plain_text(raw)
+    caption = _FORM25_CLASS_CAPTION.search(text)
+    if caption is None:
+        return ""
+    preceding = text[: caption.start()]
+    # The class sits between the address caption and the class caption. Falling
+    # back to the last closing parenthesis keeps older layouts readable.
+    address_captions = _FORM25_ADDRESS_CAPTION.findall(preceding)
+    if address_captions:
+        candidate = preceding.rpartition(address_captions[-1])[2]
+    else:
+        candidate = preceding.rpartition(")")[2]
+    return _clean_entity(candidate.strip(_FORM25_SEPARATORS))[:240]
+
+
 @dataclass(frozen=True)
 class SubmissionEventBatch:
     events: tuple[LifecycleObservation, ...]
@@ -207,7 +287,16 @@ def parse_submission_events(
         items = _parse_items(_recent_value(recent, "items", index))
         url = _filing_url(cik, accession, primary_document)
 
-        def add_event(event_type: str, state: str, event_description: str) -> None:
+        def add_event(
+            event_type: str,
+            state: str,
+            event_description: str,
+            *,
+            evidence_suffix: str = "",
+        ) -> None:
+            text = description or event_description
+            if evidence_suffix:
+                text = f"{text} {evidence_suffix}".strip()
             events.append(
                 LifecycleObservation(
                     ticker=ticker.upper(),
@@ -222,16 +311,31 @@ def parse_submission_events(
                     filing_form=form,
                     filing_items=items,
                     evidence_url=url,
-                    description=(description or event_description),
+                    description=text,
                     observed_at=observed_at,
                 )
             )
 
         if form in _FORM_25:
+            # Reading the body is new network work for this branch. A failure
+            # stays local to the filing: `run_incremental` catches per ticker,
+            # so raising here would discard the issuer's other events too.
+            try:
+                form25_document = document_loader(url)
+            except Exception:
+                form25_document = None
+            security = classify_form25_security(form25_document)
+            if security.covers_other_security:
+                continue
             add_event(
                 "listing_removal_notice",
                 "pending_delisting",
                 "SEC notification of removal from listing or registration.",
+                evidence_suffix=(
+                    f"Class of securities: {security.description}."
+                    if security.description
+                    else ""
+                ),
             )
             continue
 
@@ -286,6 +390,83 @@ def parse_submission_events(
         reverse=True,
     )
     return SubmissionEventBatch(events=tuple(events), relationships=tuple(relationships))
+
+
+def reclassify_stored_form25_observations(
+    *,
+    document_loader: Callable[[str], Optional[str]],
+    db_path: Optional[str] = None,
+    apply: bool = False,
+) -> dict:
+    """Re-read stored Form 25 rows and report the ones covering another security.
+
+    Rows written before the class of securities was read can mark an issuer's
+    equity as pending delisting on the strength of a matured note. This pass
+    re-reads each filing and reports what it found. It is read-only unless
+    ``apply`` is true, only ever examines ``listing_removal_notice`` rows, and
+    keeps anything it cannot classify. Filings are fetched outside the market
+    write lock; only the deletion runs inside it.
+    """
+    target = str(db_path or resolve_market_db_path())
+    conn = sqlite3.connect(f"file:{target}?mode=ro", uri=True)
+    try:
+        rows = conn.execute(
+            "SELECT id, ticker, filing_date, filing_form, evidence_url "
+            "FROM security_lifecycle_observations "
+            "WHERE event_type='listing_removal_notice' "
+            "ORDER BY filing_date DESC, ticker"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    other_security: list[dict] = []
+    undetermined = 0
+    unreadable = 0
+    for observation_id, ticker, filing_date, filing_form, evidence_url in rows:
+        try:
+            document = document_loader(evidence_url)
+        except Exception:
+            # One unreachable filing must not abort the pass or imply a verdict.
+            unreadable += 1
+            continue
+        security = classify_form25_security(document)
+        if security.covers_other_security:
+            other_security.append(
+                {
+                    "id": int(observation_id),
+                    "ticker": ticker,
+                    "filing_date": filing_date,
+                    "filing_form": filing_form,
+                    "evidence_url": evidence_url,
+                    "security_class": security.description,
+                }
+            )
+        elif not security.description:
+            undetermined += 1
+
+    removed = 0
+    if apply and other_security:
+        with market_write_lock():
+            writer = sqlite3.connect(target, timeout=10.0)
+            try:
+                cursor = writer.executemany(
+                    "DELETE FROM security_lifecycle_observations "
+                    "WHERE id=? AND event_type='listing_removal_notice'",
+                    [(row["id"],) for row in other_security],
+                )
+                removed = int(cursor.rowcount or 0)
+                writer.commit()
+            finally:
+                writer.close()
+
+    return {
+        "applied": bool(apply),
+        "examined": len(rows),
+        "other_security": other_security,
+        "undetermined": undetermined,
+        "unreadable": unreadable,
+        "removed": removed,
+    }
 
 
 def _utc_now() -> str:
