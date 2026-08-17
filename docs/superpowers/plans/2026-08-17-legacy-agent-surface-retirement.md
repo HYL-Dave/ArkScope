@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASK 0 INDEPENDENTLY REVIEWED GREEN; TASK 1 IMPLEMENTED;
-> INDEPENDENT TASK 1 REVIEW NEXT; TASK 2 BLOCKED
+> **Status:** TASKS 0-1 INDEPENDENTLY REVIEWED GREEN; TASK 2 PRE-EDIT
+> B-CLASS AMENDMENT REVIEW NEXT; PRODUCT/TEST EDITS BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -92,7 +92,7 @@ docs/superpowers/plans/2026-08-17-legacy-agent-surface-retirement/owned-paths.ts
 ```
 
 It has one header plus 69 unique path rows and SHA-256
-`5415e88e75952d3d302ec917d9b3db48b17541d026a969dc4eb0289168e855af`.
+`a26e180064efab63ae968fd13286af6de33629bff853b50eedaaebe17f7caf89`.
 It is the complete path authority, including temporary governance documents
 that delete themselves at closeout. `action=modify` is not permission for an
 arbitrary rewrite: each row's boundary and the task contracts below still
@@ -313,6 +313,11 @@ do not name the removed gateway. A config channel with an unimplemented type
 continues through the generic unknown-channel behavior; there is no special
 Discord compatibility branch.
 
+Task 2 also narrows the current `ReplayTrace.entrypoint` value-domain comment
+from `api | discord | test` to `api | test`. This is a one-line prose change:
+the loader remains tolerant of historical trace values, while current source
+no longer advertises the retired producer as an available entrypoint.
+
 ### 1.3 Skills and compaction no-tail
 
 Task 3 retains `SkillDefinition`, metadata parsing (including `trigger` and
@@ -434,6 +439,23 @@ unauthorized.
 
 ### Task 2: Retire Discord implementation, transport, and terminal model view
 
+**Pre-edit stop (2026-08-17):** independent Task 1 implementation review
+returned GREEN and unlocked Task 2. Before adding any Task 2 test or changing
+any product byte, a complete non-document Discord/terminal-catalog reference
+scan found one current-authority path outside the original Task 2 phase set:
+`src/agents/shared/replay.py` still described `discord` as a current replay
+entrypoint. That path was owned only by Task 1 even though the truthful change
+cannot occur until the Discord producer retires in Task 2. The only other
+outside-Task-2 source hit is the `src/agents/shared/skills.py` sentence inside
+`render_skill_suggestion_cli`, whose whole terminal helper is already owned for
+deletion in Task 3. All other non-document hits are in the original Task 2
+paths. Because the replay row's phase attribution changes, this is B-class:
+the ownership ledger now reads `T1/T2` for that path and pins the one-line T2
+boundary above. Global `157/18` node authority, Task 2 `54R/8A`, staged
+`4165/ce6d66bc...`, focused `331/20162bde...`, RED `3F/328P`, protected and
+frontend identities, and every product/test byte remain unchanged. Task 2
+product/test edits wait for focused amendment review.
+
 1. Add the eight Task 2 identities and apply the two Task 2 body evolutions
    before implementation. At staged identity `4165/ce6d66bc...`, require exact
    RED `3 failed / 328 passed`:
@@ -442,7 +464,9 @@ unauthorized.
    along with `model_registry_has_no_terminal_catalog_membership_axis`. The
    monitor preservation owner and four truthful model replacements stay GREEN.
 2. Delete/modify exactly the Task 2 paths. Remove `discord.py` and tracked
-   `DISCORD_*` examples without reading private `config/.env`.
+   `DISCORD_*` examples without reading private `config/.env`; in
+   `src/agents/shared/replay.py`, change only the `ReplayTrace.entrypoint`
+   value-domain comment from `api | discord | test` to `api | test`.
 3. Do not edit any retained `test_monitor.py` node body. Do not further edit
    either evolved model-capability body. The existing 41 non-Discord monitor
    nodes, the three monitor contracts, and the terminal-view replacements must
@@ -703,10 +727,11 @@ that the owned-path and protected sets match the design. Review must also check
 that the eight existing-body evolutions are complete, the twelve new contracts
 have genuine product owners, and each mutation can make a named owner RED.
 
-Focused plan re-review and independent Task 0 review returned GREEN under the
-default per-task review cadence. Task 1 product implementation remains blocked
-until focused review accepts the bounded fifth Task 1 body evolution. Later
-work order is:
+Focused plan re-review and independent reviews for Tasks 0-1 returned GREEN
+under the default per-task review cadence. Task 2 pre-edit grounding found the
+bounded replay value-domain ownership gap recorded above; product and test
+editing remains blocked until focused review accepts this B-class amendment.
+Later work order is:
 
 ```text
 legacy-agent surface retirement

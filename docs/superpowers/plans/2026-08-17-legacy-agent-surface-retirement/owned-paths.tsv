@@ -16,7 +16,7 @@ T1	modify	README.md	remove python -m src.agents current command
 T2	modify	src/model_capabilities.py	remove only in_cli_catalog field and assignments after both consumers retire
 T1	modify	src/agents/anthropic_agent/agent.py	remove attachment parameter/wiring; replay entrypoint becomes api
 T1	modify	src/agents/openai_agent/agent.py	remove attachment parameter/wiring
-T1	modify	src/agents/shared/replay.py	remove only attachment classifier/schema/validator branch and CLI default prose
+T1/T2	modify	src/agents/shared/replay.py	T1 removes attachment classifier/schema/validator branch and CLI default prose; T2 removes only the retired Discord entrypoint value-domain prose
 T1	modify	src/env_keys.py	remove obsolete terminal-loader comparison
 T1	modify	tests/test_replay.py	retire attachment nodes; evolve named general replay owners
 T1	modify	tests/test_replay_fixtures.py	remove attachment claim/parameter only
