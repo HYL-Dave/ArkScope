@@ -1,0 +1,70 @@
+phase	action	path	boundary
+T0	add_then_delete	docs/superpowers/specs/2026-08-17-legacy-agent-surface-retirement-design.md	binding design; delete at closeout
+T0	add_then_delete	docs/superpowers/plans/2026-08-17-legacy-agent-surface-retirement.md	implementation authority; delete at closeout
+T0	add_then_delete	docs/superpowers/plans/2026-08-17-legacy-agent-surface-retirement/backend-removals.nodes	exact node ledger; delete at closeout
+T0	add_then_delete	docs/superpowers/plans/2026-08-17-legacy-agent-surface-retirement/backend-additions.nodes	exact node ledger; delete at closeout
+T0	add_then_delete	docs/superpowers/plans/2026-08-17-legacy-agent-surface-retirement/owned-paths.tsv	exact ownership ledger; delete at closeout
+T0/T4/T7	modify	docs/design/PROJECT_PRIORITY_MAP.md	newest-first ruling; bounded P0.1/P1.4/model-catalog/localization current-truth rewrite; final closeout status
+T1	delete	src/agents/__main__.py	interactive package launcher
+T1	delete	src/agents/cli.py	interactive terminal product
+T1	delete	src/agents/shared/attachments.py	unowned legacy attachment path
+T2	delete	src/agents/shared/model_catalog.py	terminal/Discord presentation view after both consumers retire
+T1	delete	tests/test_attachments.py	whole-file retired owner
+T1	delete	tests/replay_fixtures/attachment_turn.json	retired replay fixture
+T1/T2	modify	requirements.txt	remove pymupdf then discord.py; no other dependency edit
+T1	modify	README.md	remove python -m src.agents current command
+T2	modify	src/model_capabilities.py	remove only in_cli_catalog field and assignments after both consumers retire
+T1	modify	src/agents/anthropic_agent/agent.py	remove attachment parameter/wiring; replay entrypoint becomes api
+T1	modify	src/agents/openai_agent/agent.py	remove attachment parameter/wiring
+T1	modify	src/agents/shared/replay.py	remove only attachment classifier/schema/validator branch and CLI default prose
+T1	modify	src/env_keys.py	remove obsolete terminal-loader comparison
+T1	modify	tests/test_replay.py	retire attachment nodes; evolve named general replay owners
+T1	modify	tests/test_replay_fixtures.py	remove attachment claim/parameter only
+T1	modify	tests/replay_fixtures/openai_no_tool_turn.json	remove null retired field only
+T1	modify	tests/replay_fixtures/openai_one_tool_turn.json	remove null retired field only
+T1	modify	tests/replay_fixtures/subagent_turn.json	remove null retired field only
+T1	modify	tests/test_compressor_integration.py	remove terminal owners and truthfully rename multiblock owner
+T2	modify	tests/test_model_capabilities.py	four truthful replacement pairs plus bounded body evolution
+T1	modify	tests/test_tools.py	remove terminal save seam owner only
+T1/T2/T3	add	tests/test_legacy_agent_surface_retirement.py	12 exact negative/preservation contracts
+T1/T4	modify	tests/test_eir006_retired_data_boundaries.py	remove retired paths from current authority set
+T2	delete	src/monitor/discord_bot.py	inactive Discord product surface
+T2	modify	src/monitor/notifiers.py	remove Discord notifier/router branch; retain console/log routing
+T2	modify	src/monitor/__init__.py	remove Discord export only
+T2	modify	src/monitor/engine.py	rewrite transport-specific thread comments only
+T2	modify	src/monitor/scheduler.py	rewrite transport-specific thread comments only
+T2	modify	config/.env.template	remove tracked Discord setup variables
+T2	modify	config/user_profile.yaml	remove disabled Discord channel example
+T2	modify	tests/test_monitor.py	remove exactly 51 Discord/catalog nodes; retain 41 monitor owners
+T3	modify	src/agents/shared/skills.py	retain registry; remove terminal trigger/auto-apply runtime and compatibility shim
+T3	modify	src/agents/shared/__init__.py	remove retired skill shim export
+T3	modify	src/agents/shared/prompts.py	remove current /skill activation claim only
+T3	modify	src/agents/shared/context_manager.py	remove one-shot force helper and rewrite multiblock prose
+T3	modify	src/agents/shared/compressor/context_compressor.py	remove force flag/branch; retain automatic Layer 5
+T3	modify	src/agents/shared/compressor/overflow_store.py	remove terminal-debug caller prose only
+T3	modify	src/agents/shared/events.py	remove obsolete terminal-consumer prose only
+T3	modify	src/agents/shared/subagent.py	remove terminal-runtime override prose only
+T3	modify	src/agents/config.py	remove terminal override/force prose; retain stored/runtime configuration
+T3	modify	tests/test_compressor_layer5.py	remove force owners and truthfully rename multiblock owner
+T3	modify	tests/test_skills.py	remove exactly 23 terminal/auto-apply nodes; retain registry/resource owners
+T4	modify	docs/design/P0_1_FULL_V1_SPEC.md	restate current replay fixture/schema without retired attachment branch
+T4	modify	docs/design/P1_4_SPEC.md	restate automatic compaction without terminal commands
+T4	modify	docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md	remove retired attachment/terminal-skill assumptions
+T4	modify	docs/design/INVESTMENT_SKILLS_PROFILE_DESIGN.md	re-ground Track B after current producers retire
+T4	delete	docs/design/SKILL_PLUGINS_RESEARCH.md	dated wrapper-oriented research; history is archive
+T4	modify	docs/design/DESKTOP_APP_VISION_DRAFT.md	remove claim that current Discord surface is implemented
+T4	modify	docs/design/REPO_HYGIENE_B6_MODULE_DISPOSITION.md	remove trigger-index current-runtime claim
+T4	modify	docs/design/README.md	remove deleted research entry and refresh affected current summaries
+T4	modify	docs/notes/anthropic_sdk_streaming_lesson.md	replace retired terminal consumer with current API/agent consumer
+T7	delete	docs/design/LEGACY_AGENT_CLI_ENTRYPOINT_CENSUS.md	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/MANIFEST.sha256	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/candidate_exclusions.tsv	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/capabilities.tsv	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/consumers.tsv	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/current_invocations.tsv	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/entrypoints.jsonl	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/recommendations.tsv	completed temporary census authority
+T7	delete	docs/design/legacy_agent_cli_census/tests.tsv	completed temporary census authority
+T7	delete	docs/superpowers/specs/2026-08-16-legacy-agent-cli-entrypoint-census-design.md	completed temporary census governance
+T7	delete	docs/superpowers/plans/2026-08-16-legacy-agent-cli-entrypoint-census.md	completed temporary census governance
+T7	delete	docs/superpowers/evidence/2026-08-16-legacy-agent-cli-entrypoint-census.md	completed temporary census governance
