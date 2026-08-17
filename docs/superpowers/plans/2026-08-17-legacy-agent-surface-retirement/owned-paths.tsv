@@ -35,7 +35,7 @@ T2	modify	src/monitor/engine.py	rewrite transport-specific thread comments only
 T2	modify	src/monitor/scheduler.py	rewrite transport-specific thread comments only
 T2	modify	config/.env.template	remove tracked Discord setup variables
 T2	modify	config/user_profile.yaml	remove disabled Discord channel example
-T2	modify	tests/test_monitor.py	remove exactly 51 Discord/catalog nodes; retain 41 monitor owners
+T1/T2	modify	tests/test_monitor.py	retire CLI re-export owner in T1; remove the other 50 Discord/catalog nodes in T2; retain 41 monitor owners
 T3	modify	src/agents/shared/skills.py	retain registry; remove terminal trigger/auto-apply runtime and compatibility shim
 T3	modify	src/agents/shared/__init__.py	remove retired skill shim export
 T3	modify	src/agents/shared/prompts.py	remove current /skill activation claim only
@@ -45,7 +45,7 @@ T3	modify	src/agents/shared/compressor/overflow_store.py	remove terminal-debug c
 T3	modify	src/agents/shared/events.py	remove obsolete terminal-consumer prose only
 T3	modify	src/agents/shared/subagent.py	remove terminal-runtime override prose only
 T3	modify	src/agents/config.py	remove terminal override/force prose; retain stored/runtime configuration
-T3	modify	tests/test_compressor_layer5.py	remove force owners and truthfully rename multiblock owner
+T1/T3	modify	tests/test_compressor_layer5.py	retire CLI compact-command owners in T1; remove remaining force owners and truthfully rename multiblock owner in T3
 T3	modify	tests/test_skills.py	remove exactly 23 terminal/auto-apply nodes; retain registry/resource owners
 T4	modify	docs/design/P0_1_FULL_V1_SPEC.md	restate current replay fixture/schema without retired attachment branch
 T4	modify	docs/design/P1_4_SPEC.md	restate automatic compaction without terminal commands

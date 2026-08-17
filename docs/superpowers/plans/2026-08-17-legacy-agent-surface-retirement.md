@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** AUTHORED FOR INDEPENDENT REVIEW; DOCS-ONLY; TASK 0 AND ALL
-> PRODUCT/TEST EDITS BLOCKED UNTIL REVIEW GREEN
+> **Status:** AMENDED AFTER INDEPENDENT REVIEW; FOCUSED RE-REVIEW REQUIRED;
+> DOCS-ONLY; TASK 0 AND ALL PRODUCT/TEST EDITS BLOCKED UNTIL REVIEW GREEN
 >
 > **Date:** 2026-08-17
 >
@@ -92,7 +92,7 @@ docs/superpowers/plans/2026-08-17-legacy-agent-surface-retirement/owned-paths.ts
 ```
 
 It has one header plus 69 unique path rows and SHA-256
-`2000976b75496037ca1d69dafa4414b51756d54c7af4b5b9af7fc7a2b0f4b417`.
+`5415e88e75952d3d302ec917d9b3db48b17541d026a969dc4eb0289168e855af`.
 It is the complete path authority, including temporary governance documents
 that delete themselves at closeout. `action=modify` is not permission for an
 arbitrary rewrite: each row's boundary and the task contracts below still
@@ -161,7 +161,9 @@ ledgers, not separately editable authorities.
 
 **Task 1 removals:** all removal rows in `test_attachments.py`,
 `test_compressor_integration.py`, `test_replay.py`,
-`test_replay_fixtures.py`, and `test_tools.py`.
+`test_replay_fixtures.py`, and `test_tools.py`; all five
+`tests/test_compressor_layer5.py::TestCompactCommand::*` rows; and the exact
+row `tests/test_monitor.py::TestModelCatalogShared::test_cli_reexports`.
 
 **Task 1 additions:** the addition in `test_compressor_integration.py`, plus the
 five new contracts whose names contain `agent_query_signatures`,
@@ -169,7 +171,8 @@ five new contracts whose names contain `agent_query_signatures`,
 `obsolete_attachment`.
 
 **Task 2 removals:** all removal rows in `test_monitor.py` and
-`test_model_capabilities.py`.
+`test_model_capabilities.py` except the exact `test_cli_reexports` row already
+assigned to Task 1.
 
 **Task 2 additions:** all additions in `test_model_capabilities.py`, plus the
 four new contracts whose names contain `discord_runtime`, `monitor_engine`,
@@ -179,13 +182,19 @@ four new contracts whose names contain `discord_runtime`, `monitor_engine`,
 
 | Stage | Remove/add | Full rows/SHA-256 | Focused rows/SHA-256 |
 | --- | --- | --- | --- |
-| Task 1 | `67/0e62137a028210030e5c77a901a5b28ddf1f6f1576db04ab7c772352aa0adf92`, `6/07e002f0473a11bad2a974613fa640b4b9f6be22b69cf71818acd199462cee71` | `4217/0f5615076eb306edf3ce4e2d25e2908bf1b368b9d3d787fe409a4b1e08358d4b` | `383/e0457b00033e8c65229ce8316f77e863aa9387f56edb92119d38dcffeb3b9930` |
-| Task 2 | `55/0f402fc21055b158506cd6f25128a878ef6e22112185e734de147e4a45d0598d`, `8/4203776bd4ac9747652b620e11f54d1c7c71e8b1a7f10c33b2b86fdeb5784c58` | `4170/6b5ea95de041f9ed66ea3be698c6706c22113741c302dd33b65894cbc25facc7` | `336/70b7c265ef994030d32ba38111520d1ef01588ccaa9de2b1d310c1bf45211f30` |
-| Task 3 | `35/d660f0281f48b1bec03620cb05a3af6deb96e4474fad9d59baf5e626a9285e4e`, `4/a252354de729e54baedb044b4034344bc7899f43503ff9a44a021f71fddfbf36` | `4139/bec7fb2e6119aef35b0949e39f4ad4c518e8eb4e03e2ad4391aaa28581fd3528` | `305/581f6d41c16343359ad1b50e6d0ab2bc093ae869c00f40ab945a87b62140fa33` |
+| Task 1 | `73/c9c9a470a240850ccd0540c58160660bdb2bbb25bca877bd7192762e9d61c980`, `6/07e002f0473a11bad2a974613fa640b4b9f6be22b69cf71818acd199462cee71` | `4211/51731bfd5148351f1a88a45bb6c1042c49879b1817985a4bae1779c9e0fcf566` | `377/0ab96c4fbfe3938eb81b5d3f3f4a29866df1acb61ce69a760640bf0bb3202c29` |
+| Task 2 | `54/792708b98f17694074f805ae54d930d3d0e0f675058a86fb96a61be1b58db0a0`, `8/4203776bd4ac9747652b620e11f54d1c7c71e8b1a7f10c33b2b86fdeb5784c58` | `4165/ce6d66bc842df6225522b41315719a4c625a48e06581a086d1c48cfcb7a9cc9a` | `331/20162bde14c6395eaa24a634a2050811e5c3444cd28376c9fff05c897237596a` |
+| Task 3 | `30/6ae1929d6165b9fddb2575991b1fefd63beca9843e3af2cdb654864f4d074e67`, `4/a252354de729e54baedb044b4034344bc7899f43503ff9a44a021f71fddfbf36` | `4139/bec7fb2e6119aef35b0949e39f4ad4c518e8eb4e03e2ad4391aaa28581fd3528` | `305/581f6d41c16343359ad1b50e6d0ab2bc093ae869c00f40ab945a87b62140fa33` |
 
 Each pair hash is the SHA-256 of its globally byte-sorted row stream with one
 trailing newline. The staged stream is `(previous - removals) union additions`
 under the same normalization.
+
+The review amendment moves every direct `src.agents.cli` test consumer into
+Task 1, where that module retires. It also admits one additional Task 2 body
+evolution for a retained registry-consistency node that directly imports the
+terminal catalog. Global `157/18` authority and the final identities do not
+change.
 
 ### 0.5 Existing node bodies allowed to evolve
 
@@ -199,9 +208,10 @@ this closed list:
 | 1 | `tests/test_replay.py::test_replay_capture_round_trips_new_fields` | Retain the remaining opt-in field round trip without manufacturing an attachment replacement. |
 | 2 | `tests/test_model_capabilities.py::test_new_generation_entries_present_with_task0_facts` | Remove only terminal-catalog assertions; retain every model fact/routing assertion. |
 | 1 | `tests/test_eir006_retired_data_boundaries.py::test_current_runtime_consumer_census_is_closed_and_exact` | Remove the retired CLI path from the exact current-owner set. |
+| 2 | `tests/test_model_capabilities.py::test_registry_and_helpers_agree_for_every_pre_consolidation_id` | Remove only the terminal-catalog `get_effort_options` import, its now-unused expected-tuple assignment, and its two helper assertions; retain context-limit, max-output, thinking-mode, compaction, and 1M-membership checks. |
 | 3 | `tests/test_compressor_layer5.py::TestLayer5Firing::test_noop_does_not_burn_circuit_breaker` | Exercise the same automatic short-history no-op/circuit behavior without a force flag. |
 
-Editing a seventh existing node body is a stop-and-amend event.
+Editing an eighth existing node body is a stop-and-amend event.
 
 All retained `TestNotificationRouter`, monitor engine/scheduler, Skills
 registry/resource-parsing, replay tool/subagent, automatic compaction, and Card
@@ -283,11 +293,13 @@ translation remains a one-shot owner independent of conversation history.
 
 ### 1.2 Discord transport and terminal model-view no-tail
 
-Task 2 deletes `src/monitor/discord_bot.py`, 51 Discord test nodes, and four
-terminal model-catalog test nodes. It removes only the Discord notifier, router branch, injected-bot
-seam, export, dependency, tracked environment examples, and disabled profile
-channel. Console/log routing, monitor engine, scheduler, watchers,
-deduplication, and `scan_alerts` remain.
+Across Tasks 1-2, the cut deletes `src/monitor/discord_bot.py`, 51 Discord test
+nodes, and four terminal model-catalog test nodes. The one direct CLI re-export
+owner retires in Task 1; Task 2 removes the other 50 Discord nodes and all four
+terminal model-catalog nodes. It removes only the Discord notifier, router
+branch, injected-bot seam, export, dependency, tracked environment examples,
+and disabled profile channel. Console/log routing, monitor engine, scheduler,
+watchers, deduplication, and `scan_alerts` remain.
 
 Because `src/agents/shared/model_catalog.py` is shared by the CLI and Discord,
 it remains during Task 1 and retires atomically in Task 2 after both consumers
@@ -365,7 +377,7 @@ named dated exclusion, not current product authority.
 
 1. Add the six Task 1 identities and apply the four Task 1 body evolutions
    before product implementation. Collection must equal
-   `4217/0f561507...`. Exact RED is `4 failed / 379 passed`: the three new
+   `4211/51731bfd...`. Exact RED is `4 failed / 373 passed`: the three new
    absence owners `agent_query_signatures`, `interactive_cli`, and
    `obsolete_attachment`, plus the evolved EIR-006 exact current-owner census.
    The three truthful replacement/preservation additions remain GREEN; forcing
@@ -373,21 +385,22 @@ named dated exclusion, not current product authority.
 2. Delete/modify exactly the Task 1 paths in `owned-paths.tsv`.
 3. Do not edit those four bodies again during product implementation; verify
    their final deltas remain exactly within Section 0.5.
-4. Recollect exact full/focused identities. Run all 383 focused owners with a
-   fail-closed socket boundary; require `383/383`.
+4. Recollect exact full/focused identities. Run all 377 focused owners with a
+   fail-closed socket boundary; require `377/377`.
 5. Prove the provider-agent signatures, replay serialization, fixture schema,
    dependencies, README, and product source contain no current CLI/attachment
-   tail. The still-live Discord consumer and terminal model view remain exact
-   pending Task 2.
+   tail. The still-live Discord product consumer and terminal model-view module
+   remain byte-exact pending Task 2; only their direct CLI re-export test owner
+   has already retired.
 6. Recheck the 23 protected paths and unchanged frontend stream.
 7. Commit product/tests atomically, then commit plan/map status separately;
    evidence remains in the manifested packet.
 
 ### Task 2: Retire Discord implementation, transport, and terminal model view
 
-1. Add the eight Task 2 identities and apply the one Task 2 body evolution
-   before implementation. At staged identity `4170/6b5ea95d...`, require exact
-   RED `3 failed / 333 passed`:
+1. Add the eight Task 2 identities and apply the two Task 2 body evolutions
+   before implementation. At staged identity `4165/ce6d66bc...`, require exact
+   RED `3 failed / 328 passed`:
    `discord_runtime_config_and_dependency_are_absent` and
    `monitor_router_retains_local_channels_without_retired_transport` fail,
    along with `model_registry_has_no_terminal_catalog_membership_axis`. The
@@ -395,9 +408,10 @@ named dated exclusion, not current product authority.
 2. Delete/modify exactly the Task 2 paths. Remove `discord.py` and tracked
    `DISCORD_*` examples without reading private `config/.env`.
 3. Do not edit any retained `test_monitor.py` node body. Do not further edit
-   the evolved model-facts body. The existing 41 non-Discord monitor nodes, the
-   three monitor contracts, and the terminal-view replacements must all pass.
-4. Require exact focused `336/336`, full collection identity, protected
+   either evolved model-capability body. The existing 41 non-Discord monitor
+   nodes, the three monitor contracts, and the terminal-view replacements must
+   all pass.
+4. Require exact focused `331/331`, full collection identity, protected
    aggregate, unchanged frontend stream, and zero socket attempts.
 5. Prove source/config/dependency/tests have no current Discord implementation,
    explicit router branch, terminal model catalog, or `in_cli_catalog` axis.
@@ -519,7 +533,7 @@ evidence:
 
 - source-base and tip collection streams;
 - the 157/18 global ledgers and all three staged identities;
-- the six authorized body evolutions and all actual path diffs;
+- the seven authorized body evolutions and all actual path diffs;
 - every retained model/Skills/tool/monitor capability owner named by the twelve
   new contracts, reconstructed from source and tests without relying on a
   prose summary count;
@@ -650,7 +664,7 @@ Stop before commit when any of the following occurs:
 
 Independent plan review must first reconstruct every Section 0 hash and verify
 that the owned-path and protected sets match the design. Review must also check
-that the six existing-body evolutions are complete, the twelve new contracts
+that the seven existing-body evolutions are complete, the twelve new contracts
 have genuine product owners, and each mutation can make a named owner RED.
 
 After review GREEN, Task 0 may begin under the review cadence approved by the
