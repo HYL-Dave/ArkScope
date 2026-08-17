@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** AMENDED AFTER INDEPENDENT REVIEW; FOCUSED RE-REVIEW REQUIRED;
-> DOCS-ONLY; TASK 0 AND ALL PRODUCT/TEST EDITS BLOCKED UNTIL REVIEW GREEN
+> **Status:** TASK 0 COMPLETE; INDEPENDENT TASK 0 REVIEW NEXT; DOCS-ONLY
+> STATUS COMMIT; TASK 1 AND ALL PRODUCT/TEST EDITS REMAIN BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -373,6 +373,17 @@ named dated exclusion, not current product authority.
    tracked evidence file is created. Stop for the review cadence in force; no
    product bytes change.
 
+**Execution status (2026-08-17):** complete at reviewed tip `7953e90e`. Fresh
+collect-only streams match backend `4278/ecafdab7...` and frontend `1177` / 101
+files / `c570a551...`; all global, staged, focused, ownership, and protection
+identities reconstruct exactly; and the ten-file runtime gate is `444 passed`
+with zero socket attempts. Packet
+`/tmp/legacy-agent-surface-retirement-task0-7953e90e` contains 69 manifested
+payloads with `SHA256SUMS` SHA-256
+`852dac69415aa8d4ba556d2003112ea2b55d798d2c0e289158a03aed3759a7a2`.
+The default per-task review cadence remains in force. Task 1 is blocked pending
+independent Task 0 review.
+
 ### Task 1: Retire CLI and the attachment stack
 
 1. Add the six Task 1 identities and apply the four Task 1 body evolutions
@@ -667,8 +678,9 @@ that the owned-path and protected sets match the design. Review must also check
 that the seven existing-body evolutions are complete, the twelve new contracts
 have genuine product owners, and each mutation can make a named owner RED.
 
-After review GREEN, Task 0 may begin under the review cadence approved by the
-user. Product implementation remains blocked until then. Later work order is:
+Focused plan re-review returned GREEN and Task 0 is complete under the default
+per-task review cadence. Product implementation remains blocked until the
+independent Task 0 review returns GREEN. Later work order is:
 
 ```text
 legacy-agent surface retirement
