@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASKS 0-1 INDEPENDENTLY REVIEWED GREEN; TASK 2 PRE-EDIT
-> B-CLASS AMENDMENT REVIEW NEXT; PRODUCT/TEST EDITS BLOCKED
+> **Status:** TASKS 0-1 INDEPENDENTLY REVIEWED GREEN; TASK 2 IMPLEMENTED;
+> INDEPENDENT TASK 2 REVIEW NEXT; TASK 3 BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -454,7 +454,8 @@ the ownership ledger now reads `T1/T2` for that path and pins the one-line T2
 boundary above. Global `157/18` node authority, Task 2 `54R/8A`, staged
 `4165/ce6d66bc...`, focused `331/20162bde...`, RED `3F/328P`, protected and
 frontend identities, and every product/test byte remain unchanged. Task 2
-product/test edits wait for focused amendment review.
+product/test edits waited for focused amendment review, which returned GREEN
+at `61e1b110` and unlocked implementation.
 
 1. Add the eight Task 2 identities and apply the two Task 2 body evolutions
    before implementation. At staged identity `4165/ce6d66bc...`, require exact
@@ -477,6 +478,28 @@ product/test edits wait for focused amendment review.
    explicit router branch, terminal model catalog, or `in_cli_catalog` axis.
 6. Commit product/tests atomically, then plan/map status separately; evidence
    remains in the manifested packet.
+
+**Execution status (2026-08-17):** implemented at product/tests commit
+`f8b40d4a`. The staged collection is byte-identical to
+`4165/ce6d66bc...`; exact RED is `3 failed / 328 passed`, with only the three
+planned absence contracts failing while the preservation owner and four model
+replacements remain GREEN. The product commit changes exactly the 14 Task 2
+owned paths: the inactive Discord implementation, notifier branch, tracked
+configuration examples and dependency, terminal model-view module and
+membership axis, plus the bounded replay value-domain line all retire without
+aliases or fallback paths. Final focused runtime is `331/331` with zero socket
+attempts, final backend collection remains `4165/ce6d66bc...`, frontend
+remains `1177` / 101 files / `c570a551...`, and the 23 protected rows remain
+byte-identical at aggregate `8843a3f1...`. The RED and GREEN test-body deltas
+are byte-identical, all 54 retired nodes are absent, all eight replacements are
+present, and static import/config checks find no current Task 2 implementation
+tail. The Task 3-owned terminal Skill and attachment prose remains explicitly
+deferred. Packet `/tmp/legacy-agent-surface-retirement-task2-61e1b110`
+contains 54 manifested payloads with `SHA256SUMS` SHA-256
+`50050dbcac5c1b3c50d2ac5de60c59e866a878969b0edac7122081aada0496b3`.
+Task 2 now stops for independent implementation review; Task 3, merge, push,
+live/provider/Discord/document actions, and destructive operations remain
+unauthorized.
 
 ### Task 3: Retire terminal Skills and one-shot force controls
 
@@ -728,9 +751,9 @@ that the eight existing-body evolutions are complete, the twelve new contracts
 have genuine product owners, and each mutation can make a named owner RED.
 
 Focused plan re-review and independent reviews for Tasks 0-1 returned GREEN
-under the default per-task review cadence. Task 2 pre-edit grounding found the
-bounded replay value-domain ownership gap recorded above; product and test
-editing remains blocked until focused review accepts this B-class amendment.
+under the default per-task review cadence. Focused review accepted the bounded
+Task 2 replay value-domain amendment, and Task 2 is now implemented at
+`f8b40d4a`; it stops for independent implementation review before Task 3.
 Later work order is:
 
 ```text
