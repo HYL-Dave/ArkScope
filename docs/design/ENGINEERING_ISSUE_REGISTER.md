@@ -338,6 +338,45 @@ Each entry records:
     retained rows, truthful current/typed-unavailable selector behavior,
     stored-SEC projection, null retired sync, and zero residual archive.
 
+### EIR-007 - Stop the skill registry from leaking between tests
+
+- `status`: `closed`
+- `observed_at`: `2026-08-18`
+- `impact`: Tests that rebuild `SKILL_REGISTRY` from a temporary `_CUSTOM_DIR`
+  leave the custom skill in module-global state. `monkeypatch` restores
+  `_CUSTOM_DIR` but does not rebuild, so the registry keeps the extra entry.
+  `TestCustomSkillsLoading._baseline_count()` reads `len(SKILL_REGISTRY)` at
+  call time, which makes `test_load_from_empty_dir` pass or fail purely on
+  execution order. The file is ordered safely today, so the defect is invisible
+  under a plain full-file run and appears only under selection, sharding, or
+  random ordering.
+- `evidence`:
+  - the leaking rebuild helper is `tests/test_skills.py:163-167`, and the
+    order-dependent baseline is `tests/test_skills.py:169-172`;
+  - reproduce against `979a3a19` or any earlier tip with:
+
+    ```bash
+    python -m pytest \
+      "tests/test_skills.py::TestCustomSkillsLoading::test_load_valid_yaml" \
+      "tests/test_skills.py::TestCustomSkillsLoading::test_load_from_empty_dir" \
+      -p no:randomly -q
+    ```
+
+    Observed on the observation date: `1 failed, 1 passed` with
+    `assert 10 == 11`. Both controls are green: each of the two tests run alone
+    returns `1 passed`.
+- `owner`: closed by the 2026-08-18 working-tree closeout.
+- `next_action`: none for EIR-007. This entry does not claim the wider question
+  of whether other test files mutate agent-shared module globals; that remains
+  unsurveyed.
+- `closure_evidence`:
+  - repaired by `ac8b5c9bad9e4693b6784c1c69ad15bd31a11aca`, which adds an
+    autouse fixture restoring `_CUSTOM_DIR` and rebuilding the registry after
+    every test in the file;
+  - the reproduction command above returns `2 passed` at that commit; and
+  - `python -m pytest tests/test_skills.py -p no:randomly -q` returns
+    `55 passed`.
+
 ## 5. Seed Triage: Items Not Opened
 
 These observations were considered while creating the register and are not
