@@ -1,7 +1,7 @@
 # Legacy Agent Surface Retirement Implementation Plan
 
-> **Status:** TASK 0 COMPLETE; INDEPENDENT TASK 0 REVIEW NEXT; DOCS-ONLY
-> STATUS COMMIT; TASK 1 AND ALL PRODUCT/TEST EDITS REMAIN BLOCKED
+> **Status:** TASK 0 INDEPENDENTLY REVIEWED GREEN; TASK 1 PRE-EDIT STOP;
+> REPLAY-FIXTURE OWNER AMENDMENT REVIEW NEXT; PRODUCT/TEST EDITS BLOCKED
 >
 > **Date:** 2026-08-17
 >
@@ -205,13 +205,14 @@ this closed list:
 | --- | --- | --- |
 | 1 | `tests/test_replay.py::test_existing_fixtures_load_with_new_fields_as_none` | Remove only the deleted attachment-field assertion; keep subagent/tool-pin compatibility. |
 | 1 | `tests/test_replay.py::test_load_openai_no_tool_fixture` | Remove only the deleted attachment-field assertion. |
+| 1 | `tests/test_replay.py::test_validate_all_new_fixtures_clean` | Remove only the deleted attachment fixture from the explicit fixture tuple and make its stale four-fixture prose truthful; retain clean validation for every remaining named fixture. |
 | 1 | `tests/test_replay.py::test_replay_capture_round_trips_new_fields` | Retain the remaining opt-in field round trip without manufacturing an attachment replacement. |
 | 2 | `tests/test_model_capabilities.py::test_new_generation_entries_present_with_task0_facts` | Remove only terminal-catalog assertions; retain every model fact/routing assertion. |
 | 1 | `tests/test_eir006_retired_data_boundaries.py::test_current_runtime_consumer_census_is_closed_and_exact` | Remove the retired CLI path from the exact current-owner set. |
 | 2 | `tests/test_model_capabilities.py::test_registry_and_helpers_agree_for_every_pre_consolidation_id` | Remove only the terminal-catalog `get_effort_options` import, its now-unused expected-tuple assignment, and its two helper assertions; retain context-limit, max-output, thinking-mode, compaction, and 1M-membership checks. |
 | 3 | `tests/test_compressor_layer5.py::TestLayer5Firing::test_noop_does_not_burn_circuit_breaker` | Exercise the same automatic short-history no-op/circuit behavior without a force flag. |
 
-Editing an eighth existing node body is a stop-and-amend event.
+Editing a ninth existing node body is a stop-and-amend event.
 
 All retained `TestNotificationRouter`, monitor engine/scheduler, Skills
 registry/resource-parsing, replay tool/subagent, automatic compaction, and Card
@@ -381,12 +382,16 @@ with zero socket attempts. Packet
 `/tmp/legacy-agent-surface-retirement-task0-7953e90e` contains 69 manifested
 payloads with `SHA256SUMS` SHA-256
 `852dac69415aa8d4ba556d2003112ea2b55d798d2c0e289158a03aed3759a7a2`.
-The default per-task review cadence remains in force. Task 1 is blocked pending
-independent Task 0 review.
+The default per-task review cadence remains in force. Independent Task 0
+review returned GREEN. Task 1 pre-edit grounding then found one retained replay
+owner whose explicit fixture tuple still names the Task 1-deleted attachment
+fixture. No product or test byte had changed. Section 0.5 now admits only that
+bounded fifth Task 1 evolution, and Task 1 remains blocked pending focused
+review of this amendment.
 
 ### Task 1: Retire CLI and the attachment stack
 
-1. Add the six Task 1 identities and apply the four Task 1 body evolutions
+1. Add the six Task 1 identities and apply the five Task 1 body evolutions
    before product implementation. Collection must equal
    `4211/51731bfd...`. Exact RED is `4 failed / 373 passed`: the three new
    absence owners `agent_query_signatures`, `interactive_cli`, and
@@ -394,7 +399,7 @@ independent Task 0 review.
    The three truthful replacement/preservation additions remain GREEN; forcing
    them RED would be rejected evidence.
 2. Delete/modify exactly the Task 1 paths in `owned-paths.tsv`.
-3. Do not edit those four bodies again during product implementation; verify
+3. Do not edit those five bodies again during product implementation; verify
    their final deltas remain exactly within Section 0.5.
 4. Recollect exact full/focused identities. Run all 377 focused owners with a
    fail-closed socket boundary; require `377/377`.
@@ -544,7 +549,7 @@ evidence:
 
 - source-base and tip collection streams;
 - the 157/18 global ledgers and all three staged identities;
-- the seven authorized body evolutions and all actual path diffs;
+- the eight authorized body evolutions and all actual path diffs;
 - every retained model/Skills/tool/monitor capability owner named by the twelve
   new contracts, reconstructed from source and tests without relying on a
   prose summary count;
@@ -675,12 +680,13 @@ Stop before commit when any of the following occurs:
 
 Independent plan review must first reconstruct every Section 0 hash and verify
 that the owned-path and protected sets match the design. Review must also check
-that the seven existing-body evolutions are complete, the twelve new contracts
+that the eight existing-body evolutions are complete, the twelve new contracts
 have genuine product owners, and each mutation can make a named owner RED.
 
-Focused plan re-review returned GREEN and Task 0 is complete under the default
-per-task review cadence. Product implementation remains blocked until the
-independent Task 0 review returns GREEN. Later work order is:
+Focused plan re-review and independent Task 0 review returned GREEN under the
+default per-task review cadence. Task 1 product implementation remains blocked
+until focused review accepts the bounded fifth Task 1 body evolution. Later
+work order is:
 
 ```text
 legacy-agent surface retirement
