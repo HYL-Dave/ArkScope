@@ -1,390 +1,171 @@
-# P1.4 Spec — Context Compression Phase B
+# P1.4 Context Compression - Current Authority
 
-> **Status**: 5/5 commits landed (P1.4 Phase B complete). Written 2026-04-28.
-> **Predecessor**: `MAJOR_REFACTORING_PLAN.md` §Phase B (the original 7-layer sketch — superseded by this spec for the locked-in shape).
-> **Goal**: make long / deep agent runs a **controlled steady state**, not a panic mode. Today, large tool outputs go straight into the prompt; once we hit limits, behaviour is unpredictable and `server_compaction` is `false` by default. P1.4 changes that: tool outputs are **summarised in-prompt + retained on disk**, and compaction becomes a normal operating layer rather than a last-resort cap.
-
----
+> **Status:** SHIPPED. Current contract refreshed 2026-08-17 after the
+> legacy-agent surface retirement. The original five-commit implementation
+> narrative remains available in Git history.
+>
+> **Purpose:** preserve automatic, bounded context compression and durable
+> overflow recovery as a reusable agent library.
 
 ## 1. Framing
 
-The single most important sentence of this spec:
+Context compression is a steady-state operating layer. Large tool results are
+reduced in prompt while recoverable raw payloads are stored on disk; long
+histories can be summarized before a model call without changing evidence
+ownership.
 
-> **Compression in P1.4 is not a defensive cap on agent activity — it is what enables more tool calls, deeper investigations, and (in a later cycle) multi-round agent runs to be safe under sustained load.**
+### 1.1 Scope
 
-Concretely, today an agent that wants to call 20 tools in one query will steadily push the prompt toward `max_input_tokens` until the next call either truncates silently (Anthropic) or 400-errors. After P1.4, the same agent can still issue 20 tool calls — each large result becomes a summary in-prompt plus a `CompressionRecord` on disk, retrievable on demand. The path is **wider**, not narrower.
+The current system includes deterministic reduction, optional provider-native
+compaction, threshold-driven LLM summarization, anchor recovery, durable
+overflow storage, and cross-pipeline observability.
 
-### 1.1 Non-goals (explicit)
-
-P1.4 does **not** introduce, design, or implement:
-
-- **Multi-round agent runner.** Each user query stays a single `Runner.run()` (OpenAI) / `messages.stream()` (Anthropic) loop. Multi-round (the AI_Agent_Researcher 20-round pattern) is a separate cycle (likely Phase C or a P2.x).
-- **OpenAI SDK Session replacement.** The `Runner.run(... session=...)` migration carries its own risks (`to_input_list` reasoning-item issues, OAuth backend incompatibility — proven painful in `~/PycharmProjects/AI_Agent_Researcher`). P1.4 stays on the current `auto_previous_response_id=True` path; a future P1.4b can take this on if ever needed.
-- **Subagent interface changes.** `delegate_to_subagent` keeps its current return-shape contract. Subagents can use the same `ContextCompressor` library internally, but the dispatch contract is untouched.
-- **New agent-facing tools.** P1.4 may expose a `get_overflow_payload` helper internally (CLI debug + tests), but it is **not** registered to the agent in v1 (see §5.4).
-- **Provider compaction APIs as the primary path.** Anthropic `compact-2026-01-12` beta (current local adapter gates on `_COMPACTION_MODELS` — Opus 4.7 + Sonnet 4.6 at write time; see §3.5) and OpenAI `responses.compact()` (incompatible with ChatGPT OAuth backend) are kept as Layer 4 *optional* adapters. The default path is client-side deterministic compression.
+It does not expose a user command or one-turn override. Layer 5 runs only from
+configuration, message size, caller availability, and circuit state.
 
 ### 1.2 Guarantees
 
-After P1.4, callers of the agent loop are guaranteed:
+1. **Library, not runner.** src/agents/shared/compressor/ has no agent import
+   and does not own provider loops.
+2. **Raw data remains recoverable.** Layer 0 stores oversized raw tool payloads
+   before replacing them in prompt.
+3. **No fabricated reasoning.** Reasoning blocks are retained verbatim or
+   represented as deliberately dropped; summaries may not invent them.
+4. **Recent context stays concrete.** Boundary selection keeps recent turns
+   verbatim and replaces only a safe prefix.
+5. **Idempotent markers.** Repeated compaction replaces prior summary state
+   instead of stacking duplicate summaries.
+6. **Failure isolation.** A summary failure increments a bounded circuit
+   breaker; a legitimate no-op does not.
+7. **Configuration authority.** Master and per-layer settings determine whether
+   the library participates. There is no hidden presentation-side activation.
+
+## 2. Architecture
 
-1. **Compressor is a library, not a runner.** `ContextCompressor` exposes pure functions / a class with no Anthropic / OpenAI / Runner imports at the public surface. A future multi-round runner can construct one per session and reuse it across rounds. No rewrite needed for a multi-round migration.
-2. **Subagent path unchanged.** `delegate_to_subagent` continues to work as today. Subagents that themselves run long can inject a fresh `ContextCompressor` instance — the library is reentrant and stateless across instances.
-3. **Layer 0 is a net positive for heavy-tool queries.** Today: a 200KB tool output goes straight in-prompt. After P1.4: the same tool output is capped to ≤8KB summary + the full payload lands at `data/overflow/<session>/<record_id>.json`. The agent can re-call the tool, look at a tighter slice, or (later, gated) request the overflow record. Net: more tool calls per query are *safer*, not fewer.
-4. **No fabricated reasoning.** P1.4 does not synthesise summaries of provider-side reasoning / extended-thinking content. If a turn carries Anthropic `thinking` blocks (or an OpenAI `reasoning` item), the projection-side options are: keep verbatim, drop entirely, or keep a metadata tag (`{"type": "reasoning_dropped", "tokens": N}`). Inventing a "summary of the model's thoughts" is explicitly forbidden — it produces hallucinated reasoning and breaks signature-required replay.
-5. **Per-layer toggle, conservative defaults.** Every layer ships with a config flag (`compaction.layer_0_enabled` / `layer_1_enabled` / …); defaults are conservative so behaviour is opt-in incrementally. `/compaction off` retains today's path verbatim.
+    provider loop
+        |
+        v
+    ContextManager
+        |
+        v
+    ContextCompressor
+        +-- deterministic reducers and transcript projection
+        +-- OverflowStore
+        +-- optional provider-native adapter
+        +-- optional SummaryCaller
+        +-- anchor builder
+
+The provider loop owns model calls and passes a stable message projection into
+the library. The library returns transformed messages, fired-layer metadata,
+and an optional safe prefix-replacement boundary.
 
-### 1.3 Two anchor acceptance semantics
+## 3. Layer Contracts
 
-The spec is built around two non-negotiable behaviours that every commit must preserve:
+### 3.1 Layer 0 - overflow storage
 
-- **No data loss on overflow.** A large result that exceeds Layer 0's per-tool budget is summarised AND written to disk with a `record_id`. `data_quality.overflow` flags the truncation; `record_id` is reproducible from the `(tool_name, canonical_args_hash, payload_bytes)` triple — see §3.1.1 for the exact derivation. **Payload domain in v1**: tool results are str (JSON-serialised), encoded as utf-8 for hashing and storage. `read_overflow_record(record_id)` returns the exact original payload — byte-for-byte after utf-8 round-trip. A future bytes-only payload (e.g. images) would need a separate API; out of scope for v1. Acceptance test: round-trip a 500KB tool output → assert in-prompt summary ≤ budget AND retrieved payload string-equals the original.
-- **Library reusability.** The compressor module imports nothing from `src/agents/anthropic_agent` or `src/agents/openai_agent`. A test asserts this via `ast.parse` of the compressor file's import list. Future multi-round work can import the compressor without dragging the agent loop with it.
+An oversized tool result is reduced through a named per-tool reducer or a
+bounded generic representation. The raw payload is written beneath the
+configured overflow root before the prompt receives the compact form.
+
+The observability record contains the layer, raw/compressed byte counts,
+raw/compressed digests, and overflow record ID. Replay, scratchpad, and history
+receive the same metadata object.
 
----
+#### 3.1.1 Record identity and integrity
 
-## 2. Gap vs AI_Agent_Researcher
+OverflowStore derives a deterministic record ID from the session and payload
+identity, writes atomically, and verifies the stored arguments hash, byte size,
+and payload on read. A corrupt or mismatched record is rejected rather than
+returned as trusted raw data.
 
-`~/PycharmProjects/AI_Agent_Researcher` already shipped a comparable system. We borrow architecture but not code; the matrix below is the contract for what we adopt and why we don't drop-in.
+### 3.2 Layers 1-3 - deterministic compression
 
-| Pattern | Their implementation | Adopt? | Adapt or skip |
-|---|---|---|---|
-| **Round-level mechanical compression** | `RoundCompressor` (212 lines) — Tier 0/1/2 by distance; pulls fields off `Solution` / `QualityAssessment` / `RoundOutput` structured types | **Adopt the spirit** | They use domain types (research rounds); we use **per-tool reducer policy** — every registered tool can declare a reducer (default: head + tail + ellipsis). See §4. |
-| **Client-side LLM compaction** | `ClientCompactionSession` (527 lines) — `responses.create()`-based summary, drop-in for `OpenAIResponsesCompactionSession` to bypass ChatGPT OAuth backend gap | **Adopt the abstraction; do not drop-in** | Their code is OpenAI Responses-API specific; ours must run for both Anthropic and OpenAI. We extract three patterns: marker, recent-boundary, circuit breaker. See §3 Layer 5. |
-| **Compaction summary marker** | `[CONTEXT COMPACTION SUMMARY]` prefix on user-message-shaped item; transcript renderer treats it as a separate role to avoid "fake user" confusion | **Adopt** | Direct copy of pattern. Marker string TBD: `<compaction_summary>` XML tag or sentinel string per provider. Iterative compaction reads earlier markers as ground truth. |
-| **Recent boundary** | `_find_recent_boundary(items, keep_recent_turns=2)` — scan back from end counting user turns, return cut index | **Adopt** | Same algorithm. We default `keep_recent_turns=2` to match prompt-cache stability (the cached prefix is cleaner if recent turns are immutable). |
-| **Circuit breaker** | `_CircuitBreaker` — 3 consecutive LLM-compaction failures disables LLM compaction for the session | **Adopt** | Same. Failure surface = network errors, JSON parse errors, summary > some hard cap. Per-session state, not process-global. |
-| **SQLite session backing** | `SQLiteSession` for persistence between rounds | **Skip** | Out of scope (we don't have multi-round runs). Replaced by in-memory `MessageProjection` + `data/overflow/<session>/` for raw payloads. |
-| **Domain-aware structured prompt** | 9-section research-domain summary prompt | **Skip prompt, keep skeleton** | We need a finance-domain analog: ticker context, recent tools called, open hypotheses, deferred subagent results. See §3 Layer 5. |
-| **OpenAI SDK Session injection** | `Runner.run(... session=session)` carries history; SDK calls our `run_compaction()` | **Skip in v1** | Risky integration point. v1 sticks with `auto_previous_response_id=True`. P1.4b can revisit if multi-round work happens. |
-| **`call_model_input_filter`** (e.g. `ToolOutputTrimmer`) | OpenAI SDK hook to trim tool output before each model call | **Skip** | Bypassed by per-tool reducer policy applied at insertion time (Layer 0). Trimming after the fact is a less precise API. |
+- Layer 1 minifies old structured payloads.
+- Layer 2 may reuse a supplied semantic scratchpad summary after its threshold.
+- Layer 3 progressively replaces older tool results with bounded stubs.
 
----
+These layers are cheap, deterministic, and self-gated by configuration and
+thresholds.
 
-## 3. Layer design (refined from `MAJOR_REFACTORING_PLAN.md` §Phase B)
+### 3.3 Projection and native-message safety
 
-7 layers, 0–6. Each layer has a single responsibility, a config flag, and a fallback path on failure. Order matters: 0 runs at insertion, 1–3 run periodically, 4–5 run when 1–3 are insufficient, 6 runs after any compaction.
+Projection preserves the mapping back to provider-native messages. Tool-result
+body patches preserve unaffected native block identity. Prefix replacement
+backs up only when required to keep an assistant/tool-result group valid; it
+does not consume unrelated user text.
 
-### 3.1 Layer 0 — Tool Result Budget (insertion-time)
+### 3.4 Reasoning and prior-summary handling
 
-**Trigger**: every tool result, before it lands in the message projection.
+Thinking content is labeled and retained verbatim. Redacted thinking remains a
+redaction marker. Existing summary markers are detached and supplied as prior
+summary input so repeated compaction can refine rather than duplicate them.
 
-**Action**:
-1. Look up the tool's reducer (per-tool registry, default `_truncate_with_marker`).
-2. Apply the reducer; assert output ≤ `compaction.layer_0_budget_chars` (default 8000).
-3. If the original payload exceeded the budget:
-   - Compute `record_id` (see §3.1.1 below).
-   - Write to `data/overflow/<session_id>/<record_id>.json` with `{tool_name, args_hash, original_size, original_payload, written_at}`.
-   - Append a single-line content marker to the summary, OUTSIDE any `<tool_output>` envelope: `[overflow_record=<record_id>, original_size=<N>]`. The marker rides inside the tool_result block's `content` string — never as a sidecar field on the Anthropic block, since unknown block keys are at risk of API rejection. Layer 3's stub adapter regex-extracts `overflow_record_id` from the marker at projection time.
-4. The summarised result enters the projection; the raw original never does, **except** under the fail-open path described next.
+### 3.5 Layer 4 - provider-native compaction
 
-**Fallback (fail-open)**: if the reducer raises, the disk write fails, or any other Layer 0 step throws, the original payload is inserted unchanged and a `data_quality.errors` line is appended. This is a deliberate failure mode: Layer 0 must **never block agent progress** even at the cost of the in-prompt-cap guarantee. Telemetry counts these events; if the rate is non-trivial, that's a P1.4 follow-up bug, not a runtime stop.
+Provider-native compaction is optional and provider-specific. The current
+architecture does not pretend that Anthropic client-side and OpenAI SDK-side
+mechanisms are identical.
 
-#### 3.1.1 `record_id` derivation (locked for commit 1)
+### 3.6 Layers 5-6 - automatic full summary and anchor recovery
 
-```python
-record_id = sha256(
-    tool_name.encode("utf-8")
-    + b"\0"
-    + canonical_args_hash.encode("utf-8")
-    + b"\0"
-    + payload_bytes
-).hexdigest()[:16]
-```
+Layer 5 runs only when all of these are true:
 
-Where `canonical_args_hash = sha256(json.dumps(args, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()` — stable across dict-key insertion order.
+- the compressor and Layer 5 are enabled;
+- message size exceeds the configured threshold;
+- a summary caller exists; and
+- the circuit is closed.
 
-Properties:
-- **Stable**: same `(tool_name, args, payload)` → same `record_id`. Acceptance test `test_overflow_record_id_stable` locks this.
-- **Provenance unambiguous**: `tool_name` is part of the hash input, so two tools that happen to produce the same bytes land in different records (cleaner debug; no cross-tool dedupe).
-- **Short enough for filenames + log lines**: 16 hex chars (64 bits). Collision probability for any realistic session count is negligible.
-- **Closes §9 open question 2** (`record_id` strategy) — no longer "open".
+A successful call replaces a safe old prefix with one capped summary. Three
+consecutive caller failures open the default circuit; success resets it. A
+short-history or boundary no-op neither invokes the caller unnecessarily nor
+burns the circuit.
 
-**Why first, why insertion-time**: cache stability. By the time Layer 1+ runs, the prefix is already cached; modifying old tool results invalidates cache. Layer 0 catches bloat at the door so cache stays warm.
+Layer 6 appends a bounded anchor after provider-native or Layer 5 compaction so
+current tickers and recent overflow record IDs remain concrete.
 
-### 3.2 Layer 1 — Microcompact (periodic, free)
+## 4. Per-Tool Reducers
 
-**Trigger**: every N messages added to projection (default 4) OR before each model call.
+src/agents/shared/compressor/reducers.py owns deterministic reducers for
+large-result tools. Each reducer must preserve identifiers and facts needed to
+retrieve or interpret the raw record. Unknown tools use a bounded generic path;
+they do not gain an unreviewed semantic reducer.
 
-**Action**: minify JSON-shaped tool results (collapse whitespace, strip empty fields, drop `null` values). Pure formatting, no semantic change. Targets old turns (`age > keep_recent_turns`).
+Reducer changes require realistic wrapped and unwrapped fixtures,
+byte/character boundary coverage, idempotency coverage, and an overflow-read
+integrity check.
 
-**Why**: cheap, deterministic, recovers 10-30% prompt size on JSON-heavy histories without losing fidelity.
+## 5. Integration and Observability
 
-### 3.3 Layer 2 — Session-Summary Reuse (free)
+ContextManager is the integration boundary. With client-side compaction
+disabled it preserves the legacy manager path. With it enabled, each turn
+delegates to ContextCompressor, then applies either body patches or a safe
+prefix replacement.
 
-**Trigger**: when projection size > `layer_2_threshold_chars` (default 100K).
+Compression metadata is optional and forward-compatible in replay traces.
+Consumers that do not understand it may ignore it; producers may not emit
+different values to scratchpad, replay, and history for the same event.
 
-**Action**: pull existing `SessionState.scratchpad` content (pre-existing summary built by other agent paths) and prepend to prompt as a single user-shaped item with the canonical marker. Old turn tool_results are then replaced with one-line stubs (`[old <tool_name> result, see scratchpad]`).
+## 6. Activation and Failure Semantics
 
-**Why**: free re-use of work the agent has already done. No new LLM call, no new disk write.
+AgentConfig.compaction_enabled defaults false.
+compaction_layer_5_enabled also defaults false. When enabled, Layer 5 remains
+threshold-driven and guarded by its circuit breaker.
 
-**Production scratchpad source (commit 3 deferral)**: the `ContextManager` constructor accepts a `scratchpad: str = ""` keyword. In commit 3, both Anthropic call sites (`anthropic_agent/agent.py` + `cli.py`) pass `scratchpad=""` so Layer 2 is a no-op in production until a semantic-summary builder lands. Tests pass an explicit string to exercise Layer 2. The existing `src/agents/shared/scratchpad.py` JSONL is an audit log, not a semantic summary, and is intentionally NOT used here. A future commit (post-P1.4) wires a small builder; until then the L1 + L3 path covers the steady-state need.
+Missing caller, insufficient history, disabled layers, or an open circuit are
+honest no-op states. Exceptions from the summary provider are contained and do
+not corrupt the caller's original messages.
 
-### 3.4 Layer 3 — Progressive Truncation (free)
+## 7. Regression Owners
 
-**Trigger**: projection size > `layer_3_threshold_chars` (default 150K).
+The current contract is owned by:
 
-**Action**: replace tool_results older than `keep_recent_turns` with one-line stubs preserving `tool_name`, `args_hash`, `record_id` if any. The stub is enough that the agent knows the tool ran but not what it returned — if needed, re-call.
+- tests/test_compressor_overflow_store.py;
+- tests/test_compressor_reducers.py;
+- tests/test_compressor_layers.py;
+- tests/test_compressor_integration.py;
+- tests/test_compressor_observability.py;
+- tests/test_compressor_layer5.py; and
+- tests/replay_fixtures/p1_4_l0_overflow.json.
 
-**Why**: when summarisation is too aggressive, this is the controllable middle ground. Loses raw data but preserves call structure (which the agent often re-derives anyway).
-
-### 3.5 Layer 4 — Provider-Native Compaction (optional adapter)
-
-**Trigger**: `compaction.layer_4_enabled = true` (off by default). Anthropic only — `compact-2026-01-12` beta. Current local adapter supports the two models in `_COMPACTION_MODELS` at `src/agents/anthropic_agent/agent.py:26` (Opus 4.7 and Sonnet 4.6 at the time of writing); the adapter must check this set before adding the beta header.
-
-**Action**: add `context_management={"edits": [{"type": "compact_20260112"}]}` and beta header to the next call. The provider replaces the message history with a server-managed compaction event.
-
-**Status in v1**: kept opt-in, not the default. Reasons: opaque (we can't see what was compacted), provider-locked model list, beta. Documented in spec for completeness but not the recommended path.
-
-**OpenAI side**: `OpenAIResponsesCompactionSession` is incompatible with ChatGPT OAuth backend (per AI_Agent_Researcher's findings) and changes the SDK call shape (`session=` parameter). Not adapted in v1.
-
-### 3.6 Layer 5 — Client-Side LLM Full Compact (last resort, expensive)
-
-**Trigger**: projection size > `layer_5_threshold_chars` (default 250K), OR Layer 1-3 insufficient, OR explicit user request (`/compact`).
-
-**Action**:
-1. Find recent boundary via `_find_recent_boundary(messages, keep_recent_turns=2)`.
-2. Render `messages[:boundary]` as a transcript via `_format_messages_as_transcript`.
-3. Call a cheap-tier model (`claude-sonnet-4-6` or `gpt-5.4-mini`) with a structured finance-domain summary prompt (see §3.6.1).
-4. Wrap the summary in the canonical marker; replace `messages[:boundary]` with the single marker item; keep `messages[boundary:]` verbatim.
-5. Existing markers in the transcript MUST be readable as prior summaries — the new summary must "absorb" them so iterative compaction doesn't lose old info.
-
-**Circuit breaker**: 3 consecutive LLM compaction failures disables Layer 5 for the session; falls back to Layer 3.
-
-**Why**: the irreplaceable layer for "actually shrink the prompt while preserving meaning". Expensive (one cheap-model call per trigger) but bounded (circuit breaker).
-
-#### 3.6.1 Finance-domain summary prompt (sketch — locked in commit 5)
-
-Sections:
-1. **Active context** — current ticker(s), open question, user intent.
-2. **Tool calls made** — `tool_name`, args summary, key result fields. For each, note whether output overflowed (`record_id` available).
-3. **Findings** — facts agent has confirmed (with source markers).
-4. **Open hypotheses / pending checks** — what's still being investigated.
-5. **Errors / data gaps** — partial-failure messages from `data_quality.errors`.
-6. **Subagent results** — any deferred subagent return values.
-7. **Pending tool calls** — calls planned but not yet issued.
-
-Prompt rules: no interpretation beyond transcript content; preserve all `record_id`s; preserve all `data_quality.errors` lines; keep summary ≤ 2000 words; if a prior compaction marker exists, treat it as ground truth and incorporate.
-
-### 3.7 Layer 6 — Post-Compact Recovery (free, runs after any compaction)
-
-**Trigger**: after Layer 4 or Layer 5 (any path that mutates the cached prefix).
-
-**Action**: re-inject a small "anchor block" at the end of the messages array — current ticker(s), recent file paths, plan state — so the agent doesn't lose orientation. Anchor block is ≤ 1KB.
-
-**Why**: provider compaction (Layer 4) and client compaction (Layer 5) both operate on the *cacheable prefix*. The anchor at the tail keeps the model's most recent context concrete.
-
-### 3.8 Layer interaction summary
-
-```
-Tool result arrives
-    │
-    ├──→ Layer 0 (insertion-time budget + overflow disk)
-    │
-Pre-call check (every model call):
-    ├──→ Layer 1 (microcompact old turns)
-    ├──→ if size > T_2: Layer 2 (scratchpad reuse)
-    ├──→ if size > T_3: Layer 3 (progressive stub)
-    ├──→ if config.layer_4: Layer 4 (provider native)
-    ├──→ if size > T_5 OR /compact: Layer 5 (LLM full compact)
-    └──→ after any compaction: Layer 6 (anchor recovery)
-```
-
----
-
-## 4. Per-tool reducer policy
-
-Layer 0's effectiveness depends on tool-specific reducers. Default reducer = `_truncate_with_marker(payload, budget=8000)` — good for arbitrary text. Tools with large structured output get a custom reducer registered alongside their `ToolDefinition`.
-
-### 4.1 Reducer protocol
-
-```python
-class ToolReducer(Protocol):
-    def reduce(self, payload: Any, *, budget: int) -> tuple[str, dict]:
-        """Return (in_prompt_summary, overflow_metadata).
-
-        in_prompt_summary: <= budget chars, valid for prompt insertion.
-        overflow_metadata: dict written into the overflow record next to
-            the raw payload (e.g. shape hints, dropped sections).
-        """
-```
-
-### 4.2 Reducers shipped in v1
-
-| Tool | Reducer | Strategy |
-|---|---|---|
-| **Default** | `_truncate_with_marker` | First `budget * 0.7` chars + last `budget * 0.2` chars + `"... [N chars dropped, record_id=...]"` marker |
-| `tavily_search` / `web_browse` / `codex_web_research` | `web_result_reducer` | Keep title + URL + first 500 chars of each result; drop full HTML / markdown bodies |
-| `get_option_chain` | `option_chain_reducer` | Keep ATM ± 5 strikes per expiry; drop deep ITM / OTM rows |
-| `get_iv_history_data` | `iv_history_reducer` | Keep last 30 trading days verbatim; drop older rows |
-| `execute_python_analysis` | `python_output_reducer` | Last 2000 chars of stdout + last 1000 chars of stderr; drop any large pandas display output |
-
-Tools whose output is already small / capped (P1.3 `get_sa_digest`, P1.2 `get_economic_calendar`, etc.) use the default reducer — they almost never trip the budget.
-
-### 4.3 What lives where
-
-- Reducer protocol + default: `src/agents/shared/compressor/reducers.py`
-- Per-tool reducers: same module, registered at compressor init time via `ToolRegistry` introspection (tools opt in via a `reducer=` kwarg on `ToolDefinition` — backward compatible: missing kwarg → default reducer).
-- This keeps reducer logic close to the tool definition rather than scattered in the agent loop.
-
----
-
-## 5. Module layout
-
-```
-src/agents/shared/compressor/
-    __init__.py                    — public API
-    types.py                       — CompressionRecord, MessageProjection types
-    overflow_store.py              — disk persistence (~150 lines)
-    reducers.py                    — ToolReducer protocol + 5 reducers (~250 lines)
-    layers.py                      — Layer 0-6 implementations (~400 lines)
-    context_compressor.py          — orchestrator (~300 lines)
-    transcript.py                  — _format_messages_as_transcript + _find_recent_boundary
-                                     (~150 lines, used by Layer 5)
-    summary_prompt.py              — finance-domain Layer 5 prompt (locked in commit 5)
-    debug.py                       — internal-only get_overflow_payload helper
-
-src/agents/shared/context_manager.py
-    — thinned to a thin orchestrator that delegates to ContextCompressor
-
-src/agents/anthropic_agent/agent.py
-    — wires Layer 0 at tool result insertion + Layer 1-5 at pre-call check
-
-tests/test_compressor_overflow_store.py    — Layer 0 + overflow round-trip
-tests/test_compressor_reducers.py          — per-tool reducers
-tests/test_compressor_layers.py            — Layer 0-3 (deterministic)
-tests/test_compressor_layer5.py            — LLM compaction with mocked model client
-tests/test_compressor_integration.py       — Anthropic agent loop with replay fixtures
-tests/test_compressor_no_agent_imports.py  — Guarantee 1: ast import audit
-```
-
-### 5.1 `get_overflow_payload` exposure (Guarantee 3 detail)
-
-The retrieval helper exists in v1 but is **not** an agent-facing tool. Layered exposure:
-
-| Surface | v1 | v1.1 candidate |
-|---|---|---|
-| Internal Python (tests, CLI debug) | ✓ `compressor.get_overflow_payload(record_id)` | ✓ |
-| CLI command `/overflow show <record_id>` | ✓ debug only | ✓ |
-| Agent tool `get_overflow_payload` in registry | ✗ | optional, gated |
-
-If exposed to the agent in v1.1, mandatory contract:
-- `record_id` must belong to the current `session_id` (check `data/overflow/<session_id>/`)
-- Return ≤ `overflow_size_cap` chars (default 32KB) — large records re-truncated with a "still too large" marker
-- Allowlist: only records produced this session, no historical lookback
-- Audit log entry per call
-
----
-
-## 6. Acceptance criteria (test matrix)
-
-Each commit must pass its own slice; the cumulative test set is the spec's enforceable contract.
-
-### 6.1 Locked semantics (every commit must preserve)
-
-| # | Test | Locks |
-|---|---|---|
-| **A1** | `test_overflow_round_trip_500kb` | A 500KB utf-8 tool result → in-prompt ≤ 8KB summary AND `read_overflow_record(record_id)` returns the exact original payload (string-equal; byte-for-byte after utf-8 round-trip) |
-| **A2** | `test_compressor_no_agent_imports` | `ast.parse(compressor/*.py)` shows no import from `src.agents.anthropic_agent` or `src.agents.openai_agent` (Guarantee 1) |
-| **A3** | `test_layer_0_disabled_falls_back` | With `layer_0_enabled=false`, behaviour is byte-identical to today's code path |
-| **A4** | `test_no_fabricated_reasoning` | Layer 5 transcript renderer emits `[REASONING DROPPED]` or `[REASONING (verbatim)]` for thinking blocks; never invents reasoning text |
-
-### 6.2 Per-layer
-
-| Layer | Test | Locks |
-|---|---|---|
-| 0 | `test_per_tool_reducer_dispatch` | Tool with custom reducer hits its reducer; tool without uses default |
-| 0 | `test_overflow_record_id_stable` | Same `(tool_name, args, payload)` triple → same `record_id` (deterministic hash per §3.1.1); changing any of the three components produces a different `record_id` |
-| 0 | `TestTamperDetection::*` (5 cases) | A record on disk is rejected (`read()` returns None) if any of: filename id ≠ JSON id; tool_name swapped; args_hash diverges from `canonical_args_hash(args)`; original_size diverges from `len(original_payload.encode("utf-8"))`; recomputed `compute_record_id(...)` ≠ JSON id |
-| 1 | `test_microcompact_preserves_semantic_content` | JSON tool_result minified loses no field, only whitespace |
-| 2 | `test_scratchpad_reuse_replaces_old_results` | After Layer 2 fires, old tool_result blocks are stub strings |
-| 3 | `test_progressive_truncation_keeps_recent_turns_intact` | `keep_recent_turns=2` → last 2 user turns + their assistant replies bytewise unchanged |
-| 4 | `test_layer_4_disabled_by_default` | Default config: no `context_management` field on Anthropic call |
-| 5 | `test_layer_5_marker_absorbs_prior_summaries` | Two consecutive Layer 5 fires → second summary references first as input, not duplicates |
-| 5 | `test_layer_5_circuit_breaker_after_3_failures` | 3 mocked summary failures → Layer 5 disabled for session, Layer 3 takes over |
-| 6 | `test_post_compact_anchor_re_injected` | After Layer 4/5 fires, the last item is an anchor block with current ticker |
-
-### 6.3 Integration
-
-| Test | Locks |
-|---|---|
-| `test_replay_fixture_no_compaction_unchanged` | Existing replay fixtures pass with all compression layers enabled but no triggers fired (drop-in safety) |
-| `test_replay_fixture_overflow_recoverable` | A fixture that triggers Layer 0 → agent's final answer is stable across runs (overflow doesn't change behaviour as long as record can be retrieved) |
-| `test_legacy_off_switch` | `compaction.enabled=false` → behaviour is verbatim today's code path |
-
----
-
-## 7. Implementation order (5 commits)
-
-| # | Scope | Files | Tests landed |
-|---|---|---|---|
-| **1** | `overflow_store.py` + `CompressionRecord` types + `(tool_name, args, payload)` hash record_id (§3.1.1) + retrieval helper. No agent integration. | New: `compressor/overflow_store.py`, `compressor/types.py`, `tests/test_compressor_overflow_store.py`. | A1 (round-trip), 0/record_id_stable |
-| **2** | Deterministic Layers 0-3 + reducer registry + 5 reducers. `ContextCompressor` class with hooks for Layers 4-5 stubbed but not wired. No agent integration. | New: `compressor/reducers.py`, `compressor/layers.py`, `compressor/context_compressor.py`, `compressor/transcript.py`, `tests/test_compressor_reducers.py`, `tests/test_compressor_layers.py`. | All Layer 0-3 tests, A2 (no agent imports), A3 (off-switch) |
-| **3** ✅ | Anthropic integration: `context_manager.py` delegates Layers 0-3 to `ContextCompressor` behind `compaction_enabled` flag (default off). Layer 0 wires into both `anthropic_agent/agent.py` and `cli.py` tool result insertion via shared `ContextManager.maybe_apply_layer_0` helper; Layer 1-3 fire every turn (compressor self-gates via char thresholds). Patch-based projection adapter preserves assistant `ContentBlock` object identity. record_id rides inside the L0 marker — never as a sidecar field on Anthropic blocks. Production passes `scratchpad=""` (Layer 2 no-op until semantic-summary builder lands; see §3.3). | Modified: `src/agents/config.py` (5 new fields + `compaction:` loader), `src/agents/shared/context_manager.py` (compressor delegation + projection adapter + L0 helper), `src/agents/anthropic_agent/agent.py` (L0 hook + ungate), `src/agents/cli.py` (same). New: `tests/test_compressor_integration.py` (25 tests). | 25 integration tests covering: default-off legacy preservation, L0 hook on wrapped payloads, native-block hygiene (no extra keys), record_id round-trip, projection identity preservation, multi-tool_result patching, L1/L3 firing below token threshold, idempotent re-compaction, config loader |
-| **4** ✅ | Observability post-compression: `ContextManager.compress_tool_result()` becomes the canonical L0 hook (BC wrapper kept) returning a `(compressed_str, compression_dict)` tuple. The single `compression` dict — 7 fields: `layer`, `compressed`, `raw_bytes`, `compressed_bytes`, `raw_digest`, `compressed_digest`, `overflow_record_id` — is forwarded byte-equal to all three audit pipelines (Scratchpad `log_tool_result`, ReplayCapture `record_tool_call`, ChatHistory `tool_calls_detail`) so raw / compressed / overflow_dir reconcile post-hoc. Sizes are UTF-8 bytes (line up with `OverflowStore.original_size`); digests are sha256[:16] hex (length-aligned with `record_id`). CLI gains `/overflow list` and `/overflow show <record_id>`; the show path goes through `OverflowStore.read()` so the 5-invariant tamper detection from commit 1 gates the CLI surface. | Modified: `src/agents/shared/context_manager.py` (`compress_tool_result`), `src/agents/shared/scratchpad.py` (explicit `compression: Optional[dict]` param — no `**kwargs`), `src/agents/shared/replay.py` (`CapturedToolCall.compression` + load_trace BC), `src/agents/anthropic_agent/agent.py` + `src/agents/cli.py` (single source of truth wiring + `/overflow` handler). New: `tests/test_compressor_observability.py` (20 tests), `TestL0CallgraphRegression` + `TestOverflowCommandIntegrity` in `tests/test_compressor_integration.py` (10 tests), `tests/replay_fixtures/p1_4_l0_overflow.json`, `tests/fixtures/p1_4_compressor/{l1_minify_wrapped_json,l3_stub_old_results}.json` (note: L1/L3 fixtures are NOT replay traces — replay validator does not re-run layer transformations). | Cross-pipeline byte-equal metadata; raw_digest reconciles with overflow disk sha256; tampered records (args_hash/original_size/payload) are rejected by `/overflow show`; AST-based regression: `agent.py` + `cli.py` both call the L0 hook + forward `compression=` kwarg to pad/capture. |
-| **5** ✅ | Layer 5 LLM full compact + Layer 6 anchor recovery. ``compact_pre_call`` now returns :class:`CompactionResult` with ``replace_prefix_to`` (the projected boundary index) so the adapter can dispatch between 1:1-body-patch (Layers 1-3) and prefix-replacement (Layer 5) paths. The adapter applies a SAFE NATIVE CUT — it backs up to include the preceding assistant message ONLY when the boundary target is a user-tool_result group (back-up of plain user-text would gratuitously eat the prior assistant). Boundary edges hardened: ``replace_prefix_to == 0`` → no-op, ``replace_prefix_to >= len(anchors)`` → no-op + warn (no IndexError). Output cap is enforced in code (word + char cap with marker bytes reserved BEFORE truncation, so ``len(cap_summary(s)) <= LAYER_5_CHAR_CAP`` holds). Reasoning passthrough rule (A4): projection labels ``ThinkingBlock`` items as ``[REASONING (verbatim)]...[/REASONING]`` and ``RedactedThinkingBlock`` as ``[REASONING DROPPED]`` — never paraphrased. Layer 5 absorbs prior summaries via ``[PRIOR SUMMARY]`` tag in the transcript (the adapter detaches both ``<scratchpad_summary>`` and ``<compaction_summary>`` markers and forwards the content to ``apply_layer_5(prior_summary=...)``). Layer 6 appends a ``<anchor>`` user message at the tail with current tickers + recent record_ids, hard-capped at 1024 bytes. ``find_recent_boundary`` skips both ``is_compaction_summary`` AND ``is_anchor`` so re-projection stays correct. Circuit breaker: 3 consecutive caller failures open the circuit; success resets the counter. ``/compact`` CLI (alias ``/cp``) sets a one-shot ``force_layer_5_once`` flag that is consumed and CLEARED UNCONDITIONALLY at the top of every ``compact_pre_call`` (success / failure / threshold-bypass / caller-missing / circuit-open all clear it). ``/compact`` rejects gracefully when ``compaction.enabled=False`` or provider isn't Anthropic. AnthropicSummaryCaller uses streaming (avoids the SDK's non-streaming ``max_tokens > 21333`` ValueError). OpenAI caller intentionally NOT shipped — OpenAI's agents-SDK Runner does not invoke ContextManager, so a wired adapter would be dead code; will be added when unified-runner work needs it. Default OFF: ``compaction.enabled``, ``compaction.layer_5_enabled`` both default ``False``. | New: ``compressor/summary_prompt.py`` (finance prompt + transcript renderer + ``cap_summary`` + marker wrappers), ``compressor/summary_callers.py`` (``SummaryCaller`` Protocol + ``AnthropicSummaryCaller`` + ``FakeSummaryCaller`` test helper). Modified: ``compressor/types.py`` (``CompactionResult`` + ``is_anchor``), ``compressor/transcript.py`` (boundary skips anchor; ``[ANCHOR]`` tag), ``compressor/layers.py`` (``apply_layer_5`` + ``apply_layer_6``), ``compressor/context_compressor.py`` (compact_pre_call signature + L5/L6 firing + circuit breaker + ``force_layer_5_once``), ``shared/context_manager.py`` (dual-dispatch adapter + ``_apply_layer_5_prefix_replacement`` + ``_find_safe_native_cut`` + thinking projection + ``_detach_anchor_msg`` + ``build_anchor_from_messages`` + ``request_force_layer_5`` helper), ``agents/anthropic_agent/agent.py`` + ``agents/cli.py`` (caller wiring + anchor provider closure + ``/compact`` handler), ``agents/config.py`` (``compaction.layer_5_*`` fields + loader). New: ``tests/test_compressor_layer5.py`` (53 tests). | Reasoning passthrough (A4 — projection labels thinking; never paraphrases), force-flag clear under all paths (lock #2), boundary edges (lock #1), safe-cut rule (lock #2), char cap is hard (lock #5), idempotency (lock #4 — re-compaction replaces, never stacks), circuit breaker open/reset, /compact gating (rejects on master-disabled / non-anthropic), AnthropicSummaryCaller streaming + failure → None contract. |
-
-Each commit is independently revertable. Commit 1 lands disk persistence with no agent change; commit 2 lands the deterministic layers in isolation; commit 3 wires them; commit 4 adds visibility; commit 5 lands the expensive optional layer.
-
----
-
-## 8. Configuration (added to `AgentConfig`)
-
-```yaml
-compaction:
-  enabled: true                     # master toggle; false = legacy path
-  layer_0_enabled: true
-  layer_0_budget_chars: 8000
-  layer_1_enabled: true
-  layer_1_message_interval: 4
-  layer_2_enabled: true
-  layer_2_threshold_chars: 100000
-  layer_3_enabled: true
-  layer_3_threshold_chars: 150000
-  layer_4_enabled: false            # provider native, opt-in
-  layer_5_enabled: false            # LLM compact, opt-in (commit 5)
-  layer_5_threshold_chars: 250000
-  layer_5_model_anthropic: claude-sonnet-4-6
-  layer_5_model_openai: gpt-5.4-mini
-  keep_recent_turns: 2
-  circuit_breaker_max_failures: 3
-  overflow_size_cap_chars: 32000
-```
-
-CLI:
-- `/compaction status` — show enabled layers, current projection size, recent triggers
-- `/compaction off` — runtime disable (master toggle)
-- `/compact` — force Layer 5 trigger now
-- `/overflow show <record_id>` — debug retrieve (CLI only, not agent-exposed)
-
----
-
-## 9. Risks + open questions
-
-| Risk | Mitigation |
-|---|---|
-| Layer 0 reducer for a tool drops a field the agent later needs | Per-tool reducers tested against representative payloads; default reducer keeps head + tail (most-likely-relevant slices); overflow record always retrievable |
-| Layer 5 LLM summary loses critical info | Marker-based incremental compaction means each pass absorbs prior summaries; circuit breaker prevents catastrophic repeat failures; default OFF in v1 — opt-in with telemetry |
-| Cache invalidation on Layer 1-3 fires too aggressively | Layer 1-3 only mutate items at index `< len - keep_recent_turns`; cached recent prefix unchanged; benchmarked in commit 3 with prompt-cache-hit rate as a regression metric |
-| `get_overflow_payload` becomes a back-door for prompt injection | v1 keeps it CLI-only; v1.1 exposure (if ever) gated by session_id + size_cap + audit log |
-| Multi-round runner work in a later cycle conflicts with this design | Library-not-runner guarantee + ast import audit (test A2) means a future runner is additive, not migratory |
-| Reasoning blocks corrupted by transcript rendering | Renderer's reasoning passthrough rule is locked by test A4; no LLM ever generates fake reasoning |
-
-**Open questions** (not blocking commit 1):
-
-1. Should overflow records have a TTL? Default proposal: keep for the session lifetime (`SessionState.session_id` directory), purge on session close. Long sessions could grow the disk; cap at e.g. 500MB / session and FIFO-evict. (Resolved if needed in commit 4 alongside observability.)
-2. ~~Should `record_id` use full-content hash or content + tool_name?~~ **Locked in §3.1.1**: `sha256(tool_name + "\0" + canonical_args_hash + "\0" + payload_bytes)[:16]`. Provenance-unambiguous, no cross-tool dedupe.
-3. ~~Should Layer 5 run in-process (blocks the agent loop) or async (best-effort)?~~ **Resolved in commit 5**: in-process. ``ContextCompressor.compact_pre_call`` invokes ``AnthropicSummaryCaller.__call__`` synchronously; the agent loop pauses for the cheap-tier model. Failure is bounded by the circuit breaker (3 consecutive Nones → Layer 5 disabled for the session, Layer 3 stub remains the fallback).
-4. Reducer for `delegate_to_subagent` results: subagent returns structured JSON. Should it have a reducer that prefers the subagent's own `data_quality` block over raw tool calls? Probably yes — addressed in commit 2.
-
----
-
-## 10. Reference
-
-- `~/PycharmProjects/AI_Agent_Researcher/docs/design/CONTEXT_MANAGEMENT_INVESTIGATION.md` — the four-strategy comparison this spec descends from.
-- `~/PycharmProjects/AI_Agent_Researcher/src/ai_agent_researcher/core/round_compressor.py` — pattern reference for §4 per-tool reducer policy.
-- `~/PycharmProjects/AI_Agent_Researcher/src/ai_agent_researcher/core/client_compaction_session.py` — pattern reference for §3.6 Layer 5 marker + boundary + circuit breaker.
-- `docs/design/MAJOR_REFACTORING_PLAN.md` §Phase B — original 7-layer sketch, now superseded by this spec.
-- `src/agents/shared/context_manager.py` — current single-layer ContextManager (294 lines), to be thinned in commit 3.
-- `src/agents/config.py` — `server_compaction` flag (currently default `false`); P1.4 maps `server_compaction` → `compaction.layer_4_enabled` for backward compatibility.
-- `docs/design/PROJECT_PRIORITY_MAP.md` §10 Decision Log — for the chronology of P1.3 → P1.4 transition + the framing decision.
+Any future user-facing activation, model-policy change, or new agent-exposed
+raw-payload reader requires a separate design and permission review.

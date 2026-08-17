@@ -1,301 +1,139 @@
-# P0.1 Spec — Replay Harness Full v1
+# P0.1 Replay Harness - Current Authority
 
-> **Status**: 3/3 commits landed. Written 2026-04-30. Commit 1 (OpenAI capture wiring + canonicalization + shared `server_tools.py` helper for hosted-tool wiring & validation) landed 2026-04-30; High-finding follow-up (sentinel safeguards + shared source of truth) landed 2026-05-01; Medium-finding follow-up (CLI + subagent route through shared helper, architectural AST safeguard) landed 2026-05-01; Commit 2 (4 new fixtures, 3 schema fields, attachment classifier, OpenAI install-order fix) landed 2026-05-01; Commit-2 round-2 follow-up (subagent fixture anchors `delegate_to_subagent`, `digest_bytes` helper, classifier hashes empty bytes, §2.3 resolver contract, §4.2 commit-3 unified-resolver acceptance) landed 2026-05-01; Commit 3 (parametrised pytest gate `tests/test_replay_fixtures.py`, unified resolver via `shared/bridge_tools.py`, attachment pair gate, subagent recursion with role-prefixed errors) landed 2026-05-01.
-> **Predecessor**: P0.1 minimal spike (commits `5e12d63` + `875a6ef`, 2026-04-25). This spec extends that work to "full v1" per the priority map's two-stage acceptance split (`docs/design/PROJECT_PRIORITY_MAP.md` §2 P0.1).
-> **Goal**: complete the dual-provider replay safety net BEFORE Phase C (Unified Runner) starts. Phase C will refactor the agent loop substantially; without an automatic OpenAI-side replay gate, regressions can ship silently because the only existing capture path is Anthropic.
-
----
+> **Status:** SHIPPED. Current contract refreshed 2026-08-17 after the
+> legacy-agent surface retirement. The original implementation narrative is
+> retained in Git history.
+>
+> **Purpose:** define the replay safety net that current API and agent paths
+> must preserve. This is a structural regression gate, not deterministic model
+> replay.
 
 ## 1. Framing
 
-The single most important sentence of this spec:
+The replay harness records enough information to detect drift in tool
+availability, tool-call shape, system-prompt identity, nested subagent
+expectations, and compression metadata. It does not attempt to reproduce a
+model answer byte-for-byte.
 
-> **Full v1 is a safety net for Phase C, not a feature.** Every requirement here is justified by "Phase C must not be able to break this without a fixture failing the pytest replay gate." Anything that does not advance that goal is deferred.
+### 1.1 Non-goals
 
-Concretely, today the minimal spike captures Anthropic traces only and validates them out-of-band via `scripts/replay_run.py` — a developer must remember to run the validator. A Phase C refactor that, say, drops `delegate_to_subagent` from the OpenAI tool surface or shifts the tool-call argument shape on either provider can land green. Full v1 closes that hole by (a) capturing the OpenAI side too, (b) growing the fixture set so tool/attachment/subagent paths are all anchored, and (c) building a parametrised pytest gate (`tests/test_replay_fixtures.py`) that re-validates every fixture against the live registry whenever the test suite is run. Note: there is no automatic CI / pre-commit infrastructure today (see §2.3); the gate is a regression vector that fires whenever someone runs pytest, and a one-line wiring target for whatever CI system future cycles bring in.
+The current contract does not:
 
-### 1.1 Non-goals (explicit)
+- execute a live model while validating fixtures;
+- compare generated prose for deterministic equality;
+- merge token-level streaming chunks;
+- expose a document-input schema; or
+- use replay as a compatibility layer for removed product surfaces.
 
-Full v1 does **not** introduce, design, or implement:
-
-- **Deterministic LLM replay.** We do not mock or stub LLM calls and re-run them against fixtures expecting bit-identical outputs. The validator stays static — it checks that the CURRENT registry, system prompt, and code path can still produce the SHAPE of the captured trace, not that a re-run reproduces it.
-- **Real subagent capture wiring.** Subagent traces involve parent-child trace correlation, child token aggregation back into parent, and final-message provenance — none of that is in `ReplayCapture` today. Wiring it would mean editing `subagent.py` and re-deciding `tools_used` collection semantics. v1 ships a **hand-crafted** subagent fixture (same pattern as `p1_4_l0_overflow.json`) so the validator has something to anchor; real capture wiring is a v1.1 candidate.
-- **Streaming chunk merge.** Per the priority map, "if needed for token-level analysis." We have not needed token-level analysis yet; defer until a use case appears.
-- **Cross-provider replay.** A trace captured on OpenAI is never expected to validate against the Anthropic registry, or vice versa. The `provider` field on the trace is a hard partition.
-- **CLI interactive-loop capture.** The minimal spike wires `ReplayCapture` only into `run_query_stream` (the API path), not into `cli.py::run_anthropic_interactive`. That asymmetry is preserved here — wiring CLI capture is its own cycle, since the interactive loop's tool-loop shape diverges from `run_query_stream`'s. v1 wires OpenAI capture only at `run_query` / `run_query_stream` / `run_query_sync` (the API/programmatic entry points), matching Anthropic's coverage.
-- **Capturing replay state via SDK Session.** The OpenAI agents SDK's `Session` API has its own session-id, history-replay, and reasoning-item semantics. We do not piggyback on it. Capture stays a side-channel hook around `Runner.run()`, exactly like the Anthropic side hooks around `messages.stream()`.
+Future document understanding requires its own source-to-page, provenance,
+security, and model-routing design. It is not part of replay schema authority.
 
 ### 1.2 Guarantees
 
-After P0.1 full v1, callers / future refactors are guaranteed:
+1. **Library boundary.** Replay records behavior as data and does not import
+   compressor internals or own an agent runner.
+2. **Provider parity.** Anthropic and OpenAI captures use the same
+   ReplayTrace and validator entry point.
+3. **Required resolution.** Every recorded tool call and every explicitly
+   pinned tool name must resolve through the current tool authorities.
+4. **Expected additions stay green.** A newly registered tool that no fixture
+   depends on does not invalidate existing fixtures.
+5. **Capture is non-fatal.** Capture failures are logged and never replace the
+   underlying agent result.
+6. **Capture is opt-in.** ARKSCOPE_REPLAY_CAPTURE remains off by default.
 
-1. **Symmetric provider capture.** A trace produced on either provider has the same dataclass shape (`ReplayTrace`), the same field semantics, and the same validator entry point. A consumer of fixtures (CI gate, future regression matrix, dashboard) does not branch on `provider`.
-2. **The pytest replay gate catches schema / sequence / registry drift when run.** A PR that renames a tool, deletes a registry entry used by a fixture, or shifts an argument shape (e.g. `ticker: str` → `tickers: List[str]`) fails `tests/test_replay_fixtures.py` with a message naming the specific fixture and the specific drift. There is no automatic CI / pre-commit gate in v1 — the test fires when pytest runs. Future CI infrastructure (separate cycle) wires this module in via a one-line addition.
-3. **Expected-diff is explicit.** Adding a NEW tool to the registry that no fixture references must NOT fail the pytest replay gate. The validator's contract is "every tool call in fixture F must still resolve in the current registry," not "the current registry equals the registry at fixture-capture time."
-4. **Capture failure is non-fatal.** Any exception inside `ReplayCapture` is caught + logged; the agent path continues. Same try/except pattern as the Anthropic side.
-5. **Per-provider opt-in via `ARKSCOPE_REPLAY_CAPTURE`.** Capture is OFF by default. Setting the env flag enables capture on whichever provider runs in this session — no provider-specific subflag.
+## 2. Current Contract
 
-### 1.3 Anchor acceptance semantics
+### 2.1 Capture and canonical names
 
-Two non-negotiable behaviours every commit must preserve:
+ReplayTrace records:
 
-- **No false positives in the pytest gate.** Adding a new tool, fixing a typo in a system prompt, or changing a docstring must not fail any fixture's replay validation. The validator's gate is "drift in tools / sequence / shape that the fixture relies on," not "drift anywhere."
-- **No false negatives.** A real regression — Phase C drops `delegate_to_subagent` registration, or someone changes `get_ticker_news`'s `ticker` arg from `str` to `List[str]` — must produce an actionable pytest failure pointing at the offending fixture(s) and the offending drift.
+- schema version, timestamp, explicit api or test entrypoint, provider, model,
+  session, and turn;
+- system-prompt hash, user input, and sorted visible tool names;
+- canonical tool calls with normalized arguments, digests, result shape,
+  optional compression metadata, and optional provider bridge name;
+- final answer, final-answer hash, usage, and notes; and
+- optional nested subagent traces and required-resolution tool pins.
 
----
+The current programmatic Anthropic and OpenAI query paths construct
+ReplayCapture with an explicit entrypoint. There is no implicit presentation
+surface default.
 
-## 2. Scope locks
+#### 2.1.1 Tool-name canonicalization
 
-### 2.1 OpenAI capture wiring (commit 1)
+Provider bridge names are normalized to the registry name before validation.
+The optional provider_tool_name field preserves the SDK-facing bridge name for
+diagnostics, but validator lookup always uses the canonical name.
 
-Mirror the Anthropic shape from `src/agents/anthropic_agent/agent.py` lines 227-235 + 390-395 + 452-456 + 492-495. Specifically:
+#### 2.1.2 Provider-native server tools
 
-- Hook `ReplayCapture` instantiation after tools+system prompt are built, gated by `is_capture_enabled()`.
-- `set_initial(question, system_prompt, tools_available)` immediately after instantiation. `tools_available` is the list of **canonical registry names** visible to this turn (see §2.1.1) — same domain as Anthropic.
-- After each tool execution, `record_tool_call(name, input, result)`. OpenAI's tool-call shape lives in `result.raw_responses`; we extract it once per turn (the existing token-tracking + tickers extraction already walks `raw_responses`, so we hook the same loop). `name` MUST be the canonical registry name, not the bridge function name (see §2.1.1).
-- On final output (success path) and max-turns path, `record_final(final_text, tracker.summary())` + `save()`. Failure path mirrors Anthropic: log warning, do not raise.
-- All three entry points wrapped: `run_query`, `run_query_stream`, `run_query_sync`. They share the same hook code via a small helper at module top so we don't triplicate the try/except.
-- `provider` field on the saved trace is `"openai"` (already supported by `ReplayTrace`).
+Hosted tools remain outside ToolRegistry, so replay identifies them with the
+server: namespace. src/agents/shared/server_tools.py is the single source of
+truth for which hosted kinds are currently wired. Capture and validation must
+consult that shared authority rather than maintain parallel allowlists.
 
-#### 2.1.1 Tool-name canonicalization (LOAD-BEARING)
+### 2.2 Fixture and schema authority
 
-OpenAI bridge functions are named with a `tool_` prefix (e.g. `src/agents/openai_agent/tools.py::tool_get_ticker_news`). The OpenAI agents SDK uses each function's `__name__` as the tool name presented to the model — so a raw `result.raw_responses` walk surfaces `tool_get_ticker_news`. The `ToolRegistry` (`src/tools/registry.py`) registers the same tool as `get_ticker_news`. `validate_trace_against_registry()` (`src/agents/shared/replay.py:391`) does `registry.get(call.name)` directly, so an uncanonicalized name fails registry lookup with a spurious `unknown_tool` diff.
+The current fixture set is:
 
-Locked behaviour:
+    no_tool_turn.json
+    one_tool_turn.json
+    openai_no_tool_turn.json
+    openai_one_tool_turn.json
+    p1_4_l0_overflow.json
+    subagent_turn.json
 
-- Capture stores **canonical registry names** in `ReplayTrace.tool_calls[].name` and `tools_available`. Concretely: strip the `tool_` prefix before recording.
-- The `tool_` → canonical mapping is implemented as a small helper `_canonical_tool_name(raw_name: str) -> str` in `src/agents/openai_agent/agent.py` (or a shared helper in `src/agents/shared/replay.py` if Anthropic ever needs the same — Anthropic does not today, names are already canonical there).
-- For traceability, the bridge name is preserved as an optional `provider_tool_name` field on `CapturedToolCall` (NEW field, defaults to `None`). When set, it lets a future analyst see which bridge function was actually invoked. The validator IGNORES this field (forward-compatible, opt-in).
-- A regression test asserts that an OpenAI capture for tool `tool_get_ticker_news` produces `name="get_ticker_news"` and `provider_tool_name="tool_get_ticker_news"`, and that the resulting trace validates clean against the current registry.
+Older fixture JSON remains loadable when optional current fields are absent.
+The loader requires the core trace keys, validates the schema version, and
+ignores unknown keys so historical traces do not need destructive rewriting.
 
-This canonicalization is the spec's High-priority lock — without it, every OpenAI fixture would fail validation regardless of how cleanly the tool was actually called.
+subagent_traces is an opt-in nested structural contract. Live nested capture is
+not implied; the hand-authored fixture pins child tool resolution and
+role-prefixed validation errors.
 
-#### 2.1.2 Provider-native server tools (LOAD-BEARING)
+pinned_tool_names is never a skip list. Every listed name must resolve.
 
-Both providers can attach **server-side hosted tools** that are not in `ToolRegistry`:
+### 2.3 Unified resolver contract
 
-- Anthropic: `_CLAUDE_WEB_SEARCH_TOOL` (`{"type": "web_search_20260209", ...}`) appended via `_build_anthropic_tools_list(config)` (in `src/agents/anthropic_agent/agent.py`) when `config.web_claude_search` is true. The builder iterates `shared/server_tools.py::anthropic_server_tools(config)`.
-- OpenAI: `WebSearchTool()` from the agents SDK, appended via `_build_openai_all_tools(base_tools, config)` (in `src/agents/openai_agent/agent.py`) when `config.web_openai_search` is true. The builder iterates `shared/server_tools.py::openai_server_tools(config)`.
+Resolution order is:
 
-These tools are **visible to the model** (so they belong in `tools_available` for replay shape parity) but are **executed server-side**, so they do not appear in `tool_calls[]` (our `record_tool_call` path never sees them). A naïve `registry.get(name)` lookup against `web_search_20260209` returns `None` and the validator would emit a false `unknown_tool` diff.
+1. ToolRegistry;
+2. hosted-tool authority in src/agents/shared/server_tools.py; and
+3. bridge-only authority in src/agents/shared/bridge_tools.py.
 
-Locked behaviour:
+Registry tools use the live ToolDefinition argument contract. Hosted and
+bridge tools use their bounded shared specs. Missing tools, missing required
+arguments, and unknown arguments are errors. Prompt or availability drift that
+does not break a required contract remains diagnostic.
 
-- `tools_available` records server-native tools with a `server:` prefix and a normalised short name. Concretely: `server:web_search` for both providers (the canonical form), regardless of provider-specific raw names.
-- **Single source of truth** lives in `src/agents/shared/server_tools.py`. Two per-provider helpers + one validator-facing helper:
-  ```python
-  def anthropic_server_tools(config) -> List[Tuple[str, dict]]:
-      """Return [(replay_kind, tool_def), ...] for hosted Anthropic
-      tools enabled by config."""
-  def openai_server_tools(config) -> List[Tuple[str, Any]]:
-      """Return [(replay_kind, tool_instance), ...] for hosted OpenAI
-      tools enabled by config."""
-  def all_kinds_for_provider(provider) -> Set[str]:
-      """Maximal kinds set for a probe-config with all flags ON."""
-  ```
-  The agent wiring physically iterates these helpers (see below); the validator's `_currently_wired_server_tools` reads `all_kinds_for_provider`. There is no separate live-symbol introspection — the helpers themselves do the lazy import (`from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL` only when the relevant flag is on), so dropping the live constant naturally yields an empty list and the validator naturally rejects the fixture.
-- **All Anthropic paths route through `anthropic_server_tools`.** The API path (`run_query_stream`) calls `_build_anthropic_tools_list(config)`. The CLI interactive path (`run_anthropic_interactive` in `cli.py`) and the subagent path (`_run_anthropic_subagent` in `shared/subagent.py`) directly iterate `anthropic_server_tools(config)` after their own tool-list construction. An AST-based architectural test (`test_claude_web_search_constant_only_imported_via_helper`) asserts that ONLY `anthropic_agent/agent.py` (which defines the constant) and `shared/server_tools.py` (the canonical consumer) reference `_CLAUDE_WEB_SEARCH_TOOL` — every other path that wants hosted tools imports the helper, not the constant. New paths added in future cycles inherit this rule automatically.
-- **Wiring goes THROUGH the helpers (LOAD-BEARING).** The API-path builders are still distinct so the sentinel safeguards have a discrete entry point to monkeypatch:
-  ```python
-  # anthropic_agent/agent.py
-  def _build_anthropic_tools_list(config) -> list:
-      tools = get_anthropic_tools()
-      for _kind, tool_def in anthropic_server_tools(config):
-          tools.append(tool_def)
-      return tools
+## 3. Validation Gate
 
-  # openai_agent/agent.py
-  def _build_openai_all_tools(base_tools, config) -> list:
-      all_tools = list(base_tools)
-      for _kind, tool_obj in openai_server_tools(config):
-          all_tools.append(tool_obj)
-      return all_tools
-  ```
-  `run_query_stream` (Anthropic) and `_build_agent` (OpenAI) call these builders and never re-implement the loop. **A sentinel-based test** monkeypatches each `*_server_tools` helper to return a synthetic descriptor and asserts it round-trips into the builder's output — this fails loudly if Phase C inlines wiring elsewhere.
-- A small per-provider mapping `_SERVER_TOOL_KINDS_BY_PROVIDER` survives in `src/agents/shared/replay.py` solely as the **capture-walker normalisation helper** — when capture inspects a live `tools=[]` array post-build, it uses the mapping to label e.g. `WebSearchTool()` as `server:web_search`. The mapping plays NO role in validation.
-- Validator gate: any name in `tools_available` starting with `server:` is **NOT** looked up in `ToolRegistry`. Instead, the validator checks `name in _currently_wired_server_tools(trace.provider)`, which delegates to `all_kinds_for_provider`. If `_CLAUDE_WEB_SEARCH_TOOL` is deleted, the lazy import inside `anthropic_server_tools` raises, the helper yields empty, the fixture fails with a server-tool diff. If Phase C moves wiring outside `_build_anthropic_tools_list` without deleting the constant, the sentinel safeguard test catches it.
-- `tool_calls[].name` is **never** prefixed `server:` — that field continues to hold ONLY canonical registry names. Server tool execution is invisible to capture by design.
+tests/test_replay_fixtures.py parametrizes every fixture and validates it
+without provider traffic. tests/test_replay.py and tests/test_replay_openai.py
+own schema, capture, canonicalization, hosted-tool, bridge, nested-trace, and
+failure-path behavior.
 
-#### 2.1.2.1 Wiring-vs-validator drift safeguards (LOAD-BEARING)
+The gate must fail when:
 
-The risk is asymmetric. Two failure modes; two test families:
+- a called or pinned tool no longer resolves;
+- a required argument disappears;
+- an unknown argument appears;
+- a hosted or bridge authority silently disconnects; or
+- nested subagent structure no longer validates.
 
-- **Wiring drifts** (Phase C inlines hosted-tool append outside the shared helper). Failure: validator says "wired" via `all_kinds_for_provider` (the helper still returns the kind), but actual API request lacks the tool. **Sentinel safeguards** (one per provider): monkeypatch `anthropic_server_tools` / `openai_server_tools` to return a synthetic descriptor, call the corresponding builder, assert the synthetic descriptor appears in the output. If the builder bypasses the helper, the sentinel never reaches the output and the test fails.
-- **Capture-walker mapping drifts** (provider raw name changes — version bump or SDK rename). Failure: capture-time walker labels a hosted tool with a stale or empty kind. **Forward safeguards** (one per provider): assert the live `_CLAUDE_WEB_SEARCH_TOOL["type"]` (Anthropic) and `WebSearchTool.__name__` (OpenAI) remain keys in `_SERVER_TOOL_KINDS_BY_PROVIDER`. Version bump without mapping update → test fails.
+It must remain green for unrelated registry additions and optional historical
+fields.
 
-Together, these two test families pin BOTH directions: validation can't be bypassed by relocating wiring (sentinel test fails), and capture-time labelling can't drift on raw-name changes (forward test fails). The original High-finding failure mode (Phase C removes the append but leaves the constant) is now caught by the sentinel test for the affected provider.
+## 4. Change Discipline
 
-- Acceptance tests:
-  - `tools_available = ["get_ticker_news", "server:web_search"]` validates clean against the current registry + `all_kinds_for_provider("anthropic")`.
-  - Monkeypatching `server_tools.anthropic_server_tools` to return `[]` (simulating Phase C removing hosted-tool support) makes any `server:web_search` fixture fail with a server-tool diff.
-  - Sentinel test (Anthropic): monkeypatch `agent.anthropic_server_tools` to return `[("server:test_sentinel", sentinel_dict)]`; `_build_anthropic_tools_list(config)` MUST contain `sentinel_dict`. Symmetric test for OpenAI.
+Any future schema field needs:
 
-This design keeps server-tool visibility in the trace, pins validation to `shared/server_tools.py` (the same module the wiring physically iterates), and uses sentinel tests to detect any future refactor that bypasses the shared helpers.
-
-### 2.2 Fixture set (commit 2)
-
-Five-plus fixtures total. Existing 3 (Anthropic) stay. New fixtures:
-
-| File | Provider | Coverage |
-|---|---|---|
-| `no_tool_turn.json` (existing) | anthropic | Q&A, no tools |
-| `one_tool_turn.json` (existing) | anthropic | one tool call |
-| `p1_4_l0_overflow.json` (existing) | anthropic | Layer 0 compaction metadata |
-| `openai_no_tool_turn.json` (NEW) | openai | Q&A, no tools — symmetric to no_tool_turn |
-| `openai_one_tool_turn.json` (NEW) | openai | one tool call — symmetric to one_tool_turn |
-| `attachment_turn.json` (NEW) | anthropic | request carries an attachment content block (PDF/image); `attachments_shape[]` records each block's type + size class + digest (see §2.2.1) |
-| `subagent_turn.json` (NEW) | anthropic | parent calls `delegate_to_subagent` once; the child trace block is **embedded as a hand-crafted `subagent_traces` field** on the parent — schema TBD in commit 2, locked here as: `[{role, system_prompt_hash, tools_available[], tool_calls[], final_answer_hash}]` |
-
-That's 7 fixtures, comfortably ≥5. Two of the three NEW provider-coverage entries can be cut if any fixture turns out to be expensive to hand-craft, but the **subagent + attachment + at least one OpenAI** fixtures are the floor — those three are the gaps Phase C is most likely to break silently.
-
-`subagent_traces` field is **NEW on `ReplayTrace`** and ships in commit 2. The validator treats it as opt-in: fixtures without it skip subagent validation. Hand-crafted fixture means hashes/digests are illustrative; the field's existence is what the validator gates on, not the digest values.
-
-#### 2.2.1 `attachments_shape` field (NEW on `ReplayTrace`)
-
-Today `ReplayTrace` stores `user_input: str` only — no representation of attachment content blocks. An attachment fixture WITHOUT an explicit shape field becomes schema-only theatre: a Phase C refactor that breaks attachment serialisation (e.g. switches from base64 PDF in a `document` block to a URL reference, or drops image MIME validation) leaves the fixture passing because the validator has nothing to check. Locked field shape:
-
-```python
-attachments_shape: Optional[List[Dict[str, Any]]] = None
-# Each entry: {
-#   "type": "pdf" | "image" | "text" | "unknown",
-#   "size_class": "small" (≤32KB) | "medium" (≤512KB) | "large" (≤8MB) | "huge" (>8MB),
-#   "mime": str | None,           # e.g. "application/pdf", "image/png"
-#   "content_digest": str,         # 16-hex of utf-8 / raw bytes
-#   "block_kind": str,             # provider-native block type as string (e.g. "document", "image")
-# }
-```
-
-Capture-side: `_install_capture()` (or its helper) walks the user content blocks at `set_initial()` time, classifies each, fills `attachments_shape`, and stores it on the trace. Anthropic and OpenAI both produce different content-block shapes, so the classifier is per-provider but the OUTPUT field shape is shared. Validator gate (commit 3): if `attachments_shape` is set on a fixture, the validator asserts the current code path can produce a block of `type` + `block_kind` for the same provider — i.e. the attachment-handling code paths are still wired. If absent, the validator skips this check (forward-compatible). Acceptance test: `attachment_turn.json` carries one PDF entry; deleting Anthropic's `document`-block handling code makes the fixture validate red.
-
-### 2.3 CI / pre-commit replay gate (commit 3)
-
-The gate runs `scripts/replay_run.py` against every file in `tests/replay_fixtures/*.json`. Exit codes are already defined by the minimal spike (`scripts/replay_run.py:18-22` — DO NOT change these in commit 3):
-
-- `0` = passed (no errors; warnings allowed)
-- `1` = validation failed (one or more errors — registry drift, unknown tool, unknown arg, missing required, schema break)
-- `2` = usage error (bad path, malformed fixture file)
-
-Exit code `1` is overloaded — both registry drift and schema breakage produce `1`. That is fine for the pytest gate: any `1` fails the test, the failure message names the fixture and the specific drift inside the validator output. Splitting drift-vs-schema into separate exit codes is **out of scope** for v1; if Phase C debugging needs that resolution, it can come from parsing the structured output, not from exit codes.
-
-When future CI infrastructure (out of scope for v1, see below) calls into `scripts/replay_run.py` or imports the pytest module, exit `1` (real failure) and exit `2` (file-system / fixture-corruption issue) both fail the build. Until then, the test fails the pytest run only.
-
-**Expected-diff mechanism**: each fixture optionally carries a `pinned_tool_names: [...]` field (NEW on `ReplayTrace`, opt-in). When set, the validator REQUIRES every name in the pin to resolve via a **unified resolver** — additions to the registry beyond that list are ignored. When absent, the validator falls back to the existing rule "every tool actually called must resolve." This makes "add a new tool to the registry" a no-op for all fixtures without forcing each fixture to re-pin its registry snapshot.
-
-**Resolver contract (LOAD-BEARING for commit 3)**: pinning is a REQUIRED-RESOLUTION list, NOT a skip-list. For each name in `pinned_tool_names` (and for every name that appears in `tool_calls[].name`), the validator must consult, in order:
-
-1. `ToolRegistry` — the canonical 49-tool registry.
-2. `shared/server_tools.py::all_kinds_for_provider(trace.provider)` — for `server:<kind>` names.
-3. **Provider bridge surface** — for bridge-only tools like `delegate_to_subagent` that are added by `anthropic_agent/tools.py` and `openai_agent/tools.py` outside the core registry. Commit 3 owns the implementation of "ask the bridge surface whether it exposes name X to the model"; the natural shape is a per-provider helper analogous to `_currently_wired_server_tools` but for bridge-only tools.
-
-A name that resolves through ANY of the three sources is valid; a name that resolves through NONE is `unknown_tool`. **Pinning never means "trust and skip lookup"** — that loophole would let Phase C silently drop a bridge-only tool while the pin makes the fixture validate green. The pin lists what MUST resolve; the resolver makes resolution comprehensive.
-
-**Wiring**:
-- A new pytest module `tests/test_replay_fixtures.py` parametrises over every fixture and asserts the validator returns no `unknown_tool` / `unknown_arg` / `missing_required` diffs. This runs as part of the normal pytest suite (`python -m pytest tests/test_replay_fixtures.py`).
-- `scripts/replay_run.py` stays usable for ad-hoc developer runs.
-
-**CI / pre-commit coupling — explicitly downgraded.** The repo currently has **no `.github/`, `.pre-commit-config.yaml`, `pyproject.toml`, `pytest.ini`, or `tox.ini`** at write time. There is no automatic gate — the test runs only when a developer (or future CI infrastructure) calls pytest. This is intentional for v1: introducing actual CI plumbing is its own scoping discussion (which CI? GitHub Actions vs local hook? python version matrix? fast vs slow test partitioning?), and bolting it onto P0.1 commit 3 would push this spec well past "lightweight." The spec's contribution is the **mechanism** (fixture validation as a regular pytest module, parametrised over every file under `tests/replay_fixtures/`); when the team commits to a CI choice, wiring this module into that CI is a one-line addition. Until then, the gate is a developer-discipline gate — same as every other test in the repo.
-
-The `tests/test_replay_fixtures.py` module is LOAD-BEARING for this spec — without it, full v1's main contribution (validation as a parametrised regression vector) does not exist. The CI-or-not question is orthogonal.
-
-### 2.4 Subagent fixture: hand-crafted only (locked)
-
-Already covered in §1.1 non-goals: `subagent_turn.json` is hand-crafted, and the `subagent_traces` field shape is locked but hashes are illustrative. Real subagent capture wiring is v1.1.
-
-### 2.5 Streaming merge: deferred unless triggered
-
-No commit in this spec implements streaming chunk merge. If during commit 1 we discover that some OpenAI tool-call detail is only available via streaming (and not in `result.raw_responses`), the spec is updated and the commit pauses. Otherwise `final-response only` matches the minimal spike.
-
----
-
-## 3. Out of scope (explicit)
-
-- Deterministic LLM replay (re-run a fixture's question against a stubbed LLM and assert byte-equal output). Not in v1; not in v1.1 either — moved to "Phase C+1 candidate."
-- Real subagent capture wiring (covered in §1.1).
-- Streaming chunk merge (covered in §1.1 + §2.5).
-- CLI interactive loop capture (covered in §1.1).
-- Cross-provider replay (covered in §1.1).
-- A web UI for browsing fixtures / diffs.
-- Replay fixture compression / dedup. The set is small; revisit if it grows past ~50 fixtures.
-
----
-
-## 4. Acceptance criteria
-
-Per scope lock; each commit must satisfy its own slice and not regress earlier slices.
-
-### 4.1 Locked semantics (every commit must preserve)
-
-- Capture failure never breaks the agent path. Test: monkeypatch `ReplayCapture.set_initial` to raise; assert the agent still returns a final answer + only logs a warning. Mirror of the Anthropic-side test.
-- `is_capture_enabled()` is the single gate. Test: env unset → no capture; env set → capture object created.
-- `ReplayTrace.provider` partitions strictly — a trace with `provider="openai"` validated against the Anthropic-only registry view (if such a view ever exists) is an error path, not silently passing. v1 does not have provider-scoped registries, so this acceptance reduces to "the field exists and is set per-trace."
-
-### 4.2 Per-commit
-
-- **Commit 1 (OpenAI capture wiring + tool-name canonicalization + server-tool namespacing + shared-helper validation)**: with `ARKSCOPE_REPLAY_CAPTURE=1`, running any of `run_query` / `run_query_stream` / `run_query_sync` on a question that calls one tool produces a JSON file at `data/replay/<session>/turn_001.json` that loads via `load_trace()` and validates clean against the current registry. `provider == "openai"`. `tool_calls[0].name` is the canonical registry name (e.g. `"get_ticker_news"`, NOT `"tool_get_ticker_news"`). `tool_calls[0].provider_tool_name` (NEW field) records the bridge name for traceability. With `web_openai_search=true`, `tools_available` contains `"server:web_search"` and the trace validates clean; with `web_openai_search=false`, no `server:` entry is recorded. The same trace shape is achievable on the Anthropic path with `web_claude_search=true`. The validator's source of truth for "is this server tool currently wired" is `shared/server_tools.py::all_kinds_for_provider`, which delegates to per-provider helpers (`anthropic_server_tools`, `openai_server_tools`) — the SAME helpers the agent wiring physically iterates via `_build_anthropic_tools_list` / `_build_openai_all_tools`. Two test families ship with this commit: (1) sentinel-based wiring safeguards — monkeypatch the per-provider helper, assert the sentinel descriptor round-trips through the builder; (2) forward-direction capture-walker mapping safeguards — assert the live `_CLAUDE_WEB_SEARCH_TOOL["type"]` and `WebSearchTool.__name__` remain keys in `_SERVER_TOOL_KINDS_BY_PROVIDER`. No exception escapes the capture hook.
-- **Commit 2 (fixtures + schema fields)**: 4 new fixtures land, all loadable via `load_trace()`. New fields on `ReplayTrace`:
-  - `subagent_traces: Optional[List[Dict[str, Any]]] = None` — opt-in.
-  - `pinned_tool_names: Optional[List[str]] = None` — opt-in.
-  - `attachments_shape: Optional[List[Dict[str, Any]]] = None` — opt-in. Each entry carries `type` / `size_class` / `mime` / `content_digest` / `block_kind`.
-  - `CapturedToolCall.provider_tool_name: Optional[str] = None` — already added in commit 1.
-  Existing 3 fixtures still load (no schema break — all new fields have None defaults). Per-provider attachment classifier produces correct `type`/`size_class`/`block_kind` for PDF + image inputs on Anthropic and OpenAI shapes.
-- **Commit 3 (pytest replay gate + unified resolver + attachment pair validation)**: `tests/test_replay_fixtures.py` runs in the existing pytest suite; all 7 fixtures (3 existing + 4 from commit 2) pass via parametrisation. Validator gains a unified resolver (per §2.3 resolver contract) that consults ToolRegistry → server-tools (`shared/server_tools.py`) → bridge surface (`shared/bridge_tools.py`), in that order. Bridge specs carry both `parameters` and `required` sets so bridge tools get the SAME `unknown_arg` / `missing_required` arg-shape gate as registry tools — Phase C cannot rename `task` → `prompt` on `delegate_to_subagent` and pass silently. `subagent_turn.json` flips green; the previously-pinned-failure test (`test_subagent_fixture_fails_today_pending_commit_3_resolver`) is renamed `test_subagent_fixture_validates_via_unified_resolver` and asserts the pass case. Subagent recursion: a shared `_validate_calls_and_pins` kernel handles parent + each `subagent_traces[i]` entry; child errors are prefixed `subagent_traces[i] (<role>): ` for traceability. Attachment validation gate is on the `(type, block_kind)` PAIR (not block_kind alone) — catches mis-classified entries like `{"type":"pdf","block_kind":"image"}` that a kind-only check would miss. Regression tests:
-  - **Expected-diff pass**: fixture with `pinned_tool_names: ["get_ticker_news"]` validates clean even when unrelated tools change in the registry.
-  - **Expected-diff fail**: stripping a pinned tool from the registry makes that fixture fail with `pinned_tool_names`-prefixed `unknown_tool` diff.
-  - **Bridge-tool resolution pass**: `subagent_turn.json` validates clean via the bridge branch of the unified resolver.
-  - **Bridge-drop fail (LOAD-BEARING for §2.3)**: monkeypatching `bridge_tools.all_bridge_specs_for_provider` to return `{}` makes `subagent_turn.json` fail with `unknown_tool` for `delegate_to_subagent` — confirms pinning is REQUIRED-RESOLUTION, not skip-lookup.
-  - **Bridge arg-shape missing-required**: a `delegate_to_subagent` call missing `task` fails with `missing_required` — same shape as registry-tool gate.
-  - **Bridge arg-shape unknown-arg**: a `delegate_to_subagent` call with `obsolete_arg` fails with `unknown_arg` — symmetric to above.
-  - **Subagent recursion**: corrupting a child `tool_calls[].name` produces a role-prefixed error.
-  - **Attachment pair pass**: `attachment_turn.json` validates clean against current `AttachmentManager`.
-  - **Attachment pair fail**: monkeypatching `_supported_attachment_pairs("anthropic")` to drop `("pdf", "document")` makes the fixture fail.
-  - **Attachment pair-not-kind**: hand-crafted `{type: "pdf", block_kind: "image"}` fails — pair granularity catches axis-mismatch.
-  - **Attachment unknown opts out**: `type == "unknown"` skips the pair check (per §6 risk register).
-  - **Forward safeguard (bridge sync)**: per-provider bridge surface minus `ToolRegistry.list_names()` must equal `*_bridge_tool_specs()` keys. Phase C adding a new bridge-only tool without updating the helper fails this test.
-  - **Forward safeguard (attachment sync)**: every `(canonical_type, block_kind)` pair emitted by `AttachmentManager.to_anthropic_blocks` / `to_openai_blocks` must appear in `_supported_attachment_pairs`. `attachments.py` drift breaks this before any fixture silently passes.
-
-### 4.3 Integration
-
-- `python -m pytest tests/test_replay.py tests/test_replay_fixtures.py -q` is green.
-- Running `ARKSCOPE_REPLAY_CAPTURE=1 python -c "import asyncio; from src.agents.openai_agent.agent import run_query; asyncio.run(run_query('What is the price of NVDA?'))"` produces a fixture file under `data/replay/`. (Manual smoke; not in test suite.)
-
----
-
-## 5. Implementation order (3 commits)
-
-Smaller than P1.4 (5 commits) because the underlying surface — `replay.py` — already exists and is stable. Most of the work is reuse + symmetric mirroring.
-
-| # | Commit | Files touched | Tests added |
-|---|---|---|---|
-| 1 | OpenAI capture wiring + tool-name canonicalization + `provider_tool_name` field + server-tool namespacing + shared source-of-truth helper for hosted tools | `src/agents/openai_agent/agent.py` (3 entry points + `_install_capture()` + `_build_openai_all_tools()` + `_canonical_tool_name()` re-export), `src/agents/anthropic_agent/agent.py` (`_build_anthropic_tools_list()` extraction + import of shared helper), `src/agents/shared/server_tools.py` (NEW — `anthropic_server_tools` / `openai_server_tools` / `all_kinds_for_provider`), `src/agents/shared/replay.py` (add `provider_tool_name: Optional[str]` to `CapturedToolCall`, `_SERVER_TOOL_KINDS_BY_PROVIDER` capture-walker normalisation mapping, `_currently_wired_server_tools(provider)` validator helper that delegates to the shared module, server-tool-aware validator branch) | 13-16 (Anthropic-mirror tests: capture creation, tool-call recording, save failure swallowed; canonicalization: `tool_get_ticker_news` → `get_ticker_news`, validates clean, `provider_tool_name` round-trips; server-tool validation: `tools_available=["server:web_search"]` validates clean, stubbing `anthropic_server_tools` to return empty makes it fail; sentinel-based wiring safeguards: monkeypatch `anthropic_server_tools` / `openai_server_tools` to return a synthetic descriptor, assert it round-trips through `_build_anthropic_tools_list` / `_build_openai_all_tools`; capture-walker forward safeguards: live `_CLAUDE_WEB_SEARCH_TOOL["type"]` and `WebSearchTool.__name__` remain keys in `_SERVER_TOOL_KINDS_BY_PROVIDER`; flag-off smoke: builder omits hosted tools when its config flag is false) |
-| 2 | Fixture set + schema fields (`subagent_traces`, `pinned_tool_names`, `attachments_shape`) + attachment classifier + OpenAI install-order fix | `src/agents/shared/replay.py` (3 new fields, `classify_attachments(provider, attachments)`, `digest_bytes` raw-byte helper, `_size_class` thresholds, `set_initial` accepts `attachments_shape` / `pinned_tool_names`), `src/agents/openai_agent/agent.py` (`_install_capture` accepts `attachments`, `run_query` passes them in so capture lands BEFORE content blocks are built), `src/agents/anthropic_agent/agent.py` (capture init forwards `attachments` to classifier), 4 new files in `tests/replay_fixtures/` (`openai_no_tool_turn`, `openai_one_tool_turn`, `attachment_turn`, `subagent_turn`) | 14 (existing 3 fixtures load with new fields == None; 4 new fixtures load + carry expected shape; ReplayCapture round-trips new opt-in fields; `_size_class` boundary table; classifier per-provider per-type — Anthropic pdf/image/text → document/image/text, OpenAI pdf/image/text → input_text/input_image/input_text; classifier returns None for empty / handles unknown gracefully; `digest_bytes` raw-byte hashing + empty-bytes path; 3 of 4 new fixtures validate clean against current registry, `subagent_turn` is intentionally pending commit 3's unified resolver — see `test_subagent_fixture_fails_today_pending_commit_3_resolver`) |
-| 3 | Pytest replay gate + unified resolver + attachment pair validation + subagent recursion | `tests/test_replay_fixtures.py` (NEW — parametrised over every fixture), `src/agents/shared/bridge_tools.py` (NEW — `anthropic_bridge_tool_specs` / `openai_bridge_tool_specs` / `all_bridge_specs_for_provider` carrying `{parameters, required}` per name; today only `delegate_to_subagent`), `src/agents/shared/replay.py` (`_resolve_tool` unified resolver, `_check_arg_shape` shared between registry + bridge, `_validate_calls_and_pins` kernel reused for parent + subagent recursion, `_supported_attachment_pairs` registry, `(type, block_kind)` pair gate, role-prefixed child errors, docstring update — `pinned_tool_names` legitimately accepts `server:*` and bridge-only names) | parametrised gate module covers all 7 fixtures; plus 14 regression / forward safeguard tests in `test_replay.py`: pin-pass, pin-fail, bridge-drop fail (load-bearing for §2.3), bridge arg-shape missing-required + unknown-arg, attachment pair pass + fail, pair-not-kind, unknown-opts-out, subagent recursion role-prefix, bridge surface sync (Anthropic + OpenAI), attachment pair sync (Anthropic + OpenAI) |
-
-Review checkpoint after each commit, same cadence as P1.4. Spec sync after each commit if any decision drifts.
-
----
-
-## 6. Risk register
-
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| OpenAI `result.raw_responses` shape varies by model / SDK version, breaking tool-call extraction | Medium | High | The shape is already walked elsewhere in the OpenAI agent (token tracking, tickers extraction). Reuse the same walker — if it breaks, capture breaks the same way and we already have a regression vector. |
-| Tool-name canonicalization helper drifts (registry adds new naming convention; bridge prefix changes; canonicalizer becomes silently wrong) | Medium | High | `_canonical_tool_name()` is unit-tested with the live registry's tool-name set. A future tool with a non-`tool_`-prefixed bridge name (or a registry-side rename) fails the unit test until the canonicalizer is updated. The test asserts that, for every tool in `ToolRegistry`, there exists a forward mapping from its bridge function name back to the canonical name. |
-| `subagent_traces` field becomes load-bearing for the validator before real capture wiring lands | Low | Medium | Validator treats the field as opt-in: missing field → skip subagent validation. Acceptance test asserts this. |
-| `attachments_shape` classifier mis-classifies a content block (e.g. labels a PDF as "unknown") and the validator falsely reports clean | Low | Medium | Classifier unit-tested per provider on the supported block kinds; "unknown" is a valid label but treated by the validator as "do not gate" rather than "still passes." Spec note: a fixture with `type: "unknown"` deliberately opts out of attachment validation; reviewers should reject such fixtures unless the unknown shape is intentional. |
-| `pinned_tool_names` mechanism encourages over-pinning (every fixture pins everything → gate catches nothing) | Medium | Medium | Doc string + spec note: pin only the tools the fixture's behaviour DEPENDS on, not all tools available at capture time. Code review checklist item for new fixtures. |
-| Capture wiring spreads across 3 OpenAI entry points → drift between them | High | Low | Extract a single `_install_capture()` helper called from all 3. Test asserts all 3 entry points produce the same trace shape on the same input. |
-| Pytest gate becomes flaky if a fixture's `system_prompt_hash` drifts on legitimate prompt changes | Medium | Medium | The validator does NOT compare `system_prompt_hash` — that field is captured but only used for human inspection. Drift on legitimate changes is silent + intended. |
-| Without actual CI/pre-commit plumbing, the validation gate is developer-discipline-only | Medium | Medium | Out of scope for v1 (see §2.3). Mitigation: when CI infra lands (separate cycle), wiring `tests/test_replay_fixtures.py` is a one-line addition. Until then, the test runs whenever a developer runs the full pytest suite — same status as every other regression test in the repo. |
-| Provider-native server tool list grows beyond `web_search`, `shared/server_tools.py` doesn't get updated, fixtures with the new kind silently pass | Low | Medium | Adding a hosted tool means editing `anthropic_server_tools` / `openai_server_tools` in `shared/server_tools.py`. The wiring builders iterate that helper exclusively (sentinel safeguards enforce this). The `_SERVER_TOOL_KINDS_BY_PROVIDER` capture-walker mapping is consulted by capture-time tooling only and has its own forward safeguard tests. Either component going stale breaks an existing test. |
-| Phase C inlines hosted-tool append outside `_build_anthropic_tools_list` / `_build_openai_all_tools` while leaving the helper / constant in place — validator says "wired" but actual API request lacks the tool | Medium | High | Sentinel safeguard tests in `tests/test_replay.py`: monkeypatch `anthropic_server_tools` / `openai_server_tools` to return a synthetic descriptor, assert it round-trips through the corresponding builder. Phase C bypassing the helper makes the sentinel never appear and the test fails. |
-
----
-
-## 7. Cross-references
-
-- `docs/design/PROJECT_PRIORITY_MAP.md` §2 P0.1 (the parent ticket; status will flip to "✅ done" once this spec's 3 commits land).
-- `docs/design/P1_4_SPEC.md` §1.2 guarantee 1 (library-not-runner) — capture must not import compressor internals; the trace records compression metadata as opaque data, not as a typed `CompressionRecord`.
-- `src/agents/shared/replay.py` (the existing module — DO NOT rewrite, only extend).
-- `src/agents/anthropic_agent/agent.py` lines 227-235 / 390-395 / 452-456 / 492-495 (the capture wiring pattern to mirror).
-- `tests/test_replay.py` (33 tests; Phase C must keep these green).
-- `tests/replay_fixtures/p1_4_l0_overflow.json` (the existing pattern for hand-crafted fixtures with embedded compression metadata — `subagent_turn.json` follows the same pattern with `subagent_traces` instead of `compression`).
+1. a concrete current producer or explicitly hand-authored fixture purpose;
+2. load compatibility for existing traces;
+3. a named validator behavior;
+4. a mutation that proves the new owner can fail; and
+5. no live provider request in the regression gate.
+
+Git history is the source for the original three-commit implementation
+sequence and the retired branches that are no longer current authority.

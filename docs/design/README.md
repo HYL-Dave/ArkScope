@@ -52,7 +52,7 @@ its row here in the same commit. Git history is the recovery record.
 | `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md` | **AI Research Context & Memory Plan** | ACTIVE | C-2c thread-context principles: complete transcript, no silent truncation, configurable memory policies, strategy/skill/tool extensibility roadmap. |
 | `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md` | **AI Research Run Lifecycle Plan** | ACTIVE | Next AI Research architecture: server-owned runs, per-run model selection, attach/replay trace, independent thread execution, and Slice 6/7 ordering. |
 | `AGENT_DATA_GAP_FALLBACK_PLAN.md` | **Agent Data-Gap Fallback Plan** | ACTIVE | Structured absence + deterministic fallback plan for SEC/CIK misses, web-search fallback, and provider data-gap diagnostics. |
-| `INVESTMENT_SKILLS_PROFILE_DESIGN.md` | **Investment Skills + Investor Profile Design** | ACTIVE | Opt-in investor profile, assistant stance, skill suggestions, and the committed v2 auto-trigger track. |
+| `INVESTMENT_SKILLS_PROFILE_DESIGN.md` | **Investment Skills + Investor Profile Design** | ACTIVE | Opt-in investor profile and stance are live; Track B must add the first App-owned skill suggestion/automation policy. |
 
 ## Seeking-Alpha pipeline (PROTECTED ingestion path — must not break)
 | File | Read as | Status | One-line |
@@ -87,7 +87,6 @@ its row here in the same commit. Git history is the recovery record.
 | File | Read as | Status | One-line |
 |---|---|---|---|
 | `AI_AGENT_ARCHITECTURE_PATTERNS.md` | **Agent Architecture Patterns** | REFERENCE | Dexter-derived reusable patterns (scratchpad, token budget, subagents). |
-| `SKILL_PLUGINS_RESEARCH.md` | **Skills & Plugins Research** | REFERENCE | Research on Anthropic financial plugins vs our Skills system. |
 
 ---
 

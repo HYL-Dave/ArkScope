@@ -14,6 +14,12 @@
 > inventory facts, not current owners or preservation instructions. Current
 > options mathematics remains under `src/options_math/`.
 
+> **2026-08-17 skill-runtime supersession:** the packaged Skills registry,
+> aliases, explicit expansion, validation, metadata, and resources remain.
+> Runtime trigger matching and automatic application producers have retired.
+> References below to a live trigger index are dated B6 inventory facts, not
+> current behavior.
+
 > **2026-07-27 scoped supersession:** The merged legacy-IV retirement
 > removes exactly two `scripts/analysis` consumers because they directly depend on
 > the retired store: `compare_bs_vs_american.py` and
@@ -88,11 +94,12 @@ is **10 SKILL.md across 3 category dirs**:
 - `financial-analysis/`: **competitive-analysis** · **comps-analysis** · **dcf-model**
 
 Loader (`src/agents/shared/skills.py`, Phase G): tiered registry — Tier 1 builtin
-(cannot be overridden) → Tier 2 packaged categories (`resources/skills/{category}/**`) →
-Tier 3 custom (`config/skills/`, dir currently empty); alias map + **trigger index**
-already exist. The DCF/comps/earnings skills the owner described as the product vision
-**already have packaged content and are loaded** — what does not exist yet is selection
-policy, explainability ("which skills, why"), profile/persona, and auto-trigger rules.
+(cannot be overridden) → Tier 2 packaged categories
+(`resources/skills/{category}/**`) → Tier 3 custom (`config/skills/`, dir currently
+empty); alias resolution and descriptive selection metadata remain. The
+DCF/comps/earnings skills the owner described as the product vision **already have
+packaged content and are loaded**. What does not exist yet is an App-owned selector,
+explainability ("which skills, why"), or an automatic workflow policy.
 
 **Disposition**: keep in place as read-only packaged data (review ruling); the boundary
 (src = registry/selector/profile engine · resources/skills = content · profile DB = user

@@ -156,7 +156,7 @@ S7 把右側證據面板畫成幾張**獨立子卡**，不是一坨：
 | 標準模式 vs Terminal 高密度模式切換 | P1 | PDF 自己標「若非高頻交易可能 overkill」 |
 | Local-KB vs Web live-search 檢索切換 | P1,S7 | web 後端（Tavily/SerpAPI/Brave/Bocha/SearXNG）未選 |
 | Decision Log + Workstream + Thesis Tracking | S4 | 三者邊界未定 |
-| 外部通知通道（Webhook/Discord/飛書/企業微信） | P1 | 單一來源、列在 settings 參數；engine 已存在（src/monitor）但非 v1 commit |
+| 外部通知通道（Webhook/Discord/飛書/企業微信） | P1 | 單一來源；僅屬未來 alerts transport 設計候選，現有 monitor core 不代表任何外部 transport 已實作 |
 | 多資料源（SEC/FRED/Polygon/Alpha Vantage/News API） | S4,S6 | **只有 SEC + FRED 跨來源確認**；其餘單一來源、decided=false |
 | 更廣 provider menu（Gemini/Grok/DeepSeek/Moonshot/OpenRouter） | P1 | 超出鎖定 4-provider，aspirational |
 | Settings Simple vs Expert 模式 | P1 | 哪些欄位歸哪邊未定 |
@@ -234,13 +234,17 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 - `src/tools/freshness.py` — 「真相來源是資料本身」已落地，對應 §3.3 可追溯性
 
 **Agent Layer（reasoning 後端）**
-- `src/agents/{anthropic,openai}_agent` + `shared/model_catalog.py` + `token_tracker.py` — dual-provider scaffolding + token 計帳 → provider switcher（OpenAI/Anthropic 鎖定）
+- `src/agents/{anthropic,openai}_agent` + `src/model_capabilities.py` +
+  `src/model_effective.py` + `token_tracker.py` — dual-provider execution、
+  code-reviewed model facts、credential-aware effective choices 與 token 計帳
 - `src/agents/shared/skills.py` + `config/skills/*.yaml` — 對應 Plugins 卡；goal-oriented 設計對上 reasoning 能力
-- `src/agents/shared/{attachments,subagent}.py` + `memory_tools.py` — PDF/圖附件 + 4 角色 subagent + episodic memory
+- `src/agents/shared/subagent.py` + `memory_tools.py` — 4 角色 subagent +
+  episodic memory；文件理解另走未來 Document Intelligence 設計
 - `src/agents/shared/replay.py` + `tests/replay_fixtures/` — **重構安全網**：把 tool dispatch 重切進 5 層時防行為漂移
 
 **Service / Signals / Analysis**
-- `src/monitor/`（engine/scheduler/notifiers/watchers/discord_bot）— Alert Center + 背景監控 + Discord 已實作
+- `src/monitor/`（engine/scheduler/notifiers/watchers）— Alert Center +
+  背景監控核心；目前只有本地 console/log routing，外部通知 transport 尚未設計
 - `src/service/job_runs_store.py` — 對應 S3 live-ops feed + last-sync 指示
 - `src/signals/`（anomaly/event_chain/event_tagger/sector_aggregator/synthesizer）— 餵 S6 gauges + strategy 訊號欄
 - `src/analysis/`（context_builder/factory/pipeline/renderer/...）— 對應結構化卡輸出 + scheduler spine（設計見 `PHASE_D_ANALYSIS_PIPELINE_SKETCH.md`）
@@ -253,7 +257,7 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 - **統一 lifecycle 物件 store**：現在是 per-type 表（research_reports/memories/sa_alpha_picks/news_scores），無共用狀態機 + tag + lifecycle 抽象
 - **Notes 模組**：Markdown + backlinks + Obsidian 相容 + 雙向連結 + graph 視圖 — report_tools 存報告但非可編輯雙鏈筆記
 - **Watch/Follow vs Note 原語 + priority 欄 + tag taxonomy** — 現資料模型沒有
-- **互動原語**：右鍵 / 多選 bulk / 右側 detail panel — CLI-only 產品無對應
+- **互動原語**：右鍵 / 多選 bulk / 右側 detail panel — 現行 App 尚未完整提供
 - **Soft-delete + trash + restore + archive 過濾** — 現無 soft-delete 模型
 - **Workspace 概念**（若採多 workspace，先解 §6.2 張力）
 - **Sync & Backup 後端**（Git/WebDAV/S3/External mirror）— 目前只有本地 profile 可攜式契約
@@ -288,7 +292,9 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 ## 10. 與 RL / 舊定位的關係
 
 - **舊的強化學習實作已退役**。草圖的 Algo nav 入口僅代表未來可能性，內容維持 deferred。
-- **OpenClaw 不是 roadmap**；**Discord 只做 notifier / 輕量 command surface**；未來自動化 = ArkScope 自有 local agent + scheduler 優先，external cowork 次之（PRIORITY_MAP §1 clarified 2026-05-25）。
+- **OpenClaw 不是 roadmap**；外部 alerts transport 與 external agent harness
+  都必須另立設計。未來自動化仍以 ArkScope 自有 local agent + scheduler
+  優先，external cowork 次之（PRIORITY_MAP §1 clarified 2026-05-25）。
 - 本桌面 app 就是「local agent + scheduler + workbench」這條線的**產品表面**。
 
 ---

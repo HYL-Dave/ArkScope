@@ -41,21 +41,20 @@ therefore defaults to defer until the hypothesis gate exists.
 
 ### P0.1 Replay Harness (Major Refactor Phase 0)
 
-- **Why**: Gates every subsequent agent change. Without replay, Phase B (compression) / Phase C (unified runner) are unfalsifiable — we cannot prove a refactor preserved behaviour. Smallest of the P0 items, so do FIRST.
-- **Approach**: ship the **minimal spike** first; expand only after the trace schema has survived contact with real captures.
-- **Acceptance criteria — minimal spike (do first)**:
-  - Trace schema written down (one Python dataclass + JSON example) covering: turn id, input messages, system prompt, tool list, model config, final assistant message, tool calls + results, token usage. Streaming chunk merging is OPTIONAL for v1 — final response is enough.
-  - Capture wired into one provider path (Anthropic) end-to-end. OpenAI path can come later.
-  - 1-2 captured fixtures saved under `tests/replay_fixtures/` (simple Q&A + one multi-tool turn).
-  - `scripts/replay_run.py <session>` reads a fixture, re-runs it against current code, prints a diff of (a) final assistant message and (b) tool call sequence. Diff format can be plain text — no fancy framework yet.
-  - User can manually rerun and visually accept/reject diffs.
-- **Acceptance criteria — full v1 (after schema stabilises)**:
-  - Both Anthropic and OpenAI paths capturing.
-  - 5+ fixture set covering attachment query, subagent delegation, compaction-triggered turn.
-  - Pre-commit / CI integration: fixtures must replay clean (or be explicitly marked as expected-diff).
-  - Streaming chunk merge if needed for token-level analysis.
-- **Effort**: 0.5-1 day for minimal spike; +1-2 days for full v1.
-- **Status**: ✅ FULL V1 DONE 2026-05-01. Minimal spike landed 2026-04-25 (`5e12d63` schema/validator + 33 tests, `875a6ef` Anthropic capture wiring); full-v1 landed in 3 commits + multiple review-fix passes (`14567db` commit 1 OpenAI capture + canonicalization + shared `server_tools.py` → `8829780`/`682ac49`/`0c63f49`/`c3353ea` High/Medium/Low/AST-guard test → `229d033` commit 2 fixture set + schema fields + attachment classifier → `d0a3f21`/`0a46512` round-1/round-2 review findings → `a8eaf60` round-3 wording cleanup → `4e30e71` commit 3 pytest gate + unified resolver + attachment pair gate → `172b5a1` Low fix availability diff resolver-aware). Spec at `docs/design/P0_1_FULL_V1_SPEC.md` — status "3/3 commits landed". Delivered: `src/agents/shared/replay.py` (validator + classifier + unified resolver), `src/agents/shared/server_tools.py` (Anthropic + OpenAI hosted-tool single source of truth), `src/agents/shared/bridge_tools.py` (bridge-only tool spec table — `delegate_to_subagent`), `tests/test_replay_fixtures.py` (parametrised gate over 7 fixtures), 7 fixtures (`no_tool_turn.json`, `one_tool_turn.json`, `p1_4_l0_overflow.json`, `openai_no_tool_turn.json`, `openai_one_tool_turn.json`, `attachment_turn.json`, `subagent_turn.json`), 98 replay-suite tests + 294 cross-suite regression. Phase C now has the safety net it was designed to consume; CI wiring still TBD (orthogonal cycle, see §2.3 of full-v1 spec).
+- **Why**: Gates subsequent agent changes by detecting structural drift in
+  tools, argument shape, prompt identity, nested subagent expectations, and
+  compression metadata without making a live model call.
+- **Current contract**: Anthropic and OpenAI programmatic captures share one
+  explicit-entrypoint schema and one resolver
+  (`ToolRegistry -> server_tools -> bridge_tools`). Required pins must
+  resolve; unrelated registry additions remain valid.
+- **Current fixtures**: six fixtures cover no-tool, one-tool, OpenAI parity,
+  Layer 0 overflow, and nested subagent behavior. There is no current
+  document-input replay branch; future Document Intelligence owns that design.
+- **Status**: ✅ SHIPPED. The original 2026-04/05 implementation sequence is
+  preserved in Git history. `docs/design/P0_1_FULL_V1_SPEC.md` is the
+  refreshed current authority; `tests/test_replay_fixtures.py` is the
+  provider-free regression gate.
 
 ### P0.2 Service-first S2: jobs persistence + history API
 
@@ -149,7 +148,13 @@ therefore defaults to defer until the hypothesis gate exists.
 - **Acceptance criteria**: see `docs/design/P1_4_SPEC.md` for the locked-in shape. Spec encodes 5 guarantees (compressor is a library not a runner; subagent path unchanged; Layer 0 net-positive for heavy queries; no fabricated reasoning; per-layer toggles), the 7-layer design (Layers 0-3 deterministic + Layer 4 provider-native optional + Layer 5 LLM full compact + Layer 6 anchor recovery), per-tool reducer policy, and 5-commit decomposition.
 - **Borrowed patterns** from `~/PycharmProjects/AI_Agent_Researcher` (see P1.4 spec §2): marker-based summary, recent-boundary algorithm, circuit breaker (3 consecutive failures → off). NOT borrowed: drop-in `ClientCompactionSession` (OpenAI-specific; we're dual-provider) or SDK Session injection (proven painful).
 - **Effort**: 4-5 days, 5 commits (overflow_store → deterministic layers → Anthropic integration → observability → LLM full compact).
-- **Status**: ✅ done 2026-04-30. Spec at `docs/design/P1_4_SPEC.md` (5/5 commits landed). Commit chain: `99f90c9` spec → `0f23bdc` 5 spec review findings → `d2d83f0` record_id wording + Anthropic model list sync → `05960fc` commit 1/5 (overflow_store + record_id derivation) → `b79472c` 3 commit-1 findings (tamper detection + utf-8 + newlines) → `15f4259` commit 2/5 (Layers 0-3 + reducer registry + ContextCompressor) → `60c92d9` 3 commit-2 findings (wrap-aware reducers + real shapes + L2 idempotency) → `2711c11` commit-2 medium follow-up (L1 envelope-aware) → `08bbbb0` commit 3/5 (wire ContextCompressor via ContextManager) → `0e73969` commit-3 spec staleness → `eaf13c0` commit 4/5 (observability + /overflow CLI) → `b3d44e2` commit-4 findings (/overflow integrity gate + spec sync) → `39fa8fc` gpt-5.4 → gpt-5.5 default → `1ed4d77` commit 5/5 (Layer 5 LLM compact + Layer 6 anchor recovery) → `95ff3cb` commit-5 findings (/compact wiring + L5 noop vs failure). Default ships master `compaction.enabled=true` (always-cheap Layers 0-3) but `compaction_layer_5_enabled=false` — LLM-call layer is OFF until explicitly opted in or armed for one turn via `/compact`. 308 tests passing (compressor + adjacent layers).
+- **Status**: ✅ SHIPPED. `docs/design/P1_4_SPEC.md` is the refreshed
+  current authority. Context compression remains a library with durable
+  overflow storage, deterministic Layers 0-3, optional provider-native Layer
+  4, threshold-driven Layer 5, Layer 6 anchors, and a three-failure circuit
+  breaker. Both the master client-side path and Layer 5 default off; there is
+  no current presentation command or one-turn activation path. The original
+  five-commit implementation sequence remains in Git history.
 
 ### P1.5 S3 admin dashboard — OSS-first survey
 
@@ -170,7 +175,13 @@ therefore defaults to defer until the hypothesis gate exists.
 ## 4. P2 — Later (dependencies pending)
 
 ### P2.1 Unified Agent Runner Phase C
-- **Status**: ⏸ **PAUSED 2026-05-02** — product pivot to local-first research workbench takes priority. Spec at `docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md` is preserved as-is (review-pass-1 closures + §8 closures all stand; nothing in the spec is invalidated). The pause is sequencing-only — Phase C remains the right refactor when it is the right time. **Resume gate (all three required)**: (1) local-first workbench v1 ships, (2) ≥ 2 weeks of stable single-user use without storage / scheduler / sync regressions, (3) at least one verified cross-machine migration completes (zip-and-go second-machine smoke). Rationale: Phase C improves provider symmetry and removes ~3,800 LoC of dual-SDK duplication, but those are internal-infra wins; doing them before storage / sync / UI re-architecture risks reworking the runner's edges (compaction surface, subagent dispatch, flag rollout) once the new product shape settles. See `PHASE_C_UNIFIED_RUNNER_SPEC.md` for authoritative design (original framing in retired `MAJOR_REFACTORING_PLAN.md`, available in git history) and §10 decision log 2026-05-02 entry on local-first pivot.
+- **Status**: ⏸ **PAUSED 2026-05-02; RE-GROUNDED 2026-08-17**.
+  `docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md` now records the current
+  Research/query/subagent, replay, tool, and provider-specific compaction
+  boundaries. Its old commit plan is not executable after the product-surface
+  retirement. The three-part resume gate remains: workbench v1 shipped, two
+  stable single-user weeks, and one verified cross-machine migration. Passing
+  those gates still requires a fresh census and RED-first implementation plan.
 
 ### P2.2 Knowledge Graph Phase A
 - **Status**: blocked on SA Comment Intel (P0.3) and Market News (P0.4) being mature data sources.
@@ -197,15 +208,29 @@ therefore defaults to defer until the hypothesis gate exists.
 - **Existing building blocks** (don't redesign): native host → sidecar job telemetry POST (S-H1) → `job_runs`; `sa_market_news_health`; gates-doc Level 2 host smoke; `extensions/sa_alpha_picks/install*.sh` are the CLI precursors the app setup surface will absorb.
 
 ### P2.7 Model capability/catalog slice ✅ SHIPPED 2026-07-11
-- **Status**: ✅ **SHIPPED — merged FF `7e4f5b7` 2026-07-11** (plan `docs/superpowers/plans/2026-07-10-model-capability-catalog.md`: 7 plan-review rounds + Task 0 live verification + 2 implementation-review rounds; final A/B failure sets identical 30=30, +48 passed = exact 48-test collect diff). Delivered: `src/model_capabilities.py` (22-entry code-reviewed registry = single capability authority; all 7 drift sites below now read registry views) · `src/model_discovery_cache.py` (per provider+auth_mode+credential-fingerprint, ok/seed_only/never_discovered) · `src/model_effective.py` + Settings verified-first picker (advanced toggle, discovery nudge, seed_only badge, collapsed manual override) · Fable-class refusal contract at all three seams (agent loop `model_refusal` event; synthesis/translation `AnthropicRefusalError`; never enters effort-retry). **Live verification 2026-07-11: server-side COMPLETE** (all-7-credential discovery round; cache-DB proof incl. failure-records-nothing; effective-view flips with all three badge polarities via route flip + exact restore; pinned_only zero leak; Luna + Sonnet 5 smoke ok — **Fable 5 smoke NOT run per ruling**; chatgpt_oauth credential needs re-login = S3 state, not P2.7). Remaining user-side: eyeball Settings picker rendering in the desktop app (rendering itself pinned by the frontend suite). Follow-ups live in the 07-10 decision-log entry: context-management strategy audit / CLI removal candidate / seed_only api_key-borrow hint (deferred). Original framing + architecture kept below for the record.
+- **Status**: ✅ **SHIPPED — merged FF `7e4f5b7` 2026-07-11;
+  terminal presentation axis retired 2026-08-17.** Delivered:
+  `src/model_capabilities.py` as the code-reviewed fact authority,
+  `src/model_discovery_cache.py` for per-credential visibility, and
+  `src/model_effective.py` plus Settings for verified-first task choices.
+  Fable-class refusal remains typed at agent, synthesis, and translation seams.
+  The 2026-07-11 live verification remains the evidence for that release; a
+  future model refresh still requires official facts, credential-visible
+  discovery, task canaries, and translation quality checks.
 - ~~**Status**: backlog, filed 2026-07-10 (user request); **architecture refined + prioritized ahead of P2.8 per gpt-5.6 Sol review 2026-07-10 (I verified every code claim)**. Not started.~~
 - **User's frame**: two new model generations landed within ~2 weeks (Anthropic Fable 5; OpenAI gpt-5.6 series — Sol/Terra/Luna per the Sol review) and the app's lists are stale; wants (a) the lists updated, (b) updatable without a code slice each time, (c) stop listing models the app can't actually use.
 - **Adopted shape (Sol refinement over the earlier "DB-backed authority" sketch — DB is NOT the sole authority)**:
   1. **Code-reviewed capability registry** — tools/structured-output support, effort tiers, context/output limits, executable driver per model family. These are engineering contracts, not user data; they stay in reviewed code.
   2. **DB discovery cache** — actually-visible models per provider + auth_mode + credential, with query timestamps (extends the existing per-auth-mode discovery the AI 研究 picker already uses via `researchModels.ts`).
   3. **Effective picker** — intersection: visible to the current active credential AND executable for the task at hand. **Adopted default (Sol Q → yes): picker shows only verified-usable models; legacy/pinned/custom-ID/unverified-seed entries live in an Advanced section with explicit warnings.**
-  4. CLI / discord / routing / Settings all read the same effective view.
-- **Drift sites to converge (all verified 2026-07-10)**: `src/agents/shared/model_catalog.py` (CLI+discord; newest opus-4.7/gpt-5.5) · `src/model_routing.py` (routing options; has opus-4.8, no Fable 5/gpt-5.6) · `config/user_profile.yaml` (scoring models, gpt-5.4 era) · **`src/agents/anthropic_agent/agent.py:102`** (`_ADAPTIVE_THINKING_MODELS`/`_EFFORT_MODELS` capability sets) · **`src/agents/openai_agent/agent.py:64`** (`_OPENAI_MODEL_MAX_OUTPUT`) · **`src/agents/shared/context_manager.py:58`** (`_MODEL_CONTEXT_LIMITS`) · prompt-side defaults. Sol's warning stands: converge the capability tables too, or the dropdown offers a model whose effort/output/context contract is then wrong at execution time.
+  4. Research/query/Card execution, routing, and Settings consume reviewed
+     capability/effective views rather than a presentation-only catalog.
+- **Current drift boundary**: provider facts belong in
+  `src/model_capabilities.py`; credential visibility belongs in discovery
+  cache; task eligibility belongs in effective views. Context, output,
+  thinking, effort, routing, and prompt defaults must remain derived from or
+  tested against those reviewed facts. The retired terminal view is not a
+  compatibility authority.
 - **Source material for slice-time verification (do not trust cached values)**: https://www.anthropic.com/claude/fable · https://developers.openai.com/api/docs/models · https://help.openai.com/en/articles/20001354 (gpt-5.6 availability; actual visibility varies by account/plan/auth channel — which is exactly why discovery is per-credential). openai package already bumped to 2.45.0 on 2026-07-10 (stale-process ImportError incident recorded in the calibration closeout entry).
 
 ### P2.8 UI improvement pass (audit-first + user irritation list)
@@ -321,7 +346,7 @@ therefore defaults to defer until the hypothesis gate exists.
   app-wide i18n line is CLOSED with no open unit.** The `codex/i18n-6-release`
   branch and its worktree are removed. Localized surfaces are the web app as
   rendered in Electron. The SA browser extension popup is **explicitly English by
-  decision**, while the CLI, logs, and sidecar diagnostics sit **outside the locale
+  decision**, while logs and sidecar diagnostics sit **outside the locale
   contract with no guarantee either way** — see the decision doc's scope boundary,
   which also fixes one canonical prose owner per condition so immediate popup
   feedback and durable localized health can coexist.

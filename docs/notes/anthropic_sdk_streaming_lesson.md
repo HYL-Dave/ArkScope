@@ -5,7 +5,7 @@
 ## 問題
 
 使用 Anthropic Python SDK (v0.79.0) 搭配 Claude Opus 4.7 + thinking 模式時，
-`max_tokens` 設為 128,000（模型最大 output），CLI 查詢直接報錯：
+`max_tokens` 設為 128,000（模型最大 output），agent 查詢直接報錯：
 
 ```
 Error: Streaming is required for operations that may take longer than 10 minutes.
@@ -63,10 +63,9 @@ with client.messages.stream(
 
 ## 影響範圍
 
-三處都需要修改：
-1. `src/agents/cli.py` — CLI 互動查詢（用戶直接遇到的）
-2. `src/agents/anthropic_agent/agent.py` — agent 模組的 tool loop
-3. `src/tools/code_generator.py` — code gen 的 Anthropic 呼叫
+現行 consumer 必須使用 streaming：
+1. `src/agents/anthropic_agent/agent.py` — agent 模組的 tool loop
+2. `src/tools/code_generator.py` — code generation 的 Anthropic 呼叫
 
 ## 測試 mock 更新
 

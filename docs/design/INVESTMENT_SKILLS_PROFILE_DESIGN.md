@@ -3,7 +3,9 @@
 > **Status: ACTIVE DESIGN - Track A shipped; Track A.5 (calibration chat) MERGED 2026-07-08
 > (`2bb0ca7`) + LIVE verified 2026-07-10 (`9bd47ea` fixed two live-only responder defects:
 > enum-less prompt; normalized patch carried derived risk_mismatch so proposals could never
-> validate). Track B (skill suggestions) not started.** Drafted 2026-07-06 after the
+> validate). Track B (skill suggestions) not started. Re-grounded 2026-08-17
+> after the terminal/chat producers retired: no current App path selects,
+> suggests, or applies a skill automatically.** Drafted 2026-07-06 after the
 > B6 repo-hygiene ruling moved `config/skills/` and the packaged skill boundary out of
 > cleanup and into product design. This document is the authority for how ArkScope should
 > personalize investment analysis with user profile, assistant stance, and skills. It
@@ -16,8 +18,8 @@ experience:
 
 - `resources/skills/` contains 10 packaged `SKILL.md` workflows, including DCF, comps,
   earnings analysis, catalyst calendar, portfolio scan, and full analysis.
-- `src/agents/shared/skills.py` already loads a tiered registry, aliases, trigger phrases,
-  and custom skills from `config/skills/`.
+- `src/agents/shared/skills.py` already loads a tiered registry, aliases,
+  descriptive selection metadata, and custom skills from `config/skills/`.
 - `config/user_profile.yaml` already contains early investment preferences such as risk
   tolerance, style, holding period, watchlists, and strategy weights.
 
@@ -27,7 +29,7 @@ model for:
 1. who the user is as an investor,
 2. what role the assistant should play for this run,
 3. which skills are useful for the task,
-4. when skills may be suggested or automatically applied,
+4. how skills may be suggested or selected by a future product workflow,
 5. how the UI explains the above without hiding analysis machinery.
 
 The user requirement is explicit: this feature must be optional, and the assistant should
@@ -41,30 +43,21 @@ complementary to the user's own tendencies.
 
 `src/agents/shared/skills.py` currently defines:
 
-- `SkillDefinition`: name, description, prompt template, aliases, trigger, category,
-  required params, data sources, output, `auto_apply`, and source path.
+- `SkillDefinition`: name, description, prompt template, aliases, trigger,
+  category, required params, data sources, output, `auto_apply`, and source
+  path. The trigger and `auto_apply` fields are metadata; they do not activate
+  a runtime producer.
 - Tiered loading:
   - Tier 1 builtin: `resources/skills/builtin/**/SKILL.md`, hard-fail and protected.
   - Tier 2 packaged categories: `resources/skills/{category}/**/SKILL.md`.
   - Tier 3 custom: `config/skills/custom/**/SKILL.md` or legacy `config/skills/*.yaml`.
-- Alias map and trigger index.
-- `match_skill_trigger(question)`, `expand_skill(name, params)`, and
-  `build_auto_apply_context(skill, question)`.
+- deterministic registry rebuilding and alias resolution;
+- explicit `expand_skill(name, params)`, listing, and validation.
 
-Important current-state split:
-
-- **Workbench / web research paths** do not currently use trigger matching or auto-apply.
-  For those surfaces, `off` can be tested as byte-identical current behavior.
-- **Legacy CLI and Discord paths already auto-apply some skills by default.**
-  `SkillDefinition.auto_apply` defaults true, `can_auto_apply()` allows paramless skills,
-  `src/agents/cli.py` injects `build_auto_apply_context()` for a unique auto-applicable
-  match, and `src/monitor/discord_bot.py` has the same pattern.
-
-So v2 auto-trigger is not merely "technically reachable"; a legacy version exists today
-outside the workbench control model. This design does not bless that behavior as the
-future contract. Track B must bring CLI under `skill_mode` semantics. The Discord surface
-must be proven live and then either brought under the same contract or retired as a
-pre-pivot surface in its own implementation plan.
+No current Workbench, Research, query, or alert path performs natural-language
+skill selection, suggestion, or automatic application. Track B therefore starts
+from a clean producer boundary: it must introduce an explicit App-owned selector
+and trace contract instead of adapting an older wrapper policy.
 
 ### 2.2 Existing packaged skills
 
@@ -117,10 +110,8 @@ user's own bias.
 
 Personalized profile/stance behavior is off by default. When disabled, the agent behaves
 like the current workbench: no profile-derived judgment posture, no personalized skill
-suggestion, and no automatic skill application. This statement is scoped to the workbench
-surface. The legacy CLI/Discord auto-apply call sites described in §2.1 are existing
-out-of-contract behavior and must be handled by Track B before the product can claim a
-global skill-mode policy.
+suggestion, and no automatic skill application. There is no separate current producer
+outside the workbench that weakens this statement.
 
 The UI should make the active state visible:
 
@@ -298,12 +289,10 @@ remain in storage, but they are inert until profile personalization is enabled a
 
 ### 6.1 v1: no skill selection
 
-For the workbench surface, v1 may include the current explicit `/skill` command and
-existing manual skills UI, but profile/stance does not automatically choose skills.
-
-This does not describe the whole repository today: CLI and Discord currently have legacy
-trigger-based auto-injection. Track B must explicitly settle those call sites instead of
-letting them remain a parallel policy.
+The current App has no live skill-selection command, suggestion UI, or automatic
+producer. Profile and stance do not choose skills. Registry entries and their
+metadata remain available for explicit future product workflows, but metadata
+alone is not execution.
 
 ### 6.2 v1.5: suggest-only
 
@@ -335,14 +324,10 @@ Output:
 
 No prompt expansion occurs in v1.5 unless the user accepts the suggestion.
 
-Track B must include the legacy call sites:
-
-- CLI: move from implicit unique-match auto-injection to the shared `skill_mode` contract.
-  Default should be `suggest_only`, so existing users still see useful skill guidance
-  without hidden context injection.
-- Discord: first prove whether the bot surface is still live. If live, bring it under the
-  same `skill_mode` contract. If not live, mark it as pre-pivot and retire or defer it in
-  the implementation plan.
+Track B must add one App-owned suggestion contract with an explicit input,
+ranked output, reason strings, and user acceptance step. It may use the retained
+metadata, but it must not revive a removed presentation wrapper or infer that a
+metadata flag is permission to execute.
 
 ### 6.3 v2: auto-with-trace
 
@@ -652,19 +637,17 @@ Build:
 - skill-suggestion selector;
 - reason strings;
 - UI/trace display;
-- accept suggestion action that expands selected skills.
-- CLI legacy auto-apply call site brought under `skill_mode` with default
-  `suggest_only`;
-- Discord legacy auto-apply call site either brought under `skill_mode` if live or
-  explicitly retired/deferred if proven pre-pivot.
+- accept suggestion action that expands selected skills;
+- one explicit App/API owner for selection and acceptance; and
+- no transport-specific duplicate selector.
 
 Acceptance:
 
 - suggestions do not auto-apply;
 - multiple matches are shown as choices;
 - trace records why a skill was suggested;
-- no hidden tool execution occurs.
-- legacy CLI/Discord behavior no longer bypasses the product skill-mode policy.
+- no hidden tool execution occurs; and
+- retained metadata does not activate a workflow without the App-owned policy.
 
 ### Track C - v2 auto-trigger
 
