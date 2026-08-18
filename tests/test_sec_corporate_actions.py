@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
-
 import pytest
 
 
@@ -337,8 +335,13 @@ def test_form25_classifier_reads_the_class_verbatim_from_every_served_shape():
             "Purchase Rights",
             False,
         ),
-        # A combined listing that still includes the equity.
+        # A combined listing that still includes the equity, in either order.
+        # The conclusion must not depend on which instrument is named first.
         ("Common Stock and Warrants", False),
+        ("Warrants and Common Stock", False),
+        ("Units, Common Stock and Warrants", False),
+        # A combined listing with no equity in it at all.
+        ("Warrants and Units", True),
         # The instrument is not the equity, however the equity is named.
         ("Warrants to purchase shares of common stock", True),
         ("Common Stock Purchase Warrants", True),
@@ -357,7 +360,7 @@ def test_form25_classifier_reads_the_class_verbatim_from_every_served_shape():
         ("6.00% Series B Cumulative Preferred Stock", True),
     ],
 )
-def test_form25_classifier_decides_on_the_instrument_not_a_mention(
+def test_form25_classifier_decides_on_the_listed_instruments_not_a_mention(
     description, covers_other_security
 ):
     from src.collectors.sec_corporate_actions import classify_form25_security
@@ -385,209 +388,6 @@ def test_form25_classifier_is_undetermined_when_the_class_is_absent():
         result = classify_form25_security(document)
         assert result.description == ""
         assert result.covers_other_security is False
-
-
-def _seed_removal_notice(db_path, *, ticker, source_ref, url):
-    from src.security_lifecycle import LifecycleObservation, SecurityLifecycleStore
-
-    conn = sqlite3.connect(str(db_path))
-    try:
-        SecurityLifecycleStore(conn).upsert_observation(
-            LifecycleObservation(
-                ticker=ticker,
-                cik="0000712515",
-                issuer_name=f"{ticker} Inc.",
-                event_type="listing_removal_notice",
-                lifecycle_state="pending_delisting",
-                filing_date="2026-06-15",
-                effective_date=None,
-                source="sec_edgar",
-                source_ref=source_ref,
-                filing_form="25-NSE",
-                filing_items=(),
-                evidence_url=url,
-                description="SEC notification of removal from listing or registration.",
-                observed_at="2026-06-16T12:00:00Z",
-            )
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def _seeded_removal_db(tmp_path):
-    db_path = tmp_path / "market_data.db"
-    _seed_removal_notice(
-        db_path, ticker="V", source_ref="note-1", url="https://sec.example/v-note"
-    )
-    _seed_removal_notice(
-        db_path, ticker="QBTS", source_ref="equity-1", url="https://sec.example/qbts"
-    )
-    _seed_removal_notice(
-        db_path, ticker="ZZZ", source_ref="gone-1", url="https://sec.example/missing"
-    )
-    return db_path
-
-
-_SEEDED_DOCUMENTS = {
-    "https://sec.example/v-note": _EXCHANGE_RENDERED_NOTE_FORM25,
-    "https://sec.example/qbts": _ISSUER_HTML_COMMON_STOCK_FORM25,
-}
-
-
-def test_reclassify_reports_other_security_rows_without_deleting_by_default(tmp_path):
-    from src.collectors.sec_corporate_actions import (
-        reclassify_stored_form25_observations,
-    )
-    from src.security_lifecycle import read_security_lifecycle
-
-    db_path = _seeded_removal_db(tmp_path)
-
-    result = reclassify_stored_form25_observations(
-        db_path=str(db_path), document_loader=_SEEDED_DOCUMENTS.get
-    )
-
-    assert result["applied"] is False
-    assert result["examined"] == 3
-    assert result["removed"] == 0
-    assert result["undetermined"] == 1
-    assert [(row["ticker"], row["security_class"]) for row in result["other_security"]] == [
-        ("V", "1.500% Senior Notes due 2026")
-    ]
-    assert len(read_security_lifecycle(str(db_path))["events"]) == 3
-
-
-def test_reclassify_deletes_only_the_other_security_rows_when_applied(tmp_path):
-    from src.collectors.sec_corporate_actions import (
-        reclassify_stored_form25_observations,
-    )
-    from src.security_lifecycle import read_security_lifecycle
-
-    db_path = _seeded_removal_db(tmp_path)
-
-    result = reclassify_stored_form25_observations(
-        db_path=str(db_path), document_loader=_SEEDED_DOCUMENTS.get, apply=True
-    )
-
-    assert result["applied"] is True
-    assert result["removed"] == 1
-    remaining = read_security_lifecycle(str(db_path))["events"]
-    assert sorted(row["ticker"] for row in remaining) == ["QBTS", "ZZZ"]
-
-
-def test_reclassify_refuses_to_apply_when_the_row_set_differs_from_the_plan(tmp_path):
-    """A deletion authorised against one report must not run against another.
-
-    Filings change and rows are added between the read-only report a human
-    approves and the apply that follows it. The plan is the authority.
-    """
-    from src.collectors.sec_corporate_actions import (
-        reclassify_stored_form25_observations,
-    )
-    from src.security_lifecycle import read_security_lifecycle
-
-    db_path = _seeded_removal_db(tmp_path)
-
-    with pytest.raises(ValueError, match="form25_reclassify_plan_mismatch"):
-        reclassify_stored_form25_observations(
-            db_path=str(db_path),
-            document_loader=_SEEDED_DOCUMENTS.get,
-            apply=True,
-            expected_ids=(9999,),
-        )
-
-    assert len(read_security_lifecycle(str(db_path))["events"]) == 3
-
-
-def test_reclassify_applies_when_the_row_set_matches_the_plan(tmp_path):
-    from src.collectors.sec_corporate_actions import (
-        reclassify_stored_form25_observations,
-    )
-
-    db_path = _seeded_removal_db(tmp_path)
-    plan = reclassify_stored_form25_observations(
-        db_path=str(db_path), document_loader=_SEEDED_DOCUMENTS.get
-    )
-
-    result = reclassify_stored_form25_observations(
-        db_path=str(db_path),
-        document_loader=_SEEDED_DOCUMENTS.get,
-        apply=True,
-        expected_ids=tuple(row["id"] for row in plan["other_security"]),
-    )
-
-    assert result["removed"] == 1
-
-
-def test_reclassify_survives_a_failing_document_fetch(tmp_path):
-    """One unreachable filing must not abort the pass or delete anything extra."""
-    from src.collectors.sec_corporate_actions import (
-        reclassify_stored_form25_observations,
-    )
-
-    db_path = _seeded_removal_db(tmp_path)
-
-    def loader(url):
-        if url == "https://sec.example/qbts":
-            raise RuntimeError("sec_request_failed")
-        return _SEEDED_DOCUMENTS.get(url)
-
-    result = reclassify_stored_form25_observations(
-        db_path=str(db_path), document_loader=loader
-    )
-
-    assert result["examined"] == 3
-    assert result["unreadable"] == 1
-    assert result["undetermined"] == 1
-    assert [row["ticker"] for row in result["other_security"]] == ["V"]
-
-
-def test_reclassify_never_touches_other_event_types(tmp_path):
-    from src.collectors.sec_corporate_actions import (
-        reclassify_stored_form25_observations,
-    )
-    from src.security_lifecycle import LifecycleObservation, SecurityLifecycleStore
-    from src.security_lifecycle import read_security_lifecycle
-
-    db_path = _seeded_removal_db(tmp_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
-        SecurityLifecycleStore(conn).upsert_observation(
-            LifecycleObservation(
-                ticker="V",
-                cik="0000712515",
-                issuer_name="V Inc.",
-                event_type="merger_agreement",
-                lifecycle_state="review_required",
-                filing_date="2026-06-15",
-                effective_date=None,
-                source="sec_edgar",
-                source_ref="note-1",
-                filing_form="8-K",
-                filing_items=("1.01",),
-                evidence_url="https://sec.example/v-note",
-                description="SEC Item 1.01 contains merger or acquisition language.",
-                observed_at="2026-06-16T12:00:00Z",
-            )
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    result = reclassify_stored_form25_observations(
-        db_path=str(db_path), document_loader=_SEEDED_DOCUMENTS.get, apply=True
-    )
-
-    assert result["examined"] == 3
-    assert result["removed"] == 1
-    remaining = read_security_lifecycle(str(db_path))["events"]
-    assert sorted(
-        (row["ticker"], row["event_type"]) for row in remaining
-    ) == [
-        ("QBTS", "listing_removal_notice"),
-        ("V", "merger_agreement"),
-        ("ZZZ", "listing_removal_notice"),
-    ]
 
 
 def test_ambiguous_item_201_does_not_invent_a_counterparty():

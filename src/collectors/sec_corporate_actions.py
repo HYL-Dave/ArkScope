@@ -76,14 +76,14 @@ _FORM25_OTHER_SECURITY_TERMS = re.compile(
     r"depositary shares?)\b",
     re.IGNORECASE,
 )
-# A class description names one instrument, which its qualifiers may then
-# describe in terms of the equity. Deciding on whether the equity is mentioned
+# A class description lists the instruments being removed, and each may then be
+# described in terms of the equity. Deciding on whether the equity is mentioned
 # anywhere is wrong in both directions: it dismisses a genuine common-stock
 # removal carrying attached rights, and it flags a warrant or unit removal that
-# only names the equity it converts into. Everything after an underlying
-# connector describes what the instrument resolves to, not what is being
-# removed, and everything after the first clause break is a qualifier or a
-# second listed instrument.
+# only names the equity it converts into. So the underlying is dropped first,
+# then each listed instrument is judged separately, and equity anywhere keeps
+# the notice reportable — a combined listing must not change conclusion just
+# because the equity is named second.
 _FORM25_UNDERLYING_CONNECTOR = re.compile(
     r"\b(?:to\s+purchase|to\s+receive|to\s+acquire|to\s+subscribe|"
     r"consisting\s+of|representing|evidencing|convertible\s+into|"
@@ -111,26 +111,37 @@ def classify_form25_security(document: Optional[str]) -> Form25Security:
     description = _form25_class_description(document)
     if not description:
         return Form25Security(description="", covers_other_security=False)
+    kinds = {
+        _form25_instrument_kind(segment)
+        for segment in _form25_listed_instruments(description)
+    }
+    # Equity anywhere among the listed instruments keeps the notice reportable,
+    # so a combined listing reaches the same conclusion in either order.
     return Form25Security(
         description=description,
-        covers_other_security=(
-            _form25_instrument_kind(_form25_head_instrument(description)) == "other"
-        ),
+        covers_other_security=("other" in kinds and "equity" not in kinds),
     )
 
 
-def _form25_head_instrument(description: str) -> str:
-    """Return the segment naming the instrument, dropping underlying and qualifiers."""
-    cut = len(description)
-    for pattern in (_FORM25_UNDERLYING_CONNECTOR, _FORM25_CLAUSE_BREAK):
-        match = pattern.search(description)
-        if match is not None:
-            cut = min(cut, match.start())
-    return description[:cut].strip() or description
+def _form25_listed_instruments(description: str) -> list[str]:
+    """Split a class description into the instruments it actually lists.
+
+    Everything from the first underlying connector onwards describes what the
+    instrument resolves to rather than what is being removed, and is dropped
+    before splitting. What remains is split on clause breaks so each listed
+    instrument is judged on its own.
+    """
+    connector = _FORM25_UNDERLYING_CONNECTOR.search(description)
+    head = (description[: connector.start()] if connector else description).strip()
+    return [
+        segment.strip()
+        for segment in _FORM25_CLAUSE_BREAK.split(head or description)
+        if segment.strip()
+    ]
 
 
-def _form25_instrument_kind(head: str) -> str:
-    """Return ``equity``, ``other``, or ``""`` for the head noun of ``head``.
+def _form25_instrument_kind(segment: str) -> str:
+    """Return ``equity``, ``other``, or ``""`` for one listed instrument.
 
     The last instrument term wins because English compounds put the head last:
     `Common Stock Purchase Warrants` is warrants. An unrecognised instrument
@@ -142,7 +153,7 @@ def _form25_instrument_kind(head: str) -> str:
         ("equity", _FORM25_EQUITY_TERMS),
         ("other", _FORM25_OTHER_SECURITY_TERMS),
     ):
-        for match in pattern.finditer(head):
+        for match in pattern.finditer(segment):
             if match.start() > position:
                 kind, position = candidate, match.start()
     return kind
@@ -432,97 +443,6 @@ def parse_submission_events(
         reverse=True,
     )
     return SubmissionEventBatch(events=tuple(events), relationships=tuple(relationships))
-
-
-def reclassify_stored_form25_observations(
-    *,
-    document_loader: Callable[[str], Optional[str]],
-    db_path: Optional[str] = None,
-    apply: bool = False,
-    expected_ids: Optional[tuple[int, ...]] = None,
-) -> dict:
-    """Re-read stored Form 25 rows and report the ones covering another security.
-
-    Rows written before the class of securities was read can mark an issuer's
-    equity as pending delisting on the strength of a matured note. This pass
-    re-reads each filing and reports what it found. It is read-only unless
-    ``apply`` is true, only ever examines ``listing_removal_notice`` rows, and
-    keeps anything it cannot classify. Filings are fetched outside the market
-    write lock; only the deletion runs inside it.
-
-    ``expected_ids`` pins the deletion to a report a human already approved.
-    Filings change and rows arrive between that report and the apply, so a
-    mismatch raises rather than deleting a set nobody reviewed.
-    """
-    target = str(db_path or resolve_market_db_path())
-    conn = sqlite3.connect(f"file:{target}?mode=ro", uri=True)
-    try:
-        rows = conn.execute(
-            "SELECT id, ticker, filing_date, filing_form, evidence_url "
-            "FROM security_lifecycle_observations "
-            "WHERE event_type='listing_removal_notice' "
-            "ORDER BY filing_date DESC, ticker"
-        ).fetchall()
-    finally:
-        conn.close()
-
-    other_security: list[dict] = []
-    undetermined = 0
-    unreadable = 0
-    for observation_id, ticker, filing_date, filing_form, evidence_url in rows:
-        try:
-            document = document_loader(evidence_url)
-        except Exception:
-            # One unreachable filing must not abort the pass or imply a verdict.
-            unreadable += 1
-            continue
-        security = classify_form25_security(document)
-        if security.covers_other_security:
-            other_security.append(
-                {
-                    "id": int(observation_id),
-                    "ticker": ticker,
-                    "filing_date": filing_date,
-                    "filing_form": filing_form,
-                    "evidence_url": evidence_url,
-                    "security_class": security.description,
-                }
-            )
-        elif not security.description:
-            undetermined += 1
-
-    if apply and expected_ids is not None:
-        planned = tuple(sorted(int(item) for item in expected_ids))
-        found = tuple(sorted(row["id"] for row in other_security))
-        if planned != found:
-            raise ValueError(
-                "form25_reclassify_plan_mismatch: "
-                f"approved {list(planned)}, found {list(found)}"
-            )
-
-    removed = 0
-    if apply and other_security:
-        with market_write_lock():
-            writer = sqlite3.connect(target, timeout=10.0)
-            try:
-                cursor = writer.executemany(
-                    "DELETE FROM security_lifecycle_observations "
-                    "WHERE id=? AND event_type='listing_removal_notice'",
-                    [(row["id"],) for row in other_security],
-                )
-                removed = int(cursor.rowcount or 0)
-                writer.commit()
-            finally:
-                writer.close()
-
-    return {
-        "applied": bool(apply),
-        "examined": len(rows),
-        "other_security": other_security,
-        "undetermined": undetermined,
-        "unreadable": unreadable,
-        "removed": removed,
-    }
 
 
 def _utc_now() -> str:
