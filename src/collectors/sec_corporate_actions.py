@@ -66,8 +66,6 @@ _FORM25_ADDRESS_CAPTION = re.compile(
 # Layout furniture only. Punctuation that can legitimately end a class name,
 # such as `.` or `:`, is deliberately left alone.
 _FORM25_SEPARATORS = " \t\r\n_—–-*"
-# Checked first: a class that names the equity is the equity even when the same
-# phrase also carries a series or par-value qualifier.
 _FORM25_EQUITY_TERMS = re.compile(
     r"\b(?:common stock|common shares?|ordinary shares?|capital stock|"
     r"class\s+[A-Z]\s+(?:common|ordinary))\b",
@@ -78,6 +76,21 @@ _FORM25_OTHER_SECURITY_TERMS = re.compile(
     r"depositary shares?)\b",
     re.IGNORECASE,
 )
+# A class description names one instrument, which its qualifiers may then
+# describe in terms of the equity. Deciding on whether the equity is mentioned
+# anywhere is wrong in both directions: it dismisses a genuine common-stock
+# removal carrying attached rights, and it flags a warrant or unit removal that
+# only names the equity it converts into. Everything after an underlying
+# connector describes what the instrument resolves to, not what is being
+# removed, and everything after the first clause break is a qualifier or a
+# second listed instrument.
+_FORM25_UNDERLYING_CONNECTOR = re.compile(
+    r"\b(?:to\s+purchase|to\s+receive|to\s+acquire|to\s+subscribe|"
+    r"consisting\s+of|representing|evidencing|convertible\s+into|"
+    r"exercisable\s+for|entitling|underlying)\b",
+    re.IGNORECASE,
+)
+_FORM25_CLAUSE_BREAK = re.compile(r",|\band\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -98,12 +111,41 @@ def classify_form25_security(document: Optional[str]) -> Form25Security:
     description = _form25_class_description(document)
     if not description:
         return Form25Security(description="", covers_other_security=False)
-    if _FORM25_EQUITY_TERMS.search(description):
-        return Form25Security(description=description, covers_other_security=False)
     return Form25Security(
         description=description,
-        covers_other_security=bool(_FORM25_OTHER_SECURITY_TERMS.search(description)),
+        covers_other_security=(
+            _form25_instrument_kind(_form25_head_instrument(description)) == "other"
+        ),
     )
+
+
+def _form25_head_instrument(description: str) -> str:
+    """Return the segment naming the instrument, dropping underlying and qualifiers."""
+    cut = len(description)
+    for pattern in (_FORM25_UNDERLYING_CONNECTOR, _FORM25_CLAUSE_BREAK):
+        match = pattern.search(description)
+        if match is not None:
+            cut = min(cut, match.start())
+    return description[:cut].strip() or description
+
+
+def _form25_instrument_kind(head: str) -> str:
+    """Return ``equity``, ``other``, or ``""`` for the head noun of ``head``.
+
+    The last instrument term wins because English compounds put the head last:
+    `Common Stock Purchase Warrants` is warrants. An unrecognised instrument
+    returns empty so the caller keeps reporting it.
+    """
+    kind = ""
+    position = -1
+    for candidate, pattern in (
+        ("equity", _FORM25_EQUITY_TERMS),
+        ("other", _FORM25_OTHER_SECURITY_TERMS),
+    ):
+        for match in pattern.finditer(head):
+            if match.start() > position:
+                kind, position = candidate, match.start()
+    return kind
 
 
 def _form25_class_description(document: Optional[str]) -> str:
@@ -397,6 +439,7 @@ def reclassify_stored_form25_observations(
     document_loader: Callable[[str], Optional[str]],
     db_path: Optional[str] = None,
     apply: bool = False,
+    expected_ids: Optional[tuple[int, ...]] = None,
 ) -> dict:
     """Re-read stored Form 25 rows and report the ones covering another security.
 
@@ -406,6 +449,10 @@ def reclassify_stored_form25_observations(
     ``apply`` is true, only ever examines ``listing_removal_notice`` rows, and
     keeps anything it cannot classify. Filings are fetched outside the market
     write lock; only the deletion runs inside it.
+
+    ``expected_ids`` pins the deletion to a report a human already approved.
+    Filings change and rows arrive between that report and the apply, so a
+    mismatch raises rather than deleting a set nobody reviewed.
     """
     target = str(db_path or resolve_market_db_path())
     conn = sqlite3.connect(f"file:{target}?mode=ro", uri=True)
@@ -443,6 +490,15 @@ def reclassify_stored_form25_observations(
             )
         elif not security.description:
             undetermined += 1
+
+    if apply and expected_ids is not None:
+        planned = tuple(sorted(int(item) for item in expected_ids))
+        found = tuple(sorted(row["id"] for row in other_security))
+        if planned != found:
+            raise ValueError(
+                "form25_reclassify_plan_mismatch: "
+                f"approved {list(planned)}, found {list(found)}"
+            )
 
     removed = 0
     if apply and other_security:

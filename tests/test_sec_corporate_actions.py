@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
+
 
 def test_sec_cik_lookup_loads_the_official_ticker_map_once(monkeypatch):
     from data_sources.sec_edgar_source import SECEdgarDataSource
@@ -317,6 +319,65 @@ def test_form25_classifier_reads_the_class_verbatim_from_every_served_shape():
     assert raw_xml.covers_other_security is True
 
 
+# A class description names one primary instrument, which any number of
+# qualifiers may then describe in terms of the equity. Deciding on "does the
+# text mention common stock" is wrong in both directions: it dismisses a real
+# common-stock removal that carries attached rights, and it flags a warrant or
+# unit removal that merely names the equity it converts into.
+@pytest.mark.parametrize(
+    "description, covers_other_security",
+    [
+        # The instrument is the equity.
+        ("Common stock, par value $0.0001 per share", False),
+        ("Class A Common Stock, par value $0.0001 per share", False),
+        ("Common Stock, $0.01 par value per share", False),
+        # A poison-pill right rides along with the equity being removed.
+        (
+            "Common Stock, no par value, and associated Preferred Share "
+            "Purchase Rights",
+            False,
+        ),
+        # A combined listing that still includes the equity.
+        ("Common Stock and Warrants", False),
+        # The instrument is not the equity, however the equity is named.
+        ("Warrants to purchase shares of common stock", True),
+        ("Common Stock Purchase Warrants", True),
+        (
+            "Units, each consisting of one share of Class A common stock and "
+            "one-half of one warrant",
+            True,
+        ),
+        ("Rights to receive shares of common stock", True),
+        (
+            "Depositary Shares each representing a 1/1000th interest in a "
+            "share of Preferred Stock",
+            True,
+        ),
+        ("1.500% Senior Notes due 2026", True),
+        ("6.00% Series B Cumulative Preferred Stock", True),
+    ],
+)
+def test_form25_classifier_decides_on_the_instrument_not_a_mention(
+    description, covers_other_security
+):
+    from src.collectors.sec_corporate_actions import classify_form25_security
+
+    document = (
+        "<html><body>FORM 25 Commission File Number 001-00000 Example Inc. "
+        "New York Stock Exchange (Exact name of Issuer as specified in its "
+        "charter, and name of Exchange where security is listed and/or "
+        "registered) 1 Example Street (Address, including zip code, and "
+        "telephone number, including area code, of Issuer's principal "
+        f"executive offices) {description} (Description of class of "
+        "securities) Please place an X in the box</body></html>"
+    )
+
+    result = classify_form25_security(document)
+
+    assert result.description == description
+    assert result.covers_other_security is covers_other_security
+
+
 def test_form25_classifier_is_undetermined_when_the_class_is_absent():
     from src.collectors.sec_corporate_actions import classify_form25_security
 
@@ -412,6 +473,50 @@ def test_reclassify_deletes_only_the_other_security_rows_when_applied(tmp_path):
     assert result["removed"] == 1
     remaining = read_security_lifecycle(str(db_path))["events"]
     assert sorted(row["ticker"] for row in remaining) == ["QBTS", "ZZZ"]
+
+
+def test_reclassify_refuses_to_apply_when_the_row_set_differs_from_the_plan(tmp_path):
+    """A deletion authorised against one report must not run against another.
+
+    Filings change and rows are added between the read-only report a human
+    approves and the apply that follows it. The plan is the authority.
+    """
+    from src.collectors.sec_corporate_actions import (
+        reclassify_stored_form25_observations,
+    )
+    from src.security_lifecycle import read_security_lifecycle
+
+    db_path = _seeded_removal_db(tmp_path)
+
+    with pytest.raises(ValueError, match="form25_reclassify_plan_mismatch"):
+        reclassify_stored_form25_observations(
+            db_path=str(db_path),
+            document_loader=_SEEDED_DOCUMENTS.get,
+            apply=True,
+            expected_ids=(9999,),
+        )
+
+    assert len(read_security_lifecycle(str(db_path))["events"]) == 3
+
+
+def test_reclassify_applies_when_the_row_set_matches_the_plan(tmp_path):
+    from src.collectors.sec_corporate_actions import (
+        reclassify_stored_form25_observations,
+    )
+
+    db_path = _seeded_removal_db(tmp_path)
+    plan = reclassify_stored_form25_observations(
+        db_path=str(db_path), document_loader=_SEEDED_DOCUMENTS.get
+    )
+
+    result = reclassify_stored_form25_observations(
+        db_path=str(db_path),
+        document_loader=_SEEDED_DOCUMENTS.get,
+        apply=True,
+        expected_ids=tuple(row["id"] for row in plan["other_security"]),
+    )
+
+    assert result["removed"] == 1
 
 
 def test_reclassify_survives_a_failing_document_fetch(tmp_path):
