@@ -383,6 +383,17 @@ def test_form25_classifier_reads_the_class_verbatim_from_every_served_shape():
         ),
         # A `;` list with no equity anywhere still resolves to another security.
         ("(1) Warrants to purchase common stock; (2) Units", True),
+        # The SEC Form 25-NSE schema gives descriptionClassSecurity no length
+        # limit, so the class must be classified in full. A SPAC-style list of
+        # warrants, units, and the equity pushes the equity past 240 characters.
+        (
+            "(1) Warrants to purchase one share of Class A common stock at an "
+            "exercise price of $11.50 per share, subject to adjustment; "
+            "(2) Units, each consisting of one share of Class A common stock "
+            "and one-half of one redeemable warrant to purchase Class A common "
+            "stock; (3) Class A Common Stock, par value $0.0001 per share",
+            False,
+        ),
         # The instrument is not the equity, however the equity is named.
         ("Warrants to purchase shares of common stock", True),
         ("Common Stock Purchase Warrants", True),
@@ -420,6 +431,34 @@ def test_form25_classifier_decides_on_the_listed_instruments_not_a_mention(
 
     assert result.description == description
     assert result.covers_other_security is covers_other_security
+
+
+def test_form25_classifier_reads_the_whole_class_before_deciding():
+    """The equity may be listed past any storage cap and must still count.
+
+    `descriptionClassSecurity` has no length limit in the SEC schema. Only the
+    stored description is bounded, and it is bounded to the store's own limit.
+    """
+    from src.collectors.sec_corporate_actions import classify_form25_security
+
+    filler = "; ".join(
+        f"({index}) Warrants to purchase common stock, series {index}"
+        for index in range(1, 30)
+    )
+    description = f"{filler}; (30) Common Stock, par value $0.01 per share"
+    assert len(description) > 1000
+
+    document = (
+        "<html><body>FORM 25 (Address, including zip code, and telephone "
+        "number, including area code, of Issuer's principal executive offices) "
+        f"{description} (Description of class of securities) x</body></html>"
+    )
+
+    result = classify_form25_security(document)
+
+    assert result.covers_other_security is False
+    assert len(result.description) == 1000
+    assert result.description == description[:1000]
 
 
 def test_form25_classifier_is_undetermined_when_the_class_is_absent():

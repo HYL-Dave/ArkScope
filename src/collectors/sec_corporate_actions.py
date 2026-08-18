@@ -98,14 +98,19 @@ _FORM25_UNDERLYING_CONNECTOR = re.compile(
 )
 # `;` is the separator exchanges use for a numbered list of instruments.
 _FORM25_CLAUSE_BREAK = re.compile(r"[;,]|\band\b", re.IGNORECASE)
+# `descriptionClassSecurity` has no length limit in the SEC Form 25-NSE schema,
+# so classification reads the whole class text. Only the value we hand on is
+# bounded, and it is bounded to the store's own description limit.
+_FORM25_STORED_DESCRIPTION_LIMIT = 1000
 
 
 @dataclass(frozen=True)
 class Form25Security:
     """The class of securities a Form 25 removes.
 
-    ``description`` is the verbatim caption text, empty when the filing body was
-    unavailable or did not carry one. ``covers_other_security`` is true only on a
+    ``description`` is the verbatim caption text, bounded only by the store's
+    description limit, and empty when the filing body was unavailable or did not
+    carry one. Classification always reads the untruncated text. ``covers_other_security`` is true only on a
     positive non-equity match, so an undetermined filing stays reportable rather
     than being silently dismissed.
     """
@@ -123,9 +128,10 @@ def classify_form25_security(document: Optional[str]) -> Form25Security:
         for segment in _form25_listed_instruments(description)
     }
     # Equity anywhere among the listed instruments keeps the notice reportable,
-    # so a combined listing reaches the same conclusion in either order.
+    # so a combined listing reaches the same conclusion in either order. The
+    # decision uses the full text; only the reported value is truncated.
     return Form25Security(
-        description=description,
+        description=description[:_FORM25_STORED_DESCRIPTION_LIMIT],
         covers_other_security=("other" in kinds and "equity" not in kinds),
     )
 
@@ -174,7 +180,7 @@ def _form25_class_description(document: Optional[str]) -> str:
         return ""
     tagged = _FORM25_CLASS_TAG.search(raw)
     if tagged is not None:
-        return _clean_entity(_plain_text(tagged.group("value")))[:240]
+        return _clean_entity(_plain_text(tagged.group("value")))
     text = _plain_text(raw)
     caption = _FORM25_CLASS_CAPTION.search(text)
     if caption is None:
@@ -187,7 +193,7 @@ def _form25_class_description(document: Optional[str]) -> str:
         candidate = preceding.rpartition(address_captions[-1])[2]
     else:
         candidate = preceding.rpartition(")")[2]
-    return _clean_entity(candidate.strip(_FORM25_SEPARATORS))[:240]
+    return _clean_entity(candidate.strip(_FORM25_SEPARATORS))
 
 
 @dataclass(frozen=True)
