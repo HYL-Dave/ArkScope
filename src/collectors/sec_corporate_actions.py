@@ -80,17 +80,24 @@ _FORM25_OTHER_SECURITY_TERMS = re.compile(
 # described in terms of the equity. Deciding on whether the equity is mentioned
 # anywhere is wrong in both directions: it dismisses a genuine common-stock
 # removal carrying attached rights, and it flags a warrant or unit removal that
-# only names the equity it converts into. So the underlying is dropped first,
-# then each listed instrument is judged separately, and equity anywhere keeps
-# the notice reportable — a combined listing must not change conclusion just
-# because the equity is named second.
+# only names the equity it converts into.
+#
+# So the description is split into the instruments it lists FIRST, and only then
+# is each instrument's own underlying description stripped. Dropping everything
+# after the first connector instead would discard later listed instruments —
+# a real exchange notice reads `(1) Units consisting of Common Stock ... and
+# warrants to purchase common stock; (2) Common Stock; (3) Warrants to purchase
+# common stock`, where item (2) is the equity and sits behind two connectors.
+# Equity in any listed instrument keeps the notice reportable, so the conclusion
+# does not depend on the order the instruments are named in.
 _FORM25_UNDERLYING_CONNECTOR = re.compile(
     r"\b(?:to\s+purchase|to\s+receive|to\s+acquire|to\s+subscribe|"
     r"consisting\s+of|representing|evidencing|convertible\s+into|"
     r"exercisable\s+for|entitling|underlying)\b",
     re.IGNORECASE,
 )
-_FORM25_CLAUSE_BREAK = re.compile(r",|\band\b", re.IGNORECASE)
+# `;` is the separator exchanges use for a numbered list of instruments.
+_FORM25_CLAUSE_BREAK = re.compile(r"[;,]|\band\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -124,20 +131,22 @@ def classify_form25_security(document: Optional[str]) -> Form25Security:
 
 
 def _form25_listed_instruments(description: str) -> list[str]:
-    """Split a class description into the instruments it actually lists.
+    """Split a class description into the instruments it lists.
 
-    Everything from the first underlying connector onwards describes what the
-    instrument resolves to rather than what is being removed, and is dropped
-    before splitting. What remains is split on clause breaks so each listed
-    instrument is judged on its own.
+    Each returned segment has its own underlying description removed, so a
+    warrant reduces to the warrant rather than to the equity it converts into,
+    while an instrument listed after that warrant survives instead of being
+    swallowed with it.
     """
-    connector = _FORM25_UNDERLYING_CONNECTOR.search(description)
-    head = (description[: connector.start()] if connector else description).strip()
-    return [
-        segment.strip()
-        for segment in _FORM25_CLAUSE_BREAK.split(head or description)
-        if segment.strip()
-    ]
+    instruments = []
+    for segment in _FORM25_CLAUSE_BREAK.split(description):
+        connector = _FORM25_UNDERLYING_CONNECTOR.search(segment)
+        if connector is not None:
+            segment = segment[: connector.start()]
+        segment = segment.strip()
+        if segment:
+            instruments.append(segment)
+    return instruments
 
 
 def _form25_instrument_kind(segment: str) -> str:

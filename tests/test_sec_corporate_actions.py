@@ -342,6 +342,47 @@ def test_form25_classifier_reads_the_class_verbatim_from_every_served_shape():
         ("Units, Common Stock and Warrants", False),
         # A combined listing with no equity in it at all.
         ("Warrants and Units", True),
+        # Real Form 25 descriptions, captured 2026-08-18 from EDGAR full-text
+        # search for Form 25 filings mentioning warrants. Exchanges routinely
+        # strike the equity and its warrants in one notice, using `;` as the
+        # list separator and numbering the instruments.
+        (
+            "(1) Units consisting of Common Stock $0.001 par value, per share "
+            "and warrants to purchase common stock; (2) Common Stock; "
+            "(3) Warrants to purchase common stock",
+            False,
+        ),
+        (
+            "(1) Common Stock, $0.001 par value per share; (2) Class A warrants "
+            "to purchase Common Stock; and (3) Class B warrants to purchase "
+            "Common Stock",
+            False,
+        ),
+        (
+            "Common Stock, $0.0001 par value per share Warrants to Purchase "
+            "Shares of Common Stock",
+            False,
+        ),
+        (
+            "Common Stock, $0.0001 par value per share Warrants to purchase "
+            "common stock expiring 2026",
+            False,
+        ),
+        ("Common Stock, par value $0.01 per share Warrants to purchase Common Stock", False),
+        # An instrument's own underlying must not swallow a later listed one,
+        # in either order.
+        (
+            "Warrants to purchase Common Stock, and Class A Common Stock, par "
+            "value $0.0001 per share",
+            False,
+        ),
+        (
+            "Class A Common Stock, par value $0.0001 per share, and Warrants to "
+            "purchase Common Stock",
+            False,
+        ),
+        # A `;` list with no equity anywhere still resolves to another security.
+        ("(1) Warrants to purchase common stock; (2) Units", True),
         # The instrument is not the equity, however the equity is named.
         ("Warrants to purchase shares of common stock", True),
         ("Common Stock Purchase Warrants", True),
