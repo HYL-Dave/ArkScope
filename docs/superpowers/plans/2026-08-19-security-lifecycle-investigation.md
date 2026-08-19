@@ -1,8 +1,9 @@
 # Security Lifecycle Investigation Implementation Plan
 
 > **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
-> AMENDMENT FOCUSED REVIEW PENDING; NO TASK 0 EXECUTION, LIVE MIGRATION, MERGE,
-> PUSH, OR PROVIDER CALL AUTHORIZED
+> AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT FOCUSED
+> REVIEW PENDING; NO TASK 0 EXECUTION, LIVE MIGRATION, MERGE, PUSH, OR PROVIDER
+> CALL AUTHORIZED
 >
 > **Date:** 2026-08-19
 >
@@ -631,6 +632,24 @@ the design-reviewed migration snapshot. It contains all 37 legacy rows and the
 zero-row relationship-table fact, with literal old IDs and review values. It
 contains no API key, private path, account identity, or unrelated database row.
 
+Task 0 first freezes the fixture cohort from the Slice 1 correction boundary:
+legacy rows whose immutable `first_observed_at` is strictly earlier than
+`2026-08-18T07:34:00Z`. That boundary is carried by the local
+`security-lifecycle-form25-20260818T073400Z` correction record; the local backup
+is corroboration, not a portable fixture authority. Task 0 emits the resulting
+36 exact `(source,source_ref,ticker)` keys and 37 selected old-row IDs as
+byte-sorted ledgers plus a complete public-row digest. Focused Task 0 review
+promotes those packet artifacts to the only input authority for the tracked T1
+fixture. No executor may choose a cohort from current row count or ticker name.
+
+Rows at or after the cutoff are current live observations, not fixture input.
+They are recorded by key/count in a separate exclusion ledger with reason
+`observed_after_fixture_cutoff`; they are neither deleted nor treated as drift.
+An intentionally restored pre-cutoff row, a missing selected row, or a selected
+cohort other than exact `37 rows / 36 identities / 37 kinds / 4 reviews` is
+B-class because it changes the reviewed fixture rather than merely extending
+live data.
+
 Preflight emits deterministic, byte-sorted:
 
 ```text
@@ -817,6 +836,11 @@ POSTs. Each explicit search click issues exactly one POST.
 **Files:** governance status and external evidence packet only. No owned product
 or test path changes.
 
+The 2026-08-20 step 9 amendment is B-class because it changes the sole
+production-read selector. It changes no product/test byte, node/path/route/tool
+ledger, staged identity, RED arithmetic, fixture target, or Tasks 1-8 product
+contract. Focused review is required before Task 0 authorization.
+
 1. Create a fresh branch/worktree from exact `93ad4449`; prove main remains at
    the same commit and is an ancestor.
 2. Link root `node_modules`; verify Node/Vitest and all pinned harness hashes.
@@ -833,13 +857,22 @@ or test path changes.
    streams and predicted final algebra.
 8. Run the three-file 127-node T1 baseline with the socket guard; require
    127/127 and zero attempts.
-9. After plan GREEN only, perform one bounded `mode=ro` transaction against the
-   active market DB that reads only the two legacy lifecycle tables, their
-   schema, row payloads, counts, and `integrity_check`. Capture a secret/path-free
-   public-field projection for the T1 fixture. It must still be exactly 37 rows,
-   36 identities, 37 kinds, four reviewed rows, the known CCL group, and zero
-   relationships; drift is B-class and no fixture is guessed. No profile DB or
-   unrelated market table is read in this capture.
+9. After plan GREEN and explicit Task 0 authorization only, perform one bounded
+   `mode=ro` transaction against the active market DB that reads only the two
+   legacy lifecycle tables, their schema, row payloads, counts, and
+   `integrity_check`. Partition rows mechanically at the section 1.5
+   `first_observed_at` cutoff; do not select by current count, ticker, filing
+   class, review state, or operator judgment. The selected cohort must be exact
+   `37 rows / 36 identities / 37 kinds / 4 reviewed rows`, preserve the known
+   CCL two-kind group, contain only known review values and valid non-NUL core
+   fields, and coexist with zero relationships. Emit its 36-key ledger,
+   37-old-ID ledger, complete public-row projection/digest, and a separate
+   key/count/reason ledger for every later live row. Later rows, including a
+   scheduler re-observation of V or LLY, do not stop Task 0. A missing or extra
+   selected row, changed grouping invariant, invalid selected value, restored
+   pre-cutoff V/LLY row, nonzero relationship table, schema failure, or
+   integrity failure is B-class. No profile DB or unrelated market table is
+   read, and no fixture becomes authoritative before focused packet review.
 10. Run a fresh canonical native control in a scratch runtime root. Require
    4,148 passed / 12 skipped / 0 failed and store the deterministic report.
 11. Record only whether `ARKSCOPE_SEC_USER_AGENT` is configured with an
@@ -869,9 +902,12 @@ batch ruling says otherwise.
    shape to observation/many-kind shape.
 4. Update only module-level scheduler/collector fakes needed for the new result
    DTO; this does not authorize another node-body evolution.
-5. Add the 37-row public-field fixture. A validator rejects extra/missing keys,
-   duplicate old IDs, unknown review values, nonzero relationship count, NUL,
-   and any count other than 37.
+5. Add the 37-row public-field fixture only by byte-projecting the focused-review
+   GREEN Task 0 cohort. Its 36-key ledger, 37-old-ID ledger, and complete row
+   digest must match the packet authorities exactly. A validator rejects
+   extra/missing keys, duplicate old IDs, unknown review values, nonzero
+   relationship count, NUL, and any count other than 37; Task 0's later-row
+   exclusion ledger is not fixture input.
 6. Collect exact staged identity
    `4177/91a6bde80392b9af7aec045ec784a4b2e391f11ddfa2e177720d3e78ce8b9e67`.
 7. Run the 144-node focused stream against pre-implementation product bytes.
