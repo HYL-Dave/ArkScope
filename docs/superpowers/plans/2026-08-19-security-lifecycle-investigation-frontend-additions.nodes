@@ -1,0 +1,26 @@
+src/AppShell.test.tsx	App shell integration > opens the Universe lifecycle workflow from the Settings health link
+src/SettingsLocalStorage.test.ts	local storage panels > shows lifecycle storage health and opens the Universe workflow without review actions
+src/Universe.test.tsx	Universe localization > keeps inventory and lifecycle as one Universe-owned tab set
+src/Universe.test.tsx	Universe localization > opens an exact lifecycle case navigation target and preserves it across locale switch
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > acknowledges insufficient evidence and reopens it without creating an assessment
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > adds manual URL and text evidence without network access
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > blocks proposal controls when a portfolio position requires review
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > filters cases by workflow relevance event kind and proposal type
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > keeps prior evidence and shows a typed safe error when search fails
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > keeps source-missing history visible and marks changed source content for revalidation
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > names Tavily and sends exactly one bounded request after the explicit search click
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > opening refreshing focusing and switching tabs issue zero investigation requests
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > opens a drawer with source evidence acknowledgement assessment and proposal sections
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > records successful zero-result runs without claiming no impact
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > renders bilingual workflow copy without translating provider evidence
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > renders source-aware proposals as unapplied explanations
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > renders unresolved investigating evidence ready inconclusive and resolved as distinct states
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > requires cited evidence before accepting a conclusive assessment
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > shows legacy reviews with limited provenance
+src/lifecycle/LifecycleView.test.tsx	Lifecycle workflow > uses the stable responsive triage and drawer structure
+src/lifecycle/lifecyclePresentation.test.ts	Lifecycle presentation > labels source presence and workflow state without mixing their meanings
+src/lifecycle/lifecyclePresentation.test.ts	Lifecycle presentation > preserves decimal assessment facts and unknown values
+src/lifecycle/lifecyclePresentation.test.ts	Lifecycle presentation > rejects unsafe evidence links before rendering an external action
+src/lifecycle/lifecyclePresentation.test.ts	Lifecycle presentation > renders proposals as recommendations rather than completed actions
+src/lifecycle/lifecyclePresentation.test.ts	Lifecycle presentation > sanitizes typed API failures without exposing diagnostic detail
+src/shell/navigation.test.ts	shell navigation authority > resolves an exact Universe lifecycle case without inventing a nav item

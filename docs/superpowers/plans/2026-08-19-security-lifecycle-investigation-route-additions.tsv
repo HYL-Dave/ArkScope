@@ -1,0 +1,10 @@
+GET	/security-lifecycle/cases
+GET	/security-lifecycle/cases/{case_id}
+GET	/security-lifecycle/investigations/{run_id}
+POST	/security-lifecycle/acknowledgements/{acknowledgement_id}/reopen
+POST	/security-lifecycle/action-proposals/{proposal_id}/dismiss
+POST	/security-lifecycle/assessments/{assessment_id}/accept
+POST	/security-lifecycle/cases/{case_id}/acknowledgements
+POST	/security-lifecycle/cases/{case_id}/assessments
+POST	/security-lifecycle/cases/{case_id}/evidence
+POST	/security-lifecycle/cases/{case_id}/investigations

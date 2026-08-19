@@ -1,0 +1,2 @@
+src/SettingsLocalStorage.test.ts	local storage panels > offers explicit local confirmation only for listing-status events
+src/SettingsLocalStorage.test.ts	local storage panels > shows SEC lifecycle evidence as review material and reloads it after its source runs

@@ -1,6 +1,6 @@
 # Security Lifecycle Investigation and Action Proposal Design
 
-**Status:** DRAFT AMENDED FOR FOCUSED RE-REVIEW
+**Status:** DESIGN APPROVED; RED-FIRST IMPLEMENTATION PLAN REVIEW PENDING
 **Date:** 2026-08-19
 **Base:** `be263855` (`master`; not pushed by this design)
 **Priority owner:** `PROJECT_PRIORITY_MAP.md` P0-E, Slice 2

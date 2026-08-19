@@ -1,0 +1,48 @@
+task	node_id	reason	red_expectation
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[(1) Units consisting of Common Stock and warrants; (2) Common Stock; (3) Warrants]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[(1) Warrants; (2) Class A Shares]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[6.00% Series B Cumulative Preferred Stock]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[6.75% Notes due 2031]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[American Depositary Shares, each representing five Common Shares]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[Common Stock, par value $0.0001 per share]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[Units of Beneficial Interest]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_does_not_choose_the_initial_review_state[Warrants to purchase shares of common stock]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_evidence_is_bounded_only_at_the_storage_boundary	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_class_evidence_survives_a_terse_filing_description	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_depositary_class_is_never_silently_discarded	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_fetch_failure_does_not_lose_the_rest_of_the_ticker	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_for_a_matured_note_is_review_material_not_pending_equity	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_for_common_stock_starts_as_review_material	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_records_the_class_of_securities_as_evidence	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_records_the_class_verbatim_from_every_served_shape[<?xml version="1.0"?><notificationOfRemoval><schemaVersion>X0203</schemaVersion><exchange><cik>0000876661</cik><entityName>NEW YORK STOCK EXCHANGE LLC</entityName></exchange><issuer><cik>0000059478</cik><entityName>ELI LILLY &amp; Co</entityName></issuer><descriptionClassSecurity>1.625% Notes Due 2026</descriptionClassSecurity><ruleProvision>17 CFR 240.12d2-2(a)(2)</ruleProvision></notificationOfRemoval>-1.625% Notes Due 2026]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_records_the_class_verbatim_from_every_served_shape[<html><body>FORM 25 NOTIFICATION OF REMOVAL FROM LISTING AND/OR REGISTRATION UNDER SECTION 12(b) OF THE SECURITIES EXCHANGE ACT OF 1934. Commission File Number 001-33977 Issuer: VISA INC. Exchange: NEW YORK STOCK EXCHANGE LLC (Exact name of Issuer as specified in its charter, and name of Exchange where security is listed and/or registered) Address: PO Box 8999 San Francisco CALIFORNIA 94128 Telephone number: (650) 432-3200 (Address, including zip code, and telephone number, including area code, of Issuer's principal executive offices) 1.500% Senior Notes due 2026 (Description of class of securities) Please place an X in the box to designate the rule provision relied upon to strike the class of securities from listing and registration:</body></html>-1.500% Senior Notes due 2026]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_records_the_class_verbatim_from_every_served_shape[<html><body>UNITED STATES SECURITIES AND EXCHANGE COMMISSION Washington, D.C. 20549 _______________ FORM 25 NOTIFICATION OF REMOVAL FROM LISTING AND/OR REGISTRATION UNDER SECTION 12(b) OF THE SECURITIES EXCHANGE ACT OF 1934 _______________ Commission File Number 001-41468 D-Wave Quantum Inc. New York Stock Exchange (Exact name of Issuer as specified in its charter, and name of Exchange where security is listed and/or registered) _______________ 2650 East Bayshore Road Palo Alto, California 94303 (650) 285-2881 (Address, including zip code, and telephone number, including area code, of Issuer\u2019s principal executive offices) _______________ Common stock, par value $0.0001 per share (Description of class of securities) _______________ Please place an X in the box to designate the rule provision relied upon to strike the class of securities from listing and registration:</body></html>-Common stock, par value $0.0001 per share]	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_unknown_class_remains_review_material	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_with_an_undetermined_class_does_not_claim_one	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_form25_with_an_unreadable_document_still_requires_review	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_item_301_alone_is_a_review_signal_not_delisting_proof	batch observation/kind shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_run_incremental_persists_partial_results_without_touching_profile_state	collector result and normalized store shape	must_fail
+T1	tests/test_sec_corporate_actions.py::test_scheduler_registers_sec_source_and_preserves_adapter_partial	collector result shape	must_pass
+T3	tests/test_agents.py::TestAnthropicToolSchemas::test_tool_count	bridge count 51 to 53	must_fail
+T3	tests/test_agents.py::TestAnthropicToolSchemas::test_tool_names	exact bridge names add two lifecycle tools	must_fail
+T3	tests/test_agents.py::TestOpenAIToolCreation::test_create_tools_count	bridge count 51 to 53	must_fail
+T3	tests/test_agents.py::TestRegistrySchemaExport::test_to_anthropic_schema	registry count 50 to 52	must_fail
+T3	tests/test_agents.py::TestRegistrySchemaExport::test_to_openai_schema	registry count 50 to 52	must_fail
+T3	tests/test_analyst_tools.py::TestBridgeIntegration::test_analysis_category_count	analysis count 13 to 15	must_fail
+T3	tests/test_analyst_tools.py::TestBridgeIntegration::test_registry_total_count	registry count 50 to 52	must_fail
+T3	tests/test_api.py::TestHealth::test_status	status tool count 50 to 52	must_fail
+T3	tests/test_api.py::test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes	route count 173 to 180	must_fail
+T3	tests/test_memory_tools.py::TestMemoryToolRegistry::test_total_tool_count	registry count 50 to 52	must_fail
+T3	tests/test_portfolio_tools.py::TestPortfolioToolRegistration::test_tool_registered	registry count 50 to 52	must_fail
+T3	tests/test_sa_tools.py::TestBridgeIntegration::test_anthropic_bridge_count	bridge count 51 to 53	must_fail
+T3	tests/test_sa_tools.py::TestBridgeIntegration::test_anthropic_schema_count	registry count 50 to 52	must_fail
+T3	tests/test_sa_tools.py::TestBridgeIntegration::test_openai_schema_count	registry count 50 to 52	must_fail
+T3	tests/test_sa_tools.py::TestBridgeIntegration::test_registry_count	registry count 50 to 52	must_fail
+T3	tests/test_sa_tools.py::TestRegistryV3::test_registry_count	registry count 50 to 52	must_fail
+T3	tests/test_sec_tools.py::TestBridgeIntegration::test_analysis_category_6	analysis count 13 to 15	must_fail
+T3	tests/test_sec_tools.py::TestBridgeIntegration::test_registry_23	registry count 50 to 52	must_fail
+T3	tests/test_tools.py::TestRegistry::test_anthropic_schema	registry count 50 to 52	must_fail
+T3	tests/test_tools.py::TestRegistry::test_categories	analysis count 13 to 15	must_fail
+T3	tests/test_tools.py::TestRegistry::test_openai_schema	registry count 50 to 52	must_fail
+T3	tests/test_tools.py::TestRegistry::test_register_all	registry count 50 to 52	must_fail
+T3	tests/test_tools.py::TestRegistry::test_tool_names	expected registry names add two lifecycle tools	must_fail

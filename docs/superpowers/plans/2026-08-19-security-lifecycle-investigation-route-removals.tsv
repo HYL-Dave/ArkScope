@@ -1,0 +1,3 @@
+GET	/market-data/security-lifecycle
+PUT	/market-data/security-lifecycle/events/{event_id}
+PUT	/market-data/security-lifecycle/relationships/{relationship_id}
