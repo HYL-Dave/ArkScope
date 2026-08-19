@@ -2,8 +2,9 @@
 
 > **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
 > AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
-> `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT FOCUSED REVIEW PENDING; NO
-> TASK 0 EXECUTION, LIVE MIGRATION, MERGE, PUSH, OR PROVIDER CALL AUTHORIZED
+> `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
+> AUTHORIZED BY THE USER ON 2026-08-20 WITH SPECIAL-ISSUE/HARD-STOP PAUSE;
+> LIVE MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
 >
 > **Date:** 2026-08-19
 >
@@ -839,8 +840,10 @@ or test path changes.
 The 2026-08-20 step 9 amendment is B-class because it changes the sole
 production-read selector. It changes no product/test byte, node/path/route/tool
 ledger, staged identity, RED arithmetic, fixture target, or Tasks 1-8 product
-contract. Focused review completed at `8a600ce0` before the user authorized
-Task 0.
+contract. Focused review completed at `8a600ce0` before the user explicitly
+authorized Task 0 on 2026-08-20. That ruling also permits continued task
+execution under explicit self-review while no special issue or hard stop is
+present; either condition pauses execution.
 
 The 2026-08-20 bootstrap-topology amendment is B-class because reviewed
 docs-only plan amendments necessarily moved main beyond the product grounding
@@ -848,6 +851,8 @@ base, making the former requirement that main both remain at `93ad4449` and
 contain those amendments impossible. It changes no product/test byte,
 node/path/route/tool ledger, staged identity, RED arithmetic, fixture target,
 or Tasks 1-8 product contract. Focused review is required before Task 0 starts.
+That review completed GREEN at `0e99314f`; the existing user authorization may
+therefore be exercised.
 
 1. Capture clean main HEAD after all reviewed plan amendments as
    `PLAN_AUTHORITY_TIP`, record its full hash, and create the implementation
