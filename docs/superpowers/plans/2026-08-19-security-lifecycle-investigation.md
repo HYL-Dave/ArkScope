@@ -1,6 +1,7 @@
 # Security Lifecycle Investigation Implementation Plan
 
-> **Status:** PLAN REVIEW PENDING; NO IMPLEMENTATION, LIVE MIGRATION, MERGE,
+> **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
+> AMENDMENT FOCUSED REVIEW PENDING; NO TASK 0 EXECUTION, LIVE MIGRATION, MERGE,
 > PUSH, OR PROVIDER CALL AUTHORIZED
 >
 > **Date:** 2026-08-19
@@ -1234,30 +1235,52 @@ or incomplete evidence is corrected under the A/B rules before merge.
 Task 8 is not unlocked by this plan or by Task 7 merge. It requires an explicit
 user command after closeout GREEN.
 
+The 2026-08-20 live-preflight amendment is B-class because it changes a live
+migration gate. It changes no Task 0-7 identity, ledger, product scope, test
+contract, or implementation authorization; focused review is required before
+Task 8, not before Task 0.
+
 ### 10.1 Preconditions
 
 - Desktop, sidecar, scheduler, SEC collector, browser extension, and every
   process holding either active DB are stopped and verified.
 - `ARKSCOPE_SEC_USER_AGENT` is an operator-owned non-placeholder contact. Its
   value is not recorded.
-- Fresh read-only preflight exactly matches the approved 37-row/36-case input,
-  four legacy reviews, CCL group, zero relationships, schemas, and integrity.
+- Fresh read-only preflight emits a complete byte-sorted legacy-row map and
+  derives `expected_legacy_rows`, `expected_observations`, `expected_kinds`,
+  `expected_legacy_assessments`, and unresolved count from the current
+  quiesced input. It validates known review values, every exact filing-key
+  group, core-field equality, same-kind payload compatibility, NUL absence,
+  zero relationships, both schemas, and integrity.
+- The operator reviews and explicitly approves the exact live-preflight
+  manifest and digest before any database write. Approval names the derived
+  counts and every old-row-to-case mapping; it is not inferred from Task 0 or
+  merge GREEN.
 - Timestamped backups of both active DB files live under a durable local backup
   directory outside `/tmp`; SHA-256/size/mtime manifest and per-file restore
   probes pass.
 - The operator accepts the visible post-cutover change: old Settings review
   controls disappear and the same history appears under Universe Lifecycle.
 
-Any count/content drift is a B-class stop and plan amendment. Do not force the
-live data to match fixture counts.
+The fixed 37-row fixture and its exact `36 observations / 37 kinds / 4 legacy
+assessments / 32 unresolved` result remain the Tasks 1-7 implementation and
+recovery authority. They are not a live-count target. A different live count is
+admissible when the complete preview satisfies the same shape invariants and
+the operator approves its exact manifest. Unknown vocabulary, conflicting
+groups, missing source fields, NUL, a nonzero relationship table, or a mapping
+that requires guessing is B-class and requires amendment. Any input change
+after manifest approval invalidates that approval and requires a fresh preview
+and explicit approval; never force live data to match fixture counts.
 
 ### 10.2 Migration
 
-1. Capture two stable pre-manifests while quiesced.
+1. Capture two stable pre-manifests while quiesced, then rerun the read-only
+   preflight and require byte equality with the explicitly approved manifest.
 2. Run the coordinator once with exact active market/profile paths.
-3. Verify complete receipt, 36 observations, 37 kinds, four migrated accepted
-   assessments, 32 unresolved projections, zero relationship table, route/API
-   composition, FKs, and both integrity checks.
+3. Verify the complete receipt against every approved live-preflight expected
+   count and mapping, including observations, kinds, migrated accepted
+   assessments, derived unresolved projections, zero relationship table,
+   route/API composition, FKs, and both integrity checks.
 4. Compare authorized-table row/schema manifests and assert every unrelated
    table/file is byte/row equivalent.
 5. Restart the app only after phase is complete. If interrupted or invalid,
