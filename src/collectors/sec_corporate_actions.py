@@ -48,11 +48,11 @@ _NAMED_SUBSIDIARY_RE = re.compile(
 )
 
 
-# A Form 25 strikes one named class of securities, so the issuer's equity is
-# only implicated when that class is the equity. Both shapes SEC serves place
+# A Form 25 names one or more classes of securities. The class text is evidence,
+# but its category cannot establish whether the event directly affects the
+# tracked symbol or indirectly affects its issuer. Both rendered shapes place
 # the class immediately before the `(Description of class of securities)`
-# caption: the exchange notice rendered through `xslF25X02`, and the
-# issuer-filed HTML notice. The raw XML exposes it as a single element instead.
+# caption; raw XML exposes it as a single element instead.
 _FORM25_CLASS_TAG = re.compile(
     r"<descriptionClassSecurity>(?P<value>.*?)</descriptionClassSecurity>",
     re.IGNORECASE | re.DOTALL,
@@ -66,112 +66,9 @@ _FORM25_ADDRESS_CAPTION = re.compile(
 # Layout furniture only. Punctuation that can legitimately end a class name,
 # such as `.` or `:`, is deliberately left alone.
 _FORM25_SEPARATORS = " \t\r\n_—–-*"
-_FORM25_EQUITY_TERMS = re.compile(
-    r"\b(?:common stock|common shares?|ordinary shares?|capital stock|"
-    r"class\s+[A-Z]\s+(?:common|ordinary))\b",
-    re.IGNORECASE,
-)
-_FORM25_OTHER_SECURITY_TERMS = re.compile(
-    r"\b(?:notes?|bonds?|debentures?|warrants?|units?|rights?|preferred|"
-    r"depositary shares?)\b",
-    re.IGNORECASE,
-)
-# A class description lists the instruments being removed, and each may then be
-# described in terms of the equity. Deciding on whether the equity is mentioned
-# anywhere is wrong in both directions: it dismisses a genuine common-stock
-# removal carrying attached rights, and it flags a warrant or unit removal that
-# only names the equity it converts into.
-#
-# So the description is split into the instruments it lists FIRST, and only then
-# is each instrument's own underlying description stripped. Dropping everything
-# after the first connector instead would discard later listed instruments —
-# a real exchange notice reads `(1) Units consisting of Common Stock ... and
-# warrants to purchase common stock; (2) Common Stock; (3) Warrants to purchase
-# common stock`, where item (2) is the equity and sits behind two connectors.
-# Equity in any listed instrument keeps the notice reportable, so the conclusion
-# does not depend on the order the instruments are named in.
-_FORM25_UNDERLYING_CONNECTOR = re.compile(
-    r"\b(?:to\s+purchase|to\s+receive|to\s+acquire|to\s+subscribe|"
-    r"consisting\s+of|representing|evidencing|convertible\s+into|"
-    r"exercisable\s+for|entitling|underlying)\b",
-    re.IGNORECASE,
-)
-# `;` is the separator exchanges use for a numbered list of instruments.
-_FORM25_CLAUSE_BREAK = re.compile(r"[;,]|\band\b", re.IGNORECASE)
-# `descriptionClassSecurity` has no length limit in the SEC Form 25-NSE schema,
-# so classification reads the whole class text. Only the value we hand on is
-# bounded, and it is bounded to the store's own description limit.
+# `descriptionClassSecurity` has no length limit in the SEC Form 25-NSE schema.
+# The evidence handed to the bounded local store is capped at its own limit.
 _FORM25_STORED_DESCRIPTION_LIMIT = 1000
-
-
-@dataclass(frozen=True)
-class Form25Security:
-    """The class of securities a Form 25 removes.
-
-    ``description`` is the verbatim caption text, bounded only by the store's
-    description limit, and empty when the filing body was unavailable or did not
-    carry one. Classification always reads the untruncated text. ``covers_other_security`` is true only on a
-    positive non-equity match, so an undetermined filing stays reportable rather
-    than being silently dismissed.
-    """
-
-    description: str
-    covers_other_security: bool
-
-
-def classify_form25_security(document: Optional[str]) -> Form25Security:
-    description = _form25_class_description(document)
-    if not description:
-        return Form25Security(description="", covers_other_security=False)
-    kinds = {
-        _form25_instrument_kind(segment)
-        for segment in _form25_listed_instruments(description)
-    }
-    # Equity anywhere among the listed instruments keeps the notice reportable,
-    # so a combined listing reaches the same conclusion in either order. The
-    # decision uses the full text; only the reported value is truncated.
-    return Form25Security(
-        description=description[:_FORM25_STORED_DESCRIPTION_LIMIT],
-        covers_other_security=("other" in kinds and "equity" not in kinds),
-    )
-
-
-def _form25_listed_instruments(description: str) -> list[str]:
-    """Split a class description into the instruments it lists.
-
-    Each returned segment has its own underlying description removed, so a
-    warrant reduces to the warrant rather than to the equity it converts into,
-    while an instrument listed after that warrant survives instead of being
-    swallowed with it.
-    """
-    instruments = []
-    for segment in _FORM25_CLAUSE_BREAK.split(description):
-        connector = _FORM25_UNDERLYING_CONNECTOR.search(segment)
-        if connector is not None:
-            segment = segment[: connector.start()]
-        segment = segment.strip()
-        if segment:
-            instruments.append(segment)
-    return instruments
-
-
-def _form25_instrument_kind(segment: str) -> str:
-    """Return ``equity``, ``other``, or ``""`` for one listed instrument.
-
-    The last instrument term wins because English compounds put the head last:
-    `Common Stock Purchase Warrants` is warrants. An unrecognised instrument
-    returns empty so the caller keeps reporting it.
-    """
-    kind = ""
-    position = -1
-    for candidate, pattern in (
-        ("equity", _FORM25_EQUITY_TERMS),
-        ("other", _FORM25_OTHER_SECURITY_TERMS),
-    ):
-        for match in pattern.finditer(segment):
-            if match.start() > position:
-                kind, position = candidate, match.start()
-    return kind
 
 
 def _form25_class_description(document: Optional[str]) -> str:
@@ -392,16 +289,16 @@ def parse_submission_events(
                 form25_document = document_loader(url)
             except Exception:
                 form25_document = None
-            security = classify_form25_security(form25_document)
-            if security.covers_other_security:
-                continue
+            class_description = _form25_class_description(form25_document)[
+                :_FORM25_STORED_DESCRIPTION_LIMIT
+            ]
             add_event(
                 "listing_removal_notice",
-                "pending_delisting",
+                "review_required",
                 "SEC notification of removal from listing or registration.",
                 evidence_suffix=(
-                    f"Class of securities: {security.description}."
-                    if security.description
+                    f"Class of securities: {class_description}."
+                    if class_description
                     else ""
                 ),
             )

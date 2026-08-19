@@ -73,7 +73,7 @@ def test_sec_metadata_emits_review_events_without_calling_them_confirmed():
     )
 
     assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "pending_delisting"),
+        ("listing_removal_notice", "review_required"),
         ("listing_status_review", "review_required"),
         ("acquisition_completed", "review_required"),
     ]
@@ -86,12 +86,12 @@ def test_sec_metadata_emits_review_events_without_calling_them_confirmed():
 
 
 # ============================================================
-# Form 25 class-of-securities classification
+# Form 25 class-of-securities evidence
 # ============================================================
 #
-# A Form 25 removes one named class of securities, not the issuer. The excerpts
-# below were captured on 2026-08-18 from the real filings that this collector
-# already stored, so the parser is exercised against the shapes SEC actually
+# A Form 25 names one or more classes of securities, not an investment impact.
+# The excerpts below were captured on 2026-08-18 from real filings that this
+# collector already stored, so the parser is exercised against shapes SEC
 # serves: the exchange-filed notice rendered through `xslF25X02`, and the
 # issuer-filed HTML notice. Both place the class immediately before the
 # `(Description of class of securities)` caption.
@@ -153,8 +153,10 @@ _FORM25_URL = (
 )
 
 
-def test_form25_for_a_matured_note_does_not_flag_the_issuer_equity():
-    """A bond removal must not mark the issuer's common ticker as delisting."""
+def test_form25_for_a_matured_note_is_review_material_not_pending_equity():
+    """A bond removal must not mark the issuer's common ticker as delisting,
+    but the filing remains evidence until its relationship to the tracked
+    symbol is known."""
     from src.collectors.sec_corporate_actions import parse_submission_events
 
     batch = parse_submission_events(
@@ -166,11 +168,60 @@ def test_form25_for_a_matured_note_does_not_flag_the_issuer_equity():
         start_date="2026-08-01",
     )
 
-    assert batch.events == ()
+    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
+        ("listing_removal_notice", "review_required")
+    ]
+    assert "1.500% Senior Notes due 2026" in batch.events[0].description
 
 
-def test_form25_for_common_stock_still_flags_pending_delisting():
-    """Removing the common stock stays a pending-delisting observation."""
+def test_form25_depositary_class_is_never_silently_discarded():
+    """Category and punctuation cannot make a tracked depositary security
+    disappear before ticker-to-class relevance is available."""
+    from src.collectors.sec_corporate_actions import parse_submission_events
+
+    description = (
+        "American Depositary Shares, each representing five Common Shares"
+    )
+    document = f"<descriptionClassSecurity>{description}</descriptionClassSecurity>"
+    batch = parse_submission_events(
+        ticker="EA",
+        cik="0000712515",
+        submissions=_form25_payload(),
+        document_loader=lambda _url: document,
+        observed_at="2026-08-05T12:00:00Z",
+        start_date="2026-08-01",
+    )
+
+    assert [event.event_type for event in batch.events] == [
+        "listing_removal_notice"
+    ]
+    assert batch.events[0].lifecycle_state == "review_required"
+    assert description in batch.events[0].description
+
+
+def test_form25_unknown_class_remains_review_material():
+    """Unknown wording is evidence, not a reason to infer direct impact."""
+    from src.collectors.sec_corporate_actions import parse_submission_events
+
+    description = "(1) Warrants; (2) Class A Shares"
+    document = f"<descriptionClassSecurity>{description}</descriptionClassSecurity>"
+    batch = parse_submission_events(
+        ticker="EA",
+        cik="0000712515",
+        submissions=_form25_payload(),
+        document_loader=lambda _url: document,
+        observed_at="2026-08-05T12:00:00Z",
+        start_date="2026-08-01",
+    )
+
+    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
+        ("listing_removal_notice", "review_required")
+    ]
+    assert description in batch.events[0].description
+
+
+def test_form25_for_common_stock_starts_as_review_material():
+    """The filing alone does not prove delisting, transfer, or ticker action."""
     from src.collectors.sec_corporate_actions import parse_submission_events
 
     batch = parse_submission_events(
@@ -183,7 +234,7 @@ def test_form25_for_common_stock_still_flags_pending_delisting():
     )
 
     assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "pending_delisting")
+        ("listing_removal_notice", "review_required")
     ]
 
 
@@ -274,7 +325,7 @@ def test_form25_fetch_failure_does_not_lose_the_rest_of_the_ticker():
     )
 
     assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "pending_delisting"),
+        ("listing_removal_notice", "review_required"),
         ("listing_status_review", "review_required"),
     ]
     assert (
@@ -283,8 +334,8 @@ def test_form25_fetch_failure_does_not_lose_the_rest_of_the_ticker():
     )
 
 
-def test_form25_with_an_unreadable_document_still_flags_pending_delisting():
-    """An unavailable filing body is undetermined, never a silent dismissal."""
+def test_form25_with_an_unreadable_document_still_requires_review():
+    """An unavailable filing body remains visible without inventing impact."""
     from src.collectors.sec_corporate_actions import parse_submission_events
 
     batch = parse_submission_events(
@@ -297,177 +348,91 @@ def test_form25_with_an_unreadable_document_still_flags_pending_delisting():
     )
 
     assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "pending_delisting")
+        ("listing_removal_notice", "review_required")
     ]
 
 
-def test_form25_classifier_reads_the_class_verbatim_from_every_served_shape():
-    from src.collectors.sec_corporate_actions import classify_form25_security
-
-    exchange = classify_form25_security(_EXCHANGE_RENDERED_NOTE_FORM25)
-    assert exchange.description == "1.500% Senior Notes due 2026"
-    assert exchange.covers_other_security is True
-
-    issuer = classify_form25_security(_ISSUER_HTML_COMMON_STOCK_FORM25)
-    assert issuer.description == "Common stock, par value $0.0001 per share"
-    assert issuer.covers_other_security is False
-
-    raw_xml = classify_form25_security(_RAW_XML_NOTE_FORM25)
-    assert raw_xml.description == "1.625% Notes Due 2026"
-    assert raw_xml.covers_other_security is True
-
-
-# A class description names one primary instrument, which any number of
-# qualifiers may then describe in terms of the equity. Deciding on "does the
-# text mention common stock" is wrong in both directions: it dismisses a real
-# common-stock removal that carries attached rights, and it flags a warrant or
-# unit removal that merely names the equity it converts into.
 @pytest.mark.parametrize(
-    "description, covers_other_security",
+    "document, expected_class",
     [
-        # The instrument is the equity.
-        ("Common stock, par value $0.0001 per share", False),
-        ("Class A Common Stock, par value $0.0001 per share", False),
-        ("Common Stock, $0.01 par value per share", False),
-        # A poison-pill right rides along with the equity being removed.
+        (_EXCHANGE_RENDERED_NOTE_FORM25, "1.500% Senior Notes due 2026"),
         (
-            "Common Stock, no par value, and associated Preferred Share "
-            "Purchase Rights",
-            False,
+            _ISSUER_HTML_COMMON_STOCK_FORM25,
+            "Common stock, par value $0.0001 per share",
         ),
-        # A combined listing that still includes the equity, in either order.
-        # The conclusion must not depend on which instrument is named first.
-        ("Common Stock and Warrants", False),
-        ("Warrants and Common Stock", False),
-        ("Units, Common Stock and Warrants", False),
-        # A combined listing with no equity in it at all.
-        ("Warrants and Units", True),
-        # Real Form 25 descriptions, captured 2026-08-18 from EDGAR full-text
-        # search for Form 25 filings mentioning warrants. Exchanges routinely
-        # strike the equity and its warrants in one notice, using `;` as the
-        # list separator and numbering the instruments.
-        (
-            "(1) Units consisting of Common Stock $0.001 par value, per share "
-            "and warrants to purchase common stock; (2) Common Stock; "
-            "(3) Warrants to purchase common stock",
-            False,
-        ),
-        (
-            "(1) Common Stock, $0.001 par value per share; (2) Class A warrants "
-            "to purchase Common Stock; and (3) Class B warrants to purchase "
-            "Common Stock",
-            False,
-        ),
-        (
-            "Common Stock, $0.0001 par value per share Warrants to Purchase "
-            "Shares of Common Stock",
-            False,
-        ),
-        (
-            "Common Stock, $0.0001 par value per share Warrants to purchase "
-            "common stock expiring 2026",
-            False,
-        ),
-        ("Common Stock, par value $0.01 per share Warrants to purchase Common Stock", False),
-        # An instrument's own underlying must not swallow a later listed one,
-        # in either order.
-        (
-            "Warrants to purchase Common Stock, and Class A Common Stock, par "
-            "value $0.0001 per share",
-            False,
-        ),
-        (
-            "Class A Common Stock, par value $0.0001 per share, and Warrants to "
-            "purchase Common Stock",
-            False,
-        ),
-        # A `;` list with no equity anywhere still resolves to another security.
-        ("(1) Warrants to purchase common stock; (2) Units", True),
-        # The SEC Form 25-NSE schema gives descriptionClassSecurity no length
-        # limit, so the class must be classified in full. A SPAC-style list of
-        # warrants, units, and the equity pushes the equity past 240 characters.
-        (
-            "(1) Warrants to purchase one share of Class A common stock at an "
-            "exercise price of $11.50 per share, subject to adjustment; "
-            "(2) Units, each consisting of one share of Class A common stock "
-            "and one-half of one redeemable warrant to purchase Class A common "
-            "stock; (3) Class A Common Stock, par value $0.0001 per share",
-            False,
-        ),
-        # The instrument is not the equity, however the equity is named.
-        ("Warrants to purchase shares of common stock", True),
-        ("Common Stock Purchase Warrants", True),
-        (
-            "Units, each consisting of one share of Class A common stock and "
-            "one-half of one warrant",
-            True,
-        ),
-        ("Rights to receive shares of common stock", True),
-        (
-            "Depositary Shares each representing a 1/1000th interest in a "
-            "share of Preferred Stock",
-            True,
-        ),
-        ("1.500% Senior Notes due 2026", True),
-        ("6.00% Series B Cumulative Preferred Stock", True),
+        (_RAW_XML_NOTE_FORM25, "1.625% Notes Due 2026"),
     ],
 )
-def test_form25_classifier_decides_on_the_listed_instruments_not_a_mention(
-    description, covers_other_security
+def test_form25_records_the_class_verbatim_from_every_served_shape(
+    document, expected_class
 ):
-    from src.collectors.sec_corporate_actions import classify_form25_security
+    from src.collectors.sec_corporate_actions import parse_submission_events
 
-    document = (
-        "<html><body>FORM 25 Commission File Number 001-00000 Example Inc. "
-        "New York Stock Exchange (Exact name of Issuer as specified in its "
-        "charter, and name of Exchange where security is listed and/or "
-        "registered) 1 Example Street (Address, including zip code, and "
-        "telephone number, including area code, of Issuer's principal "
-        f"executive offices) {description} (Description of class of "
-        "securities) Please place an X in the box</body></html>"
+    batch = parse_submission_events(
+        ticker="EA",
+        cik="0000712515",
+        submissions=_form25_payload(),
+        document_loader=lambda _url: document,
+        observed_at="2026-08-05T12:00:00Z",
+        start_date="2026-08-01",
     )
 
-    result = classify_form25_security(document)
-
-    assert result.description == description
-    assert result.covers_other_security is covers_other_security
+    assert batch.events[0].lifecycle_state == "review_required"
+    assert f"Class of securities: {expected_class}." in batch.events[0].description
 
 
-def test_form25_classifier_reads_the_whole_class_before_deciding():
-    """The equity may be listed past any storage cap and must still count.
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Common Stock, par value $0.0001 per share",
+        "American Depositary Shares, each representing five Common Shares",
+        "Units of Beneficial Interest",
+        "6.75% Notes due 2031",
+        "6.00% Series B Cumulative Preferred Stock",
+        "Warrants to purchase shares of common stock",
+        "(1) Warrants; (2) Class A Shares",
+        (
+            "(1) Units consisting of Common Stock and warrants; "
+            "(2) Common Stock; (3) Warrants"
+        ),
+    ],
+)
+def test_form25_class_does_not_choose_the_initial_review_state(description):
+    """Instrument class is evidence; direct or indirect impact needs research."""
+    from src.collectors.sec_corporate_actions import parse_submission_events
 
-    `descriptionClassSecurity` has no length limit in the SEC schema. Only the
-    stored description is bounded, and it is bounded to the store's own limit.
-    """
-    from src.collectors.sec_corporate_actions import classify_form25_security
-
-    filler = "; ".join(
-        f"({index}) Warrants to purchase common stock, series {index}"
-        for index in range(1, 30)
+    document = f"<descriptionClassSecurity>{description}</descriptionClassSecurity>"
+    batch = parse_submission_events(
+        ticker="EA",
+        cik="0000712515",
+        submissions=_form25_payload(),
+        document_loader=lambda _url: document,
+        observed_at="2026-08-05T12:00:00Z",
+        start_date="2026-08-01",
     )
-    description = f"{filler}; (30) Common Stock, par value $0.01 per share"
-    assert len(description) > 1000
 
-    document = (
-        "<html><body>FORM 25 (Address, including zip code, and telephone "
-        "number, including area code, of Issuer's principal executive offices) "
-        f"{description} (Description of class of securities) x</body></html>"
+    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
+        ("listing_removal_notice", "review_required")
+    ]
+    assert description in batch.events[0].description
+
+
+def test_form25_class_evidence_is_bounded_only_at_the_storage_boundary():
+    from src.collectors.sec_corporate_actions import parse_submission_events
+
+    description = "X" * 1100
+    document = f"<descriptionClassSecurity>{description}</descriptionClassSecurity>"
+    batch = parse_submission_events(
+        ticker="EA",
+        cik="0000712515",
+        submissions=_form25_payload(),
+        document_loader=lambda _url: document,
+        observed_at="2026-08-05T12:00:00Z",
+        start_date="2026-08-01",
     )
 
-    result = classify_form25_security(document)
-
-    assert result.covers_other_security is False
-    assert len(result.description) == 1000
-    assert result.description == description[:1000]
-
-
-def test_form25_classifier_is_undetermined_when_the_class_is_absent():
-    from src.collectors.sec_corporate_actions import classify_form25_security
-
-    for document in (None, "", "<html><body>FORM 25</body></html>"):
-        result = classify_form25_security(document)
-        assert result.description == ""
-        assert result.covers_other_security is False
+    assert description[:1000] in batch.events[0].description
+    assert description[:1001] not in batch.events[0].description
 
 
 def test_ambiguous_item_201_does_not_invent_a_counterparty():
