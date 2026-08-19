@@ -1,6 +1,6 @@
 # Security Lifecycle Investigation and Action Proposal Design
 
-**Status:** DRAFT FOR INDEPENDENT REVIEW
+**Status:** DRAFT AMENDED FOR FOCUSED RE-REVIEW
 **Date:** 2026-08-19
 **Base:** `be263855` (`master`; not pushed by this design)
 **Priority owner:** `PROJECT_PRIORITY_MAP.md` P0-E, Slice 2
@@ -59,7 +59,7 @@ These are observed facts at the design base, not future claims.
   values. `read_security_lifecycle()` then overlays `reviewed_state` on top of
   the observed value for display.
 - The read-only production query on 2026-08-19 returned `integrity_check=ok`, 37
-  observations, and zero relationship rows:
+  legacy observation rows, and zero relationship rows:
 
 | Observation event | Raw state | Review state | Count |
 |---|---|---|---:|
@@ -75,6 +75,13 @@ These are observed facts at the design base, not future claims.
   re-observed.
 - Thirty-two M&A observations coexist with zero relationship rows. The current
   narrow phrase extractor is not an investigation owner.
+- The 37 legacy rows represent 36 exact filing identities. CCL accession
+  `0001104659-26-057200` appears twice with identical provider fields and two
+  derived classifications (`listing_status_review` and
+  `acquisition_completed`). Their core filing fields match; only the latter
+  classification carries the collector-derived `effective_date=2026-05-07`.
+  This is present production evidence that `event_type` and its optional event
+  date are many-valued ArkScope classification metadata, not provider identity.
 
 ### 2.2 API and UI
 
@@ -151,22 +158,29 @@ proposals.
 
 ### 3.1 Observation
 
-An **observation** is an append-stable provider fact such as an SEC filing. It
-owns source identity, filing metadata, source URL, bounded description, and
-first/last observed timestamps. It does not own portfolio relevance, severity,
-or a user action.
+An **observation** is an append-stable provider fact such as an SEC filing. Its
+identity is the literal `(source, source_ref, ticker)` tuple. It owns filing
+metadata, source URL, bounded description, and first/last observed timestamps.
+It does not own portfolio relevance, severity, or a user action.
+
+ArkScope's `event_type` values and their optional derived effective dates are
+many-valued **observation kinds**. They live in a child relation and may be
+reconciled when classifier logic changes without changing observation or case
+identity. A filing can therefore carry both `listing_status_review` and
+`acquisition_completed` without copying the provider fact or opening two
+investigations.
 
 Re-observation may refresh bounded source fields and `last_observed_at`; it may
 not overwrite an accepted assessment.
 
 ### 3.2 Case
 
-A **case** is the durable investigation identity for one observation. Its ID is
-derived from the canonical UTF-8 bytes of the observation's existing unique key:
+A **case** is the durable investigation identity for one provider observation.
+Its ID is derived from the canonical UTF-8 bytes of the provider identity:
 
 ```text
 SHA256("security-lifecycle-case-v1" NUL
-       source NUL source_ref NUL ticker NUL event_type)
+       source NUL source_ref NUL ticker)
 ```
 
 The public form is `slc_` plus the lowercase 64-character digest. Values are the
@@ -176,12 +190,15 @@ observation projects as an unresolved case without causing a read-side write;
 the profile case row is created only when investigation state is first stored or
 when a legacy review is migrated.
 
-All four components must reject embedded NUL before hashing. Migration stops on
+All three components must reject embedded NUL before hashing. Migration stops on
 such a value rather than changing or ambiguously encoding an existing identity.
 
-The first implementation is strictly one case per observation. Grouping several
+The first implementation is strictly one case per exact provider observation.
+Rows sharing the same `(source, source_ref, ticker)` compose into that one case;
+this is identity normalization, not a heuristic merge. Grouping different
 filings into one transaction may be useful, but automatic date/name similarity
-must never merge cases. Case merge is a separately reviewed follow-on.
+must never merge cases. Cross-filing case merge is a separately reviewed
+follow-on.
 
 The case's visible workflow state is derived:
 
@@ -189,10 +206,25 @@ The case's visible workflow state is derived:
 unresolved       no accepted conclusive assessment
 investigating    latest run is queued or running
 evidence_ready   evidence exists and no conclusive assessment is accepted
+reviewed_inconclusive
+                 an explicit current acknowledgement records insufficient evidence
 resolved         a conclusive assessment is accepted
 ```
 
-These labels are projections, not another mutable truth column.
+These labels are projections, not another mutable truth column. Observation
+presence is a separate dimension:
+
+```text
+present           the exact provider observation is available
+source_missing    profile-side case history exists but the observation is absent
+```
+
+`source_missing` never hides evidence, assessments, acknowledgements, or
+proposals and never makes the whole list fail. If the exact provider identity is
+observed again, the deterministic case ID reattaches the retained profile
+history. An identical observation fingerprint restores the prior current
+assessment or acknowledgement; a changed fingerprint preserves that history but
+requires revalidation.
 
 ### 3.3 Investigation run
 
@@ -204,8 +236,10 @@ queued | running | succeeded | failed | cancelled
 ```
 
 It records trigger, adapter, query plan, start/finish timestamps, bounded usage,
-and a typed failure code. A failed retry never clears evidence from a prior
-successful run.
+result count, and a typed failure code only when failed. A successful run with
+zero results remains `succeeded` with `result_count=0`; it is an honest search
+outcome, not a transport failure and not evidence that the event is unimportant.
+A failed retry never clears evidence from a prior successful run.
 
 The first implementation permits only `trigger=attended_user`. Scheduler,
 automatic retry, and alert-triggered runs are out of scope.
@@ -318,6 +352,13 @@ An accepted, resolved assessment must:
 - include a bounded conclusion and impact summary; and
 - identify the author as `human` or `legacy_review`.
 
+Acceptance snapshots the cited observation fingerprint and evidence content
+hashes. If either cited input later changes or disappears, the accepted revision
+remains visible history but is not projected as a current conclusive assessment
+and cannot generate a new proposal until revalidated. An identical source row
+that reappears under the same deterministic case ID restores the prior current
+projection without copying the assessment.
+
 The first implementation has no model assessment writer. A later model-assisted
 assessment feature must write only `draft` revisions under a separately added
 author value; confidence never grants permission to mutate profile state.
@@ -326,7 +367,32 @@ author value; confidence never grants permission to mutate profile state.
 ambiguous `renamed_or_transferred` judgment. New UI/API assessments cannot create
 it; they must select the precise outcome or remain undetermined.
 
-### 3.6 Action proposal
+### 3.6 Inconclusive acknowledgement
+
+An **inconclusive acknowledgement** records a narrower human decision: the case
+was investigated against the currently available source and evidence set, but
+the evidence does not justify a conclusive assessment. It is not an assessment,
+does not change relevance or outcome, and cannot produce an action proposal.
+Creation requires at least one succeeded investigation run (including a
+successful zero-result run) or one manually supplied evidence item; a failed run
+alone cannot recreate the old clear-without-investigation button.
+
+The record stores the case ID, `reason=evidence_insufficient`, a bounded optional
+note, author, timestamp, the current observation fingerprint, and a deterministic
+evidence-set digest. The observation fingerprint covers canonical source-owned
+fields plus the sorted kind payload set but excludes first/last-observed
+timestamps, so an identical scheduled re-observation does not reopen work. The
+evidence digest covers sorted immutable evidence IDs and content hashes. The acknowledgement
+moves the case out of the default to-do queue as `reviewed_inconclusive` while
+preserving it in filters and history.
+
+The user can explicitly reopen it. It also becomes stale automatically when the
+provider observation fingerprint changes or evidence is added after the
+recorded digest. A stale acknowledgement remains in
+history, but the case projects back to `evidence_ready` or `unresolved`; the
+system never treats silence or elapsed time as a conclusion.
+
+### 3.7 Action proposal
 
 An **action proposal** is a reviewable recommendation derived from an assessment
 and an active-universe source snapshot. It is not the action itself.
@@ -367,11 +433,12 @@ Storage follows the existing durability boundary:
 | Store | Lifecycle owner |
 |---|---|
 | `market_data.db` | Provider observations and company-event metadata |
-| `profile_state.db` | User-triggered investigation runs, external/manual evidence, assessments, and proposals |
+| `profile_state.db` | User-triggered investigation runs, external/manual evidence, acknowledgements, assessments, and proposals |
 
-The API composes the two explicit stores by stable case ID. It never treats one
-store as a fallback for the other: if either required store is unavailable, the
-case projection is typed unavailable.
+The API lists the union of market observations and profile-side case rows, then
+composes them by stable case ID. It never treats one store as a fallback for the
+other. A store-level failure is typed unavailable; a single missing observation
+is the case-level `source_missing` state and does not hide other cases.
 
 Applying a proposal mutates other, existing profile tables in a separate future
 operation. The investigation tables do not become another watchlist authority.
@@ -381,13 +448,30 @@ operation. The investigation tables do not become another watchlist authority.
 `security_lifecycle_observations` is rebuilt transactionally to remove:
 
 ```text
+event_type
+effective_date
 lifecycle_state
 reviewed_state
 reviewed_at
 ```
 
-The provider-owned event fields and row IDs remain unchanged. `event_type`
-continues to classify the source observation; it does not select a case result.
+Its new unique key is `(source, source_ref, ticker)`. A new
+`security_lifecycle_observation_kinds` child relation stores the closed,
+many-valued `event_type` classifications and each kind's nullable derived
+effective date. Re-observation transactionally reconciles that child set;
+changing a classifier cannot create a new case or leave a stale classification
+as current truth.
+
+The current 37-row snapshot migrates to 36 provider observations and 37 kind
+rows. The exact CCL duplicate group collapses to one observation only after all
+core provider-owned fields compare equal; its two event kinds and the
+acquisition kind's effective-date hint both survive. All 37
+legacy integer IDs receive a deterministic old-row-to-case mapping in the
+migration packet. Singleton row IDs may remain as internal IDs, but old integer
+IDs are not retained as a compatibility product surface after routes move to
+stable case IDs. Any duplicate-key group with conflicting core provider fields,
+conflicting payload for the same kind, or incompatible legacy reviews is a hard
+stop, not a winner-selection rule.
 
 This rebuild explicitly retires `pending_delisting` from product schema and UI.
 It also removes `inactive_confirmed` and `renamed_or_transferred` from the
@@ -405,11 +489,12 @@ security_lifecycle_evidence
 security_lifecycle_assessments
 security_lifecycle_assessment_outcomes
 security_lifecycle_assessment_evidence
+security_lifecycle_case_acknowledgements
 security_lifecycle_action_proposals
 ```
 
 `security_lifecycle_cases` stores the deterministic case ID and the literal
-observation unique-key components; it contains no copied filing prose. An
+three-component observation identity; it contains no copied filing prose. An
 untouched observation needs no row. Foreign-key relations inside
 `profile_state.db`, unique case/observation ownership, bounded text lengths,
 closed vocabularies, and stable sort orders are required. SQLite cannot enforce
@@ -423,10 +508,12 @@ that drive filtering, joins, or permissions.
 
 ### 4.3 Legacy review migration
 
-Every existing observation obtains a deterministic projected case identity. The
-observation itself is the first evidence reference; its filing fields are not
-duplicated into profile state. Rows with no `reviewed_state` remain projected,
-unresolved cases and create no profile row during migration.
+Every exact provider observation obtains a deterministic projected case
+identity. The observation itself is the first evidence reference; its filing
+fields are not duplicated into profile state. Filing groups with no
+`reviewed_state` remain projected, unresolved cases and create no profile row
+during migration. At the current snapshot this is 32 unresolved cases, not 33:
+the two unreviewed CCL legacy rows are one filing case with two kinds.
 
 `inactive_confirmed` migrates to an accepted `legacy_review` assessment with
 `direct_tracked_security + listing_ended` and an explicit note that the old UI
@@ -454,7 +541,8 @@ with an explicit row-preservation mapping; it must not be dropped or guessed.
 The implementation plan must include:
 
 - a fresh read-only preflight of schema, row IDs, row counts, review-state
-  vocabulary, relationship count, and `PRAGMA integrity_check`;
+  vocabulary, exact filing-key groups, cross-row core-provider-field equality,
+  per-kind payloads, relationship count, and `PRAGMA integrity_check`;
 - complete Desktop, sidecar, scheduler, and collector quiescence before the live
   schema operation;
 - timestamped local backups of both SQLite files plus a SHA-256 manifest outside
@@ -465,15 +553,16 @@ The implementation plan must include:
 - phase 1: one `profile_state.db` transaction that writes the four legacy case
   rows/assessments plus a migration receipt keyed by the market snapshot hash;
 - phase 2: one `market_data.db` transaction that rebuilds the observation table
-  after phase 1 is verified;
+  and observation-kind child relation after phase 1 is verified;
 - phase 3: mark the profile migration receipt complete only after both stores
   and their cross-store case keys verify;
-- row-ID preservation, count equality, foreign-key checks, and post-migration
-  `integrity_check`;
+- complete 37-row input mapping, exact 36-observation/37-kind output counts for
+  the current snapshot, source-field equality, foreign-key checks, and
+  post-migration `integrity_check`;
 - idempotent resume or restoration from both backups after interruption at any
   phase; lifecycle writes remain unavailable while the receipt is incomplete;
-- rollback on any unknown review value, missing source field, count mismatch, or
-  non-empty relationship table; and
+- rollback on any unknown review value, missing source field, incompatible
+  duplicate group, count mismatch, or non-empty relationship table; and
 - pre/post production manifests proving that only the authorized lifecycle
   tables in `market_data.db` and `profile_state.db` changed.
 
@@ -570,7 +659,7 @@ the bounds.
   permissions, or instructions.
 - Adapter failures use a closed reason set such as `adapter_unavailable`,
   `credential_missing`, `permission_denied`, `rate_limited`, `network_error`,
-  `no_results`, `extract_failed`, and `unsupported_content`.
+  `extract_failed`, and `unsupported_content`.
 - Raw provider exception text, API keys, private paths, full response bodies,
   and model chain-of-thought never enter product records.
 
@@ -589,13 +678,15 @@ GET  /security-lifecycle/investigations/{run_id}
 POST /security-lifecycle/cases/{case_id}/evidence
 POST /security-lifecycle/cases/{case_id}/assessments
 POST /security-lifecycle/assessments/{assessment_id}/accept
+POST /security-lifecycle/cases/{case_id}/acknowledgements
+POST /security-lifecycle/acknowledgements/{acknowledgement_id}/reopen
 POST /security-lifecycle/action-proposals/{proposal_id}/dismiss
 ```
 
-Case/evidence/assessment writes are additive analysis records and call
-`db_write` even though their durable store is `profile_state.db`; permission
-class follows behavioral meaning, not filename. Any future tracked-universe
-action calls `profile_state_write` separately.
+Case/evidence/acknowledgement/assessment/proposal writes are additive analysis
+records and call `db_write` even though their durable store is
+`profile_state.db`; permission class follows behavioral meaning, not filename.
+Any future tracked-universe action calls `profile_state_write` separately.
 
 The old event-review and relationship-review routes retire atomically with their
 frontend consumers. No compatibility alias or hidden fallback remains.
@@ -610,8 +701,9 @@ list_security_lifecycle_cases
 get_security_lifecycle_case
 ```
 
-They return observations, evidence refs, accepted/draft assessment metadata, and
-proposals from local storage. They perform no network access and no writes.
+They return observation presence and kinds, evidence refs, acknowledgements,
+accepted/draft assessment metadata, and proposals from local storage. They
+perform no network access and no writes.
 
 There is no agent-facing `apply_lifecycle_action` tool in this slice. Generic AI
 Research may cite case evidence and may suggest a draft in prose, but it cannot
@@ -623,13 +715,16 @@ The lifecycle workflow moves to a `Lifecycle` view under `Universe`:
 
 - one compact triage table for cases;
 - filters for workflow state, relevance, event type, and proposal type;
-- a detail drawer showing source observations, current active-universe source
-  membership, investigation history, evidence, assessment, and proposals;
+- a detail drawer showing source presence and observations, current
+  active-universe source membership, investigation history, evidence,
+  acknowledgements, assessments, and proposals;
 - `Investigate` to open the case, followed by an explicit
   `Search web with <adapter>` command that names the external provider and
   performs the only network-triggering click;
 - `Add evidence` for manual URL/text;
 - explicit assessment controls with cited evidence selection; and
+- `Acknowledge insufficient evidence` and `Reopen` as distinct workflow
+  commands, never disguised assessment outcomes; and
 - proposal rows that explain what would change and why they are not yet applied.
 
 Settings retains only a compact storage/health summary and a link to the
@@ -686,6 +781,8 @@ Rules:
   reversible. Model confidence alone is never an automation gate.
 - A future executor must re-read the active-universe sources and reject a stale
   proposal rather than trusting its historical source snapshot.
+- A proposal whose assessment fingerprint is no longer current is projected as
+  blocked; it cannot be applied or silently regenerated from stale evidence.
 
 ## 8. Integration boundaries
 
@@ -761,9 +858,10 @@ explicit boundaries.
 The later implementation plan must be RED-first and split at these semantic
 boundaries:
 
-1. **Case kernel and migration**: rebuild observation truth, migrate legacy
-   reviews, create case/evidence/assessment tables, retire the empty relationship
-   extractor/table and dead UI vocabulary.
+1. **Case kernel and migration**: normalize filing observations from derived
+   event kinds, migrate legacy reviews, create case/evidence/assessment/
+   acknowledgement tables, retire the empty relationship extractor/table and
+   dead UI vocabulary.
 2. **Attended investigation**: manual evidence plus Tavily adapter, typed run
    lifecycle, permissions, budgets, and source normalization.
 3. **API and local tools**: case detail, evidence/assessment writes, two read-only
@@ -790,36 +888,53 @@ The implementation plan must pin exact owners and staged identities, but at
 minimum it must prove:
 
 1. A source observation can be written without any relevance, severity, or
-   portfolio conclusion.
-2. Every existing observation ID and source field survives the transactionally
-   rebuilt production-shaped schema.
-3. The four current legacy reviewed rows migrate to visible accepted
-   `legacy_review` assessments; 33 untouched observations project as unresolved
-   cases without read-side writes at the current snapshot.
-4. `pending_delisting`, `inactive_confirmed`, and
+   portfolio conclusion, and one observation can own multiple derived event
+   kinds.
+2. The current 37 legacy rows produce an exact 37-row migration ledger, 36
+  provider observations, and 37 event-kind rows. Every core source field, event
+  kind, and per-kind effective-date hint survives; the CCL two-row filing group
+  becomes one stable case.
+3. Changing only a derived event-kind set leaves the observation and case IDs
+   unchanged.
+4. The four current legacy reviewed rows migrate to visible accepted
+   `legacy_review` assessments; 32 untouched filing cases project as unresolved
+   without read-side writes at the current snapshot.
+5. `pending_delisting`, `inactive_confirmed`, and
    `renamed_or_transferred` have zero product/schema/UI use after migration,
    except bounded migration tests naming retired inputs.
-5. A non-empty legacy relationship table aborts migration without changing any
+6. A non-empty legacy relationship table aborts migration without changing any
    byte of the source database.
-6. Form 25 class text survives as evidence and cannot alter case relevance,
+7. Form 25 class text survives as evidence and cannot alter case relevance,
    outcome, or proposal.
-7. Opening, focusing, refreshing, polling, and switching views issue zero web
+8. An explicit inconclusive acknowledgement removes a case from the default
+   to-do queue without creating an assessment or proposal; it is rejected when
+   backed only by failed runs, while new source/evidence invalidates it and
+   explicit reopen restores active review.
+9. Deleting one source observation leaves its profile history visible as
+   `source_missing`; recreating the exact provider identity deterministically
+   reattaches that history without copying or guessing. Identical content
+   restores the prior current projection, while changed content requires
+   revalidation before proposal generation.
+10. A successful zero-result search is recorded as `succeeded` with count zero,
+    while transport/provider failures retain distinct typed failure reasons.
+11. Opening, focusing, refreshing, polling, and switching views issue zero web
    requests. One explicit investigate click issues exactly one bounded run.
-8. Adapter failure leaves the case and prior evidence intact and exposes only a
+12. Adapter failure leaves the case and prior evidence intact and exposes only a
    typed safe error.
-9. Conflicting or unknown evidence cannot produce a conclusive accepted
+13. Conflicting or unknown evidence cannot produce a conclusive accepted
    assessment without explicit human action.
-10. The two agent tools compose the explicit market observation and profile case
+14. The two agent tools compose the explicit market observation and profile case
     stores with zero network and zero writes.
-11. Investigation writes touch only the new lifecycle case tables in
+15. Investigation writes touch only the new lifecycle case tables in
     `profile_state.db`. They do not mutate observations, watchlist membership,
     `ticker_meta`, portfolio, SA, market history, or a production provider.
-12. `portfolio_open` context can produce `review_portfolio_position` but cannot
+16. `portfolio_open` context can produce `review_portfolio_position` but cannot
     produce an executable remove/hide path.
-13. The UI shows source, evidence, conclusion, impact, and proposal as separate
-    concepts at desktop and mobile widths without overflow.
-14. External URL handling rejects local/private targets and unsafe redirects.
-15. Full canonical backend/frontend admission remains green with deterministic
+17. The UI shows source presence, evidence, acknowledgement, conclusion, impact,
+    and proposal as separate concepts at desktop and mobile widths without
+    overflow.
+18. External URL handling rejects local/private targets and unsafe redirects.
+19. Full canonical backend/frontend admission remains green with deterministic
     collection identities and byte-restored mutations.
 
 ## 12. Hard stops
@@ -828,7 +943,10 @@ Stop and amend before continuing if any of these occurs:
 
 - production relationship rows are non-zero at migration time;
 - an existing review value cannot be mapped literally;
-- preserving observation IDs or source evidence requires guessing;
+- normalizing an exact filing group requires choosing between conflicting core
+  provider fields, same-kind payloads, or legacy reviews;
+- preserving source evidence or the complete old-row-to-case mapping requires
+  guessing;
 - a search adapter must parse free-form model prose to discover its sources;
 - a provider/harness-specific field enters the case, assessment, or action
   contract;
@@ -850,14 +968,18 @@ Stop and amend before continuing if any of these occurs:
 
 Independent review should focus on:
 
-1. whether observation, case, assessment, and proposal remain non-overlapping;
-2. whether legacy review migration preserves truth without promoting weak labels;
-3. whether the first Tavily adapter can be replaced without data migration;
-4. whether active-universe source ownership makes every proposal honest;
-5. whether the migration is recoverable under an external-writer environment;
-6. whether the first implementation is useful without pretending that action
+1. whether observation, case, acknowledgement, assessment, and proposal remain
+   non-overlapping;
+2. whether exact filing normalization preserves both CCL event kinds while
+   removing derived `event_type` from case identity;
+3. whether missing observations remain visible and reattach deterministically;
+4. whether legacy review migration preserves truth without promoting weak labels;
+5. whether the first Tavily adapter can be replaced without data migration;
+6. whether active-universe source ownership makes every proposal honest;
+7. whether the migration is recoverable under an external-writer environment;
+8. whether the first implementation is useful without pretending that action
    execution, hosted search, Document Intelligence, Notes, or Alerts already
    exist; and
-7. whether any current product path can still turn class wording into relevance.
+9. whether any current product path can still turn class wording into relevance.
 
 Only a GREEN design review unlocks the RED-first implementation plan.
