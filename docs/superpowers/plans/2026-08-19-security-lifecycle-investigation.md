@@ -1,9 +1,9 @@
 # Security Lifecycle Investigation Implementation Plan
 
 > **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
-> AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT FOCUSED
-> REVIEW PENDING; NO TASK 0 EXECUTION, LIVE MIGRATION, MERGE, PUSH, OR PROVIDER
-> CALL AUTHORIZED
+> AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
+> `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT FOCUSED REVIEW PENDING; NO
+> TASK 0 EXECUTION, LIVE MIGRATION, MERGE, PUSH, OR PROVIDER CALL AUTHORIZED
 >
 > **Date:** 2026-08-19
 >
@@ -839,10 +839,27 @@ or test path changes.
 The 2026-08-20 step 9 amendment is B-class because it changes the sole
 production-read selector. It changes no product/test byte, node/path/route/tool
 ledger, staged identity, RED arithmetic, fixture target, or Tasks 1-8 product
-contract. Focused review is required before Task 0 authorization.
+contract. Focused review completed at `8a600ce0` before the user authorized
+Task 0.
 
-1. Create a fresh branch/worktree from exact `93ad4449`; prove main remains at
-   the same commit and is an ancestor.
+The 2026-08-20 bootstrap-topology amendment is B-class because reviewed
+docs-only plan amendments necessarily moved main beyond the product grounding
+base, making the former requirement that main both remain at `93ad4449` and
+contain those amendments impossible. It changes no product/test byte,
+node/path/route/tool ledger, staged identity, RED arithmetic, fixture target,
+or Tasks 1-8 product contract. Focused review is required before Task 0 starts.
+
+1. Capture clean main HEAD after all reviewed plan amendments as
+   `PLAN_AUTHORITY_TIP`, record its full hash, and create the implementation
+   branch/worktree from that exact commit. Prove
+   `PRODUCT_GROUNDING_BASE=93ad444990fb856a6006ba4793b96a9c1a53625d` is an
+   ancestor of `PLAN_AUTHORITY_TIP`. The exact
+   `PRODUCT_GROUNDING_BASE..PLAN_AUTHORITY_TIP` path set must be the 13 approved
+   governance authorities only: the priority map, the design, this plan, and
+   the ten section 0.5 companion ledgers. Prove product, test, runtime config,
+   package, resource, script, and application bytes are identical to
+   `PRODUCT_GROUNDING_BASE`. Leave main clean and exactly at
+   `PLAN_AUTHORITY_TIP` throughout Task 0.
 2. Link root `node_modules`; verify Node/Vitest and all pinned harness hashes.
 3. Recollect backend and frontend streams in isolated collect-only mode. Assert
    exact byte equality with section 0.4, `seen=0`, and zero socket attempts.
@@ -860,9 +877,13 @@ contract. Focused review is required before Task 0 authorization.
 9. After plan GREEN and explicit Task 0 authorization only, perform one bounded
    `mode=ro` transaction against the active market DB that reads only the two
    legacy lifecycle tables, their schema, row payloads, counts, and
-   `integrity_check`. Partition rows mechanically at the section 1.5
-   `first_observed_at` cutoff; do not select by current count, ticker, filing
-   class, review state, or operator judgment. The selected cohort must be exact
+   `integrity_check`. Parse every `first_observed_at` as an aware RFC 3339
+   instant, normalize it to UTC, and partition rows mechanically at the section
+   1.5 cutoff; never compare timestamp strings. Require every selected value to
+   use the canonical `YYYY-MM-DDTHH:MM:SSZ` producer form. Do not select by
+   current count, ticker, filing class, review state, or operator judgment. An
+   invalid or noncanonical selected timestamp is B-class. The selected cohort
+   must be exact
    `37 rows / 36 identities / 37 kinds / 4 reviewed rows`, preserve the known
    CCL two-kind group, contain only known review values and valid non-NUL core
    fields, and coexist with zero relationships. Emit its 36-key ledger,
