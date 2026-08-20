@@ -86,10 +86,16 @@ def test_catalog_registry_and_both_generic_bridges_expose_exact_lifecycle_schema
             assert tool.category == "analysis"
             assert tool.requires_dal is False
             assert [item.name for item in tool.parameters] == parameters
-        assert expected.keys() <= {item["name"] for item in get_anthropic_tools()}
-        assert expected.keys() <= {
-            item.name for item in create_openai_tools(DataAccessLayer())
+        anthropic = {item["name"]: item for item in get_anthropic_tools()}
+        openai = {
+            item.name.removeprefix("tool_"): item
+            for item in create_openai_tools(DataAccessLayer())
         }
+        assert expected.keys() <= anthropic.keys()
+        assert expected.keys() <= openai.keys()
+        for name, parameters in expected.items():
+            assert list(anthropic[name]["input_schema"]["properties"]) == parameters
+            assert list(openai[name].params_json_schema["properties"]) == parameters
     finally:
         profile.close()
 

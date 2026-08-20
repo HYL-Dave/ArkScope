@@ -1089,6 +1089,15 @@ those returned rows to tuples in the assertions, then replay the exact RED
 against T2 product bytes. This changes no test ID, expected failure set, or
 product contract.
 
+The 2026-08-21 OpenAI bridge-name normalization is A-class. The new Task 3
+contract originally compared the Agents SDK wrapper's literal `tool_...` name
+with the provider-neutral registry name even though the retained bridge
+contract requires every wrapper name to start with `tool_`. Normalize that
+prefix only in the new contract and compare both hand-written bridge schemas'
+property rows with the central parameter rows. The owned path, node ID, RED
+failure set, collection/focused identities, and product capability surface are
+unchanged.
+
 ### 5.1 RED commit
 
 1. Add exactly 14 route and 8 tool IDs.
