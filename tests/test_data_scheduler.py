@@ -92,9 +92,8 @@ def hermetic(tmp_path, monkeypatch):
         lambda *a, **k: {
             "status": "succeeded",
             "tickers_scanned": 2,
-            "events_observed": 0,
-            "relationships_observed": 0,
-            "review_required": 0,
+            "observations_observed": 0,
+            "kinds_observed": 0,
             "errors": {},
         },
     )

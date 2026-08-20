@@ -44,7 +44,15 @@ def _recent_payload(*, forms, dates, accessions, documents, descriptions, items)
     }
 
 
-def test_sec_metadata_emits_review_events_without_calling_them_confirmed():
+def _kind_pairs(batch):
+    return [
+        (kind.event_type, kind.effective_date)
+        for observation in batch.observations
+        for kind in observation.kinds
+    ]
+
+
+def test_sec_metadata_emits_many_observation_kinds_without_relationship_guesses():
     from src.collectors.sec_corporate_actions import parse_submission_events
 
     payload = _recent_payload(
@@ -72,17 +80,15 @@ def test_sec_metadata_emits_review_events_without_calling_them_confirmed():
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required"),
-        ("listing_status_review", "review_required"),
-        ("acquisition_completed", "review_required"),
+    assert _kind_pairs(batch) == [
+        ("listing_removal_notice", None),
+        ("acquisition_completed", "2026-08-04"),
+        ("listing_status_review", None),
     ]
-    assert all(event.lifecycle_state != "inactive_confirmed" for event in batch.events)
-    assert batch.relationships[0].target_ticker == "EA"
-    assert batch.relationships[0].target_name == "Electronic Arts Inc."
-    assert batch.relationships[0].acquirer_name == "Oak-Eagle, LLC"
-    assert batch.relationships[0].status == "candidate"
-    assert "wholly owned subsidiary" in batch.relationships[0].evidence_excerpt
+    assert len(batch.observations) == 2
+    rendered = repr(batch)
+    assert "relationship" not in rendered.casefold()
+    assert "review_required" not in rendered
 
 
 # ============================================================
@@ -168,10 +174,8 @@ def test_form25_for_a_matured_note_is_review_material_not_pending_equity():
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required")
-    ]
-    assert "1.500% Senior Notes due 2026" in batch.events[0].description
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
+    assert "1.500% Senior Notes due 2026" in batch.observations[0].description
 
 
 def test_form25_depositary_class_is_never_silently_discarded():
@@ -192,11 +196,8 @@ def test_form25_depositary_class_is_never_silently_discarded():
         start_date="2026-08-01",
     )
 
-    assert [event.event_type for event in batch.events] == [
-        "listing_removal_notice"
-    ]
-    assert batch.events[0].lifecycle_state == "review_required"
-    assert description in batch.events[0].description
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
+    assert description in batch.observations[0].description
 
 
 def test_form25_unknown_class_remains_review_material():
@@ -214,10 +215,8 @@ def test_form25_unknown_class_remains_review_material():
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required")
-    ]
-    assert description in batch.events[0].description
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
+    assert description in batch.observations[0].description
 
 
 def test_form25_for_common_stock_starts_as_review_material():
@@ -233,9 +232,7 @@ def test_form25_for_common_stock_starts_as_review_material():
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required")
-    ]
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
 
 
 def test_form25_records_the_class_of_securities_as_evidence():
@@ -252,7 +249,7 @@ def test_form25_records_the_class_of_securities_as_evidence():
     )
 
     assert (
-        batch.events[0].description
+        batch.observations[0].description
         == "SEC notification of removal from listing or registration. Class of "
         "securities: Common stock, par value $0.0001 per share."
     )
@@ -273,7 +270,7 @@ def test_form25_class_evidence_survives_a_terse_filing_description():
     )
 
     assert (
-        batch.events[0].description
+        batch.observations[0].description
         == "25 Class of securities: Common stock, par value $0.0001 per share."
     )
 
@@ -292,7 +289,7 @@ def test_form25_with_an_undetermined_class_does_not_claim_one():
     )
 
     assert (
-        batch.events[0].description
+        batch.observations[0].description
         == "SEC notification of removal from listing or registration."
     )
 
@@ -324,12 +321,12 @@ def test_form25_fetch_failure_does_not_lose_the_rest_of_the_ticker():
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required"),
-        ("listing_status_review", "review_required"),
+    assert _kind_pairs(batch) == [
+        ("listing_removal_notice", None),
+        ("listing_status_review", None),
     ]
     assert (
-        batch.events[0].description
+        batch.observations[0].description
         == "SEC notification of removal from listing or registration."
     )
 
@@ -347,9 +344,7 @@ def test_form25_with_an_unreadable_document_still_requires_review():
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required")
-    ]
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
 
 
 @pytest.mark.parametrize(
@@ -377,8 +372,8 @@ def test_form25_records_the_class_verbatim_from_every_served_shape(
         start_date="2026-08-01",
     )
 
-    assert batch.events[0].lifecycle_state == "review_required"
-    assert f"Class of securities: {expected_class}." in batch.events[0].description
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
+    assert f"Class of securities: {expected_class}." in batch.observations[0].description
 
 
 @pytest.mark.parametrize(
@@ -411,10 +406,8 @@ def test_form25_class_does_not_choose_the_initial_review_state(description):
         start_date="2026-08-01",
     )
 
-    assert [(event.event_type, event.lifecycle_state) for event in batch.events] == [
-        ("listing_removal_notice", "review_required")
-    ]
-    assert description in batch.events[0].description
+    assert _kind_pairs(batch) == [("listing_removal_notice", None)]
+    assert description in batch.observations[0].description
 
 
 def test_form25_class_evidence_is_bounded_only_at_the_storage_boundary():
@@ -431,11 +424,11 @@ def test_form25_class_evidence_is_bounded_only_at_the_storage_boundary():
         start_date="2026-08-01",
     )
 
-    assert description[:1000] in batch.events[0].description
-    assert description[:1001] not in batch.events[0].description
+    assert description[:900] in batch.observations[0].description
+    assert len(batch.observations[0].description) <= 1000
 
 
-def test_ambiguous_item_201_does_not_invent_a_counterparty():
+def test_item_201_text_remains_observation_evidence_without_relationship_guess():
     from src.collectors.sec_corporate_actions import parse_submission_events
 
     payload = _recent_payload(
@@ -458,8 +451,10 @@ def test_ambiguous_item_201_does_not_invent_a_counterparty():
         start_date="2026-08-01",
     )
 
-    assert batch.events == ()
-    assert batch.relationships == ()
+    assert len(batch.observations) == 1
+    assert _kind_pairs(batch) == [("acquisition_completed", "2026-08-04")]
+    assert "completed a disposition" in batch.observations[0].description
+    assert "relationship" not in repr(batch).casefold()
 
 
 def test_item_301_alone_is_a_review_signal_not_delisting_proof():
@@ -483,9 +478,8 @@ def test_item_301_alone_is_a_review_signal_not_delisting_proof():
         observed_at="2026-08-05T12:00:00Z",
         start_date="2026-08-01",
     )
-    assert len(batch.events) == 1
-    assert batch.events[0].event_type == "listing_status_review"
-    assert batch.events[0].lifecycle_state == "review_required"
+    assert len(batch.observations) == 1
+    assert _kind_pairs(batch) == [("listing_status_review", None)]
 
 
 class _FakeSEC:
@@ -518,7 +512,7 @@ def test_run_incremental_persists_partial_results_without_touching_profile_state
     tmp_path,
 ):
     from src.collectors.sec_corporate_actions import run_incremental
-    from src.security_lifecycle import read_security_lifecycle
+    from src.security_lifecycle import read_market_observations
 
     db_path = tmp_path / "market_data.db"
     profile_path = tmp_path / "profile_state.db"
@@ -539,16 +533,18 @@ def test_run_incremental_persists_partial_results_without_touching_profile_state
     assert result == {
         "status": "partial",
         "tickers_scanned": 2,
-        "events_observed": 2,
-        "relationships_observed": 1,
-        "review_required": 2,
+        "observations_observed": 1,
+        "kinds_observed": 2,
         "errors": {"MISSING": "cik_unavailable"},
     }
     assert progress == [(1, 2, "EA"), (2, 2, "MISSING")]
     assert profile_path.read_bytes() == b"profile-sentinel"
-    snapshot = read_security_lifecycle(str(db_path))
-    assert len(snapshot["events"]) == 2
-    assert len(snapshot["relationships"]) == 1
+    snapshot = read_market_observations(str(db_path))
+    assert len(snapshot) == 1
+    assert snapshot[0]["kinds"] == [
+        {"event_type": "acquisition_completed", "effective_date": "2026-08-04"},
+        {"event_type": "listing_status_review", "effective_date": None},
+    ]
 
 
 def test_scheduler_registers_sec_source_and_preserves_adapter_partial(monkeypatch, tmp_path):
@@ -568,9 +564,8 @@ def test_scheduler_registers_sec_source_and_preserves_adapter_partial(monkeypatc
         lambda **_kwargs: {
             "status": "partial",
             "tickers_scanned": 1,
-            "events_observed": 0,
-            "relationships_observed": 0,
-            "review_required": 0,
+            "observations_observed": 0,
+            "kinds_observed": 0,
             "errors": {"EA": "submissions_unavailable"},
         },
     )

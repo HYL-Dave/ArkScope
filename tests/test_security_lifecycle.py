@@ -1,450 +1,294 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from pathlib import Path
+import hashlib
+import sqlite3
+
+import pytest
 
 
 def _observation(**overrides):
-    from src.security_lifecycle import LifecycleObservation
+    from src.security_lifecycle import LifecycleObservation, ObservationKind
 
     values = {
         "ticker": "EA",
         "cik": "0000712515",
         "issuer_name": "Electronic Arts Inc.",
-        "event_type": "acquisition_completed",
-        "lifecycle_state": "review_required",
         "filing_date": "2026-08-04",
-        "effective_date": "2026-08-04",
         "source": "sec_edgar",
         "source_ref": "0000712515-26-000042",
         "filing_form": "8-K",
         "filing_items": ("2.01", "3.01"),
         "evidence_url": "https://www.sec.gov/Archives/example/ea-8k.htm",
-        "description": "Completion of acquisition and listing removal review.",
+        "description": "Completion of acquisition and listing review.",
         "observed_at": "2026-08-05T00:00:00Z",
+        "kinds": (
+            ObservationKind("acquisition_completed", "2026-08-04"),
+            ObservationKind("listing_status_review", None),
+        ),
     }
     values.update(overrides)
     return LifecycleObservation(**values)
 
 
-def _relationship(**overrides):
-    from src.security_lifecycle import CorporateRelationship
+def _open_market(path):
+    from src.security_lifecycle_schema import create_market_schema
 
-    values = {
-        "action_type": "acquisition",
-        "target_ticker": "EA",
-        "target_cik": "0000712515",
-        "target_name": "Electronic Arts Inc.",
-        "acquirer_ticker": None,
-        "acquirer_cik": None,
-        "acquirer_name": "Oak-Eagle, LLC",
-        "status": "candidate",
-        "effective_date": "2026-08-04",
-        "source": "sec_edgar",
-        "source_ref": "0000712515-26-000042",
-        "evidence_url": "https://www.sec.gov/Archives/example/ea-8k.htm",
-        "evidence_excerpt": (
-            "The Company became a wholly owned subsidiary of Oak-Eagle, LLC."
-        ),
-        "observed_at": "2026-08-05T00:00:00Z",
-    }
-    values.update(overrides)
-    return CorporateRelationship(**values)
+    conn = sqlite3.connect(path)
+    create_market_schema(conn)
+    return conn
 
 
-def test_security_lifecycle_read_is_no_create_on_missing_database(tmp_path):
-    from src.security_lifecycle import read_security_lifecycle
+def _open_profile(path):
+    from src.security_lifecycle_schema import create_profile_schema
 
-    db_path = tmp_path / "missing" / "market_data.db"
-    assert read_security_lifecycle(str(db_path)) == {
-        "events": [],
-        "relationships": [],
-        "summary": {
-            "event_count": 0,
-            "review_required": 0,
-            "pending_delisting": 0,
-            "confirmed_inactive": 0,
-            "renamed_or_transferred": 0,
-            "relationship_candidates": 0,
-        },
-    }
-    assert not db_path.exists()
-    assert not db_path.parent.exists()
+    conn = sqlite3.connect(path)
+    create_profile_schema(conn)
+    return conn
 
 
-def test_store_is_idempotent_and_keeps_reviewed_relationship_decision(tmp_path):
-    import sqlite3
+def test_case_id_rejects_embedded_nul_and_hashes_literal_provider_identity():
+    from src.security_lifecycle_investigation import case_id_for
 
-    from src.security_lifecycle import SecurityLifecycleStore, read_security_lifecycle
+    expected = "slc_" + hashlib.sha256(
+        b"security-lifecycle-case-v1\0sec_edgar\0Ref-AbC\0Ea"
+    ).hexdigest()
+    assert case_id_for("sec_edgar", "Ref-AbC", "Ea") == expected
+    for values in (
+        ("sec\0edgar", "Ref-AbC", "Ea"),
+        ("sec_edgar", "Ref\0AbC", "Ea"),
+        ("sec_edgar", "Ref-AbC", "E\0A"),
+    ):
+        with pytest.raises(ValueError, match="embedded_nul"):
+            case_id_for(*values)
 
-    db_path = tmp_path / "market_data.db"
-    conn = sqlite3.connect(db_path)
+
+def test_observation_store_rejects_unknown_kind_before_write(tmp_path):
+    from src.security_lifecycle import (
+        LifecycleObservation,
+        ObservationKind,
+        SecurityLifecycleStore,
+    )
+
+    conn = _open_market(tmp_path / "market_data.db")
     try:
         store = SecurityLifecycleStore(conn)
-        assert store.upsert_observation(_observation()) is True
-        assert store.upsert_observation(
-            _observation(observed_at="2026-08-06T00:00:00Z")
-        ) is False
-        relation_id = store.upsert_relationship(_relationship())
-        store.review_relationship(
-            relation_id,
-            status="confirmed",
-            reviewed_at="2026-08-06T01:00:00Z",
+        invalid = LifecycleObservation(
+            **{**_observation().__dict__, "kinds": (ObservationKind("rumor", None),)}
         )
-        assert store.upsert_relationship(
-            _relationship(observed_at="2026-08-07T00:00:00Z")
-        ) == relation_id
-    finally:
-        conn.close()
-
-    snapshot = read_security_lifecycle(str(db_path))
-    assert snapshot["summary"] == {
-        "event_count": 1,
-        "review_required": 1,
-        "pending_delisting": 0,
-        "confirmed_inactive": 0,
-        "renamed_or_transferred": 0,
-        "relationship_candidates": 0,
-    }
-    assert snapshot["events"][0]["filing_items"] == ["2.01", "3.01"]
-    assert snapshot["events"][0]["first_observed_at"] == "2026-08-05T00:00:00Z"
-    assert snapshot["events"][0]["last_observed_at"] == "2026-08-06T00:00:00Z"
-    assert snapshot["relationships"][0]["status"] == "confirmed"
-    assert snapshot["relationships"][0]["reviewed_at"] == "2026-08-06T01:00:00Z"
-    assert snapshot["relationships"][0]["last_observed_at"] == "2026-08-07T00:00:00Z"
-
-
-def test_manual_lifecycle_review_survives_sec_rescan_and_can_be_cleared(tmp_path):
-    import sqlite3
-
-    from src.security_lifecycle import SecurityLifecycleStore, read_security_lifecycle
-
-    db_path = tmp_path / "market_data.db"
-    conn = sqlite3.connect(db_path)
-    try:
-        store = SecurityLifecycleStore(conn)
-        store.upsert_observation(
-            _observation(
-                event_type="listing_removal_notice",
-                lifecycle_state="pending_delisting",
-            )
-        )
-        event_id = conn.execute(
-            "SELECT id FROM security_lifecycle_observations"
-        ).fetchone()[0]
-        store.review_observation(
-            event_id,
-            status="inactive_confirmed",
-            reviewed_at="2026-08-06T01:00:00Z",
-        )
-        store.upsert_observation(
-            _observation(
-                event_type="listing_removal_notice",
-                lifecycle_state="pending_delisting",
-                observed_at="2026-08-07T00:00:00Z",
-            )
-        )
-    finally:
-        conn.close()
-
-    snapshot = read_security_lifecycle(str(db_path))
-    assert snapshot["events"][0]["observed_lifecycle_state"] == "pending_delisting"
-    assert snapshot["events"][0]["lifecycle_state"] == "inactive_confirmed"
-    assert snapshot["events"][0]["reviewed_state"] == "inactive_confirmed"
-    assert snapshot["events"][0]["reviewed_at"] == "2026-08-06T01:00:00Z"
-    assert snapshot["summary"]["pending_delisting"] == 0
-    assert snapshot["summary"]["confirmed_inactive"] == 1
-
-    conn = sqlite3.connect(db_path)
-    try:
-        SecurityLifecycleStore(conn).review_observation(
-            event_id,
-            status="unreviewed",
-            reviewed_at="2026-08-08T00:00:00Z",
-        )
-    finally:
-        conn.close()
-    cleared = read_security_lifecycle(str(db_path))
-    assert cleared["events"][0]["lifecycle_state"] == "pending_delisting"
-    assert cleared["events"][0]["reviewed_state"] is None
-    assert cleared["events"][0]["reviewed_at"] is None
-
-
-def test_store_adds_review_columns_to_an_existing_lifecycle_table(tmp_path):
-    import sqlite3
-
-    from src.security_lifecycle import SecurityLifecycleStore
-
-    conn = sqlite3.connect(tmp_path / "market_data.db")
-    try:
-        SecurityLifecycleStore(conn)
-        conn.execute(
-            "ALTER TABLE security_lifecycle_observations DROP COLUMN reviewed_at"
-        )
-        conn.execute(
-            "ALTER TABLE security_lifecycle_observations DROP COLUMN reviewed_state"
-        )
-        SecurityLifecycleStore(conn)
-        columns = {
-            row[1]
-            for row in conn.execute(
-                "PRAGMA table_info(security_lifecycle_observations)"
-            ).fetchall()
-        }
-        assert {"reviewed_state", "reviewed_at"}.issubset(columns)
+        with pytest.raises(ValueError, match="event_type"):
+            store.upsert_observation(invalid)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_observations"
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_observation_kinds"
+        ).fetchone()[0] == 0
     finally:
         conn.close()
 
 
-def test_store_rejects_unknown_states_before_sqlite_write(tmp_path):
-    import sqlite3
-
-    import pytest
-
-    from src.security_lifecycle import LifecycleObservation, SecurityLifecycleStore
-
-    conn = sqlite3.connect(tmp_path / "market_data.db")
-    try:
-        store = SecurityLifecycleStore(conn)
-        with pytest.raises(ValueError, match="lifecycle_state"):
-            store.upsert_observation(
-                LifecycleObservation(
-                    **{
-                        **_observation().__dict__,
-                        "lifecycle_state": "definitely_delisted",
-                    }
-                )
-            )
-    finally:
-        conn.close()
-
-
-def test_manual_lifecycle_review_rejects_non_listing_events(tmp_path):
-    import sqlite3
-
-    import pytest
-
-    from src.security_lifecycle import SecurityLifecycleStore
-
-    conn = sqlite3.connect(tmp_path / "market_data.db")
-    try:
-        store = SecurityLifecycleStore(conn)
-        store.upsert_observation(_observation(event_type="acquisition_completed"))
-        event_id = conn.execute(
-            "SELECT id FROM security_lifecycle_observations"
-        ).fetchone()[0]
-        with pytest.raises(ValueError, match="observation_not_reviewable"):
-            store.review_observation(
-                event_id,
-                status="inactive_confirmed",
-                reviewed_at="2026-08-06T01:00:00Z",
-            )
-    finally:
-        conn.close()
-
-
-def test_read_projection_never_claims_that_universe_was_mutated(tmp_path):
-    import sqlite3
-
-    from src.security_lifecycle import SecurityLifecycleStore, read_security_lifecycle
-
-    db_path = tmp_path / "market_data.db"
-    conn = sqlite3.connect(db_path)
-    try:
-        SecurityLifecycleStore(conn).upsert_observation(
-            _observation(
-                event_type="listing_removal_notice",
-                lifecycle_state="pending_delisting",
-            )
-        )
-    finally:
-        conn.close()
-
-    snapshot = read_security_lifecycle(str(db_path))
-    rendered = str(snapshot).lower()
-    assert "auto_removed" not in rendered
-    assert "hidden" not in rendered
-    assert snapshot["summary"]["pending_delisting"] == 1
-
-
-def test_market_data_route_reads_lifecycle_without_provider_or_scheduler(
-    tmp_path, monkeypatch
+def test_observation_upsert_preserves_first_seen_and_refreshes_bounded_source_fields(
+    tmp_path,
 ):
-    import sqlite3
-
-    import src.api.routes.market_data as route
     from src.security_lifecycle import SecurityLifecycleStore
 
-    db_path = tmp_path / "market_data.db"
-    conn = sqlite3.connect(db_path)
+    conn = _open_market(tmp_path / "market_data.db")
+    try:
+        store = SecurityLifecycleStore(conn)
+        observation_id = store.upsert_observation(_observation())
+        assert store.upsert_observation(
+            _observation(
+                issuer_name="Electronic Arts, Inc.",
+                description="updated evidence",
+                observed_at="2026-08-06T00:00:00Z",
+            )
+        ) == observation_id
+        row = conn.execute(
+            "SELECT * FROM security_lifecycle_observations WHERE id=?",
+            (observation_id,),
+        ).fetchone()
+        assert row["first_observed_at"] == "2026-08-05T00:00:00Z"
+        assert row["last_observed_at"] == "2026-08-06T00:00:00Z"
+        assert row["issuer_name"] == "Electronic Arts, Inc."
+        assert row["description"] == "updated evidence"
+    finally:
+        conn.close()
+
+
+def test_observation_upsert_reconciles_many_kinds_without_changing_case_identity(
+    tmp_path,
+):
+    from src.security_lifecycle import ObservationKind, SecurityLifecycleStore
+    from src.security_lifecycle_investigation import case_id_for
+
+    conn = _open_market(tmp_path / "market_data.db")
+    try:
+        store = SecurityLifecycleStore(conn)
+        observation_id = store.upsert_observation(_observation())
+        case_id = case_id_for("sec_edgar", "0000712515-26-000042", "EA")
+        store.upsert_observation(
+            _observation(
+                observed_at="2026-08-06T00:00:00Z",
+                kinds=(ObservationKind("listing_status_review", None),),
+            )
+        )
+        assert [
+            row[0]
+            for row in conn.execute(
+                "SELECT id FROM security_lifecycle_observations"
+            ).fetchall()
+        ] == [observation_id]
+        assert [
+            tuple(row)
+            for row in conn.execute(
+                "SELECT event_type, effective_date "
+                "FROM security_lifecycle_observation_kinds ORDER BY event_type"
+            ).fetchall()
+        ] == [("listing_status_review", None)]
+        assert case_id_for("sec_edgar", "0000712515-26-000042", "EA") == case_id
+    finally:
+        conn.close()
+
+
+def test_read_composition_keeps_profile_history_visible_when_source_is_missing(
+    tmp_path,
+):
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        compose_security_lifecycle,
+    )
+
+    market_path = tmp_path / "market_data.db"
+    profile_path = tmp_path / "profile_state.db"
+    market = _open_market(market_path)
+    market.close()
+    profile = _open_profile(profile_path)
+    try:
+        store = SecurityLifecycleInvestigationStore(profile)
+        case_id = store.ensure_case(
+            source="sec_edgar",
+            source_ref="missing-ref",
+            ticker="EA",
+            at="2026-08-06T00:00:00Z",
+        )
+    finally:
+        profile.close()
+
+    result = compose_security_lifecycle(str(market_path), str(profile_path))
+    assert result["cases"] == [
+        {
+            "case_id": case_id,
+            "source": "sec_edgar",
+            "source_ref": "missing-ref",
+            "ticker": "EA",
+            "source_presence": "source_missing",
+            "workflow_state": "unresolved",
+            "observation": None,
+            "current_assessment": None,
+        }
+    ]
+
+
+def test_read_composition_projects_untouched_observation_without_profile_write(tmp_path):
+    from src.security_lifecycle import SecurityLifecycleStore
+    from src.security_lifecycle_investigation import compose_security_lifecycle
+
+    market_path = tmp_path / "market_data.db"
+    profile_path = tmp_path / "profile_state.db"
+    conn = _open_market(market_path)
     try:
         SecurityLifecycleStore(conn).upsert_observation(_observation())
     finally:
         conn.close()
-    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
-    monkeypatch.setitem(
-        __import__("sys").modules,
-        "src.service.data_scheduler",
-        None,
-    )
 
-    result = route.security_lifecycle_status(limit=25)
-
-    assert result["summary"]["event_count"] == 1
-    assert result["events"][0]["ticker"] == "EA"
-
-
-def test_relationship_review_route_is_explicit_and_does_not_touch_profile_state(
-    tmp_path, monkeypatch
-):
-    import sqlite3
-
-    import src.api.routes.market_data as route
-    from src.security_lifecycle import SecurityLifecycleStore
-
-    db_path = tmp_path / "market_data.db"
-    profile_path = tmp_path / "profile_state.db"
-    profile_path.write_bytes(b"profile-sentinel")
-    conn = sqlite3.connect(db_path)
-    try:
-        relation_id = SecurityLifecycleStore(conn).upsert_relationship(_relationship())
-    finally:
-        conn.close()
-    allowed = []
-    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
-    monkeypatch.setattr(
-        route,
-        "require_db_write",
-        lambda action, payload: allowed.append((action, payload)),
-    )
-
-    result = route.review_corporate_relationship(
-        relation_id,
-        route.CorporateRelationshipReview(status="confirmed"),
-    )
-
-    assert result == {"id": relation_id, "status": "confirmed"}
-    assert allowed == [
-        (
-            "review_corporate_relationship",
-            {"relationship_id": relation_id, "status": "confirmed"},
-        )
+    result = compose_security_lifecycle(str(market_path), str(profile_path))
+    assert len(result["cases"]) == 1
+    assert result["cases"][0]["source_presence"] == "present"
+    assert result["cases"][0]["workflow_state"] == "unresolved"
+    assert result["cases"][0]["observation"]["kinds"] == [
+        {"event_type": "acquisition_completed", "effective_date": "2026-08-04"},
+        {"event_type": "listing_status_review", "effective_date": None},
     ]
-    assert profile_path.read_bytes() == b"profile-sentinel"
+    assert not profile_path.exists()
 
 
-def test_lifecycle_event_review_404_does_not_create_lifecycle_tables(
+def test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content(
     tmp_path,
-    monkeypatch,
 ):
-    import sqlite3
-
-    import pytest
-    from fastapi import HTTPException
-
-    import src.api.routes.market_data as route
-
-    db_path = tmp_path / "market_data.db"
-    sqlite3.connect(db_path).close()
-    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
-    monkeypatch.setattr(route, "require_db_write", lambda *_args, **_kwargs: None)
-
-    with pytest.raises(HTTPException) as exc_info:
-        route.review_security_lifecycle_event(
-            999,
-            route.SecurityLifecycleEventReview(status="inactive_confirmed"),
-        )
-    assert exc_info.value.status_code == 404
-    conn = sqlite3.connect(db_path)
-    try:
-        assert conn.execute(
-            "SELECT name FROM sqlite_master WHERE name LIKE '%lifecycle%' "
-            "OR name LIKE 'corporate_action%'"
-        ).fetchall() == []
-    finally:
-        conn.close()
-
-
-def test_relationship_review_404_does_not_create_lifecycle_tables(tmp_path, monkeypatch):
-    import sqlite3
-
-    import pytest
-    from fastapi import HTTPException
-
-    import src.api.routes.market_data as route
-
-    db_path = tmp_path / "market_data.db"
-    sqlite3.connect(db_path).close()
-    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
-    monkeypatch.setattr(route, "require_db_write", lambda *_args, **_kwargs: None)
-
-    with pytest.raises(HTTPException) as exc_info:
-        route.review_corporate_relationship(
-            999,
-            route.CorporateRelationshipReview(status="confirmed"),
-        )
-    assert exc_info.value.status_code == 404
-    conn = sqlite3.connect(db_path)
-    try:
-        assert conn.execute(
-            "SELECT name FROM sqlite_master WHERE name LIKE '%lifecycle%' "
-            "OR name LIKE 'corporate_action%'"
-        ).fetchall() == []
-    finally:
-        conn.close()
-
-
-def test_lifecycle_event_review_route_is_explicit_and_keeps_universe_untouched(
-    tmp_path, monkeypatch
-):
-    import sqlite3
-
-    import src.api.routes.market_data as route
     from src.security_lifecycle import SecurityLifecycleStore
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        compose_security_lifecycle,
+        observation_fingerprint,
+    )
 
-    db_path = tmp_path / "market_data.db"
+    market_path = tmp_path / "market_data.db"
     profile_path = tmp_path / "profile_state.db"
-    profile_path.write_bytes(b"profile-sentinel")
-    conn = sqlite3.connect(db_path)
+    market = _open_market(market_path)
     try:
-        store = SecurityLifecycleStore(conn)
+        market_store = SecurityLifecycleStore(market)
+        market_store.upsert_observation(_observation())
+        fingerprint = observation_fingerprint(market_store.get_observation("sec_edgar", "0000712515-26-000042", "EA"))
+        market.execute("DELETE FROM security_lifecycle_observations")
+        market.commit()
+    finally:
+        market.close()
+    profile = _open_profile(profile_path)
+    try:
+        profile_store = SecurityLifecycleInvestigationStore(profile)
+        profile_store.insert_legacy_assessment(
+            source="sec_edgar",
+            source_ref="0000712515-26-000042",
+            ticker="EA",
+            reviewed_state="inactive_confirmed",
+            reviewed_at="2026-08-06T00:00:00Z",
+            observation_fingerprint_sha256=fingerprint,
+        )
+    finally:
+        profile.close()
+
+    assert compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0][
+        "source_presence"
+    ] == "source_missing"
+
+    market = sqlite3.connect(market_path)
+    market.row_factory = sqlite3.Row
+    try:
+        store = SecurityLifecycleStore(market)
+        store.upsert_observation(_observation())
+    finally:
+        market.close()
+    identical = compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
+    assert identical["workflow_state"] == "resolved"
+    assert identical["current_assessment"]["stale"] is False
+
+    market = sqlite3.connect(market_path)
+    market.row_factory = sqlite3.Row
+    try:
+        store = SecurityLifecycleStore(market)
         store.upsert_observation(
-            _observation(
-                event_type="listing_removal_notice",
-                lifecycle_state="pending_delisting",
-            )
+            _observation(description="changed source evidence", observed_at="2026-08-07T00:00:00Z")
         )
-        event_id = conn.execute(
-            "SELECT id FROM security_lifecycle_observations"
-        ).fetchone()[0]
     finally:
-        conn.close()
-    allowed = []
-    monkeypatch.setattr(route, "resolve_market_db_path", lambda: str(db_path))
-    monkeypatch.setattr(
-        route,
-        "require_db_write",
-        lambda action, payload: allowed.append((action, payload)),
+        market.close()
+    changed = compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
+    assert changed["workflow_state"] == "unresolved"
+    assert changed["current_assessment"] is None
+    assert changed["assessment_history"][0]["stale"] is True
+
+
+def test_store_level_failure_is_typed_unavailable_not_empty_fallback(tmp_path):
+    from src.security_lifecycle_investigation import (
+        LifecycleStoreUnavailable,
+        compose_security_lifecycle,
     )
 
-    result = route.review_security_lifecycle_event(
-        event_id,
-        route.SecurityLifecycleEventReview(status="inactive_confirmed"),
-    )
+    market_path = tmp_path / "market_data.db"
+    profile_path = tmp_path / "profile_state.db"
+    market_path.write_bytes(b"not sqlite")
+    profile = _open_profile(profile_path)
+    profile.close()
 
-    assert result == {"id": event_id, "status": "inactive_confirmed"}
-    assert allowed == [
-        (
-            "review_security_lifecycle_event",
-            {"event_id": event_id, "status": "inactive_confirmed"},
-        )
-    ]
-    assert profile_path.read_bytes() == b"profile-sentinel"
-    conn = sqlite3.connect(db_path)
-    try:
-        assert conn.execute(
-            "SELECT reviewed_state FROM security_lifecycle_observations WHERE id=?",
-            (event_id,),
-        ).fetchone()[0] == "inactive_confirmed"
-    finally:
-        conn.close()
+    with pytest.raises(LifecycleStoreUnavailable) as exc_info:
+        compose_security_lifecycle(str(market_path), str(profile_path))
+    assert exc_info.value.store == "market"
