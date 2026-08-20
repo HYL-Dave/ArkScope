@@ -4,15 +4,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import sqlite3
-from typing import Callable, Optional
+from typing import Callable, Iterable, Mapping, Optional
 import uuid
 
 from src.security_lifecycle import read_market_observations
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
     LifecycleWritesUnavailable,
+    ACKNOWLEDGEMENT_REASONS,
+    ASSESSMENT_AUTHORS,
+    ASSESSMENT_CONFIDENCE,
+    ASSESSMENT_OUTCOMES,
+    ASSESSMENT_RELEVANCE,
+    DOCUMENT_STATUSES,
+    EVIDENCE_KINDS,
+    PROPOSAL_ACTIONS,
+    RUN_ADAPTERS,
+    RUN_FAILURE_CODES,
+    RUN_TRIGGERS,
     assert_lifecycle_writes_available,
     create_profile_schema,
     verify_profile_connection,
@@ -77,6 +89,78 @@ def observation_fingerprint(observation: dict) -> str:
 
 def empty_evidence_set_sha256() -> str:
     return hashlib.sha256(b"").hexdigest()
+
+
+def _bounded_text(
+    name: str,
+    value: object,
+    *,
+    max_length: int,
+    required: bool = False,
+) -> str | None:
+    if value is None:
+        if required:
+            raise ValueError(name)
+        return None
+    text = str(value).strip()
+    if (required and not text) or len(text) > max_length or "\0" in text:
+        raise ValueError(name)
+    return text or None
+
+
+def _canonical_json(value: object, *, max_bytes: int, name: str) -> str:
+    try:
+        encoded = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(name) from exc
+    if len(encoded.encode("utf-8")) > max_bytes:
+        raise ValueError(name)
+    return encoded
+
+
+def _canonical_decimal(value: object, *, name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError(f"{name}_decimal")
+    try:
+        number = Decimal(value.strip())
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"{name}_decimal") from exc
+    if not number.is_finite():
+        raise ValueError(f"{name}_decimal")
+    rendered = format(number, "f")
+    if "." in rendered:
+        rendered = rendered.rstrip("0").rstrip(".")
+    if rendered in {"-0", ""}:
+        rendered = "0"
+    return rendered
+
+
+def _digest_rows(rows: Iterable[tuple[str, str]]) -> str:
+    ordered = sorted((str(row_id), str(digest)) for row_id, digest in rows)
+    payload = "" if not ordered else "".join(
+        f"{row_id}\t{digest}\n" for row_id, digest in ordered
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _assessment_fingerprint(assessment: Mapping[str, object]) -> str:
+    return hashlib.sha256(
+        "\0".join(
+            (
+                str(assessment["assessment_id"]),
+                str(assessment["observation_fingerprint_sha256"]),
+                str(assessment["evidence_set_sha256"]),
+            )
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 def _component_tables(conn: sqlite3.Connection) -> set[str]:
@@ -218,8 +302,798 @@ class SecurityLifecycleInvestigationStore:
             )
         return assessment_id
 
+    def _case_row(self, case_id: str) -> sqlite3.Row:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_cases WHERE case_id=?", (case_id,)
+        ).fetchone()
+        if row is None:
+            raise KeyError("case_not_found")
+        return row
 
-def _read_profile(path: Path) -> tuple[list[dict], dict[str, list[dict]]]:
+    def _evidence_set_sha256(self, case_id: str) -> str:
+        return _digest_rows(
+            (
+                str(row["evidence_id"]),
+                str(row["content_sha256"]),
+            )
+            for row in self.conn.execute(
+                "SELECT evidence_id,content_sha256 "
+                "FROM security_lifecycle_evidence WHERE case_id=?",
+                (case_id,),
+            )
+        )
+
+    def create_investigation_run(
+        self,
+        *,
+        case_id: str,
+        trigger: str,
+        adapter: str,
+        query_plan: Iterable[str],
+        at: str,
+    ) -> str:
+        self._assert_write()
+        self._case_row(case_id)
+        if trigger not in RUN_TRIGGERS:
+            raise ValueError("trigger")
+        if adapter not in RUN_ADAPTERS:
+            raise ValueError("adapter")
+        queries = [
+            _bounded_text("query", query, max_length=1800, required=True)
+            for query in query_plan
+        ]
+        if len(queries) > 3:
+            raise ValueError("query_count")
+        run_id = self._new_id("slr")
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO security_lifecycle_investigation_runs "
+                "(run_id,case_id,trigger,adapter,status,query_plan_json,query_count,"
+                "result_count,fetch_count,usage_json,failure_code,started_at,"
+                "finished_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    run_id,
+                    case_id,
+                    trigger,
+                    adapter,
+                    "queued",
+                    _canonical_json(queries, max_bytes=6000, name="query_plan"),
+                    len(queries),
+                    None,
+                    0,
+                    "{}",
+                    None,
+                    None,
+                    None,
+                    at,
+                ),
+            )
+        return run_id
+
+    def get_investigation_run(self, run_id: str) -> dict:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_investigation_runs WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError("investigation_run_not_found")
+        return dict(row)
+
+    def list_investigation_runs(self, case_id: str) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.conn.execute(
+                "SELECT * FROM security_lifecycle_investigation_runs "
+                "WHERE case_id=? ORDER BY created_at DESC,run_id DESC",
+                (case_id,),
+            )
+        ]
+
+    def start_investigation_run(self, run_id: str, *, at: str) -> None:
+        self._assert_write()
+        row = self.get_investigation_run(run_id)
+        if row["status"] != "queued":
+            raise ValueError("terminal_or_invalid_run_transition")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE security_lifecycle_investigation_runs "
+                "SET status='running',started_at=? WHERE run_id=?",
+                (at, run_id),
+            )
+
+    def succeed_investigation_run(
+        self,
+        run_id: str,
+        *,
+        result_count: int,
+        fetch_count: int,
+        usage: Mapping[str, object],
+        at: str,
+    ) -> dict:
+        self._assert_write()
+        row = self.get_investigation_run(run_id)
+        if row["status"] != "running":
+            raise ValueError("terminal_or_invalid_run_transition")
+        if int(result_count) < 0:
+            raise ValueError("result_count")
+        if not 0 <= int(fetch_count) <= 5:
+            raise ValueError("fetch_count")
+        usage_json = _canonical_json(dict(usage), max_bytes=4096, name="usage")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE security_lifecycle_investigation_runs SET "
+                "status='succeeded',result_count=?,fetch_count=?,usage_json=?,"
+                "failure_code=NULL,finished_at=? WHERE run_id=?",
+                (int(result_count), int(fetch_count), usage_json, at, run_id),
+            )
+        return self.get_investigation_run(run_id)
+
+    def fail_investigation_run(
+        self,
+        run_id: str,
+        *,
+        failure_code: str,
+        usage: Mapping[str, object],
+        at: str,
+        fetch_count: int = 0,
+    ) -> dict:
+        self._assert_write()
+        row = self.get_investigation_run(run_id)
+        if row["status"] != "running":
+            raise ValueError("terminal_or_invalid_run_transition")
+        if failure_code not in RUN_FAILURE_CODES:
+            raise ValueError("failure_code")
+        if not 0 <= int(fetch_count) <= 5:
+            raise ValueError("fetch_count")
+        usage_json = _canonical_json(dict(usage), max_bytes=4096, name="usage")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE security_lifecycle_investigation_runs SET "
+                "status='failed',result_count=NULL,fetch_count=?,usage_json=?,failure_code=?,"
+                "finished_at=? WHERE run_id=?",
+                (int(fetch_count), usage_json, failure_code, at, run_id),
+            )
+        return self.get_investigation_run(run_id)
+
+    def add_evidence(
+        self,
+        *,
+        case_id: str,
+        run_id: str | None,
+        kind: str,
+        adapter: str,
+        excerpt: str,
+        source_url: str | None,
+        title: str | None,
+        publisher: str | None,
+        domain: str | None,
+        source_published_at: str | None,
+        retrieved_at: str | None,
+        mime_type: str | None,
+        document_status: str | None,
+        at: str,
+    ) -> str:
+        self._assert_write()
+        self._case_row(case_id)
+        if kind not in EVIDENCE_KINDS:
+            raise ValueError("evidence_kind")
+        if adapter not in RUN_ADAPTERS:
+            raise ValueError("adapter")
+        if document_status is not None and document_status not in DOCUMENT_STATUSES:
+            raise ValueError("document_status")
+        if kind == "document_reference" and document_status is None:
+            raise ValueError("document_status")
+        if kind != "document_reference" and document_status is not None:
+            raise ValueError("document_status")
+        if run_id is not None:
+            run = self.get_investigation_run(run_id)
+            if run["case_id"] != case_id:
+                raise ValueError("run_case")
+        excerpt_text = _bounded_text(
+            "excerpt", excerpt, max_length=16000, required=True
+        )
+        source_url_text = _bounded_text("source_url", source_url, max_length=1000)
+        if source_url_text is not None and not source_url_text.startswith("https://"):
+            raise ValueError("source_url")
+        evidence_id = self._new_id("sle")
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO security_lifecycle_evidence "
+                "(evidence_id,case_id,run_id,kind,source_url,title,publisher,domain,"
+                "source_published_at,retrieved_at,adapter,excerpt,content_sha256,"
+                "mime_type,document_status,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    evidence_id,
+                    case_id,
+                    run_id,
+                    kind,
+                    source_url_text,
+                    _bounded_text("title", title, max_length=500),
+                    _bounded_text("publisher", publisher, max_length=240),
+                    _bounded_text("domain", domain, max_length=253),
+                    source_published_at,
+                    retrieved_at,
+                    adapter,
+                    excerpt_text,
+                    hashlib.sha256(excerpt_text.encode("utf-8")).hexdigest(),
+                    _bounded_text("mime_type", mime_type, max_length=127),
+                    document_status,
+                    at,
+                ),
+            )
+        return evidence_id
+
+    def list_evidence(self, case_id: str) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.conn.execute(
+                "SELECT * FROM security_lifecycle_evidence "
+                "WHERE case_id=? ORDER BY created_at,evidence_id",
+                (case_id,),
+            )
+        ]
+
+    def create_assessment(
+        self,
+        *,
+        case_id: str,
+        relevance: str,
+        confidence: str,
+        author: str,
+        conclusion: str,
+        impact_summary: str,
+        outcomes: Iterable[str],
+        citations: Iterable[Mapping[str, object]],
+        observation_fingerprint_sha256: str,
+        at: str,
+        counterparty_name: str | None = None,
+        counterparty_ticker: str | None = None,
+        counterparty_cik: str | None = None,
+        successor_ticker: str | None = None,
+        destination_venue: str | None = None,
+        effective_date: str | None = None,
+        consideration_currency: str | None = None,
+        cash_per_security_decimal: object = None,
+        exchange_ratio_decimal: object = None,
+    ) -> str:
+        self._assert_write()
+        self._case_row(case_id)
+        if relevance not in ASSESSMENT_RELEVANCE:
+            raise ValueError("relevance")
+        if confidence not in ASSESSMENT_CONFIDENCE:
+            raise ValueError("confidence")
+        if author not in ASSESSMENT_AUTHORS:
+            raise ValueError("author")
+        outcome_values = tuple(sorted(set(str(value) for value in outcomes)))
+        if not outcome_values or any(value not in ASSESSMENT_OUTCOMES for value in outcome_values):
+            raise ValueError("outcome")
+        if "symbol_or_venue_changed" in outcome_values:
+            raise ValueError("legacy_outcome")
+        citation_values: list[dict[str, str | None]] = []
+        for citation in citations:
+            reference_kind = str(citation.get("reference_kind") or "")
+            if reference_kind == "observation":
+                cited_hash = str(citation.get("cited_content_sha256") or "")
+                if len(cited_hash) != 64:
+                    raise ValueError("citation")
+                citation_values.append(
+                    {
+                        "reference_kind": "observation",
+                        "evidence_id": None,
+                        "cited_content_sha256": cited_hash,
+                    }
+                )
+            elif reference_kind == "evidence":
+                evidence_id = str(citation.get("evidence_id") or "")
+                row = self.conn.execute(
+                    "SELECT case_id,content_sha256 FROM security_lifecycle_evidence "
+                    "WHERE evidence_id=?",
+                    (evidence_id,),
+                ).fetchone()
+                if row is None or row["case_id"] != case_id:
+                    raise ValueError("citation")
+                citation_values.append(
+                    {
+                        "reference_kind": "evidence",
+                        "evidence_id": evidence_id,
+                        "cited_content_sha256": str(row["content_sha256"]),
+                    }
+                )
+            else:
+                raise ValueError("citation")
+        revision = int(
+            self.conn.execute(
+                "SELECT COALESCE(MAX(revision),0)+1 "
+                "FROM security_lifecycle_assessments WHERE case_id=?",
+                (case_id,),
+            ).fetchone()[0]
+        )
+        assessment_id = self._new_id("sla")
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO security_lifecycle_assessments "
+                "(assessment_id,case_id,revision,status,relevance,confidence,author,"
+                "conclusion,impact_summary,counterparty_name,counterparty_ticker,"
+                "counterparty_cik,successor_ticker,destination_venue,effective_date,"
+                "consideration_currency,cash_per_security_decimal,"
+                "exchange_ratio_decimal,observation_fingerprint_sha256,"
+                "evidence_set_sha256,created_at,accepted_at,superseded_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    assessment_id,
+                    case_id,
+                    revision,
+                    "draft",
+                    relevance,
+                    confidence,
+                    author,
+                    _bounded_text("conclusion", conclusion, max_length=4000, required=True),
+                    _bounded_text("impact_summary", impact_summary, max_length=4000, required=True),
+                    _bounded_text("counterparty_name", counterparty_name, max_length=240),
+                    _bounded_text("counterparty_ticker", counterparty_ticker, max_length=20),
+                    _bounded_text("counterparty_cik", counterparty_cik, max_length=10),
+                    _bounded_text("successor_ticker", successor_ticker, max_length=20),
+                    _bounded_text("destination_venue", destination_venue, max_length=120),
+                    effective_date,
+                    _bounded_text("consideration_currency", consideration_currency, max_length=3),
+                    _canonical_decimal(cash_per_security_decimal, name="cash_per_security"),
+                    _canonical_decimal(exchange_ratio_decimal, name="exchange_ratio"),
+                    observation_fingerprint_sha256,
+                    self._evidence_set_sha256(case_id),
+                    at,
+                    None,
+                    None,
+                ),
+            )
+            self.conn.executemany(
+                "INSERT INTO security_lifecycle_assessment_outcomes "
+                "(assessment_id,outcome) VALUES (?,?)",
+                [(assessment_id, outcome) for outcome in outcome_values],
+            )
+            self.conn.executemany(
+                "INSERT INTO security_lifecycle_assessment_evidence "
+                "(assessment_id,reference_kind,evidence_id,cited_content_sha256) "
+                "VALUES (?,?,?,?)",
+                [
+                    (
+                        assessment_id,
+                        item["reference_kind"],
+                        item["evidence_id"],
+                        item["cited_content_sha256"],
+                    )
+                    for item in citation_values
+                ],
+            )
+        return assessment_id
+
+    def get_assessment(self, assessment_id: str) -> dict:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_assessments WHERE assessment_id=?",
+            (assessment_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError("assessment_not_found")
+        item = dict(row)
+        item["outcomes"] = [
+            str(value[0])
+            for value in self.conn.execute(
+                "SELECT outcome FROM security_lifecycle_assessment_outcomes "
+                "WHERE assessment_id=? ORDER BY outcome",
+                (assessment_id,),
+            )
+        ]
+        item["citations"] = [
+            dict(value)
+            for value in self.conn.execute(
+                "SELECT reference_kind,evidence_id,cited_content_sha256 "
+                "FROM security_lifecycle_assessment_evidence "
+                "WHERE assessment_id=? ORDER BY id",
+                (assessment_id,),
+            )
+        ]
+        return item
+
+    def list_assessments(self, case_id: str) -> list[dict]:
+        return [
+            self.get_assessment(str(row[0]))
+            for row in self.conn.execute(
+                "SELECT assessment_id FROM security_lifecycle_assessments "
+                "WHERE case_id=? ORDER BY revision DESC",
+                (case_id,),
+            )
+        ]
+
+    def accept_assessment(
+        self,
+        assessment_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+        at: str,
+    ) -> dict:
+        self._assert_write()
+        assessment = self.get_assessment(assessment_id)
+        if assessment["status"] != "draft":
+            raise ValueError("assessment_not_draft")
+        if assessment["author"] not in ASSESSMENT_AUTHORS:
+            raise ValueError("author")
+        if assessment["relevance"] == "undetermined" or not any(
+            outcome != "undetermined" for outcome in assessment["outcomes"]
+        ):
+            raise ValueError("conclusive assessment required")
+        if not assessment["citations"]:
+            raise ValueError("citation required")
+        if assessment["observation_fingerprint_sha256"] != observation_fingerprint_sha256:
+            raise ValueError("stale_assessment")
+        if any(
+            citation["reference_kind"] == "observation"
+            and citation["cited_content_sha256"] != observation_fingerprint_sha256
+            for citation in assessment["citations"]
+        ):
+            raise ValueError("stale_citation")
+        if assessment["evidence_set_sha256"] != self._evidence_set_sha256(
+            assessment["case_id"]
+        ):
+            raise ValueError("stale_assessment")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE security_lifecycle_assessments SET status='superseded',"
+                "superseded_at=? WHERE case_id=? AND status='accepted'",
+                (at, assessment["case_id"]),
+            )
+            self.conn.execute(
+                "UPDATE security_lifecycle_assessments SET status='accepted',"
+                "accepted_at=? WHERE assessment_id=?",
+                (at, assessment_id),
+            )
+        return self.get_assessment(assessment_id)
+
+    def acknowledge_case(
+        self,
+        *,
+        case_id: str,
+        reason: str,
+        note: str | None,
+        author: str,
+        observation_fingerprint_sha256: str,
+        at: str,
+    ) -> str:
+        self._assert_write()
+        self._case_row(case_id)
+        if reason not in ACKNOWLEDGEMENT_REASONS:
+            raise ValueError("reason")
+        if author != "human":
+            raise ValueError("author")
+        has_manual = self.conn.execute(
+            "SELECT 1 FROM security_lifecycle_evidence "
+            "WHERE case_id=? AND adapter='manual' LIMIT 1",
+            (case_id,),
+        ).fetchone()
+        has_success = self.conn.execute(
+            "SELECT 1 FROM security_lifecycle_investigation_runs "
+            "WHERE case_id=? AND status='succeeded' LIMIT 1",
+            (case_id,),
+        ).fetchone()
+        if has_manual is None and has_success is None:
+            raise ValueError("investigation evidence required")
+        acknowledgement_id = self._new_id("slk")
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO security_lifecycle_case_acknowledgements "
+                "(acknowledgement_id,case_id,reason,note,author,"
+                "observation_fingerprint_sha256,evidence_set_sha256,"
+                "acknowledged_at,reopened_at) VALUES (?,?,?,?,?,?,?,?,NULL)",
+                (
+                    acknowledgement_id,
+                    case_id,
+                    reason,
+                    _bounded_text("note", note, max_length=2000),
+                    author,
+                    observation_fingerprint_sha256,
+                    self._evidence_set_sha256(case_id),
+                    at,
+                ),
+            )
+        return acknowledgement_id
+
+    def reopen_acknowledgement(self, acknowledgement_id: str, *, at: str) -> None:
+        self._assert_write()
+        row = self.conn.execute(
+            "SELECT reopened_at FROM security_lifecycle_case_acknowledgements "
+            "WHERE acknowledgement_id=?",
+            (acknowledgement_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError("acknowledgement_not_found")
+        if row["reopened_at"] is not None:
+            raise ValueError("acknowledgement_already_reopened")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE security_lifecycle_case_acknowledgements "
+                "SET reopened_at=? WHERE acknowledgement_id=?",
+                (at, acknowledgement_id),
+            )
+
+    def _acknowledgements(
+        self,
+        case_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+    ) -> list[dict]:
+        evidence_digest = self._evidence_set_sha256(case_id)
+        return [
+            {
+                **dict(row),
+                "stale": (
+                    row["observation_fingerprint_sha256"]
+                    != observation_fingerprint_sha256
+                    or row["evidence_set_sha256"] != evidence_digest
+                ),
+            }
+            for row in self.conn.execute(
+                "SELECT * FROM security_lifecycle_case_acknowledgements "
+                "WHERE case_id=? ORDER BY acknowledged_at DESC,acknowledgement_id DESC",
+                (case_id,),
+            )
+        ]
+
+    def project_case_state(
+        self,
+        case_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+    ) -> dict:
+        self._case_row(case_id)
+        evidence = self.list_evidence(case_id)
+        runs = self.list_investigation_runs(case_id)
+        assessments = self.list_assessments(case_id)
+        evidence_digest = self._evidence_set_sha256(case_id)
+        rendered_assessments = [
+            {
+                **assessment,
+                "stale": (
+                    assessment["observation_fingerprint_sha256"]
+                    != observation_fingerprint_sha256
+                    or assessment["evidence_set_sha256"] != evidence_digest
+                ),
+            }
+            for assessment in assessments
+        ]
+        current_assessment = next(
+            (
+                assessment
+                for assessment in rendered_assessments
+                if assessment["status"] == "accepted" and not assessment["stale"]
+            ),
+            None,
+        )
+        acknowledgements = self._acknowledgements(
+            case_id,
+            observation_fingerprint_sha256=observation_fingerprint_sha256,
+        )
+        current_acknowledgement = next(
+            (
+                acknowledgement
+                for acknowledgement in acknowledgements
+                if acknowledgement["reopened_at"] is None
+                and not acknowledgement["stale"]
+            ),
+            None,
+        )
+        if current_assessment is not None:
+            workflow_state = "resolved"
+        elif current_acknowledgement is not None:
+            workflow_state = "reviewed_inconclusive"
+        elif any(run["status"] in {"queued", "running"} for run in runs):
+            workflow_state = "investigating"
+        elif evidence or any(run["status"] == "succeeded" for run in runs):
+            workflow_state = "evidence_ready"
+        else:
+            workflow_state = "unresolved"
+        return {
+            "workflow_state": workflow_state,
+            "current_assessment": current_assessment,
+            "assessment_history": rendered_assessments,
+            "current_acknowledgement": current_acknowledgement,
+            "acknowledgement_history": acknowledgements,
+        }
+
+    def _current_accepted_assessment(
+        self,
+        case_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+    ) -> dict | None:
+        return self.project_case_state(
+            case_id,
+            observation_fingerprint_sha256=observation_fingerprint_sha256,
+        )["current_assessment"]
+
+    def generate_action_proposals(
+        self,
+        *,
+        case_id: str,
+        observation_fingerprint_sha256: str,
+        sources_by_ticker: Mapping[str, Iterable[str]] | None,
+        at: str,
+    ) -> dict:
+        self._assert_write()
+        case = self._case_row(case_id)
+        assessment = self._current_accepted_assessment(
+            case_id,
+            observation_fingerprint_sha256=observation_fingerprint_sha256,
+        )
+        if assessment is None:
+            has_accepted = self.conn.execute(
+                "SELECT 1 FROM security_lifecycle_assessments "
+                "WHERE case_id=? AND status='accepted'",
+                (case_id,),
+            ).fetchone()
+            return {
+                "proposals": [],
+                "block_reason": "stale_assessment" if has_accepted else None,
+            }
+        if sources_by_ticker is None:
+            return {"proposals": [], "block_reason": "source_context_unavailable"}
+        sources = tuple(sorted(set(sources_by_ticker.get(str(case["ticker"]), ()))))
+        source_json = _canonical_json(list(sources), max_bytes=4096, name="sources")
+        outcomes = set(assessment["outcomes"])
+        action_rows: list[tuple[str, str | None, str | None]] = []
+        if assessment["relevance"] == "issuer_related":
+            action_rows = [("notify", None, None), ("keep_tracking", None, None)]
+        elif assessment["relevance"] == "unrelated":
+            action_rows = [("no_action", None, None)]
+        elif assessment["relevance"] == "direct_tracked_security":
+            action_rows.append(("notify", None, None))
+            if "portfolio_open" in sources:
+                action_rows.append(
+                    ("review_portfolio_position", None, "portfolio_position_open")
+                )
+            else:
+                if outcomes & {
+                    "symbol_changed",
+                    "venue_transfer",
+                    "acquisition_stock",
+                    "acquisition_mixed",
+                }:
+                    if assessment["successor_ticker"]:
+                        action_rows.append(
+                            ("remap_symbol", assessment["successor_ticker"], None)
+                        )
+                if outcomes & {
+                    "listing_ended",
+                    "acquisition_cash",
+                    "acquisition_stock",
+                    "acquisition_mixed",
+                    "acquisition_terms_unknown",
+                }:
+                    if "manual_lists" in sources:
+                        action_rows.append(("archive_manual_memberships", None, None))
+                    if sources and set(sources) & {
+                        "sa_alpha_picks_current",
+                        "legacy_config_seed",
+                    }:
+                        action_rows.append(("hide_from_active_universe", None, None))
+        assessment_fingerprint = _assessment_fingerprint(assessment)
+        created: list[dict] = []
+        for action_type, replacement_ticker, block_reason in action_rows:
+            if action_type not in PROPOSAL_ACTIONS:
+                raise ValueError("proposal_action")
+            dedupe_key = "\0".join(
+                (
+                    assessment["assessment_id"],
+                    action_type,
+                    str(case["ticker"]),
+                    replacement_ticker or "",
+                )
+            )
+            existing = self.conn.execute(
+                "SELECT proposal_id FROM security_lifecycle_action_proposals "
+                "WHERE proposal_dedupe_key=?",
+                (dedupe_key,),
+            ).fetchone()
+            if existing is None:
+                proposal_id = self._new_id("slp")
+                with self.conn:
+                    self.conn.execute(
+                        "INSERT INTO security_lifecycle_action_proposals "
+                        "(proposal_id,case_id,assessment_id,action_type,status,"
+                        "source_ticker,replacement_ticker,source_snapshot_json,reason,"
+                        "block_reason,assessment_fingerprint_sha256,proposal_dedupe_key,"
+                        "created_at,dismissed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NULL)",
+                        (
+                            proposal_id,
+                            case_id,
+                            assessment["assessment_id"],
+                            action_type,
+                            "proposed",
+                            case["ticker"],
+                            replacement_ticker,
+                            source_json,
+                            f"Derived from accepted assessment revision {assessment['revision']}.",
+                            block_reason,
+                            assessment_fingerprint,
+                            dedupe_key,
+                            at,
+                        ),
+                    )
+            else:
+                proposal_id = str(existing["proposal_id"])
+            created.append(self.get_proposal(proposal_id))
+        return {"proposals": created, "block_reason": None}
+
+    def get_proposal(self, proposal_id: str) -> dict:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_action_proposals WHERE proposal_id=?",
+            (proposal_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError("proposal_not_found")
+        return dict(row)
+
+    def list_proposals(self, case_id: str) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.conn.execute(
+                "SELECT * FROM security_lifecycle_action_proposals "
+                "WHERE case_id=? ORDER BY created_at,proposal_id",
+                (case_id,),
+            )
+        ]
+
+    def dismiss_proposal(self, proposal_id: str, *, at: str) -> dict:
+        self._assert_write()
+        proposal = self.get_proposal(proposal_id)
+        if proposal["status"] != "proposed":
+            raise ValueError("proposal_not_proposed")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE security_lifecycle_action_proposals "
+                "SET status='dismissed',dismissed_at=? WHERE proposal_id=?",
+                (at, proposal_id),
+            )
+        return self.get_proposal(proposal_id)
+
+    def project_proposals(
+        self,
+        case_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+    ) -> list[dict]:
+        evidence_digest = self._evidence_set_sha256(case_id)
+        current_assessment = self._current_accepted_assessment(
+            case_id,
+            observation_fingerprint_sha256=observation_fingerprint_sha256,
+        )
+        rendered = []
+        for proposal in self.list_proposals(case_id):
+            assessment = self.get_assessment(str(proposal["assessment_id"]))
+            stale = (
+                current_assessment is None
+                or assessment["assessment_id"]
+                != current_assessment["assessment_id"]
+                or assessment["observation_fingerprint_sha256"]
+                != observation_fingerprint_sha256
+                or assessment["evidence_set_sha256"] != evidence_digest
+                or proposal["assessment_fingerprint_sha256"]
+                != _assessment_fingerprint(assessment)
+            )
+            rendered.append(
+                {
+                    **proposal,
+                    "projected_block_reason": (
+                        "stale_assessment" if stale else proposal["block_reason"]
+                    ),
+                }
+            )
+        return rendered
+
+
+def _read_profile(
+    path: Path,
+    *,
+    observation_fingerprints: Mapping[str, str],
+) -> tuple[list[dict], dict[str, dict]]:
     if not path.is_file():
         return [], {}
     conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
@@ -235,23 +1109,38 @@ def _read_profile(path: Path) -> tuple[list[dict], dict[str, list[dict]]]:
                 "ORDER BY source,source_ref,ticker"
             )
         ]
-        histories: dict[str, list[dict]] = {}
-        rows = conn.execute(
-            "SELECT * FROM security_lifecycle_assessments "
-            "ORDER BY case_id,revision DESC"
-        ).fetchall()
-        for row in rows:
-            item = dict(row)
-            item["outcomes"] = [
-                str(outcome[0])
-                for outcome in conn.execute(
-                    "SELECT outcome FROM security_lifecycle_assessment_outcomes "
-                    "WHERE assessment_id=? ORDER BY outcome",
-                    (item["assessment_id"],),
+        store = SecurityLifecycleInvestigationStore(conn)
+        projections: dict[str, dict] = {}
+        for case in cases:
+            case_id = str(case["case_id"])
+            fingerprint = observation_fingerprints.get(case_id, "")
+            state = store.project_case_state(
+                case_id,
+                observation_fingerprint_sha256=fingerprint,
+            )
+            runs = store.list_investigation_runs(case_id)
+            evidence = store.list_evidence(case_id)
+            proposals = store.project_proposals(
+                case_id,
+                observation_fingerprint_sha256=fingerprint,
+            )
+            has_history = any(
+                (
+                    runs,
+                    evidence,
+                    state["assessment_history"],
+                    state["acknowledgement_history"],
+                    proposals,
                 )
-            ]
-            histories.setdefault(str(item["case_id"]), []).append(item)
-        return cases, histories
+            )
+            if has_history:
+                projections[case_id] = {
+                    **state,
+                    "investigation_runs": runs,
+                    "evidence": evidence,
+                    "proposals": proposals,
+                }
+        return cases, projections
     finally:
         conn.close()
 
@@ -261,11 +1150,6 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
         observations = read_market_observations(market_db_path)
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("market") from None
-    try:
-        profile_cases, histories = _read_profile(Path(profile_db_path))
-    except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
-        raise LifecycleStoreUnavailable("profile") from None
-
     by_case: dict[str, dict] = {}
     fingerprints: dict[str, str] = {}
     for observation in observations:
@@ -283,6 +1167,13 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
             "observation": observation,
             "current_assessment": None,
         }
+    try:
+        profile_cases, profile_projections = _read_profile(
+            Path(profile_db_path),
+            observation_fingerprints=fingerprints,
+        )
+    except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
+        raise LifecycleStoreUnavailable("profile") from None
     for case in profile_cases:
         by_case.setdefault(
             case["case_id"],
@@ -295,25 +1186,10 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
             },
         )
 
-    for case_id, history in histories.items():
+    for case_id, projection in profile_projections.items():
         if case_id not in by_case:
             continue
-        fingerprint = fingerprints.get(case_id)
-        rendered_history = []
-        current = None
-        for assessment in history:
-            stale = (
-                fingerprint is None
-                or assessment["observation_fingerprint_sha256"] != fingerprint
-            )
-            rendered = {**assessment, "stale": stale}
-            rendered_history.append(rendered)
-            if assessment["status"] == "accepted" and not stale and current is None:
-                current = rendered
-        by_case[case_id]["assessment_history"] = rendered_history
-        by_case[case_id]["current_assessment"] = current
-        if current is not None:
-            by_case[case_id]["workflow_state"] = "resolved"
+        by_case[case_id].update(projection)
 
     cases = sorted(
         by_case.values(),
