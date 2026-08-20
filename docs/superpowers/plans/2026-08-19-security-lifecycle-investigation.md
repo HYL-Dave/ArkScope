@@ -3,8 +3,9 @@
 > **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
 > AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
 > `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
-> COMPLETE; TASK 1 CALLER-GUARD B-CLASS AMENDMENT ACTIVE UNDER THE USER'S
-> 2026-08-20 SELF-REVIEW RULING; TASK 2 PAUSED FOR TASK 1 FOCUSED REVIEW; LIVE
+> COMPLETE; TASK 1 IMPLEMENTATION AND INDEPENDENT REVIEW GREEN AT `e2f90f98`;
+> TASK 2 NEXT UNDER THE USER'S 2026-08-20 SELF-REVIEW RULING; TASKS 1-3 ARE
+> NON-DEPLOYABLE STAGING UNTIL TASK 4 COMPLETES THE ROUTE/CONSUMER CUTOVER; LIVE
 > MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
 >
 > **Date:** 2026-08-19
@@ -277,6 +278,16 @@ Amendments use the established two classes:
 
 Calling a change "mechanical" is not sufficient for A classification; all four
 A predicates must be machine-verifiable.
+
+Task checkpoints are evidence boundaries, not release boundaries. Task 1
+removes the legacy store review methods, Task 3 retires their routes, and Task 4
+retires the frontend consumers. Therefore the implementation worktree after
+Tasks 1-3 is intentionally non-deployable: do not run App acceptance against
+those tips and do not merge, publish, or expose them as a runnable product.
+Task 4 is the first runtime-admissible cutover candidate and must prove both the
+old route absence and old consumer absence before any merge. Do not add a
+temporary legacy method, summary shape, alias, or fallback merely to make an
+intermediate tip runnable.
 
 ---
 
