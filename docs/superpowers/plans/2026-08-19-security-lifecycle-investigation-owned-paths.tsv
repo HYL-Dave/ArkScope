@@ -20,6 +20,8 @@ apps/arkscope-web/src/shell/navigation.test.ts	T4	modify	83	a5021008e1192936aefc
 apps/arkscope-web/src/shell/navigation.ts	T4	modify	125	fd2705e33dd0fecb0bb734b40cf10366d0e8cb53a121cbc2e7cec53d1b6aea13
 apps/arkscope-web/src/styles.css	T4	modify	2910	e016d2387568417c09f688a1c38bcc260bc983d820d6b9dad5dc19e29f064e9a
 docs/design/ARKSCOPE_TOOL_CATALOG.md	T3	modify	129	7342e7ac0557054482f8e3c6c6a7139d593842d00b7bfbbf6323fee1b35e3e93
+src/agents/anthropic_agent/tools.py	T3	modify	1627	650693562b839b8354918e122d9417d89c428145c9fb5597cd25a4d7e00a8823
+src/agents/openai_agent/tools.py	T3	modify	1118	98d369b1cd8f424d2ee87bb6ee951a3d13cb523b1dc7676d8c28c801659d77dc
 src/api/app.py	T3	modify	264	120575087769b645e2545fbce16219914b2197e42a8df6f3cfda4e7f5a820b84
 src/api/dependencies.py	T3	modify	436	9036bce0251056b29154577c698a7737d923b53f9a19afbc8d82f08c7e8ef5ca
 src/api/routes/market_data.py	T3	modify	285	820a8287d35ff0ec94421ff8220dfcefe1b7caac1e49f14cd07bcc68d6148acd

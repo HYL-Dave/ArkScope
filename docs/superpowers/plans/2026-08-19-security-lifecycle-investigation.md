@@ -4,7 +4,8 @@
 > AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
 > `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
 > COMPLETE; TASK 1 IMPLEMENTATION AND INDEPENDENT REVIEW GREEN AT `e2f90f98`;
-> TASK 2 NEXT UNDER THE USER'S 2026-08-20 SELF-REVIEW RULING; TASKS 1-3 ARE
+> TASK 2 COMPLETE; TASK 3 BRIDGE-OWNERSHIP AMENDMENT AWAITS FOCUSED REVIEW;
+> TASKS 1-3 ARE
 > NON-DEPLOYABLE STAGING UNTIL TASK 4 COMPLETES THE ROUTE/CONSUMER CUTOVER; LIVE
 > MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
 >
@@ -148,7 +149,7 @@ scope from prose.
 | `...-frontend-removals.nodes` | 2 | `55e24459805b139ee6f2db3db3684c0eb4c3641c26e4e6fe522df0276dc75899` |
 | `...-frontend-additions.nodes` | 26 | `52d3c8b268d3b2141fd6bcc26708c99c54d5932904140c9970683838d1f8cf7f` |
 | `...-evolved-owners.tsv` | 47 data rows | `98adeff26e8cc2776afda7864854f3fd12d14997b936e3c3b547d5144967b3c4` |
-| `...-owned-paths.tsv` | 53 data rows | `28e5855599ae8747fa1a1549faefaf2546e682c02c3d713784d2cc6f5e865e48` |
+| `...-owned-paths.tsv` | 55 data rows | `192408363bbe9641f9dd166acd973581356eba627a76457c9bf929d625cf9245` |
 | `...-focused-paths.tsv` | 25 data rows | `7be852db3dc34bf7c2fcfaf2a77bb72c758434e9e45e6e2d56281a88f238ee72` |
 | `...-protected.paths` | 24 | `4d037a50c97365484e59637484b3c903dd6ac0077250f2147df5ffa672b91faa` |
 | `...-route-removals.tsv` | 3 | `945f0ba83efa557dd9169743f0e5724ebfad5e22c8f061c11d98181dcc1a081f` |
@@ -1068,7 +1069,25 @@ Stop for Task 2 review unless a reviewed batch ruling applies.
 
 ## 5. Task 3 - API and two local read tools
 
-**Owned files:** exactly the 19 T3 rows.
+**Owned files:** exactly the 21 T3 rows.
+
+The 2026-08-21 bridge-ownership amendment is B-class. The Task 3 RED proved
+that `get_anthropic_tools()` and `create_openai_tools()` are hand-written
+schema/dispatch surfaces rather than projections of the central registry, but
+their two owner files were absent from the original ledger. The amendment adds
+exactly `src/agents/anthropic_agent/tools.py` and
+`src/agents/openai_agent/tools.py`, pinned to their product-grounding bytes.
+It authorizes only the two lifecycle wrappers/schema rows and dispatch entries;
+it does not authorize bridge refactoring or changes to any existing tool.
+Collection, focused, route, registry, allowlist, protected, and RED identities
+remain unchanged. Focused review is required before either newly owned product
+file is edited.
+
+The same pre-implementation check found two new sentinel assertions comparing
+the store's existing `sqlite3.Row` values directly with tuples. Normalize only
+those returned rows to tuples in the assertions, then replay the exact RED
+against T2 product bytes. This changes no test ID, expected failure set, or
+product contract.
 
 ### 5.1 RED commit
 
@@ -1095,8 +1114,9 @@ Commit: `test(lifecycle): define API and local-tool contracts`.
    paths and fakes.
 4. Call `db_write` for every additive write before persistence. Search route
    then follows Task 2's external permissions. Reads call no permission.
-5. Add exactly two `analysis`, no-DAL local tools. Register both in central
-   registry, generic bridges, and the two 15-name research allowlists.
+5. Add exactly two `analysis`, no-DAL local tools. Register both in the central
+   registry; add their bounded wrappers and dispatch to both hand-written
+   generic bridges; and add them to the two 15-name research allowlists.
 6. Keep tool output provider-neutral and bounded. Tool handlers call composition
    directly; they do not call HTTP routes, Tavily, or profile mutations.
 7. Update the canonical tool catalog with the two rows and explicit local-read
