@@ -3,9 +3,9 @@
 > **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
 > AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
 > `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
-> COMPLETE; TASK 1 EXECUTION NEXT UNDER THE USER'S 2026-08-20 SELF-REVIEW
-> RULING WITH SPECIAL-ISSUE/HARD-STOP PAUSE; LIVE MIGRATION, MERGE, PUSH, AND
-> PROVIDER CALLS REMAIN UNAUTHORIZED
+> COMPLETE; TASK 1 CALLER-GUARD B-CLASS AMENDMENT ACTIVE UNDER THE USER'S
+> 2026-08-20 SELF-REVIEW RULING; TASK 2 PAUSED FOR TASK 1 FOCUSED REVIEW; LIVE
+> MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
 >
 > **Date:** 2026-08-19
 >
@@ -967,6 +967,17 @@ Commit: `test(lifecycle): define observation and migration contracts`.
    drift rejection, and relationship hard stop with scratch DB copies.
 8. Assert zero import/reference to retired product symbols outside bounded
    migration tests/fixture.
+9. The SEC collector, as the only surviving product caller that writes market
+   observations, must resolve the existing profile database, open it read-only
+   when present, and pass that connection to the receipt guard for every market
+   write. A missing receipt table means no migration has begun; an incomplete
+   receipt blocks the write. An unreadable profile database must not be treated
+   as permission to write.
+10. Expand the existing
+    `test_incomplete_receipt_blocks_all_lifecycle_writes` body to exercise the
+    real collector caller in addition to both stores. This adds no test ID and
+    changes no staged/focused identity. The test must fail if the collector
+    omits the profile receipt guard.
 
 ### 3.3 GREEN gates
 
