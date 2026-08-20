@@ -339,9 +339,12 @@ def test_dismiss_proposal_route_does_not_apply_any_profile_action(tmp_path, monk
         )
         assert response.status_code == 200
         assert response.json()["status"] == "dismissed"
-        assert context["profile_conn"].execute(
-            "SELECT ticker,value FROM universe_sentinel"
-        ).fetchall() == [("EA", "unchanged")]
+        assert [
+            tuple(row)
+            for row in context["profile_conn"].execute(
+                "SELECT ticker,value FROM universe_sentinel"
+            ).fetchall()
+        ] == [("EA", "unchanged")]
     finally:
         context["profile_conn"].close()
 
@@ -434,15 +437,24 @@ def test_route_writes_do_not_mutate_universe_portfolio_sa_or_market_history(tmp_
         market_before = hashlib.sha256(context["market_path"].read_bytes()).hexdigest()
         client, _ = _client(context, monkeypatch)
         _add_manual(client, context["case_id"])
-        assert context["profile_conn"].execute(
-            "SELECT value FROM universe_rows"
-        ).fetchall() == [("u",)]
-        assert context["profile_conn"].execute(
-            "SELECT value FROM portfolio_rows"
-        ).fetchall() == [("p",)]
-        assert context["profile_conn"].execute(
-            "SELECT value FROM sa_rows"
-        ).fetchall() == [("s",)]
+        assert [
+            tuple(row)
+            for row in context["profile_conn"].execute(
+                "SELECT value FROM universe_rows"
+            ).fetchall()
+        ] == [("u",)]
+        assert [
+            tuple(row)
+            for row in context["profile_conn"].execute(
+                "SELECT value FROM portfolio_rows"
+            ).fetchall()
+        ] == [("p",)]
+        assert [
+            tuple(row)
+            for row in context["profile_conn"].execute(
+                "SELECT value FROM sa_rows"
+            ).fetchall()
+        ] == [("s",)]
         assert hashlib.sha256(context["market_path"].read_bytes()).hexdigest() == market_before
     finally:
         context["profile_conn"].close()
