@@ -141,7 +141,8 @@ def _new_observation():
     )
 
 
-def test_incomplete_receipt_blocks_all_lifecycle_writes(tmp_path):
+def test_incomplete_receipt_blocks_all_lifecycle_writes(tmp_path, monkeypatch):
+    import src.collectors.sec_corporate_actions as collector
     from src.security_lifecycle import SecurityLifecycleStore
     from src.security_lifecycle_investigation import (
         LifecycleWritesUnavailable,
@@ -184,6 +185,32 @@ def test_incomplete_receipt_blocks_all_lifecycle_writes(tmp_path):
         with pytest.raises(LifecycleWritesUnavailable):
             SecurityLifecycleStore(market, migration_conn=profile).upsert_observation(
                 _new_observation()
+            )
+        monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+        monkeypatch.setattr(
+            collector,
+            "parse_submission_events",
+            lambda **_kwargs: collector.SubmissionObservationBatch(
+                observations=(_new_observation(),)
+            ),
+        )
+
+        class _Client:
+            @staticmethod
+            def get_cik(_ticker):
+                return "0000712515"
+
+            @staticmethod
+            def fetch_submissions(_cik):
+                return {"filings": {"recent": {"form": []}}}
+
+        with pytest.raises(LifecycleWritesUnavailable):
+            collector.run_incremental(
+                tickers_arg="EA",
+                client=_Client(),
+                db_path=str(tmp_path / "market_data.db"),
+                observed_at="2026-08-20T00:00:00Z",
+                start_date="2026-01-01",
             )
     finally:
         profile.close()
