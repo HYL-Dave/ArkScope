@@ -3,8 +3,9 @@
 > **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
 > AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
 > `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
-> AUTHORIZED BY THE USER ON 2026-08-20 WITH SPECIAL-ISSUE/HARD-STOP PAUSE;
-> LIVE MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
+> COMPLETE; TASK 1 EXECUTION NEXT UNDER THE USER'S 2026-08-20 SELF-REVIEW
+> RULING WITH SPECIAL-ISSUE/HARD-STOP PAUSE; LIVE MIGRATION, MERGE, PUSH, AND
+> PROVIDER CALLS REMAIN UNAUTHORIZED
 >
 > **Date:** 2026-08-19
 >
@@ -909,8 +910,9 @@ therefore be exercised.
 12. Record the batch/review ruling in the priority-map decision log. Default is
     per-task review; any batch authorization must come from the reviewer/user.
 
-**Task 0 commit:** docs/evidence only. Stop for review unless a later explicit
-batch ruling says otherwise.
+**Task 0 commit:** docs/evidence only. The user's 2026-08-20 ruling permits
+continued execution under explicit self-review while no special issue or hard
+stop is present; Task 1 may begin after the Task 0 packet passes that review.
 
 ---
 
