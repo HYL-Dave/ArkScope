@@ -1,106 +1,37 @@
-"""Evidence-first security lifecycle and corporate-action storage.
+"""Provider-owned security-lifecycle observations.
 
-These tables record provider observations. They deliberately do not mutate the
-active universe: a missing quote, an SEC Item 3.01 filing, or a Form 25 notice is
-review material rather than an instruction to hide a ticker.
+The market store owns source facts and classifier kinds only. Investigation
+state, assessments, and profile actions live in the profile-side lifecycle
+store.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
+from pathlib import Path
 import re
 import sqlite3
-from pathlib import Path
 from typing import Optional
 
+from src.security_lifecycle_schema import (
+    OBSERVATION_KINDS,
+    assert_lifecycle_writes_available,
+    create_market_schema,
+    verify_market_connection,
+)
 
-EVENT_TYPES = frozenset(
-    {
-        "merger_agreement",
-        "merger_proxy",
-        "acquisition_completed",
-        "listing_status_review",
-        "listing_removal_notice",
-    }
-)
-LIFECYCLE_STATES = frozenset(
-    {
-        "review_required",
-        "pending_delisting",
-        "inactive_confirmed",
-        "renamed_or_transferred",
-    }
-)
-ACTION_TYPES = frozenset({"acquisition", "merger"})
-RELATIONSHIP_STATUSES = frozenset({"candidate", "confirmed", "rejected"})
-OBSERVATION_REVIEW_STATES = frozenset(
-    {"inactive_confirmed", "renamed_or_transferred"}
-)
 
 _TICKER_RE = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
 _CIK_RE = re.compile(r"^\d{10}$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS security_lifecycle_observations (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker              TEXT NOT NULL,
-    cik                 TEXT,
-    issuer_name         TEXT NOT NULL,
-    event_type          TEXT NOT NULL CHECK (event_type IN (
-                            'merger_agreement', 'merger_proxy',
-                            'acquisition_completed', 'listing_status_review',
-                            'listing_removal_notice')),
-    lifecycle_state     TEXT NOT NULL CHECK (lifecycle_state IN (
-                            'review_required', 'pending_delisting',
-                            'inactive_confirmed', 'renamed_or_transferred')),
-    filing_date         TEXT NOT NULL,
-    effective_date      TEXT,
-    source              TEXT NOT NULL,
-    source_ref          TEXT NOT NULL,
-    filing_form         TEXT NOT NULL,
-    filing_items_json   TEXT NOT NULL,
-    evidence_url        TEXT NOT NULL,
-    description         TEXT NOT NULL,
-    first_observed_at   TEXT NOT NULL,
-    last_observed_at    TEXT NOT NULL,
-    reviewed_state      TEXT,
-    reviewed_at         TEXT,
-    UNIQUE(source, source_ref, ticker, event_type)
-);
-CREATE INDEX IF NOT EXISTS idx_security_lifecycle_ticker_date
-    ON security_lifecycle_observations(ticker, filing_date DESC);
-CREATE INDEX IF NOT EXISTS idx_security_lifecycle_state_date
-    ON security_lifecycle_observations(lifecycle_state, filing_date DESC);
-
-CREATE TABLE IF NOT EXISTS corporate_action_relationships (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    action_type         TEXT NOT NULL CHECK (action_type IN ('acquisition', 'merger')),
-    target_ticker       TEXT,
-    target_cik          TEXT,
-    target_name         TEXT NOT NULL,
-    acquirer_ticker     TEXT,
-    acquirer_cik        TEXT,
-    acquirer_name       TEXT NOT NULL,
-    status              TEXT NOT NULL CHECK (status IN (
-                            'candidate', 'confirmed', 'rejected')),
-    effective_date      TEXT,
-    source              TEXT NOT NULL,
-    source_ref          TEXT NOT NULL,
-    evidence_url        TEXT NOT NULL,
-    evidence_excerpt    TEXT NOT NULL,
-    first_observed_at   TEXT NOT NULL,
-    last_observed_at    TEXT NOT NULL,
-    reviewed_at         TEXT,
-    UNIQUE(source, source_ref, target_name, acquirer_name, action_type)
-);
-CREATE INDEX IF NOT EXISTS idx_corporate_action_target
-    ON corporate_action_relationships(target_ticker, effective_date DESC);
-CREATE INDEX IF NOT EXISTS idx_corporate_action_status
-    ON corporate_action_relationships(status, effective_date DESC);
-"""
+@dataclass(frozen=True, order=True)
+class ObservationKind:
+    event_type: str
+    effective_date: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -108,10 +39,7 @@ class LifecycleObservation:
     ticker: str
     cik: Optional[str]
     issuer_name: str
-    event_type: str
-    lifecycle_state: str
     filing_date: str
-    effective_date: Optional[str]
     source: str
     source_ref: str
     filing_form: str
@@ -119,70 +47,53 @@ class LifecycleObservation:
     evidence_url: str
     description: str
     observed_at: str
-
-
-@dataclass(frozen=True)
-class CorporateRelationship:
-    action_type: str
-    target_ticker: Optional[str]
-    target_cik: Optional[str]
-    target_name: str
-    acquirer_ticker: Optional[str]
-    acquirer_cik: Optional[str]
-    acquirer_name: str
-    status: str
-    effective_date: Optional[str]
-    source: str
-    source_ref: str
-    evidence_url: str
-    evidence_excerpt: str
-    observed_at: str
+    kinds: tuple[ObservationKind, ...]
 
 
 def _required_text(name: str, value: object, *, max_length: int) -> str:
     normalized = str(value or "").strip()
-    if not normalized or len(normalized) > max_length:
+    if not normalized or len(normalized) > max_length or "\0" in normalized:
         raise ValueError(name)
     return normalized
 
 
-def _optional_ticker(name: str, value: Optional[str]) -> Optional[str]:
-    if value is None:
-        return None
-    normalized = str(value).strip().upper()
+def _ticker(value: str) -> str:
+    normalized = str(value or "").strip().upper()
     if not _TICKER_RE.fullmatch(normalized):
-        raise ValueError(name)
+        raise ValueError("ticker")
     return normalized
 
 
-def _optional_cik(name: str, value: Optional[str]) -> Optional[str]:
+def _optional_cik(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
     normalized = str(value).strip().zfill(10)
     if not _CIK_RE.fullmatch(normalized):
-        raise ValueError(name)
+        raise ValueError("cik")
     return normalized
 
 
-def _optional_date(name: str, value: Optional[str]) -> Optional[str]:
-    if value is None:
+def _date(name: str, value: Optional[str], *, optional: bool = False) -> Optional[str]:
+    if value is None and optional:
         return None
-    normalized = str(value).strip()
+    normalized = str(value or "").strip()
     if not _DATE_RE.fullmatch(normalized):
         raise ValueError(name)
+    try:
+        datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(name) from exc
     return normalized
 
 
-def _required_date(name: str, value: str) -> str:
-    normalized = _optional_date(name, value)
-    if normalized is None:
-        raise ValueError(name)
-    return normalized
-
-
-def _observed_at(value: str) -> str:
+def _timestamp(value: str) -> str:
     normalized = _required_text("observed_at", value, max_length=40)
-    if not (normalized.endswith("Z") or normalized.endswith("+00:00")):
+    parseable = normalized[:-1] + "+00:00" if normalized.endswith("Z") else normalized
+    try:
+        parsed = datetime.fromisoformat(parseable)
+    except ValueError as exc:
+        raise ValueError("observed_at") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("observed_at")
     return normalized
 
@@ -194,302 +105,189 @@ def _https_url(value: str) -> str:
     return normalized
 
 
-class SecurityLifecycleStore:
-    def __init__(self, conn: sqlite3.Connection):
-        self.conn = conn
-        self.conn.row_factory = sqlite3.Row
-        self.conn.executescript(_SCHEMA)
-        self._ensure_observation_review_columns()
-
-    def _ensure_observation_review_columns(self) -> None:
-        columns = {
-            str(row["name"])
-            for row in self.conn.execute(
-                "PRAGMA table_info(security_lifecycle_observations)"
-            ).fetchall()
-        }
-        with self.conn:
-            if "reviewed_state" not in columns:
-                self.conn.execute(
-                    "ALTER TABLE security_lifecycle_observations "
-                    "ADD COLUMN reviewed_state TEXT"
-                )
-            if "reviewed_at" not in columns:
-                self.conn.execute(
-                    "ALTER TABLE security_lifecycle_observations "
-                    "ADD COLUMN reviewed_at TEXT"
-                )
-
-    def upsert_observation(self, value: LifecycleObservation) -> bool:
-        ticker = _optional_ticker("ticker", value.ticker)
-        if ticker is None:
-            raise ValueError("ticker")
-        if value.event_type not in EVENT_TYPES:
+def _validated_observation(value: LifecycleObservation) -> dict:
+    kinds: dict[str, Optional[str]] = {}
+    for kind in value.kinds:
+        if kind.event_type not in OBSERVATION_KINDS:
             raise ValueError("event_type")
-        if value.lifecycle_state not in LIFECYCLE_STATES:
-            raise ValueError("lifecycle_state")
-        filing_items = tuple(
-            sorted({_required_text("filing_item", item, max_length=20) for item in value.filing_items})
+        effective_date = _date(
+            "effective_date", kind.effective_date, optional=True
         )
-        source = _required_text("source", value.source, max_length=64)
-        source_ref = _required_text("source_ref", value.source_ref, max_length=160)
-        existing = self.conn.execute(
-            "SELECT id FROM security_lifecycle_observations "
-            "WHERE source=? AND source_ref=? AND ticker=? AND event_type=?",
-            (source, source_ref, ticker, value.event_type),
-        ).fetchone()
-        observed_at = _observed_at(value.observed_at)
-        params = (
-            ticker,
-            _optional_cik("cik", value.cik),
-            _required_text("issuer_name", value.issuer_name, max_length=240),
-            value.event_type,
-            value.lifecycle_state,
-            _required_date("filing_date", value.filing_date),
-            _optional_date("effective_date", value.effective_date),
-            source,
-            source_ref,
-            _required_text("filing_form", value.filing_form, max_length=30),
-            json.dumps(filing_items, separators=(",", ":")),
-            _https_url(value.evidence_url),
-            str(value.description or "").strip()[:1000],
-            observed_at,
-            observed_at,
+        if kind.event_type in kinds:
+            raise ValueError("duplicate_event_type")
+        kinds[kind.event_type] = effective_date
+    if not kinds:
+        raise ValueError("kinds")
+    filing_items = tuple(
+        sorted(
+            {
+                _required_text("filing_item", item, max_length=20)
+                for item in value.filing_items
+            }
         )
-        with self.conn:
-            self.conn.execute(
-                "INSERT INTO security_lifecycle_observations "
-                "(ticker,cik,issuer_name,event_type,lifecycle_state,filing_date,"
-                "effective_date,source,source_ref,filing_form,filing_items_json,"
-                "evidence_url,description,first_observed_at,last_observed_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(source,source_ref,ticker,event_type) DO UPDATE SET "
-                "cik=excluded.cik, issuer_name=excluded.issuer_name, "
-                "lifecycle_state=excluded.lifecycle_state, filing_date=excluded.filing_date, "
-                "effective_date=excluded.effective_date, filing_form=excluded.filing_form, "
-                "filing_items_json=excluded.filing_items_json, "
-                "evidence_url=excluded.evidence_url, description=excluded.description, "
-                "last_observed_at=excluded.last_observed_at",
-                params,
-            )
-        return existing is None
-
-    def upsert_relationship(self, value: CorporateRelationship) -> int:
-        if value.action_type not in ACTION_TYPES:
-            raise ValueError("action_type")
-        if value.status not in RELATIONSHIP_STATUSES:
-            raise ValueError("status")
-        target_name = _required_text("target_name", value.target_name, max_length=240)
-        acquirer_name = _required_text("acquirer_name", value.acquirer_name, max_length=240)
-        source = _required_text("source", value.source, max_length=64)
-        source_ref = _required_text("source_ref", value.source_ref, max_length=160)
-        existing = self.conn.execute(
-            "SELECT id FROM corporate_action_relationships "
-            "WHERE source=? AND source_ref=? AND target_name=? AND acquirer_name=? "
-            "AND action_type=?",
-            (source, source_ref, target_name, acquirer_name, value.action_type),
-        ).fetchone()
-        observed_at = _observed_at(value.observed_at)
-        params = (
-            value.action_type,
-            _optional_ticker("target_ticker", value.target_ticker),
-            _optional_cik("target_cik", value.target_cik),
-            target_name,
-            _optional_ticker("acquirer_ticker", value.acquirer_ticker),
-            _optional_cik("acquirer_cik", value.acquirer_cik),
-            acquirer_name,
-            value.status,
-            _optional_date("effective_date", value.effective_date),
-            source,
-            source_ref,
-            _https_url(value.evidence_url),
-            _required_text("evidence_excerpt", value.evidence_excerpt, max_length=1000),
-            observed_at,
-            observed_at,
-        )
-        with self.conn:
-            self.conn.execute(
-                "INSERT INTO corporate_action_relationships "
-                "(action_type,target_ticker,target_cik,target_name,acquirer_ticker,"
-                "acquirer_cik,acquirer_name,status,effective_date,source,source_ref,"
-                "evidence_url,evidence_excerpt,first_observed_at,last_observed_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(source,source_ref,target_name,acquirer_name,action_type) "
-                "DO UPDATE SET target_ticker=excluded.target_ticker, "
-                "target_cik=excluded.target_cik, acquirer_ticker=excluded.acquirer_ticker, "
-                "acquirer_cik=excluded.acquirer_cik, effective_date=excluded.effective_date, "
-                "evidence_url=excluded.evidence_url, "
-                "evidence_excerpt=excluded.evidence_excerpt, "
-                "last_observed_at=excluded.last_observed_at, "
-                "status=CASE WHEN corporate_action_relationships.status='candidate' "
-                "THEN excluded.status ELSE corporate_action_relationships.status END",
-                params,
-            )
-        if existing is not None:
-            return int(existing["id"])
-        row = self.conn.execute("SELECT last_insert_rowid()").fetchone()
-        return int(row[0])
-
-    def review_relationship(self, relationship_id: int, *, status: str, reviewed_at: str) -> None:
-        if status not in {"confirmed", "rejected"}:
-            raise ValueError("status")
-        with self.conn:
-            cursor = self.conn.execute(
-                "UPDATE corporate_action_relationships SET status=?, reviewed_at=? WHERE id=?",
-                (status, _observed_at(reviewed_at), int(relationship_id)),
-            )
-        if cursor.rowcount != 1:
-            raise KeyError("relationship_not_found")
-
-    def review_observation(
-        self,
-        observation_id: int,
-        *,
-        status: str,
-        reviewed_at: str,
-    ) -> None:
-        row = self.conn.execute(
-            "SELECT event_type FROM security_lifecycle_observations WHERE id=?",
-            (int(observation_id),),
-        ).fetchone()
-        if row is None:
-            raise KeyError("observation_not_found")
-        if row["event_type"] not in {
-            "listing_status_review",
-            "listing_removal_notice",
-        }:
-            raise ValueError("observation_not_reviewable")
-        if status == "unreviewed":
-            values = (None, None, int(observation_id))
-        elif status in OBSERVATION_REVIEW_STATES:
-            values = (status, _observed_at(reviewed_at), int(observation_id))
-        else:
-            raise ValueError("status")
-        with self.conn:
-            cursor = self.conn.execute(
-                "UPDATE security_lifecycle_observations "
-                "SET reviewed_state=?, reviewed_at=? WHERE id=?",
-                values,
-            )
-        if cursor.rowcount != 1:
-            raise KeyError("observation_not_found")
-
-
-def _empty_snapshot() -> dict:
+    )
     return {
-        "events": [],
-        "relationships": [],
-        "summary": {
-            "event_count": 0,
-            "review_required": 0,
-            "pending_delisting": 0,
-            "confirmed_inactive": 0,
-            "renamed_or_transferred": 0,
-            "relationship_candidates": 0,
-        },
+        "ticker": _ticker(value.ticker),
+        "cik": _optional_cik(value.cik),
+        "issuer_name": _required_text(
+            "issuer_name", value.issuer_name, max_length=240
+        ),
+        "filing_date": _date("filing_date", value.filing_date),
+        "source": _required_text("source", value.source, max_length=64),
+        "source_ref": _required_text(
+            "source_ref", value.source_ref, max_length=160
+        ),
+        "filing_form": _required_text(
+            "filing_form", value.filing_form, max_length=30
+        ),
+        "filing_items_json": json.dumps(filing_items, separators=(",", ":")),
+        "evidence_url": _https_url(value.evidence_url),
+        "description": str(value.description or "").strip()[:1000],
+        "observed_at": _timestamp(value.observed_at),
+        "kinds": tuple(sorted(kinds.items())),
     }
 
 
-def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
-    return bool(
-        conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+def _component_tables(conn: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[0])
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name LIKE 'security_lifecycle_%'"
+        )
+    }
+
+
+class SecurityLifecycleStore:
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        migration_conn: sqlite3.Connection | None = None,
+    ):
+        self.conn = conn
+        self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        if not _component_tables(self.conn):
+            create_market_schema(self.conn)
+        else:
+            verify_market_connection(self.conn)
+        self._migration_conn = migration_conn
+
+    def upsert_observation(self, value: LifecycleObservation) -> int:
+        assert_lifecycle_writes_available(self._migration_conn)
+        item = _validated_observation(value)
+        existing = self.conn.execute(
+            "SELECT id FROM security_lifecycle_observations "
+            "WHERE source=? AND source_ref=? AND ticker=?",
+            (item["source"], item["source_ref"], item["ticker"]),
         ).fetchone()
-    )
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO security_lifecycle_observations "
+                "(ticker,cik,issuer_name,filing_date,source,source_ref,filing_form,"
+                "filing_items_json,evidence_url,description,first_observed_at,last_observed_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(source,source_ref,ticker) DO UPDATE SET "
+                "cik=excluded.cik, issuer_name=excluded.issuer_name, "
+                "filing_date=excluded.filing_date, filing_form=excluded.filing_form, "
+                "filing_items_json=excluded.filing_items_json, "
+                "evidence_url=excluded.evidence_url, description=excluded.description, "
+                "last_observed_at=excluded.last_observed_at",
+                (
+                    item["ticker"],
+                    item["cik"],
+                    item["issuer_name"],
+                    item["filing_date"],
+                    item["source"],
+                    item["source_ref"],
+                    item["filing_form"],
+                    item["filing_items_json"],
+                    item["evidence_url"],
+                    item["description"],
+                    item["observed_at"],
+                    item["observed_at"],
+                ),
+            )
+            row = self.conn.execute(
+                "SELECT id FROM security_lifecycle_observations "
+                "WHERE source=? AND source_ref=? AND ticker=?",
+                (item["source"], item["source_ref"], item["ticker"]),
+            ).fetchone()
+            observation_id = int(row["id"])
+            self.conn.execute(
+                "DELETE FROM security_lifecycle_observation_kinds "
+                "WHERE observation_id=?",
+                (observation_id,),
+            )
+            self.conn.executemany(
+                "INSERT INTO security_lifecycle_observation_kinds "
+                "(observation_id,event_type,effective_date) VALUES (?,?,?)",
+                [
+                    (observation_id, event_type, effective_date)
+                    for event_type, effective_date in item["kinds"]
+                ],
+            )
+        return observation_id if existing is None else int(existing["id"])
+
+    def get_observation(self, source: str, source_ref: str, ticker: str) -> dict:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_observations "
+            "WHERE source=? AND source_ref=? AND ticker=?",
+            (source, source_ref, ticker),
+        ).fetchone()
+        if row is None:
+            raise KeyError("observation_not_found")
+        return _row_to_observation(self.conn, row)
+
+    def list_observations(self, *, limit: int = 1000) -> list[dict]:
+        bounded = min(max(int(limit), 1), 1000)
+        rows = self.conn.execute(
+            "SELECT * FROM security_lifecycle_observations "
+            "ORDER BY filing_date DESC, source, source_ref, ticker LIMIT ?",
+            (bounded,),
+        ).fetchall()
+        return [_row_to_observation(self.conn, row) for row in rows]
+
+
+def _row_to_observation(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+    kinds = conn.execute(
+        "SELECT event_type,effective_date "
+        "FROM security_lifecycle_observation_kinds "
+        "WHERE observation_id=? ORDER BY event_type",
+        (int(row["id"]),),
+    ).fetchall()
+    item = dict(row)
+    item["filing_items"] = list(json.loads(item.pop("filing_items_json")))
+    item["kinds"] = [
+        {"event_type": str(kind["event_type"]), "effective_date": kind["effective_date"]}
+        for kind in kinds
+    ]
+    return item
+
+
+def read_market_observations(db_path: str, *, limit: int = 1000) -> list[dict]:
+    """Read observation facts without creating or repairing a database."""
+    path = Path(db_path)
+    if not path.is_file():
+        return []
+    conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        verify_market_connection(conn)
+        store = object.__new__(SecurityLifecycleStore)
+        store.conn = conn
+        store._migration_conn = None
+        return store.list_observations(limit=limit)
+    finally:
+        conn.close()
 
 
 def read_security_lifecycle(db_path: str, *, limit: int = 200) -> dict:
-    """Read the local projection without creating a DB, directory, or schema."""
-    path = Path(db_path)
-    if not path.is_file():
-        return _empty_snapshot()
-    try:
-        conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
-    except sqlite3.OperationalError:
-        return _empty_snapshot()
-    conn.row_factory = sqlite3.Row
-    try:
-        if not _table_exists(conn, "security_lifecycle_observations"):
-            return _empty_snapshot()
-        bounded_limit = min(max(int(limit), 1), 1000)
-        event_columns = {
-            str(row["name"])
-            for row in conn.execute(
-                "PRAGMA table_info(security_lifecycle_observations)"
-            ).fetchall()
-        }
-        has_review_columns = {
-            "reviewed_state",
-            "reviewed_at",
-        }.issubset(event_columns)
-        event_rows = conn.execute(
-            "SELECT * FROM security_lifecycle_observations "
-            "ORDER BY filing_date DESC, id DESC LIMIT ?",
-            (bounded_limit,),
-        ).fetchall()
-        relation_rows = []
-        if _table_exists(conn, "corporate_action_relationships"):
-            relation_rows = conn.execute(
-                "SELECT * FROM corporate_action_relationships "
-                "ORDER BY COALESCE(effective_date, first_observed_at) DESC, id DESC LIMIT ?",
-                (bounded_limit,),
-            ).fetchall()
-            relationship_candidates = int(
-                conn.execute(
-                    "SELECT COUNT(*) FROM corporate_action_relationships WHERE status='candidate'"
-                ).fetchone()[0]
-            )
-        else:
-            relationship_candidates = 0
-        if has_review_columns:
-            summary_row = conn.execute(
-                "SELECT COUNT(*) AS event_count, "
-                "SUM(CASE WHEN reviewed_state IS NULL "
-                "AND lifecycle_state='review_required' THEN 1 ELSE 0 END) "
-                "AS review_required, "
-                "SUM(CASE WHEN reviewed_state IS NULL "
-                "AND lifecycle_state='pending_delisting' THEN 1 ELSE 0 END) "
-                "AS pending_delisting, "
-                "SUM(CASE WHEN reviewed_state='inactive_confirmed' "
-                "THEN 1 ELSE 0 END) AS confirmed_inactive, "
-                "SUM(CASE WHEN reviewed_state='renamed_or_transferred' "
-                "THEN 1 ELSE 0 END) AS renamed_or_transferred "
-                "FROM security_lifecycle_observations"
-            ).fetchone()
-        else:
-            summary_row = conn.execute(
-                "SELECT COUNT(*) AS event_count, "
-                "SUM(CASE WHEN lifecycle_state='review_required' THEN 1 ELSE 0 END) "
-                "AS review_required, "
-                "SUM(CASE WHEN lifecycle_state='pending_delisting' THEN 1 ELSE 0 END) "
-                "AS pending_delisting, 0 AS confirmed_inactive, "
-                "0 AS renamed_or_transferred "
-                "FROM security_lifecycle_observations"
-            ).fetchone()
-        events = []
-        for row in event_rows:
-            item = dict(row)
-            item["filing_items"] = list(json.loads(item.pop("filing_items_json")))
-            observed_state = item["lifecycle_state"]
-            reviewed_state = item.get("reviewed_state")
-            item["observed_lifecycle_state"] = observed_state
-            item["reviewed_state"] = reviewed_state
-            item["reviewed_at"] = item.get("reviewed_at")
-            item["lifecycle_state"] = reviewed_state or observed_state
-            events.append(item)
-        return {
-            "events": events,
-            "relationships": [dict(row) for row in relation_rows],
-            "summary": {
-                "event_count": int(summary_row["event_count"] or 0),
-                "review_required": int(summary_row["review_required"] or 0),
-                "pending_delisting": int(summary_row["pending_delisting"] or 0),
-                "confirmed_inactive": int(summary_row["confirmed_inactive"] or 0),
-                "renamed_or_transferred": int(
-                    summary_row["renamed_or_transferred"] or 0
-                ),
-                "relationship_candidates": relationship_candidates,
-            },
-        }
-    finally:
-        conn.close()
+    """Temporary read bridge until Task 3 replaces the old route surface."""
+    observations = read_market_observations(db_path, limit=limit)
+    return {
+        "events": observations,
+        "relationships": [],
+        "summary": {"event_count": len(observations)},
+    }
