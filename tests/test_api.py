@@ -166,7 +166,7 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 173
+    assert len(observed["routes"]) == 180
     assert observed["active_owners"] == {
         "data-scheduler",
         "portfolio-capture-scheduler",
@@ -398,7 +398,7 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["tools_registered"] == 50
+        assert data["tools_registered"] == 52
         assert data["data_sources"] == {
             "news_tickers": 2,
             "price_tickers": 2,
