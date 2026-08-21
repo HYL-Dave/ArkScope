@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hmac
 import os
+import socket
+import sqlite3
 import threading
 from concurrent.futures import Future, TimeoutError as FutureTimeoutError
 from functools import lru_cache
@@ -28,6 +30,260 @@ def get_dal() -> DataAccessLayer:
 def get_registry() -> ToolRegistry:
     """Singleton ToolRegistry with all tools registered."""
     return create_default_registry()
+
+
+def get_security_lifecycle_read_service():
+    """Read-only composition of the market and profile lifecycle stores."""
+    from src.market_data_admin import resolve_market_db_path
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+    return SecurityLifecycleReadService(
+        market_db_path=resolve_market_db_path(),
+        profile_db_path=_local_state_db_path(),
+    )
+
+
+def get_security_lifecycle_store():
+    """Request-owned profile-side investigation store."""
+    from fastapi import HTTPException
+
+    from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
+    from src.security_lifecycle_schema import (
+        LifecycleSchemaMismatch,
+        verify_profile_connection,
+    )
+
+    path = Path(_local_state_db_path())
+    conn = None
+    try:
+        if not path.is_file():
+            raise LifecycleSchemaMismatch("profile lifecycle schema is absent")
+        conn = sqlite3.connect(
+            f"file:{path.resolve()}?mode=rw",
+            uri=True,
+            timeout=10.0,
+            check_same_thread=False,
+        )
+        verify_profile_connection(conn)
+    except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
+        if conn is not None:
+            conn.close()
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "security_lifecycle_profile_store_unavailable",
+                "store": "profile",
+            },
+        ) from None
+    try:
+        yield SecurityLifecycleInvestigationStore(conn)
+    finally:
+        conn.close()
+
+
+class _LifecycleTavilyClient:
+    def __init__(self, *, api_key_loader=None, transport=None):
+        self._api_key_loader = api_key_loader or (
+            lambda: os.environ.get("TAVILY_API_KEY", "")
+        )
+        self._transport = transport or self._request
+
+    @staticmethod
+    def _request(**kwargs):
+        import requests
+
+        return requests.post(**kwargs)
+
+    def search(self, **kwargs):
+        from src.security_lifecycle_search import LifecycleSearchFailure
+
+        api_key = str(self._api_key_loader() or "").strip()
+        if not api_key:
+            raise LifecycleSearchFailure("credential_missing")
+        payload = {
+            "query": kwargs.get("query"),
+            "topic": kwargs.get("topic"),
+            "max_results": kwargs.get("max_results"),
+            "include_answer": False,
+            "include_raw_content": False,
+            "include_usage": True,
+        }
+        payload = {key: value for key, value in payload.items() if value is not None}
+
+        try:
+            response = self._transport(
+                url="https://api.tavily.com/search",
+                json=payload,
+                timeout=(5.0, 30.0),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "X-Client-Source": "arkscope-lifecycle",
+                },
+            )
+        except LifecycleSearchFailure:
+            raise
+        except Exception:
+            raise LifecycleSearchFailure("network_error") from None
+        status_code = int(getattr(response, "status_code", 0))
+        failure_codes = {
+            400: "extract_failed",
+            401: "credential_missing",
+            403: "permission_denied",
+            429: "rate_limited",
+            432: "usage_limit_reached",
+            433: "usage_limit_reached",
+        }
+        if status_code in failure_codes:
+            raise LifecycleSearchFailure(failure_codes[status_code])
+        if status_code != 200:
+            raise LifecycleSearchFailure("network_error")
+        try:
+            result = response.json()
+        except Exception:
+            raise LifecycleSearchFailure("extract_failed") from None
+        if not isinstance(result, dict):
+            raise LifecycleSearchFailure("extract_failed")
+        return result
+
+
+def _lifecycle_https_pool(target):
+    import urllib3
+
+    if not target.addresses:
+        raise ValueError("resolved_address_required")
+    return urllib3.HTTPSConnectionPool(
+        host=target.addresses[0],
+        port=target.port,
+        timeout=urllib3.Timeout(connect=5.0, read=15.0),
+        retries=False,
+        cert_reqs="CERT_REQUIRED",
+        assert_hostname=target.hostname,
+        server_hostname=target.hostname,
+    )
+
+
+def _lifecycle_fetch_transport(
+    *, target, max_bytes: int, redirect_guard, pool_factory=None
+):
+    from urllib.parse import urljoin, urlsplit
+
+    import urllib3
+
+    from src.security_lifecycle_search import LifecycleSearchFailure
+
+    current = target
+    create_pool = pool_factory or _lifecycle_https_pool
+    for _ in range(6):
+        pool = None
+        response = None
+        next_url = None
+        try:
+            pool = create_pool(current)
+            parsed = urlsplit(current.url)
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+            rendered_host = (
+                f"[{current.hostname}]"
+                if ":" in current.hostname
+                else current.hostname
+            )
+            host_header = (
+                rendered_host
+                if current.port == 443
+                else f"{rendered_host}:{current.port}"
+            )
+            try:
+                response = pool.urlopen(
+                    "GET",
+                    path,
+                    redirect=False,
+                    preload_content=False,
+                    retries=False,
+                    headers={
+                        "Host": host_header,
+                        "User-Agent": "ArkScope lifecycle evidence reader",
+                    },
+                )
+            except (OSError, urllib3.exceptions.HTTPError):
+                raise LifecycleSearchFailure("network_error") from None
+            status_code = int(response.status)
+            if status_code in {301, 302, 303, 307, 308}:
+                location = response.headers.get("Location")
+                if not location:
+                    raise LifecycleSearchFailure("extract_failed")
+                next_url = urljoin(current.url, location)
+            elif status_code == 429:
+                raise LifecycleSearchFailure("rate_limited")
+            elif status_code >= 400:
+                raise LifecycleSearchFailure("network_error")
+            else:
+                content_type = response.headers.get("Content-Type", "").split(
+                    ";", 1
+                )[0]
+                if content_type not in {
+                    "text/html",
+                    "text/plain",
+                    "application/xhtml+xml",
+                }:
+                    return None
+                chunks = []
+                size = 0
+                for chunk in response.stream(8192):
+                    if not chunk:
+                        continue
+                    remaining = max_bytes - size
+                    if remaining <= 0:
+                        break
+                    chunks.append(chunk[:remaining])
+                    size += min(len(chunk), remaining)
+                    if size >= max_bytes:
+                        break
+                return {
+                    "url": current.url,
+                    "_resolved_target": current,
+                    "content": b"".join(chunks).decode("utf-8", errors="replace"),
+                    "mime_type": content_type,
+                }
+        finally:
+            if response is not None:
+                response.release_conn()
+            if pool is not None:
+                pool.close()
+        if next_url is not None:
+            current = redirect_guard(next_url)
+            continue
+    raise LifecycleSearchFailure("unsupported_content")
+
+
+def get_security_lifecycle_search_adapter():
+    """Injected attended Tavily adapter; construction performs no I/O."""
+    from src.security_lifecycle_search import TavilyLifecycleSearchAdapter
+
+    return TavilyLifecycleSearchAdapter(
+        client=_LifecycleTavilyClient(),
+        fetch_transport=_lifecycle_fetch_transport,
+    )
+
+
+def get_security_lifecycle_resolver():
+    """Resolve public-search hosts at the explicit investigation boundary."""
+    def resolve(host: str) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    str(row[4][0])
+                    for row in socket.getaddrinfo(
+                        host,
+                        443,
+                        type=socket.SOCK_STREAM,
+                    )
+                }
+            )
+        )
+
+    return resolve
 
 
 @lru_cache(maxsize=1)

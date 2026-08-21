@@ -1,8 +1,8 @@
 # ArkScope Tool Catalog (canonical)
 
-**Updated**: 2026-08-09
+**Updated**: 2026-08-21
 **Status**: CANONICAL current registry authority
-**Live registry**: 50 tools; agent bridges add `delegate_to_subagent` for 51
+**Live registry**: 52 tools; agent bridges add `delegate_to_subagent` for 53
 
 This document describes the current `ToolRegistry`, not removed implementations
 or possible future products. Historical catalog versions remain recoverable from
@@ -27,7 +27,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 
 ## 1. Live registry
 
-### 1.1 All 50 tools
+### 1.1 All 52 tools
 
 | Tool | Category | Parameters | Current role |
 |---|---|---|---|
@@ -62,6 +62,8 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `get_ticker_data_coverage` | analysis | ticker*, target_date? | local coverage diagnostics |
 | `get_economic_calendar` | analysis | country?, importance?, days_back?, days_forward?, as_of?, limit? | Finnhub economic calendar |
 | `get_macro_value` | analysis | series_id*, observation_date*, as_of? | point-in-time FRED value |
+| `list_security_lifecycle_cases` | analysis | ticker?, workflow_state?, source_presence?, limit? | provider-neutral local lifecycle case list |
+| `get_security_lifecycle_case` | analysis | case_id* | provider-neutral local lifecycle evidence and workflow detail |
 | `get_portfolio_analysis` | portfolio | tickers?, holdings? | deterministic beta/correlation/P&L analysis |
 | `get_portfolio_holdings` | portfolio | account_id?, include_closed? | local holdings snapshot |
 | `get_sa_alpha_picks` | portfolio | status?, sector? | captured Alpha Picks portfolio |
@@ -93,6 +95,9 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
   and investor risk preferences remain source-labelled distinct contracts.
 - Option pricing accepts the caller's rate. Provider-backed estimates are a
   separate future capability, not a hidden network fallback.
+- Lifecycle tools read the local market/profile stores only. They expose
+  observation and review evidence but never search the web, write state, or
+  apply an action proposal.
 
 ### 1.3 Permission boundaries
 

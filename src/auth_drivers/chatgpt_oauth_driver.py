@@ -61,6 +61,8 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
         "get_fundamentals_analysis",
         "get_sec_filings",
         "get_economic_calendar",
+        "get_security_lifecycle_case",
+        "list_security_lifecycle_cases",
     }
 )
 

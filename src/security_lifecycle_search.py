@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 import ipaddress
 import math
 import re
-from typing import Any, Callable, Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
 from src.api.permissions import PermissionClass, require_permission
@@ -20,11 +22,34 @@ MAX_FETCHES = 5
 MAX_FETCH_BYTES = 100_000
 
 _SPACE_RE = re.compile(r"\s+")
+_USAGE_FIELDS = frozenset(
+    {
+        "search_requests",
+        "fetch_requests",
+        "credits",
+        "credits_used",
+        "response_time_ms",
+    }
+)
+_MAX_USAGE_VALUE = 1_000_000_000_000
+_RFC3339_RE = re.compile(
+    r"^(?P<date>\d{4}-\d{2}-\d{2})T(?P<hour>\d{2}):(?P<minute>\d{2})"
+    r"(?::(?P<second>\d{2})(?P<fraction>\.\d{1,6})?)?"
+    r"(?P<offset>Z|[+-]\d{2}:\d{2})$"
+)
 
 
 class _UnsafeLifecycleUrl(ValueError):
     def __init__(self):
         super().__init__("unsafe_url")
+
+
+@dataclass(frozen=True)
+class ResolvedHttpsTarget:
+    url: str
+    hostname: str
+    port: int
+    addresses: tuple[str, ...]
 
 
 class _VisibleTextParser(HTMLParser):
@@ -63,9 +88,9 @@ class LifecycleSearchAdapter(Protocol):
     def fetch(
         self,
         *,
-        url: str,
+        target: ResolvedHttpsTarget,
         max_bytes: int,
-        redirect_guard: Callable[[str], str],
+        redirect_guard: Callable[[str], ResolvedHttpsTarget],
     ) -> Mapping[str, object] | None: ...
 
 
@@ -102,13 +127,13 @@ class TavilyLifecycleSearchAdapter:
     def fetch(
         self,
         *,
-        url: str,
+        target: ResolvedHttpsTarget,
         max_bytes: int,
-        redirect_guard: Callable[[str], str],
+        redirect_guard: Callable[[str], ResolvedHttpsTarget],
     ) -> Mapping[str, object] | None:
         try:
             payload = self._fetch_transport(
-                url=url,
+                target=target,
                 max_bytes=max_bytes,
                 redirect_guard=redirect_guard,
             )
@@ -133,6 +158,42 @@ def _clean_text(value: object, *, limit: int) -> str:
     return text[:limit]
 
 
+def _normalize_source_published_at(value: object) -> str | None:
+    raw = str(value or "").strip()
+    if not raw or len(raw) > 80 or "\0" in raw:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        try:
+            parsed_date = date.fromisoformat(raw)
+        except ValueError:
+            return None
+        return raw if parsed_date.isoformat() == raw else None
+    match = _RFC3339_RE.fullmatch(raw)
+    if match is None:
+        return None
+    offset = match.group("offset")
+    parseable = raw[:-1] + "+00:00" if offset == "Z" else raw
+    try:
+        parsed = datetime.fromisoformat(parseable)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    normalized = parsed.astimezone(timezone.utc)
+    rendered = normalized.strftime("%Y-%m-%dT%H:%M")
+    if match.group("second") is not None:
+        rendered += normalized.strftime(":%S")
+        rendered += match.group("fraction") or ""
+    return f"{rendered}Z"
+
+
+def _result_source_published_at(item: Mapping[str, object]) -> str | None:
+    value = item.get("published_date")
+    if value is None:
+        value = item.get("published_at")
+    return _normalize_source_published_at(value)
+
+
 def _literal_host_is_forbidden(host: str) -> bool:
     normalized = host.rstrip(".").casefold()
     if normalized in {"localhost", "localhost.localdomain"} or normalized.endswith(
@@ -146,11 +207,11 @@ def _literal_host_is_forbidden(host: str) -> bool:
     return not address.is_global
 
 
-def _canonical_https_url(
+def _resolve_https_target(
     value: object,
     *,
     resolver: Callable[[str], tuple[str, ...]] | None,
-) -> str:
+) -> ResolvedHttpsTarget:
     raw = str(value or "").strip()
     try:
         parsed = urlsplit(raw)
@@ -165,9 +226,10 @@ def _canonical_https_url(
     host = host_value.rstrip(".").casefold()
     if _literal_host_is_forbidden(host):
         raise _UnsafeLifecycleUrl()
+    addresses: tuple[str, ...] = ()
     if resolver is not None:
         try:
-            addresses = tuple(resolver(host))
+            addresses = tuple(sorted(set(resolver(host))))
         except Exception:
             raise _UnsafeLifecycleUrl() from None
         try:
@@ -178,8 +240,22 @@ def _canonical_https_url(
             raise _UnsafeLifecycleUrl() from None
         if not addresses or forbidden_address:
             raise _UnsafeLifecycleUrl()
-    netloc = host if port in {None, 443} else f"{host}:{port}"
-    return urlunsplit(("https", netloc, parsed.path or "/", parsed.query, ""))
+    rendered_host = f"[{host}]" if ":" in host else host
+    netloc = rendered_host if port in {None, 443} else f"{rendered_host}:{port}"
+    return ResolvedHttpsTarget(
+        url=urlunsplit(("https", netloc, parsed.path or "/", parsed.query, "")),
+        hostname=host,
+        port=port or 443,
+        addresses=addresses,
+    )
+
+
+def _canonical_https_url(
+    value: object,
+    *,
+    resolver: Callable[[str], tuple[str, ...]] | None,
+) -> str:
+    return _resolve_https_target(value, resolver=resolver).url
 
 
 def build_lifecycle_query_plan(observation: Mapping[str, object]) -> tuple[str, ...]:
@@ -251,6 +327,34 @@ def add_manual_evidence(
     )
 
 
+def _bounded_usage_value(value: object) -> int | float | bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value if 0 <= value <= _MAX_USAGE_VALUE else None
+    if isinstance(value, float) and math.isfinite(value):
+        return value if 0 <= value <= _MAX_USAGE_VALUE else None
+    return None
+
+
+def _merge_usage(total: dict[str, int | float | bool], values: object) -> None:
+    if not isinstance(values, Mapping):
+        return
+    for key in _USAGE_FIELDS:
+        value = _bounded_usage_value(values.get(key))
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            total[key] = bool(total.get(key, False)) or value
+        else:
+            prior = total.get(key, 0)
+            if isinstance(prior, bool):
+                prior = 0
+            summed = prior + value
+            if 0 <= summed <= _MAX_USAGE_VALUE:
+                total[key] = summed
+
+
 def _safe_usage(values: object, *, query_count: int, fetch_count: int) -> dict:
     result: dict[str, int | float | bool] = {
         "query_count": query_count,
@@ -258,17 +362,10 @@ def _safe_usage(values: object, *, query_count: int, fetch_count: int) -> dict:
     }
     if isinstance(values, Mapping):
         for key in sorted(values):
-            if key not in {
-                "search_requests",
-                "fetch_requests",
-                "credits_used",
-                "response_time_ms",
-            }:
+            if key not in _USAGE_FIELDS:
                 continue
-            value = values[key]
-            if isinstance(value, bool) or isinstance(value, int):
-                result[str(key)] = value
-            elif isinstance(value, float) and math.isfinite(value):
+            value = _bounded_usage_value(values[key])
+            if value is not None:
                 result[str(key)] = value
     return result
 
@@ -302,7 +399,7 @@ def run_tavily_investigation(
     )
     detail = {"adapter": "tavily", "case_id": case_id, "query_count": len(queries)}
     fetch_count = 0
-    usage: dict[str, Any] = {}
+    usage: dict[str, int | float | bool] = {}
 
     def fail_run(failure_code: str) -> dict:
         run = store.get_investigation_run(run_id)
@@ -332,21 +429,28 @@ def run_tavily_investigation(
             detail,
         )
         store.start_investigation_run(run_id, at=at)
-        by_url: dict[str, Mapping[str, object]] = {}
+        by_url: dict[str, tuple[ResolvedHttpsTarget, Mapping[str, object]]] = {}
         for query in queries:
             payload = adapter.search(query=query, max_results=MAX_RESULTS_PER_QUERY)
             if not isinstance(payload, Mapping):
                 raise LifecycleSearchFailure("extract_failed")
-            if isinstance(payload.get("usage"), Mapping):
-                usage.update(payload["usage"])
+            _merge_usage(usage, payload.get("usage"))
             for item in _result_rows(payload)[:MAX_RESULTS_PER_QUERY]:
                 try:
-                    url = _canonical_https_url(item.get("url"), resolver=resolver)
+                    canonical_url = _canonical_https_url(
+                        item.get("url"), resolver=None
+                    )
+                    if canonical_url in by_url:
+                        continue
+                    target = _resolve_https_target(
+                        canonical_url, resolver=resolver
+                    )
                 except _UnsafeLifecycleUrl:
                     raise LifecycleSearchFailure("unsupported_content") from None
-                by_url.setdefault(url, item)
-        selected = list(by_url.items())[:MAX_FETCHES]
-        for url, item in selected:
+                by_url.setdefault(target.url, (target, item))
+        selected = list(by_url.values())[:MAX_FETCHES]
+        for target, item in selected:
+            url = target.url
             snippet = _clean_text(
                 item.get("content") or item.get("snippet"), limit=16000
             )
@@ -363,7 +467,7 @@ def run_tavily_investigation(
                 publisher=_clean_text(item.get("publisher"), limit=240) or None,
                 domain=urlsplit(url).hostname,
                 source_published_at=(
-                    _clean_text(item.get("published_at"), limit=40) or None
+                    _result_source_published_at(item)
                 ),
                 retrieved_at=at,
                 mime_type=None,
@@ -371,20 +475,26 @@ def run_tavily_investigation(
                 at=at,
             )
 
-            def redirect_guard(candidate: str) -> str:
-                return _canonical_https_url(candidate, resolver=resolver)
+            def redirect_guard(candidate: str) -> ResolvedHttpsTarget:
+                return _resolve_https_target(candidate, resolver=resolver)
 
             fetch_count += 1
             fetched = adapter.fetch(
-                url=url,
+                target=target,
                 max_bytes=MAX_FETCH_BYTES,
                 redirect_guard=redirect_guard,
             )
             if fetched is None:
                 continue
-            final_url = _canonical_https_url(
-                fetched.get("url") or url, resolver=resolver
-            )
+            fetched_target = fetched.get("_resolved_target")
+            fetched_url = str(fetched.get("url") or url)
+            if (
+                isinstance(fetched_target, ResolvedHttpsTarget)
+                and fetched_target.url == fetched_url
+            ):
+                final_url = fetched_target.url
+            else:
+                final_url = _canonical_https_url(fetched_url, resolver=resolver)
             excerpt = _clean_text(fetched.get("content"), limit=16000)
             if excerpt:
                 store.add_evidence(
@@ -398,7 +508,7 @@ def run_tavily_investigation(
                     publisher=_clean_text(item.get("publisher"), limit=240) or None,
                     domain=urlsplit(final_url).hostname,
                     source_published_at=(
-                        _clean_text(item.get("published_at"), limit=40) or None
+                        _result_source_published_at(item)
                     ),
                     retrieved_at=at,
                     mime_type=_clean_text(fetched.get("mime_type"), limit=127) or None,

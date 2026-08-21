@@ -1207,6 +1207,64 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["series_id", "observation_date"],
             },
         },
+        {
+            "name": "list_security_lifecycle_cases",
+            "description": (
+                "List local security-lifecycle cases and their current workflow "
+                "state. Reads local observation and investigation evidence only; "
+                "performs no provider request or write."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Optional ticker filter.",
+                    },
+                    "workflow_state": {
+                        "type": "string",
+                        "enum": [
+                            "unresolved",
+                            "investigating",
+                            "evidence_ready",
+                            "reviewed_inconclusive",
+                            "resolved",
+                        ],
+                        "description": "Optional derived workflow-state filter.",
+                    },
+                    "source_presence": {
+                        "type": "string",
+                        "enum": ["present", "source_missing"],
+                        "description": (
+                            "Observation presence filter (default present)."
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum cases to return (1-200, default 50).",
+                    },
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "get_security_lifecycle_case",
+            "description": (
+                "Read one local security-lifecycle case with source observation, "
+                "evidence, assessments, acknowledgements, and inert proposals. "
+                "Performs no provider request or write."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "case_id": {
+                        "type": "string",
+                        "description": "Security-lifecycle case ID.",
+                    },
+                },
+                "required": ["case_id"],
+            },
+        },
     ])
 
     return tools
@@ -1326,6 +1384,10 @@ def execute_tool(
     from src.tools.monitor_tools import scan_alerts
     from src.tools.freshness import check_data_freshness
     from src.tools.data_coverage_tools import get_ticker_data_coverage
+    from src.tools.security_lifecycle_tools import (
+        get_security_lifecycle_case,
+        list_security_lifecycle_cases,
+    )
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
         get_sa_articles, get_sa_article_detail, get_sa_market_news,
@@ -1551,6 +1613,15 @@ def execute_tool(
         "get_ticker_data_coverage": lambda: get_ticker_data_coverage(
             ticker=tool_input["ticker"],
             target_date=tool_input.get("target_date"),
+        ),
+        "list_security_lifecycle_cases": lambda: list_security_lifecycle_cases(
+            ticker=tool_input.get("ticker"),
+            workflow_state=tool_input.get("workflow_state"),
+            source_presence=tool_input.get("source_presence", "present"),
+            limit=tool_input.get("limit", 50),
+        ),
+        "get_security_lifecycle_case": lambda: get_security_lifecycle_case(
+            case_id=tool_input["case_id"],
         ),
         # SA Alpha Picks (Phase 11c)
         "get_sa_alpha_picks": lambda: get_sa_alpha_picks(

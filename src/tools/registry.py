@@ -160,6 +160,7 @@ class ToolRegistry:
         self._register_options_tools()
         self._register_news_event_tools()
         self._register_analysis_tools()
+        self._register_security_lifecycle_tools()
         self._register_portfolio_tools()
         self._register_report_tools()
         self._register_memory_tools()
@@ -568,6 +569,74 @@ class ToolRegistry:
             requires_dal=False,
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
+            ],
+        ))
+
+    def _register_security_lifecycle_tools(self) -> None:
+        from .security_lifecycle_tools import (
+            get_security_lifecycle_case,
+            list_security_lifecycle_cases,
+        )
+
+        self.register(ToolDefinition(
+            name="list_security_lifecycle_cases",
+            description=(
+                "List local security-lifecycle cases and their current workflow state. "
+                "Reads local observation and investigation evidence only; performs no "
+                "provider request or write."
+            ),
+            function=list_security_lifecycle_cases,
+            category="analysis",
+            requires_dal=False,
+            parameters=[
+                ToolParameter(
+                    "ticker",
+                    "string",
+                    "Optional ticker filter.",
+                    required=False,
+                ),
+                ToolParameter(
+                    "workflow_state",
+                    "string",
+                    "Optional derived workflow-state filter.",
+                    required=False,
+                    enum=[
+                        "unresolved",
+                        "investigating",
+                        "evidence_ready",
+                        "reviewed_inconclusive",
+                        "resolved",
+                    ],
+                ),
+                ToolParameter(
+                    "source_presence",
+                    "string",
+                    "Observation presence filter (default present).",
+                    required=False,
+                    default="present",
+                    enum=["present", "source_missing"],
+                ),
+                ToolParameter(
+                    "limit",
+                    "integer",
+                    "Maximum cases to return (1-200, default 50).",
+                    required=False,
+                    default=50,
+                ),
+            ],
+        ))
+        self.register(ToolDefinition(
+            name="get_security_lifecycle_case",
+            description=(
+                "Read one local security-lifecycle case with source observation, "
+                "evidence, assessments, acknowledgements, and inert proposals. "
+                "Performs no provider request or write."
+            ),
+            function=get_security_lifecycle_case,
+            category="analysis",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("case_id", "string", "Security-lifecycle case ID."),
             ],
         ))
 

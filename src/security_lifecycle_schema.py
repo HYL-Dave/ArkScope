@@ -29,6 +29,7 @@ RUN_FAILURE_CODES = frozenset(
         "credential_missing",
         "permission_denied",
         "rate_limited",
+        "usage_limit_reached",
         "network_error",
         "extract_failed",
         "unsupported_content",

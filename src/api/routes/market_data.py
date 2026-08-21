@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,7 +24,6 @@ from src.market_coverage.models import TradingDayCoverageV2
 from src.market_coverage.service import TradingDayCoverageService
 from src.news_sync_status import overlay_news_sync_status
 from src.profile_state import ProfileStateStore
-from src.security_lifecycle import SecurityLifecycleStore, read_security_lifecycle
 
 router = APIRouter(tags=["market-data"])
 
@@ -133,112 +130,6 @@ def market_data_trading_days(
         interval=interval,
         lookback_days=lookback_days,
     )
-
-
-@router.get("/market-data/security-lifecycle")
-def security_lifecycle_status(
-    limit: int = Query(200, ge=1, le=1000),
-):
-    """Return local SEC/exchange lifecycle evidence without provider work."""
-    return read_security_lifecycle(resolve_market_db_path(), limit=limit)
-
-
-class CorporateRelationshipReview(BaseModel):
-    status: Literal["confirmed", "rejected"]
-
-
-class SecurityLifecycleEventReview(BaseModel):
-    status: Literal["inactive_confirmed", "renamed_or_transferred", "unreviewed"]
-
-
-@router.put("/market-data/security-lifecycle/events/{event_id}")
-def review_security_lifecycle_event(
-    event_id: int,
-    body: SecurityLifecycleEventReview,
-):
-    """Persist an explicit local review without changing Universe membership."""
-    payload = {"event_id": event_id, "status": body.status}
-    require_db_write("review_security_lifecycle_event", payload)
-    db_path = resolve_market_db_path()
-    if not Path(db_path).is_file():
-        raise HTTPException(status_code=404, detail="lifecycle_event_not_found")
-    from datetime import datetime, timezone
-    from src.market_data_direct import market_write_lock
-
-    reviewed_at = (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z")
-    )
-    with market_write_lock():
-        conn = sqlite3.connect(db_path, timeout=10.0)
-        try:
-            table_exists = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' "
-                "AND name='security_lifecycle_observations'"
-            ).fetchone()
-            if table_exists is None:
-                raise HTTPException(status_code=404, detail="lifecycle_event_not_found")
-            SecurityLifecycleStore(conn).review_observation(
-                event_id,
-                status=body.status,
-                reviewed_at=reviewed_at,
-            )
-        except KeyError:
-            raise HTTPException(
-                status_code=404,
-                detail="lifecycle_event_not_found",
-            ) from None
-        except ValueError as exc:
-            if str(exc) != "observation_not_reviewable":
-                raise
-            raise HTTPException(
-                status_code=409,
-                detail="lifecycle_event_not_reviewable",
-            ) from None
-        finally:
-            conn.close()
-    return {"id": event_id, "status": body.status}
-
-
-@router.put("/market-data/security-lifecycle/relationships/{relationship_id}")
-def review_corporate_relationship(
-    relationship_id: int,
-    body: CorporateRelationshipReview,
-):
-    """Persist an explicit human review; never changes active-universe membership."""
-    payload = {"relationship_id": relationship_id, "status": body.status}
-    require_db_write("review_corporate_relationship", payload)
-    db_path = resolve_market_db_path()
-    if not Path(db_path).is_file():
-        raise HTTPException(status_code=404, detail="relationship_not_found")
-    from datetime import datetime, timezone
-    from src.market_data_direct import market_write_lock
-
-    reviewed_at = (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z")
-    )
-    with market_write_lock():
-        conn = sqlite3.connect(db_path, timeout=10.0)
-        try:
-            table_exists = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' "
-                "AND name='corporate_action_relationships'"
-            ).fetchone()
-            if table_exists is None:
-                raise HTTPException(status_code=404, detail="relationship_not_found")
-            SecurityLifecycleStore(conn).review_relationship(
-                relationship_id,
-                status=body.status,
-                reviewed_at=reviewed_at,
-            )
-        except KeyError:
-            raise HTTPException(status_code=404, detail="relationship_not_found") from None
-        finally:
-            conn.close()
-    return {"id": relationship_id, "status": body.status}
 
 
 @router.post("/market-data/validate")

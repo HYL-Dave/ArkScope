@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import sqlite3
@@ -124,23 +125,84 @@ def _canonical_json(value: object, *, max_bytes: int, name: str) -> str:
     return encoded
 
 
-def _canonical_decimal(value: object, *, name: str) -> str | None:
+def canonical_assessment_decimal(value: object, *, name: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
         raise TypeError(f"{name}_decimal")
+    if not value.strip() or len(value) > 128:
+        raise ValueError(f"{name}_decimal")
     try:
         number = Decimal(value.strip())
     except (InvalidOperation, ValueError) as exc:
         raise ValueError(f"{name}_decimal") from exc
     if not number.is_finite():
         raise ValueError(f"{name}_decimal")
+    if number.is_zero():
+        return "0"
+    parts = number.as_tuple()
+    digit_count = len(parts.digits)
+    exponent = int(parts.exponent)
+    if exponent >= 0:
+        rendered_length = digit_count + exponent
+    elif digit_count + exponent > 0:
+        rendered_length = digit_count + 1
+    else:
+        rendered_length = 2 - exponent
+    rendered_length += int(parts.sign)
+    if rendered_length > 128:
+        raise ValueError(f"{name}_decimal")
     rendered = format(number, "f")
     if "." in rendered:
         rendered = rendered.rstrip("0").rstrip(".")
     if rendered in {"-0", ""}:
         rendered = "0"
+    if len(rendered) > 128:
+        raise ValueError(f"{name}_decimal")
     return rendered
+
+
+def _canonical_date(value: object, *, name: str) -> str | None:
+    text = _bounded_text(name, value, max_length=10)
+    if text is None:
+        return None
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(name) from exc
+    if parsed.isoformat() != text:
+        raise ValueError(name)
+    return text
+
+
+def _canonical_cik(value: object) -> str | None:
+    text = _bounded_text("counterparty_cik", value, max_length=10)
+    if text is not None and (
+        len(text) != 10 or not text.isascii() or not text.isdigit()
+    ):
+        raise ValueError("counterparty_cik")
+    return text
+
+
+def _canonical_currency(value: object) -> str | None:
+    text = _bounded_text("consideration_currency", value, max_length=3)
+    if text is not None and (
+        len(text) != 3
+        or not text.isascii()
+        or not text.isalpha()
+        or text != text.upper()
+    ):
+        raise ValueError("consideration_currency")
+    return text
+
+
+def _canonical_sha256(name: str, value: object) -> str:
+    text = str(value or "")
+    if len(text) != 64 or any(
+        character not in "0123456789abcdef" for character in text
+    ):
+        raise ValueError(name)
+    return text
 
 
 def _digest_rows(rows: Iterable[tuple[str, str]]) -> str:
@@ -574,9 +636,11 @@ class SecurityLifecycleInvestigationStore:
         for citation in citations:
             reference_kind = str(citation.get("reference_kind") or "")
             if reference_kind == "observation":
-                cited_hash = str(citation.get("cited_content_sha256") or "")
-                if len(cited_hash) != 64:
+                if citation.get("evidence_id") is not None:
                     raise ValueError("citation")
+                cited_hash = _canonical_sha256(
+                    "citation", citation.get("cited_content_sha256")
+                )
                 citation_values.append(
                     {
                         "reference_kind": "observation",
@@ -632,14 +696,20 @@ class SecurityLifecycleInvestigationStore:
                     _bounded_text("impact_summary", impact_summary, max_length=4000, required=True),
                     _bounded_text("counterparty_name", counterparty_name, max_length=240),
                     _bounded_text("counterparty_ticker", counterparty_ticker, max_length=20),
-                    _bounded_text("counterparty_cik", counterparty_cik, max_length=10),
+                    _canonical_cik(counterparty_cik),
                     _bounded_text("successor_ticker", successor_ticker, max_length=20),
                     _bounded_text("destination_venue", destination_venue, max_length=120),
-                    effective_date,
-                    _bounded_text("consideration_currency", consideration_currency, max_length=3),
-                    _canonical_decimal(cash_per_security_decimal, name="cash_per_security"),
-                    _canonical_decimal(exchange_ratio_decimal, name="exchange_ratio"),
-                    observation_fingerprint_sha256,
+                    _canonical_date(effective_date, name="effective_date"),
+                    _canonical_currency(consideration_currency),
+                    canonical_assessment_decimal(
+                        cash_per_security_decimal, name="cash_per_security"
+                    ),
+                    canonical_assessment_decimal(
+                        exchange_ratio_decimal, name="exchange_ratio"
+                    ),
+                    _canonical_sha256(
+                        "observation_fingerprint", observation_fingerprint_sha256
+                    ),
                     self._evidence_set_sha256(case_id),
                     at,
                     None,
@@ -723,12 +793,18 @@ class SecurityLifecycleInvestigationStore:
             raise ValueError("conclusive assessment required")
         if not assessment["citations"]:
             raise ValueError("citation required")
+        observation_citations = [
+            citation
+            for citation in assessment["citations"]
+            if citation["reference_kind"] == "observation"
+        ]
+        if not observation_citations:
+            raise ValueError("observation_citation_required")
         if assessment["observation_fingerprint_sha256"] != observation_fingerprint_sha256:
             raise ValueError("stale_assessment")
         if any(
-            citation["reference_kind"] == "observation"
-            and citation["cited_content_sha256"] != observation_fingerprint_sha256
-            for citation in assessment["citations"]
+            citation["cited_content_sha256"] != observation_fingerprint_sha256
+            for citation in observation_citations
         ):
             raise ValueError("stale_citation")
         if assessment["evidence_set_sha256"] != self._evidence_set_sha256(
@@ -1100,7 +1176,7 @@ def _read_profile(
     conn.row_factory = sqlite3.Row
     try:
         if not _component_tables(conn):
-            return [], {}
+            raise LifecycleSchemaMismatch("profile lifecycle schema is absent")
         verify_profile_connection(conn)
         cases = [
             dict(row)
@@ -1205,6 +1281,7 @@ __all__ = [
     "LifecycleStoreUnavailable",
     "LifecycleWritesUnavailable",
     "SecurityLifecycleInvestigationStore",
+    "canonical_assessment_decimal",
     "case_id_for",
     "compose_security_lifecycle",
     "observation_fingerprint",

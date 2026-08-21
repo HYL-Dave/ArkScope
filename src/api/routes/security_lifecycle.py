@@ -1,0 +1,466 @@
+"""Attended security-lifecycle investigation and local case reads."""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timezone
+import re
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from src.api.dependencies import (
+    get_security_lifecycle_read_service,
+    get_security_lifecycle_resolver,
+    get_security_lifecycle_search_adapter,
+    get_security_lifecycle_store,
+)
+from src.api.permissions import require_db_write, require_permission
+from src.security_lifecycle_investigation import (
+    LifecycleStoreUnavailable,
+    LifecycleWritesUnavailable,
+    SecurityLifecycleInvestigationStore,
+    canonical_assessment_decimal,
+    observation_fingerprint,
+)
+from src.security_lifecycle_search import (
+    LifecycleSearchAdapter,
+    add_manual_evidence,
+    run_tavily_investigation,
+)
+from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+
+router = APIRouter(prefix="/security-lifecycle", tags=["security-lifecycle"])
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )
+
+
+class InvestigationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    adapter: Literal["tavily"]
+
+
+class ManualEvidenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str | None = Field(default=None, max_length=16000)
+    url: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_shape(self):
+        if (self.text is None) == (self.url is None):
+            raise ValueError("manual_evidence_shape")
+        if self.text is not None and not self.text.strip():
+            raise ValueError("manual_text")
+        if self.url is not None and not self.url.strip():
+            raise ValueError("manual_url")
+        return self
+
+
+class CitationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_kind: Literal["observation", "evidence"]
+    evidence_id: str | None = Field(default=None, max_length=80)
+    cited_content_sha256: str | None = Field(default=None, max_length=64)
+
+    @model_validator(mode="after")
+    def validate_reference_shape(self):
+        if self.reference_kind == "observation":
+            if self.evidence_id is not None or not re.fullmatch(
+                r"[0-9a-f]{64}", self.cited_content_sha256 or ""
+            ):
+                raise ValueError("citation")
+        elif self.evidence_id is None or self.cited_content_sha256 is not None:
+            raise ValueError("citation")
+        return self
+
+
+AssessmentOutcome = Literal[
+    "undetermined",
+    "listing_ended",
+    "venue_transfer",
+    "symbol_changed",
+    "acquisition_cash",
+    "acquisition_stock",
+    "acquisition_mixed",
+    "acquisition_terms_unknown",
+    "issuer_security_change",
+    "no_tracked_security_change",
+    "other",
+    "not_applicable",
+]
+
+
+class AssessmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    relevance: Literal[
+        "undetermined", "direct_tracked_security", "issuer_related", "unrelated"
+    ]
+    confidence: Literal["unknown", "low", "medium", "high"]
+    conclusion: str = Field(min_length=1, max_length=4000)
+    impact_summary: str = Field(min_length=1, max_length=4000)
+    outcomes: list[AssessmentOutcome] = Field(min_length=1, max_length=12)
+    citations: list[CitationRequest] = Field(default_factory=list, max_length=100)
+    counterparty_name: str | None = Field(default=None, max_length=240)
+    counterparty_ticker: str | None = Field(default=None, max_length=20)
+    counterparty_cik: str | None = Field(default=None, max_length=10)
+    successor_ticker: str | None = Field(default=None, max_length=20)
+    destination_venue: str | None = Field(default=None, max_length=120)
+    effective_date: str | None = Field(default=None, max_length=10)
+    consideration_currency: str | None = Field(default=None, max_length=3)
+    cash_per_security_decimal: str | None = Field(default=None, max_length=128)
+    exchange_ratio_decimal: str | None = Field(default=None, max_length=128)
+
+    @field_validator("counterparty_cik")
+    @classmethod
+    def validate_counterparty_cik(cls, value):
+        if value is not None and not re.fullmatch(r"[0-9]{10}", value):
+            raise ValueError("counterparty_cik")
+        return value
+
+    @field_validator("effective_date")
+    @classmethod
+    def validate_effective_date(cls, value):
+        if value is None:
+            return None
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("effective_date") from exc
+        if parsed.isoformat() != value:
+            raise ValueError("effective_date")
+        return value
+
+    @field_validator("consideration_currency")
+    @classmethod
+    def validate_consideration_currency(cls, value):
+        if value is not None and not re.fullmatch(r"[A-Z]{3}", value):
+            raise ValueError("consideration_currency")
+        return value
+
+    @field_validator("cash_per_security_decimal", "exchange_ratio_decimal")
+    @classmethod
+    def validate_decimal(cls, value, info):
+        if value is not None:
+            canonical_assessment_decimal(
+                value,
+                name=info.field_name.removesuffix("_decimal"),
+            )
+        return value
+
+    @model_validator(mode="after")
+    def validate_outcomes(self):
+        if "undetermined" in self.outcomes and len(set(self.outcomes)) != 1:
+            raise ValueError("conflicting_outcomes")
+        return self
+
+
+class AcknowledgementRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Literal["evidence_insufficient"]
+    note: str | None = Field(default=None, max_length=2000)
+
+
+def _store_error(exc: LifecycleStoreUnavailable) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={
+            "code": f"security_lifecycle_{exc.store}_store_unavailable",
+            "store": exc.store,
+        },
+    )
+
+
+def _not_found(exc: KeyError) -> HTTPException:
+    code = str(exc.args[0]) if exc.args else "security_lifecycle_not_found"
+    return HTTPException(status_code=404, detail={"code": code})
+
+
+def _invalid(exc: ValueError) -> HTTPException:
+    return HTTPException(status_code=422, detail={"code": str(exc)})
+
+
+def _case_fingerprint(case: dict) -> str:
+    observation = case.get("observation")
+    if observation is None:
+        raise ValueError("source_observation_missing")
+    return observation_fingerprint(observation)
+
+
+@router.get("/cases")
+def list_cases(
+    ticker: str | None = Query(default=None),
+    workflow_state: str | None = Query(default=None),
+    relevance: str | None = Query(default=None),
+    event_type: str | None = Query(default=None),
+    proposal_type: str | None = Query(default=None),
+    source_presence: Literal["present", "source_missing"] = Query(
+        default="present"
+    ),
+    limit: int = Query(default=50, ge=1, le=200),
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+):
+    try:
+        return service.list_cases(
+            ticker=ticker,
+            workflow_state=workflow_state,
+            relevance=relevance,
+            event_type=event_type,
+            proposal_type=proposal_type,
+            source_presence=source_presence,
+            limit=limit,
+        )
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except ValueError as exc:
+        raise _invalid(exc) from None
+
+
+@router.get("/cases/{case_id}")
+def get_case(
+    case_id: str,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+):
+    try:
+        return service.get_case(case_id)
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+
+
+@router.get("/investigations/{run_id}")
+def get_investigation(
+    run_id: str,
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        return store.get_investigation_run(run_id)
+    except KeyError as exc:
+        raise _not_found(exc) from None
+
+
+@router.post("/cases/{case_id}/investigations")
+def investigate_case(
+    case_id: str,
+    body: InvestigationRequest,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+    adapter: LifecycleSearchAdapter = Depends(
+        get_security_lifecycle_search_adapter
+    ),
+    resolver=Depends(get_security_lifecycle_resolver),
+):
+    try:
+        case = service.get_case(case_id)
+        observation = case.get("observation")
+        if observation is None:
+            raise ValueError("source_observation_missing")
+        detail = {"case_id": case_id, "adapter": body.adapter}
+        require_db_write("security_lifecycle_investigation", detail)
+        return run_tavily_investigation(
+            store=store,
+            case_id=case_id,
+            observation=observation,
+            adapter=adapter,
+            permission=require_permission,
+            resolver=resolver,
+            at=_utc_now(),
+        )
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/cases/{case_id}/evidence")
+def create_manual_evidence(
+    case_id: str,
+    body: ManualEvidenceRequest,
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        require_db_write("security_lifecycle_add_evidence", {"case_id": case_id})
+        evidence_id = add_manual_evidence(
+            store=store,
+            case_id=case_id,
+            text=body.text,
+            url=body.url,
+            at=_utc_now(),
+        )
+        return {"evidence_id": evidence_id}
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/cases/{case_id}/assessments")
+def create_assessment(
+    case_id: str,
+    body: AssessmentRequest,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        case = service.get_case(case_id)
+        fingerprint = _case_fingerprint(case)
+        require_db_write(
+            "security_lifecycle_create_assessment", {"case_id": case_id}
+        )
+        values = body.model_dump()
+        citations = [item.model_dump() for item in body.citations]
+        values.pop("citations")
+        assessment_id = store.create_assessment(
+            case_id=case_id,
+            author="human",
+            citations=citations,
+            observation_fingerprint_sha256=fingerprint,
+            at=_utc_now(),
+            **values,
+        )
+        return {"assessment_id": assessment_id}
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, TypeError, ValueError) as exc:
+        raise _invalid(exc if isinstance(exc, ValueError) else ValueError(str(exc))) from None
+
+
+@router.post("/assessments/{assessment_id}/accept")
+def accept_assessment(
+    assessment_id: str,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        draft = store.get_assessment(assessment_id)
+        case = service.get_case(str(draft["case_id"]))
+        fingerprint = _case_fingerprint(case)
+        at = _utc_now()
+        require_db_write(
+            "security_lifecycle_accept_assessment",
+            {"assessment_id": assessment_id},
+        )
+        assessment = store.accept_assessment(
+            assessment_id,
+            observation_fingerprint_sha256=fingerprint,
+            at=at,
+        )
+        proposal_result = store.generate_action_proposals(
+            case_id=str(draft["case_id"]),
+            observation_fingerprint_sha256=fingerprint,
+            sources_by_ticker=service.sources_by_ticker(),
+            at=at,
+        )
+        return {"assessment": assessment, **proposal_result}
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/cases/{case_id}/acknowledgements")
+def acknowledge_case(
+    case_id: str,
+    body: AcknowledgementRequest,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        case = service.get_case(case_id)
+        fingerprint = _case_fingerprint(case)
+        require_db_write(
+            "security_lifecycle_acknowledge_case", {"case_id": case_id}
+        )
+        acknowledgement_id = store.acknowledge_case(
+            case_id=case_id,
+            reason=body.reason,
+            note=body.note,
+            author="human",
+            observation_fingerprint_sha256=fingerprint,
+            at=_utc_now(),
+        )
+        return {"acknowledgement_id": acknowledgement_id}
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/acknowledgements/{acknowledgement_id}/reopen")
+def reopen_acknowledgement(
+    acknowledgement_id: str,
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        require_db_write(
+            "security_lifecycle_reopen_acknowledgement",
+            {"acknowledgement_id": acknowledgement_id},
+        )
+        store.reopen_acknowledgement(acknowledgement_id, at=_utc_now())
+        return {"acknowledgement_id": acknowledgement_id, "status": "reopened"}
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/action-proposals/{proposal_id}/dismiss")
+def dismiss_proposal(
+    proposal_id: str,
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        require_db_write(
+            "security_lifecycle_dismiss_proposal", {"proposal_id": proposal_id}
+        )
+        return store.dismiss_proposal(proposal_id, at=_utc_now())
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None

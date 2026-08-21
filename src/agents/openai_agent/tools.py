@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 try:
     from agents import function_tool, RunContextWrapper
@@ -101,6 +101,10 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     from src.tools.monitor_tools import scan_alerts as _scan_alerts
     from src.tools.freshness import check_data_freshness as _check_data_freshness
     from src.tools.data_coverage_tools import get_ticker_data_coverage as _get_ticker_data_coverage
+    from src.tools.security_lifecycle_tools import (
+        get_security_lifecycle_case as _get_security_lifecycle_case,
+        list_security_lifecycle_cases as _list_security_lifecycle_cases,
+    )
     from src.tools.sa_tools import (
         get_sa_alpha_picks as _get_sa_alpha_picks,
         get_sa_pick_detail as _get_sa_pick_detail,
@@ -1056,6 +1060,36 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             as_of=as_of or None,
         )
 
+    @function_tool
+    def tool_list_security_lifecycle_cases(
+        ticker: Optional[str] = None,
+        workflow_state: Optional[
+            Literal[
+                "unresolved",
+                "investigating",
+                "evidence_ready",
+                "reviewed_inconclusive",
+                "resolved",
+            ]
+        ] = None,
+        source_presence: Literal["present", "source_missing"] = "present",
+        limit: int = 50,
+    ) -> str:
+        """List local security-lifecycle cases without provider access or writes."""
+        result = _list_security_lifecycle_cases(
+            ticker=ticker,
+            workflow_state=workflow_state,
+            source_presence=source_presence,
+            limit=limit,
+        )
+        return _serialize_result(result, "list_security_lifecycle_cases")
+
+    @function_tool
+    def tool_get_security_lifecycle_case(case_id: str) -> str:
+        """Read one local security-lifecycle case without provider access or writes."""
+        result = _get_security_lifecycle_case(case_id=case_id)
+        return _serialize_result(result, "get_security_lifecycle_case")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -1094,6 +1128,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_scan_alerts,
         tool_check_data_freshness,
         tool_get_ticker_data_coverage,
+        tool_list_security_lifecycle_cases,
+        tool_get_security_lifecycle_case,
         tool_get_sa_alpha_picks,
         tool_get_sa_pick_detail,
         tool_refresh_sa_alpha_picks,
